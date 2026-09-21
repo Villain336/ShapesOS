@@ -23,6 +23,7 @@ export default async function ProjectPage({
       keywords: { orderBy: [{ list: "asc" }, { volume: "desc" }] },
       competitors: { select: { id: true } },
       contentItems: { select: { id: true } },
+      siteConnections: { select: { id: true } },
       _count: { select: { keywords: { where: { tracked: true } } } },
     },
   });
@@ -54,7 +55,9 @@ export default async function ProjectPage({
             {project.competitors.length} competitor
             {project.competitors.length === 1 ? "" : "s"} ·{" "}
             {project.contentItems.length} content item
-            {project.contentItems.length === 1 ? "" : "s"} · {project.locale}
+            {project.contentItems.length === 1 ? "" : "s"} ·{" "}
+            {project.siteConnections.length} site connection
+            {project.siteConnections.length === 1 ? "" : "s"} · {project.locale}
           </p>
         </div>
         <DeleteProjectButton projectId={project.id} />
@@ -84,6 +87,12 @@ export default async function ProjectPage({
           className="rounded-md border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-200 hover:border-zinc-500"
         >
           Rank tracking →
+        </Link>
+        <Link
+          href={`/dashboard/projects/${project.id}/ide`}
+          className="rounded-md border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-200 hover:border-zinc-500"
+        >
+          Site IDE →
         </Link>
       </div>
 

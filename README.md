@@ -46,6 +46,7 @@ npm run dev
 - **M3 (done):** competitor keyword-gap analysis — competitor domains per project, gap diff vs. saved keywords with opportunity scoring, one-click save.
 - **M4 (done):** content engine — SERP-informed brief → AI draft (swappable LLM provider) → editor with live, explainable SEO score; brief → draft → editing → published lifecycle.
 - **M5 (done):** rank tracking — tracked-keyword toggle, on-demand + scheduled rank checks, positions table with deltas, unified visibility score, AI Overview presence, movement alerts.
+- **M6 (done):** site IDE — SFTP site connections (AES-256-GCM encrypted at rest, never exposed to the client), file browser + Monaco code editor, AI assistant that proposes diffs the user must approve (supervised rung), append-only change audit log, demo mock site for credential-free tryout.
 
 ### Scheduled rank checks
 

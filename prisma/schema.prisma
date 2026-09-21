@@ -69,6 +69,25 @@ enum FixRunStatus {
   rolled_back
 }
 
+enum SiteAuthType {
+  password
+  key
+}
+
+enum FileChangeActor {
+  user
+  ai
+}
+
+enum FileChangeAction {
+  // Manual edit saved by the user.
+  save
+  // AI proposed a change (not yet applied — supervised rung).
+  ai_proposal
+  // User reviewed and explicitly applied an AI proposal.
+  ai_applied
+}
+
 model Workspace {
   id        String   @id @default(cuid())
   name      String
@@ -108,6 +127,8 @@ model Project {
   contentItems ContentItem[]
   issues      Issue[]
   fixRuns     FixRun[]
+  siteConnections SiteConnection[]
+  fileChangeLogs  FileChangeLog[]
 
   @@map("projects")
 }
@@ -273,4 +294,57 @@ model FixRun {
   reportSummary String? @map("report_summary") @db.Text
 
   @@map("fix_runs")
+}
+
+// Marketr — site (SFTP/SSH) connections, milestone 6: the supervised rung of
+// the fix-agent trust ladder. Credentials are AES-256-GCM encrypted at rest
+// (lib/sitefiles/crypto.ts) and NEVER sent to the client. Production note:
+// replace the env-key encryption with a KMS/vault before hosted SaaS launch.
+model SiteConnection {
+  id        String @id @default(cuid())
+  projectId String @map("project_id")
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  label    String
+  host     String
+  port     Int    @default(22)
+  username String
+  authType SiteAuthType @default(password) @map("auth_type")
+  // AES-256-GCM encrypted secret (password or private key), base64. Server-only.
+  secretEnc String @map("secret_enc") @db.Text
+  // Non-sensitive hint shown in the UI, e.g. "••••a1b2" (sha256 prefix).
+  secretHint String? @map("secret_hint")
+  // Demo connections serve the deterministic mock file tree instead of SFTP.
+  demo Boolean @default(false)
+
+  lastTestedAt DateTime? @map("last_tested_at")
+  lastTestOk   Boolean?  @map("last_test_ok")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("site_connections")
+}
+
+// Marketr — append-only audit log for the IDE (milestone 6). Every manual
+// save and every AI proposal / approved application is recorded: who, what
+// file, when, and what changed. This log is the accountability backbone of
+// the supervised fix-agent rung.
+model FileChangeLog {
+  id        String @id @default(cuid())
+  projectId String @map("project_id")
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  connectionId String? @map("connection_id")
+  filePath     String  @map("file_path")
+  actor        FileChangeActor
+  action       FileChangeAction
+  summary      String
+  // Auth user id who approved an AI proposal (null otherwise).
+  approvedBy String? @map("approved_by")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([projectId, createdAt])
+  @@map("file_change_log")
 }
