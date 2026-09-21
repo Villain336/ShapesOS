@@ -129,6 +129,12 @@ export interface SeoDataProvider {
   backlinks(params: BacklinksParams): Promise<BacklinksResult>;
   /** Backlink profile summary for the target (DataForSEO Backlinks summary live). */
   backlinksSummary(params: BacklinkSummaryParams): Promise<BacklinkSummaryData>;
+  /** Google Maps / local-pack SERP for one grid cell (DataForSEO Maps SERP live). */
+  mapsSerp(params: MapsSerpParams): Promise<MapsSerpResult>;
+  /** Business profiles for a name/place query (DataForSEO business-data live). */
+  businessListings(params: BusinessListingsParams): Promise<BusinessListing[]>;
+  /** Reviews for a business (DataForSEO business-data reviews, async task). */
+  businessReviews(params: BusinessReviewsParams): Promise<BusinessReviewsResult>;
 }
 
 export interface BacklinkItem {
@@ -189,5 +195,117 @@ export interface BacklinkSummaryData {
   /** Dofollow backlink count, null when unknown. */
   dofollowCount: number | null;
   /** True when the data came from the built-in mock (no credentials configured). */
+  mock?: boolean;
+}
+
+/**
+ * One business listing from a Google Maps / local-pack SERP
+ * (milestone 16: local SEO geo-grids).
+ */
+export interface MapsSerpItem {
+  /** Business name as shown on Google Maps. */
+  businessName: string;
+  /** Star rating 0–5, null when the provider doesn't report it. */
+  rating: number | null;
+  /** Review count, null when unknown. */
+  reviewCount: number | null;
+  /** Street address / locality, null when unknown. */
+  address: string | null;
+  /** Google place id, null when unknown. */
+  placeId: string | null;
+  /** Business website URL, null when unknown. */
+  url: string | null;
+  /** Website domain, null when unknown. */
+  domain: string | null;
+  /** 1-based position inside the maps result set. */
+  position: number;
+  /** True when the row came from the built-in mock (no credentials configured). */
+  mock?: boolean;
+}
+
+export interface MapsSerpParams {
+  /** Keyword, e.g. "plumber greensboro nc". */
+  keyword: string;
+  /** Grid-cell center latitude. */
+  lat: number;
+  /** Grid-cell center longitude. */
+  lng: number;
+  /** Map zoom for the coordinate, default 14 (neighborhood scale). */
+  zoom?: number;
+  /** Default "en". */
+  languageCode?: string;
+}
+
+export interface MapsSerpResult {
+  /** Ranked business listings, ordered by position. */
+  items: MapsSerpItem[];
+  /** True when the rows came from the built-in mock (no credentials configured). */
+  mock?: boolean;
+}
+
+/**
+ * Business profile from the business-data API
+ * (milestone 16: competitor GBP/review intelligence — no Google approval needed).
+ */
+export interface BusinessListing {
+  /** Business name. */
+  businessName: string;
+  /** Google place id, null when unknown. */
+  placeId: string | null;
+  /** Star rating 0–5, null when unknown. */
+  rating: number | null;
+  /** Review count, null when unknown. */
+  reviewCount: number | null;
+  /** Categories, e.g. ["Plumber", "Drainage service"]. */
+  categories: string[];
+  /** Address, null when unknown. */
+  address: string | null;
+  /** Website domain, null when unknown. */
+  domain: string | null;
+  /** True when the row came from the built-in mock (no credentials configured). */
+  mock?: boolean;
+}
+
+export interface BusinessListingsParams {
+  /** Business name or "keyword near place" query. */
+  keyword: string;
+  /** Search center latitude. */
+  lat: number;
+  /** Search center longitude. */
+  lng: number;
+  /** Max listings to return, default 10. */
+  limit?: number;
+}
+
+export interface BusinessReviewItem {
+  /** Provider-side review id (stable for dedup), null when unknown. */
+  externalId: string | null;
+  /** Reviewer display name, null when unknown. */
+  author: string | null;
+  /** Star rating 1–5, null when unknown. */
+  rating: number | null;
+  /** Review body text, null when empty. */
+  text: string | null;
+  /** Published timestamp (ISO), null when unknown. */
+  publishedAt: string | null;
+  /** True when the row came from the built-in mock (no credentials configured). */
+  mock?: boolean;
+}
+
+export interface BusinessReviewsParams {
+  /** Business name (as shown on Google). */
+  keyword: string;
+  /** Business latitude. */
+  lat: number;
+  /** Business longitude. */
+  lng: number;
+  /** Max reviews to return, default 20. */
+  depth?: number;
+}
+
+export interface BusinessReviewsResult {
+  /** Reviews, newest first when the provider orders them. */
+  items: BusinessReviewItem[];
+  /** True when the rows came from the built-in mock (no credentials configured). */
   mock?: boolean;
 }

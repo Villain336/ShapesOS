@@ -98,6 +98,30 @@ export const TRIGGERS: TriggerDef[] = [
     dedupAvailable: true,
     live: true, // milestone 15: emitted by the backlink pull service.
   },
+  {
+    key: "negative_review",
+    label: "Negative review",
+    description: "A 1–2 star Google review arrives for a tracked business.",
+    conditionKeys: ["projectIds", "severities"],
+    dedupAvailable: true,
+    live: true, // milestone 16: emitted by the review ingest service.
+  },
+  {
+    key: "local_competitor_moved",
+    label: "Local competitor moved",
+    description: "A tracked local competitor's rating drops or their review count surges.",
+    conditionKeys: ["projectIds"],
+    dedupAvailable: true,
+    live: true, // milestone 16: emitted by the competitor refresh service.
+  },
+  {
+    key: "geo_grid_change",
+    label: "Geo-grid shift",
+    description: "A geo-grid's map-pack coverage or average position moves beyond the threshold.",
+    conditionKeys: ["projectIds", "thresholdPoints"],
+    dedupAvailable: true,
+    live: true, // milestone 16: emitted by the geo-grid run service.
+  },
 ];
 
 export function triggerDef(key: string): TriggerDef | undefined {

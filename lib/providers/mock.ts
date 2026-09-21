@@ -11,10 +11,18 @@ import type {
   BacklinkSummaryParams,
   BacklinksParams,
   BacklinksResult,
+  BusinessListing,
+  BusinessListingsParams,
+  BusinessReviewItem,
+  BusinessReviewsParams,
+  BusinessReviewsResult,
   CompetitorKeyword,
   CompetitorKeywordsParams,
   KeywordIdea,
   KeywordIdeasParams,
+  MapsSerpItem,
+  MapsSerpParams,
+  MapsSerpResult,
   SerpResult,
   SerpResultsParams,
   SerpSnapshot,
@@ -39,6 +47,12 @@ const MODIFIERS = [
   "cost",
   "examples",
 ];
+
+/**
+ * Fixed anchor for deterministic mock review timestamps (illustrative dates —
+ * mock only, not real review dates). Must live at module scope.
+ */
+const MOCK_REVIEWS_ANCHOR_MS = Date.parse("2026-09-01T00:00:00Z");
 
 export class MockSeoProvider implements SeoDataProvider {
   readonly name = "mock";
@@ -286,5 +300,111 @@ export class MockSeoProvider implements SeoDataProvider {
       dofollowCount: Math.round(total * (0.55 + rand() * 0.25)),
       mock: true,
     };
+  }
+
+  // Milestone 16: deterministic mock local SEO data. The grid cell's lat/lng
+  // feed the hash so neighboring cells see slightly different maps results —
+  // enough to make heatmaps look plausible. Review dates are anchored to a
+  // fixed constant (illustrative) so the output is deterministic.
+  // Labeled mock: true throughout.
+
+  async mapsSerp({ keyword, lat, lng }: MapsSerpParams): Promise<MapsSerpResult> {
+    const s = (keyword.trim().toLowerCase() || "service").slice(0, 40);
+    let h = 97;
+    const key = `${s}|${lat.toFixed(4)},${lng.toFixed(4)}`;
+    for (const c of key) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+    const rand = () => {
+      h = (h * 1103515245 + 12345) >>> 0;
+      return h / 2 ** 32;
+    };
+    const NAMES = [
+      "Acme Services", "Prime Pros", "TopNotch Co", "Reliable & Sons",
+      "Citywide Experts", "Blue Ribbon", "Golden Standard", "Neighborly Fix",
+    ];
+    const count = 5 + Math.floor(rand() * 4); // 5–8 listings per cell
+    const items: MapsSerpItem[] = [];
+    for (let i = 0; i < count; i++) {
+      const name = NAMES[Math.floor(rand() * NAMES.length)];
+      items.push({
+        businessName: name,
+        rating: Math.round((3.6 + rand() * 1.3) * 10) / 10,
+        reviewCount: Math.round(12 + rand() * 480),
+        address: `${Math.floor(rand() * 9000 + 100)} Main St`,
+        placeId: `mock-place-${Math.floor(rand() * 1e9)}`,
+        url: `https://${name.toLowerCase().replace(/[^a-z]+/g, "")}.example.com`,
+        domain: `${name.toLowerCase().replace(/[^a-z]+/g, "")}.example.com`,
+        position: i + 1,
+        mock: true,
+      });
+    }
+    return { items, mock: true };
+  }
+
+  async businessListings({
+    keyword,
+    limit = 10,
+  }: BusinessListingsParams): Promise<BusinessListing[]> {
+    const s = (keyword.trim().toLowerCase() || "business").slice(0, 40);
+    let h = 101;
+    for (const c of s) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+    const rand = () => {
+      h = (h * 1103515245 + 12345) >>> 0;
+      return h / 2 ** 32;
+    };
+    const CATS = ["Service", "Contractor", "Consultant", "Repair service"];
+    const out: BusinessListing[] = [];
+    const count = Math.max(1, Math.min(limit, 10));
+    for (let i = 0; i < count; i++) {
+      const name = `${s.split(" ")[0] ?? "local"} ${["Pro", "Plus", "Co", "Group", "Works"][Math.floor(rand() * 5)]}`;
+      out.push({
+        businessName: name,
+        placeId: `mock-place-${Math.floor(rand() * 1e9)}`,
+        rating: Math.round((3.5 + rand() * 1.4) * 10) / 10,
+        reviewCount: Math.round(8 + rand() * 600),
+        categories: [CATS[Math.floor(rand() * CATS.length)]],
+        address: `${Math.floor(rand() * 9000 + 100)} Oak Ave`,
+        domain: `${name.toLowerCase().replace(/[^a-z]+/g, "")}.example.com`,
+        mock: true,
+      });
+    }
+    return out;
+  }
+
+  async businessReviews({
+    keyword,
+    depth = 20,
+  }: BusinessReviewsParams): Promise<BusinessReviewsResult> {
+    const s = (keyword.trim().toLowerCase() || "business").slice(0, 40);
+    let h = 103;
+    for (const c of s) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+    const rand = () => {
+      h = (h * 1103515245 + 12345) >>> 0;
+      return h / 2 ** 32;
+    };
+    const AUTHORS = ["Jordan", "Casey", "Riley", "Avery", "Morgan", "Taylor", "Quinn", "Sam"];
+    const TEXTS: Record<number, string[]> = {
+      5: ["Fantastic service, highly recommend!", "Best in town — quick and professional.", "Exceeded expectations in every way."],
+      4: ["Good experience overall, minor scheduling hiccup.", "Solid work, fair price."],
+      3: ["Average. Got the job done eventually.", "Okay service, nothing special."],
+      2: ["Disappointing — had to call twice to fix issues.", "Slow response and sloppy finish."],
+      1: ["Terrible experience, would not recommend.", "Worst service I've ever had. Avoid!"],
+    };
+    const items: BusinessReviewItem[] = [];
+    const count = Math.max(1, Math.min(depth, 20));
+    for (let i = 0; i < count; i++) {
+      // Weight toward positive, like a real profile.
+      const r = rand();
+      const rating = r < 0.55 ? 5 : r < 0.75 ? 4 : r < 0.85 ? 3 : r < 0.93 ? 2 : 1;
+      const texts = TEXTS[rating];
+      items.push({
+        externalId: `mock-rev-${Math.floor(rand() * 1e9)}`,
+        author: AUTHORS[Math.floor(rand() * AUTHORS.length)],
+        rating,
+        text: texts[Math.floor(rand() * texts.length)],
+        publishedAt: new Date(MOCK_REVIEWS_ANCHOR_MS - Math.floor(rand() * 90) * 86400000).toISOString(),
+        mock: true,
+      });
+    }
+    return { items, mock: true };
   }
 }

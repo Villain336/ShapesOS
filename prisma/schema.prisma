@@ -139,6 +139,10 @@ enum FileChangeAction {
   internal_link_suggestion_created
   internal_link_suggestion_applied
   internal_link_suggestion_dismissed
+  // Milestone 16: local SEO.
+  local_grid_run
+  local_competitor_snapshot
+  reviews_ingested
 }
 
 // Marketr — where a Site's files live (milestone 7).
@@ -192,6 +196,12 @@ model Workspace {
   // Milestone 15: workspace-level monthly cap (USD) on DataForSEO Backlinks
   // spend. Null = DEFAULT_MONTHLY_SPEND_CAP_USD in lib/seo/backlinks-cost.ts.
   backlinksSpendCapUsd Float? @map("backlinks_spend_cap_usd")
+  // Milestone 16: workspace-level monthly cap (USD) on DataForSEO local-SEO
+  // spend (maps SERP, business data, reviews). Null = DEFAULT_LOCAL_SPEND_CAP_USD.
+  localSeoSpendCapUsd Float? @map("local_seo_spend_cap_usd")
+  // Milestone 16: local-SEO pull audit trail (cost accounting) + GBP scaffold.
+  localPulls  LocalPull[]
+  gbpAccounts GbpAccount[]
 
   @@map("workspaces")
 }
@@ -236,6 +246,12 @@ model Project {
   backlinkSummaries BacklinkSummary[]
   backlinkPulls BacklinkPull[]
   internalLinkSuggestions InternalLinkSuggestion[]
+  // Milestone 16: local SEO.
+  localGrids LocalGrid[]
+  localCompetitors LocalCompetitor[]
+  reviews Review[]
+  reviewSummaries ReviewSummary[]
+  localPulls LocalPull[]
 
   @@map("projects")
 }
@@ -1087,4 +1103,230 @@ model InternalLinkSuggestion {
   @@index([projectId, status])
   @@index([projectId, score])
   @@map("internal_link_suggestions")
+}
+
+enum ReviewSentiment {
+  pos
+  neu
+  neg
+}
+
+// Geo-grid definitions (milestone 16): a keyword tracked across a square grid
+// of map-pack lookups around a center point.
+model LocalGrid {
+  id        String  @id @default(cuid())
+  projectId String  @map("project_id")
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  name         String
+  keyword      String
+  // Client's business name as shown on Google (matched per cell).
+  businessName String @map("business_name")
+  centerLat    Float  @map("center_lat")
+  centerLng    Float  @map("center_lng")
+  radiusMiles  Float  @default(5) @map("radius_miles")
+  // Grid dimension (5 = 5×5 = 25 cells). Clamped 2–9 in lib/local/grid.ts.
+  gridSize  Int     @default(5) @map("grid_size")
+  // manual | weekly
+  schedule  String  @default("weekly")
+  enabled   Boolean @default(true)
+  lastRunAt DateTime? @map("last_run_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  results LocalGridResult[]
+
+  @@index([projectId])
+  @@map("local_grids")
+}
+
+// One completed geo-grid run: per-cell positions + summary.
+model LocalGridResult {
+  id          String    @id @default(cuid())
+  localGridId String    @map("local_grid_id")
+  localGrid   LocalGrid @relation(fields: [localGridId], references: [id], onDelete: Cascade)
+
+  runAt DateTime @default(now()) @map("run_at")
+  // GridCellResult[] JSON: [{ row, col, lat, lng, position, topBusiness }]
+  cells       Json
+  coveragePct Float @map("coverage_pct")
+  avgPosition Float? @map("avg_position")
+  costUsd     Float  @default(0) @map("cost_usd")
+  mock        Boolean @default(false)
+
+  @@index([localGridId, runAt])
+  @@map("local_grid_results")
+}
+
+// Tracked local competitors (milestone 16): GBP/review intelligence without
+// any Google approval — sourced from DataForSEO business data.
+model LocalCompetitor {
+  id        String  @id @default(cuid())
+  projectId String  @map("project_id")
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  businessName String  @map("business_name")
+  placeId      String? @map("place_id")
+  domain       String?
+  // Search center for the business-data lookup (defaults to a grid center).
+  lat     Float?
+  lng     Float?
+  enabled Boolean @default(true)
+
+  lastSnapshotAt DateTime? @map("last_snapshot_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  snapshots LocalCompetitorSnapshot[]
+
+  @@index([projectId])
+  @@map("local_competitors")
+}
+
+model LocalCompetitorSnapshot {
+  id                String          @id @default(cuid())
+  localCompetitorId String          @map("local_competitor_id")
+  localCompetitor   LocalCompetitor @relation(fields: [localCompetitorId], references: [id], onDelete: Cascade)
+
+  date        DateTime @default(now())
+  rating      Float?
+  reviewCount Int?     @map("review_count")
+  categories  String[] @default([])
+  address     String?
+  mock        Boolean  @default(false)
+
+  @@index([localCompetitorId, date])
+  @@map("local_competitor_snapshots")
+}
+
+// Ingested Google reviews (milestone 16).
+model Review {
+  id        String  @id @default(cuid())
+  projectId String  @map("project_id")
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  // Provider review id, or a synthetic sha1 id when the provider gives none.
+  externalId   String          @map("external_id")
+  businessName String          @map("business_name")
+  author       String?
+  rating       Int?
+  text         String?
+  publishedAt  DateTime?       @map("published_at")
+  sentiment    ReviewSentiment @default(neu)
+  // llm | heuristic — how the sentiment was classified.
+  sentimentVia String  @default("heuristic") @map("sentiment_via")
+  responded    Boolean @default(false)
+  mock         Boolean @default(false)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([projectId, externalId])
+  @@index([projectId, rating])
+  @@index([projectId, sentiment])
+  @@map("reviews")
+}
+
+// Weekly review rollup (milestone 16).
+model ReviewSummary {
+  id        String  @id @default(cuid())
+  projectId String  @map("project_id")
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  period      String   @default("weekly")
+  periodStart DateTime @map("period_start")
+  avgRating   Float?   @map("avg_rating")
+  count       Int
+  posCount    Int      @default(0) @map("pos_count")
+  neuCount    Int      @default(0) @map("neu_count")
+  negCount    Int      @default(0) @map("neg_count")
+  // [{ theme, count }] JSON from lib/local/sentiment.ts extractThemes().
+  topThemes   Json     @default("[]") @map("top_themes")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([projectId, period, periodStart])
+  @@map("review_summaries")
+}
+
+// Cost-accounting audit trail for metered local-SEO operations (milestone 16).
+// Mirrors BacklinkPull (milestone 15).
+model LocalPull {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  projectId   String    @map("project_id")
+  project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  // user | cron | system
+  actor String
+  // geo_grid | competitor_refresh | reviews_ingest
+  kind           String
+  requestsMade   Int    @default(0) @map("requests_made")
+  estimatedCostUsd Float @map("estimated_cost_usd")
+  actualCostUsd    Float? @map("actual_cost_usd")
+  // preview | completed | blocked_cap | failed
+  status String @default("preview")
+  note   String?
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([workspaceId, createdAt])
+  @@index([projectId, createdAt])
+  @@map("local_pulls")
+}
+
+// Google Business Profile management scaffold (milestone 16).
+// BEHIND the FEATURE_GBP_MANAGEMENT flag until the GBP API application is
+// approved. No live Google calls exist yet — see lib/local/gbp.ts.
+model GbpAccount {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  name    String
+  enabled Boolean @default(true)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  posts    GbpPost[]
+  insights GbpInsight[]
+
+  @@index([workspaceId])
+  @@map("gbp_accounts")
+}
+
+model GbpPost {
+  id           String     @id @default(cuid())
+  gbpAccountId String     @map("gbp_account_id")
+  gbpAccount   GbpAccount @relation(fields: [gbpAccountId], references: [id], onDelete: Cascade)
+
+  locationId String @map("location_id")
+  title      String
+  summary    String
+  // draft | scheduled | published | failed
+  status      String    @default("draft")
+  scheduledAt DateTime? @map("scheduled_at")
+  externalId  String?   @map("external_id")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([gbpAccountId, status])
+  @@map("gbp_posts")
+}
+
+model GbpInsight {
+  id           String     @id @default(cuid())
+  gbpAccountId String     @map("gbp_account_id")
+  gbpAccount   GbpAccount @relation(fields: [gbpAccountId], references: [id], onDelete: Cascade)
+
+  locationId       String   @map("location_id")
+  date             DateTime
+  views            Int      @default(0)
+  searches         Int      @default(0)
+  directionRequests Int     @default(0) @map("direction_requests")
+  calls            Int      @default(0)
+  websiteClicks    Int      @default(0) @map("website_clicks")
+  mock             Boolean  @default(false)
+
+  @@unique([gbpAccountId, locationId, date])
+  @@map("gbp_insights")
 }

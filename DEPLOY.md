@@ -59,10 +59,10 @@ them over via the Secure Vault flow and Z7 writes them server-side.
    no GitHub remote is created).
 4. **Env:** copy `.env.example` → `.env`, fill §2 items 3–7. `chmod 600 .env`.
 5. **Data volume fix:** apply §1a, then `docker compose up -d --build`.
-6. **Migrations:** watch boot logs — `npx prisma migrate deploy` must apply all 12 migrations cleanly
-   (`..._init` → `..._backlinks_internal_links`). Note: `20260921123000_site_connections` predates
-   `20260921130000_tracked_keywords`; both are fresh and self-contained, but any failure here stops
-   the deploy. Verify with `docker compose exec db psql -U marketr -c "\dt"`.
+6. **Migrations:** watch boot logs — `npx prisma migrate deploy` must apply all 13 migrations cleanly
+   (`..._init` → `..._local_seo`). The M15 (`..._backlinks_internal_links`) and M16 (`..._local_seo`)
+   migrations are hand-written (no PostgreSQL in the sandbox build environment) — review them
+   carefully before deploy. Verify with `docker compose exec db psql -U marketr -c "\dt"`.
 7. **Caddy:** reverse-proxy `marketr.launchabl.com` → `localhost:3000`, auto-TLS. Confirm HTTPS.
 8. **Cron (host crontab):**
    - `0 6 * * * curl -s -X POST -H "Authorization: Bearer $CRON_SECRET" https://marketr.launchabl.com/api/rankings/check -d '{"scope":"all"}'`
@@ -74,6 +74,9 @@ them over via the Secure Vault flow and Z7 writes them server-side.
    - `30 9 * * 1 curl -s -X POST -H "Authorization: Bearer $CRON_SECRET" https://marketr.launchabl.com/api/cron/radar` (milestone 14: weekly competitor radar)
    - `0 10 * * 1 curl -s -X POST -H "Authorization: Bearer $CRON_SECRET" https://marketr.launchabl.com/api/cron/backlinks` (milestone 15: weekly backlink refresh; per-project backlinksEnabled toggle; cost caps enforced server-side)
    - `30 10 * * 1 curl -s -X POST -H "Authorization: Bearer $CRON_SECRET" https://marketr.launchabl.com/api/cron/internal-links` (milestone 15: weekly internal-link suggestions)
+   - `0 11 * * 1 curl -s -X POST -H "Authorization: Bearer $CRON_SECRET" https://marketr.launchabl.com/api/cron/local-grid` (milestone 16: weekly geo-grid runs; enabled weekly grids due since last run; cost caps enforced server-side)
+   - `30 11 * * 1 curl -s -X POST -H "Authorization: Bearer $CRON_SECRET" https://marketr.launchabl.com/api/cron/local-competitors` (milestone 16: weekly local-competitor snapshot refresh; enabled competitors only)
+   - `0 12 * * 1 curl -s -X POST -H "Authorization: Bearer $CRON_SECRET" https://marketr.launchabl.com/api/cron/reviews` (milestone 16: weekly review ingest + sentiment summaries + negative-review alerts)
 9. **Smoke test:** log in, create workspace + project, confirm pages load, no console errors.
 10. **Backups:** nightly `pg_dump` cron → object storage; document restore command.
 

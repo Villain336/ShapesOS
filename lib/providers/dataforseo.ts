@@ -7,10 +7,18 @@ import type {
   BacklinkSummaryParams,
   BacklinksParams,
   BacklinksResult,
+  BusinessListing,
+  BusinessListingsParams,
+  BusinessReviewItem,
+  BusinessReviewsParams,
+  BusinessReviewsResult,
   CompetitorKeyword,
   CompetitorKeywordsParams,
   KeywordIdea,
   KeywordIdeasParams,
+  MapsSerpItem,
+  MapsSerpParams,
+  MapsSerpResult,
   SerpResult,
   SerpResultsParams,
   SerpSnapshot,
@@ -352,6 +360,131 @@ export class DataForSeoProvider implements SeoDataProvider {
       dofollowCount: num(item.dofollow),
     };
   }
+
+  // Milestone 16: local SEO (geo-grids, competitor/review intelligence).
+  //
+  // Endpoints (defensive parsing — DataForSEO omits nulls and renames fields
+  // between API revisions):
+  //   - /serp/google/maps/live        (synchronous, per grid cell)
+  //   - /business_data/business_listings/search/live (synchronous)
+  //   - /business_data/google/reviews/task_post + task_get (async task, polled)
+  // Pricing is request/task-priced; lib/seo/local-cost.ts holds the
+  // (conservative) per-request estimates used by the cost gate.
+
+  async mapsSerp(params: MapsSerpParams): Promise<MapsSerpResult> {
+    const { keyword, lat, lng, zoom = 14, languageCode = "en" } = params;
+    const items = await this.postItems<MapsSerpApiItem>(
+      "/serp/google/maps/live",
+      {
+        keyword: keyword.trim(),
+        location_coordinate: `${lat},${lng},${zoom}z`,
+        language_code: languageCode,
+      },
+    );
+    return { items: parseMapsSerpItems(items) };
+  }
+
+  async businessListings(
+    params: BusinessListingsParams,
+  ): Promise<BusinessListing[]> {
+    const { keyword, lat, lng, limit = 10 } = params;
+    const items = await this.postItems<BusinessListingsApiItem>(
+      "/business_data/business_listings/search/live",
+      {
+        keyword: keyword.trim(),
+        location_coordinate: `${lat},${lng},14z`,
+        limit,
+      },
+    );
+    return parseBusinessListings(items);
+  }
+
+  async businessReviews(
+    params: BusinessReviewsParams,
+  ): Promise<BusinessReviewsResult> {
+    const { keyword, lat, lng, depth = 20 } = params;
+    // Reviews are an async task API: post the task, poll task_get until
+    // complete. Bounded (max ~60s) so a stuck task can't hang a cron.
+    const taskId = await this.postReviewsTask({
+      keyword: keyword.trim(),
+      location_coordinate: `${lat},${lng},14z`,
+      sort_by: "most_relevant",
+    });
+    const items = await this.pollReviewsTask(taskId, depth);
+    return { items: parseBusinessReviews(items) };
+  }
+
+  /** Post a google/reviews task; returns the task id. */
+  private async postReviewsTask(payload: object): Promise<string> {
+    if (!this.isConfigured()) {
+      throw new Error(
+        "DataForSEO credentials are not configured. Set DATAFORSEO_LOGIN and DATAFORSEO_PASSWORD.",
+      );
+    }
+    const auth = Buffer.from(`${this.login}:${this.password}`).toString("base64");
+    const res = await fetch(`${API_BASE}/business_data/google/reviews/task_post`, {
+      method: "POST",
+      headers: {
+        Authorization: `Basic ${auth}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify([payload]),
+    });
+    if (!res.ok) {
+      throw new Error(`DataForSEO reviews task_post failed: HTTP ${res.status}`);
+    }
+    const json = (await res.json()) as {
+      tasks?: Array<{ status_code?: number; status_message?: string; id?: string }>;
+    };
+    const task = json?.tasks?.[0];
+    if (!task || task.status_code !== 20100 || !task.id) {
+      throw new Error(
+        `DataForSEO reviews task_post error: ${task?.status_message ?? "unknown error"}`,
+      );
+    }
+    return task.id;
+  }
+
+  /** Poll task_get until the reviews task completes (bounded). */
+  private async pollReviewsTask(taskId: string, depth: number): Promise<ReviewsApiItem[]> {
+    if (!this.isConfigured()) {
+      throw new Error("DataForSEO credentials are not configured.");
+    }
+    const auth = Buffer.from(`${this.login}:${this.password}`).toString("base64");
+    const deadline = Date.now() + 60_000;
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
+      const res = await fetch(
+        `${API_BASE}/business_data/google/reviews/task_get/${taskId}`,
+        { headers: { Authorization: `Basic ${auth}` } },
+      );
+      if (!res.ok) {
+        throw new Error(`DataForSEO reviews task_get failed: HTTP ${res.status}`);
+      }
+      const json = (await res.json()) as {
+        tasks?: Array<{
+          status_code?: number;
+          status_message?: string;
+          result?: Array<{ items?: ReviewsApiItem[] }>;
+        }>;
+      };
+      const task = json?.tasks?.[0];
+      if (!task) throw new Error("DataForSEO reviews task_get: empty response");
+      if (task.status_code === 20000) {
+        return (task.result?.[0]?.items ?? []).slice(0, depth);
+      }
+      // 20100 = in queue / in progress — keep polling.
+      if (task.status_code !== 20100) {
+        throw new Error(
+          `DataForSEO reviews task error: ${task.status_message ?? `status ${task.status_code}`}`,
+        );
+      }
+      if (Date.now() >= deadline) {
+        throw new Error("DataForSEO reviews task timed out after 60s");
+      }
+      await new Promise((r) => setTimeout(r, 5000));
+    }
+  }
 }
 
 /**
@@ -390,4 +523,149 @@ interface BacklinksSummaryApiItem {
   backlinks?: number | null;
   referring_domains?: number | null;
   dofollow?: number | null;
+}
+
+/** Raw DataForSEO /serp/google/maps/live item (subset we use; defensive). */
+interface MapsSerpApiItem {
+  type?: string | null;
+  rank_absolute?: number | null;
+  title?: string | null;
+  address?: string | null;
+  place_id?: string | null;
+  url?: string | null;
+  domain?: string | null;
+  /** Counts/ratings may serialize as strings in some payloads — parsers coerce. */
+  reviews_count?: number | string | null;
+  /** Rating may be a plain number, a numeric string, or { value, votes_count }. */
+  rating?: number | string | { value?: number | string | null; votes_count?: number | null } | null;
+  rating_value?: number | string | null;
+}
+
+/** Raw DataForSEO /business_data/business_listings/search/live item. */
+interface BusinessListingsApiItem {
+  title?: string | null;
+  place_id?: string | null;
+  address?: string | null;
+  domain?: string | null;
+  reviews_count?: number | string | null;
+  /** Category may be a string or an array of strings. */
+  category?: string | string[] | null;
+  categories?: string[] | null;
+  rating?: number | string | { value?: number | string | null } | null;
+  rating_value?: number | string | null;
+}
+
+/** Raw DataForSEO /business_data/google/reviews task_get item. */
+interface ReviewsApiItem {
+  review_id?: string | null;
+  profile_name?: string | null;
+  rating_value?: number | string | null;
+  rating?: number | string | { value?: number | string | null } | null;
+  review_text?: string | null;
+  text?: string | null;
+  timestamp?: string | null;
+  time?: string | null;
+}
+
+function numOrNull(v: unknown): number | null {
+  if (typeof v === "number" && Number.isFinite(v)) return v;
+  // Defensive: some API payloads serialize numbers as strings.
+  if (typeof v === "string" && v.trim() !== "") {
+    const n = Number(v);
+    if (Number.isFinite(n)) return n;
+  }
+  return null;
+}
+
+function strOrNull(v: unknown): string | null {
+  return typeof v === "string" && v.trim() ? v.trim() : null;
+}
+
+function ratingOrNull(v: unknown): number | null {
+  const n = numOrNull(v);
+  if (n != null) return n;
+  if (v && typeof v === "object") {
+    const val = numOrNull((v as { value?: unknown }).value);
+    if (val != null) return val;
+  }
+  return null;
+}
+
+/**
+ * Parse raw maps SERP items into MapsSerpItem rows. Pure — fixture-tested.
+ * Only items of type `maps_search` with a business title are kept.
+ */
+export function parseMapsSerpItems(raw: MapsSerpApiItem[]): MapsSerpItem[] {
+  const out: MapsSerpItem[] = [];
+  for (const item of raw ?? []) {
+    const type = (item.type ?? "").toLowerCase();
+    if (type && type !== "maps_search") continue;
+    const businessName = strOrNull(item.title);
+    if (!businessName) continue;
+    out.push({
+      businessName,
+      rating: ratingOrNull(item.rating) ?? numOrNull(item.rating_value),
+      reviewCount: numOrNull(item.reviews_count),
+      address: strOrNull(item.address),
+      placeId: strOrNull(item.place_id),
+      url: strOrNull(item.url),
+      domain: strOrNull(item.domain),
+      position: out.length + 1,
+    });
+  }
+  return out;
+}
+
+/**
+ * Parse raw business_listings/search items into BusinessListing rows.
+ * Pure — fixture-tested.
+ */
+export function parseBusinessListings(
+  raw: BusinessListingsApiItem[],
+): BusinessListing[] {
+  const out: BusinessListing[] = [];
+  for (const item of raw ?? []) {
+    const businessName = strOrNull(item.title);
+    if (!businessName) continue;
+    const cat = item.categories ?? item.category;
+    const categories = Array.isArray(cat)
+      ? cat.filter((c): c is string => typeof c === "string" && c.trim() !== "")
+      : typeof cat === "string" && cat.trim()
+        ? [cat.trim()]
+        : [];
+    out.push({
+      businessName,
+      placeId: strOrNull(item.place_id),
+      rating: ratingOrNull(item.rating) ?? numOrNull(item.rating_value),
+      reviewCount: numOrNull(item.reviews_count),
+      categories,
+      address: strOrNull(item.address),
+      domain: strOrNull(item.domain),
+    });
+  }
+  return out;
+}
+
+/**
+ * Parse raw google/reviews task items into BusinessReviewItem rows.
+ * Pure — fixture-tested.
+ */
+export function parseBusinessReviews(
+  raw: ReviewsApiItem[],
+): BusinessReviewItem[] {
+  const out: BusinessReviewItem[] = [];
+  for (const item of raw ?? []) {
+    const rating = ratingOrNull(item.rating) ?? numOrNull(item.rating_value);
+    const text = strOrNull(item.review_text) ?? strOrNull(item.text);
+    // A review with neither rating nor text carries no signal — skip it.
+    if (rating == null && text == null) continue;
+    out.push({
+      externalId: strOrNull(item.review_id),
+      author: strOrNull(item.profile_name),
+      rating: rating == null ? null : Math.max(1, Math.min(5, Math.round(rating))),
+      text,
+      publishedAt: strOrNull(item.timestamp) ?? strOrNull(item.time),
+    });
+  }
+  return out;
 }
