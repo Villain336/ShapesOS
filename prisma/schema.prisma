@@ -55,6 +55,19 @@ enum IssueStatus {
   ignored
 }
 
+// Marketr — per-site issue lifecycle for the fix-agent trust ladder
+// (milestone 10). open → approved (explicit per-issue approval, or the
+// issue's category is allow-listed in FixAgentSettings) → fixing → fixed
+// (applied) → verified (a re-scan confirms the finding is gone).
+enum SiteIssueStatus {
+  open
+  approved
+  fixing
+  fixed
+  verified
+  ignored
+}
+
 enum FixMode {
   manual
   scheduled
@@ -77,6 +90,8 @@ enum SiteAuthType {
 enum FileChangeActor {
   user
   ai
+  // Milestone 10: the fix agent applying approved fixes on schedule.
+  fix_agent
 }
 
 enum FileChangeAction {
@@ -88,6 +103,10 @@ enum FileChangeAction {
   ai_applied
   // Milestone 9: working copy deployed to a hosting target (Vercel/Cloudflare).
   deploy
+  // Milestone 10: fix agent applied an approved fix on schedule.
+  fix_applied
+  // Milestone 10: a fix-agent run was reverted (pre-change snapshot restored).
+  fix_reverted
 }
 
 // Marketr — where a Site's files live (milestone 7).
@@ -144,6 +163,8 @@ model Project {
   sites       Site[]
   hostingConnections HostingConnection[]
   deployments Deployment[]
+  siteAudits  SiteAudit[]
+  siteIssues  SiteIssue[]
 
   @@map("projects")
 }
@@ -307,8 +328,103 @@ model FixRun {
   snapshotRef  String? @map("snapshot_ref")
   status       FixRunStatus @default(pending)
   reportSummary String? @map("report_summary") @db.Text
+  // Milestone 10: the site this run fixed (null for legacy project runs).
+  siteId String? @map("site_id")
+  site   Site?   @relation(fields: [siteId], references: [id], onDelete: SetNull)
+
+  siteIssues SiteIssue[]
 
   @@map("fix_runs")
+}
+
+// Marketr — per-site fix-agent safety settings (milestone 10). This is the
+// visible trust ladder: nothing is auto-fixed unless the user enables the
+// agent AND approves the issue's category (or the issue itself). Dry-run is
+// on by default so the first runs only propose diffs for review.
+model FixAgentSettings {
+  id      String @id @default(cuid())
+  siteId  String @unique @map("site_id")
+  site    Site   @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  enabled           Boolean  @default(false)
+  // Issue categories the agent may fix on schedule WITHOUT per-issue approval.
+  // Destructive categories always need per-issue approval regardless.
+  allowedCategories String[] @default([]) @map("allowed_categories")
+  maxFixesPerRun    Int      @default(10) @map("max_fixes_per_run")
+  dryRun            Boolean  @default(true) @map("dry_run")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("fix_agent_settings")
+}
+
+// Marketr — one audit pass over a site's working copy (milestone 10).
+// Findings land as SiteIssue rows; the inbox shows the latest audit's issues.
+model SiteAudit {
+  id        String @id @default(cuid())
+  siteId    String @map("site_id")
+  site      Site   @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  projectId String @map("project_id")
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  startedAt  DateTime    @default(now()) @map("started_at")
+  finishedAt DateTime?   @map("finished_at")
+  status     FixRunStatus @default(pending)
+  // True when findings came from the deterministic demo scanner.
+  mock Boolean @default(false)
+
+  totalIssues Int @default(0) @map("total_issues")
+  openIssues  Int @default(0) @map("open_issues")
+  errorIssues Int @default(0) @map("error_issues")
+
+  issues SiteIssue[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([siteId, createdAt])
+  @@map("site_audits")
+}
+
+// Marketr — one detected site issue (milestone 10). Lifecycle:
+// open → approved → fixing → fixed → verified (re-scan confirms the fix).
+// Destructive categories always require per-issue approval, even when the
+// category is allow-listed in FixAgentSettings.
+model SiteIssue {
+  id        String @id @default(cuid())
+  siteId    String @map("site_id")
+  site      Site   @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  projectId String @map("project_id")
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  auditId   String? @map("audit_id")
+  audit     SiteAudit? @relation(fields: [auditId], references: [id], onDelete: SetNull)
+
+  // Category key from lib/audit/categories.ts (e.g. "missing-alt").
+  category String
+  severity IssueSeverity
+  filePath String  @map("file_path")
+  line     Int?
+  detail   String  @db.Text
+  fixHint  String? @map("fix_hint") @db.Text
+  // False when the agent cannot fix it (e.g. broken links need human intent).
+  autoFixable Boolean @default(true) @map("auto_fixable")
+  destructive Boolean @default(false)
+
+  status     SiteIssueStatus @default(open)
+  approvedBy String?   @map("approved_by")
+  approvedAt DateTime? @map("approved_at")
+  // Dry-run preview of the change the agent WOULD apply (unified-diff-ish).
+  proposedDiff String? @map("proposed_diff") @db.Text
+  fixedAt DateTime? @map("fixed_at")
+  fixRunId String? @map("fix_run_id")
+  fixRun   FixRun? @relation(fields: [fixRunId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([siteId, status])
+  @@index([siteId, category, status])
+  @@map("site_issues")
 }
 
 // Marketr — site (SFTP/SSH) connections, milestone 6: the supervised rung of
@@ -392,6 +508,10 @@ model Site {
 
   fileChangeLogs FileChangeLog[]
   deployments    Deployment[]
+  fixAgentSettings FixAgentSettings?
+  audits         SiteAudit[]
+  issues         SiteIssue[]
+  fixRuns        FixRun[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")

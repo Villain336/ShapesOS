@@ -47,6 +47,10 @@ npm run dev
 - **M4 (done):** content engine — SERP-informed brief → AI draft (swappable LLM provider) → editor with live, explainable SEO score; brief → draft → editing → published lifecycle.
 - **M5 (done):** rank tracking — tracked-keyword toggle, on-demand + scheduled rank checks, positions table with deltas, unified visibility score, AI Overview presence, movement alerts.
 - **M6 (done):** site IDE — SFTP site connections (AES-256-GCM encrypted at rest, never exposed to the client), file browser + Monaco code editor, AI assistant that proposes diffs the user must approve (supervised rung), append-only change audit log, demo mock site for credential-free tryout.
+- **M7 (done):** landing pages & websites — SiteConnector abstraction (GitHub + labeled mock + zip/file upload), Site model, AI landing-page builder with sandboxed preview, deploy to GitHub/SFTP/zip download, IDE wired to Sites.
+- **M8 (done):** WordPress + Webflow connectors — WP REST via app passwords (pages/posts/media CRUD), Webflow API v2 (CMS collections/items CRUD + site publish), labeled mocks, ContentBrowser UI, publish-to flow from landing pages.
+- **M9 (done):** hosting — DeployTarget abstraction, Vercel + Cloudflare Pages connectors (encrypted tokens, labeled mocks), HostingConnection + Deployment models, deploy-to-hosting flow with live URL + audit log.
+- **M10 (done):** fix-agent scheduled rung — site audits (broken links, missing title/meta/OG/alt, mixed content, oversized images, robots/sitemap, style bloat), issue inbox with per-issue approval, per-site safety settings (enabled, allowed categories, max fixes/run, dry-run default ON), scheduled execution via cron with pre-change snapshots + one-click revert, full audit logging.
 
 ### Scheduled rank checks
 
@@ -68,6 +72,26 @@ authenticated endpoint you call on a schedule:
   every project (cron secret only — a signed-in session can't use `"all"`).
 - Each check runs one SERP call per tracked keyword and writes `Ranking`
   rows, so schedule with your DataForSEO budget in mind.
+
+### Scheduled fix-agent runs
+
+The fix agent's scheduled rung (M10) uses the same cron-secret pattern.
+Per-site settings live on the Sites page: enable the agent, choose which
+issue categories it may fix without asking, cap fixes per run, and keep
+dry-run mode on until you trust it (dry runs only store diff previews).
+
+```cron
+0 7 * * * curl -s -X POST \
+  -H "Authorization: Bearer $CRON_SECRET" \
+  https://your-marketr-host/api/cron/fix-agent
+```
+
+The endpoint runs every site with the agent enabled, applies eligible fixes
+(explicitly approved issues, or allow-listed non-destructive categories),
+snapshots every touched file before writing (`.data/fix-snapshots/`, or
+`FIX_SNAPSHOT_DIR`), audit-logs each change as actor `fix_agent`, and
+re-scans to verify. A signed-in session can hit the same endpoint to run all
+of *your* projects on demand. Revert any run from the Sites → Fix agent panel.
 
 ## Data & costs
 
