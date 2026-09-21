@@ -10,6 +10,9 @@ import type {
   CompetitorKeywordsParams,
   KeywordIdea,
   KeywordIdeasParams,
+  SerpResult,
+  SerpResultsParams,
+  SerpSnapshot,
   SeoDataProvider,
 } from "./types";
 import { inferIntent } from "../keywords/intent";
@@ -137,5 +140,80 @@ export class MockSeoProvider implements SeoDataProvider {
         mock: true,
       } satisfies CompetitorKeyword),
     );
+  }
+
+  async serpResults({
+    keyword,
+    depth = 10,
+  }: SerpResultsParams): Promise<SerpSnapshot> {
+    // Deterministic mock SERP: same keyword always shows the same snapshot.
+    const s = keyword.trim().toLowerCase() || "keyword";
+    const titleCase = s.replace(/\b\w/g, (c) => c.toUpperCase());
+
+    const DOMAINS = [
+      "completeguide.io",
+      "howpedia.org",
+      "expertblog.net",
+      "guidely.io",
+      "reviewly.co",
+      "praxis.blog",
+      "knowhow.dev",
+      "insightpost.com",
+      "masterly.io",
+      "contenthub.com",
+    ];
+
+    const TITLES = [
+      `${titleCase}: The Complete 2026 Guide`,
+      `How to Choose ${titleCase} (Expert Tips)`,
+      `Best ${titleCase} — Top 10 Compared`,
+      `What Is ${titleCase}? Beginner's Guide`,
+      `${titleCase} vs. Alternatives: Which Is Right for You?`,
+      `${titleCase} Pricing, Reviews & FAQ`,
+      `10 ${titleCase} Mistakes to Avoid`,
+      `${titleCase} Near Me: How to Find the Best`,
+      `The Ultimate ${titleCase} Checklist`,
+      `${titleCase} Pros and Cons, Explained`,
+    ];
+
+    const DESCRIPTIONS = [
+      `Everything you need to know about ${s}: costs, options, and expert advice in one place.`,
+      `Compare the best ${s} options for 2026. Real reviews, transparent pricing, no fluff.`,
+      `Our experts break down ${s} step by step so you can decide with confidence.`,
+    ];
+
+    let h = 29;
+    for (const c of s) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+    const rand = () => {
+      h = (h * 1103515245 + 12345) >>> 0;
+      return h / 2 ** 32;
+    };
+
+    const slug = (t: string) =>
+      t
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "");
+
+    const count = Math.max(1, Math.min(depth, TITLES.length));
+    const results: SerpResult[] = TITLES.slice(0, count).map((title, i) => ({
+      domain: DOMAINS[i % DOMAINS.length],
+      url: `https://${DOMAINS[i % DOMAINS.length]}/${slug(s)}-${i + 1}`,
+      title,
+      description: DESCRIPTIONS[Math.floor(rand() * DESCRIPTIONS.length)],
+      position: i + 1,
+      mock: true,
+    }));
+
+    const peopleAlsoAsk = [
+      `What is ${s}?`,
+      `How much does ${s} cost?`,
+      `Is ${s} worth it?`,
+      `What is the best ${s}?`,
+      `How do I choose ${s}?`,
+      `Where can I find ${s} near me?`,
+    ];
+
+    return { results, peopleAlsoAsk, mock: true };
   }
 }

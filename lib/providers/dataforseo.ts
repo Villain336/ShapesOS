@@ -6,6 +6,9 @@ import type {
   CompetitorKeywordsParams,
   KeywordIdea,
   KeywordIdeasParams,
+  SerpResult,
+  SerpResultsParams,
+  SerpSnapshot,
   SeoDataProvider,
 } from "./types";
 import { inferIntent } from "../keywords/intent";
@@ -33,6 +36,17 @@ interface RankedLabsItem extends LabsItem {
   } | null;
 }
 
+interface SerpApiItem {
+  type?: string | null;
+  rank_absolute?: number | null;
+  domain?: string | null;
+  url?: string | null;
+  title?: string | null;
+  description?: string | null;
+  /** Nested items for types like people_also_ask. */
+  items?: Array<{ title?: string | null }> | null;
+}
+
 function competitionToDifficulty(item: LabsItem): number | null {
   const props = item.keyword_properties ?? {};
   if (props.keyword_difficulty != null) return props.keyword_difficulty;
@@ -53,8 +67,8 @@ export class DataForSeoProvider implements SeoDataProvider {
     return Boolean(this.login && this.password);
   }
 
-  /** Shared Labs POST helper: auth + error handling, returns the task's items. */
-  private async labsRequest<T>(endpoint: string, payload: object): Promise<T[]> {
+  /** Shared POST helper: auth + error handling, returns the task's items. */
+  private async postItems<T>(endpoint: string, payload: object): Promise<T[]> {
     if (!this.isConfigured()) {
       throw new Error(
         "DataForSEO credentials are not configured. Set DATAFORSEO_LOGIN and DATAFORSEO_PASSWORD.",
@@ -94,6 +108,11 @@ export class DataForSeoProvider implements SeoDataProvider {
     }
 
     return task.result?.[0]?.items ?? [];
+  }
+
+  /** Labs POST helper kept for backwards compatibility (delegates to postItems). */
+  private async labsRequest<T>(endpoint: string, payload: object): Promise<T[]> {
+    return this.postItems<T>(endpoint, payload);
   }
 
   async keywordIdeas(params: KeywordIdeasParams): Promise<KeywordIdea[]> {
@@ -164,5 +183,51 @@ export class DataForSeoProvider implements SeoDataProvider {
         url: serp.url ?? null,
       } satisfies CompetitorKeyword;
     });
+  }
+
+  async serpResults(params: SerpResultsParams): Promise<SerpSnapshot> {
+    const {
+      keyword,
+      locationCode = 2840,
+      languageCode = "en",
+      depth = 10,
+    } = params;
+
+    const items = await this.postItems<SerpApiItem>(
+      "/serp/google/organic/live",
+      {
+        keyword,
+        location_code: locationCode,
+        language_code: languageCode,
+        depth,
+        device: "desktop",
+        os: "windows",
+      },
+    );
+
+    const results: SerpResult[] = [];
+    const peopleAlsoAsk: string[] = [];
+
+    for (const item of items) {
+      const type = (item.type ?? "").toLowerCase();
+      if (type === "organic" && item.url) {
+        results.push({
+          domain: item.domain ?? "",
+          url: item.url,
+          title: item.title ?? "",
+          description: item.description ?? null,
+          position: results.length + 1,
+        } satisfies SerpResult);
+      } else if (type === "people_also_ask" && item.items) {
+        for (const q of item.items) {
+          if (q.title && !peopleAlsoAsk.includes(q.title)) {
+            peopleAlsoAsk.push(q.title);
+          }
+        }
+      }
+      if (results.length >= depth) break;
+    }
+
+    return { results, peopleAlsoAsk };
   }
 }

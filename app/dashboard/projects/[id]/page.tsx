@@ -22,6 +22,7 @@ export default async function ProjectPage({
     include: {
       keywords: { orderBy: [{ list: "asc" }, { volume: "desc" }] },
       competitors: { select: { id: true } },
+      contentItems: { select: { id: true } },
     },
   });
   if (!project) notFound();
@@ -47,7 +48,9 @@ export default async function ProjectPage({
           <p className="mt-1 text-sm text-zinc-400">
             {project.keywords.length} keywords saved ·{" "}
             {project.competitors.length} competitor
-            {project.competitors.length === 1 ? "" : "s"} · {project.locale}
+            {project.competitors.length === 1 ? "" : "s"} ·{" "}
+            {project.contentItems.length} content item
+            {project.contentItems.length === 1 ? "" : "s"} · {project.locale}
           </p>
         </div>
         <DeleteProjectButton projectId={project.id} />
@@ -65,6 +68,12 @@ export default async function ProjectPage({
           className="rounded-md border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-200 hover:border-zinc-500"
         >
           Competitor gaps →
+        </Link>
+        <Link
+          href={`/dashboard/projects/${project.id}/content`}
+          className="rounded-md border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-200 hover:border-zinc-500"
+        >
+          Content engine →
         </Link>
       </div>
 

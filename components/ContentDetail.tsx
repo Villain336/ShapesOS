@@ -1,0 +1,405 @@
+"use client";
+
+// Marketr — content engine detail (spec §5 flow 3).
+// One screen for the full lifecycle: brief → AI draft → editing (live SEO
+// score) → published. The score is computed with the same scoreContent()
+// the save API persists, so the live number is the stored number.
+
+import { useEffect, useMemo, useState } from "react";
+import type { ContentBrief } from "@/lib/content/brief";
+import {
+  scoreContent,
+  type SeoScoreResult,
+} from "@/lib/content/seoScore";
+import { statusPill } from "./ContentList";
+
+export type ContentDetailItem = {
+  id: string;
+  status: string;
+  bodyMarkdown: string | null;
+  seoScore: number | null;
+  outlineJson: ContentBrief | null;
+};
+
+const inputCls =
+  "rounded-md border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-zinc-500 focus:outline-none";
+
+const btnPrimary =
+  "rounded-md bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-950 hover:bg-white disabled:opacity-50";
+const btnGhost =
+  "rounded-md border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-200 hover:border-zinc-500 disabled:opacity-50";
+
+export default function ContentDetail({
+  projectId,
+  item,
+}: {
+  projectId: string;
+  item: ContentDetailItem;
+}) {
+  const [status, setStatus] = useState(item.status);
+  const [body, setBody] = useState(item.bodyMarkdown ?? "");
+  const [otherKeywords, setOtherKeywords] = useState<string[]>([]);
+  const [llmInfo, setLlmInfo] = useState<{
+    name: string;
+    isLive: boolean;
+    model: string | null;
+  } | null>(null);
+  const [busy, setBusy] = useState<"draft" | "save" | "publish" | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  const brief = item.outlineJson;
+
+  // Other saved keywords feed the internal-link check.
+  useEffect(() => {
+    fetch(`/api/keywords/saved?projectId=${encodeURIComponent(projectId)}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((json) => {
+        const phrases: string[] = (json?.keywords ?? []).map(
+          (k: { phrase: string }) => k.phrase,
+        );
+        setOtherKeywords(phrases);
+      })
+      .catch(() => {});
+  }, [projectId]);
+
+  const scoreInput = useMemo(
+    () => ({
+      bodyMarkdown: body,
+      keyword: brief?.keyword ?? "",
+      targetWordCount: brief?.targetWordCount ?? 1500,
+      h2s: brief?.h2s ?? [],
+      paa: brief?.paa ?? [],
+      otherKeywords,
+    }),
+    [body, brief, otherKeywords],
+  );
+
+  // Debounced live score — same function the server persists.
+  const [live, setLive] = useState<SeoScoreResult | null>(null);
+  useEffect(() => {
+    const t = setTimeout(() => setLive(scoreContent(scoreInput)), 400);
+    return () => clearTimeout(t);
+  }, [scoreInput]);
+
+  const displayed: SeoScoreResult | null =
+    live ?? (item.seoScore != null ? { score: item.seoScore, wordCount: 0, checks: [], internalLinkSuggestions: [] } : null);
+
+  async function onGenerateDraft() {
+    setBusy("draft");
+    setError(null);
+    setNotice(null);
+    try {
+      const res = await fetch("/api/content/draft", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contentId: item.id }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setError(json.error ?? "Draft generation failed.");
+        return;
+      }
+      setBody(json.draft ?? "");
+      setStatus(json.contentItem.status);
+      setLlmInfo(json.llm ?? null);
+      setNotice("Draft generated — edit freely, the SEO score updates live.");
+    } catch {
+      setError("Network error. Is the app server running?");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function onSave() {
+    setBusy("save");
+    setError(null);
+    setNotice(null);
+    try {
+      const res = await fetch("/api/content/save", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contentId: item.id, bodyMarkdown: body }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setError(json.error ?? "Save failed.");
+        return;
+      }
+      setStatus(json.contentItem.status);
+      setNotice(`Saved. SEO score ${Math.round(json.score.score)}/100.`);
+    } catch {
+      setError("Network error. Is the app server running?");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function onPublish() {
+    setBusy("publish");
+    setError(null);
+    setNotice(null);
+    try {
+      const res = await fetch("/api/content/publish", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contentId: item.id }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setError(json.error ?? "Publish failed.");
+        return;
+      }
+      setStatus(json.contentItem.status);
+      setNotice("Marked as published. (CMS publishing arrives with the fix-agent phase.)");
+    } catch {
+      setError("Network error. Is the app server running?");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  if (!brief) {
+    return (
+      <p className="text-sm text-red-400">
+        This content item has no brief data.
+      </p>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-8">
+      {/* Header */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          {statusPill(status)}
+          <h2 className="text-xl font-bold tracking-tight">{brief.keyword}</h2>
+        </div>
+        <div className="flex gap-2">
+          {status === "brief" && !body && (
+            <button onClick={onGenerateDraft} disabled={busy === "draft"} className={btnPrimary}>
+              {busy === "draft" ? "Generating…" : "Generate draft"}
+            </button>
+          )}
+          {status !== "published" && body && (
+            <button onClick={onPublish} disabled={busy === "publish"} className={btnGhost}>
+              {busy === "publish" ? "Publishing…" : "Mark published"}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* SERP provider banner */}
+      <div
+        className={`rounded-xl border px-4 py-3 text-sm ${
+          brief.mock
+            ? "border-amber-900 bg-amber-950/40 text-amber-300"
+            : "border-emerald-900 bg-emerald-950/40 text-emerald-300"
+        }`}
+      >
+        {brief.mock ? (
+          <>
+            Brief built from <strong>mock SERP data</strong> — add{" "}
+            <span className="font-mono">DATAFORSEO_LOGIN</span> and{" "}
+            <span className="font-mono">DATAFORSEO_PASSWORD</span> to{" "}
+            <span className="font-mono">.env</span> for live SERP data.
+          </>
+        ) : (
+          <>Brief built from a live DataForSEO SERP.</>
+        )}
+      </div>
+
+      {/* LLM provider banner */}
+      {llmInfo && (
+        <div
+          className={`rounded-xl border px-4 py-3 text-sm ${
+            llmInfo.isLive
+              ? "border-emerald-900 bg-emerald-950/40 text-emerald-300"
+              : "border-amber-900 bg-amber-950/40 text-amber-300"
+          }`}
+        >
+          {llmInfo.isLive ? (
+            <>
+              Draft generated by <span className="font-mono">{llmInfo.model ?? llmInfo.name}</span>.
+            </>
+          ) : (
+            <>
+              <strong>Mock draft</strong> — no LLM call was made. Set{" "}
+              <span className="font-mono">LLM_API_KEY</span> (or{" "}
+              <span className="font-mono">OPENAI_API_KEY</span>) and{" "}
+              <span className="font-mono">LLM_MODEL</span> in{" "}
+              <span className="font-mono">.env</span> for real AI drafts.
+            </>
+          )}
+        </div>
+      )}
+
+      {error && <p className="text-sm text-red-400">{error}</p>}
+      {notice && <p className="text-sm text-emerald-400">{notice}</p>}
+
+      {/* Brief */}
+      <section className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-5">
+        <h3 className="mb-4 text-sm font-medium uppercase tracking-widest text-zinc-500">
+          Brief
+        </h3>
+        <dl className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <dt className="text-xs uppercase tracking-widest text-zinc-500">Intent</dt>
+            <dd className="mt-1">
+              <span className="rounded-full border border-zinc-700 px-2 py-0.5 text-xs text-zinc-300">
+                {brief.intent}
+              </span>
+            </dd>
+          </div>
+          <div>
+            <dt className="text-xs uppercase tracking-widest text-zinc-500">Target length</dt>
+            <dd className="mt-1 text-sm text-zinc-200">
+              ~{brief.targetWordCount.toLocaleString()} words
+              <span className="text-zinc-500"> (heuristic from SERP depth)</span>
+            </dd>
+          </div>
+        </dl>
+
+        <div className="mt-4">
+          <dt className="text-xs uppercase tracking-widest text-zinc-500">Outline</dt>
+          <dd className="mt-2 rounded-lg bg-zinc-950/60 p-4">
+            <p className="text-base font-bold text-zinc-100"># {brief.h1}</p>
+            <ul className="mt-2 flex flex-col gap-1">
+              {brief.h2s.map((h) => (
+                <li key={h} className="text-sm text-zinc-300">
+                  ## {h}
+                </li>
+              ))}
+              {brief.h2s.length === 0 && (
+                <li className="text-sm text-zinc-500">No H2s extracted.</li>
+              )}
+            </ul>
+          </dd>
+        </div>
+
+        {brief.paa.length > 0 && (
+          <div className="mt-4">
+            <dt className="text-xs uppercase tracking-widest text-zinc-500">
+              Answer these reader questions
+            </dt>
+            <dd className="mt-2 flex flex-col gap-1.5">
+              {brief.paa.map((q) => (
+                <p key={q} className="text-sm text-zinc-300">
+                  <span className="text-zinc-500">?</span> {q}
+                </p>
+              ))}
+            </dd>
+          </div>
+        )}
+
+        {brief.entities.length > 0 && (
+          <div className="mt-4">
+            <dt className="text-xs uppercase tracking-widest text-zinc-500">
+              Entities / topics to cover
+            </dt>
+            <dd className="mt-2 flex flex-wrap gap-1.5">
+              {brief.entities.map((e) => (
+                <span
+                  key={e}
+                  className="rounded-full border border-zinc-700 px-2 py-0.5 text-xs text-zinc-400"
+                >
+                  {e}
+                </span>
+              ))}
+            </dd>
+          </div>
+        )}
+
+        {brief.sources.length > 0 && (
+          <div className="mt-4">
+            <dt className="text-xs uppercase tracking-widest text-zinc-500">
+              Sources (top {brief.sources.length} SERP results)
+            </dt>
+            <dd className="mt-2 flex flex-col gap-1">
+              {brief.sources.map((s) => (
+                <p key={s.url} className="truncate text-xs text-zinc-500">
+                  <span className="text-zinc-400">{s.domain}</span> — {s.title}
+                </p>
+              ))}
+            </dd>
+          </div>
+        )}
+      </section>
+
+      {/* Editor + live score */}
+      <section className="grid gap-6 lg:grid-cols-[1fr_320px]">
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-medium uppercase tracking-widest text-zinc-500">
+              Editor
+            </h3>
+            <button onClick={onSave} disabled={busy === "save"} className={btnPrimary}>
+              {busy === "save" ? "Saving…" : "Save draft"}
+            </button>
+          </div>
+          <textarea
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            placeholder={
+              status === "brief"
+                ? "Generate a draft above, or write your own here."
+                : "Write your article in markdown…"
+            }
+            rows={28}
+            className={`w-full font-mono text-sm leading-relaxed ${inputCls}`}
+          />
+          <p className="text-xs text-zinc-600">
+            {(displayed?.wordCount ?? 0).toLocaleString()} words · target ~
+            {brief.targetWordCount.toLocaleString()}
+          </p>
+        </div>
+
+        <aside className="flex flex-col gap-3 rounded-xl border border-zinc-800 bg-zinc-900/60 p-5">
+          <h3 className="text-sm font-medium uppercase tracking-widest text-zinc-500">
+            SEO score
+          </h3>
+          <p className="text-4xl font-bold tracking-tight text-zinc-100">
+            {displayed ? Math.round(displayed.score) : "—"}
+            <span className="text-lg text-zinc-500">/100</span>
+          </p>
+          <ul className="flex flex-col gap-2">
+            {displayed?.checks.map((c) => (
+              <li key={c.id} className="flex items-start gap-2 text-sm">
+                <span
+                  className={`mt-0.5 inline-block h-2.5 w-2.5 shrink-0 rounded-full ${
+                    c.passed
+                      ? "bg-emerald-400"
+                      : c.points > 0
+                        ? "bg-amber-400"
+                        : "bg-zinc-700"
+                  }`}
+                />
+                <span>
+                  <span className="text-zinc-300">{c.label}</span>
+                  <span className="text-zinc-500">
+                    {" "}
+                    · {c.points}/{c.max}
+                  </span>
+                  <br />
+                  <span className="text-xs text-zinc-500">{c.detail}</span>
+                </span>
+              </li>
+            )) ?? (
+              <li className="text-sm text-zinc-500">Write to see the live score.</li>
+            )}
+          </ul>
+          {displayed && displayed.internalLinkSuggestions.length > 0 && (
+            <div className="rounded-lg bg-zinc-950/60 p-3">
+              <p className="text-xs uppercase tracking-widest text-zinc-500">
+                Link these keywords
+              </p>
+              <p className="mt-1 text-xs text-zinc-400">
+                {displayed.internalLinkSuggestions.join(", ")}
+              </p>
+            </div>
+          )}
+        </aside>
+      </section>
+    </div>
+  );
+}
