@@ -33,6 +33,34 @@ export interface KeywordIdeasParams {
   limit?: number;
 }
 
+export interface CompetitorKeyword {
+  phrase: string;
+  /** Monthly search volume, null when the provider doesn't report it. */
+  volume: number | null;
+  /** 0–100, null when the provider doesn't report it. */
+  difficulty: number | null;
+  /** Cost per click in USD, null when the provider doesn't report it. */
+  cpc: number | null;
+  intent: KeywordIntentLabel;
+  /** Competitor's organic position for this keyword, null when unknown. */
+  position: number | null;
+  /** URL of the competitor page ranking for this keyword, null when unknown. */
+  url: string | null;
+  /** True when the row came from the built-in mock (no credentials configured). */
+  mock?: boolean;
+}
+
+export interface CompetitorKeywordsParams {
+  /** Competitor domain, e.g. "example.com". */
+  domain: string;
+  /** DataForSEO location code, default 2840 (United States). */
+  locationCode?: number;
+  /** Default "en". */
+  languageCode?: string;
+  /** Max keywords to return, default 100. */
+  limit?: number;
+}
+
 export interface SeoDataProvider {
   /** Stable provider key, e.g. "dataforseo" | "mock". */
   readonly name: string;
@@ -42,4 +70,8 @@ export interface SeoDataProvider {
   isConfigured(): boolean;
   /** Clustered keyword ideas for a seed keyword. */
   keywordIdeas(params: KeywordIdeasParams): Promise<KeywordIdea[]>;
+  /** Keywords a competitor domain ranks for (DataForSEO Labs ranked_keywords). */
+  competitorKeywords(
+    params: CompetitorKeywordsParams,
+  ): Promise<CompetitorKeyword[]>;
 }
