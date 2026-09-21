@@ -1,0 +1,271 @@
+// Marketr — Prisma data model (spec §6).
+// Source of truth: SPEC.md. Milestone 1: schema only, no business logic yet.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Plan {
+  self_hosted
+  starter
+  pro
+  agency
+}
+
+enum KeywordIntent {
+  informational
+  navigational
+  commercial
+  transactional
+  unknown
+}
+
+enum ContentStatus {
+  brief
+  draft
+  editing
+  published
+}
+
+enum ClientRole {
+  viewer
+  editor
+  admin
+}
+
+enum IssueSeverity {
+  info
+  warning
+  error
+  critical
+}
+
+enum IssueStatus {
+  open
+  queued
+  fixed
+  ignored
+}
+
+enum FixMode {
+  manual
+  scheduled
+  autopilot
+}
+
+enum FixRunStatus {
+  pending
+  running
+  completed
+  failed
+  rolled_back
+}
+
+model Workspace {
+  id        String   @id @default(cuid())
+  name      String
+  // owner_user_id: external auth subject (Auth.js user id) — auth wired in milestone 2
+  ownerUserId String  @map("owner_user_id")
+  plan      Plan     @default(self_hosted)
+
+  // White-label config (spec §6): logo_url, custom_domain, brand_color
+  whiteLabelLogoUrl      String? @map("white_label_logo_url")
+  whiteLabelCustomDomain String? @map("white_label_custom_domain")
+  whiteLabelBrandColor   String? @map("white_label_brand_color")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  projects Project[]
+  clients  Client[]
+  apiUsage ApiUsage[]
+
+  @@map("workspaces")
+}
+
+model Project {
+  id          String @id @default(cuid())
+  workspaceId String @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  domain       String
+  locale       String @default("en-US")
+  searchEngine String @default("google") @map("search_engine")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  keywords    Keyword[]
+  competitors Competitor[]
+  contentItems ContentItem[]
+  issues      Issue[]
+  fixRuns     FixRun[]
+
+  @@map("projects")
+}
+
+model Keyword {
+  id        String @id @default(cuid())
+  projectId String @map("project_id")
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  phrase     String
+  volume     Int?
+  difficulty Float?
+  cpc        Float?
+  intent     KeywordIntent @default(unknown)
+  // Saved list name, e.g. "Q4 content targets"
+  list       String?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  rankings     Ranking[]
+  contentItems ContentItem[]
+
+  @@unique([projectId, phrase])
+  @@map("keywords")
+}
+
+model Ranking {
+  id        String @id @default(cuid())
+  keywordId String @map("keyword_id")
+  keyword   Keyword @relation(fields: [keywordId], references: [id], onDelete: Cascade)
+
+  checkedAt        DateTime @map("checked_at") @default(now())
+  position         Int?
+  url              String?
+  aiOverviewPresent Boolean @default(false) @map("ai_overview_present")
+  serpFeatures     String[] @default([]) @map("serp_features")
+
+  @@index([keywordId, checkedAt])
+  @@map("rankings")
+}
+
+model Competitor {
+  id        String @id @default(cuid())
+  projectId String @map("project_id")
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  domain  String
+  addedAt DateTime @default(now()) @map("added_at")
+
+  @@unique([projectId, domain])
+  @@map("competitors")
+}
+
+model ContentItem {
+  id        String @id @default(cuid())
+  projectId String @map("project_id")
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  keywordId String? @map("keyword_id")
+  keyword   Keyword? @relation(fields: [keywordId], references: [id], onDelete: SetNull)
+
+  status       ContentStatus @default(brief)
+  outlineJson  Json?         @map("outline_json")
+  bodyMarkdown String?       @map("body_markdown") @db.Text
+  seoScore     Float?        @map("seo_score")
+  publishedUrl String?       @map("published_url")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("content_items")
+}
+
+model Client {
+  id          String @id @default(cuid())
+  workspaceId String @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  name          String
+  loginEmail    String @map("login_email")
+  viewerRole    ClientRole @default(viewer) @map("viewer_role")
+  // Cron expression or "weekly"/"monthly" for scheduled branded reports
+  reportSchedule String? @map("report_schedule")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  reports Report[]
+
+  @@unique([workspaceId, loginEmail])
+  @@map("clients")
+}
+
+model Report {
+  id       String @id @default(cuid())
+  clientId String @map("client_id")
+  client   Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  period String
+  pdfUrl String? @map("pdf_url")
+  sentAt DateTime? @map("sent_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("reports")
+}
+
+enum ApiMeter {
+  tracked_keywords
+  ai_words
+  serp_calls
+}
+
+model ApiUsage {
+  id          String @id @default(cuid())
+  workspaceId String @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  // Billing meter: tracked_keywords / ai_words / serp_calls
+  meter    ApiMeter
+  quantity Int
+  // Billing period, e.g. "2026-09"
+  period   String
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([workspaceId, meter, period])
+  @@map("api_usage")
+}
+
+model Issue {
+  id        String @id @default(cuid())
+  projectId String @map("project_id")
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  type       String
+  severity   IssueSeverity
+  url        String?
+  detailJson Json? @map("detail_json")
+  status     IssueStatus @default(open)
+
+  detectedAt DateTime @default(now()) @map("detected_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@index([projectId, status])
+  @@map("issues")
+}
+
+model FixRun {
+  id        String @id @default(cuid())
+  projectId String @map("project_id")
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  mode         FixMode
+  startedAt    DateTime @default(now()) @map("started_at")
+  fixesApplied Int @default(0) @map("fixes_applied")
+  // Reference to the pre-change snapshot used for rollback
+  snapshotRef  String? @map("snapshot_ref")
+  status       FixRunStatus @default(pending)
+  reportSummary String? @map("report_summary") @db.Text
+
+  @@map("fix_runs")
+}

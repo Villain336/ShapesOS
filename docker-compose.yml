@@ -1,0 +1,52 @@
+# --- Marketr self-host: one command to run everything ---
+# Usage: copy .env.example to .env, fill in keys, then `docker compose up -d`
+# App: http://localhost:3000 | Postgres: localhost:5432 | Redis: localhost:6379
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-marketr}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-marketr}
+      POSTGRES_DB: ${POSTGRES_DB:-marketr}
+    volumes:
+      - marketr-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-marketr}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - marketr-redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "${APP_PORT:-3000}:3000"
+    env_file:
+      - .env
+    environment:
+      # Compose-provided defaults; override in .env if needed
+      DATABASE_URL: postgresql://${POSTGRES_USER:-marketr}:${POSTGRES_PASSWORD:-marketr}@db:5432/${POSTGRES_DB:-marketr}?schema=public
+      REDIS_URL: redis://redis:6379
+    command: sh -c "npx prisma migrate deploy && node server.js"
+
+volumes:
+  marketr-db:
+  marketr-redis:
