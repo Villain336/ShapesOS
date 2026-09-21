@@ -2,6 +2,7 @@
 // POST /api/keywords/save  { projectId, list, ideas: KeywordIdea[] }
 // Persists into the Keyword table (spec §6), deduped on (projectId, phrase).
 
+import { accessibleWorkspaceWhere, requireProjectRole, forbidden } from "@/lib/authz";
 import type { NextRequest } from "next/server";
 import type { KeywordIntent } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
@@ -29,12 +30,13 @@ export async function POST(req: NextRequest) {
   }
 
   const project = await prisma.project.findFirst({
-    where: { id: body.projectId, workspace: { ownerUserId: user.id } },
+    where: { id: body.projectId, workspace: accessibleWorkspaceWhere(user.id) },
     include: { workspace: true },
   });
   if (!project) {
     return Response.json({ error: "Project not found" }, { status: 404 });
   }
+  if (!(await requireProjectRole(user.id, project.id, "editor"))) return forbidden();
 
   const list = String(body.list ?? "").trim() || "Saved keywords";
   const ideas = Array.isArray(body.ideas) ? body.ideas : [];

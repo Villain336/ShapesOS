@@ -11,6 +11,7 @@
 import type { NextRequest } from "next/server";
 import { DeployTargetType } from "@prisma/client";
 import { requireUser } from "@/lib/session";
+import { requireProjectRole, forbidden } from "@/lib/authz";
 import { ownedProject, readJsonBody } from "@/lib/sitefiles/api";
 import { prisma } from "@/lib/prisma";
 import {
@@ -79,6 +80,8 @@ export async function POST(req: NextRequest) {
 
   const project = await ownedProject(user.id, body.projectId);
   if (!project) return Response.json({ error: "Project not found" }, { status: 404 });
+  // Milestone 11: storing hosting tokens is admin+ (editors can't touch secrets).
+  if (!(await requireProjectRole(user.id, project.id, "admin"))) return forbidden();
 
   let target: DeployTargetType;
   try {
@@ -135,6 +138,18 @@ export async function POST(req: NextRequest) {
       name,
       target,
       configEnc: encryptHostingConfig(config),
+    },
+  });
+
+  // Milestone 11: credential lifecycle is audit-logged (no secret material).
+  await prisma.fileChangeLog.create({
+    data: {
+      projectId: project.id,
+      filePath: "(connection)",
+      actor: "user",
+      action: "credential_created",
+      summary: `${user.email ?? user.id} added hosting connection "${name}" (${body.target})`,
+      approvedBy: user.id,
     },
   });
 

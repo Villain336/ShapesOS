@@ -4,6 +4,7 @@
 // Collects every file in the site's local working copy, deploys through the
 // chosen hosting connection, persists a Deployment row, and audit-logs it.
 
+import { requireProjectRole, forbidden } from "@/lib/authz";
 import type { NextRequest } from "next/server";
 import { requireUser } from "@/lib/session";
 import { readJsonBody } from "@/lib/sitefiles/api";
@@ -31,6 +32,7 @@ export async function POST(
   const body = await readJsonBody<{ projectId?: string; connectionId?: string }>(req);
   const site = await ownedSite(user.id, body?.projectId, id);
   if (!site) return Response.json({ error: "Site not found" }, { status: 404 });
+  if (!(await requireProjectRole(user.id, site.projectId, "editor"))) return forbidden();
 
   const conn = await ownedHostingConnection(user.id, body?.projectId, body?.connectionId);
   if (!conn) return Response.json({ error: "Hosting connection not found" }, { status: 404 });

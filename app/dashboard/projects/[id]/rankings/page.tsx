@@ -1,5 +1,6 @@
 // Marketr — rank tracking dashboard page (milestone 5, spec §5 flow 4).
 
+import { accessibleWorkspaceWhere } from "@/lib/authz";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
@@ -18,7 +19,7 @@ export default async function RankingsPage({
   const { id } = await params;
 
   const project = await prisma.project.findFirst({
-    where: { id, workspace: { ownerUserId: user.id } },
+    where: { id, workspace: accessibleWorkspaceWhere(user.id) },
   });
   if (!project) notFound();
 

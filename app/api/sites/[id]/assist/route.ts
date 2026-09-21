@@ -10,6 +10,7 @@
 // Shared prompt/parse/mock logic lives in lib/sitefiles/assist.ts (also used
 // by the milestone-7 /api/websites/[id]/assist route).
 
+import { requireProjectRole, forbidden } from "@/lib/authz";
 import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
@@ -48,6 +49,7 @@ export async function POST(
   if (!connection) {
     return Response.json({ error: "Connection not found" }, { status: 404 });
   }
+  if (!(await requireProjectRole(user.id, connection.projectId, "editor"))) return forbidden();
 
   const message = (body.message ?? "").trim();
   if (!message) return Response.json({ error: "Message is required" }, { status: 400 });

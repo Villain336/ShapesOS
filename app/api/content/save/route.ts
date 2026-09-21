@@ -6,6 +6,7 @@
 // seoScore. Saving moves the item to "editing" (a published item stays
 // published — re-saving doesn't un-publish it).
 
+import { accessibleWorkspaceWhere, requireProjectRole, forbidden } from "@/lib/authz";
 import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
@@ -26,7 +27,7 @@ export async function POST(req: NextRequest) {
   const contentItem = await prisma.contentItem.findFirst({
     where: {
       id: body.contentId,
-      project: { workspace: { ownerUserId: user.id } },
+      project: { workspace: accessibleWorkspaceWhere(user.id) },
     },
     include: {
       keyword: true,
@@ -36,6 +37,7 @@ export async function POST(req: NextRequest) {
   if (!contentItem) {
     return Response.json({ error: "Content item not found" }, { status: 404 });
   }
+  if (!(await requireProjectRole(user.id, contentItem.projectId, "editor"))) return forbidden();
 
   const bodyMarkdown = String(body.bodyMarkdown ?? "");
   const brief = contentItem.outlineJson as ContentBrief | null;

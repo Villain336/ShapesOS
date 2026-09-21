@@ -2,6 +2,7 @@
 // POST /api/websites/[id]/fix-runs/[runId]/revert { projectId }
 // Restores every file from the run's pre-change snapshot and re-opens the issues.
 
+import { requireProjectRole, forbidden } from "@/lib/authz";
 import type { NextRequest } from "next/server";
 import { requireUser } from "@/lib/session";
 import { readJsonBody } from "@/lib/sitefiles/api";
@@ -20,6 +21,7 @@ export async function POST(
   const body = await readJsonBody<{ projectId?: string }>(req);
   const site = await ownedSite(user.id, body?.projectId, id);
   if (!site) return Response.json({ error: "Site not found" }, { status: 404 });
+  if (!(await requireProjectRole(user.id, site.projectId, "editor"))) return forbidden();
 
   try {
     const provider = await getSiteIdeProvider(site);

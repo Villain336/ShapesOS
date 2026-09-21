@@ -8,6 +8,7 @@
 // environments). The token is used for this single request and never stored
 // here — it is only persisted (encrypted) when the site is created.
 
+import { requireProjectRole, forbidden } from "@/lib/authz";
 import type { NextRequest } from "next/server";
 import { requireUser } from "@/lib/session";
 import { ownedProject, readJsonBody } from "@/lib/sitefiles/api";
@@ -30,6 +31,7 @@ export async function POST(req: NextRequest) {
 
   const project = await ownedProject(user.id, body.projectId);
   if (!project) return Response.json({ error: "Project not found" }, { status: 404 });
+  if (!(await requireProjectRole(user.id, project.id, "admin"))) return forbidden();
 
   try {
     if (body.demo === true) {

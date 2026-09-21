@@ -1,19 +1,46 @@
+// Marketr — sign-in page. Google OAuth when configured, SSO (generic OIDC /
+// SAML via BoxyHQ) when configured, otherwise the self-hosted admin
+// credential from ADMIN_EMAIL / ADMIN_PASSWORD.
+
 "use client";
 
-// Marketr — sign-in page. Google OAuth when configured, otherwise the
-// self-hosted admin credential from ADMIN_EMAIL / ADMIN_PASSWORD.
-
 import { signIn } from "next-auth/react";
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 
 const inputCls =
   "w-full rounded-md border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-zinc-500 focus:outline-none";
+
+interface ProviderInfo {
+  id: string;
+  name: string;
+}
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // SSO providers are discovered client-side so the buttons only render when
+  // the operator actually configured OIDC / SAML (milestone 11).
+  const [sso, setSso] = useState<ProviderInfo[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/auth/providers")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((all: Record<string, ProviderInfo> | null) => {
+        if (cancelled || !all) return;
+        setSso(
+          Object.values(all).filter(
+            (p) => p.id === "oidc" || p.id === "boxyhq-saml",
+          ),
+        );
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   async function onCredentials(e: FormEvent) {
     e.preventDefault();
@@ -50,6 +77,17 @@ export default function LoginPage() {
         >
           Continue with Google
         </button>
+
+        {sso.map((p) => (
+          <button
+            key={p.id}
+            onClick={() => signIn(p.id, { callbackUrl: "/dashboard" })}
+            className="mt-3 w-full rounded-md border border-indigo-700 bg-indigo-950 px-3 py-2 text-sm font-medium text-indigo-100 hover:bg-indigo-900"
+          >
+            Continue with {p.name}
+            {p.id === "boxyhq-saml" ? " (SAML SSO)" : ""}
+          </button>
+        ))}
 
         <div className="my-5 flex items-center gap-3 text-xs text-zinc-600">
           <span className="h-px flex-1 bg-zinc-800" />

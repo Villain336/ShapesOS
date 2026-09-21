@@ -1,5 +1,6 @@
 // Marketr — sites list page (milestone 7).
 
+import { accessibleWorkspaceWhere } from "@/lib/authz";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
@@ -20,7 +21,7 @@ export default async function SitesPage({
   const { id } = await params;
 
   const project = await prisma.project.findFirst({
-    where: { id, workspace: { ownerUserId: user.id } },
+    where: { id, workspace: accessibleWorkspaceWhere(user.id) },
   });
   if (!project) notFound();
 

@@ -7,6 +7,7 @@
 // with siteId. The AI NEVER writes files — the user applies each proposal
 // through POST /api/websites/[id]/file with source="ai".
 
+import { requireProjectRole, forbidden } from "@/lib/authz";
 import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
@@ -44,6 +45,7 @@ export async function POST(
 
   const site = await ownedSite(user.id, body.projectId, id);
   if (!site) return Response.json({ error: "Site not found" }, { status: 404 });
+  if (!(await requireProjectRole(user.id, site.projectId, "editor"))) return forbidden();
 
   const message = (body.message ?? "").trim();
   if (!message) return Response.json({ error: "Message is required" }, { status: 400 });

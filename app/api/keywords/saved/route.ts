@@ -1,6 +1,7 @@
 // Marketr — saved keywords for a project.
 // GET /api/keywords/saved?projectId=… → { keywords } grouped by list.
 
+import { accessibleWorkspaceWhere } from "@/lib/authz";
 import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
@@ -11,7 +12,7 @@ export async function GET(req: NextRequest) {
 
   const projectId = req.nextUrl.searchParams.get("projectId");
   const project = await prisma.project.findFirst({
-    where: { id: projectId ?? undefined, workspace: { ownerUserId: user.id } },
+    where: { id: projectId ?? undefined, workspace: accessibleWorkspaceWhere(user.id) },
   });
   if (!project) {
     return Response.json({ error: "Project not found" }, { status: 404 });

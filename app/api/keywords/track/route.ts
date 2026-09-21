@@ -1,6 +1,7 @@
 // Marketr — toggle rank tracking on a saved keyword.
 // POST /api/keywords/track  { keywordId, tracked: boolean }
 
+import { accessibleWorkspaceWhere, requireProjectRole, forbidden } from "@/lib/authz";
 import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
@@ -26,12 +27,13 @@ export async function POST(req: NextRequest) {
   const keyword = await prisma.keyword.findFirst({
     where: {
       id: body.keywordId,
-      project: { workspace: { ownerUserId: user.id } },
+      project: { workspace: accessibleWorkspaceWhere(user.id) },
     },
   });
   if (!keyword) {
     return Response.json({ error: "Keyword not found" }, { status: 404 });
   }
+  if (!(await requireProjectRole(user.id, keyword.projectId, "editor"))) return forbidden();
 
   const updated = await prisma.keyword.update({
     where: { id: keyword.id },

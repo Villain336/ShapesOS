@@ -1,5 +1,6 @@
 // Marketr — project detail: saved-keyword overview + entry points.
 
+import { accessibleWorkspaceWhere } from "@/lib/authz";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
@@ -18,7 +19,7 @@ export default async function ProjectPage({
   const { id } = await params;
 
   const project = await prisma.project.findFirst({
-    where: { id, workspace: { ownerUserId: user.id } },
+    where: { id, workspace: accessibleWorkspaceWhere(user.id) },
     include: {
       keywords: { orderBy: [{ list: "asc" }, { volume: "desc" }] },
       competitors: { select: { id: true } },

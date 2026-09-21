@@ -22,6 +22,12 @@ export default async function DashboardLayout({
             Marketr
           </Link>
           <div className="flex items-center gap-4">
+            <Link
+              href="/dashboard/settings/members"
+              className="text-sm text-zinc-400 hover:text-zinc-200"
+            >
+              Members
+            </Link>
             <span className="text-sm text-zinc-400">
               {user.email ?? user.name ?? "Signed in"}
             </span>

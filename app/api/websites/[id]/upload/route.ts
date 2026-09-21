@@ -6,6 +6,7 @@
 // copy with zip-slip protection (see lib/connectors/zip.ts); binaries are
 // skipped. A single .html file becomes /index.html.
 
+import { requireProjectRole, forbidden } from "@/lib/authz";
 import type { NextRequest } from "next/server";
 import { requireUser } from "@/lib/session";
 import { extractZipToProvider } from "@/lib/connectors/zip";
@@ -29,6 +30,7 @@ export async function POST(
   const projectId = form.get("projectId");
   const site = await ownedSite(user.id, typeof projectId === "string" ? projectId : null, id);
   if (!site) return Response.json({ error: "Site not found" }, { status: 404 });
+  if (!(await requireProjectRole(user.id, site.projectId, "editor"))) return forbidden();
   if (site.sourceType !== "file") {
     return Response.json({ error: "Upload is only supported for file-source sites" }, { status: 400 });
   }

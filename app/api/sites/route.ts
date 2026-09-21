@@ -7,7 +7,8 @@
 import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
-import { encryptSecret, secretHint } from "@/lib/sitefiles/crypto";
+import { secrets } from "@/lib/secrets";
+import { requireProjectRole, forbidden } from "@/lib/authz";
 import { publicConnection } from "@/lib/sitefiles";
 import { ownedConnection, ownedProject, readJsonBody } from "@/lib/sitefiles/api";
 
@@ -52,6 +53,8 @@ export async function POST(req: NextRequest) {
   if (!project) {
     return Response.json({ error: "Project not found" }, { status: 404 });
   }
+  // Milestone 11: storing credentials is admin+ (editors can't touch secrets).
+  if (!(await requireProjectRole(user.id, project.id, "admin"))) return forbidden();
 
   if (body.demo) {
     const connection = await prisma.siteConnection.create({
@@ -93,7 +96,7 @@ export async function POST(req: NextRequest) {
 
   let secretEnc: string;
   try {
-    secretEnc = encryptSecret(secret);
+    secretEnc = secrets().encrypt(secret);
   } catch (err) {
     return Response.json(
       { error: err instanceof Error ? err.message : "Encryption failed" },
@@ -110,8 +113,19 @@ export async function POST(req: NextRequest) {
       username,
       authType,
       secretEnc,
-      secretHint: secretHint(secret),
+      secretHint: secrets().hint(secret),
       demo: false,
+    },
+  });
+  // Milestone 11: credential lifecycle is audit-logged (no secret material).
+  await prisma.fileChangeLog.create({
+    data: {
+      projectId: project.id,
+      filePath: "(connection)",
+      actor: "user",
+      action: "credential_created",
+      summary: `${user.email ?? user.id} added SFTP connection "${label}" (${username}@${host}:${port})`,
+      approvedBy: user.id,
     },
   });
   return Response.json({ connection: publicConnection(connection) }, { status: 201 });

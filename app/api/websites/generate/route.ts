@@ -8,6 +8,7 @@
 // landing page tie-in). Without an LLM key, a clearly-labeled mock page is
 // returned so the builder → preview → save flow works end-to-end.
 
+import { requireProjectRole, forbidden } from "@/lib/authz";
 import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
@@ -104,6 +105,7 @@ export async function POST(req: NextRequest) {
 
   const project = await ownedProject(user.id, body.projectId);
   if (!project) return Response.json({ error: "Project not found" }, { status: 404 });
+  if (!(await requireProjectRole(user.id, project.id, "editor"))) return forbidden();
 
   const prompt = (body.prompt ?? "").trim();
   if (!prompt) return Response.json({ error: "Describe the landing page first" }, { status: 400 });

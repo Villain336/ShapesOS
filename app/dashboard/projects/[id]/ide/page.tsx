@@ -4,6 +4,7 @@
 //   - Site mode (?siteId=…): the IDE operates on a milestone-7 Site's working
 //     copy, regardless of source (GitHub / SFTP / uploaded files).
 
+import { accessibleWorkspaceWhere } from "@/lib/authz";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
@@ -27,7 +28,7 @@ export default async function IdePage({
   const { siteId } = await searchParams;
 
   const project = await prisma.project.findFirst({
-    where: { id, workspace: { ownerUserId: user.id } },
+    where: { id, workspace: accessibleWorkspaceWhere(user.id) },
     include: {
       siteConnections: { orderBy: { createdAt: "asc" } },
     },

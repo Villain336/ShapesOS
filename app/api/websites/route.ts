@@ -14,6 +14,7 @@
 import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
+import { requireProjectRole, forbidden } from "@/lib/authz";
 import { ownedProject, readJsonBody } from "@/lib/sitefiles/api";
 import { sanitizePath } from "@/lib/sitefiles/paths";
 import {
@@ -88,6 +89,15 @@ export async function POST(req: NextRequest) {
       ? body.sourceType
       : "file";
 
+  // Milestone 11: connecting a source that stores credentials (GitHub token,
+  // WP app password, Webflow token) is admin+. Plain file sites are editor+.
+  const storesCredentials =
+    (sourceType === "github" && body.github?.demo !== true) ||
+    (sourceType === "wordpress" && body.wordpress?.demo !== true) ||
+    (sourceType === "webflow" && body.webflow?.demo !== true);
+  const minRole = storesCredentials ? "admin" : "editor";
+  if (!(await requireProjectRole(user.id, project.id, minRole))) return forbidden();
+
   let configEnc = encryptSiteConfig({});
   let sftpConnectionId: string | null = null;
 
@@ -141,6 +151,21 @@ export async function POST(req: NextRequest) {
     data: { projectId: project.id, name, sourceType, configEnc, sftpConnectionId },
     include: { sftpConnection: true },
   });
+
+  // Milestone 11: credential lifecycle is audit-logged (no secret material).
+  if (storesCredentials) {
+    await prisma.fileChangeLog.create({
+      data: {
+        projectId: project.id,
+        siteId: site.id,
+        filePath: "(connection)",
+        actor: "user",
+        action: "credential_created",
+        summary: `${user.email ?? user.id} connected ${sourceType} credentials for site "${name}"`,
+        approvedBy: user.id,
+      },
+    });
+  }
 
   // Seed the working copy (validates paths through the same sanitizer the IDE uses).
   const provider = await getSiteIdeProvider({ ...site, sftpConnection: site.sftpConnection });

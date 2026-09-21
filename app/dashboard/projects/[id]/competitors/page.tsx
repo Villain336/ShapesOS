@@ -1,5 +1,6 @@
 // Marketr — competitor keyword-gap page (spec §5 flow 2, §7 item 4).
 
+import { accessibleWorkspaceWhere } from "@/lib/authz";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
@@ -18,7 +19,7 @@ export default async function CompetitorsPage({
   const { id } = await params;
 
   const project = await prisma.project.findFirst({
-    where: { id, workspace: { ownerUserId: user.id } },
+    where: { id, workspace: accessibleWorkspaceWhere(user.id) },
   });
   if (!project) notFound();
 

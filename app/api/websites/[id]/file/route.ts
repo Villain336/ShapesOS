@@ -4,6 +4,7 @@
 //      source: "manual" | "ai". Every write is appended to the audit log
 //      (FileChangeLog with siteId); AI-applied writes record approvedBy.
 
+import { requireProjectRole, forbidden } from "@/lib/authz";
 import type { NextRequest } from "next/server";
 import { requireUser } from "@/lib/session";
 import { sanitizePath } from "@/lib/sitefiles/paths";
@@ -65,6 +66,7 @@ export async function POST(
 
   const site = await ownedSite(user.id, body.projectId, id);
   if (!site) return Response.json({ error: "Site not found" }, { status: 404 });
+  if (!(await requireProjectRole(user.id, site.projectId, "editor"))) return forbidden();
 
   let path: string;
   try {

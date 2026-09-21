@@ -129,7 +129,13 @@ The sentence: **"The open-source workspace that replaces your $400/mo SEO stack 
 
 ## 11. Tech approach
 
-Next.js (App Router) + Postgres + a job queue for scheduled rank tracking; Docker Compose for self-host. DataForSEO behind an abstracted data-provider interface (single-supplier risk — the interface lets us add Serper/Bright Data later). LLM via provider abstraction (Anthropic/OpenAI/BYO). Auth: Auth.js; billing: Stripe metered billing on the three meters. WordPress publish via REST API. MCP server as a first-class interface alongside the REST API.
+Next.js (App Router) + Postgres + a job queue for scheduled rank tracking; Docker Compose for self-host. DataForSEO behind an abstracted data-provider interface (single-supplier risk — the interface lets us add Serper/Bright Data later). LLM via provider abstraction (Anthropic/OpenAI/BYO). Auth: Auth.js (M11 adds
+generic OIDC SSO, SAML via BoxyHQ Jackson, domain-based auto-provisioning,
+workspace RBAC owner/admin/editor/viewer, secrets-provider abstraction with a
+KMS-ready interface, security headers, 12h sessions, audit logging for
+credential + membership lifecycle — see README § Enterprise security);
+billing: Stripe metered billing on the three meters. WordPress publish via
+REST API. MCP server as a first-class interface alongside the REST API.
 
 Dependencies: DataForSEO API key (hosted), LLM provider, Postgres, Redis (queue), Stripe, S3-compatible storage (report PDFs).
 

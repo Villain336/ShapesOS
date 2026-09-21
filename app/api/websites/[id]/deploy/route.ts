@@ -7,7 +7,9 @@
 // SFTP: each file written over the milestone-6 SFTP provider.
 // File-source: nothing to push to — returns a zip download URL instead.
 
+import { requireProjectRole, forbidden } from "@/lib/authz";
 import type { NextRequest } from "next/server";
+import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
 import { readJsonBody } from "@/lib/sitefiles/api";
 import {
@@ -28,6 +30,7 @@ export async function POST(
   const body = await readJsonBody<{ projectId?: string; message?: string }>(req);
   const site = await ownedSite(user.id, body?.projectId, id);
   if (!site) return Response.json({ error: "Site not found" }, { status: 404 });
+  if (!(await requireProjectRole(user.id, site.projectId, "editor"))) return forbidden();
 
   const working = await getSiteIdeProvider(site);
 
@@ -63,6 +66,18 @@ export async function POST(
 
     if (remote.kind === "github") {
       const result = await remote.connector.pushFiles(files, message);
+      // Milestone 11: deploys are audit-logged.
+      await prisma.fileChangeLog.create({
+        data: {
+          projectId: site.projectId,
+          siteId: site.id,
+          filePath: "(deploy)",
+          actor: "user",
+          action: "deploy",
+          summary: `${user.email ?? user.id} deployed "${site.name}" to GitHub (${result.files.length} files, commit ${result.sha?.slice(0, 7) ?? "n/a"})`,
+          approvedBy: user.id,
+        },
+      });
       return Response.json({
         ok: true,
         fileCount: result.files.length,
@@ -87,6 +102,18 @@ export async function POST(
       }
     }
     const failed = perFile.filter((f) => !f.ok);
+    // Milestone 11: deploys are audit-logged.
+    await prisma.fileChangeLog.create({
+      data: {
+        projectId: site.projectId,
+        siteId: site.id,
+        filePath: "(deploy)",
+        actor: "user",
+        action: "deploy",
+        summary: `${user.email ?? user.id} deployed "${site.name}" to SFTP (${perFile.length - failed.length}/${perFile.length} files)`,
+        approvedBy: user.id,
+      },
+    });
     return Response.json({
       ok: failed.length === 0,
       fileCount: perFile.length,

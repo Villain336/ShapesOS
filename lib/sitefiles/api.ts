@@ -1,13 +1,16 @@
 // Marketr — shared helpers for the site/IDE API routes.
-// Every route is auth-gated and project-ownership checked. Connection
-// records are only ever loaded server-side; secrets never reach the client.
+// Every route is auth-gated and workspace-access checked (milestone 11:
+// membership-based via lib/authz, replacing the ownerUserId-only check).
+// Connection records are only ever loaded server-side; secrets never reach
+// the client.
 
 import { prisma } from "@/lib/prisma";
+import { accessibleWorkspaceWhere } from "@/lib/authz";
 
 export async function ownedProject(userId: string, projectId: unknown) {
   if (typeof projectId !== "string" || !projectId) return null;
   return prisma.project.findFirst({
-    where: { id: projectId, workspace: { ownerUserId: userId } },
+    where: { id: projectId, workspace: accessibleWorkspaceWhere(userId) },
   });
 }
 

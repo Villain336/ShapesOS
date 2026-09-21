@@ -3,6 +3,7 @@
 // POST /api/competitors  { projectId, domain } → { competitor } (201)
 // Domains are normalized (strip protocol/www/path) and deduped per project.
 
+import { accessibleWorkspaceWhere, requireProjectRole, forbidden } from "@/lib/authz";
 import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
@@ -11,7 +12,7 @@ import { normalizeDomain } from "@/lib/competitors";
 async function ownedProject(userId: string, projectId: unknown) {
   if (typeof projectId !== "string" || !projectId) return null;
   return prisma.project.findFirst({
-    where: { id: projectId, workspace: { ownerUserId: userId } },
+    where: { id: projectId, workspace: accessibleWorkspaceWhere(userId) },
   });
 }
 
@@ -47,6 +48,7 @@ export async function POST(req: NextRequest) {
   if (!project) {
     return Response.json({ error: "Project not found" }, { status: 404 });
   }
+  if (!(await requireProjectRole(user.id, body.projectId, "editor"))) return forbidden();
 
   const domain = normalizeDomain(body.domain);
   if (!domain) {

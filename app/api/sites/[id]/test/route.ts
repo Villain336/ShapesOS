@@ -2,6 +2,7 @@
 // POST /api/sites/[id]/test?projectId=… → { ok, message }
 // Runs server-side; updates lastTestedAt / lastTestOk.
 
+import { requireProjectRole, forbidden } from "@/lib/authz";
 import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
@@ -24,6 +25,7 @@ export async function POST(
   if (!connection) {
     return Response.json({ error: "Connection not found" }, { status: 404 });
   }
+  if (!(await requireProjectRole(user.id, connection.projectId, "admin"))) return forbidden();
 
   let result: { ok: boolean; message: string };
   try {

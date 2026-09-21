@@ -107,6 +107,13 @@ enum FileChangeAction {
   fix_applied
   // Milestone 10: a fix-agent run was reverted (pre-change snapshot restored).
   fix_reverted
+  // Milestone 11: enterprise audit coverage — credential lifecycle.
+  credential_created
+  credential_deleted
+  // Milestone 11: enterprise audit coverage — workspace membership.
+  member_added
+  member_role_changed
+  member_removed
 }
 
 // Marketr — where a Site's files live (milestone 7).
@@ -137,6 +144,10 @@ model Workspace {
   projects Project[]
   clients  Client[]
   apiUsage ApiUsage[]
+  // Milestone 11: workspace membership for RBAC (owner/admin/editor/viewer).
+  members  WorkspaceMember[]
+  // Milestone 11: workspace-scoped audit events.
+  auditEvents FileChangeLog[]
 
   @@map("workspaces")
 }
@@ -466,8 +477,13 @@ model SiteConnection {
 // the supervised fix-agent rung.
 model FileChangeLog {
   id        String @id @default(cuid())
-  projectId String @map("project_id")
-  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  // Milestone 11: projectId is optional so workspace-scoped events (member
+  // add/role change/remove) can be audit-logged without a project.
+  projectId String? @map("project_id")
+  project   Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  // Milestone 11: workspace-scoped audit events.
+  workspaceId String? @map("workspace_id")
+  workspace   Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   connectionId String? @map("connection_id")
   // Milestone 7: the Site (github/sftp/file) this change belongs to, when the
@@ -570,4 +586,36 @@ model Deployment {
 
   @@index([siteId, createdAt])
   @@map("deployments")
+}
+
+// Marketr — workspace membership for RBAC (milestone 11).
+// Roles form a hierarchy: owner > admin > editor > viewer.
+//  - viewer: read-only (GET routes).
+//  - editor: read + write, except member management and connection-credential CRUD.
+//  - admin: everything except workspace deletion.
+//  - owner: full control (workspace deletion, owner transfer via role change).
+enum WorkspaceRole {
+  owner
+  admin
+  editor
+  viewer
+}
+
+model WorkspaceMember {
+  id          String        @id @default(cuid())
+  workspaceId String        @map("workspace_id")
+  workspace   Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  // Auth.js user id (subject). Null for pending invites keyed by email.
+  userId      String?       @map("user_id")
+  email       String?
+  name        String?
+  role        WorkspaceRole @default(viewer)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([workspaceId, userId])
+  @@unique([workspaceId, email])
+  @@index([userId])
+  @@map("workspace_members")
 }

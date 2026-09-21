@@ -51,6 +51,7 @@ npm run dev
 - **M8 (done):** WordPress + Webflow connectors — WP REST via app passwords (pages/posts/media CRUD), Webflow API v2 (CMS collections/items CRUD + site publish), labeled mocks, ContentBrowser UI, publish-to flow from landing pages.
 - **M9 (done):** hosting — DeployTarget abstraction, Vercel + Cloudflare Pages connectors (encrypted tokens, labeled mocks), HostingConnection + Deployment models, deploy-to-hosting flow with live URL + audit log.
 - **M10 (done):** fix-agent scheduled rung — site audits (broken links, missing title/meta/OG/alt, mixed content, oversized images, robots/sitemap, style bloat), issue inbox with per-issue approval, per-site safety settings (enabled, allowed categories, max fixes/run, dry-run default ON), scheduled execution via cron with pre-change snapshots + one-click revert, full audit logging.
+- **M11 (done):** enterprise security — generic OIDC SSO + SAML via BoxyHQ (both env-configured, buttons appear on /login only when set), domain-based SSO auto-provisioning, workspace RBAC (owner/admin/editor/viewer with API-level enforcement and a Members settings page), secrets-provider abstraction (`lib/secrets` — env AES-256-GCM default, documented AWS-KMS stub), security headers, 12h absolute session lifetime, workspace-scoped audit events for credential lifecycle + membership changes.
 
 ### Scheduled rank checks
 
@@ -96,6 +97,40 @@ of *your* projects on demand. Revert any run from the Sites → Fix agent panel.
 ## Data & costs
 
 Self-hosted Marketr is bring-your-own-keys: a [DataForSEO](https://dataforseo.com) account (pay-as-you-go) for keyword/SERP data and an LLM provider key for the content engine and fix agent. No scraping, no bundled data markup — see SPEC.md §9 for the hosted unit economics.
+
+## Enterprise security (M11)
+
+**SSO.** Set `OIDC_ISSUER` / `OIDC_CLIENT_ID` / `OIDC_CLIENT_SECRET` for any
+OIDC-compliant IdP (Okta, Entra ID, Google Workspace, Keycloak, Authentik) —
+a "Continue with SSO" button appears on `/login` only when configured.
+SAML works through a BoxyHQ SAML Jackson bridge: `SAML_ENABLED=true` plus
+`BOXYHQ_SAML_ISSUER` (your Jackson URL), `BOXYHQ_SAML_CLIENT_ID`,
+`BOXYHQ_SAML_CLIENT_SECRET`. Optional domain-based auto-provisioning:
+`SSO_DOMAIN` + `SSO_WORKSPACE_ID` + `SSO_DEFAULT_ROLE` add matching SSO
+users to that workspace on first sign-in. SSO paths are config-complete but
+were not live-verified (no IdP in the build environment).
+
+**RBAC.** Workspace roles: `owner` > `admin` > `editor` > `viewer`.
+Viewers are read-only; editors write but can't manage members or stored
+credentials; admins can't delete the workspace; owners have full control.
+Enforced at the API layer (`lib/authz.ts` — `requireProjectRole` /
+`requireWorkspaceRole`, 403 on denial). Manage members at
+`/dashboard/settings/members` (admin+): invite by email (pending until first
+sign-in), change roles, remove. The last owner is protected. Membership and
+credential changes are audit-logged.
+
+**Secrets.** All credential encryption flows through `lib/secrets`
+(`SecretsProvider` interface). Default `SECRETS_PROVIDER=env` uses the
+existing AES-256-GCM `MARKETR_CREDENTIALS_KEY` scheme. For hosted production,
+implement the documented `AwsKmsSecretsProvider` stub against
+`@aws-sdk/client-kms` (per-workspace data keys, rotation) and set
+`SECRETS_PROVIDER=aws-kms`.
+
+**Hardening.** Security headers in `next.config.ts` (nosniff, SAMEORIGIN
+framing, strict referrer policy, locked-down permissions policy, HSTS on
+https). Sessions are JWT with an absolute 12h lifetime. CSP is intentionally
+deferred: Monaco loads editor assets from a CDN and needs `unsafe-eval` for
+workers, so a CSP today would be theater — self-host the editor assets first.
 
 ## License
 

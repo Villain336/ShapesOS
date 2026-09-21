@@ -4,6 +4,7 @@
 // credentials are configured, clearly-marked mock otherwise).
 // Each research call increments the serp_calls meter (best-effort).
 
+import { accessibleWorkspaceWhere, requireProjectRole, forbidden } from "@/lib/authz";
 import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
@@ -27,12 +28,13 @@ export async function POST(req: NextRequest) {
   }
 
   const project = await prisma.project.findFirst({
-    where: { id: body.projectId, workspace: { ownerUserId: user.id } },
+    where: { id: body.projectId, workspace: accessibleWorkspaceWhere(user.id) },
     include: { workspace: true },
   });
   if (!project) {
     return Response.json({ error: "Project not found" }, { status: 404 });
   }
+  if (!(await requireProjectRole(user.id, body.projectId, "editor"))) return forbidden();
 
   const provider = getSeoProvider();
   const limit = Math.max(1, Math.min(body.limit ?? 50, 200));

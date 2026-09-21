@@ -12,6 +12,7 @@
 // apply them through the same pipeline as the on-demand run. Dry-run mode
 // only stores diff previews for review — nothing is written.
 
+import { accessibleWorkspaceWhere, requireProjectRole } from "@/lib/authz";
 import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
@@ -37,15 +38,25 @@ export async function POST(req: NextRequest) {
       enabled: true,
       site: isCron
         ? undefined
-        : { project: { workspace: { ownerUserId: user!.id } } },
+        : { project: { workspace: accessibleWorkspaceWhere(user!.id) } },
     },
     include: { site: { include: { sftpConnection: true } } },
   });
 
   // Skip content-only sources (no file tree to fix).
-  const sites = enabledSettings
+  let sites = enabledSettings
     .map((s) => s.site)
     .filter((s) => s.sourceType !== "wordpress" && s.sourceType !== "webflow");
+
+  // Milestone 11: session-triggered runs honor RBAC — viewers can't apply
+  // fixes. (CRON_SECRET path is a service actor and bypasses user roles.)
+  if (!isCron && user) {
+    const kept: typeof sites = [];
+    for (const s of sites) {
+      if (await requireProjectRole(user.id, s.projectId, "editor")) kept.push(s);
+    }
+    sites = kept;
+  }
 
   const results: { siteId: string; siteName: string; ok: boolean; summary?: string; error?: string }[] = [];
 

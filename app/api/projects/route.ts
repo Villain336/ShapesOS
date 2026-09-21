@@ -5,6 +5,7 @@
 import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getOrCreateWorkspace, requireUser } from "@/lib/session";
+import { requireWorkspaceRole, forbidden } from "@/lib/authz";
 
 export async function GET() {
   const user = await requireUser();
@@ -44,6 +45,8 @@ export async function POST(req: NextRequest) {
   }
 
   const workspace = await getOrCreateWorkspace(user.id, user.email);
+  // Milestone 11: project creation is editor+ (viewers are read-only).
+  if (!(await requireWorkspaceRole(user.id, workspace.id, "editor"))) return forbidden();
   const project = await prisma.project.create({
     data: {
       workspaceId: workspace.id,

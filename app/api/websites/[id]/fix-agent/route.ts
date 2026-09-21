@@ -2,6 +2,7 @@
 // GET /api/websites/[id]/fix-agent?projectId=… → settings
 // PUT /api/websites/[id]/fix-agent { projectId, enabled, allowedCategories, maxFixesPerRun, dryRun }
 
+import { requireProjectRole, forbidden } from "@/lib/authz";
 import type { NextRequest } from "next/server";
 import { requireUser } from "@/lib/session";
 import { readJsonBody } from "@/lib/sitefiles/api";
@@ -46,6 +47,7 @@ export async function PUT(
   }>(req);
   const site = await ownedSite(user.id, body?.projectId, id);
   if (!site) return Response.json({ error: "Site not found" }, { status: 404 });
+  if (!(await requireProjectRole(user.id, site.projectId, "admin"))) return forbidden();
 
   const allowed = (body?.allowedCategories ?? []).filter((c) => CATEGORY_MAP[c]);
   const maxFixes = Math.min(50, Math.max(1, Math.floor(body?.maxFixesPerRun ?? 10)));

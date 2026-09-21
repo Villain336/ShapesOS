@@ -11,7 +11,8 @@
 
 import type { Site, SiteConnection } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { decryptSecret, encryptSecret } from "@/lib/sitefiles/crypto";
+import { accessibleWorkspaceWhere } from "@/lib/authz";
+import { secrets } from "@/lib/secrets";
 import { getSiteFileProvider } from "@/lib/sitefiles";
 import type { SiteFileProvider } from "@/lib/sitefiles/types";
 import { GitHubSiteFileProvider } from "./github";
@@ -35,22 +36,22 @@ export interface GitHubSiteConfig extends GitHubConfig {}
 export function decryptSiteConfig(site: { configEnc: string }): Record<string, unknown> {
   if (!site.configEnc) return {};
   try {
-    return JSON.parse(decryptSecret(site.configEnc)) as Record<string, unknown>;
+    return JSON.parse(secrets().decrypt(site.configEnc)) as Record<string, unknown>;
   } catch {
     return {};
   }
 }
 
 export function encryptSiteConfig(config: Record<string, unknown>): string {
-  return encryptSecret(JSON.stringify(config));
+  return secrets().encrypt(JSON.stringify(config));
 }
 
-/** Load a site only if it belongs to one of the user's projects. */
+/** Load a site only if it belongs to a project in a workspace the user can access. */
 export async function ownedSite(userId: string, projectId: unknown, siteId: unknown) {
   if (typeof projectId !== "string" || !projectId) return null;
   if (typeof siteId !== "string" || !siteId) return null;
   return prisma.site.findFirst({
-    where: { id: siteId, projectId, project: { workspace: { ownerUserId: userId } } },
+    where: { id: siteId, projectId, project: { workspace: accessibleWorkspaceWhere(userId) } },
     include: { sftpConnection: true },
   });
 }

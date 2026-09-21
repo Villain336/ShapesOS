@@ -6,6 +6,7 @@
 // clearly-marked mock otherwise), and saves the draft (status "draft").
 // Each draft increments the ai_words meter by the draft's word count.
 
+import { accessibleWorkspaceWhere, requireProjectRole, forbidden } from "@/lib/authz";
 import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
@@ -28,13 +29,14 @@ export async function POST(req: NextRequest) {
   const contentItem = await prisma.contentItem.findFirst({
     where: {
       id: body.contentId,
-      project: { workspace: { ownerUserId: user.id } },
+      project: { workspace: accessibleWorkspaceWhere(user.id) },
     },
     include: { project: true, keyword: true },
   });
   if (!contentItem) {
     return Response.json({ error: "Content item not found" }, { status: 404 });
   }
+  if (!(await requireProjectRole(user.id, contentItem.projectId, "editor"))) return forbidden();
 
   const brief = contentItem.outlineJson as ContentBrief | null;
   if (!brief?.keyword) {

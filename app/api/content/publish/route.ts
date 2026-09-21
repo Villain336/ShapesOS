@@ -3,6 +3,7 @@
 // Marks the item "published". No actual CMS publishing in this milestone —
 // the WordPress publish step belongs to the fix-agent phase (out of scope).
 
+import { accessibleWorkspaceWhere, requireProjectRole, forbidden } from "@/lib/authz";
 import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
@@ -21,12 +22,13 @@ export async function POST(req: NextRequest) {
   const contentItem = await prisma.contentItem.findFirst({
     where: {
       id: body.contentId,
-      project: { workspace: { ownerUserId: user.id } },
+      project: { workspace: accessibleWorkspaceWhere(user.id) },
     },
   });
   if (!contentItem) {
     return Response.json({ error: "Content item not found" }, { status: 404 });
   }
+  if (!(await requireProjectRole(user.id, contentItem.projectId, "editor"))) return forbidden();
 
   const updated = await prisma.contentItem.update({
     where: { id: contentItem.id },

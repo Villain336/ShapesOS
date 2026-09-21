@@ -14,6 +14,7 @@
 // field — page designs themselves are not API-editable). Nothing scheduled,
 // nothing automatic.
 
+import { requireProjectRole, forbidden } from "@/lib/authz";
 import type { NextRequest } from "next/server";
 import { requireUser } from "@/lib/session";
 import { readJsonBody } from "@/lib/sitefiles/api";
@@ -60,6 +61,7 @@ export async function POST(
 
   const source = await ownedSite(user.id, body.projectId, id);
   if (!source) return Response.json({ error: "Source site not found" }, { status: 404 });
+  if (!(await requireProjectRole(user.id, source.projectId, "editor"))) return forbidden();
   const target = await ownedSite(user.id, body.projectId, body.targetSiteId);
   if (!target) return Response.json({ error: "Target site not found" }, { status: 404 });
   if (target.sourceType !== "wordpress" && target.sourceType !== "webflow")

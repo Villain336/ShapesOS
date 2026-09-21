@@ -4,6 +4,7 @@
 //      source: "manual" | "ai". Every write is appended to the audit log
 //      (FileChangeLog); AI-applied writes record approvedBy = the user.
 
+import { requireProjectRole, forbidden } from "@/lib/authz";
 import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
@@ -70,6 +71,7 @@ export async function POST(
   if (!connection) {
     return Response.json({ error: "Connection not found" }, { status: 404 });
   }
+  if (!(await requireProjectRole(user.id, connection.projectId, "editor"))) return forbidden();
 
   let path: string;
   try {

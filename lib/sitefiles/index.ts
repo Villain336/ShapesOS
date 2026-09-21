@@ -2,7 +2,7 @@
 // Demo connections get the mock provider; everything else gets SFTP.
 // Secrets are decrypted here, server-side only, and never leave the server.
 
-import { decryptSecret } from "./crypto";
+import { secrets } from "@/lib/secrets";
 import { MockSiteFileProvider } from "./mock";
 import { SftpSiteFileProvider } from "./sftp";
 import type { SiteConnectionConfig, SiteFileProvider } from "./types";
@@ -21,7 +21,7 @@ export function getSiteFileProvider(conn: {
   demo: boolean;
 }): SiteFileProvider {
   if (conn.demo) return new MockSiteFileProvider();
-  const secret = decryptSecret(conn.secretEnc);
+  const secret = secrets().decrypt(conn.secretEnc);
   const config: SiteConnectionConfig = {
     id: conn.id,
     label: conn.label,

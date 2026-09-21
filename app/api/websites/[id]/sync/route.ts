@@ -4,6 +4,7 @@
 // GitHub/SFTP sites: every remote file is copied into the local working copy
 // (the IDE edits the working copy). File-source sites: no-op.
 
+import { requireProjectRole, forbidden } from "@/lib/authz";
 import type { NextRequest } from "next/server";
 import { requireUser } from "@/lib/session";
 import { readJsonBody } from "@/lib/sitefiles/api";
@@ -25,6 +26,7 @@ export async function POST(
   const body = await readJsonBody<{ projectId?: string }>(req);
   const site = await ownedSite(user.id, body?.projectId, id);
   if (!site) return Response.json({ error: "Site not found" }, { status: 404 });
+  if (!(await requireProjectRole(user.id, site.projectId, "editor"))) return forbidden();
 
   const working = await getSiteIdeProvider(site);
   const remote = await getSiteRemote(site).catch((err: unknown) => ({

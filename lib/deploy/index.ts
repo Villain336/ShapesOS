@@ -7,7 +7,8 @@
 
 import type { HostingConnection } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { decryptSecret, encryptSecret } from "@/lib/sitefiles/crypto";
+import { accessibleWorkspaceWhere } from "@/lib/authz";
+import { secrets } from "@/lib/secrets";
 import { VercelDeployTarget } from "./vercel";
 import { CloudflarePagesDeployTarget } from "./cloudflare";
 import { MockVercelDeployTarget } from "./mock-vercel";
@@ -24,22 +25,22 @@ import type {
 export function decryptHostingConfig(conn: { configEnc: string }): Record<string, unknown> {
   if (!conn.configEnc) return {};
   try {
-    return JSON.parse(decryptSecret(conn.configEnc)) as Record<string, unknown>;
+    return JSON.parse(secrets().decrypt(conn.configEnc)) as Record<string, unknown>;
   } catch {
     return {};
   }
 }
 
 export function encryptHostingConfig(config: Record<string, unknown>): string {
-  return encryptSecret(JSON.stringify(config));
+  return secrets().encrypt(JSON.stringify(config));
 }
 
-/** Load a hosting connection only if it belongs to one of the user's projects. */
+/** Load a hosting connection only if it belongs to a workspace the user can access. */
 export async function ownedHostingConnection(userId: string, projectId: unknown, connId: unknown) {
   if (typeof projectId !== "string" || !projectId) return null;
   if (typeof connId !== "string" || !connId) return null;
   return prisma.hostingConnection.findFirst({
-    where: { id: connId, projectId, project: { workspace: { ownerUserId: userId } } },
+    where: { id: connId, projectId, project: { workspace: accessibleWorkspaceWhere(userId) } },
   });
 }
 

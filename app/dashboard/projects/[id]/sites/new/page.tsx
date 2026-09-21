@@ -1,6 +1,7 @@
 // Marketr — AI landing-page builder page (milestone 7), server wrapper.
 // Fetches content briefs for the optional keyword → brief → page tie-in.
 
+import { accessibleWorkspaceWhere } from "@/lib/authz";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
@@ -19,7 +20,7 @@ export default async function NewSitePage({
   const { id } = await params;
 
   const project = await prisma.project.findFirst({
-    where: { id, workspace: { ownerUserId: user.id } },
+    where: { id, workspace: accessibleWorkspaceWhere(user.id) },
     include: {
       contentItems: {
         where: { status: { in: ["brief", "draft", "editing"] } },

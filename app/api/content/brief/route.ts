@@ -5,6 +5,7 @@
 // with buildBrief(), and persists it to ContentItem (status "brief").
 // Each brief increments the serp_calls meter (best-effort).
 
+import { accessibleWorkspaceWhere, requireProjectRole, forbidden } from "@/lib/authz";
 import type { NextRequest } from "next/server";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
@@ -27,13 +28,14 @@ export async function POST(req: NextRequest) {
   const keyword = await prisma.keyword.findFirst({
     where: {
       id: body.keywordId,
-      project: { id: body.projectId, workspace: { ownerUserId: user.id } },
+      project: { id: body.projectId, workspace: accessibleWorkspaceWhere(user.id) },
     },
     include: { project: true },
   });
   if (!keyword) {
     return Response.json({ error: "Keyword not found" }, { status: 404 });
   }
+  if (!(await requireProjectRole(user.id, body.projectId, "editor"))) return forbidden();
 
   const provider = getSeoProvider();
 

@@ -2,6 +2,7 @@
 // PATCH /api/websites/[id]/issues/[issueId] { projectId, status: "approved" | "ignored" }
 // Approval is the explicit per-issue gate for the scheduled rung.
 
+import { requireProjectRole, forbidden } from "@/lib/authz";
 import type { NextRequest } from "next/server";
 import { requireUser } from "@/lib/session";
 import { readJsonBody } from "@/lib/sitefiles/api";
@@ -20,6 +21,7 @@ export async function PATCH(
   const body = await readJsonBody<{ projectId?: string; status?: string }>(req);
   const site = await ownedSite(user.id, body?.projectId, id);
   if (!site) return Response.json({ error: "Site not found" }, { status: 404 });
+  if (!(await requireProjectRole(user.id, site.projectId, "editor"))) return forbidden();
 
   if (body?.status !== "approved" && body?.status !== "ignored") {
     return Response.json({ error: "status must be approved or ignored" }, { status: 400 });

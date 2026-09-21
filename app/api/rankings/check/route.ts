@@ -14,6 +14,7 @@
 // checked depth — recorded, never a crash). Movement alerts are computed
 // against the previous check and returned in the response.
 
+import { accessibleWorkspaceWhere, requireProjectRole, forbidden } from "@/lib/authz";
 import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
@@ -144,12 +145,15 @@ export async function POST(req: NextRequest) {
 
   if (!isCron) {
     const owned = await prisma.project.findFirst({
-      where: { id: projectId, workspace: { ownerUserId: user!.id } },
+      where: { id: projectId, workspace: accessibleWorkspaceWhere(user!.id) },
       select: { id: true },
     });
     if (!owned) {
       return Response.json({ error: "Project not found" }, { status: 404 });
     }
+    // Milestone 11: session-triggered rank checks are editor+ (they spend
+    // DataForSEO credits). The CRON_SECRET path is a service actor.
+    if (!(await requireProjectRole(user!.id, projectId, "editor"))) return forbidden();
   }
 
   const result = await checkProject(projectId);

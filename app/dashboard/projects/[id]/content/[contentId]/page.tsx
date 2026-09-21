@@ -2,6 +2,7 @@
 // Server-loads the ContentItem (with its brief), then hands it to the
 // interactive ContentDetail component.
 
+import { accessibleWorkspaceWhere } from "@/lib/authz";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
@@ -21,7 +22,7 @@ export default async function ContentDetailPage({
   const { id, contentId } = await params;
 
   const project = await prisma.project.findFirst({
-    where: { id, workspace: { ownerUserId: user.id } },
+    where: { id, workspace: accessibleWorkspaceWhere(user.id) },
     select: { id: true, domain: true },
   });
   if (!project) notFound();

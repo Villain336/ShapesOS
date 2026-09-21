@@ -4,6 +4,7 @@
 
 import type { NextRequest } from "next/server";
 import { requireUser } from "@/lib/session";
+import { requireProjectRole, forbidden } from "@/lib/authz";
 import { prisma } from "@/lib/prisma";
 import { ownedHostingConnection } from "@/lib/deploy";
 
@@ -19,6 +20,19 @@ export async function DELETE(
   const conn = await ownedHostingConnection(user.id, projectId, id);
   if (!conn) return Response.json({ error: "Connection not found" }, { status: 404 });
 
+  // Milestone 11: deleting stored tokens is admin+.
+  if (!(await requireProjectRole(user.id, conn.projectId, "admin"))) return forbidden();
   await prisma.hostingConnection.delete({ where: { id: conn.id } });
+  // Milestone 11: credential lifecycle is audit-logged (no secret material).
+  await prisma.fileChangeLog.create({
+    data: {
+      projectId: conn.projectId,
+      filePath: "(connection)",
+      actor: "user",
+      action: "credential_deleted",
+      summary: `${user.email ?? user.id} deleted hosting connection "${conn.name}"`,
+      approvedBy: user.id,
+    },
+  });
   return Response.json({ ok: true });
 }

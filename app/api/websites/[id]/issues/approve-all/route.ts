@@ -2,6 +2,7 @@
 // POST /api/websites/[id]/issues/approve-all { projectId, severity?, category? }
 // Approves every open, auto-fixable issue matching the filters.
 
+import { requireProjectRole, forbidden } from "@/lib/authz";
 import type { NextRequest } from "next/server";
 import { requireUser } from "@/lib/session";
 import { readJsonBody } from "@/lib/sitefiles/api";
@@ -20,6 +21,7 @@ export async function POST(
   const body = await readJsonBody<{ projectId?: string; severity?: string; category?: string }>(req);
   const site = await ownedSite(user.id, body?.projectId, id);
   if (!site) return Response.json({ error: "Site not found" }, { status: 404 });
+  if (!(await requireProjectRole(user.id, site.projectId, "editor"))) return forbidden();
 
   const result = await prisma.siteIssue.updateMany({
     where: {
