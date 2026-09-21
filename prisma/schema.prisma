@@ -86,6 +86,8 @@ enum FileChangeAction {
   ai_proposal
   // User reviewed and explicitly applied an AI proposal.
   ai_applied
+  // Milestone 9: working copy deployed to a hosting target (Vercel/Cloudflare).
+  deploy
 }
 
 // Marketr — where a Site's files live (milestone 7).
@@ -140,6 +142,8 @@ model Project {
   siteConnections SiteConnection[]
   fileChangeLogs  FileChangeLog[]
   sites       Site[]
+  hostingConnections HostingConnection[]
+  deployments Deployment[]
 
   @@map("projects")
 }
@@ -387,9 +391,63 @@ model Site {
   sftpConnection   SiteConnection? @relation(fields: [sftpConnectionId], references: [id], onDelete: SetNull)
 
   fileChangeLogs FileChangeLog[]
+  deployments    Deployment[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("sites")
+}
+
+// Marketr — hosting deploy targets (milestone 9). Tokens encrypted in
+// configEnc (AES-256-GCM, lib/sitefiles/crypto.ts), decrypted server-side
+// only, never sent to the client.
+enum DeployTargetType {
+  vercel
+  cloudflare_pages @map("cloudflare-pages")
+}
+
+model HostingConnection {
+  id        String @id @default(cuid())
+  projectId String @map("project_id")
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  name      String
+  target    DeployTargetType
+  // AES-256-GCM encrypted JSON. Vercel: { token, projectId?, teamId?, demo? }.
+  // Cloudflare: { token, accountId, projectName?, demo? }.
+  configEnc String @map("config_enc") @db.Text
+
+  deployments Deployment[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("hosting_connections")
+}
+
+// Marketr — one deploy of a Site's working copy to Vercel or Cloudflare
+// Pages (milestone 9). Persisted so the UI shows URL + status + timestamp
+// without calling the provider each time. mock=true rows are demos.
+model Deployment {
+  id         String @id @default(cuid())
+  siteId     String @map("site_id")
+  site       Site @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  projectId  String @map("project_id")
+  project    Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  connectionId String? @map("connection_id")
+  connection   HostingConnection? @relation(fields: [connectionId], references: [id], onDelete: SetNull)
+
+  target       DeployTargetType
+  url          String?
+  deploymentId String? @map("deployment_id")
+  status       String  @default("queued")
+  mock         Boolean @default(false)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([siteId, createdAt])
+  @@map("deployments")
 }

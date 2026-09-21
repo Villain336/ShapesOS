@@ -5,6 +5,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
 import SitesManager from "@/components/SitesManager";
+import HostingManager from "@/components/HostingManager";
 
 export const dynamic = "force-dynamic";
 
@@ -34,6 +35,7 @@ export default async function SitesPage({
         </p>
       </div>
       <SitesManager projectId={project.id} />
+      <HostingManager projectId={project.id} />
     </div>
   );
 }
