@@ -59,14 +59,16 @@ them over via the Secure Vault flow and Z7 writes them server-side.
    no GitHub remote is created).
 4. **Env:** copy `.env.example` → `.env`, fill §2 items 3–7. `chmod 600 .env`.
 5. **Data volume fix:** apply §1a, then `docker compose up -d --build`.
-6. **Migrations:** watch boot logs — `npx prisma migrate deploy` must apply all 8 migrations cleanly
-   (`..._init` → `..._enterprise_security`). Note: `20260921123000_site_connections` predates
+6. **Migrations:** watch boot logs — `npx prisma migrate deploy` must apply all 10 migrations cleanly
+   (`..._init` → `..._alert_hub`). Note: `20260921123000_site_connections` predates
    `20260921130000_tracked_keywords`; both are fresh and self-contained, but any failure here stops
    the deploy. Verify with `docker compose exec db psql -U marketr -c "\dt"`.
 7. **Caddy:** reverse-proxy `marketr.launchabl.com` → `localhost:3000`, auto-TLS. Confirm HTTPS.
 8. **Cron (host crontab):**
    - `0 6 * * * curl -s -X POST -H "Authorization: Bearer $CRON_SECRET" https://marketr.launchabl.com/api/rankings/check -d '{"scope":"all"}'`
    - `30 6 * * * curl -s -X POST -H "Authorization: Bearer $CRON_SECRET" https://marketr.launchabl.com/api/cron/fix-agent`
+   - `0 7 * * * curl -s -X POST -H "Authorization: Bearer $CRON_SECRET" https://marketr.launchabl.com/api/cron/reports`
+   - `*/15 * * * * curl -s -X POST -H "Authorization: Bearer $CRON_SECRET" https://marketr.launchabl.com/api/cron/alerts`
 9. **Smoke test:** log in, create workspace + project, confirm pages load, no console errors.
 10. **Backups:** nightly `pg_dump` cron → object storage; document restore command.
 

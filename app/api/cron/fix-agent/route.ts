@@ -18,6 +18,7 @@ import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
 import { getSiteIdeProvider } from "@/lib/connectors/source";
 import { runScheduledFixes } from "@/lib/audit/runner";
+import { emitAlert } from "@/lib/alerts/evaluate";
 
 export const dynamic = "force-dynamic";
 
@@ -40,7 +41,7 @@ export async function POST(req: NextRequest) {
         ? undefined
         : { project: { workspace: accessibleWorkspaceWhere(user!.id) } },
     },
-    include: { site: { include: { sftpConnection: true } } },
+    include: { site: { include: { sftpConnection: true, project: { select: { workspaceId: true } } } } },
   });
 
   // Skip content-only sources (no file tree to fix).
@@ -70,6 +71,17 @@ export async function POST(req: NextRequest) {
         provider,
       });
       results.push({ siteId: site.id, siteName: site.name, ok: true, summary: run.summary });
+      // Milestone 13: fix-agent completion alerts (best-effort, never breaks the run).
+      emitAlert({
+        workspaceId: site.project.workspaceId,
+        projectId: site.projectId,
+        trigger: "fix_run",
+        severity: "info",
+        title: `✅ Fix-agent run completed: ${site.name}`,
+        body: run.summary ?? "Completed with no errors.",
+        link: `/dashboard/projects/${site.projectId}/sites`,
+        dedupKey: `fix_run:${site.id}:${new Date().toISOString().slice(0, 10)}`,
+      }).catch(() => {});
     } catch (err) {
       results.push({
         siteId: site.id,
@@ -77,6 +89,17 @@ export async function POST(req: NextRequest) {
         ok: false,
         error: err instanceof Error ? err.message : "fix run failed",
       });
+      // Milestone 13: fix-agent failure alerts (best-effort).
+      emitAlert({
+        workspaceId: site.project.workspaceId,
+        projectId: site.projectId,
+        trigger: "fix_run",
+        severity: "critical",
+        title: `❌ Fix-agent run failed: ${site.name}`,
+        body: err instanceof Error ? err.message : "fix run failed",
+        link: `/dashboard/projects/${site.projectId}/sites`,
+        dedupKey: `fix_run:${site.id}:${new Date().toISOString().slice(0, 10)}`,
+      }).catch(() => {});
     }
   }
 

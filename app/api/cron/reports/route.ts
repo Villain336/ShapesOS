@@ -15,6 +15,7 @@ import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireUser, getOrCreateWorkspace } from "@/lib/session";
 import { generateReport } from "@/lib/pdf/generate";
+import { emitAlert } from "@/lib/alerts/evaluate";
 
 export const dynamic = "force-dynamic";
 
@@ -82,6 +83,16 @@ export async function POST(req: NextRequest) {
         },
       });
       results.push({ templateId: t.id, reportId: report.id });
+      // Milestone 13: report-ready alerts (best-effort — never breaks the cron run).
+      emitAlert({
+        workspaceId: t.workspaceId,
+        trigger: "report_ready",
+        severity: "info",
+        title: `📄 Report ready: ${t.name}`,
+        body: `The scheduled ${t.schedule} report "${t.name}" finished generating and is ready to download.`,
+        link: "/dashboard/reports",
+        dedupKey: `report_ready:${report.id}`,
+      }).catch(() => {});
     } catch (err) {
       results.push({
         templateId: t.id,

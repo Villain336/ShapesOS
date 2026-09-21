@@ -21,6 +21,7 @@ import { requireUser } from "@/lib/session";
 import { getSeoProvider, providerStatus } from "@/lib/providers";
 import { recordUsage } from "@/lib/usage";
 import { domainMatches, computeAlerts, type RankAlert } from "@/lib/rankings";
+import { emitAlert, type TriggerInput } from "@/lib/alerts/evaluate";
 
 export const dynamic = "force-dynamic";
 
@@ -97,9 +98,63 @@ async function checkProject(projectId: string): Promise<CheckResult> {
       },
     });
 
-    result.alerts.push(
-      ...computeAlerts(kw.id, kw.phrase, previous?.position ?? null, position, now),
-    );
+    const newAlerts = computeAlerts(kw.id, kw.phrase, previous?.position ?? null, position, now);
+    result.alerts.push(...newAlerts);
+
+    // Milestone 13: fan rank movements + AI Overview changes into the alert hub.
+    // Evaluation is best-effort — alert failures must never break rank checks.
+    const dayKey = now.toISOString().slice(0, 10);
+    const triggers: TriggerInput[] = [];
+    for (const a of newAlerts) {
+      const base = {
+        workspaceId: project.workspaceId,
+        projectId,
+        link: `/dashboard/projects/${projectId}/rankings`,
+        scopeKeywordIds: [kw.id],
+      };
+      if (a.kind === "big_loss" || a.kind === "dropped_out" || a.kind === "left_top_10") {
+        const movement = a.kind === "dropped_out" ? 100 : a.kind === "left_top_10" ? 10 : (a.from ?? 0) - (a.to ?? 0);
+        triggers.push({
+          ...base,
+          trigger: "rank_drop",
+          severity: a.kind === "dropped_out" ? "critical" : "warn",
+          title: `🔻 "${kw.phrase}" dropped ${movement} positions (${a.from ?? "–"} → ${a.to ?? "–"})`,
+          body: `"${kw.phrase}" on ${project.domain} moved from #${a.from ?? "unranked"} to #${a.to ?? "unranked"}.`,
+          movement,
+          dedupKey: `rank_drop:${kw.id}:${dayKey}`,
+        });
+      } else {
+        const movement = a.kind === "newly_ranking" ? 5 : a.kind === "entered_top_10" ? 10 : (a.from ?? 0) - (a.to ?? 0);
+        triggers.push({
+          ...base,
+          trigger: "rank_gain",
+          severity: "info" as const,
+          title: `📈 "${kw.phrase}" gained ${movement} positions (${a.from ?? "–"} → ${a.to ?? "–"})`,
+          body: `"${kw.phrase}" on ${project.domain} moved from #${a.from ?? "unranked"} to #${a.to ?? "unranked"}.`,
+          movement,
+          dedupKey: `rank_gain:${kw.id}:${dayKey}`,
+        });
+      }
+    }
+    const aiNow = snapshot.aiOverviewPresent ?? false;
+    if (previous && previous.aiOverviewPresent !== aiNow) {
+      triggers.push({
+        workspaceId: project.workspaceId,
+        projectId,
+        trigger: "ai_overview_change",
+        severity: "info" as const,
+        title: aiNow
+          ? `✨ AI Overviews now appearing for "${kw.phrase}"`
+          : `AI Overviews no longer appearing for "${kw.phrase}"`,
+        body: `Google AI Overview presence for "${kw.phrase}" changed to ${aiNow ? "present" : "absent"} on the latest SERP check.`,
+        link: `/dashboard/projects/${projectId}/rankings`,
+        scopeKeywordIds: [kw.id],
+        dedupKey: `ai_overview:${kw.id}:${dayKey}`,
+      });
+    }
+    if (triggers.length) {
+      await Promise.allSettled(triggers.map((t) => emitAlert(t)));
+    }
     result.rankings.push({ keywordId: kw.id, phrase: kw.phrase, position, url });
     result.checked += 1;
 

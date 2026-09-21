@@ -29,6 +29,18 @@ export default async function DashboardLayout({
               Reports
             </Link>
             <Link
+              href="/dashboard/alerts"
+              className="text-sm text-zinc-400 hover:text-zinc-200"
+            >
+              Alerts
+            </Link>
+            <Link
+              href="/dashboard/settings/alerts"
+              className="text-sm text-zinc-400 hover:text-zinc-200"
+            >
+              Alert rules
+            </Link>
+            <Link
               href="/dashboard/settings/brand-kits"
               className="text-sm text-zinc-400 hover:text-zinc-200"
             >

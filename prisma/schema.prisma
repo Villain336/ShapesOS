@@ -119,6 +119,15 @@ enum FileChangeAction {
   // Milestone 12: white-label report lifecycle.
   report_generated
   report_scheduled
+  // Milestone 13: alert hub lifecycle.
+  alert_channel_created
+  alert_channel_updated
+  alert_channel_deleted
+  alert_rule_created
+  alert_rule_updated
+  alert_rule_deleted
+  alert_sent
+  alert_failed
 }
 
 // Marketr — where a Site's files live (milestone 7).
@@ -156,6 +165,10 @@ model Workspace {
   // Milestone 12: white-label brand kits and report templates.
   brandKits BrandKit[]
   reportTemplates ReportTemplate[]
+  // Milestone 13: alerting hub (channels, rules, event history).
+  alertChannels AlertChannel[]
+  alertRules AlertRule[]
+  alertEvents AlertEvent[]
 
   @@map("workspaces")
 }
@@ -716,4 +729,111 @@ model WorkspaceMember {
   @@unique([workspaceId, email])
   @@index([userId])
   @@map("workspace_members")
+}
+
+// Marketr — alerting hub (milestone 13).
+// Slack (incoming webhook), Telegram (bot API), email (SMTP) now;
+// WhatsApp intentionally deferred (phased per spec).
+
+enum AlertChannelType {
+  slack
+  telegram
+  email
+}
+
+enum AlertEventStatus {
+  // Queued for a digest window or quiet-hours hold — not yet attempted.
+  queued
+  // Delivered to every enabled channel on the rule.
+  sent
+  // Attempted but every channel failed (see results JSON for per-channel detail).
+  failed
+  // Suppressed by cooldown/dedup or an explicitly quiet trigger — never sent.
+  suppressed
+}
+
+model AlertChannel {
+  id          String           @id @default(cuid())
+  workspaceId String           @map("workspace_id")
+  workspace   Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name        String
+  type        AlertChannelType
+  // Encrypted JSON envelope (AES-256-GCM, lib/secrets). Shapes:
+  //   slack:    { webhookUrl: string }
+  //   telegram: { botToken: string, chatId: string }
+  //   email:    { to: string, cc?: string }
+  // SMTP server settings are instance-level env vars (see .env.example),
+  // not stored per channel.
+  configEnc   String           @map("config_enc") @db.Text
+  // Non-sensitive UI hint, e.g. "…/T0123/abc" or "chat 12345" / "ops@acme.co".
+  hint        String           @default("")
+  enabled     Boolean          @default(true)
+  createdAt   DateTime         @default(now()) @map("created_at")
+  updatedAt   DateTime         @updatedAt @map("updated_at")
+
+  rules AlertRule[] @relation("AlertRuleChannels")
+
+  @@index([workspaceId])
+  @@map("alert_channels")
+}
+
+model AlertRule {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name        String
+  // Trigger key — see lib/alerts/triggers.ts TRIGGERS:
+  // rank_drop | rank_gain | ai_overview_change | fix_run | report_ready | visibility_delta
+  trigger     String
+  // JSON conditions, all optional:
+  //   { projectIds?: string[], keywordIds?: string[], thresholdPositions?: number,
+  //     severities?: string[], onlyTop10?: boolean }
+  conditions  Json      @default("{}")
+  // Minimum seconds between fires of this rule for the same dedup scope.
+  cooldownSec Int       @default(3600) @map("cooldown_sec")
+  // "immediate" — send now; "daily_digest" — batch into one message per day.
+  digest      String    @default("immediate")
+  // Optional quiet hours, UTC: { start: "22:00", end: "07:00" }. Events inside
+  // the window are queued and flushed when the window ends.
+  quietHours  Json?     @map("quiet_hours")
+  enabled     Boolean   @default(true)
+  lastFiredAt DateTime? @map("last_fired_at")
+  lastDigestAt DateTime? @map("last_digest_at")
+
+  channels AlertChannel[] @relation("AlertRuleChannels")
+  events   AlertEvent[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([workspaceId, trigger])
+  @@map("alert_rules")
+}
+
+model AlertEvent {
+  id          String           @id @default(cuid())
+  ruleId      String           @map("rule_id")
+  rule        AlertRule        @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  workspaceId String           @map("workspace_id")
+  workspace   Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  // Denormalized for the history UI (rule may be deleted later).
+  trigger     String
+  title       String
+  body        String           @db.Text
+  link        String?
+  // Dedup key, e.g. "rank_drop:<keywordId>:<yyyy-mm-dd>". Null = no dedup.
+  dedupKey    String?          @map("dedup_key")
+  // Why a queued event is waiting: "digest" (daily batch) or "quiet" (quiet hours).
+  queueReason String?          @map("queue_reason")
+  status      AlertEventStatus @default(queued)
+  // Per-channel results: [{ channelId, name, type, ok, error?, providerResponse? }]
+  results     Json             @default("[]")
+  retryCount  Int              @default(0) @map("retry_count")
+  createdAt   DateTime         @default(now()) @map("created_at")
+  sentAt      DateTime?        @map("sent_at")
+
+  @@index([workspaceId, createdAt])
+  @@index([ruleId, createdAt])
+  @@index([dedupKey, createdAt])
+  @@map("alert_events")
 }
