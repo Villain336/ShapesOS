@@ -23,6 +23,18 @@ export default async function DashboardLayout({
           </Link>
           <div className="flex items-center gap-4">
             <Link
+              href="/dashboard/reports"
+              className="text-sm text-zinc-400 hover:text-zinc-200"
+            >
+              Reports
+            </Link>
+            <Link
+              href="/dashboard/settings/brand-kits"
+              className="text-sm text-zinc-400 hover:text-zinc-200"
+            >
+              Brand kits
+            </Link>
+            <Link
               href="/dashboard/settings/members"
               className="text-sm text-zinc-400 hover:text-zinc-200"
             >

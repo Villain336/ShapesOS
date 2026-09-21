@@ -1,0 +1,25 @@
+{
+  "$schema": "https://ui.shadcn.com/schema.json",
+  "aliases": {
+    "components": "@/components",
+    "hooks": "@/hooks",
+    "lib": "@/lib",
+    "ui": "@/components/ui",
+    "utils": "@/lib/utils"
+  },
+  "iconLibrary": "lucide",
+  "registries": {
+    "@pdfcn": "https://www.pdfcn.dev/r/{name}.json",
+    "@editorcn": "https://editorcn.vercel.app/r/{name}.json"
+  },
+  "rsc": true,
+  "style": "new-york",
+  "tailwind": {
+    "baseColor": "zinc",
+    "config": "",
+    "css": "app/globals.css",
+    "cssVariables": true,
+    "prefix": ""
+  },
+  "tsx": true
+}

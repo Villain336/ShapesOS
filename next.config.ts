@@ -31,6 +31,11 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   // Required for the self-hosted Docker image (see Dockerfile)
   output: "standalone",
+  // Milestone 12: takumi-pdf ships a wasm binary with bundler-specific entry
+  // points. Externalize it so Node's own resolver picks the `node` condition
+  // (readFileSync-based wasm load) instead of Turbopack bundling the
+  // Vite-specific `?url` entry and failing the build.
+  serverExternalPackages: ["takumi-pdf"],
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },

@@ -92,6 +92,8 @@ enum FileChangeActor {
   ai
   // Milestone 10: the fix agent applying approved fixes on schedule.
   fix_agent
+  // Milestone 12: scheduled/system report generation (cron actor).
+  system
 }
 
 enum FileChangeAction {
@@ -114,6 +116,9 @@ enum FileChangeAction {
   member_added
   member_role_changed
   member_removed
+  // Milestone 12: white-label report lifecycle.
+  report_generated
+  report_scheduled
 }
 
 // Marketr — where a Site's files live (milestone 7).
@@ -148,6 +153,9 @@ model Workspace {
   members  WorkspaceMember[]
   // Milestone 11: workspace-scoped audit events.
   auditEvents FileChangeLog[]
+  // Milestone 12: white-label brand kits and report templates.
+  brandKits BrandKit[]
+  reportTemplates ReportTemplate[]
 
   @@map("workspaces")
 }
@@ -176,6 +184,9 @@ model Project {
   deployments Deployment[]
   siteAudits  SiteAudit[]
   siteIssues  SiteIssue[]
+  // Milestone 12: report templates and generated reports scoped to this project.
+  reportTemplates ReportTemplate[]
+  reports Report[]
 
   @@map("projects")
 }
@@ -267,6 +278,8 @@ model Client {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   reports Report[]
+  // Milestone 12: brand kits mapped to this client (per-client white-label).
+  brandKits BrandKit[]
 
   @@unique([workspaceId, loginEmail])
   @@map("clients")
@@ -274,16 +287,101 @@ model Client {
 
 model Report {
   id       String @id @default(cuid())
-  clientId String @map("client_id")
-  client   Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  // Milestone 12: client is optional — on-demand/scheduled template reports
+  // may exist before they are assigned/sent to a client.
+  clientId String? @map("client_id")
+  client   Client? @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  // Milestone 12: template + brand kit that produced this report.
+  templateId String? @map("template_id")
+  template   ReportTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  brandKitId String? @map("brand_kit_id")
+  brandKit   BrandKit? @relation(fields: [brandKitId], references: [id], onDelete: SetNull)
+  // Milestone 12: project whose data fills the report (rankings, visibility).
+  projectId String? @map("project_id")
+  project   Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
 
   period String
   pdfUrl String? @map("pdf_url")
+  // Milestone 12: local storage path under .data/reports (durable volume in prod).
+  pdfPath String? @map("pdf_path")
+  status  ReportStatus @default(ready) @map("status")
+  error   String?
   sentAt DateTime? @map("sent_at")
 
   createdAt DateTime @default(now()) @map("created_at")
 
   @@map("reports")
+}
+
+// Milestone 12: lifecycle of a generated white-label report.
+enum ReportStatus {
+  queued
+  generating
+  ready
+  failed
+  sent
+}
+
+// Marketr — white-label brand kit (milestone 12). Workspace-scoped; optionally
+// mapped to a client so agencies get per-client branding. Consumed by pdfcn
+// report rendering, emailcn emails (M19), ad factory (M21) and studio (M22).
+model BrandKit {
+  id          String @id @default(cuid())
+  workspaceId String @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  name String
+  // Logo file stored under .data/reports/logos/<id>.<ext>; path relative to repo root.
+  logoPath String? @map("logo_path")
+  // { primary, secondary, accent, text, muted } — hex strings.
+  colors Json @default("{}")
+  // { heading, body } — font family names.
+  fonts Json @default("{}")
+  // Voice/tone notes guiding AI-generated copy inside reports.
+  tone String?
+  // Optional client this kit brands (agency white-label per client).
+  clientId String? @map("client_id")
+  client   Client? @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  isDefault Boolean @default(false) @map("is_default")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  templates ReportTemplate[]
+  reports   Report[]
+
+  @@map("brand_kits")
+}
+
+// Marketr — editable report template (milestone 12). Content is Tiptap JSON
+// (edited with the editorcn block editor in the dashboard) plus optional
+// {{placeholders}} resolved at generation time from project data.
+model ReportTemplate {
+  id          String @id @default(cuid())
+  workspaceId String @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  name String
+  // "ranking" (keyword rankings + visibility) | "custom".
+  type String @default("custom")
+  // Tiptap JSON document — single source of truth.
+  content Json
+  brandKitId String? @map("brand_kit_id")
+  brandKit   BrandKit? @relation(fields: [brandKitId], references: [id], onDelete: SetNull)
+  // Project whose data fills {{placeholders}} at generation time.
+  projectId String? @map("project_id")
+  project   Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  // "manual" | "weekly" | "monthly" — picked up by POST /api/cron/reports.
+  schedule String @default("manual")
+  lastRunAt DateTime? @map("last_run_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  reports Report[]
+
+  @@map("report_templates")
 }
 
 enum ApiMeter {
