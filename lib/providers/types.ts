@@ -125,4 +125,69 @@ export interface SeoDataProvider {
   ): Promise<CompetitorKeyword[]>;
   /** Top organic SERP snapshot for a keyword (DataForSEO SERP organic live). */
   serpResults(params: SerpResultsParams): Promise<SerpSnapshot>;
+  /** Backlinks pointing at the target (DataForSEO Backlinks live). */
+  backlinks(params: BacklinksParams): Promise<BacklinksResult>;
+  /** Backlink profile summary for the target (DataForSEO Backlinks summary live). */
+  backlinksSummary(params: BacklinkSummaryParams): Promise<BacklinkSummaryData>;
+}
+
+export interface BacklinkItem {
+  /** Referring domain, e.g. "example.com". */
+  sourceDomain: string;
+  /** Full URL of the linking page. */
+  sourceUrl: string;
+  /** Full URL of the linked page on the target domain. */
+  targetUrl: string;
+  /** Anchor text, null when the provider doesn't report it. */
+  anchorText: string | null;
+  /** True for follow links. */
+  dofollow: boolean;
+  /** First-seen timestamp (ISO), null when unknown. */
+  firstSeen: string | null;
+  /** Last-seen/visited timestamp (ISO), null when unknown. */
+  lastSeen: string | null;
+  /** Provider's domain authority rank for the source domain (0–1000, DataForSEO domain_from_rank), null when unknown. */
+  sourceRank: number | null;
+  /** Spam score 0–100, null when unknown. */
+  spamScore: number | null;
+  /** True when the row came from the built-in mock (no credentials configured). */
+  mock?: boolean;
+}
+
+export interface BacklinksParams {
+  /** Target domain (or URL), e.g. "example.com". */
+  target: string;
+  /** Max rows to return, default 100. Capped by MAX_BACKLINK_ROWS_PER_PULL. */
+  limit?: number;
+  /** "as_is" (default) | "one_per_domain" | "one_per_anchor". */
+  mode?: "as_is" | "one_per_domain" | "one_per_anchor";
+  /** When true, only follow links. */
+  onlyDofollow?: boolean;
+}
+
+export interface BacklinksResult {
+  /** Parsed backlink rows (up to the requested limit). */
+  items: BacklinkItem[];
+  /** Provider-reported total backlink count for the target, null when unknown. */
+  totalCount: number | null;
+  /** Rows actually returned in this response. */
+  rowsReturned: number;
+  /** True when the rows came from the built-in mock (no credentials configured). */
+  mock?: boolean;
+}
+
+export interface BacklinkSummaryParams {
+  /** Target domain, e.g. "example.com". */
+  target: string;
+}
+
+export interface BacklinkSummaryData {
+  /** Total backlinks in the provider index, null when unknown. */
+  total: number | null;
+  /** Referring domains count, null when unknown. */
+  referringDomains: number | null;
+  /** Dofollow backlink count, null when unknown. */
+  dofollowCount: number | null;
+  /** True when the data came from the built-in mock (no credentials configured). */
+  mock?: boolean;
 }

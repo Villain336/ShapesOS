@@ -90,6 +90,14 @@ export const TRIGGERS: TriggerDef[] = [
     dedupAvailable: true,
     live: true, // milestone 14: emitted by the weekly radar cron.
   },
+  {
+    key: "backlink_lost",
+    label: "Backlink lost",
+    description: "A backlink from a high-authority domain stops pointing at your site (detected on a complete pull).",
+    conditionKeys: ["projectIds", "severities"],
+    dedupAvailable: true,
+    live: true, // milestone 15: emitted by the backlink pull service.
+  },
 ];
 
 export function triggerDef(key: string): TriggerDef | undefined {

@@ -2,6 +2,11 @@
 // swappable via the SeoDataProvider interface in ./types).
 
 import type {
+  BacklinkItem,
+  BacklinkSummaryData,
+  BacklinkSummaryParams,
+  BacklinksParams,
+  BacklinksResult,
   CompetitorKeyword,
   CompetitorKeywordsParams,
   KeywordIdea,
@@ -114,6 +119,36 @@ export class DataForSeoProvider implements SeoDataProvider {
     }
 
     return task.result?.[0]?.items ?? [];
+  }
+
+  /**
+   * POST helper for endpoints that return a single result OBJECT at
+   * result[0] (e.g. /backlinks/summary/live) rather than an items array.
+   */
+  private async postResult<T>(endpoint: string, payload: object): Promise<T | null> {
+    if (!this.isConfigured()) {
+      throw new Error(
+        "DataForSEO credentials are not configured. Set DATAFORSEO_LOGIN and DATAFORSEO_PASSWORD.",
+      );
+    }
+    const auth = Buffer.from(`${this.login}:${this.password}`).toString(
+      "base64",
+    );
+    const res = await fetch(`${API_BASE}${endpoint}`, {
+      method: "POST",
+      headers: {
+        Authorization: `Basic ${auth}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify([payload]),
+    });
+
+    if (!res.ok) {
+      throw new Error(`DataForSEO request failed: HTTP ${res.status}`);
+    }
+
+    const json: unknown = await res.json();
+    return parseSingleResult<T>(json);
   }
 
   /** Labs POST helper kept for backwards compatibility (delegates to postItems). */
@@ -253,4 +288,106 @@ export class DataForSeoProvider implements SeoDataProvider {
 
     return { results, peopleAlsoAsk, aiOverviewPresent, aiOverviewCitations };
   }
+
+  // Milestone 15: DataForSEO Backlinks API (backlinks list + summary).
+  //
+  // Pricing (observed 2026-09-21, lib/seo/backlinks-cost.ts is the single
+  // source of truth): $0.024 per request + $0.000036 per returned row.
+  // The summary endpoint is request-priced only. All parsing is defensive —
+  // DataForSEO omits nulls and renames fields between API revisions.
+
+  async backlinks(params: BacklinksParams): Promise<BacklinksResult> {
+    const { target, limit = 100, mode = "as_is", onlyDofollow = false } = params;
+
+    const items = await this.postItems<BacklinksApiItem>(
+      "/backlinks/backlinks/live",
+      {
+        target: target.trim(),
+        limit,
+        offset: 0,
+        mode,
+        ...(onlyDofollow
+          ? { filters: [["dofollow", "=", true]] }
+          : {}),
+        order_by: ["rank,desc"],
+      },
+    );
+
+    return {
+      items: items.map((item) => ({
+        sourceDomain: item.domain_from ?? "",
+        sourceUrl: item.url_from ?? "",
+        targetUrl: item.url_to ?? "",
+        anchorText: item.anchor ?? null,
+        dofollow: item.dofollow ?? false,
+        firstSeen: item.first_seen ?? null,
+        lastSeen: item.last_visited ?? null,
+        sourceRank:
+          typeof item.domain_from_rank === "number" ? item.domain_from_rank : null,
+        spamScore:
+          typeof item.spam_score === "number" ? item.spam_score : null,
+      })),
+      // backlinks/live returns a flat item list; the provider-wide total is
+      // only available via backlinksSummary(). Callers use rowsReturned for
+      // cost accounting.
+      totalCount: null,
+      rowsReturned: items.length,
+    };
+  }
+
+  async backlinksSummary(
+    params: BacklinkSummaryParams,
+  ): Promise<BacklinkSummaryData> {
+    // /backlinks/summary/live returns the summary object directly at
+    // result[0] (not under result[0].items), hence postResult().
+    const item = (await this.postResult<BacklinksSummaryApiItem>(
+      "/backlinks/summary/live",
+      { target: params.target.trim() },
+    )) ?? {};
+    const num = (v: unknown): number | null =>
+      typeof v === "number" && Number.isFinite(v) ? v : null;
+    return {
+      total: num(item.backlinks),
+      referringDomains: num(item.referring_domains),
+      dofollowCount: num(item.dofollow),
+    };
+  }
+}
+
+/**
+ * Extract the single result object from a DataForSEO task envelope
+ * (tasks[0].result[0]). Pure — unit-tested against fixture payloads.
+ * Returns null when the envelope is missing or the task errored.
+ */
+export function parseSingleResult<T>(json: unknown): T | null {
+  const task = (
+    json as {
+      tasks?: Array<{
+        status_code?: number;
+        result?: Array<T>;
+      }>;
+    }
+  )?.tasks?.[0];
+  if (!task || task.status_code !== 20000) return null;
+  return task.result?.[0] ?? null;
+}
+
+/** Raw DataForSEO backlinks/live item (subset we use; defensive parsing). */
+interface BacklinksApiItem {
+  domain_from?: string | null;
+  url_from?: string | null;
+  url_to?: string | null;
+  anchor?: string | null;
+  dofollow?: boolean | null;
+  first_seen?: string | null;
+  last_visited?: string | null;
+  domain_from_rank?: number | null;
+  spam_score?: number | null;
+}
+
+/** Raw DataForSEO backlinks/summary/live item (subset we use). */
+interface BacklinksSummaryApiItem {
+  backlinks?: number | null;
+  referring_domains?: number | null;
+  dofollow?: number | null;
 }

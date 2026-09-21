@@ -15,6 +15,12 @@
 // missing keys fall back to defaults and the set is normalized to sum to 1.
 // The daily cron upserts one row per project per day and emits
 // `visibility_delta` (milestone 13 trigger) on week-over-week movement.
+//
+// NOTE (milestone 15): a `backlinks` component (link-profile quality) is
+// RESERVED for a later milestone. Do not add it until the backlink quality
+// signal is calibrated — the raw counts in backlink_summaries are not yet a
+// trustworthy 0–100 signal. Schema comment on Workspace.visibilityWeights
+// carries the same note.
 
 import { prisma } from "@/lib/prisma";
 import { visibilityScore as rankingsScore } from "@/lib/rankings";

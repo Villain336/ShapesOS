@@ -6,6 +6,11 @@
 // works end-to-end without paid API credentials — never ship it as real data.
 
 import type {
+  BacklinkItem,
+  BacklinkSummaryData,
+  BacklinkSummaryParams,
+  BacklinksParams,
+  BacklinksResult,
   CompetitorKeyword,
   CompetitorKeywordsParams,
   KeywordIdea,
@@ -220,6 +225,65 @@ export class MockSeoProvider implements SeoDataProvider {
       // Deterministic AI Overview presence for the mock: ~40% of keywords show one.
       // Always labeled mock: true above — never confuse this with real detection.
       aiOverviewPresent: rand() < 0.4,
+      mock: true,
+    };
+  }
+
+  async backlinks({ target, limit = 100 }: BacklinksParams): Promise<BacklinksResult> {
+    // Deterministic mock backlink profile: same target always yields the same
+    // rows. Labeled mock: true — never confuse with real DataForSEO data.
+    const clean = target.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/^www\./, "").split("/")[0] || "example.com";
+    let h = 41;
+    for (const c of clean) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+    const rand = () => {
+      h = (h * 1103515245 + 12345) >>> 0;
+      return h / 2 ** 32;
+    };
+
+    const REFERRERS = [
+      "industryblog.com", "newsoutlet.io", "partner-site.org", "reviewhub.net",
+      "communityforum.dev", "resourcepage.co", "directorylist.com", "blognetwork.io",
+      "pressrelease.site", "localguide.org", "tutorialhub.dev", "comparisonpost.com",
+    ];
+    const ANCHORS = [
+      "learn more", "this guide", "best tools", "read the full report",
+      clean, "click here", "helpful resource", "2026 review",
+    ];
+
+    const count = Math.max(1, Math.min(limit, 40));
+    const items: BacklinkItem[] = [];
+    for (let i = 0; i < count; i++) {
+      const domain = REFERRERS[Math.floor(rand() * REFERRERS.length)];
+      items.push({
+        sourceDomain: domain,
+        sourceUrl: `https://${domain}/posts/${Math.floor(rand() * 9000 + 1000)}`,
+        targetUrl: `https://${clean}/${["", "blog/", "pricing/", "features/"][Math.floor(rand() * 4)]}${Math.floor(rand() * 50) === 0 ? "guide" : ""}`.replace(/\/$/, "") || `https://${clean}`,
+        anchorText: ANCHORS[Math.floor(rand() * ANCHORS.length)],
+        dofollow: rand() < 0.7,
+        firstSeen: new Date(Date.now() - Math.floor(rand() * 400) * 86400000).toISOString(),
+        lastSeen: new Date(Date.now() - Math.floor(rand() * 7) * 86400000).toISOString(),
+        sourceRank: Math.round(rand() * 900),
+        spamScore: Math.round(rand() * 40),
+        mock: true,
+      });
+    }
+    return { items, totalCount: items.length, rowsReturned: items.length, mock: true };
+  }
+
+  async backlinksSummary({ target }: BacklinkSummaryParams): Promise<BacklinkSummaryData> {
+    // Deterministic mock summary, consistent-ish with backlinks().
+    const clean = target.trim().toLowerCase() || "example.com";
+    let h = 43;
+    for (const c of clean) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+    const rand = () => {
+      h = (h * 1103515245 + 12345) >>> 0;
+      return h / 2 ** 32;
+    };
+    const total = Math.round(80 + rand() * 1200);
+    return {
+      total,
+      referringDomains: Math.round(total / (3 + rand() * 6)),
+      dofollowCount: Math.round(total * (0.55 + rand() * 0.25)),
       mock: true,
     };
   }
