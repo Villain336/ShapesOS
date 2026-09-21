@@ -28,11 +28,21 @@ npm run dev
 
 ## Project layout
 
-- `app/` — Next.js App Router UI (foundation page only in milestone 1)
+- `app/` — Next.js App Router UI: `/` landing, `/login`, `/dashboard` (projects CRUD), `/dashboard/projects/[id]/keywords` (keyword research)
+- `app/api/` — route handlers: auth, projects, keyword ideas/save/saved
+- `lib/providers/` — swappable SEO data-provider interface: DataForSEO (live when `DATAFORSEO_*` set) or clearly-marked mock fallback
 - `prisma/schema.prisma` — data model: Workspace, Project, Keyword, Ranking, Competitor, ContentItem, Client, Report, ApiUsage, Issue, FixRun
+- `prisma/migrations/` — SQL migrations (applied via `migrate deploy` on container start)
+- `prisma/seed.ts` — demo workspace/project/keywords (`npm run db:seed`)
+- `auth.ts` — Auth.js v5: Google OAuth + self-hosted admin credentials (`ADMIN_EMAIL`/`ADMIN_PASSWORD`)
 - `docker-compose.yml` — app + Postgres 16 + Redis 7
 - `Dockerfile` — production standalone image
 - `SPEC.md` — the full product spec (source of truth)
+
+## Milestones
+
+- **M1 (done):** scaffold, data model, Docker, license, README.
+- **M2 (done):** DB wiring + first migration + seed, Auth.js (Google + admin credentials), workspace/project CRUD, DataForSEO provider abstraction, keyword-research flow (seed → ideas with volume/difficulty/CPC/intent → filter → save to list).
 
 ## Data & costs
 
