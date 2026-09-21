@@ -64,7 +64,31 @@ export const TRIGGERS: TriggerDef[] = [
     description: "The composite visibility score moves beyond the threshold week-over-week.",
     conditionKeys: ["projectIds", "thresholdPoints"],
     dedupAvailable: true,
-    live: false, // milestone 14 (retention loops) — rules can be created, nothing emits yet.
+    live: true, // milestone 14 (retention loops): emitted by the daily score cron.
+  },
+  {
+    key: "ai_citation_change",
+    label: "AI answer citation change",
+    description: "Your site gains or loses a citation inside Google's AI Overview / AI answer for a tracked keyword.",
+    conditionKeys: ["projectIds", "keywordIds"],
+    dedupAvailable: true,
+    live: true, // milestone 14: emitted by the rank-check cron.
+  },
+  {
+    key: "content_decay",
+    label: "Content decay detected",
+    description: "A tracked page's rankings decayed beyond the threshold — refresh or rebuild suggested.",
+    conditionKeys: ["projectIds", "keywordIds", "severities"],
+    dedupAvailable: true,
+    live: true, // milestone 14: emitted by the weekly decay cron.
+  },
+  {
+    key: "competitor_radar",
+    label: "Competitor radar event",
+    description: "A tracked competitor gained keywords, published new ranking pages, or overtook you head-to-head.",
+    conditionKeys: ["projectIds"],
+    dedupAvailable: true,
+    live: true, // milestone 14: emitted by the weekly radar cron.
   },
 ];
 

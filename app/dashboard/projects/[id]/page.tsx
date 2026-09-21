@@ -6,6 +6,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
 import DeleteProjectButton from "@/components/DeleteProjectButton";
+import VisibilityScoreWidget from "@/components/VisibilityScoreWidget";
 
 export const dynamic = "force-dynamic";
 
@@ -101,7 +102,27 @@ export default async function ProjectPage({
         >
           Sites & landing pages →
         </Link>
+        <Link
+          href={`/dashboard/projects/${project.id}/ai-search`}
+          className="rounded-md border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-200 hover:border-zinc-500"
+        >
+          AI search →
+        </Link>
+        <Link
+          href={`/dashboard/projects/${project.id}/decay`}
+          className="rounded-md border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-200 hover:border-zinc-500"
+        >
+          Content decay →
+        </Link>
+        <Link
+          href={`/dashboard/projects/${project.id}/radar`}
+          className="rounded-md border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-200 hover:border-zinc-500"
+        >
+          Competitor radar →
+        </Link>
       </div>
+
+      <VisibilityScoreWidget projectId={project.id} />
 
       <div>
         <h2 className="mb-3 text-sm font-medium uppercase tracking-widest text-zinc-500">

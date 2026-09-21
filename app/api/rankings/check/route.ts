@@ -22,6 +22,7 @@ import { getSeoProvider, providerStatus } from "@/lib/providers";
 import { recordUsage } from "@/lib/usage";
 import { domainMatches, computeAlerts, type RankAlert } from "@/lib/rankings";
 import { emitAlert, type TriggerInput } from "@/lib/alerts/evaluate";
+import { recordSnapshot } from "@/lib/retention/ai-visibility";
 
 export const dynamic = "force-dynamic";
 
@@ -101,6 +102,23 @@ async function checkProject(projectId: string): Promise<CheckResult> {
     const newAlerts = computeAlerts(kw.id, kw.phrase, previous?.position ?? null, position, now);
     result.alerts.push(...newAlerts);
 
+    // Milestone 14: record an AI visibility snapshot (presence + citation)
+    // for every check. Snapshot failures must never break rank checks.
+    let aiChanges = { appeared: false, disappeared: false, citationGained: false, citationLost: false };
+    try {
+      const snap = await recordSnapshot({
+        projectId,
+        keywordId: kw.id,
+        snapshot,
+        projectDomain: project.domain,
+        checkedAt: now,
+        mock: result.mock,
+      });
+      aiChanges = snap.changes;
+    } catch (err) {
+      console.error(`AI snapshot failed for "${kw.phrase}":`, err);
+    }
+
     // Milestone 13: fan rank movements + AI Overview changes into the alert hub.
     // Evaluation is best-effort — alert failures must never break rank checks.
     const dayKey = now.toISOString().slice(0, 10);
@@ -147,9 +165,28 @@ async function checkProject(projectId: string): Promise<CheckResult> {
           ? `✨ AI Overviews now appearing for "${kw.phrase}"`
           : `AI Overviews no longer appearing for "${kw.phrase}"`,
         body: `Google AI Overview presence for "${kw.phrase}" changed to ${aiNow ? "present" : "absent"} on the latest SERP check.`,
-        link: `/dashboard/projects/${projectId}/rankings`,
+        link: `/dashboard/projects/${projectId}/ai-search`,
         scopeKeywordIds: [kw.id],
         dedupKey: `ai_overview:${kw.id}:${dayKey}`,
+      });
+    }
+    // Milestone 14: citation changes inside the AI answer get their own
+    // trigger so agencies can route citation wins/losses separately.
+    if (aiChanges.citationGained || aiChanges.citationLost) {
+      triggers.push({
+        workspaceId: project.workspaceId,
+        projectId,
+        trigger: "ai_citation_change",
+        severity: (aiChanges.citationGained ? "info" : "warn") as "info" | "warn",
+        title: aiChanges.citationGained
+          ? `✨ "${kw.phrase}" — your site is now cited in the AI answer`
+          : `⚠️ "${kw.phrase}" — your site lost its AI answer citation`,
+        body: aiChanges.citationGained
+          ? `${project.domain} is now cited inside the AI answer for "${kw.phrase}".`
+          : `${project.domain} is no longer cited inside the AI answer for "${kw.phrase}".`,
+        link: `/dashboard/projects/${projectId}/ai-search`,
+        scopeKeywordIds: [kw.id],
+        dedupKey: `ai_citation:${kw.id}:${dayKey}`,
       });
     }
     if (triggers.length) {
@@ -160,6 +197,22 @@ async function checkProject(projectId: string): Promise<CheckResult> {
 
     await recordUsage(project.workspaceId, "serp_calls", 1).catch(() => {});
   }
+
+  // Milestone 11/14 audit pattern: one workspace-scoped event per check run
+  // covering the AI visibility snapshots recorded alongside the rankings.
+  await prisma.fileChangeLog
+    .create({
+      data: {
+        workspaceId: project.workspaceId,
+        projectId,
+        connectionId: null,
+        filePath: "",
+        actor: "system",
+        action: "ai_visibility_snapshot",
+        summary: `Rank check: ${result.checked} keyword(s) checked, AI visibility snapshots recorded for ${project.domain}`,
+      },
+    })
+    .catch(() => {});
 
   return result;
 }

@@ -45,6 +45,12 @@ interface SerpApiItem {
   description?: string | null;
   /** Nested items for types like people_also_ask. */
   items?: Array<{ title?: string | null }> | null;
+  /**
+   * Cited sources inside an ai_overview item (DataForSEO exposes these as
+   * `references`; absent on most other item types). Milestone 14 uses these
+   * for AI Overview citation detection.
+   */
+  references?: Array<{ domain?: string | null; url?: string | null }> | null;
 }
 
 function competitionToDifficulty(item: LabsItem): number | null {
@@ -208,6 +214,7 @@ export class DataForSeoProvider implements SeoDataProvider {
     const results: SerpResult[] = [];
     const peopleAlsoAsk: string[] = [];
     let aiOverviewPresent: boolean | null = null;
+    const aiOverviewCitations: Array<{ domain: string; url: string | null }> = [];
 
     for (const item of items) {
       const type = (item.type ?? "").toLowerCase();
@@ -229,10 +236,21 @@ export class DataForSeoProvider implements SeoDataProvider {
         // DataForSEO SERP live surfaces Google's AI Overview as an ai_overview
         // item when present on the page (milestone 5: AI visibility tracking).
         aiOverviewPresent = true;
+        // Milestone 14: pull cited sources so we can detect whether the
+        // project's own domain is cited inside the AI answer. Defensive —
+        // DataForSEO only populates `references` on some ai_overview items.
+        for (const ref of item.references ?? []) {
+          if (ref?.domain) {
+            aiOverviewCitations.push({
+              domain: ref.domain,
+              url: ref.url ?? null,
+            });
+          }
+        }
       }
       if (results.length >= depth) break;
     }
 
-    return { results, peopleAlsoAsk, aiOverviewPresent };
+    return { results, peopleAlsoAsk, aiOverviewPresent, aiOverviewCitations };
   }
 }

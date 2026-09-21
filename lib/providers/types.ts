@@ -99,6 +99,13 @@ export interface SerpSnapshot {
    * the snapshot mock: true. Null/absent = unknown.
    */
   aiOverviewPresent?: boolean | null;
+  /**
+   * Sources cited inside the AI Overview / AI answer, when the provider
+   * exposes them (milestone 14). The live DataForSEO parser fills this from
+   * the ai_overview item's `references`; the mock leaves it empty.
+   * Each entry: { domain, url }.
+   */
+  aiOverviewCitations?: Array<{ domain: string; url: string | null }>;
   /** True when the snapshot came from the built-in mock (no credentials configured). */
   mock?: boolean;
 }

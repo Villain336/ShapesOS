@@ -36,6 +36,8 @@ export interface TriggerInput {
   dedupKey?: string;
   /** Positions moved (positive number) for rank_drop / rank_gain thresholds. */
   movement?: number;
+  /** Score points moved (signed) for visibility_delta thresholds. */
+  delta?: number;
   scopeKeywordIds?: string[];
 }
 
@@ -69,8 +71,12 @@ function matchesConditions(rule: AlertRule, input: TriggerInput): boolean {
     const threshold = c.thresholdPositions ?? (input.trigger === "rank_drop" ? DEFAULT_DROP_THRESHOLD : DEFAULT_GAIN_THRESHOLD);
     if ((input.movement ?? 0) < threshold) return false;
   }
-  if (input.trigger === "fix_run" && c.severities?.length && input.severity && !c.severities.includes(input.severity)) {
-    return false;
+  if (input.trigger === "fix_run" || input.trigger === "content_decay") {
+    if (c.severities?.length && input.severity && !c.severities.includes(input.severity)) return false;
+  }
+  if (input.trigger === "visibility_delta") {
+    const threshold = c.thresholdPoints ?? 5;
+    if (Math.abs(input.delta ?? 0) < threshold) return false;
   }
   return true;
 }

@@ -128,6 +128,12 @@ enum FileChangeAction {
   alert_rule_deleted
   alert_sent
   alert_failed
+  // Milestone 14: retention loops.
+  ai_visibility_snapshot
+  decay_finding_created
+  decay_finding_resolved
+  radar_event_detected
+  visibility_score_computed
 }
 
 // Marketr — where a Site's files live (milestone 7).
@@ -169,6 +175,10 @@ model Workspace {
   alertChannels AlertChannel[]
   alertRules AlertRule[]
   alertEvents AlertEvent[]
+  // Milestone 14: composite visibility score weights per workspace.
+  // { rankings?: number, aiPresence?: number, freshness?: number, coverage?: number }
+  // Null = defaults in lib/retention/visibility-score.ts.
+  visibilityWeights Json? @map("visibility_weights")
 
   @@map("workspaces")
 }
@@ -200,6 +210,12 @@ model Project {
   // Milestone 12: report templates and generated reports scoped to this project.
   reportTemplates ReportTemplate[]
   reports Report[]
+  // Milestone 14: retention loops.
+  aiVisibilitySnapshots AIVisibilitySnapshot[]
+  decayFindings ContentDecayFinding[]
+  competitorSnapshots CompetitorSnapshot[]
+  radarEvents CompetitorRadarEvent[]
+  visibilityScores VisibilityScore[]
 
   @@map("projects")
 }
@@ -224,6 +240,9 @@ model Keyword {
 
   rankings     Ranking[]
   contentItems ContentItem[]
+  // Milestone 14: retention loops.
+  aiVisibilitySnapshots AIVisibilitySnapshot[]
+  decayFindings ContentDecayFinding[]
 
   @@unique([projectId, phrase])
   @@map("keywords")
@@ -783,7 +802,8 @@ model AlertRule {
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   name        String
   // Trigger key — see lib/alerts/triggers.ts TRIGGERS:
-  // rank_drop | rank_gain | ai_overview_change | fix_run | report_ready | visibility_delta
+  // rank_drop | rank_gain | ai_overview_change | ai_citation_change | fix_run |
+  // report_ready | visibility_delta | content_decay | competitor_radar
   trigger     String
   // JSON conditions, all optional:
   //   { projectIds?: string[], keywordIds?: string[], thresholdPositions?: number,
@@ -836,4 +856,105 @@ model AlertEvent {
   @@index([ruleId, createdAt])
   @@index([dedupKey, createdAt])
   @@map("alert_events")
+}
+
+// Milestone 14: retention loops — AI search visibility per keyword check.
+model AIVisibilitySnapshot {
+  id        String   @id @default(cuid())
+  projectId String   @map("project_id")
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  keywordId String   @map("keyword_id")
+  keyword   Keyword  @relation(fields: [keywordId], references: [id], onDelete: Cascade)
+
+  checkedAt         DateTime @default(now()) @map("checked_at")
+  aiOverviewPresent Boolean  @default(false) @map("ai_overview_present")
+  // Whether the project's own domain was cited inside the AI Overview/answer.
+  siteCited Boolean  @default(false) @map("site_cited")
+  citedUrl  String?  @map("cited_url")
+  serpFeatures String[] @default([]) @map("serp_features")
+  mock Boolean @default(false)
+
+  @@index([projectId, checkedAt])
+  @@index([keywordId, checkedAt])
+  @@map("ai_visibility_snapshots")
+}
+
+// Milestone 14: content decay & refresh engine findings (grouped per ranking URL).
+model ContentDecayFinding {
+  id        String  @id @default(cuid())
+  projectId String  @map("project_id")
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  // Representative keyword (one finding may cover several phrases on the same URL).
+  keywordId String?  @map("keyword_id")
+  keyword   Keyword? @relation(fields: [keywordId], references: [id], onDelete: SetNull)
+
+  url String?
+  // Tracked phrases whose rankings decayed on this URL.
+  phrases String[] @default([])
+  // 0–100. See lib/retention/decay.ts for the formula.
+  decayScore Float @map("decay_score")
+  peakPosition    Int? @map("peak_position")
+  currentPosition Int? @map("current_position")
+  peakAt DateTime? @map("peak_at")
+  // refresh_content | rebuild | internal_links
+  suggestedAction String @map("suggested_action")
+  severity String @default("info") // info | warn | critical
+  status   String @default("open") // open | actioned | dismissed
+  note     String?
+  detectedAt DateTime  @default(now()) @map("detected_at")
+  resolvedAt DateTime? @map("resolved_at")
+
+  @@index([projectId, status])
+  @@map("content_decay_findings")
+}
+
+// Milestone 14: competitor keyword snapshot for radar diffing (weekly).
+model CompetitorSnapshot {
+  id               String   @id @default(cuid())
+  projectId        String   @map("project_id")
+  project          Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  competitorDomain String   @map("competitor_domain")
+  capturedAt       DateTime @default(now()) @map("captured_at")
+  // [{ phrase, position, url, volume }] — top keywords from the SEO provider.
+  keywordsJson Json @map("keywords_json")
+  mock Boolean @default(false)
+
+  @@index([projectId, competitorDomain, capturedAt])
+  @@map("competitor_snapshots")
+}
+
+// Milestone 14: competitor radar events (diff of consecutive snapshots).
+model CompetitorRadarEvent {
+  id               String   @id @default(cuid())
+  projectId        String   @map("project_id")
+  project          Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  competitorDomain String   @map("competitor_domain")
+  // new_keyword | keyword_gain | new_page | lost_to_competitor
+  eventType     String  @map("event_type")
+  keywordPhrase String? @map("keyword_phrase")
+  details       Json
+  detectedAt DateTime @default(now()) @map("detected_at")
+  read       Boolean  @default(false)
+
+  @@index([projectId, detectedAt])
+  @@index([projectId, competitorDomain, detectedAt])
+  @@map("competitor_radar_events")
+}
+
+// Milestone 14: composite visibility score time series (daily).
+model VisibilityScore {
+  id        String   @id @default(cuid())
+  projectId String   @map("project_id")
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  // Day bucket (UTC midnight).
+  date  DateTime
+  score Int // 0–100
+  // { rankings, aiPresence, freshness, coverage, weights } — components 0–100.
+  components Json
+  mock Boolean @default(false)
+
+  @@unique([projectId, date])
+  @@index([projectId, date])
+  @@map("visibility_scores")
 }
