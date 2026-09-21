@@ -118,7 +118,7 @@ function shortTime(iso: string): string {
 function TreeNode({
   entry,
   depth,
-  connId,
+  apiBase,
   projectId,
   expanded,
   onToggle,
@@ -130,7 +130,7 @@ function TreeNode({
 }: {
   entry: FileEntry;
   depth: number;
-  connId: string;
+  apiBase: string;
   projectId: string;
   expanded: boolean;
   onToggle: () => void;
@@ -190,7 +190,7 @@ function TreeNode({
               key={c.path}
               entry={c}
               depth={depth + 1}
-              connId={connId}
+              apiBase={apiBase}
               projectId={projectId}
               onOpen={onOpen}
               onAttach={onAttach}
@@ -215,7 +215,7 @@ function TreeNode({
 function TreeNodeConnected(props: {
   entry: FileEntry;
   depth: number;
-  connId: string;
+  apiBase: string;
   projectId: string;
   onOpen: (e: FileEntry) => void;
   onAttach: (e: FileEntry) => void;
@@ -230,12 +230,12 @@ function TreeNodeConnected(props: {
       if (loadedRef.current) return;
       loadedRef.current = true;
       const res = await fetch(
-        `/api/sites/${props.connId}/files?projectId=${props.projectId}&path=${encodeURIComponent(dir)}`,
+        `${props.apiBase}/files?projectId=${props.projectId}&path=${encodeURIComponent(dir)}`,
       );
       const data = await res.json();
       if (res.ok) setChildren(data.entries);
     },
-    [props.connId, props.projectId],
+    [props.apiBase, props.projectId],
   );
 
   useEffect(() => {
@@ -250,7 +250,7 @@ function TreeNodeConnected(props: {
     <TreeNode
       entry={props.entry}
       depth={props.depth}
-      connId={props.connId}
+      apiBase={props.apiBase}
       projectId={props.projectId}
       expanded={expanded}
       onToggle={() => setExpanded((e) => !e)}
@@ -295,11 +295,23 @@ export default function SiteIde({
   domain,
   initialConnections,
   llm,
+  // Milestone 7 — site mode: the IDE operates on a Site's working copy
+  // through /api/websites/[siteId]/* instead of a raw SFTP connection.
+  apiBase,
+  siteMode,
+  siteBanner,
+  pageTitle,
+  pageSubtitle,
 }: {
   projectId: string;
   domain: string;
   initialConnections: Connection[];
   llm: LlmInfo;
+  apiBase?: string;
+  siteMode?: boolean;
+  siteBanner?: { mock: boolean; title: string; detail: string } | null;
+  pageTitle?: string;
+  pageSubtitle?: string;
 }) {
   const [connections, setConnections] = useState<Connection[]>(initialConnections);
   const [selectedId, setSelectedId] = useState<string | null>(
@@ -342,7 +354,11 @@ export default function SiteIde({
   // Activity
   const [activity, setActivity] = useState<ActivityEntry[] | null>(null);
 
-  const selected = connections.find((c) => c.id === selectedId) ?? null;
+  const selected = siteMode ? null : (connections.find((c) => c.id === selectedId) ?? null);
+
+  // Base URL for file operations. Connection mode: /api/sites/<connId>.
+  // Site mode (milestone 7): /api/websites/<siteId>.
+  const fileBase: string | null = apiBase ?? (selectedId ? `/api/sites/${selectedId}` : null);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -421,14 +437,14 @@ export default function SiteIde({
 
   const openFile = useCallback(
     async (entry: FileEntry) => {
-      if (!selectedId) return;
+      if (!fileBase) return;
       if (dirty && !confirm("Discard unsaved changes?")) return;
       setFileLoading(true);
       setFileError(null);
       setTruncated(false);
       try {
         const res = await fetch(
-          `/api/sites/${selectedId}/file?projectId=${projectId}&path=${encodeURIComponent(entry.path)}`,
+          `${fileBase}/file?projectId=${projectId}&path=${encodeURIComponent(entry.path)}`,
         );
         const data = await res.json();
         if (!res.ok) {
@@ -447,10 +463,10 @@ export default function SiteIde({
   );
 
   async function saveFile(source: "manual" | "ai", summary?: string) {
-    if (!selectedId || !openPath) return;
+    if (!fileBase || !openPath) return;
     setSaving(true);
     try {
-      const res = await fetch(`/api/sites/${selectedId}/file`, {
+      const res = await fetch(`${fileBase}/file`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ projectId, path: openPath, content: editorValue, source, summary }),
@@ -468,10 +484,10 @@ export default function SiteIde({
   }
 
   async function attachFile(entry: FileEntry) {
-    if (!selectedId) return;
+    if (!fileBase) return;
     if (attached.some((a) => a.path === entry.path)) return;
     const res = await fetch(
-      `/api/sites/${selectedId}/file?projectId=${projectId}&path=${encodeURIComponent(entry.path)}`,
+      `${fileBase}/file?projectId=${projectId}&path=${encodeURIComponent(entry.path)}`,
     );
     const data = await res.json();
     if (res.ok) setAttached((a) => [...a, { path: entry.path, content: data.content }]);
@@ -481,7 +497,7 @@ export default function SiteIde({
 
   async function sendMessage() {
     const message = input.trim();
-    if (!message || !selectedId || asking) return;
+    if (!message || !fileBase || asking) return;
     if (!openPath) {
       alert("Open a file first so the assistant has context.");
       return;
@@ -495,7 +511,7 @@ export default function SiteIde({
         { path: openPath, content: editorValue },
         ...attached.filter((a) => a.path !== openPath),
       ];
-      const res = await fetch(`/api/sites/${selectedId}/assist`, {
+      const res = await fetch(`${fileBase}/assist`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -532,7 +548,7 @@ export default function SiteIde({
             } else {
               try {
                 const r = await fetch(
-                  `/api/sites/${selectedId}/file?projectId=${projectId}&path=${encodeURIComponent(p.path)}`,
+                  `${fileBase}/file?projectId=${projectId}&path=${encodeURIComponent(p.path)}`,
                 );
                 const d = await r.json();
                 if (r.ok) original = d.content;
@@ -551,10 +567,10 @@ export default function SiteIde({
   }
 
   async function applyProposal(p: Proposal) {
-    if (!selectedId) return;
+    if (!fileBase) return;
     setProposals((prev) => prev.map((x) => (x === p ? { ...x, status: "applying" } : x)));
     try {
-      const res = await fetch(`/api/sites/${selectedId}/file`, {
+      const res = await fetch(`${fileBase}/file`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -584,8 +600,8 @@ export default function SiteIde({
   // ---- activity
 
   const loadActivity = useCallback(async () => {
-    if (!selectedId) return;
-    const res = await fetch(`/api/sites/${selectedId}/activity?projectId=${projectId}`);
+    if (!fileBase) return;
+    const res = await fetch(`${fileBase}/activity?projectId=${projectId}`);
     const data = await res.json();
     if (res.ok) setActivity(data.entries);
   }, [selectedId, projectId]);
@@ -604,9 +620,9 @@ export default function SiteIde({
           <Link href={`/dashboard/projects/${projectId}`} className="text-sm text-zinc-500 hover:text-zinc-300">
             ← {domain}
           </Link>
-          <h1 className="mt-1 text-2xl font-bold tracking-tight">Site IDE</h1>
+          <h1 className="mt-1 text-2xl font-bold tracking-tight">{pageTitle ?? "Site IDE"}</h1>
           <p className="mt-1 text-sm text-zinc-400">
-            Edit client website code with AI assistance. The AI proposes — you approve.
+            {pageSubtitle ?? "Edit client website code with AI assistance. The AI proposes — you approve."}
           </p>
         </div>
         <div className="flex gap-2">
@@ -627,7 +643,12 @@ export default function SiteIde({
 
       {/* banners */}
       <div className="flex flex-col gap-2">
-        {selected ? (
+        {siteMode && siteBanner ? (
+          <div className={`rounded-md border px-3 py-2 text-sm ${siteBanner.mock ? "border-amber-800 bg-amber-950/40 text-amber-200" : "border-emerald-800 bg-emerald-950/40 text-emerald-200"}`}>
+            <strong>{siteBanner.mock ? "Mock site — demo files." : "Live site:"}</strong> {siteBanner.title}
+            {siteBanner.detail && <span className="ml-2 opacity-70">{siteBanner.detail}</span>}
+          </div>
+        ) : selected ? (
           selected.demo ? (
             <div className="rounded-md border border-amber-800 bg-amber-950/40 px-3 py-2 text-sm text-amber-200">
               <strong>Demo site — mock files.</strong> Nothing here is a real server. Add an SFTP connection below for live editing.
@@ -658,7 +679,8 @@ export default function SiteIde({
         </div>
       </div>
 
-      {/* connection manager */}
+      {/* connection manager (hidden in site mode — the site is already connected) */}
+      {!siteMode && (
       <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-4">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-semibold text-zinc-200">Site connections</h2>
@@ -754,6 +776,7 @@ export default function SiteIde({
           )}
         </div>
       </div>
+      )}
 
       {tab === "activity" ? (
         <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-4">
@@ -795,14 +818,14 @@ export default function SiteIde({
           {/* file tree */}
           <div className="col-span-3 rounded-lg border border-zinc-800 bg-zinc-950 p-2">
             <h2 className="px-2 py-1 text-sm font-semibold text-zinc-200">Files</h2>
-            {!selected ? (
+            {!fileBase ? (
               <p className="px-2 py-2 text-xs text-zinc-600">Select a connection above.</p>
             ) : (
               <TreeNodeConnected
-                key={selected.id}
+                key={fileBase}
                 entry={{ name: "/", path: "/", type: "dir" }}
                 depth={0}
-                connId={selected.id}
+                apiBase={fileBase}
                 projectId={projectId}
                 onOpen={(e) => void openFile(e)}
                 onAttach={(e) => void attachFile(e)}

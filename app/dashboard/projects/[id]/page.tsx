@@ -94,6 +94,12 @@ export default async function ProjectPage({
         >
           Site IDE →
         </Link>
+        <Link
+          href={`/dashboard/projects/${project.id}/sites`}
+          className="rounded-md border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-200 hover:border-zinc-500"
+        >
+          Sites & landing pages →
+        </Link>
       </div>
 
       <div>

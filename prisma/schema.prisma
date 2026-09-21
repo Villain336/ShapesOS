@@ -88,6 +88,13 @@ enum FileChangeAction {
   ai_applied
 }
 
+// Marketr — where a Site's files live (milestone 7).
+enum SiteSourceType {
+  github
+  sftp
+  file
+}
+
 model Workspace {
   id        String   @id @default(cuid())
   name      String
@@ -129,6 +136,7 @@ model Project {
   fixRuns     FixRun[]
   siteConnections SiteConnection[]
   fileChangeLogs  FileChangeLog[]
+  sites       Site[]
 
   @@map("projects")
 }
@@ -323,6 +331,9 @@ model SiteConnection {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
+  // Sites linked to this connection as their SFTP source (milestone 7).
+  sites Site[]
+
   @@map("site_connections")
 }
 
@@ -336,6 +347,10 @@ model FileChangeLog {
   project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   connectionId String? @map("connection_id")
+  // Milestone 7: the Site (github/sftp/file) this change belongs to, when the
+  // IDE is opened on a Site rather than a raw connection.
+  siteId       String? @map("site_id")
+  site         Site?   @relation(fields: [siteId], references: [id], onDelete: SetNull)
   filePath     String  @map("file_path")
   actor        FileChangeActor
   action       FileChangeAction
@@ -347,4 +362,31 @@ model FileChangeLog {
 
   @@index([projectId, createdAt])
   @@map("file_change_log")
+}
+
+// Marketr — a website/landing-page unit (milestone 7). A Site is what the
+// builder creates and the IDE edits, regardless of where the files live:
+// a GitHub repo, an SFTP host (reusing a milestone-6 SiteConnection), or a
+// plain uploaded/managed file set. Secrets live in configEnc (AES-256-GCM,
+// lib/sitefiles/crypto.ts) and are never sent to the client.
+model Site {
+  id        String @id @default(cuid())
+  projectId String @map("project_id")
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  name       String
+  sourceType SiteSourceType @map("source_type")
+  // AES-256-GCM encrypted JSON config. GitHub: { token, owner, repo, branch, demo? }.
+  // File/SFTP: {} (file) — SFTP reuses sftpConnectionId below.
+  configEnc String @map("config_enc") @db.Text
+  // Optional link to a milestone-6 connection for sftp-source sites.
+  sftpConnectionId String? @map("sftp_connection_id")
+  sftpConnection   SiteConnection? @relation(fields: [sftpConnectionId], references: [id], onDelete: SetNull)
+
+  fileChangeLogs FileChangeLog[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("sites")
 }

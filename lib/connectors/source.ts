@@ -1,0 +1,165 @@
+// Marketr — Site source resolution (milestone 7).
+//
+// A Site is the unit the builder creates and the IDE edits. The IDE always
+// operates on a LOCAL WORKING COPY (siteWorkingDir):
+//   - file-source sites: the working copy IS the site.
+//   - github/sftp sites: `sync` pulls remote → working copy, `deploy` pushes
+//     working copy → remote (one GitHub commit, or per-file SFTP writes).
+//
+// Secrets (GitHub tokens) live in Site.configEnc (AES-256-GCM, same crypto as
+// milestone 6) and are decrypted server-side only — never sent to the client.
+
+import type { Site, SiteConnection } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
+import { decryptSecret, encryptSecret } from "@/lib/sitefiles/crypto";
+import { getSiteFileProvider } from "@/lib/sitefiles";
+import type { SiteFileProvider } from "@/lib/sitefiles/types";
+import { GitHubSiteFileProvider } from "./github";
+import { MockGitHubConnector } from "./mock-github";
+import { LocalDirProvider, siteWorkingDir } from "./local";
+import type { GitHubConfig, GitHubConnector } from "./types";
+
+export interface GitHubSiteConfig extends GitHubConfig {}
+
+/** Parse + decrypt a site's config blob. */
+export function decryptSiteConfig(site: { configEnc: string }): Record<string, unknown> {
+  if (!site.configEnc) return {};
+  try {
+    return JSON.parse(decryptSecret(site.configEnc)) as Record<string, unknown>;
+  } catch {
+    return {};
+  }
+}
+
+export function encryptSiteConfig(config: Record<string, unknown>): string {
+  return encryptSecret(JSON.stringify(config));
+}
+
+/** Load a site only if it belongs to one of the user's projects. */
+export async function ownedSite(userId: string, projectId: unknown, siteId: unknown) {
+  if (typeof projectId !== "string" || !projectId) return null;
+  if (typeof siteId !== "string" || !siteId) return null;
+  return prisma.site.findFirst({
+    where: { id: siteId, projectId, project: { workspace: { ownerUserId: userId } } },
+    include: { sftpConnection: true },
+  });
+}
+
+export type OwnedSite = NonNullable<Awaited<ReturnType<typeof ownedSite>>>;
+
+/** The provider the IDE edits: always the local working copy. */
+export async function getSiteIdeProvider(site: OwnedSite): Promise<LocalDirProvider> {
+  const provider = new LocalDirProvider(siteWorkingDir(site.id));
+  await provider.ensureRoot();
+  return provider;
+}
+
+/** Build the remote connector for github/sftp sites. Null for file sites. */
+export async function getSiteRemote(
+  site: OwnedSite,
+): Promise<{ kind: "github"; connector: GitHubConnector } | { kind: "sftp"; provider: SiteFileProvider; connection: SiteConnection } | null> {
+  if (site.sourceType === "github") {
+    const cfg = decryptSiteConfig(site) as Partial<GitHubConfig>;
+    const full: GitHubConfig = {
+      token: String(cfg.token ?? ""),
+      owner: String(cfg.owner ?? ""),
+      repo: String(cfg.repo ?? ""),
+      branch: String(cfg.branch ?? "main"),
+      demo: cfg.demo === true,
+    };
+    const connector: GitHubConnector = full.demo
+      ? new MockGitHubConnector()
+      : new GitHubSiteFileProvider(full);
+    return { kind: "github", connector };
+  }
+  if (site.sourceType === "sftp") {
+    if (!site.sftpConnection) throw new Error("Site has no linked SFTP connection");
+    const provider = getSiteFileProvider({
+      id: site.sftpConnection.id,
+      label: site.sftpConnection.label,
+      host: site.sftpConnection.host,
+      port: site.sftpConnection.port,
+      username: site.sftpConnection.username,
+      authType: site.sftpConnection.authType,
+      secretEnc: site.sftpConnection.secretEnc,
+      demo: site.sftpConnection.demo,
+    });
+    return { kind: "sftp", provider, connection: site.sftpConnection };
+  }
+  return null;
+}
+
+/** Is this site's data mocked (demo)? Drives the honest UI banners. */
+export function siteIsMock(site: OwnedSite): boolean {
+  if (site.sourceType === "github") {
+    const cfg = decryptSiteConfig(site) as Partial<GitHubConfig>;
+    return cfg.demo === true;
+  }
+  if (site.sourceType === "sftp") return site.sftpConnection?.demo === true;
+  return false; // file sites are real local files
+}
+
+/** Public-safe site summary — no secrets, ever. */
+export function publicSite(site: OwnedSite) {
+  const cfg = decryptSiteConfig(site) as Partial<GitHubConfig>;
+  return {
+    id: site.id,
+    projectId: site.projectId,
+    name: site.name,
+    sourceType: site.sourceType,
+    isMock: siteIsMock(site),
+    isLive: !siteIsMock(site),
+    github:
+      site.sourceType === "github"
+        ? {
+            owner: String(cfg.owner ?? ""),
+            repo: String(cfg.repo ?? ""),
+            branch: String(cfg.branch ?? "main"),
+            demo: cfg.demo === true,
+          }
+        : null,
+    sftpConnection: site.sftpConnection
+      ? { id: site.sftpConnection.id, label: site.sftpConnection.label, demo: site.sftpConnection.demo }
+      : null,
+    createdAt: site.createdAt.toISOString(),
+    updatedAt: site.updatedAt.toISOString(),
+  };
+}
+
+/** Append to the audit log for site-scoped IDE actions. */
+export async function logSiteChange(args: {
+  projectId: string;
+  siteId: string;
+  filePath: string;
+  actor: "user" | "ai";
+  action: "save" | "ai_proposal" | "ai_applied";
+  summary: string;
+  approvedBy?: string | null;
+}) {
+  await prisma.fileChangeLog.create({
+    data: {
+      projectId: args.projectId,
+      siteId: args.siteId,
+      connectionId: null,
+      filePath: args.filePath,
+      actor: args.actor,
+      action: args.action,
+      summary: args.summary.slice(0, 280),
+      approvedBy: args.approvedBy ?? null,
+    },
+  });
+}
+
+/** Recursively collect every file path from a provider (for sync/deploy). */
+export async function collectAllFiles(
+  provider: SiteFileProvider,
+  dir = "/",
+  out: string[] = [],
+): Promise<string[]> {
+  const entries = await provider.listDir(dir);
+  for (const e of entries) {
+    if (e.type === "dir") await collectAllFiles(provider, e.path, out);
+    else out.push(e.path);
+  }
+  return out;
+}
