@@ -7,7 +7,10 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  // URL is provided by prisma.config.ts (env DATABASE_URL at runtime).
+  // URL is provided by prisma.config.ts (env DATABASE_URL at runtime);
+  // the env() reference below keeps `prisma generate`/`validate` happy
+  // on Prisma 6.19, which requires a url key in this block.
+  url = env("DATABASE_URL")
 }
 
 enum Plan {
@@ -121,6 +124,8 @@ model Keyword {
   intent     KeywordIntent @default(unknown)
   // Saved list name, e.g. "Q4 content targets"
   list       String?
+  // Rank tracking (milestone 5): tracked keywords get position checks on schedule/on demand.
+  tracked    Boolean @default(false)
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")

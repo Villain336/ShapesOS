@@ -43,6 +43,30 @@ npm run dev
 
 - **M1 (done):** scaffold, data model, Docker, license, README.
 - **M2 (done):** DB wiring + first migration + seed, Auth.js (Google + admin credentials), workspace/project CRUD, DataForSEO provider abstraction, keyword-research flow (seed → ideas with volume/difficulty/CPC/intent → filter → save to list).
+- **M3 (done):** competitor keyword-gap analysis — competitor domains per project, gap diff vs. saved keywords with opportunity scoring, one-click save.
+- **M4 (done):** content engine — SERP-informed brief → AI draft (swappable LLM provider) → editor with live, explainable SEO score; brief → draft → editing → published lifecycle.
+- **M5 (done):** rank tracking — tracked-keyword toggle, on-demand + scheduled rank checks, positions table with deltas, unified visibility score, AI Overview presence, movement alerts.
+
+### Scheduled rank checks
+
+Self-hosted Next.js has no built-in cron, so rank checks run through an
+authenticated endpoint you call on a schedule:
+
+1. Set a long random `CRON_SECRET` in `.env` (`openssl rand -hex 32`).
+2. Add a cron line (daily at 6am here; pick your own cadence):
+
+```cron
+0 6 * * * curl -s -X POST \
+  -H "Authorization: Bearer $CRON_SECRET" \
+  -H "Content-Type: application/json" \
+  -d '{"projectId":"all"}' \
+  https://your-marketr-host/api/rankings/check
+```
+
+- `{"projectId":"<id>"}` checks one project; `{"projectId":"all"}` checks
+  every project (cron secret only — a signed-in session can't use `"all"`).
+- Each check runs one SERP call per tracked keyword and writes `Ranking`
+  rows, so schedule with your DataForSEO budget in mind.
 
 ## Data & costs
 

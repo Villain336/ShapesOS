@@ -92,6 +92,13 @@ export interface SerpSnapshot {
   results: SerpResult[];
   /** "People also ask" questions from the SERP. */
   peopleAlsoAsk: string[];
+  /**
+   * True when an AI Overview / AI-generated answer was present on the SERP
+   * (milestone 5, rank tracking). Live provider detects the provider's
+   * ai_overview SERP item; the mock sets it deterministically and flags
+   * the snapshot mock: true. Null/absent = unknown.
+   */
+  aiOverviewPresent?: boolean | null;
   /** True when the snapshot came from the built-in mock (no credentials configured). */
   mock?: boolean;
 }

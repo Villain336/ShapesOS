@@ -214,6 +214,13 @@ export class MockSeoProvider implements SeoDataProvider {
       `Where can I find ${s} near me?`,
     ];
 
-    return { results, peopleAlsoAsk, mock: true };
+    return {
+      results,
+      peopleAlsoAsk,
+      // Deterministic AI Overview presence for the mock: ~40% of keywords show one.
+      // Always labeled mock: true above — never confuse this with real detection.
+      aiOverviewPresent: rand() < 0.4,
+      mock: true,
+    };
   }
 }

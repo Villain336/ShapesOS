@@ -23,9 +23,12 @@ export default async function ProjectPage({
       keywords: { orderBy: [{ list: "asc" }, { volume: "desc" }] },
       competitors: { select: { id: true } },
       contentItems: { select: { id: true } },
+      _count: { select: { keywords: { where: { tracked: true } } } },
     },
   });
   if (!project) notFound();
+
+  const trackedCount = project._count.keywords;
 
   const lists = new Map<string, number>();
   for (const k of project.keywords) {
@@ -47,6 +50,7 @@ export default async function ProjectPage({
           </h1>
           <p className="mt-1 text-sm text-zinc-400">
             {project.keywords.length} keywords saved ·{" "}
+            {trackedCount} tracked ·{" "}
             {project.competitors.length} competitor
             {project.competitors.length === 1 ? "" : "s"} ·{" "}
             {project.contentItems.length} content item
@@ -74,6 +78,12 @@ export default async function ProjectPage({
           className="rounded-md border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-200 hover:border-zinc-500"
         >
           Content engine →
+        </Link>
+        <Link
+          href={`/dashboard/projects/${project.id}/rankings`}
+          className="rounded-md border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-200 hover:border-zinc-500"
+        >
+          Rank tracking →
         </Link>
       </div>
 

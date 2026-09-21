@@ -207,6 +207,7 @@ export class DataForSeoProvider implements SeoDataProvider {
 
     const results: SerpResult[] = [];
     const peopleAlsoAsk: string[] = [];
+    let aiOverviewPresent: boolean | null = null;
 
     for (const item of items) {
       const type = (item.type ?? "").toLowerCase();
@@ -224,10 +225,14 @@ export class DataForSeoProvider implements SeoDataProvider {
             peopleAlsoAsk.push(q.title);
           }
         }
+      } else if (type === "ai_overview") {
+        // DataForSEO SERP live surfaces Google's AI Overview as an ai_overview
+        // item when present on the page (milestone 5: AI visibility tracking).
+        aiOverviewPresent = true;
       }
       if (results.length >= depth) break;
     }
 
-    return { results, peopleAlsoAsk };
+    return { results, peopleAlsoAsk, aiOverviewPresent };
   }
 }

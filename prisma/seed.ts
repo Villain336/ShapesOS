@@ -41,8 +41,8 @@ async function main() {
   for (const s of seeds) {
     await prisma.keyword.upsert({
       where: { projectId_phrase: { projectId: project.id, phrase: s.phrase } },
-      update: {},
-      create: { ...s, projectId: project.id, list: "Demo list" },
+      update: { tracked: true },
+      create: { ...s, projectId: project.id, list: "Demo list", tracked: true },
     });
   }
 
