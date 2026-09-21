@@ -17,7 +17,17 @@ import type { SiteFileProvider } from "@/lib/sitefiles/types";
 import { GitHubSiteFileProvider } from "./github";
 import { MockGitHubConnector } from "./mock-github";
 import { LocalDirProvider, siteWorkingDir } from "./local";
-import type { GitHubConfig, GitHubConnector } from "./types";
+import { WordPressConnector } from "./wordpress";
+import { MockWordPressConnector } from "./mock-wordpress";
+import { WebflowConnector } from "./webflow";
+import { MockWebflowConnector } from "./mock-webflow";
+import type {
+  ContentConnector,
+  GitHubConfig,
+  GitHubConnector,
+  WebflowConfig,
+  WordPressConfig,
+} from "./types";
 
 export interface GitHubSiteConfig extends GitHubConfig {}
 
@@ -96,12 +106,45 @@ export function siteIsMock(site: OwnedSite): boolean {
     return cfg.demo === true;
   }
   if (site.sourceType === "sftp") return site.sftpConnection?.demo === true;
+  if (site.sourceType === "wordpress") {
+    const cfg = decryptSiteConfig(site) as Partial<WordPressConfig>;
+    return cfg.demo === true;
+  }
+  if (site.sourceType === "webflow") {
+    const cfg = decryptSiteConfig(site) as Partial<WebflowConfig>;
+    return cfg.demo === true;
+  }
   return false; // file sites are real local files
+}
+
+/** Build the content connector for wordpress/webflow sites (live or mock). */
+export function getContentConnector(site: OwnedSite): ContentConnector {
+  const cfg = decryptSiteConfig(site) as Record<string, unknown>;
+  if (site.sourceType === "wordpress") {
+    const full: WordPressConfig = {
+      baseUrl: String(cfg.baseUrl ?? ""),
+      username: String(cfg.username ?? ""),
+      appPassword: String(cfg.appPassword ?? ""),
+      demo: cfg.demo === true,
+    };
+    return full.demo ? new MockWordPressConnector(full) : new WordPressConnector(full);
+  }
+  if (site.sourceType === "webflow") {
+    const full: WebflowConfig = {
+      token: String(cfg.token ?? ""),
+      siteId: String(cfg.siteId ?? ""),
+      demo: cfg.demo === true,
+    };
+    return full.demo ? new MockWebflowConnector(full) : new WebflowConnector(full);
+  }
+  throw new Error(`Site ${site.id} is not a content source (${site.sourceType})`);
 }
 
 /** Public-safe site summary — no secrets, ever. */
 export function publicSite(site: OwnedSite) {
-  const cfg = decryptSiteConfig(site) as Partial<GitHubConfig>;
+  const cfg = decryptSiteConfig(site) as Partial<GitHubConfig> &
+    Partial<WordPressConfig> &
+    Partial<WebflowConfig>;
   return {
     id: site.id,
     projectId: site.projectId,
@@ -115,6 +158,21 @@ export function publicSite(site: OwnedSite) {
             owner: String(cfg.owner ?? ""),
             repo: String(cfg.repo ?? ""),
             branch: String(cfg.branch ?? "main"),
+            demo: cfg.demo === true,
+          }
+        : null,
+    wordpress:
+      site.sourceType === "wordpress"
+        ? {
+            baseUrl: String(cfg.baseUrl ?? ""),
+            username: String(cfg.username ?? ""),
+            demo: cfg.demo === true,
+          }
+        : null,
+    webflow:
+      site.sourceType === "webflow"
+        ? {
+            siteId: String(cfg.siteId ?? ""),
             demo: cfg.demo === true,
           }
         : null,

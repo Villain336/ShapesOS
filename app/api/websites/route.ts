@@ -54,6 +54,17 @@ interface CreateBody {
     branch?: string;
     demo?: boolean;
   };
+  wordpress?: {
+    baseUrl?: string;
+    username?: string;
+    appPassword?: string;
+    demo?: boolean;
+  };
+  webflow?: {
+    token?: string;
+    siteId?: string;
+    demo?: boolean;
+  };
   sftpConnectionId?: string;
   initialFiles?: InitialFile[];
 }
@@ -69,7 +80,13 @@ export async function POST(req: NextRequest) {
   if (!project) return Response.json({ error: "Project not found" }, { status: 404 });
 
   const name = (body.name ?? "").trim().slice(0, 80) || "Untitled site";
-  const sourceType = body.sourceType === "github" || body.sourceType === "sftp" ? body.sourceType : "file";
+  const sourceType =
+    body.sourceType === "github" ||
+    body.sourceType === "sftp" ||
+    body.sourceType === "wordpress" ||
+    body.sourceType === "webflow"
+      ? body.sourceType
+      : "file";
 
   let configEnc = encryptSiteConfig({});
   let sftpConnectionId: string | null = null;
@@ -89,6 +106,27 @@ export async function POST(req: NextRequest) {
       if (!token) return Response.json({ error: "GitHub token is required" }, { status: 400 });
     }
     configEnc = encryptSiteConfig({ token, owner, repo, branch, demo });
+  } else if (sourceType === "wordpress") {
+    const w = body.wordpress ?? {};
+    const demo = w.demo === true;
+    const baseUrl = (w.baseUrl ?? "").trim().replace(/\/+$/, "");
+    const username = (w.username ?? "").trim();
+    const appPassword = (w.appPassword ?? "").replace(/\s+/g, "");
+    if (!demo) {
+      if (!/^https?:\/\/.+\..+/.test(baseUrl))
+        return Response.json({ error: "WordPress site URL is required (https://…)" }, { status: 400 });
+      if (!username) return Response.json({ error: "WordPress username is required" }, { status: 400 });
+      if (!appPassword) return Response.json({ error: "Application password is required" }, { status: 400 });
+    }
+    configEnc = encryptSiteConfig({ baseUrl, username, appPassword, demo });
+  } else if (sourceType === "webflow") {
+    const w = body.webflow ?? {};
+    const demo = w.demo === true;
+    const token = (w.token ?? "").trim();
+    const siteId = (w.siteId ?? "").trim();
+    if (!demo && !token)
+      return Response.json({ error: "Webflow API token is required" }, { status: 400 });
+    configEnc = encryptSiteConfig({ token, siteId, demo });
   } else if (sourceType === "sftp") {
     const connId = (body.sftpConnectionId ?? "").trim();
     if (!connId) return Response.json({ error: "sftpConnectionId is required" }, { status: 400 });

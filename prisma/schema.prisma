@@ -89,10 +89,13 @@ enum FileChangeAction {
 }
 
 // Marketr — where a Site's files live (milestone 7).
+// Milestone 8 adds content-level sources: wordpress + webflow.
 enum SiteSourceType {
   github
   sftp
   file
+  wordpress
+  webflow
 }
 
 model Workspace {

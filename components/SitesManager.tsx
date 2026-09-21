@@ -6,14 +6,17 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import ContentBrowser from "./ContentBrowser";
 
 interface SiteSummary {
   id: string;
   name: string;
-  sourceType: "github" | "sftp" | "file";
+  sourceType: "github" | "sftp" | "file" | "wordpress" | "webflow";
   isMock: boolean;
   isLive: boolean;
   github: { owner: string; repo: string; branch: string; demo: boolean } | null;
+  wordpress: { baseUrl: string; username: string; demo: boolean } | null;
+  webflow: { siteId: string; demo: boolean } | null;
   sftpConnection: { id: string; label: string; demo: boolean } | null;
   updatedAt: string;
 }
@@ -48,14 +51,46 @@ const SOURCE_LABEL: Record<string, string> = {
   github: "GitHub",
   sftp: "SFTP",
   file: "Files",
+  wordpress: "WordPress",
+  webflow: "Webflow",
 };
 
 export default function SitesManager({ projectId }: { projectId: string }) {
   const [sites, setSites] = useState<SiteSummary[]>([]);
   const [loading, setLoading] = useState(true);
-  const [form, setForm] = useState<"github" | "upload" | "sftp" | null>(null);
+  const [form, setForm] = useState<"github" | "upload" | "sftp" | "wordpress" | "webflow" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  // WordPress form
+  const [wpUrl, setWpUrl] = useState("");
+  const [wpUser, setWpUser] = useState("");
+  const [wpPass, setWpPass] = useState("");
+  const [wpDemo, setWpDemo] = useState(false);
+  const [wpTest, setWpTest] = useState<string | null>(null);
+  const [wpTestBusy, setWpTestBusy] = useState(false);
+  const [wpName, setWpName] = useState("");
+
+  // Webflow form
+  const [wfToken, setWfToken] = useState("");
+  const [wfDemo, setWfDemo] = useState(false);
+  const [wfTest, setWfTest] = useState<string | null>(null);
+  const [wfTestBusy, setWfTestBusy] = useState(false);
+  const [wfSites, setWfSites] = useState<{ id: string; name: string }[]>([]);
+  const [wfSiteId, setWfSiteId] = useState("");
+  const [wfName, setWfName] = useState("");
+
+  // Publish landing page → WordPress/Webflow
+  const [pubSite, setPubSite] = useState<SiteSummary | null>(null);
+  const [pubTarget, setPubTarget] = useState("");
+  const [pubTitle, setPubTitle] = useState("");
+  const [pubSlug, setPubSlug] = useState("");
+  const [pubStatus, setPubStatus] = useState("draft");
+  const [pubCollection, setPubCollection] = useState("");
+  const [pubCollections, setPubCollections] = useState<{ id: string; title: string }[]>([]);
+  const [pubPublishSite, setPubPublishSite] = useState(true);
+  const [pubBusy, setPubBusy] = useState(false);
+  const [pubMsg, setPubMsg] = useState<string | null>(null);
 
   // GitHub form
   const [ghToken, setGhToken] = useState("");
@@ -248,6 +283,174 @@ export default function SitesManager({ projectId }: { projectId: string }) {
     }
   }
 
+  async function testWp() {
+    setWpTestBusy(true);
+    setWpTest(null);
+    setError(null);
+    try {
+      const res = await fetch("/api/websites/wordpress/test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projectId, baseUrl: wpUrl, username: wpUser, appPassword: wpPass, demo: wpDemo || undefined }),
+      });
+      const data = await res.json();
+      setWpTest(res.ok ? `✓ ${data.info}` : `✗ ${data.error ?? "Test failed"}`);
+    } finally {
+      setWpTestBusy(false);
+    }
+  }
+
+  async function createWpSite() {
+    setError(null);
+    if (!wpDemo && (!wpUrl.trim() || !wpUser.trim() || !wpPass.trim())) {
+      setError("Site URL, username, and application password are required");
+      return;
+    }
+    setBusy(true);
+    try {
+      const res = await fetch("/api/websites", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          projectId,
+          name: wpName.trim() || wpUrl.replace(/^https?:\/\//, "") || "WordPress site",
+          sourceType: "wordpress",
+          wordpress: { baseUrl: wpUrl.trim(), username: wpUser.trim(), appPassword: wpPass, demo: wpDemo || undefined },
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error ?? "Could not create site");
+        return;
+      }
+      setForm(null);
+      setWpUrl(""); setWpUser(""); setWpPass(""); setWpName(""); setWpTest(null);
+      await refresh();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function testWf() {
+    setWfTestBusy(true);
+    setWfTest(null);
+    setWfSites([]);
+    setError(null);
+    try {
+      const res = await fetch("/api/websites/webflow/test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projectId, token: wfToken, demo: wfDemo || undefined }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setWfTest(`✗ ${data.error ?? "Test failed"}`);
+        return;
+      }
+      setWfTest(`✓ ${data.info}`);
+      setWfSites(data.sites ?? []);
+      if (data.sites?.length === 1) setWfSiteId(data.sites[0].id);
+    } finally {
+      setWfTestBusy(false);
+    }
+  }
+
+  async function createWfSite() {
+    setError(null);
+    if (!wfDemo && !wfToken.trim()) {
+      setError("API token is required");
+      return;
+    }
+    setBusy(true);
+    try {
+      const res = await fetch("/api/websites", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          projectId,
+          name: wfName.trim() || wfSites.find((s) => s.id === wfSiteId)?.name || "Webflow site",
+          sourceType: "webflow",
+          webflow: { token: wfToken, siteId: wfSiteId, demo: wfDemo || undefined },
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error ?? "Could not create site");
+        return;
+      }
+      setForm(null);
+      setWfToken(""); setWfSiteId(""); setWfSites([]); setWfName(""); setWfTest(null);
+      await refresh();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function openPublishModal(site: SiteSummary) {
+    setPubSite(site);
+    setPubTitle(site.name);
+    setPubSlug("");
+    setPubStatus("draft");
+    setPubCollection("");
+    setPubCollections([]);
+    setPubPublishSite(true);
+    setPubMsg(null);
+    const targets = sites.filter((s) => s.sourceType === "wordpress" || s.sourceType === "webflow");
+    setPubTarget(targets[0]?.id ?? "");
+    void loadPubCollections(targets[0]);
+  }
+
+  async function loadPubCollections(target?: SiteSummary) {
+    setPubCollections([]);
+    if (!target || target.sourceType !== "webflow") return;
+    try {
+      const res = await fetch(`/api/websites/${target.id}/content`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projectId, action: "list", kind: "collection" }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setPubCollections(data.items);
+        if (data.items.length > 0) setPubCollection(data.items[0].id);
+      }
+    } catch {
+      /* leave empty — user picks manually */
+    }
+  }
+
+  async function runPublish() {
+    if (!pubSite || !pubTarget) return;
+    setPubBusy(true);
+    setPubMsg(null);
+    setError(null);
+    try {
+      const res = await fetch(`/api/websites/${pubSite.id}/publish-content`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          projectId,
+          targetSiteId: pubTarget,
+          title: pubTitle,
+          slug: pubSlug,
+          status: pubStatus,
+          collectionId: pubCollection || undefined,
+          webflowPublish: pubPublishSite,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setPubMsg(`✗ ${data.error ?? "Publish failed"}`);
+        return;
+      }
+      setPubMsg(
+        `✓ Published as “${data.item.title}”${data.published ? " — Webflow site published" : ""}${data.mock ? " (mock)" : ""}${data.item.link ? ` — ${data.item.link}` : ""}`,
+      );
+    } finally {
+      setPubBusy(false);
+    }
+  }
+
   async function syncSite(site: SiteSummary) {
     setOpBusy((m) => ({ ...m, [site.id]: "sync" }));
     setSyncMsg((m) => ({ ...m, [site.id]: "" }));
@@ -330,6 +533,18 @@ export default function SitesManager({ projectId }: { projectId: string }) {
             className="rounded-md border border-zinc-700 px-3 py-1.5 text-sm text-zinc-200 hover:border-zinc-500"
           >
             Link SFTP
+          </button>
+          <button
+            onClick={() => { setForm(form === "wordpress" ? null : "wordpress"); setError(null); }}
+            className="rounded-md border border-zinc-700 px-3 py-1.5 text-sm text-zinc-200 hover:border-zinc-500"
+          >
+            Connect WordPress
+          </button>
+          <button
+            onClick={() => { setForm(form === "webflow" ? null : "webflow"); setError(null); }}
+            className="rounded-md border border-zinc-700 px-3 py-1.5 text-sm text-zinc-200 hover:border-zinc-500"
+          >
+            Connect Webflow
           </button>
         </div>
       </div>
@@ -482,9 +697,115 @@ export default function SitesManager({ projectId }: { projectId: string }) {
         </div>
       )}
 
+      {form === "wordpress" && (
+        <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-4">
+          <h3 className="mb-1 text-sm font-semibold text-zinc-200">Connect WordPress</h3>
+          <p className="mb-3 text-xs text-zinc-500">
+            Content-level access via the WP REST API: pages, posts, media. Theme/plugin files are not reachable — the UI labels this honestly.
+          </p>
+          <label className="flex items-center gap-2 text-sm text-zinc-400">
+            <input type="checkbox" checked={wpDemo} onChange={(e) => { setWpDemo(e.target.checked); setWpTest(null); }} />
+            Use demo site <span className="text-xs text-zinc-600">(mock — no credentials or network needed)</span>
+          </label>
+          {!wpDemo && (
+            <div className="mt-3 grid grid-cols-2 gap-3">
+              <label className="col-span-2 block text-sm text-zinc-400">
+                Site URL
+                <input value={wpUrl} onChange={(e) => setWpUrl(e.target.value)} placeholder="https://client.example.com" className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1.5 font-mono text-sm text-zinc-100" />
+              </label>
+              <label className="block text-sm text-zinc-400">
+                Username
+                <input value={wpUser} onChange={(e) => setWpUser(e.target.value)} placeholder="admin" className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-sm text-zinc-100" />
+              </label>
+              <label className="block text-sm text-zinc-400">
+                Application password <span className="text-xs text-zinc-600">(Users → Profile; stored encrypted)</span>
+                <input type="password" value={wpPass} onChange={(e) => setWpPass(e.target.value)} placeholder="xxxx xxxx xxxx xxxx" className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1.5 font-mono text-sm text-zinc-100" />
+              </label>
+            </div>
+          )}
+          <div className="mt-3 flex items-center gap-3">
+            <button
+              onClick={() => void testWp()}
+              disabled={wpTestBusy}
+              className="rounded-md border border-zinc-700 px-3 py-1.5 text-sm text-zinc-200 hover:border-zinc-500 disabled:opacity-50"
+            >
+              {wpTestBusy ? "Testing…" : "Test connection"}
+            </button>
+            {wpTest && <span className="text-xs text-zinc-300">{wpTest}</span>}
+          </div>
+          <div className="mt-3 flex items-end gap-3">
+            <label className="block flex-1 text-sm text-zinc-400">
+              Site name
+              <input value={wpName} onChange={(e) => setWpName(e.target.value)} placeholder="Client WordPress" className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-sm text-zinc-100" />
+            </label>
+            <button
+              onClick={() => void createWpSite()}
+              disabled={busy}
+              className="rounded-md bg-zinc-100 px-4 py-1.5 text-sm font-medium text-zinc-950 hover:bg-white disabled:opacity-50"
+            >
+              {busy ? "Connecting…" : "Connect site"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {form === "webflow" && (
+        <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-4">
+          <h3 className="mb-1 text-sm font-semibold text-zinc-200">Connect Webflow</h3>
+          <p className="mb-3 text-xs text-zinc-500">
+            Content-level access via the Webflow API v2: CMS collections, items, and site publishing. Page designs are not API-editable.
+          </p>
+          <label className="flex items-center gap-2 text-sm text-zinc-400">
+            <input type="checkbox" checked={wfDemo} onChange={(e) => { setWfDemo(e.target.checked); setWfTest(null); setWfSites([]); }} />
+            Use demo workspace <span className="text-xs text-zinc-600">(mock — no token or network needed)</span>
+          </label>
+          {!wfDemo && (
+            <label className="mt-3 block text-sm text-zinc-400">
+              API token <span className="text-xs text-zinc-600">(site or workspace token; stored encrypted)</span>
+              <input type="password" value={wfToken} onChange={(e) => setWfToken(e.target.value)} placeholder="wf_…" className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1.5 font-mono text-sm text-zinc-100" />
+            </label>
+          )}
+          <div className="mt-3 flex items-center gap-3">
+            <button
+              onClick={() => void testWf()}
+              disabled={wfTestBusy}
+              className="rounded-md border border-zinc-700 px-3 py-1.5 text-sm text-zinc-200 hover:border-zinc-500 disabled:opacity-50"
+            >
+              {wfTestBusy ? "Testing…" : "Test connection"}
+            </button>
+            {wfTest && <span className="text-xs text-zinc-300">{wfTest}</span>}
+          </div>
+          {wfSites.length > 0 && (
+            <label className="mt-3 block text-sm text-zinc-400">
+              Webflow site
+              <select value={wfSiteId} onChange={(e) => setWfSiteId(e.target.value)} className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-sm text-zinc-100">
+                <option value="">— pick a site —</option>
+                {wfSites.map((s) => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                ))}
+              </select>
+            </label>
+          )}
+          <div className="mt-3 flex items-end gap-3">
+            <label className="block flex-1 text-sm text-zinc-400">
+              Site name
+              <input value={wfName} onChange={(e) => setWfName(e.target.value)} placeholder="Client Webflow" className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-sm text-zinc-100" />
+            </label>
+            <button
+              onClick={() => void createWfSite()}
+              disabled={busy}
+              className="rounded-md bg-zinc-100 px-4 py-1.5 text-sm font-medium text-zinc-950 hover:bg-white disabled:opacity-50"
+            >
+              {busy ? "Connecting…" : "Connect site"}
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-col gap-2">
         {sites.map((site) => {
           const d = deployRes[site.id];
+          const isContent = site.sourceType === "wordpress" || site.sourceType === "webflow";
           return (
             <div key={site.id} className="rounded-lg border border-zinc-800 bg-zinc-950 p-4">
               <div className="flex items-center justify-between">
@@ -501,15 +822,20 @@ export default function SitesManager({ projectId }: { projectId: string }) {
                   {site.sftpConnection && (
                     <span className="ml-2 font-mono text-xs text-zinc-500">via {site.sftpConnection.label}</span>
                   )}
+                  {site.wordpress && (
+                    <span className="ml-2 font-mono text-xs text-zinc-500">{site.wordpress.baseUrl}</span>
+                  )}
                 </div>
                 <div className="flex items-center gap-2">
-                  <Link
-                    href={`/dashboard/projects/${projectId}/ide?siteId=${site.id}`}
-                    className="rounded border border-zinc-700 px-2 py-1 text-xs text-zinc-200 hover:border-zinc-500"
-                  >
-                    Open in IDE
-                  </Link>
-                  {site.sourceType !== "file" && (
+                  {!isContent && (
+                    <Link
+                      href={`/dashboard/projects/${projectId}/ide?siteId=${site.id}`}
+                      className="rounded border border-zinc-700 px-2 py-1 text-xs text-zinc-200 hover:border-zinc-500"
+                    >
+                      Open in IDE
+                    </Link>
+                  )}
+                  {site.sourceType !== "file" && !isContent && (
                     <button
                       onClick={() => void syncSite(site)}
                       disabled={!!opBusy[site.id]}
@@ -518,19 +844,33 @@ export default function SitesManager({ projectId }: { projectId: string }) {
                       {opBusy[site.id] === "sync" ? "Syncing…" : "Sync ↓"}
                     </button>
                   )}
-                  <button
-                    onClick={() => void deploySite(site)}
-                    disabled={!!opBusy[site.id]}
-                    className="rounded border border-zinc-700 px-2 py-1 text-xs text-zinc-300 hover:border-zinc-500 disabled:opacity-50"
-                  >
-                    {opBusy[site.id] === "deploy" ? "Deploying…" : "Deploy ↑"}
-                  </button>
-                  <a
-                    href={`/api/websites/${site.id}/download?projectId=${projectId}`}
-                    className="rounded border border-zinc-700 px-2 py-1 text-xs text-zinc-300 hover:border-zinc-500"
-                  >
-                    .zip
-                  </a>
+                  {!isContent && (
+                    <button
+                      onClick={() => void deploySite(site)}
+                      disabled={!!opBusy[site.id]}
+                      className="rounded border border-zinc-700 px-2 py-1 text-xs text-zinc-300 hover:border-zinc-500 disabled:opacity-50"
+                    >
+                      {opBusy[site.id] === "deploy" ? "Deploying…" : "Deploy ↑"}
+                    </button>
+                  )}
+                  {site.sourceType === "file" && (
+                    <button
+                      onClick={() => openPublishModal(site)}
+                      disabled={!sites.some((s) => s.sourceType === "wordpress" || s.sourceType === "webflow")}
+                      title="Publish this landing page to WordPress or Webflow"
+                      className="rounded border border-zinc-700 px-2 py-1 text-xs text-zinc-300 hover:border-zinc-500 disabled:opacity-50"
+                    >
+                      Publish to…
+                    </button>
+                  )}
+                  {!isContent && (
+                    <a
+                      href={`/api/websites/${site.id}/download?projectId=${projectId}`}
+                      className="rounded border border-zinc-700 px-2 py-1 text-xs text-zinc-300 hover:border-zinc-500"
+                    >
+                      .zip
+                    </a>
+                  )}
                   <button
                     onClick={() => void deleteSite(site)}
                     className="rounded border border-zinc-700 px-2 py-1 text-xs text-red-300 hover:border-red-700"
@@ -539,6 +879,14 @@ export default function SitesManager({ projectId }: { projectId: string }) {
                   </button>
                 </div>
               </div>
+              {(site.sourceType === "wordpress" || site.sourceType === "webflow") && (
+                <ContentBrowser
+                  projectId={projectId}
+                  siteId={site.id}
+                  sourceType={site.sourceType}
+                  isMock={site.isMock}
+                />
+              )}
               {syncMsg[site.id] && <p className="mt-2 text-xs text-zinc-400">{syncMsg[site.id]}</p>}
               {d && (
                 <div className="mt-3 rounded-md border border-zinc-800 p-3 text-xs">
@@ -572,10 +920,90 @@ export default function SitesManager({ projectId }: { projectId: string }) {
         })}
         {sites.length === 0 && (
           <p className="text-sm text-zinc-500">
-            No sites yet — build one with the AI landing-page builder, connect a GitHub repo, or upload a .zip.
+            No sites yet — build one with the AI landing-page builder, connect a GitHub repo, WordPress, or Webflow, or upload a .zip.
           </p>
         )}
       </div>
+
+      {pubSite && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+          <div className="w-full max-w-lg rounded-lg border border-zinc-800 bg-zinc-950 p-5">
+            <h3 className="text-sm font-semibold text-zinc-200">
+              Publish “{pubSite.name}” to…
+            </h3>
+            <p className="mt-1 text-xs text-zinc-500">
+              The landing page HTML (index.html) becomes a WordPress page or a Webflow CMS item. Content-level publishing — designs are not touched.
+            </p>
+            <label className="mt-3 block text-sm text-zinc-400">
+              Target site
+              <select
+                value={pubTarget}
+                onChange={(e) => {
+                  setPubTarget(e.target.value);
+                  void loadPubCollections(sites.find((s) => s.id === e.target.value));
+                }}
+                className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-sm text-zinc-100"
+              >
+                {sites.filter((s) => s.sourceType === "wordpress" || s.sourceType === "webflow").map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name} ({SOURCE_LABEL[s.sourceType]}){s.isMock ? " · mock" : ""}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div className="mt-3 grid grid-cols-2 gap-3">
+              <label className="block text-sm text-zinc-400">
+                Title
+                <input value={pubTitle} onChange={(e) => setPubTitle(e.target.value)} className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-sm text-zinc-100" />
+              </label>
+              <label className="block text-sm text-zinc-400">
+                Slug <span className="text-xs text-zinc-600">(auto from title if empty)</span>
+                <input value={pubSlug} onChange={(e) => setPubSlug(e.target.value)} className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1.5 font-mono text-sm text-zinc-100" />
+              </label>
+              <label className="block text-sm text-zinc-400">
+                Status
+                <select value={pubStatus} onChange={(e) => setPubStatus(e.target.value)} className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-sm text-zinc-100">
+                  <option value="draft">Draft</option>
+                  <option value="publish">Publish</option>
+                </select>
+              </label>
+              {sites.find((s) => s.id === pubTarget)?.sourceType === "webflow" && (
+                <label className="block text-sm text-zinc-400">
+                  Collection
+                  <select value={pubCollection} onChange={(e) => setPubCollection(e.target.value)} className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-sm text-zinc-100">
+                    {pubCollections.map((c) => (
+                      <option key={c.id} value={c.id}>{c.title}</option>
+                    ))}
+                    {pubCollections.length === 0 && <option value="">— no collections loaded —</option>}
+                  </select>
+                </label>
+              )}
+            </div>
+            {sites.find((s) => s.id === pubTarget)?.sourceType === "webflow" && (
+              <label className="mt-3 flex items-center gap-2 text-sm text-zinc-400">
+                <input type="checkbox" checked={pubPublishSite} onChange={(e) => setPubPublishSite(e.target.checked)} />
+                Publish the Webflow site after creating the item
+              </label>
+            )}
+            {pubMsg && <p className="mt-3 text-xs text-zinc-300">{pubMsg}</p>}
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                onClick={() => setPubSite(null)}
+                className="rounded border border-zinc-700 px-4 py-1.5 text-sm text-zinc-300"
+              >
+                Close
+              </button>
+              <button
+                onClick={() => void runPublish()}
+                disabled={pubBusy || !pubTarget}
+                className="rounded bg-zinc-100 px-4 py-1.5 text-sm font-medium text-zinc-950 hover:bg-white disabled:opacity-50"
+              >
+                {pubBusy ? "Publishing…" : "Publish"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

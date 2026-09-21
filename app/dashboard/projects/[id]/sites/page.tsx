@@ -30,7 +30,7 @@ export default async function SitesPage({
         </Link>
         <h1 className="mt-1 text-2xl font-bold tracking-tight">Sites & landing pages</h1>
         <p className="mt-1 text-sm text-zinc-400">
-          Build landing pages from scratch, or connect a GitHub repo, SFTP host, or uploaded .zip — then edit in the IDE and deploy.
+          Build landing pages from scratch, or connect a GitHub repo, WordPress, Webflow, SFTP host, or uploaded .zip — then edit, deploy, or publish content.
         </p>
       </div>
       <SitesManager projectId={project.id} />
