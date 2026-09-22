@@ -21,7 +21,7 @@ export interface NodeTypeDef {
   type: string;
   label: string;
   description: string;
-  /** Lucide icon name rendered client-side. */
+  /** Phosphor icon name rendered client-side. */
   icon: string;
   defaultLabel: string;
   defaultConfig: Record<string, unknown>;
@@ -61,7 +61,7 @@ export const NODE_CATALOG: Record<WorkflowNodeKind, NodeTypeDef[]> = {
       type: "rank_drop",
       label: "Keyword rank drop",
       description: "Fire when a tracked keyword drops by a threshold.",
-      icon: "TrendingDown",
+      icon: "TrendDown",
       defaultLabel: "Rank drop",
       defaultConfig: { dropThreshold: 10, keywordId: "" },
       fields: [
@@ -73,7 +73,7 @@ export const NODE_CATALOG: Record<WorkflowNodeKind, NodeTypeDef[]> = {
       type: "competitor_published",
       label: "Competitor published",
       description: "Fire when a monitored competitor publishes new content.",
-      icon: "Radar",
+      icon: "Target",
       defaultLabel: "Competitor published",
       defaultConfig: { competitorId: "" },
       fields: [{ key: "competitorId", label: "Competitor id (blank = any monitored)", type: "text" }],
@@ -91,7 +91,7 @@ export const NODE_CATALOG: Record<WorkflowNodeKind, NodeTypeDef[]> = {
       type: "webhook",
       label: "Webhook",
       description: "Fire on an inbound webhook call (v1: fired manually via run API).",
-      icon: "Webhook",
+      icon: "WebhooksLogo",
       defaultLabel: "Webhook",
       defaultConfig: { secret: "" },
       fields: [{ key: "secret", label: "Shared secret", type: "text", hint: "v1: informational only." }],
@@ -102,7 +102,7 @@ export const NODE_CATALOG: Record<WorkflowNodeKind, NodeTypeDef[]> = {
       type: "generate_draft",
       label: "Generate content draft",
       description: "Run the content engine (M4) and enqueue a pending autopilot item.",
-      icon: "Sparkles",
+      icon: "Sparkle",
       defaultLabel: "Generate draft",
       defaultConfig: { topic: "", brief: "" },
       fields: [
@@ -114,7 +114,7 @@ export const NODE_CATALOG: Record<WorkflowNodeKind, NodeTypeDef[]> = {
       type: "run_audit",
       label: "Run SEO audit",
       description: "Run a site audit and expose {auditId, totalIssues, errorIssues} to later nodes.",
-      icon: "ScanSearch",
+      icon: "Scan",
       defaultLabel: "Run audit",
       defaultConfig: { siteId: "" },
       fields: [
@@ -130,7 +130,7 @@ export const NODE_CATALOG: Record<WorkflowNodeKind, NodeTypeDef[]> = {
       type: "apply_internal_links",
       label: "Apply internal-link suggestions",
       description: "Refresh the project's internal-link suggestions (M16 sync path).",
-      icon: "Link2",
+      icon: "LinkSimple",
       defaultLabel: "Apply internal links",
       defaultConfig: {},
       fields: [],
@@ -153,7 +153,7 @@ export const NODE_CATALOG: Record<WorkflowNodeKind, NodeTypeDef[]> = {
       type: "generate_report",
       label: "Generate report",
       description: "Render a branded PDF report from a report template.",
-      icon: "FileBarChart",
+      icon: "ChartBar",
       defaultLabel: "Generate report",
       defaultConfig: { templateId: "" },
       fields: [

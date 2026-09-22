@@ -8,6 +8,7 @@ import {
   requireUser,
 } from "@/lib/session";
 import { AppSidebar, MobileNav } from "@/components/AppSidebar";
+import { DashboardMain } from "@/components/DashboardMain";
 
 export default async function DashboardLayout({
   children,
@@ -32,9 +33,7 @@ export default async function DashboardLayout({
       <div className="flex">
         <AppSidebar {...sidebarProps} />
         <div className="min-w-0 flex-1">
-          <main className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
-            {children}
-          </main>
+          <DashboardMain>{children}</DashboardMain>
         </div>
       </div>
     </div>

@@ -1,7 +1,11 @@
+"use client";
+
 import { DragHandle } from "@tiptap/extension-drag-handle-react";
 import type { Node } from "@tiptap/pm/model";
 import { EditorContent } from "@tiptap/react";
-import { Plus } from "lucide-react";
+import {
+  Plus,
+} from "@phosphor-icons/react";
 import { useCallback, useRef } from "react";
 
 import { BubbleMenu } from "./bubble-menu";

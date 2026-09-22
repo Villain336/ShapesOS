@@ -4,7 +4,7 @@
 //
 // UI language: vault components only (Button, Card, ValuePill, Field,
 // EmptyState, TaskRows, shadcn Tabs/Select/Checkbox/Switch/Dialog/Input).
-// Lucide icons only.
+// Phosphor icons only (duotone features, regular chrome).
 
 "use client";
 
@@ -40,18 +40,18 @@ import {
   TabsTrigger,
 } from "@/components/vault/shadcn/tabs";
 import {
-  AlertTriangle,
+  Warning,
   Eye,
-  Inbox,
+  Tray,
   ListChecks,
-  Activity as ActivityIcon,
-  Loader2,
-  OctagonAlert,
+  Pulse as ActivityIcon,
+  CircleNotch,
+  WarningOctagon,
   Pencil,
   Play,
   Plus,
-  Trash2,
-} from "lucide-react";
+  Trash,
+} from "@phosphor-icons/react";
 
 export interface RuleRow {
   id: string;
@@ -274,7 +274,7 @@ export default function AutopilotStudio({ projectId, canEdit, isAdmin, initialRu
     <div className="flex flex-col gap-6">
       {killed && (
         <div className="flex items-start gap-2.5 rounded-card bg-red-tint px-4 py-3 text-sm text-red">
-          <OctagonAlert className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={2} />
+          <WarningOctagon className="mt-0.5 h-4 w-4 shrink-0" />
           <span>
             Autopilot is <strong>killed</strong>
             {projectKilled && workspaceKilled ? " at project and workspace level" : projectKilled ? " for this project" : " at workspace level"}
@@ -284,7 +284,7 @@ export default function AutopilotStudio({ projectId, canEdit, isAdmin, initialRu
       )}
       {error && (
         <div className="flex items-start gap-2.5 rounded-card bg-red-tint px-4 py-3 text-sm text-red">
-          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={2} />
+          <Warning className="mt-0.5 h-4 w-4 shrink-0" />
           <span className="flex-1">{error}</span>
           <Button type="button" size="xs" variant="quiet" onClick={() => setError(null)}>
             Dismiss
@@ -303,7 +303,7 @@ export default function AutopilotStudio({ projectId, canEdit, isAdmin, initialRu
             href="#kill-switch"
             className={`mb-2 inline-flex items-center gap-1.5 text-[13px] font-medium ${killed ? "text-red" : "text-ink-3 hover:text-ink-2"}`}
           >
-            <OctagonAlert className="h-4 w-4" strokeWidth={2} />
+            <WarningOctagon className="h-4 w-4" />
             {killed ? "Kill switch ENGAGED" : "Kill switch"}
           </a>
         </div>
@@ -333,61 +333,77 @@ export default function AutopilotStudio({ projectId, canEdit, isAdmin, initialRu
               )}
               {busy && (
                 <span className="inline-flex items-center gap-1.5 text-sm text-ink-3">
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" /> Working…
+                  <CircleNotch className="h-3.5 w-3.5 animate-spin" /> Working…
                 </span>
               )}
             </div>
 
             {items.length === 0 ? (
               <EmptyState
-                icon={<Inbox className="h-5 w-5" strokeWidth={2} />}
+                icon={<Tray className="h-5 w-5" />}
                 title={`No ${queueStatus} items`}
                 description="Run a rule to generate drafts."
               />
             ) : (
-              <div className="flex flex-col gap-2">
+              <div className="flex flex-col gap-2.5">
                 {items.map((item) => (
-                  <Card key={item.id} className="flex items-center gap-3 px-4 py-3">
+                  <Card key={item.id} className="flex items-start gap-3 px-4 py-3.5">
                     {canEdit && (item.status === "pending" || item.status === "approved") && (
                       <Checkbox
                         checked={selected.has(item.id)}
                         onCheckedChange={() => toggleSelect(item.id)}
                         aria-label={`Select ${item.title}`}
+                        className="mt-1"
                       />
                     )}
                     <div className="min-w-0 flex-1">
-                      <div className="truncate text-sm font-medium text-ink">{item.title}</div>
-                      <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-ink-3">
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+                        <span className="text-[15px] font-medium leading-snug text-ink">{item.title}</span>
                         <ValuePill tone={QUEUE_TONES[item.status] ?? "neutral"}>{item.status}</ValuePill>
-                        <span>{KIND_LABELS[item.kind] ?? item.kind}</span>
-                        <span>{item.rule.name}</span>
                         {item.autoApproved && <ValuePill tone="orange">auto-approved</ValuePill>}
-                        {item.publishedUrl && <span className="text-accent-ink">→ {item.publishedUrl}</span>}
                       </div>
+                      <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-ink-3">
+                        <span>{KIND_LABELS[item.kind] ?? item.kind}</span>
+                        <span aria-hidden="true">·</span>
+                        <span>{item.rule.name}</span>
+                        <span aria-hidden="true">·</span>
+                        <span>{new Date(item.createdAt).toLocaleString()}</span>
+                      </div>
+                      {item.draftMarkdown && (
+                        <p className="mt-2 line-clamp-2 max-w-[72ch] text-[13px] leading-relaxed text-ink-2">
+                          {item.draftMarkdown.slice(0, 180)}
+                          {item.draftMarkdown.length > 180 ? "…" : ""}
+                        </p>
+                      )}
+                      {item.publishedUrl && (
+                        <p className="mt-1.5 text-[12px] text-ink-2">→ {item.publishedUrl}</p>
+                      )}
                     </div>
-                    <Button type="button" size="sm" variant="quiet" onClick={() => setPreview(item)}>
-                      <Eye className="h-3.5 w-3.5" /> Preview
-                    </Button>
-                    {canEdit && item.status === "pending" && (
-                      <>
-                        <Button type="button" size="sm" variant="accent" onClick={() => approveItem(item)}>
-                          Approve
-                        </Button>
-                        <Button type="button" size="sm" variant="ghost" onClick={() => rejectItem(item)}>
-                          Reject
-                        </Button>
-                      </>
-                    )}
-                    {canEdit && item.status === "approved" && (
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="accent"
-                        onClick={() => doAction(`publish-${item.id}`, () => api(`/api/autopilot/items/${item.id}/publish`, { method: "POST", body: JSON.stringify({ projectId }) }))}
-                      >
-                        Publish
+                    <div className="flex shrink-0 items-center gap-2">
+                      <Button type="button" size="sm" variant="quiet" onClick={() => setPreview(item)}>
+                        <Eye className="h-3.5 w-3.5" /> Preview
                       </Button>
-                    )}
+                      {canEdit && item.status === "pending" && (
+                        <>
+                          <Button type="button" size="sm" variant="accent" onClick={() => approveItem(item)}>
+                            Approve
+                          </Button>
+                          <Button type="button" size="sm" variant="ghost" onClick={() => rejectItem(item)}>
+                            Reject
+                          </Button>
+                        </>
+                      )}
+                      {canEdit && item.status === "approved" && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="accent"
+                          onClick={() => doAction(`publish-${item.id}`, () => api(`/api/autopilot/items/${item.id}/publish`, { method: "POST", body: JSON.stringify({ projectId }) }))}
+                        >
+                          Publish
+                        </Button>
+                      )}
+                    </div>
                   </Card>
                 ))}
               </div>
@@ -411,7 +427,7 @@ export default function AutopilotStudio({ projectId, canEdit, isAdmin, initialRu
             )}
             {rules.length === 0 ? (
               <EmptyState
-                icon={<ListChecks className="h-5 w-5" strokeWidth={2} />}
+                icon={<ListChecks className="h-5 w-5" />}
                 title="No autopilot rules yet"
                 description="Create one to start generating drafts on a schedule."
                 action={
@@ -433,7 +449,12 @@ export default function AutopilotStudio({ projectId, canEdit, isAdmin, initialRu
                       </div>
                       <div className="mt-1 text-xs text-ink-3">
                         {SOURCE_LABELS[rule.source] ?? rule.source} · {rule.cadence} · max {rule.maxItemsPerRun}/run
-                        {rule.autoApprove && <span className="text-orange"> · auto-approve ON</span>}
+                        {rule.autoApprove && (
+                          <>
+                            {" "}·{" "}
+                            <ValuePill tone="orange">auto-approve ON</ValuePill>
+                          </>
+                        )}
                         {rule.lastRunAt && <span> · last run {new Date(rule.lastRunAt).toLocaleString()}</span>}
                         <span> · {rule._count.items} items</span>
                       </div>
@@ -473,7 +494,7 @@ export default function AutopilotStudio({ projectId, canEdit, isAdmin, initialRu
                           className="text-red"
                           onClick={() => { if (confirm(`Delete rule "${rule.name}"? Items and history stay.`)) doAction(`del-${rule.id}`, () => api(`/api/autopilot/rules/${rule.id}?projectId=${projectId}`, { method: "DELETE" })); }}
                         >
-                          <Trash2 className="h-3.5 w-3.5" /> Delete
+                          <Trash className="h-3.5 w-3.5" /> Delete
                         </Button>
                       </>
                     )}
@@ -487,7 +508,7 @@ export default function AutopilotStudio({ projectId, canEdit, isAdmin, initialRu
         <TabsContent value="activity" className="pt-4">
           {runs.length === 0 ? (
             <EmptyState
-              icon={<ActivityIcon className="h-5 w-5" strokeWidth={2} />}
+              icon={<ActivityIcon className="h-5 w-5" />}
               title="No runs yet"
               description="Runs appear here once a rule executes."
             />
@@ -509,7 +530,12 @@ export default function AutopilotStudio({ projectId, canEdit, isAdmin, initialRu
                   {preview.autoApproved && " · auto-approved"}
                 </DialogDescription>
               </DialogHeader>
-              {preview.reviewNote && <p className="text-sm text-orange">Review note: {preview.reviewNote}</p>}
+              {preview.reviewNote && (
+                <p className="flex flex-wrap items-center gap-2 text-sm text-ink-2">
+                  <ValuePill tone="orange">Review note</ValuePill>
+                  {preview.reviewNote}
+                </p>
+              )}
               <pre className="whitespace-pre-wrap text-sm leading-relaxed text-ink-2">{preview.draftMarkdown ?? "(no draft)"}</pre>
               {canEdit && preview.status === "pending" && (
                 <DialogFooter>
@@ -554,7 +580,7 @@ export default function AutopilotStudio({ projectId, canEdit, isAdmin, initialRu
         <CardHeader
           title={
             <span className="flex items-center gap-2 text-red">
-              <OctagonAlert className="h-4 w-4" strokeWidth={2} /> Kill switch
+              <WarningOctagon className="h-4 w-4" /> Kill switch
             </span>
           }
         />
@@ -789,7 +815,7 @@ function RuleForm({ projectId, templates, sites, editing, onClose, onSaved }: {
             Cancel
           </Button>
           <Button type="button" size="sm" variant="accent" onClick={save} disabled={saving}>
-            {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+            {saving ? <CircleNotch className="h-3.5 w-3.5 animate-spin" /> : null}
             {saving ? "Saving…" : editing ? "Save changes" : "Create rule"}
           </Button>
         </DialogFooter>

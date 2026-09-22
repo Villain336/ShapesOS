@@ -1,78 +1,78 @@
 @import "tailwindcss";
+@import "@fontsource/inter/400.css";
+@import "@fontsource/inter/500.css";
+@import "@fontsource/inter/600.css";
+@import "@fontsource/inter/700.css";
+@import "@fontsource/newsreader/400.css";
+@import "@fontsource/newsreader/500.css";
+@import "@fontsource/newsreader/600.css";
 
 @custom-variant dark (&:where(.dark, .dark *));
 
 /* ══════════════════════════════════════════════════════════
- * Marketr design foundation — ported from the BeautifulUI
- * vault library (design-vault/showcase), re-skinned:
- *   --accent is orange-600 (#ea580c), light-mode only.
- * Do not hand-style buttons/inputs/cards/dialogs — use the
- * vault components in components/vault/ (see
- * VAULT-COMPONENT-MAP.md).
+ * Marketr — "Warm Operator" design foundation (design-v2)
+ *
+ * Claude's warm paper neutrals + Ahrefs' orange-ramp discipline +
+ * Semrush's tight tool surfaces + Jasper's flat color-band rhythm +
+ * CrewAI's premium type moments.
+ *
+ * Rules:
+ * - Canvas is warm paper #FAFAF7 — never pure white, never blue-gray.
+ * - Elevation = 1px rings (rgba(28,25,23,0.08)). Shadows live ONLY on
+ *   floating layers (beautiful-shadows tokens).
+ * - Orange #EA580C: actions, links, active states, focus ONLY.
+ *   Never icons. Never body text. Body links use #C2410C (4.5:1).
+ * - Inter for UI chrome; Newsreader for page headlines + empty states.
+ * - Radii: cards 10px, controls 8px, chips/pills full. Nothing else.
  * ══════════════════════════════════════════════════════════ */
 
 :root {
-  /* surfaces — cool, blue-tinted neutrals */
-  --page: oklch(0.985 0.001 286.376);
-  --canvas: oklch(0.961 0.002 247.84);
-  --surface: oklch(1 0 0);
-  --inset: oklch(0.979 0.002 247.839);
-  --hover: oklch(0.97 0.002 247.839);
-  --hover-2: oklch(0.933 0.003 247.86);
+  /* surfaces — warm paper */
+  --page: #fafaf7;
+  --canvas: #f4f2ec;
+  --surface: #ffffff;
+  --inset: #f7f5f0;
+  --hover: #f1ede4;
+  --hover-2: #e7e1d3;
+  --field: #ffffff;
 
-  /* ink ramp */
-  --ink: oklch(0.247 0.006 258.361);
-  --ink-2: oklch(0.506 0.01 264.477);
-  --ink-3: oklch(0.695 0.009 264.505);
+  /* ink ramp — warm, zero blue-gray */
+  --ink: #1c1917;
+  --ink-2: #57534e;
+  --ink-3: #a8a29e;
 
-  /* borders — solid and crisp, not alpha */
-  --line: oklch(0.946 0.003 264.542);
-  --line-strong: oklch(0.912 0.005 258.326);
-  --line-soft: oklch(0.966 0.002 264.542);
-  --grid-line: color-mix(in srgb, var(--line) 78%, transparent);
-  --field: oklch(0.961 0.001 286.375);
-  --stripe: oklch(0.405 0 0 / 0.075);
-  --stripe-bg: oklch(0.97 0 0);
+  /* borders — 1px consensus elevation */
+  --line: rgba(28, 25, 23, 0.08);
+  --line-strong: rgba(28, 25, 23, 0.16);
 
-  /* accent — Marketr orange (orange-600 #ea580c family) */
-  --accent: oklch(0.646 0.222 41.116);
-  --accent-ink: oklch(0.553 0.196 41.333);
-  --accent-tint: oklch(0.98 0.016 73.684);
+  /* accent — orange-600 family, disciplined */
+  --accent: #ea580c;
+  --accent-hover: #c2410c;
+  --accent-ink: #c2410c;
+  --accent-tint: #fff4e8;
+  --accent-deep: #9a3412;
 
-  /* semantic */
-  --green: oklch(0.603 0.155 150.883);
-  --green-tint: oklch(0.958 0.017 159.118);
-  --orange: oklch(0.689 0.179 49.902);
-  --orange-tint: oklch(0.964 0.021 67.581);
-  --red: oklch(0.621 0.192 23.042);
-  --red-tint: oklch(0.956 0.017 17.462);
+  /* semantic — muted, never orange-adjacent warning */
+  --green: #2e7d4f;
+  --green-tint: #eaf4ee;
+  --amber: #b45309;
+  --amber-tint: #fbf3e4;
+  --red: #b3261e;
+  --red-tint: #fbedea;
+
+  /* legacy alias — approval gates use warm amber, never red */
+  --orange: #b45309;
+  --orange-tint: #fbf3e4;
 
   /* chart overlays */
-  --tooltip-bg: oklch(0.272 0.008 264.435);
-  --tooltip-fg: oklch(0.976 0.002 247.839);
-  --tooltip-muted: oklch(0.731 0.008 260.731);
-  --tooltip-border: oklch(0.356 0.007 264.474);
-
-  /* smooth layered shadow scale (replaces shadow-plugin) */
-  --shadow-2xs: 0 1px 2px oklch(0 0 0 / 0.04);
-  --shadow-xs: 0 1px 2px oklch(0 0 0 / 0.05), 0 1px 3px oklch(0 0 0 / 0.05);
-  --shadow-sm: 0 1px 2px oklch(0 0 0 / 0.06), 0 2px 8px -2px oklch(0 0 0 / 0.08);
-  --shadow-md: 0 2px 4px oklch(0 0 0 / 0.06), 0 8px 24px -8px oklch(0 0 0 / 0.12);
-  --shadow-lg: 0 4px 8px oklch(0 0 0 / 0.06), 0 16px 40px -12px oklch(0 0 0 / 0.16);
-  --shadow-xl: 0 8px 16px oklch(0 0 0 / 0.06), 0 24px 64px -16px oklch(0 0 0 / 0.2);
-  --shadow-2xl: 0 12px 24px oklch(0 0 0 / 0.08), 0 32px 80px -20px oklch(0 0 0 / 0.24);
-
-  /* semantic elevation — solid hairline ring + smooth layered stacks */
-  --shadow-hairline: 0 0 0 1px var(--line);
-  --shadow-btn: 0 0 0 1px var(--line-strong), var(--shadow-xs);
-  --shadow-card: 0 0 0 1px var(--line), var(--shadow-sm);
-  --shadow-raised: 0 0 0 1px var(--line), var(--shadow-md);
-  --shadow-overlay: 0 0 0 1px var(--line), var(--shadow-lg);
-  --shadow-inset-field: inset 0 1px 2px oklch(0 0 0 / 0.12);
+  --tooltip-bg: #292524;
+  --tooltip-fg: #fafaf7;
+  --tooltip-muted: #a8a29e;
+  --tooltip-border: #44403c;
 }
 
-/* NOTE: Marketr is light-mode only (Tico decision 2026-09-22). No .dark
- * token block — the light tokens above are the single source of truth. */
+/* NOTE: Marketr is light-mode only. No .dark token block — the light tokens
+ * above are the single source of truth. */
 
 @theme inline {
   /* vault colors */
@@ -89,51 +89,57 @@
   --color-line: var(--line);
   --color-line-strong: var(--line-strong);
   --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
   --color-accent-ink: var(--accent-ink);
   --color-accent-tint: var(--accent-tint);
+  --color-accent-deep: var(--accent-deep);
   --color-green: var(--green);
   --color-green-tint: var(--green-tint);
+  --color-amber: var(--amber);
+  --color-amber-tint: var(--amber-tint);
   --color-orange: var(--orange);
   --color-orange-tint: var(--orange-tint);
   --color-red: var(--red);
   --color-red-tint: var(--red-tint);
 
-  /* shadcn aliases — lets shadcn-registry components speak vault tokens */
-  --color-background: var(--surface);
+  /* shadcn aliases — registry components speak vault tokens */
+  --color-background: var(--page);
   --color-foreground: var(--ink);
   --color-card: var(--surface);
   --color-card-foreground: var(--ink);
   --color-popover: var(--surface);
   --color-popover-foreground: var(--ink);
   --color-primary: var(--accent);
-  --color-primary-foreground: oklch(1 0 0);
-  --color-secondary: var(--hover);
+  --color-primary-foreground: #ffffff;
+  --color-secondary: var(--inset);
   --color-secondary-foreground: var(--ink);
   --color-muted: var(--inset);
   --color-muted-foreground: var(--ink-2);
-  /* NOTE: --color-accent is intentionally the vivid orange (line ~91), not the
-   * tint — the vault Button's `accent` variant and `bg-accent` utilities need
-   * it. shadcn focus states use white-on-orange via --color-accent-foreground. */
-  --color-accent-foreground: oklch(1 0 0);
+  --color-accent-foreground: #ffffff;
   --color-destructive: var(--red);
-  --color-destructive-foreground: oklch(1 0 0);
+  --color-destructive-foreground: #ffffff;
   --color-border: var(--line);
   --color-input: var(--field);
   --color-ring: var(--accent);
 
-  /* shadows */
-  --shadow-hairline: var(--shadow-hairline);
-  --shadow-btn: var(--shadow-btn);
-  --shadow-inset-field: var(--shadow-inset-field);
-  --shadow-card: var(--shadow-card);
-  --shadow-raised: var(--shadow-raised);
-  --shadow-overlay: var(--shadow-overlay);
+  /* structural elevation — hairline rings, not shadows */
+  --shadow-hairline: 0 0 0 1px var(--line);
+  --shadow-card: 0 0 0 1px var(--line);
+  --shadow-btn: 0 0 0 1px var(--line-strong);
+  --shadow-overlay: 0 0 0 1px var(--line);
 
-  /* type */
-  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
-  --font-mono: var(--font-geist-mono), ui-monospace, "SF Mono", monospace;
+  /* beautiful-shadows — FLOATING LAYERS ONLY (palette, toolbar, composer,
+   * popovers, dialogs, toasts). Never on structural surfaces or lists. */
+  --shadow-float-sm: 0px 2px 3px -1px rgba(0, 0, 0, 0.1), 0px 1px 0px 0px rgba(25, 28, 33, 0.02), 0px 0px 0px 1px rgba(25, 28, 33, 0.08);
+  --shadow-float-md: 0px 0px 0px 1px rgba(0, 0, 0, 0.06), 0px 1px 1px -0.5px rgba(0, 0, 0, 0.06), 0px 3px 3px -1.5px rgba(0, 0, 0, 0.06), 0px 6px 6px -3px rgba(0, 0, 0, 0.06), 0px 12px 12px -6px rgba(0, 0, 0, 0.06), 0px 24px 24px -12px rgba(0, 0, 0, 0.06);
+  --shadow-float-lg: 0 2.8px 2.2px rgba(0, 0, 0, 0.034), 0 6.7px 5.3px rgba(0, 0, 0, 0.048), 0 12.5px 10px rgba(0, 0, 0, 0.06), 0 22.3px 17.9px rgba(0, 0, 0, 0.072), 0 41.8px 33.4px rgba(0, 0, 0, 0.086), 0 100px 80px rgba(0, 0, 0, 0.12);
 
-  /* radii — chips 6, controls 8, cards 10, windows 14, pills 999 */
+  /* type — Inter UI, Newsreader display */
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-display: "Newsreader", ui-serif, Georgia, serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
+
+  /* radii — warm utilitarian: cards 10, controls 8, chips 6, pills full */
   --radius-chip: 6px;
   --radius-control: 8px;
   --radius-card: 10px;
@@ -154,19 +160,11 @@ html {
 }
 
 body {
-  background-color: var(--stripe-bg);
-  background-image: repeating-linear-gradient(
-    -45deg,
-    transparent 0,
-    transparent 7px,
-    var(--stripe) 7px,
-    var(--stripe) 8px
-  );
-  background-attachment: fixed;
+  background-color: var(--page);
   color: var(--ink);
   font-feature-settings: "cv11", "ss01";
   font-size: 14px;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.005em;
   line-height: 1.5;
 }
 
@@ -183,35 +181,49 @@ a {
   text-decoration-skip-ink: auto;
 }
 
-.theme-switching *,
-.theme-switching *::before,
-.theme-switching *::after {
-  transition: none !important;
+/* Display serif — page-level headlines + empty-state invitations only */
+.display-serif {
+  font-family: var(--font-display);
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  font-optical-sizing: auto;
 }
 
-@media (hover: none) {
-  .records-row:hover > .records-cell { background: transparent; }
-  .records-row:hover > td.is-colsel {
-    background: color-mix(in srgb, var(--accent) 4%, var(--surface));
+/* Translucent material — floating functional layers (apple-design).
+ * Never stack translucent-on-translucent. */
+.material-float {
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+}
+@media (prefers-reduced-transparency: reduce) {
+  .material-float {
+    background: var(--surface);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
   }
-  .records-header-button:hover { background: transparent; color: var(--ink-2); }
 }
 
-.component-nav-scroll { scrollbar-width: none; -ms-overflow-style: none; }
-.component-nav-scroll::-webkit-scrollbar { display: none; }
-
-@media (min-width: 64rem) {
-  .component-nav-scroll {
-    -webkit-mask-image: linear-gradient(to bottom, oklch(0 0 0) 0, oklch(0 0 0) calc(100% - 6rem), transparent 100%);
-    mask-image: linear-gradient(to bottom, oklch(0 0 0) 0, oklch(0 0 0) calc(100% - 6rem), transparent 100%);
-  }
-}
+/* Thin warm scrollbars for chat rails */
+.thin-scroll { scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
+.thin-scroll::-webkit-scrollbar { width: 8px; height: 8px; }
+.thin-scroll::-webkit-scrollbar-thumb { background: var(--line-strong); border-radius: 8px; }
+.thin-scroll::-webkit-scrollbar-track { background: transparent; }
 
 button:not(:disabled),
 [role="button"]:not([aria-disabled="true"]),
 label:has(input),
 a {
   cursor: pointer;
+}
+
+/* Press feedback — every pressable element (apple-design §1, emil) */
+.pressable {
+  transition: transform 100ms ease-out;
+}
+.pressable:active { transform: scale(0.97); }
+@media (hover: hover) and (pointer: fine) {
+  .pressable:hover { transform: none; }
 }
 
 :focus-visible {
@@ -241,7 +253,7 @@ a:focus-visible .animated-underline::after { transform: scaleX(1); }
  * ══════════════════════════════════════════════════════════ */
 
 /* StreamingText / ContextCards — favicon source avatars */
-.source-avatar { box-shadow: 0 0 0 1px oklch(0.21 0.034 263.436 / 0.1); }
+.source-avatar { box-shadow: 0 0 0 1px rgba(28, 25, 23, 0.1); }
 
 /* primitive spacing system */
 .primitive-card-pad { padding: 12px; }
@@ -253,11 +265,11 @@ a:focus-visible .animated-underline::after { transform: scaleX(1); }
   justify-content: center; border-radius: var(--radius-control);
 }
 
-/* FilterTable — electric status pills */
+/* FilterTable — status pills */
 .filter-status-todo, .filter-status-progress, .filter-status-done { border: 1px solid transparent; }
-.filter-status-todo { --tag-base: oklch(0.757 0.153 66.401); }
-.filter-status-progress { --tag-base: oklch(0.671 0.118 219.351); }
-.filter-status-done { --tag-base: oklch(0.652 0.131 162.865); }
+.filter-status-todo { --tag-base: #b45309; }
+.filter-status-progress { --tag-base: #2e7d4f; }
+.filter-status-done { --tag-base: #2e7d4f; }
 .filter-status-todo, .filter-status-progress, .filter-status-done {
   color: color-mix(in srgb, var(--tag-base) 92%, var(--ink));
   background: color-mix(in srgb, var(--tag-base) 20%, var(--surface));
@@ -276,7 +288,7 @@ a:focus-visible .animated-underline::after { transform: scaleX(1); }
 .insight-chart-tooltip {
   display: flex; align-items: center; gap: 12px; padding: 5px 9px;
   border: 1px solid var(--line-strong); border-radius: 8px; color: var(--tooltip-fg);
-  background: var(--tooltip-bg); box-shadow: var(--shadow-overlay);
+  background: var(--tooltip-bg); box-shadow: var(--shadow-float-md);
   font-size: 11.5px; font-variant-numeric: tabular-nums; white-space: nowrap;
 }
 .insight-chart-tooltip-item { display: inline-flex; align-items: center; gap: 6px; }
@@ -290,7 +302,7 @@ a:focus-visible .animated-underline::after { transform: scaleX(1); }
 }
 .stream-caret {
   display: inline-block; width: 2px; height: 1.05em; margin-left: 1.5px;
-  translate: 0 -0.5px; border-radius: 1px; background: var(--ink);
+  translate: 0 -0.5px; border-radius: 1px; background: var(--accent);
   vertical-align: text-bottom; animation: caret-blink 1s step-end infinite;
 }
 .stream-caret.is-streaming { animation: none; }
@@ -308,10 +320,19 @@ a:focus-visible .animated-underline::after { transform: scaleX(1); }
 @keyframes eq-bounce { 0%, 100% { transform: scaleY(0.35); } 50% { transform: scaleY(1); } }
 @keyframes pixel-on { 0%, 100% { opacity: 0.15; } 18%, 42% { opacity: 1; } 62% { opacity: 0.15; } }
 
+/* Chat message entrance — opacity + y 8px, 200ms ease-out */
+@keyframes msg-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+.msg-enter { animation: msg-in 200ms var(--ease-out-strong); }
+
+/* Dashboard staged entrance — stagger 30–80ms between widgets */
+@keyframes widget-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+.widget-enter { animation: widget-in 280ms var(--ease-out-strong) both; }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+  .msg-enter, .widget-enter { animation: none; }
 }

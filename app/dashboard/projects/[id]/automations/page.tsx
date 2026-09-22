@@ -1,16 +1,13 @@
-// Marketr — automation canvas ("Automations", redesign §2).
-// Server page: back link, loads workflows + recent runs, renders the
-// client canvas island. Nav wiring is handled by the parent (do not touch
-// app/dashboard/projects/[id]/page.tsx).
+// Marketr — automation canvas ("Automations").
+// Server page: access check, loads workflows + recent runs, renders the
+// client canvas island. Full-bleed: no page header — the canvas carries
+// floating palette, toolbar, and inspector (design-v2).
 
 import { accessibleWorkspaceWhere, requireProjectRole } from "@/lib/authz";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
 import WorkflowCanvas from "@/components/WorkflowCanvas";
-import { PageHeader } from "@/components/vault/PageHeader";
-import { ArrowLeft } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -52,23 +49,10 @@ export default async function AutomationsPage({ params }: { params: Promise<{ id
   });
 
   return (
-    <div className="flex h-[calc(100vh-8rem)] flex-col gap-4">
-      <div>
-        <Link
-          href={`/dashboard/projects/${project.id}`}
-          className="inline-flex items-center gap-1 text-[13px] text-ink-3 hover:text-ink-2"
-        >
-          <ArrowLeft className="h-3.5 w-3.5" strokeWidth={2} />
-          {project.domain}
-        </Link>
-        <PageHeader
-          title="Automations"
-          description="Build automations as node graphs: triggers → actions, with human approval gates wired into the existing approval queue. Runs fail closed and are fully audit-logged."
-          className="mt-1"
-        />
-      </div>
+    <div className="h-full">
       <WorkflowCanvas
         projectId={project.id}
+        projectDomain={project.domain}
         canEdit={!!canEdit}
         initialWorkflows={JSON.parse(JSON.stringify(workflows))}
         initialRuns={JSON.parse(JSON.stringify(runs))}

@@ -13,28 +13,28 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import {
-  AlertTriangle,
-  AlignEndHorizontal,
+  Warning,
+  ChartBarHorizontal,
   Check,
-  ChevronDown,
-  ChevronUp,
+  CaretDown,
+  CaretUp,
   Clock,
   Copy,
   Eye,
   FileText,
   Globe,
   Image as ImageIcon,
-  Mail,
+  Envelope,
   Megaphone,
   Minus,
-  MousePointerClick,
-  PanelTop,
+  CursorClick,
+  Rectangle,
   Plus,
-  Send,
-  Trash2,
-  Type,
+  PaperPlane,
+  Trash,
+  TextT,
   Users,
-} from "lucide-react";
+} from "@phosphor-icons/react";
 import {
   blockLabel,
   createBlock,
@@ -48,14 +48,14 @@ const TemplateEditor = dynamic(() => import("@/components/TemplateEditor"), { ss
 
 type Tab = "compose" | "templates" | "lists" | "broadcasts" | "domains";
 
-const BLOCK_ICONS: Record<EmailBlockType, typeof Type> = {
-  emailHeader: PanelTop,
+const BLOCK_ICONS: Record<EmailBlockType, typeof TextT> = {
+  emailHeader: Rectangle,
   emailHero: Megaphone,
-  emailText: Type,
+  emailText: TextT,
   emailImage: ImageIcon,
-  emailButton: MousePointerClick,
+  emailButton: CursorClick,
   emailDivider: Minus,
-  emailFooter: AlignEndHorizontal,
+  emailFooter: ChartBarHorizontal,
 };
 
 const BTN_PRIMARY =
@@ -334,17 +334,17 @@ function Composer({
             return (
               <div key={i} className="rounded-lg border border-zinc-200 bg-zinc-50/60 p-3">
                 <div className="mb-2 flex items-center gap-2">
-                  <Icon size={15} strokeWidth={1.5} className="text-zinc-500" />
+                  <Icon size={15} className="text-zinc-500" />
                   <span className="text-sm font-medium text-zinc-800">{blockLabel(node.type)}</span>
                   <span className="ml-auto flex items-center gap-1">
                     <button className="rounded p-1 text-zinc-500 transition-colors duration-150 hover:text-zinc-800 disabled:opacity-30" disabled={i === 0} onClick={() => moveBlock(i, -1)} aria-label="Move up">
-                      <ChevronUp size={15} strokeWidth={1.5} />
+                      <CaretUp size={15} />
                     </button>
                     <button className="rounded p-1 text-zinc-500 transition-colors duration-150 hover:text-zinc-800 disabled:opacity-30" disabled={i === doc.content.length - 1} onClick={() => moveBlock(i, 1)} aria-label="Move down">
-                      <ChevronDown size={15} strokeWidth={1.5} />
+                      <CaretDown size={15} />
                     </button>
                     <button className="rounded p-1 text-zinc-500 transition-colors duration-150 hover:text-red-700" onClick={() => deleteBlock(i)} aria-label="Delete block">
-                      <Trash2 size={15} strokeWidth={1.5} />
+                      <Trash size={15} />
                     </button>
                   </span>
                 </div>
@@ -376,7 +376,7 @@ function Composer({
               const Icon = BLOCK_ICONS[t];
               return (
                 <button key={t} className={BTN_GHOST} onClick={() => addBlock(t)} disabled={!canEdit}>
-                  <Icon size={14} strokeWidth={1.5} />
+                  <Icon size={14} />
                   {blockLabel(t)}
                 </button>
               );
@@ -386,11 +386,11 @@ function Composer({
 
         <div className="mt-5 flex items-center gap-3">
           <button className={BTN_PRIMARY} onClick={save} disabled={!canEdit || saving}>
-            <Check size={14} strokeWidth={1.5} />
+            <Check size={14} />
             {saving ? "Saving…" : templateId ? "Save template" : "Save as template"}
           </button>
           <button className={BTN_GHOST} onClick={() => onUseInBroadcast(doc)} disabled={!doc.content.length}>
-            <Send size={14} strokeWidth={1.5} />
+            <PaperPlane size={14} />
             Use in broadcast
           </button>
           {notice && <span className="text-sm text-zinc-500">{notice}</span>}
@@ -399,7 +399,7 @@ function Composer({
 
       <div className={`${CARD} overflow-hidden`}>
         <div className="flex items-center gap-2 border-b border-zinc-200 px-5 py-3">
-          <Eye size={15} strokeWidth={1.5} className="text-zinc-500" />
+          <Eye size={15} className="text-zinc-500" />
           <span className="text-sm font-medium text-zinc-800">Live preview</span>
           <span className="ml-auto text-xs text-zinc-500">Rendered server-side with react-email</span>
         </div>
@@ -457,14 +457,14 @@ function TemplatesTab({
       <div className="flex items-center border-b border-zinc-200 px-5 py-3">
         <span className="text-sm font-medium text-zinc-800">Templates</span>
         <button className={`${BTN_GHOST} ml-auto`} onClick={seed} disabled={!canEdit || busy === "seed"}>
-          <Plus size={14} strokeWidth={1.5} /> Seed starters
+          <Plus size={14} /> Seed starters
         </button>
       </div>
       {notice && <p className="border-b border-zinc-200 px-5 py-2 text-sm text-zinc-500">{notice}</p>}
       <ul className="divide-y divide-zinc-200">
         {templates.map((t) => (
           <li key={t.id} className="flex items-center gap-3 px-5 py-3">
-            <FileText size={16} strokeWidth={1.5} className="text-zinc-500" />
+            <FileText size={16} className="text-zinc-500" />
             <span className="text-sm text-zinc-800">{t.name}</span>
             {t.isStarter && <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs text-zinc-500">starter</span>}
             <span className="ml-auto flex gap-2">
@@ -472,7 +472,7 @@ function TemplatesTab({
                 Duplicate
               </button>
               <button className={BTN_DANGER} onClick={() => remove(t.id, t.name)} disabled={!canEdit || busy === t.id}>
-                <Trash2 size={14} strokeWidth={1.5} />
+                <Trash size={14} />
               </button>
             </span>
           </li>
@@ -552,7 +552,7 @@ function ListsTab({
             Double opt-in
           </label>
           <button className={BTN_PRIMARY} onClick={create} disabled={!canEdit}>
-            <Plus size={14} strokeWidth={1.5} /> Create list
+            <Plus size={14} /> Create list
           </button>
           {notice && <p className="text-sm text-zinc-500">{notice}</p>}
         </div>
@@ -563,7 +563,7 @@ function ListsTab({
           {lists.map((l) => (
             <li key={l.id}>
               <div className="flex items-center gap-3 px-5 py-3">
-                <Users size={16} strokeWidth={1.5} className="text-zinc-500" />
+                <Users size={16} className="text-zinc-500" />
                 <span className="text-sm text-zinc-800">{l.name}</span>
                 {l.doubleOptIn && <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs text-zinc-500">double opt-in</span>}
                 <span className="text-xs text-zinc-500">{l.subscribedCount} subscribed</span>
@@ -690,14 +690,14 @@ function BroadcastsTab({
     onRefresh();
   };
   const sendNow = async (id: string) => {
-    if (!confirm("Send this broadcast now?")) return;
+    if (!confirm("PaperPlane this broadcast now?")) return;
     setBusy(`send-${id}`);
     const res = await fetch(`/api/newsletter/broadcasts/${id}/send`, {
       method: "POST", headers: { "content-type": "application/json" },
       body: JSON.stringify({ projectId }),
     });
     const data = await res.json();
-    setNotice(res.ok ? `Sent to ${data.sent} subscriber${data.sent === 1 ? "" : "s"}.` : (data.error ?? "Send failed."));
+    setNotice(res.ok ? `Sent to ${data.sent} subscriber${data.sent === 1 ? "" : "s"}.` : (data.error ?? "PaperPlane failed."));
     setBusy(null);
     onRefresh();
   };
@@ -740,7 +740,7 @@ function BroadcastsTab({
           </Field>
           {domains.length > 0 && verifiedDomains.length === 0 && (
             <p className="flex items-start gap-1.5 text-xs text-amber-700">
-              <AlertTriangle size={14} strokeWidth={1.5} className="mt-0.5 shrink-0" />
+              <Warning size={14} className="mt-0.5 shrink-0" />
               No verified domains yet — add and verify one in the Domains tab before sending.
             </p>
           )}
@@ -748,7 +748,7 @@ function BroadcastsTab({
             <input type="datetime-local" className={INPUT} value={scheduledAt} onChange={(e) => setScheduledAt(e.target.value)} />
           </Field>
           <button className={BTN_PRIMARY} onClick={create} disabled={!canEdit || busy === "create"}>
-            <Plus size={14} strokeWidth={1.5} /> {scheduledAt ? "Schedule broadcast" : "Create draft"}
+            <Plus size={14} /> {scheduledAt ? "Schedule broadcast" : "Create draft"}
           </button>
           {notice && <p className="text-sm text-zinc-500">{notice}</p>}
         </div>
@@ -763,11 +763,11 @@ function BroadcastsTab({
                 <span className="text-sm font-medium text-zinc-900">{b.subject}</span>
                 <StatusBadge status={b.status} />
                 <span className="text-xs text-zinc-500">{b.list.name} · {b.domain.domain}</span>
-                {b.testSentAt && <span className="inline-flex items-center gap-1 text-xs text-emerald-600"><Check size={12} strokeWidth={1.5} /> test sent</span>}
-                {b.scheduledAt && <span className="inline-flex items-center gap-1 text-xs text-zinc-500"><Clock size={12} strokeWidth={1.5} /> {new Date(b.scheduledAt).toLocaleString()}</span>}
+                {b.testSentAt && <span className="inline-flex items-center gap-1 text-xs text-emerald-600"><Check size={12} /> test sent</span>}
+                {b.scheduledAt && <span className="inline-flex items-center gap-1 text-xs text-zinc-500"><Clock size={12} /> {new Date(b.scheduledAt).toLocaleString()}</span>}
                 <span className="ml-auto flex flex-wrap gap-2">
                   <button className={BTN_GHOST} onClick={() => previewBroadcast(b.id)}>
-                    <Eye size={14} strokeWidth={1.5} /> Preview
+                    <Eye size={14} /> Preview
                   </button>
                   {canEdit && ["draft", "scheduled"].includes(b.status) && (
                     <>
@@ -775,7 +775,7 @@ function BroadcastsTab({
                         Test
                       </button>
                       <button className={BTN_PRIMARY} onClick={() => sendNow(b.id)} disabled={busy === `send-${b.id}`}>
-                        <Send size={14} strokeWidth={1.5} /> Send now
+                        <PaperPlane size={14} /> PaperPlane now
                       </button>
                       {b.status === "scheduled" && (
                         <button className={BTN_DANGER} onClick={() => cancel(b.id)}>Cancel</button>
@@ -789,7 +789,7 @@ function BroadcastsTab({
                 <div className="mt-2 flex gap-2">
                   <input className={`${INPUT} max-w-xs`} placeholder="you@company.com" value={testEmail} onChange={(e) => setTestEmail(e.target.value)} />
                   <button className={BTN_PRIMARY} onClick={() => testSend(b.id)} disabled={busy === `test-${b.id}`}>
-                    {busy === `test-${b.id}` ? "Sending…" : "Send test"}
+                    {busy === `test-${b.id}` ? "Sending…" : "PaperPlane test"}
                   </button>
                 </div>
               )}
@@ -908,7 +908,7 @@ function DomainsTab({
     <div className="grid gap-6 lg:grid-cols-3">
       <div className={`${CARD} h-fit p-5`}>
         <h3 className="mb-3 flex items-center gap-2 text-sm font-medium text-zinc-800">
-          <Mail size={15} strokeWidth={1.5} /> Sending settings
+          <Envelope size={15} /> Sending settings
         </h3>
         <div className="grid gap-3">
           <Field label={settingsHint ? `Resend API key (saved: ${settingsHint})` : "Resend API key"}>
@@ -918,7 +918,7 @@ function DomainsTab({
             <TextInput value={fromName} onChange={setFromName} placeholder="Acme News" />
           </Field>
           <button className={BTN_PRIMARY} onClick={saveSettings} disabled={!canEdit || busy === "settings"}>
-            <Check size={14} strokeWidth={1.5} /> Save settings
+            <Check size={14} /> Save settings
           </button>
           <p className="text-xs text-zinc-500">
             Bring your own Resend key — it is stored encrypted. Webhook events update subscriber
@@ -929,7 +929,7 @@ function DomainsTab({
             <div className="flex gap-2">
               <TextInput value={newDomain} onChange={setNewDomain} placeholder="news.example.com" />
               <button className={BTN_PRIMARY} onClick={addDomain} disabled={!canEdit || busy === "add"}>
-                <Plus size={14} strokeWidth={1.5} /> Add
+                <Plus size={14} /> Add
               </button>
             </div>
           </Field>
@@ -941,7 +941,7 @@ function DomainsTab({
         {domains.map((d) => (
           <div key={d.id} className={`${CARD} p-5`}>
             <div className="mb-3 flex items-center gap-3">
-              <Globe size={16} strokeWidth={1.5} className="text-zinc-500" />
+              <Globe size={16} className="text-zinc-500" />
               <span className="text-sm font-medium text-zinc-900">{d.domain}</span>
               <StatusBadge status={d.status} />
               <span className="ml-auto flex gap-2">
@@ -949,7 +949,7 @@ function DomainsTab({
                   {busy === d.id ? "Verifying…" : "Verify now"}
                 </button>
                 <button className={BTN_DANGER} onClick={() => remove(d.id, d.domain)} disabled={!canEdit}>
-                  <Trash2 size={14} strokeWidth={1.5} />
+                  <Trash size={14} />
                 </button>
               </span>
             </div>
@@ -958,7 +958,7 @@ function DomainsTab({
               <table className="w-full text-xs">
                 <thead>
                   <tr className="bg-zinc-50 text-left text-zinc-500">
-                    <th className="px-3 py-2 font-medium">Type</th>
+                    <th className="px-3 py-2 font-medium">TextT</th>
                     <th className="px-3 py-2 font-medium">Name</th>
                     <th className="px-3 py-2 font-medium">Value</th>
                     <th className="px-3 py-2 font-medium">Purpose</th>
@@ -978,7 +978,7 @@ function DomainsTab({
                           onClick={() => copy(r.value, `${d.id}-${i}`)}
                           aria-label="Copy record value"
                         >
-                          {copied === `${d.id}-${i}` ? <Check size={14} strokeWidth={1.5} /> : <Copy size={14} strokeWidth={1.5} />}
+                          {copied === `${d.id}-${i}` ? <Check size={14} /> : <Copy size={14} />}
                         </button>
                       </td>
                     </tr>

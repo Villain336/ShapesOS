@@ -1,36 +1,38 @@
+"use client";
+
 import {
-  Bold,
-  Braces,
+  TextB,
+  BracketsCurly,
   Check,
-  ChevronDown,
+  CaretDown,
   Code,
   Copy,
   FileText,
-  GripVertical,
-  Heading,
-  Heading1,
-  Heading2,
-  Heading3,
+  DotsSixVertical,
+  TextH,
+  TextHOne,
+  TextHTwo,
+  TextHThree,
   Image,
-  Italic,
+  TextItalic,
   Link,
-  Link2Off,
+  LinkSimpleBreak,
   List,
-  ListOrdered,
-  ListTodo,
+  ListNumbers,
+  ListPlus,
   Minus,
-  Search,
-  SquareCode,
-  Strikethrough,
+  MagnifyingGlass,
+  CodeSimple,
+  TextStrikethrough,
   Table,
   TextAlignCenter,
-  TextAlignStart,
-  TextAlignEnd,
-  TextQuote,
-  Trash2,
-  Type,
-  Underline,
-} from "lucide-react";
+  TextAlignLeft,
+  TextAlignRight,
+  Quotes,
+  Trash,
+  TextT,
+  TextUnderline,
+} from "@phosphor-icons/react";
 import React from "react";
 
 export interface BlockEditorIcons {
@@ -77,7 +79,6 @@ const LangIcon = ({
     viewBox="0 0 24 24"
     fill="none"
     stroke="currentColor"
-    strokeWidth={1.5}
     strokeLinecap="round"
     strokeLinejoin="round"
     className={className}
@@ -87,13 +88,13 @@ const LangIcon = ({
 );
 
 const headingIcons: Record<number, React.ComponentType> = {
-  1: Heading1,
-  2: Heading2,
-  3: Heading3,
+  1: TextHOne,
+  2: TextHTwo,
+  3: TextHThree,
 };
 
 export const HeadingIcon = ({ level }: { level: number }) => {
-  const Icon = headingIcons[level] ?? Heading;
+  const Icon = headingIcons[level] ?? TextH;
   return <Icon />;
 };
 
@@ -258,32 +259,32 @@ export const DEFAULT_LANGUAGE_ICONS: Record<string, React.ReactNode> = {
 
 export const DEFAULT_ICONS: BlockEditorIcons = {
   alignCenterIcon: <TextAlignCenter />,
-  alignLeftIcon: <TextAlignStart />,
-  alignRightIcon: <TextAlignEnd />,
-  boldIcon: <Bold />,
+  alignLeftIcon: <TextAlignLeft />,
+  alignRightIcon: <TextAlignRight />,
+  boldIcon: <TextB />,
   checkIcon: <Check />,
-  codeBlockLanguageIcon: <Braces />,
+  codeBlockLanguageIcon: <BracketsCurly />,
   codeIcon: <Code />,
   copyIcon: <Copy />,
-  deleteIcon: <Trash2 />,
-  dragHandleIcon: <GripVertical className="block-editor-drag-handle-icon" />,
-  dropdownArrowIcon: <ChevronDown size={12} />,
+  deleteIcon: <Trash />,
+  dragHandleIcon: <DotsSixVertical className="block-editor-drag-handle-icon" />,
+  dropdownArrowIcon: <CaretDown size={12} />,
   fallbackIcon: <FileText />,
-  italicIcon: <Italic />,
+  italicIcon: <TextItalic />,
   languageIcons: DEFAULT_LANGUAGE_ICONS,
   linkIcon: <Link />,
-  searchIcon: <Search size={14} />,
-  slashBlockquoteIcon: <TextQuote />,
+  searchIcon: <MagnifyingGlass size={14} />,
+  slashBlockquoteIcon: <Quotes />,
   slashBulletListIcon: <List />,
-  slashCodeBlockIcon: <SquareCode />,
+  slashCodeBlockIcon: <CodeSimple />,
   slashDividerIcon: <Minus />,
-  slashHeadingIcon: <Heading />,
+  slashHeadingIcon: <TextH />,
   slashImageIcon: <Image />,
-  slashOrderedListIcon: <ListOrdered />,
+  slashOrderedListIcon: <ListNumbers />,
   slashTableIcon: <Table />,
-  slashTaskListIcon: <ListTodo />,
-  slashTextIcon: <Type />,
-  strikethroughIcon: <Strikethrough />,
-  underlineIcon: <Underline />,
-  unlinkIcon: <Link2Off />,
+  slashTaskListIcon: <ListPlus />,
+  slashTextIcon: <TextT />,
+  strikethroughIcon: <TextStrikethrough />,
+  underlineIcon: <TextUnderline />,
+  unlinkIcon: <LinkSimpleBreak />,
 };

@@ -1,15 +1,13 @@
-// Marketr — chat page (redesign §3): full-page AI command center + team chat.
-// Server page: access check + tabs; panels fetch their own data.
+// Marketr — chat page: full-bleed AI command center + team chat.
+// Server page: access check; the shell (ChatTabs) owns the layout — no page
+// header per design-v2.
 
-import { accessibleWorkspaceWhere, getMembership, requireProjectRole } from "@/lib/authz";
-import Link from "next/link";
+import { accessibleWorkspaceWhere, requireProjectRole } from "@/lib/authz";
 import { notFound } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
 import { llmStatus } from "@/lib/llm";
 import ChatTabs from "@/components/ChatTabs";
-import { PageHeader } from "@/components/vault/PageHeader";
 
 export const dynamic = "force-dynamic";
 
@@ -30,7 +28,6 @@ export default async function ChatPage({
   if (!project) notFound();
   if (!(await requireProjectRole(user.id, project.id, "viewer"))) notFound();
 
-  const membership = await getMembership(user.id, project.workspaceId);
   const canEdit = (await requireProjectRole(user.id, project.id, "editor")) !== null;
   const memberCount = await prisma.workspaceMember.count({
     where: { workspaceId: project.workspaceId },
@@ -41,27 +38,10 @@ export default async function ChatPage({
   const initialTab = sp.tab === "team" ? ("team" as const) : ("ai" as const);
 
   return (
-    <div className="flex flex-col gap-6">
-      <PageHeader
-        title="Chat"
-        description={
-          membership
-            ? "Talk to Marketr's AI assistant — it reads your project and executes actions — or message the project team."
-            : "Chat for this project."
-        }
-        actions={
-          <Link
-            href={`/dashboard/projects/${project.id}`}
-            className="inline-flex items-center gap-1.5 text-[13px] font-medium text-ink-2 transition-colors duration-150 hover:text-ink"
-          >
-            <ArrowLeft size={14} strokeWidth={2} />
-            {project.domain}
-          </Link>
-        }
-      />
-
+    <div className="h-full">
       <ChatTabs
         projectId={project.id}
+        projectDomain={project.domain}
         canEdit={canEdit}
         mockMode={mockMode}
         memberCount={memberCount}

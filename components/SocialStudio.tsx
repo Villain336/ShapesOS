@@ -7,23 +7,23 @@
 
 import { useMemo, useState } from "react";
 import {
-  AlertTriangle,
-  BarChart3,
-  CalendarDays,
+  Warning,
+  ChartBar,
+  CalendarDots,
   Check,
   Clock,
-  Link2,
+  LinkSimple,
   Pencil,
-  PenLine,
+  PencilLine,
   Plug,
-  RefreshCw,
-  Send,
-  Settings2,
-  Share2,
-  Trash2,
+  ArrowClockwise,
+  PaperPlane,
+  GearSix,
+  ShareNetwork,
+  Trash,
   X,
   XCircle,
-} from "lucide-react";
+} from "@phosphor-icons/react";
 import {
   ALL_SERVICES,
   CHANNEL_DEFS,
@@ -328,11 +328,11 @@ export default function SocialStudio(props: Props) {
   }
 
   const tabs: Array<{ id: Tab; label: string; icon: React.ReactNode }> = [
-    { id: "calendar", label: "Calendar", icon: <CalendarDays className="h-4 w-4" /> },
-    { id: "composer", label: "Composer", icon: <PenLine className="h-4 w-4" /> },
-    { id: "posts", label: "Posts", icon: <Send className="h-4 w-4" /> },
-    { id: "channels", label: "Channels", icon: <Share2 className="h-4 w-4" /> },
-    { id: "settings", label: "Settings", icon: <Settings2 className="h-4 w-4" /> },
+    { id: "calendar", label: "Calendar", icon: <CalendarDots className="h-4 w-4" /> },
+    { id: "composer", label: "Composer", icon: <PencilLine className="h-4 w-4" /> },
+    { id: "posts", label: "Posts", icon: <PaperPlane className="h-4 w-4" /> },
+    { id: "channels", label: "Channels", icon: <ShareNetwork className="h-4 w-4" /> },
+    { id: "settings", label: "Settings", icon: <GearSix className="h-4 w-4" /> },
   ];
 
   const press = "transition-transform duration-150 ease-[cubic-bezier(0.2,0,0,1)] active:scale-[0.96]";
@@ -348,7 +348,7 @@ export default function SocialStudio(props: Props) {
               : "border-red-200 bg-red-50/40 text-red-700"
           }`}
         >
-          {notice.kind === "ok" ? <Check className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
+          {notice.kind === "ok" ? <Check className="h-4 w-4" /> : <Warning className="h-4 w-4" />}
           {notice.text}
         </div>
       )}
@@ -567,7 +567,7 @@ export default function SocialStudio(props: Props) {
 
             <div className="mb-4">
               <div className="mb-1 flex items-center gap-1.5 text-xs font-medium uppercase tracking-widest text-zinc-500">
-                <Link2 className="h-3.5 w-3.5" /> Link + UTM
+                <LinkSimple className="h-3.5 w-3.5" /> Link + UTM
               </div>
               <input value={compLink} onChange={(e) => setCompLink(e.target.value)} placeholder="https://example.com/article" className="mb-2 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400" />
               <div className="grid grid-cols-3 gap-2">
@@ -671,10 +671,10 @@ export default function SocialStudio(props: Props) {
                         <Clock className="h-3.5 w-3.5" /> Schedule
                       </button>
                       <button onClick={() => postAction(p.id, "publish-now")} disabled={busy === `publish-now:${p.id}`} className={`flex items-center gap-1 rounded-md bg-orange-600 px-2.5 py-1.5 text-xs font-medium text-white ${press}`}>
-                        <Send className="h-3.5 w-3.5" /> Publish now
+                        <PaperPlane className="h-3.5 w-3.5" /> Publish now
                       </button>
                       <button onClick={() => { if (window.confirm("Delete this draft?")) postAction(p.id, "delete"); }} className={`flex items-center gap-1 rounded-md border border-zinc-200 px-2.5 py-1.5 text-xs text-red-700 ${press}`}>
-                        <Trash2 className="h-3.5 w-3.5" /> Delete
+                        <Trash className="h-3.5 w-3.5" /> Delete
                       </button>
                     </>
                   )}
@@ -686,7 +686,7 @@ export default function SocialStudio(props: Props) {
                       }}
                       className={`flex items-center gap-1 rounded-md border border-amber-200 px-2.5 py-1.5 text-xs text-amber-700 ${press}`}
                     >
-                      <RefreshCw className="h-3.5 w-3.5" /> Retry
+                      <ArrowClockwise className="h-3.5 w-3.5" /> Retry
                     </button>
                   )}
                   {props.canEdit && (p.status === "scheduled" || p.status === "failed") && (
@@ -696,7 +696,7 @@ export default function SocialStudio(props: Props) {
                   )}
                   {(p.status === "sent" || p.status === "scheduled") && props.canEdit && (
                     <button onClick={() => postAction(p.id, "analytics")} disabled={busy === `analytics:${p.id}`} className={`flex items-center gap-1 rounded-md border border-zinc-200 px-2.5 py-1.5 text-xs text-zinc-500 ${press}`}>
-                      <BarChart3 className="h-3.5 w-3.5" /> {busy === `analytics:${p.id}` ? "Syncing…" : "Sync analytics"}
+                      <ChartBar className="h-3.5 w-3.5" /> {busy === `analytics:${p.id}` ? "Syncing…" : "Sync analytics"}
                     </button>
                   )}
                 </div>
@@ -757,7 +757,7 @@ export default function SocialStudio(props: Props) {
             </p>
             {props.canEdit && connected && (
               <button onClick={syncChannelsNow} disabled={busy === "sync"} className={`flex items-center gap-2 rounded-lg border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-800 ${press}`}>
-                <RefreshCw className="h-4 w-4" /> {busy === "sync" ? "Syncing…" : "Sync channels"}
+                <ArrowClockwise className="h-4 w-4" /> {busy === "sync" ? "Syncing…" : "Sync channels"}
               </button>
             )}
           </div>

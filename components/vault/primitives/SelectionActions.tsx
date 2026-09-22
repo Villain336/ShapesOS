@@ -10,16 +10,16 @@ import {
 } from "react";
 import {
   ArrowUp,
-  MessageCircleQuestion as ChatBubbleQuestion,
+  Question as ChatBubbleQuestion,
   Check,
-  Smile as EmojiSatisfied,
-  ChevronRight as NavArrowRight,
-  RefreshCw as Refresh,
+  Smiley as EmojiSatisfied,
+  CaretRight as NavArrowRight,
+  ArrowClockwise as Refresh,
   Scissors as Scissor,
-  Sparkles as Spark,
-  Type as TextBox,
+  Sparkle as Spark,
+  TextT as TextBox,
   X,
-} from "lucide-react";
+} from "@phosphor-icons/react";
 import { Button } from "@/components/vault/atoms/Button";
 import { Shimmer } from "@/components/vault/atoms/Shimmer";
 import { StreamText } from "@/components/vault/atoms/StreamText";

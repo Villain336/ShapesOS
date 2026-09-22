@@ -8,20 +8,20 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
 import {
-  BarChart3,
+  ChartBar,
   Bell,
   Check,
-  ChevronDown,
-  ChevronsUpDown,
-  LayoutGrid,
-  LogOut,
-  Menu,
+  CaretDown,
+  CaretUpDown,
+  SquaresFour,
+  SignOut,
+  List,
   Palette,
   SlidersHorizontal,
-  TrendingUp,
+  TrendUp,
   Users,
-} from "lucide-react";
-import { cn } from "@/lib/utils";
+  type Icon as PhosphorIcon,
+} from "@phosphor-icons/react";import { cn } from "@/lib/utils";
 import GlideMenu from "@/components/vault/primitives/GlideMenu";
 import { buttonVariants } from "@/components/vault/atoms/Button";
 import {
@@ -39,12 +39,12 @@ export type SidebarWorkspace = { id: string; name: string };
 
 const NAV_SECTIONS: {
   title?: string;
-  items: { href: string; label: string; icon: React.ComponentType<{ className?: string }> }[];
+  items: { href: string; label: string; icon: PhosphorIcon }[];
 }[] = [
   {
     items: [
-      { href: "/dashboard", label: "Projects", icon: LayoutGrid },
-      { href: "/dashboard/reports", label: "Reports", icon: BarChart3 },
+      { href: "/dashboard", label: "Projects", icon: SquaresFour },
+      { href: "/dashboard/reports", label: "Reports", icon: ChartBar },
       { href: "/dashboard/alerts", label: "Alerts", icon: Bell },
     ],
   },
@@ -78,11 +78,11 @@ function NavItems({ pathname, onNavigate }: { pathname: string; onNavigate?: () 
       {NAV_SECTIONS.map((section, i) => (
         <div key={section.title ?? i}>
           {section.title ? (
-            <div className="mb-1 px-3 text-[11px] font-medium uppercase tracking-widest text-ink-3">
+            <div className="mb-1 px-3 text-[12px] font-medium text-ink-3">
               {section.title}
             </div>
           ) : null}
-          <GlideMenu highlightClassName="inset-x-0 rounded-control bg-hover">
+          <GlideMenu highlightClassName="inset-x-0 rounded-full bg-hover">
             {section.items.map((item) => {
               const active = isActive(pathname, item.href);
               const Icon = item.icon;
@@ -94,13 +94,13 @@ function NavItems({ pathname, onNavigate }: { pathname: string; onNavigate?: () 
                   aria-current={active ? "page" : undefined}
                   onClick={onNavigate}
                   className={cn(
-                    "relative z-10 mb-0.5 flex items-center gap-2.5 rounded-control px-3 py-2 text-[13.5px] transition-[color,background-color] duration-150 ease-[cubic-bezier(0.2,0,0,1)]",
+                    "relative z-10 mb-0.5 flex items-center gap-2.5 rounded-full px-3 py-2 text-[13.5px] transition-[color,background-color] duration-150 ease-[cubic-bezier(0.2,0,0,1)]",
                     active
                       ? "bg-accent-tint font-medium text-accent-ink"
                       : "text-ink-2 hover:text-ink",
                   )}
                 >
-                  <Icon className="size-4 shrink-0" />
+                  <Icon className="size-4 shrink-0" weight="duotone" />
                   {item.label}
                 </Link>
               );
@@ -127,7 +127,7 @@ function WorkspaceSwitcher({
         aria-label="Switch workspace"
       >
         <span className="truncate">{current?.name ?? "Workspace"}</span>
-        <ChevronsUpDown className="size-3.5 shrink-0 opacity-60" />
+        <CaretUpDown className="size-3.5 shrink-0 opacity-60" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-56">
         <DropdownMenuLabel>Workspace</DropdownMenuLabel>
@@ -181,7 +181,7 @@ function UserMenu({
                 <span className="block truncate text-[12px] text-ink-3">{user.email}</span>
               ) : null}
             </span>
-            <ChevronDown className="size-3.5 shrink-0 text-ink-3" />
+            <CaretDown className="size-3.5 shrink-0 text-ink-3" />
           </>
         )}
       </DropdownMenuTrigger>
@@ -196,7 +196,7 @@ function UserMenu({
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem variant="destructive" onClick={() => signOut({ callbackUrl: "/login" })}>
-          <LogOut />
+          <SignOut weight="duotone" />
           Sign out
         </DropdownMenuItem>
       </DropdownMenuContent>
@@ -218,8 +218,8 @@ export function AppSidebar({
     <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col border-r border-line bg-surface md:flex">
       <div className="flex flex-col gap-3 px-3 pt-4">
         <Link href="/dashboard" className="flex items-center gap-2 px-1" aria-label="Marketr home">
-          <span className="flex size-7 items-center justify-center rounded-control bg-accent-tint text-accent-ink">
-            <TrendingUp className="size-4" />
+          <span className="flex size-7 items-center justify-center rounded-control bg-ink text-page">
+            <TrendUp className="size-4" weight="duotone" />
           </span>
           <span className="text-[16px] font-semibold tracking-tight text-ink">Marketr</span>
         </Link>
@@ -248,8 +248,8 @@ export function MobileNav({
   return (
     <header className="sticky top-0 z-40 flex items-center justify-between border-b border-line bg-surface px-4 py-2.5 md:hidden">
       <Link href="/dashboard" className="flex items-center gap-2" aria-label="Marketr home">
-        <span className="flex size-7 items-center justify-center rounded-control bg-accent-tint text-accent-ink">
-          <TrendingUp className="size-4" />
+        <span className="flex size-7 items-center justify-center rounded-control bg-ink text-page">
+          <TrendUp className="size-4" weight="duotone" />
         </span>
         <span className="text-[16px] font-semibold tracking-tight text-ink">Marketr</span>
       </Link>
@@ -259,7 +259,7 @@ export function MobileNav({
             className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "px-2.5")}
             aria-label="Open navigation"
           >
-            <Menu className="size-4" />
+            <List className="size-4" weight="duotone" />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56 p-2">
             <NavItems pathname={pathname} />

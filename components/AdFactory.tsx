@@ -9,26 +9,26 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  AlertTriangle,
+  Warning,
   Check,
   Download,
-  Film,
+  FilmStrip,
   Image as ImageIcon,
-  KeyRound,
-  Loader2,
+  Key,
+  CircleNotch,
   Megaphone,
   Pencil,
   Plug,
   Plus,
-  RefreshCw,
-  Send,
-  Settings2,
-  Sparkles,
-  Trash2,
+  ArrowClockwise,
+  PaperPlane,
+  GearSix,
+  Sparkle,
+  Trash,
   Wallet,
   X,
   XCircle,
-} from "lucide-react";
+} from "@phosphor-icons/react";
 import {
   ASPECT_RATIOS,
   CHANNEL_FORMATS,
@@ -112,7 +112,7 @@ function StatusBadge({ status }: { status: string }) {
       className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium transition-colors duration-150 ${STATUS_STYLE[status] ?? "bg-zinc-100 text-zinc-500"}`}
       style={{ transitionTimingFunction: EASE }}
     >
-      {generating && <Loader2 className="h-3 w-3 animate-spin" />}
+      {generating && <CircleNotch className="h-3 w-3 animate-spin" />}
       {status}
     </span>
   );
@@ -352,9 +352,9 @@ export default function AdFactory({ projectId, campaigns: initial, brandKits, se
 
   const tabs: { key: Tab; label: string; icon: React.ReactNode }[] = [
     { key: "campaigns", label: "Campaigns", icon: <Megaphone className="h-4 w-4" /> },
-    { key: "generate", label: "Generate", icon: <Sparkles className="h-4 w-4" /> },
+    { key: "generate", label: "Generate", icon: <Sparkle className="h-4 w-4" /> },
     { key: "gallery", label: "Gallery", icon: <ImageIcon className="h-4 w-4" /> },
-    { key: "settings", label: "Settings", icon: <Settings2 className="h-4 w-4" /> },
+    { key: "settings", label: "Settings", icon: <GearSix className="h-4 w-4" /> },
   ];
 
   const btnPrimary =
@@ -390,7 +390,7 @@ export default function AdFactory({ projectId, campaigns: initial, brandKits, se
       <div key={tab} className="transition-opacity duration-150" style={{ transitionTimingFunction: EASE }}>
         {error && (
           <div className="mb-4 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50/50 px-4 py-3 text-sm text-red-700">
-            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <Warning className="mt-0.5 h-4 w-4 shrink-0" />
             {error}
           </div>
         )}
@@ -465,7 +465,7 @@ export default function AdFactory({ projectId, campaigns: initial, brandKits, se
                           <Pencil className="h-4 w-4" />
                         </button>
                         <button onClick={() => void deleteCampaign(activeCampaign.id)} className={btnGhost} aria-label="Delete campaign">
-                          <Trash2 className="h-4 w-4" />
+                          <Trash className="h-4 w-4" />
                         </button>
                       </div>
                     )}
@@ -499,13 +499,13 @@ export default function AdFactory({ projectId, campaigns: initial, brandKits, se
             )}
             {activeCampaign && !activeCampaign.brandKitId && (
               <div className="mb-4 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50/40 px-4 py-3 text-sm text-amber-800">
-                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                <Warning className="mt-0.5 h-4 w-4 shrink-0" />
                 This campaign has no brand kit — generation is blocked until you assign one (edit the campaign).
               </div>
             )}
             {!settings.connected && (
               <div className="mb-4 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50/40 px-4 py-3 text-sm text-amber-800">
-                <KeyRound className="mt-0.5 h-4 w-4 shrink-0" />
+                <Key className="mt-0.5 h-4 w-4 shrink-0" />
                 No Higgsfield API key configured — add one in Settings before generating.
               </div>
             )}
@@ -562,7 +562,7 @@ export default function AdFactory({ projectId, campaigns: initial, brandKits, se
                         }`}
                         style={{ transitionTimingFunction: EASE }}
                       >
-                        {t === "image" ? <ImageIcon className="h-4 w-4" /> : <Film className="h-4 w-4" />}
+                        {t === "image" ? <ImageIcon className="h-4 w-4" /> : <FilmStrip className="h-4 w-4" />}
                         {t}
                       </button>
                     ))}
@@ -643,7 +643,7 @@ export default function AdFactory({ projectId, campaigns: initial, brandKits, se
                 disabled={busy || !canEdit || !activeCampaign || !activeCampaign.brandKitId || !settings.connected || settings.spend.atCap}
                 className={btnPrimary}
               >
-                {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                {busy ? <CircleNotch className="h-4 w-4 animate-spin" /> : <Sparkle className="h-4 w-4" />}
                 Generate {variants} variant{variants === 1 ? "" : "s"} (~{dollars(liveEstimate)})
               </button>
               <p className="text-xs text-zinc-500">
@@ -678,7 +678,7 @@ export default function AdFactory({ projectId, campaigns: initial, brandKits, se
                         )
                       ) : (
                         <div className="flex h-full w-full flex-col items-center justify-center gap-2 text-zinc-500">
-                          {cr.status === "failed" ? <XCircle className="h-8 w-8" /> : <Loader2 className="h-8 w-8 animate-spin" />}
+                          {cr.status === "failed" ? <XCircle className="h-8 w-8" /> : <CircleNotch className="h-8 w-8 animate-spin" />}
                           <span className="px-4 text-center text-xs">{cr.error ?? "Generating…"}</span>
                         </div>
                       )}
@@ -727,7 +727,7 @@ export default function AdFactory({ projectId, campaigns: initial, brandKits, se
                               disabled={busy}
                               className={btnGhost}
                             >
-                              <RefreshCw className="h-3.5 w-3.5" /> Regenerate
+                              <ArrowClockwise className="h-3.5 w-3.5" /> Regenerate
                             </button>
                           )}
                           {(cr.status === "queued" || cr.status === "generating") && (
@@ -753,7 +753,7 @@ export default function AdFactory({ projectId, campaigns: initial, brandKits, se
                                 }}
                                 className={btnGhost}
                               >
-                                <Send className="h-3.5 w-3.5" /> To social
+                                <PaperPlane className="h-3.5 w-3.5" /> To social
                               </button>
                             </>
                           )}
@@ -889,11 +889,11 @@ export default function AdFactory({ projectId, campaigns: initial, brandKits, se
         </div>
       )}
 
-      {/* Send-to-social modal */}
+      {/* PaperPlane-to-social modal */}
       {sendTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
           <div className="w-full max-w-lg rounded-xl border border-zinc-200 bg-zinc-50 p-5">
-            <h3 className="text-sm font-semibold text-zinc-900">Send to social studio</h3>
+            <h3 className="text-sm font-semibold text-zinc-900">PaperPlane to social studio</h3>
             <p className="mt-1 text-xs text-zinc-500">Creates a post with this creative attached (Social → Calendar).</p>
             <label className={`${label} mt-4`}>Post text</label>
             <textarea value={sendText} onChange={(e) => setSendText(e.target.value)} rows={3} className={field} />
@@ -917,7 +917,7 @@ export default function AdFactory({ projectId, campaigns: initial, brandKits, se
                 Cancel
               </button>
               <button onClick={() => void sendToSocial()} disabled={busy || !sendText.trim() || sendServices.length === 0} className={btnPrimary}>
-                <Send className="h-4 w-4" /> Create post
+                <PaperPlane className="h-4 w-4" /> Create post
               </button>
             </div>
           </div>

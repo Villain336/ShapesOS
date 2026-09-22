@@ -3,7 +3,11 @@
 // sparkline, and the component breakdown that explains the number.
 
 import Link from "next/link";
-import { Gauge, TrendingDown, TrendingUp } from "lucide-react";
+import {
+  Gauge,
+  TrendDown,
+  TrendUp,
+} from "@/components/vault/phosphor";
 import { prisma } from "@/lib/prisma";
 import { Card, CardBody, CardHeader } from "@/components/vault/Card";
 import { EmptyState } from "@/components/vault/EmptyState";
@@ -69,7 +73,7 @@ export default async function VisibilityScoreWidget({ projectId }: { projectId: 
               {delta !== null && delta !== 0 && (
                 <ValuePill tone={delta > 0 ? "green" : "red"}>
                   <span className="inline-flex items-center gap-1">
-                    {delta > 0 ? <TrendingUp className="size-3" /> : <TrendingDown className="size-3" />}
+                    {delta > 0 ? <TrendUp className="size-3" /> : <TrendDown className="size-3" />}
                     {Math.abs(delta)} WoW
                   </span>
                 </ValuePill>

@@ -7,7 +7,7 @@
     "ui": "@/components/ui",
     "utils": "@/lib/utils"
   },
-  "iconLibrary": "lucide",
+  "iconLibrary": "phosphor",
   "registries": {
     "@pdfcn": "https://www.pdfcn.dev/r/{name}.json",
     "@editorcn": "https://editorcn.vercel.app/r/{name}.json"

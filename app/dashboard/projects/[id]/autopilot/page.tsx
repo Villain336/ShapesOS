@@ -8,9 +8,11 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
 import AutopilotStudio from "@/components/AutopilotStudio";
-import { PageHeader } from "@/components/vault/PageHeader";
 import { ValuePill } from "@/components/vault/atoms/ValuePill";
-import { ArrowLeft } from "lucide-react";
+import {
+  ArrowLeft,
+  Pulse as ActivityIcon,
+} from "@/components/vault/phosphor";
 
 export const dynamic = "force-dynamic";
 
@@ -72,20 +74,24 @@ export default async function AutopilotPage({ params }: { params: Promise<{ id: 
           href={`/dashboard/projects/${project.id}`}
           className="inline-flex items-center gap-1 text-[13px] text-ink-3 hover:text-ink-2"
         >
-          <ArrowLeft className="h-3.5 w-3.5" strokeWidth={2} />
+          <ArrowLeft className="h-3.5 w-3.5" />
           {project.domain}
         </Link>
-        <PageHeader
-          title="Content autopilot"
-          description={
-            <>
+        <div className="mt-2 flex flex-wrap items-center gap-3">
+          <span className="flex size-10 items-center justify-center rounded-card bg-ink text-page">
+            <ActivityIcon className="size-5" weight="duotone" />
+          </span>
+          <div>
+            <h1 className="display-serif text-[28px] font-medium leading-tight text-ink">
+              Content autopilot
+            </h1>
+            <p className="mt-0.5 text-[13.5px] text-ink-2">
               Scheduled pipeline: source → AI draft → <ValuePill tone="orange">your approval</ValuePill> → publish.
               Nothing publishes without passing the approval gate unless a rule explicitly opts in to auto-approve
               low-risk refreshes. The kill switch stops everything immediately.
-            </>
-          }
-          className="mt-1"
-        />
+            </p>
+          </div>
+        </div>
       </div>
       <AutopilotStudio
         projectId={project.id}
