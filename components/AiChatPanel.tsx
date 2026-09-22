@@ -25,6 +25,7 @@ import {
 import { Bubble, BubbleContent } from "@/components/vault/shadcn/bubble";
 import type { ChatToolCall } from "@/lib/chat/agent";
 import { useChat } from "./chat/ChatContext";
+import AttachmentMenu from "./chat/AttachmentMenu";
 
 /** Pick a vault tool icon from the tool name. */
 function stepIcon(tool: string): ToolStep["icon"] {
@@ -181,6 +182,7 @@ export default function AiChatPanel() {
             <div className="pointer-events-auto">
               {canEdit ? (
                 <div className="material-float rounded-[14px] p-2 shadow-float-lg ring-1 ring-line">
+                  <AttachmentMenu />
                   <PromptBar
                     demo={false}
                     placeholder="Ask Marketr…  (try /keywords /rankings /alerts /competitors /draft <topic> /help)"

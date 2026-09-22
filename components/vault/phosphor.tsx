@@ -30,6 +30,7 @@ export {
   Megaphone,
   Network,
   Palette,
+  Paperclip,
   Pulse,
   Quotes,
   Rocket,
@@ -40,4 +41,5 @@ export {
   TrendDown,
   TrendUp,
   Warning,
+  X,
 } from "@phosphor-icons/react";

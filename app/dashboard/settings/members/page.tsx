@@ -5,7 +5,10 @@
 import { redirect } from "next/navigation";
 import { requireUser, getOrCreateWorkspace } from "@/lib/session";
 import { requireWorkspaceRole } from "@/lib/authz";
+import { prisma } from "@/lib/prisma";
 import MembersManager from "@/components/MembersManager";
+import SettingsNav from "@/components/settings/SettingsNav";
+import PermissionGrantsManager from "@/components/settings/PermissionGrantsManager";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +18,12 @@ export default async function MembersPage() {
   const workspace = await getOrCreateWorkspace(user.id, user.email);
   const membership = await requireWorkspaceRole(user.id, workspace.id, "admin");
   if (!membership) redirect("/dashboard");
+
+  const members = await prisma.workspaceMember.findMany({
+    where: { workspaceId: workspace.id },
+    orderBy: { createdAt: "asc" },
+    select: { id: true, userId: true, email: true, name: true, role: true },
+  });
 
   return (
     <div className="flex flex-col gap-6">
@@ -28,7 +37,18 @@ export default async function MembersPage() {
           <span className="font-mono">viewer</span> (read-only).
         </p>
       </div>
+      <SettingsNav />
       <MembersManager myRole={membership.role} />
+      <PermissionGrantsManager
+        workspaceId={workspace.id}
+        members={members.map((m) => ({
+          id: m.id,
+          userId: m.userId,
+          email: m.email,
+          name: m.name,
+          role: m.role,
+        }))}
+      />
     </div>
   );
 }

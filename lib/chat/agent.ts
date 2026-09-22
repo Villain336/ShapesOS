@@ -23,6 +23,11 @@ import type { WorkspaceRole } from "@prisma/client";
 import { roleAtLeast } from "@/lib/authz";
 import { getLlmProvider, llmStatus } from "@/lib/llm";
 import { TOOLS, getTool, toolCatalogForPrompt, type ToolContext, type ToolDef } from "./tools";
+import { getEnabledProjectSkills } from "@/lib/skills/service";
+import { skillManifestSection } from "@/lib/skills/disclosure";
+import { connectorToolsSection, resolveConnectorTool } from "./connector-tools";
+import { readFileSync, existsSync } from "node:fs";
+import { join } from "node:path";
 
 const MAX_ITERATIONS = 6;
 
@@ -106,13 +111,15 @@ async function buildProjectContext(projectId: string, workspaceId: string): Prom
   return lines.join("\n");
 }
 
-function systemPrompt(projectContext: string, mockMode: boolean): string {
+function systemPrompt(projectContext: string, mockMode: boolean, supplements: string): string {
   return [
     "You are Marketr, an expert SEO strategist embedded in the user's marketing workspace.",
     "You can ACT on the user's project using the tools below. Use read tools to ground your answers in real data; prefer a tool call over guessing.",
     "",
     "PROJECT CONTEXT:",
     projectContext,
+    "",
+    supplements,
     "",
     "TOOLS:",
     toolCatalogForPrompt(),
@@ -125,11 +132,77 @@ function systemPrompt(projectContext: string, mockMode: boolean): string {
     "RULES:",
     "- Never invent data: use tools for keywords, rankings, competitors, content, alerts, scores, workflows.",
     "- Write tools (spend/publish/destructive) and any tool requiring the editor role are held behind a confirmation gate by the runtime — you don't need to ask for confirmation yourself; just emit the tool call and the system will propose it to the user.",
+    "- When a task matches an available skill, call the load_skill tool with its slug BEFORE acting.",
+    '- Invoke connector tools as {"tool_calls":[{"tool":"connector.<key>.<toolName>","args":{...}}]} — args must include no credential; the runtime injects it.',
     "- Keep summaries short and concrete: what you did, the key numbers, and what to look at next.",
     mockMode ? "- NOTE: running in mock/demonstration mode." : "",
   ]
     .filter(Boolean)
     .join("\n");
+}
+
+/**
+ * Milestone 21 (part C): parallel loader for the agent supplements —
+ * enabled skill manifests, bound connector tool catalog, and attached
+ * file contents. Skills + data sources are per project.
+ */
+async function buildAgentSupplements(
+  projectId: string,
+  workspaceId: string,
+): Promise<string> {
+  const [skills, connectors] = await Promise.all([
+    getEnabledProjectSkills(prisma, projectId).catch(() => []),
+    connectorToolsSection(projectId).catch(() => "## CONNECTOR TOOLS\n\nUnavailable."),
+  ]);
+  return [
+    skillManifestSection(skills.map((s) => ({ name: s.name, description: s.description }))),
+    "",
+    connectors,
+  ].join("\n");
+}
+
+const ATTACHMENT_TEXT_CAP = 50 * 1024;
+
+function readAttachmentText(storagePath: string, mimeType: string | null): string {
+  const abs = join(process.cwd(), storagePath);
+  if (!existsSync(abs)) return "[file missing from disk]";
+  const textLike =
+    (mimeType ?? "").startsWith("text/") ||
+    ["application/json", "application/csv", "application/xml", "application/javascript", "application/typescript"].includes(mimeType ?? "");
+  if (!textLike) return "[binary file — not readable as text]";
+  const buf = readFileSync(abs);
+  if (buf.includes(0)) return "[binary file — not readable as text]";
+  return buf.toString("utf8").slice(0, ATTACHMENT_TEXT_CAP);
+}
+
+/**
+ * Load attachment rows (must belong to the project), bind them to the
+ * thread session on first use, and build the ATTACHED FILES prompt section.
+ */
+async function buildAttachmentSection(
+  projectId: string,
+  threadId: string,
+  attachmentIds: string[] | undefined,
+): Promise<string> {
+  if (!attachmentIds || attachmentIds.length === 0) return "";
+  const rows = await prisma.fileAttachment.findMany({
+    where: { id: { in: attachmentIds }, projectId },
+  });
+  if (rows.length === 0) return "";
+  await prisma.fileAttachment.updateMany({
+    where: { id: { in: rows.map((r) => r.id) }, sessionId: null },
+    data: { sessionId: threadId },
+  });
+  const parts = rows.map((r) => {
+    if (r.source === "upload" && r.storagePath) {
+      return `- ${r.filename} (${r.mimeType ?? "unknown type"}):\n${readAttachmentText(r.storagePath, r.mimeType)}`;
+    }
+    if (r.source === "connector") {
+      return `- ${r.filename} (via connector ${r.connectorKey ?? "unknown"}: ${r.externalRef ?? "no reference"})`;
+    }
+    return `- ${r.filename}`;
+  });
+  return ["## ATTACHED FILES", "", ...parts].join("\n");
 }
 
 // ---------------------------------------------------------------------------
@@ -217,6 +290,13 @@ async function executeTool(
 ): Promise<void> {
   const tool = getTool(toolName);
   if (!tool) {
+    // Dynamic connector tools (milestone 21): connector.<key>.<toolName>.
+    if (toolName.startsWith("connector.")) {
+      const outcome = await resolveConnectorTool(toolName, ctx, args);
+      call.status = outcome.status;
+      call.resultSummary = outcome.resultSummary;
+      return;
+    }
     call.status = "error";
     call.resultSummary = `Unknown tool "${toolName}". Available: ${TOOLS.map((t) => t.name).join(", ")}`;
     return;
@@ -402,6 +482,8 @@ export interface AgentTurnInput {
   role: WorkspaceRole;
   threadId: string;
   userContent: string;
+  /** FileAttachment ids to include in this turn (validated against the project). */
+  attachmentIds?: string[];
 }
 
 export interface AgentTurnOutput {
@@ -411,14 +493,18 @@ export interface AgentTurnOutput {
 }
 
 export async function runAgentTurn(input: AgentTurnInput): Promise<AgentTurnOutput> {
-  const { projectId, workspaceId, userId, role, threadId, userContent } = input;
+  const { projectId, workspaceId, userId, role, threadId, userContent, attachmentIds } = input;
   const trimmed = userContent.trim();
+
+  // Turn-scoped skill loading state (milestone 21): load_skill records slugs
+  // here; the connector-tool declared-tool gate reads them.
+  const loadedSkills = new Set<string>();
 
   // 1. Confirmation path: "yes" + a pending proposal → execute it.
   if (CONFIRM_RE.test(trimmed)) {
     const pending = await pendingProposal(threadId);
     if (pending?.length) {
-      const ctx: ToolContext = { projectId, workspaceId, userId, role, confirmed: true };
+      const ctx: ToolContext = { projectId, workspaceId, userId, role, confirmed: true, loadedSkills };
       const executed: ChatToolCall[] = [];
       for (const call of pending) {
         const exec: ChatToolCall = { tool: call.tool, args: call.args, confirmed: true, status: "executed" };
@@ -441,7 +527,9 @@ export async function runAgentTurn(input: AgentTurnInput): Promise<AgentTurnOutp
 
   // 2. Mock mode: deterministic rule-based router.
   if (!isLive) {
-    const ctx: ToolContext = { projectId, workspaceId, userId, role, confirmed: false };
+    const ctx: ToolContext = { projectId, workspaceId, userId, role, confirmed: false, loadedSkills };
+    // Attachments still bind to the thread in mock mode.
+    await buildAttachmentSection(projectId, threadId, attachmentIds);
     const { text, toolCalls } = await mockTurn(ctx, trimmed);
     // Persist tool messages for executed reads (mirrors live mode).
     for (const call of toolCalls) {
@@ -454,9 +542,17 @@ export async function runAgentTurn(input: AgentTurnInput): Promise<AgentTurnOutp
   }
 
   // 3. Live mode: prompt-engineered agent loop.
-  const ctx: ToolContext = { projectId, workspaceId, userId, role, confirmed: false };
-  const projectContext = await buildProjectContext(projectId, workspaceId);
-  const sys = systemPrompt(projectContext, false);
+  const ctx: ToolContext = { projectId, workspaceId, userId, role, confirmed: false, loadedSkills };
+  const [projectContext, supplements, attachmentSection] = await Promise.all([
+    buildProjectContext(projectId, workspaceId),
+    buildAgentSupplements(projectId, workspaceId),
+    buildAttachmentSection(projectId, threadId, attachmentIds),
+  ]);
+  const sys = systemPrompt(
+    projectContext,
+    false,
+    [supplements, attachmentSection].filter(Boolean).join("\n\n"),
+  );
   const llm = getLlmProvider();
 
   const transcript: Array<{ role: "user" | "assistant"; content: string }> = [

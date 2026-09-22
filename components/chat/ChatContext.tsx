@@ -31,6 +31,13 @@ export interface ChatMessage {
   createdAt: string;
 }
 
+/** A file already uploaded/referenced for the project, staged to ride along
+ * with the next sent message (milestone 21, part D2). */
+export interface PendingAttachment {
+  id: string;
+  filename: string;
+}
+
 export type ChatTab = "ai" | "team";
 
 export interface ChatSession {
@@ -54,6 +61,11 @@ interface ChatContextValue {
   newThread: () => Promise<void>;
   deleteThread: (id: string) => Promise<void>;
   sendMessage: (text: string) => Promise<void>;
+  /** Files staged to attach to the next sent message. */
+  pendingAttachments: PendingAttachment[];
+  addPendingAttachment: (a: PendingAttachment) => void;
+  removePendingAttachment: (id: string) => void;
+  clearPendingAttachments: () => void;
 }
 
 const ChatContext = createContext<ChatContextValue | null>(null);
@@ -72,11 +84,28 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [sending, setSending] = useState(false);
   const [loadingThreads, setLoadingThreads] = useState(false);
+  const [pendingAttachments, setPendingAttachments] = useState<PendingAttachment[]>([]);
   const sessionRef = useRef<ChatSession | null>(null);
   sessionRef.current = session;
+  const pendingRef = useRef<PendingAttachment[]>([]);
+  pendingRef.current = pendingAttachments;
 
   const setSession = useCallback((s: ChatSession | null) => {
     setSessionState(s);
+  }, []);
+
+  const addPendingAttachment = useCallback((a: PendingAttachment) => {
+    setPendingAttachments((prev) =>
+      prev.some((p) => p.id === a.id) ? prev : [...prev, a],
+    );
+  }, []);
+
+  const removePendingAttachment = useCallback((id: string) => {
+    setPendingAttachments((prev) => prev.filter((p) => p.id !== id));
+  }, []);
+
+  const clearPendingAttachments = useCallback(() => {
+    setPendingAttachments([]);
   }, []);
 
   // (Re)load threads whenever the project session changes; reset when cleared.
@@ -85,6 +114,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     setActiveId(null);
     setMessages([]);
     setSending(false);
+    setPendingAttachments([]);
     if (!session) {
       setLoadingThreads(false);
       return;
@@ -164,6 +194,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
       const s = sessionRef.current;
       const text = raw.trim();
       if (!text || sending || !s || !s.canEdit) return;
+      const attachmentIds = pendingRef.current.map((a) => a.id);
       let threadId = activeId;
       if (!threadId) {
         const res = await fetch("/api/chat/threads", {
@@ -190,7 +221,10 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         const res = await fetch(`/api/chat/threads/${threadId}/messages`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ content: text }),
+          body: JSON.stringify({
+            content: text,
+            ...(attachmentIds.length > 0 ? { attachmentIds } : {}),
+          }),
         });
         const data = await res.json();
         if (!res.ok) {
@@ -206,6 +240,8 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
           ]);
           return;
         }
+        // Attachments were accepted — clear the staged tray.
+        if (attachmentIds.length > 0) setPendingAttachments([]);
         // Re-fetch the thread for the authoritative message list (includes tool rows).
         const threadRes = await fetch(`/api/chat/threads/${threadId}`);
         if (threadRes.ok) {
@@ -240,6 +276,10 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         newThread,
         deleteThread,
         sendMessage,
+        pendingAttachments,
+        addPendingAttachment,
+        removePendingAttachment,
+        clearPendingAttachments,
       }}
     >
       {children}

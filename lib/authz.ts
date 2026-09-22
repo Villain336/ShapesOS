@@ -129,6 +129,47 @@ export async function requireWorkspaceRole(
   return m;
 }
 
+/**
+ * Granular permission grants (milestone 21, spec §7). Owner/admin always
+ * hold every permission; PermissionGrant rows extend specific permissions
+ * to individual users or to every member at/above a role.
+ */
+export type GrantablePermission = "skills.install" | "connectors.connect";
+
+/** True when the user holds `permission` (string kept open for future grants). */
+export async function hasPermission(
+  userId: string,
+  workspaceId: string,
+  permission: string,
+): Promise<boolean> {
+  const m = await getMembership(userId, workspaceId);
+  if (!m) return false;
+  if (roleAtLeast(m.role, "admin")) return true;
+  const grants = await prisma.permissionGrant.findMany({
+    where: { workspaceId, permission },
+  });
+  for (const g of grants) {
+    if (g.userId && g.userId === userId) return true;
+    if (g.role && roleAtLeast(m.role, g.role)) return true;
+  }
+  return false;
+}
+
+/**
+ * Require a granted permission on a workspace. Returns the membership or
+ * null (null when there is no membership, or no membership with the grant).
+ */
+export async function requirePermission(
+  userId: string,
+  workspaceId: string,
+  permission: string,
+): Promise<WorkspaceMember | null> {
+  const m = await getMembership(userId, workspaceId);
+  if (!m) return null;
+  if (!(await hasPermission(userId, workspaceId, permission))) return null;
+  return m;
+}
+
 /** Resolve a project → its workspace id. */
 export async function workspaceIdForProject(projectId: string): Promise<string | null> {
   const p = await prisma.project.findUnique({
@@ -177,6 +218,13 @@ export function forbidden(message = "Insufficient role for this action.") {
  * | fix-agent settings                  |        |        |   ✓   |   ✓   |
  * | member add / role change / remove   |        |        |   ✓   |   ✓   |
  * | workspace deletion                  |        |        |       |   ✓   |
+ *
+ * M21 permission grants (spec §7) — assigned per user or per role, managed
+ * at /api/members/grants; owner/admin hold every grant by default:
+ * | skills.install (install / re-pin / uninstall skills)    | grant-only | grant-only | ✓ | ✓ |
+ * | connectors.connect (OAuth/API-key connect, add MCP)     | grant-only | grant-only | ✓ | ✓ |
+ * | data-source bind, project skill toggles                 |            |   ✓      | ✓ | ✓ |
+ * | grants CRUD                                             |            |            | ✓ | ✓ |
  *
  * *project creation: editor+. Project deletion: admin+.
  */

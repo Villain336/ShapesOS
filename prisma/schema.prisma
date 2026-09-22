@@ -230,6 +230,28 @@ enum FileChangeAction {
   auth_login_succeeded
   // Day-1 hardening: invite acceptance audit (M8).
   member_invite_accepted
+  // Milestone 21: skills, connectors, settings audit events.
+  skill_installed
+  skill_enabled
+  skill_disabled
+  skill_uninstalled
+  connector_connected
+  connector_disconnected
+  connector_reauth
+  mcp_connector_added
+  mcp_connector_removed
+  data_source_bound
+  data_source_unbound
+  file_attached
+  file_removed
+  settings_workspace_updated
+  settings_project_updated
+  permission_grant_created
+  permission_grant_removed
+  // Milestone 21 (part C): a connector tool invocation was refused by the
+  // agent loop (not bound, not declared by a loaded skill, role/allow-list
+  // gated). Denials are never silent — every one writes an audit row.
+  connector_tool_denied
 }
 
 enum ProgrammaticPageStatus {
@@ -309,6 +331,12 @@ model Workspace {
   gbpAccounts           GbpAccount[]
   // Milestone 18: content autopilot kill switches (workspace-level).
   autopilotKills        AutopilotKillSwitch[]
+  // Milestone 21: skills, connectors, settings.
+  skills                Skill[]
+  customConnectors      Connector[]
+  connectorConnections  ConnectorConnection[]
+  permissionGrants      PermissionGrant[]
+  workspaceSettings     WorkspaceSettings?
 
   @@map("workspaces")
 }
@@ -386,6 +414,11 @@ model Project {
   // Redesign (2026-09-22): AI chat threads + team chat channel.
   aiChatThreads           AiChatThread[]
   chatChannel             ChatChannel?
+  // Milestone 21: skills, connectors, settings.
+  projectSkills         ProjectSkill[]
+  projectDataSources    ProjectDataSource[]
+  fileAttachments       FileAttachment[]
+  projectSettings       ProjectSettings?
 
   @@map("projects")
 }
@@ -2376,4 +2409,240 @@ model TeamChatMessage {
 
   @@index([channelId, createdAt])
   @@map("team_chat_messages")
+}
+
+// ---------------------------------------------------------------------------
+// Milestone 21: user-installable skills, connectors, workspace/project settings.
+// ---------------------------------------------------------------------------
+//
+// Design notes (minor deviations from SPEC-SKILLS-CONNECTORS-SETTINGS.md §6,
+// recorded here deliberately):
+// - The 12 built-in connectors are code-defined in
+//   lib/connectors/native/registry.ts (matching the existing provider pattern
+//   in lib/providers/index.ts), NOT rows in the Connector table. The Connector
+//   model exists only for workspace-custom MCP servers. ConnectorConnection
+//   therefore keys on connectorKey (string) with an optional connectorId FK
+//   for custom servers. This avoids a nullable partial-unique-index problem
+//   and keeps built-ins versioned with the codebase.
+// - Project.domain / Project.locale already exist on Project; ProjectSettings
+//   holds the rest (brand context, extra domains, overrides, approval mode,
+//   publishing controls) rather than duplicating them.
+
+enum SkillSource {
+  registry
+  url
+  upload
+}
+
+enum SkillTrustTier {
+  built_in
+  pinned_url
+}
+
+enum ConnectorKind {
+  native
+  mcp
+}
+
+enum ConnectorAuthType {
+  oauth2
+  api_key
+  none
+}
+
+enum ConnectionStatus {
+  active
+  needs_reauth
+  revoked
+}
+
+model Skill {
+  id          String         @id @default(cuid())
+  workspaceId String         @map("workspace_id")
+  workspace   Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name        String
+  slug        String
+  description String         @db.Text
+  source      SkillSource
+  sourceRef   String?        @map("source_ref")
+  version     String         @default("1.0.0")
+  // Commit SHA the install is pinned to (url source). Null = not pinned.
+  shaPin      String?        @map("sha_pin")
+  skillMd     String         @map("skill_md") @db.Text
+  // Tool names the skill may invoke, e.g. "google-search-console.query".
+  declaredTools String[]     @map("declared_tools")
+  trustTier   SkillTrustTier @map("trust_tier")
+  installedBy String?        @map("installed_by")
+  installedAt DateTime       @default(now()) @map("installed_at")
+
+  projects ProjectSkill[]
+
+  @@unique([workspaceId, slug])
+  @@index([workspaceId])
+  @@map("skills")
+}
+
+model ProjectSkill {
+  projectId String  @map("project_id")
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  skillId   String  @map("skill_id")
+  skill     Skill   @relation(fields: [skillId], references: [id], onDelete: Cascade)
+  enabled   Boolean @default(true)
+  enabledBy String? @map("enabled_by")
+  enabledAt DateTime @default(now()) @map("enabled_at")
+
+  @@id([projectId, skillId])
+  @@map("project_skills")
+}
+
+// Workspace-custom MCP servers only. Built-in connectors live in code
+// (lib/connectors/native/registry.ts).
+model Connector {
+  id          String        @id @default(cuid())
+  workspaceId String        @map("workspace_id")
+  workspace   Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  key         String
+  kind        ConnectorKind @default(mcp)
+  displayName String        @map("display_name")
+  authType    ConnectorAuthType @default(none) @map("auth_type")
+  // For MCP: { endpoint, transport: "http" | "stdio", command? }
+  config      Json?
+  mcpEndpoint String?       @map("mcp_endpoint")
+  createdBy   String?       @map("created_by")
+  createdAt   DateTime      @default(now()) @map("created_at")
+  // Opposite side of ConnectorConnection.connector (M21 connectors).
+  connections ConnectorConnection[]
+
+  @@unique([workspaceId, key])
+  @@index([workspaceId])
+  @@map("connectors")
+}
+
+model ConnectorConnection {
+  id         String           @id @default(cuid())
+  // Connector key: built-in native key (e.g. "google-search-console") or a
+  // custom Connector.key for workspace MCP servers.
+  connectorKey String          @map("connector_key")
+  connectorId  String?         @map("connector_id")
+  connector    Connector?      @relation(fields: [connectorId], references: [id], onDelete: Cascade)
+  workspaceId  String          @map("workspace_id")
+  workspace    Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  // Auth.js user id that owns this credential (per-user OAuth).
+  userId      String          @map("user_id")
+  status      ConnectionStatus @default(active)
+  scopes      String[]
+  // Non-sensitive display metadata (account email, property list, ...).
+  meta        Json?
+  connectedAt   DateTime      @default(now()) @map("connected_at")
+  lastRefreshAt DateTime?     @map("last_refresh_at")
+
+  credential      ConnectorCredential?
+  projectBindings ProjectDataSource[]
+
+  @@index([workspaceId])
+  @@index([userId])
+  @@index([connectorKey])
+  @@map("connector_connections")
+}
+
+model ConnectorCredential {
+  connectionId String @id @map("connection_id")
+  connection   ConnectorConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  // AES-256-GCM envelope via lib/secrets (never logged, never sent to clients).
+  encryptedBlob String @map("encrypted_blob") @db.Text
+  keyVersion    String @default("env-v1") @map("key_version")
+  expiresAt     DateTime? @map("expires_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  @@map("connector_credentials")
+}
+
+model ProjectDataSource {
+  id           String              @id @default(cuid())
+  projectId    String              @map("project_id")
+  project      Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  connectionId String              @map("connection_id")
+  connection   ConnectorConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  connectorKey String              @map("connector_key")
+  // Per-project binding config, e.g. { property: "https://example.com" } for
+  // Search Console, { folderId } for Drive.
+  projectConfig Json?             @map("project_config")
+  createdBy     String?           @map("created_by")
+  createdAt     DateTime          @default(now()) @map("created_at")
+
+  @@unique([projectId, connectionId])
+  @@index([projectId])
+  @@map("project_data_sources")
+}
+
+model FileAttachment {
+  id           String   @id @default(cuid())
+  projectId    String   @map("project_id")
+  project      Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  // Chat session (AiChatThread id) or brief context; null = project-level.
+  sessionId    String?  @map("session_id")
+  source       String   // "upload" | "connector"
+  connectorKey String?  @map("connector_key")
+  externalRef  String?  @map("external_ref")
+  filename     String
+  mimeType     String?  @map("mime_type")
+  sizeBytes    Int?     @map("size_bytes")
+  // Local disk path under .data/attachments (uploads). Null for connector refs.
+  storagePath  String?  @map("storage_path")
+  uploadedBy   String   @map("uploaded_by")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@index([projectId])
+  @@index([sessionId])
+  @@map("file_attachments")
+}
+
+model WorkspaceSettings {
+  workspaceId          String    @id @map("workspace_id")
+  workspace            Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  defaultModel         String?   @map("default_model")
+  defaultApprovalMode  String    @default("supervised") @map("default_approval_mode")
+  notificationDefaults Json?    @map("notification_defaults")
+  dataGovernance       Json?    @map("data_governance")
+  // Tool namespaces the agent may use; empty = all enabled.
+  agentAllowList       String[]  @map("agent_allow_list")
+  updatedBy            String?   @map("updated_by")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
+
+  @@map("workspace_settings")
+}
+
+model ProjectSettings {
+  projectId            String    @id @map("project_id")
+  project              Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  // JSON overrides of any workspace default, e.g. { defaultModel, notificationDefaults }.
+  overrides            Json?
+  // Brand context text injected into the agent prompt for this project.
+  brandContext         String?   @map("brand_context") @db.Text
+  // Extra domains beyond Project.domain.
+  domains              String[]
+  approvalModeOverride String?   @map("approval_mode_override")
+  publishingControls   Json?     @map("publishing_controls")
+  updatedBy            String?   @map("updated_by")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
+
+  @@map("project_settings")
+}
+
+// Granular permission grants beyond the role hierarchy (milestone 21).
+// owner/admin always hold every permission; grants extend to others.
+model PermissionGrant {
+  id          String   @id @default(cuid())
+  workspaceId String   @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  // Exactly one of userId / role is set (enforced in code).
+  userId      String?  @map("user_id")
+  role        WorkspaceRole?
+  // "skills.install" | "connectors.connect" (open string for future grants).
+  permission  String
+  grantedBy   String   @map("granted_by")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([workspaceId, userId])
+  @@map("permission_grants")
 }

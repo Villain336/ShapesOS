@@ -37,6 +37,12 @@ export interface ToolContext {
   role: WorkspaceRole;
   /** True only when the user explicitly confirmed this action (chat "yes"). */
   confirmed: boolean;
+  /**
+   * Turn-scoped set of skill slugs the agent loaded via load_skill this
+   * turn (milestone 21). The connector-tool declared-tool gate in
+   * lib/chat/connector-tools.ts reads this.
+   */
+  loadedSkills?: Set<string>;
 }
 
 export interface ToolResult {
@@ -394,6 +400,45 @@ const get_workflows: ToolDef = {
 };
 
 // ---------------------------------------------------------------------------
+// SKILL LOADING (milestone 21: progressive disclosure, spec §6)
+//
+// The agent's system prompt lists enabled skill names + descriptions. When
+// a task matches one, it calls load_skill to pull the full SKILL.md into
+// context BEFORE acting. Loading records the slug in ctx.loadedSkills so
+// the connector-tool gate knows which tools the skills declare.
+// ---------------------------------------------------------------------------
+
+const load_skill: ToolDef = {
+  name: "load_skill",
+  description:
+    "Load an enabled project's skill by slug: returns the full SKILL.md playbook (name, description, steps, tools it may invoke). Call this BEFORE acting whenever a task matches a skill in the AVAILABLE SKILLS section.",
+  kind: "safe",
+  minRole: "viewer",
+  argsSchema: {
+    type: "object",
+    properties: {
+      slug: { type: "string", description: "Skill slug from the AVAILABLE SKILLS section." },
+    },
+    required: ["slug"],
+  },
+  async execute(ctx, args) {
+    const slug = str(args.slug);
+    if (!slug) throw new Error("slug is required");
+    const skill = await prisma.skill.findFirst({
+      where: { workspaceId: ctx.workspaceId, slug },
+    });
+    if (!skill) {
+      throw new Error(`No skill with slug "${slug}" is installed in this workspace.`);
+    }
+    ctx.loadedSkills?.add(skill.slug);
+    return {
+      summary: `Loaded skill "${skill.name}":\n\n${skill.skillMd.slice(0, 8000)}`,
+      details: { slug: skill.slug, name: skill.name, declaredTools: skill.declaredTools },
+    };
+  },
+};
+
+// ---------------------------------------------------------------------------
 // WRITE TOOLS (spend / publish / destructive — all behind the confirm gate)
 // ---------------------------------------------------------------------------
 
@@ -676,6 +721,7 @@ export const TOOLS: ToolDef[] = [
   get_alerts,
   get_visibility_score,
   get_workflows,
+  load_skill,
   research_keywords,
   create_content_draft,
   run_seo_audit,
