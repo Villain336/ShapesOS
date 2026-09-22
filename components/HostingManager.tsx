@@ -289,7 +289,7 @@ export default function HostingManager({ projectId }: { projectId: string }) {
             <button onClick={() => void testVercel()} disabled={vTestBusy} className="rounded border border-zinc-200 px-4 py-1.5 text-sm text-zinc-500 disabled:opacity-50">
               {vTestBusy ? "Testing…" : "Test"}
             </button>
-            <button onClick={() => void saveVercel()} disabled={busy} className="rounded bg-orange-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-orange-700 disabled:opacity-50 active:scale-[0.96] transition-[background-color,transform] duration-150 ease-[cubic-bezier(0.2,0,0,1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2">
+            <button onClick={() => void saveVercel()} disabled={busy} className="rounded bg-orange-700 px-4 py-1.5 text-sm font-medium text-white hover:bg-orange-800 disabled:opacity-50 active:scale-[0.96] transition-[background-color,transform] duration-150 ease-[cubic-bezier(0.2,0,0,1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2">
               {busy ? "Saving…" : "Connect"}
             </button>
           </div>
@@ -327,7 +327,7 @@ export default function HostingManager({ projectId }: { projectId: string }) {
             <button onClick={() => void testCloudflare()} disabled={cTestBusy} className="rounded border border-zinc-200 px-4 py-1.5 text-sm text-zinc-500 disabled:opacity-50">
               {cTestBusy ? "Testing…" : "Test"}
             </button>
-            <button onClick={() => void saveCloudflare()} disabled={busy} className="rounded bg-orange-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-orange-700 disabled:opacity-50 active:scale-[0.96] transition-[background-color,transform] duration-150 ease-[cubic-bezier(0.2,0,0,1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2">
+            <button onClick={() => void saveCloudflare()} disabled={busy} className="rounded bg-orange-700 px-4 py-1.5 text-sm font-medium text-white hover:bg-orange-800 disabled:opacity-50 active:scale-[0.96] transition-[background-color,transform] duration-150 ease-[cubic-bezier(0.2,0,0,1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2">
               {busy ? "Saving…" : "Connect"}
             </button>
           </div>
@@ -376,7 +376,7 @@ export default function HostingManager({ projectId }: { projectId: string }) {
               <button
                 onClick={() => void runDeploy()}
                 disabled={depBusy || !depSite || !depConn}
-                className="w-full rounded bg-orange-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-orange-700 disabled:opacity-50 active:scale-[0.96] transition-[background-color,transform] duration-150 ease-[cubic-bezier(0.2,0,0,1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2"
+                className="w-full rounded bg-orange-700 px-4 py-1.5 text-sm font-medium text-white hover:bg-orange-800 disabled:opacity-50 active:scale-[0.96] transition-[background-color,transform] duration-150 ease-[cubic-bezier(0.2,0,0,1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2"
               >
                 {depBusy ? "Deploying…" : "Deploy to hosting"}
               </button>

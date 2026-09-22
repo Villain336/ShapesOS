@@ -145,7 +145,7 @@ function tiptapToSimple(doc: unknown): SimpleBlock[] {
 const inputCls =
   "w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 placeholder-zinc-500 focus:border-orange-500 focus:outline-none";
 const btnPrimary =
-  "rounded-md bg-orange-600 px-4 py-2 text-sm font-medium text-white hover:bg-orange-700 disabled:opacity-50 active:scale-[0.96] transition-[background-color,transform] duration-150 ease-[cubic-bezier(0.2,0,0,1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2";
+  "rounded-md bg-orange-700 px-4 py-2 text-sm font-medium text-white hover:bg-orange-800 disabled:opacity-50 active:scale-[0.96] transition-[background-color,transform] duration-150 ease-[cubic-bezier(0.2,0,0,1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2";
 const btnSecondary =
   "rounded-md border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-800 hover:border-zinc-400 disabled:opacity-50";
 const btnDanger =

@@ -31,7 +31,7 @@ function TrendBars({ trend }: { trend: { date: string; checked: number; overview
         {points.map((p) => (
           <div key={p.date} className="flex flex-1 flex-col items-center justify-end gap-0.5" title={`${p.date}: ${p.overviewPresent}/${p.checked} AI Overviews, ${p.siteCited} cited`}>
             <div className="flex w-full flex-col justify-end" style={{ height: `${(100 * Math.max(p.overviewPresent, 1)) / max}%`, minHeight: 4 }}>
-              <div className="w-full rounded-sm bg-orange-600/70" style={{ height: `${p.overviewPresent ? 100 : 0}%` }} />
+              <div className="w-full rounded-sm bg-orange-700/70" style={{ height: `${p.overviewPresent ? 100 : 0}%` }} />
             </div>
             <div className="flex w-full flex-col justify-end" style={{ height: `${(100 * Math.max(p.siteCited, 1)) / max}%`, minHeight: 4 }}>
               <div className="w-full rounded-sm bg-emerald-500/80" style={{ height: `${p.siteCited ? 100 : 0}%` }} />
@@ -41,7 +41,7 @@ function TrendBars({ trend }: { trend: { date: string; checked: number; overview
         {points.length === 0 && <p className="text-sm text-zinc-500">No snapshots yet — run a rank check.</p>}
       </div>
       <div className="mt-2 flex gap-4 text-xs text-zinc-500">
-        <span><span className="mr-1 inline-block h-2 w-2 rounded-sm bg-orange-600/70" /> AI Overview present</span>
+        <span><span className="mr-1 inline-block h-2 w-2 rounded-sm bg-orange-700/70" /> AI Overview present</span>
         <span><span className="mr-1 inline-block h-2 w-2 rounded-sm bg-emerald-500/80" /> Site cited</span>
       </div>
     </div>

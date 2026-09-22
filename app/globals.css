@@ -20,7 +20,7 @@
  * - Canvas is warm paper #FAFAF7 — never pure white, never blue-gray.
  * - Elevation = 1px rings (rgba(28,25,23,0.08)). Shadows live ONLY on
  *   floating layers (beautiful-shadows tokens).
- * - Orange #EA580C: actions, links, active states, focus ONLY.
+ * - Orange #C2410C: actions, links, active states, focus ONLY.
  *   Never icons. Never body text. Body links use #C2410C (4.5:1).
  * - Inter for UI chrome; Newsreader for page headlines + empty states.
  * - Radii: cards 10px, controls 8px, chips/pills full. Nothing else.
@@ -46,7 +46,7 @@
   --line-strong: rgba(28, 25, 23, 0.16);
 
   /* accent — orange-600 family, disciplined */
-  --accent: #ea580c;
+  --accent: #c2410c;
   --accent-hover: #c2410c;
   --accent-ink: #c2410c;
   --accent-tint: #fff4e8;
