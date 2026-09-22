@@ -35,6 +35,10 @@ export interface InternalLinkSyncResult {
 
 /** Latest ranking URL per keyword for a project. */
 export async function projectPages(projectId: string): Promise<InternalPage[]> {
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
+    select: { domain: true },
+  });
   const keywords = await prisma.keyword.findMany({
     where: { projectId },
     select: {
@@ -82,6 +86,21 @@ export async function projectPages(projectId: string): Promise<InternalPage[]> {
     const key = normalizeInternalUrl(d.url);
     if (!key || byUrl.has(key)) continue;
     byUrl.set(key, { url: d.url, targetKeywords: [], bestRank: null });
+  }
+  // Milestone 17: published programmatic pages are stored, honest pages.
+  // They carry no keyword/rank data (orphan candidates until the ranking
+  // graph or a future crawl links them in).
+  if (project?.domain) {
+    const origin = `https://${project.domain.replace(/^https?:\/\//, "").replace(/\/+$/, "")}`;
+    const programmatic = await prisma.programmaticPage.findMany({
+      where: { projectId, status: "published" },
+      select: { url: true },
+    });
+    for (const p of programmatic) {
+      const key = normalizeInternalUrl(`${origin}${p.url}`);
+      if (!key || byUrl.has(key)) continue;
+      byUrl.set(key, { url: `${origin}${p.url}`, targetKeywords: [], bestRank: null });
+    }
   }
 
   return [...byUrl.values()];

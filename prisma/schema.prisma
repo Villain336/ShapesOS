@@ -10,7 +10,7 @@ datasource db {
   // URL is provided by prisma.config.ts (env DATABASE_URL at runtime);
   // the env() reference below keeps `prisma generate`/`validate` happy
   // on Prisma 6.19, which requires a url key in this block.
-  url = env("DATABASE_URL")
+  url      = env("DATABASE_URL")
 }
 
 enum Plan {
@@ -143,6 +143,23 @@ enum FileChangeAction {
   local_grid_run
   local_competitor_snapshot
   reviews_ingested
+  // Milestone 17: programmatic SEO.
+  programmatic_template_created
+  programmatic_template_updated
+  programmatic_template_deleted
+  programmatic_dataset_uploaded
+  programmatic_dataset_deleted
+  programmatic_pages_generated
+  programmatic_page_approved
+  programmatic_page_published
+  programmatic_page_discarded
+}
+
+enum ProgrammaticPageStatus {
+  draft
+  ready
+  published
+  discarded
 }
 
 // Marketr — where a Site's files live (milestone 7).
@@ -156,11 +173,11 @@ enum SiteSourceType {
 }
 
 model Workspace {
-  id        String   @id @default(cuid())
-  name      String
+  id          String @id @default(cuid())
+  name        String
   // owner_user_id: external auth subject (Auth.js user id) — auth wired in milestone 2
-  ownerUserId String  @map("owner_user_id")
-  plan      Plan     @default(self_hosted)
+  ownerUserId String @map("owner_user_id")
+  plan        Plan   @default(self_hosted)
 
   // White-label config (spec §6): logo_url, custom_domain, brand_color
   whiteLabelLogoUrl      String? @map("white_label_logo_url")
@@ -170,45 +187,45 @@ model Workspace {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  projects Project[]
-  clients  Client[]
-  apiUsage ApiUsage[]
+  projects             Project[]
+  clients              Client[]
+  apiUsage             ApiUsage[]
   // Milestone 11: workspace membership for RBAC (owner/admin/editor/viewer).
-  members  WorkspaceMember[]
+  members              WorkspaceMember[]
   // Milestone 11: workspace-scoped audit events.
-  auditEvents FileChangeLog[]
+  auditEvents          FileChangeLog[]
   // Milestone 12: white-label brand kits and report templates.
-  brandKits BrandKit[]
-  reportTemplates ReportTemplate[]
+  brandKits            BrandKit[]
+  reportTemplates      ReportTemplate[]
   // Milestone 13: alerting hub (channels, rules, event history).
-  alertChannels AlertChannel[]
-  alertRules AlertRule[]
-  alertEvents AlertEvent[]
+  alertChannels        AlertChannel[]
+  alertRules           AlertRule[]
+  alertEvents          AlertEvent[]
   // Milestone 15: backlink pull audit trail (cost accounting).
-  backlinkPulls BacklinkPull[]
+  backlinkPulls        BacklinkPull[]
   // Milestone 14: composite visibility score weights per workspace.
   // { rankings?: number, aiPresence?: number, freshness?: number, coverage?: number }
   // Null = defaults in lib/retention/visibility-score.ts.
   // NOTE (milestone 15): a `backlinks` component is reserved for a later
   // milestone — do not add it to the score until the backlink quality
   // signal is calibrated. visibility-score.ts documents the same note.
-  visibilityWeights Json? @map("visibility_weights")
+  visibilityWeights    Json?             @map("visibility_weights")
   // Milestone 15: workspace-level monthly cap (USD) on DataForSEO Backlinks
   // spend. Null = DEFAULT_MONTHLY_SPEND_CAP_USD in lib/seo/backlinks-cost.ts.
-  backlinksSpendCapUsd Float? @map("backlinks_spend_cap_usd")
+  backlinksSpendCapUsd Float?            @map("backlinks_spend_cap_usd")
   // Milestone 16: workspace-level monthly cap (USD) on DataForSEO local-SEO
   // spend (maps SERP, business data, reviews). Null = DEFAULT_LOCAL_SPEND_CAP_USD.
-  localSeoSpendCapUsd Float? @map("local_seo_spend_cap_usd")
+  localSeoSpendCapUsd  Float?            @map("local_seo_spend_cap_usd")
   // Milestone 16: local-SEO pull audit trail (cost accounting) + GBP scaffold.
-  localPulls  LocalPull[]
-  gbpAccounts GbpAccount[]
+  localPulls           LocalPull[]
+  gbpAccounts          GbpAccount[]
 
   @@map("workspaces")
 }
 
 model Project {
-  id          String @id @default(cuid())
-  workspaceId String @map("workspace_id")
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   domain       String
@@ -218,47 +235,51 @@ model Project {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  keywords    Keyword[]
-  competitors Competitor[]
-  contentItems ContentItem[]
-  issues      Issue[]
-  fixRuns     FixRun[]
-  siteConnections SiteConnection[]
-  fileChangeLogs  FileChangeLog[]
-  sites       Site[]
-  hostingConnections HostingConnection[]
-  deployments Deployment[]
-  siteAudits  SiteAudit[]
-  siteIssues  SiteIssue[]
+  keywords                Keyword[]
+  competitors             Competitor[]
+  contentItems            ContentItem[]
+  issues                  Issue[]
+  fixRuns                 FixRun[]
+  siteConnections         SiteConnection[]
+  fileChangeLogs          FileChangeLog[]
+  sites                   Site[]
+  hostingConnections      HostingConnection[]
+  deployments             Deployment[]
+  siteAudits              SiteAudit[]
+  siteIssues              SiteIssue[]
   // Milestone 12: report templates and generated reports scoped to this project.
-  reportTemplates ReportTemplate[]
-  reports Report[]
+  reportTemplates         ReportTemplate[]
+  reports                 Report[]
   // Milestone 14: retention loops.
-  aiVisibilitySnapshots AIVisibilitySnapshot[]
-  decayFindings ContentDecayFinding[]
-  competitorSnapshots CompetitorSnapshot[]
-  radarEvents CompetitorRadarEvent[]
-  visibilityScores VisibilityScore[]
+  aiVisibilitySnapshots   AIVisibilitySnapshot[]
+  decayFindings           ContentDecayFinding[]
+  competitorSnapshots     CompetitorSnapshot[]
+  radarEvents             CompetitorRadarEvent[]
+  visibilityScores        VisibilityScore[]
   // Milestone 15: link intelligence.
   // Weekly scheduled backlink refresh toggle (default on; cron skips when false).
-  backlinksEnabled Boolean @default(true) @map("backlinks_enabled")
-  backlinks Backlink[]
-  backlinkSummaries BacklinkSummary[]
-  backlinkPulls BacklinkPull[]
+  backlinksEnabled        Boolean                  @default(true) @map("backlinks_enabled")
+  backlinks               Backlink[]
+  backlinkSummaries       BacklinkSummary[]
+  backlinkPulls           BacklinkPull[]
   internalLinkSuggestions InternalLinkSuggestion[]
   // Milestone 16: local SEO.
-  localGrids LocalGrid[]
-  localCompetitors LocalCompetitor[]
-  reviews Review[]
-  reviewSummaries ReviewSummary[]
-  localPulls LocalPull[]
+  localGrids              LocalGrid[]
+  localCompetitors        LocalCompetitor[]
+  reviews                 Review[]
+  reviewSummaries         ReviewSummary[]
+  localPulls              LocalPull[]
+  // Milestone 17: programmatic SEO.
+  programmaticTemplates   ProgrammaticTemplate[]
+  programmaticDatasets    ProgrammaticDataset[]
+  programmaticPages       ProgrammaticPage[]
 
   @@map("projects")
 }
 
 model Keyword {
-  id        String @id @default(cuid())
-  projectId String @map("project_id")
+  id        String  @id @default(cuid())
+  projectId String  @map("project_id")
   project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   phrase     String
@@ -269,39 +290,39 @@ model Keyword {
   // Saved list name, e.g. "Q4 content targets"
   list       String?
   // Rank tracking (milestone 5): tracked keywords get position checks on schedule/on demand.
-  tracked    Boolean @default(false)
+  tracked    Boolean       @default(false)
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  rankings     Ranking[]
-  contentItems ContentItem[]
+  rankings              Ranking[]
+  contentItems          ContentItem[]
   // Milestone 14: retention loops.
   aiVisibilitySnapshots AIVisibilitySnapshot[]
-  decayFindings ContentDecayFinding[]
+  decayFindings         ContentDecayFinding[]
 
   @@unique([projectId, phrase])
   @@map("keywords")
 }
 
 model Ranking {
-  id        String @id @default(cuid())
-  keywordId String @map("keyword_id")
+  id        String  @id @default(cuid())
+  keywordId String  @map("keyword_id")
   keyword   Keyword @relation(fields: [keywordId], references: [id], onDelete: Cascade)
 
-  checkedAt        DateTime @map("checked_at") @default(now())
-  position         Int?
-  url              String?
-  aiOverviewPresent Boolean @default(false) @map("ai_overview_present")
-  serpFeatures     String[] @default([]) @map("serp_features")
+  checkedAt         DateTime @default(now()) @map("checked_at")
+  position          Int?
+  url               String?
+  aiOverviewPresent Boolean  @default(false) @map("ai_overview_present")
+  serpFeatures      String[] @default([]) @map("serp_features")
 
   @@index([keywordId, checkedAt])
   @@map("rankings")
 }
 
 model Competitor {
-  id        String @id @default(cuid())
-  projectId String @map("project_id")
+  id        String  @id @default(cuid())
+  projectId String  @map("project_id")
   project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   domain  String
@@ -312,11 +333,11 @@ model Competitor {
 }
 
 model ContentItem {
-  id        String @id @default(cuid())
-  projectId String @map("project_id")
+  id        String  @id @default(cuid())
+  projectId String  @map("project_id")
   project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
-  keywordId String? @map("keyword_id")
+  keywordId String?  @map("keyword_id")
   keyword   Keyword? @relation(fields: [keywordId], references: [id], onDelete: SetNull)
 
   status       ContentStatus @default(brief)
@@ -332,20 +353,20 @@ model ContentItem {
 }
 
 model Client {
-  id          String @id @default(cuid())
-  workspaceId String @map("workspace_id")
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
-  name          String
-  loginEmail    String @map("login_email")
-  viewerRole    ClientRole @default(viewer) @map("viewer_role")
+  name           String
+  loginEmail     String     @map("login_email")
+  viewerRole     ClientRole @default(viewer) @map("viewer_role")
   // Cron expression or "weekly"/"monthly" for scheduled branded reports
-  reportSchedule String? @map("report_schedule")
+  reportSchedule String?    @map("report_schedule")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  reports Report[]
+  reports   Report[]
   // Milestone 12: brand kits mapped to this client (per-client white-label).
   brandKits BrandKit[]
 
@@ -354,28 +375,28 @@ model Client {
 }
 
 model Report {
-  id       String @id @default(cuid())
+  id       String  @id @default(cuid())
   // Milestone 12: client is optional — on-demand/scheduled template reports
   // may exist before they are assigned/sent to a client.
   clientId String? @map("client_id")
   client   Client? @relation(fields: [clientId], references: [id], onDelete: Cascade)
 
   // Milestone 12: template + brand kit that produced this report.
-  templateId String? @map("template_id")
+  templateId String?         @map("template_id")
   template   ReportTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
-  brandKitId String? @map("brand_kit_id")
-  brandKit   BrandKit? @relation(fields: [brandKitId], references: [id], onDelete: SetNull)
+  brandKitId String?         @map("brand_kit_id")
+  brandKit   BrandKit?       @relation(fields: [brandKitId], references: [id], onDelete: SetNull)
   // Milestone 12: project whose data fills the report (rankings, visibility).
-  projectId String? @map("project_id")
-  project   Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  projectId  String?         @map("project_id")
+  project    Project?        @relation(fields: [projectId], references: [id], onDelete: SetNull)
 
-  period String
-  pdfUrl String? @map("pdf_url")
+  period  String
+  pdfUrl  String?      @map("pdf_url")
   // Milestone 12: local storage path under .data/reports (durable volume in prod).
-  pdfPath String? @map("pdf_path")
+  pdfPath String?      @map("pdf_path")
   status  ReportStatus @default(ready) @map("status")
   error   String?
-  sentAt DateTime? @map("sent_at")
+  sentAt  DateTime?    @map("sent_at")
 
   createdAt DateTime @default(now()) @map("created_at")
 
@@ -395,22 +416,22 @@ enum ReportStatus {
 // mapped to a client so agencies get per-client branding. Consumed by pdfcn
 // report rendering, emailcn emails (M19), ad factory (M21) and studio (M22).
 model BrandKit {
-  id          String @id @default(cuid())
-  workspaceId String @map("workspace_id")
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
-  name String
+  name      String
   // Logo file stored under .data/reports/logos/<id>.<ext>; path relative to repo root.
-  logoPath String? @map("logo_path")
+  logoPath  String? @map("logo_path")
   // { primary, secondary, accent, text, muted } — hex strings.
-  colors Json @default("{}")
+  colors    Json    @default("{}")
   // { heading, body } — font family names.
-  fonts Json @default("{}")
+  fonts     Json    @default("{}")
   // Voice/tone notes guiding AI-generated copy inside reports.
-  tone String?
+  tone      String?
   // Optional client this kit brands (agency white-label per client).
-  clientId String? @map("client_id")
-  client   Client? @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  clientId  String? @map("client_id")
+  client    Client? @relation(fields: [clientId], references: [id], onDelete: SetNull)
   isDefault Boolean @default(false) @map("is_default")
 
   createdAt DateTime @default(now()) @map("created_at")
@@ -426,23 +447,23 @@ model BrandKit {
 // (edited with the editorcn block editor in the dashboard) plus optional
 // {{placeholders}} resolved at generation time from project data.
 model ReportTemplate {
-  id          String @id @default(cuid())
-  workspaceId String @map("workspace_id")
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
-  name String
+  name       String
   // "ranking" (keyword rankings + visibility) | "custom".
-  type String @default("custom")
+  type       String    @default("custom")
   // Tiptap JSON document — single source of truth.
-  content Json
-  brandKitId String? @map("brand_kit_id")
+  content    Json
+  brandKitId String?   @map("brand_kit_id")
   brandKit   BrandKit? @relation(fields: [brandKitId], references: [id], onDelete: SetNull)
   // Project whose data fills {{placeholders}} at generation time.
-  projectId String? @map("project_id")
-  project   Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  projectId  String?   @map("project_id")
+  project    Project?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
   // "manual" | "weekly" | "monthly" — picked up by POST /api/cron/reports.
-  schedule String @default("manual")
-  lastRunAt DateTime? @map("last_run_at")
+  schedule   String    @default("manual")
+  lastRunAt  DateTime? @map("last_run_at")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -459,8 +480,8 @@ enum ApiMeter {
 }
 
 model ApiUsage {
-  id          String @id @default(cuid())
-  workspaceId String @map("workspace_id")
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   // Billing meter: tracked_keywords / ai_words / serp_calls
@@ -476,15 +497,15 @@ model ApiUsage {
 }
 
 model Issue {
-  id        String @id @default(cuid())
-  projectId String @map("project_id")
+  id        String  @id @default(cuid())
+  projectId String  @map("project_id")
   project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   type       String
   severity   IssueSeverity
   url        String?
-  detailJson Json? @map("detail_json")
-  status     IssueStatus @default(open)
+  detailJson Json?         @map("detail_json")
+  status     IssueStatus   @default(open)
 
   detectedAt DateTime @default(now()) @map("detected_at")
   updatedAt  DateTime @updatedAt @map("updated_at")
@@ -494,20 +515,20 @@ model Issue {
 }
 
 model FixRun {
-  id        String @id @default(cuid())
-  projectId String @map("project_id")
+  id        String  @id @default(cuid())
+  projectId String  @map("project_id")
   project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
-  mode         FixMode
-  startedAt    DateTime @default(now()) @map("started_at")
-  fixesApplied Int @default(0) @map("fixes_applied")
+  mode          FixMode
+  startedAt     DateTime     @default(now()) @map("started_at")
+  fixesApplied  Int          @default(0) @map("fixes_applied")
   // Reference to the pre-change snapshot used for rollback
-  snapshotRef  String? @map("snapshot_ref")
-  status       FixRunStatus @default(pending)
-  reportSummary String? @map("report_summary") @db.Text
+  snapshotRef   String?      @map("snapshot_ref")
+  status        FixRunStatus @default(pending)
+  reportSummary String?      @map("report_summary") @db.Text
   // Milestone 10: the site this run fixed (null for legacy project runs).
-  siteId String? @map("site_id")
-  site   Site?   @relation(fields: [siteId], references: [id], onDelete: SetNull)
+  siteId        String?      @map("site_id")
+  site          Site?        @relation(fields: [siteId], references: [id], onDelete: SetNull)
 
   siteIssues SiteIssue[]
 
@@ -519,9 +540,9 @@ model FixRun {
 // agent AND approves the issue's category (or the issue itself). Dry-run is
 // on by default so the first runs only propose diffs for review.
 model FixAgentSettings {
-  id      String @id @default(cuid())
-  siteId  String @unique @map("site_id")
-  site    Site   @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  id     String @id @default(cuid())
+  siteId String @unique @map("site_id")
+  site   Site   @relation(fields: [siteId], references: [id], onDelete: Cascade)
 
   enabled           Boolean  @default(false)
   // Issue categories the agent may fix on schedule WITHOUT per-issue approval.
@@ -539,17 +560,17 @@ model FixAgentSettings {
 // Marketr — one audit pass over a site's working copy (milestone 10).
 // Findings land as SiteIssue rows; the inbox shows the latest audit's issues.
 model SiteAudit {
-  id        String @id @default(cuid())
-  siteId    String @map("site_id")
-  site      Site   @relation(fields: [siteId], references: [id], onDelete: Cascade)
-  projectId String @map("project_id")
+  id        String  @id @default(cuid())
+  siteId    String  @map("site_id")
+  site      Site    @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  projectId String  @map("project_id")
   project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
-  startedAt  DateTime    @default(now()) @map("started_at")
-  finishedAt DateTime?   @map("finished_at")
+  startedAt  DateTime     @default(now()) @map("started_at")
+  finishedAt DateTime?    @map("finished_at")
   status     FixRunStatus @default(pending)
   // True when findings came from the deterministic demo scanner.
-  mock Boolean @default(false)
+  mock       Boolean      @default(false)
 
   totalIssues Int @default(0) @map("total_issues")
   openIssues  Int @default(0) @map("open_issues")
@@ -568,33 +589,33 @@ model SiteAudit {
 // Destructive categories always require per-issue approval, even when the
 // category is allow-listed in FixAgentSettings.
 model SiteIssue {
-  id        String @id @default(cuid())
-  siteId    String @map("site_id")
-  site      Site   @relation(fields: [siteId], references: [id], onDelete: Cascade)
-  projectId String @map("project_id")
-  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  auditId   String? @map("audit_id")
+  id        String     @id @default(cuid())
+  siteId    String     @map("site_id")
+  site      Site       @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  projectId String     @map("project_id")
+  project   Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  auditId   String?    @map("audit_id")
   audit     SiteAudit? @relation(fields: [auditId], references: [id], onDelete: SetNull)
 
   // Category key from lib/audit/categories.ts (e.g. "missing-alt").
-  category String
-  severity IssueSeverity
-  filePath String  @map("file_path")
-  line     Int?
-  detail   String  @db.Text
-  fixHint  String? @map("fix_hint") @db.Text
+  category    String
+  severity    IssueSeverity
+  filePath    String        @map("file_path")
+  line        Int?
+  detail      String        @db.Text
+  fixHint     String?       @map("fix_hint") @db.Text
   // False when the agent cannot fix it (e.g. broken links need human intent).
-  autoFixable Boolean @default(true) @map("auto_fixable")
-  destructive Boolean @default(false)
+  autoFixable Boolean       @default(true) @map("auto_fixable")
+  destructive Boolean       @default(false)
 
-  status     SiteIssueStatus @default(open)
-  approvedBy String?   @map("approved_by")
-  approvedAt DateTime? @map("approved_at")
+  status       SiteIssueStatus @default(open)
+  approvedBy   String?         @map("approved_by")
+  approvedAt   DateTime?       @map("approved_at")
   // Dry-run preview of the change the agent WOULD apply (unified-diff-ish).
-  proposedDiff String? @map("proposed_diff") @db.Text
-  fixedAt DateTime? @map("fixed_at")
-  fixRunId String? @map("fix_run_id")
-  fixRun   FixRun? @relation(fields: [fixRunId], references: [id], onDelete: SetNull)
+  proposedDiff String?         @map("proposed_diff") @db.Text
+  fixedAt      DateTime?       @map("fixed_at")
+  fixRunId     String?         @map("fix_run_id")
+  fixRun       FixRun?         @relation(fields: [fixRunId], references: [id], onDelete: SetNull)
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -609,21 +630,21 @@ model SiteIssue {
 // (lib/sitefiles/crypto.ts) and NEVER sent to the client. Production note:
 // replace the env-key encryption with a KMS/vault before hosted SaaS launch.
 model SiteConnection {
-  id        String @id @default(cuid())
-  projectId String @map("project_id")
+  id        String  @id @default(cuid())
+  projectId String  @map("project_id")
   project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
-  label    String
-  host     String
-  port     Int    @default(22)
-  username String
-  authType SiteAuthType @default(password) @map("auth_type")
+  label      String
+  host       String
+  port       Int          @default(22)
+  username   String
+  authType   SiteAuthType @default(password) @map("auth_type")
   // AES-256-GCM encrypted secret (password or private key), base64. Server-only.
-  secretEnc String @map("secret_enc") @db.Text
+  secretEnc  String       @map("secret_enc") @db.Text
   // Non-sensitive hint shown in the UI, e.g. "••••a1b2" (sha256 prefix).
-  secretHint String? @map("secret_hint")
+  secretHint String?      @map("secret_hint")
   // Demo connections serve the deterministic mock file tree instead of SFTP.
-  demo Boolean @default(false)
+  demo       Boolean      @default(false)
 
   lastTestedAt DateTime? @map("last_tested_at")
   lastTestOk   Boolean?  @map("last_test_ok")
@@ -642,26 +663,26 @@ model SiteConnection {
 // file, when, and what changed. This log is the accountability backbone of
 // the supervised fix-agent rung.
 model FileChangeLog {
-  id        String @id @default(cuid())
+  id          String     @id @default(cuid())
   // Milestone 11: projectId is optional so workspace-scoped events (member
   // add/role change/remove) can be audit-logged without a project.
-  projectId String? @map("project_id")
-  project   Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId   String?    @map("project_id")
+  project     Project?   @relation(fields: [projectId], references: [id], onDelete: Cascade)
   // Milestone 11: workspace-scoped audit events.
-  workspaceId String? @map("workspace_id")
+  workspaceId String?    @map("workspace_id")
   workspace   Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
-  connectionId String? @map("connection_id")
+  connectionId String?          @map("connection_id")
   // Milestone 7: the Site (github/sftp/file) this change belongs to, when the
   // IDE is opened on a Site rather than a raw connection.
-  siteId       String? @map("site_id")
-  site         Site?   @relation(fields: [siteId], references: [id], onDelete: SetNull)
-  filePath     String  @map("file_path")
+  siteId       String?          @map("site_id")
+  site         Site?            @relation(fields: [siteId], references: [id], onDelete: SetNull)
+  filePath     String           @map("file_path")
   actor        FileChangeActor
   action       FileChangeAction
   summary      String
   // Auth user id who approved an AI proposal (null otherwise).
-  approvedBy String? @map("approved_by")
+  approvedBy   String?          @map("approved_by")
 
   createdAt DateTime @default(now()) @map("created_at")
 
@@ -675,25 +696,25 @@ model FileChangeLog {
 // plain uploaded/managed file set. Secrets live in configEnc (AES-256-GCM,
 // lib/sitefiles/crypto.ts) and are never sent to the client.
 model Site {
-  id        String @id @default(cuid())
-  projectId String @map("project_id")
+  id        String  @id @default(cuid())
+  projectId String  @map("project_id")
   project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
-  name       String
-  sourceType SiteSourceType @map("source_type")
+  name             String
+  sourceType       SiteSourceType  @map("source_type")
   // AES-256-GCM encrypted JSON config. GitHub: { token, owner, repo, branch, demo? }.
   // File/SFTP: {} (file) — SFTP reuses sftpConnectionId below.
-  configEnc String @map("config_enc") @db.Text
+  configEnc        String          @map("config_enc") @db.Text
   // Optional link to a milestone-6 connection for sftp-source sites.
-  sftpConnectionId String? @map("sftp_connection_id")
+  sftpConnectionId String?         @map("sftp_connection_id")
   sftpConnection   SiteConnection? @relation(fields: [sftpConnectionId], references: [id], onDelete: SetNull)
 
-  fileChangeLogs FileChangeLog[]
-  deployments    Deployment[]
+  fileChangeLogs   FileChangeLog[]
+  deployments      Deployment[]
   fixAgentSettings FixAgentSettings?
-  audits         SiteAudit[]
-  issues         SiteIssue[]
-  fixRuns        FixRun[]
+  audits           SiteAudit[]
+  issues           SiteIssue[]
+  fixRuns          FixRun[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -710,15 +731,15 @@ enum DeployTargetType {
 }
 
 model HostingConnection {
-  id        String @id @default(cuid())
-  projectId String @map("project_id")
+  id        String  @id @default(cuid())
+  projectId String  @map("project_id")
   project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   name      String
   target    DeployTargetType
   // AES-256-GCM encrypted JSON. Vercel: { token, projectId?, teamId?, demo? }.
   // Cloudflare: { token, accountId, projectName?, demo? }.
-  configEnc String @map("config_enc") @db.Text
+  configEnc String           @map("config_enc") @db.Text
 
   deployments Deployment[]
 
@@ -732,20 +753,20 @@ model HostingConnection {
 // Pages (milestone 9). Persisted so the UI shows URL + status + timestamp
 // without calling the provider each time. mock=true rows are demos.
 model Deployment {
-  id         String @id @default(cuid())
-  siteId     String @map("site_id")
-  site       Site @relation(fields: [siteId], references: [id], onDelete: Cascade)
-  projectId  String @map("project_id")
-  project    Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  id        String  @id @default(cuid())
+  siteId    String  @map("site_id")
+  site      Site    @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  projectId String  @map("project_id")
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
-  connectionId String? @map("connection_id")
+  connectionId String?            @map("connection_id")
   connection   HostingConnection? @relation(fields: [connectionId], references: [id], onDelete: SetNull)
 
   target       DeployTargetType
   url          String?
-  deploymentId String? @map("deployment_id")
-  status       String  @default("queued")
-  mock         Boolean @default(false)
+  deploymentId String?          @map("deployment_id")
+  status       String           @default("queued")
+  mock         Boolean          @default(false)
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -833,27 +854,27 @@ model AlertChannel {
 }
 
 model AlertRule {
-  id          String    @id @default(cuid())
-  workspaceId String    @map("workspace_id")
-  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  name        String
+  id           String    @id @default(cuid())
+  workspaceId  String    @map("workspace_id")
+  workspace    Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name         String
   // Trigger key — see lib/alerts/triggers.ts TRIGGERS:
   // rank_drop | rank_gain | ai_overview_change | ai_citation_change | fix_run |
   // report_ready | visibility_delta | content_decay | competitor_radar
-  trigger     String
+  trigger      String
   // JSON conditions, all optional:
   //   { projectIds?: string[], keywordIds?: string[], thresholdPositions?: number,
   //     severities?: string[], onlyTop10?: boolean }
-  conditions  Json      @default("{}")
+  conditions   Json      @default("{}")
   // Minimum seconds between fires of this rule for the same dedup scope.
-  cooldownSec Int       @default(3600) @map("cooldown_sec")
+  cooldownSec  Int       @default(3600) @map("cooldown_sec")
   // "immediate" — send now; "daily_digest" — batch into one message per day.
-  digest      String    @default("immediate")
+  digest       String    @default("immediate")
   // Optional quiet hours, UTC: { start: "22:00", end: "07:00" }. Events inside
   // the window are queued and flushed when the window ends.
-  quietHours  Json?     @map("quiet_hours")
-  enabled     Boolean   @default(true)
-  lastFiredAt DateTime? @map("last_fired_at")
+  quietHours   Json?     @map("quiet_hours")
+  enabled      Boolean   @default(true)
+  lastFiredAt  DateTime? @map("last_fired_at")
   lastDigestAt DateTime? @map("last_digest_at")
 
   channels AlertChannel[] @relation("AlertRuleChannels")
@@ -896,19 +917,19 @@ model AlertEvent {
 
 // Milestone 14: retention loops — AI search visibility per keyword check.
 model AIVisibilitySnapshot {
-  id        String   @id @default(cuid())
-  projectId String   @map("project_id")
-  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  keywordId String   @map("keyword_id")
-  keyword   Keyword  @relation(fields: [keywordId], references: [id], onDelete: Cascade)
+  id        String  @id @default(cuid())
+  projectId String  @map("project_id")
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  keywordId String  @map("keyword_id")
+  keyword   Keyword @relation(fields: [keywordId], references: [id], onDelete: Cascade)
 
   checkedAt         DateTime @default(now()) @map("checked_at")
   aiOverviewPresent Boolean  @default(false) @map("ai_overview_present")
   // Whether the project's own domain was cited inside the AI Overview/answer.
-  siteCited Boolean  @default(false) @map("site_cited")
-  citedUrl  String?  @map("cited_url")
-  serpFeatures String[] @default([]) @map("serp_features")
-  mock Boolean @default(false)
+  siteCited         Boolean  @default(false) @map("site_cited")
+  citedUrl          String?  @map("cited_url")
+  serpFeatures      String[] @default([]) @map("serp_features")
+  mock              Boolean  @default(false)
 
   @@index([projectId, checkedAt])
   @@index([keywordId, checkedAt])
@@ -917,28 +938,28 @@ model AIVisibilitySnapshot {
 
 // Milestone 14: content decay & refresh engine findings (grouped per ranking URL).
 model ContentDecayFinding {
-  id        String  @id @default(cuid())
-  projectId String  @map("project_id")
-  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  id        String   @id @default(cuid())
+  projectId String   @map("project_id")
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
   // Representative keyword (one finding may cover several phrases on the same URL).
   keywordId String?  @map("keyword_id")
   keyword   Keyword? @relation(fields: [keywordId], references: [id], onDelete: SetNull)
 
-  url String?
+  url             String?
   // Tracked phrases whose rankings decayed on this URL.
-  phrases String[] @default([])
+  phrases         String[]  @default([])
   // 0–100. See lib/retention/decay.ts for the formula.
-  decayScore Float @map("decay_score")
-  peakPosition    Int? @map("peak_position")
-  currentPosition Int? @map("current_position")
-  peakAt DateTime? @map("peak_at")
+  decayScore      Float     @map("decay_score")
+  peakPosition    Int?      @map("peak_position")
+  currentPosition Int?      @map("current_position")
+  peakAt          DateTime? @map("peak_at")
   // refresh_content | rebuild | internal_links
-  suggestedAction String @map("suggested_action")
-  severity String @default("info") // info | warn | critical
-  status   String @default("open") // open | actioned | dismissed
-  note     String?
-  detectedAt DateTime  @default(now()) @map("detected_at")
-  resolvedAt DateTime? @map("resolved_at")
+  suggestedAction String    @map("suggested_action")
+  severity        String    @default("info") // info | warn | critical
+  status          String    @default("open") // open | actioned | dismissed
+  note            String?
+  detectedAt      DateTime  @default(now()) @map("detected_at")
+  resolvedAt      DateTime? @map("resolved_at")
 
   @@index([projectId, status])
   @@map("content_decay_findings")
@@ -952,8 +973,8 @@ model CompetitorSnapshot {
   competitorDomain String   @map("competitor_domain")
   capturedAt       DateTime @default(now()) @map("captured_at")
   // [{ phrase, position, url, volume }] — top keywords from the SEO provider.
-  keywordsJson Json @map("keywords_json")
-  mock Boolean @default(false)
+  keywordsJson     Json     @map("keywords_json")
+  mock             Boolean  @default(false)
 
   @@index([projectId, competitorDomain, capturedAt])
   @@map("competitor_snapshots")
@@ -966,11 +987,11 @@ model CompetitorRadarEvent {
   project          Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
   competitorDomain String   @map("competitor_domain")
   // new_keyword | keyword_gain | new_page | lost_to_competitor
-  eventType     String  @map("event_type")
-  keywordPhrase String? @map("keyword_phrase")
-  details       Json
-  detectedAt DateTime @default(now()) @map("detected_at")
-  read       Boolean  @default(false)
+  eventType        String   @map("event_type")
+  keywordPhrase    String?  @map("keyword_phrase")
+  details          Json
+  detectedAt       DateTime @default(now()) @map("detected_at")
+  read             Boolean  @default(false)
 
   @@index([projectId, detectedAt])
   @@index([projectId, competitorDomain, detectedAt])
@@ -979,16 +1000,16 @@ model CompetitorRadarEvent {
 
 // Milestone 14: composite visibility score time series (daily).
 model VisibilityScore {
-  id        String   @id @default(cuid())
-  projectId String   @map("project_id")
-  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  id        String  @id @default(cuid())
+  projectId String  @map("project_id")
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   // Day bucket (UTC midnight).
-  date  DateTime
-  score Int // 0–100
+  date       DateTime
+  score      Int // 0–100
   // { rankings, aiPresence, freshness, coverage, weights } — components 0–100.
   components Json
-  mock Boolean @default(false)
+  mock       Boolean  @default(false)
 
   @@unique([projectId, date])
   @@index([projectId, date])
@@ -1004,8 +1025,8 @@ enum BacklinkStatus {
 
 // One backlink edge pointing at the project's domain (upserted per pull).
 model Backlink {
-  id        String @id @default(cuid())
-  projectId String @map("project_id")
+  id        String  @id @default(cuid())
+  projectId String  @map("project_id")
   project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   sourceDomain String  @map("source_domain")
@@ -1014,11 +1035,11 @@ model Backlink {
   anchorText   String? @map("anchor_text")
   dofollow     Boolean @default(true)
   // DataForSEO domain_from_rank (0–1000); used for lost-link alert priority.
-  sourceRank Int? @map("source_rank")
-  spamScore  Int? @map("spam_score")
+  sourceRank   Int?    @map("source_rank")
+  spamScore    Int?    @map("spam_score")
 
-  firstSeen DateTime? @map("first_seen")
-  lastSeen  DateTime? @map("last_seen")
+  firstSeen DateTime?      @map("first_seen")
+  lastSeen  DateTime?      @map("last_seen")
   status    BacklinkStatus @default(active)
 
   createdAt DateTime @default(now()) @map("created_at")
@@ -1032,18 +1053,18 @@ model Backlink {
 
 // Daily backlink profile snapshot (from backlinks/summary/live + pull stats).
 model BacklinkSummary {
-  id        String @id @default(cuid())
-  projectId String @map("project_id")
+  id        String  @id @default(cuid())
+  projectId String  @map("project_id")
   project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   // Day bucket (UTC midnight).
-  date DateTime
-  total           Int
-  referringDomains Int    @map("referring_domains")
-  dofollowRatio   Float? @map("dofollow_ratio")
+  date             DateTime
+  total            Int
+  referringDomains Int      @map("referring_domains")
+  dofollowRatio    Float?   @map("dofollow_ratio")
   // { active, lost, newThisPull, providerTotal, ... }
-  snapshot Json
-  mock Boolean @default(false)
+  snapshot         Json
+  mock             Boolean  @default(false)
 
   @@unique([projectId, date])
   @@index([projectId, date])
@@ -1052,22 +1073,22 @@ model BacklinkSummary {
 
 // Cost-accounting record for every backlink pull (preview + run).
 model BacklinkPull {
-  id          String @id @default(cuid())
-  workspaceId String @map("workspace_id")
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  projectId   String @map("project_id")
-  project     Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId   String    @map("project_id")
+  project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   // user | cron | system
-  actor String
-  target String
-  rowsRequested Int    @map("rows_requested")
-  rowsReturned  Int    @default(0) @map("rows_returned")
-  estimatedCostUsd Float @map("estimated_cost_usd")
-  actualCostUsd    Float? @map("actual_cost_usd")
+  actor            String
+  target           String
+  rowsRequested    Int     @map("rows_requested")
+  rowsReturned     Int     @default(0) @map("rows_returned")
+  estimatedCostUsd Float   @map("estimated_cost_usd")
+  actualCostUsd    Float?  @map("actual_cost_usd")
   // preview | completed | blocked_cap | blocked_limit | failed
-  status String @default("preview")
-  note   String?
+  status           String  @default("preview")
+  note             String?
 
   createdAt DateTime @default(now()) @map("created_at")
 
@@ -1085,17 +1106,17 @@ enum InternalLinkSuggestionStatus {
 // Supervised internal-linking suggestions (milestone 15). "Apply" creates an
 // Issue in the fix-agent inbox — pages are never auto-edited.
 model InternalLinkSuggestion {
-  id        String @id @default(cuid())
-  projectId String @map("project_id")
+  id        String  @id @default(cuid())
+  projectId String  @map("project_id")
   project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
-  sourceUrl       String @map("source_url")
-  targetUrl       String @map("target_url")
-  suggestedAnchor String @map("suggested_anchor")
+  sourceUrl       String                       @map("source_url")
+  targetUrl       String                       @map("target_url")
+  suggestedAnchor String                       @map("suggested_anchor")
   // orphan | high_value_underlinked | keyword_relevant
-  reason String
-  score  Int // 0–100
-  status InternalLinkSuggestionStatus @default(pending)
+  reason          String
+  score           Int // 0–100
+  status          InternalLinkSuggestionStatus @default(pending)
 
   createdAt DateTime  @default(now()) @map("created_at")
   decidedAt DateTime? @map("decided_at")
@@ -1121,16 +1142,16 @@ model LocalGrid {
   name         String
   keyword      String
   // Client's business name as shown on Google (matched per cell).
-  businessName String @map("business_name")
-  centerLat    Float  @map("center_lat")
-  centerLng    Float  @map("center_lng")
-  radiusMiles  Float  @default(5) @map("radius_miles")
+  businessName String    @map("business_name")
+  centerLat    Float     @map("center_lat")
+  centerLng    Float     @map("center_lng")
+  radiusMiles  Float     @default(5) @map("radius_miles")
   // Grid dimension (5 = 5×5 = 25 cells). Clamped 2–9 in lib/local/grid.ts.
-  gridSize  Int     @default(5) @map("grid_size")
+  gridSize     Int       @default(5) @map("grid_size")
   // manual | weekly
-  schedule  String  @default("weekly")
-  enabled   Boolean @default(true)
-  lastRunAt DateTime? @map("last_run_at")
+  schedule     String    @default("weekly")
+  enabled      Boolean   @default(true)
+  lastRunAt    DateTime? @map("last_run_at")
 
   createdAt DateTime @default(now()) @map("created_at")
 
@@ -1146,13 +1167,13 @@ model LocalGridResult {
   localGridId String    @map("local_grid_id")
   localGrid   LocalGrid @relation(fields: [localGridId], references: [id], onDelete: Cascade)
 
-  runAt DateTime @default(now()) @map("run_at")
+  runAt       DateTime @default(now()) @map("run_at")
   // GridCellResult[] JSON: [{ row, col, lat, lng, position, topBusiness }]
   cells       Json
-  coveragePct Float @map("coverage_pct")
-  avgPosition Float? @map("avg_position")
-  costUsd     Float  @default(0) @map("cost_usd")
-  mock        Boolean @default(false)
+  coveragePct Float    @map("coverage_pct")
+  avgPosition Float?   @map("avg_position")
+  costUsd     Float    @default(0) @map("cost_usd")
+  mock        Boolean  @default(false)
 
   @@index([localGridId, runAt])
   @@map("local_grid_results")
@@ -1169,9 +1190,9 @@ model LocalCompetitor {
   placeId      String? @map("place_id")
   domain       String?
   // Search center for the business-data lookup (defaults to a grid center).
-  lat     Float?
-  lng     Float?
-  enabled Boolean @default(true)
+  lat          Float?
+  lng          Float?
+  enabled      Boolean @default(true)
 
   lastSnapshotAt DateTime? @map("last_snapshot_at")
   createdAt      DateTime  @default(now()) @map("created_at")
@@ -1213,9 +1234,9 @@ model Review {
   publishedAt  DateTime?       @map("published_at")
   sentiment    ReviewSentiment @default(neu)
   // llm | heuristic — how the sentiment was classified.
-  sentimentVia String  @default("heuristic") @map("sentiment_via")
-  responded    Boolean @default(false)
-  mock         Boolean @default(false)
+  sentimentVia String          @default("heuristic") @map("sentiment_via")
+  responded    Boolean         @default(false)
+  mock         Boolean         @default(false)
 
   createdAt DateTime @default(now()) @map("created_at")
 
@@ -1257,21 +1278,106 @@ model LocalPull {
   project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   // user | cron | system
-  actor String
+  actor            String
   // geo_grid | competitor_refresh | reviews_ingest
-  kind           String
-  requestsMade   Int    @default(0) @map("requests_made")
-  estimatedCostUsd Float @map("estimated_cost_usd")
-  actualCostUsd    Float? @map("actual_cost_usd")
+  kind             String
+  requestsMade     Int     @default(0) @map("requests_made")
+  estimatedCostUsd Float   @map("estimated_cost_usd")
+  actualCostUsd    Float?  @map("actual_cost_usd")
   // preview | completed | blocked_cap | failed
-  status String @default("preview")
-  note   String?
+  status           String  @default("preview")
+  note             String?
 
   createdAt DateTime @default(now()) @map("created_at")
 
   @@index([workspaceId, createdAt])
   @@index([projectId, createdAt])
   @@map("local_pulls")
+}
+
+// Programmatic SEO builder (milestone 17).
+// Template: URL/title/description/content patterns with {{variables}} that
+// get multiplied across dataset rows into individual pages.
+model ProgrammaticTemplate {
+  id        String  @id @default(cuid())
+  projectId String  @map("project_id")
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  name                String
+  // e.g. /services/{{city}}/{{service}} ({var} single-brace form also accepted)
+  urlPattern          String @map("url_pattern")
+  titleTemplate       String @map("title_template") @db.Text
+  descriptionTemplate String @map("description_template") @db.Text
+  // Tiptap JSON doc; leaf text may contain {{variables}}.
+  contentBlocks       Json   @map("content_blocks")
+
+  // Quality gates (enforced server-side on approve/publish).
+  minWordCount         Int     @default(300) @map("min_word_count")
+  // Max share of pages allowed to share an identical content hash (0-1).
+  duplicateRateCap     Float   @default(0.05) @map("duplicate_rate_cap")
+  // New pages start noindex until published.
+  noindexUntilApproved Boolean @default(true) @map("noindex_until_approved")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  pages ProgrammaticPage[]
+
+  @@map("programmatic_templates")
+}
+
+model ProgrammaticDataset {
+  id        String  @id @default(cuid())
+  projectId String  @map("project_id")
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  name          String
+  // Column names in upload order.
+  schema        Json
+  // Array of { [column]: value } objects. Capped at 10_000 rows server-side.
+  rows          Json
+  rowCount      Int    @map("row_count")
+  // variable -> column name overrides; auto-mapped by default.
+  columnMapping Json?  @map("column_mapping")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  pages ProgrammaticPage[]
+
+  @@map("programmatic_datasets")
+}
+
+model ProgrammaticPage {
+  id         String               @id @default(cuid())
+  projectId  String               @map("project_id")
+  project    Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  templateId String               @map("template_id")
+  template   ProgrammaticTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  datasetId  String?              @map("dataset_id")
+  dataset    ProgrammaticDataset? @relation(fields: [datasetId], references: [id], onDelete: SetNull)
+
+  rowIndex     Int                    @map("row_index")
+  // Substituted URL path, e.g. /services/austin/plumbing
+  url          String
+  slug         String
+  status       ProgrammaticPageStatus @default(draft)
+  // { title, description, contentBlocks (Tiptap doc), wordCount }
+  content      Json?
+  contentHash  String?                @map("content_hash")
+  noindex      Boolean                @default(true)
+  canonical    String?
+  // string[] quality flags: missing_variable | thin_content | duplicate_content | slug_collision
+  qualityFlags Json                   @default("[]") @map("quality_flags")
+  publishedUrl String?                @map("published_url")
+  publishedAt  DateTime?              @map("published_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([templateId, slug])
+  @@index([projectId, status])
+  @@map("programmatic_pages")
 }
 
 // Google Business Profile management scaffold (milestone 16).
@@ -1299,9 +1405,9 @@ model GbpPost {
   gbpAccountId String     @map("gbp_account_id")
   gbpAccount   GbpAccount @relation(fields: [gbpAccountId], references: [id], onDelete: Cascade)
 
-  locationId String @map("location_id")
-  title      String
-  summary    String
+  locationId  String    @map("location_id")
+  title       String
+  summary     String
   // draft | scheduled | published | failed
   status      String    @default("draft")
   scheduledAt DateTime? @map("scheduled_at")
@@ -1318,14 +1424,14 @@ model GbpInsight {
   gbpAccountId String     @map("gbp_account_id")
   gbpAccount   GbpAccount @relation(fields: [gbpAccountId], references: [id], onDelete: Cascade)
 
-  locationId       String   @map("location_id")
-  date             DateTime
-  views            Int      @default(0)
-  searches         Int      @default(0)
-  directionRequests Int     @default(0) @map("direction_requests")
-  calls            Int      @default(0)
-  websiteClicks    Int      @default(0) @map("website_clicks")
-  mock             Boolean  @default(false)
+  locationId        String   @map("location_id")
+  date              DateTime
+  views             Int      @default(0)
+  searches          Int      @default(0)
+  directionRequests Int      @default(0) @map("direction_requests")
+  calls             Int      @default(0)
+  websiteClicks     Int      @default(0) @map("website_clicks")
+  mock              Boolean  @default(false)
 
   @@unique([gbpAccountId, locationId, date])
   @@map("gbp_insights")

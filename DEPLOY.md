@@ -27,12 +27,13 @@ Internet → Caddy (auto-HTTPS reverse proxy) → app:3000 (Next.js standalone)
 ### 1a. Gap to fix before deploy (small code change, spec'd here)
 
 `docker-compose.yml` currently has **no volume for `.data/`** — site working copies (M7),
-fix-agent snapshots (M10), and report PDFs + brand-kit logos (M12) live on the container's
-writable layer. They survive restarts but are lost on `compose down` / rebuild. Before deploy:
+fix-agent snapshots (M10), report PDFs + brand-kit logos (M12), and programmatic-SEO
+sitemaps (M17, `.data/sitemaps`, unless `SITEMAP_STORAGE_DIR` points elsewhere) live on the
+container's writable layer. They survive restarts but are lost on `compose down` / rebuild. Before deploy:
 
 1. Add a named volume: `marketr-data:/app/.data` on the `app` service.
-2. Set `SITE_STORAGE_DIR=/app/.data/sites`, `FIX_SNAPSHOT_DIR=/app/.data/fix-snapshots`, and
-   `REPORT_STORAGE_DIR=/app/.data/reports` in `.env`.
+2. Set `SITE_STORAGE_DIR=/app/.data/sites`, `FIX_SNAPSHOT_DIR=/app/.data/fix-snapshots`,
+   `REPORT_STORAGE_DIR=/app/.data/reports`, and `SITEMAP_STORAGE_DIR=/app/.data/sitemaps` in `.env`.
 3. Rebuild and confirm a site working copy survives `docker compose down && docker compose up -d`.
 
 ## 2. Pre-flight — what Tico provides
@@ -59,10 +60,11 @@ them over via the Secure Vault flow and Z7 writes them server-side.
    no GitHub remote is created).
 4. **Env:** copy `.env.example` → `.env`, fill §2 items 3–7. `chmod 600 .env`.
 5. **Data volume fix:** apply §1a, then `docker compose up -d --build`.
-6. **Migrations:** watch boot logs — `npx prisma migrate deploy` must apply all 13 migrations cleanly
-   (`..._init` → `..._local_seo`). The M15 (`..._backlinks_internal_links`) and M16 (`..._local_seo`)
-   migrations are hand-written (no PostgreSQL in the sandbox build environment) — review them
-   carefully before deploy. Verify with `docker compose exec db psql -U marketr -c "\dt"`.
+6. **Migrations:** watch boot logs — `npx prisma migrate deploy` must apply all 14 migrations cleanly
+   (`..._init` → `..._programmatic_seo`). The M15 (`..._backlinks_internal_links`), M16
+   (`..._local_seo`), and M17 (`..._programmatic_seo`) migrations are hand-written (no
+   PostgreSQL in the sandbox build environment) — review them carefully before deploy.
+   Verify with `docker compose exec db psql -U marketr -c "\dt"`.
 7. **Caddy:** reverse-proxy `marketr.launchabl.com` → `localhost:3000`, auto-TLS. Confirm HTTPS.
 8. **Cron (host crontab):**
    - `0 6 * * * curl -s -X POST -H "Authorization: Bearer $CRON_SECRET" https://marketr.launchabl.com/api/rankings/check -d '{"scope":"all"}'`
