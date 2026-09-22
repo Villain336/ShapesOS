@@ -33,6 +33,42 @@ function encryptionKey(): Buffer {
   );
 }
 
+/**
+ * Strict canonical-base64 check.
+ *
+ * Node's base64 decoder is lenient — bytes outside the base64 alphabet are
+ * silently dropped, and non-zero padding bits are ignored. On an
+ * authenticated envelope that leniency is a tamper-DETECTION hole: a
+ * corruption that lands in the tag's trailing padding (e.g. "…==" →
+ * "…<0xa6><0x9a>") would otherwise decode to the original 16-byte tag and
+ * GCM would still verify, so the tamper would go undetected. Forging a
+ * *different* payload was never possible (the ciphertext is authenticated),
+ * but we want tamper rejection to be total.
+ *
+ * This rejects non-canonical input BEFORE decoding: non-alphabet characters,
+ * any whitespace, wrong/missing padding, and bad length (mod 4). The
+ * canonical re-encode round-trip additionally rejects non-zero padding bits
+ * and any other non-canonical encoding the lenient decoder would silently
+ * accept.
+ *
+ * Safe for existing data: every envelope is produced by encryptSecret()
+ * via Buffer.toString("base64"), which always emits canonical base64, so
+ * strict validation never rejects legitimately stored envelopes. An empty
+ * ciphertext part is permitted (it round-trips an empty plaintext).
+ */
+const B64_STD_RE = /^[A-Za-z0-9+/]*={0,2}$/;
+
+function assertCanonicalBase64(part: string): Buffer {
+  if (part.length % 4 !== 0 || !B64_STD_RE.test(part)) {
+    throw new Error("Unrecognized credential format");
+  }
+  const buf = Buffer.from(part, "base64");
+  if (buf.toString("base64") !== part) {
+    throw new Error("Unrecognized credential format");
+  }
+  return buf;
+}
+
 /** Encrypt a plaintext secret. Returns "v1:iv:ciphertext:tag" (base64 parts). */
 export function encryptSecret(plaintext: string): string {
   const key = encryptionKey();
@@ -51,19 +87,35 @@ export function encryptSecret(plaintext: string): string {
   ].join(":");
 }
 
-/** Decrypt a value produced by encryptSecret(). */
+/**
+ * Decrypt a value produced by encryptSecret().
+ *
+ * The envelope structure and every base64 part are strictly validated
+ * BEFORE any decoding or decryption: exactly 4 colon-separated parts with a
+ * "v1" version, canonical base64 parts, a 12-byte IV, and a 16-byte auth
+ * tag. (An empty ciphertext part is allowed — it round-trips an empty
+ * plaintext.) Tampered or corrupted envelopes are rejected here — never
+ * silently repaired by the lenient decoder.
+ */
 export function decryptSecret(enc: string): string {
-  const [version, ivB64, ctB64, tagB64] = enc.split(":");
-  if (version !== "v1" || !ivB64 || !ctB64 || !tagB64) {
+  const parts = enc.split(":");
+  if (parts.length !== 4 || parts[0] !== "v1") {
+    throw new Error("Unrecognized credential format");
+  }
+  const [, ivB64, ctB64, tagB64] = parts;
+  const iv = assertCanonicalBase64(ivB64);
+  const ct = assertCanonicalBase64(ctB64);
+  const tag = assertCanonicalBase64(tagB64);
+  if (iv.length !== 12) {
+    throw new Error("Unrecognized credential format");
+  }
+  if (tag.length !== 16) {
     throw new Error("Unrecognized credential format");
   }
   const key = encryptionKey();
-  const decipher = createDecipheriv(ALGO, key, Buffer.from(ivB64, "base64"));
-  decipher.setAuthTag(Buffer.from(tagB64, "base64"));
-  return (
-    decipher.update(Buffer.from(ctB64, "base64"), undefined, "utf8") +
-    decipher.final("utf8")
-  );
+  const decipher = createDecipheriv(ALGO, key, iv);
+  decipher.setAuthTag(tag);
+  return decipher.update(ct, undefined, "utf8") + decipher.final("utf8");
 }
 
 /**
