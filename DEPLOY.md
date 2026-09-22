@@ -61,10 +61,10 @@ them over via the Secure Vault flow and Z7 writes them server-side.
    no GitHub remote is created).
 4. **Env:** copy `.env.example` → `.env`, fill §2 items 3–9. `chmod 600 .env`.
 5. **Data volume fix:** apply §1a, then `docker compose up -d --build`.
-6. **Migrations:** watch boot logs — `npx prisma migrate deploy` must apply all 16 migrations cleanly
-   (`..._init` → `..._newsletter_builder`). The M15 (`..._backlinks_internal_links`), M16
-   (`..._local_seo`), M17 (`..._programmatic_seo`), M18 (`..._content_autopilot`), and M19
-   (`..._newsletter_builder`)
+6. **Migrations:** watch boot logs — `npx prisma migrate deploy` must apply all 17 migrations cleanly
+   (`..._init` → `..._social_scheduling`). The M15 (`..._backlinks_internal_links`), M16
+   (`..._local_seo`), M17 (`..._programmatic_seo`), M18 (`..._content_autopilot`), M19
+   (`..._newsletter_builder`), and M20 (`..._social_scheduling`)
    migrations are hand-written (no PostgreSQL in the sandbox build environment) — review
    them carefully before deploy.
    Verify with `docker compose exec db psql -U marketr -c "\dt"`.
@@ -84,6 +84,7 @@ them over via the Secure Vault flow and Z7 writes them server-side.
    - `0 12 * * 1 curl -s -X POST -H "Authorization: Bearer $CRON_SECRET" https://marketr.launchabl.com/api/cron/reviews` (milestone 16: weekly review ingest + sentiment summaries + negative-review alerts)
    - `0 7 * * * curl -s -X POST -H "Authorization: Bearer $CRON_SECRET" https://marketr.launchabl.com/api/cron/autopilot` (milestone 18: daily sweep; runs only daily/weekly rules whose cadence is due; kill switch, per-run item cap, idempotency, and the approval gate are enforced server-side)
    - `*/5 * * * * curl -s -X POST -H "Authorization: Bearer $CRON_SECRET" https://marketr.launchabl.com/api/cron/newsletter` (milestone 19: every-5-minutes sweep for due scheduled newsletter broadcasts; send guardrails — verified domain, completed test send, ≥1 subscriber, unsubscribe link — are re-enforced at dispatch; failures audit-log + fire an M13 alert)
+   - `*/5 * * * * curl -s -X POST -H "Authorization: Bearer $CRON_SECRET" https://marketr.launchabl.com/api/cron/social` (milestone 20: every-5-minutes sweep for due scheduled social posts; dispatches to Buffer (their queue publishes), bounded retries on transient failures, per-channel validation + idempotency enforced server-side; permanent failures audit-log + fire an M13 alert)
 9. **Smoke test:** log in, create workspace + project, confirm pages load, no console errors.
 10. **Backups:** nightly `pg_dump` cron → object storage; document restore command.
 

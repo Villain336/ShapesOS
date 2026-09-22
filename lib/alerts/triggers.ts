@@ -154,6 +154,14 @@ export const TRIGGERS: TriggerDef[] = [
     dedupAvailable: true,
     live: true, // milestone 19: emitted by the newsletter service.
   },
+  {
+    key: "social_post_failed",
+    label: "Social post failed",
+    description: "A social post failed to dispatch to Buffer after bounded retries (or hit a permanent error).",
+    conditionKeys: ["projectIds"],
+    dedupAvailable: true,
+    live: true, // milestone 20: emitted by the social service.
+  },
 ];
 
 export function triggerDef(key: string): TriggerDef | undefined {

@@ -184,6 +184,20 @@ enum FileChangeAction {
   newsletter_broadcast_failed
   newsletter_broadcast_cancelled
   newsletter_resend_key_updated
+  // Milestone 20: social scheduling via Buffer.
+  social_buffer_key_updated
+  social_buffer_key_revoked
+  social_channels_synced
+  social_channel_enabled
+  social_channel_disabled
+  social_post_created
+  social_post_updated
+  social_post_scheduled
+  social_post_sent
+  social_post_failed
+  social_post_cancelled
+  social_post_deleted
+  social_analytics_synced
 }
 
 enum ProgrammaticPageStatus {
@@ -237,6 +251,8 @@ model Workspace {
   // Milestone 19: newsletter settings (BYO Resend key) and sending domains.
   newsletterSettings   NewsletterSettings?
   newsletterDomains    NewsletterDomain[]
+  // Milestone 20: social scheduling (BYO Buffer access token).
+  socialSettings       SocialSettings?
   // Milestone 14: composite visibility score weights per workspace.
   // { rankings?: number, aiPresence?: number, freshness?: number, coverage?: number }
   // Null = defaults in lib/retention/visibility-score.ts.
@@ -276,6 +292,9 @@ model Project {
   newsletterLists         NewsletterList[]
   newsletterTemplates     NewsletterTemplate[]
   newsletterBroadcasts    NewsletterBroadcast[]
+  // Milestone 20: social channels and posts.
+  socialChannels          SocialChannel[]
+  socialPosts             SocialPost[]
   competitors             Competitor[]
   contentItems            ContentItem[]
   issues                  Issue[]
@@ -1816,4 +1835,73 @@ model NewsletterBroadcast {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("newsletter_broadcasts")
+}
+
+// Marketr — social scheduling via Buffer (milestone 20).
+model SocialSettings {
+  id              String    @id @default(cuid())
+  workspaceId     String    @unique @map("workspace_id")
+  workspace       Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  // Buffer access token, encrypted at rest (BYO credential, like Resend in M19).
+  bufferTokenEnc  String?   @map("buffer_token_enc")
+  bufferTokenHint String?   @map("buffer_token_hint")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("social_settings")
+}
+
+enum SocialPostStatus {
+  draft
+  scheduled
+  sent
+  failed
+  cancelled
+}
+
+// A Buffer profile (channel) synced into a project. enable/disable is per project.
+model SocialChannel {
+  id              String  @id @default(cuid())
+  projectId       String  @map("project_id")
+  project         Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  bufferProfileId String  @map("buffer_profile_id")
+  // Normalized service key (twitter, instagram, tiktok, linkedin, facebook,
+  // threads, youtube, bluesky, pinterest) or the raw Buffer service string.
+  service         String
+  handle          String?
+  enabled         Boolean @default(true)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([projectId, bufferProfileId])
+  @@map("social_channels")
+}
+
+model SocialPost {
+  id        String  @id @default(cuid())
+  projectId String  @map("project_id")
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  // SocialContent JSON (text, per-channel overrides, media, link, utm).
+  content         Json
+  // Target service keys, e.g. ["twitter", "linkedin"].
+  services        String[]
+  scheduledFor    DateTime?        @map("scheduled_for")
+  status          SocialPostStatus @default(draft)
+  // Idempotency record: [{ channelId, profileId, updateId, service }].
+  bufferUpdateIds Json             @default("[]") @map("buffer_update_ids")
+  // Bounded retry bookkeeping for transient Buffer failures.
+  attempts        Int              @default(0)
+  nextAttemptAt   DateTime?        @map("next_attempt_at")
+  error           String?
+  // Cached analytics payload: { byChannel, totals, syncedAt }.
+  stats           Json             @default("{}")
+  statsSyncedAt   DateTime?        @map("stats_synced_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("social_posts")
 }
