@@ -7,7 +7,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import {
-  Robot,
+  TrendUp,
   ChatCentered,
   Plus,
   Trash,
@@ -284,7 +284,7 @@ export default function AiChatPanel({
                 {messages.length === 0 && !sending ? (
                   <div className="flex flex-col items-center pt-16 text-center">
                     <span className="flex size-12 items-center justify-center rounded-full bg-ink text-page">
-                      <Robot className="size-6" weight="duotone" />
+                      <TrendUp className="size-6" weight="duotone" />
                     </span>
                     <h2 className="display-serif mt-4 text-[24px] font-medium text-ink">
                       Ask Marketr to do the work

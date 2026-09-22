@@ -4,7 +4,7 @@
 import Link from "next/link";
 import {
   ArrowLeft,
-  Robot,
+  Rocket,
   CodeSimple,
   Crosshair,
   FileText,
@@ -21,7 +21,7 @@ import {
   Palette,
   Target,
   ShareNetwork,
-  Sparkle,
+  Quotes,
   TrendDown,
   TrendUp,
   Lightning,
@@ -56,7 +56,7 @@ const EXPLORE_SECTIONS: { title: string; links: ExploreLink[] }[] = [
       { href: "keywords", label: "Keyword research", description: "Find terms worth ranking for", icon: Key },
       { href: "competitors", label: "Competitor gaps", description: "What rivals rank for that you don't", icon: Crosshair },
       { href: "rankings", label: "Rank tracking", description: "Watch positions move day by day", icon: TrendUp },
-      { href: "ai-search", label: "AI search", description: "Track citations in AI answers", icon: Sparkle },
+      { href: "ai-search", label: "AI search", description: "Track citations in AI answers", icon: Quotes },
       { href: "radar", label: "Competitor radar", description: "Get alerted when rivals move", icon: Target },
       { href: "backlinks", label: "Backlinks", description: "Links pointing at your domain", icon: LinkSimple },
     ],
@@ -66,7 +66,7 @@ const EXPLORE_SECTIONS: { title: string; links: ExploreLink[] }[] = [
     links: [
       { href: "content", label: "Content engine", description: "Briefs, drafts, and published pieces", icon: FileText },
       { href: "decay", label: "Content decay", description: "Pages losing traffic, and why", icon: TrendDown },
-      { href: "autopilot", label: "Content autopilot", description: "Supervised runs that refresh and fix", icon: Robot },
+      { href: "autopilot", label: "Content autopilot", description: "Supervised runs that refresh and fix", icon: Rocket },
       { href: "newsletter", label: "Newsletter", description: "Broadcasts and subscriber lists", icon: Envelope },
       { href: "social", label: "Social", description: "Scheduled posts across channels", icon: ShareNetwork },
     ],

@@ -5,7 +5,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Robot, Users } from "@phosphor-icons/react";
+import { ArrowLeft, TrendUp, Users } from "@phosphor-icons/react";
 import { Tabs, TabsContent } from "@/components/vault/shadcn/tabs";
 import AiChatPanel from "./AiChatPanel";
 import TeamChatPanel from "./TeamChatPanel";
@@ -51,7 +51,7 @@ export default function ChatTabs({
         >
           {(
             [
-              { value: "ai", label: "AI Assistant", Icon: Robot },
+              { value: "ai", label: "AI Assistant", Icon: TrendUp },
               { value: "team", label: "Team chat", Icon: Users },
             ] as const
           ).map(({ value, label, Icon }) => {

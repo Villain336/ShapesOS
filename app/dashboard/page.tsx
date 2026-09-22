@@ -11,9 +11,8 @@ import {
   Kanban,
   Key,
   Crosshair,
-  Robot,
+  Rocket,
   ShieldCheck,
-  Sparkle,
   TrendUp,
   Warning,
 } from "@/components/vault/phosphor";
@@ -195,7 +194,7 @@ export default async function DashboardPage() {
     }
     if (pendingApprovals === 0 && recentRuns.length === 0) {
       suggestions.push({
-        icon: <Robot className="size-4" weight="duotone" />,
+        icon: <Rocket className="size-4" weight="duotone" />,
         text: "Put refreshes and fixes on autopilot with supervised runs.",
         href: `/dashboard/projects/${projects[0]!.id}/autopilot`,
         cta: "Set up autopilot",
@@ -245,7 +244,7 @@ export default async function DashboardPage() {
             href={`/dashboard/projects/${projects[0]!.id}/chat`}
             className="pressable inline-flex items-center gap-2 rounded-full bg-accent px-4 py-2 text-[13.5px] font-medium text-white transition-colors hover:bg-accent-hover"
           >
-            <Sparkle className="size-4" weight="duotone" />
+            <TrendUp className="size-4" weight="duotone" />
             Ask Marketr AI
           </Link>
         ) : null}

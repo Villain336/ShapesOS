@@ -162,7 +162,7 @@ async function checkProject(projectId: string): Promise<CheckResult> {
         trigger: "ai_overview_change",
         severity: "info" as const,
         title: aiNow
-          ? `✨ AI Overviews now appearing for "${kw.phrase}"`
+          ? `AI Overviews now appearing for "${kw.phrase}"`
           : `AI Overviews no longer appearing for "${kw.phrase}"`,
         body: `Google AI Overview presence for "${kw.phrase}" changed to ${aiNow ? "present" : "absent"} on the latest SERP check.`,
         link: `/dashboard/projects/${projectId}/ai-search`,
@@ -179,7 +179,7 @@ async function checkProject(projectId: string): Promise<CheckResult> {
         trigger: "ai_citation_change",
         severity: (aiChanges.citationGained ? "info" : "warn") as "info" | "warn",
         title: aiChanges.citationGained
-          ? `✨ "${kw.phrase}" — your site is now cited in the AI answer`
+          ? `"${kw.phrase}" — your site is now cited in the AI answer`
           : `⚠️ "${kw.phrase}" — your site lost its AI answer citation`,
         body: aiChanges.citationGained
           ? `${project.domain} is now cited inside the AI answer for "${kw.phrase}".`

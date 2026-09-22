@@ -23,7 +23,7 @@ import {
   ArrowClockwise,
   PaperPlane,
   GearSix,
-  Sparkle,
+  Lightning,
   Trash,
   Wallet,
   X,
@@ -352,7 +352,7 @@ export default function AdFactory({ projectId, campaigns: initial, brandKits, se
 
   const tabs: { key: Tab; label: string; icon: React.ReactNode }[] = [
     { key: "campaigns", label: "Campaigns", icon: <Megaphone className="h-4 w-4" /> },
-    { key: "generate", label: "Generate", icon: <Sparkle className="h-4 w-4" /> },
+    { key: "generate", label: "Generate", icon: <Lightning className="h-4 w-4" /> },
     { key: "gallery", label: "Gallery", icon: <ImageIcon className="h-4 w-4" /> },
     { key: "settings", label: "Settings", icon: <GearSix className="h-4 w-4" /> },
   ];
@@ -643,7 +643,7 @@ export default function AdFactory({ projectId, campaigns: initial, brandKits, se
                 disabled={busy || !canEdit || !activeCampaign || !activeCampaign.brandKitId || !settings.connected || settings.spend.atCap}
                 className={btnPrimary}
               >
-                {busy ? <CircleNotch className="h-4 w-4 animate-spin" /> : <Sparkle className="h-4 w-4" />}
+                {busy ? <CircleNotch className="h-4 w-4 animate-spin" /> : <Lightning className="h-4 w-4" />}
                 Generate {variants} variant{variants === 1 ? "" : "s"} (~{dollars(liveEstimate)})
               </button>
               <p className="text-xs text-zinc-500">

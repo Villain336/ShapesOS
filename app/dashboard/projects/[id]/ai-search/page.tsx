@@ -98,7 +98,7 @@ export default async function AISearchPage({ params }: { params: Promise<{ id: s
               {summary.perKeyword.map((k) => (
                 <tr key={k.keywordId} className="border-t border-zinc-200">
                   <td className="py-2 pr-4">{k.phrase}</td>
-                  <td className="py-2 pr-4">{k.aiOverviewPresent ? "✨ yes" : <span className="text-zinc-500">—</span>}</td>
+                  <td className="py-2 pr-4">{k.aiOverviewPresent ? <span className="font-medium text-ink">Yes</span> : <span className="text-zinc-500">—</span>}</td>
                   <td className="py-2 pr-4">
                     {k.siteCited ? (
                       <span className="text-emerald-600">

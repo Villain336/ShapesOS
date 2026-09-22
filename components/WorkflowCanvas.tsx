@@ -35,7 +35,7 @@ import {
   Target,
   Leaf,
   WebhooksLogo,
-  Sparkle,
+  Lightning,
   Scan,
   LinkSimple,
   Bell,
@@ -176,8 +176,10 @@ interface ServerRun {
 }
 
 const ICONS: Record<string, typeof Play> = {
-  Play, Clock, TrendDown, Target, Leaf, WebhooksLogo, Sparkle, Scan, LinkSimple,
+  Play, Clock, TrendDown, Target, Leaf, WebhooksLogo, Lightning, Scan, LinkSimple,
   Bell, ChartBar, Rocket, ShieldCheck, GitFork, Timer,
+  // Legacy alias: pre-redesign workflows stored the "Sparkle" icon name.
+  Sparkle: Lightning,
 };
 
 /* Kind tiles — icons are always warm ink (never orange/red); kind is

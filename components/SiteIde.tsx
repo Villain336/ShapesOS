@@ -806,7 +806,7 @@ export default function SiteIde({
                   </div>
                   <div className="shrink-0 text-right text-xs text-zinc-500">
                     <div>{shortTime(e.createdAt)}</div>
-                    <div className="mt-0.5">{e.actor === "ai" ? "🤖 AI" : "👤 you"}{e.approvedBy ? " · approved by you" : ""}</div>
+                    <div className="mt-0.5">{e.actor === "ai" ? "AI" : "you"}{e.approvedBy ? " · approved by you" : ""}</div>
                   </div>
                 </div>
               ))}
@@ -882,7 +882,7 @@ export default function SiteIde({
           {/* AI assistant */}
           <div className="col-span-3 flex max-h-[640px] flex-col rounded-lg border border-zinc-200 bg-zinc-50">
             <div className="border-b border-zinc-200 px-3 py-2">
-              <h2 className="text-sm font-semibold text-zinc-800">🤖 AI assistant</h2>
+              <h2 className="text-sm font-semibold text-zinc-800">AI assistant</h2>
               <p className="text-[11px] text-zinc-500">Proposes diffs. Nothing is written until you click Apply.</p>
             </div>
 

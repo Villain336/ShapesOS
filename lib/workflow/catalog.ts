@@ -102,7 +102,7 @@ export const NODE_CATALOG: Record<WorkflowNodeKind, NodeTypeDef[]> = {
       type: "generate_draft",
       label: "Generate content draft",
       description: "Run the content engine (M4) and enqueue a pending autopilot item.",
-      icon: "Sparkle",
+      icon: "Lightning",
       defaultLabel: "Generate draft",
       defaultConfig: { topic: "", brief: "" },
       fields: [
