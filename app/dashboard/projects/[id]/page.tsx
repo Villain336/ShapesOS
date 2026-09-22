@@ -168,6 +168,12 @@ export default async function ProjectPage({
         >
           Ad factory →
         </Link>
+        <Link
+          href={`/dashboard/projects/${project.id}/studio`}
+          className="rounded-md border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-200 hover:border-zinc-500"
+        >
+          Studio →
+        </Link>
       </div>
 
       <VisibilityScoreWidget projectId={project.id} />

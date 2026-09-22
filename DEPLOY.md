@@ -61,10 +61,11 @@ them over via the Secure Vault flow and Z7 writes them server-side.
    no GitHub remote is created).
 4. **Env:** copy `.env.example` → `.env`, fill §2 items 3–9. `chmod 600 .env`.
 5. **Data volume fix:** apply §1a, then `docker compose up -d --build`.
-6. **Migrations:** watch boot logs — `npx prisma migrate deploy` must apply all 18 migrations cleanly
-   (`..._init` → `..._social_scheduling`). The M15 (`..._backlinks_internal_links`), M16
+6. **Migrations:** watch boot logs — `npx prisma migrate deploy` must apply all 19 migrations cleanly
+   (`..._init` → `..._studio_domains`). The M15 (`..._backlinks_internal_links`), M16
    (`..._local_seo`), M17 (`..._programmatic_seo`), M18 (`..._content_autopilot`), M19
-   (`..._newsletter_builder`), and M20 (`..._social_scheduling`)
+   (`..._newsletter_builder`), M20 (`..._social_scheduling`), and M22
+   (`..._studio_domains`)
    migrations are hand-written (no PostgreSQL in the sandbox build environment) — review
    them carefully before deploy.
    Verify with `docker compose exec db psql -U marketr -c "\dt"`.
@@ -108,6 +109,15 @@ Run in order; each step must pass before the next.
 - [ ] **Audit log review:** confirm credential changes, deploys, fix-agent runs, and role changes all appear.
 - [ ] **Newsletter (live Resend, BYO key):** add a workspace Resend key, add a sending domain, copy the SPF/DKIM/DMARC records into DNS, verify the domain, import a 3-address CSV list, build a template from a starter, send a test email, then send a real broadcast to the test list; confirm the unsubscribe link works, the webhook flips a bounced address, and the audit log + alert fire on a forced failure.
 - [ ] **Cron:** trigger both cron endpoints manually with `CRON_SECRET`, confirm 200s and expected side effects.
+- [ ] **Studio (Canva, mock-first → live):** connect Canva via OAuth (confirm the
+  identity check binds the right user), search designs, export one PNG and import
+  it into the asset library, autofill a brand template with brand-kit prefill.
+  Confirm plan-limitation messaging on a plan without brand templates.
+- [ ] **Studio (Porkbun domains, sandbox only):** with sandbox/dry-run keys, save
+  keys, search availability, view TLD pricing, save a registrant, preview a
+  purchase, confirm it with the terms checkbox — confirm the domain row lands
+  `registered` with nameservers + audit entries. Never run a production purchase
+  during verification.
 
 ## 4b. Ad factory environment requirements (milestone 21)
 
@@ -125,6 +135,44 @@ Run in order; each step must pass before the next.
 - Live check: add a key, create a campaign with a brand kit, generate 1 image variant, confirm it
   reaches `ready`, approve it, send it to social, confirm the post draft appears in the social studio
   and the spend summary increments.
+
+## 4c. Studio environment requirements (milestone 22: Canva Connect + Porkbun domains)
+
+- `CANVA_CLIENT_ID` / `CANVA_CLIENT_SECRET` (in `.env`): from the Canva developer
+  portal (https://www.canva.com/developers). Redirect URI must be
+  `https://<your-domain>/api/studio/canva/callback`. Request the scopes
+  `design:content:read`, `design:meta:read`, `brand_template:read`,
+  `design:content:write`, `asset:read`, `folder:read`.
+- **Canva caveats:** public integrations may require Canva review/approval before
+  other users can connect. Brand-template/autofill availability depends on the
+  connected Canva plan (Pro/Teams/Enterprise typically) — the UI says so when no
+  templates are visible. The exact OAuth token URL, export job shapes, folder
+  listing, and autofill semantics were coded from public docs; confirm the first
+  live exchange/export/autofill and adjust.
+- **Single-instance limitation:** pending OAuth states and domain-purchase
+  confirmation tokens live in process memory (5-minute TTL). The OAuth callback
+  and purchase confirm MUST hit the same app instance — run a single app
+  container (or sticky sessions) until these move to Redis/shared storage.
+- **Porkbun:** API keys are entered per-workspace in the Studio → Domains tab
+  (encrypted with `MARKETR_CREDENTIALS_KEY`; only the key tail is shown back).
+  Porkbun registration uses the account's default registrant contact — the
+  `domain/create` API accepts no contact fields — so set the account contact in
+  the Porkbun dashboard. Registration creates ICANN email-verification
+  obligations; the purchase wizard shows the disclosure and requires an explicit
+  terms checkbox.
+- **Zero-spend rule for first verification:** the first end-to-end domain test
+  must use Porkbun sandbox keys / a dry run — NEVER a production purchase. The
+  wizard blocks premium domains (registry-premium names can't be registered via
+  the API), re-checks availability and price immediately before charging, and
+  aborts on any change.
+- **Canva OAuth callback identity check:** the callback verifies the signed-in
+  user matches the user who started the OAuth flow (state carries both
+  workspaceId and userId). Reconnects are per-workspace, owner/admin only for
+  Porkbun keys; Canva connect/disconnect is editor+.
+- Live check: connect Canva, search designs, export one PNG and import it to the
+  asset library, autofill a brand template; then (sandbox) search a domain,
+  save a registrant, preview a purchase, confirm it, and confirm the domain row
+  lands `registered` with nameservers + audit entries.
 
 ## 4a. Newsletter environment requirements (milestone 19)
 

@@ -211,6 +211,20 @@ enum FileChangeAction {
   ad_creative_rejected
   ad_creative_regenerated
   ad_sent_to_social
+  // Milestone 22: Canva Connect studio + Porkbun domains.
+  studio_canva_connected
+  studio_canva_disconnected
+  studio_canva_failed
+  studio_canva_refreshed
+  studio_canva_exported
+  studio_canva_autofilled
+  studio_asset_created
+  studio_asset_deleted
+  studio_porkbun_keys_updated
+  studio_registrant_saved
+  studio_domain_purchased
+  studio_domain_purchase_failed
+  studio_domain_removed
 }
 
 enum ProgrammaticPageStatus {
@@ -245,47 +259,51 @@ model Workspace {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  projects             Project[]
-  clients              Client[]
-  apiUsage             ApiUsage[]
+  projects              Project[]
+  clients               Client[]
+  apiUsage              ApiUsage[]
   // Milestone 11: workspace membership for RBAC (owner/admin/editor/viewer).
-  members              WorkspaceMember[]
+  members               WorkspaceMember[]
   // Milestone 11: workspace-scoped audit events.
-  auditEvents          FileChangeLog[]
+  auditEvents           FileChangeLog[]
   // Milestone 12: white-label brand kits and report templates.
-  brandKits            BrandKit[]
-  reportTemplates      ReportTemplate[]
+  brandKits             BrandKit[]
+  reportTemplates       ReportTemplate[]
   // Milestone 13: alerting hub (channels, rules, event history).
-  alertChannels        AlertChannel[]
-  alertRules           AlertRule[]
-  alertEvents          AlertEvent[]
+  alertChannels         AlertChannel[]
+  alertRules            AlertRule[]
+  alertEvents           AlertEvent[]
   // Milestone 15: backlink pull audit trail (cost accounting).
-  backlinkPulls        BacklinkPull[]
+  backlinkPulls         BacklinkPull[]
   // Milestone 19: newsletter settings (BYO Resend key) and sending domains.
-  newsletterSettings   NewsletterSettings?
-  newsletterDomains    NewsletterDomain[]
+  newsletterSettings    NewsletterSettings?
+  newsletterDomains     NewsletterDomain[]
   // Milestone 20: social scheduling (BYO Buffer access token).
-  socialSettings       SocialSettings?
+  socialSettings        SocialSettings?
   // Milestone 21: ad factory (BYO Higgsfield API key).
-  adSettings           AdSettings?
+  adSettings            AdSettings?
+  // Milestone 22: Canva Connect OAuth account + Porkbun keys + registrant contact.
+  studioCanvaAccount    StudioCanvaAccount?
+  studioPorkbunSettings StudioPorkbunSettings?
+  studioRegistrant      StudioRegistrant?
   // Milestone 14: composite visibility score weights per workspace.
   // { rankings?: number, aiPresence?: number, freshness?: number, coverage?: number }
   // Null = defaults in lib/retention/visibility-score.ts.
   // NOTE (milestone 15): a `backlinks` component is reserved for a later
   // milestone — do not add it to the score until the backlink quality
   // signal is calibrated. visibility-score.ts documents the same note.
-  visibilityWeights    Json?                 @map("visibility_weights")
+  visibilityWeights     Json?                  @map("visibility_weights")
   // Milestone 15: workspace-level monthly cap (USD) on DataForSEO Backlinks
   // spend. Null = DEFAULT_MONTHLY_SPEND_CAP_USD in lib/seo/backlinks-cost.ts.
-  backlinksSpendCapUsd Float?                @map("backlinks_spend_cap_usd")
+  backlinksSpendCapUsd  Float?                 @map("backlinks_spend_cap_usd")
   // Milestone 16: workspace-level monthly cap (USD) on DataForSEO local-SEO
   // spend (maps SERP, business data, reviews). Null = DEFAULT_LOCAL_SPEND_CAP_USD.
-  localSeoSpendCapUsd  Float?                @map("local_seo_spend_cap_usd")
+  localSeoSpendCapUsd   Float?                 @map("local_seo_spend_cap_usd")
   // Milestone 16: local-SEO pull audit trail (cost accounting) + GBP scaffold.
-  localPulls           LocalPull[]
-  gbpAccounts          GbpAccount[]
+  localPulls            LocalPull[]
+  gbpAccounts           GbpAccount[]
   // Milestone 18: content autopilot kill switches (workspace-level).
-  autopilotKills       AutopilotKillSwitch[]
+  autopilotKills        AutopilotKillSwitch[]
 
   @@map("workspaces")
 }
@@ -312,6 +330,9 @@ model Project {
   socialPosts             SocialPost[]
   // Milestone 21: ad factory campaigns.
   adCampaigns             AdCampaign[]
+  // Milestone 22: Porkbun domains + unified asset library.
+  studioDomains           StudioDomain[]
+  projectAssets           ProjectAsset[]
   competitors             Competitor[]
   contentItems            ContentItem[]
   issues                  Issue[]
@@ -2020,4 +2041,117 @@ model AdCreative {
   @@index([campaignId, status])
   @@index([status, nextPollAt])
   @@map("ad_creatives")
+}
+
+// ---------------------------------------------------------------------------
+// Milestone 22 — Marketing studio (Canva Connect) + Porkbun domains
+// ---------------------------------------------------------------------------
+
+// OAuth account for Canva Connect, workspace-scoped. Tokens are encrypted
+// AES-256-GCM envelopes (lib/secrets) — never returned to clients.
+model StudioCanvaAccount {
+  id String @id @default(cuid())
+
+  workspaceId String    @unique @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  canvaUserId     String?  @map("canva_user_id")
+  accessTokenEnc  String   @map("access_token_enc") @db.Text
+  refreshTokenEnc String   @map("refresh_token_enc") @db.Text
+  tokenExpiresAt  DateTime @map("token_expires_at")
+  scopes          String   @default("")
+
+  connectedAt DateTime @default(now()) @map("connected_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("studio_canva_accounts")
+}
+
+// BYO Porkbun API keys, workspace-scoped. Encrypted AES-256-GCM envelopes
+// (lib/secrets) — never returned to clients. Owner/admin only.
+model StudioPorkbunSettings {
+  id String @id @default(cuid())
+
+  workspaceId String    @unique @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  apiKeyEnc    String  @map("api_key_enc") @db.Text
+  secretKeyEnc String  @map("secret_key_enc") @db.Text
+  apiKeyHint   String? @map("api_key_hint")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("studio_porkbun_settings")
+}
+
+// Registrant contact used for Porkbun domain purchases. Porkbun's API
+// registers with the account's default contact; Marketr collects and shows
+// this copy in the wizard for review + ICANN disclosure. Purchase is blocked
+// until this row is complete.
+model StudioRegistrant {
+  id String @id @default(cuid())
+
+  workspaceId String    @unique @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  firstName String @map("first_name")
+  lastName  String @map("last_name")
+  email     String
+  phone     String
+  address   String
+  city      String
+  state     String @default("")
+  zip       String
+  country   String @default("US")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("studio_registrants")
+}
+
+// Domain managed/purchased through Porkbun, project-scoped.
+model StudioDomain {
+  id String @id @default(cuid())
+
+  projectId String  @map("project_id")
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  domain       String
+  tld          String
+  status       String    @default("pending") // pending | registered | failed | external
+  priceUsd     Decimal?  @map("price_usd") @db.Decimal(10, 2)
+  orderId      String?   @map("order_id")
+  whoisPrivacy Boolean   @default(true) @map("whois_privacy")
+  purchasedAt  DateTime? @map("purchased_at")
+  expiresAt    DateTime? @map("expires_at")
+  nameServers  String?   @map("name_servers") @db.Text // JSON string array
+  errorDetail  String?   @map("error_detail") @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([projectId, domain])
+  @@map("studio_domains")
+}
+
+// Unified project asset library — Canva exports, uploads, generated assets.
+model ProjectAsset {
+  id String @id @default(cuid())
+
+  projectId String  @map("project_id")
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  name          String
+  source        String // canva | upload | generated
+  url           String  @db.Text
+  mimeType      String? @map("mime_type")
+  metadata      String? @db.Text // JSON: canva design id, export format, dimensions…
+  canvaDesignId String? @map("canva_design_id")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([projectId, source])
+  @@map("project_assets")
 }
