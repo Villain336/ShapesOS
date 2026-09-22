@@ -6,6 +6,8 @@ import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
 import { importSubscribers } from "@/lib/newsletter/service";
 import { ownedProject, requireEditor, workspacePort } from "../../../_lib";
+import { validateUploadBuffer } from "@/lib/security/upload-safety";
+import { auditUploadRejected, screenUploadBuffer } from "@/lib/security/upload-audit";
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await requireUser();
@@ -23,8 +25,36 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (denied) return denied;
   const file = form.get("file");
   if (!(file instanceof File)) return Response.json({ error: "No CSV file uploaded." }, { status: 400 });
-  if (file.size > 5 * 1024 * 1024) return Response.json({ error: "CSV must be under 5 MB." }, { status: 400 });
-  const text = await file.text();
+  // Phase A (fix 5): CSV imports are text-only — reject binary masquerading as
+  // CSV, then malware-screen the bytes before parsing.
+  const csvBuf = Buffer.from(await file.arrayBuffer());
+  const csvCheck = validateUploadBuffer(csvBuf, {
+    filename: file.name || "import.csv",
+    maxBytes: 5 * 1024 * 1024,
+    category: "text",
+  });
+  if (!csvCheck.ok) {
+    await auditUploadRejected({
+      projectId: project.id,
+      workspaceId: project.workspaceId,
+      filename: file.name || "import.csv",
+      reason: csvCheck.reason,
+      actorUserId: user.id,
+    });
+    return Response.json({ error: csvCheck.reason }, { status: 400 });
+  }
+  const csvScreen = await screenUploadBuffer(csvBuf);
+  if (!csvScreen.ok) {
+    await auditUploadRejected({
+      projectId: project.id,
+      workspaceId: project.workspaceId,
+      filename: file.name || "import.csv",
+      reason: csvScreen.reason,
+      actorUserId: user.id,
+    });
+    return Response.json({ error: csvScreen.reason }, { status: csvScreen.status });
+  }
+  const text = csvBuf.toString("utf8");
   const portResult = await workspacePort(project.workspaceId);
   const port = "port" in portResult ? portResult.port : null;
   try {

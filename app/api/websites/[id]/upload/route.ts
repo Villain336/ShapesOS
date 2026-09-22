@@ -11,6 +11,11 @@ import type { NextRequest } from "next/server";
 import { requireUser } from "@/lib/session";
 import { extractZipToProvider } from "@/lib/connectors/zip";
 import { getSiteIdeProvider, ownedSite } from "@/lib/connectors/source";
+import { validateUploadBuffer } from "@/lib/security/upload-safety";
+import { auditUploadRejected, screenUploadBuffer } from "@/lib/security/upload-audit";
+import { prisma } from "@/lib/prisma";
+
+const MAX_BYTES = 50 * 1024 * 1024;
 
 export async function POST(
   req: NextRequest,
@@ -42,9 +47,33 @@ export async function POST(
 
   const buf = Buffer.from(await file.arrayBuffer());
   if (buf.length === 0) return Response.json({ error: "Empty file" }, { status: 400 });
-  if (buf.length > 50 * 1024 * 1024) {
-    return Response.json({ error: "File too large (max 50 MB)" }, { status: 400 });
-  }
+
+  // Phase A (fix 5): magic-byte verification + malware screening before the
+  // archive is extracted anywhere. The extension alone is never trusted.
+  const rejectUpload = async (reason: string, status = 400) => {
+    const project = await prisma.project.findUnique({
+      where: { id: site.projectId },
+      select: { workspaceId: true },
+    });
+    if (project) {
+      await auditUploadRejected({
+        projectId: site.projectId,
+        workspaceId: project.workspaceId,
+        filename: file.name || "upload",
+        reason,
+        actorUserId: user.id,
+      });
+    }
+    return Response.json({ error: reason }, { status });
+  };
+  const check = validateUploadBuffer(buf, {
+    filename: file.name || "upload",
+    maxBytes: MAX_BYTES,
+    category: "archive",
+  });
+  if (!check.ok) return rejectUpload(check.reason);
+  const screen = await screenUploadBuffer(buf);
+  if (!screen.ok) return rejectUpload(screen.reason, screen.status);
 
   const working = await getSiteIdeProvider(site);
   const lower = file.name.toLowerCase();

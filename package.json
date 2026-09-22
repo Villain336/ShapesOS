@@ -69,9 +69,11 @@
     "tailwind-merge": "^3.7.0",
     "takumi-pdf": "^0.15.0",
     "y-protocols": "^1.0.7",
-    "yjs": "^13.6.32"
+    "yjs": "^13.6.32",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@tailwindcss/postcss": "^4",
     "@types/adm-zip": "^0.5.8",
     "@types/node": "^20",

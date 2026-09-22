@@ -11,6 +11,11 @@ import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
 import { badRequest, requireProjectAccess } from "@/lib/route-utils";
 import { auditEvent } from "@/lib/auditlog";
+import {
+  resolveWithinDir,
+  validateUploadBuffer,
+} from "@/lib/security/upload-safety";
+import { auditUploadRejected, screenUploadBuffer } from "@/lib/security/upload-audit";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
@@ -90,23 +95,52 @@ export async function POST(req: NextRequest, { params }: Params) {
 
   const uploaded = form?.get("file");
   if (uploaded instanceof File) {
-    if (uploaded.size > MAX_BYTES) {
-      return badRequest(`File is too large (max ${MAX_BYTES / 1024 / 1024}MB)`);
+    // Phase A (fix 5): the project id becomes a path segment — keep it to a
+    // strict alphabet so it can never escape the attachments directory.
+    if (!/^[A-Za-z0-9_-]{1,64}$/.test(projectId)) {
+      return badRequest("Invalid project id");
     }
-    const safe = (uploaded.name || "file")
-      .replace(/[^a-zA-Z0-9._-]/g, "_")
-      .slice(0, 120);
-    const stored = `${randomUUID()}-${safe}`;
+    const originalName = uploaded.name || "file";
+    const buf = Buffer.from(await uploaded.arrayBuffer());
+    const check = validateUploadBuffer(buf, {
+      filename: originalName,
+      maxBytes: MAX_BYTES,
+      category: "default",
+    });
+    if (!check.ok) {
+      await auditUploadRejected({
+        projectId,
+        workspaceId: access.project.workspaceId,
+        filename: originalName,
+        reason: check.reason,
+        actorUserId: user.id,
+      });
+      return badRequest(check.reason);
+    }
+    const screen = await screenUploadBuffer(buf);
+    if (!screen.ok) {
+      await auditUploadRejected({
+        projectId,
+        workspaceId: access.project.workspaceId,
+        filename: originalName,
+        reason: screen.reason,
+        actorUserId: user.id,
+      });
+      return Response.json({ error: screen.reason }, { status: screen.status });
+    }
+    // Stored under a random UUID with the *sniffed* extension — the user's
+    // filename never touches the filesystem. The original name lives in the DB.
+    const stored = `${randomUUID()}.${check.ext}`;
     const dir = join(process.cwd(), ".data", "attachments", projectId);
     await mkdir(dir, { recursive: true });
-    await writeFile(join(dir, stored), Buffer.from(await uploaded.arrayBuffer()));
+    await writeFile(resolveWithinDir(dir, stored), buf);
 
     const row = await prisma.fileAttachment.create({
       data: {
         projectId,
         source: "upload",
         filename: (uploaded.name || "file").slice(0, 255),
-        mimeType: uploaded.type || null,
+        mimeType: check.mime,
         sizeBytes: uploaded.size,
         storagePath: `.data/attachments/${projectId}/${stored}`,
         uploadedBy: user.id,

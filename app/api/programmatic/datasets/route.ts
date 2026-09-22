@@ -12,6 +12,8 @@ import { requireUser } from "@/lib/session";
 import { ownedProject, requireRole } from "../util";
 import { auditProgrammatic } from "@/lib/seo/programmatic-service";
 import { MAX_DATASET_ROWS, parseCsv } from "@/lib/seo/programmatic";
+import { validateUploadBuffer } from "@/lib/security/upload-safety";
+import { auditUploadRejected, screenUploadBuffer } from "@/lib/security/upload-audit";
 
 export const dynamic = "force-dynamic";
 const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
@@ -89,10 +91,34 @@ export async function POST(req: NextRequest) {
     name = String(form.get("name") ?? "").trim();
     const file = form.get("file");
     if (!(file instanceof File)) return Response.json({ error: "CSV file is required" }, { status: 400 });
-    if (file.size > MAX_UPLOAD_BYTES) {
-      return Response.json({ error: "File too large (max 10MB)" }, { status: 400 });
+    // Phase A (fix 5): datasets accept text CSV only — reject binary uploads,
+    // then malware-screen before parsing. Rejections are audit-logged.
+    const dsBuf = Buffer.from(await file.arrayBuffer());
+    const dsCheck = validateUploadBuffer(dsBuf, {
+      filename: file.name || "dataset.csv",
+      maxBytes: MAX_UPLOAD_BYTES,
+      category: "text",
+    });
+    const dsScreen = dsCheck.ok ? await screenUploadBuffer(dsBuf) : null;
+    const dsRejection = !dsCheck.ok
+      ? { reason: dsCheck.reason, status: 400 as const }
+      : dsScreen && !dsScreen.ok
+        ? { reason: dsScreen.reason, status: dsScreen.status }
+        : null;
+    if (dsRejection) {
+      const auditProject = await ownedProject(user.id, projectId);
+      if (auditProject) {
+        await auditUploadRejected({
+          projectId: auditProject.id,
+          workspaceId: auditProject.workspaceId,
+          filename: file.name || "dataset.csv",
+          reason: dsRejection.reason,
+          actorUserId: user.id,
+        });
+      }
+      return Response.json({ error: dsRejection.reason }, { status: dsRejection.status });
     }
-    const text = await file.text();
+    const text = dsBuf.toString("utf8");
     const parsed = parseCsv(text);
     columns = parsed.columns;
     rows = parsed.rows;

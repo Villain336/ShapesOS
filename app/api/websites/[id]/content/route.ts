@@ -32,6 +32,9 @@ import type { ContentKind } from "@/lib/connectors/types";
 import { MockWordPressConnector } from "@/lib/connectors/mock-wordpress";
 import { MockWebflowConnector } from "@/lib/connectors/mock-webflow";
 import { UnsafeUrlError } from "@/lib/safe-url";
+import { validateUploadBuffer } from "@/lib/security/upload-safety";
+import { auditUploadRejected, screenUploadBuffer } from "@/lib/security/upload-audit";
+import { prisma } from "@/lib/prisma";
 
 interface ContentBody {
   projectId?: string;
@@ -164,14 +167,40 @@ export async function POST(
       if (!uploadFile) return Response.json({ error: "file is required" }, { status: 400 });
       if (!("uploadMedia" in connector))
         return Response.json({ error: "Media upload is WordPress-only" }, { status: 400 });
-      const bytes = new Uint8Array(await uploadFile.arrayBuffer());
-      if (bytes.length > 25_000_000)
-        return Response.json({ error: "File too large (25 MB max)" }, { status: 400 });
+      // Phase A (fix 5): validate magic bytes + malware-screen before proxying
+      // bytes to the WordPress media library.
+      const mediaBytes = Buffer.from(await uploadFile.arrayBuffer());
+      const mediaCheck = validateUploadBuffer(mediaBytes, {
+        filename: uploadFile.name || "media",
+        maxBytes: 25_000_000,
+        category: "default",
+      });
+      if (!mediaCheck.ok) {
+        const project = await prisma.project.findUnique({
+          where: { id: site.projectId },
+          select: { workspaceId: true },
+        });
+        if (project) {
+          await auditUploadRejected({
+            projectId: site.projectId,
+            workspaceId: project.workspaceId,
+            filename: uploadFile.name || "media",
+            reason: mediaCheck.reason,
+            actorUserId: user.id,
+          });
+        }
+        return Response.json({ error: mediaCheck.reason }, { status: 400 });
+      }
+      const mediaScreen = await screenUploadBuffer(mediaBytes);
+      if (!mediaScreen.ok) {
+        return Response.json({ error: mediaScreen.reason }, { status: mediaScreen.status });
+      }
+      const bytes = new Uint8Array(mediaBytes);
       const r = await (
         connector as {
           uploadMedia(a: { filename: string; bytes: Uint8Array; mime: string }): Promise<{ id: string; url: string | null }>;
         }
-      ).uploadMedia({ filename: uploadFile.name, bytes, mime: uploadFile.type });
+      ).uploadMedia({ filename: uploadFile.name, bytes, mime: mediaCheck.mime });
       return Response.json({ ...r, mock });
     }
 

@@ -10,17 +10,26 @@ import { requirePermission, forbidden } from "@/lib/authz";
 import { workspaceIdFrom, badRequest, notFound, publicSkill } from "@/lib/route-utils";
 import { auditEvent } from "@/lib/auditlog";
 import { readJsonBody } from "@/lib/sitefiles/api";
+import { validateBody, z } from "@/lib/api/validate";
 import { previewFromUrl, SkillImportError } from "@/lib/skills/importer";
 import { getSkill } from "@/lib/skills/service";
 
 export const dynamic = "force-dynamic";
 
+// workspaceId may also arrive via ?workspaceId= (see workspaceIdFrom), so the
+// schema only enforces type/shape here; presence is checked below.
+const BodySchema = z.object({
+  workspaceId: z.string().trim().max(120).optional(),
+});
+
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const user = await requireUser();
   if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
   const { id } = await params;
-  const body = await readJsonBody<{ workspaceId?: unknown }>(req);
-  const workspaceId = workspaceIdFrom(req, body);
+  const body = await readJsonBody(req);
+  const v = validateBody(BodySchema, body);
+  if (!v.ok) return v.error;
+  const workspaceId = workspaceIdFrom(req, v.data);
   if (!workspaceId) return badRequest("workspaceId is required");
   if (!(await requirePermission(user.id, workspaceId, "skills.install"))) {
     return forbidden("skills.install permission required.");

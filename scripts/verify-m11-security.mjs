@@ -93,6 +93,9 @@ const uncovered = [];
 for (const f of routeFiles) {
   const rel = f.replace(ROOT + "/", "");
   if (rel.startsWith("app/api/auth/")) continue; // Auth.js provider routes
+  // E2E test-only mock infrastructure: every handler 404s unless the
+  // E2E_MOCK_OAUTH=1 flag is set; never enabled in production builds.
+  if (rel.startsWith("app/api/e2e/")) continue;
   if (PUBLIC_BY_DESIGN[rel]) continue;
   const s = fullSource(f);
   const muts = [...s.matchAll(/export async function (POST|PUT|PATCH|DELETE)\(/g)].map(m => m[1]);

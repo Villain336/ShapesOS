@@ -225,3 +225,20 @@ export function startOAuthFlow(
 export function getOAuthConfig(connectorKey: string): OAuthProviderConfig | undefined {
   return OAUTH_CONFIGS[connectorKey];
 }
+
+// ---------------------------------------------------------------------------
+// E2E TEST SEAM (Playwright). Registered ONLY when E2E_MOCK_OAUTH=1.
+// The authorize/token URLs point at same-origin fixture routes
+// (/api/e2e/mock-oauth/*) so the suite can run the real OAuth round-trip
+// without a live provider. NEVER enabled in production.
+// ---------------------------------------------------------------------------
+if (process.env.E2E_MOCK_OAUTH === "1") {
+  const e2eBase = (process.env.E2E_BASE_URL ?? "http://localhost:3000").replace(/\/+$/, "");
+  OAUTH_CONFIGS["mock-oauth"] = {
+    authorizeUrl: `${e2eBase}/api/e2e/mock-oauth/authorize`,
+    tokenUrl: `${e2eBase}/api/e2e/mock-oauth/token`,
+    scopes: ["e2e:read"],
+    clientIdEnv: "E2E_MOCK_OAUTH_CLIENT_ID",
+    clientSecretEnv: "E2E_MOCK_OAUTH_CLIENT_SECRET",
+  };
+}

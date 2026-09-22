@@ -244,6 +244,8 @@ enum FileChangeAction {
   data_source_unbound
   file_attached
   file_removed
+  // Phase A (fix 5): an upload was rejected by upload safety (type/scan).
+  file_rejected
   settings_workspace_updated
   settings_project_updated
   permission_grant_created

@@ -148,6 +148,29 @@ export const BUILT_IN_CONNECTORS: BuiltinConnectorMeta[] = [
   },
 ];
 
+// ---------------------------------------------------------------------------
+// E2E TEST SEAM (Playwright). Registered ONLY when E2E_MOCK_OAUTH=1.
+// A fake OAuth2 provider whose authorize/token endpoints are same-origin
+// routes under /api/e2e/mock-oauth/*. Lets the E2E suite exercise the full
+// production OAuth round-trip (signed state → authorize → callback → token
+// exchange → encrypted credential → audit row) without touching a live
+// provider. NEVER enabled in production.
+// ---------------------------------------------------------------------------
+if (process.env.E2E_MOCK_OAUTH === "1") {
+  BUILT_IN_CONNECTORS.push({
+    key: "mock-oauth",
+    displayName: "Mock OAuth (E2E only)",
+    authType: "oauth2",
+    description:
+      "Test-only OAuth2 provider for Playwright E2E. Visible only with E2E_MOCK_OAUTH=1.",
+    oauth: {
+      scopes: ["e2e:read"],
+      envVars: ["E2E_MOCK_OAUTH_CLIENT_ID", "E2E_MOCK_OAUTH_CLIENT_SECRET"],
+    },
+    authNote: "E2E fixture — not a real provider.",
+  });
+}
+
 const KEYS = new Set(BUILT_IN_CONNECTORS.map((c) => c.key));
 
 export function isBuiltinKey(key: string): boolean {

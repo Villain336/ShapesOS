@@ -14,10 +14,18 @@ import { requirePermission, forbidden } from "@/lib/authz";
 import { workspaceIdFrom, badRequest } from "@/lib/route-utils";
 import { auditEvent } from "@/lib/auditlog";
 import { readJsonBody } from "@/lib/sitefiles/api";
+import { validateBody, z, boundedString } from "@/lib/api/validate";
 import { McpConnectorClient, isStdioAllowed } from "@/lib/connectors/m21/mcp";
 import { slugify } from "@/lib/skills/importer";
 
 export const dynamic = "force-dynamic";
+
+const BodySchema = z.object({
+  workspaceId: z.string().trim().max(120).optional(),
+  name: boundedString(120, "name"),
+  endpoint: boundedString(2000, "endpoint"),
+  transport: z.string().trim().max(40).optional(),
+});
 
 async function guard(req: NextRequest, body: { workspaceId?: unknown } | null, userId: string) {
   const workspaceId = workspaceIdFrom(req, body);
@@ -31,19 +39,15 @@ async function guard(req: NextRequest, body: { workspaceId?: unknown } | null, u
 export async function POST(req: NextRequest) {
   const user = await requireUser();
   if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
-  const body = await readJsonBody<{
-    workspaceId?: unknown;
-    name?: unknown;
-    endpoint?: unknown;
-    transport?: unknown;
-  }>(req);
+  const rawBody = await readJsonBody(req);
+  const v = validateBody(BodySchema, rawBody);
+  if (!v.ok) return v.error;
+  const body = v.data;
   const g = await guard(req, body, user.id);
   if ("error" in g) return g.error;
 
-  const name = typeof body?.name === "string" ? body.name.trim() : "";
-  const endpoint = typeof body?.endpoint === "string" ? body.endpoint.trim() : "";
-  if (!name) return badRequest("name is required");
-  if (!endpoint) return badRequest("endpoint is required");
+  const name = body.name;
+  const endpoint = body.endpoint;
   const isStdio = endpoint.startsWith("stdio:");
   if (!isStdio) {
     try {
@@ -88,7 +92,7 @@ export async function POST(req: NextRequest) {
       authType: "none",
       config: {
         endpoint,
-        transport: typeof body?.transport === "string" ? body.transport : isStdio ? "stdio" : "http",
+        transport: body.transport ? body.transport : isStdio ? "stdio" : "http",
         toolCount: tools.length,
       },
       mcpEndpoint: endpoint,

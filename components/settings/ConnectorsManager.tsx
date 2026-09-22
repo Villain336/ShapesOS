@@ -257,7 +257,7 @@ export default function ConnectorsManager({
 
   function connectorCard(c: Connector) {
     return (
-      <div key={c.key} className={cardCls}>
+      <div key={c.key} data-testid={`connector-card-${c.key}`} className={cardCls}>
         <div className="flex items-start justify-between gap-2">
           <div>
             <h3 className="font-medium">{c.displayName}</h3>

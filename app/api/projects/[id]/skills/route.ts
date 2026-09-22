@@ -8,6 +8,7 @@ import { requireUser } from "@/lib/session";
 import { badRequest, requireProjectAccess, publicSkill } from "@/lib/route-utils";
 import { auditEvent } from "@/lib/auditlog";
 import { readJsonBody } from "@/lib/sitefiles/api";
+import { validateBody, z, boundedString } from "@/lib/api/validate";
 import {
   getSkill,
   setProjectSkillEnabled,
@@ -41,6 +42,11 @@ export async function GET(_req: NextRequest, { params }: Params) {
   });
 }
 
+const BodySchema = z.object({
+  skillId: boundedString(120, "skillId"),
+  enabled: z.boolean({ error: "enabled must be a boolean" }),
+});
+
 export async function PUT(req: NextRequest, { params }: Params) {
   const user = await requireUser();
   if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
@@ -48,11 +54,10 @@ export async function PUT(req: NextRequest, { params }: Params) {
   const access = await requireProjectAccess(user.id, projectId, "editor");
   if ("error" in access) return access.error;
 
-  const body = await readJsonBody<{ skillId?: unknown; enabled?: unknown }>(req);
-  const skillId = typeof body?.skillId === "string" ? body.skillId : "";
-  const enabled = body?.enabled;
-  if (!skillId) return badRequest("skillId is required");
-  if (typeof enabled !== "boolean") return badRequest("enabled must be a boolean");
+  const rawBody = await readJsonBody(req);
+  const v = validateBody(BodySchema, rawBody);
+  if (!v.ok) return v.error;
+  const { skillId, enabled } = v.data;
 
   try {
     await setProjectSkillEnabled(prisma, projectId, skillId, enabled, user.id);

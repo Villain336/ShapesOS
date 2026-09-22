@@ -43,3 +43,10 @@ next-env.d.ts
 
 # site working copies (milestone 7) — never commit
 .data/
+
+# Playwright E2E (Phase A, fix 3)
+scripts/e2e/.auth.json
+scripts/e2e/.e2e-ids.json
+scripts/e2e/report/
+test-results/
+playwright-report/

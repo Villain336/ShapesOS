@@ -4,6 +4,15 @@ import { accessibleWorkspaceWhere, requireProjectRole, forbidden } from "@/lib/a
 import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
+import { validateBody, z } from "@/lib/api/validate";
+
+const BodySchema = z
+  .object({
+    backlinksEnabled: z.boolean().optional(),
+  })
+  .refine((b) => b.backlinksEnabled !== undefined, {
+    message: "No updatable fields",
+  });
 
 /** PATCH /api/projects/[id] — update project settings (editor+). */
 export async function PATCH(
@@ -23,13 +32,12 @@ export async function PATCH(
   // Milestone 15: project settings are editor+.
   if (!(await requireProjectRole(user.id, project.id, "editor"))) return forbidden();
 
-  const body = await req.json().catch(() => ({}));
+  const rawBody = await req.json().catch(() => null);
+  const v = validateBody(BodySchema, rawBody);
+  if (!v.ok) return v.error;
   const data: { backlinksEnabled?: boolean } = {};
-  if (typeof body.backlinksEnabled === "boolean") {
-    data.backlinksEnabled = body.backlinksEnabled;
-  }
-  if (Object.keys(data).length === 0) {
-    return Response.json({ error: "No updatable fields" }, { status: 400 });
+  if (v.data.backlinksEnabled !== undefined) {
+    data.backlinksEnabled = v.data.backlinksEnabled;
   }
 
   const updated = await prisma.project.update({ where: { id }, data });

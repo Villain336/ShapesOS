@@ -186,7 +186,17 @@ export async function previewFromUrl(
       throw new SkillImportError(`could not fetch SKILL.md from ${url} (status ${res.status})`);
     }
     skillMd = await res.text();
-    warnings.push("could not resolve commit SHA for non-GitHub URL: install is unpinned");
+    if (process.env.E2E_MOCK_OAUTH === "1") {
+      // E2E-only: pin direct SKILL.md URLs to the content SHA so the
+      // SHA-pinning install flow (preview → install → 409 on mismatch) is
+      // exercisable without GitHub. Production behavior is unchanged
+      // (unpinned, warning below).
+      const { createHash } = await import("node:crypto");
+      sha = createHash("sha256").update(skillMd, "utf8").digest("hex");
+      warnings.push("E2E fixture: install pinned to SKILL.md content SHA");
+    } else {
+      warnings.push("could not resolve commit SHA for non-GitHub URL: install is unpinned");
+    }
   } else {
     throw new SkillImportError(
       `URL must be a GitHub repository URL or a direct link to a SKILL.md file: "${url}"`,

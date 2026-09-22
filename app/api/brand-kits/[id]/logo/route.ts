@@ -9,12 +9,9 @@ import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireUser, getOrCreateWorkspace } from "@/lib/session";
 import { reportStorageDir } from "@/lib/pdf/generate";
+import { resolveWithinDir, validateUploadBuffer } from "@/lib/security/upload-safety";
+import { auditUploadRejected, screenUploadBuffer } from "@/lib/security/upload-audit";
 
-const ALLOWED = new Map([
-  ["image/png", ".png"],
-  ["image/jpeg", ".jpg"],
-  ["image/svg+xml", ".svg"],
-]);
 const MAX_BYTES = 2 * 1024 * 1024;
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -36,19 +33,34 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (!(file instanceof File)) {
     return Response.json({ error: "Missing 'logo' file field" }, { status: 400 });
   }
-  const ext = ALLOWED.get(file.type);
-  if (!ext) {
-    return Response.json({ error: "Logo must be PNG, JPEG, or SVG" }, { status: 400 });
-  }
-  if (file.size > MAX_BYTES) {
-    return Response.json({ error: "Logo must be under 2 MB" }, { status: 400 });
-  }
+  // Phase A (fix 5): verify magic bytes — the browser-declared MIME type is
+  // never trusted — then malware-screen before touching disk.
+  const buf = Buffer.from(await file.arrayBuffer());
+  const check = validateUploadBuffer(buf, {
+    filename: file.name || "logo",
+    maxBytes: MAX_BYTES,
+    category: "images",
+  });
+  const reject = async (reason: string, status = 400) => {
+    await auditUploadRejected({
+      projectId: null,
+      workspaceId: workspace.id,
+      filename: file.name || "logo",
+      reason,
+      actorUserId: user.id,
+    });
+    return Response.json({ error: reason }, { status });
+  };
+  if (!check.ok) return reject(check.reason);
+  const screen = await screenUploadBuffer(buf);
+  if (!screen.ok) return reject(screen.reason, screen.status);
 
   const dir = path.join(reportStorageDir(), "logos");
   await fs.mkdir(dir, { recursive: true });
-  const filename = `${id}${ext}`;
-  const abs = path.join(dir, filename);
-  await fs.writeFile(abs, Buffer.from(await file.arrayBuffer()));
+  // The stored extension comes from the sniffed bytes, not the upload name.
+  const filename = `${id}.${check.ext}`;
+  const abs = resolveWithinDir(dir, filename);
+  await fs.writeFile(abs, buf);
 
   const updated = await prisma.brandKit.update({
     where: { id },

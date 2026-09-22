@@ -7,31 +7,33 @@
 import { accessibleWorkspaceWhere, getMembership, requireProjectRole, forbidden } from "@/lib/authz";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
+import { validateBody, z, boundedString } from "@/lib/api/validate";
 import { runAgentTurn, maybeAutoTitle, type ChatToolCall } from "@/lib/chat/agent";
 
 export const dynamic = "force-dynamic";
 
 const MAX_CONTENT = 4000;
 
+const BodySchema = z.object({
+  content: boundedString(MAX_CONTENT, "content"),
+  attachmentIds: z.array(boundedString(120, "attachmentId")).max(10).optional(),
+});
+
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await requireUser();
   if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
   const { id } = await params;
 
-  let body: { content?: string; attachmentIds?: string[] };
+  let rawBody: unknown;
   try {
-    body = await req.json();
+    rawBody = await req.json();
   } catch {
     return Response.json({ error: "Invalid JSON" }, { status: 400 });
   }
-  const content = String(body.content ?? "").trim();
-  if (!content) return Response.json({ error: "content is required" }, { status: 400 });
-  if (content.length > MAX_CONTENT) {
-    return Response.json({ error: `content is too long (max ${MAX_CONTENT} characters)` }, { status: 400 });
-  }
-  const attachmentIds = Array.isArray(body.attachmentIds)
-    ? body.attachmentIds.filter((a): a is string => typeof a === "string" && a.length > 0).slice(0, 10)
-    : undefined;
+  const v = validateBody(BodySchema, rawBody);
+  if (!v.ok) return v.error;
+  const content = v.data.content;
+  const attachmentIds = v.data.attachmentIds;
 
   const thread = await prisma.aiChatThread.findFirst({
     where: { id, userId: user.id },

@@ -4,11 +4,13 @@
 //   The connection must belong to the project's workspace. (editor+; audited)
 
 import type { NextRequest } from "next/server";
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
 import { badRequest, notFound, requireProjectAccess } from "@/lib/route-utils";
 import { auditEvent } from "@/lib/auditlog";
 import { readJsonBody } from "@/lib/sitefiles/api";
+import { validateBody, z, boundedString } from "@/lib/api/validate";
 
 export const dynamic = "force-dynamic";
 
@@ -61,6 +63,12 @@ export async function GET(_req: NextRequest, { params }: Params) {
   return Response.json({ bindings: bindings.map(publicBinding) });
 }
 
+const BodySchema = z.object({
+  connectionId: boundedString(120, "connectionId"),
+  // Arbitrary connector-specific config (depth-capped by validateBody).
+  projectConfig: z.unknown().optional(),
+});
+
 export async function POST(req: NextRequest, { params }: Params) {
   const user = await requireUser();
   if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
@@ -68,9 +76,11 @@ export async function POST(req: NextRequest, { params }: Params) {
   const access = await requireProjectAccess(user.id, projectId, "editor");
   if ("error" in access) return access.error;
 
-  const body = await readJsonBody<{ connectionId?: unknown; projectConfig?: unknown }>(req);
-  const connectionId = typeof body?.connectionId === "string" ? body.connectionId : "";
-  if (!connectionId) return badRequest("connectionId is required");
+  const rawBody = await readJsonBody(req);
+  const v = validateBody(BodySchema, rawBody);
+  if (!v.ok) return v.error;
+  const body = v.data;
+  const connectionId = body.connectionId;
   const connection = await prisma.connectorConnection.findFirst({
     where: { id: connectionId },
   });
@@ -87,8 +97,8 @@ export async function POST(req: NextRequest, { params }: Params) {
         connectionId,
         connectorKey: connection.connectorKey,
         projectConfig:
-          body?.projectConfig && typeof body.projectConfig === "object"
-            ? (body.projectConfig as object)
+          body.projectConfig && typeof body.projectConfig === "object"
+            ? (body.projectConfig as Prisma.InputJsonValue)
             : undefined,
         createdBy: user.id,
       },

@@ -11,6 +11,7 @@ import { getMembership } from "@/lib/authz";
 import { workspaceIdFrom, badRequest, requireWorkspaceAccess } from "@/lib/route-utils";
 import { auditEvent } from "@/lib/auditlog";
 import { readJsonBody } from "@/lib/sitefiles/api";
+import { validateBody, z, boundedString } from "@/lib/api/validate";
 import type { WorkspaceRole } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
@@ -49,24 +50,29 @@ export async function GET(req: NextRequest) {
   return Response.json({ grants: grants.map(publicGrant) });
 }
 
+const GrantBodySchema = z.object({
+  workspaceId: z.string().trim().max(120).optional(),
+  permission: boundedString(120, "permission"),
+  userId: z.string().trim().max(120).optional(),
+  role: z.string().trim().max(40).optional(),
+});
+
 export async function POST(req: NextRequest) {
   const user = await requireUser();
   if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
-  const body = await readJsonBody<{
-    workspaceId?: unknown;
-    permission?: unknown;
-    userId?: unknown;
-    role?: unknown;
-  }>(req);
+  const rawBody = await readJsonBody(req);
+  const v = validateBody(GrantBodySchema, rawBody);
+  if (!v.ok) return v.error;
+  const body = v.data;
   const access = await requireWorkspaceAccess(user.id, workspaceIdFrom(req, body), "admin");
   if ("error" in access) return access.error;
 
-  const permission = typeof body?.permission === "string" ? body.permission : "";
+  const permission = body.permission;
   if (!(GRANTABLE as readonly string[]).includes(permission)) {
     return badRequest(`permission must be one of ${GRANTABLE.join(", ")}`);
   }
-  const userId = typeof body?.userId === "string" && body.userId.trim() ? body.userId.trim() : null;
-  const role = typeof body?.role === "string" && body.role.trim() ? (body.role.trim() as WorkspaceRole) : null;
+  const userId = body.userId?.trim() ? body.userId.trim() : null;
+  const role = body.role?.trim() ? (body.role.trim() as WorkspaceRole) : null;
   if ((userId && role) || (!userId && !role)) {
     return badRequest("Exactly one of userId or role is required");
   }

@@ -6,6 +6,7 @@ import { accessibleWorkspaceWhere, requireProjectRole, forbidden } from "@/lib/a
 import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
+import { validateBody, z, boundedString } from "@/lib/api/validate";
 
 export const dynamic = "force-dynamic";
 
@@ -43,17 +44,23 @@ export async function GET(req: NextRequest) {
   });
 }
 
+const BodySchema = z.object({
+  projectId: boundedString(120, "projectId"),
+});
+
 export async function POST(req: Request) {
   const user = await requireUser();
   if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
-  let body: { projectId?: string };
+  let rawBody: unknown;
   try {
-    body = await req.json();
+    rawBody = await req.json();
   } catch {
     return Response.json({ error: "Invalid JSON" }, { status: 400 });
   }
+  const v = validateBody(BodySchema, rawBody);
+  if (!v.ok) return v.error;
   const project = await prisma.project.findFirst({
-    where: { id: body.projectId ?? "", workspace: accessibleWorkspaceWhere(user.id) },
+    where: { id: v.data.projectId, workspace: accessibleWorkspaceWhere(user.id) },
     select: { id: true },
   });
   if (!project) return Response.json({ error: "Project not found" }, { status: 404 });

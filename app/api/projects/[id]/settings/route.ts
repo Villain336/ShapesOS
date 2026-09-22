@@ -9,6 +9,7 @@ import { requireUser } from "@/lib/session";
 import { badRequest, notFound, requireProjectAccess } from "@/lib/route-utils";
 import { auditEvent } from "@/lib/auditlog";
 import { readJsonBody } from "@/lib/sitefiles/api";
+import { validateBody, z } from "@/lib/api/validate";
 import type { Prisma } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
@@ -74,6 +75,15 @@ export async function GET(_req: NextRequest, { params }: Params) {
   });
 }
 
+const BodySchema = z.object({
+  brandContext: z.string().max(20_000).nullable().optional(),
+  domains: z.array(z.string().max(255)).max(100).optional(),
+  approvalModeOverride: z.string().max(40).nullable().optional(),
+  // Arbitrary JSON blobs (depth-capped by validateBody).
+  publishingControls: z.unknown().optional(),
+  overrides: z.unknown().optional(),
+});
+
 export async function PUT(req: NextRequest, { params }: Params) {
   const user = await requireUser();
   if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
@@ -81,13 +91,10 @@ export async function PUT(req: NextRequest, { params }: Params) {
   const access = await requireProjectAccess(user.id, projectId, "editor");
   if ("error" in access) return access.error;
 
-  const body = await readJsonBody<{
-    brandContext?: unknown;
-    domains?: unknown;
-    approvalModeOverride?: unknown;
-    publishingControls?: unknown;
-    overrides?: unknown;
-  }>(req);
+  const rawBody = await readJsonBody(req);
+  const v = validateBody(BodySchema, rawBody);
+  if (!v.ok) return v.error;
+  const body = v.data;
 
   const update: {
     updatedBy?: string;
@@ -97,23 +104,20 @@ export async function PUT(req: NextRequest, { params }: Params) {
     publishingControls?: Prisma.InputJsonValue;
     overrides?: Prisma.InputJsonValue;
   } = { updatedBy: user.id };
-  if (body?.brandContext !== undefined) {
-    update.brandContext = body.brandContext === null ? null : String(body.brandContext).slice(0, 20_000);
+  if (body.brandContext !== undefined) {
+    update.brandContext = body.brandContext;
   }
-  if (body?.domains !== undefined) {
-    if (!Array.isArray(body.domains) || !body.domains.every((d) => typeof d === "string")) {
-      return badRequest("domains must be an array of strings");
-    }
-    update.domains = body.domains.map((d) => String(d).slice(0, 255));
+  if (body.domains !== undefined) {
+    update.domains = body.domains.map((d) => d.slice(0, 255));
   }
-  if (body?.approvalModeOverride !== undefined) {
-    if (body.approvalModeOverride !== null && !APPROVAL_MODES.includes(String(body.approvalModeOverride))) {
+  if (body.approvalModeOverride !== undefined) {
+    if (body.approvalModeOverride !== null && !APPROVAL_MODES.includes(body.approvalModeOverride)) {
       return badRequest(`approvalModeOverride must be one of ${APPROVAL_MODES.join(", ")} or null`);
     }
-    update.approvalModeOverride = body.approvalModeOverride === null ? null : String(body.approvalModeOverride);
+    update.approvalModeOverride = body.approvalModeOverride;
   }
-  if (body?.publishingControls !== undefined) update.publishingControls = body.publishingControls as Prisma.InputJsonValue;
-  if (body?.overrides !== undefined) update.overrides = body.overrides as Prisma.InputJsonValue;
+  if (body.publishingControls !== undefined) update.publishingControls = body.publishingControls as Prisma.InputJsonValue;
+  if (body.overrides !== undefined) update.overrides = body.overrides as Prisma.InputJsonValue;
 
   const settings = await prisma.projectSettings.upsert({
     where: { projectId },
