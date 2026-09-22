@@ -15,7 +15,7 @@ interface RadarEventItem {
 
 const TYPE_STYLE: Record<string, string> = {
   lost_to_competitor: "bg-red-500/15 text-red-700 border-red-200/30",
-  new_keyword: "bg-orange-700/15 text-violet-700 border-violet-500/30",
+  new_keyword: "bg-accent/15 text-violet-700 border-violet-500/30",
   keyword_gain: "bg-amber-500/15 text-amber-700 border-amber-200/30",
   new_page: "bg-sky-100/15 text-sky-700 border-sky-200/30",
 };

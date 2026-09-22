@@ -133,7 +133,7 @@ export default function BrandKitManager({ initial }: { initial: BrandKit[] }) {
         </p>
         <button
           onClick={startCreate}
-          className="rounded-md bg-orange-700 px-4 py-2 text-sm font-medium text-white hover:bg-orange-800"
+          className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-hover"
         >
           New brand kit
         </button>
@@ -201,7 +201,7 @@ export default function BrandKitManager({ initial }: { initial: BrandKit[] }) {
             <button
               onClick={save}
               disabled={saving}
-              className="rounded-md bg-orange-700 px-4 py-2 text-sm font-medium text-white hover:bg-orange-800 disabled:opacity-50"
+              className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-hover disabled:opacity-50"
             >
               {saving ? "Saving…" : "Save"}
             </button>
@@ -223,7 +223,7 @@ export default function BrandKitManager({ initial }: { initial: BrandKit[] }) {
                 <h3 className="font-semibold text-zinc-900">
                   {kit.name}
                   {kit.isDefault && (
-                    <span className="ml-2 rounded bg-orange-100 px-2 py-0.5 text-xs text-orange-700">default</span>
+                    <span className="ml-2 rounded bg-accent-tint px-2 py-0.5 text-xs text-accent-ink">default</span>
                   )}
                 </h3>
                 <p className="mt-1 text-xs text-zinc-500">

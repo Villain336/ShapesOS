@@ -491,7 +491,7 @@ export default function SocialStudio(props: Props) {
                       onClick={() => toggleService(c.service)}
                       className={`rounded-lg border px-3 py-1.5 text-sm ${press} ${fade} ${
                         compServices.includes(c.service)
-                          ? "border-orange-600 bg-orange-50 text-orange-800"
+                          ? "border-accent bg-accent-tint text-accent-ink"
                           : "border-zinc-200 text-zinc-500 hover:border-zinc-300"
                       }`}
                     >
@@ -596,7 +596,7 @@ export default function SocialStudio(props: Props) {
                 <button
                   onClick={() => composerSave(false)}
                   disabled={busy === "composer" || !compWhen}
-                  className={`flex items-center gap-2 rounded-lg bg-orange-700 px-4 py-2 text-sm font-medium text-white disabled:opacity-40 ${press}`}
+                  className={`flex items-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white disabled:opacity-40 ${press}`}
                   title={compWhen ? "Save and schedule" : "Pick a schedule time first"}
                 >
                   <Clock className="h-4 w-4" /> {busy === "composer" ? "Saving…" : "Save & schedule"}
@@ -670,7 +670,7 @@ export default function SocialStudio(props: Props) {
                       >
                         <Clock className="h-3.5 w-3.5" /> Schedule
                       </button>
-                      <button onClick={() => postAction(p.id, "publish-now")} disabled={busy === `publish-now:${p.id}`} className={`flex items-center gap-1 rounded-md bg-orange-700 px-2.5 py-1.5 text-xs font-medium text-white ${press}`}>
+                      <button onClick={() => postAction(p.id, "publish-now")} disabled={busy === `publish-now:${p.id}`} className={`flex items-center gap-1 rounded-md bg-accent px-2.5 py-1.5 text-xs font-medium text-white ${press}`}>
                         <PaperPlane className="h-3.5 w-3.5" /> Publish now
                       </button>
                       <button onClick={() => { if (window.confirm("Delete this draft?")) postAction(p.id, "delete"); }} className={`flex items-center gap-1 rounded-md border border-zinc-200 px-2.5 py-1.5 text-xs text-red-700 ${press}`}>
@@ -775,7 +775,7 @@ export default function SocialStudio(props: Props) {
                       <button
                         onClick={() => toggleChannel(c.id, !c.enabled)}
                         disabled={busy === `channel:${c.id}`}
-                        className={`relative h-6 w-11 rounded-full ${press} ${fade} ${c.enabled ? "bg-orange-700" : "bg-zinc-200"}`}
+                        className={`relative h-6 w-11 rounded-full ${press} ${fade} ${c.enabled ? "bg-accent" : "bg-zinc-200"}`}
                         aria-label={c.enabled ? "Disable channel" : "Enable channel"}
                       >
                         <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-transform duration-150 ease-[cubic-bezier(0.2,0,0,1)] ${c.enabled ? "translate-x-[22px]" : "translate-x-0.5"}`} />
@@ -817,7 +817,7 @@ export default function SocialStudio(props: Props) {
                     className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400"
                   />
                   <div className="flex gap-2">
-                    <button onClick={saveToken} disabled={busy === "token" || !tokenInput.trim()} className={`rounded-lg bg-orange-700 px-4 py-2 text-sm font-medium text-white disabled:opacity-40 ${press}`}>
+                    <button onClick={saveToken} disabled={busy === "token" || !tokenInput.trim()} className={`rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white disabled:opacity-40 ${press}`}>
                       Rotate token
                     </button>
                     <button onClick={() => { if (window.confirm("Revoke the Buffer token? Scheduled posts will stop dispatching.")) revokeToken(); }} disabled={busy === "token"} className={`rounded-lg border border-red-200 px-4 py-2 text-sm font-medium text-red-700 ${press}`}>
@@ -836,7 +836,7 @@ export default function SocialStudio(props: Props) {
                 placeholder="Buffer access token"
                 className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400"
               />
-              <button onClick={saveToken} disabled={busy === "token" || !tokenInput.trim()} className={`w-fit rounded-lg bg-orange-700 px-4 py-2 text-sm font-medium text-white disabled:opacity-40 ${press}`}>
+              <button onClick={saveToken} disabled={busy === "token" || !tokenInput.trim()} className={`w-fit rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white disabled:opacity-40 ${press}`}>
                 {busy === "token" ? "Connecting…" : "Connect Buffer"}
               </button>
             </div>

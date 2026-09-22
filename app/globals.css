@@ -45,12 +45,12 @@
   --line: rgba(28, 25, 23, 0.08);
   --line-strong: rgba(28, 25, 23, 0.16);
 
-  /* accent — orange-600 family, disciplined */
-  --accent: #c2410c;
-  --accent-hover: #c2410c;
-  --accent-ink: #c2410c;
-  --accent-tint: #fff4e8;
-  --accent-deep: #9a3412;
+  /* accent — scarab green, disciplined: actions, links, active states, focus */
+  --accent: #0e7c66;
+  --accent-hover: #0a5f4e;
+  --accent-ink: #0e7c66;
+  --accent-tint: #e8f4ef;
+  --accent-deep: #084c40;
 
   /* semantic — muted, never orange-adjacent warning */
   --green: #2e7d4f;

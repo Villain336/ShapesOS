@@ -358,11 +358,11 @@ export default function AdFactory({ projectId, campaigns: initial, brandKits, se
   ];
 
   const btnPrimary =
-    "inline-flex items-center gap-2 rounded-lg bg-orange-700 px-4 py-2 text-sm font-medium text-white transition-[background-color,transform] duration-150 ease-[cubic-bezier(0.2,0,0,1)] hover:bg-orange-800 active:scale-[0.96] disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2";
+    "inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition-[background-color,transform] duration-150 ease-[cubic-bezier(0.2,0,0,1)] hover:bg-accent-hover active:scale-[0.96] disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2";
   const btnGhost =
     "inline-flex items-center gap-2 rounded-lg border border-zinc-200 px-3 py-1.5 text-sm text-zinc-800 transition-[background-color,border-color,color,transform] duration-150 hover:border-zinc-400 active:scale-[0.96] disabled:opacity-50";
   const field =
-    "w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 transition-colors duration-150 focus:border-orange-500 focus:outline-none";
+    "w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 transition-colors duration-150 focus:border-accent focus:outline-none";
   const label = "mb-1 block text-xs font-medium uppercase tracking-wide text-zinc-500";
 
   return (
@@ -375,7 +375,7 @@ export default function AdFactory({ projectId, campaigns: initial, brandKits, se
             onClick={() => setTab(t.key)}
             className={`flex items-center gap-2 border-b-2 px-4 py-2.5 text-sm font-medium transition-[background-color,border-color,color,transform] duration-150 active:scale-[0.96] ${
               tab === t.key
-                ? "border-orange-600 text-orange-700"
+                ? "border-accent text-accent-ink"
                 : "border-transparent text-zinc-500 hover:text-zinc-800"
             }`}
             style={{ transitionTimingFunction: EASE }}
@@ -410,7 +410,7 @@ export default function AdFactory({ projectId, campaigns: initial, brandKits, se
                   key={c.id}
                   onClick={() => setActiveCampaignId(c.id)}
                   className={`w-full rounded-xl border p-4 text-left transition-[background-color,border-color,color,transform] duration-150 active:scale-[0.98] ${
-                    activeCampaignId === c.id ? "border-orange-600 bg-orange-50" : "border-zinc-200 bg-zinc-50 hover:border-zinc-300"
+                    activeCampaignId === c.id ? "border-accent bg-accent-tint" : "border-zinc-200 bg-zinc-50 hover:border-zinc-300"
                   }`}
                   style={{ transitionTimingFunction: EASE }}
                 >

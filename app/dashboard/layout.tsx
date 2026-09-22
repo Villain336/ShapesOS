@@ -9,6 +9,7 @@ import {
 } from "@/lib/session";
 import { AppSidebar, MobileNav } from "@/components/AppSidebar";
 import { DashboardMain } from "@/components/DashboardMain";
+import { ChatProvider } from "@/components/chat/ChatContext";
 
 export default async function DashboardLayout({
   children,
@@ -29,13 +30,15 @@ export default async function DashboardLayout({
 
   return (
     <div className="min-h-screen bg-page font-sans text-ink">
-      <MobileNav {...sidebarProps} />
-      <div className="flex">
-        <AppSidebar {...sidebarProps} />
-        <div className="min-w-0 flex-1">
-          <DashboardMain>{children}</DashboardMain>
+      <ChatProvider>
+        <MobileNav {...sidebarProps} />
+        <div className="flex">
+          <AppSidebar {...sidebarProps} />
+          <div className="min-w-0 flex-1">
+            <DashboardMain>{children}</DashboardMain>
+          </div>
         </div>
-      </div>
+      </ChatProvider>
     </div>
   );
 }

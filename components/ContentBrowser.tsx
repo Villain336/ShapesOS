@@ -303,7 +303,7 @@ export default function ContentBrowser({ projectId, siteId, sourceType, isMock }
             <button
               onClick={() => void save()}
               disabled={editBusy}
-              className="rounded bg-orange-700 px-3 py-1 text-xs font-medium text-white hover:bg-orange-800 disabled:opacity-50 active:scale-[0.96] transition-[background-color,transform] duration-150 ease-[cubic-bezier(0.2,0,0,1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2"
+              className="rounded bg-accent px-3 py-1 text-xs font-medium text-white hover:bg-accent-hover disabled:opacity-50 active:scale-[0.96] transition-[background-color,transform] duration-150 ease-[cubic-bezier(0.2,0,0,1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2"
             >
               {editBusy ? "Saving…" : "Save"}
             </button>

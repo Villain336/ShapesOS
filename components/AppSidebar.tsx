@@ -33,6 +33,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/vault/shadcn/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/vault/shadcn/avatar";
+import { useChat } from "@/components/chat/ChatContext";
+import ThreadListSection from "@/components/chat/ThreadListSection";
 
 export type SidebarUser = { name?: string | null; email?: string | null };
 export type SidebarWorkspace = { id: string; name: string };
@@ -44,6 +46,7 @@ const NAV_SECTIONS: {
   {
     items: [
       { href: "/dashboard", label: "Projects", icon: SquaresFour },
+      { href: "/dashboard/assistant", label: "AI Assistant", icon: TrendUp },
       { href: "/dashboard/reports", label: "Reports", icon: ChartBar },
       { href: "/dashboard/alerts", label: "Alerts", icon: Bell },
     ],
@@ -214,6 +217,11 @@ export function AppSidebar({
   currentWorkspaceId: string;
 }) {
   const pathname = usePathname();
+  const chat = useChat();
+  // One sidebar everywhere: on the assistant page it adjusts, gaining a
+  // contextual chat-thread section under the main nav (AI tab only).
+  const showThreads =
+    pathname === "/dashboard/assistant" && chat.tab === "ai" && chat.session !== null;
   return (
     <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col border-r border-line bg-surface md:flex">
       <div className="flex flex-col gap-3 px-3 pt-4">
@@ -227,6 +235,14 @@ export function AppSidebar({
       </div>
       <nav className="flex-1 overflow-y-auto px-2 py-4" aria-label="Dashboard">
         <NavItems pathname={pathname} />
+        {showThreads ? (
+          <div className="mt-5 border-t border-line pt-3">
+            <div className="mb-2 truncate px-3 text-[12px] font-medium text-ink-3">
+              Chats · {chat.session?.projectDomain}
+            </div>
+            <ThreadListSection />
+          </div>
+        ) : null}
       </nav>
       <div className="border-t border-line p-2">
         <UserMenu user={user} triggerClassName="w-full" />

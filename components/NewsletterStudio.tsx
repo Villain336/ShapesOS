@@ -59,8 +59,8 @@ const BLOCK_ICONS: Record<EmailBlockType, typeof TextT> = {
 };
 
 const BTN_PRIMARY =
-  "inline-flex items-center gap-1.5 rounded-lg bg-orange-700 px-3 py-1.5 text-sm font-medium text-white " +
-  "transition-[transform,background-color] duration-150 ease-[cubic-bezier(0.2,0,0,1)] hover:bg-orange-800 active:scale-[0.96] " +
+  "inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-white " +
+  "transition-[transform,background-color] duration-150 ease-[cubic-bezier(0.2,0,0,1)] hover:bg-accent-hover active:scale-[0.96] " +
   "disabled:opacity-50 disabled:pointer-events-none";
 const BTN_GHOST =
   "inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 px-3 py-1.5 text-sm text-zinc-500 " +

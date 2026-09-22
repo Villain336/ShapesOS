@@ -6,7 +6,7 @@
 
 import { usePathname } from "next/navigation";
 
-const FULL_BLEED_SUFFIX = ["/chat", "/automations"];
+const FULL_BLEED_SUFFIX = ["/chat", "/assistant", "/automations"];
 
 export function DashboardMain({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();

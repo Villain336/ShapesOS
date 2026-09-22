@@ -241,7 +241,7 @@ export default async function DashboardPage() {
         </div>
         {projects.length > 0 ? (
           <Link
-            href={`/dashboard/projects/${projects[0]!.id}/chat`}
+            href={`/dashboard/assistant?project=${projects[0]!.id}`}
             className="pressable inline-flex items-center gap-2 rounded-full bg-accent px-4 py-2 text-[13.5px] font-medium text-white transition-colors hover:bg-accent-hover"
           >
             <TrendUp className="size-4" weight="duotone" />

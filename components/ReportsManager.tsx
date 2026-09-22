@@ -209,7 +209,7 @@ export default function ReportsManager({ initialTemplates, brandKits, projects }
       <div className="flex flex-col gap-2">
         <button
           onClick={startNew}
-          className="rounded-md bg-orange-700 px-4 py-2 text-sm font-medium text-white hover:bg-orange-800"
+          className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-hover"
         >
           New template
         </button>
@@ -315,7 +315,7 @@ export default function ReportsManager({ initialTemplates, brandKits, projects }
               <button
                 onClick={saveTemplate}
                 disabled={saving}
-                className="rounded-md bg-orange-700 px-4 py-2 text-sm font-medium text-white hover:bg-orange-800 disabled:opacity-50"
+                className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-hover disabled:opacity-50"
               >
                 {saving ? "Saving…" : selectedId === "new" ? "Create template" : "Save template"}
               </button>
