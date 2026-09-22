@@ -1,11 +1,12 @@
 // Marketr — automation canvas: client island (redesign §2).
 //
 // Node-graph builder on React Flow v12: drag node types from the palette,
-// connect edges, edit node config in the inspector, save the graph, run it,
-// and review run history with per-node step statuses.
+// connect edges, edit node config in the inspector sheet, save the graph,
+// run it, and review run history with per-node step statuses.
 //
-// Light theme from the start: white canvas, zinc-200 edges, orange accents
-// for selected/running, red failed, green succeeded. Lucide icons only.
+// UI language: vault components only (Card, ValuePill, Button, Field,
+// TaskRows, GlideMenu, shadcn Sheet/Select/Input/Switch/Tabs/Tooltip).
+// Lucide icons only.
 
 "use client";
 
@@ -61,6 +62,42 @@ import {
   type ConfigField,
   type WorkflowNodeKind,
 } from "@/lib/workflow/catalog";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/vault/atoms/Button";
+import { Card } from "@/components/vault/Card";
+import { EmptyState } from "@/components/vault/EmptyState";
+import { Field } from "@/components/vault/Field";
+import { ValuePill } from "@/components/vault/atoms/ValuePill";
+import TaskRows, { type TaskRow } from "@/components/vault/primitives/TaskRows";
+import GlideMenu from "@/components/vault/primitives/GlideMenu";
+import { Input } from "@/components/vault/shadcn/input";
+import { Textarea } from "@/components/vault/shadcn/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/vault/shadcn/select";
+import { Switch } from "@/components/vault/shadcn/switch";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/vault/shadcn/sheet";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/vault/shadcn/tabs";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/vault/shadcn/tooltip";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -141,10 +178,10 @@ const ICONS: Record<string, typeof Play> = {
 };
 
 const KIND_STYLES: Record<string, string> = {
-  trigger: "bg-sky-50 text-sky-700 ring-sky-200",
-  action: "bg-orange-50 text-orange-700 ring-orange-200",
-  approval: "bg-amber-50 text-amber-700 ring-amber-200",
-  logic: "bg-violet-50 text-violet-700 ring-violet-200",
+  trigger: "bg-accent-tint text-accent-ink",
+  action: "bg-orange-tint text-orange",
+  approval: "bg-red-tint text-red",
+  logic: "bg-green-tint text-green",
 };
 
 const KIND_LABELS: Record<WorkflowNodeKind, string> = {
@@ -154,50 +191,67 @@ const KIND_LABELS: Record<WorkflowNodeKind, string> = {
   logic: "Logic",
 };
 
-const STATUS_STYLES: Record<string, string> = {
-  running: "bg-orange-500",
-  waiting_approval: "bg-amber-500",
-  succeeded: "bg-green-500",
-  failed: "bg-red-500",
-  skipped: "bg-zinc-400",
-  pending: "bg-zinc-300",
-  queued: "bg-zinc-300",
-  cancelled: "bg-zinc-500",
+const STATUS_TONES: Record<string, "neutral" | "green" | "orange" | "red" | "accent"> = {
+  running: "orange",
+  waiting_approval: "orange",
+  succeeded: "green",
+  active: "green",
+  paused: "orange",
+  failed: "red",
 };
+
+const STATUS_DOTS: Record<string, string> = {
+  running: "bg-orange",
+  waiting_approval: "bg-orange",
+  succeeded: "bg-green",
+  failed: "bg-red",
+  active: "bg-green",
+  paused: "bg-orange",
+};
+
+function StatusPill({ status }: { status: string }) {
+  return <ValuePill tone={STATUS_TONES[status] ?? "neutral"}>{status.replace(/_/g, " ")}</ValuePill>;
+}
 
 function statusDot(status?: string | null) {
   if (!status) return null;
-  const cls = STATUS_STYLES[status] ?? "bg-zinc-300";
+  const cls = STATUS_DOTS[status] ?? "bg-ink-3";
   const pulse = status === "running" ? " animate-pulse" : "";
-  return <span className={`absolute -right-1 -top-1 h-3 w-3 rounded-full ring-2 ring-white ${cls}${pulse}`} title={status.replace(/_/g, " ")} />;
+  return (
+    <span
+      className={`absolute -right-1 -top-1 z-10 h-3 w-3 rounded-full ring-2 ring-surface ${cls}${pulse}`}
+      title={status.replace(/_/g, " ")}
+    />
+  );
 }
 
 // ---------------------------------------------------------------------------
-// Custom node
+// Custom node (vault Card)
 // ---------------------------------------------------------------------------
 
 function WfNodeView({ data, selected }: NodeProps<WfNode>) {
   const def = nodeTypeDef(data.kind, data.type);
   const Icon = (def && ICONS[def.icon]) || WorkflowIcon;
   return (
-    <div
-      className={`relative min-w-[190px] max-w-[230px] rounded-xl border bg-white shadow-sm transition-shadow ${
-        selected ? "border-orange-400 ring-2 ring-orange-500/40" : "border-zinc-200"
-      }`}
+    <Card
+      className={cn(
+        "relative min-w-[190px] max-w-[230px] rounded-card",
+        selected && "ring-2 ring-accent",
+      )}
     >
       {statusDot(data.status)}
-      <Handle type="target" position={Position.Top} className="!h-2.5 !w-2.5 !border-2 !border-white !bg-zinc-400" />
+      <Handle type="target" position={Position.Top} className="!h-2.5 !w-2.5 !border-2 !border-surface !bg-ink-3" />
       <div className="flex items-center gap-2 px-3 py-2">
-        <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ring-1 ${KIND_STYLES[data.kind] ?? "bg-zinc-100 text-zinc-600 ring-zinc-200"}`}>
+        <span className={cn("flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ring-1 ring-line", KIND_STYLES[data.kind] ?? "bg-field text-ink-2")}>
           <Icon className="h-3.5 w-3.5" strokeWidth={2} />
         </span>
         <div className="min-w-0">
-          <div className="truncate text-[13px] font-semibold text-zinc-900">{data.label}</div>
-          <div className="text-[11px] capitalize text-zinc-500">{def?.label ?? data.type}</div>
+          <div className="truncate text-[13px] font-semibold text-ink">{data.label}</div>
+          <div className="text-[11px] capitalize text-ink-3">{def?.label ?? data.type}</div>
         </div>
       </div>
-      <Handle type="source" position={Position.Bottom} className="!h-2.5 !w-2.5 !border-2 !border-white !bg-zinc-400" />
-    </div>
+      <Handle type="source" position={Position.Bottom} className="!h-2.5 !w-2.5 !border-2 !border-surface !bg-ink-3" />
+    </Card>
   );
 }
 
@@ -229,53 +283,6 @@ function toFlowEdge(e: ServerEdge): WfEdge {
 }
 
 // ---------------------------------------------------------------------------
-// Small UI atoms (plain Tailwind — matches existing studio components)
-// ---------------------------------------------------------------------------
-
-function Btn({
-  children,
-  onClick,
-  disabled,
-  variant = "default",
-  className = "",
-  title,
-}: {
-  children: React.ReactNode;
-  onClick?: () => void;
-  disabled?: boolean;
-  variant?: "default" | "primary" | "danger" | "ghost";
-  className?: string;
-  title?: string;
-}) {
-  const base =
-    "inline-flex items-center justify-center gap-1.5 rounded-lg text-sm font-medium transition-all duration-150 active:scale-[0.96] disabled:pointer-events-none disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-500";
-  const variants: Record<string, string> = {
-    default: "border border-zinc-300 bg-white px-3 py-1.5 text-zinc-700 hover:bg-zinc-50",
-    primary: "bg-orange-600 px-3 py-1.5 text-white hover:bg-orange-700",
-    danger: "border border-red-200 bg-white px-3 py-1.5 text-red-600 hover:bg-red-50",
-    ghost: "px-2 py-1 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-700",
-  };
-  return (
-    <button type="button" onClick={onClick} disabled={disabled} title={title} className={`${base} ${variants[variant]} ${className}`}>
-      {children}
-    </button>
-  );
-}
-
-function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
-  return (
-    <label className="block">
-      <span className="mb-1 block text-xs font-medium text-zinc-600">{label}</span>
-      {children}
-      {hint && <span className="mt-1 block text-[11px] leading-snug text-zinc-400">{hint}</span>}
-    </label>
-  );
-}
-
-const inputCls =
-  "w-full rounded-lg border border-zinc-300 bg-white px-2.5 py-1.5 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/30";
-
-// ---------------------------------------------------------------------------
 // Config field editor (driven by the node catalog)
 // ---------------------------------------------------------------------------
 
@@ -291,7 +298,7 @@ function ConfigEditor({
   disabled: boolean;
 }) {
   if (fields.length === 0) {
-    return <p className="text-xs text-zinc-400">No configuration for this node.</p>;
+    return <p className="text-xs text-ink-3">No configuration for this node.</p>;
   }
   return (
     <div className="flex flex-col gap-3">
@@ -300,47 +307,46 @@ function ConfigEditor({
         return (
           <Field key={f.key} label={`${f.label}${f.required ? " *" : ""}`} hint={f.hint}>
             {f.type === "textarea" ? (
-              <textarea
-                className={`${inputCls} min-h-[64px] resize-y`}
+              <Textarea
                 value={typeof v === "string" ? v : ""}
                 placeholder={f.placeholder}
                 disabled={disabled}
                 onChange={(e) => onChange(f.key, e.target.value)}
               />
             ) : f.type === "select" ? (
-              <select
-                className={inputCls}
+              <Select
                 value={typeof v === "string" ? v : (f.options?.[0] ?? "")}
+                onValueChange={(val) => onChange(f.key, val)}
                 disabled={disabled}
-                onChange={(e) => onChange(f.key, e.target.value)}
               >
-                {(f.options ?? []).map((o) => (
-                  <option key={o} value={o}>
-                    {o}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {(f.options ?? []).map((o) => (
+                    <SelectItem key={o} value={o}>
+                      {o}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             ) : f.type === "number" ? (
-              <input
+              <Input
                 type="number"
-                className={inputCls}
                 value={typeof v === "number" ? v : typeof v === "string" ? v : ""}
                 placeholder={f.placeholder}
                 disabled={disabled}
                 onChange={(e) => onChange(f.key, e.target.value === "" ? "" : Number(e.target.value))}
               />
             ) : f.type === "checkbox" ? (
-              <input
-                type="checkbox"
-                className="h-4 w-4 rounded border-zinc-300 accent-orange-600"
+              <Switch
                 checked={v === true}
                 disabled={disabled}
-                onChange={(e) => onChange(f.key, e.target.checked)}
+                onCheckedChange={(checked) => onChange(f.key, checked)}
               />
             ) : (
-              <input
+              <Input
                 type="text"
-                className={inputCls}
                 value={typeof v === "string" ? v : ""}
                 placeholder={f.placeholder}
                 disabled={disabled}
@@ -355,7 +361,7 @@ function ConfigEditor({
 }
 
 // ---------------------------------------------------------------------------
-// Palette
+// Palette (GlideMenu rows, draggable)
 // ---------------------------------------------------------------------------
 
 function Palette({ canEdit }: { canEdit: boolean }) {
@@ -363,36 +369,40 @@ function Palette({ canEdit }: { canEdit: boolean }) {
     <div className="flex flex-col gap-4">
       {NODE_KINDS.map((kind) => (
         <div key={kind}>
-          <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-zinc-400">
+          <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-ink-3">
             {KIND_LABELS[kind]}
           </div>
-          <div className="flex flex-col gap-1">
-            {NODE_CATALOG[kind].map((def) => {
-              const Icon = ICONS[def.icon] || WorkflowIcon;
-              return (
-                <div
-                  key={def.type}
-                  draggable={canEdit}
-                  onDragStart={(e) => {
-                    e.dataTransfer.setData("application/wf-node", JSON.stringify({ kind, type: def.type }));
-                    e.dataTransfer.effectAllowed = "move";
-                  }}
-                  title={def.description}
-                  className={`flex items-center gap-2 rounded-lg border border-zinc-200 bg-white px-2.5 py-1.5 text-[13px] text-zinc-700 shadow-sm transition-all duration-150 ${
-                    canEdit ? "cursor-grab hover:border-orange-300 hover:shadow active:cursor-grabbing" : "opacity-60"
-                  }`}
-                >
-                  <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md ring-1 ${KIND_STYLES[kind]}`}>
-                    <Icon className="h-3.5 w-3.5" strokeWidth={2} />
-                  </span>
-                  <span className="truncate font-medium">{def.label}</span>
-                </div>
-              );
-            })}
-          </div>
+          <GlideMenu highlightClassName="inset-x-0 rounded-control bg-hover">
+            <div className="flex flex-col gap-1">
+              {NODE_CATALOG[kind].map((def) => {
+                const Icon = ICONS[def.icon] || WorkflowIcon;
+                return (
+                  <div
+                    key={def.type}
+                    data-menu-row
+                    draggable={canEdit}
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData("application/wf-node", JSON.stringify({ kind, type: def.type }));
+                      e.dataTransfer.effectAllowed = "move";
+                    }}
+                    title={def.description}
+                    className={cn(
+                      "flex items-center gap-2 rounded-control border border-line bg-surface px-2.5 py-1.5 text-[13px] text-ink shadow-hairline",
+                      canEdit ? "cursor-grab hover:border-line-strong active:cursor-grabbing" : "opacity-60",
+                    )}
+                  >
+                    <span className={cn("flex h-6 w-6 shrink-0 items-center justify-center rounded-md ring-1 ring-line", KIND_STYLES[kind])}>
+                      <Icon className="h-3.5 w-3.5" strokeWidth={2} />
+                    </span>
+                    <span className="truncate font-medium">{def.label}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </GlideMenu>
         </div>
       ))}
-      <p className="text-[11px] leading-snug text-zinc-400">
+      <p className="text-[11px] leading-snug text-ink-3">
         Drag a node onto the canvas, then drag from a handle to connect it. Click a node to edit its
         config; click an edge to label it true/false for condition branches.
       </p>
@@ -403,16 +413,6 @@ function Palette({ canEdit }: { canEdit: boolean }) {
 // ---------------------------------------------------------------------------
 // Main island
 // ---------------------------------------------------------------------------
-
-function statusChip(status: string) {
-  const dot = STATUS_STYLES[status] ?? "bg-zinc-300";
-  return (
-    <span className="inline-flex items-center gap-1.5 rounded-full bg-zinc-100 px-2 py-0.5 text-[11px] font-medium text-zinc-700">
-      <span className={`h-1.5 w-1.5 rounded-full ${dot}`} />
-      {status.replace(/_/g, " ")}
-    </span>
-  );
-}
 
 function CanvasInner({
   projectId,
@@ -764,7 +764,7 @@ function CanvasInner({
       edges.map((e) => ({
         ...e,
         style: {
-          stroke: selEdgeId === e.id ? "#f97316" : "#d4d4d8",
+          stroke: selEdgeId === e.id ? "#ea580c" : "#d4d4d8",
           strokeWidth: selEdgeId === e.id ? 2.5 : 2,
         },
         labelStyle: { fontSize: 11, fontWeight: 600, fill: "#71717a" },
@@ -775,124 +775,171 @@ function CanvasInner({
     [edges, selEdgeId],
   );
 
+  const closePropertySheet = useCallback(() => {
+    setSelNodeId(null);
+    setSelEdgeId(null);
+  }, []);
+
   // --- render ------------------------------------------------------------------
   return (
     <div className="flex min-h-0 flex-1 gap-4">
       {/* Left: workflows + palette */}
-      <div className="flex w-60 shrink-0 flex-col gap-4 overflow-y-auto rounded-xl border border-zinc-200 bg-white p-3">
+      <Card className="flex w-60 shrink-0 flex-col gap-4 overflow-y-auto p-3">
         <div>
-          <div className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-zinc-400">Workflows</div>
-          <div className="flex flex-col gap-1">
-            {workflows.map((w) => {
-              const lastRun = w.runs?.[0];
-              const active = w.id === selectedId;
-              return (
-                <button
-                  key={w.id}
-                  type="button"
-                  onClick={() => loadWorkflow(w.id)}
-                  className={`flex items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm transition-colors duration-150 ${
-                    active ? "bg-orange-50 ring-1 ring-orange-200" : "hover:bg-zinc-50"
-                  }`}
-                >
-                  <WorkflowIcon className={`h-4 w-4 shrink-0 ${active ? "text-orange-600" : "text-zinc-400"}`} strokeWidth={2} />
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate font-medium text-zinc-900">{w.name}</span>
-                    <span className="block text-[11px] text-zinc-500">
-                      {w.status}
-                      {lastRun ? ` · last run ${lastRun.status.replace(/_/g, " ")}` : ""}
-                    </span>
-                  </span>
-                  {lastRun && <span className={`h-2 w-2 shrink-0 rounded-full ${STATUS_STYLES[lastRun.status] ?? "bg-zinc-300"}`} />}
-                </button>
-              );
-            })}
-            {workflows.length === 0 && (
-              <p className="text-xs text-zinc-400">No workflows yet — create one below.</p>
-            )}
-          </div>
+          <div className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-ink-3">Workflows</div>
+          {workflows.length === 0 ? (
+            <p className="text-xs text-ink-3">No workflows yet — create one below.</p>
+          ) : (
+            <GlideMenu highlightClassName="inset-x-0 rounded-control bg-hover">
+              <div className="flex flex-col gap-0.5">
+                {workflows.map((w) => {
+                  const lastRun = w.runs?.[0];
+                  const active = w.id === selectedId;
+                  return (
+                    <button
+                      key={w.id}
+                      type="button"
+                      data-menu-row
+                      onClick={() => loadWorkflow(w.id)}
+                      className={cn(
+                        "flex items-center gap-2 rounded-control px-2.5 py-2 text-left text-sm",
+                        active && "bg-accent-tint shadow-hairline",
+                      )}
+                    >
+                      <WorkflowIcon className={cn("h-4 w-4 shrink-0", active ? "text-accent-ink" : "text-ink-3")} strokeWidth={2} />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate font-medium text-ink">{w.name}</span>
+                        <span className="block text-[11px] text-ink-3">
+                          {w.status}
+                          {lastRun ? ` · last run ${lastRun.status.replace(/_/g, " ")}` : ""}
+                        </span>
+                      </span>
+                      {lastRun && <span className={cn("h-2 w-2 shrink-0 rounded-full", STATUS_DOTS[lastRun.status] ?? "bg-ink-3")} />}
+                    </button>
+                  );
+                })}
+              </div>
+            </GlideMenu>
+          )}
           {canEdit && (
             <div className="mt-2 flex gap-1.5">
-              <input
-                className={`${inputCls} !py-1.5 text-[13px]`}
+              <Input
                 placeholder="New workflow name…"
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && createWorkflow()}
+                className="h-7 text-[13px]"
               />
-              <Btn onClick={createWorkflow} disabled={creating || !newName.trim()} variant="primary" className="!px-2.5" title="Create workflow">
-                {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-              </Btn>
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <Button
+                      type="button"
+                      size="xs"
+                      variant="accent"
+                      onClick={createWorkflow}
+                      disabled={creating || !newName.trim()}
+                      aria-label="Create workflow"
+                      className="shrink-0"
+                    >
+                      {creating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
+                    </Button>
+                  }
+                />
+                <TooltipContent>Create workflow</TooltipContent>
+              </Tooltip>
             </div>
           )}
         </div>
-        <div className="border-t border-zinc-100 pt-3">
-          <div className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-zinc-400">Node palette</div>
+        <div className="border-t border-line pt-3">
+          <div className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-ink-3">Node palette</div>
           <Palette canEdit={canEdit} />
         </div>
-      </div>
+      </Card>
 
       {/* Center: canvas */}
-      <div className="relative flex min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-zinc-200 bg-white">
+      <Card className="relative flex min-w-0 flex-1 flex-col overflow-hidden rounded-card">
         {error && (
-          <div className="flex items-start gap-2 border-b border-red-100 bg-red-50 px-4 py-2 text-sm text-red-700">
+          <div className="flex items-start gap-2 border-b border-line bg-red-tint px-4 py-2 text-sm text-red">
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={2} />
             <span className="flex-1">{error}</span>
-            <button type="button" onClick={() => setError(null)} className="text-red-400 hover:text-red-600" aria-label="Dismiss">
-              <X className="h-4 w-4" />
-            </button>
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Button type="button" size="xs" variant="quiet" onClick={() => setError(null)} aria-label="Dismiss error">
+                    <X className="h-3.5 w-3.5" />
+                  </Button>
+                }
+              />
+              <TooltipContent>Dismiss</TooltipContent>
+            </Tooltip>
           </div>
         )}
         {selectedRun && (
-          <div className="flex items-center gap-3 border-b border-zinc-100 bg-zinc-50 px-4 py-2 text-sm">
-            {statusChip(selectedRun.status)}
-            <span className="text-zinc-500">
+          <div className="flex items-center gap-3 border-b border-line bg-field px-4 py-2 text-sm">
+            <StatusPill status={selectedRun.status} />
+            <span className="text-ink-2">
               Run {selectedRun.triggerKind} · {new Date(selectedRun.startedAt).toLocaleString()}
             </span>
             {selectedRun.status === "waiting_approval" && (
               <a
                 href={`/dashboard/projects/${projectId}/autopilot`}
-                className="font-medium text-orange-600 hover:text-orange-700"
+                className="font-medium text-accent-ink hover:underline"
               >
                 Review in approval queue →
               </a>
             )}
-            {selectedRun.error && <span className="truncate text-red-600">{selectedRun.error}</span>}
-            <button
-              type="button"
-              onClick={() => selectRun(null)}
-              className="ml-auto inline-flex items-center gap-1 text-xs text-zinc-500 hover:text-zinc-700"
-            >
+            {selectedRun.error && <span className="truncate text-red">{selectedRun.error}</span>}
+            <Button type="button" size="xs" variant="quiet" onClick={() => selectRun(null)} className="ml-auto">
               <X className="h-3.5 w-3.5" /> Clear run overlay
-            </button>
+            </Button>
           </div>
         )}
-        <div className="flex items-center gap-2 border-b border-zinc-100 px-4 py-2">
-          <span className="truncate text-sm font-semibold text-zinc-900">{wf?.name ?? "No workflow selected"}</span>
-          {wf && (
-            <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[11px] font-medium text-zinc-600">{wf.status}</span>
-          )}
+        <div className="flex items-center gap-2 border-b border-line px-4 py-2">
+          <span className="truncate text-sm font-semibold text-ink">{wf?.name ?? "No workflow selected"}</span>
+          {wf && <StatusPill status={wf.status} />}
           {dirty && canEdit && (
-            <span className="inline-flex items-center gap-1 text-[11px] text-amber-600">
-              <span className="h-1.5 w-1.5 rounded-full bg-amber-500" /> Unsaved changes
-            </span>
+            <ValuePill tone="orange">
+              <span className="mr-1 h-1.5 w-1.5 rounded-full bg-orange" /> Unsaved changes
+            </ValuePill>
           )}
           <div className="ml-auto flex items-center gap-2">
-            <Btn onClick={refreshRuns} variant="ghost" title="Refresh run history">
-              <History className="h-4 w-4" />
-            </Btn>
-            <Btn onClick={handleSave} disabled={!canEdit || !dirty || saving}>
-              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Button type="button" size="xs" variant="secondary" onClick={refreshRuns} aria-label="Refresh run history">
+                    <History className="h-3.5 w-3.5" />
+                  </Button>
+                }
+              />
+              <TooltipContent>Refresh run history</TooltipContent>
+            </Tooltip>
+            <Button type="button" size="sm" variant="secondary" onClick={handleSave} disabled={!canEdit || !dirty || saving}>
+              {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
               Save
-            </Btn>
-            <Btn onClick={handleRun} disabled={!canEdit || running || !wf} variant="primary" title={dirty ? "Saves first, then runs" : "Run now"}>
-              {running ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
-              {running ? "Running…" : "Run now"}
-            </Btn>
+            </Button>
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="accent"
+                    onClick={handleRun}
+                    disabled={!canEdit || running || !wf}
+                    aria-label={dirty ? "Saves first, then runs" : "Run now"}
+                  >
+                    {running ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
+                    {running ? "Running…" : "Run now"}
+                  </Button>
+                }
+              />
+              <TooltipContent>{dirty ? "Saves first, then runs" : "Run now"}</TooltipContent>
+            </Tooltip>
           </div>
         </div>
         <div
-          className="relative min-h-0 flex-1 bg-white"
+          className="relative min-h-0 flex-1 bg-surface"
           onDrop={onDrop}
           onDragOver={(e) => {
             e.preventDefault();
@@ -900,8 +947,12 @@ function CanvasInner({
           }}
         >
           {!wf ? (
-            <div className="flex h-full items-center justify-center text-sm text-zinc-400">
-              Create or select a workflow to start building.
+            <div className="flex h-full items-center justify-center">
+              <EmptyState
+                icon={<WorkflowIcon className="h-5 w-5" strokeWidth={2} />}
+                title="No workflow selected"
+                description="Create or select a workflow to start building."
+              />
             </div>
           ) : (
             <ReactFlow
@@ -924,38 +975,57 @@ function CanvasInner({
               proOptions={{ hideAttribution: true }}
             >
               <Background color="#e9e9ec" gap={24} />
-              <Controls className="!border-zinc-200 !bg-white !shadow-sm" />
+              <Controls className="!border-line !bg-surface !shadow-hairline" />
             </ReactFlow>
           )}
         </div>
-      </div>
+      </Card>
 
       {/* Right: inspector / runs */}
-      <div className="flex w-72 shrink-0 flex-col overflow-hidden rounded-xl border border-zinc-200 bg-white">
-        <div className="flex border-b border-zinc-100">
-          {(
-            [
-              { id: "inspector", label: "Inspector", icon: MousePointer2 },
-              { id: "runs", label: "Runs", icon: History },
-            ] as const
-          ).map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              onClick={() => setTab(t.id)}
-              className={`flex flex-1 items-center justify-center gap-1.5 px-3 py-2.5 text-[13px] font-medium transition-colors duration-150 ${
-                tab === t.id ? "text-orange-700" : "text-zinc-500 hover:text-zinc-700"
-              }`}
-            >
-              <t.icon className="h-4 w-4" strokeWidth={2} />
-              {t.label}
-              <span className={`absolute bottom-0 h-0.5 w-full ${tab === t.id ? "bg-orange-600" : "bg-transparent"}`} />
-            </button>
-          ))}
-        </div>
-        <div className="min-h-0 flex-1 overflow-y-auto p-3">
-          {tab === "inspector" ? (
-            selNode ? (
+      <Card className="flex w-72 shrink-0 flex-col overflow-hidden">
+        <Tabs value={tab} onValueChange={(v) => setTab(v as "inspector" | "runs")} className="flex min-h-0 flex-1 flex-col">
+          <TabsList variant="line" className="w-full px-2 pt-1">
+            <TabsTrigger value="inspector" className="flex-1">
+              <MousePointer2 className="h-3.5 w-3.5" strokeWidth={2} /> Inspector
+            </TabsTrigger>
+            <TabsTrigger value="runs" className="flex-1">
+              <History className="h-3.5 w-3.5" strokeWidth={2} /> Runs
+            </TabsTrigger>
+          </TabsList>
+          <TabsContent value="inspector" className="min-h-0 flex-1 overflow-y-auto p-3">
+            <WorkflowSettings
+              settings={settings}
+              canEdit={canEdit}
+              saving={savingSettings}
+              onChange={(patch) => setSettings((s) => ({ ...s, ...patch }))}
+              onSave={saveSettings}
+              onDelete={deleteWorkflow}
+            />
+          </TabsContent>
+          <TabsContent value="runs" className="min-h-0 flex-1 overflow-y-auto p-3">
+            <RunsPanel
+              runs={wfRuns}
+              selectedRun={selectedRun}
+              onSelect={selectRun}
+              projectId={projectId}
+            />
+          </TabsContent>
+        </Tabs>
+      </Card>
+
+      {/* Property editor sheet */}
+      <Sheet open={!!(selNode || selEdge)} onOpenChange={(open) => { if (!open) closePropertySheet(); }}>
+        <SheetContent className="sm:max-w-md">
+          <SheetHeader>
+            <SheetTitle>{selNode ? "Node settings" : "Connection settings"}</SheetTitle>
+            <SheetDescription>
+              {selNode
+                ? "Edit the label and configuration for this node. Changes are unsaved until you press Save."
+                : "Label this connection for condition branches."}
+            </SheetDescription>
+          </SheetHeader>
+          <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-6">
+            {selNode ? (
               <NodeInspector
                 node={selNode}
                 def={selNodeDef}
@@ -973,32 +1043,16 @@ function CanvasInner({
                 onLabel={(label) => updateEdgeLabel(selEdge.id, label)}
                 onDelete={() => deleteEdge(selEdge.id)}
               />
-            ) : (
-              <WorkflowSettings
-                settings={settings}
-                canEdit={canEdit}
-                saving={savingSettings}
-                onChange={(patch) => setSettings((s) => ({ ...s, ...patch }))}
-                onSave={saveSettings}
-                onDelete={deleteWorkflow}
-              />
-            )
-          ) : (
-            <RunsPanel
-              runs={wfRuns}
-              selectedRun={selectedRun}
-              onSelect={selectRun}
-              projectId={projectId}
-            />
-          )}
-        </div>
-      </div>
+            ) : null}
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Inspectors
+// Inspectors (rendered inside the property sheet)
 // ---------------------------------------------------------------------------
 
 function NodeInspector({
@@ -1020,36 +1074,34 @@ function NodeInspector({
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <span className={`rounded-md px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide ring-1 ${KIND_STYLES[node.data.kind] ?? ""}`}>
-            {node.data.kind}
-          </span>
-          <span className="text-xs text-zinc-500">{def?.label ?? node.data.type}</span>
+          <ValuePill tone="neutral" className="uppercase">{node.data.kind}</ValuePill>
+          <span className="text-xs text-ink-3">{def?.label ?? node.data.type}</span>
         </div>
         {canEdit && (
-          <Btn variant="danger" onClick={onDelete} className="!px-2 !py-1" title="Delete node">
-            <Trash2 className="h-3.5 w-3.5" />
-          </Btn>
+          <Button type="button" size="xs" variant="ghost" onClick={onDelete} title="Delete node" className="text-red">
+            <Trash2 className="h-3.5 w-3.5" /> Delete
+          </Button>
         )}
       </div>
       <Field label="Label">
-        <input className={inputCls} value={node.data.label} disabled={!canEdit} onChange={(e) => onLabel(e.target.value)} />
+        <Input value={node.data.label} disabled={!canEdit} onChange={(e) => onLabel(e.target.value)} />
       </Field>
       {def && <ConfigEditor fields={def.fields} config={node.data.config} onChange={onConfig} disabled={!canEdit} />}
       {node.data.type === "condition" && (
-        <p className="rounded-lg bg-violet-50 px-2.5 py-2 text-[11px] leading-snug text-violet-700">
+        <p className="rounded-control bg-field px-3 py-2 text-[11px] leading-snug text-ink-2">
           Branch tip: click an outgoing edge and set its label to <b>true</b> or <b>false</b>. Unlabeled
           edges are followed on the default path.
         </p>
       )}
       {node.data.type === "approval_gate" && (
-        <p className="rounded-lg bg-amber-50 px-2.5 py-2 text-[11px] leading-snug text-amber-700">
+        <p className="rounded-control bg-field px-3 py-2 text-[11px] leading-snug text-ink-2">
           Pauses the run and pushes a pending item into the approval queue. Approve to resume, reject to
           cancel the run.
         </p>
       )}
       {node.data.status && (
-        <div className="flex items-center gap-2 text-xs text-zinc-500">
-          Last run status: {statusChip(node.data.status)}
+        <div className="flex items-center gap-2 text-xs text-ink-3">
+          Last run status: <StatusPill status={node.data.status} />
         </div>
       )}
     </div>
@@ -1071,24 +1123,28 @@ function EdgeInspector({
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
-        <span className="text-sm font-semibold text-zinc-900">Connection</span>
+        <span className="text-sm font-semibold text-ink">Connection</span>
         {canEdit && (
-          <Btn variant="danger" onClick={onDelete} className="!px-2 !py-1" title="Delete edge">
-            <Trash2 className="h-3.5 w-3.5" />
-          </Btn>
+          <Button type="button" size="xs" variant="ghost" onClick={onDelete} title="Delete edge" className="text-red">
+            <Trash2 className="h-3.5 w-3.5" /> Delete
+          </Button>
         )}
       </div>
       <Field label="Branch label" hint='For condition branches: "true" or "false". Empty = default path.'>
-        <select
-          className={inputCls}
-          value={label ?? ""}
+        <Select
+          value={label ?? "none"}
+          onValueChange={(v) => onLabel(v === "none" ? null : v)}
           disabled={!canEdit}
-          onChange={(e) => onLabel(e.target.value || null)}
         >
-          <option value="">(none — default path)</option>
-          <option value="true">true</option>
-          <option value="false">false</option>
-        </select>
+          <SelectTrigger className="w-full">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none">(none — default path)</SelectItem>
+            <SelectItem value="true">true</SelectItem>
+            <SelectItem value="false">false</SelectItem>
+          </SelectContent>
+        </Select>
       </Field>
     </div>
   );
@@ -1111,54 +1167,73 @@ function WorkflowSettings({
 }) {
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center gap-2 text-sm font-semibold text-zinc-900">
-        <Settings2 className="h-4 w-4 text-zinc-400" strokeWidth={2} />
+      <div className="flex items-center gap-2 text-sm font-semibold text-ink">
+        <Settings2 className="h-4 w-4 text-ink-3" strokeWidth={2} />
         Workflow settings
       </div>
       <Field label="Name">
-        <input className={inputCls} value={settings.name} disabled={!canEdit} onChange={(e) => onChange({ name: e.target.value })} />
+        <Input value={settings.name} disabled={!canEdit} onChange={(e) => onChange({ name: e.target.value })} />
       </Field>
       <Field label="Description">
-        <textarea className={`${inputCls} min-h-[56px] resize-y`} value={settings.description} disabled={!canEdit} onChange={(e) => onChange({ description: e.target.value })} />
+        <Textarea value={settings.description} disabled={!canEdit} onChange={(e) => onChange({ description: e.target.value })} />
       </Field>
       <Field label="Status">
-        <select className={inputCls} value={settings.status} disabled={!canEdit} onChange={(e) => onChange({ status: e.target.value })}>
-          <option value="draft">draft</option>
-          <option value="active">active</option>
-          <option value="paused">paused</option>
-          <option value="archived">archived</option>
-        </select>
+        <Select value={settings.status} onValueChange={(v) => { if (v !== null) onChange({ status: v }); }} disabled={!canEdit}>
+          <SelectTrigger className="w-full">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="draft">draft</SelectItem>
+            <SelectItem value="active">active</SelectItem>
+            <SelectItem value="paused">paused</SelectItem>
+            <SelectItem value="archived">archived</SelectItem>
+          </SelectContent>
+        </Select>
       </Field>
       <Field label="Schedule (cron)" hint="Fires automatically via /api/cron/workflows. Empty = manual only.">
-        <input className={inputCls} value={settings.schedule} disabled={!canEdit} placeholder="0 9 * * *" onChange={(e) => onChange({ schedule: e.target.value })} />
+        <Input value={settings.schedule} disabled={!canEdit} placeholder="0 9 * * *" onChange={(e) => onChange({ schedule: e.target.value })} />
       </Field>
-      <label className="flex items-center gap-2 text-sm text-zinc-700">
-        <input
-          type="checkbox"
-          className="h-4 w-4 rounded border-zinc-300 accent-orange-600"
-          checked={settings.enabled}
-          disabled={!canEdit}
-          onChange={(e) => onChange({ enabled: e.target.checked })}
-        />
-        Enabled
-      </label>
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-[13px] text-ink-2">Enabled</span>
+        <Switch checked={settings.enabled} disabled={!canEdit} onCheckedChange={(checked) => onChange({ enabled: checked })} />
+      </div>
       {canEdit && (
         <div className="flex gap-2">
-          <Btn onClick={onSave} disabled={saving} variant="primary" className="flex-1">
-            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+          <Button type="button" size="sm" variant="accent" onClick={onSave} disabled={saving} className="flex-1">
+            {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
             Save settings
-          </Btn>
-          <Btn onClick={onDelete} variant="danger" title="Delete workflow">
-            <Trash2 className="h-4 w-4" />
-          </Btn>
+          </Button>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button type="button" size="sm" variant="ghost" onClick={onDelete} aria-label="Delete workflow" className="text-red">
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              }
+            />
+            <TooltipContent>Delete workflow</TooltipContent>
+          </Tooltip>
         </div>
       )}
-      <p className="text-[11px] leading-snug text-zinc-400">
+      <p className="text-[11px] leading-snug text-ink-3">
         Only <b>active</b> + enabled workflows run. Manual runs need an active workflow; the kill switch
         in Content autopilot blocks all runs with a 423.
       </p>
     </div>
   );
+}
+
+function stepTaskRow(s: ServerStep): TaskRow {
+  return {
+    key: s.id,
+    label: s.nodeLabel,
+    amount: s.status.replace(/_/g, " "),
+    status: s.status === "succeeded" ? "done" : s.status === "running" ? "running" : "sequence",
+    details: [
+      { label: "Kind", meta: s.nodeKind },
+      ...(s.error ? [{ label: "Error", meta: s.error }] : []),
+    ],
+  };
 }
 
 function RunsPanel({
@@ -1173,54 +1248,55 @@ function RunsPanel({
   projectId: string;
 }) {
   if (runs.length === 0) {
-    return <p className="text-xs text-zinc-400">No runs yet. Press “Run now” to execute the saved graph.</p>;
+    return (
+      <EmptyState
+        icon={<History className="h-5 w-5" strokeWidth={2} />}
+        title="No runs yet"
+        description="Press “Run now” to execute the saved graph."
+      />
+    );
   }
   return (
     <div className="flex flex-col gap-2">
-      {runs.map((r) => {
-        const active = selectedRun?.id === r.id;
-        return (
-          <button
-            key={r.id}
-            type="button"
-            onClick={() => onSelect(active ? null : r.id)}
-            className={`rounded-lg border px-2.5 py-2 text-left transition-colors duration-150 ${
-              active ? "border-orange-300 bg-orange-50" : "border-zinc-200 bg-white hover:border-zinc-300"
-            }`}
-          >
-            <div className="flex items-center justify-between gap-2">
-              {statusChip(r.status)}
-              <span className="text-[11px] text-zinc-400">{new Date(r.startedAt).toLocaleString()}</span>
-            </div>
-            <div className="mt-1 flex items-center justify-between text-[11px] text-zinc-500">
-              <span>{r.triggerKind} · {r._count?.steps ?? r.steps?.length ?? 0} steps</span>
-              <ChevronRight className="h-3.5 w-3.5" />
-            </div>
-            {r.error && <div className="mt-1 truncate text-[11px] text-red-600">{r.error}</div>}
-          </button>
-        );
-      })}
+      <GlideMenu highlightClassName="inset-x-0 rounded-control bg-hover">
+        <div className="flex flex-col gap-1">
+          {runs.map((r) => {
+            const active = selectedRun?.id === r.id;
+            return (
+              <button
+                key={r.id}
+                type="button"
+                data-menu-row
+                onClick={() => onSelect(active ? null : r.id)}
+                className={cn(
+                  "rounded-control border px-2.5 py-2 text-left",
+                  active ? "border-line-strong bg-accent-tint" : "border-line bg-surface hover:border-line-strong",
+                )}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <StatusPill status={r.status} />
+                  <span className="text-[11px] text-ink-3">{new Date(r.startedAt).toLocaleString()}</span>
+                </div>
+                <div className="mt-1 flex items-center justify-between text-[11px] text-ink-3">
+                  <span>{r.triggerKind} · {r._count?.steps ?? r.steps?.length ?? 0} steps</span>
+                  <ChevronRight className="h-3.5 w-3.5" />
+                </div>
+                {r.error && <div className="mt-1 truncate text-[11px] text-red">{r.error}</div>}
+              </button>
+            );
+          })}
+        </div>
+      </GlideMenu>
       {selectedRun?.steps && selectedRun.steps.length > 0 && (
-        <div className="mt-2 border-t border-zinc-100 pt-2">
-          <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-zinc-400">
+        <div className="mt-2 border-t border-line pt-2">
+          <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-ink-3">
             Steps — {new Date(selectedRun.startedAt).toLocaleString()}
           </div>
-          <div className="flex flex-col gap-1">
-            {selectedRun.steps.map((s) => (
-              <div key={s.id} className="flex items-start gap-2 rounded-md bg-zinc-50 px-2 py-1.5">
-                <span className={`mt-1 h-2 w-2 shrink-0 rounded-full ${STATUS_STYLES[s.status] ?? "bg-zinc-300"}`} />
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-[12px] font-medium text-zinc-800">{s.nodeLabel}</div>
-                  <div className="text-[11px] text-zinc-500">{s.status.replace(/_/g, " ")}</div>
-                  {s.error && <div className="text-[11px] text-red-600">{s.error}</div>}
-                </div>
-              </div>
-            ))}
-          </div>
+          <TaskRows variant="List" rows={selectedRun.steps.map(stepTaskRow)} />
           {selectedRun.status === "waiting_approval" && (
             <a
               href={`/dashboard/projects/${projectId}/autopilot`}
-              className="mt-2 block rounded-lg bg-amber-50 px-2.5 py-2 text-[12px] font-medium text-amber-700 hover:bg-amber-100"
+              className="mt-2 block rounded-control bg-orange-tint px-2.5 py-2 text-[12px] font-medium text-orange"
             >
               Waiting on approval — review in the approval queue →
             </a>

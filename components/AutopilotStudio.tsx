@@ -1,10 +1,57 @@
 // Marketr — content autopilot studio UI (milestone 18).
 // Client island: rules (create/edit, cadence, auto-approve), approval queue
-// (preview drawer, approve/reject/publish, bulk), activity (runs), kill switch.
+// (preview dialog, approve/reject/publish, bulk), activity (runs), kill switch.
+//
+// UI language: vault components only (Button, Card, ValuePill, Field,
+// EmptyState, TaskRows, shadcn Tabs/Select/Checkbox/Switch/Dialog/Input).
+// Lucide icons only.
 
 "use client";
 
 import { useEffect, useState } from "react";
+import { Button } from "@/components/vault/atoms/Button";
+import { Card, CardBody, CardHeader } from "@/components/vault/Card";
+import { EmptyState } from "@/components/vault/EmptyState";
+import { Field } from "@/components/vault/Field";
+import { ValuePill } from "@/components/vault/atoms/ValuePill";
+import TaskRows, { type TaskRow } from "@/components/vault/primitives/TaskRows";
+import { Checkbox } from "@/components/vault/shadcn/checkbox";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/vault/shadcn/dialog";
+import { Input } from "@/components/vault/shadcn/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/vault/shadcn/select";
+import { Switch } from "@/components/vault/shadcn/switch";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/vault/shadcn/tabs";
+import {
+  AlertTriangle,
+  Eye,
+  Inbox,
+  ListChecks,
+  Activity as ActivityIcon,
+  Loader2,
+  OctagonAlert,
+  Pencil,
+  Play,
+  Plus,
+  Trash2,
+} from "lucide-react";
 
 export interface RuleRow {
   id: string;
@@ -71,12 +118,12 @@ const SOURCE_LABELS: Record<string, string> = {
   keyword_opportunity: "Keyword opportunities",
 };
 
-const STATUS_COLORS: Record<string, string> = {
-  pending: "bg-amber-100/40 text-amber-700",
-  approved: "bg-emerald-900/40 text-emerald-700",
-  rejected: "bg-zinc-200/40 text-zinc-500",
-  published: "bg-sky-100/40 text-sky-700",
-  killed: "bg-red-100/40 text-red-700",
+const QUEUE_TONES: Record<string, "neutral" | "green" | "orange" | "red" | "accent"> = {
+  pending: "orange",
+  approved: "green",
+  rejected: "neutral",
+  published: "accent",
+  killed: "red",
 };
 
 const KIND_LABELS: Record<string, string> = {
@@ -90,6 +137,22 @@ async function api(path: string, opts?: RequestInit) {
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error ?? `Request failed (${res.status})`);
   return data;
+}
+
+function runTaskRow(run: RunRow): TaskRow {
+  return {
+    key: run.id,
+    label: run.rule.name,
+    amount: `${run.itemsGenerated} generated`,
+    status: run.status === "completed" ? "done" : run.status === "running" ? "running" : "sequence",
+    details: [
+      { label: "Generated", meta: String(run.itemsGenerated) },
+      { label: "Approved", meta: String(run.itemsApproved) },
+      { label: "Published", meta: String(run.itemsPublished) },
+      { label: "By", meta: run.createdBy ?? "system" },
+      ...(run.error ? [{ label: "Error", meta: run.error }] : []),
+    ],
+  };
 }
 
 export default function AutopilotStudio({ projectId, canEdit, isAdmin, initialRules, templates, sites, initialKill }: Props) {
@@ -195,205 +258,285 @@ export default function AutopilotStudio({ projectId, canEdit, isAdmin, initialRu
     });
   }
 
+  const approveItem = (item: QueueItem) =>
+    doAction(`approve-${item.id}`, () =>
+      api(`/api/autopilot/items/${item.id}/approve`, { method: "POST", body: JSON.stringify({ projectId }) }),
+    );
+
+  const rejectItem = (item: QueueItem) => {
+    const note = prompt("Rejection note (optional):");
+    doAction(`reject-${item.id}`, () =>
+      api(`/api/autopilot/items/${item.id}/reject`, { method: "POST", body: JSON.stringify({ projectId, note }) }),
+    );
+  };
+
   return (
     <div className="flex flex-col gap-6">
       {killed && (
-        <div className="rounded-lg border border-red-200 bg-red-50/50 px-4 py-3 text-sm text-red-700">
-          🛑 Autopilot is <strong>killed</strong>
-          {projectKilled && workspaceKilled ? " at project and workspace level" : projectKilled ? " for this project" : " at workspace level"}
-          . Runs, approvals, and publishing are frozen. Release the kill switch below to resume (nothing resumes silently).
+        <div className="flex items-start gap-2.5 rounded-card bg-red-tint px-4 py-3 text-sm text-red">
+          <OctagonAlert className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={2} />
+          <span>
+            Autopilot is <strong>killed</strong>
+            {projectKilled && workspaceKilled ? " at project and workspace level" : projectKilled ? " for this project" : " at workspace level"}
+            . Runs, approvals, and publishing are frozen. Release the kill switch below to resume (nothing resumes silently).
+          </span>
         </div>
       )}
       {error && (
-        <div className="rounded-lg border border-red-200 bg-red-50/40 px-4 py-3 text-sm text-red-700">
-          {error}
-          <button className="ml-3 underline" onClick={() => setError(null)}>dismiss</button>
+        <div className="flex items-start gap-2.5 rounded-card bg-red-tint px-4 py-3 text-sm text-red">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={2} />
+          <span className="flex-1">{error}</span>
+          <Button type="button" size="xs" variant="quiet" onClick={() => setError(null)}>
+            Dismiss
+          </Button>
         </div>
       )}
 
-      <div className="flex gap-2 border-b border-zinc-200">
-        {(["queue", "rules", "activity"] as const).map((t) => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={`px-4 py-2 text-sm font-medium capitalize ${tab === t ? "border-b-2 border-zinc-100 text-zinc-900" : "text-zinc-500 hover:text-zinc-600"}`}
+      <Tabs value={tab} onValueChange={(v) => setTab(v as "rules" | "queue" | "activity")}>
+        <div className="flex items-end justify-between gap-2 border-b border-line">
+          <TabsList variant="line">
+            <TabsTrigger value="queue" className="capitalize">Queue</TabsTrigger>
+            <TabsTrigger value="rules" className="capitalize">Rules</TabsTrigger>
+            <TabsTrigger value="activity" className="capitalize">Activity</TabsTrigger>
+          </TabsList>
+          <a
+            href="#kill-switch"
+            className={`mb-2 inline-flex items-center gap-1.5 text-[13px] font-medium ${killed ? "text-red" : "text-ink-3 hover:text-ink-2"}`}
           >
-            {t}
-          </button>
-        ))}
-        <div className="ml-auto pb-2">
-          <a href="#kill-switch" className={`text-sm font-semibold ${killed ? "text-red-600" : "text-zinc-500 hover:text-zinc-800"}`}>
-            {killed ? "🛑 Kill switch ENGAGED" : "Kill switch"}
+            <OctagonAlert className="h-4 w-4" strokeWidth={2} />
+            {killed ? "Kill switch ENGAGED" : "Kill switch"}
           </a>
         </div>
-      </div>
 
-      {tab === "queue" && (
-        <div className="flex flex-col gap-4">
-          <div className="flex flex-wrap items-center gap-3">
-            <select
-              value={queueStatus}
-              onChange={(e) => setQueueStatus(e.target.value)}
-              className="rounded-md border border-zinc-200 bg-white px-3 py-1.5 text-sm text-zinc-800"
-            >
-              {["pending", "approved", "rejected", "published", "killed"].map((s) => (
-                <option key={s} value={s} className="capitalize">{s}</option>
-              ))}
-            </select>
-            {canEdit && selected.size > 0 && (
-              <div className="flex gap-2">
-                <button
-                  onClick={() => bulk("approve")}
-                  disabled={!!busy}
-                  className="rounded-md bg-emerald-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
-                >
-                  Approve {selected.size}
-                </button>
-                <button
-                  onClick={() => bulk("publish")}
-                  disabled={!!busy}
-                  className="rounded-md bg-orange-600 px-3 py-1.5 text-sm font-medium text-white transition-[background-color,transform] duration-150 ease-[cubic-bezier(0.2,0,0,1)] hover:bg-orange-700 active:scale-[0.96] disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2"
-                >
-                  Publish {selected.size}
-                </button>
+        <TabsContent value="queue" className="pt-4">
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-wrap items-center gap-3">
+              <Select value={queueStatus} onValueChange={(v) => { if (v !== null) setQueueStatus(v); }}>
+                <SelectTrigger className="w-40">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {["pending", "approved", "rejected", "published", "killed"].map((s) => (
+                    <SelectItem key={s} value={s} className="capitalize">{s}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {canEdit && selected.size > 0 && (
+                <div className="flex gap-2">
+                  <Button type="button" size="sm" variant="accent" onClick={() => bulk("approve")} disabled={!!busy}>
+                    Approve {selected.size}
+                  </Button>
+                  <Button type="button" size="sm" variant="accent" onClick={() => bulk("publish")} disabled={!!busy}>
+                    Publish {selected.size}
+                  </Button>
+                </div>
+              )}
+              {busy && (
+                <span className="inline-flex items-center gap-1.5 text-sm text-ink-3">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" /> Working…
+                </span>
+              )}
+            </div>
+
+            {items.length === 0 ? (
+              <EmptyState
+                icon={<Inbox className="h-5 w-5" strokeWidth={2} />}
+                title={`No ${queueStatus} items`}
+                description="Run a rule to generate drafts."
+              />
+            ) : (
+              <div className="flex flex-col gap-2">
+                {items.map((item) => (
+                  <Card key={item.id} className="flex items-center gap-3 px-4 py-3">
+                    {canEdit && (item.status === "pending" || item.status === "approved") && (
+                      <Checkbox
+                        checked={selected.has(item.id)}
+                        onCheckedChange={() => toggleSelect(item.id)}
+                        aria-label={`Select ${item.title}`}
+                      />
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-sm font-medium text-ink">{item.title}</div>
+                      <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-ink-3">
+                        <ValuePill tone={QUEUE_TONES[item.status] ?? "neutral"}>{item.status}</ValuePill>
+                        <span>{KIND_LABELS[item.kind] ?? item.kind}</span>
+                        <span>{item.rule.name}</span>
+                        {item.autoApproved && <ValuePill tone="orange">auto-approved</ValuePill>}
+                        {item.publishedUrl && <span className="text-accent-ink">→ {item.publishedUrl}</span>}
+                      </div>
+                    </div>
+                    <Button type="button" size="sm" variant="quiet" onClick={() => setPreview(item)}>
+                      <Eye className="h-3.5 w-3.5" /> Preview
+                    </Button>
+                    {canEdit && item.status === "pending" && (
+                      <>
+                        <Button type="button" size="sm" variant="accent" onClick={() => approveItem(item)}>
+                          Approve
+                        </Button>
+                        <Button type="button" size="sm" variant="ghost" onClick={() => rejectItem(item)}>
+                          Reject
+                        </Button>
+                      </>
+                    )}
+                    {canEdit && item.status === "approved" && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="accent"
+                        onClick={() => doAction(`publish-${item.id}`, () => api(`/api/autopilot/items/${item.id}/publish`, { method: "POST", body: JSON.stringify({ projectId }) }))}
+                      >
+                        Publish
+                      </Button>
+                    )}
+                  </Card>
+                ))}
               </div>
             )}
-            {busy && <span className="text-sm text-zinc-500">Working…</span>}
           </div>
+        </TabsContent>
 
-          {items.length === 0 && <p className="text-sm text-zinc-500">No {queueStatus} items. Run a rule to generate drafts.</p>}
-          <div className="flex flex-col gap-2">
-            {items.map((item) => (
-              <div key={item.id} className="flex items-center gap-3 rounded-lg border border-zinc-200 bg-white/60 px-4 py-3">
-                {canEdit && (item.status === "pending" || item.status === "approved") && (
-                  <input type="checkbox" checked={selected.has(item.id)} onChange={() => toggleSelect(item.id)} className="h-4 w-4" />
-                )}
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm font-medium text-zinc-900">{item.title}</div>
-                  <div className="mt-0.5 flex flex-wrap gap-2 text-xs text-zinc-500">
-                    <span className={`rounded px-1.5 py-0.5 ${STATUS_COLORS[item.status] ?? ""}`}>{item.status}</span>
-                    <span>{KIND_LABELS[item.kind] ?? item.kind}</span>
-                    <span>{item.rule.name}</span>
-                    {item.autoApproved && <span className="text-amber-700">auto-approved</span>}
-                    {item.publishedUrl && <span className="text-sky-600">→ {item.publishedUrl}</span>}
-                  </div>
-                </div>
-                <button onClick={() => setPreview(item)} className="text-sm text-zinc-500 hover:text-zinc-900">Preview</button>
-                {canEdit && item.status === "pending" && (
-                  <>
-                    <button
-                      onClick={() => doAction(`approve-${item.id}`, () => api(`/api/autopilot/items/${item.id}/approve`, { method: "POST", body: JSON.stringify({ projectId }) }))}
-                      className="rounded-md bg-emerald-700 px-3 py-1 text-sm font-medium text-white hover:bg-emerald-700"
-                    >
-                      Approve
-                    </button>
-                    <button
-                      onClick={() => { const note = prompt("Rejection note (optional):"); doAction(`reject-${item.id}`, () => api(`/api/autopilot/items/${item.id}/reject`, { method: "POST", body: JSON.stringify({ projectId, note }) })); }}
-                      className="rounded-md border border-zinc-200 px-3 py-1 text-sm text-zinc-500 hover:border-zinc-400"
-                    >
-                      Reject
-                    </button>
-                  </>
-                )}
-                {canEdit && item.status === "approved" && (
-                  <button
-                    onClick={() => doAction(`publish-${item.id}`, () => api(`/api/autopilot/items/${item.id}/publish`, { method: "POST", body: JSON.stringify({ projectId }) }))}
-                    className="rounded-md bg-orange-600 px-3 py-1 text-sm font-medium text-white transition-[background-color,transform] duration-150 ease-[cubic-bezier(0.2,0,0,1)] hover:bg-orange-700 active:scale-[0.96] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2"
-                  >
-                    Publish
-                  </button>
-                )}
+        <TabsContent value="rules" className="pt-4">
+          <div className="flex flex-col gap-4">
+            {canEdit && !killed && (
+              <div>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="accent"
+                  onClick={() => { setEditing(null); setShowRuleForm(true); }}
+                >
+                  <Plus className="h-3.5 w-3.5" /> New rule
+                </Button>
               </div>
-            ))}
+            )}
+            {rules.length === 0 ? (
+              <EmptyState
+                icon={<ListChecks className="h-5 w-5" strokeWidth={2} />}
+                title="No autopilot rules yet"
+                description="Create one to start generating drafts on a schedule."
+                action={
+                  canEdit && !killed ? (
+                    <Button type="button" size="sm" variant="accent" onClick={() => { setEditing(null); setShowRuleForm(true); }}>
+                      <Plus className="h-3.5 w-3.5" /> New rule
+                    </Button>
+                  ) : undefined
+                }
+              />
+            ) : (
+              <div className="flex flex-col gap-2">
+                {rules.map((rule) => (
+                  <Card key={rule.id} className="flex items-center gap-3 px-4 py-3">
+                    <div className="flex-1">
+                      <div className="text-sm font-medium text-ink">
+                        {rule.name}
+                        {!rule.enabled && <ValuePill tone="neutral" className="ml-2">disabled</ValuePill>}
+                      </div>
+                      <div className="mt-1 text-xs text-ink-3">
+                        {SOURCE_LABELS[rule.source] ?? rule.source} · {rule.cadence} · max {rule.maxItemsPerRun}/run
+                        {rule.autoApprove && <span className="text-orange"> · auto-approve ON</span>}
+                        {rule.lastRunAt && <span> · last run {new Date(rule.lastRunAt).toLocaleString()}</span>}
+                        <span> · {rule._count.items} items</span>
+                      </div>
+                    </div>
+                    {canEdit && (
+                      <>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="accent"
+                          onClick={() => doAction(`run-${rule.id}`, () => api("/api/autopilot/runs", { method: "POST", body: JSON.stringify({ projectId, ruleId: rule.id }) }))}
+                          disabled={!!busy || killed || !rule.enabled}
+                          title={killed ? "Kill switch is engaged" : "Run this rule now"}
+                        >
+                          <Play className="h-3.5 w-3.5" /> Run now
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => doAction(`toggle-${rule.id}`, () => api(`/api/autopilot/rules/${rule.id}`, { method: "PATCH", body: JSON.stringify({ projectId, enabled: !rule.enabled }) }))}
+                        >
+                          {rule.enabled ? "Disable" : "Enable"}
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="quiet"
+                          onClick={() => { setEditing(rule); setShowRuleForm(true); }}
+                        >
+                          <Pencil className="h-3.5 w-3.5" /> Edit
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          className="text-red"
+                          onClick={() => { if (confirm(`Delete rule "${rule.name}"? Items and history stay.`)) doAction(`del-${rule.id}`, () => api(`/api/autopilot/rules/${rule.id}?projectId=${projectId}`, { method: "DELETE" })); }}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" /> Delete
+                        </Button>
+                      </>
+                    )}
+                  </Card>
+                ))}
+              </div>
+            )}
           </div>
-        </div>
-      )}
+        </TabsContent>
 
-      {tab === "rules" && (
-        <div className="flex flex-col gap-4">
-          {canEdit && !killed && (
-            <div>
-              <button
-                onClick={() => { setEditing(null); setShowRuleForm(true); }}
-                className="rounded-md bg-orange-600 px-4 py-2 text-sm font-medium text-white hover:bg-orange-700 active:scale-[0.96] transition-[background-color,transform] duration-150 ease-[cubic-bezier(0.2,0,0,1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2"
-              >
-                + New rule
-              </button>
-            </div>
+        <TabsContent value="activity" className="pt-4">
+          {runs.length === 0 ? (
+            <EmptyState
+              icon={<ActivityIcon className="h-5 w-5" strokeWidth={2} />}
+              title="No runs yet"
+              description="Runs appear here once a rule executes."
+            />
+          ) : (
+            <TaskRows variant="List" rows={runs.map(runTaskRow)} />
           )}
-          {rules.length === 0 && <p className="text-sm text-zinc-500">No autopilot rules yet. Create one to start.</p>}
-          <div className="flex flex-col gap-2">
-            {rules.map((rule) => (
-              <div key={rule.id} className="flex items-center gap-3 rounded-lg border border-zinc-200 bg-white/60 px-4 py-3">
-                <div className="flex-1">
-                  <div className="text-sm font-medium text-zinc-900">
-                    {rule.name}
-                    {!rule.enabled && <span className="ml-2 text-xs text-zinc-500">(disabled)</span>}
-                  </div>
-                  <div className="mt-0.5 text-xs text-zinc-500">
-                    {SOURCE_LABELS[rule.source] ?? rule.source} · {rule.cadence} · max {rule.maxItemsPerRun}/run
-                    {rule.autoApprove && <span className="text-amber-700"> · auto-approve ON</span>}
-                    {rule.lastRunAt && <span> · last run {new Date(rule.lastRunAt).toLocaleString()}</span>}
-                    <span> · {rule._count.items} items</span>
-                  </div>
-                </div>
-                {canEdit && (
-                  <>
-                    <button
-                      onClick={() => doAction(`run-${rule.id}`, () => api("/api/autopilot/runs", { method: "POST", body: JSON.stringify({ projectId, ruleId: rule.id }) }))}
-                      disabled={!!busy || killed || !rule.enabled}
-                      className="rounded-md bg-orange-600 px-3 py-1 text-sm font-medium text-white transition-[background-color,transform] duration-150 ease-[cubic-bezier(0.2,0,0,1)] hover:bg-orange-700 active:scale-[0.96] disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2"
-                      title={killed ? "Kill switch is engaged" : "Run this rule now"}
-                    >
-                      Run now
-                    </button>
-                    <button
-                      onClick={() => doAction(`toggle-${rule.id}`, () => api(`/api/autopilot/rules/${rule.id}`, { method: "PATCH", body: JSON.stringify({ projectId, enabled: !rule.enabled }) }))}
-                      className="rounded-md border border-zinc-200 px-3 py-1 text-sm text-zinc-500 hover:border-zinc-400"
-                    >
-                      {rule.enabled ? "Disable" : "Enable"}
-                    </button>
-                    <button
-                      onClick={() => { setEditing(rule); setShowRuleForm(true); }}
-                      className="text-sm text-zinc-500 hover:text-zinc-900"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => { if (confirm(`Delete rule "${rule.name}"? Items and history stay.`)) doAction(`del-${rule.id}`, () => api(`/api/autopilot/rules/${rule.id}?projectId=${projectId}`, { method: "DELETE" })); }}
-                      className="text-sm text-red-600 hover:text-red-700"
-                    >
-                      Delete
-                    </button>
-                  </>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+        </TabsContent>
+      </Tabs>
 
-      {tab === "activity" && (
-        <div className="flex flex-col gap-2">
-          {runs.length === 0 && <p className="text-sm text-zinc-500">No runs yet.</p>}
-          {runs.map((run) => (
-            <div key={run.id} className="rounded-lg border border-zinc-200 bg-white/60 px-4 py-3">
-              <div className="flex items-center gap-3">
-                <span className={`rounded px-1.5 py-0.5 text-xs ${STATUS_COLORS[run.status] ?? "bg-zinc-200/40 text-zinc-500"}`}>{run.status}</span>
-                <span className="text-sm font-medium text-zinc-900">{run.rule.name}</span>
-                <span className="ml-auto text-xs text-zinc-500">
-                  {new Date(run.startedAt).toLocaleString()} · by {run.createdBy ?? "system"}
-                </span>
-              </div>
-              <div className="mt-1 text-xs text-zinc-500">
-                {run.itemsGenerated} generated · {run.itemsApproved} approved · {run.itemsPublished} published
-                {run.error && <span className="text-red-600"> · {run.error}</span>}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+      {/* Approval gate: preview dialog */}
+      <Dialog open={!!preview} onOpenChange={(open) => { if (!open) setPreview(null); }}>
+        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
+          {preview && (
+            <>
+              <DialogHeader>
+                <DialogTitle>{preview.title}</DialogTitle>
+                <DialogDescription>
+                  {KIND_LABELS[preview.kind] ?? preview.kind} · {preview.rule.name} · {preview.status}
+                  {preview.autoApproved && " · auto-approved"}
+                </DialogDescription>
+              </DialogHeader>
+              {preview.reviewNote && <p className="text-sm text-orange">Review note: {preview.reviewNote}</p>}
+              <pre className="whitespace-pre-wrap text-sm leading-relaxed text-ink-2">{preview.draftMarkdown ?? "(no draft)"}</pre>
+              {canEdit && preview.status === "pending" && (
+                <DialogFooter>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => { rejectItem(preview); setPreview(null); }}
+                  >
+                    Reject
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="accent"
+                    onClick={() => { approveItem(preview); setPreview(null); }}
+                  >
+                    Approve
+                  </Button>
+                </DialogFooter>
+              )}
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
 
+      {/* Rule form dialog */}
       {showRuleForm && (
         <RuleForm
           projectId={projectId}
@@ -405,99 +548,100 @@ export default function AutopilotStudio({ projectId, canEdit, isAdmin, initialRu
         />
       )}
 
-      {preview && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-6" onClick={() => setPreview(null)}>
-          <div className="max-h-[85vh] w-full max-w-3xl overflow-auto rounded-lg border border-zinc-200 bg-zinc-50 p-6" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <h2 className="text-lg font-semibold text-zinc-900">{preview.title}</h2>
-                <p className="mt-1 text-xs text-zinc-500">
-                  {KIND_LABELS[preview.kind]} · {preview.rule.name} · {preview.status}
-                  {preview.autoApproved && " · auto-approved"}
-                </p>
-              </div>
-              <button onClick={() => setPreview(null)} className="text-zinc-500 hover:text-zinc-800">✕</button>
-            </div>
-            {preview.reviewNote && <p className="mt-3 text-sm text-amber-700">Review note: {preview.reviewNote}</p>}
-            <pre className="mt-4 whitespace-pre-wrap text-sm leading-relaxed text-zinc-500">{preview.draftMarkdown ?? "(no draft)"}</pre>
-          </div>
-        </div>
-      )}
-
       {/* Kill switch */}
-      <div id="kill-switch" className="rounded-lg border border-red-200 bg-red-50/20 p-5">
-        <h2 className="text-lg font-semibold text-red-700">🛑 Kill switch</h2>
-        <p className="mt-1 text-sm text-zinc-500">
-          Engaging the kill switch immediately stops all scheduled autopilot activity: running runs are marked
-          killed and pending/approved items are frozen. Nothing resumes silently — release it explicitly to restart.
-          The kill is audit-logged and fires an alert.
-        </p>
-        <div className="mt-4 flex flex-wrap items-center gap-3">
-          {canEdit && !projectKilled && (
-            <button
-              onClick={() => setKillConfirm("project")}
-              className="rounded-md bg-red-700 px-5 py-2.5 text-sm font-bold text-white hover:bg-red-700"
-            >
-              KILL AUTOPILOT — this project
-            </button>
-          )}
-          {isAdmin && !workspaceKilled && (
-            <button
-              onClick={() => setKillConfirm("workspace")}
-              className="rounded-md border-2 border-red-600 px-5 py-2 text-sm font-bold text-red-700 hover:bg-red-100/40"
-            >
-              KILL AUTOPILOT — entire workspace
-            </button>
-          )}
-          {canEdit && projectKilled && (
-            <button
-              onClick={() => doAction("unkill-project", () => api(`/api/autopilot/kill?projectId=${projectId}&scope=project`, { method: "DELETE" }))}
-              className="rounded-md bg-emerald-700 px-5 py-2 text-sm font-medium text-white hover:bg-emerald-700"
-            >
-              Release project kill switch
-            </button>
-          )}
-          {isAdmin && workspaceKilled && (
-            <button
-              onClick={() => doAction("unkill-workspace", () => api(`/api/autopilot/kill?projectId=${projectId}&scope=workspace`, { method: "DELETE" }))}
-              className="rounded-md bg-emerald-700 px-5 py-2 text-sm font-medium text-white hover:bg-emerald-700"
-            >
-              Release workspace kill switch
-            </button>
-          )}
-        </div>
-        {killConfirm && (
-          <div className="mt-4 rounded-md border border-red-200 bg-red-50/60 p-4">
-            <p className="text-sm font-semibold text-red-700">
+      <div id="kill-switch" className="scroll-mt-4">
+      <Card>
+        <CardHeader
+          title={
+            <span className="flex items-center gap-2 text-red">
+              <OctagonAlert className="h-4 w-4" strokeWidth={2} /> Kill switch
+            </span>
+          }
+        />
+        <CardBody className="flex flex-col gap-4">
+          <p className="text-[13px] text-ink-2">
+            Engaging the kill switch immediately stops all scheduled autopilot activity: running runs are marked
+            killed and pending/approved items are frozen. Nothing resumes silently — release it explicitly to restart.
+            The kill is audit-logged and fires an alert.
+          </p>
+          <div className="flex flex-col gap-3">
+            {canEdit && (
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-[13px] font-medium text-ink">Project kill switch</div>
+                  <div className="text-[12px] text-ink-3">Stops all autopilot activity for this project</div>
+                </div>
+                <Switch
+                  checked={projectKilled}
+                  onCheckedChange={(checked) =>
+                    checked
+                      ? setKillConfirm("project")
+                      : doAction("unkill-project", () => api(`/api/autopilot/kill?projectId=${projectId}&scope=project`, { method: "DELETE" }))
+                  }
+                />
+              </div>
+            )}
+            {isAdmin && (
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-[13px] font-medium text-ink">Workspace kill switch</div>
+                  <div className="text-[12px] text-ink-3">Stops autopilot across the entire workspace</div>
+                </div>
+                <Switch
+                  checked={workspaceKilled}
+                  onCheckedChange={(checked) =>
+                    checked
+                      ? setKillConfirm("workspace")
+                      : doAction("unkill-workspace", () => api(`/api/autopilot/kill?projectId=${projectId}&scope=workspace`, { method: "DELETE" }))
+                  }
+                />
+              </div>
+            )}
+          </div>
+        </CardBody>
+      </Card>
+      </div>
+
+      {/* Kill confirm gate */}
+      <Dialog open={!!killConfirm} onOpenChange={(open) => { if (!open) setKillConfirm(null); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-red">
               Confirm: kill autopilot for the {killConfirm === "workspace" ? "ENTIRE WORKSPACE" : "project"}?
-            </p>
-            <input
+            </DialogTitle>
+            <DialogDescription>
+              Running runs are marked killed and pending/approved items are frozen. The kill is audit-logged.
+            </DialogDescription>
+          </DialogHeader>
+          <Field label="Reason (optional)">
+            <Input
               value={killReason}
               onChange={(e) => setKillReason(e.target.value)}
-              placeholder="Reason (optional, shown in the audit log)"
-              className="mt-3 w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-800"
+              placeholder="Shown in the audit log"
             />
-            <div className="mt-3 flex gap-2">
-              <button
-                onClick={() => doAction("kill", async () => {
-                  await api("/api/autopilot/kill", {
-                    method: "POST",
-                    body: JSON.stringify({ projectId, scope: killConfirm, reason: killReason || undefined }),
-                  });
-                  setKillConfirm(null);
-                  setKillReason("");
-                })}
-                className="rounded-md bg-red-700 px-4 py-2 text-sm font-bold text-white hover:bg-red-700"
-              >
-                Confirm kill
-              </button>
-              <button onClick={() => setKillConfirm(null)} className="rounded-md border border-zinc-200 px-4 py-2 text-sm text-zinc-500">
-                Cancel
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
+          </Field>
+          <DialogFooter>
+            <Button type="button" size="sm" variant="ghost" onClick={() => setKillConfirm(null)}>
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="accent"
+              onClick={() => doAction("kill", async () => {
+                await api("/api/autopilot/kill", {
+                  method: "POST",
+                  body: JSON.stringify({ projectId, scope: killConfirm, reason: killReason || undefined }),
+                });
+                setKillConfirm(null);
+                setKillReason("");
+              })}
+            >
+              Confirm kill
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -550,83 +694,106 @@ function RuleForm({ projectId, templates, sites, editing, onClose, onSaved }: {
     }
   }
 
-  const inputCls = "w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-800";
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-6" onClick={onClose}>
-      <div className="max-h-[85vh] w-full max-w-xl overflow-auto rounded-lg border border-zinc-200 bg-zinc-50 p-6" onClick={(e) => e.stopPropagation()}>
-        <h2 className="text-lg font-semibold text-zinc-900">{editing ? "Edit rule" : "New autopilot rule"}</h2>
-        {formError && <p className="mt-2 text-sm text-red-600">{formError}</p>}
-        <div className="mt-4 flex flex-col gap-4">
-          <label className="text-sm text-zinc-500">
-            Name
-            <input value={name} onChange={(e) => setName(e.target.value)} className={`${inputCls} mt-1`} placeholder="Weekly decay refresh" />
-          </label>
-          <label className="text-sm text-zinc-500">
-            Content source
-            <select value={source} onChange={(e) => setSource(e.target.value)} className={`${inputCls} mt-1`}>
-              {Object.entries(SOURCE_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-            </select>
-          </label>
+    <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-xl">
+        <DialogHeader>
+          <DialogTitle>{editing ? "Edit rule" : "New autopilot rule"}</DialogTitle>
+        </DialogHeader>
+        {formError && <p className="text-sm text-red">{formError}</p>}
+        <div className="flex flex-col gap-4">
+          <Field label="Name">
+            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Weekly decay refresh" />
+          </Field>
+          <Field label="Content source">
+            <Select value={source} onValueChange={(v) => { if (v !== null) setSource(v); }}>
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {Object.entries(SOURCE_LABELS).map(([v, l]) => <SelectItem key={v} value={v}>{l}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </Field>
           {source === "programmatic_template" && (
-            <label className="text-sm text-zinc-500">
-              Programmatic template
-              <select value={templateId} onChange={(e) => setTemplateId(e.target.value)} className={`${inputCls} mt-1`}>
-                <option value="">Select a template…</option>
-                {templates.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-              </select>
-            </label>
+            <Field label="Programmatic template">
+              <Select value={templateId || "none"} onValueChange={(v) => setTemplateId(v === null || v === "none" ? "" : v)}>
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Select a template…</SelectItem>
+                  {templates.map((t) => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </Field>
           )}
           <div className="grid grid-cols-2 gap-4">
-            <label className="text-sm text-zinc-500">
-              Cadence
-              <select value={cadence} onChange={(e) => setCadence(e.target.value)} className={`${inputCls} mt-1`}>
-                <option value="manual">Manual only</option>
-                <option value="daily">Daily</option>
-                <option value="weekly">Weekly</option>
-              </select>
-            </label>
-            <label className="text-sm text-zinc-500">
-              Max items per run
-              <input type="number" min={1} max={50} value={maxItems} onChange={(e) => setMaxItems(parseInt(e.target.value, 10) || 1)} className={`${inputCls} mt-1`} />
-            </label>
+            <Field label="Cadence">
+              <Select value={cadence} onValueChange={(v) => { if (v !== null) setCadence(v); }}>
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="manual">Manual only</SelectItem>
+                  <SelectItem value="daily">Daily</SelectItem>
+                  <SelectItem value="weekly">Weekly</SelectItem>
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field label="Max items per run">
+              <Input type="number" min={1} max={50} value={maxItems} onChange={(e) => setMaxItems(parseInt(e.target.value, 10) || 1)} />
+            </Field>
           </div>
-          <label className="text-sm text-zinc-500">
-            Publish target
-            <select value={targetKind} onChange={(e) => setTargetKind(e.target.value)} className={`${inputCls} mt-1`}>
-              <option value="none">None (queue only)</option>
-              <option value="wordpress">WordPress</option>
-              <option value="webflow">Webflow</option>
-              <option value="marketr-site">Marketr site</option>
-              <option value="csv">CSV export (internal)</option>
-            </select>
-          </label>
+          <Field label="Publish target">
+            <Select value={targetKind} onValueChange={(v) => { if (v !== null) setTargetKind(v); }}>
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">None (queue only)</SelectItem>
+                <SelectItem value="wordpress">WordPress</SelectItem>
+                <SelectItem value="webflow">Webflow</SelectItem>
+                <SelectItem value="marketr-site">Marketr site</SelectItem>
+                <SelectItem value="csv">CSV export (internal)</SelectItem>
+              </SelectContent>
+            </Select>
+          </Field>
           {["wordpress", "webflow", "marketr-site"].includes(targetKind) && (
-            <label className="text-sm text-zinc-500">
-              Target site
-              <select value={siteId} onChange={(e) => setSiteId(e.target.value)} className={`${inputCls} mt-1`}>
-                <option value="">Project default / first site</option>
-                {sites.map((s) => <option key={s.id} value={s.id}>{s.name} ({s.sourceType})</option>)}
-              </select>
-            </label>
+            <Field label="Target site">
+              <Select value={siteId || "none"} onValueChange={(v) => setSiteId(v === null || v === "none" ? "" : v)}>
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Project default / first site</SelectItem>
+                  {sites.map((s) => <SelectItem key={s.id} value={s.id}>{s.name} ({s.sourceType})</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </Field>
           )}
-          <label className="flex items-start gap-2 text-sm text-zinc-500">
-            <input type="checkbox" checked={autoApprove} onChange={(e) => setAutoApprove(e.target.checked)} className="mt-1 h-4 w-4" />
-            <span>
-              Auto-approve without human review <span className="text-amber-700">(low-risk decay refreshes only; every auto-approval is audit-logged)</span>
-            </span>
-          </label>
-          <label className="flex items-center gap-2 text-sm text-zinc-500">
-            <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} className="h-4 w-4" />
-            Enabled
-          </label>
-          <div className="flex gap-2">
-            <button onClick={save} disabled={saving} className="rounded-md bg-orange-600 px-4 py-2 text-sm font-medium text-white hover:bg-orange-700 disabled:opacity-50 active:scale-[0.96] transition-[background-color,transform] duration-150 ease-[cubic-bezier(0.2,0,0,1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2">
-              {saving ? "Saving…" : editing ? "Save changes" : "Create rule"}
-            </button>
-            <button onClick={onClose} className="rounded-md border border-zinc-200 px-4 py-2 text-sm text-zinc-500">Cancel</button>
+          <div className="flex items-start gap-2.5">
+            <Switch checked={autoApprove} onCheckedChange={setAutoApprove} className="mt-0.5" />
+            <div>
+              <div className="text-[13px] font-medium text-ink">Auto-approve without human review</div>
+              <div className="text-[12px] text-ink-3">Low-risk decay refreshes only; every auto-approval is audit-logged</div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2.5">
+            <Switch checked={enabled} onCheckedChange={setEnabled} />
+            <span className="text-[13px] font-medium text-ink">Enabled</span>
           </div>
         </div>
-      </div>
-    </div>
+        <DialogFooter>
+          <Button type="button" size="sm" variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button type="button" size="sm" variant="accent" onClick={save} disabled={saving}>
+            {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+            {saving ? "Saving…" : editing ? "Save changes" : "Create rule"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

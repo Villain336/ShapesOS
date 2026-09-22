@@ -4,6 +4,7 @@
 
 import { useState } from "react";
 import { Bot, Users } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/vault/shadcn/tabs";
 import AiChatPanel from "./AiChatPanel";
 import TeamChatPanel from "./TeamChatPanel";
 
@@ -25,37 +26,27 @@ export default function ChatTabs({
   const [tab, setTab] = useState<"ai" | "team">(initialTab);
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex gap-1 border-b border-zinc-200">
-        <button
-          onClick={() => setTab("ai")}
-          className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors ${
-            tab === "ai"
-              ? "border-b-2 border-orange-600 text-zinc-900"
-              : "text-zinc-500 hover:text-zinc-700"
-          }`}
-        >
-          <Bot size={16} strokeWidth={2} className={tab === "ai" ? "text-orange-600" : ""} />
+    <Tabs value={tab} onValueChange={(v) => setTab(v as "ai" | "team")}>
+      <TabsList
+        variant="line"
+        className="w-full justify-start gap-1 rounded-none border-b border-line bg-transparent p-0"
+      >
+        <TabsTrigger value="ai" className="px-3 py-2 after:bg-accent after:bottom-[-1px]">
+          <Bot size={15} strokeWidth={2} className={tab === "ai" ? "text-accent-ink" : ""} />
           AI Assistant
-        </button>
-        <button
-          onClick={() => setTab("team")}
-          className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors ${
-            tab === "team"
-              ? "border-b-2 border-orange-600 text-zinc-900"
-              : "text-zinc-500 hover:text-zinc-700"
-          }`}
-        >
-          <Users size={16} strokeWidth={2} className={tab === "team" ? "text-orange-600" : ""} />
+        </TabsTrigger>
+        <TabsTrigger value="team" className="px-3 py-2 after:bg-accent after:bottom-[-1px]">
+          <Users size={15} strokeWidth={2} className={tab === "team" ? "text-accent-ink" : ""} />
           Team chat
-        </button>
-      </div>
+        </TabsTrigger>
+      </TabsList>
 
-      {tab === "ai" ? (
+      <TabsContent value="ai" className="mt-4">
         <AiChatPanel projectId={projectId} canEdit={canEdit} mockMode={mockMode} />
-      ) : (
+      </TabsContent>
+      <TabsContent value="team" className="mt-4">
         <TeamChatPanel projectId={projectId} memberCount={memberCount} currentUserId={currentUserId} />
-      )}
-    </div>
+      </TabsContent>
+    </Tabs>
   );
 }

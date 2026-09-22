@@ -8,6 +8,9 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
 import AutopilotStudio from "@/components/AutopilotStudio";
+import { PageHeader } from "@/components/vault/PageHeader";
+import { ValuePill } from "@/components/vault/atoms/ValuePill";
+import { ArrowLeft } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -65,15 +68,24 @@ export default async function AutopilotPage({ params }: { params: Promise<{ id: 
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <Link href={`/dashboard/projects/${project.id}`} className="text-sm text-zinc-500 hover:text-zinc-600">
-          ← {project.domain}
+        <Link
+          href={`/dashboard/projects/${project.id}`}
+          className="inline-flex items-center gap-1 text-[13px] text-ink-3 hover:text-ink-2"
+        >
+          <ArrowLeft className="h-3.5 w-3.5" strokeWidth={2} />
+          {project.domain}
         </Link>
-        <h1 className="mt-1 text-2xl font-semibold text-zinc-900">Content autopilot</h1>
-        <p className="mt-1 text-sm text-zinc-500">
-          Scheduled pipeline: source → AI draft → <span className="text-amber-700">your approval</span> → publish.
-          Nothing publishes without passing the approval gate unless a rule explicitly opts in to auto-approve
-          low-risk refreshes. The kill switch stops everything immediately.
-        </p>
+        <PageHeader
+          title="Content autopilot"
+          description={
+            <>
+              Scheduled pipeline: source → AI draft → <ValuePill tone="orange">your approval</ValuePill> → publish.
+              Nothing publishes without passing the approval gate unless a rule explicitly opts in to auto-approve
+              low-risk refreshes. The kill switch stops everything immediately.
+            </>
+          }
+          className="mt-1"
+        />
       </div>
       <AutopilotStudio
         projectId={project.id}

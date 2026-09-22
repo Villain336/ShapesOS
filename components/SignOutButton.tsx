@@ -1,14 +1,16 @@
 "use client";
 
 import { signOut } from "next-auth/react";
+import { Button } from "@/components/vault/atoms/Button";
 
 export default function SignOutButton() {
   return (
-    <button
+    <Button
+      variant="ghost"
+      size="sm"
       onClick={() => signOut({ callbackUrl: "/login" })}
-      className="rounded-md border border-zinc-200 px-3 py-1.5 text-sm text-zinc-500 hover:bg-zinc-100"
     >
       Sign out
-    </button>
+    </Button>
   );
 }

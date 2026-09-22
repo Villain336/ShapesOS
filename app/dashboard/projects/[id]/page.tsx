@@ -1,14 +1,95 @@
 // Marketr — project detail: saved-keyword overview + entry points.
 
-import { accessibleWorkspaceWhere } from "@/lib/authz";
 import Link from "next/link";
+import {
+  ArrowLeft,
+  Bot,
+  Code2,
+  Crosshair,
+  FileText,
+  Globe,
+  KeyRound,
+  Layers,
+  Link2,
+  ListChecks,
+  Mail,
+  MapPin,
+  Megaphone,
+  MessageSquare,
+  Network,
+  Palette,
+  Radar,
+  Share2,
+  Sparkles,
+  TrendingDown,
+  TrendingUp,
+  Zap,
+} from "lucide-react";
+import { accessibleWorkspaceWhere } from "@/lib/authz";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
 import DeleteProjectButton from "@/components/DeleteProjectButton";
 import VisibilityScoreWidget from "@/components/VisibilityScoreWidget";
+import { PageHeader } from "@/components/vault/PageHeader";
+import { Stat } from "@/components/vault/Stat";
+import { Card, CardBody, CardHeader } from "@/components/vault/Card";
+import { EmptyState } from "@/components/vault/EmptyState";
+import { ValuePill } from "@/components/vault/atoms/ValuePill";
+import { buttonVariants } from "@/components/vault/atoms/button-variants";
+import { cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
+
+type ExploreLink = {
+  href: string;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  primary?: boolean;
+};
+
+const EXPLORE_SECTIONS: { title: string; links: ExploreLink[] }[] = [
+  {
+    title: "Research",
+    links: [
+      { href: "keywords", label: "Keyword research", icon: KeyRound, primary: true },
+      { href: "competitors", label: "Competitor gaps", icon: Crosshair },
+      { href: "rankings", label: "Rank tracking", icon: TrendingUp },
+      { href: "ai-search", label: "AI search", icon: Sparkles },
+      { href: "radar", label: "Competitor radar", icon: Radar },
+      { href: "backlinks", label: "Backlinks", icon: Link2 },
+    ],
+  },
+  {
+    title: "Content",
+    links: [
+      { href: "content", label: "Content engine", icon: FileText },
+      { href: "decay", label: "Content decay", icon: TrendingDown },
+      { href: "autopilot", label: "Content autopilot", icon: Bot },
+      { href: "newsletter", label: "Newsletter", icon: Mail },
+      { href: "social", label: "Social", icon: Share2 },
+    ],
+  },
+  {
+    title: "Sites",
+    links: [
+      { href: "ide", label: "Site IDE", icon: Code2 },
+      { href: "sites", label: "Sites & landing pages", icon: Globe },
+      { href: "programmatic", label: "Programmatic SEO", icon: Layers },
+      { href: "local", label: "Local SEO", icon: MapPin },
+      { href: "internal-links", label: "Internal links", icon: Network },
+    ],
+  },
+  {
+    title: "Automate",
+    links: [
+      { href: "automations", label: "Automations", icon: Zap },
+      { href: "chat", label: "Chat", icon: MessageSquare },
+      { href: "ads", label: "Ad factory", icon: Megaphone },
+      { href: "studio", label: "Studio", icon: Palette },
+    ],
+  },
+];
 
 export default async function ProjectPage({
   params,
@@ -38,183 +119,117 @@ export default async function ProjectPage({
     lists.set(k.list ?? "Saved keywords", (lists.get(k.list ?? "Saved keywords") ?? 0) + 1);
   }
 
+  const base = `/dashboard/projects/${project.id}`;
+
   return (
-    <div className="flex flex-col gap-8">
-      <div className="flex items-start justify-between">
-        <div>
-          <Link
-            href="/dashboard"
-            className="text-sm text-zinc-500 hover:text-zinc-600"
-          >
-            ← Projects
-          </Link>
-          <h1 className="mt-1 text-2xl font-bold tracking-tight">
-            {project.domain}
-          </h1>
-          <p className="mt-1 text-sm text-zinc-500">
-            {project.keywords.length} keywords saved ·{" "}
-            {trackedCount} tracked ·{" "}
-            {project.competitors.length} competitor
-            {project.competitors.length === 1 ? "" : "s"} ·{" "}
-            {project.contentItems.length} content item
-            {project.contentItems.length === 1 ? "" : "s"} ·{" "}
-            {project.siteConnections.length} site connection
-            {project.siteConnections.length === 1 ? "" : "s"} · {project.locale}
-          </p>
-        </div>
-        <DeleteProjectButton projectId={project.id} />
+    <div className="flex flex-col gap-6">
+      <Link
+        href="/dashboard"
+        className={cn(buttonVariants({ variant: "quiet", size: "xs" }), "self-start")}
+      >
+        <ArrowLeft className="size-3.5" />
+        Projects
+      </Link>
+
+      <PageHeader
+        title={project.domain}
+        description={
+          <span className="inline-flex flex-wrap items-center gap-x-1.5 gap-y-1">
+            {project.locale}
+            <span aria-hidden>·</span>
+            <ValuePill>
+              {project.siteConnections.length} site connection
+              {project.siteConnections.length === 1 ? "" : "s"}
+            </ValuePill>
+          </span>
+        }
+        actions={<DeleteProjectButton projectId={project.id} />}
+      />
+
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <Stat label="Keywords saved" value={project.keywords.length} icon={<KeyRound className="size-4" />} />
+        <Stat
+          label="Tracked"
+          value={trackedCount}
+          icon={<TrendingUp className="size-4" />}
+        />
+        <Stat
+          label="Competitors"
+          value={project.competitors.length}
+          icon={<Crosshair className="size-4" />}
+        />
+        <Stat
+          label="Content items"
+          value={project.contentItems.length}
+          icon={<FileText className="size-4" />}
+        />
       </div>
 
-      <div className="flex gap-3">
-        <Link
-          href={`/dashboard/projects/${project.id}/keywords`}
-          className="rounded-md bg-orange-600 px-4 py-2 text-sm font-medium text-white hover:bg-orange-700 active:scale-[0.96] transition-[background-color,transform] duration-150 ease-[cubic-bezier(0.2,0,0,1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2"
-        >
-          Keyword research →
-        </Link>
-        <Link
-          href={`/dashboard/projects/${project.id}/competitors`}
-          className="rounded-md border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-800 hover:border-zinc-400"
-        >
-          Competitor gaps →
-        </Link>
-        <Link
-          href={`/dashboard/projects/${project.id}/content`}
-          className="rounded-md border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-800 hover:border-zinc-400"
-        >
-          Content engine →
-        </Link>
-        <Link
-          href={`/dashboard/projects/${project.id}/rankings`}
-          className="rounded-md border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-800 hover:border-zinc-400"
-        >
-          Rank tracking →
-        </Link>
-        <Link
-          href={`/dashboard/projects/${project.id}/ide`}
-          className="rounded-md border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-800 hover:border-zinc-400"
-        >
-          Site IDE →
-        </Link>
-        <Link
-          href={`/dashboard/projects/${project.id}/sites`}
-          className="rounded-md border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-800 hover:border-zinc-400"
-        >
-          Sites & landing pages →
-        </Link>
-        <Link
-          href={`/dashboard/projects/${project.id}/ai-search`}
-          className="rounded-md border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-800 hover:border-zinc-400"
-        >
-          AI search →
-        </Link>
-        <Link
-          href={`/dashboard/projects/${project.id}/decay`}
-          className="rounded-md border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-800 hover:border-zinc-400"
-        >
-          Content decay →
-        </Link>
-        <Link
-          href={`/dashboard/projects/${project.id}/radar`}
-          className="rounded-md border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-800 hover:border-zinc-400"
-        >
-          Competitor radar →
-        </Link>
-        <Link
-          href={`/dashboard/projects/${project.id}/backlinks`}
-          className="rounded-md border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-800 hover:border-zinc-400"
-        >
-          Backlinks →
-        </Link>
-        <Link
-          href={`/dashboard/projects/${project.id}/internal-links`}
-          className="rounded-md border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-800 hover:border-zinc-400"
-        >
-          Internal links →
-        </Link>
-        <Link
-          href={`/dashboard/projects/${project.id}/local`}
-          className="rounded-md border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-800 hover:border-zinc-400"
-        >
-          Local SEO →
-        </Link>
-        <Link
-          href={`/dashboard/projects/${project.id}/programmatic`}
-          className="rounded-md border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-800 hover:border-zinc-400"
-        >
-          Programmatic SEO →
-        </Link>
-        <Link
-          href={`/dashboard/projects/${project.id}/autopilot`}
-          className="rounded-md border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-800 hover:border-zinc-400"
-        >
-          Content autopilot →
-        </Link>
-        <Link
-          href={`/dashboard/projects/${project.id}/automations`}
-          className="rounded-md border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-800 hover:border-zinc-400"
-        >
-          Automations →
-        </Link>
-        <Link
-          href={`/dashboard/projects/${project.id}/chat`}
-          className="rounded-md border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-800 hover:border-zinc-400"
-        >
-          Chat →
-        </Link>
-        <Link
-          href={`/dashboard/projects/${project.id}/newsletter`}
-          className="rounded-md border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-800 hover:border-zinc-400"
-        >
-          Newsletter →
-        </Link>
-        <Link
-          href={`/dashboard/projects/${project.id}/social`}
-          className="rounded-md border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-800 hover:border-zinc-400"
-        >
-          Social →
-        </Link>
-        <Link
-          href={`/dashboard/projects/${project.id}/ads`}
-          className="rounded-md border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-800 hover:border-zinc-400"
-        >
-          Ad factory →
-        </Link>
-        <Link
-          href={`/dashboard/projects/${project.id}/studio`}
-          className="rounded-md border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-800 hover:border-zinc-400"
-        >
-          Studio →
-        </Link>
-      </div>
+      <Card>
+        <CardHeader title="Explore" description="Jump into a workspace for this project" />
+        <CardBody className="flex flex-col gap-5">
+          {EXPLORE_SECTIONS.map((section) => (
+            <div key={section.title}>
+              <div className="mb-2 text-[11px] font-medium uppercase tracking-widest text-ink-3">
+                {section.title}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {section.links.map((link) => {
+                  const Icon = link.icon;
+                  return (
+                    <Link
+                      key={link.href}
+                      href={`${base}/${link.href}`}
+                      className={buttonVariants({
+                        variant: link.primary ? "accent" : "secondary",
+                        size: "sm",
+                      })}
+                    >
+                      <Icon className="size-3.5" />
+                      {link.label}
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </CardBody>
+      </Card>
 
       <VisibilityScoreWidget projectId={project.id} />
 
-      <div>
-        <h2 className="mb-3 text-sm font-medium uppercase tracking-widest text-zinc-500">
-          Keyword lists
-        </h2>
-        {lists.size === 0 ? (
-          <p className="rounded-xl border border-dashed border-zinc-200 p-8 text-center text-sm text-zinc-500">
-            Nothing saved yet. Run keyword research and save winners to a
-            list.
-          </p>
-        ) : (
-          <ul className="flex flex-col gap-2">
-            {[...lists.entries()].map(([name, count]) => (
-              <li
-                key={name}
-                className="flex items-center justify-between rounded-xl border border-zinc-200 bg-white/60 px-5 py-3"
-              >
-                <span className="font-medium">{name}</span>
-                <span className="text-sm text-zinc-500">
-                  {count} keyword{count === 1 ? "" : "s"}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+      <Card>
+        <CardHeader title="Keyword lists" description="Saved keyword collections for this project" />
+        <CardBody className="p-0">
+          {lists.size === 0 ? (
+            <EmptyState
+              icon={<ListChecks className="size-5" />}
+              title="Nothing saved yet"
+              description="Run keyword research and save winners to a list."
+              action={
+                <Link href={`${base}/keywords`} className={buttonVariants({ variant: "accent", size: "sm" })}>
+                  <KeyRound className="size-3.5" />
+                  Start keyword research
+                </Link>
+              }
+            />
+          ) : (
+            <ul className="flex flex-col">
+              {[...lists.entries()].map(([name, count]) => (
+                <li
+                  key={name}
+                  className="flex items-center justify-between gap-3 border-b border-line px-4 py-3 last:border-b-0"
+                >
+                  <span className="truncate text-[14px] font-medium text-ink">{name}</span>
+                  <ValuePill>
+                    {count} keyword{count === 1 ? "" : "s"}
+                  </ValuePill>
+                </li>
+              ))}
+            </ul>
+          )}
+        </CardBody>
+      </Card>
     </div>
   );
 }

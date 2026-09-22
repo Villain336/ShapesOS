@@ -1,10 +1,13 @@
 // Marketr — authenticated dashboard shell. Every route under /dashboard
 // requires a session; unauthenticated visitors bounce to /login.
 
-import Link from "next/link";
 import { redirect } from "next/navigation";
-import { requireUser } from "@/lib/session";
-import SignOutButton from "@/components/SignOutButton";
+import {
+  getAccessibleWorkspaces,
+  getOrCreateWorkspace,
+  requireUser,
+} from "@/lib/session";
+import { AppSidebar, MobileNav } from "@/components/AppSidebar";
 
 export default async function DashboardLayout({
   children,
@@ -14,52 +17,26 @@ export default async function DashboardLayout({
   const user = await requireUser();
   if (!user) redirect("/login");
 
+  const workspace = await getOrCreateWorkspace(user.id, user.email);
+  const workspaces = await getAccessibleWorkspaces(user.id);
+
+  const sidebarProps = {
+    user: { name: user.name, email: user.email },
+    workspaces: workspaces.map((w) => ({ id: w.id, name: w.name })),
+    currentWorkspaceId: workspace.id,
+  };
+
   return (
-    <div className="min-h-screen bg-zinc-50 font-sans text-zinc-900">
-      <header className="border-b border-zinc-200">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-          <Link href="/dashboard" className="text-lg font-bold tracking-tight">
-            Marketr
-          </Link>
-          <div className="flex items-center gap-4">
-            <Link
-              href="/dashboard/reports"
-              className="text-sm text-zinc-500 hover:text-zinc-800"
-            >
-              Reports
-            </Link>
-            <Link
-              href="/dashboard/alerts"
-              className="text-sm text-zinc-500 hover:text-zinc-800"
-            >
-              Alerts
-            </Link>
-            <Link
-              href="/dashboard/settings/alerts"
-              className="text-sm text-zinc-500 hover:text-zinc-800"
-            >
-              Alert rules
-            </Link>
-            <Link
-              href="/dashboard/settings/brand-kits"
-              className="text-sm text-zinc-500 hover:text-zinc-800"
-            >
-              Brand kits
-            </Link>
-            <Link
-              href="/dashboard/settings/members"
-              className="text-sm text-zinc-500 hover:text-zinc-800"
-            >
-              Members
-            </Link>
-            <span className="text-sm text-zinc-500">
-              {user.email ?? user.name ?? "Signed in"}
-            </span>
-            <SignOutButton />
-          </div>
+    <div className="min-h-screen bg-page font-sans text-ink">
+      <MobileNav {...sidebarProps} />
+      <div className="flex">
+        <AppSidebar {...sidebarProps} />
+        <div className="min-w-0 flex-1">
+          <main className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
+            {children}
+          </main>
         </div>
-      </header>
-      <main className="mx-auto max-w-6xl px-6 py-8">{children}</main>
+      </div>
     </div>
   );
 }

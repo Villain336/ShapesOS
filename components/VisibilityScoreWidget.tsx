@@ -3,7 +3,12 @@
 // sparkline, and the component breakdown that explains the number.
 
 import Link from "next/link";
+import { Gauge, TrendingDown, TrendingUp } from "lucide-react";
 import { prisma } from "@/lib/prisma";
+import { Card, CardBody, CardHeader } from "@/components/vault/Card";
+import { EmptyState } from "@/components/vault/EmptyState";
+import { ValuePill } from "@/components/vault/atoms/ValuePill";
+import { buttonVariants } from "@/components/vault/atoms/button-variants";
 
 const COMPONENT_LABELS: Record<string, string> = {
   rankings: "Rankings",
@@ -21,10 +26,12 @@ export default async function VisibilityScoreWidget({ projectId }: { projectId: 
   const latest = scores[0];
   const trend = scores.slice().reverse();
 
-  const weekAgo = scores.find((s) => {
-    const days = (latest!.date.getTime() - s.date.getTime()) / (24 * 60 * 60 * 1000);
-    return days >= 6 && days <= 8;
-  });
+  const weekAgo = latest
+    ? scores.find((s) => {
+        const days = (latest.date.getTime() - s.date.getTime()) / (24 * 60 * 60 * 1000);
+        return days >= 6 && days <= 8;
+      })
+    : undefined;
   const delta = latest && weekAgo ? latest.score - weekAgo.score : null;
 
   const W = 220;
@@ -38,51 +45,82 @@ export default async function VisibilityScoreWidget({ projectId }: { projectId: 
   const components = (latest?.components ?? {}) as Record<string, unknown>;
 
   return (
-    <div className="rounded-lg border border-zinc-300 bg-white p-4">
-      <div className="flex items-start justify-between">
-        <div>
-          <h2 className="text-sm font-medium uppercase tracking-widest text-zinc-500">Visibility score</h2>
-          {latest ? (
-            <div className="mt-1 flex items-baseline gap-2">
-              <span className="text-4xl font-bold">{latest.score}</span>
-              <span className="text-sm text-zinc-500">/ 100</span>
+    <Card>
+      <CardHeader
+        title="Visibility score"
+        description="Composite across rankings, AI presence, freshness, and coverage"
+        actions={
+          <Link
+            href={`/dashboard/projects/${projectId}`}
+            className={buttonVariants({ variant: "quiet", size: "xs" })}
+          >
+            What&apos;s this?
+          </Link>
+        }
+      />
+      <CardBody>
+        {latest ? (
+          <>
+            <div className="flex items-baseline gap-2">
+              <span className="text-[36px] font-semibold tracking-tight text-ink tabular-nums">
+                {latest.score}
+              </span>
+              <span className="text-[13px] text-ink-2">/ 100</span>
               {delta !== null && delta !== 0 && (
-                <span className={`text-sm font-medium ${delta > 0 ? "text-emerald-600" : "text-red-600"}`}>
-                  {delta > 0 ? "▲" : "▼"} {Math.abs(delta)} WoW
-                </span>
+                <ValuePill tone={delta > 0 ? "green" : "red"}>
+                  <span className="inline-flex items-center gap-1">
+                    {delta > 0 ? <TrendingUp className="size-3" /> : <TrendingDown className="size-3" />}
+                    {Math.abs(delta)} WoW
+                  </span>
+                </ValuePill>
               )}
             </div>
-          ) : (
-            <p className="mt-2 text-sm text-zinc-500">No score yet — the daily cron computes it.</p>
-          )}
-        </div>
-        <Link href={`/dashboard/projects/${projectId}`} className="text-xs text-zinc-500 hover:text-zinc-600">
-          What&apos;s this?
-        </Link>
-      </div>
 
-      {trend.length > 1 && (
-        <svg viewBox={`0 0 ${W} ${H}`} className="mt-3 w-full" role="img" aria-label="30-day visibility score trend">
-          <polyline points={pts.join(" ")} fill="none" stroke="#ea580c" strokeWidth="2" strokeLinejoin="round" />
-        </svg>
-      )}
+            {trend.length > 1 && (
+              <svg
+                viewBox={`0 0 ${W} ${H}`}
+                className="mt-3 w-full"
+                role="img"
+                aria-label="30-day visibility score trend"
+              >
+                <polyline
+                  points={pts.join(" ")}
+                  fill="none"
+                  stroke="var(--accent)"
+                  strokeWidth="2"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            )}
 
-      {latest && (
-        <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-          {Object.entries(COMPONENT_LABELS).map(([key, label]) => {
-            const v = typeof components[key] === "number" ? (components[key] as number) : null;
-            return (
-              <div key={key} className="rounded border border-zinc-200 bg-zinc-50 p-2">
-                <div className="text-xs text-zinc-500">{label}</div>
-                <div className="mt-0.5 text-lg font-semibold">{v ?? "–"}</div>
-                <div className="mt-1 h-1 overflow-hidden rounded bg-zinc-100">
-                  <div className="h-full rounded bg-orange-600" style={{ width: `${Math.min(100, Math.max(0, v ?? 0))}%` }} />
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
+            <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+              {Object.entries(COMPONENT_LABELS).map(([key, label]) => {
+                const v = typeof components[key] === "number" ? (components[key] as number) : null;
+                return (
+                  <div key={key} className="rounded-control bg-field p-2.5">
+                    <div className="text-[12px] text-ink-2">{label}</div>
+                    <div className="mt-0.5 text-[18px] font-semibold text-ink tabular-nums">
+                      {v ?? "–"}
+                    </div>
+                    <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-line">
+                      <div
+                        className="h-full rounded-full bg-accent transition-[width] duration-300 ease-[cubic-bezier(0.2,0,0,1)]"
+                        style={{ width: `${Math.min(100, Math.max(0, v ?? 0))}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        ) : (
+          <EmptyState
+            icon={<Gauge className="size-5" />}
+            title="No score yet"
+            description="The daily cron computes the visibility score for this project."
+          />
+        )}
+      </CardBody>
+    </Card>
   );
 }

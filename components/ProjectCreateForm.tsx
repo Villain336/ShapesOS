@@ -4,6 +4,10 @@
 
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
+import { Card, CardBody, CardHeader } from "@/components/vault/Card";
+import { Field } from "@/components/vault/Field";
+import { Button } from "@/components/vault/atoms/Button";
+import { Input } from "@/components/vault/shadcn/input";
 
 export default function ProjectCreateForm() {
   const router = useRouter();
@@ -34,34 +38,35 @@ export default function ProjectCreateForm() {
   }
 
   return (
-    <form
-      onSubmit={onSubmit}
-      className="flex flex-col gap-3 rounded-xl border border-zinc-200 bg-white/60 p-5 sm:flex-row sm:items-end"
-    >
-      <div className="flex-1">
-        <label
-          htmlFor="domain"
-          className="mb-1 block text-xs font-medium uppercase tracking-widest text-zinc-500"
+    <Card>
+      <CardHeader
+        title="New project"
+        description="Add a domain to start keyword research"
+      />
+      <CardBody>
+        <form
+          onSubmit={onSubmit}
+          className="flex flex-col gap-3 sm:flex-row sm:items-end"
         >
-          New project
-        </label>
-        <input
-          id="domain"
-          required
-          placeholder="example.com"
-          value={domain}
-          onChange={(e) => setDomain(e.target.value)}
-          className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-orange-500 focus:outline-none"
-        />
-      </div>
-      <button
-        type="submit"
-        disabled={busy}
-        className="rounded-md bg-orange-600 px-4 py-2 text-sm font-medium text-white hover:bg-orange-700 disabled:opacity-50 active:scale-[0.96] transition-[background-color,transform] duration-150 ease-[cubic-bezier(0.2,0,0,1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2"
-      >
-        {busy ? "Creating…" : "Add domain"}
-      </button>
-      {error && <p className="text-sm text-red-600 sm:basis-full">{error}</p>}
-    </form>
+          <Field
+            label="Domain"
+            htmlFor="domain"
+            error={error ?? undefined}
+            className="flex-1"
+          >
+            <Input
+              id="domain"
+              required
+              placeholder="example.com"
+              value={domain}
+              onChange={(e) => setDomain(e.target.value)}
+            />
+          </Field>
+          <Button type="submit" variant="accent" size="md" disabled={busy}>
+            {busy ? "Creating…" : "Add domain"}
+          </Button>
+        </form>
+      </CardBody>
+    </Card>
   );
 }

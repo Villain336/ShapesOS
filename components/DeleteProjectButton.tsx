@@ -1,9 +1,18 @@
 "use client";
 
-// Marketr — delete-project button with a confirm step.
+// Marketr — delete-project button with a confirm dialog.
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { Button } from "@/components/vault/atoms/Button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/vault/shadcn/dialog";
 
 export default function DeleteProjectButton({
   projectId,
@@ -26,33 +35,34 @@ export default function DeleteProjectButton({
     }
   }
 
-  if (!confirming) {
-    return (
-      <button
-        onClick={() => setConfirming(true)}
-        className="rounded-md border border-red-200 px-3 py-1.5 text-sm text-red-600 hover:bg-red-100"
-      >
-        Delete project
-      </button>
-    );
-  }
-
   return (
-    <span className="flex items-center gap-2 text-sm">
-      <span className="text-zinc-500">Are you sure?</span>
-      <button
-        onClick={onDelete}
-        disabled={busy}
-        className="rounded-md bg-red-600 px-3 py-1.5 text-white hover:bg-red-600 disabled:opacity-50"
-      >
-        {busy ? "Deleting…" : "Yes, delete"}
-      </button>
-      <button
-        onClick={() => setConfirming(false)}
-        className="rounded-md border border-zinc-200 px-3 py-1.5 text-zinc-500 hover:bg-zinc-100"
-      >
-        Cancel
-      </button>
-    </span>
+    <>
+      <Button variant="secondary" size="sm" onClick={() => setConfirming(true)}>
+        Delete project
+      </Button>
+      <Dialog open={confirming} onOpenChange={setConfirming}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete this project?</DialogTitle>
+            <DialogDescription>
+              This removes the project and all of its keywords, content,
+              competitors, and settings. This can&apos;t be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setConfirming(false)}
+            >
+              Cancel
+            </Button>
+            <Button variant="accent" size="sm" onClick={onDelete} disabled={busy}>
+              {busy ? "Deleting…" : "Yes, delete"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

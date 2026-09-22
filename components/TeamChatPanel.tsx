@@ -1,10 +1,17 @@
 // Marketr — per-project team chat (redesign §3b).
 // Polling-based message list (5s ?after= refresh), composer, member count.
+// UI: vault components only (PromptBar, Card, EmptyState, ValuePill,
+// shadcn Avatar).
 
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Send, Users } from "lucide-react";
+import { Users } from "lucide-react";
+import { Card, CardHeader } from "@/components/vault/Card";
+import { EmptyState } from "@/components/vault/EmptyState";
+import { ValuePill } from "@/components/vault/atoms/ValuePill";
+import PromptBar from "@/components/vault/primitives/PromptBar";
+import { Avatar, AvatarFallback } from "@/components/vault/shadcn/avatar";
 
 interface TeamMessage {
   id: string;
@@ -23,6 +30,15 @@ function formatTime(iso: string) {
   });
 }
 
+function initials(name: string) {
+  return name
+    .split(/\s+/)
+    .map((w) => w.charAt(0))
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+}
+
 export default function TeamChatPanel({
   projectId,
   memberCount,
@@ -33,7 +49,6 @@ export default function TeamChatPanel({
   currentUserId: string;
 }) {
   const [messages, setMessages] = useState<TeamMessage[]>([]);
-  const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const latestRef = useRef<string | null>(null);
@@ -75,101 +90,88 @@ export default function TeamChatPanel({
     return () => clearInterval(id);
   }, [fetchMessages]);
 
-  const send = useCallback(async () => {
-    const text = input.trim();
-    if (!text || sending || text.length > 2000) return;
-    setSending(true);
-    try {
-      const res = await fetch("/api/team/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ projectId, body: text }),
-      });
-      if (!res.ok) return;
-      const data = await res.json();
-      const msg = data.message as TeamMessage;
-      setMessages((prev) => {
-        if (prev.some((m) => m.id === msg.id)) return prev;
-        return [...prev, msg];
-      });
-      latestRef.current = msg.createdAt;
-      setInput("");
-      scrollToBottom();
-    } finally {
-      setSending(false);
-    }
-  }, [input, projectId, scrollToBottom, sending]);
+  const sendMessage = useCallback(
+    async (raw: string) => {
+      const text = raw.trim();
+      if (!text || sending || text.length > 2000) return;
+      setSending(true);
+      try {
+        const res = await fetch("/api/team/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ projectId, body: text }),
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        const msg = data.message as TeamMessage;
+        setMessages((prev) => {
+          if (prev.some((m) => m.id === msg.id)) return prev;
+          return [...prev, msg];
+        });
+        latestRef.current = msg.createdAt;
+        scrollToBottom();
+      } finally {
+        setSending(false);
+      }
+    },
+    [projectId, scrollToBottom, sending],
+  );
 
   return (
-    <div className="flex h-[calc(100vh-220px)] min-h-[480px] flex-col overflow-hidden rounded-xl border border-zinc-200 bg-white">
-      <div className="flex items-center justify-between border-b border-zinc-200 bg-zinc-50 px-5 py-3">
-        <div>
-          <h3 className="text-sm font-semibold text-zinc-900">Project channel</h3>
-          <p className="text-xs text-zinc-500">Shared with everyone on this project. Refreshes every 5 seconds.</p>
-        </div>
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-3 py-1 text-xs text-zinc-600">
-          <Users size={13} className="text-orange-600" strokeWidth={2} />
-          {memberCount} member{memberCount === 1 ? "" : "s"}
-        </span>
-      </div>
+    <Card className="flex h-[calc(100vh-220px)] min-h-[480px] flex-col overflow-hidden">
+      <CardHeader
+        title="Project channel"
+        description="Shared with everyone on this project. Refreshes every 5 seconds."
+        actions={
+          <ValuePill tone="neutral">
+            <Users size={12} strokeWidth={2} className="mr-1 text-accent-ink" />
+            {memberCount} member{memberCount === 1 ? "" : "s"}
+          </ValuePill>
+        }
+      />
 
-      <div ref={scrollRef} className="flex-1 space-y-4 overflow-y-auto p-5">
+      <div ref={scrollRef} className="flex-1 space-y-4 overflow-y-auto bg-canvas p-5">
         {messages.length === 0 ? (
-          <div className="mx-auto mt-16 max-w-sm text-center">
-            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-zinc-100">
-              <Users size={22} className="text-zinc-400" strokeWidth={2} />
-            </div>
-            <h3 className="text-sm font-semibold text-zinc-900">No messages yet</h3>
-            <p className="mt-1 text-sm text-zinc-500">Kick off the conversation — the whole project team sees it here.</p>
-          </div>
+          <EmptyState
+            icon={<Users size={18} strokeWidth={2} />}
+            title="No messages yet"
+            description="Kick off the conversation — the whole project team sees it here."
+          />
         ) : (
           messages.map((m) => {
             const mine = m.userId === currentUserId;
             return (
-              <div key={m.id} className="flex flex-col gap-0.5">
-                <div className="flex items-baseline gap-2">
-                  <span className={`text-sm font-medium ${mine ? "text-orange-700" : "text-zinc-900"}`}>
-                    {m.authorName}
-                    {mine && <span className="ml-1.5 text-xs font-normal text-zinc-400">(you)</span>}
-                  </span>
-                  <span className="text-xs text-zinc-400">{formatTime(m.createdAt)}</span>
+              <div key={m.id} className="flex gap-2.5">
+                <Avatar size="sm">
+                  <AvatarFallback className={mine ? "bg-accent-tint text-accent-ink" : undefined}>
+                    {initials(m.authorName)}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                    <span className={`text-[13px] font-medium ${mine ? "text-accent-ink" : "text-ink"}`}>
+                      {m.authorName}
+                    </span>
+                    {mine && <ValuePill tone="accent">you</ValuePill>}
+                    <span className="text-[12px] text-ink-3">{formatTime(m.createdAt)}</span>
+                  </div>
+                  <p className="mt-0.5 whitespace-pre-wrap text-[13px] leading-relaxed text-ink-2">
+                    {m.body}
+                  </p>
                 </div>
-                <p className="whitespace-pre-wrap text-sm leading-relaxed text-zinc-700">{m.body}</p>
               </div>
             );
           })
         )}
       </div>
 
-      <div className="border-t border-zinc-200 bg-white p-4">
-        <div className="flex items-end gap-2">
-          <textarea
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                send();
-              }
-            }}
-            rows={1}
-            maxLength={2000}
-            placeholder="Message the team…"
-            className="max-h-32 min-h-[44px] flex-1 resize-none rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-100"
-          />
-          <button
-            onClick={send}
-            disabled={sending || !input.trim()}
-            title="Send"
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-orange-600 text-white transition-all hover:bg-orange-700 active:scale-[0.96] disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            <Send size={17} strokeWidth={2} />
-          </button>
-        </div>
-        <p className={`mt-1 text-right text-xs ${input.length >= 1900 ? "text-amber-600" : "text-zinc-400"}`}>
-          {input.length}/2000
-        </p>
+      <div className="border-t border-line bg-surface p-4">
+        <PromptBar
+          demo={false}
+          placeholder="Message the team…"
+          onSend={(text) => void sendMessage(text)}
+        />
       </div>
-    </div>
+    </Card>
   );
 }
