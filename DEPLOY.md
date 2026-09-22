@@ -60,10 +60,11 @@ them over via the Secure Vault flow and Z7 writes them server-side.
    no GitHub remote is created).
 4. **Env:** copy `.env.example` → `.env`, fill §2 items 3–7. `chmod 600 .env`.
 5. **Data volume fix:** apply §1a, then `docker compose up -d --build`.
-6. **Migrations:** watch boot logs — `npx prisma migrate deploy` must apply all 14 migrations cleanly
-   (`..._init` → `..._programmatic_seo`). The M15 (`..._backlinks_internal_links`), M16
-   (`..._local_seo`), and M17 (`..._programmatic_seo`) migrations are hand-written (no
-   PostgreSQL in the sandbox build environment) — review them carefully before deploy.
+6. **Migrations:** watch boot logs — `npx prisma migrate deploy` must apply all 15 migrations cleanly
+   (`..._init` → `..._content_autopilot`). The M15 (`..._backlinks_internal_links`), M16
+   (`..._local_seo`), M17 (`..._programmatic_seo`), and M18 (`..._content_autopilot`)
+   migrations are hand-written (no PostgreSQL in the sandbox build environment) — review
+   them carefully before deploy.
    Verify with `docker compose exec db psql -U marketr -c "\dt"`.
 7. **Caddy:** reverse-proxy `marketr.launchabl.com` → `localhost:3000`, auto-TLS. Confirm HTTPS.
 8. **Cron (host crontab):**
@@ -79,6 +80,7 @@ them over via the Secure Vault flow and Z7 writes them server-side.
    - `0 11 * * 1 curl -s -X POST -H "Authorization: Bearer $CRON_SECRET" https://marketr.launchabl.com/api/cron/local-grid` (milestone 16: weekly geo-grid runs; enabled weekly grids due since last run; cost caps enforced server-side)
    - `30 11 * * 1 curl -s -X POST -H "Authorization: Bearer $CRON_SECRET" https://marketr.launchabl.com/api/cron/local-competitors` (milestone 16: weekly local-competitor snapshot refresh; enabled competitors only)
    - `0 12 * * 1 curl -s -X POST -H "Authorization: Bearer $CRON_SECRET" https://marketr.launchabl.com/api/cron/reviews` (milestone 16: weekly review ingest + sentiment summaries + negative-review alerts)
+   - `0 7 * * * curl -s -X POST -H "Authorization: Bearer $CRON_SECRET" https://marketr.launchabl.com/api/cron/autopilot` (milestone 18: daily sweep; runs only daily/weekly rules whose cadence is due; kill switch, per-run item cap, idempotency, and the approval gate are enforced server-side)
 9. **Smoke test:** log in, create workspace + project, confirm pages load, no console errors.
 10. **Backups:** nightly `pg_dump` cron → object storage; document restore command.
 

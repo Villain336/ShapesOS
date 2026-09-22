@@ -130,6 +130,22 @@ export const TRIGGERS: TriggerDef[] = [
     dedupAvailable: true,
     live: true, // milestone 17 push: emitted by the programmatic push service.
   },
+  {
+    key: "autopilot_killed",
+    label: "Autopilot kill switch engaged",
+    description: "The content autopilot kill switch was engaged — scheduled runs stop immediately.",
+    conditionKeys: ["projectIds"],
+    dedupAvailable: true,
+    live: true, // milestone 18: emitted by the autopilot service.
+  },
+  {
+    key: "autopilot_run_failed",
+    label: "Autopilot run failed",
+    description: "A scheduled content-autopilot run failed before completing.",
+    conditionKeys: ["projectIds"],
+    dedupAvailable: true,
+    live: true, // milestone 18: emitted by the autopilot service.
+  },
 ];
 
 export function triggerDef(key: string): TriggerDef | undefined {

@@ -155,6 +155,18 @@ enum FileChangeAction {
   programmatic_page_discarded
   // Milestone 17 push: a page was pushed to an external publish target.
   programmatic_page_pushed
+  // Milestone 18: content autopilot.
+  autopilot_rule_created
+  autopilot_rule_updated
+  autopilot_rule_deleted
+  autopilot_run_started
+  autopilot_run_finished
+  autopilot_item_generated
+  autopilot_item_approved
+  autopilot_item_rejected
+  autopilot_item_published
+  autopilot_killed
+  autopilot_unkilled
 }
 
 enum ProgrammaticPageStatus {
@@ -211,16 +223,18 @@ model Workspace {
   // NOTE (milestone 15): a `backlinks` component is reserved for a later
   // milestone — do not add it to the score until the backlink quality
   // signal is calibrated. visibility-score.ts documents the same note.
-  visibilityWeights    Json?             @map("visibility_weights")
+  visibilityWeights    Json?                 @map("visibility_weights")
   // Milestone 15: workspace-level monthly cap (USD) on DataForSEO Backlinks
   // spend. Null = DEFAULT_MONTHLY_SPEND_CAP_USD in lib/seo/backlinks-cost.ts.
-  backlinksSpendCapUsd Float?            @map("backlinks_spend_cap_usd")
+  backlinksSpendCapUsd Float?                @map("backlinks_spend_cap_usd")
   // Milestone 16: workspace-level monthly cap (USD) on DataForSEO local-SEO
   // spend (maps SERP, business data, reviews). Null = DEFAULT_LOCAL_SPEND_CAP_USD.
-  localSeoSpendCapUsd  Float?            @map("local_seo_spend_cap_usd")
+  localSeoSpendCapUsd  Float?                @map("local_seo_spend_cap_usd")
   // Milestone 16: local-SEO pull audit trail (cost accounting) + GBP scaffold.
   localPulls           LocalPull[]
   gbpAccounts          GbpAccount[]
+  // Milestone 18: content autopilot kill switches (workspace-level).
+  autopilotKills       AutopilotKillSwitch[]
 
   @@map("workspaces")
 }
@@ -275,6 +289,11 @@ model Project {
   programmaticTemplates   ProgrammaticTemplate[]
   programmaticDatasets    ProgrammaticDataset[]
   programmaticPages       ProgrammaticPage[]
+  // Milestone 18: content autopilot.
+  autopilotRules          AutopilotRule[]
+  autopilotRuns           AutopilotRun[]
+  autopilotItems          AutopilotItem[]
+  autopilotKills          AutopilotKillSwitch[]
 
   @@map("projects")
 }
@@ -1332,7 +1351,8 @@ model ProgrammaticTemplate {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  pages ProgrammaticPage[]
+  pages          ProgrammaticPage[]
+  autopilotRules AutopilotRule[]
 
   @@map("programmatic_templates")
 }
@@ -1456,4 +1476,157 @@ model GbpInsight {
 
   @@unique([gbpAccountId, locationId, date])
   @@map("gbp_insights")
+}
+
+// Marketr — content autopilot (milestone 18).
+// Scheduled pipeline: source candidates → AI draft → approval gate →
+// publish through the M17 push-publish path. Per-workspace autopilot scope,
+// approval policies, full audit trail, pause/kill switch.
+enum AutopilotSource {
+  // M14 decay queue: refresh_content findings.
+  decay_refresh
+  // M17 programmatic templates: ready pages from one template.
+  programmatic_template
+  // Keyword gaps: tracked keywords with no content item yet.
+  keyword_opportunity
+}
+
+enum AutopilotCadence {
+  daily
+  weekly
+  manual
+}
+
+enum AutopilotRunStatus {
+  running
+  completed
+  failed
+  killed
+}
+
+enum AutopilotItemKind {
+  decay_refresh
+  programmatic_page
+  keyword_brief
+}
+
+enum AutopilotItemStatus {
+  pending
+  approved
+  rejected
+  published
+  killed
+}
+
+model AutopilotRule {
+  id        String  @id @default(cuid())
+  projectId String  @map("project_id")
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  name                   String
+  // Which candidate source this rule pulls from.
+  source                 AutopilotSource
+  // Only for programmatic_template source: which template's ready pages.
+  programmaticTemplateId String?               @map("programmatic_template_id")
+  programmaticTemplate   ProgrammaticTemplate? @relation(fields: [programmaticTemplateId], references: [id], onDelete: SetNull)
+  cadence                AutopilotCadence      @default(manual)
+  // Cap on items generated per run (1–50).
+  maxItemsPerRun         Int                   @default(5) @map("max_items_per_run")
+  // Auto-approve without human review (default OFF). Only ever applied to
+  // low-risk decay_refresh items; every auto-approval is audit-logged.
+  autoApprove            Boolean               @default(false) @map("auto_approve")
+  // Target settings shared with the M17 push path:
+  // { kind: "wordpress"|"webflow"|"marketr-site"|"csv", siteId?, connectionId? }
+  publishTarget          Json?                 @map("publish_target")
+  enabled                Boolean               @default(true)
+
+  lastRunAt DateTime? @map("last_run_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  runs  AutopilotRun[]
+  items AutopilotItem[]
+
+  @@index([projectId, enabled])
+  @@map("autopilot_rules")
+}
+
+model AutopilotRun {
+  id        String        @id @default(cuid())
+  ruleId    String        @map("rule_id")
+  rule      AutopilotRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  projectId String        @map("project_id")
+  project   Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  status         AutopilotRunStatus @default(running)
+  itemsGenerated Int                @default(0) @map("items_generated")
+  itemsApproved  Int                @default(0) @map("items_approved")
+  itemsPublished Int                @default(0) @map("items_published")
+  // Who started the run: user id, or "cron".
+  createdBy      String?            @map("created_by")
+  error          String?
+
+  startedAt  DateTime  @default(now()) @map("started_at")
+  finishedAt DateTime? @map("finished_at")
+
+  items AutopilotItem[]
+
+  @@index([ruleId, startedAt])
+  @@index([projectId, startedAt])
+  @@map("autopilot_runs")
+}
+
+model AutopilotItem {
+  id        String        @id @default(cuid())
+  runId     String        @map("run_id")
+  run       AutopilotRun  @relation(fields: [runId], references: [id], onDelete: Cascade)
+  ruleId    String        @map("rule_id")
+  rule      AutopilotRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  projectId String        @map("project_id")
+  project   Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  kind          AutopilotItemKind
+  // Id of the source record: ContentDecayFinding / ProgrammaticPage / Keyword.
+  sourceRef     String              @map("source_ref")
+  title         String
+  // AI draft, Tiptap JSON (editorcn editable source of truth).
+  draftJson     Json?               @map("draft_json")
+  draftMarkdown String?             @map("draft_markdown")
+  status        AutopilotItemStatus @default(pending)
+  // Explicit per-item audit note when auto-approved.
+  autoApproved  Boolean             @default(false) @map("auto_approved")
+  reviewNote    String?             @map("review_note")
+  publishedUrl  String?             @map("published_url")
+  publishedAt   DateTime?           @map("published_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([ruleId, kind, sourceRef])
+  @@index([projectId, status])
+  @@index([runId, status])
+  @@map("autopilot_items")
+}
+
+model AutopilotKillSwitch {
+  id          String     @id @default(cuid())
+  // Exactly one of workspaceId / projectId is set: workspace row kills every
+  // project in the workspace; project row kills one project.
+  workspaceId String?    @map("workspace_id")
+  workspace   Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  projectId   String?    @map("project_id")
+  project     Project?   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  // "workspace:<id>" or "project:<id>" — unique because Postgres treats
+  // NULLs as distinct in composite unique constraints.
+  scopeKey    String     @unique @map("scope_key")
+
+  killed   Boolean   @default(false)
+  killedAt DateTime? @map("killed_at")
+  killedBy String?   @map("killed_by")
+  reason   String?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("autopilot_kill_switches")
 }
