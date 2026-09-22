@@ -7,8 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
 import { notFound, requireProjectAccess } from "@/lib/route-utils";
 import { auditEvent } from "@/lib/auditlog";
-import { unlink } from "node:fs/promises";
-import { resolveWithinDir } from "@/lib/security/upload-safety";
+import { deleteAttachmentBytes } from "@/lib/filesystem/compat";
 
 export const dynamic = "force-dynamic";
 
@@ -28,9 +27,13 @@ export async function DELETE(
   if (!row) return notFound("File not found");
   await prisma.fileAttachment.delete({ where: { id: row.id } });
   if (row.source === "upload" && row.storagePath) {
-    // Phase A (fix 5): never unlink outside the working directory, even if a
-    // stored path were tampered with.
-    await unlink(resolveWithinDir(process.cwd(), row.storagePath)).catch(() => {});
+    // Phase B (W3): compat delete — registry ("fs:<id>") rows are
+    // trash+purged in the filesystem; legacy ".data/attachments/..." rows
+    // are unlinked path-confined.
+    await deleteAttachmentBytes({
+      projectId: row.projectId,
+      storagePath: row.storagePath,
+    });
   }
   await auditEvent({
     projectId,

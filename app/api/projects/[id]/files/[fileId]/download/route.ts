@@ -7,8 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
 import { notFound, requireProjectAccess } from "@/lib/route-utils";
 import { auditEvent } from "@/lib/auditlog";
-import { readFile, unlink } from "node:fs/promises";
-import { join } from "node:path";
+import { readAttachmentBytes } from "@/lib/filesystem/compat";
 
 export const dynamic = "force-dynamic";
 
@@ -27,12 +26,14 @@ export async function GET(_req: NextRequest, { params }: Params) {
   if (!row || row.source !== "upload" || !row.storagePath) {
     return notFound("Upload not found");
   }
-  let bytes: Buffer;
-  try {
-    bytes = await readFile(join(process.cwd(), row.storagePath));
-  } catch {
-    return notFound("File missing from disk");
-  }
+  // Phase B (W3): compat read path — registry ("fs:<id>") or legacy
+  // ".data/attachments/..." rows both resolve here.
+  const bytes = await readAttachmentBytes({
+    id: row.id,
+    projectId: row.projectId,
+    storagePath: row.storagePath,
+  });
+  if (!bytes) return notFound("File missing from disk");
   const body = new Uint8Array(bytes);
   return new Response(body, {
     headers: {

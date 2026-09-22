@@ -11,13 +11,8 @@ import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
 import { badRequest, requireProjectAccess } from "@/lib/route-utils";
 import { auditEvent } from "@/lib/auditlog";
-import {
-  resolveWithinDir,
-  validateUploadBuffer,
-} from "@/lib/security/upload-safety";
+import { validateUploadBuffer } from "@/lib/security/upload-safety";
 import { auditUploadRejected, screenUploadBuffer } from "@/lib/security/upload-audit";
-import { mkdir, writeFile } from "node:fs/promises";
-import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 
 export const dynamic = "force-dynamic";
@@ -128,12 +123,21 @@ export async function POST(req: NextRequest, { params }: Params) {
       });
       return Response.json({ error: screen.reason }, { status: screen.status });
     }
-    // Stored under a random UUID with the *sniffed* extension — the user's
-    // filename never touches the filesystem. The original name lives in the DB.
+    // Phase B (W3): uploads now land in the workspace filesystem registry
+    // (/files) via writeFile — storage keys are opaque UUIDs, user filenames
+    // never touch storage paths. The route already ran upload-safety
+    // (validateUploadBuffer + malware screen) above, so skipSafety is safe.
+    const { writeFile } = await import("@/lib/filesystem/service");
     const stored = `${randomUUID()}.${check.ext}`;
-    const dir = join(process.cwd(), ".data", "attachments", projectId);
-    await mkdir(dir, { recursive: true });
-    await writeFile(resolveWithinDir(dir, stored), buf);
+    const wf = await writeFile({
+      workspaceId: access.project.workspaceId,
+      logicalPath: `/files/chat/${projectId}/${stored}`,
+      kind: "file",
+      bytes: buf,
+      mimeType: check.mime,
+      createdBy: user.id,
+      skipSafety: true,
+    });
 
     const row = await prisma.fileAttachment.create({
       data: {
@@ -142,7 +146,9 @@ export async function POST(req: NextRequest, { params }: Params) {
         filename: (uploaded.name || "file").slice(0, 255),
         mimeType: check.mime,
         sizeBytes: uploaded.size,
-        storagePath: `.data/attachments/${projectId}/${stored}`,
+        // Registry reference (compat: legacy ".data/attachments/..." rows
+        // keep working through lib/filesystem/compat).
+        storagePath: `fs:${wf.id}`,
         uploadedBy: user.id,
       },
     });

@@ -225,3 +225,28 @@ export function resolveAdapter(key: string): ConnectorAdapter {
   if (!make) throw new Error(`Unknown built-in connector key: ${key}`);
   return make();
 }
+
+// ---------------------------------------------------------------------------
+// Phase B (B3): live-wiring flags for the connector health checker.
+//
+// The 7 adapters whose headers say "MOCK-ONLY" have no live provider wiring
+// (live OAuth/API handshakes are untested by design — Tico owns that work
+// separately). The health checker MUST report these as `unknown`, never
+// green. Keep this set in sync with the per-adapter file headers.
+// ---------------------------------------------------------------------------
+
+/** Built-in keys with NO live provider wiring — health is always `unknown`. */
+export const MOCK_ONLY_ADAPTER_KEYS: ReadonlySet<string> = new Set([
+  "google-search-console",
+  "ga4",
+  "google-drive",
+  "notion",
+  "meta-ads",
+  "google-ads",
+  "canva",
+]);
+
+/** True when the adapter has a real provider path the checker can reason about. */
+export function hasLiveWiring(key: string): boolean {
+  return isBuiltinKey(key) && !MOCK_ONLY_ADAPTER_KEYS.has(key);
+}

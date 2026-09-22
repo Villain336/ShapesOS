@@ -194,6 +194,15 @@ export const TRIGGERS: TriggerDef[] = [
     dedupAvailable: true,
     live: true, // milestone 22: emitted by the studio service.
   },
+  {
+    key: "connector_error",
+    label: "Connector error",
+    description:
+      "A connector connection needs re-authentication or reported repeated errors (detected by the connector health checker).",
+    conditionKeys: [],
+    dedupAvailable: true,
+    live: true, // Phase B (B3): emitted by the connector health checker.
+  },
 ];
 
 export function triggerDef(key: string): TriggerDef | undefined {

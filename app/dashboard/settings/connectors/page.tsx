@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
 export default async function ConnectorsSettingsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ connected?: string; error?: string }>;
+  searchParams: Promise<{ connected?: string; error?: string; tab?: string }>;
 }) {
   const user = await requireUser();
   if (!user) redirect("/login");
@@ -21,7 +21,7 @@ export default async function ConnectorsSettingsPage({
   const membership = await requireWorkspaceRole(user.id, workspace.id, "admin");
   if (!membership) redirect("/dashboard");
 
-  const { connected, error } = await searchParams;
+  const { connected, error, tab } = await searchParams;
 
   return (
     <div className="flex flex-col gap-6">
@@ -37,6 +37,7 @@ export default async function ConnectorsSettingsPage({
         workspaceId={workspace.id}
         connectedKey={connected ?? null}
         errorMsg={error ?? null}
+        initialTab={tab === "health" ? "health" : undefined}
       />
     </div>
   );

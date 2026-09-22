@@ -6,6 +6,7 @@
 import type { NextRequest } from "next/server";
 import { auditEvent } from "@/lib/auditlog";
 import { handleOAuthCallback } from "@/lib/vault/callback";
+import { recordSuccessfulSync } from "@/lib/connectors/health";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +21,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ key:
   try {
     const redirectUri = `${origin}/api/connectors/${encodeURIComponent(key)}/callback`;
     const connection = await handleOAuthCallback(state, code, redirectUri);
+    // A completed token exchange is a real provider interaction — honest
+    // evidence for the health checker (Phase B, track B3).
+    await recordSuccessfulSync(connection.id);
     await auditEvent({
       projectId: null,
       workspaceId: connection.workspaceId,

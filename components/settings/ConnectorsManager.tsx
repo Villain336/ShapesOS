@@ -15,6 +15,7 @@ import {
   primaryBtnCls,
   type NoticeState,
 } from "./ui";
+import ConnectorHealthTab from "./ConnectorHealthTab";
 
 interface Connection {
   id: string;
@@ -65,14 +66,17 @@ export default function ConnectorsManager({
   workspaceId,
   connectedKey,
   errorMsg,
+  initialTab,
 }: {
   workspaceId: string;
   connectedKey: string | null;
   errorMsg: string | null;
+  initialTab?: "connections" | "health";
 }) {
   const [connectors, setConnectors] = useState<Connector[]>([]);
   const [notice, setNotice] = useState<NoticeState | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const [tab, setTab] = useState<"connections" | "health">(initialTab ?? "connections");
   const [apiKeyFor, setApiKeyFor] = useState<Connector | null>(null);
   const [apiKey, setApiKey] = useState("");
   const [apiKeyLabel, setApiKeyLabel] = useState("");
@@ -255,6 +259,20 @@ export default function ConnectorsManager({
   const builtIn = connectors.filter((c) => !c.custom);
   const custom = connectors.filter((c) => c.custom);
 
+  /** Reconnect from the Health tab: deep-links the existing connect flow. */
+  function reconnectFromHealth(key: string, authType: "oauth2" | "api_key" | "none") {
+    if (authType === "none") return;
+    connect({
+      key,
+      displayName: key,
+      kind: "native",
+      authType: authType === "oauth2" ? "oauth2" : "apiKey",
+      description: null,
+      custom: false,
+      connections: [],
+    });
+  }
+
   function connectorCard(c: Connector) {
     return (
       <div key={c.key} data-testid={`connector-card-${c.key}`} className={cardCls}>
@@ -358,6 +376,28 @@ export default function ConnectorsManager({
 
       <Notice notice={notice} />
 
+      <div className="flex gap-1 border-b border-zinc-200" role="tablist" aria-label="Connectors">
+        {(["connections", "health"] as const).map((t) => (
+          <button
+            key={t}
+            role="tab"
+            aria-selected={tab === t}
+            onClick={() => setTab(t)}
+            className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium ${
+              tab === t
+                ? "border-[#0E7C66] text-[#0A5F4E]"
+                : "border-transparent text-zinc-500 hover:text-zinc-700"
+            }`}
+          >
+            {t === "connections" ? "Connections" : "Health"}
+          </button>
+        ))}
+      </div>
+
+      {tab === "health" ? (
+        <ConnectorHealthTab workspaceId={workspaceId} onReconnect={reconnectFromHealth} />
+      ) : (
+      <>
       <div className="grid gap-4 md:grid-cols-2">
         {builtIn.map(connectorCard)}
         {builtIn.length === 0 && (
@@ -484,6 +524,8 @@ export default function ConnectorsManager({
             </div>
           </div>
         </div>
+      )}
+      </>
       )}
     </div>
   );

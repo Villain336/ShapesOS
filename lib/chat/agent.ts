@@ -26,8 +26,6 @@ import { TOOLS, getTool, toolCatalogForPrompt, type ToolContext, type ToolDef } 
 import { getEnabledProjectSkills } from "@/lib/skills/service";
 import { skillManifestSection } from "@/lib/skills/disclosure";
 import { connectorToolsSection, resolveConnectorTool } from "./connector-tools";
-import { readFileSync, existsSync } from "node:fs";
-import { join } from "node:path";
 
 const MAX_ITERATIONS = 6;
 
@@ -163,14 +161,21 @@ async function buildAgentSupplements(
 
 const ATTACHMENT_TEXT_CAP = 50 * 1024;
 
-function readAttachmentText(storagePath: string, mimeType: string | null): string {
-  const abs = join(process.cwd(), storagePath);
-  if (!existsSync(abs)) return "[file missing from disk]";
+async function readAttachmentText(
+  attachmentId: string,
+  projectId: string,
+  storagePath: string,
+  mimeType: string | null,
+): Promise<string> {
+  // Phase B (W3): compat read — registry ("fs:<id>") or legacy
+  // ".data/attachments/..." rows.
+  const { readAttachmentBytes } = await import("@/lib/filesystem/compat");
+  const buf = await readAttachmentBytes({ id: attachmentId, projectId, storagePath });
+  if (!buf) return "[file missing from disk]";
   const textLike =
     (mimeType ?? "").startsWith("text/") ||
     ["application/json", "application/csv", "application/xml", "application/javascript", "application/typescript"].includes(mimeType ?? "");
   if (!textLike) return "[binary file — not readable as text]";
-  const buf = readFileSync(abs);
   if (buf.includes(0)) return "[binary file — not readable as text]";
   return buf.toString("utf8").slice(0, ATTACHMENT_TEXT_CAP);
 }
@@ -193,15 +198,17 @@ async function buildAttachmentSection(
     where: { id: { in: rows.map((r) => r.id) }, sessionId: null },
     data: { sessionId: threadId },
   });
-  const parts = rows.map((r) => {
-    if (r.source === "upload" && r.storagePath) {
-      return `- ${r.filename} (${r.mimeType ?? "unknown type"}):\n${readAttachmentText(r.storagePath, r.mimeType)}`;
-    }
-    if (r.source === "connector") {
-      return `- ${r.filename} (via connector ${r.connectorKey ?? "unknown"}: ${r.externalRef ?? "no reference"})`;
-    }
-    return `- ${r.filename}`;
-  });
+  const parts = await Promise.all(
+    rows.map(async (r) => {
+      if (r.source === "upload" && r.storagePath) {
+        return `- ${r.filename} (${r.mimeType ?? "unknown type"}):\n${await readAttachmentText(r.id, r.projectId, r.storagePath, r.mimeType)}`;
+      }
+      if (r.source === "connector") {
+        return `- ${r.filename} (via connector ${r.connectorKey ?? "unknown"}: ${r.externalRef ?? "no reference"})`;
+      }
+      return `- ${r.filename}`;
+    }),
+  );
   return ["## ATTACHED FILES", "", ...parts].join("\n");
 }
 

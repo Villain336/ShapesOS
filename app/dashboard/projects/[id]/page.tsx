@@ -6,6 +6,7 @@ import {
   ArrowLeft,
   Rocket,
   CodeSimple,
+  Clock,
   Crosshair,
   FileText,
   Globe,
@@ -85,6 +86,7 @@ const EXPLORE_SECTIONS: { title: string; links: ExploreLink[] }[] = [
     title: "Automate",
     links: [
       { href: "automations", label: "Automations", description: "Workflows that run on a schedule", icon: Lightning },
+      { href: "automations/schedules", label: "Scheduled skills", description: "Cron & event runs with parallel subagents", icon: Clock },
       { href: "chat", label: "Chat", description: "Ask AI, or message your team", icon: ChatCentered },
       { href: "ads", label: "Ad factory", description: "Campaigns and creatives", icon: Megaphone },
       { href: "studio", label: "Studio", description: "Brand assets and domains", icon: Palette },

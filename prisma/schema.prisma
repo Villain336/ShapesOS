@@ -238,6 +238,8 @@ enum FileChangeAction {
   connector_connected
   connector_disconnected
   connector_reauth
+  connector_health_checked
+  connector_health_alert
   mcp_connector_added
   mcp_connector_removed
   data_source_bound
@@ -254,6 +256,24 @@ enum FileChangeAction {
   // agent loop (not bound, not declared by a loaded skill, role/allow-list
   // gated). Denials are never silent — every one writes an audit row.
   connector_tool_denied
+  // Phase B (W2): scheduled skills + parallel subagent runs.
+  schedule_created
+  schedule_updated
+  schedule_paused
+  schedule_resumed
+  schedule_deleted
+  scheduler_run_proposed
+  scheduler_run_approved
+  scheduler_run_rejected
+  scheduler_run_started
+  scheduler_run_reported
+  scheduler_run_finished
+  scheduler_run_failed
+  scheduler_run_missed
+  scheduler_cycle_blocked
+  event_fired
+  subagent_run_started
+  subagent_run_finished
 }
 
 enum ProgrammaticPageStatus {
@@ -328,6 +348,12 @@ model Workspace {
   // Milestone 16: workspace-level monthly cap (USD) on DataForSEO local-SEO
   // spend (maps SERP, business data, reviews). Null = DEFAULT_LOCAL_SPEND_CAP_USD.
   localSeoSpendCapUsd   Float?                 @map("local_seo_spend_cap_usd")
+  // Phase B (W3, track B1): private workspace filesystem. WorkspaceFile is
+  // the authorization boundary — every FS operation re-checks workspace_id
+  // against these rows. Storage keys are opaque UUIDs; user filenames never
+  // touch storage paths.
+  files               WorkspaceFile[]
+  quota               WorkspaceQuota?
   // Milestone 16: local-SEO pull audit trail (cost accounting) + GBP scaffold.
   localPulls            LocalPull[]
   gbpAccounts           GbpAccount[]
@@ -339,6 +365,9 @@ model Workspace {
   connectorConnections  ConnectorConnection[]
   permissionGrants      PermissionGrant[]
   workspaceSettings     WorkspaceSettings?
+  // Phase B (W2, track B2): scheduled skills + parallel subagent runs.
+  scheduledSkills       ScheduledSkill[]
+  skillRuns             SkillRun[]
 
   @@map("workspaces")
 }
@@ -419,6 +448,9 @@ model Project {
   // Milestone 21: skills, connectors, settings.
   projectSkills         ProjectSkill[]
   projectDataSources    ProjectDataSource[]
+  // Phase B (W2, track B2): scheduled skills + parallel subagent runs.
+  scheduledSkills       ScheduledSkill[]
+  skillRuns             SkillRun[]
   fileAttachments       FileAttachment[]
   projectSettings       ProjectSettings?
 
@@ -2458,6 +2490,43 @@ enum ConnectionStatus {
   revoked
 }
 
+// Phase B (B3): cached per-connection health. Derived, refreshed by the
+// health checker (lib/connectors/health.ts); never the source of truth for
+// auth — ConnectorConnection.status + the vault are.
+enum ConnectorHealthStatus {
+  healthy
+  degraded
+  needs_reauth
+  error
+  unknown
+}
+
+model ConnectorHealth {
+  id          String   @id @default(cuid())
+  // One row per connection; the checker upserts on connectionId.
+  connectionId String  @unique @map("connection_id")
+  connection   ConnectorConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  // Denormalized for the workspace summary query (the authorization
+  // boundary is still re-checked via ConnectorConnection on every read).
+  workspaceId String  @map("workspace_id")
+
+  status      ConnectorHealthStatus @default(unknown)
+  lastCheckAt DateTime @map("last_check_at")
+  lastSuccessAt DateTime? @map("last_success_at")
+  // Closed-set error code (see lib/connectors/health.ts ERROR_CODES) —
+  // never a raw provider message.
+  lastError   String? @map("last_error")
+  quotaUsed   Float?  @map("quota_used")
+  quotaLimit  Float?  @map("quota_limit")
+
+  // Alert spam guard: cooldown + escalation state (see THREAT-MODEL-connector-health.md).
+  lastAlertAt       DateTime? @map("last_alert_at")
+  consecutiveErrors Int       @default(0) @map("consecutive_errors")
+
+  @@index([workspaceId])
+  @@map("connector_health")
+}
+
 model Skill {
   id          String         @id @default(cuid())
   workspaceId String         @map("workspace_id")
@@ -2478,6 +2547,9 @@ model Skill {
   installedAt DateTime       @default(now()) @map("installed_at")
 
   projects ProjectSkill[]
+  // Phase B (W2, track B2): schedules that run this skill + their run history.
+  scheduledSkills ScheduledSkill[]
+  skillRuns       SkillRun[]
 
   @@unique([workspaceId, slug])
   @@index([workspaceId])
@@ -2540,6 +2612,7 @@ model ConnectorConnection {
 
   credential      ConnectorCredential?
   projectBindings ProjectDataSource[]
+  health          ConnectorHealth?
 
   @@index([workspaceId])
   @@index([userId])
@@ -2647,4 +2720,186 @@ model PermissionGrant {
 
   @@index([workspaceId, userId])
   @@map("permission_grants")
+}
+
+enum WorkspaceFileKind {
+  skill
+  memory
+  artifact
+  file
+}
+
+// Phase B (W3, track B1): registry-gated private workspace filesystem.
+// The DB registry is the isolation boundary; storage keys are opaque UUIDs.
+model WorkspaceFile {
+  id          String            @id @default(cuid())
+  workspaceId String            @map("workspace_id")
+  workspace   Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  // Normalized logical path, e.g. "/files/reports/q3.pdf". Unique among
+  // live (non-trashed) files per workspace.
+  logicalPath String            @map("logical_path")
+  // Opaque UUID storage key. Never serialized to clients.
+  storageKey  String            @unique @map("storage_key")
+  filename    String            @db.VarChar(255)
+  mimeType    String            @map("mime_type")
+  sizeBytes   Int               @map("size_bytes")
+  kind        WorkspaceFileKind
+  createdBy   String            @map("created_by")
+  createdAt   DateTime          @default(now()) @map("created_at")
+  // Trash: set on soft-delete, 30-day retention, then purge.
+  trashedAt   DateTime?         @map("trashed_at")
+
+  @@index([workspaceId, trashedAt])
+  @@index([workspaceId, kind])
+  @@map("workspace_files")
+}
+
+model WorkspaceQuota {
+  workspaceId String    @id @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  limitBytes  BigInt    @map("limit_bytes")
+  usedBytes   BigInt    @default(0) @map("used_bytes")
+
+  @@map("workspace_quotas")
+}
+
+// ---------------------------------------------------------------------------
+// Phase B (W2, track B2): scheduled skills + parallel subagent runs.
+// ---------------------------------------------------------------------------
+
+enum ScheduleTriggerType {
+  cron
+  event
+}
+
+enum ScheduleApprovalMode {
+  supervised
+  scheduled
+  autopilot
+}
+
+enum ScheduleStatus {
+  active
+  paused
+}
+
+enum SkillRunTrigger {
+  cron
+  event
+  manual
+}
+
+enum SkillRunStatus {
+  pending
+  awaiting_approval
+  approved
+  running
+  succeeded
+  failed
+  rejected
+  cancelled
+}
+
+enum SubagentRunStatus {
+  pending
+  running
+  succeeded
+  failed
+  skipped
+}
+
+// A skill schedule: fires a skill on a cron expression or a workspace event.
+model ScheduledSkill {
+  id               String               @id @default(cuid())
+  workspaceId      String               @map("workspace_id")
+  workspace        Workspace            @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  // Null = workspace-wide (fires across the workspace's projects where the
+  // skill is enabled). Set = project-scoped (creatable by project editors).
+  projectId        String?              @map("project_id")
+  project          Project?             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  skillId          String               @map("skill_id")
+  skill            Skill                @relation(fields: [skillId], references: [id], onDelete: Cascade)
+  triggerType      ScheduleTriggerType  @map("trigger_type")
+  // Strict 5-field cron ("0 9 * * 1"). Null for event schedules.
+  cronExpr         String?              @map("cron_expr")
+  // Event bus source key, e.g. "rank_drop". Null for cron schedules.
+  eventSource      String?              @map("event_source")
+  // Per-source config, e.g. { "dropThreshold": 3 } for rank_drop.
+  eventConfigJson  Json?                @map("event_config_json")
+  // JSON array of schedule ids this run must not re-trigger (cycle guard is
+  // enforced at fire time; the lineage is carried on SkillRun).
+  createdBy        String               @map("created_by")
+  approvalMode     ScheduleApprovalMode @map("approval_mode")
+  concurrencyLimit Int                  @default(4) @map("concurrency_limit")
+  status           ScheduleStatus       @default(active)
+  lastRunAt        DateTime?            @map("last_run_at")
+  nextRunAt        DateTime?            @map("next_run_at")
+  createdAt        DateTime             @default(now()) @map("created_at")
+  updatedAt        DateTime             @updatedAt @map("updated_at")
+
+  runs SkillRun[]
+
+  @@index([workspaceId, status])
+  @@index([nextRunAt])
+  @@index([workspaceId, skillId])
+  @@map("scheduled_skills")
+}
+
+// One execution of a skill: from a schedule (cron/event) or manual trigger.
+model SkillRun {
+  id          String         @id @default(cuid())
+  scheduleId  String?        @map("schedule_id")
+  schedule    ScheduledSkill? @relation(fields: [scheduleId], references: [id], onDelete: SetNull)
+  workspaceId String         @map("workspace_id")
+  workspace   Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  projectId   String?        @map("project_id")
+  project     Project?       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  skillId     String         @map("skill_id")
+  skill       Skill          @relation(fields: [skillId], references: [id], onDelete: Cascade)
+  trigger     SkillRunTrigger
+  // Server-side trigger lineage (schedule ids, oldest first) for cycle
+  // detection. Never client-supplied.
+  lineage     String[]       @default([])
+  // Firing event payload (event-triggered runs): stored so the run detail
+  // view can show exactly what fired the run.
+  eventPayload Json?         @map("event_payload")
+  status      SkillRunStatus @default(pending)
+  // True when this run was created by the missed-cron catch-up (fires once,
+  // marked missed per the decided policy).
+  wasMissed   Boolean        @default(false) @map("was_missed")
+  startedAt   DateTime       @default(now()) @map("started_at")
+  finishedAt  DateTime?      @map("finished_at")
+  // Integer credits (metering ledger arrives in Phase C; fields exist now).
+  creditsUsed Int            @default(0) @map("credits_used")
+  // Filesystem logical path, e.g. /artifacts/runs/<run-id>/report.md
+  outputPath  String?        @map("output_path")
+  error       String?        @db.Text
+  approvedBy  String?        @map("approved_by")
+  approvedAt  DateTime?      @map("approved_at")
+
+  subagents SubagentRun[]
+
+  @@index([workspaceId, startedAt])
+  @@index([scheduleId])
+  @@index([skillId])
+  @@index([status])
+  @@map("skill_runs")
+}
+
+// One parallel subagent inside a skill run. Each is separately audited and
+// credit-metered; grants never exceed the parent run's envelope.
+model SubagentRun {
+  id          String            @id @default(cuid())
+  skillRunId  String            @map("skill_run_id")
+  skillRun    SkillRun          @relation(fields: [skillRunId], references: [id], onDelete: Cascade)
+  taskLabel   String            @map("task_label")
+  status      SubagentRunStatus @default(pending)
+  startedAt   DateTime          @default(now()) @map("started_at")
+  finishedAt  DateTime?         @map("finished_at")
+  creditsUsed Int               @default(0) @map("credits_used")
+  // Summary of what the subagent produced (deterministic mock in this track).
+  result      String?           @db.Text
+
+  @@index([skillRunId])
+  @@map("subagent_runs")
 }
