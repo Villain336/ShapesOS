@@ -1,6 +1,6 @@
 // Marketr — project file attachments (milestone 21, spec §5 flow 4).
-// GET  /api/projects/[projectId]/files → { files } (viewer+)
-// POST /api/projects/[projectId]/files — multipart (editor+; audited file_attached):
+// GET  /api/projects/[id]/files → { files } (viewer+)
+// POST /api/projects/[id]/files — multipart (editor+; audited file_attached):
 //   - `file` (File) → stored under .data/attachments/<projectId>/, 25MB cap, source=upload
 //   - or fields { connectorKey, externalRef, filename, mimeType? } → source=connector
 //     (connectorKey must be a bound + active data source for the project)
@@ -17,7 +17,7 @@ import { randomUUID } from "node:crypto";
 
 export const dynamic = "force-dynamic";
 
-type Params = { params: Promise<{ projectId: string }> };
+type Params = { params: Promise<{ id: string }> };
 
 const MAX_BYTES = 25 * 1024 * 1024;
 
@@ -52,7 +52,7 @@ function publicFile(f: {
 export async function GET(_req: NextRequest, { params }: Params) {
   const user = await requireUser();
   if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
-  const { projectId } = await params;
+  const { id: projectId } = await params;
   const access = await requireProjectAccess(user.id, projectId, "viewer");
   if ("error" in access) return access.error;
 
@@ -66,7 +66,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
 export async function POST(req: NextRequest, { params }: Params) {
   const user = await requireUser();
   if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
-  const { projectId } = await params;
+  const { id: projectId } = await params;
   const access = await requireProjectAccess(user.id, projectId, "editor");
   if ("error" in access) return access.error;
 

@@ -2,9 +2,9 @@
 
 // Marketr — project settings: Data client (milestone 21, part D2).
 // Bind a workspace connection to this project:
-//   POST /api/projects/[projectId]/data-sources { connectionId, projectConfig? }
+//   POST /api/projects/[id]/data-sources { connectionId, projectConfig? }
 // Unbind:
-//   DELETE /api/projects/[projectId]/data-sources/[bindingId]
+//   DELETE /api/projects/[id]/data-sources/[bindingId]
 
 import { useState } from "react";
 import { LinkSimple, Warning } from "@/components/vault/phosphor";

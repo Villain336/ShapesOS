@@ -2,7 +2,7 @@
 
 // Marketr — project settings: Skills toggles (milestone 21, part D2).
 // Enable/disable an installed workspace skill for this project via
-// PUT /api/projects/[projectId]/skills { skillId, enabled }.
+// PUT /api/projects/[id]/skills { skillId, enabled }.
 // When enabled, the skill's name + description are injected into Marketr's
 // system prompt for this project's sessions (spec §6).
 

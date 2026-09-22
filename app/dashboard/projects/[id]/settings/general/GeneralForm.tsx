@@ -1,7 +1,7 @@
 "use client";
 
 // Marketr — project settings: General form (milestone 21, part D2).
-// Edits brandContext + domains via PUT /api/projects/[projectId]/settings.
+// Edits brandContext + domains via PUT /api/projects/[id]/settings.
 // A null brandContext means "inherited" (Marketr's default voice); empty
 // domains means the project's own domain is the only one.
 

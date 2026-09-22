@@ -1,6 +1,6 @@
 // Marketr — project settings (milestone 21, spec §5 flow 6).
-// GET /api/projects/[projectId]/settings → { settings (auto-created), project: { domain, locale }, workspace: workspaceSettings } (viewer+)
-// PUT /api/projects/[projectId]/settings { brandContext?, domains?, approvalModeOverride?, publishingControls?, overrides? }
+// GET /api/projects/[id]/settings → { settings (auto-created), project: { domain, locale }, workspace: workspaceSettings } (viewer+)
+// PUT /api/projects/[id]/settings { brandContext?, domains?, approvalModeOverride?, publishingControls?, overrides? }
 //   → { settings } (editor+; audited settings_project_updated)
 
 import type { NextRequest } from "next/server";
@@ -13,7 +13,7 @@ import type { Prisma } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
 
-type Params = { params: Promise<{ projectId: string }> };
+type Params = { params: Promise<{ id: string }> };
 
 const APPROVAL_MODES = ["supervised", "scheduled", "manual"];
 
@@ -42,7 +42,7 @@ function publicProjectSettings(s: {
 export async function GET(_req: NextRequest, { params }: Params) {
   const user = await requireUser();
   if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
-  const { projectId } = await params;
+  const { id: projectId } = await params;
   const access = await requireProjectAccess(user.id, projectId, "viewer");
   if ("error" in access) return access.error;
 
@@ -77,7 +77,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
 export async function PUT(req: NextRequest, { params }: Params) {
   const user = await requireUser();
   if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
-  const { projectId } = await params;
+  const { id: projectId } = await params;
   const access = await requireProjectAccess(user.id, projectId, "editor");
   if ("error" in access) return access.error;
 

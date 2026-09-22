@@ -1,11 +1,11 @@
 "use client";
 
 // Marketr — project settings: Files client (milestone 21, part D2).
-//   Upload:   POST /api/projects/[projectId]/files (multipart, field `file`)
-//   Reference:POST /api/projects/[projectId]/files { connectorKey, externalRef, filename, mimeType? }
-//   Download: GET  /api/projects/[projectId]/files/[fileId]/download
-//   Delete:   DELETE /api/projects/[projectId]/files/[fileId]
-//   Refresh:  GET  /api/projects/[projectId]/files
+//   Upload:   POST /api/projects/[id]/files (multipart, field `file`)
+//   Reference:POST /api/projects/[id]/files { connectorKey, externalRef, filename, mimeType? }
+//   Download: GET  /api/projects/[id]/files/[fileId]/download
+//   Delete:   DELETE /api/projects/[id]/files/[fileId]
+//   Refresh:  GET  /api/projects/[id]/files
 
 import { useRef, useState } from "react";
 import { FileText, Warning } from "@/components/vault/phosphor";

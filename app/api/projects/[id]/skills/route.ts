@@ -1,6 +1,6 @@
 // Marketr — per-project skill enable/disable (milestone 21, spec §5 flow 1).
-// GET /api/projects/[projectId]/skills → { skills: [{ ...skill, enabled }] } (viewer+)
-// PUT /api/projects/[projectId]/skills { skillId, enabled } → { ok } (editor+; audited)
+// GET /api/projects/[id]/skills → { skills: [{ ...skill, enabled }] } (viewer+)
+// PUT /api/projects/[id]/skills { skillId, enabled } → { ok } (editor+; audited)
 
 import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
@@ -16,12 +16,12 @@ import {
 
 export const dynamic = "force-dynamic";
 
-type Params = { params: Promise<{ projectId: string }> };
+type Params = { params: Promise<{ id: string }> };
 
 export async function GET(_req: NextRequest, { params }: Params) {
   const user = await requireUser();
   if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
-  const { projectId } = await params;
+  const { id: projectId } = await params;
   const access = await requireProjectAccess(user.id, projectId, "viewer");
   if ("error" in access) return access.error;
 
@@ -44,7 +44,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
 export async function PUT(req: NextRequest, { params }: Params) {
   const user = await requireUser();
   if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
-  const { projectId } = await params;
+  const { id: projectId } = await params;
   const access = await requireProjectAccess(user.id, projectId, "editor");
   if ("error" in access) return access.error;
 

@@ -1,6 +1,6 @@
 // Marketr — per-project connector data-source bindings (milestone 21, spec §5 flows 3–4).
-// GET  /api/projects/[projectId]/data-sources → { bindings } (viewer+)
-// POST /api/projects/[projectId]/data-sources { connectionId, projectConfig? } → { binding }
+// GET  /api/projects/[id]/data-sources → { bindings } (viewer+)
+// POST /api/projects/[id]/data-sources { connectionId, projectConfig? } → { binding }
 //   The connection must belong to the project's workspace. (editor+; audited)
 
 import type { NextRequest } from "next/server";
@@ -12,7 +12,7 @@ import { readJsonBody } from "@/lib/sitefiles/api";
 
 export const dynamic = "force-dynamic";
 
-type Params = { params: Promise<{ projectId: string }> };
+type Params = { params: Promise<{ id: string }> };
 
 function publicBinding(b: {
   id: string;
@@ -49,7 +49,7 @@ function publicBinding(b: {
 export async function GET(_req: NextRequest, { params }: Params) {
   const user = await requireUser();
   if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
-  const { projectId } = await params;
+  const { id: projectId } = await params;
   const access = await requireProjectAccess(user.id, projectId, "viewer");
   if ("error" in access) return access.error;
 
@@ -64,7 +64,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
 export async function POST(req: NextRequest, { params }: Params) {
   const user = await requireUser();
   if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
-  const { projectId } = await params;
+  const { id: projectId } = await params;
   const access = await requireProjectAccess(user.id, projectId, "editor");
   if ("error" in access) return access.error;
 

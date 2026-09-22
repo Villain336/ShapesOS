@@ -1,6 +1,6 @@
 // Marketr — project settings: Skills (milestone 21, part D2).
 // Server: list the workspace's installed skills plus this project's
-// enablement map. Client toggles via PUT /api/projects/[projectId]/skills.
+// enablement map. Client toggles via PUT /api/projects/[id]/skills.
 
 import { redirect, notFound } from "next/navigation";
 import { Card, CardBody, CardHeader } from "@/components/vault/Card";

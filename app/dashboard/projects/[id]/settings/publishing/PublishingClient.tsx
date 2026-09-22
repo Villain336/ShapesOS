@@ -2,7 +2,7 @@
 
 // Marketr — project settings: Publishing client (milestone 21, part D2).
 // Toggles which publish destinations Marketr may use for this project.
-// Unchecked = disallowed. Persisted via PUT /api/projects/[projectId]/settings.
+// Unchecked = disallowed. Persisted via PUT /api/projects/[id]/settings.
 
 import { useState } from "react";
 import { CheckCircle, Warning } from "@/components/vault/phosphor";

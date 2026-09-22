@@ -1,5 +1,5 @@
 // Marketr — delete an attachment (milestone 21, spec §5 flow 4).
-// DELETE /api/projects/[projectId]/files/[fileId] → { ok }
+// DELETE /api/projects/[id]/files/[fileId] → { ok }
 // (editor+; removes the disk file for uploads; audited file_removed)
 
 import type { NextRequest } from "next/server";
@@ -14,11 +14,11 @@ export const dynamic = "force-dynamic";
 
 export async function DELETE(
   _req: NextRequest,
-  { params }: { params: Promise<{ projectId: string; fileId: string }> },
+  { params }: { params: Promise<{ id: string; fileId: string }> },
 ) {
   const user = await requireUser();
   if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
-  const { projectId, fileId } = await params;
+  const { id: projectId, fileId } = await params;
   const access = await requireProjectAccess(user.id, projectId, "editor");
   if ("error" in access) return access.error;
 

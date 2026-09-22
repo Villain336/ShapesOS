@@ -1,5 +1,5 @@
 // Marketr — unbind a project data source (milestone 21).
-// DELETE /api/projects/[projectId]/data-sources/[bindingId] → { ok }
+// DELETE /api/projects/[id]/data-sources/[bindingId] → { ok }
 // (editor+; audited data_source_unbound)
 
 import type { NextRequest } from "next/server";
@@ -12,11 +12,11 @@ export const dynamic = "force-dynamic";
 
 export async function DELETE(
   _req: NextRequest,
-  { params }: { params: Promise<{ projectId: string; bindingId: string }> },
+  { params }: { params: Promise<{ id: string; bindingId: string }> },
 ) {
   const user = await requireUser();
   if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
-  const { projectId, bindingId } = await params;
+  const { id: projectId, bindingId } = await params;
   const access = await requireProjectAccess(user.id, projectId, "editor");
   if ("error" in access) return access.error;
 
