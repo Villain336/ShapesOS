@@ -198,6 +198,19 @@ enum FileChangeAction {
   social_post_cancelled
   social_post_deleted
   social_analytics_synced
+  // Milestone 21: Higgsfield ad factory.
+  ad_campaign_created
+  ad_campaign_updated
+  ad_campaign_deleted
+  ad_higgsfield_key_updated
+  ad_higgsfield_key_revoked
+  ad_generation_started
+  ad_generation_completed
+  ad_generation_failed
+  ad_creative_approved
+  ad_creative_rejected
+  ad_creative_regenerated
+  ad_sent_to_social
 }
 
 enum ProgrammaticPageStatus {
@@ -253,6 +266,8 @@ model Workspace {
   newsletterDomains    NewsletterDomain[]
   // Milestone 20: social scheduling (BYO Buffer access token).
   socialSettings       SocialSettings?
+  // Milestone 21: ad factory (BYO Higgsfield API key).
+  adSettings           AdSettings?
   // Milestone 14: composite visibility score weights per workspace.
   // { rankings?: number, aiPresence?: number, freshness?: number, coverage?: number }
   // Null = defaults in lib/retention/visibility-score.ts.
@@ -295,6 +310,8 @@ model Project {
   // Milestone 20: social channels and posts.
   socialChannels          SocialChannel[]
   socialPosts             SocialPost[]
+  // Milestone 21: ad factory campaigns.
+  adCampaigns             AdCampaign[]
   competitors             Competitor[]
   contentItems            ContentItem[]
   issues                  Issue[]
@@ -1904,4 +1921,103 @@ model SocialPost {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("social_posts")
+}
+
+// Marketr — Higgsfield-powered ad factory (milestone 21).
+model AdSettings {
+  id                String    @id @default(cuid())
+  workspaceId       String    @unique @map("workspace_id")
+  workspace         Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  // Higgsfield API key (KEY_ID:KEY_SECRET), encrypted at rest (BYO credential,
+  // same pattern as Buffer in M20 and Resend in M19). Never sent to the client.
+  higgsfieldKeyEnc  String?   @map("higgsfield_key_enc")
+  higgsfieldKeyHint String?   @map("higgsfield_key_hint")
+  // Server-side monthly spend gate (cents). Default $50 — sane starter, editable.
+  monthlyCapCents   Int       @default(5000) @map("monthly_cap_cents")
+  // Rolling spend accounting for the current period ("YYYY-MM").
+  spendCents        Int       @default(0) @map("spend_cents")
+  spendPeriod       String?   @map("spend_period")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("ad_settings")
+}
+
+enum AdCreativeType {
+  image
+  video
+}
+
+enum AdCreativeStatus {
+  queued
+  generating
+  ready
+  failed
+  cancelled
+}
+
+// One ad campaign per project: objective + brand kit + target channels.
+model AdCampaign {
+  id        String  @id @default(cuid())
+  projectId String  @map("project_id")
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  name       String
+  objective  String?
+  // Brand kit (M12) — required before any generation (enforced server-side).
+  brandKitId String? @map("brand_kit_id")
+  // Target channels, e.g. ["instagram", "tiktok", "facebook"].
+  channels   Json    @default("[]")
+
+  createdAt DateTime     @default(now()) @map("created_at")
+  updatedAt DateTime     @updatedAt @map("updated_at")
+  creatives AdCreative[]
+
+  @@map("ad_campaigns")
+}
+
+// One creative = one generation job (one prompt). Variant fan-out creates
+// N rows. Assets hold the finished media URLs.
+model AdCreative {
+  id         String     @id @default(cuid())
+  campaignId String     @map("campaign_id")
+  campaign   AdCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  // Denormalized for audit/log queries without joining the campaign.
+  projectId  String     @map("project_id")
+
+  name          String
+  type          AdCreativeType
+  // Structured brief snapshot used to compose the prompt.
+  brief         Json
+  // Final composed prompt sent to the provider.
+  prompt        String
+  // Full prompt history (regenerations prepend/append here).
+  promptHistory Json             @default("[]")
+  status        AdCreativeStatus @default(queued)
+  // Aspect ratio for this job, e.g. "1:1", "4:5", "9:16", "16:9".
+  aspectRatio   String           @default("1:1") @map("aspect_ratio")
+  channels      Json             @default("[]")
+
+  // Cost in cents. Estimates are illustrative constants (see lib/ads/brief.ts);
+  // actuals come from the provider response when available.
+  costEstimateCents Int  @default(0) @map("cost_estimate_cents")
+  costActualCents   Int  @default(0) @map("cost_actual_cents")
+  // [{ url, variantIndex, costCents }]
+  assets            Json @default("[]")
+
+  providerJobId String?   @map("provider_job_id")
+  attempts      Int       @default(0)
+  nextPollAt    DateTime? @map("next_poll_at")
+  error         String?
+
+  approved Boolean @default(false)
+  rejected Boolean @default(false)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([campaignId, status])
+  @@index([status, nextPollAt])
+  @@map("ad_creatives")
 }

@@ -61,7 +61,7 @@ them over via the Secure Vault flow and Z7 writes them server-side.
    no GitHub remote is created).
 4. **Env:** copy `.env.example` → `.env`, fill §2 items 3–9. `chmod 600 .env`.
 5. **Data volume fix:** apply §1a, then `docker compose up -d --build`.
-6. **Migrations:** watch boot logs — `npx prisma migrate deploy` must apply all 17 migrations cleanly
+6. **Migrations:** watch boot logs — `npx prisma migrate deploy` must apply all 18 migrations cleanly
    (`..._init` → `..._social_scheduling`). The M15 (`..._backlinks_internal_links`), M16
    (`..._local_seo`), M17 (`..._programmatic_seo`), M18 (`..._content_autopilot`), M19
    (`..._newsletter_builder`), and M20 (`..._social_scheduling`)
@@ -85,6 +85,7 @@ them over via the Secure Vault flow and Z7 writes them server-side.
    - `0 7 * * * curl -s -X POST -H "Authorization: Bearer $CRON_SECRET" https://marketr.launchabl.com/api/cron/autopilot` (milestone 18: daily sweep; runs only daily/weekly rules whose cadence is due; kill switch, per-run item cap, idempotency, and the approval gate are enforced server-side)
    - `*/5 * * * * curl -s -X POST -H "Authorization: Bearer $CRON_SECRET" https://marketr.launchabl.com/api/cron/newsletter` (milestone 19: every-5-minutes sweep for due scheduled newsletter broadcasts; send guardrails — verified domain, completed test send, ≥1 subscriber, unsubscribe link — are re-enforced at dispatch; failures audit-log + fire an M13 alert)
    - `*/5 * * * * curl -s -X POST -H "Authorization: Bearer $CRON_SECRET" https://marketr.launchabl.com/api/cron/social` (milestone 20: every-5-minutes sweep for due scheduled social posts; dispatches to Buffer (their queue publishes), bounded retries on transient failures, per-channel validation + idempotency enforced server-side; permanent failures audit-log + fire an M13 alert)
+   - `*/5 * * * * curl -s -X POST -H "Authorization: Bearer $CRON_SECRET" https://marketr.launchabl.com/api/cron/ads` (milestone 21: every-5-minutes sweep for queued/in-flight Higgsfield ad jobs; submits jobs that never got a provider id, polls due ones on a 30s cadence (40-attempt cap), records actual cost and spend; provider failures audit-log + fire an M13 alert)
 9. **Smoke test:** log in, create workspace + project, confirm pages load, no console errors.
 10. **Backups:** nightly `pg_dump` cron → object storage; document restore command.
 
@@ -107,6 +108,23 @@ Run in order; each step must pass before the next.
 - [ ] **Audit log review:** confirm credential changes, deploys, fix-agent runs, and role changes all appear.
 - [ ] **Newsletter (live Resend, BYO key):** add a workspace Resend key, add a sending domain, copy the SPF/DKIM/DMARC records into DNS, verify the domain, import a 3-address CSV list, build a template from a starter, send a test email, then send a real broadcast to the test list; confirm the unsubscribe link works, the webhook flips a bounced address, and the audit log + alert fire on a forced failure.
 - [ ] **Cron:** trigger both cron endpoints manually with `CRON_SECRET`, confirm 200s and expected side effects.
+
+## 4b. Ad factory environment requirements (milestone 21)
+
+- Each workspace brings its own Higgsfield API key (Ad factory → Settings) — stored encrypted with
+  `MARKETR_CREDENTIALS_KEY`; the key is never returned by the API. Auth header format:
+  `Authorization: Key KEY_ID:KEY_SECRET` against `https://platform.higgsfield.ai`.
+- **Before production image generation:** confirm the image model slug via `GET /models` against a real
+  key. The video default (`bytedance/seedance-2.5/image-to-video`) is verified; the image default
+  (`bytedance/seedance-2.5/text-to-image`) is a configurable placeholder and MUST be replaced with a
+  live catalog slug if it 404s. Video without a reference image likewise needs a text-to-video slug
+  from the live catalog.
+- Cost estimates shown in the UI are illustrative constants — reverify current provider pricing before
+  billing. The workspace monthly spend cap (default $50) is enforced server-side.
+- Scheduled polling needs the host cron entry `*/5 * * * * … /api/cron/ads` (see §3.8).
+- Live check: add a key, create a campaign with a brand kit, generate 1 image variant, confirm it
+  reaches `ready`, approve it, send it to social, confirm the post draft appears in the social studio
+  and the spend summary increments.
 
 ## 4a. Newsletter environment requirements (milestone 19)
 

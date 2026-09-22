@@ -162,6 +162,14 @@ export const TRIGGERS: TriggerDef[] = [
     dedupAvailable: true,
     live: true, // milestone 20: emitted by the social service.
   },
+  {
+    key: "ad_generation_failed",
+    label: "Ad generation failed",
+    description: "A Higgsfield ad generation job failed (provider error, submit failure, or poll timeout).",
+    conditionKeys: ["projectIds"],
+    dedupAvailable: true,
+    live: true, // milestone 21: emitted by the ad factory service.
+  },
 ];
 
 export function triggerDef(key: string): TriggerDef | undefined {
