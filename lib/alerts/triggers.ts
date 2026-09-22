@@ -146,6 +146,14 @@ export const TRIGGERS: TriggerDef[] = [
     dedupAvailable: true,
     live: true, // milestone 18: emitted by the autopilot service.
   },
+  {
+    key: "newsletter_broadcast_failed",
+    label: "Newsletter broadcast failed",
+    description: "A newsletter broadcast failed to send (guardrail or Resend error).",
+    conditionKeys: ["projectIds"],
+    dedupAvailable: true,
+    live: true, // milestone 19: emitted by the newsletter service.
+  },
 ];
 
 export function triggerDef(key: string): TriggerDef | undefined {

@@ -48,8 +48,9 @@ container's writable layer. They survive restarts but are lost on `compose down`
 | 6 | `MARKETR_CREDENTIALS_KEY` | `openssl rand -hex 32` (encrypts stored connector creds) |
 | 7 | `CRON_SECRET` | `openssl rand -hex 32` (bearer for scheduled endpoints) |
 | 8 | Test targets (see §5) | SFTP host, scratch GitHub repo, WP test site, Webflow token, Vercel/Cloudflare tokens |
+| 9 | `RESEND_WEBHOOK_SECRET` | Signing secret from the Resend dashboard webhook (milestone 19 newsletter bounces/complaints) |
 
-Secrets (4–7) go in `.env` on the VPS only — never in git, never in chat. When ready, Tico hands
+Secrets (4–7 and 9) go in `.env` on the VPS only — never in git, never in chat. When ready, Tico hands
 them over via the Secure Vault flow and Z7 writes them server-side.
 
 ## 3. Runbook
@@ -58,11 +59,12 @@ them over via the Secure Vault flow and Z7 writes them server-side.
 2. **DNS:** A record `marketr.launchabl.com` → VPS IP. Confirm propagation.
 3. **Code:** `git clone` the vault repo to `/opt/marketr` (local-only remote — this stays private;
    no GitHub remote is created).
-4. **Env:** copy `.env.example` → `.env`, fill §2 items 3–7. `chmod 600 .env`.
+4. **Env:** copy `.env.example` → `.env`, fill §2 items 3–9. `chmod 600 .env`.
 5. **Data volume fix:** apply §1a, then `docker compose up -d --build`.
-6. **Migrations:** watch boot logs — `npx prisma migrate deploy` must apply all 15 migrations cleanly
-   (`..._init` → `..._content_autopilot`). The M15 (`..._backlinks_internal_links`), M16
-   (`..._local_seo`), M17 (`..._programmatic_seo`), and M18 (`..._content_autopilot`)
+6. **Migrations:** watch boot logs — `npx prisma migrate deploy` must apply all 16 migrations cleanly
+   (`..._init` → `..._newsletter_builder`). The M15 (`..._backlinks_internal_links`), M16
+   (`..._local_seo`), M17 (`..._programmatic_seo`), M18 (`..._content_autopilot`), and M19
+   (`..._newsletter_builder`)
    migrations are hand-written (no PostgreSQL in the sandbox build environment) — review
    them carefully before deploy.
    Verify with `docker compose exec db psql -U marketr -c "\dt"`.
@@ -81,6 +83,7 @@ them over via the Secure Vault flow and Z7 writes them server-side.
    - `30 11 * * 1 curl -s -X POST -H "Authorization: Bearer $CRON_SECRET" https://marketr.launchabl.com/api/cron/local-competitors` (milestone 16: weekly local-competitor snapshot refresh; enabled competitors only)
    - `0 12 * * 1 curl -s -X POST -H "Authorization: Bearer $CRON_SECRET" https://marketr.launchabl.com/api/cron/reviews` (milestone 16: weekly review ingest + sentiment summaries + negative-review alerts)
    - `0 7 * * * curl -s -X POST -H "Authorization: Bearer $CRON_SECRET" https://marketr.launchabl.com/api/cron/autopilot` (milestone 18: daily sweep; runs only daily/weekly rules whose cadence is due; kill switch, per-run item cap, idempotency, and the approval gate are enforced server-side)
+   - `*/5 * * * * curl -s -X POST -H "Authorization: Bearer $CRON_SECRET" https://marketr.launchabl.com/api/cron/newsletter` (milestone 19: every-5-minutes sweep for due scheduled newsletter broadcasts; send guardrails — verified domain, completed test send, ≥1 subscriber, unsubscribe link — are re-enforced at dispatch; failures audit-log + fire an M13 alert)
 9. **Smoke test:** log in, create workspace + project, confirm pages load, no console errors.
 10. **Backups:** nightly `pg_dump` cron → object storage; document restore command.
 
@@ -101,7 +104,19 @@ Run in order; each step must pass before the next.
 - [ ] **Fix agent (real working copy):** run audit on a test site, approve 2–3 safe fixes, run the scheduled applier, confirm fixes + audit entries, test one-click revert.
 - [ ] **RBAC:** invite a second user as `viewer` — confirm read-only; promote to `editor` — confirm no member management; demote/remove.
 - [ ] **Audit log review:** confirm credential changes, deploys, fix-agent runs, and role changes all appear.
+- [ ] **Newsletter (live Resend, BYO key):** add a workspace Resend key, add a sending domain, copy the SPF/DKIM/DMARC records into DNS, verify the domain, import a 3-address CSV list, build a template from a starter, send a test email, then send a real broadcast to the test list; confirm the unsubscribe link works, the webhook flips a bounced address, and the audit log + alert fire on a forced failure.
 - [ ] **Cron:** trigger both cron endpoints manually with `CRON_SECRET`, confirm 200s and expected side effects.
+
+## 4a. Newsletter environment requirements (milestone 19)
+
+- Each workspace brings its own Resend API key (Settings → Newsletter → Domains & settings) — stored
+  encrypted with `MARKETR_CREDENTIALS_KEY`; the key is never returned by the API.
+- `RESEND_WEBHOOK_SECRET` (in `.env`): the signing secret from the Resend dashboard webhook
+  configured to POST to `https://marketr.launchabl.com/api/newsletter/webhooks/resend`. Without it,
+  webhook events are accepted unsigned and a warning is logged — set it before production.
+- Sending domains need SPF + DKIM (issued by Resend at domain creation) plus a DMARC TXT record —
+  the setup wizard shows the exact records and a "Verify now" button.
+- Scheduled broadcasts need the host cron entry `*/5 * * * * … /api/cron/newsletter` (see §3.8).
 
 ## 5. Test targets (safe, non-production)
 

@@ -167,6 +167,23 @@ enum FileChangeAction {
   autopilot_item_published
   autopilot_killed
   autopilot_unkilled
+  // Milestone 19: newsletter builder.
+  newsletter_template_created
+  newsletter_template_updated
+  newsletter_template_deleted
+  newsletter_list_created
+  newsletter_list_deleted
+  newsletter_subscribers_imported
+  newsletter_subscriber_unsubscribed
+  newsletter_domain_added
+  newsletter_domain_verified
+  newsletter_test_sent
+  newsletter_broadcast_created
+  newsletter_broadcast_scheduled
+  newsletter_broadcast_sent
+  newsletter_broadcast_failed
+  newsletter_broadcast_cancelled
+  newsletter_resend_key_updated
 }
 
 enum ProgrammaticPageStatus {
@@ -217,6 +234,9 @@ model Workspace {
   alertEvents          AlertEvent[]
   // Milestone 15: backlink pull audit trail (cost accounting).
   backlinkPulls        BacklinkPull[]
+  // Milestone 19: newsletter settings (BYO Resend key) and sending domains.
+  newsletterSettings   NewsletterSettings?
+  newsletterDomains    NewsletterDomain[]
   // Milestone 14: composite visibility score weights per workspace.
   // { rankings?: number, aiPresence?: number, freshness?: number, coverage?: number }
   // Null = defaults in lib/retention/visibility-score.ts.
@@ -252,6 +272,10 @@ model Project {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   keywords                Keyword[]
+  // Milestone 19: newsletter lists, templates, and broadcasts.
+  newsletterLists         NewsletterList[]
+  newsletterTemplates     NewsletterTemplate[]
+  newsletterBroadcasts    NewsletterBroadcast[]
   competitors             Competitor[]
   contentItems            ContentItem[]
   issues                  Issue[]
@@ -458,8 +482,10 @@ model BrandKit {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  templates ReportTemplate[]
-  reports   Report[]
+  templates           ReportTemplate[]
+  reports             Report[]
+  // Milestone 19: newsletter templates using this brand kit.
+  newsletterTemplates NewsletterTemplate[]
 
   @@map("brand_kits")
 }
@@ -1629,4 +1655,165 @@ model AutopilotKillSwitch {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("autopilot_kill_switches")
+}
+
+// ---------------------------------------------------------------------------
+// Marketr — newsletter builder (milestone 19).
+// Editor model: Tiptap JSON email blocks (see lib/newsletter). Brand kits
+// (milestone 12) supply fonts/colors at render time. Sending is Resend
+// Broadcasts with a BYO workspace API key (encrypted, lib/secrets).
+// ---------------------------------------------------------------------------
+
+// Milestone 19 — workspace newsletter settings: BYO Resend key + defaults.
+model NewsletterSettings {
+  id          String    @id @default(cuid())
+  workspaceId String    @unique @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  // Encrypted Resend API key (AES-256-GCM envelope, lib/secrets). The raw key
+  // is NEVER returned to clients — only the hint is readable in the UI.
+  resendKeyEnc    String? @map("resend_key_enc") @db.Text
+  resendKeyHint   String? @map("resend_key_hint")
+  defaultFromName String? @map("default_from_name")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("newsletter_settings")
+}
+
+enum NewsletterDomainStatus {
+  pending
+  verified
+  failed
+}
+
+// Milestone 19 — per-client sending domain. Broadcasts are blocked
+// server-side unless the domain's status is verified.
+model NewsletterDomain {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  domain         String
+  resendDomainId String?                @map("resend_domain_id")
+  status         NewsletterDomainStatus @default(pending)
+  // Exact DNS records Resend requires, as returned by its API:
+  // [{ name, type: "TXT"|"MX"|"CNAME", value, purpose: "spf"|"dkim"|"dmarc-note" }].
+  dnsRecords     Json                   @default("[]") @map("dns_records")
+  verifiedAt     DateTime?              @map("verified_at")
+
+  broadcasts NewsletterBroadcast[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([workspaceId, domain])
+  @@map("newsletter_domains")
+}
+
+// Milestone 19 — subscriber list (one Resend audience per list).
+model NewsletterList {
+  id        String  @id @default(cuid())
+  projectId String  @map("project_id")
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  name             String
+  doubleOptIn      Boolean @default(true) @map("double_opt_in")
+  resendAudienceId String? @map("resend_audience_id")
+
+  subscribers Subscriber[]
+  broadcasts  NewsletterBroadcast[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("newsletter_lists")
+}
+
+enum SubscriberStatus {
+  subscribed
+  unsubscribed
+  bounced
+  complained
+}
+
+// Milestone 19 — one subscriber. `token` powers the per-send unsubscribe link
+// (public route, no auth — the token is the capability).
+model Subscriber {
+  id     String         @id @default(cuid())
+  listId String         @map("list_id")
+  list   NewsletterList @relation(fields: [listId], references: [id], onDelete: Cascade)
+
+  email  String
+  name   String?
+  status SubscriberStatus @default(subscribed)
+  token  String           @unique @default(cuid())
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([listId, email])
+  @@map("subscribers")
+}
+
+// Milestone 19 — editable newsletter template. Content is Tiptap JSON email
+// blocks (emailHeader/emailHero/emailText/emailImage/emailButton/
+// emailDivider/emailFooter — see lib/newsletter), the editable source of
+// truth, same pattern as milestone 12 report templates.
+model NewsletterTemplate {
+  id        String  @id @default(cuid())
+  projectId String  @map("project_id")
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  name       String
+  tiptap     Json
+  brandKitId String?   @map("brand_kit_id")
+  brandKit   BrandKit? @relation(fields: [brandKitId], references: [id], onDelete: SetNull)
+  isStarter  Boolean   @default(false) @map("is_starter")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("newsletter_templates")
+}
+
+enum BroadcastStatus {
+  draft
+  scheduled
+  sending
+  sent
+  failed
+  cancelled
+}
+
+// Milestone 19 — one newsletter send. `templateSnapshot` is the immutable
+// Tiptap JSON at send time (editing the template later does not change it).
+model NewsletterBroadcast {
+  id        String  @id @default(cuid())
+  projectId String  @map("project_id")
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  listId   String           @map("list_id")
+  list     NewsletterList   @relation(fields: [listId], references: [id], onDelete: Restrict)
+  domainId String           @map("domain_id")
+  domain   NewsletterDomain @relation(fields: [domainId], references: [id], onDelete: Restrict)
+
+  subject           String
+  templateSnapshot  Json            @map("template_snapshot")
+  brandKitId        String?         @map("brand_kit_id")
+  status            BroadcastStatus @default(draft)
+  scheduledAt       DateTime?       @map("scheduled_at")
+  // Guardrail: a test send must complete before any broadcast.
+  testSentAt        DateTime?       @map("test_sent_at")
+  testSentTo        String?         @map("test_sent_to")
+  resendBroadcastId String?         @map("resend_broadcast_id")
+  // { sent, delivered, opened, clicked, bounced, complained } — best effort.
+  stats             Json            @default("{}")
+  error             String?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("newsletter_broadcasts")
 }
