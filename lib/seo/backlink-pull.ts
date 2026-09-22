@@ -26,6 +26,7 @@ import {
   DEFAULT_MONTHLY_SPEND_CAP_USD,
   MAX_BACKLINK_ROWS_PER_PULL,
   checkPullBudget,
+  estimateListPullCost,
   estimateSummaryPullCost,
   monthKey,
   type PullBudgetCheck,
@@ -207,12 +208,13 @@ export async function runBacklinkPull(opts: {
 
   // 1. Hard row cap.
   if (rows > MAX_BACKLINK_ROWS_PER_PULL) {
-    const over = checkPullBudget(rows, 0, Number.POSITIVE_INFINITY);
+    // Day-1: build the limit verdict directly instead of calling
+    // checkPullBudget with an Infinity cap sentinel (Infinity caps are now
+    // rejected by the fail-closed budget gate).
     return fail(
       "blocked_limit",
-      over.blockedReason ??
-        `Requested ${rows.toLocaleString()} rows exceeds the per-pull limit of ${MAX_BACKLINK_ROWS_PER_PULL.toLocaleString()}.`,
-      over.estimatedCostUsd,
+      `Requested ${rows.toLocaleString()} rows exceeds the per-pull limit of ${MAX_BACKLINK_ROWS_PER_PULL.toLocaleString()}. Lower the limit and try again.`,
+      estimateListPullCost(MAX_BACKLINK_ROWS_PER_PULL) + estimateSummaryPullCost(),
     );
   }
 

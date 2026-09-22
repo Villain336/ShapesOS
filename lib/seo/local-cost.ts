@@ -46,7 +46,10 @@ export { monthKey } from "./backlinks-cost";
  * Pure — safe to call anywhere (previews, tests).
  */
 export function estimateGridRunCost(cells: number): number {
-  const c = Math.max(0, Math.min(Math.floor(cells), MAX_GRID_CELLS_PER_RUN));
+  // Day-1 (#3): NaN must not flow through — see backlinks-cost.ts.
+  const c = Number.isFinite(cells)
+    ? Math.max(0, Math.min(Math.floor(cells), MAX_GRID_CELLS_PER_RUN))
+    : 0;
   return round4(c * LOCAL_PRICING.mapsSerpRequestUsd);
 }
 
@@ -70,12 +73,24 @@ export interface LocalBudgetCheck {
 /**
  * Pure cost-gate decision for a local-SEO operation. The service calls this
  * BEFORE any paid API call; tests cover it without a database.
+ *
+ * Day-1 fix (edge #3): fail CLOSED on non-numeric input (NaN cap → blocked).
  */
 export function checkLocalBudget(
   estimatedCostUsd: number,
   spendUsedUsd: number,
   spendCapUsd: number,
 ): LocalBudgetCheck {
+  const sane = (n: unknown): n is number => typeof n === "number" && Number.isFinite(n);
+  if (!sane(estimatedCostUsd) || estimatedCostUsd < 0) {
+    return { ok: false, blockedReason: "Invalid cost estimate — operation blocked.", estimatedCostUsd: 0 };
+  }
+  if (!sane(spendUsedUsd) || spendUsedUsd < 0) {
+    return { ok: false, blockedReason: "Invalid spend tracking state — operation blocked.", estimatedCostUsd: 0 };
+  }
+  if (!sane(spendCapUsd) || spendCapUsd < 0) {
+    return { ok: false, blockedReason: "Invalid budget cap — operation blocked.", estimatedCostUsd: 0 };
+  }
   const estimated = round4(estimatedCostUsd);
   if (spendUsedUsd + estimated > spendCapUsd) {
     return {

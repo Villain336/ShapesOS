@@ -13,6 +13,7 @@
 // secret, not a user role) — see app/api/cron/fix-agent/route.ts.
 
 import { prisma } from "./prisma";
+import { randomBytes } from "node:crypto";
 import type { WorkspaceMember, WorkspaceRole } from "@prisma/client";
 
 export const ROLE_RANK: Record<WorkspaceRole, number> = {
@@ -58,13 +59,63 @@ export async function getMembership(
   return null;
 }
 
-/** Link pending email invites to a freshly signed-in user. */
-export async function linkPendingInvites(userId: string, email: string) {
+/**
+ * Claim a pending workspace invite via its single-use token (day-1
+ * hardening, M5). Replaces the old bare-email-match auto-linking: the token
+ * is the capability, and the invite's email must still match the claimant's
+ * sign-in email so a leaked token can't be sprayed across accounts.
+ * Returns the claimed membership, or null when the token is unknown,
+ * expired, already used, or addressed to a different email.
+ */
+export async function claimInviteToken(
+  userId: string,
+  email: string,
+  token: string,
+): Promise<WorkspaceMember | null> {
   const normalized = email.trim().toLowerCase();
-  await prisma.workspaceMember.updateMany({
-    where: { email: normalized, userId: null },
-    data: { userId, email: normalized },
+  const cleanToken = token.trim();
+  if (!cleanToken || !normalized) return null;
+  const pending = await prisma.workspaceMember.findFirst({
+    where: { inviteToken: cleanToken, userId: null },
   });
+  if (!pending) return null;
+  if (pending.inviteExpiresAt && pending.inviteExpiresAt < new Date()) return null;
+  if (!pending.email || pending.email.trim().toLowerCase() !== normalized) return null;
+  // Day-1: atomic single-use claim. Two concurrent claimants could both pass
+  // the checks above; the updateMany re-asserts every condition in the WHERE
+  // so exactly one wins (count === 1) and the loser sees count === 0.
+  const claimed = await prisma.workspaceMember.updateMany({
+    where: {
+      id: pending.id,
+      userId: null,
+      inviteToken: cleanToken,
+      email: { equals: normalized, mode: "insensitive" },
+      OR: [{ inviteExpiresAt: null }, { inviteExpiresAt: { gte: new Date() } }],
+    },
+    data: { userId, inviteToken: null, inviteExpiresAt: null },
+  });
+  if (claimed.count === 0) return null; // lost the race — token already spent
+  // Privilege-grant event (M8: invite acceptance must be audited).
+  await prisma.fileChangeLog.create({
+    data: {
+      projectId: null,
+      workspaceId: pending.workspaceId,
+      filePath: "(workspace)",
+      actor: "user",
+      action: "member_invite_accepted",
+      summary: `${normalized} accepted invite as ${pending.role}`,
+      approvedBy: userId,
+    },
+  });
+  return { ...pending, userId, inviteToken: null, inviteExpiresAt: null };
+}
+
+/** Mint a single-use invite token (128-bit) with a 7-day expiry. */
+export function mintInviteToken(): { inviteToken: string; inviteExpiresAt: Date } {
+  return {
+    inviteToken: randomBytes(32).toString("hex"),
+    inviteExpiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+  };
 }
 
 /** Require at least `min` role on a workspace. Returns the membership or null. */

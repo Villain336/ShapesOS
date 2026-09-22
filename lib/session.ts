@@ -9,7 +9,6 @@
 
 import { auth } from "@/auth";
 import { prisma } from "./prisma";
-import { linkPendingInvites } from "./authz";
 
 export async function requireUser() {
   const session = await auth();
@@ -31,9 +30,9 @@ export async function getOrCreateWorkspace(
   userId: string,
   email?: string | null,
 ) {
-  // Link any pending email invites first (member added before first sign-in).
-  if (email) await linkPendingInvites(userId, email);
-
+  // NOTE (day-1 hardening, M5): pending invites are claimed via their
+  // single-use token link (/invite?token=…), never by bare email match —
+  // so no auto-linking happens here anymore.
   const accessible = await getAccessibleWorkspaces(userId);
   // Prefer a workspace where the user is an explicit member (e.g. SSO
   // auto-provisioning) over a legacy owner-only workspace.

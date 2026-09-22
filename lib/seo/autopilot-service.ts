@@ -14,7 +14,6 @@ import {
   dedupeCandidates,
   fallbackTitle,
   isAutoApproveEligible,
-  isKilledForProject,
   markdownToTiptap,
   scopeKeyFor,
   validateRuleInput,
@@ -184,14 +183,19 @@ export async function getKillStatus(
   return { workspaceKilled, projectKilled, killed: workspaceKilled || projectKilled };
 }
 
-/** True when autopilot must not run/publish for this project. */
+/**
+ * True when autopilot must not run/publish for this project.
+ *
+ * Day-1 fix (critical #1): this used to query
+ * `where: { workspaceId, OR: [{ projectId }] }`, which Prisma ANDs — kill rows
+ * set exactly one of the two IDs (the other is NULL), so the query never
+ * matched and runs continued while the UI reported "engaged". It now uses the
+ * exact same scopeKey query as getKillStatus(), so the run check and the UI
+ * can never disagree again.
+ */
 export async function isAutopilotKilled(db: Db, workspaceId: string, projectId: string): Promise<boolean> {
-  const rows = await db.autopilotKillSwitch.findMany({ where: { workspaceId, OR: [{ projectId }] } });
-  return isKilledForProject(
-    rows.map((r) => ({ scopeKey: r.scopeKey, killed: r.killed })),
-    workspaceId,
-    projectId,
-  );
+  const { killed } = await getKillStatus(db, { workspaceId, projectId });
+  return killed;
 }
 
 function dayKey(): string {

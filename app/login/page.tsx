@@ -5,7 +5,8 @@
 "use client";
 
 import { signIn } from "next-auth/react";
-import { useEffect, useState, type FormEvent } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useState, type FormEvent } from "react";
 
 const inputCls =
   "w-full rounded-md border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-zinc-500 focus:outline-none";
@@ -15,7 +16,12 @@ interface ProviderInfo {
   name: string;
 }
 
-export default function LoginPage() {
+// Day-1: honor a same-origin `next` redirect (e.g. /invite?token=…) so invite
+import { safeNext } from "@/lib/auth/redirect";
+
+function LoginBody() {
+  const params = useSearchParams();
+  const next = safeNext(params.get("next"));
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -51,7 +57,7 @@ export default function LoginPage() {
         email,
         password,
         redirect: false,
-        callbackUrl: "/dashboard",
+        callbackUrl: next,
       });
       if (res?.error) {
         setError("Invalid email or password.");
@@ -72,7 +78,7 @@ export default function LoginPage() {
         </p>
 
         <button
-          onClick={() => signIn("google", { callbackUrl: "/dashboard" })}
+          onClick={() => signIn("google", { callbackUrl: next })}
           className="mt-6 w-full rounded-md border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm font-medium hover:bg-zinc-700"
         >
           Continue with Google
@@ -81,7 +87,7 @@ export default function LoginPage() {
         {sso.map((p) => (
           <button
             key={p.id}
-            onClick={() => signIn(p.id, { callbackUrl: "/dashboard" })}
+            onClick={() => signIn(p.id, { callbackUrl: next })}
             className="mt-3 w-full rounded-md border border-indigo-700 bg-indigo-950 px-3 py-2 text-sm font-medium text-indigo-100 hover:bg-indigo-900"
           >
             Continue with {p.name}
@@ -123,5 +129,15 @@ export default function LoginPage() {
         </form>
       </div>
     </div>
+  );
+}
+
+// Default export wraps the body in Suspense: useSearchParams() requires a
+// suspense boundary for static prerendering (per the local Next.js docs).
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-center text-sm text-zinc-400">Loading…</div>}>
+      <LoginBody />
+    </Suspense>
   );
 }

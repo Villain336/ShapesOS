@@ -31,6 +31,7 @@ import {
 import type { ContentKind } from "@/lib/connectors/types";
 import { MockWordPressConnector } from "@/lib/connectors/mock-wordpress";
 import { MockWebflowConnector } from "@/lib/connectors/mock-webflow";
+import { UnsafeUrlError } from "@/lib/safe-url";
 
 interface ContentBody {
   projectId?: string;
@@ -85,7 +86,7 @@ export async function POST(
   const action = body.action ?? "";
 
   try {
-    const connector = getContentConnector(site);
+    const connector = await getContentConnector(site);
 
     if (action === "test") {
       const r = await connector.test();
@@ -211,6 +212,10 @@ export async function POST(
 
     return Response.json({ error: `Unknown action "${action}"` }, { status: 400 });
   } catch (err) {
+    // Day-1 (M6): an SSRF block is a bad stored config → 400, not a 502.
+    if (err instanceof UnsafeUrlError) {
+      return Response.json({ error: `Unsafe WordPress URL: ${err.message}` }, { status: 400 });
+    }
     return Response.json(
       { error: err instanceof Error ? err.message : "Content operation failed" },
       { status: 502 },

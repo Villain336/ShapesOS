@@ -98,7 +98,12 @@ export async function POST(req: NextRequest) {
   if (!(await requireProjectRole(user.id, project.id, "editor"))) return forbidden();
   if (body.action !== "preview") return Response.json({ error: "Invalid action" }, { status: 400 });
 
-  const limit = Math.max(1, Math.min(100_000, Math.floor(body.limit ?? 500)));
+  const rawLimit = body.limit ?? 500;
+  // Day-1 fix (edge #3): same NaN guard as /api/backlinks/pull.
+  if (typeof rawLimit !== "number" || !Number.isFinite(rawLimit)) {
+    return Response.json({ error: "limit must be a finite number" }, { status: 400 });
+  }
+  const limit = Math.max(1, Math.min(100_000, Math.floor(rawLimit)));
   const preview = await previewBacklinkPull(
     project.workspaceId,
     project.id,

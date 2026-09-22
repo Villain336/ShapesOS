@@ -47,6 +47,24 @@ function absoluteUrl(url: string, baseUrl: string): string {
   return `${baseUrl.replace(/\/$/, "")}/${url.replace(/^\//, "")}`;
 }
 
+/**
+ * Day-1 fix (edge #5): link href allow-list. Only http(s) and site-relative
+ * URLs are emitted; anything else (javascript:, data:, vbscript:, and
+ * whitespace/control-char obfuscations of them) renders as inert "#".
+ * Templates are operator-editable, so this is a stored-XSS boundary.
+ */
+function safeHref(raw: string | undefined | null): string {
+  if (!raw) return "#";
+  // Strip whitespace/control chars first — defeats "java\tscript:" tricks.
+  const cleaned = raw.replace(/[\u0000-\u0020\u007f-\u00a0]+/g, "").trim();
+  if (!cleaned) return "#";
+  const scheme = cleaned.match(/^([a-zA-Z][a-zA-Z0-9+.-]*):/);
+  if (scheme && scheme[1].toLowerCase() !== "http" && scheme[1].toLowerCase() !== "https") {
+    return "#";
+  }
+  return cleaned;
+}
+
 function RunSpan({ run, color }: { run: InlineRun; color: string }) {
   const style: React.CSSProperties = {
     color,
@@ -58,7 +76,7 @@ function RunSpan({ run, color }: { run: InlineRun; color: string }) {
   };
   if (run.href) {
     return (
-      <Link href={run.href} style={{ ...style, color: "#4f46e5", textDecoration: "underline" }}>
+      <Link href={safeHref(run.href)} style={{ ...style, color: "#4f46e5", textDecoration: "underline" }}>
         {run.text}
       </Link>
     );
@@ -218,7 +236,7 @@ function Block({
       return (
         <Section style={{ padding: "16px 32px", textAlign: "center" }}>
           <Button
-            href={attr(node, "href", "https://")}
+            href={safeHref(attr(node, "href"))}
             style={{
               backgroundColor: brand.colors.accent,
               color: "#ffffff",

@@ -25,6 +25,18 @@ export async function requireWorkspaceEditor(userId: string, workspaceId: string
   return null;
 }
 
+/**
+ * Admin-level guard for Higgsfield credential + spend-cap management
+ * (day-1 hardening, M2): connection credential CRUD stays admin+ per the
+ * lib/authz.ts capability matrix. Editors can still read settings and
+ * run generations; only admins may rotate the key or move the cap.
+ */
+export async function requireWorkspaceAdmin(userId: string, workspaceId: string) {
+  const m = await getMembership(userId, workspaceId);
+  if (!m || !["owner", "admin"].includes(m.role)) return forbidden();
+  return null;
+}
+
 /** Live Higgsfield port for the workspace, or a 400 JSON response when no key. */
 export async function workspacePort(
   workspaceId: string,

@@ -549,8 +549,22 @@ export async function sendBroadcast(
     include: { list: true, domain: true },
   });
   if (!b) throw new Error("Broadcast not found.");
-  if (b.status === "sent") throw new Error("Broadcast already sent.");
-  if (b.status === "sending") throw new Error("Broadcast is already sending.");
+
+  // Day-1 fix (edge #8): atomic claim. The old read-then-write let two
+  // concurrent sends both pass the "not sent/sending" check and double-send.
+  // The loser of the claim aborts before any email is sent.
+  const claimed = await db.newsletterBroadcast.updateMany({
+    where: { id: broadcastId, projectId, status: { notIn: ["sent", "sending"] } },
+    data: { status: "sending", error: null },
+  });
+  if (claimed.count === 0) {
+    if (b.status === "sent") throw new Error("Broadcast already sent.");
+    // Benign race: another sender holds the claim. Callers recognize this
+    // via err.code === "BROADCAST_CLAIM_LOST" and must not count it as failed.
+    const err = new Error("Broadcast is already sending.") as Error & { code?: string };
+    err.code = "BROADCAST_CLAIM_LOST";
+    throw err;
+  }
 
   const fail = async (message: string) => {
     await db.newsletterBroadcast.update({ where: { id: broadcastId }, data: { status: "failed", error: message } });
@@ -571,7 +585,7 @@ export async function sendBroadcast(
   });
   if (!guard.ok) return fail(guard.failures.join(" "));
 
-  await db.newsletterBroadcast.update({ where: { id: broadcastId }, data: { status: "sending", error: null } });
+  // (Status was already atomically claimed as "sending" above.)
 
   try {
     const brand = await resolveBrand(db, b.brandKitId, workspaceId);
@@ -582,22 +596,43 @@ export async function sendBroadcast(
       select: { email: true, token: true },
       orderBy: { createdAt: "asc" },
     });
-    // Per-recipient render (tokenized unsubscribe link) in batches.
-    const emails: BatchEmail[] = [];
-    for (const r of recipients) {
-      const html = await renderNewsletter(doc, { brand, baseUrl: base, unsubscribeToken: r.token, previewText: b.subject });
-      emails.push({
-        from, to: r.email, subject: b.subject, html,
-        headers: oneClickHeaders(base, r.token),
+    // Day-1 fix (edge #9): resumable batch progress. Recipients are fetched
+    // in a deterministic order; after each chunk we persist how many were
+    // sent (plus their message ids) in stats. If the send crashes or a chunk
+    // fails, the retry (sendBroadcast on a "failed" broadcast) skips the
+    // already-sent prefix instead of re-sending to everyone.
+    const prior = (b.stats ?? {}) as { sent?: number; messageIds?: string[] };
+    const alreadySent = Number.isInteger(prior.sent) && (prior.sent as number) > 0 ? (prior.sent as number) : 0;
+    const pending = recipients.slice(Math.min(alreadySent, recipients.length));
+    const messageIds: string[] = Array.isArray(prior.messageIds) ? [...prior.messageIds] : [];
+    const CHUNK = 50;
+    for (let i = 0; i < pending.length; i += CHUNK) {
+      const chunk = pending.slice(i, i + CHUNK);
+      // Per-recipient render (tokenized unsubscribe link).
+      const emails: BatchEmail[] = [];
+      for (const r of chunk) {
+        const html = await renderNewsletter(doc, { brand, baseUrl: base, unsubscribeToken: r.token, previewText: b.subject });
+        emails.push({
+          from, to: r.email, subject: b.subject, html,
+          headers: oneClickHeaders(base, r.token),
+        });
+      }
+      const { ids } = await port.sendBatch(emails);
+      messageIds.push(...ids);
+      const sentSoFar = Math.min(alreadySent, recipients.length) + i + chunk.length;
+      await db.newsletterBroadcast.update({
+        where: { id: broadcastId },
+        data: {
+          stats: { sent: sentSoFar, messageIds, sentAt: null } as unknown as Prisma.InputJsonValue,
+        },
       });
     }
-    const { ids } = await port.sendBatch(emails);
     await db.newsletterBroadcast.update({
       where: { id: broadcastId },
       data: {
         status: "sent",
-        resendBroadcastId: ids[0] ?? null,
-        stats: { sent: recipients.length, messageIds: ids.length, sentAt: new Date().toISOString() } as unknown as Prisma.InputJsonValue,
+        resendBroadcastId: messageIds[0] ?? null,
+        stats: { sent: recipients.length, messageIds, sentAt: new Date().toISOString() } as unknown as Prisma.InputJsonValue,
       },
     });
     await auditNewsletter(db, workspaceId, projectId, "newsletter_broadcast_sent", `Broadcast "${b.subject}" sent to ${recipients.length} recipients.`, actor);
@@ -615,6 +650,29 @@ export async function runDueBroadcasts(
   workspaceId?: string,
 ): Promise<{ checked: number; sent: number; failed: number }> {
   const now = new Date();
+  // Day-1 fix (edge #10): reclaim stale "sending" broadcasts. A crash
+  // mid-sendBroadcast used to leave the row stuck forever (neither the UI
+  // nor this sweep would touch it again). Chunked sends touch updatedAt per
+  // batch, so a row unmoved for 30 minutes is dead — mark it failed with its
+  // preserved progress; an explicit retry resumes from the last confirmed
+  // batch and skips already-sent recipients.
+  const stale = await db.newsletterBroadcast.findMany({
+    where: {
+      status: "sending",
+      updatedAt: { lt: new Date(now.getTime() - 30 * 60_000) },
+      ...(workspaceId ? { project: { workspaceId } } : {}),
+    },
+    select: { id: true, projectId: true, project: { select: { workspaceId: true } }, subject: true },
+  });
+  for (const s of stale) {
+    await db.newsletterBroadcast.update({
+      where: { id: s.id },
+      data: { status: "failed", error: "Send was interrupted (no progress for 30 minutes). Retry to resume — already-sent recipients will be skipped." },
+    });
+    await auditNewsletter(db, s.project.workspaceId, s.projectId, "newsletter_broadcast_failed",
+      `Broadcast "${s.subject}" reclaimed from a stale sending state.`, "system");
+  }
+
   const due = await db.newsletterBroadcast.findMany({
     where: {
       status: "scheduled",
@@ -640,7 +698,10 @@ export async function runDueBroadcasts(
     try {
       await sendBroadcast(db, b.id, b.project.workspaceId, b.projectId, port, "system");
       sent += 1;
-    } catch {
+    } catch (err) {
+      // Day-1 (edge #8): a lost claim is a benign race with another sender —
+      // counted nowhere, not a failure.
+      if ((err as { code?: string })?.code === "BROADCAST_CLAIM_LOST") continue;
       failed += 1;
     }
   }

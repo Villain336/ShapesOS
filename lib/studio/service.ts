@@ -4,6 +4,7 @@
 // constructed only when real credentials are configured.
 
 import type { PrismaClient } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { randomBytes } from "crypto";
 import { emitAlert } from "@/lib/alerts/evaluate";
 import { secrets } from "@/lib/secrets";
@@ -698,6 +699,50 @@ export async function previewDomainPurchase(
 }
 
 /**
+ * Atomically claim a domain purchase locally BEFORE charging the provider
+ * (day-1 fix, critical #2). Returns true when this caller won the claim,
+ * false when the domain is already registered or another purchase is in
+ * progress. The unique (projectId, domain) key, the conditional updateMany,
+ * and the P2002 catch make concurrent double-confirms (two single-use tokens
+ * from a double preview) resolve to exactly one winner — the loser aborts
+ * before any charge.
+ */
+async function claimDomainPurchase(
+  db: Db,
+  projectId: string,
+  domain: string,
+  tld: string,
+): Promise<boolean> {
+  const existing = await db.studioDomain.findUnique({
+    where: { projectId_domain: { projectId, domain } },
+    select: { id: true, status: true },
+  });
+  if (existing && (existing.status === "registered" || existing.status === "purchasing")) {
+    return false;
+  }
+  try {
+    if (existing) {
+      const updated = await db.studioDomain.updateMany({
+        where: { id: existing.id, status: { notIn: ["registered", "purchasing"] } },
+        data: { status: "purchasing", errorDetail: null },
+      });
+      return updated.count === 1;
+    }
+    await db.studioDomain.create({
+      data: { projectId, domain, tld, status: "purchasing" },
+    });
+    return true;
+  } catch (err) {
+    // Lost a concurrent create race on the unique key — the other
+    // confirmation won the claim.
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
+      return false;
+    }
+    throw err;
+  }
+}
+
+/**
  * Step 2: explicit confirmation. Re-checks availability + price, then charges
  * via Porkbun. The confirmation token is single-use.
  */
@@ -728,6 +773,18 @@ export async function confirmDomainPurchase(
   if (currentCents !== confirmation.priceCents) {
     await auditStudio(db, workspaceId, projectId, "studio_domain_purchase_failed", `Purchase aborted: price changed for ${confirmation.domain}.`, actor);
     throw new Error("The registration price changed — restart the purchase to see the new price.");
+  }
+
+  // Idempotency guard (critical #2): claim locally BEFORE charging so a
+  // double confirmation can never double-charge. This runs OUTSIDE the
+  // try/catch below on purpose: a lost claim is a clean no-op (the row is
+  // legitimately registered/purchasing by the winner) and must never fall
+  // into the failure handler, which would overwrite that row as "failed".
+  const claimed = await claimDomainPurchase(db, projectId, confirmation.domain, availability.tld);
+  if (!claimed) {
+    await auditStudio(db, workspaceId, projectId, "studio_domain_purchase_failed",
+      `Purchase aborted: ${confirmation.domain} was already purchased or a purchase is in progress — no charge made.`, actor);
+    throw new Error(`${confirmation.domain} was already purchased or a purchase is in progress — no charge was made.`);
   }
 
   try {
@@ -776,19 +833,38 @@ export async function confirmDomainPurchase(
     };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Purchase failed";
-    await db.studioDomain.upsert({
-      where: { projectId_domain: { projectId, domain: confirmation.domain } },
-      update: { status: "failed", errorDetail: message.slice(0, 500) },
-      create: {
-        projectId,
-        domain: confirmation.domain,
-        tld: availability.tld,
-        status: "failed",
-        priceUsd: confirmation.priceCents / 100,
-        errorDetail: message.slice(0, 500),
-      },
-    });
-    await auditStudio(db, workspaceId, projectId, "studio_domain_purchase_failed", `Domain purchase failed: ${confirmation.domain} — ${message.slice(0, 120)}`, actor);
+    // Day-1 (#13): the money may already have moved (provider charged, then
+    // something threw). The audit trail must not depend on the database
+    // being up: log to stderr FIRST (survives a DB outage — lands in the
+    // platform logs), then best-effort the DB writes individually so one
+    // failing write doesn't skip the others.
+    console.error(
+      `[studio] domain purchase failed: project=${projectId} domain=${confirmation.domain} ` +
+        `priceCents=${confirmation.priceCents} error=${message.slice(0, 300)}`,
+    );
+    // Only mark the row failed while it is still in the "purchasing" state
+    // this caller set when it won the claim. The conditional update means a
+    // row that is legitimately "registered" (or re-claimed) can never be
+    // overwritten as "failed" by a stale failure path.
+    try {
+      await db.studioDomain.updateMany({
+        where: {
+          projectId,
+          domain: confirmation.domain,
+          status: "purchasing",
+        },
+        data: { status: "failed", errorDetail: message.slice(0, 500) },
+      });
+    } catch (dbErr) {
+      console.error("[studio] failed to mark domain row as failed:",
+        dbErr instanceof Error ? dbErr.message : String(dbErr));
+    }
+    try {
+      await auditStudio(db, workspaceId, projectId, "studio_domain_purchase_failed", `Domain purchase failed: ${confirmation.domain} — ${message.slice(0, 120)}`, actor);
+    } catch (dbErr) {
+      console.error("[studio] failed to write purchase-failure audit:",
+        dbErr instanceof Error ? dbErr.message : String(dbErr));
+    }
     try {
       await emitAlert({
         workspaceId,

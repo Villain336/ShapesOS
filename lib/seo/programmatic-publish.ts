@@ -122,14 +122,19 @@ export interface PushClassification {
 
 /**
  * Pure idempotency classifier (fixture-tested). A published page re-pushed to
- * the same target + site with a stored external id updates in place; a page
- * published to a *different* destination is blocked so we never silently
- * duplicate content across targets.
+ * the same target + site + collection with a stored external id updates in
+ * place; a page published to a *different* destination is blocked so we never
+ * silently duplicate content across targets.
+ *
+ * Day-1 (#16): the same-target check includes the Webflow collection id —
+ * re-pushing a col-A item while targeting col-B must not "update" col-A's
+ * item (it would write into the wrong collection).
  */
 export function classifyPush(args: {
   status: string;
   publishTarget: string | null;
   targetSiteId: string | null;
+  targetCollectionId: string | null;
   externalId: string | null;
   dest: ResolvedDestination;
 }): PushClassification {
@@ -140,6 +145,7 @@ export function classifyPush(args: {
     const sameTarget =
       args.publishTarget === args.dest.kind &&
       (args.targetSiteId ?? null) === (args.dest.siteId ?? null) &&
+      (args.targetCollectionId ?? null) === (args.dest.collectionId ?? null) &&
       !!args.externalId;
     if (sameTarget) return { mode: "update", blockedReason: null };
     const where =
@@ -357,7 +363,7 @@ async function pushToConnector(args: {
     return { externalId: safe, externalUrl: null, mock: false, siteName: `${site.name}${note}` };
   }
 
-  const connector = contentOf(getContentConnector(site));
+  const connector = contentOf(await getContentConnector(site));
   const meta = buildHeadMeta({ description: pc.description, canonical, noindex: false });
   const id = args.updateMode && page.externalId ? page.externalId : undefined;
 
@@ -504,6 +510,7 @@ export async function pushProgrammaticPages(args: {
       status: page.status,
       publishTarget: page.publishTarget,
       targetSiteId: page.targetSiteId,
+      targetCollectionId: page.webflowCollectionId,
       externalId: page.externalId,
       dest,
     });

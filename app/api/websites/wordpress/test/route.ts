@@ -39,7 +39,8 @@ export async function POST(req: NextRequest) {
     };
     const connector = cfg.demo
       ? new MockWordPressConnector(cfg)
-      : new WordPressConnector(cfg);
+      // Day-1 hardening (M6): baseUrl is SSRF-validated inside create().
+      : await WordPressConnector.create(cfg);
     const r = await connector.test();
     return Response.json({ ok: r.ok, info: r.info, mock: cfg.demo });
   } catch (err) {

@@ -1,14 +1,19 @@
-// Marketr — workspace members API (milestone 11: RBAC).
+// Marketr — workspace members API (milestone 11: RBAC; day-1 hardening M5).
 // GET  /api/workspace/members            → { members, myRole } (any member)
 // POST /api/workspace/members { email, role } → invite (admin+). Creates a
-//   pending membership keyed by email; linked to the Auth.js user id on
-//   first sign-in (see lib/sso.ts).
+//   pending membership with a single-use token; the invitee claims it via the
+//   token link at /invite?token=… (see app/api/workspace/invites/accept).
 // All mutations are audit-logged (workspace-scoped).
 
 import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireUser, getOrCreateWorkspace } from "@/lib/session";
-import { getMembership, requireWorkspaceRole, forbidden } from "@/lib/authz";
+import {
+  getMembership,
+  mintInviteToken,
+  requireWorkspaceRole,
+  forbidden,
+} from "@/lib/authz";
 import { readJsonBody } from "@/lib/sitefiles/api";
 import type { WorkspaceRole } from "@prisma/client";
 
@@ -91,7 +96,7 @@ export async function POST(req: NextRequest) {
     return Response.json({ error: "That email is already a member." }, { status: 409 });
 
   const member = await prisma.workspaceMember.create({
-    data: { workspaceId: workspace.id, email, role },
+    data: { workspaceId: workspace.id, email, role, ...mintInviteToken() },
   });
   await audit(
     workspace.id,
@@ -99,5 +104,8 @@ export async function POST(req: NextRequest) {
     "member_added",
     `${user.email ?? user.id} invited ${email} as ${role}`,
   );
-  return Response.json({ ok: true, member: publicMember(member) });
+  // Day-1 hardening (M5): invites are claimed via a single-use token link,
+  // never by bare email match. Share this link with the invitee directly.
+  const inviteUrl = `/invite?token=${member.inviteToken}`;
+  return Response.json({ ok: true, member: publicMember(member), inviteUrl });
 }

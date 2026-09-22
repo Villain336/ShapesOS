@@ -6,26 +6,21 @@
 
 import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireUser, getOrCreateWorkspace } from "@/lib/session";
+import { cronGate } from "@/lib/cron/gate";
 import { refreshLocalCompetitors } from "@/lib/local/service";
 
 export const dynamic = "force-dynamic";
 
-function cronAuthorized(req: NextRequest): boolean {
-  const secret = (process.env.CRON_SECRET ?? "").trim();
-  if (!secret) return false;
-  const header = req.headers.get("authorization") ?? "";
-  return header === `Bearer ${secret}`;
-}
-
 export async function POST(req: NextRequest) {
-  const isCron = cronAuthorized(req);
-  const user = isCron ? null : await requireUser();
-  if (!isCron && !user) return Response.json({ error: "Unauthorized" }, { status: 401 });
+  // Day-1 hardening (M1): shared cron gate (lib/cron/gate.ts) — CRON_SECRET
+  // service call, or signed-in session with editor+ on the user's workspace.
+  const gate = await cronGate(req);
+  if (gate instanceof Response) return gate;
+  const { isCron, workspaceId: sessionWorkspaceId } = gate;
 
   const projects = await prisma.project.findMany({
     where: {
-      ...(isCron ? {} : { workspaceId: (await getOrCreateWorkspace(user!.id, user!.email)).id }),
+      ...(isCron ? {} : { workspaceId: sessionWorkspaceId! }),
       localCompetitors: { some: { enabled: true } },
     },
     select: { id: true, domain: true },
@@ -34,7 +29,7 @@ export async function POST(req: NextRequest) {
   const results: Array<{ projectId: string; domain: string } & Record<string, unknown>> = [];
   for (const p of projects) {
     try {
-      const r = await refreshLocalCompetitors(p.id, isCron ? "cron" : `user:${user!.id}`);
+      const r = await refreshLocalCompetitors(p.id, isCron ? "cron" : `user:${gate.userId}`);
       results.push({ projectId: p.id, domain: p.domain, ...r });
     } catch (err) {
       results.push({

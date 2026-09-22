@@ -19,6 +19,8 @@ import type {
   SaveContentInput,
   WordPressConfig,
 } from "./types";
+import { assertSafeUrl, UnsafeUrlError } from "@/lib/safe-url";
+import { safeFetch, type SafeFetchOptions } from "./safe-fetch";
 
 const MAX_READ = 2_000_000;
 
@@ -53,29 +55,58 @@ export class WordPressConnector implements ContentConnector {
   readonly name = "wordpress";
   readonly isLive = true;
 
-  constructor(private cfg: WordPressConfig) {}
+  constructor(
+    private cfg: WordPressConfig,
+    private deps: SafeFetchOptions = {},
+  ) {}
+
+  /**
+   * Validated factory (day-1 hardening, M6): the baseUrl is SSRF-checked
+   * (scheme, no embedded credentials, no loopback/private/link-local/
+   * metadata destinations) before any request is made. Prefer this over the
+   * raw constructor for any operator-supplied config.
+   */
+  static async create(
+    cfg: WordPressConfig,
+    deps: SafeFetchOptions = {},
+  ): Promise<WordPressConnector> {
+    const baseUrl = await assertSafeUrl(cfg.baseUrl, { resolve: deps.resolve });
+    return new WordPressConnector({ ...cfg, baseUrl }, deps);
+  }
 
   private get base(): string {
     return this.cfg.baseUrl.replace(/\/+$/, "");
   }
 
+  /**
+   * The single request path for every WordPress operation (day-1, M6).
+   * safeFetch re-validates the URL on every request (per-request DNS, so a
+   * rebinding hostname is caught on the next call) and re-validates every
+   * redirect hop manually — native fetch's automatic redirect following
+   * would otherwise let a server bounce the request to an internal address.
+   * UnsafeUrlError propagates typed so callers can distinguish an SSRF block
+   * (bad config → 400) from a network failure (→ 502).
+   */
   private async wp(path: string, init?: RequestInit): Promise<Response> {
-    let res: Response;
     try {
-      res = await fetch(`${this.base}/wp-json${path}`, {
-        ...init,
-        headers: {
-          Authorization: authHeader(this.cfg),
-          Accept: "application/json",
-          ...(init?.headers ?? {}),
+      return await safeFetch(
+        `${this.base}/wp-json${path}`,
+        {
+          ...init,
+          headers: {
+            Authorization: authHeader(this.cfg),
+            Accept: "application/json",
+            ...(init?.headers ?? {}),
+          },
         },
-      });
+        this.deps,
+      );
     } catch (err) {
+      if (err instanceof UnsafeUrlError) throw err;
       throw new Error(
         `WordPress request failed: ${err instanceof Error ? err.message : String(err)}`,
       );
     }
-    return res;
   }
 
   private async wpJson<T>(path: string, init?: RequestInit): Promise<T> {
@@ -131,9 +162,17 @@ export class WordPressConnector implements ContentConnector {
 
   async saveContent(kind: ContentKind, input: SaveContentInput): Promise<ContentDetail> {
     const rest = this.restKind(kind);
+    // Day-1 (#15): fail closed instead of silently truncating — posting a
+    // silently-cut article is data loss the user can't see.
+    if (input.content.length > MAX_READ) {
+      throw new Error(
+        `Content is ${(input.content.length / 1_000_000).toFixed(1)}MB; ` +
+        `WordPress connector limit is ${MAX_READ / 1_000_000}MB. Shorten the content and retry.`,
+      );
+    }
     const body: Record<string, unknown> = {
       title: input.title,
-      content: input.content.slice(0, MAX_READ),
+      content: input.content,
       status: input.status,
     };
     if (input.slug?.trim()) body.slug = input.slug.trim();

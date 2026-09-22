@@ -27,6 +27,8 @@ export default function MembersManager({ myRole }: { myRole: string }) {
   const [role, setRole] = useState<(typeof ROLES)[number]>("editor");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [inviteUrl, setInviteUrl] = useState<string | null>(null);
+  const [copied, setCopied] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const r = await fetch("/api/workspace/members");
@@ -42,6 +44,7 @@ export default function MembersManager({ myRole }: { myRole: string }) {
 
   async function invite() {
     setError(null);
+    setInviteUrl(null);
     setBusy(true);
     try {
       const r = await fetch("/api/workspace/members", {
@@ -54,10 +57,32 @@ export default function MembersManager({ myRole }: { myRole: string }) {
         setError(j.error ?? "Invite failed.");
         return;
       }
+      if (j.inviteUrl) setInviteUrl(j.inviteUrl);
       setEmail("");
       await load();
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function copyInviteLink(id: string) {
+    setError(null);
+    try {
+      const r = await fetch(`/api/workspace/members/${id}/invite-link`, {
+        method: "POST",
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok || !j.inviteUrl) {
+        setError(j.error ?? "Could not generate invite link.");
+        return;
+      }
+      await navigator.clipboard.writeText(
+        new URL(j.inviteUrl, window.location.origin).toString(),
+      );
+      setCopied(id);
+      setTimeout(() => setCopied(null), 2000);
+    } catch {
+      setError("Could not copy invite link.");
     }
   }
 
@@ -87,7 +112,8 @@ export default function MembersManager({ myRole }: { myRole: string }) {
       <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-5">
         <h2 className="text-sm font-medium">Invite a teammate</h2>
         <p className="mt-1 text-xs text-zinc-500">
-          They join on first sign-in — no email is sent. Your role:{" "}
+          They join through a single-use invite link (valid 7 days) — no email
+          is sent, so share the link with them directly. Your role:{" "}
           <span className="font-mono">{myRole}</span>
         </p>
         <div className="mt-3 flex flex-wrap gap-2">
@@ -115,6 +141,30 @@ export default function MembersManager({ myRole }: { myRole: string }) {
           </button>
         </div>
         {error && <p className="mt-2 text-sm text-red-400">{error}</p>}
+        {inviteUrl && (
+          <div className="mt-3 rounded-md border border-emerald-900 bg-emerald-950/40 p-3">
+            <p className="text-xs text-emerald-300">
+              Invite created — share this single-use link with them:
+            </p>
+            <div className="mt-2 flex items-center gap-2">
+              <code className="min-w-0 flex-1 truncate rounded bg-zinc-950 px-2 py-1 text-xs text-zinc-300">
+                {typeof window !== "undefined"
+                  ? new URL(inviteUrl, window.location.origin).toString()
+                  : inviteUrl}
+              </code>
+              <button
+                onClick={() =>
+                  navigator.clipboard.writeText(
+                    new URL(inviteUrl, window.location.origin).toString(),
+                  )
+                }
+                className={btnCls}
+              >
+                Copy
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="overflow-hidden rounded-xl border border-zinc-800">
@@ -152,7 +202,7 @@ export default function MembersManager({ myRole }: { myRole: string }) {
                 <td className="px-4 py-3">
                   {m.pending ? (
                     <span className="rounded-full bg-amber-950 px-2 py-0.5 text-xs text-amber-300">
-                      pending — joins on first sign-in
+                      pending — needs invite link
                     </span>
                   ) : (
                     <span className="rounded-full bg-emerald-950 px-2 py-0.5 text-xs text-emerald-300">
@@ -161,12 +211,22 @@ export default function MembersManager({ myRole }: { myRole: string }) {
                   )}
                 </td>
                 <td className="px-4 py-3 text-right">
-                  <button
-                    onClick={() => remove(m.id)}
-                    className="rounded-md border border-red-900 bg-red-950 px-2 py-1 text-xs text-red-300 hover:bg-red-900"
-                  >
-                    Remove
-                  </button>
+                  <div className="flex justify-end gap-2">
+                    {m.pending && (
+                      <button
+                        onClick={() => copyInviteLink(m.id)}
+                        className="rounded-md border border-zinc-700 bg-zinc-800 px-2 py-1 text-xs text-zinc-200 hover:bg-zinc-700"
+                      >
+                        {copied === m.id ? "Copied!" : "Copy invite link"}
+                      </button>
+                    )}
+                    <button
+                      onClick={() => remove(m.id)}
+                      className="rounded-md border border-red-900 bg-red-950 px-2 py-1 text-xs text-red-300 hover:bg-red-900"
+                    >
+                      Remove
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}

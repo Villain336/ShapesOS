@@ -77,7 +77,7 @@ export async function POST(
     const { file, html } = await readLandingHtml(source);
     if (!html.trim()) throw new Error(`No HTML content found in ${file}`);
 
-    const connector = getContentConnector(target);
+    const connector = await getContentConnector(target);
     const mock = siteIsMock(target);
 
     if (target.sourceType === "wordpress") {

@@ -17,6 +17,7 @@ import { requireUser } from "@/lib/session";
 import { requireProjectRole, forbidden } from "@/lib/authz";
 import { ownedProject, readJsonBody } from "@/lib/sitefiles/api";
 import { sanitizePath } from "@/lib/sitefiles/paths";
+import { assertSafeUrl } from "@/lib/safe-url";
 import {
   encryptSiteConfig,
   getSiteIdeProvider,
@@ -119,12 +120,20 @@ export async function POST(req: NextRequest) {
   } else if (sourceType === "wordpress") {
     const w = body.wordpress ?? {};
     const demo = w.demo === true;
-    const baseUrl = (w.baseUrl ?? "").trim().replace(/\/+$/, "");
+    let baseUrl = (w.baseUrl ?? "").trim().replace(/\/+$/, "");
     const username = (w.username ?? "").trim();
     const appPassword = (w.appPassword ?? "").replace(/\s+/g, "");
     if (!demo) {
-      if (!/^https?:\/\/.+\..+/.test(baseUrl))
-        return Response.json({ error: "WordPress site URL is required (https://…)" }, { status: 400 });
+      // Day-1 hardening (M6): SSRF-validate the baseUrl before storing it —
+      // blocks loopback/private/link-local/metadata destinations.
+      try {
+        baseUrl = await assertSafeUrl(baseUrl);
+      } catch {
+        return Response.json(
+          { error: "WordPress site URL is invalid or not allowed." },
+          { status: 400 },
+        );
+      }
       if (!username) return Response.json({ error: "WordPress username is required" }, { status: 400 });
       if (!appPassword) return Response.json({ error: "Application password is required" }, { status: 400 });
     }

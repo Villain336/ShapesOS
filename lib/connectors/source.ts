@@ -19,6 +19,7 @@ import { GitHubSiteFileProvider } from "./github";
 import { MockGitHubConnector } from "./mock-github";
 import { LocalDirProvider, siteWorkingDir } from "./local";
 import { WordPressConnector } from "./wordpress";
+import type { SafeFetchOptions } from "./safe-fetch";
 import { MockWordPressConnector } from "./mock-wordpress";
 import { WebflowConnector } from "./webflow";
 import { MockWebflowConnector } from "./mock-webflow";
@@ -119,7 +120,10 @@ export function siteIsMock(site: OwnedSite): boolean {
 }
 
 /** Build the content connector for wordpress/webflow sites (live or mock). */
-export function getContentConnector(site: OwnedSite): ContentConnector {
+export async function getContentConnector(
+  site: OwnedSite,
+  wpDeps?: SafeFetchOptions,
+): Promise<ContentConnector> {
   const cfg = decryptSiteConfig(site) as Record<string, unknown>;
   if (site.sourceType === "wordpress") {
     const full: WordPressConfig = {
@@ -128,7 +132,13 @@ export function getContentConnector(site: OwnedSite): ContentConnector {
       appPassword: String(cfg.appPassword ?? ""),
       demo: cfg.demo === true,
     };
-    return full.demo ? new MockWordPressConnector(full) : new WordPressConnector(full);
+    // Day-1 hardening (M6): live WordPress connectors go through the
+    // validated factory — a stored baseUrl pointing at an internal address
+    // is rejected here instead of being fetched. (Every request is also
+    // re-validated per-request + per-redirect-hop inside safeFetch.)
+    return full.demo
+      ? new MockWordPressConnector(full)
+      : await WordPressConnector.create(full, wpDeps);
   }
   if (site.sourceType === "webflow") {
     const full: WebflowConfig = {

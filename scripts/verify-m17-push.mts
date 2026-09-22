@@ -142,39 +142,39 @@ const wpDest: ResolvedDestination = { kind: "wordpress", siteId: "site-wp", coll
 const wfDest: ResolvedDestination = { kind: "webflow", siteId: "site-wf", collectionId: "col-x" };
 
 eq(
-  classifyPush({ status: "ready", publishTarget: "none", targetSiteId: null, externalId: null, dest: wpDest }),
+  classifyPush({ status: "ready", publishTarget: "none", targetSiteId: null, targetCollectionId: null, externalId: null, dest: wpDest }),
   { mode: "create", blockedReason: null },
   "ready page → create",
 );
 eq(
-  classifyPush({ status: "draft", publishTarget: "none", targetSiteId: null, externalId: null, dest: wpDest }),
+  classifyPush({ status: "draft", publishTarget: "none", targetSiteId: null, targetCollectionId: null, externalId: null, dest: wpDest }),
   { mode: "create", blockedReason: null },
   "draft page → create",
 );
 eq(
-  classifyPush({ status: "published", publishTarget: "wordpress", targetSiteId: "site-wp", externalId: "wp-123", dest: wpDest }),
+  classifyPush({ status: "published", publishTarget: "wordpress", targetSiteId: "site-wp", targetCollectionId: null, externalId: "wp-123", dest: wpDest }),
   { mode: "update", blockedReason: null },
   "re-push to the same target+site+externalId updates in place",
 );
 {
-  const c = classifyPush({ status: "published", publishTarget: "wordpress", targetSiteId: "site-wp", externalId: "wp-123", dest: wfDest });
+  const c = classifyPush({ status: "published", publishTarget: "wordpress", targetSiteId: "site-wp", targetCollectionId: null, externalId: "wp-123", dest: wfDest });
   eq(c.mode, "create", "re-push to a different target is not an update");
   ok(c.blockedReason !== null && c.blockedReason.includes("wordpress"), "different-target republish is blocked with the original target named");
 }
 {
-  const c = classifyPush({ status: "published", publishTarget: "wordpress", targetSiteId: "site-wp", externalId: null, dest: wpDest });
+  const c = classifyPush({ status: "published", publishTarget: "wordpress", targetSiteId: "site-wp", targetCollectionId: null, externalId: null, dest: wpDest });
   ok(c.blockedReason !== null, "published without a stored externalId cannot update in place");
 }
 {
-  const c = classifyPush({ status: "published", publishTarget: "wordpress", targetSiteId: "site-old", externalId: "wp-123", dest: wpDest });
+  const c = classifyPush({ status: "published", publishTarget: "wordpress", targetSiteId: "site-old", targetCollectionId: null, externalId: "wp-123", dest: wpDest });
   ok(c.blockedReason !== null && c.blockedReason.includes("wordpress"), "same target kind but a different site is blocked (no silent cross-site duplicates)");
 }
 {
-  const c = classifyPush({ status: "discarded", publishTarget: "none", targetSiteId: null, externalId: null, dest: wpDest });
+  const c = classifyPush({ status: "discarded", publishTarget: "none", targetSiteId: null, targetCollectionId: null, externalId: null, dest: wpDest });
   ok(c.blockedReason !== null && c.blockedReason.includes("discarded"), "discarded pages cannot be pushed");
 }
 {
-  const c = classifyPush({ status: "published", publishTarget: "none", targetSiteId: null, externalId: null, dest: wpDest });
+  const c = classifyPush({ status: "published", publishTarget: "none", targetSiteId: null, targetCollectionId: null, externalId: null, dest: wpDest });
   ok(c.blockedReason !== null, "page published internally (csv/none) then pushed to a connector is blocked");
 }
 

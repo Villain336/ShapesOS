@@ -38,7 +38,11 @@ export function monthKey(d: Date = new Date()): string {
  * Pure function — safe to call anywhere (previews, tests).
  */
 export function estimateListPullCost(rows: number): number {
-  const r = Math.max(0, Math.min(Math.floor(rows), MAX_BACKLINK_ROWS_PER_PULL));
+  // Day-1 (#3): NaN must not flow through — Math.floor(NaN) is NaN and
+  // Math.max(0, NaN) is NaN, which would poison downstream spend math.
+  const r = Number.isFinite(rows)
+    ? Math.max(0, Math.min(Math.floor(rows), MAX_BACKLINK_ROWS_PER_PULL))
+    : 0;
   return round4(BACKLINKS_PRICING.requestUsd + r * BACKLINKS_PRICING.perRowUsd);
 }
 
@@ -56,12 +60,26 @@ export interface PullBudgetCheck {
 /**
  * Pure cost-gate decision for a backlink pull. The pull service calls this
  * BEFORE any paid API call; tests cover it without a database.
+ *
+ * Day-1 fix (edge #3): fail CLOSED on non-numeric input. NaN/Infinity/negative
+ * used-or-cap values used to make every comparison false → ok:true, letting a
+ * malformed cap bypass the budget entirely.
  */
 export function checkPullBudget(
   rows: number,
   spendUsedUsd: number,
   spendCapUsd: number,
 ): PullBudgetCheck {
+  const sane = (n: unknown): n is number => typeof n === "number" && Number.isFinite(n);
+  if (!sane(rows) || rows <= 0) {
+    return { ok: false, blockedReason: "Invalid row count requested.", estimatedCostUsd: 0 };
+  }
+  if (!sane(spendUsedUsd) || spendUsedUsd < 0) {
+    return { ok: false, blockedReason: "Invalid spend tracking state — pull blocked.", estimatedCostUsd: 0 };
+  }
+  if (!sane(spendCapUsd) || spendCapUsd < 0) {
+    return { ok: false, blockedReason: "Invalid budget cap — pull blocked.", estimatedCostUsd: 0 };
+  }
   if (rows > MAX_BACKLINK_ROWS_PER_PULL) {
     return {
       ok: false,

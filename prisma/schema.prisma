@@ -225,6 +225,11 @@ enum FileChangeAction {
   studio_domain_purchased
   studio_domain_purchase_failed
   studio_domain_removed
+  // Day-1 hardening: authentication audit events (H1/M8).
+  auth_login_failed
+  auth_login_succeeded
+  // Day-1 hardening: invite acceptance audit (M8).
+  member_invite_accepted
 }
 
 enum ProgrammaticPageStatus {
@@ -893,14 +898,18 @@ enum WorkspaceRole {
 }
 
 model WorkspaceMember {
-  id          String        @id @default(cuid())
-  workspaceId String        @map("workspace_id")
-  workspace   Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  id              String        @id @default(cuid())
+  workspaceId     String        @map("workspace_id")
+  workspace       Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   // Auth.js user id (subject). Null for pending invites keyed by email.
-  userId      String?       @map("user_id")
-  email       String?
-  name        String?
-  role        WorkspaceRole @default(viewer)
+  userId          String?       @map("user_id")
+  email           String?
+  name            String?
+  role            WorkspaceRole @default(viewer)
+  // Tokenized invites (day-1 hardening, M5): pending invites are claimed via
+  // a single-use token link, never by bare email match. Null once claimed.
+  inviteToken     String?       @unique @map("invite_token")
+  inviteExpiresAt DateTime?     @map("invite_expires_at")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -1893,6 +1902,7 @@ model SocialSettings {
 enum SocialPostStatus {
   draft
   scheduled
+  dispatching
   sent
   failed
   cancelled

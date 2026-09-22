@@ -118,6 +118,9 @@ export async function revokeHiggsfieldKey(
   await auditAds(db, workspaceId, null, "ad_higgsfield_key_revoked", "Higgsfield API key revoked.", actor);
 }
 
+/** Upper bound for the monthly ad spend cap ($10,000 — day-1 hardening, M2). */
+export const MAX_SPEND_CAP_CENTS = 1_000_000;
+
 export async function updateSpendCap(
   db: Db,
   workspaceId: string,
@@ -126,6 +129,11 @@ export async function updateSpendCap(
 ): Promise<void> {
   if (!Number.isFinite(monthlyCapCents) || monthlyCapCents < 0) {
     throw new AdGuardError("Monthly cap must be a non-negative number of cents.");
+  }
+  if (monthlyCapCents > MAX_SPEND_CAP_CENTS) {
+    throw new AdGuardError(
+      `Monthly cap cannot exceed $${(MAX_SPEND_CAP_CENTS / 100).toFixed(0)}.`,
+    );
   }
   await db.adSettings.upsert({
     where: { workspaceId },
@@ -378,6 +386,57 @@ interface SubmitOpts {
 }
 
 /** Submit a provider job for a queued creative; idempotent on providerJobId. */
+/**
+ * Persist a provider job id with retries (day-1 fix, edge #12). Returns true
+ * when the id is safely stored; false when persistence kept failing — the
+ * caller then stashes the id in the row's error field + audit log so the
+ * billable job is never silently lost.
+ */
+async function persistSubmittedJob(
+  db: Db,
+  creativeId: string,
+  requestId: string,
+  attempts: number,
+): Promise<boolean> {
+  for (let i = 0; i < 3; i++) {
+    try {
+      await db.adCreative.update({
+        where: { id: creativeId },
+        data: {
+          providerJobId: requestId,
+          status: "generating",
+          attempts: attempts + 1,
+          nextPollAt: new Date(Date.now() + POLL_INTERVAL_MS),
+          error: null,
+        },
+      });
+      return true;
+    } catch {
+      if (i < 2) await new Promise((r) => setTimeout(r, 250 * (i + 1)));
+    }
+  }
+  return false;
+}
+
+/**
+ * Adopt a stashed provider job id (day-1 fix, edge #12 recovery). When a
+ * submit was acknowledged by the provider but the id persistence failed, the
+ * id lives in the row's error field as `providerJobId=<id>`. Adopting it lets
+ * polling + spend tracking proceed instead of losing the job.
+ */
+async function adoptStashedJobId(
+  db: Db,
+  creative: { id: string; error: string | null },
+): Promise<boolean> {
+  const m = creative.error?.match(/providerJobId=([A-Za-z0-9_-]+)/);
+  if (!m) return false;
+  await db.adCreative.update({
+    where: { id: creative.id },
+    data: { providerJobId: m[1], error: null },
+  });
+  return true;
+}
+
 export async function submitJob(
   db: Db,
   workspaceId: string,
@@ -390,6 +449,25 @@ export async function submitJob(
   if (!creative) throw new AdGuardError("Creative not found.");
   if (creative.providerJobId) return { outcome: "noop", requestId: creative.providerJobId };
   if (creative.status !== "queued") return { outcome: "noop" };
+
+  // Day-1 fix (edge #11): atomic claim. The old read-then-submit let two
+  // concurrent sweeps both see providerJobId == null and submit twice —
+  // double provider job, double spend. The claim moves queued → generating
+  // BEFORE the provider call; exactly one submitter can win it. nextPollAt
+  // bounds the claim: if the worker dies between claim and provider ack, the
+  // sweep reclaims the row after 15 minutes (never auto-resubmits — a charge
+  // may exist — it is surfaced for human review instead).
+  const claimed = await db.adCreative.updateMany({
+    where: { id: creativeId, status: "queued", providerJobId: null },
+    data: { status: "generating", error: null, nextPollAt: new Date(Date.now() + 15 * 60_000) },
+  });
+  if (claimed.count === 0) {
+    const cur = await db.adCreative.findUnique({
+      where: { id: creativeId },
+      select: { providerJobId: true },
+    });
+    return { outcome: "noop", requestId: cur?.providerJobId ?? undefined };
+  }
 
   const providerArgs: Record<string, unknown> = {
     prompt: creative.prompt,
@@ -404,25 +482,39 @@ export async function submitJob(
 
   try {
     const submitted = await port.submitJob({ modelPath: opts.modelPath, args: providerArgs });
-    await db.adCreative.update({
-      where: { id: creativeId },
-      data: {
-        providerJobId: submitted.requestId,
-        status: "generating",
-        attempts: creative.attempts + 1,
-        nextPollAt: new Date(Date.now() + POLL_INTERVAL_MS),
-        error: null,
-      },
-    });
+    // Day-1 fix (edge #12): never silently lose a provider job id — the
+    // provider may have started a billable job. Retry persistence; if it
+    // still fails, stash the id in the row + audit trail (recovery in
+    // runDueAdJobs adopts it) instead of dropping it.
+    const persisted = await persistSubmittedJob(db, creativeId, submitted.requestId, creative.attempts);
+    if (!persisted) {
+      const stash = `providerJobId=${submitted.requestId} submit-ack-not-persisted`;
+      try {
+        await db.adCreative.update({ where: { id: creativeId }, data: { error: stash } });
+      } catch {
+        // Persistence is already known-bad; the audit + thrown error below
+        // still carry the id.
+      }
+      const msg =
+        `Provider accepted the job but its id could not be saved (job id: ${submitted.requestId}). ` +
+        `Recorded in the audit log — reconcile in the provider dashboard before resubmitting.`;
+      await auditAds(db, workspaceId, creative.projectId, "ad_generation_failed",
+        `Ad job id not persisted: ${submitted.requestId} (${creative.name}).`, actor).catch(() => {});
+      return { outcome: "failed", error: msg };
+    }
     return { outcome: "submitted", requestId: submitted.requestId };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown provider error.";
     const transient = isTransientHiggsfieldError(err);
     const attempts = creative.attempts + 1;
     if (transient && attempts < MAX_SUBMIT_ATTEMPTS) {
+      // Day-1 fix (edge #11): the provider call failed BEFORE acknowledging
+      // a job, so nothing billable exists — release the claim back to
+      // "queued" for retry. Without this the row would sit in "generating"
+      // forever (the sweep only resubmits "queued").
       await db.adCreative.update({
         where: { id: creativeId },
-        data: { attempts, nextPollAt: new Date(Date.now() + attempts * 60_000), error: message },
+        data: { status: "queued", attempts, nextPollAt: new Date(Date.now() + attempts * 60_000), error: message },
       });
       await auditAds(db, workspaceId, creative.projectId, "ad_generation_started", `Generation submit attempt ${attempts} failed (retrying): ${message.slice(0, 160)}`, actor);
       return { outcome: "retrying", error: message };
@@ -588,6 +680,31 @@ export async function runDueAdJobs(
       else if (res.outcome === "failed") result.failed += 1;
       else result.pending += 1;
       void brief;
+    } else if (creative.status === "generating" && !creative.providerJobId) {
+      // Day-1 fix (edge #12): a previous submit was provider-acknowledged but
+      // the job id wasn't persisted. Adopt the stashed id so polling and
+      // spend tracking can proceed; otherwise the worker died between claim
+      // and provider ack — we cannot know whether a billable job was created,
+      // so NEVER auto-resubmit (that could double-charge). Surface it as
+      // failed with an explicit reconcile instruction instead of stalling
+      // silently.
+      const adopted = await adoptStashedJobId(db, creative).catch(() => false);
+      if (adopted) {
+        const res = await pollCreative(db, wsId, creative.id, port, "system");
+        if (res.outcome === "ready") result.ready += 1;
+        else if (res.outcome === "failed") result.failed += 1;
+        else result.pending += 1;
+      } else {
+        const msg = "Submit was interrupted before the provider acknowledged a job id. " +
+          "Check the provider dashboard for a stray job before resubmitting — do not resubmit blindly.";
+        await db.adCreative.update({
+          where: { id: creative.id },
+          data: { status: "failed", nextPollAt: null, error: msg },
+        });
+        await auditAds(db, wsId, creative.campaign.projectId, "ad_generation_failed",
+          `Ad submit interrupted in an unknown state (${creative.id}): ${msg}`, "system").catch(() => {});
+        result.failed += 1;
+      }
     } else {
       const res = await pollCreative(db, wsId, creative.id, port, "system");
       if (res.outcome === "ready") result.ready += 1;

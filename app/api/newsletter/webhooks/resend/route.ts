@@ -2,18 +2,17 @@
 // POST /api/newsletter/webhooks/resend
 //
 // Handles email.bounced / email.complained → subscriber status updates.
-// Signature verification (Svix) runs when RESEND_WEBHOOK_SECRET is set; when
-// it isn't, the payload is accepted and the gap is logged — configure the
-// secret in production (see DEPLOY.md).
+// Day-1 hardening (H2): FAIL CLOSED — unsigned payloads are rejected unless
+// RESEND_WEBHOOK_SECRET is set (Svix verification) or the operator explicitly
+// opts into the dev-only fallback with ALLOW_UNSIGNED_WEBHOOKS=true.
 
-import { Resend } from "resend";
 import { prisma } from "@/lib/prisma";
 import { handleResendWebhook } from "@/lib/newsletter/service";
+import { verifyWebhookRequest } from "@/lib/newsletter/webhook-auth";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
-  const secret = (process.env.RESEND_WEBHOOK_SECRET ?? "").trim();
   const raw = await req.text();
   let event: { type?: string; data?: { to?: string[]; email?: string } };
   try {
@@ -21,25 +20,10 @@ export async function POST(req: Request) {
   } catch {
     return Response.json({ error: "Invalid JSON." }, { status: 400 });
   }
-  if (secret) {
-    try {
-      const resend = new Resend("re_verify_only");
-      // Resend's verify expects the Svix header triple (id/timestamp/signature).
-      resend.webhooks.verify({
-        payload: raw,
-        headers: {
-          id: req.headers.get("svix-id") ?? "",
-          timestamp: req.headers.get("svix-timestamp") ?? "",
-          signature: req.headers.get("svix-signature") ?? "",
-        },
-        webhookSecret: secret,
-      });
-    } catch {
-      return Response.json({ error: "Invalid webhook signature." }, { status: 401 });
-    }
-  } else {
-    console.warn("[newsletter] RESEND_WEBHOOK_SECRET not set — accepting unsigned webhook (dev only).");
-  }
+  // Day-1 hardening (H2): fail-closed webhook authentication — see
+  // lib/newsletter/webhook-auth.ts.
+  const denied = await verifyWebhookRequest(req, raw);
+  if (denied) return denied;
   const result = await handleResendWebhook(prisma, event);
   return Response.json(result);
 }

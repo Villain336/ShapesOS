@@ -33,7 +33,13 @@ export async function POST(req: NextRequest) {
   if (!project) return Response.json({ error: "Project not found" }, { status: 404 });
   if (!(await requireProjectRole(user.id, project.id, "editor"))) return forbidden();
 
-  const limit = Math.max(1, Math.min(100_000, Math.floor(body.limit ?? 500)));
+  const rawLimit = body.limit ?? 500;
+  // Day-1 fix (edge #3): validate before Math.floor — a non-numeric limit
+  // (e.g. {"limit":"abc"}) used to become NaN and bypass the budget gate.
+  if (typeof rawLimit !== "number" || !Number.isFinite(rawLimit)) {
+    return Response.json({ error: "limit must be a finite number" }, { status: 400 });
+  }
+  const limit = Math.max(1, Math.min(100_000, Math.floor(rawLimit)));
   const result = await runBacklinkPull({
     workspaceId: project.workspaceId,
     projectId: project.id,

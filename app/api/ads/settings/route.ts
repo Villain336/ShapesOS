@@ -13,7 +13,7 @@ import {
   setHiggsfieldKey,
   updateSpendCap,
 } from "@/lib/ads/service";
-import { ownedProject, readJson, requireWorkspaceEditor } from "../_lib";
+import { ownedProject, readJson, requireWorkspaceAdmin } from "../_lib";
 
 export async function GET(req: Request) {
   const user = await requireUser();
@@ -38,7 +38,7 @@ export async function POST(req: Request) {
   const body = await readJson(req);
   const project = await ownedProject(user.id, body.projectId);
   if (!project) return Response.json({ error: "Project not found" }, { status: 404 });
-  const denied = await requireWorkspaceEditor(user.id, project.workspaceId);
+  const denied = await requireWorkspaceAdmin(user.id, project.workspaceId);
   if (denied) return denied;
   const key = typeof body.key === "string" ? body.key : "";
   if (!key.trim()) return Response.json({ error: "Higgsfield API key is required." }, { status: 400 });
@@ -56,7 +56,7 @@ export async function PATCH(req: Request) {
   const body = await readJson(req);
   const project = await ownedProject(user.id, body.projectId);
   if (!project) return Response.json({ error: "Project not found" }, { status: 404 });
-  const denied = await requireWorkspaceEditor(user.id, project.workspaceId);
+  const denied = await requireWorkspaceAdmin(user.id, project.workspaceId);
   if (denied) return denied;
   const cents = Number(body.monthlyCapCents);
   try {
@@ -72,7 +72,7 @@ export async function DELETE(req: Request) {
   if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
   const project = await ownedProject(user.id, new URL(req.url).searchParams.get("projectId"));
   if (!project) return Response.json({ error: "Project not found" }, { status: 404 });
-  const denied = await requireWorkspaceEditor(user.id, project.workspaceId);
+  const denied = await requireWorkspaceAdmin(user.id, project.workspaceId);
   if (denied) return denied;
   await revokeHiggsfieldKey(prisma, project.workspaceId, "user");
   return Response.json({ connected: false });

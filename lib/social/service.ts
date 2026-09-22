@@ -366,67 +366,110 @@ export async function dispatchPost(
   const actor = opts.actor ?? "user";
   const post = await db.socialPost.findUniqueOrThrow({ where: { id: postId } });
   if (post.projectId !== projectId) throw new Error("Post does not belong to this project.");
-  if (post.status === "sent") throw new Error("Post already sent.");
-  if (post.status === "cancelled") throw new Error("Post was cancelled.");
 
-  const services = (post.services as string[]).map((s) => normalizeService(s)).filter((s): s is SocialService => !!s);
-  const { channels, missing } = await resolveTargetChannels(db, projectId, services);
-  if (missing.length > 0) {
-    const labels = missing.map((s) => CHANNEL_DEFS[s]?.label ?? s).join(", ");
-    throw new Error(`Not connected or disabled: ${labels}. Sync channels and enable them first.`);
-  }
-
-  const content = sanitizeContent(post.content);
-  const issues = validatePostForChannels(services, content);
-  if (issues.length > 0) {
-    throw new Error(issues.map((i) => i.message).join(" "));
-  }
-
-  const existing = readDispatchEntries(post.bufferUpdateIds);
-  const existingByProfile = new Map(existing.map((e) => [e.profileId, e]));
-  const dispatched: DispatchEntry[] = [...existing];
-
-  for (const ch of channels) {
-    if (existingByProfile.has(ch.bufferProfileId)) continue; // idempotent: already queued
-    const resolved = resolveChannelContent(content, ch.service);
-    const link = buildUtmUrl(content.link, content.utm);
-    const photo = resolved.media.find((m) => m.type === "image")?.url;
-    try {
-      const update = await port.createUpdate(ch.bufferProfileId, {
-        text: resolved.text.trim(),
-        link,
-        photo,
-        scheduledAt: opts.now ? undefined : post.scheduledFor?.toISOString(),
-        now: opts.now,
-      });
-      dispatched.push({ channelId: ch.id, profileId: ch.bufferProfileId, updateId: update.id, service: ch.service });
-    } catch (err) {
-      throw annotateDispatchError(err);
-    }
-  }
-
-  const alreadyDispatched = dispatched.length === existing.length && existing.length > 0;
-  await db.socialPost.update({
-    where: { id: postId },
-    data: {
-      bufferUpdateIds: dispatched as unknown as Prisma.InputJsonValue,
-      status: "scheduled",
-      attempts: 0,
-      nextAttemptAt: null,
-      error: null,
-    },
+  // Day-1 fix (edge #7): atomic claim. The old read-then-dispatch let two
+  // concurrent runs (manual send + cron, or overlapping crons) both see an
+  // empty bufferUpdateIds and create duplicate Buffer updates. Exactly one
+  // dispatcher can hold the claim; the loser aborts before touching Buffer.
+  // Dispatchable statuses mirror the publish-now route (draft/failed) plus
+  // the cron's scheduled.
+  const claimed = await db.socialPost.updateMany({
+    where: { id: postId, status: { in: ["draft", "scheduled", "failed"] } },
+    data: { status: "dispatching" },
   });
-  if (!alreadyDispatched) {
-    await auditSocial(
-      db,
-      workspaceId,
-      projectId,
-      "social_post_scheduled",
-      `Social post queued via Buffer (${channels.length} channel${channels.length === 1 ? "" : "s"}).`,
-      actor,
-    );
+  if (claimed.count === 0) {
+    const cur = await db.socialPost.findUniqueOrThrow({
+      where: { id: postId },
+      select: { status: true },
+    });
+    if (cur.status === "sent") throw new Error("Post already sent.");
+    if (cur.status === "cancelled") throw new Error("Post was cancelled.");
+    // Benign race: another dispatcher holds the claim. Callers recognize
+    // this via err.code === "DISPATCH_CLAIM_LOST" and must not treat it as
+    // a failure or bump retry attempts.
+    const err = new Error("Post dispatch already in progress.") as Error & { code?: string };
+    err.code = "DISPATCH_CLAIM_LOST";
+    throw err;
   }
-  return { dispatched, alreadyDispatched };
+
+  const releaseClaim = () =>
+    db.socialPost.updateMany({
+      where: { id: postId, status: "dispatching" },
+      data: { status: "scheduled" },
+    });
+
+  try {
+    const services = (post.services as string[]).map((s) => normalizeService(s)).filter((s): s is SocialService => !!s);
+    const { channels, missing } = await resolveTargetChannels(db, projectId, services);
+    if (missing.length > 0) {
+      const labels = missing.map((s) => CHANNEL_DEFS[s]?.label ?? s).join(", ");
+      throw new Error(`Not connected or disabled: ${labels}. Sync channels and enable them first.`);
+    }
+
+    const content = sanitizeContent(post.content);
+    const issues = validatePostForChannels(services, content);
+    if (issues.length > 0) {
+      throw new Error(issues.map((i) => i.message).join(" "));
+    }
+
+    const existing = readDispatchEntries(post.bufferUpdateIds);
+    const existingByProfile = new Map(existing.map((e) => [e.profileId, e]));
+    const dispatched: DispatchEntry[] = [...existing];
+
+    for (const ch of channels) {
+      if (existingByProfile.has(ch.bufferProfileId)) continue; // idempotent: already queued
+      const resolved = resolveChannelContent(content, ch.service);
+      const link = buildUtmUrl(content.link, content.utm);
+      const photo = resolved.media.find((m) => m.type === "image")?.url;
+      try {
+        const update = await port.createUpdate(ch.bufferProfileId, {
+          text: resolved.text.trim(),
+          link,
+          photo,
+          scheduledAt: opts.now ? undefined : post.scheduledFor?.toISOString(),
+          now: opts.now,
+        });
+        dispatched.push({ channelId: ch.id, profileId: ch.bufferProfileId, updateId: update.id, service: ch.service });
+      } catch (err) {
+        throw annotateDispatchError(err);
+      }
+      // Day-1 fix (edge #9): persist update ids incrementally. A failure on a
+      // later channel used to orphan the already-created Buffer updates — the
+      // retry then created duplicates. Now each created update is durable
+      // before the next channel is attempted, and retries skip them.
+      await db.socialPost.update({
+        where: { id: postId },
+        data: { bufferUpdateIds: dispatched as unknown as Prisma.InputJsonValue },
+      });
+    }
+
+    const alreadyDispatched = dispatched.length === existing.length && existing.length > 0;
+    await db.socialPost.update({
+      where: { id: postId },
+      data: {
+        bufferUpdateIds: dispatched as unknown as Prisma.InputJsonValue,
+        status: "scheduled",
+        attempts: 0,
+        nextAttemptAt: null,
+        error: null,
+      },
+    });
+    if (!alreadyDispatched) {
+      await auditSocial(
+        db,
+        workspaceId,
+        projectId,
+        "social_post_scheduled",
+        `Social post queued via Buffer (${dispatched.length} channel${dispatched.length === 1 ? "" : "s"}).`,
+        actor,
+      );
+    }
+    return { dispatched, alreadyDispatched };
+  } catch (err) {
+    // Release the atomic claim so retries / the next cron sweep can proceed.
+    await releaseClaim().catch(() => {});
+    throw err;
+  }
 }
 
 function annotateDispatchError(err: unknown): Error {
@@ -455,11 +498,17 @@ export async function attemptDispatch(
   row: DispatchRow,
   port: BufferPort,
   actor: "user" | "system" = "system",
-): Promise<{ outcome: "dispatched" | "retrying" | "failed"; error?: string }> {
+): Promise<{ outcome: "dispatched" | "retrying" | "failed" | "skipped"; error?: string }> {
   try {
     await dispatchPost(db, workspaceId, row.projectId, row.id, port, { actor });
     return { outcome: "dispatched" };
   } catch (err) {
+    // Day-1 (edge #7): lost the dispatch claim to another worker. Not a
+    // failure — the claim holder is doing the send. Leave attempts/backoff
+    // untouched so we don't pollute the retry state of a healthy post.
+    if ((err as { code?: string })?.code === "DISPATCH_CLAIM_LOST") {
+      return { outcome: "skipped", error: err instanceof Error ? err.message : String(err) };
+    }
     const transient = (err as { transient?: boolean })?.transient ?? isTransientBufferError(err);
     const message = err instanceof Error ? err.message : String(err);
     const attempts = row.attempts + 1;
@@ -603,6 +652,20 @@ export async function runDueSocialPosts(
   const now = new Date();
   const result: CronSweepResult = { dispatched: 0, retrying: 0, failed: 0, markedSent: 0 };
 
+  // Day-1 fix (edge #7): reclaim stale dispatch claims. If a dispatcher
+  // crashed between claiming and releasing, the post would sit in
+  // "dispatching" forever (the sweep only selects "scheduled"). Claims older
+  // than 15 minutes are safely returned to "scheduled" — the per-channel
+  // idempotency in dispatchPost makes re-dispatch safe.
+  await db.socialPost.updateMany({
+    where: {
+      ...(onlyWorkspaceId ? { project: { workspaceId: onlyWorkspaceId } } : {}),
+      status: "dispatching",
+      updatedAt: { lt: new Date(now.getTime() - 15 * 60_000) },
+    },
+    data: { status: "scheduled" },
+  });
+
   // Candidates: user-scheduled posts that are due, plus transient failures
   // whose backoff has elapsed. BufferUpdateIds discrimination happens in JS
   // (empty = never dispatched; non-empty = handed to Buffer already).
@@ -623,11 +686,12 @@ export async function runDueSocialPosts(
     if (!port) continue;
 
     if (readDispatchEntries(row.bufferUpdateIds).length === 0) {
-      // Never dispatched: hand off to Buffer now.
+      // Never dispatched: hand off to Buffer now. "skipped" means another
+      // worker holds the dispatch claim — counted nowhere, not a failure.
       const outcome = await attemptDispatch(db, wsId, row, port, actor);
       if (outcome.outcome === "dispatched") result.dispatched += 1;
       else if (outcome.outcome === "retrying") result.retrying += 1;
-      else result.failed += 1;
+      else if (outcome.outcome === "failed") result.failed += 1;
     } else if (row.scheduledFor && row.scheduledFor <= now && !row.nextAttemptAt) {
       // Dispatched and due: observe Buffer's publish status.
       const refreshed = await refreshPostStatus(db, wsId, row.id, port, actor);

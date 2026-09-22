@@ -107,19 +107,21 @@ export class CloudflarePagesDeployTarget implements DeployTarget {
       (opts?.projectName ?? this.cfg.projectName).trim() || "marketr-site",
     );
 
-    // Direct-upload: manifest maps sha256 → filename, blobs attach per file.
+    // Direct-upload: manifest maps path → sha256 (Cloudflare's format).
+    // Day-1 (#14): keyed by PATH, not hash — two files with identical
+    // content share one blob but both paths must appear in the manifest.
     const manifest: Record<string, string> = {};
     const blobs = new Map<string, Buffer>();
     for (const f of files) {
       const clean = f.path.replace(/^\//, "");
       const hash = sha256(f.content);
-      manifest[hash] = clean;
+      manifest[clean] = hash;
       if (!blobs.has(hash)) blobs.set(hash, Buffer.from(f.content, "utf8"));
     }
     const form = new FormData();
     form.append("manifest", JSON.stringify(manifest));
     for (const [hash, buf] of blobs) {
-      form.append(hash, new Blob([new Uint8Array(buf)]), manifest[hash]);
+      form.append(hash, new Blob([new Uint8Array(buf)]), hash);
     }
 
     const body = await this.api(`${this.projectPath()}/${projectName}/deployments`, {

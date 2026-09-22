@@ -13,18 +13,11 @@
 
 import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireUser, getOrCreateWorkspace } from "@/lib/session";
+import { cronGate } from "@/lib/cron/gate";
 import { isKilledForProject } from "@/lib/seo/autopilot";
 import { runAutopilotRule } from "@/lib/seo/autopilot-service";
 
 export const dynamic = "force-dynamic";
-
-function cronAuthorized(req: NextRequest): boolean {
-  const secret = (process.env.CRON_SECRET ?? "").trim();
-  if (!secret) return false;
-  const header = req.headers.get("authorization") ?? "";
-  return header === `Bearer ${secret}`;
-}
 
 /** True when a rule's cadence is due given its lastRunAt. */
 function cadenceDue(cadence: string, lastRunAt: Date | null, now: Date): boolean {
@@ -36,11 +29,13 @@ function cadenceDue(cadence: string, lastRunAt: Date | null, now: Date): boolean
 }
 
 export async function POST(req: NextRequest) {
-  const isCron = cronAuthorized(req);
-  const user = isCron ? null : await requireUser();
-  if (!isCron && !user) return Response.json({ error: "Unauthorized" }, { status: 401 });
+  // Day-1 hardening (M1): shared cron gate (lib/cron/gate.ts) — CRON_SECRET
+  // service call, or signed-in session with editor+ on the user's workspace.
+  const gate = await cronGate(req);
+  if (gate instanceof Response) return gate;
+  const { isCron, workspaceId: sessionWorkspaceId } = gate;
 
-  const workspaceId = isCron ? null : (await getOrCreateWorkspace(user!.id, user!.email)).id;
+  const workspaceId = isCron ? null : sessionWorkspaceId!;
   const now = new Date();
 
   const rules = await prisma.autopilotRule.findMany({

@@ -11,22 +11,17 @@
 
 import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireUser, getOrCreateWorkspace } from "@/lib/session";
+import { cronGate } from "@/lib/cron/gate";
 import { runLocalGrid } from "@/lib/local/service";
 
 export const dynamic = "force-dynamic";
 
-function cronAuthorized(req: NextRequest): boolean {
-  const secret = (process.env.CRON_SECRET ?? "").trim();
-  if (!secret) return false;
-  const header = req.headers.get("authorization") ?? "";
-  return header === `Bearer ${secret}`;
-}
-
 export async function POST(req: NextRequest) {
-  const isCron = cronAuthorized(req);
-  const user = isCron ? null : await requireUser();
-  if (!isCron && !user) return Response.json({ error: "Unauthorized" }, { status: 401 });
+  // Day-1 hardening (M1): shared cron gate (lib/cron/gate.ts) — CRON_SECRET
+  // service call, or signed-in session with editor+ on the user's workspace.
+  const gate = await cronGate(req);
+  if (gate instanceof Response) return gate;
+  const { isCron, workspaceId: sessionWorkspaceId } = gate;
 
   const weekAgo = new Date(Date.now() - 7 * 86400000);
   const grids = await prisma.localGrid.findMany({
@@ -34,7 +29,7 @@ export async function POST(req: NextRequest) {
       enabled: true,
       schedule: "weekly",
       OR: [{ lastRunAt: null }, { lastRunAt: { lt: weekAgo } }],
-      ...(isCron ? {} : { project: { workspaceId: (await getOrCreateWorkspace(user!.id, user!.email)).id } }),
+      ...(isCron ? {} : { project: { workspaceId: sessionWorkspaceId! } }),
     },
     select: { id: true, name: true, projectId: true },
   });
@@ -42,7 +37,7 @@ export async function POST(req: NextRequest) {
   const results: Array<{ gridId: string; name: string } & Record<string, unknown>> = [];
   for (const g of grids) {
     try {
-      const r = await runLocalGrid(g.id, isCron ? "cron" : `user:${user!.id}`);
+      const r = await runLocalGrid(g.id, isCron ? "cron" : `user:${gate.userId}`);
       results.push({ gridId: g.id, name: g.name, ...r });
     } catch (err) {
       results.push({

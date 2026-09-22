@@ -12,7 +12,7 @@
 
 import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireUser, getOrCreateWorkspace } from "@/lib/session";
+import { cronGate } from "@/lib/cron/gate";
 import { runBacklinkPull } from "@/lib/seo/backlink-pull";
 
 export const dynamic = "force-dynamic";
@@ -21,22 +21,17 @@ export const dynamic = "force-dynamic";
  *  ($0.024 list + 500 rows × $0.000036 + $0.024 summary). */
 export const CRON_BACKLINK_ROWS = 500;
 
-function cronAuthorized(req: NextRequest): boolean {
-  const secret = (process.env.CRON_SECRET ?? "").trim();
-  if (!secret) return false;
-  const header = req.headers.get("authorization") ?? "";
-  return header === `Bearer ${secret}`;
-}
-
 export async function POST(req: NextRequest) {
-  const isCron = cronAuthorized(req);
-  const user = isCron ? null : await requireUser();
-  if (!isCron && !user) return Response.json({ error: "Unauthorized" }, { status: 401 });
+  // Day-1 hardening (M1): shared cron gate (lib/cron/gate.ts) — CRON_SECRET
+  // service call, or signed-in session with editor+ on the user's workspace.
+  const gate = await cronGate(req);
+  if (gate instanceof Response) return gate;
+  const { isCron, workspaceId: sessionWorkspaceId } = gate;
 
   const projects = await prisma.project.findMany({
     where: {
       backlinksEnabled: true,
-      ...(isCron ? {} : { workspaceId: (await getOrCreateWorkspace(user!.id, user!.email)).id }),
+      ...(isCron ? {} : { workspaceId: sessionWorkspaceId! }),
     },
     select: { id: true, workspaceId: true, domain: true },
   });
