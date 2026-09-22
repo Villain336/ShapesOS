@@ -9,6 +9,7 @@ import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
 import { ownedProject, requireRole } from "../../util";
 import { auditProgrammatic } from "@/lib/seo/programmatic-service";
+import { isPublishTarget } from "@/lib/seo/programmatic-publish";
 import { normalizeUrlPattern, simpleBlocksToTiptap, type SimpleBlock } from "@/lib/seo/programmatic";
 
 export const dynamic = "force-dynamic";
@@ -86,6 +87,28 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
   if (body.noindexUntilApproved !== undefined) {
     data.noindexUntilApproved = body.noindexUntilApproved === true;
+  }
+  if (body.defaultPublishTarget !== undefined) {
+    const t = String(body.defaultPublishTarget);
+    if (!isPublishTarget(t)) {
+      return Response.json({ error: 'defaultPublishTarget must be one of "none" | "csv" | "wordpress" | "webflow" | "marketr-site"' }, { status: 400 });
+    }
+    data.defaultPublishTarget = t;
+  }
+  if (body.defaultTargetSiteId !== undefined) {
+    const s = body.defaultTargetSiteId === null ? null : String(body.defaultTargetSiteId).trim() || null;
+    data.defaultTargetSiteId = s;
+  }
+  if (body.defaultWebflowCollectionId !== undefined) {
+    const c = body.defaultWebflowCollectionId === null ? null : String(body.defaultWebflowCollectionId).trim() || null;
+    data.defaultWebflowCollectionId = c;
+  }
+
+  // Consistency: a site-backed target needs a site (using post-update values).
+  const effectiveTarget = (data.defaultPublishTarget ?? owned.template.defaultPublishTarget) as string;
+  const effectiveSite = ("defaultTargetSiteId" in data ? data.defaultTargetSiteId : owned.template.defaultTargetSiteId) as string | null;
+  if (["wordpress", "webflow", "marketr-site"].includes(effectiveTarget) && !effectiveSite) {
+    return Response.json({ error: `${effectiveTarget} default target needs a site` }, { status: 400 });
   }
 
   const template = await prisma.programmaticTemplate.update({ where: { id }, data });

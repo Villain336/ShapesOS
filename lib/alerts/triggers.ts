@@ -122,6 +122,14 @@ export const TRIGGERS: TriggerDef[] = [
     dedupAvailable: true,
     live: true, // milestone 16: emitted by the geo-grid run service.
   },
+  {
+    key: "programmatic_publish_failed",
+    label: "Programmatic publish failed",
+    description: "A programmatic SEO page failed to push to its publish target (WordPress, Webflow, or a Marketr site).",
+    conditionKeys: ["projectIds"],
+    dedupAvailable: true,
+    live: true, // milestone 17 push: emitted by the programmatic push service.
+  },
 ];
 
 export function triggerDef(key: string): TriggerDef | undefined {

@@ -31,7 +31,8 @@ type AuditAction =
   | "programmatic_pages_generated"
   | "programmatic_page_approved"
   | "programmatic_page_published"
-  | "programmatic_page_discarded";
+  | "programmatic_page_discarded"
+  | "programmatic_page_pushed";
 
 /** Shared audit helper for the programmatic API routes. */
 export async function auditProgrammatic(
@@ -341,7 +342,7 @@ export interface PageActionResult {
   blocked: { id: string; url: string; reasons: string[] }[];
 }
 
-async function templateDuplicateRate(templateId: string): Promise<number> {
+export async function templateDuplicateRate(templateId: string): Promise<number> {
   const hashes = (
     await prisma.programmaticPage.findMany({
       where: { templateId, status: { not: "discarded" } },

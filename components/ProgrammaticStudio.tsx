@@ -5,7 +5,7 @@
 
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 export interface TemplateRow {
   id: string;
@@ -17,22 +17,29 @@ export interface TemplateRow {
   minWordCount: number;
   duplicateRateCap: number;
   noindexUntilApproved: boolean;
+  defaultPublishTarget: string;
+  defaultTargetSiteId: string | null;
+  defaultWebflowCollectionId: string | null;
   variables?: { name: string; fallback?: string }[];
   pageCounts?: { total: number; draft: number; ready: number; published: number };
   createdAt: string;
   updatedAt: string;
 }
 
-export interface DatasetRow {
+export interface SiteOption {
   id: string;
   name: string;
-  columns: string[];
-  rowCount: number;
-  columnMapping: Record<string, string> | null;
-  pageCount?: number;
-  createdAt: string;
-  updatedAt: string;
+  sourceType: string;
+  isMock: boolean;
 }
+
+export const TARGET_LABELS: Record<string, string> = {
+  none: "None (template default)",
+  csv: "CSV export (internal)",
+  wordpress: "WordPress",
+  webflow: "Webflow",
+  "marketr-site": "Marketr site",
+};
 
 export interface PageRow {
   id: string;
@@ -47,10 +54,35 @@ export interface PageRow {
   noindex: boolean;
   canonical: string | null;
   publishedUrl: string | null;
+  publishedAt: string | null;
+  publishTarget: string;
+  targetSiteId: string | null;
+  webflowCollectionId: string | null;
+  externalId: string | null;
+  externalUrl: string | null;
   html: string;
-  template: { id: string; name: string; minWordCount: number; duplicateRateCap: number };
+  template: {
+    id: string;
+    name: string;
+    minWordCount: number;
+    duplicateRateCap: number;
+    defaultPublishTarget?: string;
+    defaultTargetSiteId?: string | null;
+    defaultWebflowCollectionId?: string | null;
+  };
   dataset: { id: string; name: string } | null;
   rowIndex: number;
+}
+
+export interface DatasetRow {
+  id: string;
+  name: string;
+  columns: string[];
+  rowCount: number;
+  columnMapping: Record<string, string> | null;
+  pageCount?: number;
+  createdAt: string;
+  updatedAt: string;
 }
 
 interface SimpleBlock {
@@ -147,12 +179,14 @@ function TemplateEditor({
   projectId,
   initial,
   datasetColumns,
+  sites,
   onSaved,
   onCancel,
 }: {
   projectId: string;
   initial: TemplateRow | null;
   datasetColumns: string[];
+  sites: SiteOption[];
   onSaved: () => void;
   onCancel: () => void;
 }) {
@@ -166,6 +200,9 @@ function TemplateEditor({
   const [minWordCount, setMinWordCount] = useState(initial?.minWordCount ?? 300);
   const [duplicateRateCap, setDuplicateRateCap] = useState(initial?.duplicateRateCap ?? 0.05);
   const [noindexUntilApproved, setNoindexUntilApproved] = useState(initial?.noindexUntilApproved ?? true);
+  const [defaultPublishTarget, setDefaultPublishTarget] = useState(initial?.defaultPublishTarget ?? "none");
+  const [defaultTargetSiteId, setDefaultTargetSiteId] = useState(initial?.defaultTargetSiteId ?? "");
+  const [defaultWebflowCollectionId, setDefaultWebflowCollectionId] = useState(initial?.defaultWebflowCollectionId ?? "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeField, setActiveField] = useState<"title" | "description" | "url" | number>("title");
@@ -198,6 +235,9 @@ function TemplateEditor({
       minWordCount,
       duplicateRateCap,
       noindexUntilApproved,
+      defaultPublishTarget,
+      defaultTargetSiteId: ["wordpress", "webflow", "marketr-site"].includes(defaultPublishTarget) && defaultTargetSiteId ? defaultTargetSiteId : null,
+      defaultWebflowCollectionId: defaultPublishTarget === "webflow" && defaultWebflowCollectionId.trim() ? defaultWebflowCollectionId.trim() : null,
     };
     const url = initial ? `/api/programmatic/templates/${initial.id}` : "/api/programmatic/templates";
     const res = await fetch(url, {
@@ -309,6 +349,49 @@ function TemplateEditor({
         </label>
       </div>
 
+      <div className="mt-4 rounded-lg border border-zinc-800 p-4">
+        <span className="mb-2 block text-xs uppercase tracking-widest text-zinc-500">Default publish target</span>
+        <div className="grid gap-3 md:grid-cols-3">
+          <label className="block">
+            <span className="mb-1 block text-xs text-zinc-500">Target</span>
+            <select
+              className={inputCls}
+              value={defaultPublishTarget}
+              onChange={(e) => { setDefaultPublishTarget(e.target.value); setDefaultTargetSiteId(""); }}
+            >
+              {Object.entries(TARGET_LABELS).map(([v, l]) => (
+                <option key={v} value={v}>{l}</option>
+              ))}
+            </select>
+          </label>
+          {["wordpress", "webflow", "marketr-site"].includes(defaultPublishTarget) && (
+            <label className="block">
+              <span className="mb-1 block text-xs text-zinc-500">Site</span>
+              <select className={inputCls} value={defaultTargetSiteId} onChange={(e) => setDefaultTargetSiteId(e.target.value)}>
+                <option value="">— pick a site —</option>
+                {sites
+                  .filter((s) =>
+                    defaultPublishTarget === "wordpress" ? s.sourceType === "wordpress"
+                    : defaultPublishTarget === "webflow" ? s.sourceType === "webflow"
+                    : true)
+                  .map((s) => (
+                    <option key={s.id} value={s.id}>{s.name} ({s.sourceType}{s.isMock ? ", mock" : ""})</option>
+                  ))}
+              </select>
+            </label>
+          )}
+          {defaultPublishTarget === "webflow" && (
+            <label className="block">
+              <span className="mb-1 block text-xs text-zinc-500">Webflow collection id</span>
+              <input className={inputCls + " font-mono"} value={defaultWebflowCollectionId} onChange={(e) => setDefaultWebflowCollectionId(e.target.value)} placeholder="col-…" />
+            </label>
+          )}
+        </div>
+        <p className="mt-2 text-xs text-zinc-600">
+          Pages of this template publish here by default; individual pages can override it in the Pages tab. Quality gates still run before every push.
+        </p>
+      </div>
+
       <div className="mt-5 flex gap-2">
         <button onClick={save} disabled={saving} className={btnPrimary}>{saving ? "Saving…" : initial ? "Save changes" : "Create template"}</button>
         <button onClick={onCancel} className={btnSecondary}>Cancel</button>
@@ -326,12 +409,14 @@ function TemplatesTab({
   canEdit,
   templates,
   datasets,
+  sites,
   refresh,
 }: {
   projectId: string;
   canEdit: boolean;
   templates: TemplateRow[];
   datasets: DatasetRow[];
+  sites: SiteOption[];
   refresh: () => void;
 }) {
   const [editing, setEditing] = useState<TemplateRow | "new" | null>(null);
@@ -367,6 +452,7 @@ function TemplatesTab({
           projectId={projectId}
           initial={editing === "new" ? null : editing}
           datasetColumns={datasetColumns}
+          sites={sites}
           onSaved={() => { setEditing(null); refresh(); }}
           onCancel={() => setEditing(null)}
         />
@@ -393,6 +479,10 @@ function TemplatesTab({
                 <p className="mt-2 text-xs text-zinc-500">
                   Gates: ≥{t.minWordCount} words · duplicate cap {(t.duplicateRateCap * 100).toFixed(0)}%
                   {t.noindexUntilApproved ? " · noindex until published" : ""}
+                </p>
+                <p className="mt-1 text-xs text-zinc-500">
+                  Default publish: {TARGET_LABELS[t.defaultPublishTarget] ?? t.defaultPublishTarget}
+                  {t.defaultTargetSiteId ? ` → ${sites.find((s) => s.id === t.defaultTargetSiteId)?.name ?? t.defaultTargetSiteId}` : ""}
                 </p>
               </div>
               <div className="flex shrink-0 items-center gap-3">
@@ -629,6 +719,7 @@ function PagesTab({
   templates,
   datasets,
   counts,
+  sites,
   refreshAll,
 }: {
   projectId: string;
@@ -636,6 +727,7 @@ function PagesTab({
   templates: TemplateRow[];
   datasets: DatasetRow[];
   counts: Record<string, number>;
+  sites: SiteOption[];
   refreshAll: () => void;
 }) {
   const [templateId, setTemplateId] = useState(templates[0]?.id ?? "");
@@ -651,9 +743,18 @@ function PagesTab({
   const [genResult, setGenResult] = useState<Record<string, unknown> | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [acting, setActing] = useState(false);
-  const [actionResult, setActionResult] = useState<{ changed: string[]; blocked: { id: string; url: string; reasons: string[] }[] } | null>(null);
+  const [actionResult, setActionResult] = useState<{
+    changed: string[];
+    blocked: { id: string; url: string; reasons: string[] }[];
+    pushes?: { id: string; url: string; target: string; siteName: string | null; externalId: string | null; externalUrl: string | null; updated: boolean; mock: boolean }[];
+  } | null>(null);
   const [drawer, setDrawer] = useState<PageRow | PreviewPage | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [pushModal, setPushModal] = useState(false);
+  const [pushTarget, setPushTarget] = useState("");
+  const [pushSiteId, setPushSiteId] = useState("");
+  const [pushCollectionId, setPushCollectionId] = useState("");
+  const [pushWebflowPublish, setPushWebflowPublish] = useState(false);
 
   async function loadPages() {
     setLoading(true);
@@ -713,7 +814,16 @@ function PagesTab({
 
   async function bulkAction(action: "approve" | "publish" | "discard") {
     if (selected.size === 0) return;
-    const verb = action === "approve" ? "approve" : action === "publish" ? "publish" : "discard";
+    if (action === "publish") {
+      // Destination summary modal — no silent pushes.
+      setPushTarget("");
+      setPushSiteId("");
+      setPushCollectionId("");
+      setPushWebflowPublish(false);
+      setPushModal(true);
+      return;
+    }
+    const verb = action === "approve" ? "approve" : "discard";
     if (!confirm(`${verb} ${selected.size} page(s)? Quality gates run server-side.`)) return;
     setActing(true);
     setActionResult(null);
@@ -731,6 +841,68 @@ function PagesTab({
     setActionResult(data);
     loadPages();
     refreshAll();
+  }
+
+  /** Effective destination for one page: explicit modal override > page override > template default. */
+  function effectiveDest(p: PageRow): { kind: string; siteId: string | null; collectionId: string | null } {
+    const explicit = pushModal ? { target: pushTarget || undefined, siteId: pushSiteId || undefined, collectionId: pushCollectionId || undefined } : {};
+    const kind =
+      explicit.target !== undefined ? explicit.target
+      : p.publishTarget !== "none" ? p.publishTarget
+      : p.template.defaultPublishTarget ?? "none";
+    const siteId =
+      explicit.siteId !== undefined ? explicit.siteId
+      : (p.targetSiteId ?? p.template.defaultTargetSiteId ?? null);
+    const collectionId =
+      explicit.collectionId !== undefined ? explicit.collectionId
+      : (p.webflowCollectionId ?? p.template.defaultWebflowCollectionId ?? null);
+    return { kind, siteId, collectionId };
+  }
+
+  function siteName(id: string | null): string | null {
+    if (!id) return null;
+    return sites.find((s) => s.id === id)?.name ?? id;
+  }
+
+  async function confirmPush() {
+    if (selected.size === 0) return;
+    setActing(true);
+    setActionResult(null);
+    const body: Record<string, unknown> = { projectId, pageIds: [...selected], action: "push" };
+    if (pushTarget) body.target = pushTarget;
+    if (pushSiteId) body.siteId = pushSiteId;
+    if (pushCollectionId.trim()) body.collectionId = pushCollectionId.trim();
+    if (pushWebflowPublish) body.webflowPublish = true;
+    const res = await fetch("/api/programmatic/pages", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json().catch(() => ({}));
+    setActing(false);
+    setPushModal(false);
+    if (!res.ok) {
+      setError(data.error ?? "Push failed");
+      return;
+    }
+    setActionResult(data);
+    loadPages();
+    refreshAll();
+  }
+
+  async function setPageTarget(pageId: string, target: string) {
+    setError(null);
+    const res = await fetch("/api/programmatic/pages", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ projectId, pageIds: [pageId], action: "setTarget", target }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      setError(data.error ?? "Could not set target");
+      return;
+    }
+    loadPages();
   }
 
   function toggleSelect(id: string) {
@@ -856,6 +1028,22 @@ function PagesTab({
         {actionResult && (
           <div className="mb-3 rounded-lg border border-zinc-800 p-3 text-sm">
             <p className="text-emerald-400">{actionResult.changed.length} page(s) updated.</p>
+            {actionResult.pushes && actionResult.pushes.length > 0 && (
+              <ul className="mt-2 list-disc pl-5 text-xs text-zinc-400">
+                {actionResult.pushes.slice(0, 10).map((pu) => (
+                  <li key={pu.id}>
+                    <span className="font-mono">{pu.url}</span> → {TARGET_LABELS[pu.target] ?? pu.target}
+                    {pu.siteName ? ` · ${pu.siteName}` : ""}
+                    {pu.updated ? " (updated in place)" : ""}
+                    {pu.mock ? " (mock)" : ""}
+                    {pu.externalUrl ? (
+                      <> · <a href={pu.externalUrl} target="_blank" rel="noreferrer" className="underline hover:text-zinc-200">{pu.externalUrl}</a></>
+                    ) : null}
+                  </li>
+                ))}
+                {actionResult.pushes.length > 10 && <li>…and {actionResult.pushes.length - 10} more</li>}
+              </ul>
+            )}
             {actionResult.blocked.length > 0 && (
               <div className="mt-2">
                 <p className="text-amber-300">{actionResult.blocked.length} blocked by quality gates:</p>
@@ -877,23 +1065,46 @@ function PagesTab({
                 {canEdit && <th className="w-8 px-2 py-1"><input type="checkbox" checked={pages.length > 0 && selected.size === pages.length} onChange={() => setSelected(selected.size === pages.length ? new Set() : new Set(pages.map((p) => p.id)))} /></th>}
                 <th className="px-2 py-1">URL</th>
                 <th className="px-2 py-1">Status</th>
+                <th className="px-2 py-1">Target</th>
                 <th className="px-2 py-1">Flags</th>
                 <th className="px-2 py-1">Words</th>
               </tr>
             </thead>
             <tbody>
-              {pages.map((p) => (
+              {pages.map((p) => {
+                const effKind = p.publishTarget !== "none" ? p.publishTarget : (p.template.defaultPublishTarget ?? "none");
+                return (
                 <tr key={p.id} className="border-t border-zinc-900 text-zinc-300">
                   {canEdit && <td className="px-2 py-2"><input type="checkbox" checked={selected.has(p.id)} onChange={() => toggleSelect(p.id)} /></td>}
                   <td className="px-2 py-2">
                     <button onClick={() => setDrawer(p)} className="font-mono text-xs text-zinc-200 hover:text-white">{p.url}</button>
                     <p className="max-w-md truncate text-xs text-zinc-600">{p.title}</p>
+                    {p.externalUrl && <p className="max-w-md truncate text-xs text-emerald-600">→ {p.externalUrl}</p>}
                   </td>
                   <td className="px-2 py-2"><StatusBadge status={p.status} /></td>
+                  <td className="px-2 py-2">
+                    {canEdit ? (
+                      <select
+                        className="rounded-md border border-zinc-700 bg-zinc-900 px-1.5 py-1 text-xs text-zinc-300"
+                        value={p.publishTarget}
+                        onChange={(e) => setPageTarget(p.id, e.target.value)}
+                        title="Per-page publish target override (blank = template default)"
+                      >
+                        <option value="none">{p.template.defaultPublishTarget && p.template.defaultPublishTarget !== "none" ? `Default: ${TARGET_LABELS[p.template.defaultPublishTarget] ?? p.template.defaultPublishTarget}` : "No target"}</option>
+                        <option value="csv">CSV export (internal)</option>
+                        <option value="wordpress">WordPress</option>
+                        <option value="webflow">Webflow</option>
+                        <option value="marketr-site">Marketr site</option>
+                      </select>
+                    ) : (
+                      <span className="text-xs text-zinc-500">{TARGET_LABELS[effKind] ?? effKind}</span>
+                    )}
+                  </td>
                   <td className="px-2 py-2"><div className="flex flex-wrap gap-1">{p.qualityFlags.map((f) => <FlagBadge key={f} flag={f} />)}</div></td>
                   <td className="px-2 py-2 text-xs text-zinc-500">{p.wordCount}</td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
           {pages.length === 0 && !loading && (
@@ -906,6 +1117,95 @@ function PagesTab({
           <a href={`/api/programmatic/sitemap?projectId=${projectId}`} target="_blank" rel="noreferrer" className="text-zinc-400 underline hover:text-zinc-200">View sitemap.xml</a>
         </div>
       </div>
+
+      {/* Publish destination summary modal */}
+      {pushModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => setPushModal(false)}>
+          <div className="w-full max-w-2xl rounded-xl border border-zinc-800 bg-zinc-950 p-6" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-base font-semibold">Publish {selected.size} page(s)</h3>
+            <p className="mt-1 text-xs text-zinc-500">
+              Destination per page (explicit override below wins, else the page override, else the template default).
+              Quality gates run server-side — gated pages are blocked, never pushed. Re-pushing to the same
+              target updates in place instead of duplicating.
+            </p>
+
+            <div className="mt-4 max-h-56 overflow-y-auto rounded-lg border border-zinc-800">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="text-left text-zinc-500">
+                    <th className="px-3 py-2">URL</th>
+                    <th className="px-3 py-2">Status</th>
+                    <th className="px-3 py-2">Destination</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pages.filter((p) => selected.has(p.id)).map((p) => {
+                    const d = effectiveDest(p);
+                    const label =
+                      d.kind === "none" ? "— no target —"
+                      : d.kind === "csv" ? "CSV export (internal)"
+                      : `${TARGET_LABELS[d.kind] ?? d.kind}${d.siteId ? ` → ${siteName(d.siteId) ?? d.siteId}` : " (no site!)"}`;
+                    return (
+                      <tr key={p.id} className="border-t border-zinc-900 text-zinc-300">
+                        <td className="px-3 py-1.5 font-mono">{p.url}</td>
+                        <td className="px-3 py-1.5"><StatusBadge status={p.status} /></td>
+                        <td className={`px-3 py-1.5 ${d.kind === "none" || ((d.kind === "wordpress" || d.kind === "webflow" || d.kind === "marketr-site") && !d.siteId) ? "text-amber-300" : ""}`}>{label}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="mt-4 grid gap-3 md:grid-cols-3">
+              <label className="block">
+                <span className="mb-1 block text-xs text-zinc-500">Override target (all)</span>
+                <select className={inputCls} value={pushTarget} onChange={(e) => { setPushTarget(e.target.value); setPushSiteId(""); }}>
+                  <option value="">Use per-page/template targets</option>
+                  {Object.entries(TARGET_LABELS).filter(([v]) => v !== "none").map(([v, l]) => (
+                    <option key={v} value={v}>{l}</option>
+                  ))}
+                </select>
+              </label>
+              {["wordpress", "webflow", "marketr-site"].includes(pushTarget) && (
+                <label className="block">
+                  <span className="mb-1 block text-xs text-zinc-500">Site</span>
+                  <select className={inputCls} value={pushSiteId} onChange={(e) => setPushSiteId(e.target.value)}>
+                    <option value="">— pick a site —</option>
+                    {sites
+                      .filter((s) =>
+                        pushTarget === "wordpress" ? s.sourceType === "wordpress"
+                        : pushTarget === "webflow" ? s.sourceType === "webflow"
+                        : true)
+                      .map((s) => (
+                        <option key={s.id} value={s.id}>{s.name} ({s.sourceType}{s.isMock ? ", mock" : ""})</option>
+                      ))}
+                  </select>
+                </label>
+              )}
+              {pushTarget === "webflow" && (
+                <label className="block">
+                  <span className="mb-1 block text-xs text-zinc-500">Webflow collection id</span>
+                  <input className={inputCls + " font-mono"} value={pushCollectionId} onChange={(e) => setPushCollectionId(e.target.value)} placeholder="col-…" />
+                </label>
+              )}
+            </div>
+            {pushTarget === "webflow" && (
+              <label className="mt-2 flex items-center gap-2 text-xs text-zinc-400">
+                <input type="checkbox" checked={pushWebflowPublish} onChange={(e) => setPushWebflowPublish(e.target.checked)} />
+                Publish the Webflow site after the CMS items are saved
+              </label>
+            )}
+
+            <div className="mt-5 flex justify-end gap-2">
+              <button onClick={() => setPushModal(false)} disabled={acting} className={btnSecondary}>Cancel</button>
+              <button onClick={confirmPush} disabled={acting} className={btnPrimary}>
+                {acting ? "Pushing…" : `Push ${selected.size} page(s)`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Preview drawer */}
       {drawer && (
@@ -930,6 +1230,15 @@ function PagesTab({
                 {drawerIsPage && (
                   <p className="mt-1 text-xs text-zinc-600">
                     canonical: {(drawer as PageRow).canonical ?? "—"} · noindex: {(drawer as PageRow).noindex ? "yes" : "no"}
+                  </p>
+                )}
+                {drawerIsPage && (drawer as PageRow).status === "published" && (
+                  <p className="mt-1 text-xs text-emerald-400">
+                    Published via {TARGET_LABELS[(drawer as PageRow).publishTarget] ?? (drawer as PageRow).publishTarget}
+                    {(drawer as PageRow).publishedAt ? ` · ${new Date((drawer as PageRow).publishedAt!).toLocaleString()}` : ""}
+                    {(drawer as PageRow).externalUrl ? (
+                      <> · <a href={(drawer as PageRow).externalUrl!} target="_blank" rel="noreferrer" className="underline hover:text-emerald-200">{(drawer as PageRow).externalUrl}</a></>
+                    ) : null}
                   </p>
                 )}
               </div>
@@ -967,6 +1276,26 @@ export default function ProgrammaticStudio({
   const [templates, setTemplates] = useState(initialTemplates);
   const [datasets, setDatasets] = useState(initialDatasets);
   const [counts, setCounts] = useState(initialCounts);
+  const [sites, setSites] = useState<SiteOption[]>([]);
+  const [sitesLoaded, setSitesLoaded] = useState(false);
+
+  async function loadSites() {
+    try {
+      const res = await fetch(`/api/websites?projectId=${projectId}`);
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) setSites((data.sites ?? []) as SiteOption[]);
+    } catch {
+      // sites list is a nice-to-have for target pickers; never block the studio
+    } finally {
+      setSitesLoaded(true);
+    }
+  }
+
+  // Load the project's sites once (for publish-target pickers).
+  useEffect(() => {
+    void loadSites();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function refreshAll() {
     const [tRes, dRes, pRes] = await Promise.all([
@@ -994,13 +1323,13 @@ export default function ProgrammaticStudio({
         ))}
       </div>
       {tab === "templates" && (
-        <TemplatesTab projectId={projectId} canEdit={canEdit} templates={templates} datasets={datasets} refresh={refreshAll} />
+        <TemplatesTab projectId={projectId} canEdit={canEdit} templates={templates} datasets={datasets} sites={sites} refresh={refreshAll} />
       )}
       {tab === "datasets" && (
         <DatasetsTab projectId={projectId} canEdit={canEdit} datasets={datasets} templates={templates} refresh={refreshAll} />
       )}
       {tab === "pages" && (
-        <PagesTab projectId={projectId} canEdit={canEdit} templates={templates} datasets={datasets} counts={counts} refreshAll={refreshAll} />
+        <PagesTab projectId={projectId} canEdit={canEdit} templates={templates} datasets={datasets} counts={counts} sites={sites} refreshAll={refreshAll} />
       )}
     </div>
   );

@@ -153,6 +153,8 @@ enum FileChangeAction {
   programmatic_page_approved
   programmatic_page_published
   programmatic_page_discarded
+  // Milestone 17 push: a page was pushed to an external publish target.
+  programmatic_page_pushed
 }
 
 enum ProgrammaticPageStatus {
@@ -1318,6 +1320,15 @@ model ProgrammaticTemplate {
   // New pages start noindex until published.
   noindexUntilApproved Boolean @default(true) @map("noindex_until_approved")
 
+  // Milestone 17 push: default publish target for this template's pages.
+  // "none" | "csv" | "wordpress" | "webflow" | "marketr-site". Pages may
+  // override this per-page (ProgrammaticPage.publishTarget).
+  defaultPublishTarget       String  @default("none") @map("default_publish_target")
+  // Site id for wordpress/webflow/marketr-site targets (nullable = unset).
+  defaultTargetSiteId        String? @map("default_target_site_id")
+  // Webflow CMS collection id for webflow pushes.
+  defaultWebflowCollectionId String? @map("default_webflow_collection_id")
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -1371,6 +1382,16 @@ model ProgrammaticPage {
   qualityFlags Json                   @default("[]") @map("quality_flags")
   publishedUrl String?                @map("published_url")
   publishedAt  DateTime?              @map("published_at")
+
+  // Milestone 17 push: per-page publish-target override ("none" = inherit
+  // the template default), target site, and the remote refs used for
+  // idempotent in-place updates (externalId = WP post id / Webflow item id /
+  // site file path).
+  publishTarget       String  @default("none") @map("publish_target")
+  targetSiteId        String? @map("target_site_id")
+  webflowCollectionId String? @map("webflow_collection_id")
+  externalId          String? @map("external_id")
+  externalUrl         String? @map("external_url")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")

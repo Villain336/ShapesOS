@@ -3,6 +3,10 @@
 // PATCH /api/programmatic/pages { projectId, pageIds, action:
 //   "approve" | "publish" | "discard" } (editor+). Quality gates enforced
 //   server-side; publish also regenerates the sitemap.
+//   action "push": { projectId, pageIds, target?, siteId?, collectionId?,
+//   webflowPublish? } — push through existing connectors (milestone 17 push).
+//   action "setTarget": { projectId, pageIds, target, siteId?, collectionId? }
+//   — store a per-page publish-target override (editor+).
 
 import { forbidden } from "@/lib/authz";
 import type { NextRequest } from "next/server";
@@ -14,6 +18,11 @@ import {
   discardProgrammaticPages,
   publishProgrammaticPages,
 } from "@/lib/seo/programmatic-service";
+import {
+  isPublishTarget,
+  pushProgrammaticPages,
+  setProgrammaticPageTargets,
+} from "@/lib/seo/programmatic-publish";
 import { tiptapToHtml } from "@/lib/seo/programmatic";
 
 export const dynamic = "force-dynamic";
@@ -72,6 +81,11 @@ export async function GET(req: NextRequest) {
         canonical: p.canonical,
         publishedUrl: p.publishedUrl,
         publishedAt: p.publishedAt,
+        publishTarget: p.publishTarget,
+        targetSiteId: p.targetSiteId,
+        webflowCollectionId: p.webflowCollectionId,
+        externalId: p.externalId,
+        externalUrl: p.externalUrl,
         html: content.contentBlocks ? tiptapToHtml(content.contentBlocks) : "",
         template: p.template,
         dataset: p.dataset,
@@ -87,7 +101,15 @@ export async function GET(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   const user = await requireUser();
   if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
-  let body: { projectId?: string; pageIds?: string[]; action?: string };
+  let body: {
+    projectId?: string;
+    pageIds?: string[];
+    action?: string;
+    target?: string;
+    siteId?: string;
+    collectionId?: string;
+    webflowPublish?: boolean;
+  };
   try {
     body = await req.json();
   } catch {
@@ -108,7 +130,37 @@ export async function PATCH(req: NextRequest) {
     if (body.action === "approve") return Response.json(await approveProgrammaticPages(args));
     if (body.action === "publish") return Response.json(await publishProgrammaticPages(args));
     if (body.action === "discard") return Response.json(await discardProgrammaticPages(args));
-    return Response.json({ error: 'action must be "approve" | "publish" | "discard"' }, { status: 400 });
+    if (body.action === "push") {
+      const explicitDest =
+        body.target !== undefined || body.siteId !== undefined || body.collectionId !== undefined
+          ? {
+              target: body.target,
+              siteId: body.siteId,
+              collectionId: body.collectionId,
+              webflowPublish: body.webflowPublish === true,
+            }
+          : undefined;
+      if (explicitDest?.target !== undefined && !isPublishTarget(explicitDest.target)) {
+        return Response.json({ error: `Unknown publish target "${explicitDest.target}"` }, { status: 400 });
+      }
+      return Response.json(
+        await pushProgrammaticPages({ ...args, userId: user.id, explicitDest }),
+      );
+    }
+    if (body.action === "setTarget") {
+      if (!isPublishTarget(body.target)) {
+        return Response.json({ error: 'target must be one of "none" | "csv" | "wordpress" | "webflow" | "marketr-site"' }, { status: 400 });
+      }
+      return Response.json(
+        await setProgrammaticPageTargets({
+          ...args,
+          target: body.target,
+          siteId: body.siteId ?? null,
+          collectionId: body.collectionId ?? null,
+        }),
+      );
+    }
+    return Response.json({ error: 'action must be "approve" | "publish" | "discard" | "push" | "setTarget"' }, { status: 400 });
   } catch (e) {
     return Response.json({ error: e instanceof Error ? e.message : "Action failed" }, { status: 400 });
   }

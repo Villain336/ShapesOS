@@ -10,6 +10,7 @@ import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
 import { ownedProject, requireRole } from "../util";
 import { auditProgrammatic } from "@/lib/seo/programmatic-service";
+import { isPublishTarget } from "@/lib/seo/programmatic-publish";
 import {
   normalizeUrlPattern,
   simpleBlocksToTiptap,
@@ -68,6 +69,24 @@ function validateTemplateBody(body: Record<string, unknown>): { ok: true; data: 
   }
   const noindexUntilApproved = body.noindexUntilApproved === undefined ? true : body.noindexUntilApproved === true;
 
+  // Milestone 17 push: default publish target for this template's pages.
+  const defaultPublishTarget =
+    body.defaultPublishTarget === undefined ? "none" : String(body.defaultPublishTarget);
+  if (!isPublishTarget(defaultPublishTarget)) {
+    return { ok: false, error: 'defaultPublishTarget must be one of "none" | "csv" | "wordpress" | "webflow" | "marketr-site"' };
+  }
+  const defaultTargetSiteId =
+    body.defaultTargetSiteId === undefined || body.defaultTargetSiteId === null
+      ? null
+      : String(body.defaultTargetSiteId).trim() || null;
+  if (["wordpress", "webflow", "marketr-site"].includes(defaultPublishTarget) && !defaultTargetSiteId) {
+    return { ok: false, error: `${defaultPublishTarget} default target needs a site` };
+  }
+  const defaultWebflowCollectionId =
+    body.defaultWebflowCollectionId === undefined || body.defaultWebflowCollectionId === null
+      ? null
+      : String(body.defaultWebflowCollectionId).trim() || null;
+
   return {
     ok: true,
     data: {
@@ -79,6 +98,9 @@ function validateTemplateBody(body: Record<string, unknown>): { ok: true; data: 
       minWordCount,
       duplicateRateCap,
       noindexUntilApproved,
+      defaultPublishTarget,
+      defaultTargetSiteId,
+      defaultWebflowCollectionId,
     },
   };
 }
@@ -111,6 +133,9 @@ export async function GET(req: NextRequest) {
       minWordCount: t.minWordCount,
       duplicateRateCap: t.duplicateRateCap,
       noindexUntilApproved: t.noindexUntilApproved,
+      defaultPublishTarget: t.defaultPublishTarget,
+      defaultTargetSiteId: t.defaultTargetSiteId,
+      defaultWebflowCollectionId: t.defaultWebflowCollectionId,
       variables: templateVariables({
         urlPattern: t.urlPattern,
         titleTemplate: t.titleTemplate,
