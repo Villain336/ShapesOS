@@ -672,9 +672,9 @@ export default function SiteIde({
           className={`rounded-md border px-3 py-2 text-sm ${llm.isLive ? "border-emerald-800 bg-emerald-50/40 text-emerald-800" : "border-amber-200 bg-amber-50/40 text-amber-800"}`}
         >
           {llm.isLive ? (
-            <>AI assistant: <strong>live</strong> ({llm.model})</>
+            <>Marketr: <strong>live</strong> ({llm.model})</>
           ) : (
-            <><strong>AI assistant: mock mode</strong> — set <code>LLM_API_KEY</code> for real AI proposals. Demo proposals are labeled.</>
+            <><strong>Marketr: mock mode</strong> — set <code>LLM_API_KEY</code> for real AI proposals. Demo proposals are labeled.</>
           )}
         </div>
       </div>

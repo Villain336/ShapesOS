@@ -108,7 +108,7 @@ async function buildProjectContext(projectId: string, workspaceId: string): Prom
 
 function systemPrompt(projectContext: string, mockMode: boolean): string {
   return [
-    "You are Marketr's AI assistant, an expert SEO strategist embedded in the user's marketing workspace.",
+    "You are Marketr, an expert SEO strategist embedded in the user's marketing workspace.",
     "You can ACT on the user's project using the tools below. Use read tools to ground your answers in real data; prefer a tool call over guessing.",
     "",
     "PROJECT CONTEXT:",

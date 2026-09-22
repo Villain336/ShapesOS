@@ -245,7 +245,7 @@ export default async function DashboardPage() {
             className="pressable inline-flex items-center gap-2 rounded-full bg-accent px-4 py-2 text-[13.5px] font-medium text-white transition-colors hover:bg-accent-hover"
           >
             <TrendUp className="size-4" weight="duotone" />
-            Ask Marketr AI
+            Ask Marketr
           </Link>
         ) : null}
       </div>

@@ -189,7 +189,7 @@ export default function AiChatPanel() {
                 </div>
               ) : (
                 <div className="rounded-[14px] bg-surface px-4 py-3 text-center text-[13px] text-ink-2 shadow-float-md ring-1 ring-line">
-                  You need the editor role to chat with the AI assistant.
+                  You need the editor role to chat with Marketr.
                 </div>
               )}
               {mockMode && canEdit && (

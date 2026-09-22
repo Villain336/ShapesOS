@@ -112,7 +112,7 @@ export default function AssistantClient({
         >
           {(
             [
-              { value: "ai", label: "AI Assistant", Icon: TrendUp },
+              { value: "ai", label: "Marketr", Icon: TrendUp },
               { value: "team", label: "Team chat", Icon: Users },
             ] as const
           ).map(({ value, label, Icon }) => {

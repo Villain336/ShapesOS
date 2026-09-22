@@ -46,7 +46,7 @@ const NAV_SECTIONS: {
   {
     items: [
       { href: "/dashboard", label: "Projects", icon: SquaresFour },
-      { href: "/dashboard/assistant", label: "AI Assistant", icon: TrendUp },
+      { href: "/dashboard/assistant", label: "Marketr", icon: TrendUp },
       { href: "/dashboard/reports", label: "Reports", icon: ChartBar },
       { href: "/dashboard/alerts", label: "Alerts", icon: Bell },
     ],
