@@ -13,9 +13,11 @@
 }
 
 @media (prefers-color-scheme: dark) {
+  /* Marketr is light-mode only (full light theme, no dark toggle).
+     Forcing light values here regardless of OS preference. */
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: #ffffff;
+    --foreground: #171717;
   }
 }
 

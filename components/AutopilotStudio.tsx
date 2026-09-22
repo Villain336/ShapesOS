@@ -72,11 +72,11 @@ const SOURCE_LABELS: Record<string, string> = {
 };
 
 const STATUS_COLORS: Record<string, string> = {
-  pending: "bg-amber-900/40 text-amber-300",
-  approved: "bg-emerald-900/40 text-emerald-300",
-  rejected: "bg-zinc-700/40 text-zinc-400",
-  published: "bg-sky-900/40 text-sky-300",
-  killed: "bg-red-900/40 text-red-300",
+  pending: "bg-amber-100/40 text-amber-700",
+  approved: "bg-emerald-900/40 text-emerald-700",
+  rejected: "bg-zinc-200/40 text-zinc-500",
+  published: "bg-sky-100/40 text-sky-700",
+  killed: "bg-red-100/40 text-red-700",
 };
 
 const KIND_LABELS: Record<string, string> = {
@@ -198,31 +198,31 @@ export default function AutopilotStudio({ projectId, canEdit, isAdmin, initialRu
   return (
     <div className="flex flex-col gap-6">
       {killed && (
-        <div className="rounded-lg border border-red-700 bg-red-950/50 px-4 py-3 text-sm text-red-200">
+        <div className="rounded-lg border border-red-200 bg-red-50/50 px-4 py-3 text-sm text-red-700">
           🛑 Autopilot is <strong>killed</strong>
           {projectKilled && workspaceKilled ? " at project and workspace level" : projectKilled ? " for this project" : " at workspace level"}
           . Runs, approvals, and publishing are frozen. Release the kill switch below to resume (nothing resumes silently).
         </div>
       )}
       {error && (
-        <div className="rounded-lg border border-red-800 bg-red-950/40 px-4 py-3 text-sm text-red-300">
+        <div className="rounded-lg border border-red-200 bg-red-50/40 px-4 py-3 text-sm text-red-700">
           {error}
           <button className="ml-3 underline" onClick={() => setError(null)}>dismiss</button>
         </div>
       )}
 
-      <div className="flex gap-2 border-b border-zinc-800">
+      <div className="flex gap-2 border-b border-zinc-200">
         {(["queue", "rules", "activity"] as const).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
-            className={`px-4 py-2 text-sm font-medium capitalize ${tab === t ? "border-b-2 border-zinc-100 text-zinc-100" : "text-zinc-500 hover:text-zinc-300"}`}
+            className={`px-4 py-2 text-sm font-medium capitalize ${tab === t ? "border-b-2 border-zinc-100 text-zinc-900" : "text-zinc-500 hover:text-zinc-600"}`}
           >
             {t}
           </button>
         ))}
         <div className="ml-auto pb-2">
-          <a href="#kill-switch" className={`text-sm font-semibold ${killed ? "text-red-400" : "text-zinc-400 hover:text-zinc-200"}`}>
+          <a href="#kill-switch" className={`text-sm font-semibold ${killed ? "text-red-600" : "text-zinc-500 hover:text-zinc-800"}`}>
             {killed ? "🛑 Kill switch ENGAGED" : "Kill switch"}
           </a>
         </div>
@@ -234,7 +234,7 @@ export default function AutopilotStudio({ projectId, canEdit, isAdmin, initialRu
             <select
               value={queueStatus}
               onChange={(e) => setQueueStatus(e.target.value)}
-              className="rounded-md border border-zinc-700 bg-zinc-900 px-3 py-1.5 text-sm text-zinc-200"
+              className="rounded-md border border-zinc-200 bg-white px-3 py-1.5 text-sm text-zinc-800"
             >
               {["pending", "approved", "rejected", "published", "killed"].map((s) => (
                 <option key={s} value={s} className="capitalize">{s}</option>
@@ -245,14 +245,14 @@ export default function AutopilotStudio({ projectId, canEdit, isAdmin, initialRu
                 <button
                   onClick={() => bulk("approve")}
                   disabled={!!busy}
-                  className="rounded-md bg-emerald-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-600 disabled:opacity-50"
+                  className="rounded-md bg-emerald-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
                 >
                   Approve {selected.size}
                 </button>
                 <button
                   onClick={() => bulk("publish")}
                   disabled={!!busy}
-                  className="rounded-md bg-sky-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-sky-600 disabled:opacity-50"
+                  className="rounded-md bg-orange-600 px-3 py-1.5 text-sm font-medium text-white transition-[background-color,transform] duration-150 ease-[cubic-bezier(0.2,0,0,1)] hover:bg-orange-700 active:scale-[0.96] disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2"
                 >
                   Publish {selected.size}
                 </button>
@@ -264,32 +264,32 @@ export default function AutopilotStudio({ projectId, canEdit, isAdmin, initialRu
           {items.length === 0 && <p className="text-sm text-zinc-500">No {queueStatus} items. Run a rule to generate drafts.</p>}
           <div className="flex flex-col gap-2">
             {items.map((item) => (
-              <div key={item.id} className="flex items-center gap-3 rounded-lg border border-zinc-800 bg-zinc-900/60 px-4 py-3">
+              <div key={item.id} className="flex items-center gap-3 rounded-lg border border-zinc-200 bg-white/60 px-4 py-3">
                 {canEdit && (item.status === "pending" || item.status === "approved") && (
                   <input type="checkbox" checked={selected.has(item.id)} onChange={() => toggleSelect(item.id)} className="h-4 w-4" />
                 )}
                 <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm font-medium text-zinc-100">{item.title}</div>
+                  <div className="truncate text-sm font-medium text-zinc-900">{item.title}</div>
                   <div className="mt-0.5 flex flex-wrap gap-2 text-xs text-zinc-500">
                     <span className={`rounded px-1.5 py-0.5 ${STATUS_COLORS[item.status] ?? ""}`}>{item.status}</span>
                     <span>{KIND_LABELS[item.kind] ?? item.kind}</span>
                     <span>{item.rule.name}</span>
-                    {item.autoApproved && <span className="text-amber-400">auto-approved</span>}
-                    {item.publishedUrl && <span className="text-sky-400">→ {item.publishedUrl}</span>}
+                    {item.autoApproved && <span className="text-amber-700">auto-approved</span>}
+                    {item.publishedUrl && <span className="text-sky-600">→ {item.publishedUrl}</span>}
                   </div>
                 </div>
-                <button onClick={() => setPreview(item)} className="text-sm text-zinc-400 hover:text-zinc-100">Preview</button>
+                <button onClick={() => setPreview(item)} className="text-sm text-zinc-500 hover:text-zinc-900">Preview</button>
                 {canEdit && item.status === "pending" && (
                   <>
                     <button
                       onClick={() => doAction(`approve-${item.id}`, () => api(`/api/autopilot/items/${item.id}/approve`, { method: "POST", body: JSON.stringify({ projectId }) }))}
-                      className="rounded-md bg-emerald-700 px-3 py-1 text-sm font-medium text-white hover:bg-emerald-600"
+                      className="rounded-md bg-emerald-700 px-3 py-1 text-sm font-medium text-white hover:bg-emerald-700"
                     >
                       Approve
                     </button>
                     <button
                       onClick={() => { const note = prompt("Rejection note (optional):"); doAction(`reject-${item.id}`, () => api(`/api/autopilot/items/${item.id}/reject`, { method: "POST", body: JSON.stringify({ projectId, note }) })); }}
-                      className="rounded-md border border-zinc-700 px-3 py-1 text-sm text-zinc-300 hover:border-zinc-500"
+                      className="rounded-md border border-zinc-200 px-3 py-1 text-sm text-zinc-500 hover:border-zinc-400"
                     >
                       Reject
                     </button>
@@ -298,7 +298,7 @@ export default function AutopilotStudio({ projectId, canEdit, isAdmin, initialRu
                 {canEdit && item.status === "approved" && (
                   <button
                     onClick={() => doAction(`publish-${item.id}`, () => api(`/api/autopilot/items/${item.id}/publish`, { method: "POST", body: JSON.stringify({ projectId }) }))}
-                    className="rounded-md bg-sky-700 px-3 py-1 text-sm font-medium text-white hover:bg-sky-600"
+                    className="rounded-md bg-orange-600 px-3 py-1 text-sm font-medium text-white transition-[background-color,transform] duration-150 ease-[cubic-bezier(0.2,0,0,1)] hover:bg-orange-700 active:scale-[0.96] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2"
                   >
                     Publish
                   </button>
@@ -315,7 +315,7 @@ export default function AutopilotStudio({ projectId, canEdit, isAdmin, initialRu
             <div>
               <button
                 onClick={() => { setEditing(null); setShowRuleForm(true); }}
-                className="rounded-md bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-900 hover:bg-white"
+                className="rounded-md bg-orange-600 px-4 py-2 text-sm font-medium text-white hover:bg-orange-700 active:scale-[0.96] transition-[background-color,transform] duration-150 ease-[cubic-bezier(0.2,0,0,1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2"
               >
                 + New rule
               </button>
@@ -324,15 +324,15 @@ export default function AutopilotStudio({ projectId, canEdit, isAdmin, initialRu
           {rules.length === 0 && <p className="text-sm text-zinc-500">No autopilot rules yet. Create one to start.</p>}
           <div className="flex flex-col gap-2">
             {rules.map((rule) => (
-              <div key={rule.id} className="flex items-center gap-3 rounded-lg border border-zinc-800 bg-zinc-900/60 px-4 py-3">
+              <div key={rule.id} className="flex items-center gap-3 rounded-lg border border-zinc-200 bg-white/60 px-4 py-3">
                 <div className="flex-1">
-                  <div className="text-sm font-medium text-zinc-100">
+                  <div className="text-sm font-medium text-zinc-900">
                     {rule.name}
                     {!rule.enabled && <span className="ml-2 text-xs text-zinc-500">(disabled)</span>}
                   </div>
                   <div className="mt-0.5 text-xs text-zinc-500">
                     {SOURCE_LABELS[rule.source] ?? rule.source} · {rule.cadence} · max {rule.maxItemsPerRun}/run
-                    {rule.autoApprove && <span className="text-amber-400"> · auto-approve ON</span>}
+                    {rule.autoApprove && <span className="text-amber-700"> · auto-approve ON</span>}
                     {rule.lastRunAt && <span> · last run {new Date(rule.lastRunAt).toLocaleString()}</span>}
                     <span> · {rule._count.items} items</span>
                   </div>
@@ -342,26 +342,26 @@ export default function AutopilotStudio({ projectId, canEdit, isAdmin, initialRu
                     <button
                       onClick={() => doAction(`run-${rule.id}`, () => api("/api/autopilot/runs", { method: "POST", body: JSON.stringify({ projectId, ruleId: rule.id }) }))}
                       disabled={!!busy || killed || !rule.enabled}
-                      className="rounded-md bg-zinc-700 px-3 py-1 text-sm font-medium text-white hover:bg-zinc-600 disabled:opacity-40"
+                      className="rounded-md bg-orange-600 px-3 py-1 text-sm font-medium text-white transition-[background-color,transform] duration-150 ease-[cubic-bezier(0.2,0,0,1)] hover:bg-orange-700 active:scale-[0.96] disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2"
                       title={killed ? "Kill switch is engaged" : "Run this rule now"}
                     >
                       Run now
                     </button>
                     <button
                       onClick={() => doAction(`toggle-${rule.id}`, () => api(`/api/autopilot/rules/${rule.id}`, { method: "PATCH", body: JSON.stringify({ projectId, enabled: !rule.enabled }) }))}
-                      className="rounded-md border border-zinc-700 px-3 py-1 text-sm text-zinc-300 hover:border-zinc-500"
+                      className="rounded-md border border-zinc-200 px-3 py-1 text-sm text-zinc-500 hover:border-zinc-400"
                     >
                       {rule.enabled ? "Disable" : "Enable"}
                     </button>
                     <button
                       onClick={() => { setEditing(rule); setShowRuleForm(true); }}
-                      className="text-sm text-zinc-400 hover:text-zinc-100"
+                      className="text-sm text-zinc-500 hover:text-zinc-900"
                     >
                       Edit
                     </button>
                     <button
                       onClick={() => { if (confirm(`Delete rule "${rule.name}"? Items and history stay.`)) doAction(`del-${rule.id}`, () => api(`/api/autopilot/rules/${rule.id}?projectId=${projectId}`, { method: "DELETE" })); }}
-                      className="text-sm text-red-400 hover:text-red-300"
+                      className="text-sm text-red-600 hover:text-red-700"
                     >
                       Delete
                     </button>
@@ -377,17 +377,17 @@ export default function AutopilotStudio({ projectId, canEdit, isAdmin, initialRu
         <div className="flex flex-col gap-2">
           {runs.length === 0 && <p className="text-sm text-zinc-500">No runs yet.</p>}
           {runs.map((run) => (
-            <div key={run.id} className="rounded-lg border border-zinc-800 bg-zinc-900/60 px-4 py-3">
+            <div key={run.id} className="rounded-lg border border-zinc-200 bg-white/60 px-4 py-3">
               <div className="flex items-center gap-3">
-                <span className={`rounded px-1.5 py-0.5 text-xs ${STATUS_COLORS[run.status] ?? "bg-zinc-700/40 text-zinc-400"}`}>{run.status}</span>
-                <span className="text-sm font-medium text-zinc-100">{run.rule.name}</span>
+                <span className={`rounded px-1.5 py-0.5 text-xs ${STATUS_COLORS[run.status] ?? "bg-zinc-200/40 text-zinc-500"}`}>{run.status}</span>
+                <span className="text-sm font-medium text-zinc-900">{run.rule.name}</span>
                 <span className="ml-auto text-xs text-zinc-500">
                   {new Date(run.startedAt).toLocaleString()} · by {run.createdBy ?? "system"}
                 </span>
               </div>
               <div className="mt-1 text-xs text-zinc-500">
                 {run.itemsGenerated} generated · {run.itemsApproved} approved · {run.itemsPublished} published
-                {run.error && <span className="text-red-400"> · {run.error}</span>}
+                {run.error && <span className="text-red-600"> · {run.error}</span>}
               </div>
             </div>
           ))}
@@ -407,27 +407,27 @@ export default function AutopilotStudio({ projectId, canEdit, isAdmin, initialRu
 
       {preview && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-6" onClick={() => setPreview(null)}>
-          <div className="max-h-[85vh] w-full max-w-3xl overflow-auto rounded-lg border border-zinc-700 bg-zinc-950 p-6" onClick={(e) => e.stopPropagation()}>
+          <div className="max-h-[85vh] w-full max-w-3xl overflow-auto rounded-lg border border-zinc-200 bg-zinc-50 p-6" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-start justify-between gap-4">
               <div>
-                <h2 className="text-lg font-semibold text-zinc-100">{preview.title}</h2>
+                <h2 className="text-lg font-semibold text-zinc-900">{preview.title}</h2>
                 <p className="mt-1 text-xs text-zinc-500">
                   {KIND_LABELS[preview.kind]} · {preview.rule.name} · {preview.status}
                   {preview.autoApproved && " · auto-approved"}
                 </p>
               </div>
-              <button onClick={() => setPreview(null)} className="text-zinc-500 hover:text-zinc-200">✕</button>
+              <button onClick={() => setPreview(null)} className="text-zinc-500 hover:text-zinc-800">✕</button>
             </div>
-            {preview.reviewNote && <p className="mt-3 text-sm text-amber-300">Review note: {preview.reviewNote}</p>}
-            <pre className="mt-4 whitespace-pre-wrap text-sm leading-relaxed text-zinc-300">{preview.draftMarkdown ?? "(no draft)"}</pre>
+            {preview.reviewNote && <p className="mt-3 text-sm text-amber-700">Review note: {preview.reviewNote}</p>}
+            <pre className="mt-4 whitespace-pre-wrap text-sm leading-relaxed text-zinc-500">{preview.draftMarkdown ?? "(no draft)"}</pre>
           </div>
         </div>
       )}
 
       {/* Kill switch */}
-      <div id="kill-switch" className="rounded-lg border border-red-900 bg-red-950/20 p-5">
-        <h2 className="text-lg font-semibold text-red-300">🛑 Kill switch</h2>
-        <p className="mt-1 text-sm text-zinc-400">
+      <div id="kill-switch" className="rounded-lg border border-red-200 bg-red-50/20 p-5">
+        <h2 className="text-lg font-semibold text-red-700">🛑 Kill switch</h2>
+        <p className="mt-1 text-sm text-zinc-500">
           Engaging the kill switch immediately stops all scheduled autopilot activity: running runs are marked
           killed and pending/approved items are frozen. Nothing resumes silently — release it explicitly to restart.
           The kill is audit-logged and fires an alert.
@@ -436,7 +436,7 @@ export default function AutopilotStudio({ projectId, canEdit, isAdmin, initialRu
           {canEdit && !projectKilled && (
             <button
               onClick={() => setKillConfirm("project")}
-              className="rounded-md bg-red-700 px-5 py-2.5 text-sm font-bold text-white hover:bg-red-600"
+              className="rounded-md bg-red-700 px-5 py-2.5 text-sm font-bold text-white hover:bg-red-700"
             >
               KILL AUTOPILOT — this project
             </button>
@@ -444,7 +444,7 @@ export default function AutopilotStudio({ projectId, canEdit, isAdmin, initialRu
           {isAdmin && !workspaceKilled && (
             <button
               onClick={() => setKillConfirm("workspace")}
-              className="rounded-md border-2 border-red-600 px-5 py-2 text-sm font-bold text-red-300 hover:bg-red-900/40"
+              className="rounded-md border-2 border-red-600 px-5 py-2 text-sm font-bold text-red-700 hover:bg-red-100/40"
             >
               KILL AUTOPILOT — entire workspace
             </button>
@@ -452,7 +452,7 @@ export default function AutopilotStudio({ projectId, canEdit, isAdmin, initialRu
           {canEdit && projectKilled && (
             <button
               onClick={() => doAction("unkill-project", () => api(`/api/autopilot/kill?projectId=${projectId}&scope=project`, { method: "DELETE" }))}
-              className="rounded-md bg-emerald-700 px-5 py-2 text-sm font-medium text-white hover:bg-emerald-600"
+              className="rounded-md bg-emerald-700 px-5 py-2 text-sm font-medium text-white hover:bg-emerald-700"
             >
               Release project kill switch
             </button>
@@ -460,22 +460,22 @@ export default function AutopilotStudio({ projectId, canEdit, isAdmin, initialRu
           {isAdmin && workspaceKilled && (
             <button
               onClick={() => doAction("unkill-workspace", () => api(`/api/autopilot/kill?projectId=${projectId}&scope=workspace`, { method: "DELETE" }))}
-              className="rounded-md bg-emerald-700 px-5 py-2 text-sm font-medium text-white hover:bg-emerald-600"
+              className="rounded-md bg-emerald-700 px-5 py-2 text-sm font-medium text-white hover:bg-emerald-700"
             >
               Release workspace kill switch
             </button>
           )}
         </div>
         {killConfirm && (
-          <div className="mt-4 rounded-md border border-red-800 bg-red-950/60 p-4">
-            <p className="text-sm font-semibold text-red-200">
+          <div className="mt-4 rounded-md border border-red-200 bg-red-50/60 p-4">
+            <p className="text-sm font-semibold text-red-700">
               Confirm: kill autopilot for the {killConfirm === "workspace" ? "ENTIRE WORKSPACE" : "project"}?
             </p>
             <input
               value={killReason}
               onChange={(e) => setKillReason(e.target.value)}
               placeholder="Reason (optional, shown in the audit log)"
-              className="mt-3 w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-200"
+              className="mt-3 w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-800"
             />
             <div className="mt-3 flex gap-2">
               <button
@@ -487,11 +487,11 @@ export default function AutopilotStudio({ projectId, canEdit, isAdmin, initialRu
                   setKillConfirm(null);
                   setKillReason("");
                 })}
-                className="rounded-md bg-red-700 px-4 py-2 text-sm font-bold text-white hover:bg-red-600"
+                className="rounded-md bg-red-700 px-4 py-2 text-sm font-bold text-white hover:bg-red-700"
               >
                 Confirm kill
               </button>
-              <button onClick={() => setKillConfirm(null)} className="rounded-md border border-zinc-700 px-4 py-2 text-sm text-zinc-300">
+              <button onClick={() => setKillConfirm(null)} className="rounded-md border border-zinc-200 px-4 py-2 text-sm text-zinc-500">
                 Cancel
               </button>
             </div>
@@ -550,25 +550,25 @@ function RuleForm({ projectId, templates, sites, editing, onClose, onSaved }: {
     }
   }
 
-  const inputCls = "w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-200";
+  const inputCls = "w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-800";
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-6" onClick={onClose}>
-      <div className="max-h-[85vh] w-full max-w-xl overflow-auto rounded-lg border border-zinc-700 bg-zinc-950 p-6" onClick={(e) => e.stopPropagation()}>
-        <h2 className="text-lg font-semibold text-zinc-100">{editing ? "Edit rule" : "New autopilot rule"}</h2>
-        {formError && <p className="mt-2 text-sm text-red-400">{formError}</p>}
+      <div className="max-h-[85vh] w-full max-w-xl overflow-auto rounded-lg border border-zinc-200 bg-zinc-50 p-6" onClick={(e) => e.stopPropagation()}>
+        <h2 className="text-lg font-semibold text-zinc-900">{editing ? "Edit rule" : "New autopilot rule"}</h2>
+        {formError && <p className="mt-2 text-sm text-red-600">{formError}</p>}
         <div className="mt-4 flex flex-col gap-4">
-          <label className="text-sm text-zinc-300">
+          <label className="text-sm text-zinc-500">
             Name
             <input value={name} onChange={(e) => setName(e.target.value)} className={`${inputCls} mt-1`} placeholder="Weekly decay refresh" />
           </label>
-          <label className="text-sm text-zinc-300">
+          <label className="text-sm text-zinc-500">
             Content source
             <select value={source} onChange={(e) => setSource(e.target.value)} className={`${inputCls} mt-1`}>
               {Object.entries(SOURCE_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
             </select>
           </label>
           {source === "programmatic_template" && (
-            <label className="text-sm text-zinc-300">
+            <label className="text-sm text-zinc-500">
               Programmatic template
               <select value={templateId} onChange={(e) => setTemplateId(e.target.value)} className={`${inputCls} mt-1`}>
                 <option value="">Select a template…</option>
@@ -577,7 +577,7 @@ function RuleForm({ projectId, templates, sites, editing, onClose, onSaved }: {
             </label>
           )}
           <div className="grid grid-cols-2 gap-4">
-            <label className="text-sm text-zinc-300">
+            <label className="text-sm text-zinc-500">
               Cadence
               <select value={cadence} onChange={(e) => setCadence(e.target.value)} className={`${inputCls} mt-1`}>
                 <option value="manual">Manual only</option>
@@ -585,12 +585,12 @@ function RuleForm({ projectId, templates, sites, editing, onClose, onSaved }: {
                 <option value="weekly">Weekly</option>
               </select>
             </label>
-            <label className="text-sm text-zinc-300">
+            <label className="text-sm text-zinc-500">
               Max items per run
               <input type="number" min={1} max={50} value={maxItems} onChange={(e) => setMaxItems(parseInt(e.target.value, 10) || 1)} className={`${inputCls} mt-1`} />
             </label>
           </div>
-          <label className="text-sm text-zinc-300">
+          <label className="text-sm text-zinc-500">
             Publish target
             <select value={targetKind} onChange={(e) => setTargetKind(e.target.value)} className={`${inputCls} mt-1`}>
               <option value="none">None (queue only)</option>
@@ -601,7 +601,7 @@ function RuleForm({ projectId, templates, sites, editing, onClose, onSaved }: {
             </select>
           </label>
           {["wordpress", "webflow", "marketr-site"].includes(targetKind) && (
-            <label className="text-sm text-zinc-300">
+            <label className="text-sm text-zinc-500">
               Target site
               <select value={siteId} onChange={(e) => setSiteId(e.target.value)} className={`${inputCls} mt-1`}>
                 <option value="">Project default / first site</option>
@@ -609,21 +609,21 @@ function RuleForm({ projectId, templates, sites, editing, onClose, onSaved }: {
               </select>
             </label>
           )}
-          <label className="flex items-start gap-2 text-sm text-zinc-300">
+          <label className="flex items-start gap-2 text-sm text-zinc-500">
             <input type="checkbox" checked={autoApprove} onChange={(e) => setAutoApprove(e.target.checked)} className="mt-1 h-4 w-4" />
             <span>
-              Auto-approve without human review <span className="text-amber-400">(low-risk decay refreshes only; every auto-approval is audit-logged)</span>
+              Auto-approve without human review <span className="text-amber-700">(low-risk decay refreshes only; every auto-approval is audit-logged)</span>
             </span>
           </label>
-          <label className="flex items-center gap-2 text-sm text-zinc-300">
+          <label className="flex items-center gap-2 text-sm text-zinc-500">
             <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} className="h-4 w-4" />
             Enabled
           </label>
           <div className="flex gap-2">
-            <button onClick={save} disabled={saving} className="rounded-md bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-900 hover:bg-white disabled:opacity-50">
+            <button onClick={save} disabled={saving} className="rounded-md bg-orange-600 px-4 py-2 text-sm font-medium text-white hover:bg-orange-700 disabled:opacity-50 active:scale-[0.96] transition-[background-color,transform] duration-150 ease-[cubic-bezier(0.2,0,0,1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2">
               {saving ? "Saving…" : editing ? "Save changes" : "Create rule"}
             </button>
-            <button onClick={onClose} className="rounded-md border border-zinc-700 px-4 py-2 text-sm text-zinc-300">Cancel</button>
+            <button onClick={onClose} className="rounded-md border border-zinc-200 px-4 py-2 text-sm text-zinc-500">Cancel</button>
           </div>
         </div>
       </div>

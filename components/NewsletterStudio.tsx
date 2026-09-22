@@ -59,22 +59,22 @@ const BLOCK_ICONS: Record<EmailBlockType, typeof Type> = {
 };
 
 const BTN_PRIMARY =
-  "inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white " +
-  "transition-[transform,background-color] duration-150 ease-[cubic-bezier(0.2,0,0,1)] hover:bg-indigo-500 active:scale-[0.96] " +
+  "inline-flex items-center gap-1.5 rounded-lg bg-orange-600 px-3 py-1.5 text-sm font-medium text-white " +
+  "transition-[transform,background-color] duration-150 ease-[cubic-bezier(0.2,0,0,1)] hover:bg-orange-700 active:scale-[0.96] " +
   "disabled:opacity-50 disabled:pointer-events-none";
 const BTN_GHOST =
-  "inline-flex items-center gap-1.5 rounded-lg border border-zinc-700 px-3 py-1.5 text-sm text-zinc-300 " +
-  "transition-[transform,background-color] duration-150 ease-[cubic-bezier(0.2,0,0,1)] hover:bg-zinc-800 active:scale-[0.96] " +
+  "inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 px-3 py-1.5 text-sm text-zinc-500 " +
+  "transition-[transform,background-color] duration-150 ease-[cubic-bezier(0.2,0,0,1)] hover:bg-zinc-100 active:scale-[0.96] " +
   "disabled:opacity-50 disabled:pointer-events-none";
 const BTN_DANGER =
-  "inline-flex items-center gap-1.5 rounded-lg border border-red-900 px-3 py-1.5 text-sm text-red-300 " +
-  "transition-[transform,background-color] duration-150 ease-[cubic-bezier(0.2,0,0,1)] hover:bg-red-950 active:scale-[0.96] " +
+  "inline-flex items-center gap-1.5 rounded-lg border border-red-200 px-3 py-1.5 text-sm text-red-700 " +
+  "transition-[transform,background-color] duration-150 ease-[cubic-bezier(0.2,0,0,1)] hover:bg-red-100 active:scale-[0.96] " +
   "disabled:opacity-50 disabled:pointer-events-none";
 const INPUT =
-  "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-1.5 text-sm text-zinc-100 " +
+  "w-full rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-sm text-zinc-900 " +
   "outline-none focus:border-indigo-500 transition-[border-color] duration-150 ease-[cubic-bezier(0.2,0,0,1)]";
-const CARD = "rounded-xl border border-zinc-800 bg-zinc-900";
-const LABEL = "mb-1 block text-xs font-medium text-zinc-400";
+const CARD = "rounded-xl border border-zinc-300 bg-white";
+const LABEL = "mb-1 block text-xs font-medium text-zinc-500";
 
 export interface TemplateRow { id: string; name: string; brandKitId: string | null; isStarter: boolean }
 export interface ListRow { id: string; name: string; doubleOptIn: boolean; subscribedCount: number }
@@ -112,21 +112,21 @@ interface Props {
 
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, string> = {
-    draft: "bg-zinc-800 text-zinc-300",
-    scheduled: "bg-blue-950 text-blue-300",
-    sending: "bg-amber-950 text-amber-300",
-    sent: "bg-emerald-950 text-emerald-300",
-    failed: "bg-red-950 text-red-300",
-    cancelled: "bg-zinc-800 text-zinc-500",
-    verified: "bg-emerald-950 text-emerald-300",
-    pending: "bg-amber-950 text-amber-300",
-    subscribed: "bg-emerald-950 text-emerald-300",
-    unsubscribed: "bg-zinc-800 text-zinc-400",
-    bounced: "bg-red-950 text-red-300",
-    complained: "bg-red-950 text-red-300",
+    draft: "bg-zinc-100 text-zinc-500",
+    scheduled: "bg-blue-50 text-blue-700",
+    sending: "bg-amber-50 text-amber-700",
+    sent: "bg-emerald-50 text-emerald-700",
+    failed: "bg-red-50 text-red-700",
+    cancelled: "bg-zinc-100 text-zinc-500",
+    verified: "bg-emerald-50 text-emerald-700",
+    pending: "bg-amber-50 text-amber-700",
+    subscribed: "bg-emerald-50 text-emerald-700",
+    unsubscribed: "bg-zinc-100 text-zinc-500",
+    bounced: "bg-red-50 text-red-700",
+    complained: "bg-red-50 text-red-700",
   };
   return (
-    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${map[status] ?? "bg-zinc-800 text-zinc-300"}`}>
+    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${map[status] ?? "bg-zinc-100 text-zinc-500"}`}>
       {status}
     </span>
   );
@@ -332,18 +332,18 @@ function Composer({
           {doc.content.map((node, i) => {
             const Icon = BLOCK_ICONS[node.type];
             return (
-              <div key={i} className="rounded-lg border border-zinc-800 bg-zinc-950/60 p-3">
+              <div key={i} className="rounded-lg border border-zinc-200 bg-zinc-50/60 p-3">
                 <div className="mb-2 flex items-center gap-2">
-                  <Icon size={15} strokeWidth={1.5} className="text-zinc-400" />
-                  <span className="text-sm font-medium text-zinc-200">{blockLabel(node.type)}</span>
+                  <Icon size={15} strokeWidth={1.5} className="text-zinc-500" />
+                  <span className="text-sm font-medium text-zinc-800">{blockLabel(node.type)}</span>
                   <span className="ml-auto flex items-center gap-1">
-                    <button className="rounded p-1 text-zinc-500 transition-colors duration-150 hover:text-zinc-200 disabled:opacity-30" disabled={i === 0} onClick={() => moveBlock(i, -1)} aria-label="Move up">
+                    <button className="rounded p-1 text-zinc-500 transition-colors duration-150 hover:text-zinc-800 disabled:opacity-30" disabled={i === 0} onClick={() => moveBlock(i, -1)} aria-label="Move up">
                       <ChevronUp size={15} strokeWidth={1.5} />
                     </button>
-                    <button className="rounded p-1 text-zinc-500 transition-colors duration-150 hover:text-zinc-200 disabled:opacity-30" disabled={i === doc.content.length - 1} onClick={() => moveBlock(i, 1)} aria-label="Move down">
+                    <button className="rounded p-1 text-zinc-500 transition-colors duration-150 hover:text-zinc-800 disabled:opacity-30" disabled={i === doc.content.length - 1} onClick={() => moveBlock(i, 1)} aria-label="Move down">
                       <ChevronDown size={15} strokeWidth={1.5} />
                     </button>
-                    <button className="rounded p-1 text-zinc-500 transition-colors duration-150 hover:text-red-300" onClick={() => deleteBlock(i)} aria-label="Delete block">
+                    <button className="rounded p-1 text-zinc-500 transition-colors duration-150 hover:text-red-700" onClick={() => deleteBlock(i)} aria-label="Delete block">
                       <Trash2 size={15} strokeWidth={1.5} />
                     </button>
                   </span>
@@ -363,7 +363,7 @@ function Composer({
             );
           })}
           {doc.content.length === 0 && (
-            <p className="rounded-lg border border-dashed border-zinc-800 p-6 text-center text-sm text-zinc-500">
+            <p className="rounded-lg border border-dashed border-zinc-200 p-6 text-center text-sm text-zinc-500">
               No blocks yet — add your first block below.
             </p>
           )}
@@ -393,14 +393,14 @@ function Composer({
             <Send size={14} strokeWidth={1.5} />
             Use in broadcast
           </button>
-          {notice && <span className="text-sm text-zinc-400">{notice}</span>}
+          {notice && <span className="text-sm text-zinc-500">{notice}</span>}
         </div>
       </div>
 
       <div className={`${CARD} overflow-hidden`}>
-        <div className="flex items-center gap-2 border-b border-zinc-800 px-5 py-3">
-          <Eye size={15} strokeWidth={1.5} className="text-zinc-400" />
-          <span className="text-sm font-medium text-zinc-200">Live preview</span>
+        <div className="flex items-center gap-2 border-b border-zinc-200 px-5 py-3">
+          <Eye size={15} strokeWidth={1.5} className="text-zinc-500" />
+          <span className="text-sm font-medium text-zinc-800">Live preview</span>
           <span className="ml-auto text-xs text-zinc-500">Rendered server-side with react-email</span>
         </div>
         {previewHtml ? (
@@ -454,19 +454,19 @@ function TemplatesTab({
 
   return (
     <div className={CARD}>
-      <div className="flex items-center border-b border-zinc-800 px-5 py-3">
-        <span className="text-sm font-medium text-zinc-200">Templates</span>
+      <div className="flex items-center border-b border-zinc-200 px-5 py-3">
+        <span className="text-sm font-medium text-zinc-800">Templates</span>
         <button className={`${BTN_GHOST} ml-auto`} onClick={seed} disabled={!canEdit || busy === "seed"}>
           <Plus size={14} strokeWidth={1.5} /> Seed starters
         </button>
       </div>
-      {notice && <p className="border-b border-zinc-800 px-5 py-2 text-sm text-zinc-400">{notice}</p>}
-      <ul className="divide-y divide-zinc-800">
+      {notice && <p className="border-b border-zinc-200 px-5 py-2 text-sm text-zinc-500">{notice}</p>}
+      <ul className="divide-y divide-zinc-200">
         {templates.map((t) => (
           <li key={t.id} className="flex items-center gap-3 px-5 py-3">
             <FileText size={16} strokeWidth={1.5} className="text-zinc-500" />
-            <span className="text-sm text-zinc-200">{t.name}</span>
-            {t.isStarter && <span className="rounded-full bg-zinc-800 px-2 py-0.5 text-xs text-zinc-400">starter</span>}
+            <span className="text-sm text-zinc-800">{t.name}</span>
+            {t.isStarter && <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs text-zinc-500">starter</span>}
             <span className="ml-auto flex gap-2">
               <button className={BTN_GHOST} onClick={() => duplicate(t.id)} disabled={!canEdit || busy === t.id}>
                 Duplicate
@@ -544,28 +544,28 @@ function ListsTab({
   return (
     <div className="grid gap-6 lg:grid-cols-3">
       <div className={`${CARD} h-fit p-5`}>
-        <h3 className="mb-3 text-sm font-medium text-zinc-200">New list</h3>
+        <h3 className="mb-3 text-sm font-medium text-zinc-800">New list</h3>
         <div className="grid gap-3">
           <Field label="Name"><TextInput value={name} onChange={setName} placeholder="Weekly readers" /></Field>
-          <label className="flex cursor-pointer items-center gap-2 text-sm text-zinc-300">
+          <label className="flex cursor-pointer items-center gap-2 text-sm text-zinc-500">
             <input type="checkbox" className="h-4 w-4 accent-indigo-600" checked={doubleOptIn} onChange={(e) => setDoubleOptIn(e.target.checked)} />
             Double opt-in
           </label>
           <button className={BTN_PRIMARY} onClick={create} disabled={!canEdit}>
             <Plus size={14} strokeWidth={1.5} /> Create list
           </button>
-          {notice && <p className="text-sm text-zinc-400">{notice}</p>}
+          {notice && <p className="text-sm text-zinc-500">{notice}</p>}
         </div>
       </div>
       <div className={`${CARD} lg:col-span-2`}>
-        <div className="border-b border-zinc-800 px-5 py-3 text-sm font-medium text-zinc-200">Lists</div>
-        <ul className="divide-y divide-zinc-800">
+        <div className="border-b border-zinc-200 px-5 py-3 text-sm font-medium text-zinc-800">Lists</div>
+        <ul className="divide-y divide-zinc-200">
           {lists.map((l) => (
             <li key={l.id}>
               <div className="flex items-center gap-3 px-5 py-3">
                 <Users size={16} strokeWidth={1.5} className="text-zinc-500" />
-                <span className="text-sm text-zinc-200">{l.name}</span>
-                {l.doubleOptIn && <span className="rounded-full bg-zinc-800 px-2 py-0.5 text-xs text-zinc-400">double opt-in</span>}
+                <span className="text-sm text-zinc-800">{l.name}</span>
+                {l.doubleOptIn && <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs text-zinc-500">double opt-in</span>}
                 <span className="text-xs text-zinc-500">{l.subscribedCount} subscribed</span>
                 <span className="ml-auto flex gap-2">
                   <button
@@ -581,15 +581,15 @@ function ListsTab({
                 </span>
               </div>
               {openList === l.id && (
-                <div className="border-t border-zinc-800 px-5 py-3">
+                <div className="border-t border-zinc-200 px-5 py-3">
                   <input className={`${INPUT} mb-3 max-w-xs`} placeholder="Search subscribers…" value={filter} onChange={(e) => setFilter(e.target.value)} />
-                  <div className="max-h-64 overflow-auto rounded-lg border border-zinc-800">
+                  <div className="max-h-64 overflow-auto rounded-lg border border-zinc-200">
                     <table className="w-full text-sm">
-                      <tbody className="divide-y divide-zinc-800">
+                      <tbody className="divide-y divide-zinc-200">
                         {filtered.map((s) => (
                           <tr key={s.email}>
-                            <td className="px-3 py-1.5 text-zinc-200">{s.email}</td>
-                            <td className="px-3 py-1.5 text-zinc-400">{s.name ?? "—"}</td>
+                            <td className="px-3 py-1.5 text-zinc-800">{s.email}</td>
+                            <td className="px-3 py-1.5 text-zinc-500">{s.name ?? "—"}</td>
                             <td className="px-3 py-1.5 text-right"><StatusBadge status={s.status} /></td>
                           </tr>
                         ))}
@@ -711,10 +711,10 @@ function BroadcastsTab({
   return (
     <div className="grid gap-6 lg:grid-cols-3">
       <div className={`${CARD} h-fit p-5`}>
-        <h3 className="mb-3 text-sm font-medium text-zinc-200">New broadcast</h3>
+        <h3 className="mb-3 text-sm font-medium text-zinc-800">New broadcast</h3>
         <div className="grid gap-3">
           <Field label="Subject"><TextInput value={subject} onChange={setSubject} placeholder="This week's updates" /></Field>
-          <label className="flex cursor-pointer items-center gap-2 text-sm text-zinc-300">
+          <label className="flex cursor-pointer items-center gap-2 text-sm text-zinc-500">
             <input type="checkbox" className="h-4 w-4 accent-indigo-600" checked={useComposer} onChange={(e) => setUseComposer(e.target.checked)} />
             Use current composer content
           </label>
@@ -739,7 +739,7 @@ function BroadcastsTab({
             </select>
           </Field>
           {domains.length > 0 && verifiedDomains.length === 0 && (
-            <p className="flex items-start gap-1.5 text-xs text-amber-300">
+            <p className="flex items-start gap-1.5 text-xs text-amber-700">
               <AlertTriangle size={14} strokeWidth={1.5} className="mt-0.5 shrink-0" />
               No verified domains yet — add and verify one in the Domains tab before sending.
             </p>
@@ -750,20 +750,20 @@ function BroadcastsTab({
           <button className={BTN_PRIMARY} onClick={create} disabled={!canEdit || busy === "create"}>
             <Plus size={14} strokeWidth={1.5} /> {scheduledAt ? "Schedule broadcast" : "Create draft"}
           </button>
-          {notice && <p className="text-sm text-zinc-400">{notice}</p>}
+          {notice && <p className="text-sm text-zinc-500">{notice}</p>}
         </div>
       </div>
 
       <div className={`${CARD} lg:col-span-2`}>
-        <div className="border-b border-zinc-800 px-5 py-3 text-sm font-medium text-zinc-200">Broadcasts</div>
-        <ul className="divide-y divide-zinc-800">
+        <div className="border-b border-zinc-200 px-5 py-3 text-sm font-medium text-zinc-800">Broadcasts</div>
+        <ul className="divide-y divide-zinc-200">
           {broadcasts.map((b) => (
             <li key={b.id} className="px-5 py-3">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="text-sm font-medium text-zinc-100">{b.subject}</span>
+                <span className="text-sm font-medium text-zinc-900">{b.subject}</span>
                 <StatusBadge status={b.status} />
                 <span className="text-xs text-zinc-500">{b.list.name} · {b.domain.domain}</span>
-                {b.testSentAt && <span className="inline-flex items-center gap-1 text-xs text-emerald-400"><Check size={12} strokeWidth={1.5} /> test sent</span>}
+                {b.testSentAt && <span className="inline-flex items-center gap-1 text-xs text-emerald-600"><Check size={12} strokeWidth={1.5} /> test sent</span>}
                 {b.scheduledAt && <span className="inline-flex items-center gap-1 text-xs text-zinc-500"><Clock size={12} strokeWidth={1.5} /> {new Date(b.scheduledAt).toLocaleString()}</span>}
                 <span className="ml-auto flex flex-wrap gap-2">
                   <button className={BTN_GHOST} onClick={() => previewBroadcast(b.id)}>
@@ -784,7 +784,7 @@ function BroadcastsTab({
                   )}
                 </span>
               </div>
-              {b.error && <p className="mt-1 text-xs text-red-300">{b.error}</p>}
+              {b.error && <p className="mt-1 text-xs text-red-700">{b.error}</p>}
               {testFor === b.id && (
                 <div className="mt-2 flex gap-2">
                   <input className={`${INPUT} max-w-xs`} placeholder="you@company.com" value={testEmail} onChange={(e) => setTestEmail(e.target.value)} />
@@ -804,13 +804,13 @@ function BroadcastsTab({
       {preview && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => setPreview(null)}>
           <div
-            className="h-[85vh] w-full max-w-3xl overflow-hidden rounded-xl border border-zinc-700 bg-white"
+            className="h-[85vh] w-full max-w-3xl overflow-hidden rounded-xl border border-zinc-200 bg-white"
             onClick={(e) => e.stopPropagation()}
             style={{ animation: "nl-pop 200ms cubic-bezier(0.2,0,0,1)", transformOrigin: "center" }}
           >
             <div className="flex items-center border-b border-zinc-200 bg-zinc-50 px-4 py-2">
-              <span className="text-sm font-medium text-zinc-700">Broadcast preview</span>
-              <button className="ml-auto rounded-lg px-2 py-1 text-sm text-zinc-600 hover:bg-zinc-200" onClick={() => setPreview(null)}>Close</button>
+              <span className="text-sm font-medium text-zinc-600">Broadcast preview</span>
+              <button className="ml-auto rounded-lg px-2 py-1 text-sm text-zinc-500 hover:bg-zinc-200" onClick={() => setPreview(null)}>Close</button>
             </div>
             <iframe title="Broadcast preview" srcDoc={preview} className="h-full w-full" sandbox="" />
           </div>
@@ -907,7 +907,7 @@ function DomainsTab({
   return (
     <div className="grid gap-6 lg:grid-cols-3">
       <div className={`${CARD} h-fit p-5`}>
-        <h3 className="mb-3 flex items-center gap-2 text-sm font-medium text-zinc-200">
+        <h3 className="mb-3 flex items-center gap-2 text-sm font-medium text-zinc-800">
           <Mail size={15} strokeWidth={1.5} /> Sending settings
         </h3>
         <div className="grid gap-3">
@@ -924,7 +924,7 @@ function DomainsTab({
             Bring your own Resend key — it is stored encrypted. Webhook events update subscriber
             bounces and complaints automatically.
           </p>
-          <hr className="border-zinc-800" />
+          <hr className="border-zinc-200" />
           <Field label="Add sending domain">
             <div className="flex gap-2">
               <TextInput value={newDomain} onChange={setNewDomain} placeholder="news.example.com" />
@@ -933,7 +933,7 @@ function DomainsTab({
               </button>
             </div>
           </Field>
-          {notice && <p className="text-sm text-zinc-400">{notice}</p>}
+          {notice && <p className="text-sm text-zinc-500">{notice}</p>}
         </div>
       </div>
 
@@ -941,8 +941,8 @@ function DomainsTab({
         {domains.map((d) => (
           <div key={d.id} className={`${CARD} p-5`}>
             <div className="mb-3 flex items-center gap-3">
-              <Globe size={16} strokeWidth={1.5} className="text-zinc-400" />
-              <span className="text-sm font-medium text-zinc-100">{d.domain}</span>
+              <Globe size={16} strokeWidth={1.5} className="text-zinc-500" />
+              <span className="text-sm font-medium text-zinc-900">{d.domain}</span>
               <StatusBadge status={d.status} />
               <span className="ml-auto flex gap-2">
                 <button className={BTN_GHOST} onClick={() => verify(d.id)} disabled={!canEdit || busy === d.id}>
@@ -954,10 +954,10 @@ function DomainsTab({
               </span>
             </div>
             <p className="mb-2 text-xs text-zinc-500">Add these DNS records at your DNS provider, then verify:</p>
-            <div className="overflow-x-auto rounded-lg border border-zinc-800">
+            <div className="overflow-x-auto rounded-lg border border-zinc-200">
               <table className="w-full text-xs">
                 <thead>
-                  <tr className="bg-zinc-950 text-left text-zinc-500">
+                  <tr className="bg-zinc-50 text-left text-zinc-500">
                     <th className="px-3 py-2 font-medium">Type</th>
                     <th className="px-3 py-2 font-medium">Name</th>
                     <th className="px-3 py-2 font-medium">Value</th>
@@ -965,16 +965,16 @@ function DomainsTab({
                     <th className="px-3 py-2" />
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-zinc-800">
+                <tbody className="divide-y divide-zinc-200">
                   {d.dnsRecords.map((r, i) => (
                     <tr key={i}>
-                      <td className="px-3 py-2 font-mono text-zinc-300">{r.type}</td>
-                      <td className="px-3 py-2 font-mono text-zinc-300">{r.name}</td>
-                      <td className="max-w-[280px] truncate px-3 py-2 font-mono text-zinc-400" title={r.value}>{r.value}</td>
-                      <td className="px-3 py-2 text-zinc-400">{r.purpose === "dmarc-note" ? "DMARC" : r.purpose.toUpperCase()}</td>
+                      <td className="px-3 py-2 font-mono text-zinc-500">{r.type}</td>
+                      <td className="px-3 py-2 font-mono text-zinc-500">{r.name}</td>
+                      <td className="max-w-[280px] truncate px-3 py-2 font-mono text-zinc-500" title={r.value}>{r.value}</td>
+                      <td className="px-3 py-2 text-zinc-500">{r.purpose === "dmarc-note" ? "DMARC" : r.purpose.toUpperCase()}</td>
                       <td className="px-3 py-2 text-right">
                         <button
-                          className="rounded p-1 text-zinc-500 transition-colors duration-150 hover:text-zinc-200"
+                          className="rounded p-1 text-zinc-500 transition-colors duration-150 hover:text-zinc-800"
                           onClick={() => copy(r.value, `${d.id}-${i}`)}
                           aria-label="Copy record value"
                         >
@@ -1087,15 +1087,15 @@ export default function NewsletterStudio(props: Props) {
     <div>
       <style>{`@keyframes nl-fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
 @keyframes nl-pop { from { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: scale(1); } }`}</style>
-      <div className="mb-6 flex gap-1 overflow-x-auto border-b border-zinc-800">
+      <div className="mb-6 flex gap-1 overflow-x-auto border-b border-zinc-200">
         {TABS.map((t) => (
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
             className={`whitespace-nowrap px-4 py-2.5 text-sm font-medium transition-[color,border-color] duration-150 ease-[cubic-bezier(0.2,0,0,1)] ${
               tab === t.id
-                ? "border-b-2 border-indigo-500 text-zinc-100"
-                : "border-b-2 border-transparent text-zinc-500 hover:text-zinc-300"
+                ? "border-b-2 border-indigo-500 text-zinc-900"
+                : "border-b-2 border-transparent text-zinc-500 hover:text-zinc-600"
             }`}
           >
             {t.label}

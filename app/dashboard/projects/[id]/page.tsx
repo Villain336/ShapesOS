@@ -44,14 +44,14 @@ export default async function ProjectPage({
         <div>
           <Link
             href="/dashboard"
-            className="text-sm text-zinc-500 hover:text-zinc-300"
+            className="text-sm text-zinc-500 hover:text-zinc-600"
           >
             ← Projects
           </Link>
           <h1 className="mt-1 text-2xl font-bold tracking-tight">
             {project.domain}
           </h1>
-          <p className="mt-1 text-sm text-zinc-400">
+          <p className="mt-1 text-sm text-zinc-500">
             {project.keywords.length} keywords saved ·{" "}
             {trackedCount} tracked ·{" "}
             {project.competitors.length} competitor
@@ -68,109 +68,121 @@ export default async function ProjectPage({
       <div className="flex gap-3">
         <Link
           href={`/dashboard/projects/${project.id}/keywords`}
-          className="rounded-md bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-950 hover:bg-white"
+          className="rounded-md bg-orange-600 px-4 py-2 text-sm font-medium text-white hover:bg-orange-700 active:scale-[0.96] transition-[background-color,transform] duration-150 ease-[cubic-bezier(0.2,0,0,1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2"
         >
           Keyword research →
         </Link>
         <Link
           href={`/dashboard/projects/${project.id}/competitors`}
-          className="rounded-md border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-200 hover:border-zinc-500"
+          className="rounded-md border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-800 hover:border-zinc-400"
         >
           Competitor gaps →
         </Link>
         <Link
           href={`/dashboard/projects/${project.id}/content`}
-          className="rounded-md border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-200 hover:border-zinc-500"
+          className="rounded-md border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-800 hover:border-zinc-400"
         >
           Content engine →
         </Link>
         <Link
           href={`/dashboard/projects/${project.id}/rankings`}
-          className="rounded-md border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-200 hover:border-zinc-500"
+          className="rounded-md border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-800 hover:border-zinc-400"
         >
           Rank tracking →
         </Link>
         <Link
           href={`/dashboard/projects/${project.id}/ide`}
-          className="rounded-md border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-200 hover:border-zinc-500"
+          className="rounded-md border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-800 hover:border-zinc-400"
         >
           Site IDE →
         </Link>
         <Link
           href={`/dashboard/projects/${project.id}/sites`}
-          className="rounded-md border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-200 hover:border-zinc-500"
+          className="rounded-md border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-800 hover:border-zinc-400"
         >
           Sites & landing pages →
         </Link>
         <Link
           href={`/dashboard/projects/${project.id}/ai-search`}
-          className="rounded-md border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-200 hover:border-zinc-500"
+          className="rounded-md border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-800 hover:border-zinc-400"
         >
           AI search →
         </Link>
         <Link
           href={`/dashboard/projects/${project.id}/decay`}
-          className="rounded-md border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-200 hover:border-zinc-500"
+          className="rounded-md border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-800 hover:border-zinc-400"
         >
           Content decay →
         </Link>
         <Link
           href={`/dashboard/projects/${project.id}/radar`}
-          className="rounded-md border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-200 hover:border-zinc-500"
+          className="rounded-md border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-800 hover:border-zinc-400"
         >
           Competitor radar →
         </Link>
         <Link
           href={`/dashboard/projects/${project.id}/backlinks`}
-          className="rounded-md border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-200 hover:border-zinc-500"
+          className="rounded-md border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-800 hover:border-zinc-400"
         >
           Backlinks →
         </Link>
         <Link
           href={`/dashboard/projects/${project.id}/internal-links`}
-          className="rounded-md border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-200 hover:border-zinc-500"
+          className="rounded-md border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-800 hover:border-zinc-400"
         >
           Internal links →
         </Link>
         <Link
           href={`/dashboard/projects/${project.id}/local`}
-          className="rounded-md border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-200 hover:border-zinc-500"
+          className="rounded-md border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-800 hover:border-zinc-400"
         >
           Local SEO →
         </Link>
         <Link
           href={`/dashboard/projects/${project.id}/programmatic`}
-          className="rounded-md border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-200 hover:border-zinc-500"
+          className="rounded-md border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-800 hover:border-zinc-400"
         >
           Programmatic SEO →
         </Link>
         <Link
           href={`/dashboard/projects/${project.id}/autopilot`}
-          className="rounded-md border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-200 hover:border-zinc-500"
+          className="rounded-md border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-800 hover:border-zinc-400"
         >
           Content autopilot →
         </Link>
         <Link
+          href={`/dashboard/projects/${project.id}/automations`}
+          className="rounded-md border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-800 hover:border-zinc-400"
+        >
+          Automations →
+        </Link>
+        <Link
+          href={`/dashboard/projects/${project.id}/chat`}
+          className="rounded-md border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-800 hover:border-zinc-400"
+        >
+          Chat →
+        </Link>
+        <Link
           href={`/dashboard/projects/${project.id}/newsletter`}
-          className="rounded-md border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-200 hover:border-zinc-500"
+          className="rounded-md border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-800 hover:border-zinc-400"
         >
           Newsletter →
         </Link>
         <Link
           href={`/dashboard/projects/${project.id}/social`}
-          className="rounded-md border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-200 hover:border-zinc-500"
+          className="rounded-md border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-800 hover:border-zinc-400"
         >
           Social →
         </Link>
         <Link
           href={`/dashboard/projects/${project.id}/ads`}
-          className="rounded-md border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-200 hover:border-zinc-500"
+          className="rounded-md border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-800 hover:border-zinc-400"
         >
           Ad factory →
         </Link>
         <Link
           href={`/dashboard/projects/${project.id}/studio`}
-          className="rounded-md border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-200 hover:border-zinc-500"
+          className="rounded-md border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-800 hover:border-zinc-400"
         >
           Studio →
         </Link>
@@ -183,7 +195,7 @@ export default async function ProjectPage({
           Keyword lists
         </h2>
         {lists.size === 0 ? (
-          <p className="rounded-xl border border-dashed border-zinc-800 p-8 text-center text-sm text-zinc-500">
+          <p className="rounded-xl border border-dashed border-zinc-200 p-8 text-center text-sm text-zinc-500">
             Nothing saved yet. Run keyword research and save winners to a
             list.
           </p>
@@ -192,7 +204,7 @@ export default async function ProjectPage({
             {[...lists.entries()].map(([name, count]) => (
               <li
                 key={name}
-                className="flex items-center justify-between rounded-xl border border-zinc-800 bg-zinc-900/60 px-5 py-3"
+                className="flex items-center justify-between rounded-xl border border-zinc-200 bg-white/60 px-5 py-3"
               >
                 <span className="font-medium">{name}</span>
                 <span className="text-sm text-zinc-500">

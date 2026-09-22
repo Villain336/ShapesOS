@@ -15,8 +15,8 @@ export default async function DashboardLayout({
   if (!user) redirect("/login");
 
   return (
-    <div className="min-h-screen bg-zinc-950 font-sans text-zinc-50">
-      <header className="border-b border-zinc-800">
+    <div className="min-h-screen bg-zinc-50 font-sans text-zinc-900">
+      <header className="border-b border-zinc-200">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <Link href="/dashboard" className="text-lg font-bold tracking-tight">
             Marketr
@@ -24,35 +24,35 @@ export default async function DashboardLayout({
           <div className="flex items-center gap-4">
             <Link
               href="/dashboard/reports"
-              className="text-sm text-zinc-400 hover:text-zinc-200"
+              className="text-sm text-zinc-500 hover:text-zinc-800"
             >
               Reports
             </Link>
             <Link
               href="/dashboard/alerts"
-              className="text-sm text-zinc-400 hover:text-zinc-200"
+              className="text-sm text-zinc-500 hover:text-zinc-800"
             >
               Alerts
             </Link>
             <Link
               href="/dashboard/settings/alerts"
-              className="text-sm text-zinc-400 hover:text-zinc-200"
+              className="text-sm text-zinc-500 hover:text-zinc-800"
             >
               Alert rules
             </Link>
             <Link
               href="/dashboard/settings/brand-kits"
-              className="text-sm text-zinc-400 hover:text-zinc-200"
+              className="text-sm text-zinc-500 hover:text-zinc-800"
             >
               Brand kits
             </Link>
             <Link
               href="/dashboard/settings/members"
-              className="text-sm text-zinc-400 hover:text-zinc-200"
+              className="text-sm text-zinc-500 hover:text-zinc-800"
             >
               Members
             </Link>
-            <span className="text-sm text-zinc-400">
+            <span className="text-sm text-zinc-500">
               {user.email ?? user.name ?? "Signed in"}
             </span>
             <SignOutButton />

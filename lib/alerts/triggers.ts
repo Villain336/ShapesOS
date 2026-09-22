@@ -131,6 +131,14 @@ export const TRIGGERS: TriggerDef[] = [
     live: true, // milestone 17 push: emitted by the programmatic push service.
   },
   {
+    key: "workflow",
+    label: "Workflow event",
+    description: "An automation canvas workflow emits a notification (send_alert action node).",
+    conditionKeys: ["projectIds"],
+    dedupAvailable: true,
+    live: true, // redesign: automation canvas send_alert action.
+  },
+  {
     key: "autopilot_killed",
     label: "Autopilot kill switch engaged",
     description: "The content autopilot kill switch was engaged — scheduled runs stop immediately.",

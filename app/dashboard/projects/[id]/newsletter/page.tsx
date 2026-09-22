@@ -66,11 +66,11 @@ export default async function NewsletterPage({ params }: { params: Promise<{ id:
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <Link href={`/dashboard/projects/${project.id}`} className="text-sm text-zinc-500 hover:text-zinc-300">
+        <Link href={`/dashboard/projects/${project.id}`} className="text-sm text-zinc-500 hover:text-zinc-600">
           ← {project.domain}
         </Link>
         <h1 className="mt-1 text-2xl font-bold tracking-tight">Newsletter</h1>
-        <p className="mt-1 text-sm text-zinc-400">
+        <p className="mt-1 text-sm text-zinc-500">
           Design emails from blocks, grow lists, and send campaigns through Resend.
           {!membership && " (read-only)"}
         </p>

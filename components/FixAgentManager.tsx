@@ -74,10 +74,10 @@ interface FixRun {
 
 const SEVERITY_ORDER = ["critical", "error", "warning", "info"];
 const SEVERITY_COLOR: Record<string, string> = {
-  critical: "text-red-400 border-red-800",
-  error: "text-red-400 border-red-800",
-  warning: "text-amber-400 border-amber-800",
-  info: "text-sky-400 border-sky-800",
+  critical: "text-red-600 border-red-200",
+  error: "text-red-600 border-red-200",
+  warning: "text-amber-700 border-amber-200",
+  info: "text-sky-600 border-sky-200",
 };
 
 const STATUS_LABEL: Record<string, string> = {
@@ -258,11 +258,11 @@ export default function FixAgentManager({ projectId }: { projectId: string }) {
   if (loading) return <div className="text-sm text-zinc-500">Loading fix agent…</div>;
 
   return (
-    <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-5">
+    <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold">Fix agent <span className="text-xs font-normal text-zinc-500">— scheduled rung</span></h2>
-          <p className="mt-1 text-sm text-zinc-400">
+          <p className="mt-1 text-sm text-zinc-500">
             Audit a site, approve the fixes you want, and the agent applies them on schedule.
             Nothing is auto-fixed without your approval — dry-run mode is on by default.
           </p>
@@ -270,7 +270,7 @@ export default function FixAgentManager({ projectId }: { projectId: string }) {
         <select
           value={siteId}
           onChange={(e) => setSiteId(e.target.value)}
-          className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm"
+          className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm"
         >
           {sites.map((s) => (
             <option key={s.id} value={s.id}>{s.name}</option>
@@ -278,8 +278,8 @@ export default function FixAgentManager({ projectId }: { projectId: string }) {
         </select>
       </div>
 
-      {error && <div className="mt-3 rounded-lg border border-red-800 bg-red-950/40 px-3 py-2 text-sm text-red-300">{error}</div>}
-      {notice && <div className="mt-3 rounded-lg border border-emerald-800 bg-emerald-950/40 px-3 py-2 text-sm text-emerald-300">{notice}</div>}
+      {error && <div className="mt-3 rounded-lg border border-red-200 bg-red-50/40 px-3 py-2 text-sm text-red-700">{error}</div>}
+      {notice && <div className="mt-3 rounded-lg border border-emerald-800 bg-emerald-50/40 px-3 py-2 text-sm text-emerald-700">{notice}</div>}
 
       {!sites.length && (
         <p className="mt-3 text-sm text-zinc-500">
@@ -291,7 +291,7 @@ export default function FixAgentManager({ projectId }: { projectId: string }) {
       {siteId && settings && (
         <div className="mt-4 grid gap-4 lg:grid-cols-[320px_1fr]">
           {/* Settings */}
-          <div className="rounded-lg border border-zinc-800 p-4">
+          <div className="rounded-lg border border-zinc-200 p-4">
             <h3 className="text-sm font-semibold">Agent settings</h3>
             <label className="mt-3 flex items-center justify-between text-sm">
               <span>Enabled</span>
@@ -307,7 +307,7 @@ export default function FixAgentManager({ projectId }: { projectId: string }) {
               <span>Max fixes per run</span>
               <input type="number" min={1} max={50} value={settings.maxFixesPerRun} disabled={busy}
                 onChange={(e) => saveSettings({ maxFixesPerRun: parseInt(e.target.value || "10", 10) })}
-                className="w-16 rounded border border-zinc-700 bg-zinc-900 px-2 py-1 text-sm" />
+                className="w-16 rounded border border-zinc-200 bg-white px-2 py-1 text-sm" />
             </label>
             <div className="mt-3">
               <p className="text-sm font-medium">Auto-fixable without asking</p>
@@ -323,7 +323,7 @@ export default function FixAgentManager({ projectId }: { projectId: string }) {
                           : settings.allowedCategories.filter((k) => k !== c.key);
                         saveSettings({ allowedCategories: next });
                       }} />
-                    <span><span className="font-medium text-zinc-200">{c.label}</span>
+                    <span><span className="font-medium text-zinc-800">{c.label}</span>
                       <span className="text-zinc-500"> — {c.description}</span></span>
                   </label>
                 ))}
@@ -336,7 +336,7 @@ export default function FixAgentManager({ projectId }: { projectId: string }) {
               </button>
               <button onClick={runFixes} disabled={busy || !settings.enabled}
                 title={settings.enabled ? "Apply eligible fixes now" : "Enable the agent first"}
-                className="rounded-lg border border-zinc-700 px-3 py-1.5 text-sm disabled:opacity-50">
+                className="rounded-lg border border-zinc-200 px-3 py-1.5 text-sm disabled:opacity-50">
                 {busy ? "Working…" : settings.dryRun ? "Preview fixes (dry-run)" : "Apply fixes now"}
               </button>
             </div>
@@ -351,7 +351,7 @@ export default function FixAgentManager({ projectId }: { projectId: string }) {
           {/* Inbox */}
           <div>
             {grouped.length === 0 && (
-              <p className="rounded-lg border border-zinc-800 p-4 text-sm text-zinc-500">
+              <p className="rounded-lg border border-zinc-200 p-4 text-sm text-zinc-500">
                 No open issues. Run an audit to scan this site.
               </p>
             )}
@@ -362,22 +362,22 @@ export default function FixAgentManager({ projectId }: { projectId: string }) {
                     {g.severity} ({g.items.length})
                   </h4>
                   <button onClick={() => approveAll(g.severity)} disabled={busy}
-                    className="text-xs text-zinc-400 underline hover:text-zinc-200 disabled:opacity-50">
+                    className="text-xs text-zinc-500 underline hover:text-zinc-800 disabled:opacity-50">
                     Approve all {g.severity}
                   </button>
                 </div>
                 <div className="space-y-2">
                   {g.items.map((issue) => (
-                    <div key={issue.id} className={`rounded-lg border bg-zinc-900/60 p-3 ${SEVERITY_COLOR[issue.severity]}`}>
+                    <div key={issue.id} className={`rounded-lg border bg-white/60 p-3 ${SEVERITY_COLOR[issue.severity]}`}>
                       <div className="flex flex-wrap items-start justify-between gap-2">
                         <div className="min-w-0">
-                          <p className="text-sm font-medium text-zinc-100">{issue.detail}</p>
+                          <p className="text-sm font-medium text-zinc-900">{issue.detail}</p>
                           <p className="mt-0.5 font-mono text-xs text-zinc-500">
                             {issue.filePath}{issue.line ? `:${issue.line}` : ""} · {issue.category}
-                            {!issue.autoFixable && <span className="ml-2 rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] text-zinc-400">manual only</span>}
-                            {issue.destructive && <span className="ml-2 rounded bg-red-900/60 px-1.5 py-0.5 text-[10px] text-red-300">destructive</span>}
+                            {!issue.autoFixable && <span className="ml-2 rounded bg-zinc-100 px-1.5 py-0.5 text-[10px] text-zinc-500">manual only</span>}
+                            {issue.destructive && <span className="ml-2 rounded bg-red-100/60 px-1.5 py-0.5 text-[10px] text-red-700">destructive</span>}
                           </p>
-                          {issue.fixHint && <p className="mt-1 text-xs text-zinc-400">{issue.fixHint}</p>}
+                          {issue.fixHint && <p className="mt-1 text-xs text-zinc-500">{issue.fixHint}</p>}
                         </div>
                         <div className="flex shrink-0 items-center gap-2">
                           <span className="text-xs text-zinc-500">{STATUS_LABEL[issue.status] ?? issue.status}</span>
@@ -385,7 +385,7 @@ export default function FixAgentManager({ projectId }: { projectId: string }) {
                             <>
                               {issue.proposedDiff && (
                                 <button onClick={() => setShowPreview(showPreview === issue.id ? null : issue.id)}
-                                  className="rounded border border-zinc-700 px-2 py-1 text-xs">Preview</button>
+                                  className="rounded border border-zinc-200 px-2 py-1 text-xs">Preview</button>
                               )}
                               {issue.status === "open" && (
                                 <button onClick={() => setIssueStatus(issue.id, "approved")} disabled={busy}
@@ -394,7 +394,7 @@ export default function FixAgentManager({ projectId }: { projectId: string }) {
                                 </button>
                               )}
                               <button onClick={() => setIssueStatus(issue.id, "ignored")} disabled={busy}
-                                className="rounded border border-zinc-700 px-2 py-1 text-xs text-zinc-400 disabled:opacity-50">
+                                className="rounded border border-zinc-200 px-2 py-1 text-xs text-zinc-500 disabled:opacity-50">
                                 Ignore
                               </button>
                             </>
@@ -402,7 +402,7 @@ export default function FixAgentManager({ projectId }: { projectId: string }) {
                         </div>
                       </div>
                       {showPreview === issue.id && issue.proposedDiff && (
-                        <pre className="mt-2 max-h-64 overflow-auto rounded bg-zinc-950 p-2 font-mono text-[11px] text-zinc-300">
+                        <pre className="mt-2 max-h-64 overflow-auto rounded bg-zinc-50 p-2 font-mono text-[11px] text-zinc-500">
                           {issue.proposedDiff}
                         </pre>
                       )}
@@ -418,9 +418,9 @@ export default function FixAgentManager({ projectId }: { projectId: string }) {
                 <h4 className="mb-2 text-sm font-semibold">Fix runs</h4>
                 <div className="space-y-2">
                   {runs.map((r) => (
-                    <div key={r.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-zinc-800 p-3 text-sm">
+                    <div key={r.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-zinc-200 p-3 text-sm">
                       <div>
-                        <p className="text-zinc-200">
+                        <p className="text-zinc-800">
                           <span className="font-medium">{r.fixesApplied} fix{r.fixesApplied === 1 ? "" : "es"}</span>
                           <span className="ml-2 text-xs text-zinc-500">{r.status} · {new Date(r.startedAt).toLocaleString()}</span>
                         </p>
@@ -428,7 +428,7 @@ export default function FixAgentManager({ projectId }: { projectId: string }) {
                       </div>
                       {r.snapshotRef && r.status === "completed" && (
                         <button onClick={() => revertRun(r.id)} disabled={busy}
-                          className="rounded border border-red-800 px-2 py-1 text-xs text-red-300 disabled:opacity-50">
+                          className="rounded border border-red-200 px-2 py-1 text-xs text-red-700 disabled:opacity-50">
                           Revert run
                         </button>
                       )}

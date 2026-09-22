@@ -508,65 +508,65 @@ export default function SitesManager({ projectId }: { projectId: string }) {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-zinc-200">Sites</h2>
+        <h2 className="text-sm font-semibold text-zinc-800">Sites</h2>
         <div className="flex gap-2">
           <Link
             href={`/dashboard/projects/${projectId}/sites/new`}
-            className="rounded-md bg-zinc-100 px-3 py-1.5 text-sm font-medium text-zinc-950 hover:bg-white"
+            className="rounded-md bg-orange-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-orange-700 active:scale-[0.96] transition-[background-color,transform] duration-150 ease-[cubic-bezier(0.2,0,0,1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2"
           >
             ＋ AI landing-page builder
           </Link>
           <button
             onClick={() => { setForm(form === "github" ? null : "github"); setError(null); }}
-            className="rounded-md border border-zinc-700 px-3 py-1.5 text-sm text-zinc-200 hover:border-zinc-500"
+            className="rounded-md border border-zinc-200 px-3 py-1.5 text-sm text-zinc-800 hover:border-zinc-400"
           >
             Connect GitHub
           </button>
           <button
             onClick={() => { setForm(form === "upload" ? null : "upload"); setError(null); }}
-            className="rounded-md border border-zinc-700 px-3 py-1.5 text-sm text-zinc-200 hover:border-zinc-500"
+            className="rounded-md border border-zinc-200 px-3 py-1.5 text-sm text-zinc-800 hover:border-zinc-400"
           >
             Upload .zip
           </button>
           <button
             onClick={() => { const n = form === "sftp" ? null : "sftp"; setForm(n); setError(null); if (n === "sftp") void loadConns(); }}
-            className="rounded-md border border-zinc-700 px-3 py-1.5 text-sm text-zinc-200 hover:border-zinc-500"
+            className="rounded-md border border-zinc-200 px-3 py-1.5 text-sm text-zinc-800 hover:border-zinc-400"
           >
             Link SFTP
           </button>
           <button
             onClick={() => { setForm(form === "wordpress" ? null : "wordpress"); setError(null); }}
-            className="rounded-md border border-zinc-700 px-3 py-1.5 text-sm text-zinc-200 hover:border-zinc-500"
+            className="rounded-md border border-zinc-200 px-3 py-1.5 text-sm text-zinc-800 hover:border-zinc-400"
           >
             Connect WordPress
           </button>
           <button
             onClick={() => { setForm(form === "webflow" ? null : "webflow"); setError(null); }}
-            className="rounded-md border border-zinc-700 px-3 py-1.5 text-sm text-zinc-200 hover:border-zinc-500"
+            className="rounded-md border border-zinc-200 px-3 py-1.5 text-sm text-zinc-800 hover:border-zinc-400"
           >
             Connect Webflow
           </button>
         </div>
       </div>
 
-      {error && <p className="text-sm text-red-400">{error}</p>}
+      {error && <p className="text-sm text-red-600">{error}</p>}
 
       {form === "github" && (
-        <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-4">
-          <h3 className="mb-3 text-sm font-semibold text-zinc-200">Connect a GitHub repo</h3>
-          <label className="flex items-center gap-2 text-sm text-zinc-400">
+        <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4">
+          <h3 className="mb-3 text-sm font-semibold text-zinc-800">Connect a GitHub repo</h3>
+          <label className="flex items-center gap-2 text-sm text-zinc-500">
             <input type="checkbox" checked={ghDemo} onChange={(e) => { setGhDemo(e.target.checked); setGhRepos(null); }} />
-            Use demo repo <span className="text-xs text-zinc-600">(mock — no token or network needed)</span>
+            Use demo repo <span className="text-xs text-zinc-500">(mock — no token or network needed)</span>
           </label>
           {!ghDemo && (
-            <label className="mt-3 block text-sm text-zinc-400">
-              Personal access token <span className="text-xs text-zinc-600">(needs repo scope; stored encrypted)</span>
+            <label className="mt-3 block text-sm text-zinc-500">
+              Personal access token <span className="text-xs text-zinc-500">(needs repo scope; stored encrypted)</span>
               <input
                 type="password"
                 value={ghToken}
                 onChange={(e) => setGhToken(e.target.value)}
                 placeholder="ghp_…"
-                className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1.5 font-mono text-sm text-zinc-100"
+                className="mt-1 w-full rounded-md border border-zinc-200 bg-white px-2 py-1.5 font-mono text-sm text-zinc-900"
               />
             </label>
           )}
@@ -574,14 +574,14 @@ export default function SitesManager({ projectId }: { projectId: string }) {
             <button
               onClick={() => void loadGhRepos()}
               disabled={ghReposBusy || (!ghDemo && !ghToken.trim())}
-              className="rounded-md border border-zinc-700 px-3 py-1.5 text-sm text-zinc-200 hover:border-zinc-500 disabled:opacity-50"
+              className="rounded-md border border-zinc-200 px-3 py-1.5 text-sm text-zinc-800 hover:border-zinc-400 disabled:opacity-50"
             >
               {ghReposBusy ? "Loading…" : "List my repos"}
             </button>
           </div>
           {ghRepos && (
             <div className="mt-3 flex flex-col gap-3">
-              <label className="block text-sm text-zinc-400">
+              <label className="block text-sm text-zinc-500">
                 Repository
                 <select
                   value={ghSelected}
@@ -590,7 +590,7 @@ export default function SitesManager({ projectId }: { projectId: string }) {
                     const r = ghRepos.find((x) => x.fullName === e.target.value);
                     if (r) setGhBranch(r.defaultBranch || "main");
                   }}
-                  className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-sm text-zinc-100"
+                  className="mt-1 w-full rounded-md border border-zinc-200 bg-white px-2 py-1.5 text-sm text-zinc-900"
                 >
                   {ghRepos.map((r) => (
                     <option key={r.fullName} value={r.fullName}>
@@ -599,30 +599,30 @@ export default function SitesManager({ projectId }: { projectId: string }) {
                   ))}
                 </select>
               </label>
-              <label className="block text-sm text-zinc-400">
+              <label className="block text-sm text-zinc-500">
                 …or create a new repo
                 <input
                   value={ghNewName}
                   onChange={(e) => setGhNewName(e.target.value)}
                   placeholder="my-new-site (private)"
-                  className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1.5 font-mono text-sm text-zinc-100"
+                  className="mt-1 w-full rounded-md border border-zinc-200 bg-white px-2 py-1.5 font-mono text-sm text-zinc-900"
                 />
               </label>
               <div className="grid grid-cols-2 gap-3">
-                <label className="block text-sm text-zinc-400">
+                <label className="block text-sm text-zinc-500">
                   Branch
-                  <input value={ghBranch} onChange={(e) => setGhBranch(e.target.value)} className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1.5 font-mono text-sm text-zinc-100" />
+                  <input value={ghBranch} onChange={(e) => setGhBranch(e.target.value)} className="mt-1 w-full rounded-md border border-zinc-200 bg-white px-2 py-1.5 font-mono text-sm text-zinc-900" />
                 </label>
-                <label className="block text-sm text-zinc-400">
+                <label className="block text-sm text-zinc-500">
                   Site name
-                  <input value={ghName} onChange={(e) => setGhName(e.target.value)} placeholder="Defaults to repo name" className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-sm text-zinc-100" />
+                  <input value={ghName} onChange={(e) => setGhName(e.target.value)} placeholder="Defaults to repo name" className="mt-1 w-full rounded-md border border-zinc-200 bg-white px-2 py-1.5 text-sm text-zinc-900" />
                 </label>
               </div>
               <div>
                 <button
                   onClick={() => void createGhSite()}
                   disabled={busy}
-                  className="rounded-md bg-zinc-100 px-4 py-1.5 text-sm font-medium text-zinc-950 hover:bg-white disabled:opacity-50"
+                  className="rounded-md bg-orange-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-orange-700 disabled:opacity-50 active:scale-[0.96] transition-[background-color,transform] duration-150 ease-[cubic-bezier(0.2,0,0,1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2"
                 >
                   {busy ? "Connecting…" : "Connect repo"}
                 </button>
@@ -633,27 +633,27 @@ export default function SitesManager({ projectId }: { projectId: string }) {
       )}
 
       {form === "upload" && (
-        <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-4">
-          <h3 className="mb-3 text-sm font-semibold text-zinc-200">Upload a site</h3>
+        <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4">
+          <h3 className="mb-3 text-sm font-semibold text-zinc-800">Upload a site</h3>
           <div className="grid grid-cols-2 gap-3">
-            <label className="block text-sm text-zinc-400">
+            <label className="block text-sm text-zinc-500">
               Site name
-              <input value={upName} onChange={(e) => setUpName(e.target.value)} placeholder="Client landing page" className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-sm text-zinc-100" />
+              <input value={upName} onChange={(e) => setUpName(e.target.value)} placeholder="Client landing page" className="mt-1 w-full rounded-md border border-zinc-200 bg-white px-2 py-1.5 text-sm text-zinc-900" />
             </label>
-            <label className="block text-sm text-zinc-400">
+            <label className="block text-sm text-zinc-500">
               .zip archive or single .html
               <input
                 type="file"
                 accept=".zip,.html,.htm"
                 onChange={(e) => setUpFile(e.target.files?.[0] ?? null)}
-                className="mt-1 w-full text-sm text-zinc-300"
+                className="mt-1 w-full text-sm text-zinc-500"
               />
             </label>
           </div>
           <button
             onClick={() => void createUploadSite()}
             disabled={busy}
-            className="mt-3 rounded-md bg-zinc-100 px-4 py-1.5 text-sm font-medium text-zinc-950 hover:bg-white disabled:opacity-50"
+            className="mt-3 rounded-md bg-orange-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-orange-700 disabled:opacity-50 active:scale-[0.96] transition-[background-color,transform] duration-150 ease-[cubic-bezier(0.2,0,0,1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2"
           >
             {busy ? "Uploading…" : "Upload & create site"}
           </button>
@@ -661,8 +661,8 @@ export default function SitesManager({ projectId }: { projectId: string }) {
       )}
 
       {form === "sftp" && (
-        <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-4">
-          <h3 className="mb-3 text-sm font-semibold text-zinc-200">Link an SFTP connection</h3>
+        <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4">
+          <h3 className="mb-3 text-sm font-semibold text-zinc-800">Link an SFTP connection</h3>
           {conns === null ? (
             <p className="text-sm text-zinc-500">Loading connections…</p>
           ) : conns.length === 0 ? (
@@ -671,23 +671,23 @@ export default function SitesManager({ projectId }: { projectId: string }) {
             </p>
           ) : (
             <div className="flex flex-col gap-3">
-              <label className="block text-sm text-zinc-400">
+              <label className="block text-sm text-zinc-500">
                 Connection
-                <select value={sftpConnId} onChange={(e) => setSftpConnId(e.target.value)} className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-sm text-zinc-100">
+                <select value={sftpConnId} onChange={(e) => setSftpConnId(e.target.value)} className="mt-1 w-full rounded-md border border-zinc-200 bg-white px-2 py-1.5 text-sm text-zinc-900">
                   {conns.map((c) => (
                     <option key={c.id} value={c.id}>{c.label} — {c.host}{c.demo ? " (mock)" : ""}</option>
                   ))}
                 </select>
               </label>
-              <label className="block text-sm text-zinc-400">
+              <label className="block text-sm text-zinc-500">
                 Site name
-                <input value={sftpName} onChange={(e) => setSftpName(e.target.value)} placeholder="Client production" className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-sm text-zinc-100" />
+                <input value={sftpName} onChange={(e) => setSftpName(e.target.value)} placeholder="Client production" className="mt-1 w-full rounded-md border border-zinc-200 bg-white px-2 py-1.5 text-sm text-zinc-900" />
               </label>
               <div>
                 <button
                   onClick={() => void createSftpSite()}
                   disabled={busy}
-                  className="rounded-md bg-zinc-100 px-4 py-1.5 text-sm font-medium text-zinc-950 hover:bg-white disabled:opacity-50"
+                  className="rounded-md bg-orange-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-orange-700 disabled:opacity-50 active:scale-[0.96] transition-[background-color,transform] duration-150 ease-[cubic-bezier(0.2,0,0,1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2"
                 >
                   {busy ? "Linking…" : "Link connection"}
                 </button>
@@ -698,28 +698,28 @@ export default function SitesManager({ projectId }: { projectId: string }) {
       )}
 
       {form === "wordpress" && (
-        <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-4">
-          <h3 className="mb-1 text-sm font-semibold text-zinc-200">Connect WordPress</h3>
+        <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4">
+          <h3 className="mb-1 text-sm font-semibold text-zinc-800">Connect WordPress</h3>
           <p className="mb-3 text-xs text-zinc-500">
             Content-level access via the WP REST API: pages, posts, media. Theme/plugin files are not reachable — the UI labels this honestly.
           </p>
-          <label className="flex items-center gap-2 text-sm text-zinc-400">
+          <label className="flex items-center gap-2 text-sm text-zinc-500">
             <input type="checkbox" checked={wpDemo} onChange={(e) => { setWpDemo(e.target.checked); setWpTest(null); }} />
-            Use demo site <span className="text-xs text-zinc-600">(mock — no credentials or network needed)</span>
+            Use demo site <span className="text-xs text-zinc-500">(mock — no credentials or network needed)</span>
           </label>
           {!wpDemo && (
             <div className="mt-3 grid grid-cols-2 gap-3">
-              <label className="col-span-2 block text-sm text-zinc-400">
+              <label className="col-span-2 block text-sm text-zinc-500">
                 Site URL
-                <input value={wpUrl} onChange={(e) => setWpUrl(e.target.value)} placeholder="https://client.example.com" className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1.5 font-mono text-sm text-zinc-100" />
+                <input value={wpUrl} onChange={(e) => setWpUrl(e.target.value)} placeholder="https://client.example.com" className="mt-1 w-full rounded-md border border-zinc-200 bg-white px-2 py-1.5 font-mono text-sm text-zinc-900" />
               </label>
-              <label className="block text-sm text-zinc-400">
+              <label className="block text-sm text-zinc-500">
                 Username
-                <input value={wpUser} onChange={(e) => setWpUser(e.target.value)} placeholder="admin" className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-sm text-zinc-100" />
+                <input value={wpUser} onChange={(e) => setWpUser(e.target.value)} placeholder="admin" className="mt-1 w-full rounded-md border border-zinc-200 bg-white px-2 py-1.5 text-sm text-zinc-900" />
               </label>
-              <label className="block text-sm text-zinc-400">
-                Application password <span className="text-xs text-zinc-600">(Users → Profile; stored encrypted)</span>
-                <input type="password" value={wpPass} onChange={(e) => setWpPass(e.target.value)} placeholder="xxxx xxxx xxxx xxxx" className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1.5 font-mono text-sm text-zinc-100" />
+              <label className="block text-sm text-zinc-500">
+                Application password <span className="text-xs text-zinc-500">(Users → Profile; stored encrypted)</span>
+                <input type="password" value={wpPass} onChange={(e) => setWpPass(e.target.value)} placeholder="xxxx xxxx xxxx xxxx" className="mt-1 w-full rounded-md border border-zinc-200 bg-white px-2 py-1.5 font-mono text-sm text-zinc-900" />
               </label>
             </div>
           )}
@@ -727,21 +727,21 @@ export default function SitesManager({ projectId }: { projectId: string }) {
             <button
               onClick={() => void testWp()}
               disabled={wpTestBusy}
-              className="rounded-md border border-zinc-700 px-3 py-1.5 text-sm text-zinc-200 hover:border-zinc-500 disabled:opacity-50"
+              className="rounded-md border border-zinc-200 px-3 py-1.5 text-sm text-zinc-800 hover:border-zinc-400 disabled:opacity-50"
             >
               {wpTestBusy ? "Testing…" : "Test connection"}
             </button>
-            {wpTest && <span className="text-xs text-zinc-300">{wpTest}</span>}
+            {wpTest && <span className="text-xs text-zinc-500">{wpTest}</span>}
           </div>
           <div className="mt-3 flex items-end gap-3">
-            <label className="block flex-1 text-sm text-zinc-400">
+            <label className="block flex-1 text-sm text-zinc-500">
               Site name
-              <input value={wpName} onChange={(e) => setWpName(e.target.value)} placeholder="Client WordPress" className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-sm text-zinc-100" />
+              <input value={wpName} onChange={(e) => setWpName(e.target.value)} placeholder="Client WordPress" className="mt-1 w-full rounded-md border border-zinc-200 bg-white px-2 py-1.5 text-sm text-zinc-900" />
             </label>
             <button
               onClick={() => void createWpSite()}
               disabled={busy}
-              className="rounded-md bg-zinc-100 px-4 py-1.5 text-sm font-medium text-zinc-950 hover:bg-white disabled:opacity-50"
+              className="rounded-md bg-orange-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-orange-700 disabled:opacity-50 active:scale-[0.96] transition-[background-color,transform] duration-150 ease-[cubic-bezier(0.2,0,0,1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2"
             >
               {busy ? "Connecting…" : "Connect site"}
             </button>
@@ -750,35 +750,35 @@ export default function SitesManager({ projectId }: { projectId: string }) {
       )}
 
       {form === "webflow" && (
-        <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-4">
-          <h3 className="mb-1 text-sm font-semibold text-zinc-200">Connect Webflow</h3>
+        <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4">
+          <h3 className="mb-1 text-sm font-semibold text-zinc-800">Connect Webflow</h3>
           <p className="mb-3 text-xs text-zinc-500">
             Content-level access via the Webflow API v2: CMS collections, items, and site publishing. Page designs are not API-editable.
           </p>
-          <label className="flex items-center gap-2 text-sm text-zinc-400">
+          <label className="flex items-center gap-2 text-sm text-zinc-500">
             <input type="checkbox" checked={wfDemo} onChange={(e) => { setWfDemo(e.target.checked); setWfTest(null); setWfSites([]); }} />
-            Use demo workspace <span className="text-xs text-zinc-600">(mock — no token or network needed)</span>
+            Use demo workspace <span className="text-xs text-zinc-500">(mock — no token or network needed)</span>
           </label>
           {!wfDemo && (
-            <label className="mt-3 block text-sm text-zinc-400">
-              API token <span className="text-xs text-zinc-600">(site or workspace token; stored encrypted)</span>
-              <input type="password" value={wfToken} onChange={(e) => setWfToken(e.target.value)} placeholder="wf_…" className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1.5 font-mono text-sm text-zinc-100" />
+            <label className="mt-3 block text-sm text-zinc-500">
+              API token <span className="text-xs text-zinc-500">(site or workspace token; stored encrypted)</span>
+              <input type="password" value={wfToken} onChange={(e) => setWfToken(e.target.value)} placeholder="wf_…" className="mt-1 w-full rounded-md border border-zinc-200 bg-white px-2 py-1.5 font-mono text-sm text-zinc-900" />
             </label>
           )}
           <div className="mt-3 flex items-center gap-3">
             <button
               onClick={() => void testWf()}
               disabled={wfTestBusy}
-              className="rounded-md border border-zinc-700 px-3 py-1.5 text-sm text-zinc-200 hover:border-zinc-500 disabled:opacity-50"
+              className="rounded-md border border-zinc-200 px-3 py-1.5 text-sm text-zinc-800 hover:border-zinc-400 disabled:opacity-50"
             >
               {wfTestBusy ? "Testing…" : "Test connection"}
             </button>
-            {wfTest && <span className="text-xs text-zinc-300">{wfTest}</span>}
+            {wfTest && <span className="text-xs text-zinc-500">{wfTest}</span>}
           </div>
           {wfSites.length > 0 && (
-            <label className="mt-3 block text-sm text-zinc-400">
+            <label className="mt-3 block text-sm text-zinc-500">
               Webflow site
-              <select value={wfSiteId} onChange={(e) => setWfSiteId(e.target.value)} className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-sm text-zinc-100">
+              <select value={wfSiteId} onChange={(e) => setWfSiteId(e.target.value)} className="mt-1 w-full rounded-md border border-zinc-200 bg-white px-2 py-1.5 text-sm text-zinc-900">
                 <option value="">— pick a site —</option>
                 {wfSites.map((s) => (
                   <option key={s.id} value={s.id}>{s.name}</option>
@@ -787,14 +787,14 @@ export default function SitesManager({ projectId }: { projectId: string }) {
             </label>
           )}
           <div className="mt-3 flex items-end gap-3">
-            <label className="block flex-1 text-sm text-zinc-400">
+            <label className="block flex-1 text-sm text-zinc-500">
               Site name
-              <input value={wfName} onChange={(e) => setWfName(e.target.value)} placeholder="Client Webflow" className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-sm text-zinc-100" />
+              <input value={wfName} onChange={(e) => setWfName(e.target.value)} placeholder="Client Webflow" className="mt-1 w-full rounded-md border border-zinc-200 bg-white px-2 py-1.5 text-sm text-zinc-900" />
             </label>
             <button
               onClick={() => void createWfSite()}
               disabled={busy}
-              className="rounded-md bg-zinc-100 px-4 py-1.5 text-sm font-medium text-zinc-950 hover:bg-white disabled:opacity-50"
+              className="rounded-md bg-orange-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-orange-700 disabled:opacity-50 active:scale-[0.96] transition-[background-color,transform] duration-150 ease-[cubic-bezier(0.2,0,0,1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2"
             >
               {busy ? "Connecting…" : "Connect site"}
             </button>
@@ -807,11 +807,11 @@ export default function SitesManager({ projectId }: { projectId: string }) {
           const d = deployRes[site.id];
           const isContent = site.sourceType === "wordpress" || site.sourceType === "webflow";
           return (
-            <div key={site.id} className="rounded-lg border border-zinc-800 bg-zinc-950 p-4">
+            <div key={site.id} className="rounded-lg border border-zinc-200 bg-zinc-50 p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <span className="text-sm font-medium text-zinc-100">{site.name}</span>
-                  <span className={`ml-2 rounded px-1.5 py-0.5 text-xs ${site.isMock ? "bg-amber-950 text-amber-200" : "bg-emerald-950 text-emerald-200"}`}>
+                  <span className="text-sm font-medium text-zinc-900">{site.name}</span>
+                  <span className={`ml-2 rounded px-1.5 py-0.5 text-xs ${site.isMock ? "bg-amber-50 text-amber-800" : "bg-emerald-50 text-emerald-800"}`}>
                     {SOURCE_LABEL[site.sourceType]}{site.isMock ? " · mock" : ""}
                   </span>
                   {site.github && (
@@ -830,7 +830,7 @@ export default function SitesManager({ projectId }: { projectId: string }) {
                   {!isContent && (
                     <Link
                       href={`/dashboard/projects/${projectId}/ide?siteId=${site.id}`}
-                      className="rounded border border-zinc-700 px-2 py-1 text-xs text-zinc-200 hover:border-zinc-500"
+                      className="rounded border border-zinc-200 px-2 py-1 text-xs text-zinc-800 hover:border-zinc-400"
                     >
                       Open in IDE
                     </Link>
@@ -839,7 +839,7 @@ export default function SitesManager({ projectId }: { projectId: string }) {
                     <button
                       onClick={() => void syncSite(site)}
                       disabled={!!opBusy[site.id]}
-                      className="rounded border border-zinc-700 px-2 py-1 text-xs text-zinc-300 hover:border-zinc-500 disabled:opacity-50"
+                      className="rounded border border-zinc-200 px-2 py-1 text-xs text-zinc-500 hover:border-zinc-400 disabled:opacity-50"
                     >
                       {opBusy[site.id] === "sync" ? "Syncing…" : "Sync ↓"}
                     </button>
@@ -848,7 +848,7 @@ export default function SitesManager({ projectId }: { projectId: string }) {
                     <button
                       onClick={() => void deploySite(site)}
                       disabled={!!opBusy[site.id]}
-                      className="rounded border border-zinc-700 px-2 py-1 text-xs text-zinc-300 hover:border-zinc-500 disabled:opacity-50"
+                      className="rounded border border-zinc-200 px-2 py-1 text-xs text-zinc-500 hover:border-zinc-400 disabled:opacity-50"
                     >
                       {opBusy[site.id] === "deploy" ? "Deploying…" : "Deploy ↑"}
                     </button>
@@ -858,7 +858,7 @@ export default function SitesManager({ projectId }: { projectId: string }) {
                       onClick={() => openPublishModal(site)}
                       disabled={!sites.some((s) => s.sourceType === "wordpress" || s.sourceType === "webflow")}
                       title="Publish this landing page to WordPress or Webflow"
-                      className="rounded border border-zinc-700 px-2 py-1 text-xs text-zinc-300 hover:border-zinc-500 disabled:opacity-50"
+                      className="rounded border border-zinc-200 px-2 py-1 text-xs text-zinc-500 hover:border-zinc-400 disabled:opacity-50"
                     >
                       Publish to…
                     </button>
@@ -866,14 +866,14 @@ export default function SitesManager({ projectId }: { projectId: string }) {
                   {!isContent && (
                     <a
                       href={`/api/websites/${site.id}/download?projectId=${projectId}`}
-                      className="rounded border border-zinc-700 px-2 py-1 text-xs text-zinc-300 hover:border-zinc-500"
+                      className="rounded border border-zinc-200 px-2 py-1 text-xs text-zinc-500 hover:border-zinc-400"
                     >
                       .zip
                     </a>
                   )}
                   <button
                     onClick={() => void deleteSite(site)}
-                    className="rounded border border-zinc-700 px-2 py-1 text-xs text-red-300 hover:border-red-700"
+                    className="rounded border border-zinc-200 px-2 py-1 text-xs text-red-700 hover:border-red-300"
                   >
                     Delete
                   </button>
@@ -887,14 +887,14 @@ export default function SitesManager({ projectId }: { projectId: string }) {
                   isMock={site.isMock}
                 />
               )}
-              {syncMsg[site.id] && <p className="mt-2 text-xs text-zinc-400">{syncMsg[site.id]}</p>}
+              {syncMsg[site.id] && <p className="mt-2 text-xs text-zinc-500">{syncMsg[site.id]}</p>}
               {d && (
-                <div className="mt-3 rounded-md border border-zinc-800 p-3 text-xs">
+                <div className="mt-3 rounded-md border border-zinc-200 p-3 text-xs">
                   {d.error && !d.ok && d.fileCount === 0 ? (
-                    <p className="text-red-400">✗ {d.error}</p>
+                    <p className="text-red-600">✗ {d.error}</p>
                   ) : (
                     <>
-                      <p className={d.ok ? "text-emerald-300" : "text-amber-300"}>
+                      <p className={d.ok ? "text-emerald-700" : "text-amber-700"}>
                         {d.ok ? "✓ Deployed" : "⚠ Partial deploy"} — {d.fileCount} file(s)
                         {d.commitSha && <span className="ml-2 font-mono">commit {d.commitSha.slice(0, 12)}</span>}
                         {d.mock && <span className="ml-2">(mock)</span>}
@@ -902,10 +902,10 @@ export default function SitesManager({ projectId }: { projectId: string }) {
                           <a href={`${d.downloadUrl}`} className="ml-2 underline">Download .zip</a>
                         )}
                       </p>
-                      {!d.ok && d.error && <p className="mt-1 text-red-400">{d.error}</p>}
+                      {!d.ok && d.error && <p className="mt-1 text-red-600">{d.error}</p>}
                       <ul className="mt-2 max-h-32 overflow-auto font-mono text-zinc-500">
                         {d.perFile.slice(0, 50).map((f) => (
-                          <li key={f.path} className={f.ok ? "" : "text-red-400"}>
+                          <li key={f.path} className={f.ok ? "" : "text-red-600"}>
                             {f.ok ? "✓" : "✗"} {f.path}{f.error ? ` — ${f.error}` : ""}
                           </li>
                         ))}
@@ -927,14 +927,14 @@ export default function SitesManager({ projectId }: { projectId: string }) {
 
       {pubSite && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-          <div className="w-full max-w-lg rounded-lg border border-zinc-800 bg-zinc-950 p-5">
-            <h3 className="text-sm font-semibold text-zinc-200">
+          <div className="w-full max-w-lg rounded-lg border border-zinc-200 bg-zinc-50 p-5">
+            <h3 className="text-sm font-semibold text-zinc-800">
               Publish “{pubSite.name}” to…
             </h3>
             <p className="mt-1 text-xs text-zinc-500">
               The landing page HTML (index.html) becomes a WordPress page or a Webflow CMS item. Content-level publishing — designs are not touched.
             </p>
-            <label className="mt-3 block text-sm text-zinc-400">
+            <label className="mt-3 block text-sm text-zinc-500">
               Target site
               <select
                 value={pubTarget}
@@ -942,7 +942,7 @@ export default function SitesManager({ projectId }: { projectId: string }) {
                   setPubTarget(e.target.value);
                   void loadPubCollections(sites.find((s) => s.id === e.target.value));
                 }}
-                className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-sm text-zinc-100"
+                className="mt-1 w-full rounded-md border border-zinc-200 bg-white px-2 py-1.5 text-sm text-zinc-900"
               >
                 {sites.filter((s) => s.sourceType === "wordpress" || s.sourceType === "webflow").map((s) => (
                   <option key={s.id} value={s.id}>
@@ -952,25 +952,25 @@ export default function SitesManager({ projectId }: { projectId: string }) {
               </select>
             </label>
             <div className="mt-3 grid grid-cols-2 gap-3">
-              <label className="block text-sm text-zinc-400">
+              <label className="block text-sm text-zinc-500">
                 Title
-                <input value={pubTitle} onChange={(e) => setPubTitle(e.target.value)} className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-sm text-zinc-100" />
+                <input value={pubTitle} onChange={(e) => setPubTitle(e.target.value)} className="mt-1 w-full rounded-md border border-zinc-200 bg-white px-2 py-1.5 text-sm text-zinc-900" />
               </label>
-              <label className="block text-sm text-zinc-400">
-                Slug <span className="text-xs text-zinc-600">(auto from title if empty)</span>
-                <input value={pubSlug} onChange={(e) => setPubSlug(e.target.value)} className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1.5 font-mono text-sm text-zinc-100" />
+              <label className="block text-sm text-zinc-500">
+                Slug <span className="text-xs text-zinc-500">(auto from title if empty)</span>
+                <input value={pubSlug} onChange={(e) => setPubSlug(e.target.value)} className="mt-1 w-full rounded-md border border-zinc-200 bg-white px-2 py-1.5 font-mono text-sm text-zinc-900" />
               </label>
-              <label className="block text-sm text-zinc-400">
+              <label className="block text-sm text-zinc-500">
                 Status
-                <select value={pubStatus} onChange={(e) => setPubStatus(e.target.value)} className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-sm text-zinc-100">
+                <select value={pubStatus} onChange={(e) => setPubStatus(e.target.value)} className="mt-1 w-full rounded-md border border-zinc-200 bg-white px-2 py-1.5 text-sm text-zinc-900">
                   <option value="draft">Draft</option>
                   <option value="publish">Publish</option>
                 </select>
               </label>
               {sites.find((s) => s.id === pubTarget)?.sourceType === "webflow" && (
-                <label className="block text-sm text-zinc-400">
+                <label className="block text-sm text-zinc-500">
                   Collection
-                  <select value={pubCollection} onChange={(e) => setPubCollection(e.target.value)} className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-sm text-zinc-100">
+                  <select value={pubCollection} onChange={(e) => setPubCollection(e.target.value)} className="mt-1 w-full rounded-md border border-zinc-200 bg-white px-2 py-1.5 text-sm text-zinc-900">
                     {pubCollections.map((c) => (
                       <option key={c.id} value={c.id}>{c.title}</option>
                     ))}
@@ -980,23 +980,23 @@ export default function SitesManager({ projectId }: { projectId: string }) {
               )}
             </div>
             {sites.find((s) => s.id === pubTarget)?.sourceType === "webflow" && (
-              <label className="mt-3 flex items-center gap-2 text-sm text-zinc-400">
+              <label className="mt-3 flex items-center gap-2 text-sm text-zinc-500">
                 <input type="checkbox" checked={pubPublishSite} onChange={(e) => setPubPublishSite(e.target.checked)} />
                 Publish the Webflow site after creating the item
               </label>
             )}
-            {pubMsg && <p className="mt-3 text-xs text-zinc-300">{pubMsg}</p>}
+            {pubMsg && <p className="mt-3 text-xs text-zinc-500">{pubMsg}</p>}
             <div className="mt-4 flex justify-end gap-2">
               <button
                 onClick={() => setPubSite(null)}
-                className="rounded border border-zinc-700 px-4 py-1.5 text-sm text-zinc-300"
+                className="rounded border border-zinc-200 px-4 py-1.5 text-sm text-zinc-500"
               >
                 Close
               </button>
               <button
                 onClick={() => void runPublish()}
                 disabled={pubBusy || !pubTarget}
-                className="rounded bg-zinc-100 px-4 py-1.5 text-sm font-medium text-zinc-950 hover:bg-white disabled:opacity-50"
+                className="rounded bg-orange-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-orange-700 disabled:opacity-50 active:scale-[0.96] transition-[background-color,transform] duration-150 ease-[cubic-bezier(0.2,0,0,1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2"
               >
                 {pubBusy ? "Publishing…" : "Publish"}
               </button>

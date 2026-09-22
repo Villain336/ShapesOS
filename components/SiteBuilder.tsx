@@ -97,16 +97,16 @@ export default function SiteBuilder({
   return (
     <div className="flex flex-col gap-4">
       <div>
-        <Link href={`/dashboard/projects/${projectId}/sites`} className="text-sm text-zinc-500 hover:text-zinc-300">
+        <Link href={`/dashboard/projects/${projectId}/sites`} className="text-sm text-zinc-500 hover:text-zinc-600">
           ← Sites
         </Link>
         <h1 className="mt-1 text-2xl font-bold tracking-tight">AI landing-page builder</h1>
-        <p className="mt-1 text-sm text-zinc-400">
+        <p className="mt-1 text-sm text-zinc-500">
           Describe the page — the AI writes the full HTML. Preview it, regenerate, then save to a site for editing in the IDE.
         </p>
       </div>
 
-      <div className={`rounded-md border px-3 py-2 text-sm ${llmLive ? "border-emerald-800 bg-emerald-950/40 text-emerald-200" : "border-amber-800 bg-amber-950/40 text-amber-200"}`}>
+      <div className={`rounded-md border px-3 py-2 text-sm ${llmLive ? "border-emerald-800 bg-emerald-50/40 text-emerald-800" : "border-amber-200 bg-amber-50/40 text-amber-800"}`}>
         {llmLive ? (
           <>AI builder: <strong>live</strong> ({llmModel})</>
         ) : (
@@ -114,24 +114,24 @@ export default function SiteBuilder({
         )}
       </div>
 
-      <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-4">
-        <label className="block text-sm text-zinc-400">
+      <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4">
+        <label className="block text-sm text-zinc-500">
           What should this landing page be for?
           <textarea
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
             rows={3}
             placeholder="A landing page for Acme Plumbing's $49 drain-cleaning special in Greensboro — urgent, trustworthy, strong call to action…"
-            className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100"
+            className="mt-1 w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900"
           />
         </label>
         {briefs.length > 0 && (
-          <label className="mt-3 block text-sm text-zinc-400">
-            Ground it in a content brief <span className="text-xs text-zinc-600">(optional — keyword → brief → landing page)</span>
+          <label className="mt-3 block text-sm text-zinc-500">
+            Ground it in a content brief <span className="text-xs text-zinc-500">(optional — keyword → brief → landing page)</span>
             <select
               value={briefId}
               onChange={(e) => setBriefId(e.target.value)}
-              className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-sm text-zinc-100"
+              className="mt-1 w-full rounded-md border border-zinc-200 bg-white px-2 py-1.5 text-sm text-zinc-900"
             >
               <option value="">No brief — just the prompt</option>
               {briefs.map((b) => (
@@ -140,12 +140,12 @@ export default function SiteBuilder({
             </select>
           </label>
         )}
-        {error && <p className="mt-2 text-sm text-red-400">{error}</p>}
+        {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
         <div className="mt-3 flex gap-2">
           <button
             onClick={() => void generate()}
             disabled={generating}
-            className="rounded-md bg-zinc-100 px-4 py-1.5 text-sm font-medium text-zinc-950 hover:bg-white disabled:opacity-50"
+            className="rounded-md bg-orange-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-orange-700 disabled:opacity-50 active:scale-[0.96] transition-[background-color,transform] duration-150 ease-[cubic-bezier(0.2,0,0,1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2"
           >
             {generating ? "Generating…" : html ? "Regenerate" : "Generate page"}
           </button>
@@ -155,12 +155,12 @@ export default function SiteBuilder({
                 value={siteName}
                 onChange={(e) => setSiteName(e.target.value)}
                 placeholder="Site name"
-                className="rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-sm text-zinc-100"
+                className="rounded-md border border-zinc-200 bg-white px-2 py-1.5 text-sm text-zinc-900"
               />
               <button
                 onClick={() => void saveToSite()}
                 disabled={saving}
-                className="rounded-md border border-emerald-700 px-4 py-1.5 text-sm font-medium text-emerald-200 hover:bg-emerald-950 disabled:opacity-50"
+                className="rounded-md border border-emerald-700 px-4 py-1.5 text-sm font-medium text-emerald-800 hover:bg-emerald-100 disabled:opacity-50"
               >
                 {saving ? "Saving…" : "Save to site → edit in IDE"}
               </button>
@@ -170,18 +170,18 @@ export default function SiteBuilder({
       </div>
 
       {html && (
-        <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-4">
+        <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4">
           <div className="mb-2 flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-zinc-200">
-              Preview {isMockHtml && <span className="ml-2 rounded bg-amber-950 px-1.5 py-0.5 text-xs text-amber-200">mock</span>}
+            <h2 className="text-sm font-semibold text-zinc-800">
+              Preview {isMockHtml && <span className="ml-2 rounded bg-amber-50 px-1.5 py-0.5 text-xs text-amber-800">mock</span>}
             </h2>
-            <span className="text-xs text-zinc-600">sandboxed iframe</span>
+            <span className="text-xs text-zinc-500">sandboxed iframe</span>
           </div>
           <iframe
             title="Landing page preview"
             srcDoc={html}
             sandbox="allow-scripts"
-            className="h-[640px] w-full rounded-md border border-zinc-800 bg-white"
+            className="h-[640px] w-full rounded-md border border-zinc-200 bg-white"
           />
         </div>
       )}

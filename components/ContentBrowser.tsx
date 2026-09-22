@@ -179,12 +179,12 @@ export default function ContentBrowser({ projectId, siteId, sourceType, isMock }
   const editorOpen = openId !== null || newItem;
 
   return (
-    <div className="mt-3 rounded-md border border-zinc-800 p-3">
-      <div className="mb-3 rounded-md border border-sky-900 bg-sky-950/40 p-2 text-xs text-sky-200">
+    <div className="mt-3 rounded-md border border-zinc-200 p-3">
+      <div className="mb-3 rounded-md border border-sky-200 bg-sky-50/40 p-2 text-xs text-sky-800">
         {sourceType === "wordpress"
           ? "Content-level access: pages, posts, and media via the WP REST API. Theme/plugin file editing is not available through this connection — use an SFTP site for that."
           : "Content-level access: CMS collections, items, and site publishing via the Webflow API. Page designs are not API-editable — use the Designer for layout changes."}
-        {isMock && <span className="ml-2 rounded bg-amber-900 px-1.5 py-0.5 text-amber-200">mock demo data</span>}
+        {isMock && <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-amber-800">mock demo data</span>}
       </div>
 
       <div className="mb-2 flex items-center gap-2">
@@ -193,7 +193,7 @@ export default function ContentBrowser({ projectId, siteId, sourceType, isMock }
             <button
               key={t}
               onClick={() => { setTab(t); setOpenId(null); setNewItem(false); }}
-              className={`rounded px-2 py-1 text-xs ${tab === t ? "bg-zinc-100 text-zinc-950" : "border border-zinc-700 text-zinc-300"}`}
+              className={`rounded px-2 py-1 text-xs ${tab === t ? "bg-zinc-900 text-white" : "border border-zinc-200 text-zinc-500"}`}
             >
               {t === "page" ? "Pages" : "Posts"}
             </button>
@@ -202,14 +202,14 @@ export default function ContentBrowser({ projectId, siteId, sourceType, isMock }
           <>
             <button
               onClick={() => { setTab("collection"); setOpenId(null); setNewItem(false); }}
-              className={`rounded px-2 py-1 text-xs ${tab === "collection" ? "bg-zinc-100 text-zinc-950" : "border border-zinc-700 text-zinc-300"}`}
+              className={`rounded px-2 py-1 text-xs ${tab === "collection" ? "bg-zinc-900 text-white" : "border border-zinc-200 text-zinc-500"}`}
             >
               Collections
             </button>
             <button
               onClick={() => void publishSite()}
               disabled={publishBusy}
-              className="rounded border border-zinc-700 px-2 py-1 text-xs text-zinc-300 hover:border-zinc-500 disabled:opacity-50"
+              className="rounded border border-zinc-200 px-2 py-1 text-xs text-zinc-500 hover:border-zinc-400 disabled:opacity-50"
             >
               {publishBusy ? "Publishing…" : "Publish site"}
             </button>
@@ -218,35 +218,35 @@ export default function ContentBrowser({ projectId, siteId, sourceType, isMock }
         {(!isItemTab) && (
           <button
             onClick={startNew}
-            className="ml-auto rounded border border-zinc-700 px-2 py-1 text-xs text-zinc-200 hover:border-zinc-500"
+            className="ml-auto rounded border border-zinc-200 px-2 py-1 text-xs text-zinc-800 hover:border-zinc-400"
           >
             ＋ New {sourceType === "wordpress" ? (tab === "page" ? "page" : "post") : tab === "collection" ? "item" : "item"}
           </button>
         )}
       </div>
 
-      {error && <p className="mb-2 text-xs text-red-400">{error}</p>}
-      {msg && <p className="mb-2 text-xs text-emerald-300">{msg}</p>}
+      {error && <p className="mb-2 text-xs text-red-600">{error}</p>}
+      {msg && <p className="mb-2 text-xs text-emerald-700">{msg}</p>}
 
       {loading ? (
         <p className="text-xs text-zinc-500">Loading…</p>
       ) : (
         <ul className="flex flex-col gap-1">
           {items.map((item) => (
-            <li key={item.id} className="flex items-center justify-between rounded border border-zinc-800 px-2 py-1.5 text-xs">
+            <li key={item.id} className="flex items-center justify-between rounded border border-zinc-200 px-2 py-1.5 text-xs">
               <button
                 onClick={() => (item.kind === "collection" ? setTab(item.id) : void openItem(item))}
-                className="text-left text-zinc-200 hover:underline"
+                className="text-left text-zinc-800 hover:underline"
               >
                 {item.title}
                 <span className="ml-2 font-mono text-zinc-500">/{item.slug}</span>
-                <span className={`ml-2 rounded px-1 py-0.5 ${item.status === "publish" || item.status === "published" ? "bg-emerald-950 text-emerald-300" : "bg-zinc-800 text-zinc-400"}`}>
+                <span className={`ml-2 rounded px-1 py-0.5 ${item.status === "publish" || item.status === "published" ? "bg-emerald-50 text-emerald-700" : "bg-zinc-100 text-zinc-500"}`}>
                   {item.status}
                 </span>
                 {item.kind === "collection" && <span className="ml-2 text-zinc-500">→ browse items</span>}
               </button>
               {item.kind !== "collection" && (
-                <button onClick={() => void remove(item)} className="text-red-300 hover:text-red-200">
+                <button onClick={() => void remove(item)} className="text-red-700 hover:text-red-700">
                   Delete
                 </button>
               )}
@@ -257,28 +257,28 @@ export default function ContentBrowser({ projectId, siteId, sourceType, isMock }
       )}
 
       {isItemTab && (
-        <button onClick={() => { setTab("collection"); setOpenId(null); setNewItem(false); }} className="mt-2 text-xs text-zinc-400 hover:text-zinc-200">
+        <button onClick={() => { setTab("collection"); setOpenId(null); setNewItem(false); }} className="mt-2 text-xs text-zinc-500 hover:text-zinc-800">
           ← Back to collections
         </button>
       )}
 
       {editorOpen && (
-        <div className="mt-3 rounded-md border border-zinc-700 p-3">
-          <h4 className="mb-2 text-xs font-semibold text-zinc-200">
+        <div className="mt-3 rounded-md border border-zinc-200 p-3">
+          <h4 className="mb-2 text-xs font-semibold text-zinc-800">
             {newItem ? "New item" : "Edit"} {sourceType === "webflow" && "(fieldData JSON)"}
           </h4>
           <div className="grid grid-cols-3 gap-2">
-            <label className="block text-xs text-zinc-400">
+            <label className="block text-xs text-zinc-500">
               Title
-              <input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} className="mt-1 w-full rounded border border-zinc-700 bg-zinc-900 px-2 py-1 text-xs text-zinc-100" />
+              <input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} className="mt-1 w-full rounded border border-zinc-200 bg-white px-2 py-1 text-xs text-zinc-900" />
             </label>
-            <label className="block text-xs text-zinc-400">
+            <label className="block text-xs text-zinc-500">
               Slug
-              <input value={editSlug} onChange={(e) => setEditSlug(e.target.value)} className="mt-1 w-full rounded border border-zinc-700 bg-zinc-900 px-2 py-1 font-mono text-xs text-zinc-100" />
+              <input value={editSlug} onChange={(e) => setEditSlug(e.target.value)} className="mt-1 w-full rounded border border-zinc-200 bg-white px-2 py-1 font-mono text-xs text-zinc-900" />
             </label>
-            <label className="block text-xs text-zinc-400">
+            <label className="block text-xs text-zinc-500">
               Status
-              <select value={editStatus} onChange={(e) => setEditStatus(e.target.value)} className="mt-1 w-full rounded border border-zinc-700 bg-zinc-900 px-2 py-1 text-xs text-zinc-100">
+              <select value={editStatus} onChange={(e) => setEditStatus(e.target.value)} className="mt-1 w-full rounded border border-zinc-200 bg-white px-2 py-1 text-xs text-zinc-900">
                 <option value="draft">Draft</option>
                 <option value="publish">Publish</option>
               </select>
@@ -289,27 +289,27 @@ export default function ContentBrowser({ projectId, siteId, sourceType, isMock }
               Collection: <span className="font-mono">{collectionId}</span>
             </p>
           )}
-          <label className="mt-2 block text-xs text-zinc-400">
+          <label className="mt-2 block text-xs text-zinc-500">
             {sourceType === "wordpress" ? "Content (HTML)" : "fieldData (JSON)"}
             <textarea
               value={editContent}
               onChange={(e) => setEditContent(e.target.value)}
               rows={10}
               spellCheck={false}
-              className="mt-1 w-full rounded border border-zinc-700 bg-zinc-900 px-2 py-1 font-mono text-xs text-zinc-100"
+              className="mt-1 w-full rounded border border-zinc-200 bg-white px-2 py-1 font-mono text-xs text-zinc-900"
             />
           </label>
           <div className="mt-2 flex gap-2">
             <button
               onClick={() => void save()}
               disabled={editBusy}
-              className="rounded bg-zinc-100 px-3 py-1 text-xs font-medium text-zinc-950 hover:bg-white disabled:opacity-50"
+              className="rounded bg-orange-600 px-3 py-1 text-xs font-medium text-white hover:bg-orange-700 disabled:opacity-50 active:scale-[0.96] transition-[background-color,transform] duration-150 ease-[cubic-bezier(0.2,0,0,1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2"
             >
               {editBusy ? "Saving…" : "Save"}
             </button>
             <button
               onClick={() => { setOpenId(null); setNewItem(false); }}
-              className="rounded border border-zinc-700 px-3 py-1 text-xs text-zinc-300"
+              className="rounded border border-zinc-200 px-3 py-1 text-xs text-zinc-500"
             >
               Close
             </button>

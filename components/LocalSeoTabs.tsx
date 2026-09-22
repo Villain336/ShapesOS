@@ -113,12 +113,12 @@ interface Props {
 }
 
 const inputCls =
-  "w-full rounded-md border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:border-zinc-500 focus:outline-none";
+  "w-full rounded-md border border-zinc-200 bg-zinc-100 px-3 py-2 text-sm text-zinc-900 placeholder-zinc-500 focus:border-orange-500 focus:outline-none";
 const btnPrimary =
-  "rounded-md bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-950 hover:bg-white disabled:opacity-50";
+  "rounded-md bg-orange-600 px-4 py-2 text-sm font-medium text-white hover:bg-orange-700 disabled:opacity-50 active:scale-[0.96] transition-[background-color,transform] duration-150 ease-[cubic-bezier(0.2,0,0,1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2";
 const btnSecondary =
-  "rounded-md border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-200 hover:border-zinc-500 disabled:opacity-50";
-const cardCls = "rounded-lg border border-zinc-800 bg-zinc-900 p-4";
+  "rounded-md border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-800 hover:border-zinc-400 disabled:opacity-50";
+const cardCls = "rounded-lg border border-zinc-300 bg-white p-4";
 
 function fmtUsd(n: number): string {
   return `$${n.toFixed(n < 1 ? 4 : 2)}`;
@@ -132,7 +132,7 @@ function fmtDate(iso: string | null): string {
 function ErrorBanner({ message }: { message: string | null }) {
   if (!message) return null;
   return (
-    <div className="rounded-md border border-red-500/30 bg-red-500/10 px-4 py-2 text-sm text-red-300">
+    <div className="rounded-md border border-red-200/30 bg-red-500/10 px-4 py-2 text-sm text-red-700">
       {message}
     </div>
   );
@@ -145,7 +145,7 @@ function Modal({ onClose, children }: { onClose: () => void; children: React.Rea
       onClick={onClose}
     >
       <div
-        className="w-full max-w-lg rounded-lg border border-zinc-700 bg-zinc-900 p-6"
+        className="w-full max-w-lg rounded-lg border border-zinc-200 bg-white p-6"
         onClick={(e) => e.stopPropagation()}
       >
         {children}
@@ -155,8 +155,8 @@ function Modal({ onClose, children }: { onClose: () => void; children: React.Rea
 }
 
 function cellColor(position: number | null): string {
-  if (position == null || position > 10) return "bg-red-500/80 hover:bg-red-500";
-  if (position <= 3) return "bg-green-500/80 hover:bg-green-500";
+  if (position == null || position > 10) return "bg-red-500/80 hover:bg-red-600";
+  if (position <= 3) return "bg-green-500/80 hover:bg-green-600";
   return "bg-yellow-500/80 hover:bg-yellow-500";
 }
 
@@ -176,7 +176,7 @@ export function Heatmap({ cells, gridSize }: { cells: GridCellResult[]; gridSize
         <div
           key={c}
           title={tip}
-          className={`aspect-square rounded-sm ${cell ? cellColor(cell.position) : "bg-zinc-800"}`}
+          className={`aspect-square rounded-sm ${cell ? cellColor(cell.position) : "bg-zinc-100"}`}
         />,
       );
     }
@@ -189,7 +189,7 @@ export function Heatmap({ cells, gridSize }: { cells: GridCellResult[]; gridSize
   return (
     <div>
       <div className="flex flex-col gap-1">{rows}</div>
-      <div className="mt-2 flex items-center gap-4 text-xs text-zinc-400">
+      <div className="mt-2 flex items-center gap-4 text-xs text-zinc-500">
         <span className="flex items-center gap-1">
           <span className="inline-block h-3 w-3 rounded-sm bg-green-500/80" /> Top 3
         </span>
@@ -371,9 +371,9 @@ function GridsPanel({ projectId, canEdit, initialGrids, spend }: Pick<Props, "pr
     <div className="flex flex-col gap-4">
       <ErrorBanner message={error} />
       <div className="flex items-center justify-between">
-        <p className="text-sm text-zinc-400">
+        <p className="text-sm text-zinc-500">
           Maps SERP position sampled at each cell around a center point. Spend this month:{" "}
-          <span className="text-zinc-200">{fmtUsd(spend.usedUsd)} / {fmtUsd(spend.capUsd)}</span>
+          <span className="text-zinc-800">{fmtUsd(spend.usedUsd)} / {fmtUsd(spend.capUsd)}</span>
         </p>
         {canEdit && (
           <button className={btnSecondary} onClick={() => setShowCreate((s) => !s)}>
@@ -399,7 +399,7 @@ function GridsPanel({ projectId, canEdit, initialGrids, spend }: Pick<Props, "pr
           </div>
           <div className="md:col-span-3 flex items-center justify-between">
             <p className="text-xs text-zinc-500">
-              Estimated cost per run: <span className="text-zinc-300">{fmtUsd(estimateGridRunCost(newGridCells))}</span> ({newGridCells} cells)
+              Estimated cost per run: <span className="text-zinc-500">{fmtUsd(estimateGridRunCost(newGridCells))}</span> ({newGridCells} cells)
             </p>
             <button type="submit" className={btnPrimary} disabled={creating}>
               {creating ? "Creating…" : "Create grid"}
@@ -409,7 +409,7 @@ function GridsPanel({ projectId, canEdit, initialGrids, spend }: Pick<Props, "pr
       )}
 
       {grids.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-zinc-800 p-8 text-center text-sm text-zinc-500">
+        <div className="rounded-lg border border-dashed border-zinc-200 p-8 text-center text-sm text-zinc-500">
           No geo-grids yet. Create one to start sampling Maps positions around your market.
         </div>
       ) : (
@@ -421,14 +421,14 @@ function GridsPanel({ projectId, canEdit, initialGrids, spend }: Pick<Props, "pr
             <div key={grid.id} className={cardCls}>
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <h3 className="text-base font-semibold text-zinc-100">{grid.name}</h3>
-                  <p className="mt-0.5 text-sm text-zinc-400">
+                  <h3 className="text-base font-semibold text-zinc-900">{grid.name}</h3>
+                  <p className="mt-0.5 text-sm text-zinc-500">
                     “{grid.keyword}” · {grid.businessName} · {grid.gridSize}×{grid.gridSize} · {grid.radiusMiles}mi radius ·{" "}
                     {grid.centerLat.toFixed(4)}, {grid.centerLng.toFixed(4)} · {grid.schedule}
                     {grid.enabled ? "" : " · paused"}
                   </p>
                   {grid.latest ? (
-                    <p className="mt-1 text-sm text-zinc-300">
+                    <p className="mt-1 text-sm text-zinc-500">
                       Latest run {fmtDate(grid.latest.runAt)}:{" "}
                       <span className="font-medium">{grid.latest.coveragePct.toFixed(0)}% coverage</span>
                       {grid.latest.avgPosition != null && (
@@ -449,7 +449,7 @@ function GridsPanel({ projectId, canEdit, initialGrids, spend }: Pick<Props, "pr
                       Run now
                     </button>
                     <button
-                      className="rounded-md border border-red-500/40 px-3 py-2 text-sm font-medium text-red-300 hover:border-red-500 disabled:opacity-50"
+                      className="rounded-md border border-red-200/40 px-3 py-2 text-sm font-medium text-red-700 hover:border-red-300 disabled:opacity-50"
                       onClick={() => handleDelete(grid)}
                       disabled={deleting === grid.id}
                     >
@@ -460,20 +460,20 @@ function GridsPanel({ projectId, canEdit, initialGrids, spend }: Pick<Props, "pr
               </div>
 
               {expandedId === grid.id && (
-                <div className="mt-4 border-t border-zinc-800 pt-4">
+                <div className="mt-4 border-t border-zinc-200 pt-4">
                   {loadingDetail === grid.id ? (
                     <p className="text-sm text-zinc-500">Loading results…</p>
                   ) : results && results.length > 0 && selected ? (
                     <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
                       <div>
                         <div className="mb-2 flex items-center justify-between">
-                          <h4 className="text-sm font-medium text-zinc-200">
+                          <h4 className="text-sm font-medium text-zinc-800">
                             Heatmap — {fmtDate(selected.runAt)}
                             {selected.mock && <span className="ml-2 text-xs text-zinc-500">(mock)</span>}
                           </h4>
                           {results.length > 1 && (
                             <select
-                              className="rounded-md border border-zinc-700 bg-zinc-800 px-2 py-1 text-xs text-zinc-200"
+                              className="rounded-md border border-zinc-200 bg-zinc-100 px-2 py-1 text-xs text-zinc-800"
                               onChange={(e) => {
                                 const r = results.find((x) => x.id === e.target.value);
                                 if (r) setDetail((d) => ({ ...d, [grid.id]: [r, ...results.filter((x) => x.id !== r.id)] }));
@@ -493,17 +493,17 @@ function GridsPanel({ projectId, canEdit, initialGrids, spend }: Pick<Props, "pr
                       </div>
                       <div className="flex flex-col gap-3">
                         <div className="grid grid-cols-3 gap-3">
-                          <div className="rounded-md border border-zinc-800 bg-zinc-950 p-3">
+                          <div className="rounded-md border border-zinc-200 bg-zinc-50 p-3">
                             <p className="text-xs uppercase tracking-widest text-zinc-500">Coverage</p>
                             <p className="mt-1 text-xl font-semibold">{selected.coveragePct.toFixed(0)}%</p>
                           </div>
-                          <div className="rounded-md border border-zinc-800 bg-zinc-950 p-3">
+                          <div className="rounded-md border border-zinc-200 bg-zinc-50 p-3">
                             <p className="text-xs uppercase tracking-widest text-zinc-500">Avg position</p>
                             <p className="mt-1 text-xl font-semibold">
                               {selected.avgPosition != null ? `#${selected.avgPosition.toFixed(1)}` : "—"}
                             </p>
                           </div>
-                          <div className="rounded-md border border-zinc-800 bg-zinc-950 p-3">
+                          <div className="rounded-md border border-zinc-200 bg-zinc-50 p-3">
                             <p className="text-xs uppercase tracking-widest text-zinc-500">Run cost</p>
                             <p className="mt-1 text-xl font-semibold">{fmtUsd(selected.costUsd)}</p>
                           </div>
@@ -514,19 +514,19 @@ function GridsPanel({ projectId, canEdit, initialGrids, spend }: Pick<Props, "pr
                             { cells: selected.cells.length, coveragePct: selected.coveragePct, avgPosition: selected.avgPosition },
                           );
                           return (
-                            <div className="rounded-md border border-zinc-800 bg-zinc-950 p-3">
+                            <div className="rounded-md border border-zinc-200 bg-zinc-50 p-3">
                               <p className="text-xs uppercase tracking-widest text-zinc-500">
                                 vs previous run ({fmtDate(prev.runAt)})
                               </p>
-                              <p className="mt-1 text-sm text-zinc-300">
+                              <p className="mt-1 text-sm text-zinc-500">
                                 Coverage{" "}
-                                <span className={delta.coverageDeltaPct >= 0 ? "text-green-300" : "text-red-300"}>
+                                <span className={delta.coverageDeltaPct >= 0 ? "text-green-700" : "text-red-700"}>
                                   {delta.coverageDeltaPct >= 0 ? "+" : ""}{delta.coverageDeltaPct.toFixed(1)}pp
                                 </span>
                                 {delta.avgPositionDelta != null && (
                                   <>
                                     {" "}· Avg position{" "}
-                                    <span className={delta.avgPositionDelta >= 0 ? "text-green-300" : "text-red-300"}>
+                                    <span className={delta.avgPositionDelta >= 0 ? "text-green-700" : "text-red-700"}>
                                       {delta.avgPositionDelta >= 0 ? "▲" : "▼"}{Math.abs(delta.avgPositionDelta).toFixed(1)}
                                     </span>
                                   </>
@@ -537,7 +537,7 @@ function GridsPanel({ projectId, canEdit, initialGrids, spend }: Pick<Props, "pr
                         })()}
                         <div>
                           <p className="mb-1 text-xs uppercase tracking-widest text-zinc-500">Run history</p>
-                          <ul className="flex flex-col gap-1 text-sm text-zinc-400">
+                          <ul className="flex flex-col gap-1 text-sm text-zinc-500">
                             {results.map((r) => (
                               <li key={r.id} className="flex justify-between">
                                 <span>{fmtDate(r.runAt)}{r.mock ? " (mock)" : ""}</span>
@@ -562,12 +562,12 @@ function GridsPanel({ projectId, canEdit, initialGrids, spend }: Pick<Props, "pr
         <Modal onClose={() => !running && setPreview(null)}>
           <h3 className="text-lg font-semibold">Run “{preview.gridName}”?</h3>
           <div className="mt-4 flex flex-col gap-2 text-sm">
-            <div className="flex justify-between"><span className="text-zinc-400">Cells</span><span>{preview.data.cells}</span></div>
-            <div className="flex justify-between"><span className="text-zinc-400">Estimated cost</span><span className="font-medium">{fmtUsd(preview.data.estimatedCostUsd)}{!preview.data.isLive && " (mock — free)"}</span></div>
-            <div className="flex justify-between"><span className="text-zinc-400">Monthly spend</span><span>{fmtUsd(preview.data.spendUsedUsd)} / {fmtUsd(preview.data.spendCapUsd)}</span></div>
-            <div className="flex justify-between"><span className="text-zinc-400">Provider</span><span>{preview.data.providerName}{preview.data.isLive ? "" : " (mock)"}</span></div>
+            <div className="flex justify-between"><span className="text-zinc-500">Cells</span><span>{preview.data.cells}</span></div>
+            <div className="flex justify-between"><span className="text-zinc-500">Estimated cost</span><span className="font-medium">{fmtUsd(preview.data.estimatedCostUsd)}{!preview.data.isLive && " (mock — free)"}</span></div>
+            <div className="flex justify-between"><span className="text-zinc-500">Monthly spend</span><span>{fmtUsd(preview.data.spendUsedUsd)} / {fmtUsd(preview.data.spendCapUsd)}</span></div>
+            <div className="flex justify-between"><span className="text-zinc-500">Provider</span><span>{preview.data.providerName}{preview.data.isLive ? "" : " (mock)"}</span></div>
             {!preview.data.withinCap && (
-              <p className="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-red-300">
+              <p className="rounded-md border border-red-200/30 bg-red-500/10 px-3 py-2 text-red-700">
                 Blocked: {preview.data.blockedReason}
               </p>
             )}
@@ -704,7 +704,7 @@ function CompetitorsPanel({ projectId, canEdit, initialCompetitors, spend }: Pic
     <div className="flex flex-col gap-4">
       <ErrorBanner message={error} />
       <div className="flex items-center justify-between">
-        <p className="text-sm text-zinc-400">
+        <p className="text-sm text-zinc-500">
           Google Business Profile and review intelligence for nearby competitors — no Google approval needed.
           Snapshots refresh weekly automatically.
         </p>
@@ -734,7 +734,7 @@ function CompetitorsPanel({ projectId, canEdit, initialCompetitors, spend }: Pic
       )}
 
       {competitors.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-zinc-800 p-8 text-center text-sm text-zinc-500">
+        <div className="rounded-lg border border-dashed border-zinc-200 p-8 text-center text-sm text-zinc-500">
           No local competitors tracked yet. Add one to start snapshotting its rating and review velocity.
         </div>
       ) : (
@@ -746,7 +746,7 @@ function CompetitorsPanel({ projectId, canEdit, initialCompetitors, spend }: Pic
               <div key={c.id} className={`${cardCls} ${c.enabled ? "" : "opacity-60"}`}>
                 <div className="flex items-start justify-between gap-2">
                   <div>
-                    <h3 className="text-base font-semibold text-zinc-100">{c.businessName}</h3>
+                    <h3 className="text-base font-semibold text-zinc-900">{c.businessName}</h3>
                     <p className="mt-0.5 text-xs text-zinc-500">
                       {c.domain ?? "no domain"}{c.placeId ? ` · ${c.placeId}` : ""}
                       {c.lastSnapshotAt ? ` · snapshot ${fmtDate(c.lastSnapshotAt)}` : " · no snapshot yet"}
@@ -755,7 +755,7 @@ function CompetitorsPanel({ projectId, canEdit, initialCompetitors, spend }: Pic
                   {canEdit && (
                     <div className="flex gap-1">
                       <button
-                        className="rounded-md border border-zinc-700 px-2 py-1 text-xs text-zinc-300 hover:border-zinc-500 disabled:opacity-50"
+                        className="rounded-md border border-zinc-200 px-2 py-1 text-xs text-zinc-500 hover:border-zinc-400 disabled:opacity-50"
                         onClick={() => handleToggle(c)}
                         disabled={toggling === c.id}
                         title={c.enabled ? "Pause snapshots" : "Resume snapshots"}
@@ -763,7 +763,7 @@ function CompetitorsPanel({ projectId, canEdit, initialCompetitors, spend }: Pic
                         {c.enabled ? "Pause" : "Resume"}
                       </button>
                       <button
-                        className="rounded-md border border-red-500/40 px-2 py-1 text-xs text-red-300 hover:border-red-500 disabled:opacity-50"
+                        className="rounded-md border border-red-200/40 px-2 py-1 text-xs text-red-700 hover:border-red-300 disabled:opacity-50"
                         onClick={() => handleDelete(c)}
                         disabled={deleting === c.id}
                       >
@@ -775,10 +775,10 @@ function CompetitorsPanel({ projectId, canEdit, initialCompetitors, spend }: Pic
                 {latest ? (
                   <div className="mt-3">
                     <div className="flex items-baseline gap-4">
-                      <span className="text-2xl font-semibold text-zinc-100">
+                      <span className="text-2xl font-semibold text-zinc-900">
                         {latest.rating != null ? `${latest.rating.toFixed(1)}★` : "—"}
                       </span>
-                      <span className="text-sm text-zinc-400">
+                      <span className="text-sm text-zinc-500">
                         {latest.reviewCount != null ? `${latest.reviewCount} reviews` : "no review count"}
                       </span>
                       {latest.mock && <span className="text-xs text-zinc-500">(mock)</span>}
@@ -790,12 +790,12 @@ function CompetitorsPanel({ projectId, canEdit, initialCompetitors, spend }: Pic
                     {prev && (
                       <div className="mt-2 flex gap-4 text-xs">
                         {latest.rating != null && prev.rating != null && (
-                          <span className={latest.rating - prev.rating >= 0 ? "text-green-300" : "text-red-300"}>
+                          <span className={latest.rating - prev.rating >= 0 ? "text-green-700" : "text-red-700"}>
                             Rating {prev.rating.toFixed(1)} → {latest.rating.toFixed(1)} ({latest.rating - prev.rating >= 0 ? "+" : ""}{(latest.rating - prev.rating).toFixed(1)})
                           </span>
                         )}
                         {latest.reviewCount != null && prev.reviewCount != null && (
-                          <span className={latest.reviewCount - prev.reviewCount >= 0 ? "text-zinc-300" : "text-red-300"}>
+                          <span className={latest.reviewCount - prev.reviewCount >= 0 ? "text-zinc-500" : "text-red-700"}>
                             Reviews {prev.reviewCount} → {latest.reviewCount} ({latest.reviewCount - prev.reviewCount >= 0 ? "+" : ""}{latest.reviewCount - prev.reviewCount})
                           </span>
                         )}
@@ -818,11 +818,11 @@ function CompetitorsPanel({ projectId, canEdit, initialCompetitors, spend }: Pic
           <h3 className="text-lg font-semibold">Refresh competitor snapshots?</h3>
           {refreshResult ? (
             <div className="mt-4 flex flex-col gap-2 text-sm">
-              <div className="flex justify-between"><span className="text-zinc-400">Status</span><span className={refreshResult.status === "completed" ? "text-green-300" : "text-amber-300"}>{refreshResult.status}</span></div>
-              <div className="flex justify-between"><span className="text-zinc-400">Refreshed</span><span>{refreshResult.refreshed} (skipped {refreshResult.skipped})</span></div>
-              <div className="flex justify-between"><span className="text-zinc-400">Alerts emitted</span><span>{refreshResult.alertsEmitted}</span></div>
-              <div className="flex justify-between"><span className="text-zinc-400">Actual cost</span><span>{refreshResult.actualCostUsd != null ? fmtUsd(refreshResult.actualCostUsd) : "—"}</span></div>
-              {refreshResult.note && <p className="text-zinc-400">{refreshResult.note}</p>}
+              <div className="flex justify-between"><span className="text-zinc-500">Status</span><span className={refreshResult.status === "completed" ? "text-green-700" : "text-amber-700"}>{refreshResult.status}</span></div>
+              <div className="flex justify-between"><span className="text-zinc-500">Refreshed</span><span>{refreshResult.refreshed} (skipped {refreshResult.skipped})</span></div>
+              <div className="flex justify-between"><span className="text-zinc-500">Alerts emitted</span><span>{refreshResult.alertsEmitted}</span></div>
+              <div className="flex justify-between"><span className="text-zinc-500">Actual cost</span><span>{refreshResult.actualCostUsd != null ? fmtUsd(refreshResult.actualCostUsd) : "—"}</span></div>
+              {refreshResult.note && <p className="text-zinc-500">{refreshResult.note}</p>}
               <div className="mt-4 flex justify-end">
                 <button className={btnPrimary} onClick={() => { setShowRefresh(false); setRefreshResult(null); }}>Done</button>
               </div>
@@ -830,9 +830,9 @@ function CompetitorsPanel({ projectId, canEdit, initialCompetitors, spend }: Pic
           ) : (
             <>
               <div className="mt-4 flex flex-col gap-2 text-sm">
-                <div className="flex justify-between"><span className="text-zinc-400">Competitors</span><span>{enabledCount} enabled</span></div>
-                <div className="flex justify-between"><span className="text-zinc-400">Estimated cost</span><span className="font-medium">{fmtUsd(refreshEstimate)} (mock — free)</span></div>
-                <div className="flex justify-between"><span className="text-zinc-400">Monthly spend</span><span>{fmtUsd(spend.usedUsd)} / {fmtUsd(spend.capUsd)}</span></div>
+                <div className="flex justify-between"><span className="text-zinc-500">Competitors</span><span>{enabledCount} enabled</span></div>
+                <div className="flex justify-between"><span className="text-zinc-500">Estimated cost</span><span className="font-medium">{fmtUsd(refreshEstimate)} (mock — free)</span></div>
+                <div className="flex justify-between"><span className="text-zinc-500">Monthly spend</span><span>{fmtUsd(spend.usedUsd)} / {fmtUsd(spend.capUsd)}</span></div>
                 <p className="text-xs text-zinc-500">Rating drops and review surges fire alerts through the alert hub.</p>
               </div>
               <div className="mt-6 flex justify-end gap-2">
@@ -854,9 +854,9 @@ function CompetitorsPanel({ projectId, canEdit, initialCompetitors, spend }: Pic
 // ---------------------------------------------------------------------------
 
 const SENTIMENT_STYLE: Record<string, string> = {
-  pos: "bg-green-500/15 text-green-300 border-green-500/30",
-  neu: "bg-zinc-500/15 text-zinc-300 border-zinc-700",
-  neg: "bg-red-500/15 text-red-300 border-red-500/30",
+  pos: "bg-green-500/15 text-green-700 border-green-500/30",
+  neu: "bg-zinc-500/15 text-zinc-500 border-zinc-200",
+  neg: "bg-red-500/15 text-red-700 border-red-200/30",
 };
 
 function ReviewsPanel({ projectId, canEdit, reviewSummary, sentimentCounts, spend }: Pick<Props, "projectId" | "canEdit" | "reviewSummary" | "sentimentCounts" | "spend">) {
@@ -953,7 +953,7 @@ function ReviewsPanel({ projectId, canEdit, reviewSummary, sentimentCounts, spen
     <div className="flex flex-col gap-4">
       <ErrorBanner message={error} />
       <div className="flex items-center justify-between">
-        <p className="text-sm text-zinc-400">
+        <p className="text-sm text-zinc-500">
           Review monitoring with sentiment analysis. New and negative reviews fire alerts through the alert hub.
         </p>
         {canEdit && (
@@ -971,17 +971,17 @@ function ReviewsPanel({ projectId, canEdit, reviewSummary, sentimentCounts, spen
         </div>
         <div className={cardCls}>
           <p className="text-xs uppercase tracking-widest text-zinc-500">Positive</p>
-          <p className="mt-1 text-2xl font-semibold text-green-300">{pos}</p>
+          <p className="mt-1 text-2xl font-semibold text-green-700">{pos}</p>
           <p className="mt-0.5 text-xs text-zinc-500">{total > 0 ? `${Math.round((pos / total) * 100)}%` : "—"} of all reviews</p>
         </div>
         <div className={cardCls}>
           <p className="text-xs uppercase tracking-widest text-zinc-500">Neutral</p>
-          <p className="mt-1 text-2xl font-semibold text-zinc-300">{neu}</p>
+          <p className="mt-1 text-2xl font-semibold text-zinc-500">{neu}</p>
           <p className="mt-0.5 text-xs text-zinc-500">{total > 0 ? `${Math.round((neu / total) * 100)}%` : "—"} of all reviews</p>
         </div>
         <div className={cardCls}>
           <p className="text-xs uppercase tracking-widest text-zinc-500">Negative</p>
-          <p className="mt-1 text-2xl font-semibold text-red-300">{neg}</p>
+          <p className="mt-1 text-2xl font-semibold text-red-700">{neg}</p>
           <p className="mt-0.5 text-xs text-zinc-500">{total > 0 ? `${Math.round((neg / total) * 100)}%` : "—"} of all reviews</p>
         </div>
       </div>
@@ -991,7 +991,7 @@ function ReviewsPanel({ projectId, canEdit, reviewSummary, sentimentCounts, spen
           <p className="mb-2 text-xs uppercase tracking-widest text-zinc-500">Top themes</p>
           <div className="flex flex-wrap gap-2">
             {reviewSummary.topThemes.map((t) => (
-              <span key={t.theme} className="rounded-full border border-zinc-700 bg-zinc-800 px-3 py-1 text-xs text-zinc-300">
+              <span key={t.theme} className="rounded-full border border-zinc-200 bg-zinc-100 px-3 py-1 text-xs text-zinc-500">
                 {t.theme} <span className="text-zinc-500">×{t.count}</span>
               </span>
             ))}
@@ -1039,7 +1039,7 @@ function ReviewsPanel({ projectId, canEdit, reviewSummary, sentimentCounts, spen
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
               <thead>
-                <tr className="border-b border-zinc-800 text-xs uppercase tracking-widest text-zinc-500">
+                <tr className="border-b border-zinc-200 text-xs uppercase tracking-widest text-zinc-500">
                   <th className="py-2 pr-3">Author</th>
                   <th className="py-2 pr-3">Rating</th>
                   <th className="py-2 pr-3">Sentiment</th>
@@ -1050,15 +1050,15 @@ function ReviewsPanel({ projectId, canEdit, reviewSummary, sentimentCounts, spen
               </thead>
               <tbody>
                 {reviews.map((r) => (
-                  <tr key={r.id} className="border-b border-zinc-800/60 align-top">
-                    <td className="py-2 pr-3 text-zinc-200">{r.author ?? "—"}</td>
-                    <td className="py-2 pr-3 whitespace-nowrap text-zinc-200">{r.rating != null ? `${r.rating}★` : "—"}</td>
+                  <tr key={r.id} className="border-b border-zinc-200/60 align-top">
+                    <td className="py-2 pr-3 text-zinc-800">{r.author ?? "—"}</td>
+                    <td className="py-2 pr-3 whitespace-nowrap text-zinc-800">{r.rating != null ? `${r.rating}★` : "—"}</td>
                     <td className="py-2 pr-3">
                       <span className={`rounded-full border px-2 py-0.5 text-xs ${SENTIMENT_STYLE[r.sentiment] ?? SENTIMENT_STYLE.neu}`}>
                         {r.sentiment}
                       </span>
                     </td>
-                    <td className="max-w-md py-2 pr-3 text-zinc-300">
+                    <td className="max-w-md py-2 pr-3 text-zinc-500">
                       {r.text ?? <span className="text-zinc-500">no text</span>}
                       {r.mock && <span className="ml-2 text-xs text-zinc-500">(mock)</span>}
                     </td>
@@ -1068,8 +1068,8 @@ function ReviewsPanel({ projectId, canEdit, reviewSummary, sentimentCounts, spen
                         <button
                           className={`rounded-md border px-2 py-1 text-xs disabled:opacity-50 ${
                             r.responded
-                              ? "border-green-500/40 text-green-300 hover:border-green-500"
-                              : "border-zinc-700 text-zinc-300 hover:border-zinc-500"
+                              ? "border-green-500/40 text-green-700 hover:border-green-300"
+                              : "border-zinc-200 text-zinc-500 hover:border-zinc-400"
                           }`}
                           onClick={() => handleMarkResponded(r)}
                           disabled={updating === r.id}
@@ -1093,11 +1093,11 @@ function ReviewsPanel({ projectId, canEdit, reviewSummary, sentimentCounts, spen
           <h3 className="text-lg font-semibold">Ingest latest reviews?</h3>
           {ingestResult ? (
             <div className="mt-4 flex flex-col gap-2 text-sm">
-              <div className="flex justify-between"><span className="text-zinc-400">Status</span><span className={ingestResult.status === "completed" ? "text-green-300" : "text-amber-300"}>{ingestResult.status}</span></div>
-              <div className="flex justify-between"><span className="text-zinc-400">Fetched</span><span>{ingestResult.fetched} ({ingestResult.newReviews} new)</span></div>
-              <div className="flex justify-between"><span className="text-zinc-400">Alerts emitted</span><span>{ingestResult.alertsEmitted}</span></div>
-              <div className="flex justify-between"><span className="text-zinc-400">Actual cost</span><span>{ingestResult.actualCostUsd != null ? fmtUsd(ingestResult.actualCostUsd) : "—"}</span></div>
-              {ingestResult.note && <p className="text-zinc-400">{ingestResult.note}</p>}
+              <div className="flex justify-between"><span className="text-zinc-500">Status</span><span className={ingestResult.status === "completed" ? "text-green-700" : "text-amber-700"}>{ingestResult.status}</span></div>
+              <div className="flex justify-between"><span className="text-zinc-500">Fetched</span><span>{ingestResult.fetched} ({ingestResult.newReviews} new)</span></div>
+              <div className="flex justify-between"><span className="text-zinc-500">Alerts emitted</span><span>{ingestResult.alertsEmitted}</span></div>
+              <div className="flex justify-between"><span className="text-zinc-500">Actual cost</span><span>{ingestResult.actualCostUsd != null ? fmtUsd(ingestResult.actualCostUsd) : "—"}</span></div>
+              {ingestResult.note && <p className="text-zinc-500">{ingestResult.note}</p>}
               <div className="mt-4 flex justify-end">
                 <button className={btnPrimary} onClick={() => { setShowIngest(false); setIngestResult(null); }}>Done</button>
               </div>
@@ -1105,8 +1105,8 @@ function ReviewsPanel({ projectId, canEdit, reviewSummary, sentimentCounts, spen
           ) : (
             <>
               <div className="mt-4 flex flex-col gap-2 text-sm">
-                <div className="flex justify-between"><span className="text-zinc-400">Estimated cost</span><span className="font-medium">{fmtUsd(ingestEstimate)} (mock — free)</span></div>
-                <div className="flex justify-between"><span className="text-zinc-400">Monthly spend</span><span>{fmtUsd(spend.usedUsd)} / {fmtUsd(spend.capUsd)}</span></div>
+                <div className="flex justify-between"><span className="text-zinc-500">Estimated cost</span><span className="font-medium">{fmtUsd(ingestEstimate)} (mock — free)</span></div>
+                <div className="flex justify-between"><span className="text-zinc-500">Monthly spend</span><span>{fmtUsd(spend.usedUsd)} / {fmtUsd(spend.capUsd)}</span></div>
                 <p className="text-xs text-zinc-500">Pulls your latest Google reviews, classifies sentiment, and alerts on new or negative reviews.</p>
               </div>
               <div className="mt-6 flex justify-end gap-2">
@@ -1139,15 +1139,15 @@ export default function LocalSeoTabs(props: Props) {
   const [tab, setTab] = useState<TabKey>("grids");
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex gap-2 border-b border-zinc-800 pb-2">
+      <div className="flex gap-2 border-b border-zinc-200 pb-2">
         {TABS.map((t) => (
           <button
             key={t.key}
             onClick={() => setTab(t.key)}
             className={`rounded-md px-4 py-2 text-sm font-medium ${
               tab === t.key
-                ? "bg-zinc-800 text-white"
-                : "text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200"
+                ? "bg-zinc-900 text-white"
+                : "text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800"
             }`}
           >
             {t.label}

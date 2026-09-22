@@ -66,7 +66,7 @@ function Delta({ row }: { row: KeywordRow }) {
   const d = prev - curr; // positive = moved up
   if (d === 0)
     return <span className="ml-1 text-xs text-zinc-500">=</span>;
-  const cls = d > 0 ? "text-emerald-400" : "text-red-400";
+  const cls = d > 0 ? "text-emerald-600" : "text-red-600";
   const arrow = d > 0 ? "▲" : "▼";
   return (
     <span className={`ml-1 text-xs ${cls}`}>
@@ -172,8 +172,8 @@ export default function RankingsDashboard({
         <div
           className={`rounded-xl border px-4 py-3 text-sm ${
             provider.isLive
-              ? "border-emerald-900 bg-emerald-950/40 text-emerald-300"
-              : "border-amber-900 bg-amber-950/40 text-amber-300"
+              ? "border-emerald-200 bg-emerald-50/40 text-emerald-700"
+              : "border-amber-200 bg-amber-50/40 text-amber-700"
           }`}
         >
           {provider.isLive ? (
@@ -202,9 +202,9 @@ export default function RankingsDashboard({
               <span className="text-lg text-zinc-500">/100</span>
             </div>
           </div>
-          <div className="text-sm text-zinc-400">
+          <div className="text-sm text-zinc-500">
             <div>
-              <strong className="text-zinc-200">{data?.trackedCount ?? 0}</strong>{" "}
+              <strong className="text-zinc-800">{data?.trackedCount ?? 0}</strong>{" "}
               tracked keywords
             </div>
             <div className="mt-1">
@@ -217,7 +217,7 @@ export default function RankingsDashboard({
         <button
           onClick={runCheck}
           disabled={checking || tracked.length === 0}
-          className="rounded-md bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-950 hover:bg-white disabled:cursor-not-allowed disabled:opacity-40"
+          className="rounded-md bg-orange-600 px-4 py-2 text-sm font-medium text-white hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-40 active:scale-[0.96] transition-[background-color,transform] duration-150 ease-[cubic-bezier(0.2,0,0,1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2"
         >
           {checking ? "Checking…" : "Run rank check"}
         </button>
@@ -229,12 +229,12 @@ export default function RankingsDashboard({
         </p>
       )}
       {error && (
-        <div className="rounded-xl border border-red-900 bg-red-950/40 px-4 py-3 text-sm text-red-300">
+        <div className="rounded-xl border border-red-200 bg-red-50/40 px-4 py-3 text-sm text-red-700">
           {error}
         </div>
       )}
       {checkMsg && (
-        <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 px-4 py-3 text-sm text-zinc-300">
+        <div className="rounded-xl border border-zinc-200 bg-white/60 px-4 py-3 text-sm text-zinc-500">
           {checkMsg}
         </div>
       )}
@@ -249,15 +249,15 @@ export default function RankingsDashboard({
             {data.alerts.map((a, i) => (
               <li
                 key={`${a.keywordId}-${a.kind}-${a.checkedAt}-${i}`}
-                className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border border-zinc-800 bg-zinc-900/60 px-4 py-2.5 text-sm"
+                className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border border-zinc-200 bg-white/60 px-4 py-2.5 text-sm"
               >
                 <span
                   className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
                     a.kind === "entered_top_10" ||
                     a.kind === "big_gain" ||
                     a.kind === "newly_ranking"
-                      ? "bg-emerald-950 text-emerald-300"
-                      : "bg-red-950 text-red-300"
+                      ? "bg-emerald-50 text-emerald-700"
+                      : "bg-red-50 text-red-700"
                   }`}
                 >
                   {ALERT_LABEL[a.kind] ?? a.kind}
@@ -266,7 +266,7 @@ export default function RankingsDashboard({
                 <span className="text-zinc-500">
                   {fmtPos(a.from)} → {fmtPos(a.to)}
                 </span>
-                <span className="ml-auto text-xs text-zinc-600">
+                <span className="ml-auto text-xs text-zinc-500">
                   {new Date(a.checkedAt).toLocaleString()}
                 </span>
               </li>
@@ -281,9 +281,9 @@ export default function RankingsDashboard({
           <h2 className="mb-3 text-sm font-medium uppercase tracking-widest text-zinc-500">
             Tracked positions
           </h2>
-          <div className="overflow-x-auto rounded-xl border border-zinc-800">
+          <div className="overflow-x-auto rounded-xl border border-zinc-200">
             <table className="w-full border-collapse">
-              <thead className="bg-zinc-900/80">
+              <thead className="bg-zinc-100/80">
                 <tr>
                   <th className={th}>Keyword</th>
                   <th className={th}>Position</th>
@@ -294,7 +294,7 @@ export default function RankingsDashboard({
               </thead>
               <tbody>
                 {tracked.map((k) => (
-                  <tr key={k.id} className="border-t border-zinc-800/60">
+                  <tr key={k.id} className="border-t border-zinc-200/60">
                     <td className={td}>
                       <span className="font-medium">{k.phrase}</span>
                     </td>
@@ -307,11 +307,11 @@ export default function RankingsDashboard({
                     <td className={td}>
                       {k.latest ? (
                         k.latest.aiOverviewPresent ? (
-                          <span className="rounded-full bg-violet-950 px-2.5 py-0.5 text-xs text-violet-300">
+                          <span className="rounded-full bg-violet-50 px-2.5 py-0.5 text-xs text-violet-700">
                             Present
                           </span>
                         ) : (
-                          <span className="text-xs text-zinc-600">Absent</span>
+                          <span className="text-xs text-zinc-500">Absent</span>
                         )
                       ) : (
                         "—"
@@ -322,7 +322,7 @@ export default function RankingsDashboard({
                     </td>
                     <td className={`${td} max-w-64 truncate`}>
                       {k.latest?.url ? (
-                        <span className="font-mono text-xs text-zinc-400">
+                        <span className="font-mono text-xs text-zinc-500">
                           {k.latest.url.replace(/^https?:\/\//, "")}
                         </span>
                       ) : (
@@ -334,7 +334,7 @@ export default function RankingsDashboard({
               </tbody>
             </table>
           </div>
-          <p className="mt-2 text-xs text-zinc-600">
+          <p className="mt-2 text-xs text-zinc-500">
             {domain} matched by apex domain or subdomain. "—" means not found in
             the checked depth.
           </p>
@@ -347,7 +347,7 @@ export default function RankingsDashboard({
           Saved keywords — track for ranking
         </h2>
         {(data?.keywords ?? []).length === 0 ? (
-          <p className="rounded-xl border border-dashed border-zinc-800 p-8 text-center text-sm text-zinc-500">
+          <p className="rounded-xl border border-dashed border-zinc-200 p-8 text-center text-sm text-zinc-500">
             No saved keywords yet. Run keyword research or the gap analysis and
             save keywords to a list first.
           </p>
@@ -356,7 +356,7 @@ export default function RankingsDashboard({
             {(data?.keywords ?? []).map((k) => (
               <li
                 key={k.id}
-                className="flex items-center justify-between gap-4 rounded-xl border border-zinc-800 bg-zinc-900/60 px-4 py-2.5"
+                className="flex items-center justify-between gap-4 rounded-xl border border-zinc-200 bg-white/60 px-4 py-2.5"
               >
                 <div className="min-w-0">
                   <div className="truncate text-sm font-medium">{k.phrase}</div>
@@ -371,8 +371,8 @@ export default function RankingsDashboard({
                   disabled={toggling.has(k.id)}
                   className={`shrink-0 rounded-full px-3 py-1 text-xs font-medium ${
                     k.tracked
-                      ? "bg-emerald-950 text-emerald-300"
-                      : "border border-zinc-700 text-zinc-400 hover:border-zinc-500"
+                      ? "bg-emerald-50 text-emerald-700"
+                      : "border border-zinc-200 text-zinc-500 hover:border-zinc-400"
                   } disabled:opacity-40`}
                 >
                   {toggling.has(k.id)

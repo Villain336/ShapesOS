@@ -28,7 +28,7 @@ export default async function CompetitorsPage({
       <div>
         <Link
           href={`/dashboard/projects/${project.id}`}
-          className="text-sm text-zinc-500 hover:text-zinc-300"
+          className="text-sm text-zinc-500 hover:text-zinc-600"
         >
           ← {project.domain}
         </Link>

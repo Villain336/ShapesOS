@@ -9,7 +9,7 @@ import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState, type FormEvent } from "react";
 
 const inputCls =
-  "w-full rounded-md border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-zinc-500 focus:outline-none";
+  "w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-orange-500 focus:outline-none";
 
 interface ProviderInfo {
   id: string;
@@ -70,16 +70,16 @@ function LoginBody() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-950 px-6 font-sans text-zinc-50">
-      <div className="w-full max-w-sm rounded-xl border border-zinc-800 bg-zinc-900/60 p-8">
+    <div className="flex min-h-screen items-center justify-center bg-zinc-50 px-6 font-sans text-zinc-900">
+      <div className="w-full max-w-sm rounded-xl border border-zinc-200 bg-white/60 p-8">
         <h1 className="text-2xl font-bold tracking-tight">Marketr</h1>
-        <p className="mt-1 text-sm text-zinc-400">
+        <p className="mt-1 text-sm text-zinc-500">
           Sign in to your marketing workspace
         </p>
 
         <button
           onClick={() => signIn("google", { callbackUrl: next })}
-          className="mt-6 w-full rounded-md border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm font-medium hover:bg-zinc-700"
+          className="mt-6 w-full rounded-md border border-zinc-200 bg-zinc-100 px-3 py-2 text-sm font-medium hover:bg-zinc-200"
         >
           Continue with Google
         </button>
@@ -88,17 +88,17 @@ function LoginBody() {
           <button
             key={p.id}
             onClick={() => signIn(p.id, { callbackUrl: next })}
-            className="mt-3 w-full rounded-md border border-indigo-700 bg-indigo-950 px-3 py-2 text-sm font-medium text-indigo-100 hover:bg-indigo-900"
+            className="mt-3 w-full rounded-md border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-100"
           >
             Continue with {p.name}
             {p.id === "boxyhq-saml" ? " (SAML SSO)" : ""}
           </button>
         ))}
 
-        <div className="my-5 flex items-center gap-3 text-xs text-zinc-600">
-          <span className="h-px flex-1 bg-zinc-800" />
+        <div className="my-5 flex items-center gap-3 text-xs text-zinc-500">
+          <span className="h-px flex-1 bg-zinc-200" />
           or self-host admin login
-          <span className="h-px flex-1 bg-zinc-800" />
+          <span className="h-px flex-1 bg-zinc-200" />
         </div>
 
         <form onSubmit={onCredentials} className="flex flex-col gap-3">
@@ -118,11 +118,11 @@ function LoginBody() {
             onChange={(e) => setPassword(e.target.value)}
             className={inputCls}
           />
-          {error && <p className="text-sm text-red-400">{error}</p>}
+          {error && <p className="text-sm text-red-600">{error}</p>}
           <button
             type="submit"
             disabled={busy}
-            className="rounded-md bg-zinc-100 px-3 py-2 text-sm font-medium text-zinc-950 hover:bg-white disabled:opacity-50"
+            className="rounded-md bg-orange-600 px-3 py-2 text-sm font-medium text-white hover:bg-orange-700 disabled:opacity-50 active:scale-[0.96] transition-[background-color,transform] duration-150 ease-[cubic-bezier(0.2,0,0,1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2"
           >
             {busy ? "Signing in…" : "Sign in"}
           </button>
@@ -136,7 +136,7 @@ function LoginBody() {
 // suspense boundary for static prerendering (per the local Next.js docs).
 export default function LoginPage() {
   return (
-    <Suspense fallback={<div className="p-8 text-center text-sm text-zinc-400">Loading…</div>}>
+    <Suspense fallback={<div className="p-8 text-center text-sm text-zinc-500">Loading…</div>}>
       <LoginBody />
     </Suspense>
   );

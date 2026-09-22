@@ -44,14 +44,14 @@ export default async function ContentPage({
       <div>
         <Link
           href={`/dashboard/projects/${project.id}`}
-          className="text-sm text-zinc-500 hover:text-zinc-300"
+          className="text-sm text-zinc-500 hover:text-zinc-600"
         >
           ← {project.domain}
         </Link>
         <h1 className="mt-1 text-2xl font-bold tracking-tight">
           Content engine
         </h1>
-        <p className="mt-1 text-sm text-zinc-400">
+        <p className="mt-1 text-sm text-zinc-500">
           Brief → draft → edit → publish.
         </p>
       </div>

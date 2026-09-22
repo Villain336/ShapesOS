@@ -19,7 +19,7 @@ const th =
   "px-3 py-2 text-left text-xs font-medium uppercase tracking-widest text-zinc-500";
 const td = "px-3 py-2 text-sm";
 const inputCls =
-  "rounded-md border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-zinc-500 focus:outline-none";
+  "rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-orange-500 focus:outline-none";
 
 function fmt(n: number | null, digits = 0): string {
   if (n == null) return "—";
@@ -173,8 +173,8 @@ export default function CompetitorGap({ projectId }: { projectId: string }) {
         <div
           className={`rounded-xl border px-4 py-3 text-sm ${
             provider.isLive
-              ? "border-emerald-900 bg-emerald-950/40 text-emerald-300"
-              : "border-amber-900 bg-amber-950/40 text-amber-300"
+              ? "border-emerald-200 bg-emerald-50/40 text-emerald-700"
+              : "border-amber-200 bg-amber-50/40 text-amber-700"
           }`}
         >
           {provider.isLive ? (
@@ -193,7 +193,7 @@ export default function CompetitorGap({ projectId }: { projectId: string }) {
       {/* Add competitor */}
       <form
         onSubmit={onAdd}
-        className="flex flex-col gap-3 rounded-xl border border-zinc-800 bg-zinc-900/60 p-5 sm:flex-row sm:items-end"
+        className="flex flex-col gap-3 rounded-xl border border-zinc-200 bg-white/60 p-5 sm:flex-row sm:items-end"
       >
         <div className="flex-1">
           <label
@@ -213,12 +213,12 @@ export default function CompetitorGap({ projectId }: { projectId: string }) {
         <button
           type="submit"
           disabled={adding}
-          className="rounded-md bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-950 hover:bg-white disabled:opacity-50"
+          className="rounded-md bg-orange-600 px-4 py-2 text-sm font-medium text-white hover:bg-orange-700 disabled:opacity-50 active:scale-[0.96] transition-[background-color,transform] duration-150 ease-[cubic-bezier(0.2,0,0,1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2"
         >
           {adding ? "Adding…" : "Add competitor"}
         </button>
       </form>
-      {error && <p className="text-sm text-red-400">{error}</p>}
+      {error && <p className="text-sm text-red-600">{error}</p>}
 
       {/* Competitor list */}
       <div>
@@ -226,7 +226,7 @@ export default function CompetitorGap({ projectId }: { projectId: string }) {
           Competitors ({competitors.length})
         </h2>
         {competitors.length === 0 ? (
-          <p className="rounded-xl border border-dashed border-zinc-800 p-6 text-center text-sm text-zinc-500">
+          <p className="rounded-xl border border-dashed border-zinc-200 p-6 text-center text-sm text-zinc-500">
             No competitors yet. Add one above to analyze the keyword gap.
           </p>
         ) : (
@@ -236,13 +236,13 @@ export default function CompetitorGap({ projectId }: { projectId: string }) {
                 key={c.id}
                 className={`flex items-center justify-between rounded-xl border px-5 py-3 ${
                   selectedId === c.id
-                    ? "border-zinc-500 bg-zinc-900"
-                    : "border-zinc-800 bg-zinc-900/60"
+                    ? "border-zinc-400 bg-white"
+                    : "border-zinc-200 bg-white/60"
                 }`}
               >
                 <button
                   onClick={() => analyzeGap(c.id)}
-                  className="text-left font-medium text-zinc-100 hover:underline"
+                  className="text-left font-medium text-zinc-900 hover:underline"
                 >
                   {c.domain}
                 </button>
@@ -250,7 +250,7 @@ export default function CompetitorGap({ projectId }: { projectId: string }) {
                   <button
                     onClick={() => analyzeGap(c.id)}
                     disabled={loading && selectedId === c.id}
-                    className="rounded-md border border-zinc-700 px-3 py-1 text-xs text-zinc-300 hover:border-zinc-500 disabled:opacity-50"
+                    className="rounded-md border border-zinc-200 px-3 py-1 text-xs text-zinc-500 hover:border-zinc-400 disabled:opacity-50"
                   >
                     {loading && selectedId === c.id
                       ? "Analyzing…"
@@ -258,7 +258,7 @@ export default function CompetitorGap({ projectId }: { projectId: string }) {
                   </button>
                   <button
                     onClick={() => onRemove(c.id)}
-                    className="text-xs text-zinc-500 hover:text-red-400"
+                    className="text-xs text-zinc-500 hover:text-red-600"
                   >
                     Remove
                   </button>
@@ -275,7 +275,7 @@ export default function CompetitorGap({ projectId }: { projectId: string }) {
           <h2 className="text-sm font-medium uppercase tracking-widest text-zinc-500">
             Keyword gaps — {selectedCompetitor.domain}
             {gaps.length > 0 && (
-              <span className="ml-2 normal-case tracking-normal text-zinc-600">
+              <span className="ml-2 normal-case tracking-normal text-zinc-500">
                 {gaps.length} keyword{gaps.length === 1 ? "" : "s"} they rank
                 for that you don’t have, sorted by opportunity
               </span>
@@ -283,7 +283,7 @@ export default function CompetitorGap({ projectId }: { projectId: string }) {
           </h2>
 
           {!loading && gaps.length === 0 && provider && (
-            <p className="rounded-xl border border-dashed border-zinc-800 p-6 text-center text-sm text-zinc-500">
+            <p className="rounded-xl border border-dashed border-zinc-200 p-6 text-center text-sm text-zinc-500">
               No gaps found — you already cover every keyword this competitor
               ranks for in the analyzed set.
             </p>
@@ -291,9 +291,9 @@ export default function CompetitorGap({ projectId }: { projectId: string }) {
 
           {gaps.length > 0 && (
             <>
-              <div className="overflow-x-auto rounded-xl border border-zinc-800">
+              <div className="overflow-x-auto rounded-xl border border-zinc-200">
                 <table className="w-full border-collapse">
-                  <thead className="bg-zinc-900">
+                  <thead className="bg-white">
                     <tr>
                       <th className={th}>
                         <input
@@ -319,7 +319,7 @@ export default function CompetitorGap({ projectId }: { projectId: string }) {
                     {gaps.map((g) => (
                       <tr
                         key={g.phrase}
-                        className="border-t border-zinc-800/60 hover:bg-zinc-900/60"
+                        className="border-t border-zinc-200/60 hover:bg-zinc-100/60"
                       >
                         <td className={td}>
                           <input
@@ -329,10 +329,10 @@ export default function CompetitorGap({ projectId }: { projectId: string }) {
                             aria-label={`Select ${g.phrase}`}
                           />
                         </td>
-                        <td className={`${td} font-medium text-zinc-100`}>
+                        <td className={`${td} font-medium text-zinc-900`}>
                           {g.phrase}
                           {g.mock && (
-                            <span className="ml-2 rounded bg-amber-900/60 px-1.5 py-0.5 text-[10px] uppercase text-amber-300">
+                            <span className="ml-2 rounded bg-amber-100/60 px-1.5 py-0.5 text-[10px] uppercase text-amber-700">
                               mock
                             </span>
                           )}
@@ -347,7 +347,7 @@ export default function CompetitorGap({ projectId }: { projectId: string }) {
                               target="_blank"
                               rel="noreferrer"
                               title={g.url}
-                              className="block truncate text-zinc-400 hover:text-zinc-200 hover:underline"
+                              className="block truncate text-zinc-500 hover:text-zinc-800 hover:underline"
                             >
                               {g.url}
                             </a>
@@ -361,11 +361,11 @@ export default function CompetitorGap({ projectId }: { projectId: string }) {
                           {g.cpc == null ? "—" : `$${fmt(g.cpc, 2)}`}
                         </td>
                         <td className={td}>
-                          <span className="rounded-full border border-zinc-700 px-2 py-0.5 text-xs text-zinc-400">
+                          <span className="rounded-full border border-zinc-200 px-2 py-0.5 text-xs text-zinc-500">
                             {g.intent}
                           </span>
                         </td>
-                        <td className={`${td} font-medium text-emerald-400`}>
+                        <td className={`${td} font-medium text-emerald-600`}>
                           {fmt(g.opportunity)}
                         </td>
                       </tr>
@@ -374,7 +374,7 @@ export default function CompetitorGap({ projectId }: { projectId: string }) {
                 </table>
               </div>
 
-              <div className="flex flex-col gap-3 rounded-xl border border-zinc-800 bg-zinc-900/60 p-4 sm:flex-row sm:items-end">
+              <div className="flex flex-col gap-3 rounded-xl border border-zinc-200 bg-white/60 p-4 sm:flex-row sm:items-end">
                 <div className="flex-1">
                   <label
                     htmlFor="gap-list"
@@ -393,13 +393,13 @@ export default function CompetitorGap({ projectId }: { projectId: string }) {
                 <button
                   onClick={onSave}
                   disabled={saving || selected.size === 0}
-                  className="rounded-md bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-950 hover:bg-white disabled:opacity-50"
+                  className="rounded-md bg-orange-600 px-4 py-2 text-sm font-medium text-white hover:bg-orange-700 disabled:opacity-50 active:scale-[0.96] transition-[background-color,transform] duration-150 ease-[cubic-bezier(0.2,0,0,1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2"
                 >
                   {saving ? "Saving…" : `Save ${selected.size} keyword(s)`}
                 </button>
               </div>
               {saveMsg && (
-                <p className="text-sm text-emerald-400">{saveMsg}</p>
+                <p className="text-sm text-emerald-600">{saveMsg}</p>
               )}
             </>
           )}

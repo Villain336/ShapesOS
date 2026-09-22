@@ -22,12 +22,12 @@ export type ContentDetailItem = {
 };
 
 const inputCls =
-  "rounded-md border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-zinc-500 focus:outline-none";
+  "rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-orange-500 focus:outline-none";
 
 const btnPrimary =
-  "rounded-md bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-950 hover:bg-white disabled:opacity-50";
+  "rounded-md bg-orange-600 px-4 py-2 text-sm font-medium text-white hover:bg-orange-700 disabled:opacity-50 active:scale-[0.96] transition-[background-color,transform] duration-150 ease-[cubic-bezier(0.2,0,0,1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2";
 const btnGhost =
-  "rounded-md border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-200 hover:border-zinc-500 disabled:opacity-50";
+  "rounded-md border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-800 hover:border-zinc-400 disabled:opacity-50";
 
 export default function ContentDetail({
   projectId,
@@ -161,7 +161,7 @@ export default function ContentDetail({
 
   if (!brief) {
     return (
-      <p className="text-sm text-red-400">
+      <p className="text-sm text-red-600">
         This content item has no brief data.
       </p>
     );
@@ -193,8 +193,8 @@ export default function ContentDetail({
       <div
         className={`rounded-xl border px-4 py-3 text-sm ${
           brief.mock
-            ? "border-amber-900 bg-amber-950/40 text-amber-300"
-            : "border-emerald-900 bg-emerald-950/40 text-emerald-300"
+            ? "border-amber-200 bg-amber-50/40 text-amber-700"
+            : "border-emerald-200 bg-emerald-50/40 text-emerald-700"
         }`}
       >
         {brief.mock ? (
@@ -214,8 +214,8 @@ export default function ContentDetail({
         <div
           className={`rounded-xl border px-4 py-3 text-sm ${
             llmInfo.isLive
-              ? "border-emerald-900 bg-emerald-950/40 text-emerald-300"
-              : "border-amber-900 bg-amber-950/40 text-amber-300"
+              ? "border-emerald-200 bg-emerald-50/40 text-emerald-700"
+              : "border-amber-200 bg-amber-50/40 text-amber-700"
           }`}
         >
           {llmInfo.isLive ? (
@@ -234,11 +234,11 @@ export default function ContentDetail({
         </div>
       )}
 
-      {error && <p className="text-sm text-red-400">{error}</p>}
-      {notice && <p className="text-sm text-emerald-400">{notice}</p>}
+      {error && <p className="text-sm text-red-600">{error}</p>}
+      {notice && <p className="text-sm text-emerald-600">{notice}</p>}
 
       {/* Brief */}
-      <section className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-5">
+      <section className="rounded-xl border border-zinc-200 bg-white/60 p-5">
         <h3 className="mb-4 text-sm font-medium uppercase tracking-widest text-zinc-500">
           Brief
         </h3>
@@ -246,14 +246,14 @@ export default function ContentDetail({
           <div>
             <dt className="text-xs uppercase tracking-widest text-zinc-500">Intent</dt>
             <dd className="mt-1">
-              <span className="rounded-full border border-zinc-700 px-2 py-0.5 text-xs text-zinc-300">
+              <span className="rounded-full border border-zinc-200 px-2 py-0.5 text-xs text-zinc-500">
                 {brief.intent}
               </span>
             </dd>
           </div>
           <div>
             <dt className="text-xs uppercase tracking-widest text-zinc-500">Target length</dt>
-            <dd className="mt-1 text-sm text-zinc-200">
+            <dd className="mt-1 text-sm text-zinc-800">
               ~{brief.targetWordCount.toLocaleString()} words
               <span className="text-zinc-500"> (heuristic from SERP depth)</span>
             </dd>
@@ -262,11 +262,11 @@ export default function ContentDetail({
 
         <div className="mt-4">
           <dt className="text-xs uppercase tracking-widest text-zinc-500">Outline</dt>
-          <dd className="mt-2 rounded-lg bg-zinc-950/60 p-4">
-            <p className="text-base font-bold text-zinc-100"># {brief.h1}</p>
+          <dd className="mt-2 rounded-lg bg-zinc-50/60 p-4">
+            <p className="text-base font-bold text-zinc-900"># {brief.h1}</p>
             <ul className="mt-2 flex flex-col gap-1">
               {brief.h2s.map((h) => (
-                <li key={h} className="text-sm text-zinc-300">
+                <li key={h} className="text-sm text-zinc-500">
                   ## {h}
                 </li>
               ))}
@@ -284,7 +284,7 @@ export default function ContentDetail({
             </dt>
             <dd className="mt-2 flex flex-col gap-1.5">
               {brief.paa.map((q) => (
-                <p key={q} className="text-sm text-zinc-300">
+                <p key={q} className="text-sm text-zinc-500">
                   <span className="text-zinc-500">?</span> {q}
                 </p>
               ))}
@@ -301,7 +301,7 @@ export default function ContentDetail({
               {brief.entities.map((e) => (
                 <span
                   key={e}
-                  className="rounded-full border border-zinc-700 px-2 py-0.5 text-xs text-zinc-400"
+                  className="rounded-full border border-zinc-200 px-2 py-0.5 text-xs text-zinc-500"
                 >
                   {e}
                 </span>
@@ -318,7 +318,7 @@ export default function ContentDetail({
             <dd className="mt-2 flex flex-col gap-1">
               {brief.sources.map((s) => (
                 <p key={s.url} className="truncate text-xs text-zinc-500">
-                  <span className="text-zinc-400">{s.domain}</span> — {s.title}
+                  <span className="text-zinc-500">{s.domain}</span> — {s.title}
                 </p>
               ))}
             </dd>
@@ -348,17 +348,17 @@ export default function ContentDetail({
             rows={28}
             className={`w-full font-mono text-sm leading-relaxed ${inputCls}`}
           />
-          <p className="text-xs text-zinc-600">
+          <p className="text-xs text-zinc-500">
             {(displayed?.wordCount ?? 0).toLocaleString()} words · target ~
             {brief.targetWordCount.toLocaleString()}
           </p>
         </div>
 
-        <aside className="flex flex-col gap-3 rounded-xl border border-zinc-800 bg-zinc-900/60 p-5">
+        <aside className="flex flex-col gap-3 rounded-xl border border-zinc-200 bg-white/60 p-5">
           <h3 className="text-sm font-medium uppercase tracking-widest text-zinc-500">
             SEO score
           </h3>
-          <p className="text-4xl font-bold tracking-tight text-zinc-100">
+          <p className="text-4xl font-bold tracking-tight text-zinc-900">
             {displayed ? Math.round(displayed.score) : "—"}
             <span className="text-lg text-zinc-500">/100</span>
           </p>
@@ -371,11 +371,11 @@ export default function ContentDetail({
                       ? "bg-emerald-400"
                       : c.points > 0
                         ? "bg-amber-400"
-                        : "bg-zinc-700"
+                        : "bg-zinc-200"
                   }`}
                 />
                 <span>
-                  <span className="text-zinc-300">{c.label}</span>
+                  <span className="text-zinc-500">{c.label}</span>
                   <span className="text-zinc-500">
                     {" "}
                     · {c.points}/{c.max}
@@ -389,11 +389,11 @@ export default function ContentDetail({
             )}
           </ul>
           {displayed && displayed.internalLinkSuggestions.length > 0 && (
-            <div className="rounded-lg bg-zinc-950/60 p-3">
+            <div className="rounded-lg bg-zinc-50/60 p-3">
               <p className="text-xs uppercase tracking-widest text-zinc-500">
                 Link these keywords
               </p>
-              <p className="mt-1 text-xs text-zinc-400">
+              <p className="mt-1 text-xs text-zinc-500">
                 {displayed.internalLinkSuggestions.join(", ")}
               </p>
             </div>

@@ -30,7 +30,7 @@ export default function DeleteProjectButton({
     return (
       <button
         onClick={() => setConfirming(true)}
-        className="rounded-md border border-red-900 px-3 py-1.5 text-sm text-red-400 hover:bg-red-950"
+        className="rounded-md border border-red-200 px-3 py-1.5 text-sm text-red-600 hover:bg-red-100"
       >
         Delete project
       </button>
@@ -39,17 +39,17 @@ export default function DeleteProjectButton({
 
   return (
     <span className="flex items-center gap-2 text-sm">
-      <span className="text-zinc-400">Are you sure?</span>
+      <span className="text-zinc-500">Are you sure?</span>
       <button
         onClick={onDelete}
         disabled={busy}
-        className="rounded-md bg-red-600 px-3 py-1.5 text-white hover:bg-red-500 disabled:opacity-50"
+        className="rounded-md bg-red-600 px-3 py-1.5 text-white hover:bg-red-600 disabled:opacity-50"
       >
         {busy ? "Deleting…" : "Yes, delete"}
       </button>
       <button
         onClick={() => setConfirming(false)}
-        className="rounded-md border border-zinc-700 px-3 py-1.5 text-zinc-300 hover:bg-zinc-800"
+        className="rounded-md border border-zinc-200 px-3 py-1.5 text-zinc-500 hover:bg-zinc-100"
       >
         Cancel
       </button>

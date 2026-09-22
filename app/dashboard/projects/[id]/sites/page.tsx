@@ -28,11 +28,11 @@ export default async function SitesPage({
   return (
     <div className="flex flex-col gap-4">
       <div>
-        <Link href={`/dashboard/projects/${project.id}`} className="text-sm text-zinc-500 hover:text-zinc-300">
+        <Link href={`/dashboard/projects/${project.id}`} className="text-sm text-zinc-500 hover:text-zinc-600">
           ← {project.domain}
         </Link>
         <h1 className="mt-1 text-2xl font-bold tracking-tight">Sites & landing pages</h1>
-        <p className="mt-1 text-sm text-zinc-400">
+        <p className="mt-1 text-sm text-zinc-500">
           Build landing pages from scratch, or connect a GitHub repo, WordPress, Webflow, SFTP host, or uploaded .zip — then edit, deploy, or publish content.
         </p>
       </div>

@@ -146,8 +146,8 @@ function TreeNode({
       <div
         className={`group flex items-center gap-1 rounded px-2 py-1 text-sm ${
           openPath === entry.path
-            ? "bg-zinc-800 text-zinc-100"
-            : "text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200"
+            ? "bg-zinc-900 text-white"
+            : "text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800"
         }`}
         style={{ paddingLeft: `${depth * 12 + 8}px` }}
       >
@@ -159,7 +159,7 @@ function TreeNode({
             }}
             className="flex flex-1 items-center gap-1 text-left"
           >
-            <span className="w-3 text-zinc-600">{expanded ? "▾" : "▸"}</span>
+            <span className="w-3 text-zinc-500">{expanded ? "▾" : "▸"}</span>
             <span>📁</span>
             <span className="truncate">{entry.name}</span>
           </button>
@@ -176,7 +176,7 @@ function TreeNode({
             <button
               onClick={() => onAttach(entry)}
               title="Attach to AI chat"
-              className="hidden rounded px-1 text-xs text-zinc-600 hover:text-zinc-200 group-hover:block"
+              className="hidden rounded px-1 text-xs text-zinc-500 hover:text-zinc-800 group-hover:block"
             >
               ＋
             </button>
@@ -199,7 +199,7 @@ function TreeNode({
           ))}
           {children && children.length === 0 && (
             <div
-              className="py-1 text-xs text-zinc-600"
+              className="py-1 text-xs text-zinc-500"
               style={{ paddingLeft: `${depth * 12 + 28}px` }}
             >
               empty
@@ -268,16 +268,16 @@ function TreeNodeConnected(props: {
 function DiffView({ original, proposed }: { original: string; proposed: string }) {
   const parts = useMemo(() => diffLines(original, proposed), [original, proposed]);
   return (
-    <pre className="max-h-64 overflow-auto rounded bg-zinc-950 p-2 font-mono text-xs leading-5">
+    <pre className="max-h-64 overflow-auto rounded bg-zinc-50 p-2 font-mono text-xs leading-5">
       {parts.map((part, i) => (
         <span
           key={i}
           className={
             part.added
-              ? "block bg-emerald-950/60 text-emerald-200"
+              ? "block bg-emerald-50/60 text-emerald-800"
               : part.removed
-                ? "block bg-red-950/60 text-red-200"
-                : "block text-zinc-600"
+                ? "block bg-red-50/60 text-red-700"
+                : "block text-zinc-500"
           }
         >
           {part.added ? "+ " : part.removed ? "− " : "  "}
@@ -617,24 +617,24 @@ export default function SiteIde({
       {/* header */}
       <div className="flex items-start justify-between">
         <div>
-          <Link href={`/dashboard/projects/${projectId}`} className="text-sm text-zinc-500 hover:text-zinc-300">
+          <Link href={`/dashboard/projects/${projectId}`} className="text-sm text-zinc-500 hover:text-zinc-600">
             ← {domain}
           </Link>
           <h1 className="mt-1 text-2xl font-bold tracking-tight">{pageTitle ?? "Site IDE"}</h1>
-          <p className="mt-1 text-sm text-zinc-400">
+          <p className="mt-1 text-sm text-zinc-500">
             {pageSubtitle ?? "Edit client website code with AI assistance. The AI proposes — you approve."}
           </p>
         </div>
         <div className="flex gap-2">
           <button
             onClick={() => setTab("editor")}
-            className={`rounded-md px-3 py-1.5 text-sm font-medium ${tab === "editor" ? "bg-zinc-100 text-zinc-950" : "border border-zinc-700 text-zinc-300"}`}
+            className={`rounded-md px-3 py-1.5 text-sm font-medium ${tab === "editor" ? "bg-zinc-900 text-white" : "border border-zinc-200 text-zinc-500"}`}
           >
             Editor
           </button>
           <button
             onClick={() => setTab("activity")}
-            className={`rounded-md px-3 py-1.5 text-sm font-medium ${tab === "activity" ? "bg-zinc-100 text-zinc-950" : "border border-zinc-700 text-zinc-300"}`}
+            className={`rounded-md px-3 py-1.5 text-sm font-medium ${tab === "activity" ? "bg-zinc-900 text-white" : "border border-zinc-200 text-zinc-500"}`}
           >
             Activity
           </button>
@@ -644,32 +644,32 @@ export default function SiteIde({
       {/* banners */}
       <div className="flex flex-col gap-2">
         {siteMode && siteBanner ? (
-          <div className={`rounded-md border px-3 py-2 text-sm ${siteBanner.mock ? "border-amber-800 bg-amber-950/40 text-amber-200" : "border-emerald-800 bg-emerald-950/40 text-emerald-200"}`}>
+          <div className={`rounded-md border px-3 py-2 text-sm ${siteBanner.mock ? "border-amber-200 bg-amber-50/40 text-amber-800" : "border-emerald-800 bg-emerald-50/40 text-emerald-800"}`}>
             <strong>{siteBanner.mock ? "Mock site — demo files." : "Live site:"}</strong> {siteBanner.title}
             {siteBanner.detail && <span className="ml-2 opacity-70">{siteBanner.detail}</span>}
           </div>
         ) : selected ? (
           selected.demo ? (
-            <div className="rounded-md border border-amber-800 bg-amber-950/40 px-3 py-2 text-sm text-amber-200">
+            <div className="rounded-md border border-amber-200 bg-amber-50/40 px-3 py-2 text-sm text-amber-800">
               <strong>Demo site — mock files.</strong> Nothing here is a real server. Add an SFTP connection below for live editing.
             </div>
           ) : (
-            <div className="rounded-md border border-emerald-800 bg-emerald-950/40 px-3 py-2 text-sm text-emerald-200">
+            <div className="rounded-md border border-emerald-800 bg-emerald-50/40 px-3 py-2 text-sm text-emerald-800">
               <strong>Live SFTP:</strong> {selected.username}@{selected.host}:{selected.port}
               {selected.lastTestedAt && (
-                <span className="ml-2 text-emerald-300/70">
+                <span className="ml-2 text-emerald-700/70">
                   · last test {selected.lastTestOk ? "✓" : "✗"} {shortTime(selected.lastTestedAt)}
                 </span>
               )}
             </div>
           )
         ) : (
-          <div className="rounded-md border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-zinc-400">
+          <div className="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-500">
             No connection selected — add an SFTP connection or open the demo site.
           </div>
         )}
         <div
-          className={`rounded-md border px-3 py-2 text-sm ${llm.isLive ? "border-emerald-800 bg-emerald-950/40 text-emerald-200" : "border-amber-800 bg-amber-950/40 text-amber-200"}`}
+          className={`rounded-md border px-3 py-2 text-sm ${llm.isLive ? "border-emerald-800 bg-emerald-50/40 text-emerald-800" : "border-amber-200 bg-amber-50/40 text-amber-800"}`}
         >
           {llm.isLive ? (
             <>AI assistant: <strong>live</strong> ({llm.model})</>
@@ -681,20 +681,20 @@ export default function SiteIde({
 
       {/* connection manager (hidden in site mode — the site is already connected) */}
       {!siteMode && (
-      <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-4">
+      <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-zinc-200">Site connections</h2>
+          <h2 className="text-sm font-semibold text-zinc-800">Site connections</h2>
           <div className="flex gap-2">
             <button
               onClick={() => void createConnection(true)}
               disabled={formBusy}
-              className="rounded-md border border-amber-700 px-3 py-1.5 text-sm text-amber-200 hover:bg-amber-950"
+              className="rounded-md border border-amber-700 px-3 py-1.5 text-sm text-amber-800 hover:bg-amber-100"
             >
               Open demo site
             </button>
             <button
               onClick={() => setShowForm((s) => !s)}
-              className="rounded-md border border-zinc-700 px-3 py-1.5 text-sm text-zinc-200 hover:border-zinc-500"
+              className="rounded-md border border-zinc-200 px-3 py-1.5 text-sm text-zinc-800 hover:border-zinc-400"
             >
               {showForm ? "Cancel" : "＋ Add SFTP connection"}
             </button>
@@ -702,44 +702,44 @@ export default function SiteIde({
         </div>
 
         {showForm && (
-          <div className="mt-3 grid grid-cols-2 gap-3 rounded-md border border-zinc-800 p-3">
-            <label className="text-sm text-zinc-400">
+          <div className="mt-3 grid grid-cols-2 gap-3 rounded-md border border-zinc-200 p-3">
+            <label className="text-sm text-zinc-500">
               Label
-              <input value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })} placeholder="Client production" className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-sm text-zinc-100" />
+              <input value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })} placeholder="Client production" className="mt-1 w-full rounded-md border border-zinc-200 bg-white px-2 py-1.5 text-sm text-zinc-900" />
             </label>
-            <label className="text-sm text-zinc-400">
+            <label className="text-sm text-zinc-500">
               Host
-              <input value={form.host} onChange={(e) => setForm({ ...form, host: e.target.value })} placeholder="example.com" className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1.5 font-mono text-sm text-zinc-100" />
+              <input value={form.host} onChange={(e) => setForm({ ...form, host: e.target.value })} placeholder="example.com" className="mt-1 w-full rounded-md border border-zinc-200 bg-white px-2 py-1.5 font-mono text-sm text-zinc-900" />
             </label>
-            <label className="text-sm text-zinc-400">
+            <label className="text-sm text-zinc-500">
               Port
-              <input value={form.port} onChange={(e) => setForm({ ...form, port: e.target.value })} className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1.5 font-mono text-sm text-zinc-100" />
+              <input value={form.port} onChange={(e) => setForm({ ...form, port: e.target.value })} className="mt-1 w-full rounded-md border border-zinc-200 bg-white px-2 py-1.5 font-mono text-sm text-zinc-900" />
             </label>
-            <label className="text-sm text-zinc-400">
+            <label className="text-sm text-zinc-500">
               Username
-              <input value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} placeholder="deploy" className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1.5 font-mono text-sm text-zinc-100" />
+              <input value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} placeholder="deploy" className="mt-1 w-full rounded-md border border-zinc-200 bg-white px-2 py-1.5 font-mono text-sm text-zinc-900" />
             </label>
-            <label className="text-sm text-zinc-400">
+            <label className="text-sm text-zinc-500">
               Auth type
-              <select value={form.authType} onChange={(e) => setForm({ ...form, authType: e.target.value })} className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-sm text-zinc-100">
+              <select value={form.authType} onChange={(e) => setForm({ ...form, authType: e.target.value })} className="mt-1 w-full rounded-md border border-zinc-200 bg-white px-2 py-1.5 text-sm text-zinc-900">
                 <option value="password">Password</option>
                 <option value="key">Private key</option>
               </select>
             </label>
-            <label className="text-sm text-zinc-400">
+            <label className="text-sm text-zinc-500">
               {form.authType === "key" ? "Private key" : "Password"}
               {form.authType === "key" ? (
-                <textarea value={form.secret} onChange={(e) => setForm({ ...form, secret: e.target.value })} rows={3} placeholder="-----BEGIN OPENSSH PRIVATE KEY-----" className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1.5 font-mono text-xs text-zinc-100" />
+                <textarea value={form.secret} onChange={(e) => setForm({ ...form, secret: e.target.value })} rows={3} placeholder="-----BEGIN OPENSSH PRIVATE KEY-----" className="mt-1 w-full rounded-md border border-zinc-200 bg-white px-2 py-1.5 font-mono text-xs text-zinc-900" />
               ) : (
-                <input type="password" value={form.secret} onChange={(e) => setForm({ ...form, secret: e.target.value })} className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1.5 font-mono text-sm text-zinc-100" />
+                <input type="password" value={form.secret} onChange={(e) => setForm({ ...form, secret: e.target.value })} className="mt-1 w-full rounded-md border border-zinc-200 bg-white px-2 py-1.5 font-mono text-sm text-zinc-900" />
               )}
             </label>
             <div className="col-span-2">
-              {formError && <p className="mb-2 text-sm text-red-400">{formError}</p>}
-              <button onClick={() => void createConnection(false)} disabled={formBusy} className="rounded-md bg-zinc-100 px-4 py-1.5 text-sm font-medium text-zinc-950 hover:bg-white disabled:opacity-50">
+              {formError && <p className="mb-2 text-sm text-red-600">{formError}</p>}
+              <button onClick={() => void createConnection(false)} disabled={formBusy} className="rounded-md bg-orange-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-orange-700 disabled:opacity-50 active:scale-[0.96] transition-[background-color,transform] duration-150 ease-[cubic-bezier(0.2,0,0,1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2">
                 {formBusy ? "Saving…" : "Save connection"}
               </button>
-              <p className="mt-2 text-xs text-zinc-600">
+              <p className="mt-2 text-xs text-zinc-500">
                 Credentials are AES-256-GCM encrypted at rest and never shown again — only a non-sensitive hint ({`••••····`}) is displayed.
               </p>
             </div>
@@ -750,10 +750,10 @@ export default function SiteIde({
           {connections.map((c) => (
             <div
               key={c.id}
-              className={`flex items-center justify-between rounded-md border px-3 py-2 ${selectedId === c.id ? "border-zinc-500 bg-zinc-900" : "border-zinc-800"}`}
+              className={`flex items-center justify-between rounded-md border px-3 py-2 ${selectedId === c.id ? "border-zinc-400 bg-white" : "border-zinc-200"}`}
             >
               <button onClick={() => { setSelectedId(c.id); setOpenPath(null); }} className="flex-1 text-left">
-                <span className="text-sm font-medium text-zinc-100">
+                <span className="text-sm font-medium text-zinc-900">
                   {c.demo ? "🧪 " : ""}{c.label}
                 </span>
                 <span className="ml-2 font-mono text-xs text-zinc-500">
@@ -761,11 +761,11 @@ export default function SiteIde({
                 </span>
               </button>
               <div className="flex items-center gap-2">
-                {testMsg[c.id] && <span className="max-w-xs truncate text-xs text-zinc-400">{testMsg[c.id]}</span>}
-                <button onClick={() => void testConnection(c)} className="rounded border border-zinc-700 px-2 py-1 text-xs text-zinc-300 hover:border-zinc-500">
+                {testMsg[c.id] && <span className="max-w-xs truncate text-xs text-zinc-500">{testMsg[c.id]}</span>}
+                <button onClick={() => void testConnection(c)} className="rounded border border-zinc-200 px-2 py-1 text-xs text-zinc-500 hover:border-zinc-400">
                   Test
                 </button>
-                <button onClick={() => void deleteConnection(c)} className="rounded border border-zinc-700 px-2 py-1 text-xs text-red-300 hover:border-red-700">
+                <button onClick={() => void deleteConnection(c)} className="rounded border border-zinc-200 px-2 py-1 text-xs text-red-700 hover:border-red-300">
                   Remove
                 </button>
               </div>
@@ -779,8 +779,8 @@ export default function SiteIde({
       )}
 
       {tab === "activity" ? (
-        <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-4">
-          <h2 className="mb-3 text-sm font-semibold text-zinc-200">Change audit log</h2>
+        <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4">
+          <h2 className="mb-3 text-sm font-semibold text-zinc-800">Change audit log</h2>
           {activity === null ? (
             <p className="text-sm text-zinc-500">Loading…</p>
           ) : activity.length === 0 ? (
@@ -788,23 +788,23 @@ export default function SiteIde({
           ) : (
             <div className="flex flex-col gap-2">
               {activity.map((e) => (
-                <div key={e.id} className="flex items-start justify-between rounded-md border border-zinc-800 px-3 py-2">
+                <div key={e.id} className="flex items-start justify-between rounded-md border border-zinc-200 px-3 py-2">
                   <div>
                     <span
                       className={`mr-2 inline-block rounded px-1.5 py-0.5 text-xs font-medium ${
                         e.action === "ai_proposal"
-                          ? "bg-violet-950 text-violet-200"
+                          ? "bg-violet-50 text-violet-800"
                           : e.action === "ai_applied"
-                            ? "bg-emerald-950 text-emerald-200"
-                            : "bg-zinc-800 text-zinc-300"
+                            ? "bg-emerald-50 text-emerald-800"
+                            : "bg-zinc-100 text-zinc-500"
                       }`}
                     >
                       {e.action === "ai_proposal" ? "AI proposed" : e.action === "ai_applied" ? "AI applied ✓" : "Manual save"}
                     </span>
-                    <span className="font-mono text-sm text-zinc-200">{e.filePath}</span>
+                    <span className="font-mono text-sm text-zinc-800">{e.filePath}</span>
                     <p className="mt-0.5 text-xs text-zinc-500">{e.summary}</p>                    <p className="mt-0.5 text-xs text-zinc-500">{e.summary}</p>
                   </div>
-                  <div className="shrink-0 text-right text-xs text-zinc-600">
+                  <div className="shrink-0 text-right text-xs text-zinc-500">
                     <div>{shortTime(e.createdAt)}</div>
                     <div className="mt-0.5">{e.actor === "ai" ? "🤖 AI" : "👤 you"}{e.approvedBy ? " · approved by you" : ""}</div>
                   </div>
@@ -816,10 +816,10 @@ export default function SiteIde({
       ) : (
         <div className="grid grid-cols-12 gap-4">
           {/* file tree */}
-          <div className="col-span-3 rounded-lg border border-zinc-800 bg-zinc-950 p-2">
-            <h2 className="px-2 py-1 text-sm font-semibold text-zinc-200">Files</h2>
+          <div className="col-span-3 rounded-lg border border-zinc-200 bg-zinc-50 p-2">
+            <h2 className="px-2 py-1 text-sm font-semibold text-zinc-800">Files</h2>
             {!fileBase ? (
-              <p className="px-2 py-2 text-xs text-zinc-600">Select a connection above.</p>
+              <p className="px-2 py-2 text-xs text-zinc-500">Select a connection above.</p>
             ) : (
               <TreeNodeConnected
                 key={fileBase}
@@ -832,27 +832,27 @@ export default function SiteIde({
                 openPath={openPath}
               />
             )}
-            <p className="px-2 py-2 text-[11px] text-zinc-600">Hover a file and press ＋ to attach it to the AI chat.</p>
+            <p className="px-2 py-2 text-[11px] text-zinc-500">Hover a file and press ＋ to attach it to the AI chat.</p>
           </div>
 
           {/* editor */}
-          <div className="col-span-6 flex flex-col rounded-lg border border-zinc-800 bg-zinc-950">
-            <div className="flex items-center justify-between border-b border-zinc-800 px-3 py-2">
+          <div className="col-span-6 flex flex-col rounded-lg border border-zinc-200 bg-zinc-50">
+            <div className="flex items-center justify-between border-b border-zinc-200 px-3 py-2">
               <div className="min-w-0">
                 {openPath ? (
                   <>
-                    <span className="font-mono text-sm text-zinc-100">{openPath}</span>
-                    {dirty && <span className="ml-2 text-xs text-amber-300">● unsaved</span>}
-                    {truncated && <span className="ml-2 text-xs text-amber-300">(truncated at 200 KB)</span>}
+                    <span className="font-mono text-sm text-zinc-900">{openPath}</span>
+                    {dirty && <span className="ml-2 text-xs text-amber-700">● unsaved</span>}
+                    {truncated && <span className="ml-2 text-xs text-amber-700">(truncated at 200 KB)</span>}
                   </>
                 ) : (
-                  <span className="text-sm text-zinc-600">No file open — pick one from the tree.</span>
+                  <span className="text-sm text-zinc-500">No file open — pick one from the tree.</span>
                 )}
               </div>
               <button
                 onClick={() => void saveFile("manual")}
                 disabled={!openPath || !dirty || saving}
-                className="rounded-md bg-zinc-100 px-3 py-1 text-sm font-medium text-zinc-950 hover:bg-white disabled:opacity-40"
+                className="rounded-md bg-orange-600 px-3 py-1 text-sm font-medium text-white hover:bg-orange-700 disabled:opacity-40 active:scale-[0.96] transition-[background-color,transform] duration-150 ease-[cubic-bezier(0.2,0,0,1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2"
               >
                 {saving ? "Saving…" : "Save"}
               </button>
@@ -861,7 +861,7 @@ export default function SiteIde({
               {fileLoading ? (
                 <div className="flex h-full items-center justify-center text-sm text-zinc-500">Loading…</div>
               ) : fileError ? (
-                <div className="flex h-full items-center justify-center text-sm text-red-400">{fileError}</div>
+                <div className="flex h-full items-center justify-center text-sm text-red-600">{fileError}</div>
               ) : openPath ? (
                 <MonacoEditor
                   height="560px"
@@ -872,7 +872,7 @@ export default function SiteIde({
                   options={{ minimap: { enabled: false }, fontSize: 13, scrollBeyondLastLine: false, wordWrap: "on" }}
                 />
               ) : (
-                <div className="flex h-full items-center justify-center text-sm text-zinc-600">
+                <div className="flex h-full items-center justify-center text-sm text-zinc-500">
                   {selected ? "Select a file to start editing." : "Connect a site first."}
                 </div>
               )}
@@ -880,18 +880,18 @@ export default function SiteIde({
           </div>
 
           {/* AI assistant */}
-          <div className="col-span-3 flex max-h-[640px] flex-col rounded-lg border border-zinc-800 bg-zinc-950">
-            <div className="border-b border-zinc-800 px-3 py-2">
-              <h2 className="text-sm font-semibold text-zinc-200">🤖 AI assistant</h2>
+          <div className="col-span-3 flex max-h-[640px] flex-col rounded-lg border border-zinc-200 bg-zinc-50">
+            <div className="border-b border-zinc-200 px-3 py-2">
+              <h2 className="text-sm font-semibold text-zinc-800">🤖 AI assistant</h2>
               <p className="text-[11px] text-zinc-500">Proposes diffs. Nothing is written until you click Apply.</p>
             </div>
 
             {attached.length > 0 && (
-              <div className="flex flex-wrap gap-1 border-b border-zinc-800 px-3 py-2">
+              <div className="flex flex-wrap gap-1 border-b border-zinc-200 px-3 py-2">
                 {attached.map((a) => (
-                  <span key={a.path} className="flex items-center gap-1 rounded bg-zinc-800 px-1.5 py-0.5 font-mono text-[11px] text-zinc-300">
+                  <span key={a.path} className="flex items-center gap-1 rounded bg-zinc-100 px-1.5 py-0.5 font-mono text-[11px] text-zinc-500">
                     {a.path}
-                    <button onClick={() => setAttached((prev) => prev.filter((x) => x.path !== a.path))} className="text-zinc-500 hover:text-zinc-200">✕</button>
+                    <button onClick={() => setAttached((prev) => prev.filter((x) => x.path !== a.path))} className="text-zinc-500 hover:text-zinc-800">✕</button>
                   </span>
                 ))}
               </div>
@@ -899,13 +899,13 @@ export default function SiteIde({
 
             <div className="flex-1 space-y-2 overflow-y-auto px-3 py-2">
               {chat.length === 0 && (
-                <p className="text-xs text-zinc-600">
+                <p className="text-xs text-zinc-500">
                   Ask for a change, e.g. “Add a meta description to the head” or “Make the header sticky”. The open file
                   {attached.length > 0 ? " and attached files are" : " is"} sent as context.
                 </p>
               )}
               {chat.map((m, i) => (
-                <div key={i} className={`rounded-md px-2.5 py-2 text-sm ${m.role === "user" ? "bg-zinc-800 text-zinc-100" : "bg-zinc-900 text-zinc-300"}`}>
+                <div key={i} className={`rounded-md px-2.5 py-2 text-sm ${m.role === "user" ? "bg-zinc-900 text-white" : "bg-white text-zinc-500"}`}>
                   <div className="mb-0.5 text-[11px] font-medium text-zinc-500">{m.role === "user" ? "You" : "Assistant"}</div>
                   <div className="whitespace-pre-wrap text-[13px]">{m.text}</div>
                 </div>
@@ -915,12 +915,12 @@ export default function SiteIde({
             </div>
 
             {proposals.length > 0 && (
-              <div className="max-h-72 space-y-2 overflow-y-auto border-t border-zinc-800 px-3 py-2">
+              <div className="max-h-72 space-y-2 overflow-y-auto border-t border-zinc-200 px-3 py-2">
                 <h3 className="text-xs font-semibold uppercase tracking-widest text-zinc-500">Proposals — review required</h3>
                 {proposals.map((pr, i) => (
-                  <div key={`${pr.path}-${i}`} className="rounded-md border border-violet-900 bg-violet-950/20 p-2">
-                    <div className="font-mono text-xs text-violet-200">{pr.path}</div>
-                    <p className="mt-0.5 text-xs text-zinc-400">{pr.summary}</p>
+                  <div key={`${pr.path}-${i}`} className="rounded-md border border-violet-200 bg-violet-50/20 p-2">
+                    <div className="font-mono text-xs text-violet-800">{pr.path}</div>
+                    <p className="mt-0.5 text-xs text-zinc-500">{pr.summary}</p>
                     {pr.originalContent !== null ? (
                       <div className="mt-1.5"><DiffView original={pr.originalContent} proposed={pr.proposedContent} /></div>
                     ) : (
@@ -928,7 +928,7 @@ export default function SiteIde({
                     )}
                     <div className="mt-1.5 flex gap-2">
                       {pr.status === "applied" ? (
-                        <span className="text-xs font-medium text-emerald-300">✓ Applied & logged</span>
+                        <span className="text-xs font-medium text-emerald-700">✓ Applied & logged</span>
                       ) : pr.status === "rejected" ? (
                         <span className="text-xs text-zinc-500">Rejected</span>
                       ) : (
@@ -936,13 +936,13 @@ export default function SiteIde({
                           <button
                             onClick={() => void applyProposal(pr)}
                             disabled={pr.status === "applying"}
-                            className="rounded bg-emerald-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-emerald-500 disabled:opacity-50"
+                            className="rounded bg-emerald-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-emerald-600 disabled:opacity-50"
                           >
                             {pr.status === "applying" ? "Applying…" : "Apply"}
                           </button>
                           <button
                             onClick={() => setProposals((prev) => prev.map((x) => (x === pr ? { ...x, status: "rejected" as const } : x)))}
-                            className="rounded border border-zinc-700 px-2.5 py-1 text-xs text-zinc-300 hover:border-zinc-500"
+                            className="rounded border border-zinc-200 px-2.5 py-1 text-xs text-zinc-500 hover:border-zinc-400"
                           >
                             Reject
                           </button>
@@ -954,19 +954,19 @@ export default function SiteIde({
               </div>
             )}
 
-            <div className="border-t border-zinc-800 p-2">
+            <div className="border-t border-zinc-200 p-2">
               <div className="flex gap-2">
                 <input
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter") void sendMessage(); }}
                   placeholder="Ask for a code change…"
-                  className="min-w-0 flex-1 rounded-md border border-zinc-700 bg-zinc-900 px-2.5 py-1.5 text-sm text-zinc-100 placeholder:text-zinc-600"
+                  className="min-w-0 flex-1 rounded-md border border-zinc-200 bg-white px-2.5 py-1.5 text-sm text-zinc-900 placeholder:text-zinc-400"
                 />
                 <button
                   onClick={() => void sendMessage()}
                   disabled={asking || !input.trim()}
-                  className="rounded-md bg-zinc-100 px-3 py-1.5 text-sm font-medium text-zinc-950 hover:bg-white disabled:opacity-40"
+                  className="rounded-md bg-orange-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-orange-700 disabled:opacity-40 active:scale-[0.96] transition-[background-color,transform] duration-150 ease-[cubic-bezier(0.2,0,0,1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2"
                 >
                   Send
                 </button>

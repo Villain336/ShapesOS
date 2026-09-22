@@ -380,6 +380,12 @@ model Project {
   autopilotRuns           AutopilotRun[]
   autopilotItems          AutopilotItem[]
   autopilotKills          AutopilotKillSwitch[]
+  // Redesign (2026-09-22): automation canvas workflows.
+  workflows               Workflow[]
+  workflowRuns            WorkflowRun[]
+  // Redesign (2026-09-22): AI chat threads + team chat channel.
+  aiChatThreads           AiChatThread[]
+  chatChannel             ChatChannel?
 
   @@map("projects")
 }
@@ -2164,4 +2170,210 @@ model ProjectAsset {
 
   @@index([projectId, source])
   @@map("project_assets")
+}
+
+// ---------------------------------------------------------------------------
+// Marketr — redesign (2026-09-22): automation canvas workflows.
+// Node-graph workflows per project: triggers, actions, approval gates, logic.
+// ---------------------------------------------------------------------------
+
+enum WorkflowStatus {
+  draft
+  active
+  paused
+  archived
+}
+
+enum WorkflowRunStatus {
+  queued
+  running
+  waiting_approval
+  succeeded
+  failed
+  cancelled
+}
+
+enum WorkflowStepStatus {
+  pending
+  running
+  waiting_approval
+  succeeded
+  failed
+  skipped
+}
+
+model Workflow {
+  id        String  @id @default(cuid())
+  projectId String  @map("project_id")
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  name        String
+  description String?
+  status      WorkflowStatus @default(draft)
+  // Cron expression for the schedule trigger; null = manual-only workflow.
+  schedule    String?
+  enabled     Boolean        @default(true)
+  createdBy   String?        @map("created_by")
+  lastRunAt   DateTime?      @map("last_run_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  nodes WorkflowNode[]
+  edges WorkflowEdge[]
+  runs  WorkflowRun[]
+
+  @@index([projectId, status])
+  @@map("workflows")
+}
+
+model WorkflowNode {
+  id         String   @id @default(cuid())
+  workflowId String   @map("workflow_id")
+  workflow   Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  // Node category: "trigger" | "action" | "approval" | "logic".
+  kind      String
+  // Node type within the category, e.g. trigger: schedule|rank_drop|
+  // competitor_published|decay_detected|webhook|manual; action:
+  // generate_draft|run_audit|apply_internal_links|send_alert|generate_report|
+  // publish_approved; approval: approval_gate; logic: condition|delay.
+  type      String
+  label     String
+  // Node-specific config JSON (cron expression, thresholds, template ids…).
+  config    Json   @default("{}")
+  // Canvas position.
+  positionX Float  @map("position_x")
+  positionY Float  @map("position_y")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([workflowId])
+  @@map("workflow_nodes")
+}
+
+model WorkflowEdge {
+  id         String   @id @default(cuid())
+  workflowId String   @map("workflow_id")
+  workflow   Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  sourceNodeId String  @map("source_node_id")
+  targetNodeId String  @map("target_node_id")
+  // For condition branches: "true" | "false"; null = default path.
+  label        String?
+
+  @@index([workflowId])
+  @@map("workflow_edges")
+}
+
+model WorkflowRun {
+  id         String   @id @default(cuid())
+  workflowId String   @map("workflow_id")
+  workflow   Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  projectId  String   @map("project_id")
+  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  status                WorkflowRunStatus @default(queued)
+  // What started the run: "manual" | "schedule" | "webhook" | event key.
+  triggerKind           String            @map("trigger_kind")
+  createdBy             String?           @map("created_by")
+  error                 String?
+  // Autopilot item id when the run is paused at an approval gate.
+  pendingApprovalItemId String?           @map("pending_approval_item_id")
+
+  startedAt  DateTime  @default(now()) @map("started_at")
+  finishedAt DateTime? @map("finished_at")
+
+  steps WorkflowRunStep[]
+
+  @@index([workflowId, startedAt])
+  @@index([projectId, startedAt])
+  @@map("workflow_runs")
+}
+
+model WorkflowRunStep {
+  id        String             @id @default(cuid())
+  runId     String             @map("run_id")
+  run       WorkflowRun        @relation(fields: [runId], references: [id], onDelete: Cascade)
+  nodeId    String             @map("node_id")
+  nodeKind  String             @map("node_kind")
+  nodeLabel String             @map("node_label")
+  status    WorkflowStepStatus @default(pending)
+  input     Json?
+  output    Json?
+  error     String?
+
+  startedAt  DateTime  @default(now()) @map("started_at")
+  finishedAt DateTime? @map("finished_at")
+
+  @@index([runId, startedAt])
+  @@map("workflow_run_steps")
+}
+
+// ---------------------------------------------------------------------------
+// Marketr — redesign (2026-09-22): AI chat threads (project-scoped,
+// LLM-style command center) and per-project team chat channels.
+// ---------------------------------------------------------------------------
+
+model AiChatThread {
+  id        String  @id @default(cuid())
+  projectId String  @map("project_id")
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  userId    String  @map("user_id")
+  title     String  @default("New chat")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  messages AiChatMessage[]
+
+  @@index([projectId, userId, updatedAt])
+  @@map("ai_chat_threads")
+}
+
+model AiChatMessage {
+  id       String       @id @default(cuid())
+  threadId String       @map("thread_id")
+  thread   AiChatThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+
+  // "user" | "assistant" | "tool".
+  role      String
+  content   String @db.Text
+  // Tool calls executed for this message:
+  // [{ tool, args, resultSummary, status, confirmed? }].
+  toolCalls Json?
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([threadId, createdAt])
+  @@map("ai_chat_messages")
+}
+
+model ChatChannel {
+  id        String  @id @default(cuid())
+  projectId String  @unique @map("project_id")
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name      String  @default("Project chat")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  messages TeamChatMessage[]
+
+  @@map("chat_channels")
+}
+
+model TeamChatMessage {
+  id         String      @id @default(cuid())
+  channelId  String      @map("channel_id")
+  channel    ChatChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  userId     String      @map("user_id")
+  // Denormalized display-name snapshot (email or name at send time).
+  authorName String      @map("author_name")
+  body       String      @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([channelId, createdAt])
+  @@map("team_chat_messages")
 }

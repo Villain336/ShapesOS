@@ -59,14 +59,14 @@ export default async function SocialPage({ params }: { params: Promise<{ id: str
     <main className="mx-auto max-w-7xl px-4 py-8">
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-zinc-100">Social</h1>
+          <h1 className="text-2xl font-bold text-zinc-900">Social</h1>
           <p className="mt-1 text-sm text-zinc-500">
             Content calendar and scheduled publishing through Buffer.
           </p>
         </div>
         <Link
           href={`/dashboard/projects/${project.id}`}
-          className="rounded-md border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-200 hover:border-zinc-500"
+          className="rounded-md border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-800 hover:border-zinc-400"
         >
           ← Project
         </Link>

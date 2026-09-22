@@ -501,6 +501,16 @@ export async function runAutopilotRule(
 // Approval gates
 // ---------------------------------------------------------------------------
 
+/**
+ * Parse a workflow approval-gate sourceRef ("workflow_run:<runId>:<nodeId>").
+ * Local helper (not imported from lib/workflow/approvals) so this module
+ * keeps no static dependency on the workflow engine.
+ */
+function parseWorkflowGateRef(sourceRef: string): { runId: string; nodeId: string } | null {
+  const m = /^workflow_run:([^:]+):([^:]+)$/.exec(sourceRef);
+  return m ? { runId: m[1], nodeId: m[2] } : null;
+}
+
 async function loadItem(db: Db, projectId: string, itemId: string) {
   const item = await db.autopilotItem.findFirst({
     where: { id: itemId, projectId },
@@ -522,6 +532,27 @@ export async function approveAutopilotItem(
   await db.autopilotItem.update({ where: { id: item.id }, data: { status: "approved" } });
   await auditAutopilot(db, args.workspaceId, args.projectId, "autopilot_item_approved",
     `Autopilot item approved: "${item.title}"`);
+  // Redesign §2 (automation canvas): workflow approval gates enqueue items
+  // with sourceRef "workflow_run:<runId>:<nodeId>". Approving one resumes
+  // the paused workflow run. Dynamic import avoids a static import cycle
+  // with lib/workflow/engine (engine → actions → this module).
+  const gate = parseWorkflowGateRef(item.sourceRef);
+  if (gate) {
+    try {
+      const { resumeWorkflowRun } = await import("@/lib/workflow/engine");
+      await resumeWorkflowRun({
+        runId: gate.runId,
+        nodeId: gate.nodeId,
+        decision: "approved",
+        itemId: item.id,
+        workspaceId: args.workspaceId,
+        actor: args.actor,
+      });
+    } catch (err) {
+      await auditAutopilot(db, args.workspaceId, args.projectId, "autopilot_run_finished",
+        `Workflow run ${gate.runId} failed to resume after approval: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
 }
 
 export async function rejectAutopilotItem(
@@ -538,6 +569,26 @@ export async function rejectAutopilotItem(
   });
   await auditAutopilot(db, args.workspaceId, args.projectId, "autopilot_item_rejected",
     `Autopilot item rejected: "${item.title}"${args.note ? ` — ${args.note}` : ""}`);
+  // Redesign §2 (automation canvas): rejecting a workflow gate item cancels
+  // the paused run. Mirrors the approval hook above (dynamic import avoids
+  // the static cycle with lib/workflow/engine).
+  const gate = parseWorkflowGateRef(item.sourceRef);
+  if (gate) {
+    try {
+      const { resumeWorkflowRun } = await import("@/lib/workflow/engine");
+      await resumeWorkflowRun({
+        runId: gate.runId,
+        nodeId: gate.nodeId,
+        decision: "rejected",
+        itemId: item.id,
+        workspaceId: args.workspaceId,
+        actor: args.actor,
+      });
+    } catch (err) {
+      await auditAutopilot(db, args.workspaceId, args.projectId, "autopilot_run_finished",
+        `Workflow run ${gate.runId} failed to cancel after rejection: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
 }
 
 // Publishing

@@ -29,7 +29,7 @@ const th =
   "px-3 py-2 text-left text-xs font-medium uppercase tracking-widest text-zinc-500";
 const td = "px-3 py-2 text-sm";
 const inputCls =
-  "rounded-md border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-zinc-500 focus:outline-none";
+  "rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-orange-500 focus:outline-none";
 
 function fmt(n: number | null, digits = 0): string {
   if (n == null) return "—";
@@ -164,8 +164,8 @@ export default function KeywordResearch({ projectId }: { projectId: string }) {
         <div
           className={`rounded-xl border px-4 py-3 text-sm ${
             provider.isLive
-              ? "border-emerald-900 bg-emerald-950/40 text-emerald-300"
-              : "border-amber-900 bg-amber-950/40 text-amber-300"
+              ? "border-emerald-200 bg-emerald-50/40 text-emerald-700"
+              : "border-amber-200 bg-amber-50/40 text-amber-700"
           }`}
         >
           {provider.isLive ? (
@@ -184,7 +184,7 @@ export default function KeywordResearch({ projectId }: { projectId: string }) {
       {/* Research form */}
       <form
         onSubmit={onResearch}
-        className="flex flex-col gap-3 rounded-xl border border-zinc-800 bg-zinc-900/60 p-5 sm:flex-row sm:items-end"
+        className="flex flex-col gap-3 rounded-xl border border-zinc-200 bg-white/60 p-5 sm:flex-row sm:items-end"
       >
         <div className="flex-1">
           <label
@@ -204,18 +204,18 @@ export default function KeywordResearch({ projectId }: { projectId: string }) {
         <button
           type="submit"
           disabled={loading}
-          className="rounded-md bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-950 hover:bg-white disabled:opacity-50"
+          className="rounded-md bg-orange-600 px-4 py-2 text-sm font-medium text-white hover:bg-orange-700 disabled:opacity-50 active:scale-[0.96] transition-[background-color,transform] duration-150 ease-[cubic-bezier(0.2,0,0,1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2"
         >
           {loading ? "Researching…" : "Research"}
         </button>
       </form>
-      {error && <p className="text-sm text-red-400">{error}</p>}
+      {error && <p className="text-sm text-red-600">{error}</p>}
 
       {/* Results */}
       {ideas.length > 0 && (
         <div className="flex flex-col gap-4">
-          <div className="flex flex-wrap items-center gap-x-6 gap-y-3 rounded-xl border border-zinc-800 bg-zinc-900/60 p-4 text-sm">
-            <label className="flex items-center gap-2 text-zinc-400">
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-3 rounded-xl border border-zinc-200 bg-white/60 p-4 text-sm">
+            <label className="flex items-center gap-2 text-zinc-500">
               Max difficulty
               <input
                 type="number"
@@ -226,7 +226,7 @@ export default function KeywordResearch({ projectId }: { projectId: string }) {
                 className={`w-20 ${inputCls}`}
               />
             </label>
-            <label className="flex items-center gap-2 text-zinc-400">
+            <label className="flex items-center gap-2 text-zinc-500">
               Min volume
               <input
                 type="number"
@@ -245,8 +245,8 @@ export default function KeywordResearch({ projectId }: { projectId: string }) {
                   onClick={() => toggleIntent(intent)}
                   className={`rounded-full border px-3 py-1 text-xs ${
                     intentFilter.includes(intent)
-                      ? "border-zinc-100 bg-zinc-100 text-zinc-950"
-                      : "border-zinc-700 text-zinc-400 hover:border-zinc-500"
+                      ? "border-zinc-900 bg-zinc-900 text-white"
+                      : "border-zinc-200 text-zinc-500 hover:border-zinc-400"
                   }`}
                 >
                   {intent}
@@ -258,9 +258,9 @@ export default function KeywordResearch({ projectId }: { projectId: string }) {
             </span>
           </div>
 
-          <div className="overflow-x-auto rounded-xl border border-zinc-800">
+          <div className="overflow-x-auto rounded-xl border border-zinc-200">
             <table className="w-full border-collapse">
-              <thead className="bg-zinc-900">
+              <thead className="bg-white">
                 <tr>
                   <th className={th}>
                     <input
@@ -284,7 +284,7 @@ export default function KeywordResearch({ projectId }: { projectId: string }) {
                 {filtered.map((idea) => (
                   <tr
                     key={idea.phrase}
-                    className="border-t border-zinc-800/60 hover:bg-zinc-900/60"
+                    className="border-t border-zinc-200/60 hover:bg-zinc-100/60"
                   >
                     <td className={td}>
                       <input
@@ -294,10 +294,10 @@ export default function KeywordResearch({ projectId }: { projectId: string }) {
                         aria-label={`Select ${idea.phrase}`}
                       />
                     </td>
-                    <td className={`${td} font-medium text-zinc-100`}>
+                    <td className={`${td} font-medium text-zinc-900`}>
                       {idea.phrase}
                       {idea.mock && (
-                        <span className="ml-2 rounded bg-amber-900/60 px-1.5 py-0.5 text-[10px] uppercase text-amber-300">
+                        <span className="ml-2 rounded bg-amber-100/60 px-1.5 py-0.5 text-[10px] uppercase text-amber-700">
                           mock
                         </span>
                       )}
@@ -308,7 +308,7 @@ export default function KeywordResearch({ projectId }: { projectId: string }) {
                       {idea.cpc == null ? "—" : `$${fmt(idea.cpc, 2)}`}
                     </td>
                     <td className={td}>
-                      <span className="rounded-full border border-zinc-700 px-2 py-0.5 text-xs text-zinc-400">
+                      <span className="rounded-full border border-zinc-200 px-2 py-0.5 text-xs text-zinc-500">
                         {idea.intent}
                       </span>
                     </td>
@@ -318,7 +318,7 @@ export default function KeywordResearch({ projectId }: { projectId: string }) {
             </table>
           </div>
 
-          <div className="flex flex-col gap-3 rounded-xl border border-zinc-800 bg-zinc-900/60 p-4 sm:flex-row sm:items-end">
+          <div className="flex flex-col gap-3 rounded-xl border border-zinc-200 bg-white/60 p-4 sm:flex-row sm:items-end">
             <div className="flex-1">
               <label
                 htmlFor="list"
@@ -337,12 +337,12 @@ export default function KeywordResearch({ projectId }: { projectId: string }) {
             <button
               onClick={onSave}
               disabled={saving || selected.size === 0}
-              className="rounded-md bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-950 hover:bg-white disabled:opacity-50"
+              className="rounded-md bg-orange-600 px-4 py-2 text-sm font-medium text-white hover:bg-orange-700 disabled:opacity-50 active:scale-[0.96] transition-[background-color,transform] duration-150 ease-[cubic-bezier(0.2,0,0,1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2"
             >
               {saving ? "Saving…" : `Save ${selected.size} keyword(s)`}
             </button>
           </div>
-          {saveMsg && <p className="text-sm text-emerald-400">{saveMsg}</p>}
+          {saveMsg && <p className="text-sm text-emerald-600">{saveMsg}</p>}
         </div>
       )}
 
@@ -352,13 +352,13 @@ export default function KeywordResearch({ projectId }: { projectId: string }) {
           Saved keywords ({saved.length})
         </h2>
         {saved.length === 0 ? (
-          <p className="rounded-xl border border-dashed border-zinc-800 p-6 text-center text-sm text-zinc-500">
+          <p className="rounded-xl border border-dashed border-zinc-200 p-6 text-center text-sm text-zinc-500">
             No saved keywords yet.
           </p>
         ) : (
-          <div className="overflow-x-auto rounded-xl border border-zinc-800">
+          <div className="overflow-x-auto rounded-xl border border-zinc-200">
             <table className="w-full border-collapse">
-              <thead className="bg-zinc-900">
+              <thead className="bg-white">
                 <tr>
                   <th className={th}>Keyword</th>
                   <th className={th}>List</th>
@@ -372,9 +372,9 @@ export default function KeywordResearch({ projectId }: { projectId: string }) {
                 {saved.map((k) => (
                   <tr
                     key={k.id}
-                    className="border-t border-zinc-800/60 hover:bg-zinc-900/60"
+                    className="border-t border-zinc-200/60 hover:bg-zinc-100/60"
                   >
-                    <td className={`${td} font-medium text-zinc-100`}>
+                    <td className={`${td} font-medium text-zinc-900`}>
                       {k.phrase}
                     </td>
                     <td className={td}>{k.list}</td>

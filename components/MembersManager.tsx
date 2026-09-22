@@ -6,9 +6,9 @@
 import { useCallback, useEffect, useState } from "react";
 
 const inputCls =
-  "rounded-md border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-zinc-500 focus:outline-none";
+  "rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-orange-500 focus:outline-none";
 const btnCls =
-  "rounded-md border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm font-medium hover:bg-zinc-700 disabled:opacity-50";
+  "rounded-md border border-zinc-200 bg-zinc-100 px-3 py-2 text-sm font-medium hover:bg-zinc-200 disabled:opacity-50";
 
 interface Member {
   id: string;
@@ -109,7 +109,7 @@ export default function MembersManager({ myRole }: { myRole: string }) {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-5">
+      <div className="rounded-xl border border-zinc-200 bg-white/60 p-5">
         <h2 className="text-sm font-medium">Invite a teammate</h2>
         <p className="mt-1 text-xs text-zinc-500">
           They join through a single-use invite link (valid 7 days) — no email
@@ -140,14 +140,14 @@ export default function MembersManager({ myRole }: { myRole: string }) {
             {busy ? "Inviting…" : "Invite"}
           </button>
         </div>
-        {error && <p className="mt-2 text-sm text-red-400">{error}</p>}
+        {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
         {inviteUrl && (
-          <div className="mt-3 rounded-md border border-emerald-900 bg-emerald-950/40 p-3">
-            <p className="text-xs text-emerald-300">
+          <div className="mt-3 rounded-md border border-emerald-200 bg-emerald-50/40 p-3">
+            <p className="text-xs text-emerald-700">
               Invite created — share this single-use link with them:
             </p>
             <div className="mt-2 flex items-center gap-2">
-              <code className="min-w-0 flex-1 truncate rounded bg-zinc-950 px-2 py-1 text-xs text-zinc-300">
+              <code className="min-w-0 flex-1 truncate rounded bg-zinc-50 px-2 py-1 text-xs text-zinc-500">
                 {typeof window !== "undefined"
                   ? new URL(inviteUrl, window.location.origin).toString()
                   : inviteUrl}
@@ -167,10 +167,10 @@ export default function MembersManager({ myRole }: { myRole: string }) {
         )}
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-zinc-800">
+      <div className="overflow-hidden rounded-xl border border-zinc-200">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-zinc-800 bg-zinc-900/60 text-left text-xs uppercase tracking-widest text-zinc-500">
+            <tr className="border-b border-zinc-200 bg-white/60 text-left text-xs uppercase tracking-widest text-zinc-500">
               <th className="px-4 py-3">Member</th>
               <th className="px-4 py-3">Role</th>
               <th className="px-4 py-3">Status</th>
@@ -179,7 +179,7 @@ export default function MembersManager({ myRole }: { myRole: string }) {
           </thead>
           <tbody>
             {members.map((m) => (
-              <tr key={m.id} className="border-b border-zinc-800/60 last:border-0">
+              <tr key={m.id} className="border-b border-zinc-200/60 last:border-0">
                 <td className="px-4 py-3">
                   <div className="font-medium">{m.name ?? m.email ?? "—"}</div>
                   {m.name && m.email && (
@@ -201,11 +201,11 @@ export default function MembersManager({ myRole }: { myRole: string }) {
                 </td>
                 <td className="px-4 py-3">
                   {m.pending ? (
-                    <span className="rounded-full bg-amber-950 px-2 py-0.5 text-xs text-amber-300">
+                    <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs text-amber-700">
                       pending — needs invite link
                     </span>
                   ) : (
-                    <span className="rounded-full bg-emerald-950 px-2 py-0.5 text-xs text-emerald-300">
+                    <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs text-emerald-700">
                       active
                     </span>
                   )}
@@ -215,14 +215,14 @@ export default function MembersManager({ myRole }: { myRole: string }) {
                     {m.pending && (
                       <button
                         onClick={() => copyInviteLink(m.id)}
-                        className="rounded-md border border-zinc-700 bg-zinc-800 px-2 py-1 text-xs text-zinc-200 hover:bg-zinc-700"
+                        className="rounded-md border border-zinc-200 bg-zinc-100 px-2 py-1 text-xs text-zinc-800 hover:bg-zinc-200"
                       >
                         {copied === m.id ? "Copied!" : "Copy invite link"}
                       </button>
                     )}
                     <button
                       onClick={() => remove(m.id)}
-                      className="rounded-md border border-red-900 bg-red-950 px-2 py-1 text-xs text-red-300 hover:bg-red-900"
+                      className="rounded-md border border-red-200 bg-red-50 px-2 py-1 text-xs text-red-700 hover:bg-red-100"
                     >
                       Remove
                     </button>

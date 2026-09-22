@@ -143,17 +143,17 @@ function tiptapToSimple(doc: unknown): SimpleBlock[] {
 }
 
 const inputCls =
-  "w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:border-zinc-500 focus:outline-none";
+  "w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 placeholder-zinc-500 focus:border-orange-500 focus:outline-none";
 const btnPrimary =
-  "rounded-md bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-900 hover:bg-white disabled:opacity-50";
+  "rounded-md bg-orange-600 px-4 py-2 text-sm font-medium text-white hover:bg-orange-700 disabled:opacity-50 active:scale-[0.96] transition-[background-color,transform] duration-150 ease-[cubic-bezier(0.2,0,0,1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2";
 const btnSecondary =
-  "rounded-md border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-200 hover:border-zinc-500 disabled:opacity-50";
+  "rounded-md border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-800 hover:border-zinc-400 disabled:opacity-50";
 const btnDanger =
-  "rounded-md border border-red-900 px-3 py-1.5 text-sm text-red-400 hover:border-red-700 disabled:opacity-50";
+  "rounded-md border border-red-200 px-3 py-1.5 text-sm text-red-600 hover:border-red-300 disabled:opacity-50";
 
 function FlagBadge({ flag }: { flag: string }) {
   return (
-    <span className="inline-block rounded-full bg-amber-900/40 px-2 py-0.5 text-xs text-amber-300">
+    <span className="inline-block rounded-full bg-amber-100/40 px-2 py-0.5 text-xs text-amber-700">
       {FLAG_LABELS[flag] ?? flag}
     </span>
   );
@@ -161,10 +161,10 @@ function FlagBadge({ flag }: { flag: string }) {
 
 function StatusBadge({ status }: { status: PageRow["status"] }) {
   const colors: Record<string, string> = {
-    draft: "bg-zinc-800 text-zinc-300",
-    ready: "bg-blue-900/40 text-blue-300",
-    published: "bg-emerald-900/40 text-emerald-300",
-    discarded: "bg-zinc-900 text-zinc-600",
+    draft: "bg-zinc-100 text-zinc-500",
+    ready: "bg-blue-100/40 text-blue-700",
+    published: "bg-emerald-900/40 text-emerald-700",
+    discarded: "bg-white text-zinc-500",
   };
   return (
     <span className={`inline-block rounded-full px-2 py-0.5 text-xs ${colors[status]}`}>{status}</span>
@@ -257,9 +257,9 @@ function TemplateEditor({
   const insertSources = [...new Set([...detectedVars, ...datasetColumns])];
 
   return (
-    <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-5">
+    <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-5">
       <h3 className="mb-4 text-base font-semibold">{initial ? "Edit template" : "New template"}</h3>
-      {error && <p className="mb-3 rounded-md bg-red-900/30 px-3 py-2 text-sm text-red-300">{error}</p>}
+      {error && <p className="mb-3 rounded-md bg-red-100/30 px-3 py-2 text-sm text-red-700">{error}</p>}
       <div className="grid gap-4 md:grid-cols-2">
         <label className="block">
           <span className="mb-1 block text-xs uppercase tracking-widest text-zinc-500">Name</span>
@@ -290,14 +290,14 @@ function TemplateEditor({
       <div className="mt-4">
         <span className="mb-1 block text-xs uppercase tracking-widest text-zinc-500">Insert variable</span>
         <div className="flex flex-wrap gap-1.5">
-          {insertSources.length === 0 && <span className="text-xs text-zinc-600">Type {"{{var}}"} in a field to detect variables, or upload a dataset.</span>}
+          {insertSources.length === 0 && <span className="text-xs text-zinc-500">Type {"{{var}}"} in a field to detect variables, or upload a dataset.</span>}
           {insertSources.map((v) => (
-            <button key={v} type="button" onClick={() => insertVariable(v)} className="rounded border border-zinc-700 px-2 py-0.5 font-mono text-xs text-zinc-300 hover:border-zinc-500">
+            <button key={v} type="button" onClick={() => insertVariable(v)} className="rounded border border-zinc-200 px-2 py-0.5 font-mono text-xs text-zinc-500 hover:border-zinc-400">
               {`{{${v}}}`}
             </button>
           ))}
         </div>
-        <p className="mt-1 text-xs text-zinc-600">Fallbacks: {"{{city|your area}}"} renders “your area” when city is empty.</p>
+        <p className="mt-1 text-xs text-zinc-500">Fallbacks: {"{{city|your area}}"} renders “your area” when city is empty.</p>
       </div>
 
       <div className="mt-4">
@@ -306,7 +306,7 @@ function TemplateEditor({
           {blocks.map((b, i) => (
             <div key={i} className="flex gap-2">
               <select
-                className="w-28 rounded-md border border-zinc-700 bg-zinc-900 px-2 py-2 text-xs text-zinc-200"
+                className="w-28 rounded-md border border-zinc-200 bg-white px-2 py-2 text-xs text-zinc-800"
                 value={b.type}
                 onChange={(e) => setBlocks((bs) => bs.map((x, j) => (j === i ? { ...x, type: e.target.value as SimpleBlock["type"] } : x)))}
               >
@@ -328,7 +328,7 @@ function TemplateEditor({
         <button
           type="button"
           onClick={() => setBlocks((bs) => [...bs, { type: "paragraph", text: "" }])}
-          className="mt-2 rounded-md border border-dashed border-zinc-700 px-3 py-1.5 text-xs text-zinc-400 hover:border-zinc-500"
+          className="mt-2 rounded-md border border-dashed border-zinc-200 px-3 py-1.5 text-xs text-zinc-500 hover:border-zinc-400"
         >
           + Add block
         </button>
@@ -343,13 +343,13 @@ function TemplateEditor({
           <span className="mb-1 block text-xs uppercase tracking-widest text-zinc-500">Duplicate-rate cap (0–1)</span>
           <input type="number" className={inputCls} value={duplicateRateCap} min={0} max={1} step={0.01} onChange={(e) => setDuplicateRateCap(Number(e.target.value))} />
         </label>
-        <label className="flex items-center gap-2 pt-5 text-sm text-zinc-300">
+        <label className="flex items-center gap-2 pt-5 text-sm text-zinc-500">
           <input type="checkbox" checked={noindexUntilApproved} onChange={(e) => setNoindexUntilApproved(e.target.checked)} />
           noindex until published
         </label>
       </div>
 
-      <div className="mt-4 rounded-lg border border-zinc-800 p-4">
+      <div className="mt-4 rounded-lg border border-zinc-200 p-4">
         <span className="mb-2 block text-xs uppercase tracking-widest text-zinc-500">Default publish target</span>
         <div className="grid gap-3 md:grid-cols-3">
           <label className="block">
@@ -387,7 +387,7 @@ function TemplateEditor({
             </label>
           )}
         </div>
-        <p className="mt-2 text-xs text-zinc-600">
+        <p className="mt-2 text-xs text-zinc-500">
           Pages of this template publish here by default; individual pages can override it in the Pages tab. Quality gates still run before every push.
         </p>
       </div>
@@ -440,7 +440,7 @@ function TemplatesTab({
 
   return (
     <div className="flex flex-col gap-4">
-      {error && <p className="rounded-md bg-red-900/30 px-3 py-2 text-sm text-red-300">{error}</p>}
+      {error && <p className="rounded-md bg-red-100/30 px-3 py-2 text-sm text-red-700">{error}</p>}
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-medium uppercase tracking-widest text-zinc-500">Templates</h2>
         {canEdit && (
@@ -458,20 +458,20 @@ function TemplatesTab({
         />
       )}
       {templates.length === 0 && !editing && (
-        <p className="rounded-xl border border-dashed border-zinc-800 p-8 text-center text-sm text-zinc-500">
+        <p className="rounded-xl border border-dashed border-zinc-200 p-8 text-center text-sm text-zinc-500">
           No templates yet. Create one to start generating pages.
         </p>
       )}
       <div className="grid gap-3">
         {templates.map((t) => (
-          <div key={t.id} className="rounded-xl border border-zinc-800 bg-zinc-950 p-4">
+          <div key={t.id} className="rounded-xl border border-zinc-200 bg-zinc-50 p-4">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <h3 className="font-semibold">{t.name}</h3>
                 <p className="mt-0.5 font-mono text-xs text-zinc-500">{t.urlPattern}</p>
                 <div className="mt-2 flex flex-wrap gap-1.5">
                   {(t.variables ?? []).map((v) => (
-                    <span key={v.name} className="rounded border border-zinc-800 px-1.5 py-0.5 font-mono text-xs text-zinc-400">
+                    <span key={v.name} className="rounded border border-zinc-200 px-1.5 py-0.5 font-mono text-xs text-zinc-500">
                       {`{{${v.name}${v.fallback !== undefined ? `|${v.fallback}` : ""}}}`}
                     </span>
                   ))}
@@ -603,7 +603,7 @@ function DatasetsTab({
 
   return (
     <div className="flex flex-col gap-4">
-      {error && <p className="rounded-md bg-red-900/30 px-3 py-2 text-sm text-red-300">{error}</p>}
+      {error && <p className="rounded-md bg-red-100/30 px-3 py-2 text-sm text-red-700">{error}</p>}
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-medium uppercase tracking-widest text-zinc-500">Datasets</h2>
         {canEdit && (
@@ -613,22 +613,22 @@ function DatasetsTab({
           </label>
         )}
       </div>
-      <p className="text-xs text-zinc-600">CSV upload, parsed server-side. 10,000-row cap. Columns auto-map to template variables by name; override below when names differ.</p>
+      <p className="text-xs text-zinc-500">CSV upload, parsed server-side. 10,000-row cap. Columns auto-map to template variables by name; override below when names differ.</p>
       {datasets.length === 0 && (
-        <p className="rounded-xl border border-dashed border-zinc-800 p-8 text-center text-sm text-zinc-500">
+        <p className="rounded-xl border border-dashed border-zinc-200 p-8 text-center text-sm text-zinc-500">
           No datasets yet. Upload a CSV to feed your templates.
         </p>
       )}
       <div className="grid gap-3">
         {datasets.map((d) => (
-          <div key={d.id} className="rounded-xl border border-zinc-800 bg-zinc-950 p-4">
+          <div key={d.id} className="rounded-xl border border-zinc-200 bg-zinc-50 p-4">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <h3 className="font-semibold">{d.name}</h3>
                 <p className="mt-0.5 text-xs text-zinc-500">
                   {d.rowCount.toLocaleString()} rows · {d.columns.length} columns · {d.pageCount ?? 0} pages generated
                 </p>
-                <p className="mt-1 font-mono text-xs text-zinc-600">{d.columns.join(", ")}</p>
+                <p className="mt-1 font-mono text-xs text-zinc-500">{d.columns.join(", ")}</p>
               </div>
               <div className="flex shrink-0 gap-2">
                 <button onClick={() => loadPreview(d.id)} className={btnSecondary}>
@@ -648,15 +648,15 @@ function DatasetsTab({
                   <thead>
                     <tr className="text-left text-zinc-500">
                       {previews[d.id].columns.map((c) => (
-                        <th key={c} className="border-b border-zinc-800 px-2 py-1 font-medium">{c}</th>
+                        <th key={c} className="border-b border-zinc-200 px-2 py-1 font-medium">{c}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
                     {previews[d.id].rows.map((r, i) => (
-                      <tr key={i} className="text-zinc-300">
+                      <tr key={i} className="text-zinc-500">
                         {previews[d.id].columns.map((c) => (
-                          <td key={c} className="border-b border-zinc-900 px-2 py-1">{String(r[c] ?? "")}</td>
+                          <td key={c} className="border-b border-zinc-300 px-2 py-1">{String(r[c] ?? "")}</td>
                         ))}
                       </tr>
                     ))}
@@ -665,14 +665,14 @@ function DatasetsTab({
               </div>
             )}
             {mappingFor === d.id && (
-              <div className="mt-3 rounded-lg border border-zinc-800 p-3">
+              <div className="mt-3 rounded-lg border border-zinc-200 p-3">
                 <h4 className="mb-2 text-xs font-medium uppercase tracking-widest text-zinc-500">Variable → column mapping</h4>
                 <div className="grid gap-2 md:grid-cols-2">
                   {templateVars.map((v) => (
                     <label key={v} className="flex items-center gap-2 text-sm">
-                      <span className="w-32 shrink-0 font-mono text-xs text-zinc-400">{`{{${v}}}`}</span>
+                      <span className="w-32 shrink-0 font-mono text-xs text-zinc-500">{`{{${v}}}`}</span>
                       <select
-                        className="flex-1 rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-xs text-zinc-200"
+                        className="flex-1 rounded-md border border-zinc-200 bg-white px-2 py-1.5 text-xs text-zinc-800"
                         value={mappingDraft[v] ?? ""}
                         onChange={(e) => setMappingDraft((m) => { const n = { ...m }; if (e.target.value) n[v] = e.target.value; else delete n[v]; return n; })}
                       >
@@ -920,10 +920,10 @@ function PagesTab({
 
   return (
     <div className="flex flex-col gap-4">
-      {error && <p className="rounded-md bg-red-900/30 px-3 py-2 text-sm text-red-300">{error}</p>}
+      {error && <p className="rounded-md bg-red-100/30 px-3 py-2 text-sm text-red-700">{error}</p>}
 
       {/* Generation controls */}
-      <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-4">
+      <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-4">
         <h2 className="mb-3 text-sm font-medium uppercase tracking-widest text-zinc-500">Generate</h2>
         <div className="grid gap-3 md:grid-cols-2">
           <label className="block">
@@ -954,9 +954,9 @@ function PagesTab({
           </div>
         )}
         {genResult && (
-          <div className="mt-3 rounded-lg border border-zinc-800 p-3 text-sm text-zinc-300">
+          <div className="mt-3 rounded-lg border border-zinc-200 p-3 text-sm text-zinc-500">
             <p>
-              Generated: <strong className="text-zinc-100">{String(genResult.created)} created</strong>,{" "}
+              Generated: <strong className="text-zinc-900">{String(genResult.created)} created</strong>,{" "}
               {String(genResult.updated)} updated, {String(genResult.flagged)} flagged,{" "}
               {String(genResult.skippedPublished)} published skipped,{" "}
               {(genResult.skippedCollisions as unknown[])?.length ?? 0} slug collisions skipped.
@@ -967,26 +967,26 @@ function PagesTab({
 
       {/* Preview results */}
       {preview && (
-        <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-4">
+        <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-4">
           <div className="mb-2 flex items-center justify-between">
             <h3 className="text-sm font-medium">Preview — first {preview.length} of {previewTotal.toLocaleString()} rows</h3>
-            <button onClick={() => setPreview(null)} className="text-xs text-zinc-500 hover:text-zinc-300">close</button>
+            <button onClick={() => setPreview(null)} className="text-xs text-zinc-500 hover:text-zinc-600">close</button>
           </div>
           <div className="flex flex-col gap-2">
             {preview.map((p) => (
               <button
                 key={p.rowIndex}
                 onClick={() => setDrawer(p)}
-                className="rounded-lg border border-zinc-800 p-3 text-left hover:border-zinc-600"
+                className="rounded-lg border border-zinc-200 p-3 text-left hover:border-zinc-300"
               >
-                <p className="font-mono text-xs text-zinc-400">{p.url}</p>
-                <p className="mt-0.5 text-sm font-medium text-zinc-100">{p.title}</p>
+                <p className="font-mono text-xs text-zinc-500">{p.url}</p>
+                <p className="mt-0.5 text-sm font-medium text-zinc-900">{p.title}</p>
                 <div className="mt-1 flex gap-1.5">
                   {p.flags.map((f) => (
                     <FlagBadge key={f} flag={f} />
                   ))}
-                  {p.flags.length === 0 && <span className="text-xs text-emerald-400">✓ clean</span>}
-                  <span className="text-xs text-zinc-600">{p.wordCount} words</span>
+                  {p.flags.length === 0 && <span className="text-xs text-emerald-600">✓ clean</span>}
+                  <span className="text-xs text-zinc-500">{p.wordCount} words</span>
                 </div>
               </button>
             ))}
@@ -995,14 +995,14 @@ function PagesTab({
       )}
 
       {/* Page list */}
-      <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-4">
+      <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-4">
         <div className="mb-3 flex flex-wrap items-center gap-2">
           <h2 className="mr-2 text-sm font-medium uppercase tracking-widest text-zinc-500">Pages</h2>
           {(["", "draft", "ready", "published", "discarded"] as const).map((s) => (
             <button
               key={s}
               onClick={() => setStatusFilter(s)}
-              className={`rounded-full px-3 py-1 text-xs ${statusFilter === s ? "bg-zinc-100 text-zinc-900" : "border border-zinc-700 text-zinc-400"}`}
+              className={`rounded-full px-3 py-1 text-xs ${statusFilter === s ? "bg-zinc-900 text-white" : "border border-zinc-200 text-zinc-500"}`}
             >
               {s === "" ? `all (${Object.values(counts).reduce((a, b) => a + b, 0)})` : `${s} (${counts[s] ?? 0})`}
             </button>
@@ -1018,18 +1018,18 @@ function PagesTab({
         </div>
 
         {canEdit && selected.size > 0 && (
-          <div className="mb-3 flex items-center gap-2 rounded-lg border border-zinc-800 p-2">
-            <span className="text-xs text-zinc-400">{selected.size} selected</span>
+          <div className="mb-3 flex items-center gap-2 rounded-lg border border-zinc-200 p-2">
+            <span className="text-xs text-zinc-500">{selected.size} selected</span>
             <button onClick={() => bulkAction("approve")} disabled={acting} className={btnSecondary}>Approve → ready</button>
             <button onClick={() => bulkAction("publish")} disabled={acting} className={btnPrimary}>Publish</button>
             <button onClick={() => bulkAction("discard")} disabled={acting} className={btnDanger}>Discard</button>
           </div>
         )}
         {actionResult && (
-          <div className="mb-3 rounded-lg border border-zinc-800 p-3 text-sm">
-            <p className="text-emerald-400">{actionResult.changed.length} page(s) updated.</p>
+          <div className="mb-3 rounded-lg border border-zinc-200 p-3 text-sm">
+            <p className="text-emerald-600">{actionResult.changed.length} page(s) updated.</p>
             {actionResult.pushes && actionResult.pushes.length > 0 && (
-              <ul className="mt-2 list-disc pl-5 text-xs text-zinc-400">
+              <ul className="mt-2 list-disc pl-5 text-xs text-zinc-500">
                 {actionResult.pushes.slice(0, 10).map((pu) => (
                   <li key={pu.id}>
                     <span className="font-mono">{pu.url}</span> → {TARGET_LABELS[pu.target] ?? pu.target}
@@ -1037,7 +1037,7 @@ function PagesTab({
                     {pu.updated ? " (updated in place)" : ""}
                     {pu.mock ? " (mock)" : ""}
                     {pu.externalUrl ? (
-                      <> · <a href={pu.externalUrl} target="_blank" rel="noreferrer" className="underline hover:text-zinc-200">{pu.externalUrl}</a></>
+                      <> · <a href={pu.externalUrl} target="_blank" rel="noreferrer" className="underline hover:text-zinc-800">{pu.externalUrl}</a></>
                     ) : null}
                   </li>
                 ))}
@@ -1046,8 +1046,8 @@ function PagesTab({
             )}
             {actionResult.blocked.length > 0 && (
               <div className="mt-2">
-                <p className="text-amber-300">{actionResult.blocked.length} blocked by quality gates:</p>
-                <ul className="mt-1 list-disc pl-5 text-xs text-zinc-400">
+                <p className="text-amber-700">{actionResult.blocked.length} blocked by quality gates:</p>
+                <ul className="mt-1 list-disc pl-5 text-xs text-zinc-500">
                   {actionResult.blocked.slice(0, 10).map((b) => (
                     <li key={b.id}><span className="font-mono">{b.url}</span> — {b.reasons.join("; ")}</li>
                   ))}
@@ -1074,18 +1074,18 @@ function PagesTab({
               {pages.map((p) => {
                 const effKind = p.publishTarget !== "none" ? p.publishTarget : (p.template.defaultPublishTarget ?? "none");
                 return (
-                <tr key={p.id} className="border-t border-zinc-900 text-zinc-300">
+                <tr key={p.id} className="border-t border-zinc-300 text-zinc-500">
                   {canEdit && <td className="px-2 py-2"><input type="checkbox" checked={selected.has(p.id)} onChange={() => toggleSelect(p.id)} /></td>}
                   <td className="px-2 py-2">
-                    <button onClick={() => setDrawer(p)} className="font-mono text-xs text-zinc-200 hover:text-white">{p.url}</button>
-                    <p className="max-w-md truncate text-xs text-zinc-600">{p.title}</p>
+                    <button onClick={() => setDrawer(p)} className="font-mono text-xs text-zinc-800 hover:text-zinc-900">{p.url}</button>
+                    <p className="max-w-md truncate text-xs text-zinc-500">{p.title}</p>
                     {p.externalUrl && <p className="max-w-md truncate text-xs text-emerald-600">→ {p.externalUrl}</p>}
                   </td>
                   <td className="px-2 py-2"><StatusBadge status={p.status} /></td>
                   <td className="px-2 py-2">
                     {canEdit ? (
                       <select
-                        className="rounded-md border border-zinc-700 bg-zinc-900 px-1.5 py-1 text-xs text-zinc-300"
+                        className="rounded-md border border-zinc-200 bg-white px-1.5 py-1 text-xs text-zinc-500"
                         value={p.publishTarget}
                         onChange={(e) => setPageTarget(p.id, e.target.value)}
                         title="Per-page publish target override (blank = template default)"
@@ -1108,20 +1108,20 @@ function PagesTab({
             </tbody>
           </table>
           {pages.length === 0 && !loading && (
-            <p className="p-6 text-center text-sm text-zinc-600">No pages loaded. Pick a template + dataset and generate, or adjust filters.</p>
+            <p className="p-6 text-center text-sm text-zinc-500">No pages loaded. Pick a template + dataset and generate, or adjust filters.</p>
           )}
         </div>
 
         <div className="mt-3 flex gap-3 text-xs">
-          <a href={`/api/programmatic/export?projectId=${projectId}${templateId ? `&templateId=${templateId}` : ""}`} className="text-zinc-400 underline hover:text-zinc-200">Export CSV</a>
-          <a href={`/api/programmatic/sitemap?projectId=${projectId}`} target="_blank" rel="noreferrer" className="text-zinc-400 underline hover:text-zinc-200">View sitemap.xml</a>
+          <a href={`/api/programmatic/export?projectId=${projectId}${templateId ? `&templateId=${templateId}` : ""}`} className="text-zinc-500 underline hover:text-zinc-800">Export CSV</a>
+          <a href={`/api/programmatic/sitemap?projectId=${projectId}`} target="_blank" rel="noreferrer" className="text-zinc-500 underline hover:text-zinc-800">View sitemap.xml</a>
         </div>
       </div>
 
       {/* Publish destination summary modal */}
       {pushModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => setPushModal(false)}>
-          <div className="w-full max-w-2xl rounded-xl border border-zinc-800 bg-zinc-950 p-6" onClick={(e) => e.stopPropagation()}>
+          <div className="w-full max-w-2xl rounded-xl border border-zinc-200 bg-zinc-50 p-6" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-base font-semibold">Publish {selected.size} page(s)</h3>
             <p className="mt-1 text-xs text-zinc-500">
               Destination per page (explicit override below wins, else the page override, else the template default).
@@ -1129,7 +1129,7 @@ function PagesTab({
               target updates in place instead of duplicating.
             </p>
 
-            <div className="mt-4 max-h-56 overflow-y-auto rounded-lg border border-zinc-800">
+            <div className="mt-4 max-h-56 overflow-y-auto rounded-lg border border-zinc-200">
               <table className="w-full text-xs">
                 <thead>
                   <tr className="text-left text-zinc-500">
@@ -1146,10 +1146,10 @@ function PagesTab({
                       : d.kind === "csv" ? "CSV export (internal)"
                       : `${TARGET_LABELS[d.kind] ?? d.kind}${d.siteId ? ` → ${siteName(d.siteId) ?? d.siteId}` : " (no site!)"}`;
                     return (
-                      <tr key={p.id} className="border-t border-zinc-900 text-zinc-300">
+                      <tr key={p.id} className="border-t border-zinc-300 text-zinc-500">
                         <td className="px-3 py-1.5 font-mono">{p.url}</td>
                         <td className="px-3 py-1.5"><StatusBadge status={p.status} /></td>
-                        <td className={`px-3 py-1.5 ${d.kind === "none" || ((d.kind === "wordpress" || d.kind === "webflow" || d.kind === "marketr-site") && !d.siteId) ? "text-amber-300" : ""}`}>{label}</td>
+                        <td className={`px-3 py-1.5 ${d.kind === "none" || ((d.kind === "wordpress" || d.kind === "webflow" || d.kind === "marketr-site") && !d.siteId) ? "text-amber-700" : ""}`}>{label}</td>
                       </tr>
                     );
                   })}
@@ -1191,7 +1191,7 @@ function PagesTab({
               )}
             </div>
             {pushTarget === "webflow" && (
-              <label className="mt-2 flex items-center gap-2 text-xs text-zinc-400">
+              <label className="mt-2 flex items-center gap-2 text-xs text-zinc-500">
                 <input type="checkbox" checked={pushWebflowPublish} onChange={(e) => setPushWebflowPublish(e.target.checked)} />
                 Publish the Webflow site after the CMS items are saved
               </label>
@@ -1210,10 +1210,10 @@ function PagesTab({
       {/* Preview drawer */}
       {drawer && (
         <div className="fixed inset-0 z-50 flex justify-end bg-black/60" onClick={() => setDrawer(null)}>
-          <div className="h-full w-full max-w-2xl overflow-y-auto bg-zinc-950 p-6" onClick={(e) => e.stopPropagation()}>
+          <div className="h-full w-full max-w-2xl overflow-y-auto bg-zinc-50 p-6" onClick={(e) => e.stopPropagation()}>
             <div className="mb-4 flex items-start justify-between">
               <div>
-                <p className="font-mono text-sm text-zinc-400">{drawer.url}</p>
+                <p className="font-mono text-sm text-zinc-500">{drawer.url}</p>
                 <h2 className="mt-1 text-xl font-bold">{drawer.title}</h2>
                 <p className="mt-1 text-sm text-zinc-500">{drawer.description}</p>
                 <div className="mt-2 flex flex-wrap items-center gap-1.5">
@@ -1221,23 +1221,23 @@ function PagesTab({
                   {drawerFlags.map((f: string) => (
                     <FlagBadge key={f} flag={f} />
                   ))}
-                  {drawerFlags.length === 0 && <span className="text-xs text-emerald-400">✓ clean</span>}
-                  <span className="text-xs text-zinc-600">{drawer.wordCount} words</span>
+                  {drawerFlags.length === 0 && <span className="text-xs text-emerald-600">✓ clean</span>}
+                  <span className="text-xs text-zinc-500">{drawer.wordCount} words</span>
                   {drawerMissing.length > 0 && (
-                    <span className="text-xs text-amber-300">missing: {drawerMissing.join(", ")}</span>
+                    <span className="text-xs text-amber-700">missing: {drawerMissing.join(", ")}</span>
                   )}
                 </div>
                 {drawerIsPage && (
-                  <p className="mt-1 text-xs text-zinc-600">
+                  <p className="mt-1 text-xs text-zinc-500">
                     canonical: {(drawer as PageRow).canonical ?? "—"} · noindex: {(drawer as PageRow).noindex ? "yes" : "no"}
                   </p>
                 )}
                 {drawerIsPage && (drawer as PageRow).status === "published" && (
-                  <p className="mt-1 text-xs text-emerald-400">
+                  <p className="mt-1 text-xs text-emerald-600">
                     Published via {TARGET_LABELS[(drawer as PageRow).publishTarget] ?? (drawer as PageRow).publishTarget}
                     {(drawer as PageRow).publishedAt ? ` · ${new Date((drawer as PageRow).publishedAt!).toLocaleString()}` : ""}
                     {(drawer as PageRow).externalUrl ? (
-                      <> · <a href={(drawer as PageRow).externalUrl!} target="_blank" rel="noreferrer" className="underline hover:text-emerald-200">{(drawer as PageRow).externalUrl}</a></>
+                      <> · <a href={(drawer as PageRow).externalUrl!} target="_blank" rel="noreferrer" className="underline hover:text-emerald-800">{(drawer as PageRow).externalUrl}</a></>
                     ) : null}
                   </p>
                 )}
@@ -1245,7 +1245,7 @@ function PagesTab({
               <button onClick={() => setDrawer(null)} className={btnSecondary}>Close</button>
             </div>
             <div
-              className="prose prose-invert max-w-none rounded-xl border border-zinc-800 bg-zinc-900/50 p-5 text-sm text-zinc-200 [&_h1]:text-xl [&_h1]:font-bold [&_h2]:text-lg [&_h2]:font-bold [&_h3]:font-bold [&_p]:my-2 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5"
+              className="prose prose-invert max-w-none rounded-xl border border-zinc-200 bg-white/50 p-5 text-sm text-zinc-800 [&_h1]:text-xl [&_h1]:font-bold [&_h2]:text-lg [&_h2]:font-bold [&_h3]:font-bold [&_p]:my-2 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5"
               dangerouslySetInnerHTML={{ __html: drawer.html }}
             />
           </div>
@@ -1311,12 +1311,12 @@ export default function ProgrammaticStudio({
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="flex gap-1 rounded-lg border border-zinc-800 bg-zinc-950 p-1">
+      <div className="flex gap-1 rounded-lg border border-zinc-200 bg-zinc-50 p-1">
         {(["templates", "datasets", "pages"] as const).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
-            className={`flex-1 rounded-md px-4 py-2 text-sm font-medium capitalize ${tab === t ? "bg-zinc-800 text-zinc-100" : "text-zinc-500 hover:text-zinc-300"}`}
+            className={`flex-1 rounded-md px-4 py-2 text-sm font-medium capitalize ${tab === t ? "bg-zinc-900 text-white" : "text-zinc-500 hover:text-zinc-600"}`}
           >
             {t}
           </button>

@@ -209,7 +209,7 @@ export default function ReportsManager({ initialTemplates, brandKits, projects }
       <div className="flex flex-col gap-2">
         <button
           onClick={startNew}
-          className="rounded-md bg-orange-600 px-4 py-2 text-sm font-medium text-white hover:bg-orange-500"
+          className="rounded-md bg-orange-600 px-4 py-2 text-sm font-medium text-white hover:bg-orange-700"
         >
           New template
         </button>
@@ -218,10 +218,10 @@ export default function ReportsManager({ initialTemplates, brandKits, projects }
             key={t.id}
             onClick={() => select(t.id)}
             className={`rounded-lg border p-3 text-left ${
-              selectedId === t.id ? "border-orange-700 bg-zinc-900" : "border-zinc-800 bg-zinc-950 hover:bg-zinc-900"
+              selectedId === t.id ? "border-orange-200 bg-white" : "border-zinc-200 bg-zinc-50 hover:bg-zinc-100"
             }`}
           >
-            <p className="text-sm font-medium text-zinc-100">{t.name}</p>
+            <p className="text-sm font-medium text-zinc-900">{t.name}</p>
             <p className="mt-1 text-xs text-zinc-500">
               {t.type} · {t.schedule}
               {t.project ? ` · ${t.project.domain}` : ""}
@@ -234,39 +234,39 @@ export default function ReportsManager({ initialTemplates, brandKits, projects }
 
       {/* Editor / history */}
       <div className="flex min-w-0 flex-col gap-4">
-        {error && <p className="rounded-md border border-red-900 bg-red-950 px-4 py-2 text-sm text-red-300">{error}</p>}
+        {error && <p className="rounded-md border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">{error}</p>}
         {notice && (
-          <p className="rounded-md border border-green-900 bg-green-950 px-4 py-2 text-sm text-green-300">{notice}</p>
+          <p className="rounded-md border border-green-200 bg-green-50 px-4 py-2 text-sm text-green-700">{notice}</p>
         )}
 
         {(selected || selectedId === "new") && (
           <>
-            <div className="grid gap-3 rounded-lg border border-zinc-800 bg-zinc-900 p-4 md:grid-cols-2">
+            <div className="grid gap-3 rounded-lg border border-zinc-300 bg-white p-4 md:grid-cols-2">
               <label className="flex flex-col gap-1 text-sm">
-                <span className="text-zinc-400">Template name</span>
+                <span className="text-zinc-500">Template name</span>
                 <input
                   value={meta.name}
                   onChange={(e) => setMeta({ ...meta, name: e.target.value })}
-                  className="rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-zinc-100"
+                  className="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-zinc-900"
                 />
               </label>
               <label className="flex flex-col gap-1 text-sm">
-                <span className="text-zinc-400">Type</span>
+                <span className="text-zinc-500">Type</span>
                 <select
                   value={meta.type}
                   onChange={(e) => setMeta({ ...meta, type: e.target.value })}
-                  className="rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-zinc-100"
+                  className="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-zinc-900"
                 >
                   <option value="ranking">Ranking report</option>
                   <option value="custom">Custom</option>
                 </select>
               </label>
               <label className="flex flex-col gap-1 text-sm">
-                <span className="text-zinc-400">Brand kit</span>
+                <span className="text-zinc-500">Brand kit</span>
                 <select
                   value={meta.brandKitId}
                   onChange={(e) => setMeta({ ...meta, brandKitId: e.target.value })}
-                  className="rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-zinc-100"
+                  className="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-zinc-900"
                 >
                   <option value="">Workspace default</option>
                   {brandKits.map((k) => (
@@ -277,11 +277,11 @@ export default function ReportsManager({ initialTemplates, brandKits, projects }
                 </select>
               </label>
               <label className="flex flex-col gap-1 text-sm">
-                <span className="text-zinc-400">Project (data source)</span>
+                <span className="text-zinc-500">Project (data source)</span>
                 <select
                   value={meta.projectId}
                   onChange={(e) => setMeta({ ...meta, projectId: e.target.value })}
-                  className="rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-zinc-100"
+                  className="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-zinc-900"
                 >
                   <option value="">None</option>
                   {projects.map((p) => (
@@ -292,11 +292,11 @@ export default function ReportsManager({ initialTemplates, brandKits, projects }
                 </select>
               </label>
               <label className="flex flex-col gap-1 text-sm">
-                <span className="text-zinc-400">Schedule</span>
+                <span className="text-zinc-500">Schedule</span>
                 <select
                   value={meta.schedule}
                   onChange={(e) => setMeta({ ...meta, schedule: e.target.value })}
-                  className="rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-zinc-100"
+                  className="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-zinc-900"
                 >
                   <option value="manual">Manual</option>
                   <option value="weekly">Weekly</option>
@@ -315,7 +315,7 @@ export default function ReportsManager({ initialTemplates, brandKits, projects }
               <button
                 onClick={saveTemplate}
                 disabled={saving}
-                className="rounded-md bg-orange-600 px-4 py-2 text-sm font-medium text-white hover:bg-orange-500 disabled:opacity-50"
+                className="rounded-md bg-orange-600 px-4 py-2 text-sm font-medium text-white hover:bg-orange-700 disabled:opacity-50"
               >
                 {saving ? "Saving…" : selectedId === "new" ? "Create template" : "Save template"}
               </button>
@@ -323,7 +323,7 @@ export default function ReportsManager({ initialTemplates, brandKits, projects }
                 <button
                   onClick={generateNow}
                   disabled={generating}
-                  className="rounded-md border border-zinc-700 px-4 py-2 text-sm text-zinc-200 hover:bg-zinc-800 disabled:opacity-50"
+                  className="rounded-md border border-zinc-200 px-4 py-2 text-sm text-zinc-800 hover:bg-zinc-100 disabled:opacity-50"
                 >
                   {generating ? "Generating PDF…" : "Generate PDF now"}
                 </button>
@@ -331,7 +331,7 @@ export default function ReportsManager({ initialTemplates, brandKits, projects }
               {selectedId !== "new" && (
                 <button
                   onClick={deleteTemplate}
-                  className="rounded-md border border-red-900 px-4 py-2 text-sm text-red-400 hover:bg-red-950"
+                  className="rounded-md border border-red-200 px-4 py-2 text-sm text-red-600 hover:bg-red-100"
                 >
                   Delete
                 </button>
@@ -340,30 +340,30 @@ export default function ReportsManager({ initialTemplates, brandKits, projects }
 
             {/* History */}
             {historyFor === selectedId && history.length > 0 && (
-              <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-4">
-                <h3 className="mb-2 text-sm font-semibold text-zinc-200">Generated reports</h3>
+              <div className="rounded-lg border border-zinc-300 bg-white p-4">
+                <h3 className="mb-2 text-sm font-semibold text-zinc-800">Generated reports</h3>
                 <ul className="flex flex-col gap-2">
                   {history.map((r) => (
-                    <li key={r.id} className="flex items-center justify-between rounded border border-zinc-800 px-3 py-2 text-sm">
-                      <span className="text-zinc-300">
+                    <li key={r.id} className="flex items-center justify-between rounded border border-zinc-200 px-3 py-2 text-sm">
+                      <span className="text-zinc-500">
                         {r.period} · {new Date(r.createdAt).toLocaleString()}
                         <span
                           className={`ml-2 rounded px-1.5 py-0.5 text-xs ${
                             r.status === "ready"
-                              ? "bg-green-950 text-green-300"
+                              ? "bg-green-50 text-green-700"
                               : r.status === "failed"
-                                ? "bg-red-950 text-red-300"
-                                : "bg-zinc-800 text-zinc-400"
+                                ? "bg-red-50 text-red-700"
+                                : "bg-zinc-100 text-zinc-500"
                           }`}
                         >
                           {r.status}
                         </span>
-                        {r.error && <span className="ml-2 text-xs text-red-400">{r.error.slice(0, 120)}</span>}
+                        {r.error && <span className="ml-2 text-xs text-red-600">{r.error.slice(0, 120)}</span>}
                       </span>
                       {r.status === "ready" && (
                         <a
                           href={`/api/reports/${r.id}/download`}
-                          className="rounded border border-zinc-700 px-2 py-1 text-xs text-zinc-200 hover:bg-zinc-800"
+                          className="rounded border border-zinc-200 px-2 py-1 text-xs text-zinc-800 hover:bg-zinc-100"
                         >
                           Download PDF
                         </a>

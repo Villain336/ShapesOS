@@ -22,20 +22,20 @@ export type SavedKeywordOption = {
 };
 
 const inputCls =
-  "rounded-md border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-zinc-500 focus:outline-none";
+  "rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-orange-500 focus:outline-none";
 
 const STATUS_STYLES: Record<string, string> = {
-  brief: "border-sky-800 bg-sky-950/40 text-sky-300",
-  draft: "border-violet-800 bg-violet-950/40 text-violet-300",
-  editing: "border-amber-800 bg-amber-950/40 text-amber-300",
-  published: "border-emerald-800 bg-emerald-950/40 text-emerald-300",
+  brief: "border-sky-200 bg-sky-50/40 text-sky-700",
+  draft: "border-violet-200 bg-violet-50/40 text-violet-700",
+  editing: "border-amber-200 bg-amber-50/40 text-amber-700",
+  published: "border-emerald-800 bg-emerald-50/40 text-emerald-700",
 };
 
 export function statusPill(status: string) {
   return (
     <span
       className={`rounded-full border px-2.5 py-0.5 text-xs font-medium ${
-        STATUS_STYLES[status] ?? "border-zinc-700 text-zinc-400"
+        STATUS_STYLES[status] ?? "border-zinc-200 text-zinc-500"
       }`}
     >
       {status}
@@ -86,7 +86,7 @@ export default function ContentList({
       {/* Create brief */}
       <form
         onSubmit={onCreateBrief}
-        className="flex flex-col gap-3 rounded-xl border border-zinc-800 bg-zinc-900/60 p-5 sm:flex-row sm:items-end"
+        className="flex flex-col gap-3 rounded-xl border border-zinc-200 bg-white/60 p-5 sm:flex-row sm:items-end"
       >
         <div className="flex-1">
           <label
@@ -113,12 +113,12 @@ export default function ContentList({
         <button
           type="submit"
           disabled={loading || !keywordId}
-          className="rounded-md bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-950 hover:bg-white disabled:opacity-50"
+          className="rounded-md bg-orange-600 px-4 py-2 text-sm font-medium text-white hover:bg-orange-700 disabled:opacity-50 active:scale-[0.96] transition-[background-color,transform] duration-150 ease-[cubic-bezier(0.2,0,0,1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2"
         >
           {loading ? "Building brief…" : "Create brief"}
         </button>
       </form>
-      {error && <p className="text-sm text-red-400">{error}</p>}
+      {error && <p className="text-sm text-red-600">{error}</p>}
       {keywords.length === 0 && (
         <p className="text-sm text-zinc-500">
           No saved keywords yet — run keyword research first, then come back
@@ -132,7 +132,7 @@ export default function ContentList({
           Content ({items.length})
         </h2>
         {items.length === 0 ? (
-          <p className="rounded-xl border border-dashed border-zinc-800 p-8 text-center text-sm text-zinc-500">
+          <p className="rounded-xl border border-dashed border-zinc-200 p-8 text-center text-sm text-zinc-500">
             No content yet. Create a brief from a saved keyword above.
           </p>
         ) : (
@@ -145,18 +145,18 @@ export default function ContentList({
                       `/dashboard/projects/${projectId}/content/${item.id}`,
                     )
                   }
-                  className="flex w-full items-center justify-between gap-4 rounded-xl border border-zinc-800 bg-zinc-900/60 px-5 py-3 text-left hover:border-zinc-600"
+                  className="flex w-full items-center justify-between gap-4 rounded-xl border border-zinc-200 bg-white/60 px-5 py-3 text-left hover:border-zinc-300"
                 >
                   <span className="flex items-center gap-3">
                     {statusPill(item.status)}
-                    <span className="font-medium text-zinc-100">
+                    <span className="font-medium text-zinc-900">
                       {item.keyword?.phrase ?? "Untitled"}
                     </span>
                   </span>
                   <span className="flex items-center gap-4 text-sm text-zinc-500">
                     {item.seoScore != null && (
                       <span>
-                        SEO <span className="text-zinc-200">{Math.round(item.seoScore)}</span>/100
+                        SEO <span className="text-zinc-800">{Math.round(item.seoScore)}</span>/100
                       </span>
                     )}
                     <span>

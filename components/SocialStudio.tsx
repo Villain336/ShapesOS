@@ -69,11 +69,11 @@ interface Props {
 type Tab = "calendar" | "composer" | "posts" | "channels" | "settings";
 
 const STATUS_STYLE: Record<string, string> = {
-  draft: "bg-zinc-800 text-zinc-300",
-  scheduled: "bg-blue-950 text-blue-300",
-  sent: "bg-emerald-950 text-emerald-300",
-  failed: "bg-red-950 text-red-300",
-  cancelled: "bg-zinc-900 text-zinc-500",
+  draft: "bg-zinc-100 text-zinc-500",
+  scheduled: "bg-blue-50 text-blue-700",
+  sent: "bg-emerald-50 text-emerald-700",
+  failed: "bg-red-50 text-red-700",
+  cancelled: "bg-white text-zinc-500",
 };
 
 function serviceLabel(s: string): string {
@@ -344,8 +344,8 @@ export default function SocialStudio(props: Props) {
         <div
           className={`mb-4 flex items-center gap-2 rounded-lg border px-4 py-2.5 text-sm ${fade} ${
             notice.kind === "ok"
-              ? "border-emerald-900 bg-emerald-950/40 text-emerald-300"
-              : "border-red-900 bg-red-950/40 text-red-300"
+              ? "border-emerald-200 bg-emerald-50/40 text-emerald-700"
+              : "border-red-200 bg-red-50/40 text-red-700"
           }`}
         >
           {notice.kind === "ok" ? <Check className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
@@ -354,13 +354,13 @@ export default function SocialStudio(props: Props) {
       )}
 
       {/* Tabs */}
-      <div className="mb-6 flex flex-wrap gap-1 rounded-xl border border-zinc-800 bg-zinc-950 p-1">
+      <div className="mb-6 flex flex-wrap gap-1 rounded-xl border border-zinc-200 bg-zinc-50 p-1">
         {tabs.map((t) => (
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
             className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium ${press} ${fade} ${
-              tab === t.id ? "bg-zinc-800 text-zinc-100" : "text-zinc-500 hover:text-zinc-300"
+              tab === t.id ? "bg-zinc-900 text-white" : "text-zinc-500 hover:text-zinc-600"
             }`}
           >
             {t.icon}
@@ -374,16 +374,16 @@ export default function SocialStudio(props: Props) {
         <div className={fade}>
           <div className="mb-4 flex flex-wrap items-center gap-3">
             <div className="flex items-center gap-2">
-              <button onClick={() => shiftMonth(-1)} className={`rounded-md border border-zinc-800 px-3 py-1.5 text-sm text-zinc-300 ${press}`}>←</button>
-              <span className="min-w-40 text-center text-sm font-semibold text-zinc-100">{monthName}</span>
-              <button onClick={() => shiftMonth(1)} className={`rounded-md border border-zinc-800 px-3 py-1.5 text-sm text-zinc-300 ${press}`}>→</button>
+              <button onClick={() => shiftMonth(-1)} className={`rounded-md border border-zinc-200 px-3 py-1.5 text-sm text-zinc-500 ${press}`}>←</button>
+              <span className="min-w-40 text-center text-sm font-semibold text-zinc-900">{monthName}</span>
+              <button onClick={() => shiftMonth(1)} className={`rounded-md border border-zinc-200 px-3 py-1.5 text-sm text-zinc-500 ${press}`}>→</button>
             </div>
-            <div className="flex gap-1 rounded-lg border border-zinc-800 p-0.5">
+            <div className="flex gap-1 rounded-lg border border-zinc-200 p-0.5">
               {(["month", "week"] as const).map((m) => (
                 <button
                   key={m}
                   onClick={() => setCalMode(m)}
-                  className={`rounded-md px-3 py-1 text-xs font-medium capitalize ${press} ${fade} ${calMode === m ? "bg-zinc-800 text-zinc-100" : "text-zinc-500"}`}
+                  className={`rounded-md px-3 py-1 text-xs font-medium capitalize ${press} ${fade} ${calMode === m ? "bg-zinc-900 text-white" : "text-zinc-500"}`}
                 >
                   {m}
                 </button>
@@ -392,7 +392,7 @@ export default function SocialStudio(props: Props) {
             <select
               value={calFilter}
               onChange={(e) => setCalFilter(e.target.value)}
-              className="rounded-md border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm text-zinc-200"
+              className="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-1.5 text-sm text-zinc-800"
             >
               <option value="all">All channels</option>
               {ALL_SERVICES.map((s) => (
@@ -402,14 +402,14 @@ export default function SocialStudio(props: Props) {
           </div>
 
           {calMode === "month" ? (
-            <div className="grid grid-cols-7 gap-px overflow-hidden rounded-xl border border-zinc-800 bg-zinc-800">
+            <div className="grid grid-cols-7 gap-px overflow-hidden rounded-xl border border-zinc-200 bg-zinc-100">
               {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
-                <div key={d} className="bg-zinc-950 px-2 py-2 text-center text-xs font-medium text-zinc-500">{d}</div>
+                <div key={d} className="bg-zinc-50 px-2 py-2 text-center text-xs font-medium text-zinc-500">{d}</div>
               ))}
               {cells.map((day, i) => {
                 const dayPosts = day ? bucketed.days.get(day) ?? [] : [];
                 return (
-                  <div key={i} className="min-h-24 bg-zinc-950 p-1.5">
+                  <div key={i} className="min-h-24 bg-zinc-50 p-1.5">
                     {day && (
                       <>
                         <div className="mb-1 text-xs font-medium text-zinc-500">{day}</div>
@@ -441,19 +441,19 @@ export default function SocialStudio(props: Props) {
                 d.setDate(d.getDate() + i);
                 const dayPosts = bucketed.days.get(d.getDate()) ?? [];
                 return (
-                  <div key={i} className="rounded-xl border border-zinc-800 bg-zinc-950 p-3">
-                    <div className="mb-2 text-sm font-semibold text-zinc-200">
+                  <div key={i} className="rounded-xl border border-zinc-200 bg-zinc-50 p-3">
+                    <div className="mb-2 text-sm font-semibold text-zinc-800">
                       {d.toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" })}
                     </div>
                     {dayPosts.length === 0 ? (
-                      <div className="text-xs text-zinc-600">Nothing scheduled</div>
+                      <div className="text-xs text-zinc-500">Nothing scheduled</div>
                     ) : (
                       <div className="flex flex-col gap-1.5">
                         {dayPosts.map((p) => (
                           <button
                             key={p.id}
                             onClick={() => { setSelectedPostId(p.id); setTab("posts"); }}
-                            className="flex items-center justify-between rounded-lg border border-zinc-800 px-3 py-2 text-left text-sm text-zinc-200 hover:border-zinc-600"
+                            className="flex items-center justify-between rounded-lg border border-zinc-200 px-3 py-2 text-left text-sm text-zinc-800 hover:border-zinc-300"
                           >
                             <span className="truncate">{p.services.map(serviceLabel).join(" · ")}</span>
                             <span className={`ml-2 shrink-0 rounded px-2 py-0.5 text-xs font-medium ${STATUS_STYLE[p.status] ?? STATUS_STYLE.draft}`}>
@@ -466,7 +466,7 @@ export default function SocialStudio(props: Props) {
                   </div>
                 );
               })}
-              <p className="text-xs text-zinc-600">Week view shows the first 7 days of the selected month.</p>
+              <p className="text-xs text-zinc-500">Week view shows the first 7 days of the selected month.</p>
             </div>
           )}
         </div>
@@ -475,8 +475,8 @@ export default function SocialStudio(props: Props) {
       {/* COMPOSER */}
       {tab === "composer" && (
         <div className={`${fade} grid gap-6 lg:grid-cols-[1fr_320px]`}>
-          <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-5">
-            <h3 className="mb-3 text-sm font-semibold text-zinc-100">New post</h3>
+          <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-5">
+            <h3 className="mb-3 text-sm font-semibold text-zinc-900">New post</h3>
             {!props.canEdit && <p className="mb-3 text-xs text-zinc-500">Viewer role — you can preview but not publish.</p>}
 
             <div className="mb-4">
@@ -491,8 +491,8 @@ export default function SocialStudio(props: Props) {
                       onClick={() => toggleService(c.service)}
                       className={`rounded-lg border px-3 py-1.5 text-sm ${press} ${fade} ${
                         compServices.includes(c.service)
-                          ? "border-blue-700 bg-blue-950/40 text-blue-200"
-                          : "border-zinc-800 text-zinc-400 hover:border-zinc-600"
+                          ? "border-orange-600 bg-orange-50 text-orange-800"
+                          : "border-zinc-200 text-zinc-500 hover:border-zinc-300"
                       }`}
                     >
                       {serviceLabel(c.service)}{c.handle ? ` · ${c.handle}` : ""}
@@ -508,7 +508,7 @@ export default function SocialStudio(props: Props) {
                 {compLimits.length > 0 && (
                   <span className="text-xs text-zinc-500">
                     {compLimits.map((l) => (
-                      <span key={l.service} className={l.len > l.max ? "text-red-400" : ""}>
+                      <span key={l.service} className={l.len > l.max ? "text-red-600" : ""}>
                         {l.label.split(" ")[0]} {l.len}/{l.max}{"  "}
                       </span>
                     ))}
@@ -520,7 +520,7 @@ export default function SocialStudio(props: Props) {
                 onChange={(e) => setCompText(e.target.value)}
                 rows={5}
                 placeholder="What should this post say?"
-                className="w-full rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600"
+                className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400"
               />
             </div>
 
@@ -529,22 +529,22 @@ export default function SocialStudio(props: Props) {
                 <div className="mb-2 text-xs font-medium uppercase tracking-widest text-zinc-500">Per-channel overrides</div>
                 <div className="flex flex-col gap-2">
                   {compServices.map((s) => (
-                    <div key={s} className="rounded-lg border border-zinc-800">
+                    <div key={s} className="rounded-lg border border-zinc-200">
                       <button
                         onClick={() => setOverrideOpen(overrideOpen === s ? null : s)}
-                        className="flex w-full items-center justify-between px-3 py-2 text-sm text-zinc-300"
+                        className="flex w-full items-center justify-between px-3 py-2 text-sm text-zinc-500"
                       >
                         {serviceLabel(s)}
                         <span className="text-xs text-zinc-500">{compOverrides[s] ? "custom" : "uses shared text"}</span>
                       </button>
                       {overrideOpen === s && (
-                        <div className="border-t border-zinc-800 p-3">
+                        <div className="border-t border-zinc-200 p-3">
                           <textarea
                             value={compOverrides[s] ?? ""}
                             onChange={(e) => setCompOverrides((prev) => ({ ...prev, [s]: e.target.value }))}
                             rows={3}
                             placeholder={`Custom text for ${serviceLabel(s)} (blank = shared text)`}
-                            className="w-full rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600"
+                            className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400"
                           />
                         </div>
                       )}
@@ -557,11 +557,11 @@ export default function SocialStudio(props: Props) {
             <div className="mb-4 grid gap-3 sm:grid-cols-2">
               <div>
                 <div className="mb-1 text-xs font-medium uppercase tracking-widest text-zinc-500">Image URLs (one per line)</div>
-                <textarea value={compImages} onChange={(e) => setCompImages(e.target.value)} rows={2} placeholder="https://…" className="w-full rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600" />
+                <textarea value={compImages} onChange={(e) => setCompImages(e.target.value)} rows={2} placeholder="https://…" className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400" />
               </div>
               <div>
                 <div className="mb-1 text-xs font-medium uppercase tracking-widest text-zinc-500">Video URLs (one per line)</div>
-                <textarea value={compVideos} onChange={(e) => setCompVideos(e.target.value)} rows={2} placeholder="https://…" className="w-full rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600" />
+                <textarea value={compVideos} onChange={(e) => setCompVideos(e.target.value)} rows={2} placeholder="https://…" className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400" />
               </div>
             </div>
 
@@ -569,11 +569,11 @@ export default function SocialStudio(props: Props) {
               <div className="mb-1 flex items-center gap-1.5 text-xs font-medium uppercase tracking-widest text-zinc-500">
                 <Link2 className="h-3.5 w-3.5" /> Link + UTM
               </div>
-              <input value={compLink} onChange={(e) => setCompLink(e.target.value)} placeholder="https://example.com/article" className="mb-2 w-full rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600" />
+              <input value={compLink} onChange={(e) => setCompLink(e.target.value)} placeholder="https://example.com/article" className="mb-2 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400" />
               <div className="grid grid-cols-3 gap-2">
-                <input value={compUtmSource} onChange={(e) => setCompUtmSource(e.target.value)} placeholder="utm_source" className="rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600" />
-                <input value={compUtmMedium} onChange={(e) => setCompUtmMedium(e.target.value)} placeholder="utm_medium" className="rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600" />
-                <input value={compUtmCampaign} onChange={(e) => setCompUtmCampaign(e.target.value)} placeholder="utm_campaign" className="rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600" />
+                <input value={compUtmSource} onChange={(e) => setCompUtmSource(e.target.value)} placeholder="utm_source" className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400" />
+                <input value={compUtmMedium} onChange={(e) => setCompUtmMedium(e.target.value)} placeholder="utm_medium" className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400" />
+                <input value={compUtmCampaign} onChange={(e) => setCompUtmCampaign(e.target.value)} placeholder="utm_campaign" className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400" />
               </div>
             </div>
 
@@ -581,7 +581,7 @@ export default function SocialStudio(props: Props) {
               <div className="mb-1 flex items-center gap-1.5 text-xs font-medium uppercase tracking-widest text-zinc-500">
                 <Clock className="h-3.5 w-3.5" /> Schedule (optional)
               </div>
-              <input type="datetime-local" value={compWhen} onChange={(e) => setCompWhen(e.target.value)} className="rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm text-zinc-100" />
+              <input type="datetime-local" value={compWhen} onChange={(e) => setCompWhen(e.target.value)} className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900" />
             </div>
 
             {props.canEdit && (
@@ -589,14 +589,14 @@ export default function SocialStudio(props: Props) {
                 <button
                   onClick={() => composerSave(true)}
                   disabled={busy === "composer"}
-                  className={`flex items-center gap-2 rounded-lg border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-200 ${press}`}
+                  className={`flex items-center gap-2 rounded-lg border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-800 ${press}`}
                 >
                   <Pencil className="h-4 w-4" /> Save draft
                 </button>
                 <button
                   onClick={() => composerSave(false)}
                   disabled={busy === "composer" || !compWhen}
-                  className={`flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-40 ${press}`}
+                  className={`flex items-center gap-2 rounded-lg bg-orange-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-40 ${press}`}
                   title={compWhen ? "Save and schedule" : "Pick a schedule time first"}
                 >
                   <Clock className="h-4 w-4" /> {busy === "composer" ? "Saving…" : "Save & schedule"}
@@ -605,14 +605,14 @@ export default function SocialStudio(props: Props) {
             )}
           </div>
 
-          <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-5">
-            <h3 className="mb-3 text-sm font-semibold text-zinc-100">Channel rules</h3>
+          <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-5">
+            <h3 className="mb-3 text-sm font-semibold text-zinc-900">Channel rules</h3>
             <div className="flex flex-col gap-3">
               {ALL_SERVICES.map((s) => {
                 const def = CHANNEL_DEFS[s];
                 return (
                   <div key={s} className="text-xs">
-                    <div className="font-medium text-zinc-200">{def.label}</div>
+                    <div className="font-medium text-zinc-800">{def.label}</div>
                     <div className="text-zinc-500">{def.maxLength.toLocaleString()} chars · {def.mediaHint}</div>
                   </div>
                 );
@@ -627,14 +627,14 @@ export default function SocialStudio(props: Props) {
         <div className={`${fade} grid gap-6 lg:grid-cols-[1fr_360px]`}>
           <div className="flex flex-col gap-3">
             {posts.length === 0 && (
-              <p className="rounded-xl border border-dashed border-zinc-800 p-8 text-center text-sm text-zinc-500">
+              <p className="rounded-xl border border-dashed border-zinc-200 p-8 text-center text-sm text-zinc-500">
                 No posts yet. Compose one to get started.
               </p>
             )}
             {posts.map((p) => (
               <div
                 key={p.id}
-                className={`rounded-xl border bg-zinc-950 p-4 ${selectedPostId === p.id ? "border-blue-800" : "border-zinc-800"}`}
+                className={`rounded-xl border bg-zinc-50 p-4 ${selectedPostId === p.id ? "border-blue-200" : "border-zinc-200"}`}
               >
                 <div className="mb-2 flex items-center justify-between gap-2">
                   <span className={`rounded px-2 py-0.5 text-xs font-medium ${STATUS_STYLE[p.status] ?? STATUS_STYLE.draft}`}>
@@ -644,19 +644,19 @@ export default function SocialStudio(props: Props) {
                     {p.scheduledFor ? fmtDateTime(p.scheduledFor) : "unscheduled"}
                   </span>
                 </div>
-                <p className="mb-2 line-clamp-3 text-sm text-zinc-200">{p.content.text || <span className="text-zinc-600">(no shared text)</span>}</p>
+                <p className="mb-2 line-clamp-3 text-sm text-zinc-800">{p.content.text || <span className="text-zinc-500">(no shared text)</span>}</p>
                 <div className="mb-3 text-xs text-zinc-500">{p.serviceLabels.join(" · ")}</div>
                 {p.error && (
-                  <div className="mb-3 flex items-start gap-2 rounded-lg border border-red-900 bg-red-950/30 px-3 py-2 text-xs text-red-300">
+                  <div className="mb-3 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50/30 px-3 py-2 text-xs text-red-700">
                     <XCircle className="mt-0.5 h-4 w-4 shrink-0" />
                     <span>{p.error}</span>
                   </div>
                 )}
                 {p.nextAttemptAt && p.status === "scheduled" && (
-                  <div className="mb-3 text-xs text-amber-300">Retrying at {fmtDateTime(p.nextAttemptAt)} (attempt {p.attempts + 1})</div>
+                  <div className="mb-3 text-xs text-amber-700">Retrying at {fmtDateTime(p.nextAttemptAt)} (attempt {p.attempts + 1})</div>
                 )}
                 <div className="flex flex-wrap gap-2">
-                  <button onClick={() => setSelectedPostId(selectedPostId === p.id ? null : p.id)} className={`rounded-md border border-zinc-800 px-2.5 py-1.5 text-xs text-zinc-300 ${press}`}>
+                  <button onClick={() => setSelectedPostId(selectedPostId === p.id ? null : p.id)} className={`rounded-md border border-zinc-200 px-2.5 py-1.5 text-xs text-zinc-500 ${press}`}>
                     Details
                   </button>
                   {props.canEdit && p.status === "draft" && (
@@ -666,14 +666,14 @@ export default function SocialStudio(props: Props) {
                           const when = window.prompt("Schedule for (YYYY-MM-DDTHH:MM):", new Date(Date.now() + 3600000).toISOString().slice(0, 16));
                           if (when) postAction(p.id, "schedule", { scheduledFor: new Date(when).toISOString() });
                         }}
-                        className={`flex items-center gap-1 rounded-md border border-zinc-700 px-2.5 py-1.5 text-xs text-zinc-200 ${press}`}
+                        className={`flex items-center gap-1 rounded-md border border-zinc-200 px-2.5 py-1.5 text-xs text-zinc-800 ${press}`}
                       >
                         <Clock className="h-3.5 w-3.5" /> Schedule
                       </button>
-                      <button onClick={() => postAction(p.id, "publish-now")} disabled={busy === `publish-now:${p.id}`} className={`flex items-center gap-1 rounded-md bg-blue-600 px-2.5 py-1.5 text-xs font-medium text-white ${press}`}>
+                      <button onClick={() => postAction(p.id, "publish-now")} disabled={busy === `publish-now:${p.id}`} className={`flex items-center gap-1 rounded-md bg-orange-600 px-2.5 py-1.5 text-xs font-medium text-white ${press}`}>
                         <Send className="h-3.5 w-3.5" /> Publish now
                       </button>
-                      <button onClick={() => { if (window.confirm("Delete this draft?")) postAction(p.id, "delete"); }} className={`flex items-center gap-1 rounded-md border border-zinc-800 px-2.5 py-1.5 text-xs text-red-300 ${press}`}>
+                      <button onClick={() => { if (window.confirm("Delete this draft?")) postAction(p.id, "delete"); }} className={`flex items-center gap-1 rounded-md border border-zinc-200 px-2.5 py-1.5 text-xs text-red-700 ${press}`}>
                         <Trash2 className="h-3.5 w-3.5" /> Delete
                       </button>
                     </>
@@ -684,18 +684,18 @@ export default function SocialStudio(props: Props) {
                         const when = window.prompt("Retry schedule for (YYYY-MM-DDTHH:MM), blank = now:", "");
                         postAction(p.id, "schedule", when ? { scheduledFor: new Date(when).toISOString() } : { scheduledFor: new Date().toISOString() });
                       }}
-                      className={`flex items-center gap-1 rounded-md border border-amber-800 px-2.5 py-1.5 text-xs text-amber-300 ${press}`}
+                      className={`flex items-center gap-1 rounded-md border border-amber-200 px-2.5 py-1.5 text-xs text-amber-700 ${press}`}
                     >
                       <RefreshCw className="h-3.5 w-3.5" /> Retry
                     </button>
                   )}
                   {props.canEdit && (p.status === "scheduled" || p.status === "failed") && (
-                    <button onClick={() => { if (window.confirm("Cancel this post? Pending Buffer updates will be removed.")) postAction(p.id, "cancel"); }} className={`flex items-center gap-1 rounded-md border border-zinc-800 px-2.5 py-1.5 text-xs text-zinc-300 ${press}`}>
+                    <button onClick={() => { if (window.confirm("Cancel this post? Pending Buffer updates will be removed.")) postAction(p.id, "cancel"); }} className={`flex items-center gap-1 rounded-md border border-zinc-200 px-2.5 py-1.5 text-xs text-zinc-500 ${press}`}>
                       <X className="h-3.5 w-3.5" /> Cancel
                     </button>
                   )}
                   {(p.status === "sent" || p.status === "scheduled") && props.canEdit && (
-                    <button onClick={() => postAction(p.id, "analytics")} disabled={busy === `analytics:${p.id}`} className={`flex items-center gap-1 rounded-md border border-zinc-800 px-2.5 py-1.5 text-xs text-zinc-300 ${press}`}>
+                    <button onClick={() => postAction(p.id, "analytics")} disabled={busy === `analytics:${p.id}`} className={`flex items-center gap-1 rounded-md border border-zinc-200 px-2.5 py-1.5 text-xs text-zinc-500 ${press}`}>
                       <BarChart3 className="h-3.5 w-3.5" /> {busy === `analytics:${p.id}` ? "Syncing…" : "Sync analytics"}
                     </button>
                   )}
@@ -707,24 +707,24 @@ export default function SocialStudio(props: Props) {
           {/* Detail drawer */}
           <div>
             {selectedPost ? (
-              <div className={`rounded-xl border border-zinc-800 bg-zinc-950 p-5 ${fade}`}>
+              <div className={`rounded-xl border border-zinc-200 bg-zinc-50 p-5 ${fade}`}>
                 <div className="mb-3 flex items-center justify-between">
-                  <h3 className="text-sm font-semibold text-zinc-100">Post detail</h3>
-                  <button onClick={() => setSelectedPostId(null)} className="text-zinc-500 hover:text-zinc-300"><X className="h-4 w-4" /></button>
+                  <h3 className="text-sm font-semibold text-zinc-900">Post detail</h3>
+                  <button onClick={() => setSelectedPostId(null)} className="text-zinc-500 hover:text-zinc-600"><X className="h-4 w-4" /></button>
                 </div>
-                <div className="mb-3 text-sm text-zinc-200 whitespace-pre-wrap">{selectedPost.content.text}</div>
+                <div className="mb-3 text-sm text-zinc-800 whitespace-pre-wrap">{selectedPost.content.text}</div>
                 {Object.entries(selectedPost.content.perChannel).length > 0 && (
                   <div className="mb-3">
                     <div className="mb-1 text-xs font-medium uppercase tracking-widest text-zinc-500">Overrides</div>
                     {Object.entries(selectedPost.content.perChannel).map(([s, o]) => (
-                      <div key={s} className="mb-1 text-xs text-zinc-400">
-                        <span className="font-medium text-zinc-300">{serviceLabel(s)}:</span> {(o as { text?: string }).text}
+                      <div key={s} className="mb-1 text-xs text-zinc-500">
+                        <span className="font-medium text-zinc-500">{serviceLabel(s)}:</span> {(o as { text?: string }).text}
                       </div>
                     ))}
                   </div>
                 )}
                 {(selectedPost.content.media.length > 0 || selectedPost.content.link) && (
-                  <div className="mb-3 text-xs text-zinc-400">
+                  <div className="mb-3 text-xs text-zinc-500">
                     {selectedPost.content.media.map((m, i) => (
                       <div key={i} className="truncate">[{m.type}] {m.url}</div>
                     ))}
@@ -732,15 +732,15 @@ export default function SocialStudio(props: Props) {
                   </div>
                 )}
                 <div className="mb-3 grid grid-cols-2 gap-2 text-xs">
-                  <div><div className="text-zinc-500">Status</div><div className="text-zinc-200">{selectedPost.status}</div></div>
-                  <div><div className="text-zinc-500">Scheduled</div><div className="text-zinc-200">{fmtDateTime(selectedPost.scheduledFor)}</div></div>
-                  <div><div className="text-zinc-500">Attempts</div><div className="text-zinc-200">{selectedPost.attempts}</div></div>
-                  <div><div className="text-zinc-500">Analytics synced</div><div className="text-zinc-200">{selectedPost.statsSyncedAt ? fmtDateTime(selectedPost.statsSyncedAt) : "never"}</div></div>
+                  <div><div className="text-zinc-500">Status</div><div className="text-zinc-800">{selectedPost.status}</div></div>
+                  <div><div className="text-zinc-500">Scheduled</div><div className="text-zinc-800">{fmtDateTime(selectedPost.scheduledFor)}</div></div>
+                  <div><div className="text-zinc-500">Attempts</div><div className="text-zinc-800">{selectedPost.attempts}</div></div>
+                  <div><div className="text-zinc-500">Analytics synced</div><div className="text-zinc-800">{selectedPost.statsSyncedAt ? fmtDateTime(selectedPost.statsSyncedAt) : "never"}</div></div>
                 </div>
                 <AnalyticsBlock stats={selectedPost.stats} />
               </div>
             ) : (
-              <div className="rounded-xl border border-dashed border-zinc-800 p-8 text-center text-sm text-zinc-600">
+              <div className="rounded-xl border border-dashed border-zinc-200 p-8 text-center text-sm text-zinc-500">
                 Select a post for details and analytics.
               </div>
             )}
@@ -752,30 +752,30 @@ export default function SocialStudio(props: Props) {
       {tab === "channels" && (
         <div className={fade}>
           <div className="mb-4 flex items-center justify-between">
-            <p className="text-sm text-zinc-400">
+            <p className="text-sm text-zinc-500">
               {connected ? "Buffer connected. Sync to pull your connected profiles." : "Connect Buffer in Settings first."}
             </p>
             {props.canEdit && connected && (
-              <button onClick={syncChannelsNow} disabled={busy === "sync"} className={`flex items-center gap-2 rounded-lg border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-200 ${press}`}>
+              <button onClick={syncChannelsNow} disabled={busy === "sync"} className={`flex items-center gap-2 rounded-lg border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-800 ${press}`}>
                 <RefreshCw className="h-4 w-4" /> {busy === "sync" ? "Syncing…" : "Sync channels"}
               </button>
             )}
           </div>
           {channels.length === 0 ? (
-            <p className="rounded-xl border border-dashed border-zinc-800 p-8 text-center text-sm text-zinc-500">
+            <p className="rounded-xl border border-dashed border-zinc-200 p-8 text-center text-sm text-zinc-500">
               No channels yet. Connect Buffer, then sync.
             </p>
           ) : (
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {channels.map((c) => (
-                <div key={c.id} className="rounded-xl border border-zinc-800 bg-zinc-950 p-4">
+                <div key={c.id} className="rounded-xl border border-zinc-200 bg-zinc-50 p-4">
                   <div className="mb-1 flex items-center justify-between">
-                    <span className="text-sm font-semibold text-zinc-100">{serviceLabel(c.service)}</span>
+                    <span className="text-sm font-semibold text-zinc-900">{serviceLabel(c.service)}</span>
                     {props.canEdit ? (
                       <button
                         onClick={() => toggleChannel(c.id, !c.enabled)}
                         disabled={busy === `channel:${c.id}`}
-                        className={`relative h-6 w-11 rounded-full ${press} ${fade} ${c.enabled ? "bg-blue-600" : "bg-zinc-700"}`}
+                        className={`relative h-6 w-11 rounded-full ${press} ${fade} ${c.enabled ? "bg-orange-600" : "bg-zinc-200"}`}
                         aria-label={c.enabled ? "Disable channel" : "Enable channel"}
                       >
                         <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-transform duration-150 ease-[cubic-bezier(0.2,0,0,1)] ${c.enabled ? "translate-x-[22px]" : "translate-x-0.5"}`} />
@@ -794,8 +794,8 @@ export default function SocialStudio(props: Props) {
 
       {/* SETTINGS */}
       {tab === "settings" && (
-        <div className={`${fade} max-w-xl rounded-xl border border-zinc-800 bg-zinc-950 p-5`}>
-          <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold text-zinc-100">
+        <div className={`${fade} max-w-xl rounded-xl border border-zinc-200 bg-zinc-50 p-5`}>
+          <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold text-zinc-900">
             <Plug className="h-4 w-4" /> Buffer connection
           </h3>
           <p className="mb-4 text-xs text-zinc-500">
@@ -804,7 +804,7 @@ export default function SocialStudio(props: Props) {
           </p>
           {connected ? (
             <div>
-              <div className="mb-3 flex items-center gap-2 text-sm text-emerald-300">
+              <div className="mb-3 flex items-center gap-2 text-sm text-emerald-700">
                 <Check className="h-4 w-4" /> Connected {tokenHint && <span className="text-zinc-500">({tokenHint})</span>}
               </div>
               {props.canEdit && (
@@ -814,13 +814,13 @@ export default function SocialStudio(props: Props) {
                     onChange={(e) => setTokenInput(e.target.value)}
                     type="password"
                     placeholder="Paste a new token to rotate…"
-                    className="w-full rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600"
+                    className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400"
                   />
                   <div className="flex gap-2">
-                    <button onClick={saveToken} disabled={busy === "token" || !tokenInput.trim()} className={`rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-40 ${press}`}>
+                    <button onClick={saveToken} disabled={busy === "token" || !tokenInput.trim()} className={`rounded-lg bg-orange-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-40 ${press}`}>
                       Rotate token
                     </button>
-                    <button onClick={() => { if (window.confirm("Revoke the Buffer token? Scheduled posts will stop dispatching.")) revokeToken(); }} disabled={busy === "token"} className={`rounded-lg border border-red-900 px-4 py-2 text-sm font-medium text-red-300 ${press}`}>
+                    <button onClick={() => { if (window.confirm("Revoke the Buffer token? Scheduled posts will stop dispatching.")) revokeToken(); }} disabled={busy === "token"} className={`rounded-lg border border-red-200 px-4 py-2 text-sm font-medium text-red-700 ${press}`}>
                       Revoke
                     </button>
                   </div>
@@ -834,9 +834,9 @@ export default function SocialStudio(props: Props) {
                 onChange={(e) => setTokenInput(e.target.value)}
                 type="password"
                 placeholder="Buffer access token"
-                className="w-full rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600"
+                className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400"
               />
-              <button onClick={saveToken} disabled={busy === "token" || !tokenInput.trim()} className={`w-fit rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-40 ${press}`}>
+              <button onClick={saveToken} disabled={busy === "token" || !tokenInput.trim()} className={`w-fit rounded-lg bg-orange-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-40 ${press}`}>
                 {busy === "token" ? "Connecting…" : "Connect Buffer"}
               </button>
             </div>
@@ -853,20 +853,20 @@ function AnalyticsBlock({ stats }: { stats: unknown }) {
   const s = (stats ?? {}) as { byChannel?: Record<string, Record<string, number | undefined>>; totals?: Record<string, number> };
   const totals = s.totals ?? {};
   const hasAny = Object.values(totals).some((v) => (v ?? 0) > 0) || (s.byChannel && Object.keys(s.byChannel).length > 0);
-  if (!hasAny) return <p className="text-xs text-zinc-600">No analytics yet — sync to pull engagement from Buffer.</p>;
+  if (!hasAny) return <p className="text-xs text-zinc-500">No analytics yet — sync to pull engagement from Buffer.</p>;
   return (
     <div>
       <div className="mb-2 text-xs font-medium uppercase tracking-widest text-zinc-500">Analytics</div>
       <div className="mb-2 grid grid-cols-4 gap-2 text-center">
         {(["likes", "shares", "comments", "clicks"] as const).map((k) => (
-          <div key={k} className="rounded-lg border border-zinc-800 px-2 py-2">
-            <div className="text-lg font-semibold text-zinc-100">{totals[k] ?? 0}</div>
+          <div key={k} className="rounded-lg border border-zinc-200 px-2 py-2">
+            <div className="text-lg font-semibold text-zinc-900">{totals[k] ?? 0}</div>
             <div className="text-[11px] capitalize text-zinc-500">{k}</div>
           </div>
         ))}
       </div>
       {s.byChannel && Object.entries(s.byChannel).map(([svc, vals]) => (
-        <div key={svc} className="flex justify-between text-xs text-zinc-400">
+        <div key={svc} className="flex justify-between text-xs text-zinc-500">
           <span>{serviceLabel(svc)}</span>
           <span>
             {vals.likes ?? 0} likes · {vals.shares ?? 0} shares · {vals.comments ?? 0} comments · {vals.clicks ?? 0} clicks

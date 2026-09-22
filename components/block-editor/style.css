@@ -674,12 +674,7 @@
     box-shadow 150ms ease-out;
 }
 
-@media (prefers-color-scheme: dark) {
-  .block-editor-content .ProseMirror img {
-    outline-color: oklch(1 0 0 / 0.1);
-  }
-}
-
+/* Light-mode only: image outlines stay black at low opacity (better-ui). */
 .block-editor-content .ProseMirror img.ProseMirror-selectednode {
   outline: 2px solid var(--primary);
   outline-offset: 2px;

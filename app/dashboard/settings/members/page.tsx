@@ -20,7 +20,7 @@ export default async function MembersPage() {
     <div className="flex flex-col gap-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Workspace members</h1>
-        <p className="mt-1 text-sm text-zinc-400">
+        <p className="mt-1 text-sm text-zinc-500">
           {workspace.name} — invite teammates and control what they can do.
           Roles: <span className="font-mono">owner</span> &gt;{" "}
           <span className="font-mono">admin</span> &gt;{" "}

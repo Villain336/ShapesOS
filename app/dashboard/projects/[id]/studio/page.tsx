@@ -27,10 +27,10 @@ export default async function StudioPage({ params }: { params: Promise<{ id: str
   return (
     <div className="mx-auto max-w-6xl px-4 py-8">
       <div className="mb-6">
-        <Link href={`/dashboard/projects/${project.id}`} className="text-sm text-zinc-500 hover:text-zinc-300">
+        <Link href={`/dashboard/projects/${project.id}`} className="text-sm text-zinc-500 hover:text-zinc-600">
           ← {project.domain}
         </Link>
-        <h1 className="mt-2 text-2xl font-semibold text-zinc-100">Marketing studio</h1>
+        <h1 className="mt-2 text-2xl font-semibold text-zinc-900">Marketing studio</h1>
         <p className="mt-1 text-sm text-zinc-500">
           Canva designs, domain purchasing, and a shared asset library.
         </p>

@@ -31,11 +31,11 @@ export default async function InternalLinksPage({ params }: { params: Promise<{ 
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <Link href={`/dashboard/projects/${project.id}`} className="text-sm text-zinc-500 hover:text-zinc-300">
+        <Link href={`/dashboard/projects/${project.id}`} className="text-sm text-zinc-500 hover:text-zinc-600">
           ← {project.domain}
         </Link>
         <h1 className="mt-1 text-2xl font-bold tracking-tight">Internal links</h1>
-        <p className="mt-1 text-sm text-zinc-400">
+        <p className="mt-1 text-sm text-zinc-500">
           Orphan pages, under-linked money pages, and keyword-relevant link opportunities —
           computed from your ranking data. Applying a suggestion files it in the fix-agent
           inbox for review; pages are never edited automatically.

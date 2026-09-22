@@ -54,7 +54,7 @@ export default function TemplateEditor({ initialContent, onChange }: TemplateEdi
     editorProps: {
       attributes: {
         class:
-          "min-h-[420px] rounded-lg border border-zinc-800 bg-zinc-900 p-6 text-zinc-100 outline-none prose prose-invert max-w-none",
+          "min-h-[420px] rounded-lg border border-zinc-300 bg-white p-6 text-zinc-900 outline-none prose prose-invert max-w-none",
       },
     },
     onUpdate: ({ editor }) => onChange(editor.getJSON()),
@@ -62,14 +62,14 @@ export default function TemplateEditor({ initialContent, onChange }: TemplateEdi
 
   if (!editor) {
     return (
-      <div className="min-h-[420px] rounded-lg border border-zinc-800 bg-zinc-900 p-6 text-sm text-zinc-500">
+      <div className="min-h-[420px] rounded-lg border border-zinc-300 bg-white p-6 text-sm text-zinc-500">
         Loading editor…
       </div>
     );
   }
 
   return (
-    <div className="rounded-lg border border-zinc-800 bg-zinc-900">
+    <div className="rounded-lg border border-zinc-300 bg-white">
       <BlockEditor editor={editor} />
     </div>
   );

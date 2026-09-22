@@ -43,7 +43,7 @@ export default async function AlertsSettingsPage() {
     <div className="flex flex-col gap-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Alerts</h1>
-        <p className="mt-1 text-sm text-zinc-400">
+        <p className="mt-1 text-sm text-zinc-500">
           Rules watch for rank drops, AI Overview changes, fix-agent runs and report completions —
           then notify Slack, Telegram, or email. Cooldowns keep it quiet.
         </p>

@@ -53,12 +53,12 @@ interface Project {
 }
 
 const inputCls =
-  "w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-500 focus:border-zinc-500 focus:outline-none";
-const labelCls = "mb-1 block text-xs font-medium text-zinc-400";
+  "w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-orange-500 focus:outline-none";
+const labelCls = "mb-1 block text-xs font-medium text-zinc-500";
 const btnPrimary =
-  "rounded-md bg-zinc-100 px-3 py-2 text-sm font-medium text-zinc-900 hover:bg-white disabled:opacity-50";
+  "rounded-md bg-orange-600 px-3 py-2 text-sm font-medium text-white hover:bg-orange-700 disabled:opacity-50 active:scale-[0.96] transition-[background-color,transform] duration-150 ease-[cubic-bezier(0.2,0,0,1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2";
 const btnGhost =
-  "rounded-md border border-zinc-700 px-3 py-2 text-sm text-zinc-300 hover:border-zinc-500 disabled:opacity-50";
+  "rounded-md border border-zinc-200 px-3 py-2 text-sm text-zinc-500 hover:border-zinc-400 disabled:opacity-50";
 
 const TYPE_LABELS: Record<string, string> = { slack: "Slack", telegram: "Telegram", email: "Email" };
 
@@ -142,7 +142,7 @@ function ChannelForm({
   }
 
   return (
-    <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
+    <div className="rounded-lg border border-zinc-200 bg-white/50 p-4">
       <h3 className="mb-3 text-sm font-semibold">{editing ? "Edit channel" : "New channel"}</h3>
       <div className="grid gap-3 sm:grid-cols-2">
         <div>
@@ -202,13 +202,13 @@ function ChannelForm({
           </>
         )}
         <div className="flex items-end">
-          <label className="flex items-center gap-2 text-sm text-zinc-300">
+          <label className="flex items-center gap-2 text-sm text-zinc-500">
             <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} className="h-4 w-4" />
             Enabled
           </label>
         </div>
       </div>
-      {error && <p className="mt-3 text-sm text-red-400">{error}</p>}
+      {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
       <div className="mt-4 flex gap-2">
         <button className={btnPrimary} onClick={save} disabled={saving}>
           {saving ? "Saving…" : editing ? "Save changes" : "Create channel"}
@@ -308,7 +308,7 @@ function RuleForm({
   }
 
   return (
-    <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
+    <div className="rounded-lg border border-zinc-200 bg-white/50 p-4">
       <h3 className="mb-3 text-sm font-semibold">{editing ? "Edit rule" : "New rule"}</h3>
       <div className="grid gap-3 sm:grid-cols-2">
         <div>
@@ -333,7 +333,7 @@ function RuleForm({
             {channels
               .filter((c) => c.enabled)
               .map((c) => (
-                <label key={c.id} className="flex items-center gap-1.5 rounded-md border border-zinc-700 px-2.5 py-1.5 text-sm text-zinc-300">
+                <label key={c.id} className="flex items-center gap-1.5 rounded-md border border-zinc-200 px-2.5 py-1.5 text-sm text-zinc-500">
                   <input
                     type="checkbox"
                     checked={channelIds.includes(c.id)}
@@ -351,7 +351,7 @@ function RuleForm({
             <label className={labelCls}>Projects (empty = all)</label>
             <div className="flex flex-wrap gap-2">
               {projects.map((p) => (
-                <label key={p.id} className="flex items-center gap-1.5 rounded-md border border-zinc-700 px-2.5 py-1.5 text-sm text-zinc-300">
+                <label key={p.id} className="flex items-center gap-1.5 rounded-md border border-zinc-200 px-2.5 py-1.5 text-sm text-zinc-500">
                   <input
                     type="checkbox"
                     checked={projectIds.includes(p.id)}
@@ -381,7 +381,7 @@ function RuleForm({
             <label className={labelCls}>Severities</label>
             <div className="flex gap-3 pt-2">
               {["info", "warn", "critical"].map((s) => (
-                <label key={s} className="flex items-center gap-1.5 text-sm text-zinc-300">
+                <label key={s} className="flex items-center gap-1.5 text-sm text-zinc-500">
                   <input
                     type="checkbox"
                     checked={severities.includes(s)}
@@ -420,13 +420,13 @@ function RuleForm({
           </div>
         </div>
         <div className="flex items-end">
-          <label className="flex items-center gap-2 text-sm text-zinc-300">
+          <label className="flex items-center gap-2 text-sm text-zinc-500">
             <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} className="h-4 w-4" />
             Enabled
           </label>
         </div>
       </div>
-      {error && <p className="mt-3 text-sm text-red-400">{error}</p>}
+      {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
       <div className="mt-4 flex gap-2">
         <button className={btnPrimary} onClick={save} disabled={saving}>
           {saving ? "Saving…" : editing ? "Save changes" : "Create rule"}
@@ -542,7 +542,7 @@ export default function AlertManager({
             key={t}
             onClick={() => setTab(t)}
             className={`rounded-md px-3 py-2 text-sm font-medium ${
-              tab === t ? "bg-zinc-100 text-zinc-900" : "border border-zinc-700 text-zinc-300 hover:border-zinc-500"
+              tab === t ? "bg-zinc-900 text-white" : "border border-zinc-200 text-zinc-500 hover:border-zinc-400"
             }`}
           >
             {t === "rules" ? "Rules" : "Channels"}
@@ -550,12 +550,12 @@ export default function AlertManager({
         ))}
       </div>
 
-      {error && <p className="mb-4 text-sm text-red-400">{error}</p>}
+      {error && <p className="mb-4 text-sm text-red-600">{error}</p>}
 
       {tab === "channels" && (
         <div className="flex flex-col gap-4">
           <div className="flex items-center justify-between">
-            <p className="text-sm text-zinc-400">
+            <p className="text-sm text-zinc-500">
               Destinations for alerts. Secrets are stored encrypted and never shown back.
               {!canManageChannels && " Channel management requires an admin."}
             </p>
@@ -580,12 +580,12 @@ export default function AlertManager({
           )}
 
           {channels.map((c) => (
-            <div key={c.id} className="flex items-center justify-between rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
+            <div key={c.id} className="flex items-center justify-between rounded-lg border border-zinc-200 bg-white/50 p-4">
               <div>
                 <div className="flex items-center gap-2">
                   <span className="font-medium">{c.name}</span>
-                  <span className="rounded bg-zinc-800 px-2 py-0.5 text-xs text-zinc-400">{TYPE_LABELS[c.type]}</span>
-                  {!c.enabled && <span className="rounded bg-zinc-800 px-2 py-0.5 text-xs text-zinc-500">disabled</span>}
+                  <span className="rounded bg-zinc-100 px-2 py-0.5 text-xs text-zinc-500">{TYPE_LABELS[c.type]}</span>
+                  {!c.enabled && <span className="rounded bg-zinc-100 px-2 py-0.5 text-xs text-zinc-500">disabled</span>}
                 </div>
                 <p className="mt-1 font-mono text-xs text-zinc-500">{c.hint || "—"}</p>
                 <p className="mt-1 text-xs text-zinc-500">
@@ -614,7 +614,7 @@ export default function AlertManager({
       {tab === "rules" && (
         <div className="flex flex-col gap-4">
           <div className="flex items-center justify-between">
-            <p className="text-sm text-zinc-400">What fires, where it goes, and how often.</p>
+            <p className="text-sm text-zinc-500">What fires, where it goes, and how often.</p>
             {!editingRule && (
               <button className={btnPrimary} onClick={() => setEditingRule("new")}>
                 New rule
@@ -637,17 +637,17 @@ export default function AlertManager({
           )}
 
           {rules.map((r) => (
-            <div key={r.id} className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
+            <div key={r.id} className="rounded-lg border border-zinc-200 bg-white/50 p-4">
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <div className="flex items-center gap-2">
                     <span className="font-medium">{r.name}</span>
-                    {!r.enabled && <span className="rounded bg-zinc-800 px-2 py-0.5 text-xs text-zinc-500">disabled</span>}
+                    {!r.enabled && <span className="rounded bg-zinc-100 px-2 py-0.5 text-xs text-zinc-500">disabled</span>}
                   </div>
-                  <p className="mt-1 text-sm text-zinc-400">{r.triggerLabel}</p>
+                  <p className="mt-1 text-sm text-zinc-500">{r.triggerLabel}</p>
                   <div className="mt-2 flex flex-wrap gap-1.5">
                     {r.channels.map((c) => (
-                      <span key={c.id} className="rounded bg-zinc-800 px-2 py-0.5 text-xs text-zinc-300">
+                      <span key={c.id} className="rounded bg-zinc-100 px-2 py-0.5 text-xs text-zinc-500">
                         {c.name} <span className="text-zinc-500">({TYPE_LABELS[c.type] ?? c.type})</span>
                       </span>
                     ))}

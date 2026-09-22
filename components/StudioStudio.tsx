@@ -498,8 +498,8 @@ export default function StudioStudio({ projectId, workspaceId, canEdit, isOwnerA
         <div
           className={`mb-4 flex items-center gap-2 rounded-lg border px-4 py-2.5 text-sm ${fade} ${
             notice.kind === "ok"
-              ? "border-emerald-900 bg-emerald-950/40 text-emerald-300"
-              : "border-red-900 bg-red-950/40 text-red-300"
+              ? "border-emerald-200 bg-emerald-50/40 text-emerald-700"
+              : "border-red-200 bg-red-50/40 text-red-700"
           }`}
         >
           {notice.kind === "ok" ? <Check className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
@@ -507,13 +507,13 @@ export default function StudioStudio({ projectId, workspaceId, canEdit, isOwnerA
         </div>
       )}
 
-      <div className="mb-6 flex flex-wrap gap-1 rounded-xl border border-zinc-800 bg-zinc-950 p-1">
+      <div className="mb-6 flex flex-wrap gap-1 rounded-xl border border-zinc-200 bg-zinc-50 p-1">
         {tabs.map((t) => (
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
             className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium ${press} ${fade} ${
-              tab === t.id ? "bg-zinc-800 text-zinc-100" : "text-zinc-500 hover:text-zinc-300"
+              tab === t.id ? "bg-zinc-900 text-white" : "text-zinc-500 hover:text-zinc-600"
             }`}
           >
             {t.icon}
@@ -526,9 +526,9 @@ export default function StudioStudio({ projectId, workspaceId, canEdit, isOwnerA
       {tab === "canva" && (
         <div className={fade}>
           {!canvaConnected ? (
-            <div className="rounded-xl border border-dashed border-zinc-800 p-10 text-center">
-              <Palette className="mx-auto mb-3 h-8 w-8 text-zinc-600" />
-              <h3 className="mb-1 font-medium text-zinc-200">Connect Canva</h3>
+            <div className="rounded-xl border border-dashed border-zinc-200 p-10 text-center">
+              <Palette className="mx-auto mb-3 h-8 w-8 text-zinc-500" />
+              <h3 className="mb-1 font-medium text-zinc-800">Connect Canva</h3>
               <p className="mx-auto mb-5 max-w-md text-sm text-zinc-500">
                 Browse your designs, export them into Marketr, and autofill brand templates — without
                 leaving the studio.
@@ -537,33 +537,33 @@ export default function StudioStudio({ projectId, workspaceId, canEdit, isOwnerA
                 <button
                   onClick={connectCanva}
                   disabled={busy}
-                  className={`inline-flex items-center gap-2 rounded-lg bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-950 ${press}`}
+                  className={`inline-flex items-center gap-2 rounded-lg bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-900 ${press}`}
                 >
                   {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plug className="h-4 w-4" />}
                   Connect Canva
                 </button>
               ) : (
-                <p className="text-sm text-zinc-600">An editor can connect the Canva account.</p>
+                <p className="text-sm text-zinc-500">An editor can connect the Canva account.</p>
               )}
             </div>
           ) : (
             <div>
-              <div className="mb-6 flex items-center justify-between rounded-xl border border-zinc-800 bg-zinc-950 p-4">
+              <div className="mb-6 flex items-center justify-between rounded-xl border border-zinc-200 bg-zinc-50 p-4">
                 <div className="flex items-center gap-3">
                   <span className="flex h-2 w-2 rounded-full bg-emerald-400" />
-                  <span className="text-sm text-zinc-300">Canva connected</span>
+                  <span className="text-sm text-zinc-500">Canva connected</span>
                 </div>
                 <div className="flex gap-2">
                   <button
                     onClick={() => run(refreshCanva)}
-                    className={`rounded-md border border-zinc-800 px-3 py-1.5 text-sm text-zinc-300 ${press}`}
+                    className={`rounded-md border border-zinc-200 px-3 py-1.5 text-sm text-zinc-500 ${press}`}
                   >
                     <RefreshCw className="h-4 w-4" />
                   </button>
                   {canEdit && (
                     <button
                       onClick={disconnectCanva}
-                      className={`inline-flex items-center gap-2 rounded-md border border-zinc-800 px-3 py-1.5 text-sm text-zinc-400 ${press}`}
+                      className={`inline-flex items-center gap-2 rounded-md border border-zinc-200 px-3 py-1.5 text-sm text-zinc-500 ${press}`}
                     >
                       <Unplug className="h-4 w-4" /> Disconnect
                     </button>
@@ -576,7 +576,7 @@ export default function StudioStudio({ projectId, workspaceId, canEdit, isOwnerA
                 Brand templates
               </h3>
               {templatesPlanLimited && (
-                <p className="mb-4 rounded-lg border border-amber-900 bg-amber-950/40 px-4 py-2.5 text-sm text-amber-300">
+                <p className="mb-4 rounded-lg border border-amber-200 bg-amber-50/40 px-4 py-2.5 text-sm text-amber-700">
                   No brand templates are visible on this Canva plan — autofill needs a plan with brand
                   templates (typically Pro/Teams/Enterprise).
                 </p>
@@ -584,7 +584,7 @@ export default function StudioStudio({ projectId, workspaceId, canEdit, isOwnerA
               {templates.length > 0 && (
                 <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   {templates.map((t) => (
-                    <div key={t.id} className="rounded-xl border border-zinc-800 bg-zinc-950 p-4">
+                    <div key={t.id} className="rounded-xl border border-zinc-200 bg-zinc-50 p-4">
                       {t.thumbnailUrl && (
                         <img
                           src={t.thumbnailUrl}
@@ -592,12 +592,12 @@ export default function StudioStudio({ projectId, workspaceId, canEdit, isOwnerA
                           className="mb-3 aspect-video w-full rounded-lg object-cover outline outline-1 outline-[oklch(0_0_0/0.1)]"
                         />
                       )}
-                      <p className="text-sm font-medium text-zinc-200">{t.title}</p>
+                      <p className="text-sm font-medium text-zinc-800">{t.title}</p>
                       <p className="mb-3 text-xs text-zinc-500">{t.designType}</p>
                       {canEdit && (
                         <button
                           onClick={() => openAutofill(t)}
-                          className={`rounded-md border border-zinc-700 px-3 py-1.5 text-xs font-medium text-zinc-200 ${press}`}
+                          className={`rounded-md border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-800 ${press}`}
                         >
                           Autofill template
                         </button>
@@ -617,13 +617,13 @@ export default function StudioStudio({ projectId, workspaceId, canEdit, isOwnerA
                     value={designQuery}
                     onChange={(e) => setDesignQuery(e.target.value)}
                     placeholder="Search designs…"
-                    className="rounded-md border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm text-zinc-200"
+                    className="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-1.5 text-sm text-zinc-800"
                   />
                   {folders.length > 0 && (
                     <select
                       value={folderId}
                       onChange={(e) => setFolderId(e.target.value)}
-                      className="rounded-md border border-zinc-800 bg-zinc-950 px-2 py-1.5 text-sm text-zinc-300"
+                      className="rounded-md border border-zinc-200 bg-zinc-50 px-2 py-1.5 text-sm text-zinc-500"
                     >
                       <option value="">All folders</option>
                       {folders.map((f) => (
@@ -635,7 +635,7 @@ export default function StudioStudio({ projectId, workspaceId, canEdit, isOwnerA
                   )}
                   <button
                     onClick={searchDesigns}
-                    className={`rounded-md border border-zinc-800 px-3 py-1.5 text-sm text-zinc-300 ${press}`}
+                    className={`rounded-md border border-zinc-200 px-3 py-1.5 text-sm text-zinc-500 ${press}`}
                   >
                     <Search className="h-4 w-4" />
                   </button>
@@ -643,7 +643,7 @@ export default function StudioStudio({ projectId, workspaceId, canEdit, isOwnerA
               </div>
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {designs.map((d) => (
-                  <div key={d.id} className="rounded-xl border border-zinc-800 bg-zinc-950 p-4">
+                  <div key={d.id} className="rounded-xl border border-zinc-200 bg-zinc-50 p-4">
                     {d.thumbnailUrl && (
                       <img
                         src={d.thumbnailUrl}
@@ -651,14 +651,14 @@ export default function StudioStudio({ projectId, workspaceId, canEdit, isOwnerA
                         className="mb-3 aspect-video w-full rounded-lg object-cover outline outline-1 outline-[oklch(0_0_0/0.1)]"
                       />
                     )}
-                    <p className="text-sm font-medium text-zinc-200">{d.title}</p>
+                    <p className="text-sm font-medium text-zinc-800">{d.title}</p>
                     <p className="mb-3 text-xs text-zinc-500">{d.designType}</p>
                     <div className="flex flex-wrap gap-2">
                       <a
                         href={d.editUrl}
                         target="_blank"
                         rel="noreferrer"
-                        className={`inline-flex items-center gap-1 rounded-md border border-zinc-700 px-3 py-1.5 text-xs font-medium text-zinc-200 ${press}`}
+                        className={`inline-flex items-center gap-1 rounded-md border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-800 ${press}`}
                       >
                         <ExternalLink className="h-3 w-3" /> Open in Canva
                       </a>
@@ -667,7 +667,7 @@ export default function StudioStudio({ projectId, workspaceId, canEdit, isOwnerA
                           <button
                             onClick={() => exportDesign(d, "png")}
                             disabled={exporting === d.id}
-                            className={`inline-flex items-center gap-1 rounded-md bg-zinc-100 px-3 py-1.5 text-xs font-medium text-zinc-950 ${press}`}
+                            className={`inline-flex items-center gap-1 rounded-md bg-zinc-100 px-3 py-1.5 text-xs font-medium text-zinc-900 ${press}`}
                           >
                             {exporting === d.id ? (
                               <Loader2 className="h-3 w-3 animate-spin" />
@@ -679,7 +679,7 @@ export default function StudioStudio({ projectId, workspaceId, canEdit, isOwnerA
                           <button
                             onClick={() => exportDesign(d, "pdf")}
                             disabled={exporting === d.id}
-                            className={`inline-flex items-center gap-1 rounded-md border border-zinc-700 px-3 py-1.5 text-xs font-medium text-zinc-200 ${press}`}
+                            className={`inline-flex items-center gap-1 rounded-md border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-800 ${press}`}
                           >
                             PDF
                           </button>
@@ -687,7 +687,7 @@ export default function StudioStudio({ projectId, workspaceId, canEdit, isOwnerA
                             <button
                               onClick={() => importDesignThumbnail(d)}
                               title="Save the design's thumbnail + metadata to the asset library"
-                              className={`inline-flex items-center gap-1 rounded-md border border-zinc-800 px-3 py-1.5 text-xs text-zinc-400 ${press}`}
+                              className={`inline-flex items-center gap-1 rounded-md border border-zinc-200 px-3 py-1.5 text-xs text-zinc-500 ${press}`}
                             >
                               <ImageIcon className="h-3 w-3" /> Import thumbnail
                             </button>
@@ -699,7 +699,7 @@ export default function StudioStudio({ projectId, workspaceId, canEdit, isOwnerA
                 ))}
               </div>
               {designs.length === 0 && (
-                <p className="rounded-xl border border-dashed border-zinc-800 p-8 text-center text-sm text-zinc-500">
+                <p className="rounded-xl border border-dashed border-zinc-200 p-8 text-center text-sm text-zinc-500">
                   No designs found.
                 </p>
               )}
@@ -712,7 +712,7 @@ export default function StudioStudio({ projectId, workspaceId, canEdit, isOwnerA
       {tab === "domains" && (
         <div className={fade}>
           {!isOwnerAdmin && (
-            <p className="mb-4 rounded-lg border border-amber-900 bg-amber-950/40 px-4 py-2.5 text-sm text-amber-300">
+            <p className="mb-4 rounded-lg border border-amber-200 bg-amber-50/40 px-4 py-2.5 text-sm text-amber-700">
               Domain purchasing needs an owner or admin role. Availability search and the domain list
               are still visible.
             </p>
@@ -720,8 +720,8 @@ export default function StudioStudio({ projectId, workspaceId, canEdit, isOwnerA
 
           {/* Porkbun keys */}
           {isOwnerAdmin && (
-            <div className="mb-6 rounded-xl border border-zinc-800 bg-zinc-950 p-5">
-              <h3 className="mb-1 flex items-center gap-2 text-sm font-semibold text-zinc-200">
+            <div className="mb-6 rounded-xl border border-zinc-200 bg-zinc-50 p-5">
+              <h3 className="mb-1 flex items-center gap-2 text-sm font-semibold text-zinc-800">
                 <Settings2 className="h-4 w-4" /> Porkbun API keys
               </h3>
               <p className="mb-4 text-sm text-zinc-500">
@@ -735,19 +735,19 @@ export default function StudioStudio({ projectId, workspaceId, canEdit, isOwnerA
                   type="password"
                   placeholder="API key"
                   autoComplete="off"
-                  className="w-56 rounded-md border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm text-zinc-200"
+                  className="w-56 rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-800"
                 />
                 <input
                   name="secretApiKey"
                   type="password"
                   placeholder="Secret API key"
                   autoComplete="off"
-                  className="w-56 rounded-md border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm text-zinc-200"
+                  className="w-56 rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-800"
                 />
                 <button
                   type="submit"
                   disabled={busy}
-                  className={`rounded-md bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-950 ${press}`}
+                  className={`rounded-md bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-900 ${press}`}
                 >
                   Save keys
                 </button>
@@ -757,39 +757,39 @@ export default function StudioStudio({ projectId, workspaceId, canEdit, isOwnerA
 
           {/* Search */}
           {porkbunConfigured && (
-            <div className="mb-6 rounded-xl border border-zinc-800 bg-zinc-950 p-5">
-              <h3 className="mb-3 text-sm font-semibold text-zinc-200">Check availability</h3>
+            <div className="mb-6 rounded-xl border border-zinc-200 bg-zinc-50 p-5">
+              <h3 className="mb-3 text-sm font-semibold text-zinc-800">Check availability</h3>
               <div className="flex gap-2">
                 <input
                   value={searchDomain}
                   onChange={(e) => setSearchDomain(e.target.value)}
                   placeholder="yourdomain.com"
-                  className="flex-1 rounded-md border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm text-zinc-200"
+                  className="flex-1 rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-800"
                 />
                 <button
                   onClick={searchAvailability}
                   disabled={busy || !searchDomain.trim()}
-                  className={`rounded-md bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-950 ${press}`}
+                  className={`rounded-md bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-900 ${press}`}
                 >
                   Search
                 </button>
               </div>
               {searchResult && (
-                <div className="mt-4 rounded-lg border border-zinc-800 p-4">
+                <div className="mt-4 rounded-lg border border-zinc-200 p-4">
                   <div className="flex items-center justify-between">
-                    <span className="font-medium text-zinc-100">{searchResult.domain}</span>
+                    <span className="font-medium text-zinc-900">{searchResult.domain}</span>
                     <span
                       className={`rounded-full px-3 py-1 text-xs font-medium ${
                         searchResult.available
-                          ? "bg-emerald-950 text-emerald-300"
-                          : "bg-zinc-800 text-zinc-400"
+                          ? "bg-emerald-50 text-emerald-700"
+                          : "bg-zinc-100 text-zinc-500"
                       }`}
                     >
                       {searchResult.available ? "Available" : "Taken"}
                     </span>
                   </div>
                   {searchResult.available && searchResult.priceUsd != null && (
-                    <div className="mt-2 text-sm text-zinc-400">
+                    <div className="mt-2 text-sm text-zinc-500">
                       ${searchResult.priceUsd.toFixed(2)}/yr registration
                       {searchResult.renewalPriceUsd != null &&
                         searchResult.renewalPriceUsd !== searchResult.priceUsd && (
@@ -804,7 +804,7 @@ export default function StudioStudio({ projectId, workspaceId, canEdit, isOwnerA
                   {searchResult.available && isOwnerAdmin && !preview && (
                     <button
                       onClick={previewPurchase}
-                      className={`mt-3 rounded-md bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-950 ${press}`}
+                      className={`mt-3 rounded-md bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-900 ${press}`}
                     >
                       Buy this domain
                     </button>
@@ -816,25 +816,25 @@ export default function StudioStudio({ projectId, workspaceId, canEdit, isOwnerA
 
           {/* Purchase preview / double confirmation */}
           {preview && (
-            <div className="mb-6 rounded-xl border border-amber-900 bg-amber-950/20 p-5">
-              <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold text-amber-200">
+            <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50/20 p-5">
+              <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold text-amber-800">
                 <AlertTriangle className="h-4 w-4" /> Confirm purchase
               </h3>
-              <p className="mb-1 text-lg font-semibold text-zinc-100">{preview.domain}</p>
-              <p className="mb-3 text-sm text-zinc-400">
+              <p className="mb-1 text-lg font-semibold text-zinc-900">{preview.domain}</p>
+              <p className="mb-3 text-sm text-zinc-500">
                 ${preview.priceUsd?.toFixed(2)}/yr registration
                 {preview.renewalPriceUsd != null && ` · $${preview.renewalPriceUsd.toFixed(2)}/yr renewal`}
               </p>
               <p className="mb-2 text-xs uppercase tracking-widest text-zinc-500">Registrant</p>
-              <p className="mb-3 text-sm text-zinc-300">
+              <p className="mb-3 text-sm text-zinc-500">
                 {preview.registrant.firstName} {preview.registrant.lastName} · {preview.registrant.email} ·{" "}
                 {preview.registrant.address}, {preview.registrant.city} {preview.registrant.zip},{" "}
                 {preview.registrant.country}
               </p>
-              <p className="mb-4 rounded-lg border border-zinc-800 bg-zinc-950 p-3 text-xs leading-relaxed text-zinc-400">
+              <p className="mb-4 rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-xs leading-relaxed text-zinc-500">
                 {preview.icannDisclosure}
               </p>
-              <label className="mb-4 flex cursor-pointer items-start gap-2 text-sm text-zinc-300">
+              <label className="mb-4 flex cursor-pointer items-start gap-2 text-sm text-zinc-500">
                 <input
                   type="checkbox"
                   checked={agreeTerms}
@@ -854,7 +854,7 @@ export default function StudioStudio({ projectId, workspaceId, canEdit, isOwnerA
                 </button>
                 <button
                   onClick={() => setPreview(null)}
-                  className={`rounded-md border border-zinc-700 px-4 py-2 text-sm text-zinc-300 ${press}`}
+                  className={`rounded-md border border-zinc-200 px-4 py-2 text-sm text-zinc-500 ${press}`}
                 >
                   Cancel
                 </button>
@@ -864,8 +864,8 @@ export default function StudioStudio({ projectId, workspaceId, canEdit, isOwnerA
 
           {/* Registrant */}
           {isOwnerAdmin && (
-            <div className="mb-6 rounded-xl border border-zinc-800 bg-zinc-950 p-5">
-              <h3 className="mb-1 text-sm font-semibold text-zinc-200">Registrant contact</h3>
+            <div className="mb-6 rounded-xl border border-zinc-200 bg-zinc-50 p-5">
+              <h3 className="mb-1 text-sm font-semibold text-zinc-800">Registrant contact</h3>
               <p className="mb-4 text-sm text-zinc-500">
                 Required before any purchase. Porkbun registers with your account&apos;s default
                 contact; this is your review copy and audit record.
@@ -887,14 +887,14 @@ export default function StudioStudio({ projectId, workspaceId, canEdit, isOwnerA
                     name={k}
                     defaultValue={registrant?.[k] ?? (k === "country" ? "US" : "")}
                     placeholder={label}
-                    className="rounded-md border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm text-zinc-200"
+                    className="rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-800"
                   />
                 ))}
                 <div className="sm:col-span-2">
                   <button
                     type="submit"
                     disabled={busy}
-                    className={`rounded-md border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-200 ${press}`}
+                    className={`rounded-md border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-800 ${press}`}
                   >
                     Save registrant
                   </button>
@@ -908,7 +908,7 @@ export default function StudioStudio({ projectId, workspaceId, canEdit, isOwnerA
             Project domains
           </h3>
           {domains.length === 0 ? (
-            <p className="rounded-xl border border-dashed border-zinc-800 p-8 text-center text-sm text-zinc-500">
+            <p className="rounded-xl border border-dashed border-zinc-200 p-8 text-center text-sm text-zinc-500">
               No domains yet. Search above to register one through Porkbun.
             </p>
           ) : (
@@ -916,25 +916,25 @@ export default function StudioStudio({ projectId, workspaceId, canEdit, isOwnerA
               {domains.map((d) => (
                 <div
                   key={d.id}
-                  className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-zinc-800 bg-zinc-950 p-4"
+                  className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-zinc-200 bg-zinc-50 p-4"
                 >
                   <div>
-                    <p className="font-medium text-zinc-100">{d.domain}</p>
+                    <p className="font-medium text-zinc-900">{d.domain}</p>
                     <p className="text-xs text-zinc-500">
                       {d.status}
                       {d.priceUsd != null && ` · $${d.priceUsd.toFixed(2)}`}
                       {d.purchasedAt && ` · bought ${new Date(d.purchasedAt).toLocaleDateString()}`}
                       {d.nameServers.length > 0 && ` · ${d.nameServers.join(", ")}`}
                     </p>
-                    {d.errorDetail && <p className="text-xs text-red-400">{d.errorDetail}</p>}
+                    {d.errorDetail && <p className="text-xs text-red-600">{d.errorDetail}</p>}
                   </div>
                   <span
                     className={`rounded-full px-3 py-1 text-xs font-medium ${
                       d.status === "registered"
-                        ? "bg-emerald-950 text-emerald-300"
+                        ? "bg-emerald-50 text-emerald-700"
                         : d.status === "failed"
-                          ? "bg-red-950 text-red-300"
-                          : "bg-zinc-800 text-zinc-400"
+                          ? "bg-red-50 text-red-700"
+                          : "bg-zinc-100 text-zinc-500"
                     }`}
                   >
                     {d.status}
@@ -950,51 +950,51 @@ export default function StudioStudio({ projectId, workspaceId, canEdit, isOwnerA
       {tab === "assets" && (
         <div className={fade}>
           {canEdit && (
-            <form onSubmit={addAsset} className="mb-6 flex flex-wrap gap-2 rounded-xl border border-zinc-800 bg-zinc-950 p-4">
+            <form onSubmit={addAsset} className="mb-6 flex flex-wrap gap-2 rounded-xl border border-zinc-200 bg-zinc-50 p-4">
               <input
                 value={newAssetName}
                 onChange={(e) => setNewAssetName(e.target.value)}
                 placeholder="Name"
-                className="w-48 rounded-md border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm text-zinc-200"
+                className="w-48 rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-800"
               />
               <input
                 value={newAssetUrl}
                 onChange={(e) => setNewAssetUrl(e.target.value)}
                 placeholder="https://… image or file URL"
-                className="flex-1 rounded-md border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm text-zinc-200"
+                className="flex-1 rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-800"
               />
               <button
                 type="submit"
                 disabled={busy || !newAssetUrl.trim()}
-                className={`rounded-md bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-950 ${press}`}
+                className={`rounded-md bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-900 ${press}`}
               >
                 Add asset
               </button>
             </form>
           )}
           {assets.length === 0 ? (
-            <p className="rounded-xl border border-dashed border-zinc-800 p-8 text-center text-sm text-zinc-500">
+            <p className="rounded-xl border border-dashed border-zinc-200 p-8 text-center text-sm text-zinc-500">
               No assets yet. Export a Canva design above or add a URL.
             </p>
           ) : (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {assets.map((a) => (
-                <div key={a.id} className="rounded-xl border border-zinc-800 bg-zinc-950 p-4">
-                  <div className="mb-3 flex h-32 items-center justify-center overflow-hidden rounded-lg bg-zinc-900 outline outline-1 outline-[oklch(0_0_0/0.1)]">
+                <div key={a.id} className="rounded-xl border border-zinc-200 bg-zinc-50 p-4">
+                  <div className="mb-3 flex h-32 items-center justify-center overflow-hidden rounded-lg bg-white outline outline-1 outline-[oklch(0_0_0/0.1)]">
                     {a.mimeType?.startsWith("image/") || /\.(png|jpe?g|gif|webp|svg)$/i.test(a.url) ? (
                       <img src={a.url} alt={a.name} className="max-h-full object-contain" />
                     ) : (
-                      <ImageIcon className="h-8 w-8 text-zinc-700" />
+                      <ImageIcon className="h-8 w-8 text-zinc-600" />
                     )}
                   </div>
-                  <p className="text-sm font-medium text-zinc-200">{a.name}</p>
+                  <p className="text-sm font-medium text-zinc-800">{a.name}</p>
                   <p className="mb-3 text-xs capitalize text-zinc-500">{a.source}</p>
                   <div className="flex flex-wrap gap-2">
                     <a
                       href={a.url}
                       target="_blank"
                       rel="noreferrer"
-                      className={`inline-flex items-center gap-1 rounded-md border border-zinc-700 px-3 py-1.5 text-xs text-zinc-200 ${press}`}
+                      className={`inline-flex items-center gap-1 rounded-md border border-zinc-200 px-3 py-1.5 text-xs text-zinc-800 ${press}`}
                     >
                       <Link2 className="h-3 w-3" /> Open
                     </a>
@@ -1002,13 +1002,13 @@ export default function StudioStudio({ projectId, workspaceId, canEdit, isOwnerA
                       <>
                         <button
                           onClick={() => openUseInSocial(a)}
-                          className={`inline-flex items-center gap-1 rounded-md bg-zinc-100 px-3 py-1.5 text-xs font-medium text-zinc-950 ${press}`}
+                          className={`inline-flex items-center gap-1 rounded-md bg-zinc-100 px-3 py-1.5 text-xs font-medium text-zinc-900 ${press}`}
                         >
                           <Send className="h-3 w-3" /> Use in social post
                         </button>
                         <button
                           onClick={() => deleteAsset(a.id)}
-                          className={`rounded-md border border-zinc-800 px-3 py-1.5 text-xs text-zinc-500 ${press}`}
+                          className={`rounded-md border border-zinc-200 px-3 py-1.5 text-xs text-zinc-500 ${press}`}
                         >
                           <Trash2 className="h-3 w-3" />
                         </button>
@@ -1024,8 +1024,8 @@ export default function StudioStudio({ projectId, workspaceId, canEdit, isOwnerA
       {/* Autofill editor */}
       {autofillTpl && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-          <div className={`w-full max-w-lg rounded-2xl border border-zinc-800 bg-zinc-950 p-6 ${fade}`}>
-            <h3 className="text-base font-semibold text-zinc-100">Autofill “{autofillTpl.title}”</h3>
+          <div className={`w-full max-w-lg rounded-2xl border border-zinc-200 bg-zinc-50 p-6 ${fade}`}>
+            <h3 className="text-base font-semibold text-zinc-900">Autofill “{autofillTpl.title}”</h3>
             <p className="mt-1 text-xs text-zinc-500">
               Text fields are prefilled from your brand kit
               {brandDefaults ? ` “${brandDefaults.brandKitName}”` : ""} where the field name matches —
@@ -1036,11 +1036,11 @@ export default function StudioStudio({ projectId, workspaceId, canEdit, isOwnerA
                 .filter((f) => f.type === "text")
                 .map((f) => (
                   <label key={f.name} className="block">
-                    <span className="mb-1 block text-xs font-medium text-zinc-400">{f.name}</span>
+                    <span className="mb-1 block text-xs font-medium text-zinc-500">{f.name}</span>
                     <input
                       value={autofillVals[f.name] ?? ""}
                       onChange={(e) => setAutofillVals((v) => ({ ...v, [f.name]: e.target.value }))}
-                      className="w-full rounded-md border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm text-zinc-100"
+                      className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900"
                     />
                   </label>
                 ))}
@@ -1053,14 +1053,14 @@ export default function StudioStudio({ projectId, workspaceId, canEdit, isOwnerA
             <div className="mt-6 flex justify-end gap-2">
               <button
                 onClick={() => setAutofillTpl(null)}
-                className={`rounded-md border border-zinc-800 px-4 py-2 text-sm text-zinc-300 ${press}`}
+                className={`rounded-md border border-zinc-200 px-4 py-2 text-sm text-zinc-500 ${press}`}
               >
                 Cancel
               </button>
               <button
                 onClick={submitAutofill}
                 disabled={busy}
-                className={`rounded-md bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-950 ${press}`}
+                className={`rounded-md bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-900 ${press}`}
               >
                 Create design
               </button>
@@ -1071,15 +1071,15 @@ export default function StudioStudio({ projectId, workspaceId, canEdit, isOwnerA
       {/* Delete confirmation */}
       {deleteTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-          <div className={`w-full max-w-sm rounded-2xl border border-zinc-800 bg-zinc-950 p-6 ${fade}`}>
-            <h3 className="text-base font-semibold text-zinc-100">Delete this asset?</h3>
+          <div className={`w-full max-w-sm rounded-2xl border border-zinc-200 bg-zinc-50 p-6 ${fade}`}>
+            <h3 className="text-base font-semibold text-zinc-900">Delete this asset?</h3>
             <p className="mt-1 text-sm text-zinc-500">
               This removes it from the asset library. Posts already using it keep their copy.
             </p>
             <div className="mt-6 flex justify-end gap-2">
               <button
                 onClick={() => setDeleteTarget(null)}
-                className={`rounded-md border border-zinc-800 px-4 py-2 text-sm text-zinc-300 ${press}`}
+                className={`rounded-md border border-zinc-200 px-4 py-2 text-sm text-zinc-500 ${press}`}
               >
                 Cancel
               </button>
@@ -1098,32 +1098,32 @@ export default function StudioStudio({ projectId, workspaceId, canEdit, isOwnerA
       {/* Use in social post */}
       {socialAsset && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-          <div className={`w-full max-w-lg rounded-2xl border border-zinc-800 bg-zinc-950 p-6 ${fade}`}>
-            <h3 className="text-base font-semibold text-zinc-100">Use in social post</h3>
+          <div className={`w-full max-w-lg rounded-2xl border border-zinc-200 bg-zinc-50 p-6 ${fade}`}>
+            <h3 className="text-base font-semibold text-zinc-900">Use in social post</h3>
             <p className="mt-1 text-xs text-zinc-500">
               Creates a draft in the social studio with “{socialAsset.name}” attached.
             </p>
             <label className="mt-4 block">
-              <span className="mb-1 block text-xs font-medium text-zinc-400">Post text</span>
+              <span className="mb-1 block text-xs font-medium text-zinc-500">Post text</span>
               <textarea
                 value={socialText}
                 onChange={(e) => setSocialText(e.target.value)}
                 rows={4}
                 placeholder="Write the post…"
-                className="w-full rounded-md border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm text-zinc-100"
+                className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900"
               />
             </label>
             <div className="mt-6 flex justify-end gap-2">
               <button
                 onClick={() => setSocialAsset(null)}
-                className={`rounded-md border border-zinc-800 px-4 py-2 text-sm text-zinc-300 ${press}`}
+                className={`rounded-md border border-zinc-200 px-4 py-2 text-sm text-zinc-500 ${press}`}
               >
                 Cancel
               </button>
               <button
                 onClick={submitUseInSocial}
                 disabled={busy}
-                className={`rounded-md bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-950 ${press}`}
+                className={`rounded-md bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-900 ${press}`}
               >
                 Create draft
               </button>

@@ -36,7 +36,7 @@ export default function ProjectCreateForm() {
   return (
     <form
       onSubmit={onSubmit}
-      className="flex flex-col gap-3 rounded-xl border border-zinc-800 bg-zinc-900/60 p-5 sm:flex-row sm:items-end"
+      className="flex flex-col gap-3 rounded-xl border border-zinc-200 bg-white/60 p-5 sm:flex-row sm:items-end"
     >
       <div className="flex-1">
         <label
@@ -51,17 +51,17 @@ export default function ProjectCreateForm() {
           placeholder="example.com"
           value={domain}
           onChange={(e) => setDomain(e.target.value)}
-          className="w-full rounded-md border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-zinc-500 focus:outline-none"
+          className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-orange-500 focus:outline-none"
         />
       </div>
       <button
         type="submit"
         disabled={busy}
-        className="rounded-md bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-950 hover:bg-white disabled:opacity-50"
+        className="rounded-md bg-orange-600 px-4 py-2 text-sm font-medium text-white hover:bg-orange-700 disabled:opacity-50 active:scale-[0.96] transition-[background-color,transform] duration-150 ease-[cubic-bezier(0.2,0,0,1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2"
       >
         {busy ? "Creating…" : "Add domain"}
       </button>
-      {error && <p className="text-sm text-red-400 sm:basis-full">{error}</p>}
+      {error && <p className="text-sm text-red-600 sm:basis-full">{error}</p>}
     </form>
   );
 }

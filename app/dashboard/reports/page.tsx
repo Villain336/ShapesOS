@@ -42,9 +42,9 @@ export default async function ReportsPage() {
     <div className="flex flex-col gap-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Reports</h1>
-        <p className="mt-1 text-sm text-zinc-400">
+        <p className="mt-1 text-sm text-zinc-500">
           Editable templates, branded PDF generation, and schedules. A paragraph containing only{" "}
-          <span className="font-mono text-zinc-300">{"{{rankings_table}}"}</span> becomes the keyword
+          <span className="font-mono text-zinc-500">{"{{rankings_table}}"}</span> becomes the keyword
           rankings table at generation time.
         </p>
       </div>

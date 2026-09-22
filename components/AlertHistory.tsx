@@ -36,14 +36,14 @@ function isChannelResult(r: unknown): r is ChannelResult {
 }
 
 const STATUS_STYLES: Record<string, string> = {
-  sent: "bg-emerald-900/40 text-emerald-300",
-  failed: "bg-red-900/40 text-red-300",
-  queued: "bg-amber-900/40 text-amber-300",
-  suppressed: "bg-zinc-800 text-zinc-500",
+  sent: "bg-emerald-900/40 text-emerald-700",
+  failed: "bg-red-100/40 text-red-700",
+  queued: "bg-amber-100/40 text-amber-700",
+  suppressed: "bg-zinc-100 text-zinc-500",
 };
 
 const btnGhost =
-  "rounded-md border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300 hover:border-zinc-500 disabled:opacity-50";
+  "rounded-md border border-zinc-200 px-3 py-1.5 text-xs text-zinc-500 hover:border-zinc-400 disabled:opacity-50";
 
 export default function AlertHistory({
   initial,
@@ -97,7 +97,7 @@ export default function AlertHistory({
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap gap-3">
         <select
-          className="rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm"
+          className="rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm"
           value={status}
           onChange={(e) => {
             setStatus(e.target.value);
@@ -111,7 +111,7 @@ export default function AlertHistory({
           <option value="suppressed">Suppressed</option>
         </select>
         <select
-          className="rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm"
+          className="rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm"
           value={ruleId}
           onChange={(e) => {
             setRuleId(e.target.value);
@@ -129,30 +129,30 @@ export default function AlertHistory({
       </div>
 
       {events.map((e) => (
-        <div key={e.id} className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
+        <div key={e.id} className="rounded-lg border border-zinc-200 bg-white/50 p-4">
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
                 <span className={`rounded px-2 py-0.5 text-xs font-medium ${STATUS_STYLES[e.status]}`}>{e.status}</span>
                 <span className="text-xs text-zinc-500">{e.triggerLabel}</span>
                 <span className="text-xs text-zinc-500">· {e.ruleName}</span>
-                {e.queueReason && <span className="text-xs text-amber-400/80">· waiting: {e.queueReason}</span>}
+                {e.queueReason && <span className="text-xs text-amber-700/80">· waiting: {e.queueReason}</span>}
               </div>
               <p className="mt-2 font-medium">{e.title}</p>
-              <p className="mt-1 whitespace-pre-wrap text-sm text-zinc-400">{e.body}</p>
+              <p className="mt-1 whitespace-pre-wrap text-sm text-zinc-500">{e.body}</p>
               <div className="mt-2 flex flex-wrap gap-2">
                 {e.results.map((r, i) =>
                   isChannelResult(r) ? (
                     <span
                       key={i}
                       title={r.error ?? undefined}
-                      className={`rounded px-2 py-0.5 text-xs ${r.ok ? "bg-zinc-800 text-zinc-300" : "bg-red-900/40 text-red-300"}`}
+                      className={`rounded px-2 py-0.5 text-xs ${r.ok ? "bg-zinc-100 text-zinc-500" : "bg-red-100/40 text-red-700"}`}
                     >
                       {r.ok ? "✓" : "✗"} {r.name}
                       {r.error ? `: ${r.error}` : ""}
                     </span>
                   ) : (
-                    <span key={i} className="rounded bg-zinc-800 px-2 py-0.5 text-xs text-zinc-500">
+                    <span key={i} className="rounded bg-zinc-100 px-2 py-0.5 text-xs text-zinc-500">
                       {typeof r === "object" && r !== null && "digest" in r ? "folded into digest" : "suppressed"}
                     </span>
                   ),
