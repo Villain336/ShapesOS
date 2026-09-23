@@ -322,7 +322,7 @@ async function main() {
     }
     ok("61st call in window → 429", last.status === 429);
     // Independent budgets: keyA still has room.
-    const other = checkMcpRateLimit(keyA.id);
+    const other = await checkMcpRateLimit(keyA.id);
     ok("budgets are per-credential", other.allowed === true);
     resetMcpRateLimits();
   }

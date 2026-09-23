@@ -20,6 +20,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { getSeoProvider } from "@/lib/providers";
+import { meter } from "@/lib/metering/service";
 import type { BacklinkItem, SeoDataProvider } from "@/lib/providers/types";
 import { emitAlert } from "@/lib/alerts/evaluate";
 import {
@@ -370,6 +371,18 @@ export async function runBacklinkPull(opts: {
     "backlink_pull",
     `Backlink pull completed: ${rowsReturned} rows, ${newLinks} new, ${lostLinks.length} lost, $${actualCostUsd.toFixed(4)} (${provider.name}${mock ? ", mock" : ""})`,
   ).catch(() => {});
+
+  // Phase C gaps (G1): ledger one backlink_summary per completed pull. The
+  // pull row is the domain row — retried pulls reuse the key.
+  await meter({
+    workspaceId,
+    projectId,
+    action: "backlink_summary",
+    idempotencyKey: `backlinksummary:${pull.id}`,
+    evidenceRef: `backlink-pull:${pull.id}`,
+  }).catch((err) => {
+    console.error(`Metering failed for backlink pull ${pull.id}:`, err);
+  });
 
   // 7. Alerts for lost high-authority links (best-effort, never breaks the pull).
   let alertsEmitted = 0;

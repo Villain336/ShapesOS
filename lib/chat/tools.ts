@@ -18,6 +18,8 @@ import type { SiteSourceType, WorkspaceRole } from "@prisma/client";
 import { roleAtLeast } from "@/lib/authz";
 import { getSeoProvider } from "@/lib/providers";
 import { recordUsage } from "@/lib/usage";
+import { meter } from "@/lib/metering/service";
+import { hourBucket, seedHash } from "@/lib/metering/wiring";
 import { visibilityScore, computeAlerts } from "@/lib/rankings";
 import { buildDraftPrompt } from "@/lib/content/draft";
 import { wordCount, type ContentBrief } from "@/lib/content/brief";
@@ -463,6 +465,15 @@ const research_keywords: ToolDef = {
     const limit = Math.max(1, Math.min(num(args.limit) ?? 20, 50));
     const provider = getSeoProvider();
     const ideas = await provider.keywordIdeas({ seed, limit });
+    // Phase C gaps (G1): same underlying action as /api/keywords/ideas —
+    // ledger it so the chat path can't bypass metering. Hour-bucketed key (T12).
+    await meter({
+      workspaceId: ctx.workspaceId,
+      projectId: ctx.projectId,
+      action: "keyword_ideas",
+      idempotencyKey: `kwideas:${ctx.projectId}:${seedHash(seed.toLowerCase())}:${limit}:${hourBucket()}`,
+      evidenceRef: `chat-research:${seed.slice(0, 60)}`,
+    }).catch(() => {});
     await recordUsage(ctx.workspaceId, "serp_calls", 1).catch(() => {});
     const top = ideas.slice(0, limit).map((i: { phrase?: string; volume?: number | null; difficulty?: number | null }) => ({
       phrase: i.phrase ?? "",
@@ -524,6 +535,15 @@ const create_content_draft: ToolDef = {
       },
     });
     await recordUsage(ctx.workspaceId, "ai_words", words).catch(() => {});
+    // Phase C gaps (G1): same underlying action as /api/content/draft —
+    // ledger it so the chat path can't bypass metering.
+    await meter({
+      workspaceId: ctx.workspaceId,
+      projectId: ctx.projectId,
+      action: "ai_article",
+      idempotencyKey: `aichatdraft:${item.id}`,
+      evidenceRef: `chat-draft:${item.id}`,
+    }).catch(() => {});
     return {
       summary: `Draft created for "${topic}" (${words} words, status "draft" — pending review, not published). Content item ${item.id}.`,
       details: { contentItemId: item.id, topic, words, mock: brief.mock },

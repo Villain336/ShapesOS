@@ -16,6 +16,7 @@
 
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { prisma } from "@/lib/prisma";
+import { secrets } from "@/lib/secrets";
 import { isKnownScope } from "./scopes";
 import { mintAccessToken } from "./auth";
 
@@ -119,6 +120,12 @@ export interface PendingAuthorization {
   state?: string;
   codeChallenge?: string;
   codeChallengeMethod?: string;
+  /**
+   * Bound by the workspace-picker step (G3): the workspace the approver chose
+   * on the consent screen, sealed into the grant. Absent on grants sealed by
+   * the authorize endpoint before the picker step.
+   */
+  workspaceId?: string;
 }
 
 /** Begin the authorize flow: validate everything, return the pending record for the consent screen. */
@@ -282,4 +289,103 @@ export async function exchangeCode(params: {
       scope: row.scopes.join(" "),
     },
   };
+}
+
+/* ── Workspace picker (G3) ────────────────────────────────────────────────
+ * The consent screen lets the approver choose which of THEIR workspaces the
+ * OAuth token binds to (previously: the approver's default workspace).
+ *
+ * Two-step, both server-verified (T14/T15):
+ *   1. select: POST { grant, decision: "select", workspaceId } — the posted
+ *      id is checked against a FRESH membership query; on success the pending
+ *      authorization is RE-SEALED with workspaceId bound inside.
+ *   2. approve: POST { grant: <re-sealed>, decision: "approve" } — the grant
+ *      is decrypted (AES-GCM: any tamper → invalid_grant, fail closed), the
+ *      sealed workspaceId is membership-checked AGAIN (the user may have been
+ *      removed between steps), mcpEnabled is checked, then the code is
+ *      minted for exactly that workspace.
+ */
+
+/** Fresh workspace ids the user can access (owner OR member) — never cached across the check. */
+export async function userWorkspaceIds(userId: string): Promise<string[]> {
+  const rows = await prisma.workspace.findMany({
+    where: { OR: [{ ownerUserId: userId }, { members: { some: { userId } } }] },
+    select: { id: true },
+  });
+  return rows.map((r) => r.id);
+}
+
+function decryptPending(grant: string): PendingAuthorization | null {
+  try {
+    const pending = JSON.parse(secrets().decrypt(grant)) as PendingAuthorization;
+    if (!pending || typeof pending.clientId !== "string" || typeof pending.redirectUri !== "string") return null;
+    if (!Array.isArray(pending.scopes)) return null;
+    return pending;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Step 1 — bind the approver's chosen workspace into a re-sealed grant.
+ * The posted workspaceId is NEVER trusted without a membership check (T14).
+ */
+export async function bindWorkspaceToGrant(
+  grant: string,
+  userId: string,
+  workspaceId: string,
+): Promise<{ ok: true; grant: string } | { ok: false; error: string }> {
+  const pending = decryptPending(grant);
+  if (!pending) return { ok: false, error: "invalid_grant" };
+  if (typeof workspaceId !== "string" || workspaceId.length === 0) {
+    return { ok: false, error: "workspaceId is required" };
+  }
+  // Re-validate against current DB state (client may have been deleted).
+  const client = await prisma.mcpOAuthClient.findUnique({ where: { clientId: pending.clientId } });
+  if (!client) return { ok: false, error: "unknown client" };
+  const accessible = await userWorkspaceIds(userId);
+  if (!accessible.includes(workspaceId)) {
+    return { ok: false, error: "workspace_not_accessible" };
+  }
+  const resealed = secrets().encrypt(JSON.stringify({ ...pending, workspaceId }));
+  return { ok: true, grant: resealed };
+}
+
+export type ApproveBoundResult =
+  | { ok: true; code: string; redirectUri: string; state?: string }
+  | { ok: false; status: number; error: string };
+
+/**
+ * Step 2 — approve a workspace-bound grant and mint the code.
+ * A tampered grant (workspace swapped post-seal) fails closed at decrypt
+ * (T15); membership is re-checked fresh (T14); mcpEnabled is enforced (T8).
+ */
+export async function approveWorkspaceBoundGrant(grant: string, userId: string): Promise<ApproveBoundResult> {
+  const pending = decryptPending(grant);
+  if (!pending) return { ok: false, status: 400, error: "invalid_grant" };
+  const workspaceId = pending.workspaceId;
+  if (typeof workspaceId !== "string" || workspaceId.length === 0) {
+    return { ok: false, status: 400, error: "workspace_not_selected" };
+  }
+  const accessible = await userWorkspaceIds(userId);
+  if (!accessible.includes(workspaceId)) {
+    return { ok: false, status: 403, error: "workspace_not_accessible" };
+  }
+  const ws = await prisma.workspace.findUnique({ where: { id: workspaceId }, select: { mcpEnabled: true } });
+  if (!ws?.mcpEnabled) {
+    return { ok: false, status: 403, error: "MCP is not enabled for this workspace" };
+  }
+  try {
+    const { code, redirectUri, state } = await approveAuthorization(pending, userId, workspaceId);
+    return { ok: true, code, redirectUri, state };
+  } catch (e) {
+    return { ok: false, status: 403, error: e instanceof Error ? e.message : "authorization failed" };
+  }
+}
+
+/** Decrypt a grant for the deny path (needs only redirectUri/state). */
+export function decryptGrantForDeny(grant: string): { redirectUri: string; state?: string } | null {
+  const pending = decryptPending(grant);
+  if (!pending) return null;
+  return { redirectUri: pending.redirectUri, state: pending.state };
 }

@@ -23,6 +23,7 @@ import {
 } from "./autopilot";
 import { pushProgrammaticPages, buildSiteHtml, siteFilePathForUrl } from "./programmatic-publish";
 import { emitAlert } from "@/lib/alerts/evaluate";
+import { meter } from "@/lib/metering/service";
 import { getSiteIdeProvider, ownedSite } from "@/lib/connectors/source";
 import { sanitizePath } from "@/lib/sitefiles/paths";
 
@@ -453,6 +454,20 @@ export async function runAutopilotRule(
       });
       await auditAutopilot(db, args.workspaceId, args.projectId, "autopilot_item_generated",
         `Autopilot item generated: "${item.title}" (${c.kind})`, "system");
+      // Phase C gaps (G1): ledger one content_refresh per decay-refresh
+      // draft. The autopilotItem row is the domain row. Programmatic pages
+      // are a separate flow with no credit-table action — left unwired.
+      if (c.kind === "decay_refresh") {
+        await meter({
+          workspaceId: args.workspaceId,
+          projectId: args.projectId,
+          action: "content_refresh",
+          idempotencyKey: `contentrefresh:${item.id}`,
+          evidenceRef: `autopilot-item:${item.id}`,
+        }).catch((err) => {
+          console.error(`Metering failed for autopilot item ${item.id}:`, err);
+        });
+      }
       if (eligible) {
         autoApproved += 1;
         await auditAutopilot(db, args.workspaceId, args.projectId, "autopilot_item_approved",

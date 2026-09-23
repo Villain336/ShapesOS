@@ -53,20 +53,27 @@ ledger reconciles with the run's `creditsUsed`.
 not `mcp_tool_call` itself. `get_usage_summary` → call `getUsageSummary()`
 directly (no charge — it's a read).
 
-## Follow-up wiring (not in this track)
+**Per-key attribution (G1):** pass `keyId` in the `meter()` call —
+`ctx.credential.keyId` for API-key auth, `ctx.credential.clientId` for
+OAuth. It is validated to the workspace server-side (T8); a bad keyId
+throws. Reads: `getUsageSummary({ workspaceId, keyId? })` filters to one
+key, or returns `byKey` (keyId → credits, `"direct"` bucket for non-MCP
+charges) when unfiltered.
+
+## Follow-up wiring (Phase C gaps, G1 — wired)
 
 | Action | Owning service | Charge point |
 |---|---|---|
-| `rank_check` | rank tracker cron | per keyword checked |
-| `serp_analysis` | SERP service | per live SERP pull |
-| `keyword_research` | keyword service | per research task |
-| `keyword_ideas` | keyword ideas | per expansion |
-| `keyword_gap` | competitor gap | per gap analysis |
-| `site_audit` | site audit | per crawl |
-| `backlink_summary` | backlinks | per summary request |
-| `content_brief` / `ai_article` / `content_refresh` | content engine | per generation |
-| `storage_over_quota` | quota cron (monthly) | per GB-month over quota |
-| `skill_run_base` / `subagent_spawn` | scheduler | ✅ wired this track |
+| `rank_check` | rank tracker cron | ✅ per keyword checked (`app/api/rankings/check/route.ts`, key `rankcheck:<rankingId>`) |
+| `serp_analysis` | — | ⏸ no standalone execution path (SERP pulls happen inside brief/rank-check flows, charged under those actions; the m21 native connector is the connector track's adapter) |
+| `keyword_research` | — | ⏸ no execution path in the codebase (volumes task); action reserved in the credit table |
+| `keyword_ideas` | keyword ideas | ✅ per expansion (`app/api/keywords/ideas/route.ts` + chat `research_keywords` tool; hour-bucketed key, T12) |
+| `keyword_gap` | competitor gap | ✅ per gap analysis (`app/api/competitors/gap/route.ts`; hour-bucketed key, T12) |
+| `site_audit` | site audit | ✅ per crawl (`lib/audit/audit.ts` `runAudit`; key `siteaudit:<auditId>`; covers the API route and the chat audit tool) |
+| `backlink_summary` | backlinks | ✅ per completed pull (`lib/seo/backlink-pull.ts` `runBacklinkPull`; key `backlinksummary:<pullId>`) |
+| `content_brief` / `ai_article` / `content_refresh` | content engine | ✅ per generation (brief/draft routes + chat draft tool; autopilot `decay_refresh` items) |
+| `storage_over_quota` | quota cron (monthly) | ✅ `POST /api/cron/storage-metering` (key `storagequota:<ws>:<YYYY-MM>`; snapshot rule, T11) |
+| `skill_run_base` / `subagent_spawn` | scheduler | ✅ wired Phase C; pre-run cap gate added in G1 (T9) |
 
 ## What meter() guarantees callers
 

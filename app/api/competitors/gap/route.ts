@@ -16,6 +16,8 @@ import { requireUser } from "@/lib/session";
 import { getSeoProvider, providerStatus } from "@/lib/providers";
 import { normalizePhrase, opportunityScore } from "@/lib/competitors";
 import { recordUsage } from "@/lib/usage";
+import { meter } from "@/lib/metering/service";
+import { hourBucket } from "@/lib/metering/wiring";
 import type { CompetitorKeyword } from "@/lib/providers/types";
 
 export async function POST(req: NextRequest) {
@@ -73,6 +75,16 @@ export async function POST(req: NextRequest) {
   await recordUsage(competitor.project.workspaceId, "serp_calls", 1).catch(
     () => {},
   );
+
+  // Phase C gaps (G1): ledger the gap analysis. No per-analysis domain row
+  // exists, so the idempotency key is hour-bucketed (T12).
+  await meter({
+    workspaceId: competitor.project.workspaceId,
+    projectId: competitor.project.id,
+    action: "keyword_gap",
+    idempotencyKey: `kwgap:${competitor.id}:${hourBucket()}`,
+    evidenceRef: `keyword-gap:${competitor.domain}`,
+  }).catch(() => {});
 
   return Response.json({
     competitor: { id: competitor.id, domain: competitor.domain },

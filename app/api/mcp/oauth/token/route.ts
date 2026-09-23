@@ -19,7 +19,7 @@ function clientIp(req: NextRequest): string {
 }
 
 export async function POST(req: NextRequest) {
-  const rl = checkPreAuthRateLimit(clientIp(req));
+  const rl = await checkPreAuthRateLimit(clientIp(req));
   if (!rl.allowed) {
     return Response.json({ error: "rate_limited" }, { status: 429 });
   }

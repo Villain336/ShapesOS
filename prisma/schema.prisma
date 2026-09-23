@@ -275,6 +275,9 @@ enum FileChangeAction {
   // write failed — audit-loud, the run itself continues.
   scheduler_metering_blocked
   scheduler_metering_failed
+  // Phase C gaps (G1): a scheduled run was blocked pre-run by the spend cap
+  // (T9) — status 'blocked', never executed, never charged.
+  scheduler_run_blocked_cap
   // Phase C (W4): admin changed the workspace spend cap / overage opt-in.
   spend_cap_updated
   event_fired
@@ -2823,6 +2826,8 @@ enum SkillRunStatus {
   failed
   rejected
   cancelled
+  // Phase C gaps (G1): pre-run cap gate blocked this run before execution (T9).
+  blocked
 }
 
 enum SubagentRunStatus {
@@ -2998,6 +3003,21 @@ model McpOAuthToken {
   @@map("mcp_oauth_tokens")
 }
 
+// Phase C gaps (G3): distributed rate-limit counters for PostgresRateLimiter.
+// Incremented atomically via a single INSERT ... ON CONFLICT DO UPDATE
+// statement (see migration 20260922250000_mcp_ratelimit); never via
+// read-modify-write. Expired windows are deleted opportunistically.
+model McpRateLimit {
+  bucketKey   String   @map("bucket_key")
+  windowStart BigInt   @map("window_start")
+  count       Int      @default(1)
+  updatedAt   DateTime @default(now()) @map("updated_at")
+
+  @@id([bucketKey, windowStart])
+  @@index([windowStart])
+  @@map("mcp_rate_limits")
+}
+
 // ─── Phase C (W4): hosted metering ───────────────────────────────────────────
 // Immutable usage ledger. Application code only ever CREATES UsageEvent rows
 // (lib/metering/service.ts exposes no update/delete); the migration adds a
@@ -3021,10 +3041,14 @@ model UsageEvent {
   idempotencyKey String   @unique @map("idempotency_key")
   // Unverified human pointer for disputes (run id, report path) — see T7.
   evidenceRef    String?  @map("evidence_ref")
+  // Phase C gaps (G1): MCP API key / OAuth client this charge is attributed
+  // to. Null for non-MCP charges. Server-validated to the workspace (T8).
+  keyId          String?  @map("key_id")
 
   @@index([workspaceId, occurredAt])
   @@index([workspaceId, action])
   @@index([projectId])
+  @@index([workspaceId, keyId])
   @@map("usage_events")
 }
 
@@ -3059,6 +3083,9 @@ model SpendCap {
   // Once-per-period alert guard: the warning fires only when lastAlertAt is
   // null or older than the current periodStart.
   lastAlertAt  DateTime? @map("last_alert_at")
+  // Phase C gaps (G1): explicit auto-overage opt-in. Default false — the
+  // hard cap stays the default. The billing track flips this on opt-in.
+  autoOverage  Boolean   @default(false) @map("auto_overage")
 
   @@map("spend_caps")
 }

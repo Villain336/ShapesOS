@@ -24,12 +24,29 @@ import {
 } from "./credits";
 
 // ── Public contract (consumed by the sibling MCP track — keep stable) ────────
+// Phase C gaps (G1) additions — all back-compatible:
+//   MeterOptions.keyId?: string | null — MCP API key id / OAuth client id the
+//     charge is attributed to. Server-validated: must belong to an
+//     mcpApiKey or mcpOAuthClient in `workspaceId`, else meter() throws (T8).
+//     The MCP track passes ctx.credential.keyId (api_key) / clientId (oauth).
+//   UsageSummary.byKey?: Record<string, number> — keyId → credits in scope,
+//     present only when getUsageSummary() is called WITHOUT a keyId filter.
+//   CapStatus += { used, autoOverage } — `allowed` is false only when the
+//     hard cap blocks (blockAtCap && !autoOverage && remaining <= 0).
+//   setSpendCap() accepts { autoOverage?: boolean } — the explicit opt-in
+//     the billing track flips; default stays false (hard cap is the default).
 
 export interface MeterOptions {
   workspaceId: string;
   projectId?: string | null;
   /** Null = system/scheduler actor. Recorded as evidence only. */
   actorId?: string | null;
+  /**
+   * Phase C gaps (G1): MCP credential this charge is attributed to —
+   * the McpApiKey id or McpOAuthClient clientId from the MCP server's own
+   * auth context. Null for non-MCP charges. Validated to the workspace (T8).
+   */
+  keyId?: string | null;
   /** Key into CREDIT_COSTS (v1). */
   action: string;
   /** Caller-supplied idempotency key; must be unique per charge. */
@@ -57,6 +74,12 @@ export interface UsageSummary {
   remaining: number;
   byAction: Record<string, number>;
   byProject: Record<string, number>;
+  /**
+   * Phase C gaps (G1): keyId → credits in scope. Present only when
+   * getUsageSummary() is called WITHOUT a keyId filter. Null keyId rows
+   * (non-MCP charges) aggregate under the "direct" bucket.
+   */
+  byKey?: Record<string, number>;
   periodStart: string;
 }
 
@@ -65,6 +88,10 @@ export interface CapStatus {
   allowed: boolean;
   remaining: number;
   capCredits: number;
+  /** Credits used in the current period (for plain-language messaging). */
+  used: number;
+  /** True when the workspace opted into automatic overage (never the default). */
+  autoOverage: boolean;
 }
 
 // ── Internals ────────────────────────────────────────────────────────────────
@@ -98,6 +125,7 @@ interface LockedCap {
   blockAtCap: boolean;
   alertAtPct: number;
   lastAlertAt: Date | null;
+  autoOverage: boolean;
 }
 
 /**
@@ -138,7 +166,8 @@ async function lockSpendCap(tx: Tx, workspaceId: string, pool: number): Promise<
   for (let attempt = 0; attempt < 3; attempt++) {
     const rows = await tx.$queryRaw<LockedCap[]>`
       SELECT cap_credits AS "capCredits", block_at_cap AS "blockAtCap",
-             alert_at_pct AS "alertAtPct", last_alert_at AS "lastAlertAt"
+             alert_at_pct AS "alertAtPct", last_alert_at AS "lastAlertAt",
+             auto_overage AS "autoOverage"
       FROM spend_caps WHERE workspace_id = ${workspaceId} FOR UPDATE`;
     if (rows.length > 0) return rows[0];
     try {
@@ -167,6 +196,7 @@ export async function meter(opts: MeterOptions): Promise<MeterResult> {
     workspaceId,
     projectId = null,
     actorId = null,
+    keyId = null,
     action,
     idempotencyKey,
     evidenceRef = null,
@@ -212,6 +242,19 @@ export async function meter(opts: MeterOptions): Promise<MeterResult> {
           if (!proj) throw new Error("metering: project does not belong to workspace");
         }
 
+        // T8: a keyId from another workspace (or a made-up one) is rejected,
+        // never stored. The only trusted source is the MCP server's own auth
+        // context; meter() re-validates the workspace binding here.
+        if (keyId) {
+          const [apiKey, oauthClient] = await Promise.all([
+            tx.mcpApiKey.findFirst({ where: { id: keyId, workspaceId }, select: { id: true } }),
+            tx.mcpOAuthClient.findFirst({ where: { clientId: keyId, workspaceId }, select: { clientId: true } }),
+          ]);
+          if (!apiKey && !oauthClient) {
+            throw new Error("metering: keyId does not belong to workspace");
+          }
+        }
+
         // T2: lock balance + cap — concurrent meter() calls serialize here.
         const bal = await lockBalance(tx, workspaceId);
         const cap = await lockSpendCap(tx, workspaceId, bal.includedCredits + bal.purchasedCredits);
@@ -237,7 +280,10 @@ export async function meter(opts: MeterOptions): Promise<MeterResult> {
         }
 
         // Cap check FIRST. Zero-cost actions always pass — never punish the outcome.
-        if (charge > 0 && cap.blockAtCap && usedCredits + charge > cap.capCredits) {
+        // Auto-overage (explicit opt-in) also passes: the billing track bills
+        // the overage; the ledger records it honestly.
+        const overageAllowed = cap.autoOverage || !cap.blockAtCap;
+        if (charge > 0 && !overageAllowed && usedCredits + charge > cap.capCredits) {
           return {
             result: {
               ok: false,
@@ -257,6 +303,7 @@ export async function meter(opts: MeterOptions): Promise<MeterResult> {
             workspaceId,
             projectId,
             actorId,
+            keyId,
             action,
             credits: charge,
             idempotencyKey,
@@ -326,6 +373,9 @@ export async function meter(opts: MeterOptions): Promise<MeterResult> {
 
 /**
  * Advisory cap status. meter() remains the authoritative per-charge check.
+ * `allowed` is false only when the hard cap blocks: blockAtCap is on, no
+ * auto-overage opt-in, and nothing remains. The scheduler's pre-run gate
+ * uses this; the TOCTOU between gate and charge is closed by meter() (T9).
  */
 export async function checkCap(workspaceId: string): Promise<CapStatus> {
   const [bal, cap] = await Promise.all([
@@ -341,8 +391,15 @@ export async function checkCap(workspaceId: string): Promise<CapStatus> {
   const used = bal?.usedCredits ?? 0;
   const capCredits = cap?.capCredits ?? included + purchased;
   const blockAtCap = cap?.blockAtCap ?? true;
+  const autoOverage = cap?.autoOverage ?? false;
   const remaining = Math.max(0, capCredits - used);
-  return { allowed: !blockAtCap || remaining > 0, remaining, capCredits };
+  return {
+    allowed: !blockAtCap || autoOverage || remaining > 0,
+    remaining,
+    capCredits,
+    used,
+    autoOverage,
+  };
 }
 
 // ── getUsageSummary() ────────────────────────────────────────────────────────
@@ -355,6 +412,8 @@ export async function getUsageSummary(opts: {
   workspaceId: string;
   projectId?: string;
   periodStart?: string | Date;
+  /** Phase C gaps (G1): restrict to one MCP key / OAuth client. */
+  keyId?: string;
 }): Promise<UsageSummary> {
   const { workspaceId } = opts;
   const bal = await prisma.creditBalance.findUnique({ where: { workspaceId } });
@@ -369,10 +428,15 @@ export async function getUsageSummary(opts: {
     workspaceId,
     occurredAt: { gte: start },
     ...(opts.projectId ? { projectId: opts.projectId } : {}),
+    ...(opts.keyId ? { keyId: opts.keyId } : {}),
   };
-  const [byActionRows, byProjectRows] = await Promise.all([
+  const [byActionRows, byProjectRows, byKeyRows] = await Promise.all([
     prisma.usageEvent.groupBy({ by: ["action"], where, _sum: { credits: true } }),
     prisma.usageEvent.groupBy({ by: ["projectId"], where, _sum: { credits: true } }),
+    // byKey only when unfiltered (contract: sibling MCP track).
+    opts.keyId
+      ? Promise.resolve([])
+      : prisma.usageEvent.groupBy({ by: ["keyId"], where, _sum: { credits: true } }),
   ]);
   const byAction: Record<string, number> = {};
   const byProject: Record<string, number> = {};
@@ -385,16 +449,24 @@ export async function getUsageSummary(opts: {
   for (const r of byProjectRows) {
     byProject[r.projectId ?? "workspace"] = r._sum.credits ?? 0;
   }
-  const pool = included + purchased;
-  return {
+  const summary: UsageSummary = {
     used,
     included,
     purchased,
-    remaining: Math.max(0, pool - used),
+    remaining: Math.max(0, included + purchased - used),
     byAction,
     byProject,
     periodStart: start.toISOString(),
   };
+  if (!opts.keyId) {
+    // Null keyId = non-MCP charges; surfaced as the "direct" bucket.
+    const byKey: Record<string, number> = {};
+    for (const r of byKeyRows) {
+      byKey[r.keyId ?? "direct"] = r._sum.credits ?? 0;
+    }
+    summary.byKey = byKey;
+  }
+  return summary;
 }
 
 // ── Admin operations ─────────────────────────────────────────────────────────
@@ -431,11 +503,13 @@ export async function applyTopUp(
 
 /**
  * Admin spend-cap management. Overage stays opt-in: setting blockAtCap false
- * is the explicit auto-overage opt-in and is audit-logged by the caller.
+ * is the legacy explicit opt-out; the Phase C gaps (G1) `autoOverage` flag is
+ * the explicit opt-in the billing track flips. Either allows over-cap
+ * charges; both default to the hard cap. Audit-logged by the caller.
  */
 export async function setSpendCap(
   workspaceId: string,
-  patch: { capCredits?: number; blockAtCap?: boolean; alertAtPct?: number },
+  patch: { capCredits?: number; blockAtCap?: boolean; alertAtPct?: number; autoOverage?: boolean },
 ): Promise<LockedCap> {
   if (patch.capCredits !== undefined && (!Number.isInteger(patch.capCredits) || patch.capCredits < 0)) {
     throw new Error("capCredits must be a non-negative integer");
@@ -446,10 +520,11 @@ export async function setSpendCap(
   return prisma.$transaction(async (tx) => {
     const bal = await lockBalance(tx, workspaceId);
     const cap = await lockSpendCap(tx, workspaceId, bal.includedCredits + bal.purchasedCredits);
-    const data: { capCredits?: number; blockAtCap?: boolean; alertAtPct?: number } = {};
+    const data: { capCredits?: number; blockAtCap?: boolean; alertAtPct?: number; autoOverage?: boolean } = {};
     if (patch.capCredits !== undefined) data.capCredits = patch.capCredits;
     if (patch.blockAtCap !== undefined) data.blockAtCap = patch.blockAtCap;
     if (patch.alertAtPct !== undefined) data.alertAtPct = patch.alertAtPct;
+    if (patch.autoOverage !== undefined) data.autoOverage = patch.autoOverage;
     if (Object.keys(data).length > 0) {
       await tx.spendCap.update({ where: { workspaceId }, data });
     }

@@ -96,6 +96,9 @@ const PUBLIC_BY_DESIGN = {
     "signed-in user + AES-GCM-sealed grant token minted by the authorize endpoint; the grant is the capability and fixes the scope set",
   "app/api/mcp/oauth/token/route.ts":
     "authorization-code exchange; single-use code + PKCE verifier is the capability (standard OAuth 2.1)",
+  // Phase C gap-fill (G2): Stripe billing webhook — capability model, see route comments.
+  "app/api/billing/webhook/route.ts":
+    "inbound Stripe webhook; HMAC signature verified with stripe.webhooks.constructEvent before any parsing/logic (lib/metering/THREAT-MODEL-BILLING.md B1); signature is the authorization",
 };
 const uncovered = [];
 for (const f of routeFiles) {
@@ -115,7 +118,7 @@ ok(`all ${routeFiles.length} API route files scanned`, true);
 ok("every mutation route is authorization-gated", uncovered.length === 0, uncovered.join("; "));
 ok(
   "public-by-design allow-list is documented",
-  Object.keys(PUBLIC_BY_DESIGN).length === 6 &&
+  Object.keys(PUBLIC_BY_DESIGN).length === 7 &&
     Object.values(PUBLIC_BY_DESIGN).every(v => v.length > 20)
 );
 

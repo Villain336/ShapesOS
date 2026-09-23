@@ -17,7 +17,7 @@ import {
 import { effectiveConcurrency, DEFAULT_CONCURRENCY } from "./guard";
 import { getOutputStoreAsync, type SchedulerOutputStore } from "./outputStore";
 import { schedulerAudit } from "./audit";
-import { meter } from "@/lib/metering/service";
+import { checkCap, meter } from "@/lib/metering/service";
 
 export interface GrantEnvelope {
   workspaceId: string;
@@ -199,6 +199,29 @@ export async function executeSkillRun(db: Db, runId: string, deps: ExecutorDeps 
   if (!run) throw new Error(`skill run not found: ${runId}`);
   if (run.status !== "pending" && run.status !== "approved") {
     throw new Error(`cannot execute skill run in status ${run.status}`);
+  }
+
+  // Phase C gaps (G1) — pre-run cap gate (T9): never start work the workspace
+  // can't pay for. Advisory only; meter() stays the authoritative per-charge
+  // check (the post-run charges below still reconcile, and cannot double
+  // charge — the gate never writes to the ledger).
+  const gate = await checkCap(run.workspaceId);
+  if (!gate.allowed) {
+    const reason =
+      `Credit cap reached (${gate.used.toLocaleString()} of ${gate.capCredits.toLocaleString()} ` +
+      `credits used). Raise the cap or add credits in Settings → Usage.`;
+    await db.skillRun.update({
+      where: { id: run.id },
+      data: { status: "blocked", finishedAt: new Date(), error: reason },
+    });
+    await schedulerAudit(db, {
+      projectId: run.projectId,
+      workspaceId: run.workspaceId,
+      action: "scheduler_run_blocked_cap",
+      summary: `Skill run blocked before execution: ${reason}`,
+      actorUserId: null,
+    });
+    return;
   }
 
   const skill = run.skill;

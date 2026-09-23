@@ -208,8 +208,74 @@ Tool descriptions are served to untrusted models; a compromised client could
 misrender them. Descriptions are static, secret-free (T3), and treated as
 untrusted input downstream per spec §6.4. No dynamic content in descriptions.
 
+### T13 — Rate-limit bypass via multi-instance desync
+*Attack:* two (or N) app instances behind a load balancer each run an
+in-memory limiter: each allows 60 calls/min per credential, so the effective
+budget is 60×N. An attacker who can fan out across instances multiplies quota.
+*Mitigations:*
+- Pluggable limiter (`lib/mcp/rateLimit.ts`): `InMemoryRateLimiter` (kept as
+  the single-box/self-host default — behavior unchanged) plus
+  `PostgresRateLimiter` (windowed counters in `mcp_rate_limits`, incremented
+  with a single atomic `INSERT ... ON CONFLICT DO UPDATE` statement so
+  concurrent instances serialize on the row and agree on the count).
+- Selection via `MCP_RATE_LIMITER=postgres|memory` (default `memory`, preserving
+  current behavior); hosted/multi-box deployments MUST set `postgres`
+  (documented at the top of rateLimit.ts and in the settings UI copy).
+- Buckets keyed by credential id, not IP (same as T4); pre-auth limiter
+  unchanged in keying, now sharing the pluggable backend.
+- Expired windows are cleaned opportunistically (every 128th check) plus an
+  exported `cleanupRateLimits()`; the table cannot grow unboundedly.
+*Tests:* two limiter instances × 70 concurrent checks on one bucket → exactly
+60 allowed total (no double-count from races); `MCP_RATE_LIMITER` unset/bogus →
+memory limiter; stale rows removed by cleanup, current-window rows kept.
+
+### T14 — OAuth consent workspace-picker privilege escalation
+*Attack:* the approver posts `workspaceId` of a workspace they do not belong
+to, binding the OAuth token to a foreign tenant (cross-tenant token mint).
+*Mitigations:*
+- The picker lists ONLY `getAccessibleWorkspaces(userId)` (owner OR member).
+- The `select` POST never trusts the posted id: membership is re-checked
+  against a fresh DB query; failure → 403 `workspace_not_accessible`, no
+  re-sealed grant issued.
+- The final `approve` POST re-checks membership for the workspace sealed in
+  the grant (the user could have been removed between select and approve).
+- `approveAuthorization` still mints the code from server-verified values only.
+*Tests:* select with a foreign workspaceId → rejected; approve after the
+membership row is deleted → rejected; minted code's workspaceId == the
+selected (and accessible) workspace.
+
+### T15 — Sealed-grant workspace tampering
+*Attack:* attacker flips bytes in the re-sealed grant to swap `workspaceId`
+after the select step ("workspace swapped post-seal").
+*Mitigations:*
+- The grant is AES-256-GCM sealed (`secrets()`); any modification breaks
+  authentication → decrypt throws → `400 invalid_grant`, fail closed.
+- The approve step requires `pending.workspaceId` to be a non-empty string
+  that round-tripped through the seal — a grant from the pre-picker era
+  (no workspaceId) cannot approve.
+*Tests:* byte-flipped bound grant → `invalid_grant`; structurally valid grant
+with `workspaceId` deleted → rejected; valid bound grant approves exactly
+once for the bound workspace.
+
+### T16 — byKey usage enumeration across keys
+*Attack:* `getUsageSummary().byKey` maps key id → credits. If exposed broadly,
+it leaks which keys are active and their relative traffic.
+*Mitigations:*
+- `byKey` is keyed on the stable opaque key **id** (cuid), never the name,
+  prefix, or hash — renaming a key doesn't fork its history, and no secret
+  material is involved.
+- The only consumer is the admin-gated `GET /api/mcp/keys` (server-side
+  `requireWorkspaceRole(..., "admin")`); the MCP `get_usage_summary` tool
+  returns the summary to the caller but per-key attribution is a
+  workspace-admin concern, not a per-key-holder one.
+- Revoked keys keep historical attribution (join on id); deleting a key row
+  is a hard delete and drops its future attribution — documented.
+*Tests:* non-admin `GET /api/mcp/keys` → 403 (existing M11 coverage);
+revoked key id present in `byKey` still resolves to a usage number.
+
 ## Residual risks (accepted, documented)
-- In-memory rate limits are single-instance (same stance as existing limiters).
+- In-memory rate limiting remains the default and is single-instance; hosted
+  multi-box deployments must set `MCP_RATE_LIMITER=postgres` (documented).
 - No refresh tokens in v1; OAuth tokens live 1 hour.
 - `degraded` connector-style honesty: vendor-backed tools (rank report, SEO
   audit, keyword ideas) return clearly-labeled mock data or "live unavailable"

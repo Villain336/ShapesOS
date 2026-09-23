@@ -96,7 +96,7 @@ export async function handleMcpPost(
   }
 
   // 3. Per-credential rate limit (T4).
-  const rl = checkMcpRateLimit(credentialId(ctx));
+  const rl = await checkMcpRateLimit(credentialId(ctx));
   if (!rl.allowed) {
     await mcpAudit({ projectId: null, workspaceId: ctx.workspaceId, action: "mcp_tool_denied", ctx, outcome: "denied: rate_limited" });
     return { status: 429, response: err(null, -32000, "Rate limit exceeded"), retryAfterMs: rl.retryAfterMs };
@@ -176,12 +176,14 @@ async function handleToolCall(
   }
 
   // Meter BEFORE execution; fail closed on any metering problem (T9).
+  // keyId attributes usage to the calling API key (G3; undefined for OAuth).
   const callId = randomUUID();
   const metered = await meterToolCall({
     workspaceId: ctx.workspaceId,
     tool: toolName as McpToolName,
     actorId: ctx.userId,
     callId,
+    keyId: ctx.credential.kind === "api_key" ? ctx.credential.keyId : undefined,
   });
   if (!metered.ok) {
     const message =

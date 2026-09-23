@@ -160,6 +160,123 @@ another workspace's run ID) to win a chargeback dispute.
 - The CSV export labels the column `evidence_ref (unverified pointer)` so
   downstream consumers (Mara's client invoices) don't treat it as proof.
 
+## T8 — keyId spoofing / attribution integrity (Phase C gaps, G1)
+
+**Abuse:** An MCP caller passes another workspace's API-key ID (or a made-up
+keyId) as `keyId` so their usage is attributed to someone else's key —
+poisoning per-key breakdowns, or laundering usage through a key that will be
+revoked/deleted to hide the trail.
+
+**Mitigations:**
+- `keyId` is validated server-side inside the meter transaction: it must
+  match an `mcpApiKey.id` **or** `mcpOAuthClient.clientId` whose
+  `workspaceId` equals the charged workspace. A keyId from another workspace
+  (or a nonexistent one) throws — same treatment as cross-workspace
+  projectId (T3).
+- `meter()` is a library function; the only trusted keyId source is the MCP
+  server's own auth context (`requireMcpAuth` → `ctx.credential.keyId`),
+  resolved from the Bearer <redacted> hash before the tool runs. Callers never take
+  keyId from agent-supplied input.
+- On idempotency replay, the *original* event's keyId stands — a replay
+  cannot re-attribute an existing charge to a different key.
+- Revocation is enforced at auth time (`requireMcpAuth`), not in the
+  ledger: a revoked key can no longer mint calls, so its historical rows
+  stay accurate without a ledger-side revocation check.
+
+**Battery:** meter with another workspace's keyId → throws, no event;
+nonexistent keyId → throws; valid keyId → stored, appears in `byKey`.
+
+## T9 — pre-run cap-gate TOCTOU (Phase C gaps, G1)
+
+**Abuse / failure mode:** The scheduler's pre-run `checkCap()` says "allowed",
+but between the check and the post-run charge another process consumes the
+cap — the run executes "for free", or conversely the pre-check blocks a run
+that would have fit.
+
+**Mitigations:**
+- The pre-run gate is an **optimization, not the enforcement boundary**.
+  Enforcement stays in `meter()`'s locked transaction (T2): if the cap is
+  exhausted by the time the run's charges land, the charges return
+  `cap_exceeded`, are audit-logged, and the run's ledger stays clean. The
+  pre-check can never *authorize* an over-cap charge.
+- The pre-check never writes: it cannot double-charge, and a blocked run
+  records `status: "blocked"` with the plain-language reason in the run's
+  `error` field plus a `scheduler_run_blocked_cap` audit entry. Blocked runs
+  never execute — no subagent rows, no tool calls, no charges.
+- `checkCap()` is advisory by contract (its doc comment says so); only
+  `meter()` is authoritative. The gate reuses the same `blockAtCap` /
+  `autoOverage` semantics so gate and charge cannot disagree on policy.
+
+**Battery:** capped workspace → `executeSkillRun` returns with run status
+`blocked`, zero subagent rows, zero new usage events, audit entry present.
+
+## T10 — wiring-point workspace confusion (Phase C gaps, G1)
+
+**Abuse:** A newly wired charge point takes `workspaceId` from the request
+body / query string, letting a caller bill another workspace (or read its
+cap state via error messages).
+
+**Mitigations:**
+- Every charge point derives `workspaceId` from a server-side join, never
+  from client input: the project row (`project.workspaceId`), the site row's
+  project, the skill run's `workspaceId`, or the cron gate's session
+  workspace. The battery statically asserts no wired call site passes a
+  body-derived workspaceId (grep check on the diff).
+- `projectId`, where supplied, is re-validated inside `meter()` (T3) — the
+  charge point's project lookup is defense in depth, not the boundary.
+- Cap-denied messages are the same plain-language copy everywhere
+  ("Credit cap reached … Raise the cap or add credits in Settings → Usage.")
+  and never disclose another workspace's usage.
+
+## T11 — storage snapshot approximation honesty (Phase C gaps, G1)
+
+**Abuse / failure mode:** The monthly `storage_over_quota` cron charges from
+a point-in-time `usedBytes` snapshot, not a time-weighted average — a
+workspace that spikes over quota and cleans up before month-end is never
+charged, while one that sits 1 byte over all month pays a full GB-month.
+
+**Mitigations (honesty, not precision):**
+- The cron route header, SEAM.md, and the Settings → Usage copy all state
+  the rule plainly: **charged on the month-end snapshot, per whole GB over
+  quota (rounded up), 1 credit per GB-month**. No pretense of averaging.
+- The idempotency key `storagequota:<workspaceId>:<YYYY-MM>` makes the
+  monthly charge exactly-once; a re-run of the cron never double-charges.
+- The GB math is a pure exported helper (`gbOverQuota`) covered by the
+  battery, so the rounding rule is pinned by test, not by prose.
+
+## T12 — hour-bucket idempotency for row-less actions (Phase C gaps, G1)
+
+**Abuse / failure mode:** `keyword_ideas`, `keyword_gap`, and chat-tool
+equivalents have no domain row to derive a stable idempotency key from, so
+SEAM.md's `<action>:<row-id>` pattern cannot apply. A random key per attempt
+would make every retry a new charge; a fully stable key would make repeat
+use free forever.
+
+**Mitigations (documented tradeoff):**
+- These actions use `kwideas:<projectId>:<seedHash>:<limit>:<UTC-hour>` (and
+  the `kwgap:` analogue): retries/double-clicks within the same UTC hour
+  dedup to one charge; genuinely repeated use an hour later charges again.
+- The tradeoff is explicit: we under-charge (favor the user) on repeats
+  within the hour rather than risk double-charging on retry. The battery
+  pins both behaviors.
+- Actions WITH a domain row (rank_check → ranking row, content_brief →
+  contentItem, ai_article → contentItem+updatedAt, site_audit → audit row,
+  backlink_summary → pull row, content_refresh → autopilotItem) keep the
+  strict `<action>:<row-id>` form.
+
+## Policy notes (not threats, recorded so they can't drift)
+
+- **Mock-mode charging:** the ledger meters successful actions even when the
+  underlying provider is a mock (same as the Phase C scheduler wiring).
+  Credits are the product's unit of account, not a vendor-cost pass-through;
+  on self-host they cost nothing. The UI already marks mock results as mock.
+- **Unwired credit-table actions:** `serp_analysis` and `keyword_research`
+  exist in the credit table but have no standalone execution path in the
+  codebase (SERP pulls happen inside brief/rank-check flows and are charged
+  under those actions; the m21 native connector is the connector track's
+  adapter with its own credential model). They are intentionally left
+  unwired rather than wired to the wrong seam.
+
 ## Non-goals (explicitly not handled here)
 
 - Stripe webhook forgery / top-up fraud — the sink is a stub; the hosted

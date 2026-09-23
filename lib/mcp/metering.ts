@@ -27,11 +27,15 @@ interface MeteringService {
     action: string;
     idempotencyKey: string;
     evidenceRef?: string;
+    // G3: per-key attribution. Optional — the sibling track owns the field;
+    // when absent (older sibling), usage simply isn't key-attributed.
+    keyId?: string;
   }): Promise<{ ok: true; charged: number; eventId: string } | { ok: false; reason: string; charged: number }>;
   getUsageSummary(args: {
     workspaceId: string;
     projectId?: string;
     periodStart?: string;
+    keyId?: string;
   }): Promise<{
     used: number;
     included: number;
@@ -39,6 +43,9 @@ interface MeteringService {
     remaining: number;
     byAction: Record<string, number>;
     byProject: Record<string, number>;
+    // G3: per-key credit usage, keyed on stable key ID. Optional — degrade
+    // gracefully when the sibling hasn't shipped it yet.
+    byKey?: Record<string, number>;
     periodStart: string;
   }>;
 }
@@ -77,6 +84,9 @@ export async function meterToolCall(args: {
   projectId?: string;
   actorId?: string;
   callId?: string;
+  // G3: the calling MCP API key's stable ID (undefined for OAuth tokens).
+  // Passed through to the sibling's meter() for per-key attribution.
+  keyId?: string;
 }): Promise<MeterOutcome> {
   const svc = await loadMetering();
   if (!svc) return { ok: false, reason: "metering_unavailable", charged: 0 };
@@ -89,6 +99,7 @@ export async function meterToolCall(args: {
       action: "mcp_tool_call",
       idempotencyKey: `mcp:${args.callId ?? randomUUID()}`,
       evidenceRef: `mcp:${args.tool}:${passthrough.credits}`,
+      keyId: args.keyId,
     });
     if (!res.ok) {
       const reason = res.reason === "cap_exceeded" || res.reason === "unknown_action"
@@ -107,6 +118,7 @@ export async function readUsageSummary(args: {
   workspaceId: string;
   projectId?: string;
   periodStart?: string;
+  keyId?: string;
 }): Promise<
   | { ok: true; summary: Awaited<ReturnType<MeteringService["getUsageSummary"]>> }
   | { ok: false; reason: MeterDeniedReason }

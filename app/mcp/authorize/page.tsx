@@ -1,11 +1,13 @@
-// Marketr — OAuth consent screen (Phase C, W5).
+// Marketr — OAuth consent screen (Phase C, W5; G3 workspace picker).
 //
 // Browser page showing the EXACT scopes the client requested, rendered from
-// the AES-GCM-sealed grant (server-side decrypt). Approve/deny POSTs to
-// /api/mcp/oauth/consent. Signed-in users only.
+// the AES-GCM-sealed grant (server-side decrypt), plus a workspace picker:
+// the token binds to the workspace the approver CHOOSES here (previously the
+// approver's default workspace). Only workspaces the user belongs to are
+// listed; the choice is membership-verified again on POST (T14).
 
 import { redirect } from "next/navigation";
-import { requireUser } from "@/lib/session";
+import { requireUser, getAccessibleWorkspaces, getOrCreateWorkspace } from "@/lib/session";
 import { secrets } from "@/lib/secrets";
 import { SCOPE_LABELS, type McpToolName } from "@/lib/mcp/scopes";
 import type { PendingAuthorization } from "@/lib/mcp/oauth";
@@ -44,12 +46,21 @@ export default async function McpAuthorizePage({
     .map((s) => ({ scope: s, label: toolNameOf(s) ? SCOPE_LABELS[toolNameOf(s)!] : null }))
     .filter((s) => s.label);
 
+  // Workspace picker: only workspaces this user belongs to (T14). Default
+  // preselects the workspace the old flow would have bound (continuity).
+  const accessible = await getAccessibleWorkspaces(user.id);
+  const fallback = await getOrCreateWorkspace(user.id, user.email);
+  const defaultWorkspaceId = accessible.some((w) => w.id === fallback.id)
+    ? fallback.id
+    : (accessible[0]?.id ?? fallback.id);
+  const workspaces = accessible.map((w) => ({ id: w.id, name: w.name }));
+
   return (
     <div className="mx-auto max-w-lg p-8">
       <h1 className="text-xl font-semibold">Connect to Marketr</h1>
       <p className="mt-2 text-sm text-zinc-600">
-        <span className="font-medium">{pending.clientId}</span> is requesting access to your Marketr
-        workspace with these exact permissions:
+        <span className="font-medium">{pending.clientId}</span> is requesting access with these exact
+        permissions:
       </p>
       <ul className="mt-4 divide-y divide-zinc-200 rounded-lg border border-zinc-200">
         {scopes.map(({ scope, label }) => (
@@ -60,11 +71,11 @@ export default async function McpAuthorizePage({
           </li>
         ))}
       </ul>
+      <ConsentForm grant={grant!} workspaces={workspaces} defaultWorkspaceId={defaultWorkspaceId} />
       <p className="mt-4 text-xs text-zinc-500">
-        The token is bound to your workspace and expires after 1 hour. You can revoke access by
-        deleting the OAuth client; API keys can be revoked in Settings → API / MCP.
+        The token is bound to the workspace you choose and expires after 1 hour. You can revoke
+        access by deleting the OAuth client; API keys can be revoked in Settings → API / MCP.
       </p>
-      <ConsentForm grant={grant!} />
     </div>
   );
 }

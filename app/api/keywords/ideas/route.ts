@@ -10,6 +10,8 @@ import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
 import { getSeoProvider, providerStatus } from "@/lib/providers";
 import { recordUsage } from "@/lib/usage";
+import { meter } from "@/lib/metering/service";
+import { hourBucket, seedHash } from "@/lib/metering/wiring";
 
 export async function POST(req: NextRequest) {
   const user = await requireUser();
@@ -41,6 +43,17 @@ export async function POST(req: NextRequest) {
 
   try {
     const ideas = await provider.keywordIdeas({ seed, limit });
+    // Phase C gaps (G1): ledger the expansion. No domain row exists for an
+    // ideas call, so the idempotency key is hour-bucketed (T12): retries and
+    // double-clicks within the hour dedup; genuinely repeated use later
+    // charges again.
+    await meter({
+      workspaceId: project.workspaceId,
+      projectId: project.id,
+      action: "keyword_ideas",
+      idempotencyKey: `kwideas:${project.id}:${seedHash(seed.toLowerCase())}:${limit}:${hourBucket()}`,
+      evidenceRef: `keyword-ideas:${seed.slice(0, 60)}`,
+    }).catch(() => {});
     await recordUsage(project.workspaceId, "serp_calls", 1).catch(() => {});
     return Response.json({ ideas, provider: providerStatus() });
   } catch (err) {

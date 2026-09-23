@@ -13,6 +13,7 @@ import { requireUser } from "@/lib/session";
 import { getSeoProvider, providerStatus } from "@/lib/providers";
 import { buildBrief, type ContentBrief } from "@/lib/content/brief";
 import { recordUsage } from "@/lib/usage";
+import { meter } from "@/lib/metering/service";
 
 export async function POST(req: NextRequest) {
   const user = await requireUser();
@@ -63,6 +64,17 @@ export async function POST(req: NextRequest) {
       outlineJson: brief as unknown as Prisma.InputJsonValue,
     },
   });
+
+  // Phase C gaps (G1): ledger one content_brief per generated brief. The
+  // contentItem row is the domain row — a new brief always creates a new
+  // item, so the key is unique per brief and stable across retries.
+  await meter({
+    workspaceId: keyword.project.workspaceId,
+    projectId: keyword.project.id,
+    action: "content_brief",
+    idempotencyKey: `contentbrief:${contentItem.id}`,
+    evidenceRef: `content-brief:${contentItem.id}`,
+  }).catch(() => {});
 
   return Response.json({
     contentItem: {

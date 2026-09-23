@@ -20,6 +20,7 @@ import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
 import { getSeoProvider, providerStatus } from "@/lib/providers";
 import { recordUsage } from "@/lib/usage";
+import { meter } from "@/lib/metering/service";
 import { domainMatches, computeAlerts, type RankAlert } from "@/lib/rankings";
 import { emitAlert, type TriggerInput } from "@/lib/alerts/evaluate";
 import { recordSnapshot } from "@/lib/retention/ai-visibility";
@@ -31,6 +32,8 @@ interface CheckResult {
   domain: string;
   checked: number;
   skipped: number;
+  /** Keywords whose ledger charge was denied by the spend cap. */
+  meteringBlocked: number;
   rankings: { keywordId: string; phrase: string; position: number | null; url: string | null }[];
   alerts: RankAlert[];
   mock: boolean;
@@ -60,6 +63,7 @@ async function checkProject(projectId: string): Promise<CheckResult> {
     domain: project.domain,
     checked: 0,
     skipped: 0,
+    meteringBlocked: 0,
     rankings: [],
     alerts: [],
     mock: !status.isLive,
@@ -89,7 +93,7 @@ async function checkProject(projectId: string): Promise<CheckResult> {
       orderBy: { checkedAt: "desc" },
     });
 
-    await prisma.ranking.create({
+    const ranking = await prisma.ranking.create({
       data: {
         keywordId: kw.id,
         checkedAt: now,
@@ -98,6 +102,22 @@ async function checkProject(projectId: string): Promise<CheckResult> {
         aiOverviewPresent: snapshot.aiOverviewPresent ?? false,
       },
     });
+
+    // Phase C gaps (G1): ledger one rank_check per keyword. The ranking row
+    // is the domain row — the idempotency key makes retried batches charge
+    // exactly once per check. workspaceId comes from the project row (server
+    // context), never the request body (T10).
+    const mres = await meter({
+      workspaceId: project.workspaceId,
+      projectId,
+      action: "rank_check",
+      idempotencyKey: `rankcheck:${ranking.id}`,
+      evidenceRef: `rank-check:${ranking.id}`,
+    }).catch((err) => {
+      console.error(`Metering failed for rank check ${ranking.id}:`, err);
+      return null;
+    });
+    if (mres && !mres.ok) result.meteringBlocked += 1;
 
     const newAlerts = computeAlerts(kw.id, kw.phrase, previous?.position ?? null, position, now);
     result.alerts.push(...newAlerts);

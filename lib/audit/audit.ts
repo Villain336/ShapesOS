@@ -5,6 +5,7 @@ import type { SiteFileProvider } from "@/lib/sitefiles/types";
 import { CATEGORY_MAP } from "./categories";
 import { scanSite } from "./scanner";
 import { mockScanFindings } from "./mock";
+import { meter } from "@/lib/metering/service";
 
 export interface AuditInput {
   siteId: string;
@@ -64,6 +65,26 @@ export async function runAudit(input: AuditInput) {
         errorIssues,
       },
     });
+
+    // Phase C gaps (G1): ledger one site_audit per crawl. The audit row is
+    // the domain row. workspaceId is resolved from the project row — never
+    // from the caller (T10). Covers the API route and the chat audit tool,
+    // which both funnel through runAudit.
+    const proj = await prisma.project.findUnique({
+      where: { id: projectId },
+      select: { workspaceId: true },
+    });
+    if (proj) {
+      await meter({
+        workspaceId: proj.workspaceId,
+        projectId,
+        action: "site_audit",
+        idempotencyKey: `siteaudit:${done.id}`,
+        evidenceRef: `site-audit:${done.id}`,
+      }).catch((err) => {
+        console.error(`Metering failed for site audit ${done.id}:`, err);
+      });
+    }
 
     return { audit: done, issues: rows };
   } catch (err) {

@@ -67,6 +67,7 @@
     "react-email": "^6.9.5",
     "resend": "^6.28.1",
     "ssh2": "^1.17.0",
+    "stripe": "^22.6.2",
     "tailwind-merge": "^3.7.0",
     "takumi-pdf": "^0.15.0",
     "y-protocols": "^1.0.7",

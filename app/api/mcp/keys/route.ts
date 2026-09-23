@@ -10,6 +10,7 @@ import { prisma } from "@/lib/prisma";
 import { requireUser, getOrCreateWorkspace } from "@/lib/session";
 import { requireWorkspaceRole, forbidden } from "@/lib/authz";
 import { mintApiKey } from "@/lib/mcp/auth";
+import { readUsageSummary } from "@/lib/mcp/metering";
 import { MCP_TOOL_NAMES, scopeForTool } from "@/lib/mcp/scopes";
 
 export const dynamic = "force-dynamic";
@@ -52,7 +53,19 @@ export async function GET() {
     where: { workspaceId: ctx.workspace.id },
     orderBy: { createdAt: "desc" },
   });
-  return Response.json({ enabled: ctx.workspace.mcpEnabled, keys: keys.map(publicKey) });
+  // Per-key credit usage (G3): from the metering sibling's byKey map, keyed
+  // on stable key ID so revoked keys keep their historical attribution.
+  // Degrades to 0s when metering is unavailable — key management must not
+  // break because usage reporting is down.
+  let byKey: Record<string, number> = {};
+  try {
+    const usage = await readUsageSummary({ workspaceId: ctx.workspace.id });
+    if (usage.ok) byKey = usage.summary.byKey ?? {};
+  } catch {
+    byKey = {};
+  }
+  const withUsage = keys.map((k) => ({ ...publicKey(k), usageCredits: byKey[k.id] ?? 0 }));
+  return Response.json({ enabled: ctx.workspace.mcpEnabled, keys: withUsage });
 }
 
 const CreateKeySchema = z

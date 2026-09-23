@@ -18,6 +18,9 @@ interface ApiKey {
   lastUsedAt: string | null;
   revokedAt: string | null;
   createdAt: string;
+  // G3: credits charged to this key in the current billing period (0 when
+  // the key has no usage, or when usage reporting is unavailable).
+  usageCredits?: number;
 }
 
 interface OAuthClient {
@@ -181,6 +184,10 @@ export default function McpManager() {
 
       <section className="rounded-xl border border-zinc-200 bg-white p-5">
         <h2 className="text-base font-semibold">API keys</h2>
+        <p className="mt-1 text-xs text-zinc-500">
+          Credit usage per key for the current billing period. Attribution follows the key even
+          after it is revoked.
+        </p>
         {keys.length === 0 ? (
           <p className="mt-2 text-sm text-zinc-500">No API keys yet.</p>
         ) : (
@@ -197,6 +204,7 @@ export default function McpManager() {
                   </div>
                   <div className="mt-0.5 text-xs text-zinc-500">
                     {k.scopes.length} scope{k.scopes.length === 1 ? "" : "s"}
+                    {` · ${k.usageCredits ?? 0} credit${(k.usageCredits ?? 0) === 1 ? "" : "s"} used`}
                     {k.lastUsedAt ? ` · last used ${new Date(k.lastUsedAt).toLocaleString()}` : " · never used"}
                     {k.expiresAt ? ` · expires ${new Date(k.expiresAt).toLocaleDateString()}` : ""}
                   </div>

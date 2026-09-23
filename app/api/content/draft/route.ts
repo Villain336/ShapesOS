@@ -18,6 +18,7 @@ import {
 import { buildDraftPrompt } from "@/lib/content/draft";
 import { wordCount, type ContentBrief } from "@/lib/content/brief";
 import { recordUsage } from "@/lib/usage";
+import { meter } from "@/lib/metering/service";
 
 export async function POST(req: NextRequest) {
   const user = await requireUser();
@@ -69,6 +70,18 @@ export async function POST(req: NextRequest) {
     where: { id: contentItem.id },
     data: { bodyMarkdown: draft, status: "draft" },
   });
+
+  // Phase C gaps (G1): ledger one ai_article per generated draft. The key
+  // binds the pre-generation updatedAt: a retry after a failed generation
+  // reuses the key (no double charge); a genuine regeneration after success
+  // sees a new updatedAt and charges again.
+  await meter({
+    workspaceId: contentItem.project.workspaceId,
+    projectId: contentItem.projectId,
+    action: "ai_article",
+    idempotencyKey: `aiarticle:${contentItem.id}:${contentItem.updatedAt.getTime()}`,
+    evidenceRef: `ai-article:${contentItem.id}`,
+  }).catch(() => {});
 
   await recordUsage(contentItem.project.workspaceId, "ai_words", wordCount(draft)).catch(
     () => {},

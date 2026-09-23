@@ -6,6 +6,7 @@ import { requireUser, getOrCreateWorkspace } from "@/lib/session";
 import { requireWorkspaceRole } from "@/lib/authz";
 import SettingsNav from "@/components/settings/SettingsNav";
 import UsageDashboard from "@/components/settings/UsageDashboard";
+import BillingSection from "@/components/settings/BillingSection";
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +28,7 @@ export default async function UsageSettingsPage() {
       </div>
       <SettingsNav />
       <UsageDashboard workspaceId={workspace.id} />
+      <BillingSection workspaceId={workspace.id} />
     </div>
   );
 }
