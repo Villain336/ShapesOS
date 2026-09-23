@@ -8,6 +8,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
 import { aiVisibilitySummary } from "@/lib/retention/ai-visibility";
+import SerpAnalyzer from "@/components/SerpAnalyzer";
 
 export const dynamic = "force-dynamic";
 
@@ -79,6 +80,8 @@ export default async function AISearchPage({ params }: { params: Promise<{ id: s
       </div>
 
       <TrendBars trend={summary.trend} />
+
+      <SerpAnalyzer projectId={project.id} />
 
       <div className="rounded-lg border border-zinc-300 bg-white p-4">
         <h2 className="mb-3 text-sm font-medium uppercase tracking-widest text-zinc-500">Per keyword</h2>

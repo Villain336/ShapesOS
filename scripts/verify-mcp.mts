@@ -307,8 +307,8 @@ async function main() {
     const r = await handleMcpPost(authz(keyAFull.raw), rpc("tools/call", { name: "get_rank_report", arguments: { projectId: pA } }));
     ok("metered call executes", !isErr(r.response) && !r.response?.error);
     const call = fakeMeter.calls[0] as { action?: string; evidenceRef?: string; idempotencyKey?: string; workspaceId?: string };
-    ok("meter action is mcp_tool_call", call?.action === "mcp_tool_call");
-    ok("passthrough in evidenceRef", call?.evidenceRef === "mcp:get_rank_report:1");
+    ok("meter action is the underlying passthrough action", call?.action === "rank_check");
+    ok("passthrough in evidenceRef", call?.evidenceRef === "mcp:get_rank_report");
     ok("meter tenant = auth tenant", call?.workspaceId === wsA);
     ok("idempotency key present", typeof call?.idempotencyKey === "string" && call.idempotencyKey.startsWith("mcp:"));
   }

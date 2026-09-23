@@ -92,13 +92,17 @@ export async function meterToolCall(args: {
   if (!svc) return { ok: false, reason: "metering_unavailable", charged: 0 };
   const passthrough = TOOL_CREDIT_PASSTHROUGH[args.tool];
   try {
+    // T17: charge the UNDERLYING action key (serp_analysis, keyword_research,
+    // rank_check, ...) — the credit-table cost for that action is the charge.
+    // "mcp_tool_call" is only the audit label; it costs zero and must never
+    // be the ledger action.
     const res = await svc.meter({
       workspaceId: args.workspaceId,
       projectId: args.projectId,
       actorId: args.actorId,
-      action: "mcp_tool_call",
+      action: passthrough.action,
       idempotencyKey: `mcp:${args.callId ?? randomUUID()}`,
-      evidenceRef: `mcp:${args.tool}:${passthrough.credits}`,
+      evidenceRef: `mcp:${args.tool}`,
       keyId: args.keyId,
     });
     if (!res.ok) {

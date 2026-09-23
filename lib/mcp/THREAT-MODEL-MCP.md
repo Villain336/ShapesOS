@@ -39,7 +39,7 @@ read another workspace's projects/rankings.
 - Zod schemas for tool args do not declare `workspaceId`; an injected field is
   stripped/ignored (`z.object(...).strict()` where feasible — unknown keys throw).
 - Defense in depth: every Prisma query in every handler is `where: { workspaceId:
-  ctx.workspaceId }`; shared across all 8 tools via the tool-runner wrapper, not
+  ctx.workspaceId }`; shared across all 10 tools via the tool-runner wrapper, not
   per-handler discipline.
 *Tests:* cross-tenant `tools/call` with forged `workspaceId` returns only the
 caller's workspace rows; strict-schema rejection logged.
@@ -273,6 +273,38 @@ it leaks which keys are active and their relative traffic.
 *Tests:* non-admin `GET /api/mcp/keys` → 403 (existing M11 coverage);
 revoked key id present in `byKey` still resolves to a usage number.
 
+### T17 — New tools: analyze_serp / research_keywords (standalone paths)
+
+*Attack/abuse:* the two new tools expose live-vendor primitives to agents.
+`research_keywords` costs 40 credits per call via passthrough — an agent
+loop (or a compromised client) can burn budget fast; `analyze_serp` at 1
+credit is cheap enough to hammer for SERP scraping via the MCP surface.
+
+*Mitigations:*
+- Same gates as every tool: strict zod schemas (no `workspaceId` in args —
+  T1), per-tool scope check (`tools:analyze_serp`, `tools:research_keywords`)
+  before metering or execution (T2), metering BEFORE the handler via
+  `meterToolCall` with the underlying action key (`serp_analysis`,
+  `keyword_research` — T9), per-key rate limits (T4/T13), and a capped
+  workspace fails the call closed before execution.
+- Cost asymmetry is explicit in the tool descriptions served to the model
+  ("Costs 40 credits") and in the scope labels on the consent screen, so a
+  key grant is informed. The 40-credit figure comes from the credit table
+  via `TOOL_CREDIT_PASSTHROUGH`, not a hardcoded string — table and tools
+  cannot drift.
+- Handlers call the same un-metered cores as the REST routes
+  (`analyzeSerp` / `researchKeywords` lib functions); the tool's single
+  passthrough charge is the only ledger write (T14 — no double charge).
+- `research_keywords` is the fuller task (volumes + clustered ideas);
+  `get_keyword_ideas` is kept unchanged for the lighter expansion.
+- Mock honesty (T12/residual): in this environment the vendor is
+  unavailable, so both tools return clearly-labeled mock results
+  (`live: false, mock: true`) — never fabricated data presented as real.
+
+*Tests:* scope-denied call → no charge, no execution; keyId attribution
+present on the passthrough event; capped workspace → denied before
+execution; mock flag present in results.
+
 ## Residual risks (accepted, documented)
 - In-memory rate limiting remains the default and is single-instance; hosted
   multi-box deployments must set `MCP_RATE_LIMITER=postgres` (documented).
@@ -280,7 +312,10 @@ revoked key id present in `byKey` still resolves to a usage number.
 - `degraded` connector-style honesty: vendor-backed tools (rank report, SEO
   audit, keyword ideas) return clearly-labeled mock data or "live unavailable"
   — never fabricated data presented as real.
-- Sibling contract risk: `meter()`'s `mcp_tool_call` passthrough semantics are
-  defined by the metering track; we pass `action: "mcp_tool_call"` with
-  `evidenceRef: "mcp:<tool>:<credits>"` documenting the passthrough. If the
-  sibling's table resolves differently, the integrator must reconcile.
+- Sibling contract risk: `meter()`'s per-tool passthrough semantics are
+  defined by the metering track; we pass the UNDERLYING action key (e.g.
+  `action: "rank_check"` for `get_rank_report`) with `evidenceRef:
+  "mcp:<tool>"` documenting the passthrough, and `keyId` for per-key
+  attribution. `"mcp_tool_call"` is never the ledger action — it costs
+  zero in the credit table. If the sibling's table resolves differently,
+  the integrator must reconcile.

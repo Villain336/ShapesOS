@@ -6,6 +6,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
 import KeywordResearch from "@/components/KeywordResearch";
+import KeywordResearchTask from "@/components/KeywordResearchTask";
 
 export const dynamic = "force-dynamic";
 
@@ -37,6 +38,7 @@ export default async function KeywordsPage({
         </h1>
       </div>
       <KeywordResearch projectId={project.id} />
+      <KeywordResearchTask projectId={project.id} />
     </div>
   );
 }

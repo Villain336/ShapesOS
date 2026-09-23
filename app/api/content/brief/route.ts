@@ -10,7 +10,8 @@ import type { NextRequest } from "next/server";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
-import { getSeoProvider, providerStatus } from "@/lib/providers";
+import { providerStatus } from "@/lib/providers";
+import { pullSerp } from "@/lib/serp/pull";
 import { buildBrief, type ContentBrief } from "@/lib/content/brief";
 import { recordUsage } from "@/lib/usage";
 import { meter } from "@/lib/metering/service";
@@ -38,14 +39,15 @@ export async function POST(req: NextRequest) {
   }
   if (!(await requireProjectRole(user.id, body.projectId, "editor"))) return forbidden();
 
-  const provider = getSeoProvider();
-
   let brief: ContentBrief;
   try {
-    const serp = await provider.serpResults({
+    // Internal SERP pull via the shared un-metered helper (T14): the brief
+    // charges "content_brief" once per ContentItem below — never
+    // "serp_analysis" for this pull.
+    const serp = (await pullSerp({
       keyword: keyword.phrase,
       depth: 10,
-    });
+    })).snapshot;
     brief = buildBrief(keyword.phrase, keyword.intent, serp);
     await recordUsage(keyword.project.workspaceId, "serp_calls", 1).catch(
       () => {},

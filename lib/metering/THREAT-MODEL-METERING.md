@@ -264,18 +264,72 @@ use free forever.
   backlink_summary → pull row, content_refresh → autopilotItem) keep the
   strict `<action>:<row-id>` form.
 
+## T13 — day-bucket idempotency gaming (standalone SERP/keyword paths)
+
+**Abuse / failure mode:** `serp_analysis` and `keyword_research` have no
+domain row, so their idempotency keys are day-bucketed:
+`serpanalysis:<hash(workspace+keyword+location+device+day)>`,
+`keywordresearch:<hash(workspace+seed+location+limit+day)>`. A user who re-runs the
+same query tomorrow is charged again (intended — SERPs change daily); a
+user who hammers the same query all day gets one charge (intended
+under-charge, same tradeoff as T12's hour buckets, but day-granular
+because SERP data is meaningfully stable within a day and the vendor pull
+is the costliest primitive).
+
+**Mitigations (documented tradeoff):**
+- The day bucket is UTC (`dayBucket()` in `lib/metering/wiring.ts`) — no
+  timezone gaming; the boundary is the same for everyone.
+- Replays within the day return `{ ok: true }` from `meter()` with the
+  ORIGINAL event — the replay path is checked before the cap check (T1),
+  so a same-day repeat is never cap-blocked and never double-charged.
+- The pull itself re-executes on replay (results are not cached) — in live
+  mode this spends vendor budget without a user charge. Accepted: the
+  alternative (caching SERPs) is a product feature with staleness
+  semantics, not a metering fix. Documented here so it can't be
+  "discovered" later as a surprise.
+- Key includes workspace+location+device+limit so "same keyword, different market"
+  is a genuinely different (charged) analysis, not a free replay.
+
+**Battery:** same query twice same day → 1 event; different day bucket →
+new charge; different location → new charge.
+
+## T14 — shared-helper metering discipline (no double-charge on SERP pulls)
+
+**Abuse / failure mode:** The raw SERP pull is now a shared un-metered
+helper (`lib/serp/pull.ts` `pullSerp()`). If a caller meters it AND the
+parent action meters too (brief generation charging both `content_brief`
+and `serp_analysis` for its internal pull), the user is double-charged for
+one intent — violating the charge-at-intent rule.
+
+**Mitigations:**
+- `pullSerp()` is un-metered BY CONSTRUCTION: it imports nothing from
+  `lib/metering` (static battery check — the import graph is pinned), so it
+  cannot charge no matter how it is called.
+- Metering lives ONLY at the seams: the standalone
+  `POST /api/serp/analyze` route (action `serp_analysis`) and the existing
+  parent-action call sites (`content_brief` per ContentItem,
+  `rank_check` per ranking row). Internal pulls inside those flows call
+  `pullSerp()` and charge only the parent action.
+- The MCP `analyze_serp` tool meters via the per-tool passthrough (the
+  UNDERLYING `serp_analysis` action, 1 credit) BEFORE execution; its
+  handler calls the same un-metered core as the route — no second charge.
+- The old best-effort `recordUsage(workspaceId, "serp_calls", 1)` counter
+  is untouched legacy telemetry, not the ledger — it never affects billing.
+
+**Battery:** generate a brief (which pulls a SERP internally) → exactly one
+ledger event with action `content_brief`, zero `serp_analysis` events;
+static check that `lib/serp/pull.ts` has no metering import.
+
 ## Policy notes (not threats, recorded so they can't drift)
 
 - **Mock-mode charging:** the ledger meters successful actions even when the
   underlying provider is a mock (same as the Phase C scheduler wiring).
   Credits are the product's unit of account, not a vendor-cost pass-through;
   on self-host they cost nothing. The UI already marks mock results as mock.
-- **Unwired credit-table actions:** `serp_analysis` and `keyword_research`
-  exist in the credit table but have no standalone execution path in the
-  codebase (SERP pulls happen inside brief/rank-check flows and are charged
-  under those actions; the m21 native connector is the connector track's
-  adapter with its own credential model). They are intentionally left
-  unwired rather than wired to the wrong seam.
+- **Charge at intent:** one user intent = one ledger action. A brief that
+  pulls 5 SERPs internally charges `content_brief` once, not 5×
+  `serp_analysis`. The standalone routes exist so standalone intent is
+  possible — and separately billable.
 
 ## Non-goals (explicitly not handled here)
 

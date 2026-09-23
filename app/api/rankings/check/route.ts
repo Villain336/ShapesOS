@@ -18,7 +18,8 @@ import { accessibleWorkspaceWhere, requireProjectRole, forbidden } from "@/lib/a
 import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
-import { getSeoProvider, providerStatus } from "@/lib/providers";
+import { providerStatus } from "@/lib/providers";
+import { pullSerp } from "@/lib/serp/pull";
 import { recordUsage } from "@/lib/usage";
 import { meter } from "@/lib/metering/service";
 import { domainMatches, computeAlerts, type RankAlert } from "@/lib/rankings";
@@ -55,7 +56,6 @@ async function checkProject(projectId: string): Promise<CheckResult> {
     orderBy: { phrase: "asc" },
   });
 
-  const provider = getSeoProvider();
   const status = providerStatus();
   const now = new Date();
   const result: CheckResult = {
@@ -72,7 +72,10 @@ async function checkProject(projectId: string): Promise<CheckResult> {
   for (const kw of tracked) {
     let snapshot;
     try {
-      snapshot = await provider.serpResults({ keyword: kw.phrase, depth: 20 });
+      // Internal SERP pull via the shared un-metered helper (T14): the
+      // rank check charges "rank_check" per ranking row below — never
+      // "serp_analysis" for these pulls.
+      snapshot = (await pullSerp({ keyword: kw.phrase, depth: 20 })).snapshot;
     } catch (err) {
       // One keyword's failure must not kill the whole batch — record the
       // keyword as skipped and keep going.

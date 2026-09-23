@@ -65,8 +65,8 @@ charges) when unfiltered.
 | Action | Owning service | Charge point |
 |---|---|---|
 | `rank_check` | rank tracker cron | ✅ per keyword checked (`app/api/rankings/check/route.ts`, key `rankcheck:<rankingId>`) |
-| `serp_analysis` | — | ⏸ no standalone execution path (SERP pulls happen inside brief/rank-check flows, charged under those actions; the m21 native connector is the connector track's adapter) |
-| `keyword_research` | — | ⏸ no execution path in the codebase (volumes task); action reserved in the credit table |
+| `serp_analysis` | SERP analysis | ✅ standalone (`POST /api/serp/analyze`, key `serpanalysis:<hash(workspace+keyword+location+device+day)>`; T13 day-bucket). Raw pull is the shared un-metered `lib/serp/pull.ts` (T14); internal pulls in brief/rank-check flows charge the parent action only. MCP: `analyze_serp` tool via mcp_tool_call passthrough. |
+| `keyword_research` | keyword research | ✅ standalone (`POST /api/keywords/research`, key `keywordresearch:<hash(workspace+seed+location+limit+day)>`; T13 day-bucket). Composes provider keywordIdeas into a clustered report; the lighter `keyword_ideas` expansion is a separate action and is never double-charged. MCP: `research_keywords` tool via mcp_tool_call passthrough. |
 | `keyword_ideas` | keyword ideas | ✅ per expansion (`app/api/keywords/ideas/route.ts` + chat `research_keywords` tool; hour-bucketed key, T12) |
 | `keyword_gap` | competitor gap | ✅ per gap analysis (`app/api/competitors/gap/route.ts`; hour-bucketed key, T12) |
 | `site_audit` | site audit | ✅ per crawl (`lib/audit/audit.ts` `runAudit`; key `siteaudit:<auditId>`; covers the API route and the chat audit tool) |

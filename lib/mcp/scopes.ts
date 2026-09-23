@@ -13,6 +13,8 @@ export const MCP_TOOL_NAMES = [
   "get_site_health",
   "list_scheduled_skills",
   "get_usage_summary",
+  "analyze_serp",
+  "research_keywords",
 ] as const;
 
 export type McpToolName = (typeof MCP_TOOL_NAMES)[number];
@@ -44,6 +46,8 @@ export const TOOL_CREDIT_PASSTHROUGH: Record<McpToolName, { action: string; cred
   get_site_health: { action: "rank_check", credits: 1 },
   list_scheduled_skills: { action: "skill_list", credits: 0 },
   get_usage_summary: { action: "usage_summary", credits: 0 },
+  analyze_serp: { action: "serp_analysis", credits: 1 },
+  research_keywords: { action: "keyword_research", credits: 40 },
 };
 
 /** Human-readable scope labels for the consent screen and key UI. */
@@ -79,5 +83,13 @@ export const SCOPE_LABELS: Record<McpToolName, { title: string; description: str
   get_usage_summary: {
     title: "Usage summary",
     description: "Read this workspace's credit usage summary (read-only).",
+  },
+  analyze_serp: {
+    title: "SERP analysis",
+    description: "Analyze the live search results page for a keyword — top results, SERP features, and a deterministic breakdown (1 credit per call).",
+  },
+  research_keywords: {
+    title: "Keyword research",
+    description: "Full keyword research task: seed metrics plus a clustered ideas report (40 credits per call).",
   },
 };

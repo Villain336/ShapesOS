@@ -1,6 +1,6 @@
 // Marketr — MCP v1 tool definitions (Phase C, W5).
 //
-// 8 task-oriented tools (spec §6.4 — never 1:1 REST mirrors). Every handler:
+// 10 task-oriented tools (spec §6.4 — never 1:1 REST mirrors). Every handler:
 //   - receives ctx (tenant workspaceId from AUTH, never from args — T1),
 //   - validates args with a strict zod schema (unknown keys rejected),
 //   - re-checks its own scope via the runner (T2),
@@ -15,6 +15,8 @@ import { prisma } from "@/lib/prisma";
 import type { McpAuthContext } from "./auth";
 import type { McpToolName } from "./scopes";
 import { readUsageSummary } from "./metering";
+import { analyzeSerpUnmetered, ActionError } from "@/lib/serp/analyze";
+import { researchKeywordsUnmetered } from "@/lib/keywords/research";
 
 export interface ToolResult {
   /** JSON-serializable payload. */
@@ -258,6 +260,82 @@ const tools: ToolDef[] = [
       const res = await readUsageSummary({ workspaceId: ctx.workspaceId, projectId });
       if (!res.ok) throw new ToolError("metering_unavailable", "Usage data is temporarily unavailable.");
       return { data: { usage: res.summary } };
+    },
+  },
+  {
+    name: "analyze_serp",
+    description:
+      "Analyze the search results page for a keyword: top organic results, SERP features (AI Overview, people-also-ask), and a deterministic breakdown (result count, domain diversity). Costs 1 credit. In this environment the data vendor is unavailable, so results are clearly-labeled mock data.",
+    inputSchema: z
+      .object({
+        projectId: z.string().min(1),
+        keyword: z.string().min(1).max(200),
+        locationCode: z.number().int().positive().optional(),
+        device: z.enum(["desktop", "mobile"]).optional(),
+      })
+      .strict(),
+    inputJsonSchema: {"type":"object","properties":{"projectId":{"type":"string"},"keyword":{"type":"string"},"locationCode":{"type":"number"},"device":{"type":"string","enum":["desktop","mobile"]}},"required":["projectId","keyword"],"additionalProperties":false},
+    handler: async (ctx, args) => {
+      const { projectId, keyword, locationCode, device } = args as {
+        projectId: string;
+        keyword: string;
+        locationCode?: number;
+        device?: "desktop" | "mobile";
+      };
+      // The runner already metered via the mcp_tool_call passthrough
+      // (serp_analysis credits) with keyId attribution — use the un-metered
+      // core so the tool call is charged exactly once (T14).
+      try {
+        const { analysis } = await analyzeSerpUnmetered({
+          userId: ctx.userId,
+          projectId,
+          keyword,
+          locationCode,
+          device,
+          actorId: ctx.userId,
+        });
+        return { data: { analysis } };
+      } catch (e) {
+        if (e instanceof ActionError) throw new ToolError(e.code, e.message);
+        throw e;
+      }
+    },
+  },
+  {
+    name: "research_keywords",
+    description:
+      "Full keyword research task for a seed term: seed metrics plus a clustered ideas report (volumes, difficulty, CPC, intent per idea). Costs 40 credits. In this environment the data vendor is unavailable, so results are clearly-labeled mock data. (For the lighter expansion, use get_keyword_ideas.)",
+    inputSchema: z
+      .object({
+        projectId: z.string().min(1),
+        seedKeyword: z.string().min(1).max(200),
+        locationCode: z.number().int().positive().optional(),
+        limit: z.number().int().min(1).max(100).optional(),
+      })
+      .strict(),
+    inputJsonSchema: {"type":"object","properties":{"projectId":{"type":"string"},"seedKeyword":{"type":"string"},"locationCode":{"type":"number"},"limit":{"type":"number"}},"required":["projectId","seedKeyword"],"additionalProperties":false},
+    handler: async (ctx, args) => {
+      const { projectId, seedKeyword, locationCode, limit } = args as {
+        projectId: string;
+        seedKeyword: string;
+        locationCode?: number;
+        limit?: number;
+      };
+      // Same single-charge discipline as analyze_serp (T14).
+      try {
+        const { report } = await researchKeywordsUnmetered({
+          userId: ctx.userId,
+          projectId,
+          seedKeyword,
+          locationCode,
+          limit,
+          actorId: ctx.userId,
+        });
+        return { data: { report } };
+      } catch (e) {
+        if (e instanceof ActionError) throw new ToolError(e.code, e.message);
+        throw e;
+      }
     },
   },
 ];

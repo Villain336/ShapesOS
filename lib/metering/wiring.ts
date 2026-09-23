@@ -18,6 +18,19 @@ export function hourBucket(d: Date = new Date()): string {
   return d.toISOString().slice(0, 13);
 }
 
+/**
+ * UTC day bucket, e.g. "2026-09-22".
+ *
+ * Used in idempotency keys for the standalone SERP/keyword paths
+ * (serp_analysis, keyword_research). Documented tradeoff (T13): the same
+ * query on the same UTC day dedups to one charge; re-running tomorrow
+ * charges again (SERPs change daily). We under-charge within the day
+ * rather than risk double-charging on retry.
+ */
+export function dayBucket(d: Date = new Date()): string {
+  return d.toISOString().slice(0, 10);
+}
+
 /** Short stable hash for embedding user input in idempotency keys. */
 export function seedHash(s: string): string {
   return createHash("sha256").update(s).digest("hex").slice(0, 16);
