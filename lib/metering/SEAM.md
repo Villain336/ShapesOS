@@ -84,3 +84,27 @@ charges) when unfiltered.
   errors (missing workspaceId/key, negative override, cross-workspace key).
 - The ledger write and the balance bump are one transaction; the 80% alert
   fires after commit and is best-effort.
+
+## Overage accrual (invoicing track)
+
+When a charge lands beyond the **paid pool** (`includedCredits +
+purchasedCredits`), meter() marks the overage portion factually on the
+UsageEvent: `overageCredits = max(0, min(charge, usedBefore + charge −
+paidPool))`. This is accounting, not policy:
+
+- It is written **only when the workspace has auto-overage ON**. Legacy
+  `blockAtCap: false` usage passes the cap but accrues nothing — it can
+  never be invoiced. Hard-cap denials write nothing (no event, no accrual).
+- It is measured against the paid pool, **not** `cap.capCredits`: an admin
+  may raise the cap above the pool, but only the pool is pre-paid.
+- It is capped to the charge: an event fully beyond the pool marks exactly
+  its own credits, never the cumulative excess. A straddling charge (e.g.
+  95/100 used, 10-credit charge) marks only the 5 overage credits — one
+  event per charge, exact split.
+- Zero-cost actions always mark 0.
+
+The monthly invoice cron (`POST /api/cron/overage-invoicing`,
+`StripeBillingSink.invoiceOverage`) sums `overage_credits` per workspace
+for completed UTC months; amounts always come from this column — Stripe
+never decides what is owed. See `lib/metering/billing.ts` and
+THREAT-MODEL-BILLING.md B9–B15.

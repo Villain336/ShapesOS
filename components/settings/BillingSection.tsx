@@ -8,6 +8,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Notice, btnCls, cardCls, primaryBtnCls, type NoticeState } from "./ui";
+import OverageBillingSection, { type OverageState } from "./OverageBillingSection";
 
 interface Pack {
   id: string;
@@ -30,6 +31,7 @@ interface StatusData {
   overageRate: string;
   packs: Pack[];
   purchases: Purchase[];
+  overage: OverageState;
 }
 
 function money(cents: number): string {
@@ -62,7 +64,7 @@ export default function BillingSection({ workspaceId }: { workspaceId: string })
     load();
   }, [load]);
 
-  // Surface Stripe's redirect result (?topup=success|cancelled).
+  // Surface Stripe's redirect results (?topup=… / ?setup=…).
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const t = params.get("topup");
@@ -70,6 +72,12 @@ export default function BillingSection({ workspaceId }: { workspaceId: string })
       setNotice({ kind: "ok", message: "Payment received — your credits were added. It can take a few seconds to appear below." });
     } else if (t === "cancelled") {
       setNotice({ kind: "info", message: "Checkout was cancelled — no charge was made." });
+    }
+    const s = params.get("setup");
+    if (s === "success") {
+      setNotice({ kind: "ok", message: "Card saved — it will be charged automatically for monthly overage invoices." });
+    } else if (s === "cancelled") {
+      setNotice({ kind: "info", message: "Card setup was cancelled — no card was saved." });
     }
   }, []);
 
@@ -189,6 +197,9 @@ export default function BillingSection({ workspaceId }: { workspaceId: string })
               recorded in the audit log.
             </p>
           </div>
+
+          {/* Overage billing: card on file, accrued overage, invoices */}
+          <OverageBillingSection workspaceId={workspaceId} overage={data.overage} onChanged={load} />
 
           {/* Purchase history */}
           <div>

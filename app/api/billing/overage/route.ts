@@ -7,7 +7,7 @@
 import type { NextRequest } from "next/server";
 import { requireUser } from "@/lib/session";
 import { workspaceIdFrom, requireWorkspaceAccess, badRequest } from "@/lib/route-utils";
-import { setAutoOverage } from "@/lib/metering/billing";
+import { setAutoOverage, OverageCardRequiredError } from "@/lib/metering/billing";
 
 export const dynamic = "force-dynamic";
 
@@ -28,11 +28,22 @@ export async function setOverageForUser(args: {
     }
     return { status: res.status, body };
   }
-  const result = await setAutoOverage({
-    workspaceId: access.workspaceId,
-    enabled: args.enabled,
-    actorId: args.userId,
-  });
+  let result;
+  try {
+    result = await setAutoOverage({
+      workspaceId: access.workspaceId,
+      enabled: args.enabled,
+      actorId: args.userId,
+    });
+  } catch (e) {
+    // No card on file: enabling would accrue unbilled overage. 402 with the
+    // plain-language message, surfaced verbatim by the UI. The gate is
+    // unconditional — no card, no auto-overage, even unconfigured.
+    if (e instanceof OverageCardRequiredError) {
+      return { status: 402, body: { error: e.message } };
+    }
+    throw e;
+  }
   return { status: 200, body: result };
 }
 

@@ -15,8 +15,9 @@
 //   B7 unconfigured Stripe fail-closed (plain language, never half-initialized)
 //   B8 stolen session IDs are useless without a valid signature (covered by B1+B3)
 // Plus: pack table vs spec Appendix A, overage rate display, purchaseTopUp /
-// billOverage fail-closed semantics, default opt-out, purchase history, no
-// key material in errors.
+// billOverage semantics (billOverage is wired: completed months invoice from
+// the ledger, in-progress months return nothing_due), default opt-out,
+// purchase history, no key material in errors.
 //
 // NOTE: battery workspaces are uniquely named per run (zz-bill-battery-*)
 // and left in place, matching the metering battery convention.
@@ -29,6 +30,11 @@ if (!process.env.DATABASE_URL) {
 // Test Stripe keys live ONLY in-process (never shell env, never committed).
 const SK_TEST = "sk_test_battery_4eC39HqLyjWDarjtT1zdp7dc";
 const WHSEC_TEST = "whsec_test_battery_8e5f3a1b2c4d6e7f8a9b0c1d2e3f4a5b";
+// Billing "configured" for this battery = env keys present (in-process only),
+// so the card gate in setAutoOverage is active. B7's unconfigured checks use
+// a null-key sink and are unaffected.
+process.env.STRIPE_SECRET_KEY = SK_TEST;
+process.env.STRIPE_WEBHOOK_SECRET = WHSEC_TEST;
 
 import { randomUUID } from "node:crypto";
 import Stripe from "stripe";
@@ -38,6 +44,7 @@ const billing = await import("@/lib/metering/billing");
 const {
   StripeBillingSink,
   BillingNotConfiguredError,
+  OverageCardRequiredError,
   TOP_UP_PACKS,
   OVERAGE_RATE_DISPLAY,
   packById,
@@ -45,6 +52,7 @@ const {
   getTopUpHistory,
   getBillingStatus,
 } = billing;
+import type { OverageInvoiceResult } from "@/lib/metering/billing";
 const { setOverageForUser } = await import("@/app/api/billing/overage/route");
 
 let passed = 0;
@@ -137,6 +145,11 @@ check("unknown packId throws", threwUnknown);
 // ── B7: unconfigured fail-closed ─────────────────────────────────────────────
 console.log("unconfigured fail-closed");
 {
+  // Truly unconfigured: no keys anywhere (constructor null + env removed).
+  const savedSK = process.env.STRIPE_SECRET_KEY;
+  const savedWH = process.env.STRIPE_WEBHOOK_SECRET;
+  delete process.env.STRIPE_SECRET_KEY;
+  delete process.env.STRIPE_WEBHOOK_SECRET;
   const dead = new StripeBillingSink({ secretKey: null, webhookSecret: null });
   const expectNotConfigured = async (name: string, fn: () => Promise<unknown>) => {
     try {
@@ -159,6 +172,9 @@ console.log("unconfigured fail-closed");
   // Half of the pair configured is still not configured.
   const half = new StripeBillingSink({ secretKey: SK_TEST, webhookSecret: null });
   await expectNotConfigured("webhook secret missing still fails closed", () => half.handleWebhook("{}", "sig"));
+  // Restore the battery's in-process keys for the remaining sections.
+  if (savedSK !== undefined) process.env.STRIPE_SECRET_KEY = savedSK;
+  if (savedWH !== undefined) process.env.STRIPE_WEBHOOK_SECRET = savedWH;
 }
 
 // ── createTopUpCheckout binds the authorized workspace ───────────────────────
@@ -316,8 +332,18 @@ console.log("overage opt-in privilege");
   const rView = await setOverageForUser({ userId: viewerA, workspaceId: wsA.id, enabled: true });
   check("viewer denied (403)", rView.status === 403, String(rView.status));
   const capBefore = await prisma.spendCap.findUnique({ where: { workspaceId: wsA.id } });
+  // New card gate: enabling without a card on file is a 402 (no card, no
+  // uncapped spend). The full setup-webhook card flow is covered by
+  // verify-overage.mts; here we mark the flag directly.
+  const rNoCard = await setOverageForUser({ userId: adminA, workspaceId: wsA.id, enabled: true });
+  check("admin opt-in without card → 402", rNoCard.status === 402, String(rNoCard.status));
+  await prisma.billingWorkspace.upsert({
+    where: { workspaceId: wsA.id },
+    create: { workspaceId: wsA.id, stripeCustomerId: "cus_test_batt", hasPaymentMethod: true },
+    update: { stripeCustomerId: "cus_test_batt", hasPaymentMethod: true },
+  });
   const rAdmin = await setOverageForUser({ userId: adminA, workspaceId: wsA.id, enabled: true });
-  check("admin can opt in", rAdmin.status === 200 && (rAdmin.body as { autoOverage: boolean }).autoOverage === true);
+  check("admin can opt in with card", rAdmin.status === 200 && (rAdmin.body as { autoOverage: boolean }).autoOverage === true);
   const capOn = await prisma.spendCap.findUnique({ where: { workspaceId: wsA.id } });
   check("opt-in sets autoOverage flag", capOn?.autoOverage === true);
   const audit = await prisma.fileChangeLog.findFirst({
@@ -343,9 +369,17 @@ console.log("defaults and history");
   const hist = await getTopUpHistory(wsA.id);
   check("purchase history lists applied top-ups", hist.length >= 3 && hist.every((h) => h.credits > 0 && h.amountCents > 0));
   check("history newest-first", hist.every((h, i, a) => i === 0 || a[i - 1].appliedAt >= h.appliedAt));
-  // setAutoOverage bridge (no Stripe needed — it flips metering state).
-  const t = await setAutoOverage({ workspaceId: wsC.id, enabled: true, actorId: "battery" });
-  check("setAutoOverage bridge enables", t.autoOverage === true);
+  // setAutoOverage bridge: the card gate applies when billing is configured
+  // (no card → OverageCardRequiredError, no uncapped spend).
+  let threwCard = false;
+  try {
+    await setAutoOverage({ workspaceId: wsC.id, enabled: true, actorId: "battery" });
+  } catch (e) {
+    threwCard = e instanceof OverageCardRequiredError;
+  }
+  check("setAutoOverage bridge requires card when configured", threwCard);
+  const capStillOff = await prisma.spendCap.findUnique({ where: { workspaceId: wsC.id } });
+  check("failed opt-in flips nothing", capStillOff?.autoOverage !== true);
   const t2 = await setAutoOverage({ workspaceId: wsC.id, enabled: false });
   check("setAutoOverage bridge disables", t2.autoOverage === false);
 }
@@ -357,9 +391,13 @@ console.log("sink interface semantics");
   let m1 = "";
   try { await s.purchaseTopUp(wsA.id, 5000); } catch (e) { m1 = e instanceof Error ? e.message : ""; }
   check("purchaseTopUp directs to Checkout", /createTopUpCheckout/i.test(m1), m1.slice(0, 60));
-  let m2 = "";
-  try { await s.billOverage(wsA.id, 100, new Date()); } catch (e) { m2 = e instanceof Error ? e.message : ""; }
-  check("billOverage fails closed (follow-up)", /not yet wired/i.test(m2), m2.slice(0, 60));
+  let m2: ({ providerRef: string } & OverageInvoiceResult) | null = null;
+  try { m2 = await s.billOverage(wsA.id, 100, new Date()); } catch { m2 = null; }
+  check(
+    "billOverage wired: in-progress month → nothing_due (ledger decides, not the credits arg)",
+    m2 !== null && m2.status === "nothing_due" && m2.providerRef === "",
+    m2 === null ? "threw" : m2.status,
+  );
   check("sink name is stripe", s.name === "stripe");
 }
 

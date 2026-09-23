@@ -394,6 +394,9 @@ model Workspace {
   // Phase B (W2, track B2): scheduled skills + parallel subagent runs.
   scheduledSkills       ScheduledSkill[]
   skillRuns             SkillRun[]
+  // Hosted Stripe track: overage invoicing state + invoice history.
+  billingWorkspace      BillingWorkspace?
+  billingOverageInvoices BillingOverageInvoice[]
 
   @@map("workspaces")
 }
@@ -3044,6 +3047,11 @@ model UsageEvent {
   // Phase C gaps (G1): MCP API key / OAuth client this charge is attributed
   // to. Null for non-MCP charges. Server-validated to the workspace (T8).
   keyId          String?  @map("key_id")
+  // Overage invoicing: portion of `credits` that fell beyond the paid pool
+  // (included + purchased) at charge time. Factual accounting written by
+  // meter() in-transaction; the invoice cron sums this per month. 0 for
+  // in-cap charges and zero-cost actions. See SEAM.md "Overage accrual".
+  overageCredits Int      @default(0) @map("overage_credits")
 
   @@index([workspaceId, occurredAt])
   @@index([workspaceId, action])
@@ -3088,4 +3096,68 @@ model SpendCap {
   autoOverage  Boolean   @default(false) @map("auto_overage")
 
   @@map("spend_caps")
+}
+
+// ── Hosted Stripe billing state (overage invoicing track) ────────────────────
+// The UsageEvent ledger stays the source of truth for what was spent; these
+// tables record the money side: which Stripe customer belongs to which
+// workspace, which invoices were issued, and exactly-once webhook guards.
+// Self-hosted Marketr never creates rows here (billing methods fail closed
+// without Stripe keys). See lib/metering/THREAT-MODEL-BILLING.md B10–B15.
+
+model BillingWorkspace {
+  workspaceId String @id @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  // Stripe Customer bound to this workspace (B10). Written only from a
+  // signed webhook or an admin-session checkout creation — never from
+  // client-supplied input.
+  stripeCustomerId String? @map("stripe_customer_id")
+  // True once a setup-mode Checkout completed and the payment method was
+  // attached as the customer's default for invoices (B11). Required to
+  // enable auto-overage while billing is configured.
+  hasPaymentMethod Boolean @default(false) @map("has_payment_method")
+  // Watermark: overage events with occurredAt <= this value are invoiced.
+  // Sub-minimum amounts are NOT invoiced but the watermark does not advance,
+  // so they carry forward and are billed once the $5 minimum is reached (B15).
+  lastOverageInvoicedThrough DateTime? @map("last_overage_invoiced_through")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("billing_workspaces")
+}
+
+model BillingOverageInvoice {
+  id          String @id @default(cuid())
+  workspaceId String @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  // YYYY-MM of the COMPLETED billing month this invoice covers (derived from
+  // cutoff - 1ms). Covers all unbilled overage before that month's end,
+  // including carried-forward amounts.
+  period           String
+  overageCredits   Int     @map("overage_credits")
+  amountCents      Int     @map("amount_cents")
+  stripeInvoiceId  String? @map("stripe_invoice_id")
+  hostedInvoiceUrl String? @map("hosted_invoice_url")
+  invoicePdfUrl    String? @map("invoice_pdf_url")
+  // finalized | paid | failed. Updated by invoice.paid / invoice.payment_failed
+  // webhooks (B13); dunning after failure is a documented follow-up.
+  status         String   @default("finalized")
+  // overageinvoice:<workspaceId>:<YYYY-MM> — replay-safe per workspace per
+  // month (B12).
+  idempotencyKey String   @unique @map("idempotency_key")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@index([workspaceId, period])
+  @@map("billing_overage_invoices")
+}
+
+// Exactly-once guard for setup-mode Checkout completions (B11): a replayed
+// checkout.session.completed (mode=setup) must not re-attach or double-count.
+model BillingSetupIdempotency {
+  idempotencyKey  String   @id @map("idempotency_key")
+  workspaceId     String   @map("workspace_id")
+  stripeSessionId String   @map("stripe_session_id")
+  appliedAt       DateTime @default(now()) @map("applied_at")
+
+  @@map("billing_setup_idempotency")
 }

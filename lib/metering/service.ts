@@ -298,6 +298,21 @@ export async function meter(opts: MeterOptions): Promise<MeterResult> {
         }
 
         // Append the immutable event, then bump the balance — same transaction.
+        // Overage accrual (invoicing track): the portion of this charge that
+        // fell beyond the PAID pool (included + purchased) is marked factually
+        // here — but ONLY when the workspace has auto-overage ON. Legacy
+        // blockAtCap=false usage is uncapped but unbilled: it accrues no
+        // overage, so it can never be invoiced. The hard cap still blocks
+        // when it applies (returned above). The invoice cron sums
+        // overageCredits per month. Note this is measured against the paid
+        // pool, not cap.capCredits — an admin may raise the cap above the
+        // pool, but only the pool is pre-paid. Capped to the charge so an
+        // event fully beyond the pool marks exactly its own credits.
+        const paidPool = includedCredits + purchasedCredits;
+        const overageCredits =
+          cap.autoOverage && charge > 0
+            ? Math.max(0, Math.min(charge, usedCredits + charge - paidPool))
+            : 0;
         const event = await tx.usageEvent.create({
           data: {
             workspaceId,
@@ -306,6 +321,7 @@ export async function meter(opts: MeterOptions): Promise<MeterResult> {
             keyId,
             action,
             credits: charge,
+            overageCredits,
             idempotencyKey,
             evidenceRef,
           },
