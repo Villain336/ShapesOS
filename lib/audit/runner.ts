@@ -17,7 +17,7 @@ import { promises as fs } from "fs";
 import { join } from "path";
 import { prisma } from "@/lib/prisma";
 import type { SiteFileProvider } from "@/lib/sitefiles/types";
-import { getLlmProvider } from "@/lib/llm";
+import { getLlmProviderFor } from "@/lib/llm";
 import { CATEGORY_MAP } from "./categories";
 import { scanSite } from "./scanner";
 import { planFix } from "./fixer";
@@ -110,7 +110,8 @@ export async function runScheduledFixes(input: RunInput): Promise<RunResult> {
   const eligible = issues.filter((i) => isIssueEligible(i, settings)).slice(0, settings.maxFixesPerRun);
   const skipped = issues.length - eligible.length;
 
-  const llm = getLlmProvider();
+  // Phase D: audit summaries/fix reasoning → "bulk" workload.
+  const llm = getLlmProviderFor("bulk");
   const snapshotFiles: Record<string, string> = {};
   const touched = new Set<string>();
   const results: RunResult["issues"] = [];

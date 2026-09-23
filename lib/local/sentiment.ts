@@ -8,7 +8,7 @@
 // Theme extraction is always heuristic (token frequency with a stopword
 // list) — no LLM cost, fully deterministic, fixture-tested.
 
-import { getLlmProvider } from "../llm";
+import { getLlmProviderFor } from "../llm";
 
 export type Sentiment = "pos" | "neu" | "neg";
 
@@ -61,7 +61,8 @@ export async function classifySentiment(
   text: string | null,
   rating: number | null,
 ): Promise<{ sentiment: Sentiment; via: "llm" | "heuristic" }> {
-  const provider = getLlmProvider();
+  // Phase D: one-word classification → "bulk" workload.
+  const provider = getLlmProviderFor("bulk");
   if (provider.isLive) {
     try {
       const prompt =

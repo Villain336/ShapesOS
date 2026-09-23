@@ -21,7 +21,7 @@
 import { prisma } from "@/lib/prisma";
 import type { WorkspaceRole } from "@prisma/client";
 import { roleAtLeast } from "@/lib/authz";
-import { getLlmProvider, llmStatus } from "@/lib/llm";
+import { getLlmProviderFor, llmStatus } from "@/lib/llm";
 import { TOOLS, getTool, toolCatalogForPrompt, type ToolContext, type ToolDef } from "./tools";
 import { getEnabledProjectSkills } from "@/lib/skills/service";
 import { skillManifestSection } from "@/lib/skills/disclosure";
@@ -560,7 +560,8 @@ export async function runAgentTurn(input: AgentTurnInput): Promise<AgentTurnOutp
     false,
     [supplements, attachmentSection].filter(Boolean).join("\n\n"),
   );
-  const llm = getLlmProvider();
+  // Phase D: the chat agent loop runs on the "bulk" workload.
+  const llm = getLlmProviderFor("bulk");
 
   const transcript: Array<{ role: "user" | "assistant"; content: string }> = [
     { role: "user", content: trimmed },

@@ -12,7 +12,7 @@ import { requireProjectRole, forbidden } from "@/lib/authz";
 import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
-import { getLlmProvider, llmStatus } from "@/lib/llm";
+import { getLlmProviderFor, llmStatus } from "@/lib/llm";
 import { ownedProject, readJsonBody } from "@/lib/sitefiles/api";
 import { recordUsage } from "@/lib/usage";
 
@@ -134,7 +134,8 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const llm = getLlmProvider();
+  // Phase D: generated site HTML is client-facing → "copy" workload.
+  const llm = getLlmProviderFor("copy");
   let html: string;
   if (!llm.isLive) {
     html = mockLandingPage(prompt);

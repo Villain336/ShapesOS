@@ -16,7 +16,7 @@ export class MockLlmProvider implements LlmProvider {
     return true;
   }
 
-  async generate(prompt: string): Promise<string> {
+  async generate(prompt: string, _opts?: { maxTokens?: number }): Promise<string> {
     // Pull the target keyword out of the prompt so the sample draft reads
     // plausibly. Everything else is fixed sample copy, clearly labeled.
     const m = prompt.match(/targeting the keyword:\s*"([^"]+)"/i);

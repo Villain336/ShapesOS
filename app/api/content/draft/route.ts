@@ -10,7 +10,11 @@ import { accessibleWorkspaceWhere, requireProjectRole, forbidden } from "@/lib/a
 import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
-import { getLlmProvider, llmStatus } from "@/lib/llm";
+import {
+  getLlmProviderFor,
+  llmStatus,
+  WORKLOAD_MAX_TOKENS,
+} from "@/lib/llm";
 import { buildDraftPrompt } from "@/lib/content/draft";
 import { wordCount, type ContentBrief } from "@/lib/content/brief";
 import { recordUsage } from "@/lib/usage";
@@ -46,12 +50,15 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const llm = getLlmProvider();
+  // Phase D: client-facing draft → "copy" workload (claude-haiku-4-5).
+  const llm = getLlmProviderFor("copy");
   const prompt = buildDraftPrompt(brief);
 
   let draft: string;
   try {
-    draft = await llm.generate(prompt);
+    draft = await llm.generate(prompt, {
+      maxTokens: WORKLOAD_MAX_TOKENS.copy,
+    });
   } catch (err) {
     const message =
       err instanceof Error ? err.message : "Draft generation failed";

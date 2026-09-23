@@ -25,7 +25,7 @@ export class OpenAiCompatibleLlmProvider implements LlmProvider {
     return this.model;
   }
 
-  async generate(prompt: string): Promise<string> {
+  async generate(prompt: string, opts?: { maxTokens?: number }): Promise<string> {
     if (!this.isConfigured()) {
       throw new Error(
         "LLM credentials are not configured. Set LLM_API_KEY (or OPENAI_API_KEY) and LLM_MODEL.",
@@ -42,6 +42,7 @@ export class OpenAiCompatibleLlmProvider implements LlmProvider {
         model: this.model,
         messages: [{ role: "user", content: prompt }],
         temperature: 0.7,
+        ...(opts?.maxTokens ? { max_tokens: opts.maxTokens } : {}),
       }),
     });
 

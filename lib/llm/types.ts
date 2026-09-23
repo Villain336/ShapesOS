@@ -11,6 +11,11 @@ export interface LlmProvider {
   readonly isLive: boolean;
   /** Whether the provider has everything it needs to serve real completions. */
   isConfigured(): boolean;
-  /** Generate a completion for a full prompt. */
-  generate(prompt: string): Promise<string>;
+  /**
+   * Generate a completion for a full prompt.
+   * opts.maxTokens caps output tokens (cost-blowout guard, T4). Adapters
+   * apply their own default when omitted; the router publishes suggested
+   * ceilings per workload (WORKLOAD_MAX_TOKENS).
+   */
+  generate(prompt: string, opts?: { maxTokens?: number }): Promise<string>;
 }

@@ -14,7 +14,7 @@ import { requireProjectRole, forbidden } from "@/lib/authz";
 import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
-import { getLlmProvider, llmStatus } from "@/lib/llm";
+import { getLlmProviderFor, llmStatus } from "@/lib/llm";
 import { sanitizePath } from "@/lib/sitefiles/paths";
 import { ownedConnection, readJsonBody } from "@/lib/sitefiles/api";
 import {
@@ -83,7 +83,8 @@ export async function POST(
       text: (h.text as string).slice(0, 2000),
     }));
 
-  const llm = getLlmProvider();
+  // Phase D: structured file-change proposals → "bulk" workload.
+  const llm = getLlmProviderFor("bulk");
   let parsed: { proposals: Proposal[]; explanation: string };
 
   if (!llm.isLive) {

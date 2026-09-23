@@ -22,7 +22,7 @@ import { visibilityScore, computeAlerts } from "@/lib/rankings";
 import { buildDraftPrompt } from "@/lib/content/draft";
 import { wordCount, type ContentBrief } from "@/lib/content/brief";
 import { inferIntent } from "@/lib/keywords/intent";
-import { getLlmProvider } from "@/lib/llm";
+import { getLlmProviderFor } from "@/lib/llm";
 import { runAudit } from "@/lib/audit/audit";
 import { getSiteIdeProvider, siteIsMock } from "@/lib/connectors/source";
 import { generateReport } from "@/lib/pdf/generate";
@@ -506,7 +506,8 @@ const create_content_draft: ToolDef = {
       sources: [],
       mock: true,
     };
-    const llm = getLlmProvider();
+    // Phase D: tool-generated drafts are client-facing → "copy" workload.
+    const llm = getLlmProviderFor("copy");
     const body = await llm.generate(buildDraftPrompt(brief));
     const words = wordCount(body);
     const keywordId = str(args.keywordId);

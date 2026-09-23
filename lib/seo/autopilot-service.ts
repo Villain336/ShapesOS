@@ -7,7 +7,7 @@
 
 import type { PrismaClient } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { getLlmProvider } from "@/lib/llm";
+import { getLlmProviderFor } from "@/lib/llm";
 import { buildDraftPrompt } from "@/lib/content/draft";
 import {
   capCandidates,
@@ -76,7 +76,8 @@ export type DraftGenerator = (candidate: AutopilotCandidate) => Promise<Generate
 
 /** Default draft generator: M4 content-engine prompt → swappable LLM provider. */
 export const defaultDraftGenerator: DraftGenerator = async (candidate) => {
-  const llm = getLlmProvider();
+  // Phase D: autopilot drafts are client-facing articles → "copy" workload.
+  const llm = getLlmProviderFor("copy");
   const prompt = buildDraftPrompt({
     keyword: candidate.brief,
     intent: "informational",
