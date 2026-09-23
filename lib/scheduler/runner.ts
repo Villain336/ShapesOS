@@ -17,6 +17,7 @@ import {
 import { effectiveConcurrency, DEFAULT_CONCURRENCY } from "./guard";
 import { getOutputStoreAsync, type SchedulerOutputStore } from "./outputStore";
 import { schedulerAudit } from "./audit";
+import { meter } from "@/lib/metering/service";
 
 export interface GrantEnvelope {
   workspaceId: string;
@@ -135,6 +136,55 @@ export async function runWithLimit<T, R>(
 type Db = PrismaClient;
 
 /**
+ * Phase C (W4): record a scheduler charge against the metering ledger.
+ *
+ * Metering never fails a run: a blocked charge (spend cap) or a ledger
+ * error is audit-logged loudly and the run continues — the run row's own
+ * creditsUsed field remains the local record. Idempotency keys are derived
+ * from the run/subagent row IDs, so retried executions never double-charge.
+ */
+async function recordMeterCharge(
+  db: Db,
+  args: {
+    workspaceId: string;
+    projectId: string | null;
+    action: "skill_run_base" | "subagent_spawn";
+    credits: number;
+    idempotencyKey: string;
+    evidenceRef: string;
+    label: string;
+  },
+): Promise<void> {
+  try {
+    const res = await meter({
+      workspaceId: args.workspaceId,
+      projectId: args.projectId,
+      action: args.action,
+      credits: args.credits,
+      idempotencyKey: args.idempotencyKey,
+      evidenceRef: args.evidenceRef,
+    });
+    if (!res.ok) {
+      await schedulerAudit(db, {
+        projectId: args.projectId,
+        workspaceId: args.workspaceId,
+        action: "scheduler_metering_blocked",
+        summary: `Metering blocked for ${args.label}: ${res.message}`,
+        actorUserId: null,
+      });
+    }
+  } catch (err) {
+    await schedulerAudit(db, {
+      projectId: args.projectId,
+      workspaceId: args.workspaceId,
+      action: "scheduler_metering_failed",
+      summary: `Metering failed for ${args.label}: ${err instanceof Error ? err.message : String(err)}`.slice(0, 500),
+      actorUserId: null,
+    });
+  }
+}
+
+/**
  * Execute a skill run: fan out subtasks to subagents under the concurrency cap,
  * enforce the grant envelope, aggregate into one report, write the output,
  * and record credits. Called for scheduled/autopilot runs and for approved
@@ -224,6 +274,16 @@ export async function executeSkillRun(db: Db, runId: string, deps: ExecutorDeps 
         where: { id: sub.id },
         data: { status: "succeeded", finishedAt: new Date(), creditsUsed: credits, result },
       });
+      // Phase C (W4): ledger the spawn fee + this subagent's actions.
+      await recordMeterCharge(db, {
+        workspaceId: run.workspaceId,
+        projectId: run.projectId,
+        action: "subagent_spawn",
+        credits,
+        idempotencyKey: `subagent-run:${sub.id}`,
+        evidenceRef: `subagent-run:${sub.id}`,
+        label: `subagent "${subtask.label}"`,
+      });
       await schedulerAudit(db, {
         projectId: run.projectId,
         workspaceId: run.workspaceId,
@@ -264,6 +324,18 @@ export async function executeSkillRun(db: Db, runId: string, deps: ExecutorDeps 
       summary: `Skill run finished: "${skill.name}" — ${subagentResults.length} subagents, ${creditsUsed} credits, output ${logicalPath}`,
       actorUserId: null,
     });
+    // Phase C (W4): ledger the run-level charge (base + report assembly).
+    // Subagent charges were ledgered inline above; the three meter() calls
+    // sum to exactly creditsUsed.
+    await recordMeterCharge(db, {
+      workspaceId: run.workspaceId,
+      projectId: run.projectId,
+      action: "skill_run_base",
+      credits: SKILL_RUN_BASE_CREDITS + MOCK_ACTION_CREDITS.report_assembly,
+      idempotencyKey: `skill-run:${run.id}`,
+      evidenceRef: `skill-run:${run.id}`,
+      label: `skill run ${run.id.slice(0, 8)}`,
+    });
     if (schedule?.approvalMode === "scheduled") {
       await schedulerAudit(db, {
         projectId: run.projectId,
@@ -285,6 +357,16 @@ export async function executeSkillRun(db: Db, runId: string, deps: ExecutorDeps 
       action: "scheduler_run_failed",
       summary: `Skill run failed: "${skill.name}" — ${message.slice(0, 300)}`,
       actorUserId: null,
+    });
+    // Phase C (W4): a failed run still consumed the base orchestration.
+    await recordMeterCharge(db, {
+      workspaceId: run.workspaceId,
+      projectId: run.projectId,
+      action: "skill_run_base",
+      credits: SKILL_RUN_BASE_CREDITS,
+      idempotencyKey: `skill-run:${run.id}`,
+      evidenceRef: `skill-run:${run.id}`,
+      label: `failed skill run ${run.id.slice(0, 8)}`,
     });
     throw err;
   }

@@ -203,6 +203,15 @@ export const TRIGGERS: TriggerDef[] = [
     dedupAvailable: true,
     live: true, // Phase B (B3): emitted by the connector health checker.
   },
+  {
+    key: "metering_cap_warning",
+    label: "Credit usage warning",
+    description:
+      "Workspace credit usage crossed the spend-cap alert threshold (default 80% of cap). Fires once per billing period.",
+    conditionKeys: [],
+    dedupAvailable: true,
+    live: true, // Phase C (W4): emitted by lib/metering/service.ts.
+  },
 ];
 
 export function triggerDef(key: string): TriggerDef | undefined {

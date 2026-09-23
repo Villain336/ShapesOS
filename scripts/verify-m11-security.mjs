@@ -77,6 +77,7 @@ const AUTHZ_PRIMITIVES = [
   "requireWorkflow", "requireWorkflowProject",  // lib/workflow/http.ts
   "cronGate", "CRON_SECRET",                    // cron service auth (lib/cron/gate.ts)
   "roleAtLeast",                                // inline owner-or-admin checks (lib/authz.ts)
+  "requireMcpAuth",                             // MCP bearer auth (lib/mcp/auth.ts) — tenant from credential
 ];
 // Public by design. Each entry documents WHY — this is a justification list,
 // not a suppression list. Adding an entry requires a code comment in the
@@ -88,6 +89,13 @@ const PUBLIC_BY_DESIGN = {
     "inbound webhook, fail-closed Svix verification (lib/newsletter/webhook-auth.ts)",
   "app/api/workspace/invites/accept/route.ts":
     "signed-in user + single-use invite token bound to claimant email (lib/authz.ts claimInviteToken)",
+  // Phase C (W5): MCP OAuth 2.1 endpoints — capability model, see route comments.
+  "app/api/mcp/oauth/register/route.ts":
+    "DCR open registration per RFC 7591 (no credentials issued); strict pre-auth rate limit + redirect_uri validation",
+  "app/api/mcp/oauth/consent/route.ts":
+    "signed-in user + AES-GCM-sealed grant token minted by the authorize endpoint; the grant is the capability and fixes the scope set",
+  "app/api/mcp/oauth/token/route.ts":
+    "authorization-code exchange; single-use code + PKCE verifier is the capability (standard OAuth 2.1)",
 };
 const uncovered = [];
 for (const f of routeFiles) {
@@ -107,7 +115,7 @@ ok(`all ${routeFiles.length} API route files scanned`, true);
 ok("every mutation route is authorization-gated", uncovered.length === 0, uncovered.join("; "));
 ok(
   "public-by-design allow-list is documented",
-  Object.keys(PUBLIC_BY_DESIGN).length === 3 &&
+  Object.keys(PUBLIC_BY_DESIGN).length === 6 &&
     Object.values(PUBLIC_BY_DESIGN).every(v => v.length > 20)
 );
 

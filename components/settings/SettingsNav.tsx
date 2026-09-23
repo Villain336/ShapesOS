@@ -13,7 +13,9 @@ const LINKS = [
   { href: "/dashboard/settings/security", label: "Security" },
   { href: "/dashboard/settings/notifications", label: "Notifications" },
   { href: "/dashboard/settings/defaults", label: "Defaults" },
+  { href: "/dashboard/settings/api-mcp", label: "API / MCP" },
   { href: "/dashboard/settings/audit", label: "Audit log" },
+  { href: "/dashboard/settings/usage", label: "Usage" },
 ];
 
 export default function SettingsNav() {

@@ -271,9 +271,24 @@ enum FileChangeAction {
   scheduler_run_failed
   scheduler_run_missed
   scheduler_cycle_blocked
+  // Phase C (W4): metering charge blocked by the spend cap, or the ledger
+  // write failed — audit-loud, the run itself continues.
+  scheduler_metering_blocked
+  scheduler_metering_failed
+  // Phase C (W4): admin changed the workspace spend cap / overage opt-in.
+  spend_cap_updated
   event_fired
   subagent_run_started
   subagent_run_finished
+  // Phase C (W5): Marketr as MCP server. Every MCP call — success or denial —
+  // writes a tenant-tagged audit row (source 'mcp' via filePath prefix).
+  mcp_tool_called
+  mcp_tool_denied
+  mcp_key_created
+  mcp_key_revoked
+  mcp_oauth_authorized
+  mcp_oauth_revoked
+  mcp_rpc
 }
 
 enum ProgrammaticPageStatus {
@@ -305,6 +320,10 @@ model Workspace {
   whiteLabelCustomDomain String? @map("white_label_custom_domain")
   whiteLabelBrandColor   String? @map("white_label_brand_color")
 
+  // Phase C (W5): MCP server opt-in. OFF by default — the new attack surface
+  // only exists for workspaces whose admin explicitly enables it.
+  mcpEnabled Boolean @default(false) @map("mcp_enabled")
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -315,6 +334,10 @@ model Workspace {
   members               WorkspaceMember[]
   // Milestone 11: workspace-scoped audit events.
   auditEvents           FileChangeLog[]
+  // Phase C (W4): hosted metering.
+  usageEvents           UsageEvent[]
+  creditBalance         CreditBalance?
+  spendCap              SpendCap?
   // Milestone 12: white-label brand kits and report templates.
   brandKits             BrandKit[]
   reportTemplates       ReportTemplate[]
@@ -387,6 +410,8 @@ model Project {
   keywords                Keyword[]
   // Milestone 19: newsletter lists, templates, and broadcasts.
   newsletterLists         NewsletterList[]
+  // Phase C (W4): usage events attributed to this project (chargeback).
+  usageEvents             UsageEvent[]
   newsletterTemplates     NewsletterTemplate[]
   newsletterBroadcasts    NewsletterBroadcast[]
   // Milestone 20: social channels and posts.
@@ -2902,4 +2927,138 @@ model SubagentRun {
 
   @@index([skillRunId])
   @@map("subagent_runs")
+}
+
+// Phase C (W5): Marketr as MCP server — workspace API keys.
+model McpApiKey {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  userId      String    @map("user_id")
+  name        String
+  // SHA-256 hex of the raw key. Raw key material is NEVER stored.
+  keyHash     String    @unique @map("key_hash")
+  // Public prefix (e.g. "mcpk_a1b2c3") for display/identification only.
+  keyPrefix   String    @map("key_prefix")
+  // Per-tool scopes, e.g. ["tools:list_projects"]. Fixed constants, no wildcards.
+  scopes      String[]  @map("scopes")
+  expiresAt   DateTime? @map("expires_at")
+  lastUsedAt  DateTime? @map("last_used_at")
+  revokedAt   DateTime? @map("revoked_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@index([workspaceId])
+  @@map("mcp_api_keys")
+}
+
+// Phase C (W5): OAuth 2.1 Dynamic Client Registration (RFC 7591) clients.
+model McpOAuthClient {
+  // Opaque public client id (e.g. "mcpc_<random>").
+  clientId     String   @id @map("client_id")
+  // Null until the first consent approval claims the client (public DCR, RFC 7591).
+  userId       String?  @map("user_id")
+  // Bound at authorization time: the token's tenant.
+  workspaceId  String?  @map("workspace_id")
+  clientName   String?  @map("client_name")
+  redirectUris String[] @map("redirect_uris")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@map("mcp_oauth_clients")
+}
+
+// Phase C (W5): single-use authorization codes (OAuth 2.1 code flow + PKCE).
+model McpOAuthCode {
+  code          String   @id
+  clientId      String   @map("client_id")
+  userId        String   @map("user_id")
+  workspaceId   String   @map("workspace_id")
+  redirectUri   String   @map("redirect_uri")
+  scopes        String[]
+  // S256 code challenge (plain verifier never stored).
+  codeChallenge String?  @map("code_challenge")
+  expiresAt     DateTime @map("expires_at")
+  used          Boolean  @default(false)
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@index([clientId])
+  @@map("mcp_oauth_codes")
+}
+
+// Phase C (W5): access tokens (SHA-256 hash stored; raw token never stored).
+model McpOAuthToken {
+  // SHA-256 hex of the raw token.
+  tokenHash   String    @id @map("token_hash")
+  clientId    String    @map("client_id")
+  userId      String    @map("user_id")
+  workspaceId String    @map("workspace_id")
+  scopes      String[]
+  expiresAt   DateTime  @map("expires_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@index([workspaceId])
+  @@map("mcp_oauth_tokens")
+}
+
+// ─── Phase C (W4): hosted metering ───────────────────────────────────────────
+// Immutable usage ledger. Application code only ever CREATES UsageEvent rows
+// (lib/metering/service.ts exposes no update/delete); the migration adds a
+// Postgres trigger that rejects UPDATE/DELETE outright (see
+// lib/metering/THREAT-MODEL-METERING.md T5).
+model UsageEvent {
+  id             String   @id @default(cuid())
+  workspaceId    String   @map("workspace_id")
+  workspace      Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  projectId      String?  @map("project_id")
+  project        Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  // Null = system/scheduler actor.
+  actorId        String?  @map("actor_id")
+  // Key into lib/metering/credits.ts CREDIT_COSTS (versioned, v1).
+  action         String
+  // Integer credits only — 1 credit = $0.01. Never floats.
+  credits        Int
+  // Set server-side at insert; callers cannot supply it.
+  occurredAt     DateTime @default(now()) @map("occurred_at")
+  // Caller-supplied idempotency key; UNIQUE so replays can never double-charge.
+  idempotencyKey String   @unique @map("idempotency_key")
+  // Unverified human pointer for disputes (run id, report path) — see T7.
+  evidenceRef    String?  @map("evidence_ref")
+
+  @@index([workspaceId, occurredAt])
+  @@index([workspaceId, action])
+  @@index([projectId])
+  @@map("usage_events")
+}
+
+// Per-workspace credit pool for the current billing period. Mutated ONLY
+// inside meter()'s locked transaction (check-then-append is atomic) and the
+// locked period-rollover path — see T2/T6.
+model CreditBalance {
+  workspaceId      String   @id @map("workspace_id")
+  workspace        Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  includedCredits  Int      @map("included_credits")
+  purchasedCredits Int      @default(0) @map("purchased_credits")
+  // Null = no purchased credits outstanding.
+  purchasedExpiresAt DateTime? @map("purchased_expires_at")
+  usedCredits      Int      @default(0) @map("used_credits")
+  periodStart      DateTime @map("period_start")
+
+  @@map("credit_balances")
+}
+
+// Spend guard. Default: hard cap ON at 100% of (included + purchased),
+// alert at 80%. Admins may raise the cap or disable the block (opt-in
+// overage); the alert still fires.
+model SpendCap {
+  workspaceId  String   @id @map("workspace_id")
+  workspace    Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  // Effective cap in credits. Defaults to included + purchased; an admin can
+  // set a custom (higher or lower) value.
+  capCredits   Int      @map("cap_credits")
+  blockAtCap   Boolean  @default(true) @map("block_at_cap")
+  // Percent of capCredits at which the warning alert fires (default 80).
+  alertAtPct   Int      @default(80) @map("alert_at_pct")
+  // Once-per-period alert guard: the warning fires only when lastAlertAt is
+  // null or older than the current periodStart.
+  lastAlertAt  DateTime? @map("last_alert_at")
+
+  @@map("spend_caps")
 }
