@@ -94,6 +94,7 @@ export function channelFor(leadSource: string, utm: UtmInput | null | undefined)
     ad: "paid_ads",
     ooh: "ooh",
     direct_mail: "direct_mail",
+    booking: "booking",
     other: "other",
   };
   return SOURCE_CHANNEL[leadSource] ?? "other";

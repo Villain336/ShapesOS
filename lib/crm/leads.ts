@@ -22,6 +22,7 @@ export const LEAD_SOURCES = [
   "ad",
   "ooh",
   "direct_mail",
+  "booking",
   "other",
 ] as const;
 

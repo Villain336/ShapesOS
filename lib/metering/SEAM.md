@@ -55,6 +55,7 @@ ledger as charges:
 |---|---|---|
 | `crm_active_leads` | `lib/crm/meter.ts` | Count of leads not in a closed (won/lost) stage, tenant-scoped by `workspaceId`. Read-only: `getActiveLeadCount(workspaceId)`, `getActiveLeadCountByPipeline(workspaceId)`. Used by the CRM UI (pipeline list counts, status bar) and available for future seat/usage-limit policy. No credit charge is created, by design. |
 | `attribution` (no meter) | `lib/attribution/*` | Revenue attribution (Phase 2, C2) adds **no new usage meter**. Touch logging, report computation, and spend entries are analytics, not billable actions — they never call `meter()` and never appear on the ledger. Attribution quality (multi-touch models, content influence, ROAS) is a **tier/value feature**, not a metered dimension. `AttributionSpend` rows are manual analytics inputs for CPL/CAC/ROAS math — they are not billing charges and must never be confused with `meter()` credit events. |
+| `call_minutes` | `lib/calls/meter.ts` | Whole minutes of tracked call time per workspace, tenant-scoped by `workspaceId`. Read-only: `getCallMinutes(workspaceId)`, `getCallMinutesByNumber(workspaceId)`. Billed per minute started — `ceil(durationSec / 60)` per `completed`/`voicemail` call (the same rule Twilio uses, so pass-through cost reconciles with the provider invoice). Never calls `meter()` and never creates a ledger charge — it is a usage dimension for plan limits and reporting only. |
 
 ### MCP tool calls (sibling track)
 

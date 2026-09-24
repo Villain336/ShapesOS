@@ -341,6 +341,12 @@ model Workspace {
   // Phase 2 (C2): revenue attribution back-relations.
   attributionTouches    AttributionTouch[]
   attributionSpend      AttributionSpend[]
+  // Phase 2 (R5): call tracking & booking back-relations.
+  callNumbers           CallNumber[]
+  calls                 Call[]
+  bookingPages          BookingPage[]
+  bookings              Booking[]
+  reminders             Reminder[]
   // Milestone 11: workspace membership for RBAC (owner/admin/editor/viewer).
   members               WorkspaceMember[]
   // Milestone 11: workspace-scoped audit events.
@@ -3187,6 +3193,7 @@ enum LeadSource {
   ad
   ooh
   direct_mail
+  booking
   other
 }
 
@@ -3267,6 +3274,9 @@ model Lead {
   activities LeadActivity[]
   // Phase 2 (C2): marketing touches attributed to this lead.
   attributionTouches AttributionTouch[]
+  // Phase 2 (R5): tracked calls and bookings linked to this lead.
+  calls             Call[]
+  bookings          Booking[]
 
   @@unique([workspaceId, dedupKey])
   @@index([workspaceId, pipelineId, stage])
@@ -3384,4 +3394,166 @@ model AttributionSpend {
   @@index([workspaceId, channel])
   @@index([workspaceId, periodStart, periodEnd])
   @@map("attr_spend")
+}
+
+// Phase 2 (R5): call tracking & appointment booking.
+//
+// Number provisioning is provider-backed (Twilio in production, a fake
+// telephony provider in tests/dev). The FakeTelephonyProvider is the only
+// one wired today — real Twilio credentials plug into lib/calls/provider.ts
+// without touching these models.
+//
+// Call model notes:
+// - `externalSid` is the provider's call SID (Twilio CallSid / fake SID).
+//   UNIQUE so retried status webhooks collapse to one Call (idempotency).
+// - Inbound calls match/create leads: `leadId` links the caller to the CRM,
+//   and a call-source attribution touch feeds C2.
+// - `status`: in_progress | completed | missed | voicemail | busy | failed.
+model CallNumber {
+  id           String    @id @default(cuid())
+  workspaceId  String    @map("workspace_id")
+  workspace    Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  // E.164 globally unique (a real number can only belong to one account).
+  e164         String    @unique
+  provider     String    @default("fake")
+  providerSid  String?   @map("provider_sid")
+  friendlyName String?   @map("friendly_name")
+  // Campaign/source label this number tracks (DNI resolution key).
+  campaign     String?
+  status       String    @default("active")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  calls Call[]
+
+  @@index([workspaceId, status])
+  @@index([workspaceId, campaign])
+  @@map("call_number")
+}
+
+// A reminder/outreach message queued for a booking. Delivery is provider-
+// backed behind lib/calls/reminders.ts (MailPort); the row is the audit
+// trail: when it was due, when it was sent (or why it was skipped), and
+// whose quiet hours it respected.
+model Reminder {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  bookingId   String    @map("booking_id")
+  booking     Booking   @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  kind        String    // confirmation | reminder_24h | reminder_1h
+  // The channel it was queued for: email (SMS is a future channel).
+  channel     String    @default("email")
+  to          String
+  subject     String
+  body        String    @db.Text
+  // scheduled | sent | skipped_opt_out | failed
+  // (quiet-hour reminders are DEFERRED — dueAt pushed to 08:00 local, row
+  // stays scheduled — never skipped; sendDueReminders enforces this).
+  status      String    @default("scheduled")
+  // The recipient-local time the reminder was due (quiet-hours evaluated in
+  // the booking page's timezone).
+  dueAt       DateTime  @map("due_at")
+  sentAt      DateTime? @map("sent_at")
+  failReason  String?   @map("fail_reason")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@index([workspaceId, status, dueAt])
+  @@index([bookingId])
+  @@map("reminder")
+}
+
+// A tracked phone call. Created by the inbound-voice webhook (in_progress)
+// and finalized by the status callback (completed/missed/…). The status
+// callback also meters call_minutes, matches/creates the lead, and logs
+// the call-source attribution touch (see lib/calls/inbound.ts).
+model Call {
+  id            String      @id @default(cuid())
+  workspaceId   String      @map("workspace_id")
+  workspace     Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  numberId      String      @map("number_id")
+  number        CallNumber  @relation(fields: [numberId], references: [id], onDelete: Cascade)
+  // Provider's call SID (Twilio CallSid / fake SID). UNIQUE = idempotency
+  // for retried status webhooks.
+  externalSid   String      @unique @map("external_sid")
+  from          String
+  to            String
+  direction     String      @default("inbound")
+  status        String      @default("in_progress")
+  startedAt     DateTime    @map("started_at")
+  endedAt       DateTime?   @map("ended_at")
+  durationSec   Int         @default(0) @map("duration_sec")
+  recordingUrl  String?     @map("recording_url")
+  transcription String?     @db.Text
+  summary       String?     @db.Text
+  // Lead the caller matched to (by caller number) or created from the call.
+  leadId        String?     @map("lead_id")
+  lead          Lead?       @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  // The call-source attribution touch (channel "phone", source
+  // "tracking-number") this call produced, if any.
+  touchId       String?     @map("touch_id")
+  createdAt     DateTime    @default(now()) @map("created_at")
+
+  @@index([workspaceId, startedAt])
+  @@index([numberId])
+  @@index([workspaceId, from])
+  @@index([leadId])
+  @@map("call")
+}
+
+// A public, token-gated appointment booking page (same token pattern as
+// LeadCaptureForm: mkbook_<32 hex>, stored as sha256). `settings` carries:
+// durationMin, bufferMin, workingHours {mon..sun: [open,close] in 24h local},
+// timezone (IANA), and reminder offsets.
+model BookingPage {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  slug        String    @unique
+  tokenHash   String    @unique @map("token_hash")
+  title       String
+  description String?   @db.Text
+  enabled     Boolean   @default(true)
+  settings    Json      @default("{}")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  bookings Booking[]
+
+  @@index([workspaceId, enabled])
+  @@map("booking_page")
+}
+
+// One booked appointment on a BookingPage. Bookings create or attach to a
+// Lead (matched by email or phone) and log an attribution touch
+// (channel "booking") so C2 sees them. TCPA posture: `consentGiven` is
+// required at booking time for reminders; `remindersOptedOut` suppresses
+// all future reminder sends; quiet hours are enforced per the page's
+// timezone when reminders are sent.
+model Booking {
+  id               String      @id @default(cuid())
+  workspaceId      String      @map("workspace_id")
+  workspace        Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  pageId           String      @map("page_id")
+  page             BookingPage @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  leadId           String?     @map("lead_id")
+  lead             Lead?       @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  name             String
+  email            String?
+  phone            String?
+  startAt          DateTime    @map("start_at")
+  endAt            DateTime    @map("end_at")
+  status           String      @default("scheduled")
+  consentGiven     Boolean     @default(false) @map("consent_given")
+  remindersOptedOut Boolean    @default(false) @map("reminders_opted_out")
+  remindersSent    Int         @default(0) @map("reminders_sent")
+  notes            String?     @db.Text
+  createdAt        DateTime    @default(now()) @map("created_at")
+
+  reminders Reminder[]
+
+  @@index([workspaceId, startAt])
+  @@index([pageId, startAt])
+  @@index([leadId])
+  @@map("booking")
 }

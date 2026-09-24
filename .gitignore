@@ -50,3 +50,6 @@ scripts/e2e/.e2e-ids.json
 scripts/e2e/report/
 test-results/
 playwright-report/
+
+# Call-tracking verification artifacts (never commit)
+screenshots/

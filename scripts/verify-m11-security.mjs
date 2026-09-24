@@ -102,6 +102,15 @@ const PUBLIC_BY_DESIGN = {
   // Phase 1 (R1): CRM public capture form — capability model, see route comments.
   "app/api/crm/public/forms/[token]/route.ts":
     "public lead-capture endpoint; unguessable token (mkfrm_<32hex>, sha256 at rest) is the capability, scoped to one pipeline; per-token+IP rate limit, honeypot, Zod validation, dedup-checked insert; disabled/missing token 404s",
+  // Phase 2 (R5): call-tracking webhooks + public booking — capability model, see route comments.
+  "app/api/calls/webhooks/twilio/voice/route.ts":
+    "inbound Twilio voice webhook; HMAC-SHA1 verified with TWILIO_AUTH_TOKEN before any parsing/logic (lib/calls/webhooks.ts verifyTwilioSignature); unknown numbers 404, released numbers rejected; provider call SID is the idempotency key",
+  "app/api/calls/webhooks/twilio/status/route.ts":
+    "inbound Twilio status-callback webhook; same HMAC-SHA1 verification as voice; updates are idempotent per provider call SID and never resurrect terminal call states",
+  "app/api/calls/webhooks/twilio/transcription/route.ts":
+    "inbound Twilio transcription-callback webhook; same HMAC-SHA1 verification as voice; transcription text stored on the matched call row only",
+  "app/api/calls/public/booking/[token]/route.ts":
+    "public booking endpoint; unguessable token (mkbook_<32hex>, sha256 at rest) is the capability, scoped to one page; per-page+IP rate limit, Zod validation + body-size cap, explicit TCPA consent required, offered-slot + clash-checked insert; disabled/missing token 404s",
 };
 const uncovered = [];
 for (const f of routeFiles) {
@@ -121,7 +130,7 @@ ok(`all ${routeFiles.length} API route files scanned`, true);
 ok("every mutation route is authorization-gated", uncovered.length === 0, uncovered.join("; "));
 ok(
   "public-by-design allow-list is documented",
-  Object.keys(PUBLIC_BY_DESIGN).length === 8 &&
+  Object.keys(PUBLIC_BY_DESIGN).length === 12 &&
     Object.values(PUBLIC_BY_DESIGN).every(v => v.length > 20)
 );
 
