@@ -3,6 +3,7 @@
 // application/javascript. Embed: <script src="…/api/calls/dni/snippet?workspace=WS"></script>
 
 import { dniSnippetJs } from "@/lib/calls/dni";
+import { publicOrigin } from "@/lib/physical/bundles";
 
 export async function GET(req: Request) {
   const sp = new URL(req.url).searchParams;
@@ -13,7 +14,7 @@ export async function GET(req: Request) {
       headers: { "content-type": "application/javascript" },
     });
   }
-  const origin = new URL(req.url).origin;
+  const origin = publicOrigin(req);
   return new Response(dniSnippetJs(workspaceId, origin), {
     status: 200,
     headers: {

@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { getOrCreateWorkspace, requireUser } from "@/lib/session";
 import { requireWorkspaceRole, forbidden } from "@/lib/authz";
 import { getProvider } from "@/lib/calls/provider";
+import { publicOrigin } from "@/lib/physical/bundles";
 
 const PurchaseSchema = z.object({
   areaCode: z.string().trim().max(10).optional(),
@@ -50,7 +51,7 @@ export async function POST(req: Request) {
     return Response.json({ error: e instanceof Error ? e.message : "Provider unconfigured" }, { status: 500 });
   }
 
-  const origin = new URL(req.url).origin;
+  const origin = publicOrigin(req);
   let purchased;
   try {
     purchased = await provider.purchaseNumber({

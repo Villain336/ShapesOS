@@ -158,7 +158,7 @@ export function BundlesSection() {
       ) : (
         <div className="grid gap-4 md:grid-cols-2">
           {bundles.map((b) => (
-            <div key={b.id} className="rounded-[10px] border border-stone-200 p-4">
+            <div key={b.id} className="min-w-0 rounded-[10px] border border-stone-200 p-4">
               <div className="mb-3 flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">

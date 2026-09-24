@@ -11,6 +11,7 @@ import {
   createBundle,
   listBundles,
   bundleStats,
+  publicOrigin,
 } from "@/lib/physical/bundles";
 import { qrPngDataUrl } from "@/lib/physical/qr";
 
@@ -30,7 +31,7 @@ export async function GET(req: Request) {
   if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
   const workspace = await getOrCreateWorkspace(user.id, user.email);
 
-  const origin = new URL(req.url).origin;
+  const origin = publicOrigin(req);
   const bundles = await listBundles(workspace.id);
   const withStats = await Promise.all(
     bundles.map(async (b) => ({
@@ -61,7 +62,7 @@ export async function POST(req: Request) {
 
   try {
     const bundle = await createBundle({ workspaceId: workspace.id, ...d });
-    const origin = new URL(req.url).origin;
+    const origin = publicOrigin(req);
     return Response.json(
       {
         bundle: {

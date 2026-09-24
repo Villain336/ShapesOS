@@ -256,6 +256,20 @@ export function vanityUrlFor(bundle: { vanitySlug: string }, origin: string): st
 }
 
 // ---------------------------------------------------------------------------
+// Public origin for customer-facing links (vanity URLs baked into QR codes,
+// DNI snippets). The standalone server does not trust the Host header
+// (trustHostHeader: false), so the request URL carries the bind address
+// (e.g. http://0.0.0.0:3000) — useless on a printed mailer. An explicit
+// APP_PUBLIC_URL always wins; otherwise fall back to the request origin.
+// ---------------------------------------------------------------------------
+
+export function publicOrigin(req: Request): string {
+  const configured = (process.env.APP_PUBLIC_URL ?? "").trim().replace(/\/$/, "");
+  if (configured) return configured;
+  return new URL(req.url).origin;
+}
+
+// ---------------------------------------------------------------------------
 // Vanity-URL redirect (public). The slug is the capability.
 // ---------------------------------------------------------------------------
 

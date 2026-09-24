@@ -3,7 +3,7 @@
 // as a downloadable file. Content is the vanity URL.
 
 import { getOrCreateWorkspace, requireUser } from "@/lib/session";
-import { getBundle, vanityUrlFor } from "@/lib/physical/bundles";
+import { getBundle, vanityUrlFor, publicOrigin } from "@/lib/physical/bundles";
 import { qrPngDataUrl, qrSvgString } from "@/lib/physical/qr";
 
 export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }) {
@@ -15,7 +15,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
   const bundle = await getBundle(workspace.id, id);
   if (!bundle) return Response.json({ error: "Not found" }, { status: 404 });
 
-  const origin = new URL(req.url).origin;
+  const origin = publicOrigin(req);
   const vanityUrl = vanityUrlFor(bundle, origin);
   const format = new URL(req.url).searchParams.get("format") ?? "png";
   const filename = `${bundle.vanitySlug}-qr`;

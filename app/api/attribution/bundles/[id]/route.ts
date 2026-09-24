@@ -6,7 +6,7 @@
 import { z } from "zod";
 import { getOrCreateWorkspace, requireUser } from "@/lib/session";
 import { requireWorkspaceRole, forbidden } from "@/lib/authz";
-import { setBundleStatus, regenerateQrStyle, vanityUrlFor } from "@/lib/physical/bundles";
+import { setBundleStatus, regenerateQrStyle, vanityUrlFor, publicOrigin } from "@/lib/physical/bundles";
 import { qrPngDataUrl } from "@/lib/physical/qr";
 
 const PatchSchema = z.object({
@@ -34,7 +34,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     const bundle = parsed.data.regenerateQr
       ? await regenerateQrStyle(workspace.id, id)
       : await setBundleStatus(workspace.id, id, parsed.data.status!);
-    const origin = new URL(req.url).origin;
+    const origin = publicOrigin(req);
     const vanityUrl = vanityUrlFor(bundle, origin);
     return Response.json({ bundle: { ...bundle, vanityUrl, qrPreview: await qrPngDataUrl(vanityUrl, bundle.qrStyle) } });
   } catch (e) {
