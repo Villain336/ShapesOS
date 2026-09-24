@@ -79,6 +79,7 @@ const AUTHZ_PRIMITIVES = [
   "cronGate", "CRON_SECRET",                    // cron service auth (lib/cron/gate.ts)
   "roleAtLeast",                                // inline owner-or-admin checks (lib/authz.ts)
   "requireMcpAuth",                             // MCP bearer auth (lib/mcp/auth.ts) — tenant from credential
+  "guardWorkspace",                              // lib/enrichment/guard.ts R6 helper — requireUser + requireWorkspaceRole(editor) for mutations
 ];
 // Public by design. Each entry documents WHY — this is a justification list,
 // not a suppression list. Adding an entry requires a code comment in the
@@ -120,6 +121,14 @@ const PUBLIC_BY_DESIGN = {
     "public promo redemption; 30-bit random code (WAVE-<6>, globally unique) is the capability, scoped to its bundle's workspace; per-code+IP rate limit (10/min), Zod validation + body-size cap, email-or-phone required; invalid/disabled code 404s with no oracle; redemption unique per (bundle,lead)",
   "app/r/[slug]/route.ts":
     "public vanity-URL redirect; 40-bit random slug (globally unique, findUnique resolution) is the capability; anonymous scan logged per (bundle,ip,day) via unique constraint (P2002 collapse), disabled bundle 410s, unknown slug 404s; qr_code touch only for identified (?lead=) scanners",
+  // Phase 3 (R3): messaging webhook + unsubscribe — capability model, see route comments.
+  "app/api/messaging/inbound/sms/route.ts":
+    "inbound Twilio SMS webhook; HMAC-SHA1 verified with TWILIO_AUTH_TOKEN before any parsing/logic (provider.validateWebhookSignature); invalid signature 401s; STOP/HELP/START only mutate consent state, no PII returned",
+  "app/api/messaging/unsubscribe/route.ts":
+    "public one-click unsubscribe; HMAC-signed token (workspaceId+messageId+leadId) is the capability; invalid/expired token 404s; only sets opt_out, never returns data",
+  // Phase 3 (R4): review QR completion — capability model, see route comments.
+  "app/api/review-requests/by-token/[token]/complete/route.ts":
+    "public QR-landing completion; unlisted random review-request token is the capability (mirrors /r/[slug] vanity model); per-token+IP rate limit; only flips viewed→completed, expired links 410",
 };
 const uncovered = [];
 for (const f of routeFiles) {
@@ -143,7 +152,7 @@ const missingAllowList = Object.keys(PUBLIC_BY_DESIGN).filter(k => {
 ok("every public-by-design entry maps to a real route file", missingAllowList.length === 0, missingAllowList.join("; "));
 ok(
   "public-by-design allow-list is documented",
-  Object.keys(PUBLIC_BY_DESIGN).length === 14 &&
+  Object.keys(PUBLIC_BY_DESIGN).length === 17 &&
     Object.values(PUBLIC_BY_DESIGN).every(v => v.length > 20)
 );
 

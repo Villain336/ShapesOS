@@ -24,6 +24,7 @@ import {
   TrendUp,
   Users,
   Kanban,
+  Star,
   type Icon as PhosphorIcon,
 } from "@phosphor-icons/react";import { cn } from "@/lib/utils";
 import GlideMenu from "@/components/vault/primitives/GlideMenu";
@@ -53,6 +54,7 @@ const NAV_SECTIONS: {
       { href: "/dashboard/assistant", label: "Marketr", icon: TrendUp },
       { href: "/dashboard/crm", label: "CRM", icon: Kanban },
       { href: "/dashboard/attribution", label: "Attribution", icon: ChartLineUp },
+      { href: "/dashboard/reviews", label: "Reviews", icon: Star },
       { href: "/dashboard/calls", label: "Calls", icon: Phone },
       { href: "/dashboard/reports", label: "Reports", icon: ChartBar },
       { href: "/dashboard/files", label: "Files", icon: FolderSimple },

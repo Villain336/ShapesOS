@@ -412,6 +412,19 @@ model Workspace {
   // Hosted Stripe track: overage invoicing state + invoice history.
   billingWorkspace      BillingWorkspace?
   billingOverageInvoices BillingOverageInvoice[]
+  // Phase 3 (R3): acquisition-loop messaging back-relations.
+  contactConsents    ContactConsent[]
+  outboundMessages   OutboundMessage[]
+  approvalItems      ApprovalItem[]
+  nurtureSequences   NurtureSequence[]
+  sequenceEnrollments SequenceEnrollment[]
+  // Phase 3 (R4): review engine back-relations.
+  reviewRequests     ReviewRequest[]
+  reviewSiteConfigs  ReviewSiteConfig[]
+  // Phase 3 (R6): prospecting & enrichment back-relations.
+  prospectLists      ProspectList[]
+  prospects          Prospect[]
+  enrichmentLookups  EnrichmentLookup[]
 
   @@map("workspaces")
 }
@@ -3279,6 +3292,12 @@ model Lead {
   // Phase 2 (R5): tracked calls and bookings linked to this lead.
   calls             Call[]
   bookings          Booking[]
+  // Phase 3: consent, messaging, sequences, review requests, prospect conversion.
+  consents            ContactConsent[]
+  outboundMessages    OutboundMessage[]
+  sequenceEnrollments SequenceEnrollment[]
+  reviewRequests      ReviewRequest[]
+  convertedProspects  Prospect[]
 
   @@unique([workspaceId, dedupKey])
   @@index([workspaceId, pipelineId, stage])
@@ -3650,4 +3669,243 @@ model BundleRedemption {
   @@unique([bundleId, leadId])
   @@index([bundleId])
   @@map("bundle_redemption")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 3 — acquisition loop (R3 nurture, R4 review engine, R6 prospecting).
+// All tables are workspace-scoped. Channel values: "sms" | "email" | "voice".
+// ─────────────────────────────────────────────────────────────────────────────
+
+// R3: per-contact per-channel consent state machine (TCPA / CAN-SPAM).
+// status: "unknown" | "pending" | "opted_in" | "opted_out".
+// source: "form" | "import" | "manual" | "api" | "booking" | "inbound_sms".
+model ContactConsent {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  leadId      String    @map("lead_id")
+  lead        Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  channel     String
+  status      String    @default("unknown")
+  source      String?
+  consentedAt DateTime? @map("consented_at")
+  optedOutAt  DateTime? @map("opted_out_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@unique([workspaceId, leadId, channel])
+  @@index([workspaceId, channel, status])
+  @@map("contact_consent")
+}
+
+// R3: the send ledger — every outbound (and inbound) customer message.
+// kind: "sequence" | "speed_to_lead" | "missed_call_textback" |
+//       "review_request" | "broadcast" | "manual".
+// status: "queued" | "sent" | "delivered" | "failed" | "suppressed".
+// suppressionReason: "opt_out" | "no_consent" | "quiet_hours" | "cap" |
+//                    "invalid_contact" | "duplicate".
+// provider: "fake" | "twilio" | "resend".
+model OutboundMessage {
+  id                String     @id @default(cuid())
+  workspaceId       String     @map("workspace_id")
+  workspace         Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  leadId            String?    @map("lead_id")
+  lead              Lead?      @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  channel           String
+  direction         String     @default("outbound")
+  kind              String
+  subject           String?
+  body              String
+  status            String     @default("queued")
+  suppressionReason String?    @map("suppression_reason")
+  provider          String     @default("fake")
+  providerSid       String?    @map("provider_sid")
+  scheduledFor      DateTime?  @map("scheduled_for")
+  sentAt            DateTime?  @map("sent_at")
+  deliveredAt       DateTime?  @map("delivered_at")
+  error             String?
+  costCents         Int        @default(0) @map("cost_cents")
+  // ApprovalItem id that authorized this send (C3 ladder).
+  approvalId        String?    @map("approval_id")
+  createdAt         DateTime   @default(now()) @map("created_at")
+
+  @@index([workspaceId, leadId, createdAt])
+  @@index([workspaceId, status, scheduledFor])
+  @@map("outbound_message")
+}
+
+// R3/C3: human approval queue for outbound sends and AI-drafted copy.
+// kind: "sequence_send" | "review_response" | "broadcast" | "prospect_export".
+// status: "pending" | "approved" | "rejected" | "expired".
+model ApprovalItem {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  kind        String
+  // Payload awaiting approval: rendered message, target lead, channel…
+  payload     Json
+  status      String    @default("pending")
+  requestedBy String?   @map("requested_by")
+  decidedBy   String?   @map("decided_by")
+  decidedAt   DateTime? @map("decided_at")
+  note        String?
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@index([workspaceId, status, createdAt])
+  @@map("approval_item")
+}
+
+// R3: nurture sequences. steps: [{ channel, delayMinutes, template, subject? }].
+// status: "draft" | "active" | "paused" | "archived".
+// approvalPolicy: "manual" — Phase 3 ships manual-only (every send approved).
+model NurtureSequence {
+  id             String   @id @default(cuid())
+  workspaceId    String   @map("workspace_id")
+  workspace      Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name           String
+  description    String?
+  steps          Json     @default("[]")
+  status         String   @default("draft")
+  approvalPolicy String   @default("manual") @map("approval_policy")
+  dailyCap       Int?     @map("daily_cap")
+  createdBy      String?  @map("created_by")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  enrollments SequenceEnrollment[]
+
+  @@index([workspaceId, status])
+  @@map("nurture_sequence")
+}
+
+// R3: lead enrollment in a sequence.
+// status: "active" | "paused" | "completed" | "unenrolled" | "bounced".
+model SequenceEnrollment {
+  id          String          @id @default(cuid())
+  workspaceId String          @map("workspace_id")
+  workspace   Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  sequenceId  String          @map("sequence_id")
+  sequence    NurtureSequence @relation(fields: [sequenceId], references: [id], onDelete: Cascade)
+  leadId      String          @map("lead_id")
+  lead        Lead            @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  status      String          @default("active")
+  currentStep Int             @default(0) @map("current_step")
+  nextRunAt   DateTime?       @map("next_run_at")
+  completedAt DateTime?       @map("completed_at")
+  createdAt   DateTime        @default(now()) @map("created_at")
+  updatedAt   DateTime        @updatedAt @map("updated_at")
+
+  @@unique([sequenceId, leadId])
+  @@index([workspaceId, status, nextRunAt])
+  @@map("sequence_enrollment")
+}
+
+// R4: review requests. token powers the public QR landing page /r/review/<token>.
+// status: "sent" | "viewed" | "completed" | "expired".
+model ReviewRequest {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  leadId      String    @map("lead_id")
+  lead        Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  token       String    @unique
+  channel     String
+  status      String    @default("sent")
+  reviewUrl   String?   @map("review_url")
+  messageId   String?   @map("message_id")
+  sentAt      DateTime  @default(now()) @map("sent_at")
+  viewedAt    DateTime? @map("viewed_at")
+  completedAt DateTime? @map("completed_at")
+  expiresAt   DateTime? @map("expires_at")
+
+  @@index([workspaceId, status])
+  @@map("review_request")
+}
+
+// R4: per-workspace review-site configuration. site: "google" | "facebook" |
+// "yelp" | "custom".
+model ReviewSiteConfig {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  site        String    @default("google")
+  reviewUrl   String    @map("review_url")
+  delayDays   Int       @default(1) @map("delay_days")
+  enabled     Boolean   @default(true)
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@unique([workspaceId, site])
+  @@map("review_site_config")
+}
+
+// R6: prospect lists with ICP definition.
+// icp: { industries[], employeeRange, geo, techSignals[], titles[] }.
+// status: "draft" | "building" | "ready" | "archived".
+model ProspectList {
+  id          String     @id @default(cuid())
+  workspaceId String     @map("workspace_id")
+  workspace   Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name        String
+  icp         Json       @default("{}")
+  status      String     @default("draft")
+  createdBy   String?    @map("created_by")
+  createdAt   DateTime   @default(now()) @map("created_at")
+  updatedAt   DateTime   @updatedAt @map("updated_at")
+
+  prospects Prospect[]
+
+  @@index([workspaceId, status])
+  @@map("prospect_list")
+}
+
+// R6: enriched prospects. status: "new" | "enriching" | "enriched" | "failed" |
+// "in_sequence" | "converted". research: AI icebreakers/first lines/summary.
+model Prospect {
+  id             String        @id @default(cuid())
+  workspaceId    String        @map("workspace_id")
+  workspace      Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  listId         String        @map("list_id")
+  list           ProspectList  @relation(fields: [listId], references: [id], onDelete: Cascade)
+  company        String?
+  name           String?
+  email          String?
+  phone          String?
+  title          String?
+  website        String?
+  enrichmentData Json?         @map("enrichment_data")
+  research       Json?
+  status         String        @default("new")
+  score          Int           @default(0)
+  leadId         String?       @map("lead_id")
+  lead           Lead?         @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  dedupKey       String?       @map("dedup_key")
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
+
+  lookups EnrichmentLookup[]
+
+  @@unique([workspaceId, dedupKey])
+  @@index([listId, status])
+  @@map("prospect")
+}
+
+// R6: waterfall lookup audit trail + cost accounting.
+model EnrichmentLookup {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  prospectId  String    @map("prospect_id")
+  prospect    Prospect  @relation(fields: [prospectId], references: [id], onDelete: Cascade)
+  provider    String
+  // "hit" | "miss" | "error" | "skipped"
+  status      String
+  costCents   Int       @default(0) @map("cost_cents")
+  result      Json?
+  error       String?
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@index([prospectId, createdAt])
+  @@index([workspaceId, createdAt])
+  @@map("enrichment_lookup")
 }

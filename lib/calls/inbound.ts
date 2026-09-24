@@ -7,6 +7,10 @@
 //   3. logs a call-source attribution touch (channel "phone", source
 //      "tracking-number") so C2 picks the call up,
 //   4. writes a call activity to the lead timeline.
+//   5. (best-effort) queues a missed-call text-back when the caller matches
+//      a lead with SMS opt-in — lib/messaging/dispatcher.ts
+//      queueMissedCallTextback. Under the manual-only approval policy the
+//      text-back stays queued behind a pending ApprovalItem.
 //
 // call_minutes is a *usage dimension* (lib/calls/meter.ts) — read-only
 // reporting like crm_active_leads, never a meter() credit charge.
@@ -222,6 +226,19 @@ export async function handleCallStatus(input: CallStatusInput): Promise<CallStat
       touchId: touch?.id ?? null,
     },
   });
+
+  // 5. Missed-call text-back (best-effort): only fires when the caller
+  // matches a lead with explicit SMS opt-in. A messaging failure must never
+  // break call finalization. Dynamic import keeps the module graph acyclic
+  // (lib/messaging/consent.ts imports normalizePhone from this module).
+  if (status === "missed" && leadId) {
+    try {
+      const { queueMissedCallTextback } = await import("@/lib/messaging/dispatcher");
+      await queueMissedCallTextback({ workspaceId: call.workspaceId, leadId });
+    } catch {
+      // best-effort — the call row is already finalized above
+    }
+  }
 
   return { ok: true, callId: call.id, leadId, touchId: touch?.id ?? undefined, minutesBilled };
 }

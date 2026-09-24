@@ -11,7 +11,7 @@
 // source of truth for that row.
 
 /** Credit table version. Bump when costs change; history is immutable. */
-export const CREDIT_TABLE_VERSION = 1;
+export const CREDIT_TABLE_VERSION = 2;
 
 /** 1 credit = $0.01. */
 export const CREDITS_PER_DOLLAR = 100;
@@ -64,6 +64,18 @@ export const CREDIT_COSTS = {
   connector_sync: { credits: 0, basis: "free", description: "Connector sync (free)" },
   /** Per GB-month beyond the included storage quota. */
   storage_over_quota: { credits: 1, basis: "value", description: "Storage over quota: per GB-month" },
+
+  // ── R6 prospecting & enrichment (added 2026-09-24) ──
+  /** 1 enrichment provider lookup attempt in the waterfall (cost-plus ~4x of a ~$0.005 blended vendor cost). */
+  enrichment_lookup: { credits: 2, basis: "cost-plus", description: "Enrichment lookup: 1 provider attempt" },
+  /** AI research pass per prospect: summary + icebreakers + first lines (value-priced). */
+  prospect_research: { credits: 5, basis: "value", description: "Prospect AI research: summary + icebreakers + first lines" },
+
+  // ── R3 messaging (added 2026-09-24; 1 credit = $0.01) ──
+  /** One outbound SMS segment (R3 messaging core). Raw vendor ~1¢ → 4cr. */
+  sms_send: { credits: 4, basis: "cost-plus", description: "Outbound SMS: 1 segment (R3 messaging)" },
+  /** One outbound email (R3 messaging core). Raw vendor ~0.1¢ → 1cr floor. */
+  email_send: { credits: 1, basis: "cost-plus", description: "Outbound email: 1 message (R3 messaging)" },
 } as const satisfies Record<string, CreditCostDef>;
 
 /** Action keys meter() accepts. */

@@ -9,6 +9,7 @@ import { getOrCreateWorkspace, requireUser } from "@/lib/session";
 import { requireWorkspaceRole, forbidden } from "@/lib/authz";
 import { createLeadRecord, LEAD_SOURCES, UtmSchema } from "@/lib/crm/leads";
 import { applyPromoCodeToLead } from "@/lib/physical/bundles";
+import { triggerSpeedToLead } from "@/lib/messaging/speed-to-lead";
 
 const CreateSchema = z.object({
   pipelineId: z.string().min(1).max(64),
@@ -181,6 +182,13 @@ export async function POST(req: Request) {
   if (d.promoCode) {
     const bundle = await applyPromoCodeToLead(workspace.id, result.lead.id, d.promoCode);
     promoApplied = bundle?.campaignName ?? null;
+  }
+  // R3: best-effort speed-to-lead touch on the fastest consented channel.
+  // Never breaks lead creation — consent-gated inside; failure is silent.
+  try {
+    await triggerSpeedToLead(workspace.id, result.lead.id);
+  } catch {
+    /* speed-to-lead is best-effort */
   }
   return Response.json({ lead: result.lead, promoApplied }, { status: 201 });
 }

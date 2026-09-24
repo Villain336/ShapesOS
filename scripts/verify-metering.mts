@@ -63,20 +63,21 @@ async function makeWorkspace(plan: "starter" | "pro" | "agency" | "self_hosted" 
 
 console.log("metering battery");
 
-// ── 1. credit table v1 matches spec Appendix A ───────────────────────────────
+// ── 1. credit table v2 matches spec Appendix A + Phase 3 additions ──────────
 {
-  check("table version is 1", credits.CREDIT_TABLE_VERSION === 1);
+  check("table version is 2", credits.CREDIT_TABLE_VERSION === 2);
   const expected: Record<string, number> = {
     rank_check: 1, serp_analysis: 1, keyword_research: 40, keyword_ideas: 50,
     keyword_gap: 50, site_audit: 30, backlink_summary: 10, content_brief: 5,
     ai_article: 15, content_refresh: 10, skill_run_base: 5, subagent_spawn: 2,
     mcp_tool_call: 0, publish: 0, connector_sync: 0, storage_over_quota: 1,
+    enrichment_lookup: 2, prospect_research: 5, sms_send: 4, email_send: 1,
   };
   let allOk = true;
   for (const [action, want] of Object.entries(expected)) {
     if (credits.creditsFor(action) !== want) { allOk = false; break; }
   }
-  check("16 Appendix-A costs exact", allOk);
+  check("20 Appendix-A + Phase 3 costs exact", allOk);
   check("mcp_tool_call is passthrough basis", (credits.CREDIT_COSTS as any).mcp_tool_call.basis === "passthrough");
   let threw = false;
   try { credits.creditsFor("nope_not_real"); } catch { threw = true; }
