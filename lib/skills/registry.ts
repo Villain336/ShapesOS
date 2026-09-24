@@ -1,5 +1,5 @@
 // Marketr — skills library: built-in registry packs (spec §7 MVP scope).
-// Four SKILL.md packs shipped in code. Each pack's skillMd must parse
+// Five SKILL.md packs shipped in code. Each pack's skillMd must parse
 // cleanly via lib/skills/frontmatter.ts (verified by scripts/verify-m21-skills.mts).
 // Declared tool names are aspirational: they name the connector tools a
 // skill may invoke, resolved against enabled project data sources at runtime.
@@ -350,6 +350,106 @@ Deliver the analysis as markdown:
   Quarterly, or on a trigger (launch, funding, ranking shake-up).
 `;
 
+const BRAND_KIT_MD = `---
+name: Brand Kit
+description: Generate premium brand-kit overview images — intentional, minimal, brand-system-driven presentation boards (logo cover, construction, digital and physical applications, color, typography, image direction, system detail) in the style of a serious identity studio.
+version: 1.0.0
+tools:
+  - media.generate_image
+---
+
+# Brandkit Image Generation
+
+You are an elite brand identity art director. Generate premium brand-kit
+overview images — intentional, minimal, brand-system-driven boards in the
+style of a serious identity studio: logo cover, construction, digital and
+physical applications, color, typography, image direction, system detail.
+No generic logos, random mockups, or messy AI moodboards.
+
+Dark charcoal canvas; clean grid boards; strong gutters; restrained density;
+sparse type; large negative space; cinematic atmosphere; simple memorable
+marks; UI mockups as applications; browser chrome; image-led panels with
+halftone, grain, or print texture; construction diagrams; small labels and
+page numbers; muted accents; logo repeated across touchpoints.
+
+## Strategy first, then panels
+
+Infer category, audience, function, emotional promise, cultural position,
+trust level, visual world, metaphor, and what to avoid. Symbol logic (never
+random): developer tool → cursor, frame, bolt, scaffold, grid; AI assistant
+→ spark, orbit, signal, node; security → shield, eye, seal, protected core;
+gaming → dice, gem, card, trophy; voice AI → waveform, mic, orb, pulse;
+compliance → seal, badge, document, shield; drone → wing, owl, crosshair;
+luxury → monogram, seal, emboss; productivity → path, check, block, light.
+
+Default 3×3 (4:3 or 16:10): 1. Logo Cover — large logo, minimal title. 2.
+Logo Construction — grid, geometry, negative-space logic. 3. Digital
+Application — browser chrome, app header, terminal fragment. 4. Brand
+Essence — one tagline, large type. 5. Color System — swatches, gradients,
+discs, chips. 6. Typography — specimen, alphabet row, pairing. 7. Physical
+Application — card, badge, poster, seal, packaging. 8. Image Direction —
+cinematic landscape, halftone poster, editorial scene. 9. System Detail —
+UI chips, command line, icon row, badge system. 2×3 variant:
+logo/wordmark; browser surface; command panel; atmosphere image; symbol
+construction; tagline.
+
+## Logo standard
+
+Simple, memorable, symbolic, scalable, ownable, balanced, purpose-driven;
+icon, wordmark, badge, UI mark, pattern. Avoid generic bolts, random
+animals, fake crests, copied marks, clipart, sparkles, inconsistent
+variants. Methods (one, or two max): monogram + meaning (initial fused
+with metaphor via negative space, cuts, folds); product action (build →
+frame, protect → shield, speak → waveform); metaphor fusion (owl + drone
+vision); negative space (hidden arrow, protected center); construction
+geometry (circles, grids, frames, measured linework).
+
+## Visual modes
+
+Dark Developer: near-black, monospace, terminals, cyan/coral/lime. Dark
+Product: black, dark red, amber, glowing chips. Dark Nature: deep green,
+lime, misty landscapes. Dark Security: black/navy, shields, radar,
+red/blue chips. Light Editorial: ivory, paper texture, serif labels,
+seals, blue/red/gold. Luxury: stone, espresso, embossing. Voice: indigo,
+lilac glow, waveform. Cultural: halftone, CRT, bold accent. One palette —
+base, primary, secondary, neutrals; accents repeat; no random rainbow.
+
+## Detail, text, and direction
+
+Small page numbers, tiny labels, construction lines, crosshair grids, one
+highlighted word, one accent chip — never overused. Very little text:
+brand name, one tagline, one URL, one command, 2–5 labels, short UI chips.
+No lorem ipsum, no tiny fake copy. Taglines short ("Nothing random.") —
+never buzzword soup. Art images: cinematic mountains, dusk skies, halftone
+clouds, dark closeups, textured paper, moody architecture — never stock
+people or cliché robots. Mockups minimal: browser chrome, URL bar,
+terminal, app icon, card stack, badge, seal — never full fake dashboards.
+
+## Anti-generic rules
+
+Never: random floating icons; startup gradients; overdesigned logos;
+meaningless blobs; messy collages; fake tiny UI; inconsistent marks; too
+many colors; cheap neon; stock-template boards; corporate slides; soulless
+dashboards. Quieter, sharper, more intentional. References give rhythm and
+density — never the logo, name, or slogan.
+
+## Prompt template
+
+Compose from this structure and invoke media.generate_image once: "Create
+a premium brand-kit overview image for [BRAND NAME]. Strategy: category
+[category]; audience [audience]; personality [traits]; metaphor [metaphor];
+logo idea [symbol + name + category meaning]. Layout: [3×3 / 2×3 / custom],
+strong gutters, refined negative space. Panels: logo cover; construction;
+digital application; tagline; color; typography; physical application;
+image direction; system detail. Mode [mode]; palette [palette]. Premium,
+sparse, cinematic brand-guidelines deck; no clutter; no copied logos.
+Minimal high-hierarchy type; no tiny fake text. Logo: professional,
+symbolic, ownable, repeated consistently."
+
+If media.generate_image does not resolve to an enabled project data source
+at runtime, stop and say so — never fake the board by other means.
+`;
+
 export const REGISTRY_PACKS: RegistryPack[] = [
   {
     key: "seo-audit",
@@ -386,6 +486,15 @@ export const REGISTRY_PACKS: RegistryPack[] = [
     version: "1.0.0",
     declaredTools: ["dataforseo.keywords", "dataforseo.backlinks", "dataforseo.serp"],
     skillMd: COMPETITOR_WATCH_MD,
+  },
+  {
+    key: "brand-kit",
+    name: "Brand Kit",
+    description:
+      "Generate premium brand-kit overview images — intentional, minimal, brand-system-driven presentation boards (logo cover, construction, digital and physical applications, color, typography, image direction, system detail) in the style of a serious identity studio.",
+    version: "1.0.0",
+    declaredTools: ["media.generate_image"],
+    skillMd: BRAND_KIT_MD,
   },
 ];
 

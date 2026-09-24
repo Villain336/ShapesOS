@@ -304,11 +304,11 @@ Some guidance here.
 }
 
 // ============================================================== registry ===
-check("registry has 4 packs", REGISTRY_PACKS.length === 4);
+check("registry has 5 packs", REGISTRY_PACKS.length === 5);
 check(
   "registry keys",
   JSON.stringify(REGISTRY_PACKS.map((p) => p.key)) ===
-    JSON.stringify(["seo-audit", "content-brief", "rank-report", "competitor-watch"]),
+    JSON.stringify(["seo-audit", "content-brief", "rank-report", "competitor-watch", "brand-kit"]),
 );
 for (const pack of REGISTRY_PACKS) {
   const r = parseSkillMd(pack.skillMd);
@@ -327,13 +327,34 @@ for (const pack of REGISTRY_PACKS) {
 }
 {
   const meta = listRegistryPacks();
-  check("listRegistryPacks has 4", meta.length === 4);
+  check("listRegistryPacks has 5", meta.length === 5);
   check(
     "listRegistryPacks hides bodies",
     meta.every((m) => !("skillMd" in m)),
   );
   check("getRegistryPack finds seo-audit", getRegistryPack("seo-audit")?.name === "SEO Audit");
   check("getRegistryPack unknown → undefined", getRegistryPack("nope") === undefined);
+}
+{
+  // --- brand-kit canonical pack assertion ---
+  const pack = getRegistryPack("brand-kit");
+  check("brand-kit key present in registry", pack !== undefined);
+  check("brand-kit display name", pack?.name === "Brand Kit");
+  check("brand-kit version 1.0.0", pack?.version === "1.0.0");
+  if (pack) {
+    const r = parseSkillMd(pack.skillMd);
+    check("brand-kit frontmatter parses", r.ok === true, r.ok ? "" : (r as { errors: string[] }).errors.join("; "));
+    if (r.ok) {
+      check(
+        "brand-kit declares media.generate_image",
+        (r.value.manifest.declaredTools ?? []).includes("media.generate_image"),
+      );
+      check(
+        "brand-kit skillMd contains the PROMPT TEMPLATE section",
+        /prompt template/i.test(r.value.body),
+      );
+    }
+  }
 }
 
 // ============================================================== importer ===
