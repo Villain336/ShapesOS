@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import "@/components/crm/crm.css"; // CRM visual system, scoped under .crm
 
 /* Type comes from @fontsource/inter + @fontsource/newsreader, imported in
  * globals.css — no next/font needed. */

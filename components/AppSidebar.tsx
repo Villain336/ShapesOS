@@ -21,6 +21,7 @@ import {
   SlidersHorizontal,
   TrendUp,
   Users,
+  Kanban,
   type Icon as PhosphorIcon,
 } from "@phosphor-icons/react";import { cn } from "@/lib/utils";
 import GlideMenu from "@/components/vault/primitives/GlideMenu";
@@ -48,6 +49,7 @@ const NAV_SECTIONS: {
     items: [
       { href: "/dashboard", label: "Projects", icon: SquaresFour },
       { href: "/dashboard/assistant", label: "Marketr", icon: TrendUp },
+      { href: "/dashboard/crm", label: "CRM", icon: Kanban },
       { href: "/dashboard/reports", label: "Reports", icon: ChartBar },
       { href: "/dashboard/files", label: "Files", icon: FolderSimple },
       { href: "/dashboard/alerts", label: "Alerts", icon: Bell },

@@ -99,6 +99,9 @@ const PUBLIC_BY_DESIGN = {
   // Phase C gap-fill (G2): Stripe billing webhook — capability model, see route comments.
   "app/api/billing/webhook/route.ts":
     "inbound Stripe webhook; HMAC signature verified with stripe.webhooks.constructEvent before any parsing/logic (lib/metering/THREAT-MODEL-BILLING.md B1); signature is the authorization",
+  // Phase 1 (R1): CRM public capture form — capability model, see route comments.
+  "app/api/crm/public/forms/[token]/route.ts":
+    "public lead-capture endpoint; unguessable token (mkfrm_<32hex>, sha256 at rest) is the capability, scoped to one pipeline; per-token+IP rate limit, honeypot, Zod validation, dedup-checked insert; disabled/missing token 404s",
 };
 const uncovered = [];
 for (const f of routeFiles) {
@@ -118,7 +121,7 @@ ok(`all ${routeFiles.length} API route files scanned`, true);
 ok("every mutation route is authorization-gated", uncovered.length === 0, uncovered.join("; "));
 ok(
   "public-by-design allow-list is documented",
-  Object.keys(PUBLIC_BY_DESIGN).length === 7 &&
+  Object.keys(PUBLIC_BY_DESIGN).length === 8 &&
     Object.values(PUBLIC_BY_DESIGN).every(v => v.length > 20)
 );
 

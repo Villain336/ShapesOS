@@ -333,6 +333,11 @@ model Workspace {
   projects              Project[]
   clients               Client[]
   apiUsage              ApiUsage[]
+  // Phase 1 (R1): Lead Pipeline CRM back-relations.
+  pipelines             Pipeline[]
+  leads                 Lead[]
+  leadActivities        LeadActivity[]
+  leadCaptureForms      LeadCaptureForm[]
   // Milestone 11: workspace membership for RBAC (owner/admin/editor/viewer).
   members               WorkspaceMember[]
   // Milestone 11: workspace-scoped audit events.
@@ -414,6 +419,8 @@ model Project {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   keywords                Keyword[]
+  // Phase 1 (R1): leads attributed to this project.
+  leads                   Lead[]
   // Milestone 19: newsletter lists, templates, and broadcasts.
   newsletterLists         NewsletterList[]
   // Phase C (W4): usage events attributed to this project (chargeback).
@@ -580,6 +587,8 @@ model Client {
   reports   Report[]
   // Milestone 12: brand kits mapped to this client (per-client white-label).
   brandKits BrandKit[]
+  // Phase 1 (R1): pipelines serving this white-label client.
+  pipelines Pipeline[]
 
   @@unique([workspaceId, loginEmail])
   @@map("clients")
@@ -3160,4 +3169,136 @@ model BillingSetupIdempotency {
   appliedAt       DateTime @default(now()) @map("applied_at")
 
   @@map("billing_setup_idempotency")
+}
+
+// ── Lead Pipeline CRM (Phase 1 / R1) ─────────────────────────────────────
+// The Lead is the central object of the agency-in-a-box thesis: every
+// channel (digital, physical, media) feeds one pipeline per client.
+// Tenant rule: every row carries workspaceId; every query filters on it.
+
+enum LeadSource {
+  website_form
+  phone
+  referral
+  import
+  ad
+  ooh
+  direct_mail
+  other
+}
+
+enum LeadActivityType {
+  created
+  note
+  email
+  call
+  sms
+  meeting
+  stage_change
+  score_change
+  form_submit
+  import
+}
+
+model Pipeline {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  // Optional link to the white-label Client this pipeline serves. Null =
+  // agency-internal pipeline.
+  clientId    String?   @map("client_id")
+  client      Client?   @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  name        String
+  // Ordered stage machine: [{ id: "new", label: "New", color: "violet" }, ...].
+  // Lead.stage must be one of these ids (validated in lib/crm).
+  stages      Json
+  isDefault   Boolean   @default(false) @map("is_default")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  leads        Lead[]
+  captureForms LeadCaptureForm[]
+
+  @@index([workspaceId])
+  @@map("crm_pipelines")
+}
+
+model Lead {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  pipelineId  String    @map("pipeline_id")
+  pipeline    Pipeline  @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+  // Optional link to the SEO project this lead is attributed to.
+  projectId   String?   @map("project_id")
+  project     Project?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  name        String
+  email       String?
+  phone       String?
+  company     String?
+  title       String?
+  source      LeadSource @default(other)
+  sourceDetail String?   @map("source_detail")
+  // Stage id — must exist in Pipeline.stages (validated in lib/crm).
+  stage       String    @default("new")
+  // 0–100, computed deterministically by lib/crm/scoring.ts (rules v1).
+  score       Int       @default(0)
+  valueCents  Int?      @map("value_cents")
+  ownerId     String?   @map("owner_id")
+  ownerName   String?   @map("owner_name")
+  starred     Boolean   @default(false)
+  customFields Json?    @map("custom_fields")
+  // Dedup identity: "email:<normalized>" | "phone:<digits>". Unique per
+  // workspace when present; the unique constraint is the race-safe backstop
+  // behind the check-then-insert in the API (P2002 → 409 duplicate).
+  dedupKey    String?   @map("dedup_key")
+
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+  lastActivityAt DateTime @default(now()) @map("last_activity_at")
+
+  activities LeadActivity[]
+
+  @@unique([workspaceId, dedupKey])
+  @@index([workspaceId, pipelineId, stage])
+  @@index([workspaceId, score])
+  @@map("crm_leads")
+}
+
+model LeadActivity {
+  id          String           @id @default(cuid())
+  workspaceId String           @map("workspace_id")
+  workspace   Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  leadId      String           @map("lead_id")
+  lead        Lead             @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  type        LeadActivityType
+  body        String?
+  // Human-readable actor ("Tico", "Public form", "Import", "System").
+  actor       String?
+  createdAt   DateTime         @default(now()) @map("created_at")
+
+  @@index([leadId, createdAt])
+  @@index([workspaceId, createdAt])
+  @@map("crm_lead_activities")
+}
+
+model LeadCaptureForm {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  pipelineId  String    @map("pipeline_id")
+  pipeline    Pipeline  @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+  name        String
+  // sha256 hex of the public token. The token itself is shown once at
+  // creation and never stored; lookup is by hash.
+  tokenHash   String    @unique @map("token_hash")
+  tokenPrefix String    @map("token_prefix")
+  enabled     Boolean   @default(true)
+  // Optional field config: [{ key: "company", label: "Company", required: true }]
+  fields      Json?
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@index([pipelineId])
+  @@map("crm_capture_forms")
 }

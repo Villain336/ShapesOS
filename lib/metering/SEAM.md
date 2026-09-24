@@ -45,6 +45,16 @@ ledger reconciles with the run's `creditsUsed`.
 `publish` and `connector_sync` cost 0. Call `meter()` anyway — it appends a
 0-credit event for audit completeness and never touches the cap.
 
+### Usage dimensions (not credit actions)
+
+Some quantities are *dimensions* surfaced for reporting/limits, not
+billable credit actions. They never call `meter()` and never appear on the
+ledger as charges:
+
+| Dimension | Source | Meaning |
+|---|---|---|
+| `crm_active_leads` | `lib/crm/meter.ts` | Count of leads not in a closed (won/lost) stage, tenant-scoped by `workspaceId`. Read-only: `getActiveLeadCount(workspaceId)`, `getActiveLeadCountByPipeline(workspaceId)`. Used by the CRM UI (pipeline list counts, status bar) and available for future seat/usage-limit policy. No credit charge is created, by design. |
+
 ### MCP tool calls (sibling track)
 
 `mcp_tool_call` is passthrough: the MCP server calls `meter()` with the

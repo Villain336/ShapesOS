@@ -1,0 +1,99 @@
+// Marketr CRM — filter toolbar (reference: rich filter row above the table).
+"use client";
+
+import { MagnifyingGlass, DownloadSimple, Plus, UploadSimple, FunnelSimple } from "@phosphor-icons/react";
+import type { CrmStage } from "./types";
+import { SOURCE_LABELS } from "./types";
+
+export interface LeadFilters {
+  q: string;
+  stage: string;
+  owner: string;
+  source: string;
+  scoreBand: string;
+  activeWithinDays: string;
+  sort: string;
+  starred: boolean;
+}
+
+export const DEFAULT_FILTERS: LeadFilters = {
+  q: "", stage: "", owner: "", source: "", scoreBand: "",
+  activeWithinDays: "", sort: "recent", starred: false,
+};
+
+export function FilterToolbar({
+  filters, setFilters, stages, owners,
+  onNewLead, onImport, onExport,
+}: {
+  filters: LeadFilters;
+  setFilters: (f: LeadFilters) => void;
+  stages: CrmStage[];
+  owners: string[];
+  onNewLead: () => void;
+  onImport: () => void;
+  onExport: () => void;
+}) {
+  const set = (k: keyof LeadFilters, v: string | boolean) =>
+    setFilters({ ...filters, [k]: v });
+  const selectCls = "crm-select !py-[6px] !text-[12.5px] max-w-[150px]";
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <div className="relative">
+        <MagnifyingGlass size={15} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-stone-400" />
+        <input
+          className="crm-input !py-[6px] pl-8 !text-[12.5px] w-[220px]"
+          placeholder="Search name, email, company…"
+          value={filters.q}
+          onChange={(e) => set("q", e.target.value)}
+        />
+      </div>
+      <select className={selectCls} value={filters.stage} onChange={(e) => set("stage", e.target.value)}>
+        <option value="">Stage: Any</option>
+        {stages.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
+      </select>
+      <select className={selectCls} value={filters.owner} onChange={(e) => set("owner", e.target.value)}>
+        <option value="">Owner: All</option>
+        {owners.map((o) => <option key={o} value={o}>{o}</option>)}
+      </select>
+      <select className={selectCls} value={filters.source} onChange={(e) => set("source", e.target.value)}>
+        <option value="">Source: Any</option>
+        {Object.entries(SOURCE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+      </select>
+      <select className={selectCls} value={filters.scoreBand} onChange={(e) => set("scoreBand", e.target.value)}>
+        <option value="">Score: Any</option>
+        <option value="hot">Hot (70+)</option>
+        <option value="warm">Warm (40–69)</option>
+        <option value="cold">Cold (&lt;40)</option>
+      </select>
+      <select className={selectCls} value={filters.activeWithinDays} onChange={(e) => set("activeWithinDays", e.target.value)}>
+        <option value="">Activity: Any time</option>
+        <option value="7">Active: 7 days</option>
+        <option value="30">Active: 30 days</option>
+        <option value="90">Active: 90 days</option>
+      </select>
+      <select className={selectCls} value={filters.sort} onChange={(e) => set("sort", e.target.value)}>
+        <option value="recent">Sort: Recent</option>
+        <option value="score">Sort: Score</option>
+        <option value="value">Sort: Value</option>
+      </select>
+      <button
+        className={`crm-btn-ghost !py-[6px] !text-[12.5px] ${filters.starred ? "!border-violet-400 !text-violet-700 !bg-violet-50" : ""}`}
+        onClick={() => set("starred", !filters.starred)}
+        title="Starred only"
+      >
+        <FunnelSimple size={14} /> Starred
+      </button>
+      <div className="ml-auto flex items-center gap-2">
+        <button className="crm-btn-ghost !py-[6px] !text-[12.5px]" onClick={onImport}>
+          <UploadSimple size={14} /> Import
+        </button>
+        <button className="crm-btn-ghost !py-[6px] !text-[12.5px]" onClick={onExport}>
+          <DownloadSimple size={14} /> Export
+        </button>
+        <button className="crm-btn-primary !py-[6px] !text-[12.5px]" onClick={onNewLead}>
+          <Plus size={14} weight="bold" /> New Lead
+        </button>
+      </div>
+    </div>
+  );
+}
