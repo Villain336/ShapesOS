@@ -8,6 +8,7 @@ import { prisma } from "@/lib/prisma";
 import { getOrCreateWorkspace, requireUser } from "@/lib/session";
 import { requireWorkspaceRole, forbidden } from "@/lib/authz";
 import { createLeadRecord, LEAD_SOURCES, UtmSchema } from "@/lib/crm/leads";
+import { applyPromoCodeToLead } from "@/lib/physical/bundles";
 
 const CreateSchema = z.object({
   pipelineId: z.string().min(1).max(64),
@@ -27,6 +28,8 @@ const CreateSchema = z.object({
   // C2: optional UTM capture + linked content page for attribution touches.
   utm: UtmSchema.optional(),
   contentId: z.string().trim().max(64).optional(),
+  // P2: optional promo code (WAVE-XXXXXX) — logs a promo_code touch.
+  promoCode: z.string().trim().max(32).optional(),
 });
 
 export async function GET(req: Request) {
@@ -172,5 +175,12 @@ export async function POST(req: Request) {
       { status: result.status },
     );
   }
-  return Response.json({ lead: result.lead }, { status: 201 });
+  // P2: promo code redemption — attaches the bundle's promo_code touch and
+  // redemption row. A bad code never fails lead creation.
+  let promoApplied: string | null = null;
+  if (d.promoCode) {
+    const bundle = await applyPromoCodeToLead(workspace.id, result.lead.id, d.promoCode);
+    promoApplied = bundle?.campaignName ?? null;
+  }
+  return Response.json({ lead: result.lead, promoApplied }, { status: 201 });
 }

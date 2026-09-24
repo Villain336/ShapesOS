@@ -12,6 +12,7 @@ import { prisma } from "@/lib/prisma";
 import { InMemoryRateLimiter } from "@/lib/mcp/rateLimit";
 import { dedupKeyFor, hashFormToken, recomputeScore, logActivity } from "@/lib/crm/dedup";
 import { recordCaptureTouch } from "@/lib/attribution/touches";
+import { applyPromoCodeToLead } from "@/lib/physical/bundles";
 import { UtmSchema } from "@/lib/crm/leads";
 import { parseStages } from "@/lib/crm/stages";
 
@@ -39,6 +40,9 @@ export const PublicSubmitSchema = z.object({
   // C2: optional UTM capture + linked content page for attribution touches.
   utm: UtmSchema.optional(),
   contentId: z.string().trim().max(64).optional(),
+  // P2: optional promo code (WAVE-XXXXXX) — logs a promo_code attribution
+  // touch when the code belongs to an active bundle in this workspace.
+  promoCode: z.string().trim().max(32).optional(),
 });
 
 export async function findFormByToken(token: string) {
@@ -147,6 +151,11 @@ export async function handlePublicSubmit(opts: {
       contentId: d.contentId ?? null,
       campaignFallback: `form:${form.name}`,
     });
+    // P2: promo code redemption — attaches the bundle's promo_code touch and
+    // redemption row. A bad code never fails the submission.
+    if (d.promoCode) {
+      await applyPromoCodeToLead(form.workspaceId, lead.id, d.promoCode);
+    }
     await recomputeScore(lead.id, form.workspaceId);
   } catch (e) {
     if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {

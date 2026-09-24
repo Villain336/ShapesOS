@@ -62,6 +62,7 @@ export function channelFor(leadSource: string, utm: UtmInput | null | undefined)
   if (med === "email" || src === "email" || src === "newsletter") return "email";
   if (med === "sms" || src === "sms") return "sms";
   if (med === "qr" || src === "qr" || src === "qr_code") return "qr_code";
+  if (med === "promo" || src === "promo" || src === "promo_code") return "promo_code";
   if (med === "social-paid" || med === "paid_social") return "paid_social";
 
   const ALIASES: Record<string, string> = {
@@ -95,6 +96,8 @@ export function channelFor(leadSource: string, utm: UtmInput | null | undefined)
     ooh: "ooh",
     direct_mail: "direct_mail",
     booking: "booking",
+    promo_code: "promo_code",
+    qr_scan: "qr_code",
     other: "other",
   };
   return SOURCE_CHANNEL[leadSource] ?? "other";

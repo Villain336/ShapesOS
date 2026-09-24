@@ -312,6 +312,7 @@ enum SiteSourceType {
 }
 
 model Workspace {
+  attributionBundles AttributionBundle[]
   id          String @id @default(cuid())
   name        String
   // owner_user_id: external auth subject (Auth.js user id) — auth wired in milestone 2
@@ -3274,6 +3275,7 @@ model Lead {
   activities LeadActivity[]
   // Phase 2 (C2): marketing touches attributed to this lead.
   attributionTouches AttributionTouch[]
+  bundleRedemptions BundleRedemption[]
   // Phase 2 (R5): tracked calls and bookings linked to this lead.
   calls             Call[]
   bookings          Booking[]
@@ -3425,6 +3427,7 @@ model CallNumber {
   updatedAt    DateTime  @updatedAt @map("updated_at")
 
   calls Call[]
+  bundles AttributionBundle[]
 
   @@index([workspaceId, status])
   @@index([workspaceId, campaign])
@@ -3556,4 +3559,95 @@ model Booking {
   @@index([pageId, startAt])
   @@index([leadId])
   @@map("booking")
+}
+
+// ---------------------------------------------------------------------------
+// Physical attribution kit (P2): one-click measurement bundle per campaign.
+// A bundle ties four artifacts to one campaign key:
+//   - a tracking phone number (CallNumber via the R5 provider abstraction),
+//   - a QR code (generated on demand from the vanity URL; nothing stored),
+//   - a vanity URL slug (/r/<slug> → logs a scan, then 302s to destination),
+//   - a promo code (WAVE-XXXXXX, redeemable on lead forms / redeem endpoint).
+// Scans are anonymous events (BundleScan); attribution credit flows through
+// AttributionTouch rows carrying the bundle's campaign name, so first/last/
+// linear models credit them with zero model changes.
+// ---------------------------------------------------------------------------
+
+model AttributionBundle {
+  id          String   @id @default(cuid())
+  workspaceId String   @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  name         String
+  // Campaign key stamped on every touch this bundle generates. This is what
+  // the attribution dashboard groups by — keep it stable per campaign.
+  campaignName String @map("campaign_name")
+  destinationUrl String @map("destination_url")
+  // Public redirect slug: /r/<vanitySlug>. Globally unique (not just
+  // per-workspace): the public route resolves the slug with no workspace
+  // key, so two workspaces sharing a slug would make /r/<slug> ambiguous.
+  // The slug is the capability.
+  vanitySlug   String @unique @map("vanity_slug")
+  utmSource    String @default("physical") @map("utm_source")
+  utmMedium    String @default("qr") @map("utm_medium")
+  utmCampaign  String? @map("utm_campaign")
+  // Globally unique promo code (e.g. WAVE-7K2QX9). The code is the capability.
+  promoCode    String @unique @map("promo_code")
+
+  // Tracking number provisioned at bundle creation (R5 provider layer).
+  numberId   String?    @map("number_id")
+  number     CallNumber? @relation(fields: [numberId], references: [id], onDelete: SetNull)
+
+  status   String @default("active") // active | disabled
+  // QR render preset index; "regenerate" cycles it (QR content is the vanity
+  // URL, so regeneration is a style change, not a content change).
+  qrStyle  Int    @default(0) @map("qr_style")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  scans       BundleScan[]
+  redemptions BundleRedemption[]
+
+  @@index([workspaceId, status])
+  @@map("attribution_bundle")
+}
+
+// One deduped vanity-URL scan: (bundle, ip-hash, UTC day). Anonymous by
+// design — no lead exists at scan time. Identified scans (a ?lead= param
+// matching a workspace lead) additionally log an AttributionTouch.
+model BundleScan {
+  id       String            @id @default(cuid())
+  bundleId String            @map("bundle_id")
+  bundle   AttributionBundle @relation(fields: [bundleId], references: [id], onDelete: Cascade)
+
+  ipHash String @map("ip_hash")
+  day    String // yyyy-mm-dd (UTC)
+
+  userAgent String? @map("user_agent") @db.VarChar(512)
+  referer   String? @db.VarChar(1024)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([bundleId, ipHash, day])
+  @@index([bundleId, day])
+  @@map("bundle_scan")
+}
+
+// A promo-code redemption tied to one lead. Unique per (bundle, lead) so a
+// re-submitted code doesn't double-count the response.
+model BundleRedemption {
+  id       String            @id @default(cuid())
+  bundleId String            @map("bundle_id")
+  bundle   AttributionBundle @relation(fields: [bundleId], references: [id], onDelete: Cascade)
+  leadId   String            @map("lead_id")
+  lead     Lead              @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  code String
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([bundleId, leadId])
+  @@index([bundleId])
+  @@map("bundle_redemption")
 }

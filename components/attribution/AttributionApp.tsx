@@ -16,6 +16,7 @@ import {
 } from "@phosphor-icons/react";
 import { formatMoney } from "../crm/types";
 import { EmptyState } from "../crm/ui";
+import { BundlesSection } from "./BundlesSection";
 
 type Model = "first_touch" | "last_touch" | "linear";
 
@@ -250,6 +251,9 @@ export function AttributionApp() {
                 has no marketing touches — those leads were created without UTM data. Add UTMs to capture forms to close the gap.
               </div>
             )}
+
+            {/* Measurement bundles (P2) */}
+            <BundlesSection />
 
             {/* Channel performance */}
             <section className={cardCls}>
