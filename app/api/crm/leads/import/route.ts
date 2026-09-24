@@ -1,7 +1,9 @@
 // Marketr — CRM CSV import with dedup report.
 // POST /api/crm/leads/import  → { pipelineId, csv } (editor+)
 // Columns: name*, email, phone, company, title, source, sourceDetail, stage,
-// value (dollars), ownerName. Returns { created, duplicates, errors }.
+// value (dollars), ownerName, utm_source, utm_medium, utm_campaign,
+// utm_content, content_id. Returns { created, duplicates, errors }.
+// UTM columns are recorded as the lead's creation attribution touch (C2).
 
 import { z } from "zod";
 import { Prisma } from "@prisma/client";
@@ -10,6 +12,8 @@ import { getOrCreateWorkspace, requireUser } from "@/lib/session";
 import { requireWorkspaceRole, forbidden } from "@/lib/authz";
 import { dedupKeyFor, recomputeScore, logActivity } from "@/lib/crm/dedup";
 import { parseStages, CLOSED_STAGES } from "@/lib/crm/stages";
+import { recordCaptureTouch } from "@/lib/attribution/touches";
+import { maybeRecordWonRevenue } from "@/lib/attribution/revenue";
 
 const SOURCES = ["website_form", "phone", "referral", "import", "ad", "ooh", "direct_mail", "other"] as const;
 
@@ -42,43 +46,36 @@ export function parseCsv(text: string): string[][] {
   return rows.filter((r) => r.some((f) => f.trim() !== ""));
 }
 
-export async function POST(req: Request) {
-  const user = await requireUser();
-  if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
-  const workspace = await getOrCreateWorkspace(user.id, user.email);
-  if (!(await requireWorkspaceRole(user.id, workspace.id, "editor"))) return forbidden();
+export interface ImportRowResult {
+  created: number;
+  duplicates: { row: number; name: string; existingId: string }[];
+  errors: { row: number; error: string }[];
+  total: number;
+}
 
-  let body: unknown;
-  try { body = await req.json(); } catch {
-    return Response.json({ error: "Invalid JSON" }, { status: 400 });
-  }
-  const parsed = ImportSchema.safeParse(body);
-  if (!parsed.success) {
-    return Response.json({ error: "Invalid input", issues: parsed.error.issues }, { status: 400 });
-  }
-
-  const pipeline = await prisma.pipeline.findFirst({
-    where: { id: parsed.data.pipelineId, workspaceId: workspace.id },
-  });
-  if (!pipeline) return Response.json({ error: "Pipeline not found" }, { status: 404 });
+/**
+ * Process parsed CSV rows into leads. Exported so the attribution battery
+ * exercises the same code the route runs (C2: UTM columns → touches).
+ */
+export async function processImportRows(
+  workspaceId: string,
+  actor: string,
+  pipeline: { id: string; stages: unknown },
+  rows: string[][],
+): Promise<ImportRowResult> {
   const stages = parseStages(pipeline.stages);
   const stageIds = new Set(stages.map((s) => s.id));
 
-  const rows = parseCsv(parsed.data.csv);
   if (rows.length < 2) {
-    return Response.json({ error: "CSV needs a header row and at least one data row" }, { status: 400 });
+    return { created: 0, duplicates: [], errors: [{ row: 0, error: "CSV needs a header row and at least one data row" }], total: 0 };
   }
   const header = rows[0].map((h) => h.trim().toLowerCase());
   const idx = (name: string) => header.indexOf(name);
   const nameIdx = idx("name");
   if (nameIdx === -1) {
-    return Response.json({ error: 'CSV must have a "name" column' }, { status: 400 });
-  }
-  if (rows.length > 5001) {
-    return Response.json({ error: "Import capped at 5000 rows" }, { status: 400 });
+    return { created: 0, duplicates: [], errors: [{ row: 0, error: 'CSV must have a "name" column' }], total: 0 };
   }
 
-  const actor = user.name ?? user.email ?? "Import";
   let created = 0;
   const duplicates: { row: number; name: string; existingId: string }[] = [];
   const errors: { row: number; error: string }[] = [];
@@ -103,12 +100,20 @@ export async function POST(req: Request) {
     if (valueCents !== null && (!Number.isFinite(valueCents) || valueCents < 0)) {
       errors.push({ row: r + 1, error: "invalid value" }); continue;
     }
+    // C2: UTM columns → the creation attribution touch.
+    const utm = {
+      utm_source: get(idx("utm_source")) || undefined,
+      utm_medium: get(idx("utm_medium")) || undefined,
+      utm_campaign: get(idx("utm_campaign")) || undefined,
+      utm_content: get(idx("utm_content")) || undefined,
+    };
+    const contentId = get(idx("content_id")) || null;
 
     const dedupKey = dedupKeyFor(email, phone);
     try {
       if (dedupKey) {
         const existing = await prisma.lead.findFirst({
-          where: { workspaceId: workspace.id, dedupKey, NOT: { stage: { in: [...CLOSED_STAGES] } } },
+          where: { workspaceId, dedupKey, NOT: { stage: { in: [...CLOSED_STAGES] } } },
           select: { id: true },
         });
         if (existing) {
@@ -118,7 +123,7 @@ export async function POST(req: Request) {
       }
       const lead = await prisma.lead.create({
         data: {
-          workspaceId: workspace.id,
+          workspaceId,
           pipelineId: pipeline.id,
           name,
           email,
@@ -134,15 +139,26 @@ export async function POST(req: Request) {
         },
       });
       await logActivity({
-        workspaceId: workspace.id, leadId: lead.id, type: "import",
+        workspaceId, leadId: lead.id, type: "import",
         body: `Imported from CSV (row ${r + 1})`, actor,
       });
-      await recomputeScore(lead.id, workspace.id);
+      // C2: creation touch + won-revenue event (imported rows may be won).
+      await recordCaptureTouch({
+        workspaceId, leadId: lead.id, leadSource: source,
+        utm, contentId,
+      });
+      await maybeRecordWonRevenue({
+        workspaceId, leadId: lead.id,
+        before: { stage: "", valueCents: 0 },
+        after: { stage: lead.stage, valueCents: lead.valueCents },
+        actor,
+      });
+      await recomputeScore(lead.id, workspaceId);
       created++;
     } catch (e) {
       if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002" && dedupKey) {
         const existing = await prisma.lead.findFirst({
-          where: { workspaceId: workspace.id, dedupKey },
+          where: { workspaceId, dedupKey },
           select: { id: true },
         });
         duplicates.push({ row: r + 1, name, existingId: existing?.id ?? "unknown" });
@@ -152,5 +168,34 @@ export async function POST(req: Request) {
     }
   }
 
-  return Response.json({ created, duplicates, errors, total: rows.length - 1 });
+  return { created, duplicates, errors, total: rows.length - 1 };
+}
+
+export async function POST(req: Request) {
+  const user = await requireUser();
+  if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
+  const workspace = await getOrCreateWorkspace(user.id, user.email);
+  if (!(await requireWorkspaceRole(user.id, workspace.id, "editor"))) return forbidden();
+
+  let body: unknown;
+  try { body = await req.json(); } catch {
+    return Response.json({ error: "Invalid JSON" }, { status: 400 });
+  }
+  const parsed = ImportSchema.safeParse(body);
+  if (!parsed.success) {
+    return Response.json({ error: "Invalid input", issues: parsed.error.issues }, { status: 400 });
+  }
+
+  const pipeline = await prisma.pipeline.findFirst({
+    where: { id: parsed.data.pipelineId, workspaceId: workspace.id },
+  });
+  if (!pipeline) return Response.json({ error: "Pipeline not found" }, { status: 404 });
+
+  const rows = parseCsv(parsed.data.csv);
+  if (rows.length > 5001) {
+    return Response.json({ error: "Import capped at 5000 rows" }, { status: 400 });
+  }
+  const actor = user.name ?? user.email ?? "Import";
+  const result = await processImportRows(workspace.id, actor, pipeline, rows);
+  return Response.json(result);
 }

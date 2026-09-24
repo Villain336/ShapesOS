@@ -59,7 +59,7 @@ export async function recomputeScore(leadId: string, workspaceId: string, now = 
 export async function logActivity(opts: {
   workspaceId: string;
   leadId: string;
-  type: "created" | "note" | "email" | "call" | "sms" | "meeting" | "stage_change" | "score_change" | "form_submit" | "import";
+  type: "created" | "note" | "email" | "call" | "sms" | "meeting" | "stage_change" | "score_change" | "form_submit" | "import" | "revenue";
   body?: string;
   actor?: string;
 }) {

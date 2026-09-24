@@ -11,6 +11,7 @@ import { getOrCreateWorkspace, requireUser } from "@/lib/session";
 import { requireWorkspaceRole, forbidden } from "@/lib/authz";
 import { parseStages } from "@/lib/crm/stages";
 import { scoreFor } from "@/lib/crm/stages";
+import { maybeRecordWonRevenue } from "@/lib/attribution/revenue";
 import { dedupKeyFor, recomputeScore, logActivity } from "@/lib/crm/dedup";
 
 const SOURCES = ["website_form", "phone", "referral", "import", "ad", "ooh", "direct_mail", "other"] as const;
@@ -159,6 +160,16 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
       leadId: lead.id,
       type: "stage_change",
       body: `Stage: ${from} → ${to}`,
+      actor,
+    });
+  }
+  // C2: a lead newly reaching won with a value books a revenue event.
+  if (d.stage !== undefined || d.valueCents !== undefined) {
+    await maybeRecordWonRevenue({
+      workspaceId: workspace.id,
+      leadId: lead.id,
+      before: { stage: lead.stage, valueCents: lead.valueCents },
+      after: { stage: d.stage ?? lead.stage, valueCents: updated.valueCents },
       actor,
     });
   }

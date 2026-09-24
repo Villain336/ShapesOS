@@ -54,6 +54,7 @@ ledger as charges:
 | Dimension | Source | Meaning |
 |---|---|---|
 | `crm_active_leads` | `lib/crm/meter.ts` | Count of leads not in a closed (won/lost) stage, tenant-scoped by `workspaceId`. Read-only: `getActiveLeadCount(workspaceId)`, `getActiveLeadCountByPipeline(workspaceId)`. Used by the CRM UI (pipeline list counts, status bar) and available for future seat/usage-limit policy. No credit charge is created, by design. |
+| `attribution` (no meter) | `lib/attribution/*` | Revenue attribution (Phase 2, C2) adds **no new usage meter**. Touch logging, report computation, and spend entries are analytics, not billable actions — they never call `meter()` and never appear on the ledger. Attribution quality (multi-touch models, content influence, ROAS) is a **tier/value feature**, not a metered dimension. `AttributionSpend` rows are manual analytics inputs for CPL/CAC/ROAS math — they are not billing charges and must never be confused with `meter()` credit events. |
 
 ### MCP tool calls (sibling track)
 

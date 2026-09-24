@@ -10,6 +10,7 @@ import { signOut } from "next-auth/react";
 import {
   ChartBar,
   Bell,
+  ChartLineUp,
   Check,
   CaretDown,
   CaretUpDown,
@@ -50,6 +51,7 @@ const NAV_SECTIONS: {
       { href: "/dashboard", label: "Projects", icon: SquaresFour },
       { href: "/dashboard/assistant", label: "Marketr", icon: TrendUp },
       { href: "/dashboard/crm", label: "CRM", icon: Kanban },
+      { href: "/dashboard/attribution", label: "Attribution", icon: ChartLineUp },
       { href: "/dashboard/reports", label: "Reports", icon: ChartBar },
       { href: "/dashboard/files", label: "Files", icon: FolderSimple },
       { href: "/dashboard/alerts", label: "Alerts", icon: Bell },

@@ -7,10 +7,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getOrCreateWorkspace, requireUser } from "@/lib/session";
 import { requireWorkspaceRole, forbidden } from "@/lib/authz";
-import { dedupKeyFor, recomputeScore, logActivity } from "@/lib/crm/dedup";
-import { parseStages, CLOSED_STAGES } from "@/lib/crm/stages";
-
-const SOURCES = ["website_form", "phone", "referral", "import", "ad", "ooh", "direct_mail", "other"] as const;
+import { createLeadRecord, LEAD_SOURCES, UtmSchema } from "@/lib/crm/leads";
 
 const CreateSchema = z.object({
   pipelineId: z.string().min(1).max(64),
@@ -19,7 +16,7 @@ const CreateSchema = z.object({
   phone: z.string().trim().max(40).optional(),
   company: z.string().trim().max(160).optional(),
   title: z.string().trim().max(160).optional(),
-  source: z.enum(SOURCES).default("other"),
+  source: z.enum(LEAD_SOURCES).default("other"),
   sourceDetail: z.string().trim().max(240).optional(),
   stage: z.string().trim().min(1).max(40).optional(),
   valueCents: z.number().int().min(0).max(1_000_000_000).optional(),
@@ -27,11 +24,10 @@ const CreateSchema = z.object({
   ownerName: z.string().trim().max(160).optional(),
   projectId: z.string().max(64).optional(),
   customFields: z.record(z.string(), z.unknown()).optional(),
+  // C2: optional UTM capture + linked content page for attribution touches.
+  utm: UtmSchema.optional(),
+  contentId: z.string().trim().max(64).optional(),
 });
-
-function validEmail(e: string): boolean {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
-}
 
 export async function GET(req: Request) {
   const user = await requireUser();
@@ -47,7 +43,7 @@ export async function GET(req: Request) {
   const owner = sp.get("owner");
   if (owner) where.OR = [{ ownerId: owner }, { ownerName: owner }];
   const source = sp.get("source");
-  if (source) where.source = source as (typeof SOURCES)[number];
+  if (source) where.source = source as (typeof LEAD_SOURCES)[number];
   const band = sp.get("scoreBand");
   if (band === "hot") where.score = { gte: 70 };
   else if (band === "warm") where.score = { gte: 40, lt: 70 };
@@ -150,88 +146,31 @@ export async function POST(req: Request) {
   }
   const d = parsed.data;
 
-  const pipeline = await prisma.pipeline.findFirst({
-    where: { id: d.pipelineId, workspaceId: workspace.id },
+  // The create logic lives in lib/crm/leads.ts (shared with the batteries);
+  // this route only handles auth, validation, and response mapping.
+  const result = await createLeadRecord(workspace.id, user.name ?? user.email ?? "User", {
+    pipelineId: d.pipelineId,
+    name: d.name,
+    email: d.email,
+    phone: d.phone,
+    company: d.company,
+    title: d.title,
+    source: d.source,
+    sourceDetail: d.sourceDetail,
+    stage: d.stage,
+    valueCents: d.valueCents,
+    ownerId: d.ownerId,
+    ownerName: d.ownerName,
+    projectId: d.projectId,
+    customFields: d.customFields,
+    utm: d.utm ?? null,
+    contentId: d.contentId ?? null,
   });
-  if (!pipeline) return Response.json({ error: "Pipeline not found" }, { status: 404 });
-
-  if (d.email && !validEmail(d.email)) {
-    return Response.json({ error: "Invalid email" }, { status: 400 });
+  if (!result.ok) {
+    return Response.json(
+      { error: result.error, ...(result.existing ? { duplicate: true, existing: result.existing } : {}) },
+      { status: result.status },
+    );
   }
-  if (d.projectId) {
-    const project = await prisma.project.findFirst({
-      where: { id: d.projectId, workspaceId: workspace.id },
-    });
-    if (!project) return Response.json({ error: "Project not found" }, { status: 404 });
-  }
-
-  const stages = parseStages(pipeline.stages);
-  const stage = d.stage ?? stages[0].id;
-  if (!stages.some((s) => s.id === stage)) {
-    return Response.json({ error: `Unknown stage "${stage}" for this pipeline` }, { status: 400 });
-  }
-
-  const dedupKey = dedupKeyFor(d.email, d.phone);
-  // Fast path: check-then-insert. The UNIQUE(workspaceId, dedupKey) constraint
-  // below is the race backstop (P2002 → 409).
-  if (dedupKey) {
-    const existing = await prisma.lead.findFirst({
-      where: { workspaceId: workspace.id, dedupKey, NOT: { stage: { in: [...CLOSED_STAGES] } } },
-      select: { id: true, name: true, email: true, company: true, stage: true },
-    });
-    if (existing) {
-      return Response.json(
-        { error: "Duplicate lead", duplicate: true, existing },
-        { status: 409 },
-      );
-    }
-  }
-
-  let lead;
-  try {
-    lead = await prisma.lead.create({
-      data: {
-        workspaceId: workspace.id,
-        pipelineId: pipeline.id,
-        projectId: d.projectId ?? null,
-        name: d.name,
-        email: d.email?.trim() || null,
-        phone: d.phone?.trim() || null,
-        company: d.company?.trim() || null,
-        title: d.title?.trim() || null,
-        source: d.source,
-        sourceDetail: d.sourceDetail?.trim() || null,
-        stage,
-        valueCents: d.valueCents ?? null,
-        ownerId: d.ownerId ?? null,
-        ownerName: d.ownerName?.trim() || null,
-        customFields: (d.customFields ?? undefined) as unknown as Prisma.InputJsonValue | undefined,
-        dedupKey,
-      },
-    });
-  } catch (e) {
-    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002" && dedupKey) {
-      const existing = await prisma.lead.findFirst({
-        where: { workspaceId: workspace.id, dedupKey },
-        select: { id: true, name: true, email: true, company: true, stage: true },
-      });
-      return Response.json(
-        { error: "Duplicate lead", duplicate: true, existing },
-        { status: 409 },
-      );
-    }
-    throw e;
-  }
-
-  await logActivity({
-    workspaceId: workspace.id,
-    leadId: lead.id,
-    type: "created",
-    body: `Lead created (${d.source})`,
-    actor: user.name ?? user.email ?? "User",
-  });
-  await recomputeScore(lead.id, workspace.id);
-
-  const full = await prisma.lead.findUnique({ where: { id: lead.id } });
-  return Response.json({ lead: full }, { status: 201 });
+  return Response.json({ lead: result.lead }, { status: 201 });
 }

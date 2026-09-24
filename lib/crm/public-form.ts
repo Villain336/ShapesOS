@@ -11,6 +11,8 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { InMemoryRateLimiter } from "@/lib/mcp/rateLimit";
 import { dedupKeyFor, hashFormToken, recomputeScore, logActivity } from "@/lib/crm/dedup";
+import { recordCaptureTouch } from "@/lib/attribution/touches";
+import { UtmSchema } from "@/lib/crm/leads";
 import { parseStages } from "@/lib/crm/stages";
 
 export const PUBLIC_FORM_LIMIT = 10; // submissions per window
@@ -34,6 +36,9 @@ export const PublicSubmitSchema = z.object({
   message: z.string().trim().max(2000).optional(),
   // Honeypot: legitimate embeds leave this empty.
   website: z.string().max(200).optional(),
+  // C2: optional UTM capture + linked content page for attribution touches.
+  utm: UtmSchema.optional(),
+  contentId: z.string().trim().max(64).optional(),
 });
 
 export async function findFormByToken(token: string) {
@@ -132,6 +137,15 @@ export async function handlePublicSubmit(opts: {
       type: "form_submit",
       body: d.message ? `Form submission: ${d.message.slice(0, 500)}` : "Form submission",
       actor: "Public form",
+    });
+    // C2: the creation touch (campaign falls back to the form name).
+    await recordCaptureTouch({
+      workspaceId: form.workspaceId,
+      leadId: lead.id,
+      leadSource: "website_form",
+      utm: d.utm ?? null,
+      contentId: d.contentId ?? null,
+      campaignFallback: `form:${form.name}`,
     });
     await recomputeScore(lead.id, form.workspaceId);
   } catch (e) {

@@ -338,6 +338,9 @@ model Workspace {
   leads                 Lead[]
   leadActivities        LeadActivity[]
   leadCaptureForms      LeadCaptureForm[]
+  // Phase 2 (C2): revenue attribution back-relations.
+  attributionTouches    AttributionTouch[]
+  attributionSpend      AttributionSpend[]
   // Milestone 11: workspace membership for RBAC (owner/admin/editor/viewer).
   members               WorkspaceMember[]
   // Milestone 11: workspace-scoped audit events.
@@ -3198,6 +3201,9 @@ enum LeadActivityType {
   score_change
   form_submit
   import
+  // Phase 2 (C2): logged when a lead newly reaches won with a value — the
+  // revenue event the attribution dashboard reads.
+  revenue
 }
 
 model Pipeline {
@@ -3259,6 +3265,8 @@ model Lead {
   lastActivityAt DateTime @default(now()) @map("last_activity_at")
 
   activities LeadActivity[]
+  // Phase 2 (C2): marketing touches attributed to this lead.
+  attributionTouches AttributionTouch[]
 
   @@unique([workspaceId, dedupKey])
   @@index([workspaceId, pipelineId, stage])
@@ -3301,4 +3309,79 @@ model LeadCaptureForm {
 
   @@index([pipelineId])
   @@map("crm_capture_forms")
+}
+
+// ── Phase 2 (C2): Revenue attribution ──────────────────────────────────────
+// Pure-software, read-only analytics on the Lead model. Touches are the raw
+// marketing contacts; lib/attribution/models.ts turns them into channel
+// credit under first-touch / last-touch / linear. No new billing meter
+// (attribution quality is the tier upsell).
+
+/** The nature of a marketing touch. `first` = the touch that created the lead. */
+enum AttributionTouchType {
+  first
+  visit
+  form
+  call
+  manual
+}
+
+model AttributionTouch {
+  id          String               @id @default(cuid())
+  workspaceId String               @map("workspace_id")
+  workspace   Workspace            @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  leadId      String               @map("lead_id")
+  lead        Lead                 @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  // Normalized grouping key used by the dashboard (e.g. "paid_search",
+  // "organic_search", "email", "website", "phone", "referral",
+  // "social_organic", "direct_mail", "ooh", "qr_code", "direct", "other").
+  // Mapping rules live in lib/attribution/touches.ts (channelFor).
+  channel     String
+  // Raw UTM values as captured.
+  source      String?
+  medium      String?
+  campaign    String?
+  // Optional link to a ContentItem (Marketr page) for revenue-influenced
+  // content. Loose reference (no FK): content can be deleted without
+  // destroying the attribution record.
+  contentId   String?              @map("content_id")
+  touchType   AttributionTouchType @default(visit) @map("touch_type")
+  occurredAt  DateTime             @default(now()) @map("occurred_at")
+  // Dedup identity: sha256 of the touch's natural key with occurredAt
+  // truncated to the hour. A double-submitted form or a re-imported CSV row
+  // collapses to one touch. Unique per lead; the race-safe backstop is the
+  // P2002 handler in lib/attribution/touches.ts (logTouch).
+  dedupHash   String               @map("dedup_hash")
+  // Raw extras (utm_term, utm_content, page URL, referrer…).
+  meta        Json?
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([leadId, dedupHash])
+  @@index([workspaceId, channel])
+  @@index([workspaceId, campaign])
+  @@index([workspaceId, occurredAt])
+  @@map("attr_touches")
+}
+
+model AttributionSpend {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  // Same normalized vocabulary as AttributionTouch.channel.
+  channel     String
+  campaign    String?
+  amountCents Int       @map("amount_cents")
+  periodStart DateTime  @map("period_start")
+  periodEnd   DateTime  @map("period_end")
+  // Ad APIs don't exist yet, so spend is entered manually; organic/physical
+  // channels legitimately carry $0 spend (CPL/CAC/ROAS then report null).
+  notes       String?
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@index([workspaceId, channel])
+  @@index([workspaceId, periodStart, periodEnd])
+  @@map("attr_spend")
 }
