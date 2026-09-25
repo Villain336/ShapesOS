@@ -4,7 +4,7 @@
 // constructed only when real credentials are configured.
 
 import type { PrismaClient } from "@prisma/client";
-import { Prisma } from "@prisma/client";
+import { Prisma, type FileChangeAction } from "@prisma/client";
 import { randomBytes } from "crypto";
 import { emitAlert } from "@/lib/alerts/evaluate";
 import { secrets } from "@/lib/secrets";
@@ -15,6 +15,7 @@ import {
   type CanvaBrandTemplate,
   type CanvaDesign,
   type CanvaExport,
+  type CanvaExportFormat,
   type CanvaFolder,
   type CanvaPort,
 } from "./canva";
@@ -42,11 +43,32 @@ type AuditAction =
   | "studio_canva_autofilled"
   | "studio_asset_created"
   | "studio_asset_deleted"
+  | "studio_creative_created"
+  | "studio_creative_versioned"
+  | "studio_creative_validated"
+  | "studio_creative_ready"
+  | "studio_creative_archived"
+  | "studio_creative_exported"
   | "studio_porkbun_keys_updated"
   | "studio_registrant_saved"
   | "studio_domain_purchased"
   | "studio_domain_purchase_failed"
   | "studio_domain_removed";
+
+/**
+ * Phase-4 creative audit actions not present in the Prisma FileChangeAction
+ * enum (schema.prisma is owned by another track). auditStudio stores these
+ * under studio_asset_created with the real action in the summary — see its
+ * comment for the full rationale.
+ */
+const CREATIVE_ACTION_FALLBACK: Record<string, true> = {
+  studio_creative_created: true,
+  studio_creative_versioned: true,
+  studio_creative_validated: true,
+  studio_creative_ready: true,
+  studio_creative_archived: true,
+  studio_creative_exported: true,
+};
 
 export async function auditStudio(
   db: Db,
@@ -56,15 +78,26 @@ export async function auditStudio(
   summary: string,
   actor: Actor = "user",
 ): Promise<void> {
+  // Phase-4 creative actions are not (yet) members of the Prisma
+  // FileChangeAction enum, and schema.prisma is owned by another track — so
+  // they are stored under studio_asset_created with the real action name
+  // prefixed in the summary. Auditability is preserved and the insert can
+  // never fail on an unknown enum value. If the schema owner adds the six
+  // studio_creative_* values to FileChangeAction, drop
+  // CREATIVE_ACTION_FALLBACK below and write the action directly.
+  const dbAction = (CREATIVE_ACTION_FALLBACK[action] ? "studio_asset_created" : action) as FileChangeAction;
+  const dbSummary = (CREATIVE_ACTION_FALLBACK[action] ? `[${action}] ` : "") + summary;
   await db.fileChangeLog.create({
     data: {
       workspaceId,
-      projectId: projectId ?? "",
+      // Milestone 11 made project_id nullable for workspace-scoped events —
+      // pass null (not "") so the projects FK is never violated.
+      projectId: projectId ?? null,
       connectionId: null,
       filePath: "",
       actor,
-      action,
-      summary: summary.slice(0, 280),
+      action: dbAction,
+      summary: dbSummary.slice(0, 280),
     },
   });
 }
@@ -428,7 +461,7 @@ export async function startStudioExport(
   workspaceId: string,
   port: CanvaPort,
   client: { clientId: string; clientSecret: string },
-  args: { designId: string; format: "png" | "jpg" | "pdf" | "mp4" },
+  args: { designId: string; format: CanvaExportFormat },
 ): Promise<{ exportId: string }> {
   if (!args.designId) throw new Error("Select a design.");
   const token = await getValidCanvaToken(db, workspaceId, port, client);

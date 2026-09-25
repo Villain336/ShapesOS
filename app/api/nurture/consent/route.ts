@@ -13,7 +13,7 @@ import { setConsent } from "@/lib/messaging/consent";
 
 export const dynamic = "force-dynamic";
 
-const CHANNELS = ["sms", "email", "voice"] as const;
+const CHANNELS = ["sms", "email", "voice", "mail"] as const;
 const CONSENT_STATUSES = ["unknown", "pending", "opted_in", "opted_out"] as const;
 
 export async function GET(req: Request) {

@@ -7,6 +7,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
+import type { ComponentType } from "react";
+import { Mail, Paintbrush } from "lucide-react";
 import {
   ChartBar,
   Bell,
@@ -25,7 +27,6 @@ import {
   Users,
   Kanban,
   Star,
-  type Icon as PhosphorIcon,
 } from "@phosphor-icons/react";import { cn } from "@/lib/utils";
 import GlideMenu from "@/components/vault/primitives/GlideMenu";
 import { buttonVariants } from "@/components/vault/atoms/Button";
@@ -44,9 +45,12 @@ import ThreadListSection from "@/components/chat/ThreadListSection";
 export type SidebarUser = { name?: string | null; email?: string | null };
 export type SidebarWorkspace = { id: string; name: string };
 
+/** Nav icon: phosphor (existing entries) or Lucide (newer entries). */
+type NavIcon = ComponentType<{ className?: string }>;
+
 const NAV_SECTIONS: {
   title?: string;
-  items: { href: string; label: string; icon: PhosphorIcon }[];
+  items: { href: string; label: string; icon: NavIcon }[];
 }[] = [
   {
     items: [
@@ -59,6 +63,10 @@ const NAV_SECTIONS: {
       { href: "/dashboard/reports", label: "Reports", icon: ChartBar },
       { href: "/dashboard/files", label: "Files", icon: FolderSimple },
       { href: "/dashboard/alerts", label: "Alerts", icon: Bell },
+      // Phase 4: Creative Studio (T2, central creative home) + Direct Mail
+      // (R3/T1 mail engine — page lands with that track; nav is wired here).
+      { href: "/dashboard/studio", label: "Studio", icon: Paintbrush },
+      { href: "/dashboard/mail", label: "Direct Mail", icon: Mail },
     ],
   },
   {
@@ -113,7 +121,7 @@ function NavItems({ pathname, onNavigate }: { pathname: string; onNavigate?: () 
                       : "text-ink-2 hover:text-ink",
                   )}
                 >
-                  <Icon className="size-4 shrink-0" weight="duotone" />
+                  <Icon className="size-4 shrink-0" />
                   {item.label}
                 </Link>
               );

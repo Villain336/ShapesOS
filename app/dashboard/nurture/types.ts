@@ -2,10 +2,16 @@
 "use client";
 
 export interface NurtureStep {
-  channel: "sms" | "email" | "voice";
+  channel: "sms" | "email" | "voice" | "postcard" | "letter";
   delayMinutes: number;
   template: string;
   subject?: string;
+  /** Mail steps: Studio creative id (T2). */
+  creativeId?: string;
+  /** Mail steps: days from step execution to mailDate. */
+  delayDays?: number;
+  /** Mail steps: USPS transit assumption [min, max] days. */
+  inHomeWindowDays?: [number, number];
 }
 
 export interface SequenceStats {
@@ -72,7 +78,7 @@ export interface ConsentRow {
   email: string | null;
   phone: string | null;
   company: string | null;
-  consent: Record<"sms" | "email" | "voice", string>;
+  consent: Record<"sms" | "email" | "voice" | "mail", string>;
 }
 
 export interface LeadOption {

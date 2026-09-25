@@ -76,6 +76,14 @@ export const CREDIT_COSTS = {
   sms_send: { credits: 4, basis: "cost-plus", description: "Outbound SMS: 1 segment (R3 messaging)" },
   /** One outbound email (R3 messaging core). Raw vendor ~0.1¢ → 1cr floor. */
   email_send: { credits: 1, basis: "cost-plus", description: "Outbound email: 1 message (R3 messaging)" },
+
+  // ── R3 direct mail (added 2026-09-24, Phase 4 R3-integration) ──
+  /** One addressed mail piece sent (postcard|letter). Default ≈ cost-plus
+   * 2.5× on a 4×6 postcard baseline; the dispatcher overrides with the live
+   * provider estimate × margin at send time. */
+  mail_piece: { credits: 250, basis: "cost-plus", description: "Direct mail: 1 addressed piece sent (R3 mail channel)" },
+  /** One address verification (CASS) lookup ahead of a mail piece. */
+  mail_verification: { credits: 5, basis: "cost-plus", description: "Address verification: 1 CASS lookup (R3 mail channel)" },
 } as const satisfies Record<string, CreditCostDef>;
 
 /** Action keys meter() accepts. */

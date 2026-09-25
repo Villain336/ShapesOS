@@ -19,7 +19,7 @@ export default async function NurturePage() {
       <div>
         <h1 className="text-xl font-bold tracking-tight text-stone-900">Nurture Sequences</h1>
         <p className="mt-0.5 text-[13px] text-stone-500">
-          Approval-gated drip sequences across SMS, email, and voice. Every send requires a human approval —
+          Approval-gated drip sequences across SMS, email, voice, and direct mail. Every send requires a human approval —
           nothing auto-sends.
         </p>
       </div>

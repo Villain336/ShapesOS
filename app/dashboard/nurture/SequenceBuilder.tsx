@@ -3,12 +3,14 @@
 // placeholder chips).
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ArrowDown,
   ArrowUp,
+  FileText,
   GripVertical,
   Mail,
+  Mailbox,
   MessageCircle,
   Phone,
   Plus,
@@ -18,15 +20,53 @@ import type { NurtureSequence, NurtureStep } from "./types";
 import { Chip, inputCls, btnPrimary, btnSecondary } from "./ui";
 
 const PLACEHOLDERS = ["firstName", "company", "email", "phone", "unsubscribeUrl"] as const;
+const MAIL_PLACEHOLDERS = ["firstName", "company", "addressLine1", "city", "state", "zip", "qrSlug"] as const;
 
 const CHANNELS = [
   { value: "sms", label: "SMS", Icon: MessageCircle },
   { value: "email", label: "Email", Icon: Mail },
   { value: "voice", label: "Voice", Icon: Phone },
+  { value: "postcard", label: "Postcard", Icon: Mailbox },
+  { value: "letter", label: "Letter", Icon: FileText },
 ] as const;
+
+function isMailChannelValue(channel: string): boolean {
+  return channel === "postcard" || channel === "letter";
+}
+
+function fmtDate(d: Date): string {
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
+/** In-home window preview for a mail step (mailDate + 2d / + 7d transit). */
+function inHomePreview(delayDays: number): string {
+  const mail = new Date(Date.now() + Math.max(0, delayDays) * 86_400_000);
+  const start = new Date(mail.getTime() + 2 * 86_400_000);
+  const end = new Date(mail.getTime() + 7 * 86_400_000);
+  return `Mails ${fmtDate(mail)} → in-home ${fmtDate(start)}–${fmtDate(end)}`;
+}
 
 function blankStep(): NurtureStep {
   return { channel: "sms", delayMinutes: 60, template: "" };
+}
+
+interface StudioCreativeOpt {
+  id: string;
+  name: string;
+  size: string;
+  status: string;
+}
+
+/** Studio print creatives for the mail-step creative picker (T2). */
+function useStudioCreatives() {
+  const [creatives, setCreatives] = useState<StudioCreativeOpt[] | null>(null);
+  useEffect(() => {
+    fetch("/api/studio/creatives?channelTemplate=print&formatTrack=addressed")
+      .then((r) => (r.ok ? r.json() : { creatives: [] }))
+      .then((d) => setCreatives(Array.isArray(d.creatives) ? d.creatives : []))
+      .catch(() => setCreatives([]));
+  }, []);
+  return creatives;
 }
 
 export function SequenceBuilder({
@@ -55,6 +95,7 @@ export function SequenceBuilder({
   const [steps, setSteps] = useState<NurtureStep[]>(
     initial?.steps?.length ? initial.steps.map((s) => ({ ...s })) : [blankStep()],
   );
+  const studioCreatives = useStudioCreatives();
 
   const updateStep = (i: number, patch: Partial<NurtureStep>) =>
     setSteps((prev) => prev.map((s, j) => (j === i ? { ...s, ...patch } : s)));
@@ -126,7 +167,7 @@ export function SequenceBuilder({
                   <GripVertical size={13} className="text-stone-300" />
                   Step {i + 1}
                 </span>
-                <div className="flex rounded-md border border-stone-300 bg-white p-px">
+                <div className="flex flex-wrap rounded-md border border-stone-300 bg-white p-px">
                   {CHANNELS.map(({ value, label, Icon }) => (
                     <button
                       key={value}
@@ -139,17 +180,31 @@ export function SequenceBuilder({
                     </button>
                   ))}
                 </div>
-                <label className="flex items-center gap-1.5 text-[12px] text-stone-600">
-                  Delay
-                  <input
-                    type="number"
-                    min={0}
-                    value={step.delayMinutes}
-                    onChange={(e) => updateStep(i, { delayMinutes: Math.max(0, Math.floor(Number(e.target.value) || 0)) })}
-                    className="w-20 rounded-md border border-stone-300 bg-white px-2 py-1 text-[12px] focus:border-violet-500 focus:outline-none"
-                  />
-                  min
-                </label>
+                {isMailChannelValue(step.channel) ? (
+                  <label className="flex items-center gap-1.5 text-[12px] text-stone-600">
+                    Delay
+                    <input
+                      type="number"
+                      min={0}
+                      value={step.delayDays ?? 1}
+                      onChange={(e) => updateStep(i, { delayDays: Math.max(0, Math.floor(Number(e.target.value) || 0)) })}
+                      className="w-20 rounded-md border border-stone-300 bg-white px-2 py-1 text-[12px] focus:border-violet-500 focus:outline-none"
+                    />
+                    days
+                  </label>
+                ) : (
+                  <label className="flex items-center gap-1.5 text-[12px] text-stone-600">
+                    Delay
+                    <input
+                      type="number"
+                      min={0}
+                      value={step.delayMinutes}
+                      onChange={(e) => updateStep(i, { delayMinutes: Math.max(0, Math.floor(Number(e.target.value) || 0)) })}
+                      className="w-20 rounded-md border border-stone-300 bg-white px-2 py-1 text-[12px] focus:border-violet-500 focus:outline-none"
+                    />
+                    min
+                  </label>
+                )}
                 <div className="ml-auto flex items-center gap-1">
                   <button
                     className="rounded p-1 text-stone-400 hover:bg-stone-200 hover:text-stone-700 disabled:opacity-30"
@@ -177,6 +232,32 @@ export function SequenceBuilder({
                   </button>
                 </div>
               </div>
+              {isMailChannelValue(step.channel) ? (
+                <div className="mb-2 space-y-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <select
+                      className={`${inputCls} max-w-[300px]`}
+                      value={step.creativeId ?? ""}
+                      onChange={(e) => updateStep(i, { creativeId: e.target.value || undefined })}
+                      title="Studio creative (optional — ad-hoc copy creative is hash-bound automatically)"
+                    >
+                      <option value="">Ad-hoc copy creative (auto)</option>
+                      {(studioCreatives ?? []).map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name} — {c.size} ({c.status})
+                        </option>
+                      ))}
+                    </select>
+                    <span className="text-[12px] text-stone-500">
+                      {inHomePreview(step.delayDays ?? 1)}
+                      <span className="text-stone-400"> · USPS transit 2–7 days · approval binds creative + spend</span>
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-stone-400">
+                    Recipient needs a physical address on file (CRM custom field <span className="font-mono">address</span>) and mail opt-in. Unverifiable addresses are quarantined, never mailed.
+                  </p>
+                </div>
+              ) : null}
               {step.channel === "email" ? (
                 <input
                   className={`${inputCls} mb-2`}
@@ -192,12 +273,14 @@ export function SequenceBuilder({
                 placeholder={
                   step.channel === "email"
                     ? "Hi {{firstName}}, … ({{unsubscribeUrl}} is appended for compliance)"
-                    : "Hi {{firstName}}, …"
+                    : isMailChannelValue(step.channel)
+                      ? "Hi {{firstName}}, … ({{addressLine1}}, {{city}} merge from the lead's address; {{qrSlug}} for the tracking QR)"
+                      : "Hi {{firstName}}, …"
                 }
               />
               <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                 <span className="text-[11px] text-stone-400">Insert:</span>
-                {PLACEHOLDERS.map((ph) => (
+                {(isMailChannelValue(step.channel) ? MAIL_PLACEHOLDERS : PLACEHOLDERS).map((ph) => (
                   <button key={ph} onClick={() => insertPlaceholder(i, ph)} title={`Insert {{${ph}}}`}>
                     <Chip tone="violet">{`{{${ph}}}`}</Chip>
                   </button>

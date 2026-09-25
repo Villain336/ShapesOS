@@ -2,7 +2,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { Mail, MessageCircle, Phone, X } from "lucide-react";
+import { FileText, Mail, Mailbox, MessageCircle, Phone, X } from "lucide-react";
 
 export type Tone = "violet" | "green" | "amber" | "red" | "blue" | "stone" | "zinc";
 
@@ -28,8 +28,24 @@ export function Chip({ tone, children, title }: { tone: Tone; children: ReactNod
 }
 
 export function ChannelChip({ channel }: { channel: string }) {
-  const tone: Tone = channel === "sms" ? "green" : channel === "email" ? "blue" : "violet";
-  const Icon = channel === "sms" ? MessageCircle : channel === "email" ? Mail : Phone;
+  const tone: Tone =
+    channel === "sms"
+      ? "green"
+      : channel === "email"
+        ? "blue"
+        : channel === "postcard" || channel === "letter"
+          ? "amber"
+          : "violet";
+  const Icon =
+    channel === "sms"
+      ? MessageCircle
+      : channel === "email"
+        ? Mail
+        : channel === "postcard"
+          ? Mailbox
+          : channel === "letter"
+            ? FileText
+            : Phone;
   return (
     <Chip tone={tone}>
       <Icon size={11} />

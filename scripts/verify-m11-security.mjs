@@ -129,6 +129,11 @@ const PUBLIC_BY_DESIGN = {
   // Phase 3 (R4): review QR completion — capability model, see route comments.
   "app/api/review-requests/by-token/[token]/complete/route.ts":
     "public QR-landing completion; unlisted random review-request token is the capability (mirrors /r/[slug] vanity model); per-token+IP rate limit; only flips viewed→completed, expired links 410",
+  // Phase 4 (T1): direct-mail provider webhooks — capability model, see route comments.
+  "app/api/webhooks/mail/lob/route.ts":
+    "inbound Lob mail-tracking webhook; HMAC-SHA256 verified (timestamp-bound raw body, lib/mail/lob.ts) before any parsing/logic; invalid signature 401s; idempotent via MailWebhookEvent unique (provider,eventId), duplicate/out-of-order collapse; only updates piece delivery status + attribution touches, never returns data",
+  "app/api/webhooks/mail/postgrid/route.ts":
+    "inbound PostGrid mail-tracking webhook; JWT verified (Bearer or body token/jwt, lib/mail/postgrid.ts) before any parsing/logic; invalid signature 401s; same idempotency + status-update-only semantics as the Lob route",
 };
 const uncovered = [];
 for (const f of routeFiles) {
@@ -152,7 +157,7 @@ const missingAllowList = Object.keys(PUBLIC_BY_DESIGN).filter(k => {
 ok("every public-by-design entry maps to a real route file", missingAllowList.length === 0, missingAllowList.join("; "));
 ok(
   "public-by-design allow-list is documented",
-  Object.keys(PUBLIC_BY_DESIGN).length === 17 &&
+  Object.keys(PUBLIC_BY_DESIGN).length === 19 &&
     Object.values(PUBLIC_BY_DESIGN).every(v => v.length > 20)
 );
 

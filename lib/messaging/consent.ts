@@ -15,7 +15,7 @@ import { prisma } from "@/lib/prisma";
 import { normalizePhone } from "@/lib/calls/inbound";
 import type { ContactConsent } from "@prisma/client";
 
-export type ConsentChannel = "sms" | "email" | "voice";
+export type ConsentChannel = "sms" | "email" | "voice" | "mail";
 export type ConsentStatus = "unknown" | "pending" | "opted_in" | "opted_out";
 
 const VALID_STATUSES: ConsentStatus[] = ["unknown", "pending", "opted_in", "opted_out"];

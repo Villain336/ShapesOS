@@ -13,22 +13,31 @@
 //   (a) consent  → opted_out → suppress "opt_out"; anything but opted_in →
 //       suppress "no_consent". NEVER sends without explicit opt-in.
 //   (b) quiet hours → DEFER scheduledFor to the window's end (reschedule,
-//       never suppress — mirrors lib/calls/reminders.ts).
-//   (c) per-workspace daily cap → suppress "cap".
+//       never suppress — mirrors lib/calls/reminders.ts). Direct mail
+//       (postcard|letter) skips this: timing is the date-based in-home
+//       window (mailDate + USPS transit) — see ./mail-channel.ts.
+//   (c) per-workspace daily cap → suppress "cap" (shared across channels,
+//       counting SMS/email/voice rows AND mail pieces).
 //   (d) approval → Phase 3 is MANUAL-ONLY: without a valid approved
 //       ApprovalItem the message stays "queued" (a pending ApprovalItem is
-//       created when none was supplied). Nothing sends autonomously.
+//       created when none was supplied). Nothing sends autonomously. Direct
+//       mail instead uses T1's MailApproval (binds creativeHash + pieceCount
+//       + maxSpendCents) via queueMailPiece — it is not an OutboundMessage.
 //   (e) provider send → "sent"; every send is meter()ed and audit-logged.
+//       Mail provider calls are owned by T1's lib/mail/service.ts
+//       (executeCampaign = the money gate); dispatchDue sweeps due+approved
+//       nurture MailCampaigns through it.
 //
 // Voice: accepted in the input type for forward-compat but NOT implemented
 // in R3 — queueMessage throws an explicit error rather than silently
-// dropping it.
+// dropping it. Mail channels likewise throw in queueMessage: use
+// queueMailPiece (lib/messaging/mail-channel.ts).
 
 import { prisma } from "@/lib/prisma";
 import { meter } from "@/lib/metering/service";
 import { auditEvent } from "@/lib/auditlog";
-import type { ApprovalItem, OutboundMessage } from "@prisma/client";
-import { getConsent } from "./consent";
+import type { OutboundMessage } from "@prisma/client";
+import { getConsent, type ConsentChannel } from "./consent";
 import {
   getMessagingSettings,
   resolveRecipientTimezone,
@@ -43,19 +52,24 @@ import {
   ProviderNotConfiguredError,
 } from "./provider";
 import { signUnsubscribeToken } from "./consent";
+import { isMailChannel, dispatchDueNurtureMail } from "./mail-channel";
+
+import {
+  requestApproval,
+  decideApproval,
+  approvalKindFor,
+  type MessageKind,
+} from "./approvals";
+// Approval primitives live in ./approvals.ts (re-exported here so the
+// dispatcher contract is unchanged); the mail channel imports them from
+// there directly to avoid an import cycle.
+export { requestApproval, decideApproval, approvalKindFor, type MessageKind };
 
 // ---------------------------------------------------------------------------
 // Contract types
 // ---------------------------------------------------------------------------
 
-export type MessageChannel = "sms" | "email" | "voice";
-export type MessageKind =
-  | "sequence"
-  | "speed_to_lead"
-  | "missed_call_textback"
-  | "review_request"
-  | "broadcast"
-  | "manual";
+export type MessageChannel = "sms" | "email" | "voice" | "postcard" | "letter";
 
 export interface QueueMessageInput {
   workspaceId: string;
@@ -67,6 +81,10 @@ export interface QueueMessageInput {
   approvalId?: string;
   scheduledFor?: Date;
   requestedBy?: string;
+  /** Mail-only: Studio creative id + USPS transit assumption (days). */
+  mail?: { creativeId?: string; inHomeTransitDays?: [number, number] };
+  /** Sequence context for mail-step approvals (kind "sequence_send"). */
+  sequence?: { sequenceId: string; enrollmentId: string; stepIndex: number };
 }
 
 export interface DispatchResult {
@@ -95,67 +113,6 @@ export function messageCredits(channel: "sms" | "email", body: string): number {
 
 function meterAction(channel: "sms" | "email"): string {
   return channel === "sms" ? "sms_send" : "email_send";
-}
-
-// ---------------------------------------------------------------------------
-// Approvals
-// ---------------------------------------------------------------------------
-
-/** QueueMessageInput.kind → ApprovalItem.kind for auto-created approvals.
- * ApprovalItem.kind is a free-form string in the schema; requestApproval
- * accepts any non-empty kind so sibling agents (reviews: "review_request")
- * can use their own vocabulary. */
-export function approvalKindFor(kind: MessageKind): string {
-  switch (kind) {
-    case "review_request":
-      return "review_response";
-    case "broadcast":
-      return "broadcast";
-    default:
-      return "sequence_send";
-  }
-}
-
-export async function requestApproval(input: {
-  workspaceId: string;
-  kind: string;
-  payload: unknown;
-  requestedBy?: string;
-}): Promise<ApprovalItem> {
-  const kind = (input.kind ?? "").trim();
-  if (!kind) throw new Error("approval kind is required");
-  return prisma.approvalItem.create({
-    data: {
-      workspaceId: input.workspaceId,
-      kind,
-      payload: (input.payload ?? {}) as object,
-      status: "pending",
-      requestedBy: input.requestedBy ?? null,
-    },
-  });
-}
-
-export async function decideApproval(
-  id: string,
-  workspaceId: string,
-  decision: "approve" | "reject",
-  decidedBy?: string,
-  note?: string,
-): Promise<ApprovalItem> {
-  const item = await prisma.approvalItem.findFirst({ where: { id, workspaceId } });
-  if (!item) throw new Error("Approval item not found");
-  if (item.status !== "pending") {
-    throw new Error(`Approval item is already ${item.status}`);
-  }
-  return prisma.approvalItem.update({
-    where: { id },
-    data: {
-      status: decision === "approve" ? "approved" : "rejected",
-      decidedBy: decidedBy ?? null,
-      decidedAt: new Date(),
-      note: note ?? null,
-    },
-  });
 }
 
 // ---------------------------------------------------------------------------
@@ -215,7 +172,12 @@ async function composeMarketingEmail(
 // queueMessage
 // ---------------------------------------------------------------------------
 
-type SuppressionReason = "opt_out" | "no_consent" | "cap" | "invalid_contact";
+type SuppressionReason = "opt_out" | "no_consent" | "cap" | "invalid_contact" | "invalid_address";
+
+/** Consent ledger channel for a dispatch channel (mail → "mail"). */
+function consentChannelFor(channel: MessageChannel): ConsentChannel {
+  return isMailChannel(channel) ? "mail" : (channel as ConsentChannel);
+}
 
 async function createSuppressed(
   workspaceId: string,
@@ -260,6 +222,14 @@ async function sentTodayCount(workspaceId: string, now: Date): Promise<number> {
 export async function queueMessage(input: QueueMessageInput): Promise<OutboundMessage> {
   if (input.channel === "voice") {
     throw new Error("voice channel is not implemented in R3 messaging core");
+  }
+  // Direct mail is queued through queueMailPiece (./mail-channel.ts), which
+  // creates a T1 MailCampaign + MailPiece per step-run and routes approval
+  // through T1's MailApproval. It is not an OutboundMessage row.
+  if (isMailChannel(input.channel)) {
+    throw new Error(
+      "postcard/letter queue via queueMailPiece (lib/messaging/mail-channel.ts), not queueMessage",
+    );
   }
   const channel = input.channel as "sms" | "email";
   const body = (input.body ?? "").trim();
@@ -512,7 +482,7 @@ export async function dispatchDue(workspaceId?: string): Promise<DispatchResult>
   });
 
   for (const msg of due) {
-    const channel = msg.channel as "sms" | "email" | "voice";
+    const channel = msg.channel as MessageChannel;
     if (channel === "voice" || !msg.leadId) {
       await prisma.outboundMessage.update({
         where: { id: msg.id },
@@ -523,7 +493,7 @@ export async function dispatchDue(workspaceId?: string): Promise<DispatchResult>
     }
 
     // (a) consent re-check.
-    const consent = await getConsent(msg.workspaceId, msg.leadId, channel);
+    const consent = await getConsent(msg.workspaceId, msg.leadId, consentChannelFor(channel));
     if (consent !== "opted_in") {
       await prisma.outboundMessage.update({
         where: { id: msg.id },
@@ -578,6 +548,18 @@ export async function dispatchDue(workspaceId?: string): Promise<DispatchResult>
     if (sent.status === "sent" || sent.status === "delivered") out.sent += 1;
     else if (sent.status === "failed") out.failed += 1;
     else out.suppressed += 1;
+  }
+
+  // Direct mail: due + approved nurture MailCampaigns → T1 executeCampaign
+  // (the money gate). Mail pieces are not OutboundMessage rows.
+  const mailWorkspaces = workspaceId
+    ? [workspaceId]
+    : (await prisma.workspace.findMany({ select: { id: true } })).map((w) => w.id);
+  for (const wsId of mailWorkspaces) {
+    const mail = await dispatchDueNurtureMail(wsId, now);
+    out.sent += mail.sent;
+    out.suppressed += mail.suppressed;
+    out.failed += mail.failed;
   }
   return out;
 }

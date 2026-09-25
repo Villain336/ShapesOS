@@ -313,11 +313,11 @@ enum SiteSourceType {
 
 model Workspace {
   attributionBundles AttributionBundle[]
-  id          String @id @default(cuid())
-  name        String
+  id                 String              @id @default(cuid())
+  name               String
   // owner_user_id: external auth subject (Auth.js user id) — auth wired in milestone 2
-  ownerUserId String @map("owner_user_id")
-  plan        Plan   @default(self_hosted)
+  ownerUserId        String              @map("owner_user_id")
+  plan               Plan                @default(self_hosted)
 
   // White-label config (spec §6): logo_url, custom_domain, brand_color
   whiteLabelLogoUrl      String? @map("white_label_logo_url")
@@ -331,100 +331,104 @@ model Workspace {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  projects              Project[]
-  clients               Client[]
-  apiUsage              ApiUsage[]
+  projects               Project[]
+  clients                Client[]
+  apiUsage               ApiUsage[]
   // Phase 1 (R1): Lead Pipeline CRM back-relations.
-  pipelines             Pipeline[]
-  leads                 Lead[]
-  leadActivities        LeadActivity[]
-  leadCaptureForms      LeadCaptureForm[]
+  pipelines              Pipeline[]
+  leads                  Lead[]
+  leadActivities         LeadActivity[]
+  leadCaptureForms       LeadCaptureForm[]
   // Phase 2 (C2): revenue attribution back-relations.
-  attributionTouches    AttributionTouch[]
-  attributionSpend      AttributionSpend[]
+  attributionTouches     AttributionTouch[]
+  attributionSpend       AttributionSpend[]
   // Phase 2 (R5): call tracking & booking back-relations.
-  callNumbers           CallNumber[]
-  calls                 Call[]
-  bookingPages          BookingPage[]
-  bookings              Booking[]
-  reminders             Reminder[]
+  callNumbers            CallNumber[]
+  calls                  Call[]
+  bookingPages           BookingPage[]
+  bookings               Booking[]
+  reminders              Reminder[]
   // Milestone 11: workspace membership for RBAC (owner/admin/editor/viewer).
-  members               WorkspaceMember[]
+  members                WorkspaceMember[]
   // Milestone 11: workspace-scoped audit events.
-  auditEvents           FileChangeLog[]
+  auditEvents            FileChangeLog[]
   // Phase C (W4): hosted metering.
-  usageEvents           UsageEvent[]
-  creditBalance         CreditBalance?
-  spendCap              SpendCap?
+  usageEvents            UsageEvent[]
+  creditBalance          CreditBalance?
+  spendCap               SpendCap?
   // Milestone 12: white-label brand kits and report templates.
-  brandKits             BrandKit[]
-  reportTemplates       ReportTemplate[]
+  brandKits              BrandKit[]
+  reportTemplates        ReportTemplate[]
   // Milestone 13: alerting hub (channels, rules, event history).
-  alertChannels         AlertChannel[]
-  alertRules            AlertRule[]
-  alertEvents           AlertEvent[]
+  alertChannels          AlertChannel[]
+  alertRules             AlertRule[]
+  alertEvents            AlertEvent[]
   // Milestone 15: backlink pull audit trail (cost accounting).
-  backlinkPulls         BacklinkPull[]
+  backlinkPulls          BacklinkPull[]
   // Milestone 19: newsletter settings (BYO Resend key) and sending domains.
-  newsletterSettings    NewsletterSettings?
-  newsletterDomains     NewsletterDomain[]
+  newsletterSettings     NewsletterSettings?
+  newsletterDomains      NewsletterDomain[]
   // Milestone 20: social scheduling (BYO Buffer access token).
-  socialSettings        SocialSettings?
+  socialSettings         SocialSettings?
   // Milestone 21: ad factory (BYO Higgsfield API key).
-  adSettings            AdSettings?
+  adSettings             AdSettings?
   // Milestone 22: Canva Connect OAuth account + Porkbun keys + registrant contact.
-  studioCanvaAccount    StudioCanvaAccount?
-  studioPorkbunSettings StudioPorkbunSettings?
-  studioRegistrant      StudioRegistrant?
+  studioCanvaAccount     StudioCanvaAccount?
+  studioPorkbunSettings  StudioPorkbunSettings?
+  studioRegistrant       StudioRegistrant?
   // Milestone 14: composite visibility score weights per workspace.
   // { rankings?: number, aiPresence?: number, freshness?: number, coverage?: number }
   // Null = defaults in lib/retention/visibility-score.ts.
   // NOTE (milestone 15): a `backlinks` component is reserved for a later
   // milestone — do not add it to the score until the backlink quality
   // signal is calibrated. visibility-score.ts documents the same note.
-  visibilityWeights     Json?                  @map("visibility_weights")
+  visibilityWeights      Json?                   @map("visibility_weights")
   // Milestone 15: workspace-level monthly cap (USD) on DataForSEO Backlinks
   // spend. Null = DEFAULT_MONTHLY_SPEND_CAP_USD in lib/seo/backlinks-cost.ts.
-  backlinksSpendCapUsd  Float?                 @map("backlinks_spend_cap_usd")
+  backlinksSpendCapUsd   Float?                  @map("backlinks_spend_cap_usd")
   // Milestone 16: workspace-level monthly cap (USD) on DataForSEO local-SEO
   // spend (maps SERP, business data, reviews). Null = DEFAULT_LOCAL_SPEND_CAP_USD.
-  localSeoSpendCapUsd   Float?                 @map("local_seo_spend_cap_usd")
+  localSeoSpendCapUsd    Float?                  @map("local_seo_spend_cap_usd")
   // Phase B (W3, track B1): private workspace filesystem. WorkspaceFile is
   // the authorization boundary — every FS operation re-checks workspace_id
   // against these rows. Storage keys are opaque UUIDs; user filenames never
   // touch storage paths.
-  files               WorkspaceFile[]
-  quota               WorkspaceQuota?
+  files                  WorkspaceFile[]
+  quota                  WorkspaceQuota?
   // Milestone 16: local-SEO pull audit trail (cost accounting) + GBP scaffold.
-  localPulls            LocalPull[]
-  gbpAccounts           GbpAccount[]
+  localPulls             LocalPull[]
+  gbpAccounts            GbpAccount[]
   // Milestone 18: content autopilot kill switches (workspace-level).
-  autopilotKills        AutopilotKillSwitch[]
+  autopilotKills         AutopilotKillSwitch[]
   // Milestone 21: skills, connectors, settings.
-  skills                Skill[]
-  customConnectors      Connector[]
-  connectorConnections  ConnectorConnection[]
-  permissionGrants      PermissionGrant[]
-  workspaceSettings     WorkspaceSettings?
+  skills                 Skill[]
+  customConnectors       Connector[]
+  connectorConnections   ConnectorConnection[]
+  permissionGrants       PermissionGrant[]
+  workspaceSettings      WorkspaceSettings?
   // Phase B (W2, track B2): scheduled skills + parallel subagent runs.
-  scheduledSkills       ScheduledSkill[]
-  skillRuns             SkillRun[]
+  scheduledSkills        ScheduledSkill[]
+  skillRuns              SkillRun[]
   // Hosted Stripe track: overage invoicing state + invoice history.
-  billingWorkspace      BillingWorkspace?
+  billingWorkspace       BillingWorkspace?
   billingOverageInvoices BillingOverageInvoice[]
   // Phase 3 (R3): acquisition-loop messaging back-relations.
-  contactConsents    ContactConsent[]
-  outboundMessages   OutboundMessage[]
-  approvalItems      ApprovalItem[]
-  nurtureSequences   NurtureSequence[]
-  sequenceEnrollments SequenceEnrollment[]
+  contactConsents        ContactConsent[]
+  outboundMessages       OutboundMessage[]
+  approvalItems          ApprovalItem[]
+  nurtureSequences       NurtureSequence[]
+  sequenceEnrollments    SequenceEnrollment[]
   // Phase 3 (R4): review engine back-relations.
-  reviewRequests     ReviewRequest[]
-  reviewSiteConfigs  ReviewSiteConfig[]
+  reviewRequests         ReviewRequest[]
+  reviewSiteConfigs      ReviewSiteConfig[]
   // Phase 3 (R6): prospecting & enrichment back-relations.
-  prospectLists      ProspectList[]
-  prospects          Prospect[]
-  enrichmentLookups  EnrichmentLookup[]
+  prospectLists          ProspectList[]
+  prospects              Prospect[]
+  enrichmentLookups      EnrichmentLookup[]
+  mailProviders          MailProvider[]
+  mailCreatives          MailCreative[]
+  mailCampaigns          MailCampaign[]
+  eddmOrders             EddmOrder[]
 
   @@map("workspaces")
 }
@@ -507,13 +511,13 @@ model Project {
   aiChatThreads           AiChatThread[]
   chatChannel             ChatChannel?
   // Milestone 21: skills, connectors, settings.
-  projectSkills         ProjectSkill[]
-  projectDataSources    ProjectDataSource[]
+  projectSkills           ProjectSkill[]
+  projectDataSources      ProjectDataSource[]
   // Phase B (W2, track B2): scheduled skills + parallel subagent runs.
-  scheduledSkills       ScheduledSkill[]
-  skillRuns             SkillRun[]
-  fileAttachments       FileAttachment[]
-  projectSettings       ProjectSettings?
+  scheduledSkills         ScheduledSkill[]
+  skillRuns               SkillRun[]
+  fileAttachments         FileAttachment[]
+  projectSettings         ProjectSettings?
 
   @@map("projects")
 }
@@ -2565,22 +2569,22 @@ enum ConnectorHealthStatus {
 }
 
 model ConnectorHealth {
-  id          String   @id @default(cuid())
+  id           String              @id @default(cuid())
   // One row per connection; the checker upserts on connectionId.
-  connectionId String  @unique @map("connection_id")
+  connectionId String              @unique @map("connection_id")
   connection   ConnectorConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
   // Denormalized for the workspace summary query (the authorization
   // boundary is still re-checked via ConnectorConnection on every read).
-  workspaceId String  @map("workspace_id")
+  workspaceId  String              @map("workspace_id")
 
-  status      ConnectorHealthStatus @default(unknown)
-  lastCheckAt DateTime @map("last_check_at")
-  lastSuccessAt DateTime? @map("last_success_at")
+  status        ConnectorHealthStatus @default(unknown)
+  lastCheckAt   DateTime              @map("last_check_at")
+  lastSuccessAt DateTime?             @map("last_success_at")
   // Closed-set error code (see lib/connectors/health.ts ERROR_CODES) —
   // never a raw provider message.
-  lastError   String? @map("last_error")
-  quotaUsed   Float?  @map("quota_used")
-  quotaLimit  Float?  @map("quota_limit")
+  lastError     String?               @map("last_error")
+  quotaUsed     Float?                @map("quota_used")
+  quotaLimit    Float?                @map("quota_limit")
 
   // Alert spam guard: cooldown + escalation state (see THREAT-MODEL-connector-health.md).
   lastAlertAt       DateTime? @map("last_alert_at")
@@ -2591,25 +2595,25 @@ model ConnectorHealth {
 }
 
 model Skill {
-  id          String         @id @default(cuid())
-  workspaceId String         @map("workspace_id")
-  workspace   Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  name        String
-  slug        String
-  description String         @db.Text
-  source      SkillSource
-  sourceRef   String?        @map("source_ref")
-  version     String         @default("1.0.0")
+  id            String         @id @default(cuid())
+  workspaceId   String         @map("workspace_id")
+  workspace     Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name          String
+  slug          String
+  description   String         @db.Text
+  source        SkillSource
+  sourceRef     String?        @map("source_ref")
+  version       String         @default("1.0.0")
   // Commit SHA the install is pinned to (url source). Null = not pinned.
-  shaPin      String?        @map("sha_pin")
-  skillMd     String         @map("skill_md") @db.Text
+  shaPin        String?        @map("sha_pin")
+  skillMd       String         @map("skill_md") @db.Text
   // Tool names the skill may invoke, e.g. "google-search-console.query".
-  declaredTools String[]     @map("declared_tools")
-  trustTier   SkillTrustTier @map("trust_tier")
-  installedBy String?        @map("installed_by")
-  installedAt DateTime       @default(now()) @map("installed_at")
+  declaredTools String[]       @map("declared_tools")
+  trustTier     SkillTrustTier @map("trust_tier")
+  installedBy   String?        @map("installed_by")
+  installedAt   DateTime       @default(now()) @map("installed_at")
 
-  projects ProjectSkill[]
+  projects        ProjectSkill[]
   // Phase B (W2, track B2): schedules that run this skill + their run history.
   scheduledSkills ScheduledSkill[]
   skillRuns       SkillRun[]
@@ -2620,12 +2624,12 @@ model Skill {
 }
 
 model ProjectSkill {
-  projectId String  @map("project_id")
-  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  skillId   String  @map("skill_id")
-  skill     Skill   @relation(fields: [skillId], references: [id], onDelete: Cascade)
-  enabled   Boolean @default(true)
-  enabledBy String? @map("enabled_by")
+  projectId String   @map("project_id")
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  skillId   String   @map("skill_id")
+  skill     Skill    @relation(fields: [skillId], references: [id], onDelete: Cascade)
+  enabled   Boolean  @default(true)
+  enabledBy String?  @map("enabled_by")
   enabledAt DateTime @default(now()) @map("enabled_at")
 
   @@id([projectId, skillId])
@@ -2635,18 +2639,18 @@ model ProjectSkill {
 // Workspace-custom MCP servers only. Built-in connectors live in code
 // (lib/connectors/native/registry.ts).
 model Connector {
-  id          String        @id @default(cuid())
-  workspaceId String        @map("workspace_id")
-  workspace   Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  id          String                @id @default(cuid())
+  workspaceId String                @map("workspace_id")
+  workspace   Workspace             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   key         String
-  kind        ConnectorKind @default(mcp)
-  displayName String        @map("display_name")
-  authType    ConnectorAuthType @default(none) @map("auth_type")
+  kind        ConnectorKind         @default(mcp)
+  displayName String                @map("display_name")
+  authType    ConnectorAuthType     @default(none) @map("auth_type")
   // For MCP: { endpoint, transport: "http" | "stdio", command? }
   config      Json?
-  mcpEndpoint String?       @map("mcp_endpoint")
-  createdBy   String?       @map("created_by")
-  createdAt   DateTime      @default(now()) @map("created_at")
+  mcpEndpoint String?               @map("mcp_endpoint")
+  createdBy   String?               @map("created_by")
+  createdAt   DateTime              @default(now()) @map("created_at")
   // Opposite side of ConnectorConnection.connector (M21 connectors).
   connections ConnectorConnection[]
 
@@ -2656,22 +2660,22 @@ model Connector {
 }
 
 model ConnectorConnection {
-  id         String           @id @default(cuid())
+  id            String           @id @default(cuid())
   // Connector key: built-in native key (e.g. "google-search-console") or a
   // custom Connector.key for workspace MCP servers.
-  connectorKey String          @map("connector_key")
-  connectorId  String?         @map("connector_id")
-  connector    Connector?      @relation(fields: [connectorId], references: [id], onDelete: Cascade)
-  workspaceId  String          @map("workspace_id")
-  workspace    Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  connectorKey  String           @map("connector_key")
+  connectorId   String?          @map("connector_id")
+  connector     Connector?       @relation(fields: [connectorId], references: [id], onDelete: Cascade)
+  workspaceId   String           @map("workspace_id")
+  workspace     Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   // Auth.js user id that owns this credential (per-user OAuth).
-  userId      String          @map("user_id")
-  status      ConnectionStatus @default(active)
-  scopes      String[]
+  userId        String           @map("user_id")
+  status        ConnectionStatus @default(active)
+  scopes        String[]
   // Non-sensitive display metadata (account email, property list, ...).
-  meta        Json?
-  connectedAt   DateTime      @default(now()) @map("connected_at")
-  lastRefreshAt DateTime?     @map("last_refresh_at")
+  meta          Json?
+  connectedAt   DateTime         @default(now()) @map("connected_at")
+  lastRefreshAt DateTime?        @map("last_refresh_at")
 
   credential      ConnectorCredential?
   projectBindings ProjectDataSource[]
@@ -2684,29 +2688,29 @@ model ConnectorConnection {
 }
 
 model ConnectorCredential {
-  connectionId String @id @map("connection_id")
-  connection   ConnectorConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  connectionId  String              @id @map("connection_id")
+  connection    ConnectorConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
   // AES-256-GCM envelope via lib/secrets (never logged, never sent to clients).
-  encryptedBlob String @map("encrypted_blob") @db.Text
-  keyVersion    String @default("env-v1") @map("key_version")
-  expiresAt     DateTime? @map("expires_at")
-  updatedAt     DateTime  @updatedAt @map("updated_at")
+  encryptedBlob String              @map("encrypted_blob") @db.Text
+  keyVersion    String              @default("env-v1") @map("key_version")
+  expiresAt     DateTime?           @map("expires_at")
+  updatedAt     DateTime            @updatedAt @map("updated_at")
 
   @@map("connector_credentials")
 }
 
 model ProjectDataSource {
-  id           String              @id @default(cuid())
-  projectId    String              @map("project_id")
-  project      Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  connectionId String              @map("connection_id")
-  connection   ConnectorConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
-  connectorKey String              @map("connector_key")
+  id            String              @id @default(cuid())
+  projectId     String              @map("project_id")
+  project       Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  connectionId  String              @map("connection_id")
+  connection    ConnectorConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  connectorKey  String              @map("connector_key")
   // Per-project binding config, e.g. { property: "https://example.com" } for
   // Search Console, { folderId } for Drive.
-  projectConfig Json?             @map("project_config")
-  createdBy     String?           @map("created_by")
-  createdAt     DateTime          @default(now()) @map("created_at")
+  projectConfig Json?               @map("project_config")
+  createdBy     String?             @map("created_by")
+  createdAt     DateTime            @default(now()) @map("created_at")
 
   @@unique([projectId, connectionId])
   @@index([projectId])
@@ -2719,7 +2723,7 @@ model FileAttachment {
   project      Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
   // Chat session (AiChatThread id) or brief context; null = project-level.
   sessionId    String?  @map("session_id")
-  source       String   // "upload" | "connector"
+  source       String // "upload" | "connector"
   connectorKey String?  @map("connector_key")
   externalRef  String?  @map("external_ref")
   filename     String
@@ -2740,8 +2744,8 @@ model WorkspaceSettings {
   workspace            Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   defaultModel         String?   @map("default_model")
   defaultApprovalMode  String    @default("supervised") @map("default_approval_mode")
-  notificationDefaults Json?    @map("notification_defaults")
-  dataGovernance       Json?    @map("data_governance")
+  notificationDefaults Json?     @map("notification_defaults")
+  dataGovernance       Json?     @map("data_governance")
   // Tool namespaces the agent may use; empty = all enabled.
   agentAllowList       String[]  @map("agent_allow_list")
   updatedBy            String?   @map("updated_by")
@@ -2751,18 +2755,18 @@ model WorkspaceSettings {
 }
 
 model ProjectSettings {
-  projectId            String    @id @map("project_id")
-  project              Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId            String   @id @map("project_id")
+  project              Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
   // JSON overrides of any workspace default, e.g. { defaultModel, notificationDefaults }.
   overrides            Json?
   // Brand context text injected into the agent prompt for this project.
-  brandContext         String?   @map("brand_context") @db.Text
+  brandContext         String?  @map("brand_context") @db.Text
   // Extra domains beyond Project.domain.
   domains              String[]
-  approvalModeOverride String?   @map("approval_mode_override")
-  publishingControls   Json?     @map("publishing_controls")
-  updatedBy            String?   @map("updated_by")
-  updatedAt            DateTime  @updatedAt @map("updated_at")
+  approvalModeOverride String?  @map("approval_mode_override")
+  publishingControls   Json?    @map("publishing_controls")
+  updatedBy            String?  @map("updated_by")
+  updatedAt            DateTime @updatedAt @map("updated_at")
 
   @@map("project_settings")
 }
@@ -2770,16 +2774,16 @@ model ProjectSettings {
 // Granular permission grants beyond the role hierarchy (milestone 21).
 // owner/admin always hold every permission; grants extend to others.
 model PermissionGrant {
-  id          String   @id @default(cuid())
-  workspaceId String   @map("workspace_id")
-  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  id          String         @id @default(cuid())
+  workspaceId String         @map("workspace_id")
+  workspace   Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   // Exactly one of userId / role is set (enforced in code).
-  userId      String?  @map("user_id")
+  userId      String?        @map("user_id")
   role        WorkspaceRole?
   // "skills.install" | "connectors.connect" (open string for future grants).
   permission  String
-  grantedBy   String   @map("granted_by")
-  createdAt   DateTime @default(now()) @map("created_at")
+  grantedBy   String         @map("granted_by")
+  createdAt   DateTime       @default(now()) @map("created_at")
 
   @@index([workspaceId, userId])
   @@map("permission_grants")
@@ -2912,35 +2916,35 @@ model ScheduledSkill {
 
 // One execution of a skill: from a schedule (cron/event) or manual trigger.
 model SkillRun {
-  id          String         @id @default(cuid())
-  scheduleId  String?        @map("schedule_id")
-  schedule    ScheduledSkill? @relation(fields: [scheduleId], references: [id], onDelete: SetNull)
-  workspaceId String         @map("workspace_id")
-  workspace   Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  projectId   String?        @map("project_id")
-  project     Project?       @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  skillId     String         @map("skill_id")
-  skill       Skill          @relation(fields: [skillId], references: [id], onDelete: Cascade)
-  trigger     SkillRunTrigger
+  id           String          @id @default(cuid())
+  scheduleId   String?         @map("schedule_id")
+  schedule     ScheduledSkill? @relation(fields: [scheduleId], references: [id], onDelete: SetNull)
+  workspaceId  String          @map("workspace_id")
+  workspace    Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  projectId    String?         @map("project_id")
+  project      Project?        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  skillId      String          @map("skill_id")
+  skill        Skill           @relation(fields: [skillId], references: [id], onDelete: Cascade)
+  trigger      SkillRunTrigger
   // Server-side trigger lineage (schedule ids, oldest first) for cycle
   // detection. Never client-supplied.
-  lineage     String[]       @default([])
+  lineage      String[]        @default([])
   // Firing event payload (event-triggered runs): stored so the run detail
   // view can show exactly what fired the run.
-  eventPayload Json?         @map("event_payload")
-  status      SkillRunStatus @default(pending)
+  eventPayload Json?           @map("event_payload")
+  status       SkillRunStatus  @default(pending)
   // True when this run was created by the missed-cron catch-up (fires once,
   // marked missed per the decided policy).
-  wasMissed   Boolean        @default(false) @map("was_missed")
-  startedAt   DateTime       @default(now()) @map("started_at")
-  finishedAt  DateTime?      @map("finished_at")
+  wasMissed    Boolean         @default(false) @map("was_missed")
+  startedAt    DateTime        @default(now()) @map("started_at")
+  finishedAt   DateTime?       @map("finished_at")
   // Integer credits (metering ledger arrives in Phase C; fields exist now).
-  creditsUsed Int            @default(0) @map("credits_used")
+  creditsUsed  Int             @default(0) @map("credits_used")
   // Filesystem logical path, e.g. /artifacts/runs/<run-id>/report.md
-  outputPath  String?        @map("output_path")
-  error       String?        @db.Text
-  approvedBy  String?        @map("approved_by")
-  approvedAt  DateTime?      @map("approved_at")
+  outputPath   String?         @map("output_path")
+  error        String?         @db.Text
+  approvedBy   String?         @map("approved_by")
+  approvedAt   DateTime?       @map("approved_at")
 
   subagents SubagentRun[]
 
@@ -3026,13 +3030,13 @@ model McpOAuthCode {
 // Phase C (W5): access tokens (SHA-256 hash stored; raw token never stored).
 model McpOAuthToken {
   // SHA-256 hex of the raw token.
-  tokenHash   String    @id @map("token_hash")
-  clientId    String    @map("client_id")
-  userId      String    @map("user_id")
-  workspaceId String    @map("workspace_id")
+  tokenHash   String   @id @map("token_hash")
+  clientId    String   @map("client_id")
+  userId      String   @map("user_id")
+  workspaceId String   @map("workspace_id")
   scopes      String[]
-  expiresAt   DateTime  @map("expires_at")
-  createdAt   DateTime  @default(now()) @map("created_at")
+  expiresAt   DateTime @map("expires_at")
+  createdAt   DateTime @default(now()) @map("created_at")
 
   @@index([workspaceId])
   @@map("mcp_oauth_tokens")
@@ -3059,31 +3063,31 @@ model McpRateLimit {
 // Postgres trigger that rejects UPDATE/DELETE outright (see
 // lib/metering/THREAT-MODEL-METERING.md T5).
 model UsageEvent {
-  id             String   @id @default(cuid())
-  workspaceId    String   @map("workspace_id")
+  id             String    @id @default(cuid())
+  workspaceId    String    @map("workspace_id")
   workspace      Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  projectId      String?  @map("project_id")
-  project        Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  projectId      String?   @map("project_id")
+  project        Project?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
   // Null = system/scheduler actor.
-  actorId        String?  @map("actor_id")
+  actorId        String?   @map("actor_id")
   // Key into lib/metering/credits.ts CREDIT_COSTS (versioned, v1).
   action         String
   // Integer credits only — 1 credit = $0.01. Never floats.
   credits        Int
   // Set server-side at insert; callers cannot supply it.
-  occurredAt     DateTime @default(now()) @map("occurred_at")
+  occurredAt     DateTime  @default(now()) @map("occurred_at")
   // Caller-supplied idempotency key; UNIQUE so replays can never double-charge.
-  idempotencyKey String   @unique @map("idempotency_key")
+  idempotencyKey String    @unique @map("idempotency_key")
   // Unverified human pointer for disputes (run id, report path) — see T7.
-  evidenceRef    String?  @map("evidence_ref")
+  evidenceRef    String?   @map("evidence_ref")
   // Phase C gaps (G1): MCP API key / OAuth client this charge is attributed
   // to. Null for non-MCP charges. Server-validated to the workspace (T8).
-  keyId          String?  @map("key_id")
+  keyId          String?   @map("key_id")
   // Overage invoicing: portion of `credits` that fell beyond the paid pool
   // (included + purchased) at charge time. Factual accounting written by
   // meter() in-transaction; the invoice cron sums this per month. 0 for
   // in-cap charges and zero-cost actions. See SEAM.md "Overage accrual".
-  overageCredits Int      @default(0) @map("overage_credits")
+  overageCredits Int       @default(0) @map("overage_credits")
 
   @@index([workspaceId, occurredAt])
   @@index([workspaceId, action])
@@ -3096,14 +3100,14 @@ model UsageEvent {
 // inside meter()'s locked transaction (check-then-append is atomic) and the
 // locked period-rollover path — see T2/T6.
 model CreditBalance {
-  workspaceId      String   @id @map("workspace_id")
-  workspace        Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  includedCredits  Int      @map("included_credits")
-  purchasedCredits Int      @default(0) @map("purchased_credits")
+  workspaceId        String    @id @map("workspace_id")
+  workspace          Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  includedCredits    Int       @map("included_credits")
+  purchasedCredits   Int       @default(0) @map("purchased_credits")
   // Null = no purchased credits outstanding.
   purchasedExpiresAt DateTime? @map("purchased_expires_at")
-  usedCredits      Int      @default(0) @map("used_credits")
-  periodStart      DateTime @map("period_start")
+  usedCredits        Int       @default(0) @map("used_credits")
+  periodStart        DateTime  @map("period_start")
 
   @@map("credit_balances")
 }
@@ -3112,20 +3116,20 @@ model CreditBalance {
 // alert at 80%. Admins may raise the cap or disable the block (opt-in
 // overage); the alert still fires.
 model SpendCap {
-  workspaceId  String   @id @map("workspace_id")
-  workspace    Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  workspaceId String    @id @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   // Effective cap in credits. Defaults to included + purchased; an admin can
   // set a custom (higher or lower) value.
-  capCredits   Int      @map("cap_credits")
-  blockAtCap   Boolean  @default(true) @map("block_at_cap")
+  capCredits  Int       @map("cap_credits")
+  blockAtCap  Boolean   @default(true) @map("block_at_cap")
   // Percent of capCredits at which the warning alert fires (default 80).
-  alertAtPct   Int      @default(80) @map("alert_at_pct")
+  alertAtPct  Int       @default(80) @map("alert_at_pct")
   // Once-per-period alert guard: the warning fires only when lastAlertAt is
   // null or older than the current periodStart.
-  lastAlertAt  DateTime? @map("last_alert_at")
+  lastAlertAt DateTime? @map("last_alert_at")
   // Phase C gaps (G1): explicit auto-overage opt-in. Default false — the
   // hard cap stays the default. The billing track flips this on opt-in.
-  autoOverage  Boolean   @default(false) @map("auto_overage")
+  autoOverage Boolean   @default(false) @map("auto_overage")
 
   @@map("spend_caps")
 }
@@ -3138,46 +3142,46 @@ model SpendCap {
 // without Stripe keys). See lib/metering/THREAT-MODEL-BILLING.md B10–B15.
 
 model BillingWorkspace {
-  workspaceId String @id @map("workspace_id")
-  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  workspaceId                String    @id @map("workspace_id")
+  workspace                  Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   // Stripe Customer bound to this workspace (B10). Written only from a
   // signed webhook or an admin-session checkout creation — never from
   // client-supplied input.
-  stripeCustomerId String? @map("stripe_customer_id")
+  stripeCustomerId           String?   @map("stripe_customer_id")
   // True once a setup-mode Checkout completed and the payment method was
   // attached as the customer's default for invoices (B11). Required to
   // enable auto-overage while billing is configured.
-  hasPaymentMethod Boolean @default(false) @map("has_payment_method")
+  hasPaymentMethod           Boolean   @default(false) @map("has_payment_method")
   // Watermark: overage events with occurredAt <= this value are invoiced.
   // Sub-minimum amounts are NOT invoiced but the watermark does not advance,
   // so they carry forward and are billed once the $5 minimum is reached (B15).
   lastOverageInvoicedThrough DateTime? @map("last_overage_invoiced_through")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt                  DateTime  @default(now()) @map("created_at")
+  updatedAt                  DateTime  @updatedAt @map("updated_at")
 
   @@map("billing_workspaces")
 }
 
 model BillingOverageInvoice {
-  id          String @id @default(cuid())
-  workspaceId String @map("workspace_id")
-  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  id               String    @id @default(cuid())
+  workspaceId      String    @map("workspace_id")
+  workspace        Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   // YYYY-MM of the COMPLETED billing month this invoice covers (derived from
   // cutoff - 1ms). Covers all unbilled overage before that month's end,
   // including carried-forward amounts.
   period           String
-  overageCredits   Int     @map("overage_credits")
-  amountCents      Int     @map("amount_cents")
-  stripeInvoiceId  String? @map("stripe_invoice_id")
-  hostedInvoiceUrl String? @map("hosted_invoice_url")
-  invoicePdfUrl    String? @map("invoice_pdf_url")
+  overageCredits   Int       @map("overage_credits")
+  amountCents      Int       @map("amount_cents")
+  stripeInvoiceId  String?   @map("stripe_invoice_id")
+  hostedInvoiceUrl String?   @map("hosted_invoice_url")
+  invoicePdfUrl    String?   @map("invoice_pdf_url")
   // finalized | paid | failed. Updated by invoice.paid / invoice.payment_failed
   // webhooks (B13); dunning after failure is a documented follow-up.
-  status         String   @default("finalized")
+  status           String    @default("finalized")
   // overageinvoice:<workspaceId>:<YYYY-MM> — replay-safe per workspace per
   // month (B12).
-  idempotencyKey String   @unique @map("idempotency_key")
-  createdAt      DateTime @default(now()) @map("created_at")
+  idempotencyKey   String    @unique @map("idempotency_key")
+  createdAt        DateTime  @default(now()) @map("created_at")
 
   @@index([workspaceId, period])
   @@map("billing_overage_invoices")
@@ -3260,38 +3264,38 @@ model Lead {
   projectId   String?   @map("project_id")
   project     Project?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
 
-  name        String
-  email       String?
-  phone       String?
-  company     String?
-  title       String?
-  source      LeadSource @default(other)
-  sourceDetail String?   @map("source_detail")
+  name         String
+  email        String?
+  phone        String?
+  company      String?
+  title        String?
+  source       LeadSource @default(other)
+  sourceDetail String?    @map("source_detail")
   // Stage id — must exist in Pipeline.stages (validated in lib/crm).
-  stage       String    @default("new")
+  stage        String     @default("new")
   // 0–100, computed deterministically by lib/crm/scoring.ts (rules v1).
-  score       Int       @default(0)
-  valueCents  Int?      @map("value_cents")
-  ownerId     String?   @map("owner_id")
-  ownerName   String?   @map("owner_name")
-  starred     Boolean   @default(false)
-  customFields Json?    @map("custom_fields")
+  score        Int        @default(0)
+  valueCents   Int?       @map("value_cents")
+  ownerId      String?    @map("owner_id")
+  ownerName    String?    @map("owner_name")
+  starred      Boolean    @default(false)
+  customFields Json?      @map("custom_fields")
   // Dedup identity: "email:<normalized>" | "phone:<digits>". Unique per
   // workspace when present; the unique constraint is the race-safe backstop
   // behind the check-then-insert in the API (P2002 → 409 duplicate).
-  dedupKey    String?   @map("dedup_key")
+  dedupKey     String?    @map("dedup_key")
 
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
   lastActivityAt DateTime @default(now()) @map("last_activity_at")
 
-  activities LeadActivity[]
+  activities          LeadActivity[]
   // Phase 2 (C2): marketing touches attributed to this lead.
-  attributionTouches AttributionTouch[]
-  bundleRedemptions BundleRedemption[]
+  attributionTouches  AttributionTouch[]
+  bundleRedemptions   BundleRedemption[]
   // Phase 2 (R5): tracked calls and bookings linked to this lead.
-  calls             Call[]
-  bookings          Booking[]
+  calls               Call[]
+  bookings            Booking[]
   // Phase 3: consent, messaging, sequences, review requests, prospect conversion.
   consents            ContactConsent[]
   outboundMessages    OutboundMessage[]
@@ -3348,7 +3352,9 @@ model LeadCaptureForm {
 // credit under first-touch / last-touch / linear. No new billing meter
 // (attribution quality is the tier upsell).
 
-/** The nature of a marketing touch. `first` = the touch that created the lead. */
+/**
+ * The nature of a marketing touch. `first` = the touch that created the lead.
+ */
 enum AttributionTouchType {
   first
   visit
@@ -3358,34 +3364,34 @@ enum AttributionTouchType {
 }
 
 model AttributionTouch {
-  id          String               @id @default(cuid())
-  workspaceId String               @map("workspace_id")
-  workspace   Workspace            @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  leadId      String               @map("lead_id")
-  lead        Lead                 @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  leadId      String    @map("lead_id")
+  lead        Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
 
   // Normalized grouping key used by the dashboard (e.g. "paid_search",
   // "organic_search", "email", "website", "phone", "referral",
   // "social_organic", "direct_mail", "ooh", "qr_code", "direct", "other").
   // Mapping rules live in lib/attribution/touches.ts (channelFor).
-  channel     String
+  channel    String
   // Raw UTM values as captured.
-  source      String?
-  medium      String?
-  campaign    String?
+  source     String?
+  medium     String?
+  campaign   String?
   // Optional link to a ContentItem (Marketr page) for revenue-influenced
   // content. Loose reference (no FK): content can be deleted without
   // destroying the attribution record.
-  contentId   String?              @map("content_id")
-  touchType   AttributionTouchType @default(visit) @map("touch_type")
-  occurredAt  DateTime             @default(now()) @map("occurred_at")
+  contentId  String?              @map("content_id")
+  touchType  AttributionTouchType @default(visit) @map("touch_type")
+  occurredAt DateTime             @default(now()) @map("occurred_at")
   // Dedup identity: sha256 of the touch's natural key with occurredAt
   // truncated to the hour. A double-submitted form or a re-imported CSV row
   // collapses to one touch. Unique per lead; the race-safe backstop is the
   // P2002 handler in lib/attribution/touches.ts (logTouch).
-  dedupHash   String               @map("dedup_hash")
+  dedupHash  String               @map("dedup_hash")
   // Raw extras (utm_term, utm_content, page URL, referrer…).
-  meta        Json?
+  meta       Json?
 
   createdAt DateTime @default(now()) @map("created_at")
 
@@ -3445,7 +3451,7 @@ model CallNumber {
   createdAt    DateTime  @default(now()) @map("created_at")
   updatedAt    DateTime  @updatedAt @map("updated_at")
 
-  calls Call[]
+  calls   Call[]
   bundles AttributionBundle[]
 
   @@index([workspaceId, status])
@@ -3463,7 +3469,7 @@ model Reminder {
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   bookingId   String    @map("booking_id")
   booking     Booking   @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-  kind        String    // confirmation | reminder_24h | reminder_1h
+  kind        String // confirmation | reminder_24h | reminder_1h
   // The channel it was queued for: email (SMS is a future channel).
   channel     String    @default("email")
   to          String
@@ -3490,31 +3496,31 @@ model Reminder {
 // callback also meters call_minutes, matches/creates the lead, and logs
 // the call-source attribution touch (see lib/calls/inbound.ts).
 model Call {
-  id            String      @id @default(cuid())
-  workspaceId   String      @map("workspace_id")
-  workspace     Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  numberId      String      @map("number_id")
-  number        CallNumber  @relation(fields: [numberId], references: [id], onDelete: Cascade)
+  id            String     @id @default(cuid())
+  workspaceId   String     @map("workspace_id")
+  workspace     Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  numberId      String     @map("number_id")
+  number        CallNumber @relation(fields: [numberId], references: [id], onDelete: Cascade)
   // Provider's call SID (Twilio CallSid / fake SID). UNIQUE = idempotency
   // for retried status webhooks.
-  externalSid   String      @unique @map("external_sid")
+  externalSid   String     @unique @map("external_sid")
   from          String
   to            String
-  direction     String      @default("inbound")
-  status        String      @default("in_progress")
-  startedAt     DateTime    @map("started_at")
-  endedAt       DateTime?   @map("ended_at")
-  durationSec   Int         @default(0) @map("duration_sec")
-  recordingUrl  String?     @map("recording_url")
-  transcription String?     @db.Text
-  summary       String?     @db.Text
+  direction     String     @default("inbound")
+  status        String     @default("in_progress")
+  startedAt     DateTime   @map("started_at")
+  endedAt       DateTime?  @map("ended_at")
+  durationSec   Int        @default(0) @map("duration_sec")
+  recordingUrl  String?    @map("recording_url")
+  transcription String?    @db.Text
+  summary       String?    @db.Text
   // Lead the caller matched to (by caller number) or created from the call.
-  leadId        String?     @map("lead_id")
-  lead          Lead?       @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  leadId        String?    @map("lead_id")
+  lead          Lead?      @relation(fields: [leadId], references: [id], onDelete: SetNull)
   // The call-source attribution touch (channel "phone", source
   // "tracking-number") this call produced, if any.
-  touchId       String?     @map("touch_id")
-  createdAt     DateTime    @default(now()) @map("created_at")
+  touchId       String?    @map("touch_id")
+  createdAt     DateTime   @default(now()) @map("created_at")
 
   @@index([workspaceId, startedAt])
   @@index([numberId])
@@ -3553,24 +3559,24 @@ model BookingPage {
 // all future reminder sends; quiet hours are enforced per the page's
 // timezone when reminders are sent.
 model Booking {
-  id               String      @id @default(cuid())
-  workspaceId      String      @map("workspace_id")
-  workspace        Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  pageId           String      @map("page_id")
-  page             BookingPage @relation(fields: [pageId], references: [id], onDelete: Cascade)
-  leadId           String?     @map("lead_id")
-  lead             Lead?       @relation(fields: [leadId], references: [id], onDelete: SetNull)
-  name             String
-  email            String?
-  phone            String?
-  startAt          DateTime    @map("start_at")
-  endAt            DateTime    @map("end_at")
-  status           String      @default("scheduled")
-  consentGiven     Boolean     @default(false) @map("consent_given")
-  remindersOptedOut Boolean    @default(false) @map("reminders_opted_out")
-  remindersSent    Int         @default(0) @map("reminders_sent")
-  notes            String?     @db.Text
-  createdAt        DateTime    @default(now()) @map("created_at")
+  id                String      @id @default(cuid())
+  workspaceId       String      @map("workspace_id")
+  workspace         Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  pageId            String      @map("page_id")
+  page              BookingPage @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  leadId            String?     @map("lead_id")
+  lead              Lead?       @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  name              String
+  email             String?
+  phone             String?
+  startAt           DateTime    @map("start_at")
+  endAt             DateTime    @map("end_at")
+  status            String      @default("scheduled")
+  consentGiven      Boolean     @default(false) @map("consent_given")
+  remindersOptedOut Boolean     @default(false) @map("reminders_opted_out")
+  remindersSent     Int         @default(0) @map("reminders_sent")
+  notes             String?     @db.Text
+  createdAt         DateTime    @default(now()) @map("created_at")
 
   reminders Reminder[]
 
@@ -3593,34 +3599,34 @@ model Booking {
 // ---------------------------------------------------------------------------
 
 model AttributionBundle {
-  id          String   @id @default(cuid())
-  workspaceId String   @map("workspace_id")
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
-  name         String
+  name           String
   // Campaign key stamped on every touch this bundle generates. This is what
   // the attribution dashboard groups by — keep it stable per campaign.
-  campaignName String @map("campaign_name")
-  destinationUrl String @map("destination_url")
+  campaignName   String  @map("campaign_name")
+  destinationUrl String  @map("destination_url")
   // Public redirect slug: /r/<vanitySlug>. Globally unique (not just
   // per-workspace): the public route resolves the slug with no workspace
   // key, so two workspaces sharing a slug would make /r/<slug> ambiguous.
   // The slug is the capability.
-  vanitySlug   String @unique @map("vanity_slug")
-  utmSource    String @default("physical") @map("utm_source")
-  utmMedium    String @default("qr") @map("utm_medium")
-  utmCampaign  String? @map("utm_campaign")
+  vanitySlug     String  @unique @map("vanity_slug")
+  utmSource      String  @default("physical") @map("utm_source")
+  utmMedium      String  @default("qr") @map("utm_medium")
+  utmCampaign    String? @map("utm_campaign")
   // Globally unique promo code (e.g. WAVE-7K2QX9). The code is the capability.
-  promoCode    String @unique @map("promo_code")
+  promoCode      String  @unique @map("promo_code")
 
   // Tracking number provisioned at bundle creation (R5 provider layer).
-  numberId   String?    @map("number_id")
-  number     CallNumber? @relation(fields: [numberId], references: [id], onDelete: SetNull)
+  numberId String?     @map("number_id")
+  number   CallNumber? @relation(fields: [numberId], references: [id], onDelete: SetNull)
 
-  status   String @default("active") // active | disabled
+  status  String @default("active") // active | disabled
   // QR render preset index; "regenerate" cycles it (QR content is the vanity
   // URL, so regeneration is a style change, not a content change).
-  qrStyle  Int    @default(0) @map("qr_style")
+  qrStyle Int    @default(0) @map("qr_style")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -3706,28 +3712,28 @@ model ContactConsent {
 //                    "invalid_contact" | "duplicate".
 // provider: "fake" | "twilio" | "resend".
 model OutboundMessage {
-  id                String     @id @default(cuid())
-  workspaceId       String     @map("workspace_id")
-  workspace         Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  leadId            String?    @map("lead_id")
-  lead              Lead?      @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  id                String    @id @default(cuid())
+  workspaceId       String    @map("workspace_id")
+  workspace         Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  leadId            String?   @map("lead_id")
+  lead              Lead?     @relation(fields: [leadId], references: [id], onDelete: SetNull)
   channel           String
-  direction         String     @default("outbound")
+  direction         String    @default("outbound")
   kind              String
   subject           String?
   body              String
-  status            String     @default("queued")
-  suppressionReason String?    @map("suppression_reason")
-  provider          String     @default("fake")
-  providerSid       String?    @map("provider_sid")
-  scheduledFor      DateTime?  @map("scheduled_for")
-  sentAt            DateTime?  @map("sent_at")
-  deliveredAt       DateTime?  @map("delivered_at")
+  status            String    @default("queued")
+  suppressionReason String?   @map("suppression_reason")
+  provider          String    @default("fake")
+  providerSid       String?   @map("provider_sid")
+  scheduledFor      DateTime? @map("scheduled_for")
+  sentAt            DateTime? @map("sent_at")
+  deliveredAt       DateTime? @map("delivered_at")
   error             String?
-  costCents         Int        @default(0) @map("cost_cents")
+  costCents         Int       @default(0) @map("cost_cents")
   // ApprovalItem id that authorized this send (C3 ladder).
-  approvalId        String?    @map("approval_id")
-  createdAt         DateTime   @default(now()) @map("created_at")
+  approvalId        String?   @map("approval_id")
+  createdAt         DateTime  @default(now()) @map("created_at")
 
   @@index([workspaceId, leadId, createdAt])
   @@index([workspaceId, status, scheduledFor])
@@ -3759,18 +3765,18 @@ model ApprovalItem {
 // status: "draft" | "active" | "paused" | "archived".
 // approvalPolicy: "manual" — Phase 3 ships manual-only (every send approved).
 model NurtureSequence {
-  id             String   @id @default(cuid())
-  workspaceId    String   @map("workspace_id")
+  id             String    @id @default(cuid())
+  workspaceId    String    @map("workspace_id")
   workspace      Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   name           String
   description    String?
-  steps          Json     @default("[]")
-  status         String   @default("draft")
-  approvalPolicy String   @default("manual") @map("approval_policy")
-  dailyCap       Int?     @map("daily_cap")
-  createdBy      String?  @map("created_by")
-  createdAt      DateTime @default(now()) @map("created_at")
-  updatedAt      DateTime @updatedAt @map("updated_at")
+  steps          Json      @default("[]")
+  status         String    @default("draft")
+  approvalPolicy String    @default("manual") @map("approval_policy")
+  dailyCap       Int?      @map("daily_cap")
+  createdBy      String?   @map("created_by")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
 
   enrollments SequenceEnrollment[]
 
@@ -3843,15 +3849,15 @@ model ReviewSiteConfig {
 // icp: { industries[], employeeRange, geo, techSignals[], titles[] }.
 // status: "draft" | "building" | "ready" | "archived".
 model ProspectList {
-  id          String     @id @default(cuid())
-  workspaceId String     @map("workspace_id")
-  workspace   Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   name        String
-  icp         Json       @default("{}")
-  status      String     @default("draft")
-  createdBy   String?    @map("created_by")
-  createdAt   DateTime   @default(now()) @map("created_at")
-  updatedAt   DateTime   @updatedAt @map("updated_at")
+  icp         Json      @default("{}")
+  status      String    @default("draft")
+  createdBy   String?   @map("created_by")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
 
   prospects Prospect[]
 
@@ -3862,26 +3868,26 @@ model ProspectList {
 // R6: enriched prospects. status: "new" | "enriching" | "enriched" | "failed" |
 // "in_sequence" | "converted". research: AI icebreakers/first lines/summary.
 model Prospect {
-  id             String        @id @default(cuid())
-  workspaceId    String        @map("workspace_id")
-  workspace      Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  listId         String        @map("list_id")
-  list           ProspectList  @relation(fields: [listId], references: [id], onDelete: Cascade)
+  id             String       @id @default(cuid())
+  workspaceId    String       @map("workspace_id")
+  workspace      Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  listId         String       @map("list_id")
+  list           ProspectList @relation(fields: [listId], references: [id], onDelete: Cascade)
   company        String?
   name           String?
   email          String?
   phone          String?
   title          String?
   website        String?
-  enrichmentData Json?         @map("enrichment_data")
+  enrichmentData Json?        @map("enrichment_data")
   research       Json?
-  status         String        @default("new")
-  score          Int           @default(0)
-  leadId         String?       @map("lead_id")
-  lead           Lead?         @relation(fields: [leadId], references: [id], onDelete: SetNull)
-  dedupKey       String?       @map("dedup_key")
-  createdAt      DateTime      @default(now()) @map("created_at")
-  updatedAt      DateTime      @updatedAt @map("updated_at")
+  status         String       @default("new")
+  score          Int          @default(0)
+  leadId         String?      @map("lead_id")
+  lead           Lead?        @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  dedupKey       String?      @map("dedup_key")
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
 
   lookups EnrichmentLookup[]
 
@@ -3908,4 +3914,210 @@ model EnrichmentLookup {
   @@index([prospectId, createdAt])
   @@index([workspaceId, createdAt])
   @@map("enrichment_lookup")
+}
+
+// ─── Phase 4: direct mail ────────────────────────────────────────────────
+
+// T1: workspace mail-provider connections. Keys stored as AES-256-GCM
+// envelopes (lib/secrets) — never returned to clients, never logged.
+// provider: "lob" | "postgrid" | "fake". mode: "test" | "live".
+// Live mode is visually fenced in UI and requires per-campaign approval.
+model MailProvider {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  provider         String
+  mode             String    @default("test")
+  testKeyEnc       String?   @map("test_key_enc") @db.Text
+  liveKeyEnc       String?   @map("live_key_enc") @db.Text
+  webhookSecretEnc String?   @map("webhook_secret_enc") @db.Text
+  // "healthy" | "degraded" | "unconfigured" | "error"
+  health           String    @default("unconfigured")
+  healthCheckedAt  DateTime? @map("health_checked_at")
+  healthMessage    String?   @map("health_message")
+
+  campaigns MailCampaign[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([workspaceId, provider])
+  @@index([workspaceId, mode])
+  @@map("mail_provider")
+}
+
+// T2: Creative Studio creatives. The studio is the central home for ALL
+// creative/design work; channelTemplate ("print" | "email" | "social") keeps
+// the door open for non-print templates later without rework.
+// formatTrack: "addressed" (4x6 postcard, #10 letter) | "eddm" (flats only,
+// min 6.125"x11.5" — 4x6 MUST be rejected for eddm at validation).
+// status: "draft" | "ready" | "archived".
+model MailCreative {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  name            String
+  channelTemplate String  @default("print") @map("channel_template")
+  formatTrack     String  @map("format_track")
+  size            String
+  // "canva" | "canva_link" | "upload"
+  source          String  @default("upload")
+  canvaDesignId   String? @map("canva_design_id")
+  canvaExportId   String? @map("canva_export_id")
+  pdfUrl          String? @map("pdf_url")
+  // SHA-256 of the canonical PDF bytes; bound to approvals.
+  creativeHash    String? @map("creative_hash")
+  version         Int     @default(1)
+  status          String  @default("draft")
+  // Format validation report (dimensions, pages, bleed notes).
+  validation      Json?
+
+  campaigns MailCampaign[]
+
+  createdBy String?  @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([workspaceId, formatTrack, status])
+  @@index([workspaceId, channelTemplate])
+  @@map("mail_creative")
+}
+
+// T1: a mail campaign. Approval binds creativeHash + pieceCount + maxSpend.
+model MailCampaign {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  name             String
+  providerId       String?       @map("provider_id")
+  provider         MailProvider? @relation(fields: [providerId], references: [id], onDelete: SetNull)
+  creativeId       String?       @map("creative_id")
+  creative         MailCreative? @relation(fields: [creativeId], references: [id], onDelete: SetNull)
+  // { kind: "crm_segment" | "prospect_list" | "csv", ref: string }
+  audienceSource   Json          @map("audience_source")
+  pieceCount       Int           @default(0) @map("piece_count")
+  verifiedCount    Int           @default(0) @map("verified_count")
+  quarantinedCount Int           @default(0) @map("quarantined_count")
+  estCostCents     Int           @default(0) @map("est_cost_cents")
+  actualCostCents  Int?          @map("actual_cost_cents")
+  // "draft" | "verifying" | "pending_approval" | "approved" | "sending" |
+  // "complete" | "cancelled" | "failed"
+  status           String        @default("draft")
+  // In-home window target (date-based; physical mail has days of latency).
+  inHomeStart      DateTime?     @map("in_home_start")
+  inHomeEnd        DateTime?     @map("in_home_end")
+  mailedAt         DateTime?     @map("mailed_at")
+
+  pieces    MailPiece[]
+  approvals MailApproval[]
+
+  createdBy String?  @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([workspaceId, status])
+  @@map("mail_campaign")
+}
+
+// T1: one addressed piece. qrSlug reuses the Phase 2 physical-attribution
+// kit (bundle-style slugs). verificationStatus: "pending" | "valid" |
+// "corrected" | "quarantined".
+model MailPiece {
+  id         String       @id @default(cuid())
+  campaignId String       @map("campaign_id")
+  campaign   MailCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  leadId             String?   @map("lead_id")
+  addressSnapshot    Json      @map("address_snapshot")
+  verificationStatus String    @default("pending") @map("verification_status")
+  providerPieceId    String?   @map("provider_piece_id")
+  qrSlug             String?   @map("qr_slug")
+  // "queued" | "sent" | "in_transit" | "delivered" | "returned" | "failed" | "suppressed"
+  status             String    @default("queued")
+  suppressionReason  String?   @map("suppression_reason")
+  costCents          Int?      @map("cost_cents")
+  sentAt             DateTime? @map("sent_at")
+  deliveredAt        DateTime? @map("delivered_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([qrSlug])
+  @@index([campaignId, status])
+  @@map("mail_piece")
+}
+
+// T1: raw provider webhook events. eventId is the idempotency key —
+// duplicate/out-of-order deliveries collapse to one ledger entry.
+model MailWebhookEvent {
+  id          String    @id @default(cuid())
+  workspaceId String?   @map("workspace_id")
+  provider    String
+  eventId     String    @map("event_id")
+  eventType   String    @map("event_type")
+  payload     Json
+  processedAt DateTime? @map("processed_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@unique([provider, eventId])
+  @@index([provider, processedAt])
+  @@map("mail_webhook_event")
+}
+
+// T1: C3 approval binding — creative hash + piece count + max spend.
+// status: "pending" | "approved" | "rejected" | "expired".
+model MailApproval {
+  id         String       @id @default(cuid())
+  campaignId String       @map("campaign_id")
+  campaign   MailCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  creativeHash  String    @map("creative_hash")
+  pieceCount    Int       @map("piece_count")
+  maxSpendCents Int       @map("max_spend_cents")
+  status        String    @default("pending")
+  approverId    String?   @map("approver_id")
+  decidedAt     DateTime? @map("decided_at")
+  note          String?
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([campaignId, status])
+  @@map("mail_approval")
+}
+
+// T3: EDDM concierge orders. No API send — human/mailhouse executes;
+// Marketr plans, briefs, tracks, and attributes.
+model EddmOrder {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  name         String
+  zips         Json
+  // [{ zip, routeId, households, selected }]
+  routes       Json      @default("[]")
+  pieceCount   Int       @default(0) @map("piece_count")
+  creativeId   String?   @map("creative_id")
+  mailhouse    String?
+  briefPdfUrl  String?   @map("brief_pdf_url")
+  // "draft" | "briefed" | "at_mailhouse" | "dropped" | "complete" | "cancelled"
+  status       String    @default("draft")
+  costCents    Int       @default(0) @map("cost_cents")
+  postageCents Int       @default(0) @map("postage_cents")
+  printCents   Int       @default(0) @map("print_cents")
+  dropDate     DateTime? @map("drop_date")
+  inHomeStart  DateTime? @map("in_home_start")
+  inHomeEnd    DateTime? @map("in_home_end")
+  qrSlug       String?   @map("qr_slug")
+
+  createdBy String?  @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([qrSlug])
+  @@index([workspaceId, status])
+  @@map("eddm_order")
 }

@@ -679,6 +679,8 @@ function MessageLogTab() {
           <option value="sms">SMS</option>
           <option value="email">Email</option>
           <option value="voice">Voice</option>
+          <option value="postcard">Postcard</option>
+          <option value="letter">Letter</option>
         </select>
         <select className={`${inputCls} w-36`} value={status} onChange={(e) => setStatus(e.target.value)}>
           <option value="">All statuses</option>
@@ -773,7 +775,7 @@ function ConsentTab() {
 
   useEffect(() => { load(); }, [load]);
 
-  const setConsent = async (leadId: string, channel: "sms" | "email" | "voice", status: string) => {
+  const setConsent = async (leadId: string, channel: "sms" | "email" | "voice" | "mail", status: string) => {
     await api("/api/nurture/consent", {
       method: "POST",
       body: JSON.stringify({ leadId, channel, status, source: "manual" }),
@@ -805,6 +807,7 @@ function ConsentTab() {
                 <th className="px-3 py-2 font-medium">SMS</th>
                 <th className="px-3 py-2 font-medium">Email</th>
                 <th className="px-3 py-2 font-medium">Voice</th>
+                <th className="px-3 py-2 font-medium">Mail</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-stone-100">
@@ -814,7 +817,7 @@ function ConsentTab() {
                     <div className="font-medium text-stone-900">{r.name}</div>
                     <div className="text-[12px] text-stone-500">{[r.company, r.email].filter(Boolean).join(" · ") || "—"}</div>
                   </td>
-                  {(["sms", "email", "voice"] as const).map((ch) => (
+                  {(["sms", "email", "voice", "mail"] as const).map((ch) => (
                     <td key={ch} className="px-3 py-2">
                       <select
                         className={`rounded-full border px-2 py-0.5 text-[12px] font-medium focus:outline-none ${

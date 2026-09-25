@@ -12,17 +12,39 @@
 import { prisma } from "@/lib/prisma";
 import { queueMessage, requestApproval } from "./dispatcher";
 import { leadTemplateValues, renderTemplate } from "./templates";
+import { queueMailPiece, sequenceMailSendsToday, type MailChannel } from "./mail-channel";
 
-export type SequenceChannel = "sms" | "email" | "voice";
+export type SequenceChannel = "sms" | "email" | "voice" | MailChannel;
 
 export interface NurtureStep {
   channel: SequenceChannel;
   delayMinutes: number;
   template: string;
   subject?: string;
+  /** Mail steps (postcard|letter): Studio creative id (T2). */
+  creativeId?: string;
+  /** Mail steps: days from step execution to mailDate (hand-to-provider). */
+  delayDays?: number;
+  /** Mail steps: USPS transit assumption [min, max] days. Default [2, 7]. */
+  inHomeWindowDays?: [number, number];
 }
 
-const CHANNELS: SequenceChannel[] = ["sms", "email", "voice"];
+const CHANNELS: SequenceChannel[] = ["sms", "email", "voice", "postcard", "letter"];
+
+export function isMailStep(
+  step: Pick<NurtureStep, "channel">,
+): step is Pick<NurtureStep, "channel"> & { channel: "postcard" | "letter" } {
+  return step.channel === "postcard" || step.channel === "letter";
+}
+
+function parseTransit(raw: unknown): [number, number] {
+  if (Array.isArray(raw) && raw.length === 2) {
+    const lo = Math.max(0, Math.floor(Number(raw[0]) || 0));
+    const hi = Math.max(lo, Math.floor(Number(raw[1]) || 0));
+    if (hi > 0) return [lo, hi];
+  }
+  return [2, 7];
+}
 
 export function parseSteps(raw: unknown): NurtureStep[] {
   if (!Array.isArray(raw)) return [];
@@ -34,14 +56,34 @@ export function parseSteps(raw: unknown): NurtureStep[] {
     const template = rec.template;
     if (!CHANNELS.includes(channel as SequenceChannel)) continue;
     if (typeof template !== "string" || !template.trim()) continue;
+    const mail = channel === "postcard" || channel === "letter";
     steps.push({
       channel: channel as SequenceChannel,
       delayMinutes: Math.max(0, Math.floor(Number(rec.delayMinutes) || 0)),
       template,
       ...(typeof rec.subject === "string" && rec.subject ? { subject: rec.subject } : {}),
+      // Mail-only fields (ignored by sms/email/voice steps).
+      ...(mail && typeof rec.creativeId === "string" && rec.creativeId.trim()
+        ? { creativeId: rec.creativeId.trim() }
+        : {}),
+      ...(mail
+        ? {
+            delayDays:
+              rec.delayDays == null ? 1 : Math.max(0, Math.floor(Number(rec.delayDays) || 0)),
+            inHomeWindowDays: parseTransit(rec.inHomeWindowDays),
+          }
+        : {}),
     });
   }
   return steps;
+}
+
+/** Scheduling delay for a step: mail steps are date-based (delayDays),
+ * everything else is minute-based (delayMinutes). */
+export function stepDelayMs(step: NurtureStep): number {
+  return isMailStep(step)
+    ? (step.delayDays ?? 1) * 86_400_000
+    : step.delayMinutes * 60_000;
 }
 
 function publicOrigin(): string {
@@ -55,16 +97,22 @@ function startOfToday(): Date {
 }
 
 async function sequenceSendsToday(workspaceId: string, sequenceId: string): Promise<number> {
-  // One "sequence_send" approval is requested per queued send, so counting
-  // today's approvals for this sequence is the deterministic daily tally.
-  return prisma.approvalItem.count({
-    where: {
-      workspaceId,
-      kind: "sequence_send",
-      createdAt: { gte: startOfToday() },
-      payload: { path: ["sequenceId"], equals: sequenceId },
-    },
-  });
+  // One "sequence_send" approval is requested per queued SMS/email send, so
+  // counting today's approvals for this sequence is the deterministic daily
+  // tally. Mail steps use T1's MailApproval instead — count the nurture mail
+  // campaigns created for this sequence today as well.
+  const [approvals, mailCampaigns] = await Promise.all([
+    prisma.approvalItem.count({
+      where: {
+        workspaceId,
+        kind: "sequence_send",
+        createdAt: { gte: startOfToday() },
+        payload: { path: ["sequenceId"], equals: sequenceId },
+      },
+    }),
+    sequenceMailSendsToday(workspaceId, sequenceId),
+  ]);
+  return approvals + mailCampaigns;
 }
 
 function renderBody(
@@ -112,7 +160,7 @@ export async function enrollLead(
     where: { sequenceId, leadId, workspaceId },
   });
   const steps = parseSteps(sequence.steps);
-  const nextRunAt = new Date(Date.now() + (steps[0]?.delayMinutes ?? 0) * 60_000);
+  const nextRunAt = new Date(Date.now() + (steps[0] ? stepDelayMs(steps[0]) : 0));
 
   if (existing) {
     if (existing.status === "active") {
@@ -157,7 +205,7 @@ export async function advanceEnrollments(workspaceId?: string): Promise<AdvanceR
     },
     include: {
       sequence: { select: { id: true, workspaceId: true, name: true, status: true, steps: true, dailyCap: true } },
-      lead: { select: { id: true, name: true, company: true, email: true, phone: true } },
+      lead: { select: { id: true, name: true, company: true, email: true, phone: true, customFields: true } },
     },
     take: 500,
     orderBy: { nextRunAt: "asc" },
@@ -193,6 +241,52 @@ export async function advanceEnrollments(workspaceId?: string): Promise<AdvanceR
       }
 
       const step = steps[enr.currentStep];
+
+      if (isMailStep(step)) {
+        // Direct mail step: queueMailPiece creates one T1 MailCampaign + one
+        // MailPiece for this step-run (consent → address → verify → cap →
+        // T1 requestApproval binding creativeHash + pieceCount + maxSpend).
+        // delayDays is applied ONCE, inside queueMailPiece: the due instant
+        // (now) is the base, mailDate = now + delayDays.
+        const queued = await queueMailPiece({
+          workspaceId: seq.workspaceId,
+          leadId: enr.leadId,
+          channel: step.channel,
+          copy: { body: step.template },
+          creativeId: step.creativeId,
+          delayDays: step.delayDays ?? 1,
+          inHomeTransitDays: step.inHomeWindowDays ?? [2, 7],
+          sequenceId: seq.id,
+          enrollmentId: enr.id,
+          stepIndex: enr.currentStep,
+          kind: "sequence_step",
+          requestedBy: "nurture-engine",
+        });
+
+        const nextStep = enr.currentStep + 1;
+        if (nextStep >= steps.length) {
+          await prisma.sequenceEnrollment.update({
+            where: { id: enr.id },
+            data: { status: "completed", completedAt: now, nextRunAt: null },
+          });
+          result.completed += 1;
+        } else {
+          // Date-based follow-up: the next step anchors on the piece's
+          // in-home window end, not the mail date. A suppressed piece still
+          // advances (logged on the campaign/piece); fall back to mailDate.
+          const anchor = queued.inHome?.inHomeEnd ?? new Date(now.getTime() + (step.delayDays ?? 1) * 86_400_000);
+          await prisma.sequenceEnrollment.update({
+            where: { id: enr.id },
+            data: {
+              currentStep: nextStep,
+              nextRunAt: new Date(anchor.getTime() + stepDelayMs(steps[nextStep])),
+            },
+          });
+          result.advanced += 1;
+        }
+        continue;
+      }
+
       const body = renderBody(step, enr.lead, enr.leadId);
       // The dispatcher requires a subject for email — fall back to the
       // sequence name so an email step without one still queues.
@@ -241,7 +335,7 @@ export async function advanceEnrollments(workspaceId?: string): Promise<AdvanceR
           where: { id: enr.id },
           data: {
             currentStep: nextStep,
-            nextRunAt: new Date(now.getTime() + steps[nextStep].delayMinutes * 60_000),
+            nextRunAt: new Date(now.getTime() + stepDelayMs(steps[nextStep])),
           },
         });
         result.advanced += 1;

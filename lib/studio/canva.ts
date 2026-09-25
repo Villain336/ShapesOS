@@ -50,6 +50,15 @@ export interface CanvaExport {
   downloadUrls: string[];
 }
 
+/**
+ * Export formats Marketr requests. "pdf_print" is a Marketr alias for the
+ * highest-quality PDF the Connect API can produce ({ type:"pdf",
+ * export_quality:"pro" }) — the API has NO separate PDF Print variant, no
+ * bleed/crop-mark flags, and no CMYK option (verified against Canva's API
+ * reference 2026-09-24). See lib/studio/creatives.ts for the full findings.
+ */
+export type CanvaExportFormat = "png" | "jpg" | "pdf" | "pdf_print" | "mp4";
+
 export interface CanvaOAuthTokens {
   accessToken: string;
   refreshToken: string;
@@ -101,11 +110,11 @@ export interface CanvaPort {
     brandTemplateId: string,
     data: Record<string, { type: "text" | "image"; text?: string; assetId?: string }>,
   ): Promise<{ designId: string }>;
-  /** Start an export job for a design. format: png | jpg | pdf | mp4. */
+  /** Start an export job for a design. "pdf_print" = highest-quality PDF alias. */
   startExport(
     accessToken: string,
     designId: string,
-    format: "png" | "jpg" | "pdf" | "mp4",
+    format: CanvaExportFormat,
   ): Promise<{ exportId: string }>;
   /** Poll an export job. */
   getExport(accessToken: string, exportId: string): Promise<CanvaExport>;
@@ -268,12 +277,44 @@ export function createCanvaPort(): CanvaPort {
       return { designId: String(job.id ?? body.design_id ?? "") };
     },
     async startExport(accessToken, designId, format) {
-      const body = (await canvaFetch(accessToken, "/exports", {
-        method: "POST",
-        body: JSON.stringify({ design_id: designId, format }),
-      })) as Record<string, unknown>;
-      const job = (body.job ?? {}) as Record<string, unknown>;
-      return { exportId: String(job.id ?? "") };
+      // Per Canva's API reference, POST /exports takes format as an OBJECT
+      // with a "type" field (a bare string 400s with "'type' must not be
+      // null"). The only PDF variant is { type:"pdf" } with export_quality
+      // regular|pro — no bleed/crop/CMYK options exist in the Connect API.
+      const formatObject = (f: CanvaExportFormat): Record<string, unknown> => {
+        switch (f) {
+          case "pdf_print":
+            return { type: "pdf", export_quality: "pro" };
+          case "pdf":
+            return { type: "pdf" };
+          case "png":
+            return { type: "png" };
+          case "jpg":
+            return { type: "jpg", quality: 95 };
+          case "mp4":
+            return { type: "mp4", quality: "horizontal_1080p" };
+        }
+      };
+      try {
+        const body = (await canvaFetch(accessToken, "/exports", {
+          method: "POST",
+          body: JSON.stringify({ design_id: designId, format: formatObject(format) }),
+        })) as Record<string, unknown>;
+        const job = (body.job ?? {}) as Record<string, unknown>;
+        return { exportId: String(job.id ?? "") };
+      } catch (err) {
+        // "pro" export quality is a premium feature — fall back to regular
+        // quality rather than failing the whole export.
+        if (format === "pdf_print" && /premium|pro plan|export_quality/i.test(err instanceof Error ? err.message : "")) {
+          const body = (await canvaFetch(accessToken, "/exports", {
+            method: "POST",
+            body: JSON.stringify({ design_id: designId, format: { type: "pdf" } }),
+          })) as Record<string, unknown>;
+          const job = (body.job ?? {}) as Record<string, unknown>;
+          return { exportId: String(job.id ?? "") };
+        }
+        throw err;
+      }
     },
     async getExport(accessToken, exportId) {
       const body = (await canvaFetch(accessToken, `/exports/${exportId}`)) as Record<string, unknown>;
