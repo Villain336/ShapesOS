@@ -128,9 +128,10 @@ never buys; kill switches on cost-per-call/lead.
 Attribution data feeds planning → winning creative propagates across channels →
 budgets shift to what converts → compounding per client. Concretely: a
 cross-channel optimization agent that proposes budget reallocation (human
-approves), a creative-recycling pipeline (winning mailer → billboard variant),
-and client-facing "growth autopilot" reports. Depends on: all of C1–C4 and at
-least one paid channel live.
+approves — §3.1 autopilot money rules apply), a creative-recycling pipeline
+(winning mailer → billboard variant), and client-facing supervised growth
+reports (proposals + results; spend changes always human-approved).
+Depends on: all of C1–C4 and at least one paid channel live.
 
 ---
 
@@ -187,8 +188,14 @@ trail proofs.
 
 **Phase 6 — Authority & relevance (2 cycles).** Guest-post outreach engine,
 digital PR, local listings/citations, answer-engine optimization agent, maps/
-review-site agent. *Why: compounds everything above; outreach rides the email
-infra from Phase 3.* Exit: deliverability safeguards, placement-tracking
+review-site agent. Plus the **Onboarding Intelligence Report** (adopted from
+the GrowthOS direction, 2026-09-25): connect the client's stack (site, GBP,
+GA4, Search Console, ads, CRM, email, social) → a full audit pack (company
+intelligence, market position, competitor map, website/brand/SEO/paid-media/
+reputation/conversion/CRM/content/technology audits, revenue opportunities) →
+a recommended 90-day Growth Plan. *Why: compounds everything above; outreach
+rides the email infra from Phase 3; the Intelligence Report is the wedge demo
+that sells the platform.* Exit: deliverability safeguards, placement-tracking
 accuracy, no autonomous publishing without approval.
 
 **Phase 7 — The flywheel + public launch (ongoing).** Cross-channel budget
@@ -197,11 +204,50 @@ testing (deferred until attribution + volume exist), CTV/commercials buying
 path, DSP seat when aggregate volume justifies it. Public launch: open-source
 the core, commercial-license the ecosystem (see §4).
 
+**Phase 8 — The agentic substrate: Business Graph + Campaign object + Growth
+Memory (2–3 cycles).** Adopted from the GrowthOS direction (2026-09-25). A
+per-client Business Graph (customers, competitors, products, services, prices,
+brand, employees, locations, historical campaigns, reviews, website, CRM,
+sales performance, creative assets, keywords, content, channels — continuously
+updated, so no agent call starts from zero); the Campaign as a first-class
+cross-channel object (research → offer → audience → messaging → landing page →
+ads → email/SMS → social → retargeting → CRM pipeline → lead scoring →
+reporting under one ID — ending the fragmentation of campaigns across ten
+systems); Growth Memory (every experiment and outcome recorded — what worked,
+what failed, when — queryable by every agent). *Why: the orchestrator is only
+as smart as its memory; this substrate is the moat.* Exit: graph-completeness
+battery, campaign-object E2E across three channels, memory recall correctness
+proofs.
+
+**Phase 9 — GrowthOS: the orchestrator (3+ cycles).** Adopted from the GrowthOS
+direction (2026-09-25). A Chief Strategy Agent that decomposes a revenue goal
+into a coordinated multi-agent plan ("Your revenue goal is $2M — here is the
+audience, offer, landing page, ads, budget, email sequence, CRM pipeline, and
+KPIs. Approve?") and delegates to the specialized executors; a command-bar UX
+("What are we trying to accomplish?" — Linear + Ramp + Bloomberg + ChatGPT, not
+HubSpot); Growth Missions as outcome products (Enter a New City, Launch a
+Product, Fix Declining Growth — each an orchestrated multi-dozen-task run);
+and a versioned Agent Playbooks library (new-location-launch.md,
+recover-declining-seo.md, google-ads-high-cpl.md, …). Autonomy stays
+ladder-governed: Copilot (AI recommends, human executes) → Approval Mode (AI
+prepares, human approves, agents execute) as the default; the §3.1 autopilot
+money rules are structural invariants here, not policy text — no mission or
+playbook moves a dollar without a human-signed approval object. The 17-agent
+roster from the vision doc collapses in implementation: one orchestrator plus a
+handful of executor agents with tools, not seventeen separate agents. *Why:
+this is the product the GrowthOS direction actually describes — an agentic
+growth operating system, not another dashboard — built on the five verified
+phases as its hands.* Exit: mission E2E (Enter a New City against fixtures),
+orchestrator plan-quality review, full adversarial battery on delegated spend
+(every dollar still approval-bound).
+
 **Rough sequencing rationale:** dependency order is Lead → Attribution →
 Engagement (nurture/reviews/calls) → Paid execution (mail, then media) →
-Authority → Flywheel. Revenue starts in Phase 3 (review/messaging margin),
+Authority → Flywheel → Agentic substrate (graph, campaign object, memory) →
+Orchestrator. Revenue starts in Phase 3 (review/messaging margin),
 scales in Phase 4–5 (mail pass-through, media planning fees), compounds in
-Phase 7. BD (AdQuick) runs parallel from Phase 4 — it must not gate Phase 5's
+Phase 7, and the Phase 9 orchestrator turns the whole stack into the
+retainer-replacement product. BD (AdQuick) runs parallel from Phase 4 — it must not gate Phase 5's
 concierge paths.
 
 **What's genuinely hard (no padding):**
@@ -216,6 +262,14 @@ concierge paths.
   the highest legal-risk builds — the ladder isn't optional there.
 - Creative approval is a human gate at every media operator; "fully automated
   media buying" is not a real product, only supervised buying is.
+- The connector long-pole: the GrowthOS direction assumes "access to your
+  stack" — each of Google/Meta/LinkedIn/TikTok/HubSpot/Salesforce/Shopify/
+  WordPress is its own OAuth, rate-limit, and gating story. Phase 9 timelines
+  live or die here; sequence connectors by revenue impact.
+- Cross-company intelligence (aggregate learnings across clients) stays
+  opt-in only — agency clients will not accept their data training the
+  commons by default. Aggregation thresholds plus explicit consent, or it
+  kills the agency tier.
 
 ---
 
@@ -237,6 +291,17 @@ autopilot. Media buying is supervised *always* — not a ladder stage, not an
 exception. Pre-approved budgets are planning constraints (caps/schedules/kill
 switches gating *proposed* buys), never standing spend authority.
 
+**Autopilot money rules (fixed 2026-09-25, non-negotiable):** autopilot NEVER
+initiates, increases, decreases, reallocates, or pauses-then-restarts media
+spend — any change to spend, of any size, requires a human-signed approval
+(per-buy approval or pool-cap approval). The lighter-approval lane inside a
+human-approved pool cap is the maximum automation allowed near money, and the
+pool's auto-approve threshold defaults to disabled until dogfooding proves the
+encumbrance math. No agent, mission, playbook, or orchestrator may move,
+commit, or reallocate a dollar without a human-signed approval object.
+"Growth autopilot" anywhere in this plan means supervised optimization
+*proposals* and reporting — never autonomous spend.
+
 ### 3.2 Media-buying gates (the red lane, concretely)
 
 1. **Per-buy approval binding:** the approval token cryptographically binds the
@@ -247,7 +312,7 @@ switches gating *proposed* buys), never standing spend authority.
    "the price changed" accidents alike.
 2. **Approval expiry:** pending checkouts expire (e.g. 24h); no stale approvals.
 3. **Execution sandbox:** the browser-agent executor runs with least privilege —
-   no access to other workspaces' wallets, no free-form navigation beyond the
+   no access to other workspaces' budget pools, no free-form navigation beyond the
    operator's purchase flow, DOM-level confirmation of the final order summary
    before the last click, receipt capture and reconciliation against the
    approved terms.
@@ -264,26 +329,30 @@ switches gating *proposed* buys), never standing spend authority.
 
 1. **SaaS billing** (existing): Stripe customer + card on file for Marketr
    subscriptions, top-ups, overage invoices. (Shipped.)
-2. **Media wallet** (new, per client workspace): pre-funded balance or
-   dedicated instrument for ad/media spend. Client money in → operator out.
-   Marketr never fronts media on the agency's card and never co-mingles.
+2. **Budget pools** (new, per client workspace, non-custodial): encumbrance-tracked
+   spend caps against the client's own payment instruments. Client money never
+   enters Marketr — the pool is an accounting and enforcement object, not a
+   balance. Optionally backstopped by virtual cards issued on the client's own
+   Brex/Ramp accounts (Marketr stores only card refs, never PANs).
+   **Decided in Phase 5 (2026-09-25): zero custody.** Marketr never holds,
+   fronts, or co-mingles client media funds — spend flows from the client's
+   own accounts/cards; Marketr plans, proposes, and executes against explicit
+   approvals. No money-transmitter exposure by design; the earlier open
+   question is closed.
 3. **Pass-through accounting** (new): provider COGS tracked separately from
    Marketr margin in the ledger; monthly reconciliation (ledger vs. provider
    invoices: Lob, Twilio, Blip, AdQuick) as a scheduled job with alerts on
    drift.
 
-White-label fit: each agency client workspace gets its own media wallet; the
-client funds it; the agency sees spend but can't silently draw from other
-clients' wallets. **Open question with legal teeth:** holding client funds for
-media spend edges toward money-transmitter territory — get counsel's read
-before Phase 5; the fallback is "client pays operator directly, Marketr takes
-a planning fee," which keeps Marketr out of the funds flow entirely.
+White-label fit: each agency client workspace gets its own budget pools; the
+client funds their own instruments; the agency sees spend but can't silently
+draw from other clients' pools.
 
 ### 3.4 Tenant isolation (white-label agencies)
 
 - Workspace-scoped everything: leads, numbers, wallets, approvals, audit logs.
   The existing metering ledger already attributes per workspace — extend the
-  same scoping to CRM records, tracking numbers, and media wallets, with
+  same scoping to CRM records, tracking numbers, and budget pools, with
   battery-proven cross-workspace access denials.
 - Sub-accounts: agency staff roles (owner / media buyer / viewer) with
   least-privilege; media-buyer role can propose but not approve; approvals
@@ -387,6 +456,7 @@ ecosystem arc, split deliberately:
 | Phase 5 | Media buying | Planning fees + % of spend; the retainer-replacement pitch ("run your $3k/mo retainer delivery on a $199 platform") |
 | Phase 6–7 | Outreach + AI relevance | Per-placement / tier upsell; retention value more than direct margin |
 | Phase 7 | Performance pricing | 10–15% revenue share or pay-per-lead — only possible once C2 attribution is airtight; Tico's agency proves it first |
+| Phase 8–9 | GrowthOS orchestrator + Missions | Per-mission fees + platform tier uplift; the retainer-replacement product — planning fees scale with managed spend, never custody |
 
 The business-model shift, restated: from "replace your $400/mo SEO stack" to
 "run your $3k/mo retainer delivery on a $199 platform" to "the growth engine
