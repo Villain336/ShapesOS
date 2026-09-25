@@ -1,0 +1,90 @@
+// Marketr — Phase 8 G3: consolidation status (SPEC-PHASE8.md §6).
+// Server status + client trigger button. Async by design: trigger returns
+// 202 immediately; the pass runs detached on the worker pool.
+
+import { redirect } from "next/navigation";
+import { requireUser, getOrCreateWorkspace } from "@/lib/session";
+import { Badge } from "@/components/vault/shadcn/badge";
+import { DatabaseZap, Clock3 } from "lucide-react";
+import { consolidationStatus } from "@/lib/substrate/memory/consolidate";
+import ConsolidationTrigger from "./consolidation-trigger";
+
+export const dynamic = "force-dynamic";
+
+export const metadata = {
+  title: "Consolidation — Growth Memory — Marketr",
+  description: "Async distillation, contradiction detection, and decay-to-floor pruning.",
+};
+
+function statusVariant(s: string): "secondary" | "outline" | "destructive" {
+  if (s === "succeeded") return "secondary";
+  if (s === "running") return "outline";
+  return "destructive";
+}
+
+export default async function ConsolidationPage() {
+  const user = await requireUser();
+  if (!user?.id) redirect("/login");
+  const workspace = await getOrCreateWorkspace(user.id, user.email);
+  const status = await consolidationStatus(workspace.id);
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-3">
+        <ConsolidationTrigger workspaceId={workspace.id} />
+        <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <DatabaseZap className="h-3.5 w-3.5" aria-hidden />
+          Worker: {status.workerIdentity}
+        </span>
+        <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <Clock3 className="h-3.5 w-3.5" aria-hidden />
+          {status.queueDepth} episodes in the distillation backlog
+        </span>
+      </div>
+
+      {status.lastRun ? (
+        <article className="relative rounded-lg border bg-card p-4">
+          <div className="absolute right-3 top-3">
+            <Badge variant={statusVariant(status.lastRun.status)}>{status.lastRun.status}</Badge>
+          </div>
+          <h3 className="font-medium">Last run</h3>
+          <dl className="mt-3 grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:grid-cols-3">
+            <div><dt className="text-muted-foreground">Started</dt><dd>{new Date(status.lastRun.startedAt).toLocaleString()}</dd></div>
+            <div><dt className="text-muted-foreground">Finished</dt><dd>{status.lastRun.finishedAt ? new Date(status.lastRun.finishedAt).toLocaleString() : "—"}</dd></div>
+            <div><dt className="text-muted-foreground">Episodes scanned</dt><dd>{status.lastRun.episodesScanned}</dd></div>
+            <div><dt className="text-muted-foreground">Facts distilled</dt><dd>{status.lastRun.factsDistilled}</dd></div>
+            <div><dt className="text-muted-foreground">Contradictions invalidated</dt><dd>{status.lastRun.factsInvalidated}</dd></div>
+            <div><dt className="text-muted-foreground">Learnings deduped</dt><dd>{status.lastRun.learningsDeduped}</dd></div>
+            <div><dt className="text-muted-foreground">Rows pruned (decay-to-floor)</dt><dd>{status.lastRun.rowsPruned}</dd></div>
+          </dl>
+          {status.lastRun.error && status.lastRun.status !== "succeeded" && (
+            <p className="mt-3 rounded-md bg-muted p-2 text-xs">Run note: {status.lastRun.error.slice(0, 300)}</p>
+          )}
+        </article>
+      ) : (
+        <div className="rounded-lg border bg-card p-8 text-center text-sm text-muted-foreground">
+          No consolidation runs yet. Trigger the first pass to distill episodes into facts.
+        </div>
+      )}
+
+      {status.recentRuns.length > 1 && (
+        <article className="rounded-lg border bg-card p-4">
+          <h3 className="font-medium">Recent runs</h3>
+          <ul className="mt-2 space-y-1 text-sm">
+            {status.recentRuns.slice(1).map((r) => (
+              <li key={r.id} className="flex items-center gap-2">
+                <Badge variant={statusVariant(r.status)}>{r.status}</Badge>
+                <span className="text-muted-foreground">{new Date(r.startedAt).toLocaleString()}</span>
+              </li>
+            ))}
+          </ul>
+        </article>
+      )}
+
+      <p className="text-xs text-muted-foreground">
+        Decay-to-floor: user-told facts are never pruned. Agent inferences fade after a year and
+        expire only when their decayed confidence falls below the floor — nothing is ever deleted.
+      </p>
+    </div>
+  );
+}

@@ -292,6 +292,171 @@ enum FileChangeAction {
   mcp_oauth_authorized
   mcp_oauth_revoked
   mcp_rpc
+  // Phase 8 (G1): business-graph substrate audit coverage.
+  graph_fact_appended
+  graph_merge_decided
+  graph_connector_changed
+  // Phase 8 (G2): the campaign object — links only, nothing moves money.
+  // Attach/detach orchestrate through existing approval objects.
+  campaign_created
+  campaign_updated
+  campaign_archived
+  campaign_link_attached
+  campaign_link_detached
+  link_proposal_resolved
+}
+
+// ---------------------------------------------------------------------------
+// Phase 8 G2 — The Campaign object
+// ---------------------------------------------------------------------------
+// The object LINKS to fragment tables (mail_campaign, outreach_campaign,
+// media_buy, ctv_campaign, newsletter_broadcast, social_post, experiment,
+// recycling_brief); it never re-models them and never touches their rows.
+// The word "campaign" is overloaded across ten existing tables, so the model
+// is named `growth_campaign` in code (SPEC-PHASE8.md §2 G2).
+
+enum GrowthCampaignObjective {
+  lead_gen
+  sale
+  awareness
+  retention
+  launch
+}
+
+enum GrowthCampaignStatus {
+  draft
+  active
+  paused
+  complete
+  archived
+}
+
+enum CampaignLinkedType {
+  mail_campaign
+  outreach_campaign
+  media_buy
+  ctv_campaign
+  newsletter_broadcast
+  social_post
+  experiment
+  recycling_brief
+}
+
+enum CampaignLinkRole {
+  primary
+  supporting
+}
+
+enum CampaignLinkSource {
+  human
+  naming_convention
+  utm
+  api
+}
+
+enum LinkProposalStatus {
+  pending
+  approved
+  rejected
+}
+
+// The 12 master-plan stages, stored as JSONB on the campaign. Each stage:
+// { key, status: not_started|in_progress|complete|blocked|skipped, note?,
+//   linkedRefs: [{ linkedType, linkedId, stageKey }] }
+// Stage statuses are derived on attach/detach (refs added/removed); humans
+// drive status transitions via the UI.
+model GrowthCampaign {
+  id          String @id @default(cuid()) @map("id")
+  workspaceId String @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  name      String                  @map("name")
+  objective GrowthCampaignObjective @map("objective")
+  status    GrowthCampaignStatus    @default(draft) @map("status")
+
+  stages Json @default("[]") @map("stages")
+
+  // Computed by the rollup engine when links change. Read-only at the API
+  // layer — no route writes this; it's a reporting convenience, not a
+  // spending envelope (§3.1: nothing here moves money).
+  budgetRollupCents Int  @default(0) @map("budget_rollup_cents")
+  reportingConfig   Json @default("{}") @map("reporting_config")
+
+  // HubSpot-style hierarchy, ≤3 levels, enforced in code with cycle
+  // detection (lib/substrate/campaigns).
+  parentCampaignId String?         @map("parent_campaign_id")
+  parentCampaign   GrowthCampaign? @relation("CampaignHierarchy", fields: [parentCampaignId], references: [id], onDelete: SetNull)
+  children         GrowthCampaign[] @relation("CampaignHierarchy")
+
+  createdBy String?  @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  links CampaignLink[]
+  // G2 stub completeness: opposite of CampaignLinkProposal.campaign
+  // (added by G1 track so the schema validates; G2 owns the semantics).
+  linkProposals CampaignLinkProposal[]
+
+  @@index([workspaceId, status])
+  @@index([parentCampaignId])
+  @@map("growth_campaigns")
+}
+
+// First-class link rows with provenance — never a JSON array — so unlinking
+// is surgical and auditable.
+model CampaignLink {
+  id         String @id @default(cuid()) @map("id")
+  campaignId String @map("campaign_id")
+  campaign   GrowthCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  linkedType CampaignLinkedType @map("linked_type")
+  linkedId   String             @map("linked_id")
+
+  role       CampaignLinkRole   @default(primary) @map("role")
+  linkSource CampaignLinkSource @default(human) @map("link_source")
+
+  // Opaque platform ref — the object never re-models Meta's ad sets or
+  // Google's asset groups. { platform, platform_campaign_ref,
+  // hierarchy_snapshot, budget_semantics_note }
+  platformRef Json? @map("platform_ref")
+
+  linkedAt DateTime @default(now()) @map("linked_at")
+  linkedBy String?  @map("linked_by")
+
+  @@unique([campaignId, linkedType, linkedId])
+  @@index([campaignId])
+  @@index([linkedType, linkedId])
+  @@map("campaign_links")
+}
+
+// Human review queue for the backfill proposer. Precision over recall:
+// proposals never auto-materialize into links.
+model CampaignLinkProposal {
+  id          String @id @default(cuid()) @map("id")
+  workspaceId String @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  campaignId String?         @map("campaign_id")
+  campaign   GrowthCampaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+
+  linkedType CampaignLinkedType @map("linked_type")
+  linkedId   String             @map("linked_id")
+
+  // [{ signal: name_similarity|utm_campaign|date_proximity|shared_audience|shared_creative,
+  //    detail, score }]
+  matchSignals Json @default("[]") @map("match_signals")
+  confidence   Float @default(0) @map("confidence")
+
+  status    LinkProposalStatus @default(pending) @map("status")
+  decidedBy String?            @map("decided_by")
+  decidedAt DateTime?          @map("decided_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([workspaceId, status])
+  @@index([workspaceId, linkedType, linkedId])
+  @@map("campaign_link_proposals")
 }
 
 enum ProgrammaticPageStatus {
@@ -334,6 +499,9 @@ model Workspace {
   projects               Project[]
   clients                Client[]
   apiUsage               ApiUsage[]
+  // Phase 8 G2: campaign object back-relations.
+  growthCampaigns        GrowthCampaign[]
+  campaignLinkProposals  CampaignLinkProposal[]
   // Phase 1 (R1): Lead Pipeline CRM back-relations.
   pipelines              Pipeline[]
   leads                  Lead[]
@@ -343,6 +511,18 @@ model Workspace {
   ctvCampaigns           CtvCampaign[]
   ctvCreativeValidations CtvCreativeValidation[]
   ctvSpots               CtvSpot[]
+  // Phase 8 (G1): business-graph substrate back-relations.
+  graphFacts     GraphFact[]
+  graphNodes     GraphNode[]
+  graphEdges     GraphEdge[]
+  graphErQueue   GraphErQueue[]
+  graphConnectors GraphConnector[]
+  graphSyncJobs  GraphSyncJob[]
+  // Phase 8 (G3): growth-memory substrate back-relations.
+  memoryEpisodes         MemoryEpisode[]
+  memoryFacts            MemoryFact[]
+  memoryLearnings        MemoryLearning[]
+  memoryConsolidationRuns MemoryConsolidationRun[]
   ctvIos                 CtvIo[]
   ctvPixels              CtvPixel[]
   launchChecklists       LaunchChecklist[]
@@ -6226,4 +6406,404 @@ model LaunchChecklist {
   @@index([workspaceId, category])
   @@index([workspaceId, status])
   @@map("launch_checklist")
+}
+
+// ============================================================
+// Phase 8 G1 — Business Graph substrate (SPEC-PHASE8.md §2 G1, §4).
+// Postgres-native graph: append-only graph_facts log, resolved
+// graph_nodes current state, bi-temporal graph_edges (Graphiti-style
+// valid_at/invalid_at + created_at/expired_at), human-gated ER queue,
+// connector hub + sync-job bookkeeping. RLS tenant isolation from day
+// one (see migration: FORCE ROW LEVEL SECURITY + app.workspace_id GUC).
+// The substrate reads/computes — it never touches spend (§3.1).
+// ============================================================
+
+enum GraphEntityType {
+  customer
+  competitor
+  product
+  service
+  price
+  brand
+  employee
+  location
+  campaign_ref
+  review
+  website
+  crm_record
+  creative_asset
+  keyword
+  content
+  channel
+  offer
+  audience
+  landing_page
+  form_cta
+}
+
+enum GraphErStatus {
+  pending
+  approved
+  rejected
+}
+
+enum GraphConnectorPlatform {
+  hubspot
+  salesforce
+  shopify
+  woocommerce
+  google_ads
+  meta
+  tiktok
+  linkedin
+}
+
+enum GraphConnectorStatus {
+  connected
+  pending
+  error
+  revoked
+}
+
+enum GraphSyncTier {
+  webhook
+  scheduled
+  manual
+}
+
+enum GraphSyncJobStatus {
+  idle
+  running
+  succeeded
+  failed
+  backing_off
+  dead
+}
+
+// Append-only fact log. Application code NEVER updates or deletes rows
+// here (safety invariant §9.4) — corrections are new facts; retention
+// archival moves rows to cold storage without mutating them.
+model GraphFact {
+  id             String   @id @default(cuid()) @map("id")
+  workspaceId    String   @map("workspace_id")
+  workspace      Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  // connector id | manual | import | onboarding
+  source         String   @map("source")
+  sourceRecordId String   @map("source_record_id")
+  // deterministic node key hint, e.g. "customer:email:amy@example.com"
+  entityRef      String   @map("entity_ref")
+  factType       String   @map("fact_type")
+  payload        Json     @map("payload")
+  observedAt     DateTime @map("observed_at")
+  ingestedAt     DateTime @default(now()) @map("ingested_at")
+  // sha256 of the canonicalized payload — idempotent re-ingest
+  contentHash    String   @map("content_hash")
+
+  edges GraphEdge[]
+
+  @@unique([workspaceId, source, sourceRecordId, factType, contentHash])
+  @@index([workspaceId, entityRef])
+  @@index([workspaceId, factType])
+  @@index([workspaceId, ingestedAt])
+  @@map("graph_facts")
+}
+
+// Resolved current state: one row per deduped entity.
+model GraphNode {
+  id           String          @id @default(cuid()) @map("id")
+  workspaceId  String          @map("workspace_id")
+  workspace    Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  entityType   GraphEntityType @map("entity_type")
+  // deterministic: "<entityType>:<normalized dedupe key>" (email for
+  // customer, domain for competitor/website, sku for product, ...)
+  canonicalKey String          @map("canonical_key")
+  displayName  String          @map("display_name")
+  // typed queryable core (names, dates, amounts, geo)
+  core         Json            @default("{}") @map("core")
+  // long tail
+  properties   Json            @default("{}") @map("properties")
+  firstSeen    DateTime        @default(now()) @map("first_seen")
+  lastSeen     DateTime        @default(now()) @map("last_seen")
+  // freshness contract: every node carries as_of + source
+  asOf         DateTime        @map("as_of")
+  asOfSource   String          @map("as_of_source")
+  // absorbed duplicates point at the canonical node (reversible merges)
+  mergedIntoId String?         @map("merged_into_id")
+  mergedInto   GraphNode?      @relation("GraphNodeMerge", fields: [mergedIntoId], references: [id], onDelete: SetNull)
+  absorbed     GraphNode[]     @relation("GraphNodeMerge")
+
+  edgesFrom GraphEdge[] @relation("GraphEdgeFrom")
+  edgesTo   GraphEdge[] @relation("GraphEdgeTo")
+  erQueueA  GraphErQueue[] @relation("GraphErQueueA")
+  erQueueB  GraphErQueue[] @relation("GraphErQueueB")
+  // Phase 8 (G3): memory facts may anchor to a graph subject node.
+  memoryFacts MemoryFact[]
+
+  @@unique([workspaceId, canonicalKey])
+  @@index([workspaceId, entityType])
+  @@index([workspaceId, mergedIntoId])
+  @@map("graph_nodes")
+}
+
+// Typed relationships, bi-temporal (Graphiti-style): valid_at/invalid_at
+// is world time, created_at/expired_at is transaction time. New facts
+// INVALIDATE old edges (set invalid_at/expired_at + superseded_by_id) —
+// rows are never deleted, so point-in-time queries stay answerable.
+model GraphEdge {
+  id             String    @id @default(cuid()) @map("id")
+  workspaceId    String    @map("workspace_id")
+  workspace      Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  fromNodeId     String    @map("from_node_id")
+  fromNode       GraphNode @relation("GraphEdgeFrom", fields: [fromNodeId], references: [id], onDelete: Cascade)
+  toNodeId       String    @map("to_node_id")
+  toNode         GraphNode @relation("GraphEdgeTo", fields: [toNodeId], references: [id], onDelete: Cascade)
+  edgeType       String    @map("edge_type")
+  properties     Json      @default("{}") @map("properties")
+  confidence     Float     @default(1.0) @map("confidence")
+  validAt        DateTime  @map("valid_at")
+  invalidAt      DateTime? @map("invalid_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  expiredAt      DateTime? @map("expired_at")
+  sourceFactId   String?   @map("source_fact_id")
+  sourceFact     GraphFact? @relation(fields: [sourceFactId], references: [id], onDelete: SetNull)
+  supersededById String?   @map("superseded_by_id")
+  supersededBy   GraphEdge? @relation("GraphEdgeSupersede", fields: [supersededById], references: [id], onDelete: SetNull)
+  supersedes     GraphEdge[] @relation("GraphEdgeSupersede")
+
+  @@index([workspaceId, fromNodeId, edgeType])
+  @@index([workspaceId, toNodeId, edgeType])
+  @@index([workspaceId, edgeType, validAt])
+  @@map("graph_edges")
+}
+
+// Ambiguous merge candidates for human review. v1: NO auto-merge — every
+// merge is a human decision (safety invariant §9.6).
+model GraphErQueue {
+  id             String        @id @default(cuid()) @map("id")
+  workspaceId    String        @map("workspace_id")
+  workspace      Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  nodeAId        String        @map("node_a_id")
+  nodeA          GraphNode     @relation("GraphErQueueA", fields: [nodeAId], references: [id], onDelete: Cascade)
+  nodeBId        String        @map("node_b_id")
+  nodeB          GraphNode     @relation("GraphErQueueB", fields: [nodeBId], references: [id], onDelete: Cascade)
+  matcherSignals Json          @default("[]") @map("matcher_signals")
+  confidence     Float         @map("confidence")
+  status         GraphErStatus @default(pending) @map("status")
+  decidedBy      String?       @map("decided_by")
+  decidedAt      DateTime?     @map("decided_at")
+  createdAt      DateTime      @default(now()) @map("created_at")
+
+  @@index([workspaceId, status])
+  @@map("graph_er_queue")
+}
+
+// Connector hub: one row per platform per workspace. Credentials live in
+// the vault — authRef/webhookSecretRef are vault reference ids, NEVER
+// secrets (safety invariant §9.9).
+model GraphConnector {
+  id               String                 @id @default(cuid()) @map("id")
+  workspaceId      String                 @map("workspace_id")
+  workspace        Workspace              @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  platform         GraphConnectorPlatform @map("platform")
+  authRef          String?                @map("auth_ref")
+  tier             GraphSyncTier          @map("tier")
+  status           GraphConnectorStatus   @default(pending) @map("status")
+  scopesGranted    String[]               @default([]) @map("scopes_granted")
+  webhookSecretRef String?                @map("webhook_secret_ref")
+
+  syncJobs GraphSyncJob[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([workspaceId, platform])
+  @@map("graph_connectors")
+}
+
+// Sync-job bookkeeping: cursor state, per-platform rate budgets,
+// backoff-with-jitter. All sync work is async — nothing on the request path.
+model GraphSyncJob {
+  id            String             @id @default(cuid()) @map("id")
+  workspaceId   String             @map("workspace_id")
+  workspace     Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  connectorId   String             @map("connector_id")
+  connector     GraphConnector     @relation(fields: [connectorId], references: [id], onDelete: Cascade)
+  tier          GraphSyncTier      @map("tier")
+  scheduleCron  String?            @map("schedule_cron")
+  cursorState   Json               @default("{}") @map("cursor_state")
+  // { dailyOps, usedOps, windowStart, callsPerHour, usedThisHour, ... }
+  rateBudget    Json               @default("{}") @map("rate_budget")
+  lastRunAt     DateTime?          @map("last_run_at")
+  lastSuccessAt DateTime?          @map("last_success_at")
+  errorCount    Int                @default(0) @map("error_count")
+  backoffUntil  DateTime?          @map("backoff_until")
+  status        GraphSyncJobStatus @default(idle) @map("status")
+
+  @@index([workspaceId, connectorId, status])
+  @@map("graph_sync_jobs")
+}
+
+// ============================================================
+// Phase 8 G3 — Growth Memory substrate (SPEC-PHASE8.md §2 G3, §4).
+// ============================================================
+// Marketr — Growth Memory: three stores + one retrieval contract.
+// Merged from prisma/fragments/phase8-memory.prisma by the G3 track
+// builder (coordinator commits). See the fragment for full notes.
+
+// migration is prisma/migrations/<ts>_phase8_memory/migration.sql, which
+// also carries: pg_trgm + pgvector extensions (honest-fail with setup
+// guidance per spec §9.12), tsvector generated columns, trigram GIN
+// indexes, HNSW indexes, FORCE ROW LEVEL SECURITY policies, and the
+// unified memory_index_view.
+//
+// Tenant isolation: every memory_* table carries workspace_id with FORCE
+// RLS, fail-closed on the app.workspace_id GUC (mirrors G1's graph tables).
+// playbook_learnings is deliberately cross-tenant (no workspace_id); rows
+// enter only via the anonymization transform + human review gate.
+
+// What happened: run/session/sync/agent-call records. Immutable —
+// application code never UPDATEs or DELETEs these rows (spec §9.4).
+enum MemoryEpisodeType {
+  run
+  session
+  sync
+  agent_call
+}
+
+// Procedural outcome verdicts (the F3 archive sink vocabulary).
+enum MemoryLearningResult {
+  worked
+  failed
+  inconclusive
+}
+
+// Where a learning came from.
+enum MemoryLearningSource {
+  test_lab
+  reallocation
+  campaign
+  human
+  import
+}
+
+
+// Episodic store: raw what-happened. Immutable, never edited.
+model MemoryEpisode {
+  id          String           @id @default(cuid()) @map("id")
+  workspaceId String           @map("workspace_id")
+  workspace   Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  episodeType MemoryEpisodeType @map("episode_type")
+  actor       String           @map("actor")
+  summary     String           @db.Text @map("summary")
+  // links to graph nodes / campaigns / fragments (ids + kinds)
+  refs        Json             @default("{}") @map("refs")
+  startedAt   DateTime         @map("started_at")
+  endedAt     DateTime?        @map("ended_at")
+  // 384-d MiniLM embedding, written via raw SQL (Prisma Unsupported).
+  // NULL until the embedder backfills it.
+  embedding   Unsupported("vector(384)")? @map("embedding")
+
+  learnings MemoryLearning[] @relation("LearningSourceEpisode")
+  facts     MemoryFact[]     @relation("FactSourceEpisode")
+
+  @@index([workspaceId, episodeType])
+  @@index([workspaceId, startedAt])
+  @@map("memory_episodes")
+}
+
+// Semantic store: distilled facts, bi-temporal (Graphiti-style).
+// Contradictions resolve by invalidation (invalid_at/expired_at +
+// superseded_by_id), never deletion (spec §9.5).
+model MemoryFact {
+  id              String    @id @default(cuid()) @map("id")
+  workspaceId     String    @map("workspace_id")
+  workspace       Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  subjectNodeId   String?   @map("subject_node_id")
+  subjectNode     GraphNode? @relation(fields: [subjectNodeId], references: [id], onDelete: SetNull)
+  predicate       String    @map("predicate")
+  object          Json      @map("object")
+  confidence      Float     @default(1.0) @map("confidence")
+  // world time: when the fact was true
+  validAt         DateTime  @map("valid_at")
+  invalidAt       DateTime? @map("invalid_at")
+  // transaction time: when we believed it
+  createdAt       DateTime  @default(now()) @map("created_at")
+  expiredAt       DateTime? @map("expired_at")
+  sourceEpisodeId String?   @map("source_episode_id")
+  sourceEpisode   MemoryEpisode? @relation("FactSourceEpisode", fields: [sourceEpisodeId], references: [id], onDelete: SetNull)
+  supersededById  String?   @map("superseded_by_id")
+  supersededBy    MemoryFact? @relation("FactSupersede", fields: [supersededById], references: [id], onDelete: SetNull)
+  supersedes      MemoryFact[] @relation("FactSupersede")
+  // Decay-to-floor needs to know what survives a prune sweep:
+  // user_told facts persist; agent_inferred fade; imported follows policy.
+  origin          String    @default("agent_inferred") @map("origin")
+  embedding       Unsupported("vector(384)")? @map("embedding")
+
+  @@index([workspaceId, predicate])
+  @@index([workspaceId, subjectNodeId])
+  @@index([workspaceId, validAt])
+  @@map("memory_facts")
+}
+
+// Procedural store: what worked / what failed / when. The F3 archive sink
+// schema made real (lib/flywheel/testlab/memory-sink.ts).
+model MemoryLearning {
+  id              String               @id @default(cuid()) @map("id")
+  workspaceId     String               @map("workspace_id")
+  workspace       Workspace            @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  hypothesis      String               @db.Text @map("hypothesis")
+  action          String               @db.Text @map("action")
+  result          MemoryLearningResult @map("result")
+  metricDelta     Json                 @default("{}") @map("metric_delta")
+  observedAt      DateTime             @map("observed_at")
+  invalidatedAt   DateTime?            @map("invalidated_at")
+  // campaign / experiment / channel context refs
+  contextRefs     Json                 @default("{}") @map("context_refs")
+  source          MemoryLearningSource @map("source")
+  sourceEpisodeId String?              @map("source_episode_id")
+  sourceEpisode   MemoryEpisode?       @relation("LearningSourceEpisode", fields: [sourceEpisodeId], references: [id], onDelete: SetNull)
+  embedding       Unsupported("vector(384)")? @map("embedding")
+
+  @@index([workspaceId, result])
+  @@index([workspaceId, observedAt])
+  @@index([workspaceId, source])
+  @@map("memory_learnings")
+}
+
+// Consolidation worker bookkeeping (powers GET /api/substrate/memory/consolidation).
+model MemoryConsolidationRun {
+  id               String    @id @default(cuid()) @map("id")
+  workspaceId      String    @map("workspace_id")
+  workspace        Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  startedAt        DateTime  @default(now()) @map("started_at")
+  finishedAt       DateTime? @map("finished_at")
+  status           String    @default("running") @map("status")
+  episodesScanned  Int       @default(0) @map("episodes_scanned")
+  factsDistilled   Int       @default(0) @map("facts_distilled")
+  factsInvalidated Int       @default(0) @map("facts_invalidated")
+  learningsDeduped Int       @default(0) @map("learnings_deduped")
+  rowsPruned       Int       @default(0) @map("rows_pruned")
+  error            String?   @db.Text @map("error")
+
+  @@index([workspaceId, startedAt])
+  @@map("memory_consolidation_runs")
+}
+
+// Cross-client learning: anonymized playbook patterns ONLY. No
+// workspace_id — deliberately cross-tenant. Rows enter only through the
+// anonymization transform (lib/substrate/memory/anonymize.ts) AND a human
+// review gate (reviewed_at + anonymization_reviewed_by set). Unreviewed
+// patterns never publish (spec §9.3; enforced by RLS + API + battery).
+model PlaybookLearning {
+  id                     String    @id @default(cuid()) @map("id")
+  patternTitle           String    @map("pattern_title")
+  patternBody            String    @db.Text @map("pattern_body")
+  supportingClientCount  Int       @default(1) @map("supporting_client_count")
+  firstObserved          DateTime  @default(now()) @map("first_observed")
+  lastObserved           DateTime  @default(now()) @map("last_observed")
+  anonymizationReviewedBy String?  @map("anonymization_reviewed_by")
+  reviewedAt             DateTime? @map("reviewed_at")
+
+  @@index([reviewedAt])
+  @@map("playbook_learnings")
 }

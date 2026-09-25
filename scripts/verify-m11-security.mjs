@@ -81,6 +81,9 @@ const AUTHZ_PRIMITIVES = [
   "requireMcpAuth",                             // MCP bearer auth (lib/mcp/auth.ts) — tenant from credential
   "guardWorkspace",                              // lib/enrichment/guard.ts R6 helper — requireUser + requireWorkspaceRole(editor) for mutations
   "authorityGuard",                              // Phase 6 authority session guard (app/api/authority/_lib.ts) — role-gated per route
+  "flywheelGuard",                              // Phase 7 flywheel guard (app/api/flywheel/_lib.ts) — requireUser + requireWorkspaceRole(editor) for mutations
+  "dspGuard",                                   // Phase 7 DSP guard (app/api/flywheel/dsp/_lib.ts) — requireUser + requireWorkspaceRole(editor) for mutations
+  "launchGuard",                                // Phase 7 launch guard (app/api/flywheel/launch/_lib.ts) — requireUser + requireWorkspaceRole(editor) for mutations
 ];
 // Public by design. Each entry documents WHY — this is a justification list,
 // not a suppression list. Adding an entry requires a code comment in the
@@ -146,6 +149,9 @@ const PUBLIC_BY_DESIGN = {
   // Phase 6 (R1): GBP review-notification webhook — capability model, see route comments.
   "app/api/authority/webhooks/gbp/route.ts":
     "inbound GBP Pub/Sub new-review notification webhook; HMAC-SHA256 verified (x-marketr-signature) before any parsing/logic; invalid signature 401s; idempotent per notification id; only enqueues reviews into the approval queue, never returns data",
+  // Phase 8 (G1): business-graph platform webhooks — capability model, see route comments.
+  "app/api/substrate/graph/webhooks/[platform]/route.ts":
+    "inbound platform webhook (hubspot/shopify/meta/salesforce); per-platform HMAC verified with fail-closed semantics (verifyTierWWebhook in lib/substrate/graph/connectors/tierw.ts) before any parsing/logic; missing secret 503s, forged signature 401s, replayed delivery 409s; only appends graph facts, never returns data",
 };
 const uncovered = [];
 for (const f of routeFiles) {
@@ -169,7 +175,7 @@ const missingAllowList = Object.keys(PUBLIC_BY_DESIGN).filter(k => {
 ok("every public-by-design entry maps to a real route file", missingAllowList.length === 0, missingAllowList.join("; "));
 ok(
   "public-by-design allow-list is documented",
-  Object.keys(PUBLIC_BY_DESIGN).length === 23 &&
+  Object.keys(PUBLIC_BY_DESIGN).length === 24 &&
     Object.values(PUBLIC_BY_DESIGN).every(v => v.length > 20)
 );
 

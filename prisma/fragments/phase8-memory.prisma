@@ -1,0 +1,172 @@
+// ============================================================
+// Phase 8 G3 — Growth Memory substrate (SPEC-PHASE8.md §2 G3, §4).
+// ============================================================
+// Marketr — Growth Memory: three stores (episodic / semantic / procedural)
+// + one retrieval contract. The Test Lab's F3 archive sink schema is adopted
+// as v1 of memory_learnings — no schema migration is needed for seed data.
+//
+// ASSEMBLY NOTE: this fragment is merged into prisma/schema.prisma by the
+// coordinator (never edit prisma/schema.prisma directly). The paired
+// migration is prisma/migrations/<ts>_phase8_memory/migration.sql, which
+// also carries: pg_trgm + pgvector extensions (honest-fail with setup
+// guidance per spec §9.12), tsvector generated columns, trigram GIN
+// indexes, HNSW indexes, FORCE ROW LEVEL SECURITY policies, and the
+// unified memory_index_view.
+//
+// ASSEMBLY NOTE (G1 coordination): MemoryFact.subjectNode references the
+// G1-owned GraphNode model. The coordinator's merge must add the opposite
+// relation field `memoryFacts MemoryFact[]` to GraphNode (G3 track added it
+// to prisma/schema.prisma alongside the G1 models; it is additive and does
+// not change any G1 behavior).
+//
+// Tenant isolation: every memory_* table carries workspace_id with FORCE
+// RLS, fail-closed on the app.workspace_id GUC (mirrors G1's graph tables).
+// playbook_learnings is deliberately cross-tenant (no workspace_id); rows
+// enter only via the anonymization transform + human review gate.
+
+// What happened: run/session/sync/agent-call records. Immutable —
+// application code never UPDATEs or DELETEs these rows (spec §9.4).
+enum MemoryEpisodeType {
+  run
+  session
+  sync
+  agent_call
+}
+
+// Procedural outcome verdicts (the F3 archive sink vocabulary).
+enum MemoryLearningResult {
+  worked
+  failed
+  inconclusive
+}
+
+// Where a learning came from.
+enum MemoryLearningSource {
+  test_lab
+  reallocation
+  campaign
+  human
+  import
+}
+
+
+// Episodic store: raw what-happened. Immutable, never edited.
+model MemoryEpisode {
+  id          String           @id @default(cuid()) @map("id")
+  workspaceId String           @map("workspace_id")
+  workspace   Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  episodeType MemoryEpisodeType @map("episode_type")
+  actor       String           @map("actor")
+  summary     String           @db.Text @map("summary")
+  // links to graph nodes / campaigns / fragments (ids + kinds)
+  refs        Json             @default("{}") @map("refs")
+  startedAt   DateTime         @map("started_at")
+  endedAt     DateTime?        @map("ended_at")
+  // 384-d MiniLM embedding, written via raw SQL (Prisma Unsupported).
+  // NULL until the embedder backfills it.
+  embedding   Unsupported("vector(384)")? @map("embedding")
+
+  learnings MemoryLearning[] @relation("LearningSourceEpisode")
+  facts     MemoryFact[]     @relation("FactSourceEpisode")
+
+  @@index([workspaceId, episodeType])
+  @@index([workspaceId, startedAt])
+  @@map("memory_episodes")
+}
+
+// Semantic store: distilled facts, bi-temporal (Graphiti-style).
+// Contradictions resolve by invalidation (invalid_at/expired_at +
+// superseded_by_id), never deletion (spec §9.5).
+model MemoryFact {
+  id              String    @id @default(cuid()) @map("id")
+  workspaceId     String    @map("workspace_id")
+  workspace       Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  subjectNodeId   String?   @map("subject_node_id")
+  subjectNode     GraphNode? @relation(fields: [subjectNodeId], references: [id], onDelete: SetNull)
+  predicate       String    @map("predicate")
+  object          Json      @map("object")
+  confidence      Float     @default(1.0) @map("confidence")
+  // world time: when the fact was true
+  validAt         DateTime  @map("valid_at")
+  invalidAt       DateTime? @map("invalid_at")
+  // transaction time: when we believed it
+  createdAt       DateTime  @default(now()) @map("created_at")
+  expiredAt       DateTime? @map("expired_at")
+  sourceEpisodeId String?   @map("source_episode_id")
+  sourceEpisode   MemoryEpisode? @relation("FactSourceEpisode", fields: [sourceEpisodeId], references: [id], onDelete: SetNull)
+  supersededById  String?   @map("superseded_by_id")
+  supersededBy    MemoryFact? @relation("FactSupersede", fields: [supersededById], references: [id], onDelete: SetNull)
+  supersedes      MemoryFact[] @relation("FactSupersede")
+  // Decay-to-floor needs to know what survives a prune sweep:
+  // user_told facts persist; agent_inferred fade; imported follows policy.
+  origin          String    @default("agent_inferred") @map("origin")
+  embedding       Unsupported("vector(384)")? @map("embedding")
+
+  @@index([workspaceId, predicate])
+  @@index([workspaceId, subjectNodeId])
+  @@index([workspaceId, validAt])
+  @@map("memory_facts")
+}
+
+// Procedural store: what worked / what failed / when. The F3 archive sink
+// schema made real (lib/flywheel/testlab/memory-sink.ts).
+model MemoryLearning {
+  id              String               @id @default(cuid()) @map("id")
+  workspaceId     String               @map("workspace_id")
+  workspace       Workspace            @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  hypothesis      String               @db.Text @map("hypothesis")
+  action          String               @db.Text @map("action")
+  result          MemoryLearningResult @map("result")
+  metricDelta     Json                 @default("{}") @map("metric_delta")
+  observedAt      DateTime             @map("observed_at")
+  invalidatedAt   DateTime?            @map("invalidated_at")
+  // campaign / experiment / channel context refs
+  contextRefs     Json                 @default("{}") @map("context_refs")
+  source          MemoryLearningSource @map("source")
+  sourceEpisodeId String?              @map("source_episode_id")
+  sourceEpisode   MemoryEpisode?       @relation("LearningSourceEpisode", fields: [sourceEpisodeId], references: [id], onDelete: SetNull)
+  embedding       Unsupported("vector(384)")? @map("embedding")
+
+  @@index([workspaceId, result])
+  @@index([workspaceId, observedAt])
+  @@index([workspaceId, source])
+  @@map("memory_learnings")
+}
+
+// Consolidation worker bookkeeping (powers GET /api/substrate/memory/consolidation).
+model MemoryConsolidationRun {
+  id               String    @id @default(cuid()) @map("id")
+  workspaceId      String    @map("workspace_id")
+  workspace        Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  startedAt        DateTime  @default(now()) @map("started_at")
+  finishedAt       DateTime? @map("finished_at")
+  status           String    @default("running") @map("status")
+  episodesScanned  Int       @default(0) @map("episodes_scanned")
+  factsDistilled   Int       @default(0) @map("facts_distilled")
+  factsInvalidated Int       @default(0) @map("facts_invalidated")
+  learningsDeduped Int       @default(0) @map("learnings_deduped")
+  rowsPruned       Int       @default(0) @map("rows_pruned")
+  error            String?   @db.Text @map("error")
+
+  @@index([workspaceId, startedAt])
+  @@map("memory_consolidation_runs")
+}
+
+// Cross-client learning: anonymized playbook patterns ONLY. No
+// workspace_id — deliberately cross-tenant. Rows enter only through the
+// anonymization transform (lib/substrate/memory/anonymize.ts) AND a human
+// review gate (reviewed_at + anonymization_reviewed_by set). Unreviewed
+// patterns never publish (spec §9.3; enforced by RLS + API + battery).
+model PlaybookLearning {
+  id                     String    @id @default(cuid()) @map("id")
+  patternTitle           String    @map("pattern_title")
+  patternBody            String    @db.Text @map("pattern_body")
+  supportingClientCount  Int       @default(1) @map("supporting_client_count")
+  firstObserved          DateTime  @default(now()) @map("first_observed")
+  lastObserved           DateTime  @default(now()) @map("last_observed")
+  anonymizationReviewedBy String?  @map("anonymization_reviewed_by")
+  reviewedAt             DateTime? @map("reviewed_at")
+
+  @@index([reviewedAt])
+  @@map("playbook_learnings")
+}

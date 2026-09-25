@@ -7,6 +7,7 @@ import { canTransition, LifecycleError } from "@/lib/flywheel/testlab/experiment
 import {
   buildGrowthLearning, createFakeMemorySink, GROWTH_MEMORY_SINK_SCHEMA,
 } from "@/lib/flywheel/testlab/memory-sink";
+import { createPrismaMemorySink, useFakeMemorySink } from "@/lib/substrate/memory/archive-sink";
 
 export const dynamic = "force-dynamic";
 
@@ -52,13 +53,26 @@ export async function POST(_req: Request, ctx: { params: Promise<{ id: string }>
       {},
     );
 
-    // The sink: Growth Memory is Phase 8 — archive against the forward-compatible
-    // schema. The fake sink validates the schema; Phase 8 swaps in the store.
-    const sink = createFakeMemorySink();
+    // The sink: real Growth Memory store (Phase 8). Fake/test mode stays
+    // available when DB tables are unavailable or MEMORY_TEST_MODE is set.
+    let sink = useFakeMemorySink() ? createFakeMemorySink() : createPrismaMemorySink();
     if (sink.schema !== GROWTH_MEMORY_SINK_SCHEMA) {
       return flywheelError(new Error("Growth Memory sink schema drift — refusing to archive."));
     }
-    const { ref } = await sink.archive(learning);
+    let ref: string;
+    try {
+      ({ ref } = await sink.archive(learning));
+    } catch (err) {
+      // Table-missing (P2021 / 42P01): preserve the fake-mode default so
+      // archiving never bricks Test Lab on a DB without Phase 8 tables.
+      const msg = err instanceof Error ? err.message : String(err);
+      if (/does not exist|P2021|42P01/i.test(msg)) {
+        sink = createFakeMemorySink();
+        ({ ref } = await sink.archive(learning));
+      } else {
+        throw err;
+      }
+    }
 
     if (saved) {
       await store.saveResult({ ...saved, archivedToMemory: true });

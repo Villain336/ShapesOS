@@ -8,7 +8,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
 import type { ComponentType } from "react";
-import { Mail, Paintbrush, Megaphone, RefreshCw } from "lucide-react";
+import { Mail, Paintbrush, Megaphone, RefreshCw, Brain } from "lucide-react";
 import {
   ChartBar,
   Bell,
@@ -75,6 +75,8 @@ const NAV_SECTIONS: {
       { href: "/dashboard/authority", label: "Authority", icon: GlobeHemisphereWest },
       // Phase 7: the flywheel (reallocation, recycling, Test Lab, CTV, DSP, launch).
       { href: "/dashboard/flywheel", label: "Flywheel", icon: RefreshCw },
+      // Phase 8: the agentic substrate (Business Graph, Campaigns, Growth Memory).
+      { href: "/dashboard/substrate", label: "Substrate", icon: Brain },
     ],
   },
   {
