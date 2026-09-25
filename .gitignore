@@ -53,3 +53,4 @@ playwright-report/
 
 # Call-tracking verification artifacts (never commit)
 screenshots/
+.pgdata/

@@ -80,6 +80,7 @@ const AUTHZ_PRIMITIVES = [
   "roleAtLeast",                                // inline owner-or-admin checks (lib/authz.ts)
   "requireMcpAuth",                             // MCP bearer auth (lib/mcp/auth.ts) — tenant from credential
   "guardWorkspace",                              // lib/enrichment/guard.ts R6 helper — requireUser + requireWorkspaceRole(editor) for mutations
+  "authorityGuard",                              // Phase 6 authority session guard (app/api/authority/_lib.ts) — role-gated per route
 ];
 // Public by design. Each entry documents WHY — this is a justification list,
 // not a suppression list. Adding an entry requires a code comment in the
@@ -134,6 +135,17 @@ const PUBLIC_BY_DESIGN = {
     "inbound Lob mail-tracking webhook; HMAC-SHA256 verified (timestamp-bound raw body, lib/mail/lob.ts) before any parsing/logic; invalid signature 401s; idempotent via MailWebhookEvent unique (provider,eventId), duplicate/out-of-order collapse; only updates piece delivery status + attribution touches, never returns data",
   "app/api/webhooks/mail/postgrid/route.ts":
     "inbound PostGrid mail-tracking webhook; JWT verified (Bearer or body token/jwt, lib/mail/postgrid.ts) before any parsing/logic; invalid signature 401s; same idempotency + status-update-only semantics as the Lob route",
+  // Phase 5 (media buying): CallRail webhook — capability model, see route comments.
+  "app/api/webhooks/callrail/route.ts":
+    "inbound CallRail call-event webhook; HMAC signature verified (x-callrail-signature) before any parsing/logic; invalid signature 401s; idempotent via CallWebhookEvent unique(provider,eventId); only updates call/attribution state, never returns data",
+  // Phase 6 (O1): Smartlead/Instantly webhooks — capability model, see route comments.
+  "app/api/authority/outreach/webhooks/smartlead/route.ts":
+    "inbound Smartlead event webhook; HMAC-SHA256 verified (x-marketr-signature, SMARTLEAD_WEBHOOK_SECRET) before any parsing/logic (app/api/authority/outreach/webhooks/_handler.ts); invalid/missing signature 401s; idempotent per provider event id; only updates outreach sequence/prospect state (incl. stop-on-reply), never returns data",
+  "app/api/authority/outreach/webhooks/instantly/route.ts":
+    "inbound Instantly event webhook; same HMAC-SHA256 verification as the Smartlead route (INSTANTLY_WEBHOOK_SECRET); invalid/missing signature 401s; idempotent per provider event id; only updates outreach sequence/prospect state (incl. stop-on-reply), never returns data",
+  // Phase 6 (R1): GBP review-notification webhook — capability model, see route comments.
+  "app/api/authority/webhooks/gbp/route.ts":
+    "inbound GBP Pub/Sub new-review notification webhook; HMAC-SHA256 verified (x-marketr-signature) before any parsing/logic; invalid signature 401s; idempotent per notification id; only enqueues reviews into the approval queue, never returns data",
 };
 const uncovered = [];
 for (const f of routeFiles) {
@@ -157,7 +169,7 @@ const missingAllowList = Object.keys(PUBLIC_BY_DESIGN).filter(k => {
 ok("every public-by-design entry maps to a real route file", missingAllowList.length === 0, missingAllowList.join("; "));
 ok(
   "public-by-design allow-list is documented",
-  Object.keys(PUBLIC_BY_DESIGN).length === 19 &&
+  Object.keys(PUBLIC_BY_DESIGN).length === 23 &&
     Object.values(PUBLIC_BY_DESIGN).every(v => v.length > 20)
 );
 

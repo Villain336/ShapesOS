@@ -17,6 +17,7 @@ import {
   CaretDown,
   CaretUpDown,
   FolderSimple,
+  GlobeHemisphereWest,
   SquaresFour,
   SignOut,
   List,
@@ -69,6 +70,9 @@ const NAV_SECTIONS: {
       { href: "/dashboard/mail", label: "Direct Mail", icon: Mail },
       // Phase 5 SAFETY: media buying command center (pools, approvals, kill switches).
       { href: "/dashboard/media", label: "Media", icon: Megaphone },
+      // Phase 6: authority & relevance command center (outreach, PR, listings,
+      // AEO, review replies, intelligence reports).
+      { href: "/dashboard/authority", label: "Authority", icon: GlobeHemisphereWest },
     ],
   },
   {
