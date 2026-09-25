@@ -1499,6 +1499,16 @@ export async function defaultStoreQrFile(
   mimeType: string,
   createdBy: string,
 ): Promise<{ fileId: string }> {
+  // Idempotent: the logical path is content-addressed (sha256 of the PNG
+  // bytes), so an existing live file at this path is byte-identical to what
+  // we would write. Re-designing the same QR must return the existing asset
+  // instead of 500ing on a path conflict.
+  const { prisma } = await import("@/lib/prisma");
+  const existing = await prisma.workspaceFile.findFirst({
+    where: { workspaceId, logicalPath, trashedAt: null },
+    select: { id: true },
+  });
+  if (existing) return { fileId: existing.id };
   const { writeFile } = await import("@/lib/filesystem/service");
   const file = await writeFile({ workspaceId, logicalPath, kind: "file", bytes, mimeType, createdBy });
   return { fileId: file.id };
