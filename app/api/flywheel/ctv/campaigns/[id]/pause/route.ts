@@ -10,7 +10,7 @@
 import type { NextRequest } from "next/server";
 import { z } from "zod";
 import { ctvGuard, badRequest, safetyError, readJson } from "../../../_lib";
-import { getCtvStore } from "@/lib/flywheel/ctv/store";
+import { resolveCtvStore } from "@/lib/flywheel/ctv/store";
 import { createVibeAdapter } from "@/lib/flywheel/ctv/vibe";
 import {
   requestConciergePause,
@@ -33,7 +33,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
   if (!parsed.success) return badRequest("Invalid input", parsed.error.issues);
 
   try {
-    const store = getCtvStore();
+    const store = await resolveCtvStore();
     const campaign = await store.getCampaign(gate.workspaceId, id);
     if (!campaign) return safetyError(new Error("CTV campaign not found in workspace"));
 

@@ -9,7 +9,7 @@ import type { NextRequest } from "next/server";
 import { z } from "zod";
 import { ctvGuard, badRequest, safetyError, readJson } from "../_lib";
 import {
-  getCtvStore,
+  resolveCtvStore,
   type CtvPlatform,
   type CtvMode,
 } from "@/lib/flywheel/ctv/store";
@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
     return badRequest("approvalObjectId is required for Vibe API campaigns (every spend action behind a Phase 5 per-buy approval object).");
   }
 
-  const store = getCtvStore();
+  const store = await resolveCtvStore();
   try {
     const campaign = await store.createCampaign({
       workspaceId: gate.workspaceId,
@@ -95,6 +95,21 @@ export async function POST(req: NextRequest) {
       detail: { platform: d.platform, mode: d.mode, approvalObjectId: d.approvalObjectId ?? null },
     });
     return Response.json({ campaign, vibe });
+  } catch (err) {
+    return safetyError(err);
+  }
+}
+
+// Marketr — GET /api/flywheel/ctv/campaigns
+// List workspace CTV campaigns (reads the resolved store: Prisma-backed when
+// the CTV tables are provisioned, memory fallback otherwise).
+export async function GET() {
+  const gate = await ctvGuard("viewer");
+  if (gate instanceof Response) return gate;
+  try {
+    const store = await resolveCtvStore();
+    const campaigns = await store.listCampaigns(gate.workspaceId);
+    return Response.json({ campaigns });
   } catch (err) {
     return safetyError(err);
   }

@@ -6,7 +6,7 @@
 import type { NextRequest } from "next/server";
 import { z } from "zod";
 import { ctvGuard, badRequest, safetyError, readJson } from "../_lib";
-import { getCtvStore } from "@/lib/flywheel/ctv/store";
+import { resolveCtvStore } from "@/lib/flywheel/ctv/store";
 import { signPixelToken, pixelUrl } from "@/lib/flywheel/ctv/attribution";
 
 export const dynamic = "force-dynamic";
@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) return badRequest("Invalid input", parsed.error.issues);
 
   try {
-    const store = getCtvStore();
+    const store = await resolveCtvStore();
     const campaign = await store.getCampaign(gate.workspaceId, parsed.data.campaignId);
     if (!campaign) return safetyError(new Error("CTV campaign not found in workspace"));
 

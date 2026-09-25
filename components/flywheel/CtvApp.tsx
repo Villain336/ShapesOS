@@ -3,16 +3,23 @@
 // validator, per-spot QR/pURL kit, concierge IO workflow states (alert-only
 // copy enforced), probabilistic attribution views.
 //
-// Tailwind + lucide-react only (repo dashboard conventions). Concierge
-// paths are labeled alert-only everywhere; no deterministic ROAS is
-// rendered anywhere.
+// House primitives only (shadcn Button/Input/Label/Tabs, vault Card,
+// ValuePill) — no hand-rolled button/card language. Concierge paths are
+// labeled alert-only everywhere; no deterministic ROAS is rendered anywhere.
 
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { Card, CardHeader } from "@/components/vault/Card";
+import { ValuePill } from "@/components/vault/atoms/ValuePill";
+import { Badge } from "@/components/vault/shadcn/badge";
+import { Button } from "@/components/vault/shadcn/button";
+import { Input } from "@/components/vault/shadcn/input";
+import { Label } from "@/components/vault/shadcn/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/vault/shadcn/tabs";
 import {
-  Tv, QrCode, FileText, BarChart3, PauseCircle,
-  AlertTriangle, CheckCircle2, XCircle, Loader2, Zap, ShieldAlert,
+  QrCode, FileText, BarChart3, PauseCircle,
+  AlertTriangle, CheckCircle2, XCircle, Loader2, ShieldAlert,
 } from "lucide-react";
 
 type Tab = "campaigns" | "validator" | "spots" | "io" | "attribution";
@@ -27,15 +34,6 @@ interface Campaign {
   vibeTestMode: boolean;
   vibeCampaignId: string | null;
 }
-
-const inputCls =
-  "w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder-zinc-400 focus:border-zinc-500 focus:outline-none";
-const btnPrimary =
-  "inline-flex items-center gap-2 rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-700 disabled:opacity-50";
-const btnGhost =
-  "inline-flex items-center gap-2 rounded-md border border-zinc-300 px-3 py-1.5 text-sm text-zinc-700 hover:border-zinc-500 disabled:opacity-50";
-const card = "rounded-lg border border-zinc-200 bg-white p-4 shadow-sm";
-const labelCls = "mb-1 block text-xs font-medium uppercase tracking-wide text-zinc-500";
 
 const PLATFORM_LABELS: Record<string, string> = {
   vibe: "Vibe.co (API)",
@@ -58,43 +56,31 @@ async function api(path: string, init?: RequestInit) {
   return data;
 }
 
+function statusTone(s: string): "neutral" | "green" | "orange" | "red" | "accent" {
+  if (s === "live" || s === "human_placed") return "green";
+  if (s === "pending_vendor_approval" || s === "reconciling") return "orange";
+  if (s === "cancelled") return "red";
+  return "neutral";
+}
+
 export function CtvApp() {
   const [tab, setTab] = useState<Tab>("campaigns");
+
   return (
-    <div className="mx-auto max-w-6xl px-6 py-8">
-      <header className="mb-6 flex items-center gap-3">
-        <Tv className="h-6 w-6 text-zinc-900" />
-        <div>
-          <h1 className="text-2xl font-semibold text-zinc-900">CTV / Commercials Buying Path</h1>
-          <p className="text-sm text-zinc-500">
-            Validator → per-spot QR/pURL kit → concierge IO → Vibe API → probabilistic attribution.
-            Every spend action sits behind a Phase 5 per-buy approval object.
-          </p>
-        </div>
-      </header>
-      <nav className="mb-6 flex flex-wrap gap-2">
-        {([
-          ["campaigns", "Campaigns"],
-          ["validator", "Creative Validator"],
-          ["spots", "Spot QR/pURL Kit"],
-          ["io", "Concierge IO"],
-          ["attribution", "Attribution"],
-        ] as [Tab, string][]).map(([t, label]) => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={`rounded-md px-3 py-1.5 text-sm font-medium ${tab === t ? "bg-zinc-900 text-white" : "border border-zinc-300 text-zinc-600 hover:border-zinc-500"}`}
-          >
-            {label}
-          </button>
-        ))}
-      </nav>
-      {tab === "campaigns" && <CampaignsTab />}
-      {tab === "validator" && <ValidatorTab />}
-      {tab === "spots" && <SpotsTab />}
-      {tab === "io" && <IoTab />}
-      {tab === "attribution" && <AttributionTab />}
-    </div>
+    <Tabs value={tab} onValueChange={(v) => setTab(v as Tab)}>
+      <TabsList className="max-w-full justify-start overflow-x-auto">
+        <TabsTrigger value="campaigns">Campaigns</TabsTrigger>
+        <TabsTrigger value="validator">Creative validator</TabsTrigger>
+        <TabsTrigger value="spots">Spot QR/pURL kit</TabsTrigger>
+        <TabsTrigger value="io">Concierge IO</TabsTrigger>
+        <TabsTrigger value="attribution">Attribution</TabsTrigger>
+      </TabsList>
+      <TabsContent value="campaigns" className="mt-4"><CampaignsTab /></TabsContent>
+      <TabsContent value="validator" className="mt-4"><ValidatorTab /></TabsContent>
+      <TabsContent value="spots" className="mt-4"><SpotsTab /></TabsContent>
+      <TabsContent value="io" className="mt-4"><IoTab /></TabsContent>
+      <TabsContent value="attribution" className="mt-4"><AttributionTab /></TabsContent>
+    </Tabs>
   );
 }
 
@@ -102,7 +88,7 @@ export function CtvApp() {
 
 function CampaignsTab() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [form, setForm] = useState({ name: "", platform: "vibe", mode: "api", approvalObjectId: "", vibeAdvertiserId: "" });
   const [pausing, setPausing] = useState<string | null>(null);
@@ -112,9 +98,10 @@ function CampaignsTab() {
     setLoading(true);
     setError("");
     try {
-      // list via the store-backed detail route is per-id; the dashboard keeps
-      // a local registry of campaigns it created this session plus fresh reads.
-      setCampaigns((c) => c);
+      const data = await api("/api/flywheel/ctv/campaigns");
+      setCampaigns((data.campaigns as Campaign[]) ?? []);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
     } finally {
       setLoading(false);
     }
@@ -166,58 +153,73 @@ function CampaignsTab() {
   }
 
   return (
-    <div className="space-y-4">
-      <div className={card}>
-        <h2 className="mb-3 text-sm font-semibold text-zinc-900">New CTV campaign</h2>
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-          <div><span className={labelCls}>Name</span><input className={inputCls} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Spring :30 flight" /></div>
-          <div><span className={labelCls}>Platform</span>
-            <select className={inputCls} value={form.platform} onChange={(e) => setForm({ ...form, platform: e.target.value })}>
+    <div className="flex flex-col gap-4">
+      {error && (
+        <div className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-[13px] text-red-900">
+          <XCircle className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>{error}</span>
+        </div>
+      )}
+      <Card>
+        <CardHeader
+          title="New CTV campaign"
+          description="Vibe adapter runs in test mode by default — never touches real spend."
+        />
+        <div className="grid gap-3 p-4 md:grid-cols-3">
+          <div className="grid gap-1.5"><Label htmlFor="ctv-name">Name</Label><Input id="ctv-name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Spring :30 flight" /></div>
+          <div className="grid gap-1.5"><Label htmlFor="ctv-platform">Platform</Label>
+            <select id="ctv-platform" className="rounded-md border bg-background px-3 py-2 text-sm" value={form.platform} onChange={(e) => setForm({ ...form, platform: e.target.value })}>
               {Object.entries(PLATFORM_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
             </select>
           </div>
-          <div><span className={labelCls}>Mode</span>
-            <select className={inputCls} value={form.mode} onChange={(e) => setForm({ ...form, mode: e.target.value })}>
+          <div className="grid gap-1.5"><Label htmlFor="ctv-mode">Mode</Label>
+            <select id="ctv-mode" className="rounded-md border bg-background px-3 py-2 text-sm" value={form.mode} onChange={(e) => setForm({ ...form, mode: e.target.value })}>
               <option value="api">API (Vibe / seat)</option>
               <option value="concierge">Concierge IO</option>
             </select>
           </div>
-          <div><span className={labelCls}>Approval object id (required for API buys)</span><input className={inputCls} value={form.approvalObjectId} onChange={(e) => setForm({ ...form, approvalObjectId: e.target.value })} placeholder="appr_…" /></div>
-          <div><span className={labelCls}>Vibe advertiser id (API mode)</span><input className={inputCls} value={form.vibeAdvertiserId} onChange={(e) => setForm({ ...form, vibeAdvertiserId: e.target.value })} placeholder="adv_…" /></div>
-        </div>
-        <div className="mt-3 flex items-center gap-3">
-          <button className={btnPrimary} onClick={create} disabled={!form.name}><Zap className="h-4 w-4" /> Create (draft)</button>
-          <span className="text-xs text-zinc-500">Vibe adapter runs in test mode by default — never touches real spend.</span>
-        </div>
-        {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
-      </div>
-
-      <div className={card}>
-        <h2 className="mb-3 text-sm font-semibold text-zinc-900">Campaigns {loading && <Loader2 className="inline h-4 w-4 animate-spin" />}</h2>
-        {pauseNote && (
-          <div className="mb-3 flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
-            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" /><span>{pauseNote}</span>
+          <div className="grid gap-1.5"><Label htmlFor="ctv-approval">Approval object id (required for API buys)</Label><Input id="ctv-approval" value={form.approvalObjectId} onChange={(e) => setForm({ ...form, approvalObjectId: e.target.value })} placeholder="appr_…" /></div>
+          <div className="grid gap-1.5"><Label htmlFor="ctv-advertiser">Vibe advertiser id (API mode)</Label><Input id="ctv-advertiser" value={form.vibeAdvertiserId} onChange={(e) => setForm({ ...form, vibeAdvertiserId: e.target.value })} placeholder="adv_…" /></div>
+          <div className="flex items-end">
+            <Button onClick={create} disabled={!form.name}>Create (draft)</Button>
           </div>
-        )}
-        {campaigns.length === 0 && <p className="text-sm text-zinc-500">No campaigns yet this session.</p>}
-        <div className="space-y-2">
+        </div>
+      </Card>
+
+      <Card>
+        <CardHeader
+          title="Campaigns"
+          actions={<Button size="sm" variant="outline" onClick={refresh} disabled={loading}>Refresh</Button>}
+        />
+        <div className="divide-y divide-stone-100">
+          {pauseNote && (
+            <div className="flex items-start gap-2 p-4 text-[13px] text-amber-900">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+              <span>{pauseNote}</span>
+            </div>
+          )}
+          {!loading && campaigns.length === 0 && (
+            <p className="p-4 text-[13px] text-stone-500">No campaigns yet — create one above.</p>
+          )}
           {campaigns.map((c) => (
-            <div key={c.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-zinc-200 p-3">
-              <div>
-                <p className="text-sm font-medium text-zinc-900">{c.name}</p>
-                <p className="text-xs text-zinc-500">
-                  {PLATFORM_LABELS[c.platform] ?? c.platform} · {c.mode} · status <b>{c.status}</b>
-                  {c.vibeTestMode && c.mode === "api" ? " · test mode" : ""}
-                </p>
+            <div key={c.id} className="flex flex-wrap items-center gap-3 p-4">
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2 text-[13px] font-medium text-stone-900">
+                  <span>{c.name}</span>
+                  <ValuePill tone={statusTone(c.status)}>{c.status}</ValuePill>
+                  <Badge variant="outline">{PLATFORM_LABELS[c.platform] ?? c.platform}</Badge>
+                  {c.vibeTestMode && c.mode === "api" && <Badge variant="outline">test mode</Badge>}
+                </div>
+                <p className="mt-1 text-[12px] text-stone-500">{c.mode} mode</p>
               </div>
-              <button className={btnGhost} onClick={() => pause(c.id)} disabled={pausing === c.id || c.status === "paused"}>
-                {pausing === c.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <PauseCircle className="h-4 w-4" />}
+              <Button size="sm" variant="outline" onClick={() => pause(c.id)} disabled={pausing === c.id || c.status === "paused"}>
+                {pausing === c.id ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <PauseCircle className="mr-1 h-3.5 w-3.5" />}
                 Pause
-              </button>
+              </Button>
             </div>
           ))}
         </div>
-      </div>
+      </Card>
     </div>
   );
 }
@@ -231,67 +233,67 @@ function ValidatorTab() {
   const [error, setError] = useState("");
 
   return (
-    <div className={card}>
-      <h2 className="mb-1 text-sm font-semibold text-zinc-900">Creative validator</h2>
-      <p className="mb-4 text-sm text-zinc-500">
-        ffprobe checks against the IAB Tech Lab Dec 2025 draft: 1920×1080, :15/:30 (6/15/30/45/60 accepted),
-        MP4 H.264, ready-to-serve bitrate, stereo −23 LUFS / 48 kHz, no slates/countdowns, no black bars.
-        Non-compliant creative <b>blocks</b> submission.
-      </p>
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-        <div>
-          <span className={labelCls}>Workspace file id</span>
-          <input className={inputCls} id="ctv-file-id" placeholder="file_… — upload the MP4 via Dashboard → Files first" />
-        </div>
-        <div>
-          <span className={labelCls}>Publisher (optional)</span>
-          <select className={inputCls} value={publisher} onChange={(e) => setPublisher(e.target.value)}>
-            <option value="">IAB base only</option>
-            <option value="tubi">Tubi</option>
-            <option value="roku">Roku</option>
-            <option value="pluto">Pluto TV</option>
-            <option value="freevee">Amazon Freevee</option>
-            <option value="hulu">Hulu</option>
-            <option value="peacock">Peacock</option>
-            <option value="vibe-network">Vibe.co network</option>
-          </select>
-        </div>
-      </div>
-      <div className="mt-3 flex gap-2">
-        <button className={btnPrimary} disabled={busy} onClick={async () => {
-          setBusy(true); setError(""); setResult(null);
-          try {
-            const fileId = (document.getElementById("ctv-file-id") as HTMLInputElement | null)?.value?.trim();
-            if (!fileId) throw new Error("Paste the workspace file id first (upload via Dashboard → Files).");
-            const data = await api("/api/flywheel/ctv/creative/validate", {
-              method: "POST",
-              body: JSON.stringify({ fileId, publisher: publisher || undefined }),
-            });
-            setResult({ pass: data.pass as boolean, checks: data.checks as { name: string; passed: boolean; detail: string; heuristic?: boolean }[] });
-          } catch (e) { setError(e instanceof Error ? e.message : String(e)); }
-          finally { setBusy(false); }
-        }}>
-          {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldAlert className="h-4 w-4" />} Validate
-        </button>
-      </div>
-      {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
-      {result && (
-        <div className="mt-4">
-          <div className={`mb-2 flex items-center gap-2 text-sm font-semibold ${result.pass ? "text-emerald-700" : "text-red-700"}`}>
-            {result.pass ? <CheckCircle2 className="h-4 w-4" /> : <XCircle className="h-4 w-4" />}
-            {result.pass ? "COMPLIANT — may be attached to a buy" : "BLOCKED — fix the failing checks before submission"}
+    <Card>
+      <CardHeader
+        title="Creative validator"
+        description="ffprobe checks against the IAB Tech Lab Dec 2025 draft: 1920×1080, :15/:30 (6/15/30/45/60 accepted), MP4 H.264, ready-to-serve bitrate, stereo −23 LUFS / 48 kHz, no slates/countdowns, no black bars. Non-compliant creative blocks submission."
+      />
+      <div className="flex flex-col gap-3 p-4">
+        <div className="grid gap-3 md:grid-cols-2">
+          <div className="grid gap-1.5">
+            <Label htmlFor="ctv-file-id">Workspace file id</Label>
+            <Input id="ctv-file-id" placeholder="file_… — upload the MP4 via Dashboard → Files first" />
           </div>
-          <ul className="space-y-1">
-            {result.checks.map((c) => (
-              <li key={c.name} className="flex items-start gap-2 text-sm">
-                {c.passed ? <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" /> : <XCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-600" />}
-                <span><b className="font-mono text-xs">{c.name}</b>{c.heuristic && <span className="ml-1 rounded bg-zinc-100 px-1 text-[10px] text-zinc-500">heuristic</span>} <span className="text-zinc-600">— {c.detail}</span></span>
-              </li>
-            ))}
-          </ul>
+          <div className="grid gap-1.5">
+            <Label htmlFor="ctv-publisher">Publisher (optional)</Label>
+            <select id="ctv-publisher" className="rounded-md border bg-background px-3 py-2 text-sm" value={publisher} onChange={(e) => setPublisher(e.target.value)}>
+              <option value="">IAB base only</option>
+              <option value="tubi">Tubi</option>
+              <option value="roku">Roku</option>
+              <option value="pluto">Pluto TV</option>
+              <option value="freevee">Amazon Freevee</option>
+              <option value="hulu">Hulu</option>
+              <option value="peacock">Peacock</option>
+              <option value="vibe-network">Vibe.co network</option>
+            </select>
+          </div>
         </div>
-      )}
-    </div>
+        <div>
+          <Button disabled={busy} onClick={async () => {
+            setBusy(true); setError(""); setResult(null);
+            try {
+              const fileId = (document.getElementById("ctv-file-id") as HTMLInputElement | null)?.value?.trim();
+              if (!fileId) throw new Error("Paste the workspace file id first (upload via Dashboard → Files).");
+              const data = await api("/api/flywheel/ctv/creative/validate", {
+                method: "POST",
+                body: JSON.stringify({ fileId, publisher: publisher || undefined }),
+              });
+              setResult({ pass: data.pass as boolean, checks: data.checks as { name: string; passed: boolean; detail: string; heuristic?: boolean }[] });
+            } catch (e) { setError(e instanceof Error ? e.message : String(e)); }
+            finally { setBusy(false); }
+          }}>
+            {busy ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <ShieldAlert className="mr-1 h-4 w-4" />} Validate
+          </Button>
+        </div>
+        {error && <p className="text-sm text-red-600">{error}</p>}
+        {result && (
+          <div>
+            <div className={`mb-2 flex items-center gap-2 text-sm font-semibold ${result.pass ? "text-emerald-700" : "text-red-700"}`}>
+              {result.pass ? <CheckCircle2 className="h-4 w-4" /> : <XCircle className="h-4 w-4" />}
+              {result.pass ? "COMPLIANT — may be attached to a buy" : "BLOCKED — fix the failing checks before submission"}
+            </div>
+            <ul className="space-y-1">
+              {result.checks.map((c) => (
+                <li key={c.name} className="flex items-start gap-2 text-sm">
+                  {c.passed ? <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" /> : <XCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-600" />}
+                  <span><b className="font-mono text-xs">{c.name}</b>{c.heuristic && <Badge variant="outline" className="ml-1">heuristic</Badge>} <span className="text-stone-600">— {c.detail}</span></span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
+    </Card>
   );
 }
 
@@ -330,45 +332,48 @@ function SpotsTab() {
   }
 
   return (
-    <div className="space-y-4">
-      <div className={card}>
-        <h2 className="mb-1 text-sm font-semibold text-zinc-900">Per-spot QR/pURL kit</h2>
-        <p className="mb-4 text-sm text-zinc-500">
-          One unique dynamic QR + pURL per placement (show genre, daypart, demo). Codes are sized for couch-distance
-          scanning (~3 m); landings must complete in ≤3 taps. Minting requires a passing creative validation.
-        </p>
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-          <div><span className={labelCls}>Campaign id</span><input className={inputCls} value={campaignId} onChange={(e) => setCampaignId(e.target.value)} placeholder="ctv_…" /></div>
-          <div><span className={labelCls}>Destination URL</span><input className={inputCls} value={destinationUrl} onChange={(e) => setDestinationUrl(e.target.value)} placeholder="https://shop.example.com/tv" /></div>
+    <div className="flex flex-col gap-4">
+      <Card>
+        <CardHeader
+          title="Per-spot QR/pURL kit"
+          description="One unique dynamic QR + pURL per placement (show genre, daypart, demo). Codes are sized for couch-distance scanning (~3 m); landings must complete in ≤3 taps. Minting requires a passing creative validation."
+        />
+        <div className="flex flex-col gap-3 p-4">
+          <div className="grid gap-3 md:grid-cols-2">
+            <div className="grid gap-1.5"><Label htmlFor="spot-campaign">Campaign id</Label><Input id="spot-campaign" value={campaignId} onChange={(e) => setCampaignId(e.target.value)} placeholder="ctv_…" /></div>
+            <div className="grid gap-1.5"><Label htmlFor="spot-dest">Destination URL</Label><Input id="spot-dest" value={destinationUrl} onChange={(e) => setDestinationUrl(e.target.value)} placeholder="https://shop.example.com/tv" /></div>
+          </div>
+          <div className="space-y-2">
+            {rows.map((r, i) => (
+              <div key={i} className="grid grid-cols-2 gap-2 md:grid-cols-4">
+                <Input placeholder="Placement label" value={r.placementLabel} onChange={(e) => setRows(rows.map((x, j) => (j === i ? { ...x, placementLabel: e.target.value } : x)))} />
+                <Input placeholder="Show genre" value={r.showGenre} onChange={(e) => setRows(rows.map((x, j) => (j === i ? { ...x, showGenre: e.target.value } : x)))} />
+                <Input placeholder="Daypart" value={r.daypart} onChange={(e) => setRows(rows.map((x, j) => (j === i ? { ...x, daypart: e.target.value } : x)))} />
+                <Input placeholder="Demo" value={r.demo} onChange={(e) => setRows(rows.map((x, j) => (j === i ? { ...x, demo: e.target.value } : x)))} />
+              </div>
+            ))}
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setRows([...rows, { placementLabel: "", showGenre: "", daypart: "", demo: "" }])}>+ placement</Button>
+            <Button onClick={mint} disabled={busy || !campaignId || !destinationUrl}>
+              {busy ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <QrCode className="mr-1 h-4 w-4" />} Mint kit
+            </Button>
+          </div>
+          {error && <p className="text-sm text-red-600">{error}</p>}
+          {landing && <p className="text-sm text-stone-600">{landing}</p>}
         </div>
-        <div className="mt-3 space-y-2">
-          {rows.map((r, i) => (
-            <div key={i} className="grid grid-cols-2 gap-2 md:grid-cols-4">
-              <input className={inputCls} placeholder="Placement label" value={r.placementLabel} onChange={(e) => setRows(rows.map((x, j) => (j === i ? { ...x, placementLabel: e.target.value } : x)))} />
-              <input className={inputCls} placeholder="Show genre" value={r.showGenre} onChange={(e) => setRows(rows.map((x, j) => (j === i ? { ...x, showGenre: e.target.value } : x)))} />
-              <input className={inputCls} placeholder="Daypart" value={r.daypart} onChange={(e) => setRows(rows.map((x, j) => (j === i ? { ...x, daypart: e.target.value } : x)))} />
-              <input className={inputCls} placeholder="Demo" value={r.demo} onChange={(e) => setRows(rows.map((x, j) => (j === i ? { ...x, demo: e.target.value } : x)))} />
-            </div>
-          ))}
-        </div>
-        <div className="mt-3 flex gap-2">
-          <button className={btnGhost} onClick={() => setRows([...rows, { placementLabel: "", showGenre: "", daypart: "", demo: "" }])}>+ placement</button>
-          <button className={btnPrimary} onClick={mint} disabled={busy || !campaignId || !destinationUrl}>
-            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <QrCode className="h-4 w-4" />} Mint kit
-          </button>
-        </div>
-        {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
-        {landing && <p className="mt-2 text-sm text-zinc-600">{landing}</p>}
-      </div>
+      </Card>
       {result && (
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+        <div className="grid gap-3 md:grid-cols-2">
           {result.map((s) => (
-            <div key={s.publicUrl} className={card}>
-              <p className="text-sm font-medium text-zinc-900">{s.placementLabel}</p>
-              <p className="mb-2 font-mono text-xs text-zinc-500">{s.publicUrl}</p>
-              <div className="max-w-[180px]" dangerouslySetInnerHTML={{ __html: s.qrSvg }} />
-              <p className="mt-1 text-xs text-zinc-500">Print ≥ {s.qrWidthCm} cm wide (couch distance ~3 m)</p>
-            </div>
+            <Card key={s.publicUrl}>
+              <div className="p-4">
+                <p className="text-sm font-medium text-stone-900">{s.placementLabel}</p>
+                <p className="mb-2 font-mono text-xs text-stone-500">{s.publicUrl}</p>
+                <div className="max-w-[180px]" dangerouslySetInnerHTML={{ __html: s.qrSvg }} />
+                <p className="mt-1 text-xs text-stone-500">Print ≥ {s.qrWidthCm} cm wide (couch distance ~3 m)</p>
+              </div>
+            </Card>
           ))}
         </div>
       )}
@@ -425,66 +430,75 @@ function IoTab() {
       });
       setIo(data.io as { id: string; state: string; ioPayload: { ioDocument: Record<string, unknown> } });
     } catch (e) { setError(e instanceof Error ? e.message : String(e)); }
+    finally { }
   }
 
   const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
     setForm({ ...form, [k]: e.target.value });
 
   return (
-    <div className="space-y-4">
-      <div className={card}>
-        <h2 className="mb-1 text-sm font-semibold text-zinc-900">Concierge IO generator</h2>
-        <div className="mb-4 flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
-          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-          <span>{ALERT_ONLY_COPY} Marketr generates the IO + creative brief; you place the buy in the vendor UI.</span>
-        </div>
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-          <div><span className={labelCls}>Campaign id</span><input className={inputCls} value={form.campaignId} onChange={set("campaignId")} /></div>
-          <div><span className={labelCls}>Vendor</span>
-            <select className={inputCls} value={form.vendor} onChange={set("vendor")}>
-              <option value="mntn">MNTN</option><option value="roku">Roku Ads Manager</option>
-              <option value="tatari">Tatari</option><option value="tvscientific">tvScientific</option>
-            </select>
+    <div className="flex flex-col gap-4">
+      <Card>
+        <CardHeader title="Concierge IO generator" />
+        <div className="flex flex-col gap-3 p-4">
+          <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-[13px] text-amber-900">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>{ALERT_ONLY_COPY} Marketr generates the IO + creative brief; you place the buy in the vendor UI.</span>
           </div>
-          <div><span className={labelCls}>Advertiser name</span><input className={inputCls} value={form.advertiserName} onChange={set("advertiserName")} /></div>
-          <div><span className={labelCls}>Audience</span><input className={inputCls} value={form.audience} onChange={set("audience")} placeholder="In-market auto intenders, 25–54" /></div>
-          <div><span className={labelCls}>Geo (comma-separated)</span><input className={inputCls} value={form.geo} onChange={set("geo")} placeholder="US-NC, US-SC" /></div>
-          <div><span className={labelCls}>Budget (cents)</span><input className={inputCls} value={form.budgetCents} onChange={set("budgetCents")} /></div>
-          <div><span className={labelCls}>Flight start</span><input type="date" className={inputCls} value={form.flightStart} onChange={set("flightStart")} /></div>
-          <div><span className={labelCls}>Flight end</span><input type="date" className={inputCls} value={form.flightEnd} onChange={set("flightEnd")} /></div>
-          <div><span className={labelCls}>Approval object id</span><input className={inputCls} value={form.approvalObjectId} onChange={set("approvalObjectId")} /></div>
+          <div className="grid gap-3 md:grid-cols-3">
+            <div className="grid gap-1.5"><Label>Campaign id</Label><Input value={form.campaignId} onChange={set("campaignId")} /></div>
+            <div className="grid gap-1.5"><Label>Vendor</Label>
+              <select className="rounded-md border bg-background px-3 py-2 text-sm" value={form.vendor} onChange={set("vendor")}>
+                <option value="mntn">MNTN</option><option value="roku">Roku Ads Manager</option>
+                <option value="tatari">Tatari</option><option value="tvscientific">tvScientific</option>
+              </select>
+            </div>
+            <div className="grid gap-1.5"><Label>Advertiser name</Label><Input value={form.advertiserName} onChange={set("advertiserName")} /></div>
+            <div className="grid gap-1.5"><Label>Audience</Label><Input value={form.audience} onChange={set("audience")} placeholder="In-market auto intenders, 25–54" /></div>
+            <div className="grid gap-1.5"><Label>Geo (comma-separated)</Label><Input value={form.geo} onChange={set("geo")} placeholder="US-NC, US-SC" /></div>
+            <div className="grid gap-1.5"><Label>Budget (cents)</Label><Input value={form.budgetCents} onChange={set("budgetCents")} /></div>
+            <div className="grid gap-1.5"><Label>Flight start</Label><Input type="date" value={form.flightStart} onChange={set("flightStart")} /></div>
+            <div className="grid gap-1.5"><Label>Flight end</Label><Input type="date" value={form.flightEnd} onChange={set("flightEnd")} /></div>
+            <div className="grid gap-1.5"><Label>Approval object id</Label><Input value={form.approvalObjectId} onChange={set("approvalObjectId")} /></div>
+          </div>
+          <div>
+            <Button onClick={createIo} disabled={busy}>
+              {busy ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <FileText className="mr-1 h-4 w-4" />} Generate IO + brief
+            </Button>
+          </div>
+          {error && <p className="text-sm text-red-600">{error}</p>}
         </div>
-        <button className={`${btnPrimary} mt-3`} onClick={createIo} disabled={busy}>
-          {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />} Generate IO + brief
-        </button>
-        {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
-      </div>
+      </Card>
 
       {honesty.length > 0 && (
-        <div className={`${card} border-amber-300`}>
-          <h3 className="mb-2 text-sm font-semibold text-amber-900">Vendor honesty notes (surfaced in-product)</h3>
-          <ul className="list-disc space-y-1 pl-5 text-sm text-amber-900">
-            {honesty.map((h, i) => <li key={i}>{h}</li>)}
-          </ul>
-        </div>
+        <Card>
+          <div className="p-4">
+            <h3 className="mb-2 text-sm font-semibold text-amber-900">Vendor honesty notes (surfaced in-product)</h3>
+            <ul className="list-disc space-y-1 pl-5 text-sm text-amber-900">
+              {honesty.map((h, i) => <li key={i}>{h}</li>)}
+            </ul>
+          </div>
+        </Card>
       )}
 
       {io && (
-        <div className={card}>
-          <div className="mb-2 flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-zinc-900">IO {io.id}</h3>
-            <span className="rounded bg-zinc-100 px-2 py-0.5 font-mono text-xs text-zinc-700">{io.state}</span>
+        <Card>
+          <CardHeader
+            title={`IO ${io.id}`}
+            actions={<Badge variant="outline">{io.state}</Badge>}
+          />
+          <div className="flex flex-col gap-3 p-4">
+            <div className="flex flex-wrap gap-2">
+              {(["pending_vendor_approval", "human_placed", "live", "reconciling", "cancelled"] as const).map((s) => (
+                <Button key={s} variant="outline" size="sm" onClick={() => transition(s)}>{s.replace(/_/g, " ")}</Button>
+              ))}
+            </div>
+            <pre className="max-h-96 overflow-auto rounded-md bg-stone-50 p-3 font-mono text-xs text-stone-700">
+              {JSON.stringify(io.ioPayload.ioDocument, null, 2)}
+            </pre>
+            <p className="text-xs text-amber-800">{ALERT_ONLY_COPY}</p>
           </div>
-          <div className="mb-3 flex flex-wrap gap-2">
-            {(["pending_vendor_approval", "human_placed", "live", "reconciling", "cancelled"] as const).map((s) => (
-              <button key={s} className={btnGhost} onClick={() => transition(s)}>{s.replace(/_/g, " ")}</button>
-            ))}
-          </div>
-          <pre className="max-h-96 overflow-auto rounded-md bg-zinc-50 p-3 font-mono text-xs text-zinc-700">
-            {JSON.stringify(io.ioPayload.ioDocument, null, 2)}
-          </pre>
-          <p className="mt-2 text-xs text-amber-800">{ALERT_ONLY_COPY}</p>
-        </div>
+        </Card>
       )}
     </div>
   );
@@ -514,39 +528,40 @@ function AttributionTab() {
   } | undefined;
 
   return (
-    <div className={card}>
-      <h2 className="mb-1 text-sm font-semibold text-zinc-900">Attribution — layered & probabilistic</h2>
-      <p className="mb-4 text-sm text-zinc-500">
-        Impression-to-conversion on CTV is device-graph inference or geo-holdout experiment — never ledger-grade.
-        QR/pURL scans are the deterministic slice. Deterministic CTV ROAS is never presented.
-      </p>
-      <div className="mb-4 flex gap-2">
-        <input className={inputCls} value={campaignId} onChange={(e) => setCampaignId(e.target.value)} placeholder="Campaign id" />
-        <button className={btnPrimary} onClick={load} disabled={busy || !campaignId}>
-          {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <BarChart3 className="h-4 w-4" />} Load
-        </button>
-      </div>
-      {error && <p className="text-sm text-red-600">{error}</p>}
-      {view && layers && (
-        <div className="space-y-3">
-          <LayerCard title="Impression pixel" value={`${layers.impressionPixel.impressions} impressions`} note={`View-through window: ${layers.impressionPixel.viewThroughWindowDays} days`} />
-          <LayerCard title="View-through (modeled)" value={`${layers.viewThrough.attributedConversions} attributed conversions`} note={layers.viewThrough.disclaimer} />
-          <LayerCard title="QR/pURL scans — deterministic slice" value={`${layers.qrScans.scans} scans`} note={layers.qrScans.deterministicSliceNote} highlight />
-          <div className="rounded-md border border-zinc-200 bg-zinc-50 p-3 text-xs text-zinc-600">
-            {(view.probabilisticDisclaimer as string) ?? ""}
-          </div>
+    <Card>
+      <CardHeader
+        title="Attribution — layered & probabilistic"
+        description="Impression-to-conversion on CTV is device-graph inference or geo-holdout experiment — never ledger-grade. QR/pURL scans are the deterministic slice. Deterministic CTV ROAS is never presented."
+      />
+      <div className="flex flex-col gap-3 p-4">
+        <div className="flex gap-2">
+          <Input value={campaignId} onChange={(e) => setCampaignId(e.target.value)} placeholder="Campaign id" />
+          <Button onClick={load} disabled={busy || !campaignId}>
+            {busy ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <BarChart3 className="mr-1 h-4 w-4" />} Load
+          </Button>
         </div>
-      )}
-    </div>
+        {error && <p className="text-sm text-red-600">{error}</p>}
+        {view && layers && (
+          <div className="space-y-3">
+            <LayerCard title="Impression pixel" value={`${layers.impressionPixel.impressions} impressions`} note={`View-through window: ${layers.impressionPixel.viewThroughWindowDays} days`} />
+            <LayerCard title="View-through (modeled)" value={`${layers.viewThrough.attributedConversions} attributed conversions`} note={layers.viewThrough.disclaimer} />
+            <LayerCard title="QR/pURL scans — deterministic slice" value={`${layers.qrScans.scans} scans`} note={layers.qrScans.deterministicSliceNote} highlight />
+            <div className="rounded-md border border-stone-200 bg-stone-50 p-3 text-xs text-stone-600">
+              {(view.probabilisticDisclaimer as string) ?? ""}
+            </div>
+          </div>
+        )}
+      </div>
+    </Card>
   );
 }
 
 function LayerCard({ title, value, note, highlight }: { title: string; value: string; note: string; highlight?: boolean }) {
   return (
-    <div className={`rounded-md border p-3 ${highlight ? "border-emerald-300 bg-emerald-50/50" : "border-zinc-200"}`}>
-      <p className="text-sm font-medium text-zinc-900">{title}</p>
-      <p className="text-lg font-semibold text-zinc-900">{value}</p>
-      <p className="text-xs text-zinc-500">{note}</p>
+    <div className={`rounded-lg border p-3 ${highlight ? "border-emerald-200 bg-emerald-50/60" : "border-stone-200"}`}>
+      <p className="text-sm font-medium text-stone-900">{title}</p>
+      <p className="text-lg font-semibold text-stone-900">{value}</p>
+      <p className="text-xs text-stone-500">{note}</p>
     </div>
   );
 }

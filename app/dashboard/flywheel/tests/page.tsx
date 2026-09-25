@@ -9,7 +9,7 @@ import { requireWorkspaceRole } from "@/lib/authz";
 import { resolveExperimentStore } from "@/lib/flywheel/testlab/store";
 import { Badge } from "@/components/vault/shadcn/badge";
 import { Button } from "@/components/vault/shadcn/button";
-import { FlaskConical, Lightbulb, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -54,9 +54,7 @@ export default async function TestLabPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight">
-            <FlaskConical className="h-6 w-6" /> Test Lab
-          </h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Test Lab</h1>
           <p className="text-sm text-muted-foreground">
             Peek-safe A/B testing with an honesty dashboard — the lab refuses to
             declare a winner it can&apos;t defend.
@@ -75,8 +73,7 @@ export default async function TestLabPage() {
       )}
 
       <section className="space-y-3">
-        <h2 className="flex items-center gap-2 text-base font-semibold">
-          <Lightbulb className="h-4 w-4" /> Idea queue
+        <h2 className="text-base font-semibold">Idea queue
           <span className="text-xs font-normal text-muted-foreground">ranked by PIE/ICE</span>
         </h2>
         {ideas.length === 0 ? (

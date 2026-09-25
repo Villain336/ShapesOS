@@ -7,7 +7,7 @@
 // every render.
 
 import { ctvGuard, safetyError } from "../../_lib";
-import { getCtvStore } from "@/lib/flywheel/ctv/store";
+import { resolveCtvStore } from "@/lib/flywheel/ctv/store";
 import {
   buildAttributionView,
   assertNoDeterministicRoas,
@@ -23,7 +23,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
   const { id } = await ctx.params;
 
   try {
-    const store = getCtvStore();
+    const store = await resolveCtvStore();
     const campaign = await store.getCampaign(gate.workspaceId, id);
     if (!campaign) return safetyError(new Error("CTV campaign not found in workspace"));
 

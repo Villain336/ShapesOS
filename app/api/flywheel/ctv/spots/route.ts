@@ -8,7 +8,7 @@
 import type { NextRequest } from "next/server";
 import { z } from "zod";
 import { ctvGuard, badRequest, safetyError, readJson } from "../_lib";
-import { getCtvStore } from "@/lib/flywheel/ctv/store";
+import { resolveCtvStore } from "@/lib/flywheel/ctv/store";
 import {
   mintSpotKit,
   checkLandingTaps,
@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
   const d = parsed.data;
 
   try {
-    const store = getCtvStore();
+    const store = await resolveCtvStore();
     const campaign = await store.getCampaign(gate.workspaceId, d.campaignId);
     if (!campaign) return safetyError(new Error("CTV campaign not found in workspace"));
 

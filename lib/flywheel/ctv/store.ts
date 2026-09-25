@@ -14,6 +14,7 @@
 import { sha256Hex } from "@/lib/media/safety";
 import { canonicalize } from "@/lib/media/approvals";
 import { createId } from "@/lib/media/ids";
+import { prisma } from "@/lib/prisma";
 
 // ---------------------------------------------------------------------------
 // Row types (mirror prisma/fragments/phase7-ctv.prisma)
@@ -310,14 +311,288 @@ export function createMemoryCtvStore(): CtvStore {
   };
 }
 
-// Singleton accessor (routes). The phase-7 coordinator replaces this with
-// the Prisma-backed implementation at merge time.
+// ---------------------------------------------------------------------------
+// Prisma-backed implementation
+// ---------------------------------------------------------------------------
+// Mirrors lib/flywheel/reallocation/store.ts conventions: the generated
+// client is cast through `any` so the track doesn't hard-depend on the exact
+// client typings. Audit events land in the shared FlywheelAuditEvent table
+// (workspace-scoped, hash-chained) using the F4 CTV kinds added to the
+// FlywheelAuditKind enum.
+
+
+type AnyPrisma = any;
+
+const asJson = (v: unknown): Record<string, unknown> | null =>
+  v === null || v === undefined ? null : (v as Record<string, unknown>);
+
+const serCampaign = (r: any): CtvCampaignRow => ({
+  id: r.id,
+  workspaceId: r.workspaceId,
+  name: r.name,
+  platform: r.platform as CtvPlatform,
+  mode: r.mode as CtvMode,
+  status: r.status as CtvCampaignStatus,
+  approvalObjectId: r.approvalObjectId ?? null,
+  budgetCents: r.budgetCents ?? null,
+  currency: r.currency,
+  flightStart: r.flightStart ?? null,
+  flightEnd: r.flightEnd ?? null,
+  targetingJson: asJson(r.targetingJson),
+  creativeIds: r.creativeIds ?? [],
+  creativeHashes: r.creativeHashes ?? [],
+  vibeAdvertiserId: r.vibeAdvertiserId ?? null,
+  vibeCampaignId: r.vibeCampaignId ?? null,
+  vibeTestMode: r.vibeTestMode,
+  vibeConfigRef: r.vibeConfigRef ?? null,
+  createdBy: r.createdBy ?? null,
+  createdAt: r.createdAt,
+  updatedAt: r.updatedAt,
+});
+
+const serValidation = (r: any): CtvCreativeValidationRow => ({
+  id: r.id,
+  workspaceId: r.workspaceId,
+  campaignId: r.campaignId ?? null,
+  creativeId: r.creativeId,
+  creativeSha256: r.creativeSha256 ?? null,
+  ffprobeJson: (r.ffprobeJson ?? {}) as Record<string, unknown>,
+  pass: r.pass,
+  checks: (r.checks ?? []) as CtvCreativeValidationRow["checks"],
+  durationSeconds: r.durationSeconds ?? null,
+  publisher: r.publisher ?? null,
+  publisherRulesVersion: r.publisherRulesVersion,
+  validatedBy: r.validatedBy ?? null,
+  createdAt: r.createdAt,
+});
+
+const serSpot = (r: any): CtvSpotRow => ({
+  id: r.id,
+  workspaceId: r.workspaceId,
+  campaignId: r.campaignId,
+  placementLabel: r.placementLabel,
+  showGenre: r.showGenre ?? null,
+  daypart: r.daypart ?? null,
+  demo: r.demo ?? null,
+  creativeId: r.creativeId ?? null,
+  qrId: r.qrId ?? null,
+  purlId: r.purlId ?? null,
+  qrSvg: r.qrSvg ?? null,
+  flightFrom: r.flightFrom ?? null,
+  flightTo: r.flightTo ?? null,
+  status: r.status,
+  createdAt: r.createdAt,
+  updatedAt: r.updatedAt,
+});
+
+const serIo = (r: any): CtvIoRow => ({
+  id: r.id,
+  workspaceId: r.workspaceId,
+  campaignId: r.campaignId,
+  vendor: r.vendor,
+  ioPayload: (r.ioPayload ?? {}) as Record<string, unknown>,
+  state: r.state as CtvIoState,
+  placedBy: r.placedBy ?? null,
+  placedAt: r.placedAt ?? null,
+  vendorConfirmation: r.vendorConfirmation ?? null,
+  createdAt: r.createdAt,
+  updatedAt: r.updatedAt,
+});
+
+const serPixel = (r: any): CtvPixelRow => ({
+  id: r.id,
+  workspaceId: r.workspaceId,
+  campaignId: r.campaignId,
+  pixelUrl: r.pixelUrl,
+  pixelToken: r.pixelToken,
+  viewThroughWindowDays: r.viewThroughWindowDays,
+  impressionsCount: r.impressionsCount,
+  createdAt: r.createdAt,
+  updatedAt: r.updatedAt,
+});
+
+/** True when the CTV tables exist and are reachable. */
+export async function ctvTablesReady(): Promise<boolean> {
+  try {
+    await (prisma as AnyPrisma).ctvCampaign.findFirst({ select: { id: true } });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function createPrismaCtvStore(db: AnyPrisma = prisma): CtvStore {
+  const auditEvent = async (input: {
+    workspaceId: string; actor: string; action: CtvAuditAction;
+    subjectType: CtvAuditEvent["subjectType"]; subjectId?: string | null;
+    detail?: Record<string, unknown> | null;
+  }): Promise<CtvAuditEvent> => {
+    const ts = new Date();
+    const detail = input.detail ?? null;
+    const payloadHash = sha256Hex(canonicalize(detail ?? {}));
+    const last = await db.flywheelAuditEvent.findFirst({
+      where: { workspaceId: input.workspaceId },
+      orderBy: { ts: "desc" },
+      select: { eventHash: true },
+    });
+    const prevHash = last?.eventHash ?? "GENESIS";
+    const eventHash = ctvAuditEventHashFor(prevHash, {
+      workspaceId: input.workspaceId, ts: ts.toISOString(), actor: input.actor,
+      action: input.action, subjectType: input.subjectType,
+      subjectId: input.subjectId ?? null, payloadHash,
+    });
+    const row = await db.flywheelAuditEvent.create({
+      data: {
+        workspaceId: input.workspaceId,
+        correlationId: `ctv:${input.action}:${input.subjectId ?? input.workspaceId}`,
+        kind: input.action,
+        actor: input.actor,
+        payload: { ...(detail ?? {}), ctvSubjectType: input.subjectType, ctvSubjectId: input.subjectId ?? null },
+        payloadHash,
+        prevHash,
+        eventHash,
+        ts,
+      },
+    });
+    const payload = (row.payload ?? {}) as Record<string, unknown>;
+    return {
+      id: row.id,
+      workspaceId: row.workspaceId,
+      ts: row.ts,
+      actor: row.actor,
+      action: input.action,
+      subjectType: input.subjectType,
+      subjectId: input.subjectId ?? null,
+      payloadHash: row.payloadHash,
+      prevHash: row.prevHash,
+      eventHash: row.eventHash,
+      detail: detail,
+    };
+  };
+
+  const auditList = async (workspaceId: string, limit = 200): Promise<CtvAuditEvent[]> => {
+    const rows = await db.flywheelAuditEvent.findMany({
+      where: { workspaceId, correlationId: { startsWith: "ctv:" } },
+      orderBy: { ts: "asc" },
+      take: limit,
+    });
+    return rows.map((row: any) => {
+      const action = row.correlationId.slice(4).split(":")[0] as CtvAuditAction;
+      const payload = (row.payload ?? {}) as Record<string, unknown>;
+      const subjectType = (payload.ctvSubjectType ?? "workspace") as CtvAuditEvent["subjectType"];
+      const subjectId = (payload.ctvSubjectId ?? null) as string | null;
+      const { ctvSubjectType, ctvSubjectId, ...detail } = payload;
+      return {
+        id: row.id,
+        workspaceId: row.workspaceId,
+        ts: row.ts,
+        actor: row.actor,
+        action,
+        subjectType,
+        subjectId,
+        payloadHash: row.payloadHash,
+        prevHash: row.prevHash,
+        eventHash: row.eventHash,
+        detail: Object.keys(detail).length > 0 ? detail : null,
+      } as CtvAuditEvent;
+    });
+  };
+
+  return {
+    async createCampaign(input) {
+      return serCampaign(await db.ctvCampaign.create({ data: { ...input } }));
+    },
+    async getCampaign(workspaceId, id) {
+      const row = await db.ctvCampaign.findFirst({ where: { id, workspaceId } });
+      return row ? serCampaign(row) : null;
+    },
+    async listCampaigns(workspaceId) {
+      const rows = await db.ctvCampaign.findMany({ where: { workspaceId }, orderBy: { createdAt: "desc" } });
+      return rows.map(serCampaign);
+    },
+    async updateCampaign(workspaceId, id, patch) {
+      const existing = await db.ctvCampaign.findFirst({ where: { id, workspaceId }, select: { id: true } });
+      if (!existing) return null;
+      const { id: _dropId, workspaceId: _dropWs, createdAt: _dropCa, ...data } = patch as Record<string, unknown>;
+      return serCampaign(await db.ctvCampaign.update({ where: { id }, data }));
+    },
+    async createValidation(input) {
+      return serValidation(await db.ctvCreativeValidation.create({ data: { ...input } }));
+    },
+    async listValidations(workspaceId, creativeId) {
+      const rows = await db.ctvCreativeValidation.findMany({
+        where: { workspaceId, ...(creativeId ? { creativeId } : {}) },
+        orderBy: { createdAt: "desc" },
+      });
+      return rows.map(serValidation);
+    },
+    async createSpot(input) {
+      return serSpot(await db.ctvSpot.create({ data: { ...input } }));
+    },
+    async listSpots(workspaceId, campaignId) {
+      const rows = await db.ctvSpot.findMany({ where: { workspaceId, campaignId }, orderBy: { createdAt: "asc" } });
+      return rows.map(serSpot);
+    },
+    async createIo(input) {
+      return serIo(await db.ctvIo.create({ data: { ...input } }));
+    },
+    async getIo(workspaceId, id) {
+      const row = await db.ctvIo.findFirst({ where: { id, workspaceId } });
+      return row ? serIo(row) : null;
+    },
+    async updateIo(workspaceId, id, patch) {
+      const existing = await db.ctvIo.findFirst({ where: { id, workspaceId }, select: { id: true } });
+      if (!existing) return null;
+      const { id: _dropId, workspaceId: _dropWs, createdAt: _dropCa, ...data } = patch as Record<string, unknown>;
+      return serIo(await db.ctvIo.update({ where: { id }, data }));
+    },
+    async createPixel(input) {
+      return serPixel(await db.ctvPixel.create({ data: { ...input } }));
+    },
+    async getPixel(workspaceId, id) {
+      const row = await db.ctvPixel.findFirst({ where: { id, workspaceId } });
+      return row ? serPixel(row) : null;
+    },
+    async getPixelByToken(token) {
+      const row = await db.ctvPixel.findFirst({ where: { pixelToken: token } });
+      return row ? serPixel(row) : null;
+    },
+    async getPixelAny(id) {
+      const row = await db.ctvPixel.findUnique({ where: { id } });
+      return row ? serPixel(row) : null;
+    },
+    async listPixels(workspaceId, campaignId) {
+      const rows = await db.ctvPixel.findMany({ where: { workspaceId, campaignId }, orderBy: { createdAt: "asc" } });
+      return rows.map(serPixel);
+    },
+    async incrementImpressions(pixelId) {
+      await db.ctvPixel.update({ where: { id: pixelId }, data: { impressionsCount: { increment: 1 } } }).catch(() => null);
+    },
+    audit: auditEvent,
+    auditList,
+  };
+}
+
+// Singleton accessor (memory fallback). Test hook: swap the singleton
+// (verify battery uses createMemoryCtvStore() directly on fresh stores).
 let singleton: CtvStore | null = null;
 export function getCtvStore(): CtvStore {
   if (!singleton) singleton = createMemoryCtvStore();
   return singleton;
 }
-/** Test hook: swap the singleton (verify battery uses fresh stores). */
+/** Test hook: swap the singleton. */
 export function setCtvStore(store: CtvStore | null): void {
   singleton = store;
+}
+
+// ---------------------------------------------------------------------------
+// Route accessor
+// ---------------------------------------------------------------------------
+// Prisma-backed when the CTV tables are provisioned; memory fallback otherwise
+// (mirrors the Test Lab resolveExperimentStore pattern). The verify battery
+// uses createMemoryCtvStore() directly, so this resolution never touches it.
+
+export async function resolveCtvStore(): Promise<CtvStore> {
+  if (await ctvTablesReady()) return createPrismaCtvStore(prisma);
+  return getCtvStore();
 }

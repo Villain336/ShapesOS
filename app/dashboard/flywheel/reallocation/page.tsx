@@ -24,7 +24,7 @@ export default async function ReallocationPage() {
   const isOwner = membership.role === "owner" || membership.role === "admin";
 
   return (
-    <div className="flex h-full flex-col gap-6 bg-[#FAFAF7] p-4 md:p-6">
+    <div className="space-y-6">
       <div>
         <h1 className="text-xl font-bold tracking-tight text-stone-900">Budget reallocation</h1>
         <p className="mt-0.5 max-w-3xl text-[13px] text-stone-500">

@@ -22,7 +22,7 @@ import {
   assertCreativePasses,
 } from "@/lib/flywheel/ctv/validator";
 import { rulesForPublisher, getPublisherRule } from "@/lib/flywheel/ctv/publisher-rules";
-import { getCtvStore } from "@/lib/flywheel/ctv/store";
+import { resolveCtvStore } from "@/lib/flywheel/ctv/store";
 import { readFile as readWorkspaceFile } from "@/lib/filesystem/service";
 
 export const dynamic = "force-dynamic";
@@ -78,7 +78,7 @@ export async function POST(req: NextRequest) {
     }
 
     const sha = createHash("sha256").update(bytes).digest("hex");
-    const store = getCtvStore();
+    const store = await resolveCtvStore();
     const creativeId = d.creativeId ?? `file:${label}`;
     const row = await store.createValidation({
       workspaceId: gate.workspaceId,

@@ -10,7 +10,7 @@
 import type { NextRequest } from "next/server";
 import { z } from "zod";
 import { ctvGuard, badRequest, safetyError, readJson } from "../_lib";
-import { getCtvStore, type CtvIoState } from "@/lib/flywheel/ctv/store";
+import { resolveCtvStore, type CtvIoState } from "@/lib/flywheel/ctv/store";
 import {
   generateIo,
   transitionIo,
@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
   const action = body.action;
 
   try {
-    const store = getCtvStore();
+    const store = await resolveCtvStore();
 
     if (action === "create") {
       const parsed = CreateIoSchema.safeParse(body);

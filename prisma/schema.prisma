@@ -5558,6 +5558,21 @@ enum FlywheelAuditKind {
   breaker_acknowledged
   run_completed
   approval_materialized
+  // F4 CTV kinds (owned by the phase7-ctv fragment)
+  creative_validated
+  campaign_created
+  campaign_paused
+  spot_kit_minted
+  io_created
+  io_state_transition
+  io_brief_generated
+  vibe_call
+  vibe_budget_move_rejected
+  concierge_pause_alerted
+  seat_status_checked
+  seat_action_rejected
+  attribution_viewed
+  pixel_impression
 }
 
 // Human-signed bounded envelope: channel allowlist, caps, band, cool-down,
