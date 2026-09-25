@@ -59,8 +59,15 @@ export interface SequenceStore {
 }
 
 export function approvalSecret(): string {
-  // GAP (reported): no Secure Vault wiring for the approval HMAC secret yet.
-  return process.env.AUTHORITY_APPROVAL_SECRET ?? "dev-insecure-secret";
+  const s = (process.env.AUTHORITY_APPROVAL_SECRET ?? "").trim();
+  if (s) return s;
+  // Fail closed in production: a hardcoded fallback secret would let anyone
+  // forge approval receipts. Dev-only fallback with a loud warning.
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("AUTHORITY_APPROVAL_SECRET is not set — refusing to sign approvals with a fallback secret.");
+  }
+  console.warn("[authority] WARNING: AUTHORITY_APPROVAL_SECRET unset — using insecure dev fallback. Set it before any production use.");
+  return "dev-insecure-secret";
 }
 
 export function isDraftExpired(createdAt: Date, now = new Date()): boolean {

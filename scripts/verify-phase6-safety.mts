@@ -32,7 +32,9 @@ import {
 import {
   prismaSequenceStore, createMemorySequenceStore,
   createDraft, sendNextStep, stopSequenceOnReply, recordHardBounce,
+  approvalSecret as outreachApprovalSecret,
 } from "../lib/authority/outreach/sequences";
+import { approvalSecret as reviewsApprovalSecret } from "../lib/authority/reviews/gbpClient";
 import {
   prismaSuppressionStore, suppressEmail, isEmailSuppressed,
 } from "../lib/authority/outreach/suppression";
@@ -344,6 +346,27 @@ async function main() {
   // (never a bare "unreachable", never a pretend-send).
   await expectThrow("real-key path throws honest NotConfiguredError", () =>
     Promise.resolve(resolveSendingPartner({ provider: "smartlead", apiKey: "sk_live_x", fake: false })), /not configured/i);
+
+  // Approval HMAC secrets fail closed in production (no hardcoded fallback).
+  // (process.env is NODE_ENV-readonly in types; mutate via a record cast.)
+  const env = process.env as Record<string, string | undefined>;
+  const savedAuth = env.AUTHORITY_APPROVAL_SECRET;
+  const savedMkt = env.MARKETR_APPROVAL_SECRET;
+  const savedNode = env.NODE_ENV;
+  delete env.AUTHORITY_APPROVAL_SECRET;
+  delete env.MARKETR_APPROVAL_SECRET;
+  env.NODE_ENV = "production";
+  await expectThrow("outreach approvalSecret fails closed in prod", () =>
+    Promise.resolve(outreachApprovalSecret()), /not set/i);
+  await expectThrow("reviews approvalSecret fails closed in prod", () =>
+    Promise.resolve(reviewsApprovalSecret()), /not set/i);
+  env.NODE_ENV = "development";
+  if (outreachApprovalSecret() === "dev-insecure-secret") ok("dev fallback (loud warning) outside prod");
+  else bad("dev fallback", "unexpected value");
+  // Restore env for the rest of the battery.
+  if (savedAuth !== undefined) env.AUTHORITY_APPROVAL_SECRET = savedAuth;
+  if (savedMkt !== undefined) env.MARKETR_APPROVAL_SECRET = savedMkt;
+  if (savedNode !== undefined) env.NODE_ENV = savedNode; else delete env.NODE_ENV;
 
   console.log(`\n${passed} passed, ${failed} failed`);
   await teardown([ws, ws2]);

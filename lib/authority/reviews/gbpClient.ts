@@ -19,7 +19,13 @@ export function gbpClientForRoutes(): GbpClient {
 
 /** Approval receipt secret — mirrors lib/media/safety.ts convention. */
 export function approvalSecret(): string {
-  const s = (process.env.MARKETR_APPROVAL_SECRET ?? "marketr-approval-dev-secret").trim();
-  if (!s) throw new Error("MARKETR_APPROVAL_SECRET must not be empty.");
-  return s;
+  const s = (process.env.MARKETR_APPROVAL_SECRET ?? "").trim();
+  if (s) return s;
+  // Fail closed in production: a hardcoded fallback secret would let anyone
+  // forge approval receipts. Dev-only fallback with a loud warning.
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("MARKETR_APPROVAL_SECRET is not set — refusing to sign approvals with a fallback secret.");
+  }
+  console.warn("[authority] WARNING: MARKETR_APPROVAL_SECRET unset — using insecure dev fallback. Set it before any production use.");
+  return "marketr-approval-dev-secret";
 }
