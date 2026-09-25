@@ -29,6 +29,8 @@ import { runAudit } from "@/lib/audit/audit";
 import { getSiteIdeProvider, siteIsMock } from "@/lib/connectors/source";
 import { generateReport } from "@/lib/pdf/generate";
 import { approveAutopilotItem } from "@/lib/seo/autopilot-service";
+import { designQr, printLockQr, QrDesignerError } from "@/lib/studio/qr-designer";
+import { auditStudio } from "@/lib/studio/service";
 
 export type ToolKind = "safe" | "destructive" | "publish" | "spend";
 
@@ -734,6 +736,127 @@ const approve_autopilot_item: ToolDef = {
   },
 };
 
+// ---------------------------------------------------------------------------
+// PHASE 5 A1 — CHAT-GENERATED QR DESIGNER (Creative Studio)
+//
+// Chat-first: the user describes the look in natural language ("round QR,
+// modules as little snakes, brand colors, logo in the center"). The engine
+// designs the module glyph (deterministic procedural glyphs — no LLM key
+// needed; a QrGlyphLlm can be plugged in for true AI-designed SVG glyphs),
+// tiles it onto the REAL QR matrix, applies the shape mask / colors / logo,
+// then runs automated validation (glyph fill, contrast, finder integrity,
+// quiet zone, EC forced to H) plus a REAL decoder scan test before anything
+// is shown as verified.
+//
+// The tool NEVER exposes an unverified code as verified: failures return the
+// named reason plus the bolder auto-regenerated variant (per spec §A1).
+// Success print-locks the asset and returns its sha256 — the hash the
+// per-buy approval object binds (spec §4 tracking_links qr_png_url).
+// ---------------------------------------------------------------------------
+
+const design_qr_code: ToolDef = {
+  name: "design_qr_code",
+  description:
+    "Design a brand-styled QR code from a natural-language style request (e.g. 'round QR, modules as little snakes, brand colors, logo in the center'). Renders the styled code on the real QR matrix, runs automated validation (glyph fill, contrast, finder integrity, quiet zone, error correction H) and a real decoder scan test. Failures come back with the named reason plus a bolder auto-regenerated variant. A verified design is print-locked and its sha256 hash is returned for the media-buy approval binding. The AI only ever styles the artwork — never the encoded data.",
+  kind: "spend",
+  minRole: "editor",
+  argsSchema: {
+    type: "object",
+    properties: {
+      stylePrompt: { type: "string", description: "Natural-language style request (required). Describe the look: glyph style, shape, colors, logo, frame CTA." },
+      targetUrl: { type: "string", description: "The exact URL the QR must encode and decode to (required, http(s))." },
+      foreground: { type: "string", description: "Brand foreground hex color (optional — parsed from the prompt otherwise)." },
+      background: { type: "string", description: "Brand background hex color (optional)." },
+      logoDataUrl: { type: "string", description: "PNG data URL for the center logo (optional; PNG only)." },
+      shapeMask: { type: "string", description: '"square" (default) or "round" — round drops outer modules, keepers finders intact.' },
+      frameCta: { type: "string", description: 'Printable frame CTA text, e.g. "Scan for 20% off" (optional).' },
+    },
+    required: ["stylePrompt", "targetUrl"],
+  },
+  async execute(ctx, args) {
+    if (!hasRole(ctx, "editor")) throw new Error("editor role required");
+    const stylePrompt = str(args.stylePrompt);
+    const targetUrl = str(args.targetUrl);
+    if (!stylePrompt) throw new Error("stylePrompt is required");
+    if (!targetUrl) throw new Error("targetUrl is required");
+    const brand =
+      str(args.foreground) || str(args.background) || str(args.logoDataUrl)
+        ? {
+            foreground: str(args.foreground),
+            background: str(args.background),
+            logoDataUrl: str(args.logoDataUrl),
+          }
+        : undefined;
+    let result;
+    try {
+      result = await designQr({
+        targetUrl,
+        stylePrompt,
+        brand,
+        shapeMask: (str(args.shapeMask) as "square" | "round" | undefined) ?? undefined,
+        frameCta: str(args.frameCta),
+      });
+    } catch (err) {
+      if (err instanceof QrDesignerError) throw new Error(err.message);
+      throw err;
+    }
+
+    let lock: Awaited<ReturnType<typeof printLockQr>> | null = null;
+    if (result.ok && result.png && result.validation?.ok && result.scanTest.passed) {
+      lock = await printLockQr({ workspaceId: ctx.workspaceId, result, targetUrl, createdBy: ctx.userId });
+      await auditStudio(
+        prisma,
+        ctx.workspaceId,
+        null,
+        "studio_qr_print_locked",
+        `QR print-locked via chat for ${targetUrl} (${result.spec.glyphLabel}) — sha256 ${lock.hash.slice(0, 12)}….`,
+        "user",
+      ).catch(() => {});
+    } else {
+      await auditStudio(
+        prisma,
+        ctx.workspaceId,
+        null,
+        "studio_qr_designed",
+        `QR design attempt via chat for ${targetUrl} did not verify: ${(result.validation?.issues ?? []).map((i) => i.code).join(", ") || result.fatal || "unknown"}.`,
+        "user",
+      ).catch(() => {});
+    }
+
+    const v = result.validation;
+    const summary = result.ok
+      ? `QR designed and scan-verified for ${targetUrl}: ${result.spec.glyphLabel}, ${result.spec.shapeMask} mask, contrast ${v?.metrics.contrastRatio.toFixed(1)}:1, finder integrity ${(100 * (v?.metrics.finderMatchPct ?? 0)).toFixed(0)}%${result.regenerated ? " (bolder auto-regenerated variant — the first style failed validation)" : ""}. Print-locked: sha256 ${lock?.hash.slice(0, 16)}….`
+      : `QR design did not verify for ${targetUrl}: ${v?.issues.map((i) => i.message).join(" ") ?? result.fatal ?? "unknown error"}. No unverified code was exposed — nothing was print-locked.`;
+    return {
+      summary,
+      details: {
+        ok: result.ok,
+        regenerated: result.regenerated,
+        attempts: result.attempts,
+        fatal: result.fatal ?? null,
+        spec: {
+          moduleGlyph: result.spec.moduleGlyph,
+          glyphLabel: result.spec.glyphLabel,
+          shapeMask: result.spec.shapeMask,
+          foreground: result.spec.foreground,
+          background: result.spec.background,
+          finderStyle: result.spec.finderStyle,
+          frameCta: result.spec.frameCta,
+          errorCorrection: result.spec.errorCorrection,
+        },
+        validation: v
+          ? { ok: v.ok, issues: v.issues, metrics: v.metrics }
+          : null,
+        scanTest: result.scanTest,
+        lock: lock
+          ? { hash: lock.hash, qrPngUrl: lock.qrPngUrl, validatedAt: lock.validatedAt }
+          : null,
+        previewPng: result.png ? `data:image/png;base64,${result.png.toString("base64")}` : null,
+      },
+    };
+  },
+};
+
 export const TOOLS: ToolDef[] = [
   get_keywords,
   get_rankings,
@@ -749,6 +872,7 @@ export const TOOLS: ToolDef[] = [
   create_report,
   run_workflow,
   approve_autopilot_item,
+  design_qr_code,
 ];
 
 export function getTool(name: string): ToolDef | undefined {

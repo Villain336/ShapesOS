@@ -1,6 +1,6 @@
 // Marketr — Creative Studio home (Phase 4, T2).
 // The central home for all creative and design work across Marketr, powered by
-// Canva. Tabs: [Creatives] [Assets] [Canva connection].
+// Canva. Tabs: [Creatives] [Assets] [QR codes] [Canva connection].
 // v1 ships print/mail creative + the asset library; email/social channel
 // templates are registered as coming_soon and plug in without rework.
 "use client";
@@ -19,6 +19,7 @@ import {
   Palette,
   Plug,
   Plus,
+  QrCode,
   RefreshCw,
   Trash2,
   X,
@@ -32,6 +33,7 @@ import {
   type ValidationReport,
 } from "./api";
 import { CreativeWizard, ValidationView } from "./CreativeWizard";
+import { QrDesignerTab } from "./QrDesigner";
 
 // ── Small atoms ──────────────────────────────────────────────────────────────
 
@@ -657,6 +659,7 @@ function CanvaTab() {
 const TABS = [
   { id: "creatives", label: "Creatives", icon: Palette },
   { id: "assets", label: "Assets", icon: FolderOpen },
+  { id: "qr", label: "QR codes", icon: QrCode },
   { id: "canva", label: "Canva connection", icon: Plug },
 ] as const;
 
@@ -682,6 +685,7 @@ export function StudioApp() {
       </div>
       {tab === "creatives" && <CreativesTab />}
       {tab === "assets" && <AssetsTab />}
+      {tab === "qr" && <QrDesignerTab />}
       {tab === "canva" && <CanvaTab />}
     </div>
   );

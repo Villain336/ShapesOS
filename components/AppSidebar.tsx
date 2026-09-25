@@ -8,7 +8,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
 import type { ComponentType } from "react";
-import { Mail, Paintbrush } from "lucide-react";
+import { Mail, Paintbrush, Megaphone } from "lucide-react";
 import {
   ChartBar,
   Bell,
@@ -67,6 +67,8 @@ const NAV_SECTIONS: {
       // (R3/T1 mail engine — page lands with that track; nav is wired here).
       { href: "/dashboard/studio", label: "Studio", icon: Paintbrush },
       { href: "/dashboard/mail", label: "Direct Mail", icon: Mail },
+      // Phase 5 SAFETY: media buying command center (pools, approvals, kill switches).
+      { href: "/dashboard/media", label: "Media", icon: Megaphone },
     ],
   },
   {

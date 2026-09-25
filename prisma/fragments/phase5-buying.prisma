@@ -1,0 +1,221 @@
+// Marketr — Phase 5 buying-paths track (B1/B2/B3) data models.
+//
+// ASSEMBLY NOTE: this fragment is merged into prisma/schema.prisma by the
+// phase-5 coordinator. It is a fragment — do NOT `prisma generate` against
+// it directly. Validate the assembled schema with `prisma validate`.
+//
+// Table names: media_buys / media_receipts live in the safety track's
+// fragment (S1–S4, owned by the safety track). This fragment only owns:
+// dooh_plans, audio_buys, io_briefs, launch_packets, media_receipts.
+// The `buyId` scalar on each row references the safety track's
+// media_buys(id); the relation itself is declared here as a scalar-only
+// link until the fragments are merged (merge-time the relation can be
+// completed on the media_buys side).
+//
+// All rows are workspace-isolated. Money values are integer cents. No card
+// PANs, no key material, no raw credentials — only refs.
+
+// B1: DOOH plan (planner output). An approved plan compiles to a launch
+// packet (launch_packet_url). Status: draft → planned → packet_ready →
+// launched (client-account execution) | cancelled.
+model DoohPlan {
+  id          String @id @default(cuid())
+  workspaceId String @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  // Optional back-link to the safety track's media_buys row (scalar until
+  // merge; the approval binding lives there, not here).
+  buyId String? @map("buy_id")
+
+  name   String
+  vendor String @map("vendor") // "blip" | "blindspot" | "adomni" | "fake"
+  // { markets: [{ city, state, radius_mi }], placements: [{ boardId, name,
+  //   city, state, lat?, lng?, formats: [wIn x hIn] }], dayparts: [{ name,
+  //   hours: [start,end], weight }], flightStart, flightEnd }
+  placementsJson Json @map("placements_json")
+  // Estimate provenance: { basis: "documented_estimate", vendor,
+  //   lineItems: [{ label, units, unitCents, totalCents }], notes }
+  estimateJson Json @map("estimate_json")
+  estimateCents Int @map("estimate_cents")
+  currency String @default("USD")
+
+  // Creative Studio references (id + sha256). DOOH sizes are validated by
+  // the planner against DOOH_SIZE_SPECS in lib/media/dooh.ts — the Studio
+  // format registry is not modified.
+  creativeIds   String[] @map("creative_ids")
+  creativeHashes String[] @map("creative_hashes")
+
+  // Per-placement tracking assignments (placement_ref → link slug),
+  // coordinated with the attribution track's /api/media/links shape.
+  trackingAssignments Json? @map("tracking_assignments")
+
+  launchPacketUrl String? @map("launch_packet_url")
+  status          String  @default("draft") @map("status")
+
+  createdBy String? @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  packets LaunchPacket[]
+
+  @@index([workspaceId, vendor, status])
+  @@map("dooh_plans")
+}
+
+// Launch packet: the durable execution artifact for an approved DOOH buy.
+// One packet per plan revision; the packet_sha256 covers the rendered PDF
+// bytes so the executor can prove the packet hasn't drifted since approval.
+model LaunchPacket {
+  id          String @id @default(cuid())
+  workspaceId String @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  planId String @map("plan_id")
+  plan   DoohPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  // Approval binding this packet was compiled from (safety track object).
+  approvalId  String  @map("approval_id")
+  bindingHash String  @map("binding_hash")
+  packetSha256 String @map("packet_sha256")
+  pdfUrl      String  @map("pdf_url")
+  version     Int     @default(1)
+
+  generatedBy String?  @map("generated_by")
+  generatedAt DateTime @default(now()) @map("generated_at")
+
+  @@index([workspaceId, planId])
+  @@map("launch_packets")
+}
+
+// B2: streaming-audio buy plan + generated brief (Spotify Ads Manager /
+// Acast / AudioGo). Execution is self-serve in the client's own account.
+model AudioBuy {
+  id          String @id @default(cuid())
+  workspaceId String @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  buyId String? @map("buy_id")
+
+  name   String
+  vendor String // "spotify" | "acast" | "audiogo" | "fake"
+  // { markets, stations: [{ name, type: streaming|podcast, dayparts }],
+  //   spotMix: [{ lengthSec, count, label }], flightStart, flightEnd }
+  stationsJson Json @map("stations_json")
+  // { spotLengthSec, spotCount, dailyBudgetCents, lifetimeCents,
+  //   productionCents, basis: "documented_estimate" }
+  budgetJson Json @map("budget_json")
+  budgetCents Int @map("budget_cents")
+  currency String @default("USD")
+
+  creativeIds    String[] @map("creative_ids")
+  creativeHashes String[] @map("creative_hashes")
+
+  // Per-station promo codes / vanity URLs assigned at brief time.
+  trackingAssignments Json? @map("tracking_assignments")
+
+  briefUrl String? @map("brief_url")
+  status   String  @default("draft") @map("status") // draft → briefed → launched | cancelled
+
+  createdBy String? @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([workspaceId, vendor, status])
+  @@map("audio_buys")
+}
+
+// B3: IO brief (IAB/AAAA template) for rep-driven radio / newspaper /
+// magazine buys. The rep keeps the signature; Marketr plans, briefs,
+// and captures proof-of-run.
+model IoBrief {
+  id          String @id @default(cuid())
+  workspaceId String @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  buyId String? @map("buy_id")
+
+  name    String
+  channel String // "radio" | "newspaper" | "magazine"
+
+  // Station/publication selection: [{ name, market, callSign?, daypartMix?,
+  //   placement }].
+  inventoryJson Json @map("inventory_json")
+  // IAB/AAAA terms: { deliverables[], prices[], maximumSpendCents (THE
+  // binding max), flightStart, flightEnd, thirdPartyAdServer, cancelTerms,
+  //  paymentTerms, notes }.
+  ioTermsJson Json @map("io_terms_json")
+  maxSpendCents Int @map("max_spend_cents")
+  currency String @default("USD")
+
+  creativeIds    String[] @map("creative_ids")
+  creativeHashes String[] @map("creative_hashes")
+
+  // Rep contact: { name, email, phone, company, rateCardRef }.
+  repContact Json? @map("rep_contact")
+  // "draft" | "sent_to_rep" | "signed" | "proof_received" | "cancelled".
+  signatureStatus String @default("draft") @map("signature_status")
+  signedAt        DateTime? @map("signed_at")
+  proofOfRunUrl   String?  @map("proof_of_run_url")
+
+  briefPdfUrl String? @map("brief_pdf_url")
+  status      String  @default("draft") @map("status")
+
+  createdBy String? @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([workspaceId, channel, signatureStatus])
+  @@map("io_briefs")
+}
+
+// Receipt capture: the browser-agent executor (or a human from the launch
+// packet checklist) stores the operator receipt/invoice here. `verified`
+// is set when the receipt's key terms were parsed back against the
+// approved binding (reconciliation support).
+model MediaReceipt {
+  id          String @id @default(cuid())
+  workspaceId String @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  buyId String @map("buy_id")
+  // "browser_executor" | "human_upload".
+  capturedBy String @map("captured_by")
+  // Operator invoice/reference number, when parseable.
+  platformInvoiceRef String? @map("platform_invoice_ref")
+  amountCents Int? @map("amount_cents")
+  currency String @default("USD")
+  receiptUrl String? @map("receipt_url")
+  // Parsed order-confirmation terms from the DOM-verified screen (browser
+  // executor) or the uploaded invoice (human).
+  parsedTermsJson Json? @map("parsed_terms_json")
+  verified Boolean @default(false) @map("verified")
+
+  capturedAt DateTime @default(now()) @map("captured_at")
+
+  @@index([workspaceId, buyId])
+  @@map("media_receipts")
+}
+
+// Buying-lifecycle audit trail (append-only). The safety track owns the
+// hash-chained media_approval_events for the proposed → approved →
+// executed transition; this table audits the buying track's own
+// lifecycle: plan created, packet compiled, brief generated, signature
+// moved, receipt recorded. Append-only by API surface (no UPDATE/DELETE
+// exposure) — the approval-event chain is the legal record.
+model MediaBuyingEvent {
+  id          String @id @default(cuid())
+  workspaceId String @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  actor String @map("actor")
+  action String @map("action")
+  entityType String @map("entity_type")
+  entityId String @map("entity_id")
+  payloadHash String? @map("payload_hash")
+  detail Json @default("{}") @map("detail")
+
+  ts DateTime @default(now()) @map("ts")
+
+  @@index([workspaceId, entityId, ts])
+  @@map("media_buying_events")
+}

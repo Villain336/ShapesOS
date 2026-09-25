@@ -49,6 +49,8 @@ type AuditAction =
   | "studio_creative_ready"
   | "studio_creative_archived"
   | "studio_creative_exported"
+  | "studio_qr_designed"
+  | "studio_qr_print_locked"
   | "studio_porkbun_keys_updated"
   | "studio_registrant_saved"
   | "studio_domain_purchased"
@@ -68,6 +70,8 @@ const CREATIVE_ACTION_FALLBACK: Record<string, true> = {
   studio_creative_ready: true,
   studio_creative_archived: true,
   studio_creative_exported: true,
+  studio_qr_designed: true,
+  studio_qr_print_locked: true,
 };
 
 export async function auditStudio(

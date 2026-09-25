@@ -1,0 +1,51 @@
+import { chromium } from 'playwright-core';
+import fs from 'node:fs';
+
+// Credentials are read from the preview .env at runtime — never printed.
+const stripQuotes = (v) => (v.length >= 2 && v[0] === v[v.length - 1] && (v[0] === '"' || v[0] === "'")) ? v.slice(1, -1) : v;
+const env = Object.fromEntries(
+  fs.readFileSync('/home/hatch/workspace/marketr/.env', 'utf8')
+    .split('\n')
+    .filter((l) => l.includes('=') && !l.trim().startsWith('#'))
+    .map((l) => { const i = l.indexOf('='); return [l.slice(0, i).trim(), stripQuotes(l.slice(i + 1).trim())]; })
+);
+const EMAIL = env.ADMIN_EMAIL;
+const PASSWORD = env.ADMIN_PASSWORD;
+if (!EMAIL || !PASSWORD) { console.error('missing ADMIN_EMAIL/ADMIN_PASSWORD in .env'); process.exit(1); }
+
+const exe = '/home/hatch/.cache/ms-playwright/chromium_headless_shell-1243/chrome-headless-shell-linux64/chrome-headless-shell';
+const out = '/home/hatch/workspace/marketr/previews';
+
+// Fresh filenames per the iOS-caching rule.
+const shots = [
+  { route: '/dashboard/nurture', slug: 'phase3-nurture' },
+  { route: '/dashboard/reviews', slug: 'phase3-reviews' },
+  { route: '/dashboard/prospects', slug: 'phase3-prospects' },
+];
+
+async function capture(device) {
+  const isMobile = device === 'iphone';
+  const browser = await chromium.launch({ executablePath: exe, args: ['--no-sandbox'] });
+  const context = await browser.newContext(
+    isMobile
+      ? { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2, userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1' }
+      : { viewport: { width: 1440, height: 900 } }
+  );
+  const page = await context.newPage();
+  await page.goto('http://localhost:3000/login', { waitUntil: 'domcontentloaded' });
+  await page.waitForSelector('input[placeholder="Email"]', { timeout: 20000 });
+  await page.fill('input[placeholder="Email"]', EMAIL);
+  await page.fill('input[placeholder="Password"]', PASSWORD);
+  await page.click('form button[type="submit"]');
+  await page.waitForURL(/dashboard/, { timeout: 15000 });
+  for (const s of shots) {
+    await page.goto(`http://localhost:3000${s.route}`, { waitUntil: 'networkidle' });
+    await page.waitForTimeout(1500);
+    await page.screenshot({ path: `${out}/${s.slug}-${device}.png`, fullPage: false });
+    console.log(`captured ${s.slug}-${device}`);
+  }
+  await browser.close();
+}
+
+const which = process.argv[2] || 'desktop';
+await capture(which).catch((e) => { console.error('FAILED', e.message); process.exit(1); });

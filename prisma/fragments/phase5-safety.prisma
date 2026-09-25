@@ -1,0 +1,291 @@
+// Marketr — Phase 5 S1–S4 SAFETY track: Prisma fragment.
+//
+// Merged into prisma/schema.prisma by the Phase 5 schema-merge step.
+// Do NOT edit prisma/schema.prisma directly (track ownership rule).
+// Conventions: cuid() ids, @map snake_case columns, workspace isolation,
+// @@map table names. All money-adjacent tables are append-only ledgers;
+// updates happen through state machines, never raw overwrites.
+//
+// HARD CONSTRAINTS this model enforces:
+// - ZERO custody: BudgetPool is an accounting object only. Marketr never
+//   holds/fronts/co-mingles client money. No balance columns, no payout
+//   rails — only caps, encumbrances, and refs to the CLIENT's own
+//   instruments (virtual_card_ref only; never PANs).
+// - The €7,937/day failure class (Apr 2026: an automation bug compounded a
+//   25% hourly budget increase to €7,937/day in 4 days — no state persisted,
+//   no account-level ceiling) is killed structurally: encumbrance caps,
+//   per-buy approval binding, and pool-exhausted sweeps.
+
+enum MediaApprovalStatus {
+  draft
+  pending
+  approved
+  executed
+  expired
+  revoked
+}
+
+enum MediaApprovalType {
+  buy
+  io_brief
+  pool_draw
+}
+
+enum MediaApprovalMethod {
+  none
+  sso
+  otp
+  signed_link
+}
+
+enum MediaApprovalEventAction {
+  created
+  submitted
+  approved
+  approval_rejected
+  revoked
+  expired
+  requeued
+  executed
+  execution_halted
+  encumbered
+  encumbrance_released
+  spent
+  kill_rule_fired
+  circuit_breaker_tripped
+  emergency_stop
+  quote_refreshed
+}
+
+enum BudgetPoolPeriod {
+  monthly
+  campaign
+  one_time
+}
+
+enum BudgetPoolStatus {
+  active
+  frozen
+  exhausted
+}
+
+enum PoolTransactionKind {
+  encumber
+  spend
+  release
+  adjust
+}
+
+enum MediaBuyStatus {
+  draft
+  executing
+  executed
+  failed
+  paused
+}
+
+enum KillRuleAction {
+  pause
+  reduce_budget
+  alert
+}
+
+enum CardProvider {
+  brex
+  ramp
+  fake
+}
+
+// Workspace-scoped append-only audit for money-adjacent safety mutations
+// that belong to no single approval: pool create/freeze/unfreeze, virtual
+// card issue/attach, kill-rule create/toggle/seed, emergency stop, buy
+// execution. Hash-chained per workspace (tamper-evident); complements
+// media_approval_events (approval-scoped) and pool_transactions
+// (pool-ledger-scoped).
+enum MediaAuditAction {
+  pool_created
+  pool_frozen
+  pool_unfrozen
+  virtual_card_issued
+  virtual_card_attached
+  kill_rule_created
+  kill_rule_toggled
+  kill_rule_pack_seeded
+  emergency_stop
+  buy_executed
+  buy_execution_halted
+}
+
+model MediaAuditEvent {
+  id          String           @id @default(cuid()) @map("id")
+  workspaceId String           @map("workspace_id")
+  ts          DateTime         @default(now()) @map("ts")
+  actor       String           @map("actor")
+  action      MediaAuditAction @map("action")
+  subjectType String           @map("subject_type") // "pool" | "kill_rule" | "approval" | "workspace"
+  subjectId   String?          @map("subject_id")
+  payloadHash String           @map("payload_hash")
+  prevHash    String           @map("prev_hash")
+  eventHash   String           @map("event_hash")
+  detail      Json?            @map("detail")
+
+  @@index([workspaceId, ts])
+  @@index([workspaceId, action])
+  @@map("media_audit_events")
+}
+
+// Per-buy binding approval (S3). binding_json is IMMUTABLE once approved —
+// any change invalidates binding_hash and the executor HALTs (TOCTOU kill).
+model MediaApproval {
+  id                   String               @id @default(cuid()) @map("id")
+  workspaceId          String               @map("workspace_id")
+  clientId             String?              @map("client_id")
+  type                 MediaApprovalType    @map("type")
+  status               MediaApprovalStatus  @default(draft) @map("status")
+  bindingJson          Json                 @map("binding_json")
+  bindingHash          String               @map("binding_hash")
+  maxSpendCents        Int                  @map("max_spend_cents")
+  currency             String               @default("USD") @map("currency")
+  poolId               String?              @map("pool_id")
+  quoteId              String?              @map("quote_id")
+  quoteExpiresAt       DateTime?            @map("quote_expires_at")
+  driftToleranceJson   Json                 @default("{\"pricePct\": 10, \"spendPct\": 5}") @map("drift_tolerance_json")
+  createdBy            String               @map("created_by")
+  approversJson        Json                 @default("[]") @map("approvers_json")
+  twoPersonSatisfied   Boolean              @default(false) @map("two_person_satisfied")
+  approvalMethod       MediaApprovalMethod  @default(none) @map("approval_method")
+  // HMAC(approval_secret, approvalId || bindingHash || approver || decidedAt):
+  // the cryptographically verified approval record (PubMatic AgenticOS pattern).
+  approvalReceipt      String?              @map("approval_receipt")
+  approvalsExpiresAt   DateTime?            @map("approvals_expires_at")
+  approvedAt           DateTime?            @map("approved_at")
+  revokedAt            DateTime?            @map("revoked_at")
+  revokedBy            String?              @map("revoked_by")
+  executedAt           DateTime?            @map("executed_at")
+  createdAt            DateTime             @default(now()) @map("created_at")
+  updatedAt            DateTime             @updatedAt @map("updated_at")
+
+  events MediaApprovalEvent[]
+
+  @@index([workspaceId, status])
+  @@index([workspaceId, clientId])
+  @@map("media_approvals")
+}
+
+// Append-only, hash-chained event log (IAB event-bus pattern).
+// event_hash = sha256(prev_hash || canonical(ts, approval_id, actor, action, payload_hash)).
+model MediaApprovalEvent {
+  id          String                    @id @default(cuid()) @map("id")
+  approvalId  String                    @map("approval_id")
+  workspaceId String                    @map("workspace_id")
+  ts          DateTime                  @default(now()) @map("ts")
+  actor       String                    @map("actor")
+  action      MediaApprovalEventAction  @map("action")
+  payloadHash String                    @map("payload_hash")
+  prevHash    String                    @map("prev_hash")
+  eventHash   String                    @map("event_hash")
+  detail      Json?                     @map("detail")
+
+  approval MediaApproval @relation(fields: [approvalId], references: [id], onDelete: Cascade)
+
+  @@index([approvalId, ts])
+  @@index([workspaceId, ts])
+  @@map("media_approval_events")
+}
+
+// Non-custodial budget pool (S2): a cap with a ledger. The money itself
+// NEVER passes through Marketr — spend flows from the client's own
+// accounts/cards. remaining = cap - spent; encumbered = reserved by
+// approved-but-unexecuted buys. Over-encumbrance is rejected by the
+// service layer (conditional UPDATE on remaining_cents >= amount).
+model BudgetPool {
+  id                        String           @id @default(cuid()) @map("id")
+  workspaceId               String           @map("workspace_id")
+  clientId                  String           @map("client_id")
+  name                      String           @map("name")
+  period                    BudgetPoolPeriod @map("period")
+  capCents                  Int              @map("cap_cents")
+  remainingCents            Int              @map("remaining_cents")
+  encumberedCents           Int              @default(0) @map("encumbered_cents")
+  currency                  String           @default("USD") @map("currency")
+  platformAllowlist         String[]         @map("platform_allowlist")
+  autoApproveThresholdCents Int             @default(0) @map("auto_approve_threshold_cents")
+  alertThresholdsJson       Json             @default("[50, 75, 90]") @map("alert_thresholds_json")
+  // Client's OWN virtual card ref only. Never a PAN, never key material.
+  virtualCardRef            String?          @map("virtual_card_ref")
+  cardProvider              CardProvider     @default(fake) @map("card_provider")
+  status                    BudgetPoolStatus @default(active) @map("status")
+  createdBy                 String           @map("created_by")
+  createdAt                 DateTime         @default(now()) @map("created_at")
+  updatedAt                 DateTime         @updatedAt @map("updated_at")
+
+  @@index([workspaceId, clientId])
+  @@index([workspaceId, status])
+  @@map("budget_pools")
+}
+
+// Append-only pool ledger. Every encumber/spend/release/adjust writes a row
+// with running balances so the ledger is independently auditable.
+model PoolTransaction {
+  id                     String              @id @default(cuid()) @map("id")
+  poolId                 String              @map("pool_id")
+  workspaceId            String              @map("workspace_id")
+  approvalId             String?             @map("approval_id")
+  kind                   PoolTransactionKind @map("kind")
+  amountCents            Int                 @map("amount_cents")
+  runningRemainingCents Int                 @map("running_remaining_cents")
+  runningEncumberedCents Int                 @map("running_encumbered_cents")
+  actor                  String              @map("actor")
+  ts                     DateTime            @default(now()) @map("ts")
+  note                   String?             @map("note")
+
+  @@index([poolId, ts])
+  @@index([workspaceId, ts])
+  @@map("pool_transactions")
+}
+
+// Executed buy record. Created only by the executor after pre-flight passes.
+model MediaBuy {
+  id                  String         @id @default(cuid()) @map("id")
+  workspaceId         String         @map("workspace_id")
+  approvalId          String         @unique @map("approval_id")
+  poolId              String         @map("pool_id")
+  platform            String         @map("platform")
+  clientAdAccountId   String         @map("client_ad_account_id")
+  status              MediaBuyStatus @default(draft) @map("status")
+  platformCampaignRef String?        @map("platform_campaign_ref")
+  receiptUrl          String?        @map("receipt_url")
+  executedAt          DateTime?      @map("executed_at")
+  actualSpendCents    Int?           @map("actual_spend_cents")
+  failureCount        Int            @default(0) @map("failure_count")
+  killRulesRegistered Json          @default("[]") @map("kill_rules_registered")
+  createdAt           DateTime       @default(now()) @map("created_at")
+  updatedAt           DateTime       @updatedAt @map("updated_at")
+
+  @@index([workspaceId, status])
+  @@index([poolId])
+  @@map("media_buys")
+}
+
+// Sweeper rule (S4). Every sweeper action is logged to the approval's event
+// log tracing back to the human who created the rule (Birch pattern).
+model KillRule {
+  id              String         @id @default(cuid()) @map("id")
+  workspaceId     String         @map("workspace_id")
+  clientId        String?        @map("client_id")
+  name            String         @map("name")
+  scopeJson       Json           @default("{}") @map("scope_json")
+  conditionJson   Json           @map("condition_json")
+  window          String         @default("1h") @map("window")
+  action          KillRuleAction @map("action")
+  cooldownMinutes Int            @default(60) @map("cooldown_minutes")
+  enabled         Boolean        @default(true) @map("enabled")
+  createdBy       String         @map("created_by")
+  lastFiredAt     DateTime?      @map("last_fired_at")
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
+
+  @@index([workspaceId, enabled])
+  @@index([workspaceId, clientId])
+  @@map("kill_rules")
+}

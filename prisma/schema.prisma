@@ -429,6 +429,31 @@ model Workspace {
   mailCreatives          MailCreative[]
   mailCampaigns          MailCampaign[]
   eddmOrders             EddmOrder[]
+  // Phase 5 (S1–S4): media safety back-relations.
+  mediaApprovals         MediaApproval[]
+  mediaApprovalEvents    MediaApprovalEvent[]
+  mediaAuditEvents       MediaAuditEvent[]
+  budgetPools            BudgetPool[]
+  poolTransactions       PoolTransaction[]
+  mediaBuys              MediaBuy[]
+  killRules              KillRule[]
+  // Phase 5 (B1–B3): buying-path back-relations.
+  doohPlans              DoohPlan[]
+  launchPackets          LaunchPacket[]
+  audioBuys              AudioBuy[]
+  ioBriefs               IoBrief[]
+  mediaReceipts          MediaReceipt[]
+  mediaBuyingEvents      MediaBuyingEvent[]
+  // Phase 5 (A1): offline attribution back-relations.
+  // (MediaCallNumber is the A1 model — `CallNumber` was already taken by
+  // Phase 2 R5 call tracking, which maps to the `call_number` table.)
+  mediaTrackingLinks     TrackingLink[]
+  mediaPromoCodes        PromoCode[]
+  // RedemptionEvent is reached via PromoCode.redemptions (no workspaceId).
+  mediaCallNumbers       MediaCallNumber[]
+  mediaCallWebhookEvents CallWebhookEvent[]
+  mediaLiftSnapshots     LiftSnapshot[]
+  mediaSpendEntries      MediaSpendEntry[]
 
   @@map("workspaces")
 }
@@ -4120,4 +4145,665 @@ model EddmOrder {
   @@unique([qrSlug])
   @@index([workspaceId, status])
   @@map("eddm_order")
+}
+
+// ===========================================================================
+// Phase 5: Media Buying v1 (S1–S4 safety + B1–B3 buying paths + A1 attribution)
+//
+// Merged from prisma/fragments/phase5-{safety,buying,attribution}.prisma.
+//
+// KNOWN MERGE DECISION (MediaReceipt): the buying and attribution fragments
+// each declared a MediaReceipt with complementary fields. Merged here into
+// ONE model with the union of fields. approvalRef is REQUIRED — every
+// receipt traces to a safety-track approval (zero-custody invariant).
+// @@unique([workspaceId, buyId, platformInvoiceRef]): platformInvoiceRef is
+// nullable; Postgres/Prisma treat NULLs as distinct, so human-upload receipts
+// without an invoice ref do not collide with each other.
+//
+// CONVENTIONS: cuid() ids, @map snake_case columns, @@map table names,
+// workspace isolation on every table, onDelete: Cascade on workspace
+// relations. Enum names have no @@map, so Postgres enum types are the
+// PascalCase schema names — the raw-SQL stores in lib/media/db.ts cast to
+// these quoted PascalCase names.
+// ===========================================================================
+
+enum MediaApprovalStatus {
+  draft
+  pending
+  approved
+  executed
+  expired
+  revoked
+}
+
+enum MediaApprovalType {
+  buy
+  io_brief
+  pool_draw
+}
+
+enum MediaApprovalMethod {
+  none
+  sso
+  otp
+  signed_link
+}
+
+enum MediaApprovalEventAction {
+  created
+  submitted
+  approved
+  approval_rejected
+  revoked
+  expired
+  requeued
+  executed
+  execution_halted
+  encumbered
+  encumbrance_released
+  spent
+  kill_rule_fired
+  circuit_breaker_tripped
+  emergency_stop
+  quote_refreshed
+}
+
+enum BudgetPoolPeriod {
+  monthly
+  campaign
+  one_time
+}
+
+enum BudgetPoolStatus {
+  active
+  frozen
+  exhausted
+}
+
+enum PoolTransactionKind {
+  encumber
+  spend
+  release
+  adjust
+}
+
+enum MediaBuyStatus {
+  draft
+  executing
+  executed
+  failed
+  paused
+}
+
+enum KillRuleAction {
+  pause
+  reduce_budget
+  alert
+}
+
+enum CardProvider {
+  brex
+  ramp
+  fake
+}
+
+enum MediaAuditAction {
+  pool_created
+  pool_frozen
+  pool_unfrozen
+  virtual_card_issued
+  virtual_card_attached
+  kill_rule_created
+  kill_rule_toggled
+  kill_rule_pack_seeded
+  emergency_stop
+  buy_executed
+  buy_execution_halted
+}
+
+// Workspace-scoped append-only audit for money-adjacent safety mutations
+// that belong to no single approval: pool create/freeze/unfreeze, virtual
+// card issue/attach, kill-rule create/toggle/seed, emergency stop, buy
+// execution. Hash-chained per workspace (tamper-evident); complements
+// media_approval_events (approval-scoped) and pool_transactions
+// (pool-ledger-scoped).
+model MediaAuditEvent {
+  id          String           @id @default(cuid()) @map("id")
+  workspaceId String           @map("workspace_id")
+  workspace   Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  ts          DateTime         @default(now()) @map("ts")
+  actor       String           @map("actor")
+  action      MediaAuditAction @map("action")
+  subjectType String           @map("subject_type") // "pool" | "kill_rule" | "approval" | "workspace"
+  subjectId   String?          @map("subject_id")
+  payloadHash String           @map("payload_hash")
+  prevHash    String           @map("prev_hash")
+  eventHash   String           @map("event_hash")
+  detail      Json?            @map("detail")
+
+  @@index([workspaceId, ts])
+  @@index([workspaceId, action])
+  @@map("media_audit_events")
+}
+
+// Per-buy binding approval (S3). binding_json is IMMUTABLE once approved —
+// any change invalidates binding_hash and the executor HALTs (TOCTOU kill).
+model MediaApproval {
+  id                   String               @id @default(cuid()) @map("id")
+  workspaceId          String               @map("workspace_id")
+  workspace            Workspace            @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  clientId             String?              @map("client_id")
+  type                 MediaApprovalType    @map("type")
+  status               MediaApprovalStatus  @default(draft) @map("status")
+  bindingJson          Json                 @map("binding_json")
+  bindingHash          String               @map("binding_hash")
+  maxSpendCents        Int                  @map("max_spend_cents")
+  currency             String               @default("USD") @map("currency")
+  poolId               String?              @map("pool_id")
+  quoteId              String?              @map("quote_id")
+  quoteExpiresAt       DateTime?            @map("quote_expires_at")
+  driftToleranceJson   Json                 @default("{\"pricePct\": 10, \"spendPct\": 5}") @map("drift_tolerance_json")
+  createdBy            String               @map("created_by")
+  approversJson        Json                 @default("[]") @map("approvers_json")
+  twoPersonSatisfied   Boolean              @default(false) @map("two_person_satisfied")
+  approvalMethod       MediaApprovalMethod  @default(none) @map("approval_method")
+  // HMAC(approval_secret, approvalId || bindingHash || approver || decidedAt):
+  // the cryptographically verified approval record (PubMatic AgenticOS pattern).
+  approvalReceipt      String?              @map("approval_receipt")
+  approvalsExpiresAt   DateTime?            @map("approvals_expires_at")
+  approvedAt           DateTime?            @map("approved_at")
+  revokedAt            DateTime?            @map("revoked_at")
+  revokedBy            String?              @map("revoked_by")
+  executedAt           DateTime?            @map("executed_at")
+  createdAt            DateTime             @default(now()) @map("created_at")
+  updatedAt            DateTime             @updatedAt @map("updated_at")
+
+  events MediaApprovalEvent[]
+
+  @@index([workspaceId, status])
+  @@index([workspaceId, clientId])
+  @@map("media_approvals")
+}
+
+// Append-only, hash-chained event log (IAB event-bus pattern).
+// event_hash = sha256(prev_hash || canonical(ts, approval_id, actor, action, payload_hash)).
+model MediaApprovalEvent {
+  id          String                    @id @default(cuid()) @map("id")
+  approvalId  String                    @map("approval_id")
+  workspaceId String                    @map("workspace_id")
+  workspace   Workspace                 @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  ts          DateTime                  @default(now()) @map("ts")
+  actor       String                    @map("actor")
+  action      MediaApprovalEventAction  @map("action")
+  payloadHash String                    @map("payload_hash")
+  prevHash    String                    @map("prev_hash")
+  eventHash   String                    @map("event_hash")
+  detail      Json?                     @map("detail")
+
+  approval MediaApproval @relation(fields: [approvalId], references: [id], onDelete: Cascade)
+
+  @@index([approvalId, ts])
+  @@index([workspaceId, ts])
+  @@map("media_approval_events")
+}
+
+// Non-custodial budget pool (S2): a cap with a ledger. The money itself
+// NEVER passes through Marketr — spend flows from the client's own
+// accounts/cards. remaining = cap - spent; encumbered = reserved by
+// approved-but-unexecuted buys. Over-encumbrance is rejected by the
+// service layer (conditional UPDATE on remaining_cents >= amount).
+model BudgetPool {
+  id                        String           @id @default(cuid()) @map("id")
+  workspaceId               String           @map("workspace_id")
+  workspace                 Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  clientId                  String           @map("client_id")
+  name                      String           @map("name")
+  period                    BudgetPoolPeriod @map("period")
+  capCents                  Int              @map("cap_cents")
+  remainingCents            Int              @map("remaining_cents")
+  encumberedCents           Int              @default(0) @map("encumbered_cents")
+  currency                  String           @default("USD") @map("currency")
+  platformAllowlist         String[]         @map("platform_allowlist")
+  autoApproveThresholdCents Int              @default(0) @map("auto_approve_threshold_cents")
+  alertThresholdsJson       Json             @default("[50, 75, 90]") @map("alert_thresholds_json")
+  // Client's OWN virtual card ref only. Never a PAN, never key material.
+  virtualCardRef            String?          @map("virtual_card_ref")
+  cardProvider              CardProvider     @default(fake) @map("card_provider")
+  status                    BudgetPoolStatus @default(active) @map("status")
+  createdBy                 String           @map("created_by")
+  createdAt                 DateTime         @default(now()) @map("created_at")
+  updatedAt                 DateTime         @updatedAt @map("updated_at")
+
+  @@index([workspaceId, clientId])
+  @@index([workspaceId, status])
+  @@map("budget_pools")
+}
+
+// Append-only pool ledger. Every encumber/spend/release/adjust writes a row
+// with running balances so the ledger is independently auditable.
+model PoolTransaction {
+  id                     String              @id @default(cuid()) @map("id")
+  poolId                 String              @map("pool_id")
+  workspaceId            String              @map("workspace_id")
+  workspace              Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  approvalId             String?             @map("approval_id")
+  kind                   PoolTransactionKind @map("kind")
+  amountCents            Int                 @map("amount_cents")
+  runningRemainingCents  Int                 @map("running_remaining_cents")
+  runningEncumberedCents Int                 @map("running_encumbered_cents")
+  actor                  String              @map("actor")
+  ts                     DateTime            @default(now()) @map("ts")
+  note                   String?             @map("note")
+
+  @@index([poolId, ts])
+  @@index([workspaceId, ts])
+  @@map("pool_transactions")
+}
+
+// Executed buy record. Created only by the executor after pre-flight passes.
+model MediaBuy {
+  id                  String         @id @default(cuid()) @map("id")
+  workspaceId         String         @map("workspace_id")
+  workspace           Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  approvalId          String         @unique @map("approval_id")
+  poolId              String         @map("pool_id")
+  platform            String         @map("platform")
+  clientAdAccountId   String         @map("client_ad_account_id")
+  status              MediaBuyStatus @default(draft) @map("status")
+  platformCampaignRef String?        @map("platform_campaign_ref")
+  receiptUrl          String?        @map("receipt_url")
+  executedAt          DateTime?      @map("executed_at")
+  actualSpendCents    Int?           @map("actual_spend_cents")
+  failureCount        Int            @default(0) @map("failure_count")
+  killRulesRegistered Json          @default("[]") @map("kill_rules_registered")
+  createdAt           DateTime       @default(now()) @map("created_at")
+  updatedAt           DateTime       @updatedAt @map("updated_at")
+
+  @@index([workspaceId, status])
+  @@index([poolId])
+  @@map("media_buys")
+}
+
+// Sweeper rule (S4). Every sweeper action is logged to the approval's event
+// log tracing back to the human who created the rule (Birch pattern).
+model KillRule {
+  id              String         @id @default(cuid()) @map("id")
+  workspaceId     String         @map("workspace_id")
+  workspace       Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  clientId        String?        @map("client_id")
+  name            String         @map("name")
+  scopeJson       Json           @default("{}") @map("scope_json")
+  conditionJson   Json           @map("condition_json")
+  window          String         @default("1h") @map("window")
+  action          KillRuleAction @map("action")
+  cooldownMinutes Int            @default(60) @map("cooldown_minutes")
+  enabled         Boolean        @default(true) @map("enabled")
+  createdBy       String         @map("created_by")
+  lastFiredAt     DateTime?      @map("last_fired_at")
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
+
+  @@index([workspaceId, enabled])
+  @@index([workspaceId, clientId])
+  @@map("kill_rules")
+}
+
+// ---------------------------------------------------------------------------
+// Phase 5 B1/B2/B3: buying paths
+// ---------------------------------------------------------------------------
+
+// B1: DOOH plan (planner output). An approved plan compiles to a launch
+// packet (launch_packet_url). Status: draft → planned → packet_ready →
+// launched (client-account execution) | cancelled.
+model DoohPlan {
+  id          String @id @default(cuid())
+  workspaceId String @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  // Optional back-link to the safety track's media_buys row (the approval
+  // binding lives there, not here).
+  buyId String? @map("buy_id")
+
+  name   String
+  vendor String @map("vendor") // "blip" | "blindspot" | "adomni" | "fake"
+  // { markets: [{ city, state, radius_mi }], placements: [{ boardId, name,
+  //   city, state, lat?, lng?, formats: [wIn x hIn] }], dayparts: [{ name,
+  //   hours: [start,end], weight }], flightStart, flightEnd }
+  placementsJson Json @map("placements_json")
+  // Estimate provenance: { basis: "documented_estimate", vendor,
+  //   lineItems: [{ label, units, unitCents, totalCents }], notes }
+  estimateJson Json @map("estimate_json")
+  estimateCents Int @map("estimate_cents")
+  currency String @default("USD")
+
+  // Creative Studio references (id + sha256). DOOH sizes are validated by
+  // the planner against DOOH_SIZE_SPECS in lib/media/dooh.ts.
+  creativeIds   String[] @map("creative_ids")
+  creativeHashes String[] @map("creative_hashes")
+
+  // Per-placement tracking assignments (placement_ref → link slug),
+  // coordinated with the attribution track's /api/media/links shape.
+  trackingAssignments Json? @map("tracking_assignments")
+
+  launchPacketUrl String? @map("launch_packet_url")
+  status          String  @default("draft") @map("status")
+
+  createdBy String? @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  packets LaunchPacket[]
+
+  @@index([workspaceId, vendor, status])
+  @@map("dooh_plans")
+}
+
+// Launch packet: the durable execution artifact for an approved DOOH buy.
+// One packet per plan revision; the packet_sha256 covers the rendered PDF
+// bytes so the executor can prove the packet hasn't drifted since approval.
+model LaunchPacket {
+  id          String @id @default(cuid())
+  workspaceId String @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  planId String @map("plan_id")
+  plan   DoohPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  // Approval binding this packet was compiled from (safety track object).
+  approvalId  String  @map("approval_id")
+  bindingHash String  @map("binding_hash")
+  packetSha256 String @map("packet_sha256")
+  pdfUrl      String  @map("pdf_url")
+  version     Int     @default(1)
+
+  generatedBy String?  @map("generated_by")
+  generatedAt DateTime @default(now()) @map("generated_at")
+
+  @@index([workspaceId, planId])
+  @@map("launch_packets")
+}
+
+// B2: streaming-audio buy plan + generated brief (Spotify Ads Manager /
+// Acast / AudioGo). Execution is self-serve in the client's own account.
+model AudioBuy {
+  id          String @id @default(cuid())
+  workspaceId String @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  buyId String? @map("buy_id")
+
+  name   String
+  vendor String // "spotify" | "acast" | "audiogo" | "fake"
+  // { markets, stations: [{ name, type: streaming|podcast, dayparts }],
+  //   spotMix: [{ lengthSec, count, label }], flightStart, flightEnd }
+  stationsJson Json @map("stations_json")
+  // { spotLengthSec, spotCount, dailyBudgetCents, lifetimeCents,
+  //   productionCents, basis: "documented_estimate" }
+  budgetJson Json @map("budget_json")
+  budgetCents Int @map("budget_cents")
+  currency String @default("USD")
+
+  creativeIds    String[] @map("creative_ids")
+  creativeHashes String[] @map("creative_hashes")
+
+  // Per-station promo codes / vanity URLs assigned at brief time.
+  trackingAssignments Json? @map("tracking_assignments")
+
+  briefUrl String? @map("brief_url")
+  status   String  @default("draft") @map("status") // draft → briefed → launched | cancelled
+
+  createdBy String? @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([workspaceId, vendor, status])
+  @@map("audio_buys")
+}
+
+// B3: IO brief (IAB/AAAA template) for rep-driven radio / newspaper /
+// magazine buys. The rep keeps the signature; Marketr plans, briefs,
+// and captures proof-of-run.
+model IoBrief {
+  id          String @id @default(cuid())
+  workspaceId String @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  buyId String? @map("buy_id")
+
+  name    String
+  channel String // "radio" | "newspaper" | "magazine"
+
+  // Station/publication selection: [{ name, market, callSign?, daypartMix?,
+  //   placement }].
+  inventoryJson Json @map("inventory_json")
+  // IAB/AAAA terms: { deliverables[], prices[], maximumSpendCents (THE
+  // binding max), flightStart, flightEnd, thirdPartyAdServer, cancelTerms,
+  //  paymentTerms, notes }.
+  ioTermsJson Json @map("io_terms_json")
+  maxSpendCents Int @map("max_spend_cents")
+  currency String @default("USD")
+
+  creativeIds    String[] @map("creative_ids")
+  creativeHashes String[] @map("creative_hashes")
+
+  // Rep contact: { name, email, phone, company, rateCardRef }.
+  repContact Json? @map("rep_contact")
+  // "draft" | "sent_to_rep" | "signed" | "proof_received" | "cancelled".
+  signatureStatus String @default("draft") @map("signature_status")
+  signedAt        DateTime? @map("signed_at")
+  proofOfRunUrl   String?  @map("proof_of_run_url")
+
+  briefPdfUrl String? @map("brief_pdf_url")
+  status      String  @default("draft") @map("status")
+
+  createdBy String? @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([workspaceId, channel, signatureStatus])
+  @@map("io_briefs")
+}
+
+// Receipt capture — MERGED MODEL (buying ∪ attribution fragments).
+// The browser-agent executor (or a human from the launch packet checklist)
+// stores the operator receipt/invoice here. `verified` is set when the
+// receipt's key terms were parsed back against the approved binding;
+// `reconciled` + `varianceCents` are set by A1 reconciliation when the
+// ledger is trued up against platform actuals.
+// approvalRef is REQUIRED: every receipt traces to a safety-track approval
+// (zero-custody invariant).
+model MediaReceipt {
+  id          String @id @default(cuid())
+  workspaceId String @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  buyId String @map("buy_id")
+  // "browser_executor" | "human_upload".
+  capturedBy String @map("captured_by")
+  // Operator invoice/reference number, when parseable.
+  platformInvoiceRef String? @map("platform_invoice_ref")
+  amountCents Int? @map("amount_cents")
+  currency String @default("USD")
+  receiptUrl String? @map("receipt_url")
+  // Parsed order-confirmation terms from the DOM-verified screen (browser
+  // executor) or the uploaded invoice (human).
+  parsedTermsJson Json? @map("parsed_terms_json")
+  verified Boolean @default(false) @map("verified")
+  reconciled Boolean @default(false) @map("reconciled")
+  varianceCents Int? @map("variance_cents")
+  approvalRef String @map("approval_ref")
+
+  capturedAt DateTime @default(now()) @map("captured_at")
+
+  // platformInvoiceRef is nullable: NULLs are treated as distinct, so
+  // human-upload receipts without an invoice ref never collide.
+  @@unique([workspaceId, buyId, platformInvoiceRef])
+  @@index([workspaceId, buyId])
+  @@map("media_receipts")
+}
+
+// Buying-lifecycle audit trail (append-only). The safety track owns the
+// hash-chained media_approval_events for the proposed → approved →
+// executed transition; this table audits the buying track's own
+// lifecycle: plan created, packet compiled, brief generated, signature
+// moved, receipt recorded. Append-only by API surface (no UPDATE/DELETE
+// exposure) — the approval-event chain is the legal record.
+model MediaBuyingEvent {
+  id          String @id @default(cuid())
+  workspaceId String @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  actor String @map("actor")
+  action String @map("action")
+  entityType String @map("entity_type")
+  entityId String @map("entity_id")
+  payloadHash String? @map("payload_hash")
+  detail Json @default("{}") @map("detail")
+
+  ts DateTime @default(now()) @map("ts")
+
+  @@index([workspaceId, entityId, ts])
+  @@map("media_buying_events")
+}
+
+// ---------------------------------------------------------------------------
+// Phase 5 A1: offline attribution
+// ---------------------------------------------------------------------------
+
+model TrackingLink {
+  id             String    @id @default(cuid()) @map("id")
+  workspaceId    String    @map("workspace_id")
+  workspace      Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  buyId          String?   @map("buy_id")
+  placementRef   String    @map("placement_ref")
+  slug           String    @map("slug")
+  destinationUrl String    @map("destination_url")
+  utmJson        Json      @default("{}") @map("utm_json")
+  engine         String    @default("marketr") @map("engine") // marketr | dub
+  status         String    @default("active") @map("status")  // active | paused | archived
+  scansCount     Int       @default(0) @map("scans_count")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  scanEvents ScanEvent[]
+
+  @@unique([workspaceId, slug])
+  @@index([workspaceId, buyId])
+  @@map("tracking_links")
+}
+
+model ScanEvent {
+  id         String       @id @default(cuid()) @map("id")
+  linkId     String       @map("link_id")
+  link       TrackingLink @relation(fields: [linkId], references: [id], onDelete: Cascade)
+  occurredAt DateTime     @default(now()) @map("occurred_at")
+  userAgent  String?      @map("user_agent")
+  ipHash     String?      @map("ip_hash") // sha256(ip + daily salt); never the raw IP
+  referer    String?      @map("referer")
+
+  @@index([linkId, occurredAt])
+  @@map("scan_events")
+}
+
+model PromoCode {
+  id               String   @id @default(cuid()) @map("id")
+  workspaceId      String   @map("workspace_id")
+  workspace        Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  buyId            String?  @map("buy_id")
+  code             String   @map("code")
+  channelRef       String   @map("channel_ref")
+  redemptionsCount Int      @default(0) @map("redemptions_count")
+  maxRedemptions   Int?     @map("max_redemptions")
+  status           String   @default("active") @map("status") // active | paused | expired
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  redemptions RedemptionEvent[]
+
+  @@unique([workspaceId, code])
+  @@index([workspaceId, buyId])
+  @@map("promo_codes")
+}
+
+model RedemptionEvent {
+  id          String    @id @default(cuid()) @map("id")
+  promoCodeId String    @map("promo_code_id")
+  promoCode   PromoCode @relation(fields: [promoCodeId], references: [id], onDelete: Cascade)
+  occurredAt  DateTime  @default(now()) @map("occurred_at")
+  orderRef    String?   @map("order_ref")
+
+  @@index([promoCodeId, occurredAt])
+  @@map("redemption_events")
+}
+
+// A1 attribution call numbers. Named MediaCallNumber (not CallNumber)
+// because Phase 2 R5 call tracking already owns model `CallNumber`
+// (table `call_number`); that model serves DNI/booking flows, while this
+// one serves per-station/per-publication offline attribution numbers.
+model MediaCallNumber {
+  id               String    @id @default(cuid()) @map("id")
+  workspaceId      String    @map("workspace_id")
+  workspace        Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  buyId            String?   @map("buy_id")
+  provider         String    @default("callrail") @map("provider") // callrail | fake
+  numberE164       String    @map("number_e164")
+  stationRef       String    @map("station_ref")
+  status           String    @default("active") @map("status") // active | released
+  callsCount       Int       @default(0) @map("calls_count")
+  totalDurationSec Int       @default(0) @map("total_duration_sec")
+  firstCallAt      DateTime? @map("first_call_at")
+  lastCallAt       DateTime? @map("last_call_at")
+  createdAt        DateTime  @default(now()) @map("created_at")
+
+  @@unique([workspaceId, numberE164])
+  @@index([workspaceId, buyId])
+  @@map("media_call_numbers")
+}
+
+model CallWebhookEvent {
+  id          String    @id @default(cuid()) @map("id")
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  provider    String    @map("provider")
+  eventId     String    @map("event_id")
+  eventType   String    @map("event_type")
+  payload     Json      @map("payload")
+  processedAt DateTime? @map("processed_at")
+
+  // Idempotency backstop: one ledger row per provider event id.
+  @@unique([provider, eventId])
+  @@index([workspaceId])
+  @@map("call_webhook_events")
+}
+
+model LiftSnapshot {
+  id           String   @id @default(cuid()) @map("id")
+  workspaceId  String   @map("workspace_id")
+  workspace    Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  buyId        String   @map("buy_id")
+  source       String   @map("source") // gsc | gtrends | ga4 | gbp
+  baselineJson Json     @map("baseline_json")
+  flightJson   Json     @map("flight_json")
+  holdoutJson  Json?    @map("holdout_json")
+  capturedAt   DateTime @default(now()) @map("captured_at")
+
+  @@index([workspaceId, buyId, source])
+  @@map("lift_snapshots")
+}
+
+// Spend ledger (A1). Every row traces to a safety-track approval via
+// approvalRef (REQUIRED — zero-custody invariant). Autopilot never buys;
+// this ledger cannot be a backdoor.
+model MediaSpendEntry {
+  id           String   @id @default(cuid()) @map("id")
+  workspaceId  String   @map("workspace_id")
+  workspace    Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  buyId        String   @map("buy_id")
+  kind         String   @map("kind") // estimate | encumbrance | spend | release | adjust
+  amountCents  Int      @map("amount_cents")
+  approvalRef  String   @map("approval_ref")
+  note         String?  @map("note")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@index([workspaceId, buyId, kind])
+  @@map("media_spend_entries")
 }

@@ -1,0 +1,152 @@
+// Marketr — Phase 5 A1: offline attribution data model (FRAGMENT).
+//
+// NOT YET MERGED into prisma/schema.prisma (integration step merges all
+// Phase 5 fragments, then regenerates the client). lib/media modules run
+// against the MediaStore interface until then; this fragment is the
+// canonical schema for the merge.
+//
+// Conventions: cuid() ids, @map snake_case columns, workspace isolation on
+// every table, @@map table names.
+
+model TrackingLink {
+  id            String   @id @default(cuid()) @map("id")
+  workspaceId   String   @map("workspace_id")
+  buyId         String?  @map("buy_id")
+  placementRef  String   @map("placement_ref")
+  slug          String   @map("slug")
+  destinationUrl String  @map("destination_url")
+  utmJson       Json     @default("{}") @map("utm_json")
+  engine        String   @default("marketr") @map("engine") // marketr | dub
+  status        String   @default("active") @map("status")  // active | paused | archived
+  scansCount    Int      @default(0) @map("scans_count")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  scanEvents ScanEvent[]
+
+  @@unique([workspaceId, slug])
+  @@index([workspaceId, buyId])
+  @@map("tracking_links")
+}
+
+model ScanEvent {
+  id         String       @id @default(cuid()) @map("id")
+  linkId     String       @map("link_id")
+  link       TrackingLink @relation(fields: [linkId], references: [id], onDelete: Cascade)
+  occurredAt DateTime     @default(now()) @map("occurred_at")
+  userAgent  String?      @map("user_agent")
+  ipHash     String?      @map("ip_hash") // sha256(ip + daily salt); never the raw IP
+  referer    String?      @map("referer")
+
+  @@index([linkId, occurredAt])
+  @@map("scan_events")
+}
+
+model PromoCode {
+  id               String   @id @default(cuid()) @map("id")
+  workspaceId      String   @map("workspace_id")
+  buyId            String?  @map("buy_id")
+  code             String   @map("code")
+  channelRef       String   @map("channel_ref")
+  redemptionsCount Int      @default(0) @map("redemptions_count")
+  maxRedemptions   Int?     @map("max_redemptions")
+  status           String   @default("active") @map("status") // active | paused | expired
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  redemptions RedemptionEvent[]
+
+  @@unique([workspaceId, code])
+  @@index([workspaceId, buyId])
+  @@map("promo_codes")
+}
+
+model RedemptionEvent {
+  id          String    @id @default(cuid()) @map("id")
+  promoCodeId String    @map("promo_code_id")
+  promoCode   PromoCode @relation(fields: [promoCodeId], references: [id], onDelete: Cascade)
+  occurredAt  DateTime  @default(now()) @map("occurred_at")
+  orderRef    String?   @map("order_ref")
+
+  @@index([promoCodeId, occurredAt])
+  @@map("redemption_events")
+}
+
+model CallNumber {
+  id               String    @id @default(cuid()) @map("id")
+  workspaceId      String    @map("workspace_id")
+  buyId            String?   @map("buy_id")
+  provider         String    @default("callrail") @map("provider") // callrail | fake
+  numberE164       String    @map("number_e164")
+  stationRef       String    @map("station_ref")
+  status           String    @default("active") @map("status") // active | released
+  callsCount       Int       @default(0) @map("calls_count")
+  totalDurationSec Int       @default(0) @map("total_duration_sec")
+  firstCallAt      DateTime? @map("first_call_at")
+  lastCallAt       DateTime? @map("last_call_at")
+  createdAt        DateTime  @default(now()) @map("created_at")
+
+  @@unique([workspaceId, numberE164])
+  @@index([workspaceId, buyId])
+  @@map("call_numbers")
+}
+
+model CallWebhookEvent {
+  id          String    @id @default(cuid()) @map("id")
+  workspaceId String    @map("workspace_id")
+  provider    String    @map("provider")
+  eventId     String    @map("event_id")
+  eventType   String    @map("event_type")
+  payload     Json      @map("payload")
+  processedAt DateTime? @map("processed_at")
+
+  // Idempotency backstop: one ledger row per provider event id.
+  @@unique([provider, eventId])
+  @@index([workspaceId])
+  @@map("call_webhook_events")
+}
+
+model LiftSnapshot {
+  id           String   @id @default(cuid()) @map("id")
+  workspaceId  String   @map("workspace_id")
+  buyId        String   @map("buy_id")
+  source       String   @map("source") // gsc | gtrends | ga4 | gbp
+  baselineJson Json     @map("baseline_json")
+  flightJson   Json     @map("flight_json")
+  holdoutJson  Json?    @map("holdout_json")
+  capturedAt   DateTime @default(now()) @map("captured_at")
+
+  @@index([workspaceId, buyId, source])
+  @@map("lift_snapshots")
+}
+
+model MediaReceipt {
+  id                 String   @id @default(cuid()) @map("id")
+  workspaceId        String   @map("workspace_id")
+  buyId              String   @map("buy_id")
+  platformInvoiceRef String   @map("platform_invoice_ref")
+  amountCents        Int      @map("amount_cents")
+  capturedAt         DateTime @default(now()) @map("captured_at")
+  reconciled         Boolean  @default(false) @map("reconciled")
+  varianceCents      Int?     @map("variance_cents")
+  // REQUIRED: every receipt traces to a safety-track approval (zero-custody invariant).
+  approvalRef        String   @map("approval_ref")
+
+  @@unique([workspaceId, buyId, platformInvoiceRef])
+  @@index([workspaceId, buyId])
+  @@map("media_receipts")
+}
+
+model MediaSpendEntry {
+  id           String   @id @default(cuid()) @map("id")
+  workspaceId  String   @map("workspace_id")
+  buyId        String   @map("buy_id")
+  kind         String   @map("kind") // estimate | encumbrance | spend | release | adjust
+  amountCents  Int      @map("amount_cents")
+  // REQUIRED: the safety track's approval id this spend traces to.
+  approvalRef  String   @map("approval_ref")
+  note         String?  @map("note")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@index([workspaceId, buyId, kind])
+  @@map("media_spend_entries")
+}

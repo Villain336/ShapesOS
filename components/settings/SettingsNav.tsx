@@ -8,6 +8,7 @@ const LINKS = [
   { href: "/dashboard/settings/skills", label: "Skills" },
   { href: "/dashboard/settings/connectors", label: "Connectors" },
   { href: "/dashboard/settings/mail", label: "Direct Mail" },
+  { href: "/dashboard/settings/media", label: "Media safety" },
   { href: "/dashboard/settings/members", label: "Members" },
   { href: "/dashboard/settings/providers", label: "Providers" },
   { href: "/dashboard/settings/governance", label: "Governance" },
