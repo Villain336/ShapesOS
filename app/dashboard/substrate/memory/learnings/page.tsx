@@ -1,16 +1,24 @@
-// Marketr — Phase 8 G3: learnings list (SPEC-PHASE8.md §6).
-// Filters (result, source, q), badges top-right, provenance + freshness on
-// every card. House pattern: plain cards, light mode, Lucide icons.
+// Marketr — Phase 8 G3: learnings list.
+// House pattern (Creative Studio): dense table, violet primary button,
+// stone info notes, light mode, Lucide icons. Filters (result, source, q).
+// Styling only — no data changes.
 
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requireUser, getOrCreateWorkspace } from "@/lib/session";
-import { Badge } from "@/components/vault/shadcn/badge";
-import { Input } from "@/components/vault/shadcn/input";
-import { Button } from "@/components/vault/shadcn/button";
-import { CheckCircle2, XCircle, HelpCircle, FlaskConical } from "lucide-react";
+import { CheckCircle2, XCircle, HelpCircle, FlaskConical, Filter } from "lucide-react";
 import { withWorkspaceScope } from "@/lib/substrate/memory/rls";
 import { freshnessLabel } from "@/lib/substrate/graph/freshness";
+import {
+  Chip,
+  btnPrimary,
+  infoNoteCls,
+  inputCls,
+  rowCls,
+  tableShell,
+  thCls,
+  theadCls,
+} from "../../ui";
 
 export const dynamic = "force-dynamic";
 
@@ -25,10 +33,16 @@ const RESULT_ICON = {
   inconclusive: HelpCircle,
 } as const;
 
-function bucketVariant(bucket: string): "secondary" | "outline" | "destructive" {
-  if (bucket === "fresh") return "secondary";
-  if (bucket === "aging") return "outline";
-  return "destructive";
+const RESULT_TONE = {
+  worked: "green",
+  failed: "red",
+  inconclusive: "amber",
+} as const;
+
+function bucketTone(bucket: string): "slate" | "amber" | "red" {
+  if (bucket === "fresh") return "slate";
+  if (bucket === "aging") return "amber";
+  return "red";
 }
 
 async function listLearnings(
@@ -74,13 +88,18 @@ export default async function LearningsPage({
   const now = new Date();
 
   return (
-    <div className="space-y-4">
-      <form method="get" className="flex flex-wrap items-center gap-2">
-        <Input name="q" placeholder="Search hypothesis or action…" defaultValue={sp.q ?? ""} className="w-64" />
+    <div>
+      <form method="get" className="mb-3 flex flex-wrap items-center gap-2">
+        <input
+          name="q"
+          placeholder="Search hypothesis or action…"
+          defaultValue={sp.q ?? ""}
+          className={`${inputCls} w-64`}
+        />
         <select
           name="result"
           defaultValue={sp.result ?? ""}
-          className="rounded-md border border-input bg-background px-3 py-2 text-sm"
+          className={inputCls}
           aria-label="Filter by result"
         >
           <option value="">All results</option>
@@ -88,62 +107,84 @@ export default async function LearningsPage({
           <option value="failed">Failed</option>
           <option value="inconclusive">Inconclusive</option>
         </select>
-        <Button type="submit" variant="secondary">
-          Filter
-        </Button>
-        <span className="ml-auto text-sm text-muted-foreground">{learnings.length} learnings</span>
+        <button type="submit" className={btnPrimary}>
+          <Filter size={14} /> Filter
+        </button>
+        <span className="ml-auto text-[13px] text-stone-500">{learnings.length} learnings</span>
       </form>
 
-      {learnings.length === 0 && (
-        <div className="rounded-lg border bg-card p-8 text-center text-sm text-muted-foreground">
-          No learnings yet. Close a Test Lab experiment and archive it — the learning lands here.
-        </div>
-      )}
-
-      <div className="grid gap-3">
-        {learnings.map((l) => {
-          const Icon = RESULT_ICON[l.result as keyof typeof RESULT_ICON] ?? HelpCircle;
-          const fresh = freshnessLabel(l.observedAt, `memory:learning · ${l.source}`, now);
-          return (
-            <article key={l.id} className="relative rounded-lg border bg-card p-4">
-              <div className="absolute right-3 top-3 flex gap-1.5">
-                <Badge variant={l.result === "worked" ? "secondary" : l.result === "failed" ? "destructive" : "outline"}>
-                  {l.result}
-                </Badge>
-                <Badge variant={bucketVariant(fresh.bucket)} title={fresh.label}>
-                  {fresh.bucket}
-                </Badge>
-              </div>
-              <div className="flex items-start gap-3 pr-40">
-                <Icon className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground" aria-hidden />
-                <div className="min-w-0">
-                  <h3 className="font-medium leading-snug">{l.hypothesis}</h3>
-                  <p className="mt-1 text-sm text-muted-foreground">{l.action}</p>
-                  <p className="mt-2 text-xs text-muted-foreground">
-                    {fresh.label}
+      <div className={tableShell}>
+        <table className="w-full text-left text-[13px]">
+          <thead>
+            <tr className={theadCls}>
+              <th className={thCls}>Learning</th>
+              <th className={thCls}>Verdict</th>
+              <th className={thCls}>Confidence</th>
+              <th className={thCls}>Provenance</th>
+              <th className={thCls}>Source episode</th>
+            </tr>
+          </thead>
+          <tbody>
+            {learnings.map((l) => {
+              const Icon = RESULT_ICON[l.result as keyof typeof RESULT_ICON] ?? HelpCircle;
+              const fresh = freshnessLabel(l.observedAt, `memory:learning · ${l.source}`, now);
+              return (
+                <tr key={l.id} className={rowCls}>
+                  <td className="px-3 py-2">
+                    <div className="flex items-start gap-2">
+                      <Icon size={15} className="mt-0.5 shrink-0 text-stone-400" aria-hidden />
+                      <div className="min-w-0">
+                        <div className="font-medium leading-snug text-stone-900">{l.hypothesis}</div>
+                        <div className="mt-0.5 text-[12px] text-stone-500">{l.action}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-3 py-2">
+                    <Chip tone={RESULT_TONE[l.result as keyof typeof RESULT_TONE] ?? "slate"}>
+                      {l.result}
+                    </Chip>
+                  </td>
+                  <td className="px-3 py-2 tabular-nums text-stone-600">
+                    {/* Procedural learnings carry no stored confidence; human-asserted
+                        ones are 1.0 by house rule (they never decay). */}
+                    {l.source === "human" ? "1.00" : "—"}
+                  </td>
+                  <td className="px-3 py-2">
+                    <div className="text-[12px] text-stone-500">{fresh.label}</div>
+                    <div className="mt-1">
+                      <Chip tone={bucketTone(fresh.bucket)}>{fresh.bucket}</Chip>
+                    </div>
+                  </td>
+                  <td className="px-3 py-2">
                     {l.sourceEpisodeId ? (
-                      <>
-                        {" · "}
-                        <Link
-                          className="underline"
-                          href={`/dashboard/substrate/memory/episodes#${l.sourceEpisodeId}`}
-                        >
-                          source episode
-                        </Link>
-                      </>
-                    ) : null}
-                  </p>
-                </div>
-              </div>
-            </article>
-          );
-        })}
+                      <Link
+                        className="text-[12px] text-violet-700 underline hover:text-violet-800"
+                        href={`/dashboard/substrate/memory/episodes#${l.sourceEpisodeId}`}
+                      >
+                        source episode
+                      </Link>
+                    ) : (
+                      <span className="text-[12px] text-stone-400">—</span>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+            {learnings.length === 0 && (
+              <tr>
+                <td colSpan={5} className="px-3 py-8 text-center text-[13px] text-stone-400">
+                  No learnings yet. Close a Test Lab experiment and archive it — the learning lands here.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
       </div>
 
-      <p className="flex items-center gap-2 text-xs text-muted-foreground">
-        <FlaskConical className="h-3.5 w-3.5" aria-hidden />
-        Human-asserted learnings carry confidence 1.0 and origin user_told — they never decay.
-      </p>
+      <div className={`${infoNoteCls} mt-3 flex items-start gap-2`}>
+        <FlaskConical size={14} className="mt-0.5 shrink-0 text-stone-500" aria-hidden />
+        <p>Human-asserted learnings carry confidence 1.0 and origin user_told — they never decay.</p>
+      </div>
     </div>
   );
 }

@@ -1,6 +1,8 @@
 // Marketr — Phase 8 G2: campaign detail.
-// SPEC-PHASE8.md §6: campaign detail — 12-stage pipeline view, linked
-// fragments with provenance labels, roll-up report, link manager.
+// House pattern (Creative Studio): violet tabs (layout), dense tables,
+// stone info notes, light mode, Lucide icons. Styling only — no data changes.
+// Sections: 12-stage pipeline view, linked fragments with provenance labels,
+// roll-up report, link manager.
 
 import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
@@ -16,23 +18,39 @@ import {
   LINKED_TYPE_LABELS,
   type CampaignStageKey,
 } from "@/lib/substrate/campaigns/types";
-import { Card, CardBody, CardHeader } from "@/components/vault/Card";
-import { Badge } from "@/components/vault/shadcn/badge";
 import { campaignTablesReady } from "@/app/api/substrate/_lib";
 import {
   AttachLinkForm, CampaignStatusSelect, NewCampaignForm, StageStatusSelect, UnlinkButton,
   type FragmentOption,
 } from "../client-actions";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, AlertTriangle } from "lucide-react";
+import {
+  Chip,
+  PageTitle,
+  Section,
+  infoNoteCls,
+  rowCls,
+  tableShell,
+  thCls,
+  theadCls,
+} from "../../ui";
 
 export const dynamic = "force-dynamic";
 
-const STAGE_BADGE: Record<string, "default" | "secondary" | "outline" | "destructive"> = {
-  not_started: "secondary",
-  in_progress: "default",
-  complete: "secondary",
-  blocked: "destructive",
-  skipped: "outline",
+const STAGE_TONE: Record<string, "slate" | "violet" | "green" | "red"> = {
+  not_started: "slate",
+  in_progress: "violet",
+  complete: "green",
+  blocked: "red",
+  skipped: "slate",
+};
+
+const STATUS_TONE: Record<string, "violet" | "green" | "amber" | "slate"> = {
+  draft: "violet",
+  active: "green",
+  paused: "amber",
+  complete: "slate",
+  archived: "slate",
 };
 
 function fmtCents(c: number | null): string {
@@ -77,10 +95,10 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
   const canNest = depth < 3;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Header */}
       <div>
-        <nav className="mb-2 flex items-center gap-1 text-xs text-muted-foreground" aria-label="Breadcrumb">
+        <nav className="mb-2 flex items-center gap-1 text-xs text-stone-500" aria-label="Breadcrumb">
           <Link href="/dashboard/substrate/campaigns" className="hover:underline">Campaigns</Link>
           {ancestors.map((a) => (
             <span key={a.id} className="flex items-center gap-1">
@@ -90,195 +108,223 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
           ))}
         </nav>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">{campaign.name}</h1>
-            <p className="text-sm text-muted-foreground">
-              Objective: {campaign.objective.replace("_", " ")} · Level {depth} of 3
-              {campaign.createdBy ? ` · created by ${campaign.createdBy}` : ""}
-            </p>
-          </div>
-          <div className="flex shrink-0 items-center gap-2">
-            <Badge variant="outline">{campaign.links.length} fragment{campaign.links.length === 1 ? "" : "s"}</Badge>
-            <Badge variant="outline">Roll-up {fmtCents(campaign.budgetRollupCents)}</Badge>
+          <PageTitle
+            title={campaign.name}
+            subtitle={
+              <>
+                Objective: {campaign.objective.replace("_", " ")} · Level {depth} of 3
+                {campaign.createdBy ? ` · created by ${campaign.createdBy}` : ""} ·{" "}
+                <Chip tone={STATUS_TONE[campaign.status] ?? "slate"}>{campaign.status}</Chip>
+              </>
+            }
+          />
+          <div className="flex shrink-0 items-center gap-1.5">
+            <Chip>
+              {campaign.links.length} fragment{campaign.links.length === 1 ? "" : "s"}
+            </Chip>
+            <Chip>Roll-up {fmtCents(campaign.budgetRollupCents)}</Chip>
             <CampaignStatusSelect campaignId={campaign.id} value={campaign.status} />
           </div>
         </div>
-        <p className="mt-2 text-xs text-muted-foreground">
-          The budget roll-up is a reporting convenience (per-fragment declared budgets/spend) — not a
-          spending envelope. Nothing on this page can move money (§3.1).
-        </p>
+        <div className={`${infoNoteCls} mt-3`}>
+          <span className="font-medium text-stone-800">Money note. </span>
+          The budget roll-up is a reporting convenience (per-fragment declared budgets/spend) —
+          not a spending envelope. Nothing on this page can move money (§3.1).
+        </div>
       </div>
 
       {/* 12-stage pipeline */}
-      <Card>
-        <CardHeader
-          title="Lifecycle pipeline"
-          description="The 12 master-plan stages. Attaching a fragment flips its stage to in-progress; status is otherwise human-driven."
-        />
-        <CardBody>
-          <ol className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {stages.map((s) => (
-              <li key={s.key} className="rounded-lg border p-3">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="text-sm font-medium">{CAMPAIGN_STAGE_LABELS[s.key as CampaignStageKey] ?? s.key}</div>
-                  <Badge variant={STAGE_BADGE[s.status] ?? "secondary"}>{s.status.replace("_", " ")}</Badge>
-                </div>
-                {s.linkedRefs.length > 0 ? (
-                  <ul className="mt-2 space-y-1">
-                    {s.linkedRefs.map((r) => (
-                      <li key={`${r.linkedType}:${r.linkedId}`} className="text-xs text-muted-foreground">
-                        <span className="font-medium text-foreground">{LINKED_TYPE_LABELS[r.linkedType]}</span>
-                        {" · "}
-                        {report.fragments.find((f) => f.linkedType === r.linkedType && f.linkedId === r.linkedId)?.displayName ?? r.linkedId.slice(0, 8)}
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="mt-2 text-xs text-muted-foreground">No linked fragments yet.</p>
-                )}
-                <div className="mt-2">
-                  <StageStatusSelect campaignId={campaign.id} stageKey={s.key} value={s.status} />
-                </div>
-              </li>
-            ))}
-          </ol>
-        </CardBody>
-      </Card>
+      <Section
+        title="Lifecycle pipeline"
+        description="The 12 master-plan stages. Attaching a fragment flips its stage to in-progress; status is otherwise human-driven."
+      >
+        <div className={tableShell}>
+          <table className="w-full text-left text-[13px]">
+            <thead>
+              <tr className={theadCls}>
+                <th className={thCls}>Stage</th>
+                <th className={thCls}>Status</th>
+                <th className={thCls}>Linked fragments</th>
+                <th className={thCls}>Set status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {stages.map((s) => (
+                <tr key={s.key} className={rowCls}>
+                  <td className="px-3 py-2 font-medium text-stone-900">
+                    {CAMPAIGN_STAGE_LABELS[s.key as CampaignStageKey] ?? s.key}
+                  </td>
+                  <td className="px-3 py-2">
+                    <Chip tone={STAGE_TONE[s.status] ?? "slate"}>{s.status.replace("_", " ")}</Chip>
+                  </td>
+                  <td className="px-3 py-2 text-stone-500">
+                    {s.linkedRefs.length > 0 ? (
+                      <ul className="space-y-0.5">
+                        {s.linkedRefs.map((r) => (
+                          <li key={`${r.linkedType}:${r.linkedId}`} className="text-xs">
+                            <span className="font-medium text-stone-700">{LINKED_TYPE_LABELS[r.linkedType]}</span>
+                            {" · "}
+                            {report.fragments.find((f) => f.linkedType === r.linkedType && f.linkedId === r.linkedId)?.displayName ?? r.linkedId.slice(0, 8)}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <span className="text-xs text-stone-400">No linked fragments yet.</span>
+                    )}
+                  </td>
+                  <td className="px-3 py-2">
+                    <StageStatusSelect campaignId={campaign.id} stageKey={s.key} value={s.status} />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Section>
 
       {/* Linked fragments */}
-      <Card>
-        <CardHeader
-          title="Linked fragments"
-          description="Each link is a first-class row with provenance. Unlinking is surgical — fragment rows are never touched."
-        />
-        <CardBody className="space-y-4">
-          {report.fragments.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              No fragments linked yet. Attach one below, or run the backfill proposer on the Link proposals tab.
-            </p>
-          ) : (
-            <ul className="divide-y">
-              {report.fragments.map((f) => (
-                <li key={f.linkId} className="py-4 first:pt-0 last:pb-0">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="text-sm font-medium">{f.displayName}</div>
-                      <p className="mt-0.5 text-xs text-muted-foreground">
-                        {LINKED_TYPE_LABELS[f.linkedType]} · role {f.role} · source {f.linkSource.replace("_", " ")}
-                        {f.stageKeys.length > 0 ? ` · stages: ${f.stageKeys.map((k) => CAMPAIGN_STAGE_LABELS[k as CampaignStageKey] ?? k).join(", ")}` : ""}
+      <Section
+        title="Linked fragments"
+        description="Each link is a first-class row with provenance. Unlinking is surgical — fragment rows are never touched."
+      >
+        {report.fragments.length === 0 ? (
+          <p className="text-[13px] text-stone-500">
+            No fragments linked yet. Attach one below, or run the backfill proposer on the Link proposals tab.
+          </p>
+        ) : (
+          <ul>
+            {report.fragments.map((f) => (
+              <li key={f.linkId} className="border-b border-stone-100 py-3 first:pt-0 last:border-0 last:pb-0">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="text-[13px] font-medium text-stone-900">{f.displayName}</div>
+                    <p className="mt-0.5 text-xs text-stone-500">
+                      {LINKED_TYPE_LABELS[f.linkedType]} · role {f.role} · source {f.linkSource.replace("_", " ")}
+                      {f.stageKeys.length > 0 ? ` · stages: ${f.stageKeys.map((k) => CAMPAIGN_STAGE_LABELS[k as CampaignStageKey] ?? k).join(", ")}` : ""}
+                    </p>
+                    <p className="mt-1 text-xs text-stone-500">
+                      <span className="font-medium text-stone-700">Provenance:</span> table <code>{f.provenance.table}</code>
+                      {" · "}{f.provenance.notes.join("; ")}
+                    </p>
+                    {f.platformRef ? (
+                      <p className="mt-1 text-xs text-stone-500">
+                        <span className="font-medium text-stone-700">Platform ref (opaque):</span>{" "}
+                        <code className="break-all">{JSON.stringify(f.platformRef)}</code>
                       </p>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        <span className="font-medium text-foreground">Provenance:</span> table <code>{f.provenance.table}</code>
-                        {" · "}{f.provenance.notes.join("; ")}
-                      </p>
-                      {f.platformRef ? (
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          <span className="font-medium text-foreground">Platform ref (opaque):</span>{" "}
-                          <code className="break-all">{JSON.stringify(f.platformRef)}</code>
-                        </p>
-                      ) : null}
-                    </div>
-                    <UnlinkButton campaignId={campaign.id} linkId={f.linkId} label={f.displayName} />
+                    ) : null}
                   </div>
-                  {f.metrics.length > 0 ? (
-                    <dl className="mt-2 flex flex-wrap gap-x-6 gap-y-1">
-                      {f.metrics.map((m) => (
-                        <div key={m.key} className="text-xs">
-                          <dt className="text-muted-foreground">{m.label}</dt>
-                          <dd className="font-medium">{m.key === "spend_cents" ? fmtCents(typeof m.value === "number" ? m.value : null) : fmtVal(m.value)}</dd>
-                        </div>
-                      ))}
-                    </dl>
-                  ) : null}
-                </li>
-              ))}
-            </ul>
+                  <UnlinkButton campaignId={campaign.id} linkId={f.linkId} label={f.displayName} />
+                </div>
+                {f.metrics.length > 0 ? (
+                  <dl className="mt-2 flex flex-wrap gap-x-6 gap-y-1">
+                    {f.metrics.map((m) => (
+                      <div key={m.key} className="text-xs">
+                        <dt className="text-stone-500">{m.label}</dt>
+                        <dd className="font-medium text-stone-800">{m.key === "spend_cents" ? fmtCents(typeof m.value === "number" ? m.value : null) : fmtVal(m.value)}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        )}
+        <div className="mt-4 border-t border-stone-100 pt-4">
+          <h3 className="mb-2 text-[13px] font-medium text-stone-800">Attach a fragment</h3>
+          {attachOptions.length === 0 ? (
+            <p className="text-[13px] text-stone-500">Every fragment in this workspace is already linked.</p>
+          ) : (
+            <AttachLinkForm campaignId={campaign.id} fragments={attachOptions} />
           )}
-          <div className="border-t pt-4">
-            <h3 className="mb-2 text-sm font-medium">Attach a fragment</h3>
-            {attachOptions.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Every fragment in this workspace is already linked.</p>
-            ) : (
-              <AttachLinkForm campaignId={campaign.id} fragments={attachOptions} />
-            )}
-          </div>
-        </CardBody>
-      </Card>
+        </div>
+      </Section>
 
       {/* Roll-up report */}
-      <Card>
-        <CardHeader
-          title="Roll-up report"
-          description="Per-fragment metrics with provenance labels. Totals carry explicit semantics notes — semantically-different metrics are never silently summed."
-        />
-        <CardBody className="space-y-4">
-          {report.warnings.length > 0 ? (
+      <Section
+        title="Roll-up report"
+        description="Per-fragment metrics with provenance labels. Totals carry explicit semantics notes — semantically-different metrics are never silently summed."
+      >
+        {report.warnings.length > 0 ? (
+          <div className="mb-3 flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[13px] text-amber-800">
+            <AlertTriangle size={14} className="mt-0.5 shrink-0" />
             <ul className="space-y-1">
               {report.warnings.map((w, i) => (
-                <li key={i} className="text-sm text-amber-700">{w}</li>
+                <li key={i}>{w}</li>
               ))}
             </ul>
-          ) : null}
-          {report.totals.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No summable metrics on the linked fragments yet.</p>
-          ) : (
-            <div className="grid gap-3 md:grid-cols-2">
-              {report.totals.map((t) => (
-                <div key={t.key} className="rounded-lg border p-3">
-                  <div className="flex items-baseline justify-between gap-2">
-                    <div className="text-sm font-medium">{t.key.replace(/_/g, " ")}</div>
-                    <div className="text-lg font-semibold">
+          </div>
+        ) : null}
+        {report.totals.length === 0 ? (
+          <p className="text-[13px] text-stone-500">No summable metrics on the linked fragments yet.</p>
+        ) : (
+          <div className={tableShell}>
+            <table className="w-full text-left text-[13px]">
+              <thead>
+                <tr className={theadCls}>
+                  <th className={thCls}>Metric</th>
+                  <th className={thCls}>Total</th>
+                  <th className={thCls}>Semantics</th>
+                  <th className={thCls}>From fragments</th>
+                </tr>
+              </thead>
+              <tbody>
+                {report.totals.map((t) => (
+                  <tr key={t.key} className={rowCls}>
+                    <td className="px-3 py-2 font-medium text-stone-900">{t.key.replace(/_/g, " ")}</td>
+                    <td className="px-3 py-2 font-semibold tabular-nums text-stone-900">
                       {t.key === "spend_cents" ? fmtCents(t.value) : t.value.toLocaleString("en-US")}
-                    </div>
-                  </div>
-                  <p className="mt-1 text-xs text-muted-foreground">{t.semantics}</p>
-                  <ul className="mt-2 space-y-0.5">
-                    {t.provenance.map((p, i) => (
-                      <li key={i} className="text-xs text-muted-foreground">
-                        {p.from}: <span className="font-medium text-foreground">{t.key === "spend_cents" ? fmtCents(p.value) : p.value.toLocaleString("en-US")}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
-            </div>
-          )}
-          <p className="text-xs text-muted-foreground">
-            Generated {new Date(report.generatedAt).toLocaleString()} · metrics labeled at the fragment level;
-            no "conversions" total is produced because platform conversions and CRM closed-won are different things.
-          </p>
-        </CardBody>
-      </Card>
+                    </td>
+                    <td className="px-3 py-2 text-xs text-stone-500">{t.semantics}</td>
+                    <td className="px-3 py-2">
+                      <ul className="space-y-0.5">
+                        {t.provenance.map((p, i) => (
+                          <li key={i} className="text-xs text-stone-500">
+                            {p.from}:{" "}
+                            <span className="font-medium text-stone-800">
+                              {t.key === "spend_cents" ? fmtCents(p.value) : p.value.toLocaleString("en-US")}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        <p className="mt-3 text-xs text-stone-500">
+          Generated {new Date(report.generatedAt).toLocaleString()} · metrics labeled at the fragment level;
+          no "conversions" total is produced because platform conversions and CRM closed-won are different things.
+        </p>
+      </Section>
 
       {/* Sub-campaigns */}
-      <Card>
-        <CardHeader
-          title={`Sub-campaigns (${children.length})`}
-          description={canNest ? "HubSpot-style hierarchy — up to 3 levels. A 4th level is rejected." : "Maximum depth (3 levels) reached — no further nesting."}
-        />
-        <CardBody className="space-y-4">
-          {children.length > 0 ? (
-            <ul className="divide-y">
-              {children.map((c) => (
-                <li key={c.id} className="flex items-center justify-between gap-3 py-2">
-                  <Link href={`/dashboard/substrate/campaigns/${c.id}`} className="text-sm font-medium hover:underline">
-                    {c.name}
-                  </Link>
-                  <Badge variant="secondary">{c.status}</Badge>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="text-sm text-muted-foreground">No sub-campaigns.</p>
-          )}
-          {canNest ? (
-            <div className="border-t pt-4">
-              <h3 className="mb-2 text-sm font-medium">Create sub-campaign</h3>
-              <NewCampaignForm parentId={campaign.id} />
-            </div>
-          ) : null}
-        </CardBody>
-      </Card>
+      <Section
+        title={`Sub-campaigns (${children.length})`}
+        description={canNest ? "HubSpot-style hierarchy — up to 3 levels. A 4th level is rejected." : "Maximum depth (3 levels) reached — no further nesting."}
+      >
+        {children.length > 0 ? (
+          <ul>
+            {children.map((c) => (
+              <li key={c.id} className="flex items-center justify-between gap-3 border-b border-stone-100 py-2 last:border-0">
+                <Link href={`/dashboard/substrate/campaigns/${c.id}`} className="text-[13px] font-medium text-stone-900 hover:underline">
+                  {c.name}
+                </Link>
+                <Chip tone={STATUS_TONE[c.status] ?? "slate"}>{c.status}</Chip>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-[13px] text-stone-500">No sub-campaigns.</p>
+        )}
+        {canNest ? (
+          <div className="mt-4 border-t border-stone-100 pt-4">
+            <h3 className="mb-2 text-[13px] font-medium text-stone-800">Create sub-campaign</h3>
+            <NewCampaignForm parentId={campaign.id} />
+          </div>
+        ) : null}
+      </Section>
     </div>
   );
 }

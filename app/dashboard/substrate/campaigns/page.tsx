@@ -1,15 +1,21 @@
 // Marketr — Phase 8 G2: campaign list (hierarchy-aware).
-// SPEC-PHASE8.md §6: campaign list (hierarchy-aware).
+// House pattern (Creative Studio): dense table, violet tabs (layout),
+// stone info notes, light mode, Lucide icons. Styling only — no data changes.
 
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { requireUser, getOrCreateWorkspace } from "@/lib/session";
 import { requireWorkspaceRole } from "@/lib/authz";
 import { listCampaigns } from "@/lib/substrate/campaigns/store";
-import { Card, CardBody, CardHeader } from "@/components/vault/Card";
-import { EmptyState } from "@/components/vault/EmptyState";
-import { Badge } from "@/components/vault/shadcn/badge";
 import { campaignTablesReady } from "@/app/api/substrate/_lib";
+import {
+  Chip,
+  PageTitle,
+  rowCls,
+  tableShell,
+  thCls,
+  theadCls,
+} from "../ui";
 
 export const dynamic = "force-dynamic";
 
@@ -18,12 +24,12 @@ export const metadata = {
   description: "The cross-channel campaign object: one ID across mail, email, social, ads, CTV, and tests.",
 };
 
-const STATUS_VARIANT: Record<string, "default" | "secondary" | "outline" | "destructive"> = {
-  draft: "secondary",
-  active: "default",
-  paused: "outline",
-  complete: "secondary",
-  archived: "outline",
+const STATUS_TONE: Record<string, "violet" | "green" | "amber" | "slate"> = {
+  draft: "violet",
+  active: "green",
+  paused: "amber",
+  complete: "slate",
+  archived: "slate",
 };
 
 interface Row {
@@ -78,58 +84,74 @@ export default async function CampaignsPage() {
   const tree = buildTree(rows);
 
   return (
-    <div className="space-y-6">
+    <div>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Campaigns</h1>
-          <p className="text-sm text-muted-foreground">
-            One campaign object across every channel — links only, never re-modeled.
-            The roll-up is reporting, not a spending envelope: nothing here moves money.
-          </p>
-        </div>
-        <div className="flex shrink-0 gap-2">
-          <Badge variant="secondary">{campaigns.length} campaigns</Badge>
-          <Badge variant="outline">{rows.reduce((a, r) => a + r.linkCount, 0)} linked fragments</Badge>
+        <PageTitle
+          title="Campaigns"
+          subtitle="One campaign object across every channel — links only, never re-modeled. The roll-up is reporting, not a spending envelope: nothing here moves money."
+        />
+        <div className="flex shrink-0 gap-1.5">
+          <Chip>{campaigns.length} campaigns</Chip>
+          <Chip>{rows.reduce((a, r) => a + r.linkCount, 0)} linked fragments</Chip>
         </div>
       </div>
 
-      <Card>
-        <CardHeader
-          title="All campaigns"
-          description="Hierarchy-aware: parents indent above their sub-campaigns (≤3 levels)."
-        />
-        <CardBody>
-          {tree.length === 0 ? (
-            <EmptyState
-              title="No campaigns yet"
-              description="Create your first campaign object, then attach fragments — or run the backfill proposer on the Link proposals tab to link historical fragments."
-            />
-          ) : (
-            <ul className="divide-y">
-              {tree.map(({ row, depth }) => (
-                <li key={row.id} className="flex items-center justify-between gap-3 py-3" style={{ paddingLeft: depth * 24 }}>
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <Link href={`/dashboard/substrate/campaigns/${row.id}`} className="truncate text-sm font-medium hover:underline">
-                        {row.name}
-                      </Link>
+      <div className={`${tableShell} mt-4`}>
+        <table className="w-full text-left text-[13px]">
+          <thead>
+            <tr className={theadCls}>
+              <th className={thCls}>Name</th>
+              <th className={thCls}>Status</th>
+              <th className={thCls}>Fragments</th>
+              <th className={thCls}>Roll-up</th>
+              <th className={thCls}>Objective</th>
+            </tr>
+          </thead>
+          <tbody>
+            {tree.map(({ row, depth }) => (
+              <tr key={row.id} className={rowCls}>
+                <td className="px-3 py-2" style={{ paddingLeft: 12 + depth * 24 }}>
+                  <Link
+                    href={`/dashboard/substrate/campaigns/${row.id}`}
+                    className="font-medium text-stone-900 hover:underline"
+                  >
+                    {row.name}
+                  </Link>
+                  {(row.childCount > 0 || row.parentCampaign) && (
+                    <div className="text-[11px] text-stone-500">
+                      {row.childCount > 0
+                        ? `${row.childCount} sub-campaign${row.childCount === 1 ? "" : "s"}`
+                        : ""}
+                      {row.childCount > 0 && row.parentCampaign ? " · " : ""}
+                      {row.parentCampaign ? `under ${row.parentCampaign.name}` : ""}
                     </div>
-                    <p className="mt-0.5 text-xs text-muted-foreground">
-                      {row.objective.replace("_", " ")} · {row.linkCount} fragment{row.linkCount === 1 ? "" : "s"}
-                      {row.childCount > 0 ? ` · ${row.childCount} sub-campaign${row.childCount === 1 ? "" : "s"}` : ""}
-                      {row.parentCampaign ? ` · under ${row.parentCampaign.name}` : ""}
-                      {" · roll-up "}{fmtCents(row.budgetRollupCents)}
-                    </p>
-                  </div>
-                  <Badge variant={STATUS_VARIANT[row.status] ?? "secondary"} className="shrink-0">
-                    {row.status}
-                  </Badge>
-                </li>
-              ))}
-            </ul>
-          )}
-        </CardBody>
-      </Card>
+                  )}
+                </td>
+                <td className="px-3 py-2">
+                  <Chip tone={STATUS_TONE[row.status] ?? "slate"}>{row.status}</Chip>
+                </td>
+                <td className="px-3 py-2 tabular-nums text-stone-600">
+                  {row.linkCount} fragment{row.linkCount === 1 ? "" : "s"}
+                </td>
+                <td className="px-3 py-2 tabular-nums text-stone-600">{fmtCents(row.budgetRollupCents)}</td>
+                <td className="px-3 py-2 text-stone-500">{row.objective.replace("_", " ")}</td>
+              </tr>
+            ))}
+            {tree.length === 0 && (
+              <tr>
+                <td colSpan={5} className="px-3 py-8 text-center text-[13px] text-stone-400">
+                  No campaigns yet. Create one on the New campaign tab, then attach fragments —
+                  or run the backfill proposer on the Link proposals tab to link historical fragments.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      <p className="mt-3 text-[12px] text-stone-500">
+        Hierarchy-aware: parents indent above their sub-campaigns (≤3 levels).
+      </p>
     </div>
   );
 }

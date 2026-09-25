@@ -1,20 +1,13 @@
 // Marketr — Phase 8 G2: client-side campaign actions.
 // Plain fetch calls against /api/substrate/campaigns/*, then router.refresh().
+// House pattern (Creative Studio): violet primary buttons, stone inputs,
+// light mode. Styling only — no behavior changes.
 
 "use client";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button } from "@/components/vault/shadcn/button";
-import { Input } from "@/components/vault/shadcn/input";
-import { Label } from "@/components/vault/shadcn/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/vault/shadcn/select";
+import { btnGhost, btnPrimary, inputCls, labelCls } from "../ui";
 import {
   CAMPAIGN_STAGES,
   CAMPAIGN_STAGE_LABELS,
@@ -59,30 +52,31 @@ export function NewCampaignForm({ parentId }: { parentId?: string }) {
   }
 
   return (
-    <form onSubmit={submit} className="space-y-4">
-      <div className="space-y-2">
-        <Label htmlFor="g2-name">Name</Label>
-        <Input id="g2-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="2026 Q4 Holiday Launch" />
+    <form onSubmit={submit} className="space-y-3">
+      <div className="space-y-1.5">
+        <label htmlFor="g2-name" className={labelCls}>Name</label>
+        <input
+          id="g2-name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="2026 Q4 Holiday Launch"
+          className={`${inputCls} w-full`}
+        />
       </div>
-      <div className="space-y-2">
-        <Label>Objective</Label>
-        <Select value={objective} onValueChange={(v) => setObjective(v ?? "lead_gen")}>
-          <SelectTrigger>
-            <SelectValue placeholder="Objective" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="lead_gen">Lead generation</SelectItem>
-            <SelectItem value="sale">Sale</SelectItem>
-            <SelectItem value="awareness">Awareness</SelectItem>
-            <SelectItem value="retention">Retention</SelectItem>
-            <SelectItem value="launch">Launch</SelectItem>
-          </SelectContent>
-        </Select>
+      <div className="space-y-1.5">
+        <label className={labelCls}>Objective</label>
+        <select value={objective} onChange={(e) => setObjective(e.target.value || "lead_gen")} className={inputCls}>
+          <option value="lead_gen">Lead generation</option>
+          <option value="sale">Sale</option>
+          <option value="awareness">Awareness</option>
+          <option value="retention">Retention</option>
+          <option value="launch">Launch</option>
+        </select>
       </div>
-      {error ? <p className="text-sm text-destructive">{error}</p> : null}
-      <Button type="submit" disabled={busy || !name.trim()}>
+      {error ? <p className="text-[13px] text-red-700">{error}</p> : null}
+      <button type="submit" className={btnPrimary} disabled={busy || !name.trim()}>
         {busy ? "Creating…" : parentId ? "Create sub-campaign" : "Create campaign"}
-      </Button>
+      </button>
     </form>
   );
 }
@@ -126,54 +120,45 @@ export function AttachLinkForm({ campaignId, fragments }: { campaignId: string; 
 
   return (
     <form onSubmit={submit} className="space-y-3">
-      <div className="space-y-2">
-        <Label>Fragment</Label>
-        <Select value={value} onValueChange={(v) => setValue(v ?? "")}>
-          <SelectTrigger>
-            <SelectValue placeholder="Choose a fragment…" />
-          </SelectTrigger>
-          <SelectContent>
-            {fragments.map((f) => (
-              <SelectItem key={`${f.linkedType}::${f.linkedId}`} value={`${f.linkedType}::${f.linkedId}`}>
-                [{LINKED_TYPE_LABELS[f.linkedType]}] {f.displayName}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      <div className="space-y-1.5">
+        <label className={labelCls}>Fragment</label>
+        <select value={value} onChange={(e) => setValue(e.target.value || "")} className={`${inputCls} w-full`}>
+          <option value="">Choose a fragment…</option>
+          {fragments.map((f) => (
+            <option key={`${f.linkedType}::${f.linkedId}`} value={`${f.linkedType}::${f.linkedId}`}>
+              [{LINKED_TYPE_LABELS[f.linkedType]}] {f.displayName}
+            </option>
+          ))}
+        </select>
       </div>
       <div className="grid grid-cols-2 gap-3">
-        <div className="space-y-2">
-          <Label>Role</Label>
-          <Select value={role} onValueChange={(v) => setRole((v as "primary" | "supporting") ?? "primary")}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="primary">Primary</SelectItem>
-              <SelectItem value="supporting">Supporting</SelectItem>
-            </SelectContent>
-          </Select>
+        <div className="space-y-1.5">
+          <label className={labelCls}>Role</label>
+          <select
+            value={role}
+            onChange={(e) => setRole((e.target.value as "primary" | "supporting") || "primary")}
+            className={`${inputCls} w-full`}
+          >
+            <option value="primary">Primary</option>
+            <option value="supporting">Supporting</option>
+          </select>
         </div>
-        <div className="space-y-2">
-          <Label>Stage (optional)</Label>
-          <Select value={stageKey} onValueChange={(v) => setStageKey(v ?? "")}>
-            <SelectTrigger>
-              <SelectValue placeholder="Auto (by fragment type)" />
-            </SelectTrigger>
-            <SelectContent>
-              {CAMPAIGN_STAGES.map((k) => (
-                <SelectItem key={k} value={k as string}>
-                  {CAMPAIGN_STAGE_LABELS[k as CampaignStageKey]}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        <div className="space-y-1.5">
+          <label className={labelCls}>Stage (optional)</label>
+          <select value={stageKey} onChange={(e) => setStageKey(e.target.value || "")} className={`${inputCls} w-full`}>
+            <option value="">Auto (by fragment type)</option>
+            {CAMPAIGN_STAGES.map((k) => (
+              <option key={k} value={k as string}>
+                {CAMPAIGN_STAGE_LABELS[k as CampaignStageKey]}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
-      {error ? <p className="text-sm text-destructive">{error}</p> : null}
-      <Button type="submit" disabled={busy || !value}>
+      {error ? <p className="text-[13px] text-red-700">{error}</p> : null}
+      <button type="submit" className={btnPrimary} disabled={busy || !value}>
         {busy ? "Attaching…" : "Attach to campaign"}
-      </Button>
+      </button>
     </form>
   );
 }
@@ -197,11 +182,11 @@ export function UnlinkButton({ campaignId, linkId, label }: { campaignId: string
   }
 
   return (
-    <span className="inline-flex items-center gap-2">
-      <Button variant="outline" size="sm" onClick={unlink} disabled={busy}>
+    <span className="inline-flex shrink-0 items-center gap-2">
+      <button onClick={unlink} disabled={busy} className={btnGhost}>
         {busy ? "Unlinking…" : "Unlink"}
-      </Button>
-      {error ? <span className="text-xs text-destructive">{error}</span> : null}
+      </button>
+      {error ? <span className="text-xs text-red-700">{error}</span> : null}
     </span>
   );
 }
@@ -225,13 +210,13 @@ export function ProposalActions({ proposalId }: { proposalId: string }) {
 
   return (
     <span className="inline-flex items-center gap-2">
-      <Button size="sm" onClick={() => resolve("approved")} disabled={busy !== null}>
+      <button onClick={() => resolve("approved")} disabled={busy !== null} className={btnPrimary}>
         {busy === "approved" ? "Approving…" : "Approve"}
-      </Button>
-      <Button variant="outline" size="sm" onClick={() => resolve("rejected")} disabled={busy !== null}>
+      </button>
+      <button onClick={() => resolve("rejected")} disabled={busy !== null} className={btnGhost}>
         {busy === "rejected" ? "Rejecting…" : "Reject"}
-      </Button>
-      {error ? <span className="text-xs text-destructive">{error}</span> : null}
+      </button>
+      {error ? <span className="text-xs text-red-700">{error}</span> : null}
     </span>
   );
 }
@@ -262,11 +247,11 @@ export function RunScanButton() {
 
   return (
     <span className="inline-flex flex-wrap items-center gap-3">
-      <Button onClick={scan} disabled={busy}>
+      <button onClick={scan} disabled={busy} className={btnPrimary}>
         {busy ? "Scanning fragments…" : "Run backfill scan"}
-      </Button>
-      {result ? <span className="text-sm text-muted-foreground">{result}</span> : null}
-      {error ? <span className="text-sm text-destructive">{error}</span> : null}
+      </button>
+      {result ? <span className="text-[13px] text-stone-500">{result}</span> : null}
+      {error ? <span className="text-[13px] text-red-700">{error}</span> : null}
     </span>
   );
 }
@@ -282,7 +267,7 @@ export function CampaignStatusSelect({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function change(next: string | null) {
+  async function change(next: string) {
     if (!next) return;
     setBusy(true);
     setError(null);
@@ -298,19 +283,20 @@ export function CampaignStatusSelect({
 
   return (
     <span className="inline-flex items-center gap-2">
-      <Select value={value} onValueChange={change} disabled={busy}>
-        <SelectTrigger className="w-32" aria-label="Campaign status">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="draft">Draft</SelectItem>
-          <SelectItem value="active">Active</SelectItem>
-          <SelectItem value="paused">Paused</SelectItem>
-          <SelectItem value="complete">Complete</SelectItem>
-          <SelectItem value="archived">Archived</SelectItem>
-        </SelectContent>
-      </Select>
-      {error ? <span className="text-xs text-destructive">{error}</span> : null}
+      <select
+        value={value}
+        onChange={(e) => change(e.target.value)}
+        disabled={busy}
+        className={`${inputCls} w-32`}
+        aria-label="Campaign status"
+      >
+        <option value="draft">Draft</option>
+        <option value="active">Active</option>
+        <option value="paused">Paused</option>
+        <option value="complete">Complete</option>
+        <option value="archived">Archived</option>
+      </select>
+      {error ? <span className="text-xs text-red-700">{error}</span> : null}
     </span>
   );
 }
@@ -328,7 +314,7 @@ export function StageStatusSelect({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function change(next: string | null) {
+  async function change(next: string) {
     if (!next) return;
     setBusy(true);
     setError(null);
@@ -352,19 +338,20 @@ export function StageStatusSelect({
 
   return (
     <span className="inline-flex items-center gap-2">
-      <Select value={value} onValueChange={change} disabled={busy}>
-        <SelectTrigger className="w-36" aria-label={`${stageKey} status`}>
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="not_started">Not started</SelectItem>
-          <SelectItem value="in_progress">In progress</SelectItem>
-          <SelectItem value="complete">Complete</SelectItem>
-          <SelectItem value="blocked">Blocked</SelectItem>
-          <SelectItem value="skipped">Skipped</SelectItem>
-        </SelectContent>
-      </Select>
-      {error ? <span className="text-xs text-destructive">{error}</span> : null}
+      <select
+        value={value}
+        onChange={(e) => change(e.target.value)}
+        disabled={busy}
+        className={`${inputCls} w-36`}
+        aria-label={`${stageKey} status`}
+      >
+        <option value="not_started">Not started</option>
+        <option value="in_progress">In progress</option>
+        <option value="complete">Complete</option>
+        <option value="blocked">Blocked</option>
+        <option value="skipped">Skipped</option>
+      </select>
+      {error ? <span className="text-xs text-red-700">{error}</span> : null}
     </span>
   );
 }
