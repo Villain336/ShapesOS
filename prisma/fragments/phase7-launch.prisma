@@ -1,0 +1,57 @@
+// Marketr — Phase 7 launch-readiness track (F6) data models.
+//
+// ASSEMBLY NOTE: this fragment is merged into prisma/schema.prisma by the
+// phase-7 coordinator. It is a fragment — do NOT `prisma generate` against
+// it directly. Validate the assembled schema with `prisma validate`.
+//
+// This fragment owns: launch_checklist.
+//
+// The checklist rows are seeded from the canonical catalog in
+// lib/flywheel/launch/catalog.ts (the spec §F6 item list). Each row tracks
+// one readiness item: its category (security|legal|community|build), its
+// status, an evidence URL proving completion, and when it completed.
+//
+// All rows are workspace-isolated. No secrets, no PII, no credentials —
+// evidence URLs only. The launch_checklist table itself is workspace-
+// isolated per the F6 hard constraint.
+//
+// SPEC: SPEC-PHASE7.md §2/F6, §4 (launch_checklist), §5 (routes), §10 (exit
+// gate 9). The open-core split is DEFERRED — this table tracks readiness
+// only; no public-flip state lives here.
+
+model LaunchChecklist {
+  id          String @id @default(cuid())
+  workspaceId String @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  // Stable catalog key (e.g. "secret-history-scan") from
+  // lib/flywheel/launch/catalog.ts. Unique per workspace so re-seeding is
+  // idempotent.
+  key String @map("key")
+
+  // Human-readable item title (denormalized from the catalog at seed time
+  // so history survives catalog edits).
+  item String @map("item")
+
+  // security | legal | community | build
+  category String @map("category")
+
+  // pending | in_progress | complete
+  status String @map("status") @default("pending")
+
+  // Proof of completion (commit link, doc path, CI run URL). Nullable until
+  // complete.
+  evidenceUrl String? @map("evidence_url")
+
+  // Optional operator note (e.g. why an item is N/A, rotation ticket ref).
+  note String? @map("note")
+
+  completedAt DateTime? @map("completed_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@unique([workspaceId, key])
+  @@index([workspaceId, category])
+  @@index([workspaceId, status])
+  @@map("launch_checklist")
+}

@@ -1,0 +1,224 @@
+// Marketr — Phase 7 F1 REALLOCATION track: Prisma fragment.
+//
+// Merged into prisma/schema.prisma by the coordinator's schema-merge step.
+// Do NOT edit prisma/schema.prisma directly (track ownership rule).
+// Conventions: cuid() ids, @map snake_case columns, workspace isolation,
+// @@map table names. Money in integer cents. Audit-adjacent tables are
+// append-only; state changes go through the lib state machines.
+//
+// HARD CONSTRAINTS this model supports:
+// - §9.1/§9.2: every dollar human-signed; the SRA is a pool-cap object with
+//   mandatory ≤30d expiry, never standing authority.
+// - §9.3: three-plane separation — proposals, policy decisions, and
+//   executions are distinct rows; the optimizer cannot write executions.
+
+enum ReallocationMode {
+  a
+  b
+}
+
+enum ProposalStatus {
+  proposed
+  policy_approved
+  policy_denied
+  human_approved
+  executed
+  rejected
+}
+
+enum SraStatus {
+  active
+  revoked
+  expired
+}
+
+enum PolicyDecisionKind {
+  allow
+  deny
+}
+
+enum CurveType {
+  hill
+  power
+  loglog
+}
+
+enum BreakerType {
+  performance
+  velocity
+  measurement
+  error_rate
+  attribution_regime
+}
+
+enum FlywheelAuditKind {
+  proposal_created
+  proposal_status
+  policy_decision
+  sra_created
+  sra_revoked
+  sra_expired
+  execution
+  execution_halted
+  breaker_fired
+  breaker_acknowledged
+  run_completed
+  approval_materialized
+}
+
+// Human-signed bounded envelope: channel allowlist, caps, band, cool-down,
+// mandatory expiry, instant revocation. Pre-signed for a window, not perpetual.
+model SraEnvelope {
+  id                     String    @id @default(cuid()) @map("id")
+  workspaceId            String    @map("workspace_id")
+  name                   String    @map("name")
+  channels               Json      @map("channels") // string[] allowlist — explicit only
+  perShiftCapCents       Int       @map("per_shift_cap_cents")
+  dailyAggregateCapCents Int       @map("daily_aggregate_cap_cents")
+  weeklyAggregateCapCents Int      @map("weekly_aggregate_cap_cents")
+  perChannelBandPct      Float     @map("per_channel_band_pct")
+  explorationFloorPct    Float     @map("exploration_floor_pct")
+  cooldownHours          Int       @map("cooldown_hours")
+  validFrom              DateTime  @map("valid_from")
+  validUntil             DateTime  @map("valid_until") // mandatory expiry ≤30d
+  revocationId           String    @unique @map("revocation_id")
+  status                 SraStatus @default(active) @map("status")
+  signerIds              Json      @map("signer_ids") // string[] — 2 required for ≥$1k cumulative
+  signatureHash          String    @map("signature_hash")
+  createdBy              String    @map("created_by")
+  createdAt              DateTime  @default(now()) @map("created_at")
+  revokedAt              DateTime? @map("revoked_at")
+  revokedBy              String?   @map("revoked_by")
+
+  proposals ReallocationProposal[]
+
+  @@index([workspaceId, status])
+  @@map("sra_envelopes")
+}
+
+// Optimizer output with the full decision record (data window, curve
+// params, R², model version) — the audit answer for every shift.
+model ReallocationProposal {
+  id                String         @id @default(cuid()) @map("id")
+  workspaceId       String         @map("workspace_id")
+  mode              ReallocationMode @map("mode")
+  sraId             String?        @map("sra_id")
+  sra               SraEnvelope?   @relation(fields: [sraId], references: [id])
+  sourceChannel     String         @map("source_channel")
+  destChannel       String         @map("dest_channel")
+  sourceCampaignRef String         @map("source_campaign_ref")
+  destCampaignRef   String         @map("dest_campaign_ref")
+  amountCents       Int            @map("amount_cents")
+  marginalRoasDelta Float          @map("marginal_roas_delta")
+  decisionRecord    Json           @map("decision_record")
+  status            ProposalStatus @default(proposed) @map("status")
+  humanApprovalId   String?        @map("human_approval_id") // Phase 5 MediaApproval id (mode a)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  decisions PolicyDecision[]
+
+  @@index([workspaceId, status])
+  @@index([workspaceId, sraId])
+  @@map("reallocation_proposals")
+}
+
+// Every policy decision, allow AND deny — denials carry investigative value.
+model PolicyDecision {
+  id                 String            @id @default(cuid()) @map("id")
+  proposalId         String            @map("proposal_id")
+  proposal           ReallocationProposal @relation(fields: [proposalId], references: [id])
+  workspaceId        String            @map("workspace_id")
+  decision           PolicyDecisionKind @map("decision")
+  reasons            Json              @map("reasons") // string[]
+  sraId              String?           @map("sra_id")
+  revocationCheckedAt DateTime        @map("revocation_checked_at")
+
+  @@index([proposalId])
+  @@map("policy_decisions")
+}
+
+// Fitted diminishing-returns curves per channel (best of hill/power/loglog
+// by R²), with adstock + seasonality and optional holdout calibration.
+model MarginalCurve {
+  id                    String    @id @default(cuid()) @map("id")
+  workspaceId           String    @map("workspace_id")
+  channel               String    @map("channel")
+  curveType             CurveType @map("curve_type")
+  params                Json      @map("params")
+  adstock               Json      @map("adstock")
+  seasonality           Json      @map("seasonality") // number[7]
+  rSquared              Float     @map("r_squared")
+  dataWindow            String    @map("data_window")
+  iroasCalibrationFactor Float?   @map("iroas_calibration_factor")
+  fittedAt              DateTime  @default(now()) @map("fitted_at")
+  modelVersion          String    @map("model_version")
+
+  @@index([workspaceId, channel])
+  @@map("marginal_curves")
+}
+
+// Per-channel learning-viable floors: below ~10× target CPA/day campaigns
+// can't exit learning — the optimizer would optimize noise.
+model ChannelFloor {
+  workspaceId                String @map("workspace_id")
+  channel                    String @map("channel")
+  learningViableMinCentsDay  Int    @map("learning_viable_min_cents_day")
+  stabilizationHours         Int    @map("stabilization_hours")
+
+  @@id([workspaceId, channel])
+  @@map("channel_floors")
+}
+
+// Optimizer run summary: proposals, executions, denials, freeze state.
+model ReallocationRun {
+  id               String  @id @default(cuid()) @map("id")
+  workspaceId      String  @map("workspace_id")
+  runAt            DateTime @default(now()) @map("run_at")
+  mode             ReallocationMode @map("mode")
+  proposalsCount   Int     @map("proposals_count")
+  executedCount    Int     @map("executed_count")
+  deniedCount      Int     @map("denied_count")
+  frozen           Boolean @default(false) @map("frozen")
+  dataHealthSnapshot Json  @map("data_health_snapshot")
+
+  @@index([workspaceId, runAt])
+  @@map("reallocation_runs")
+}
+
+// Breaker events: one-way ratchets — pause/freeze only, never authorize.
+// Resume needs human acknowledgment + mandatory cool-down.
+model BreakerEvent {
+  id             String      @id @default(cuid()) @map("id")
+  workspaceId    String      @map("workspace_id")
+  breakerType    BreakerType @map("breaker_type")
+  scope          String      @map("scope") // channel ref or "global"
+  reason         String      @map("reason")
+  firedAt        DateTime    @default(now()) @map("fired_at")
+  acknowledgedBy String?     @map("acknowledged_by")
+  acknowledgedAt DateTime?   @map("acknowledged_at")
+  cooldownUntil  DateTime    @map("cooldown_until")
+
+  @@index([workspaceId, breakerType])
+  @@index([workspaceId, scope])
+  @@map("breaker_events")
+}
+
+// Immutable hash-chained audit log (F1 scope): proposals, policy decisions,
+// signature checks, executions, breaker events — with correlation IDs.
+model FlywheelAuditEvent {
+  id            String           @id @default(cuid()) @map("id")
+  workspaceId   String           @map("workspace_id")
+  correlationId String           @map("correlation_id")
+  kind          FlywheelAuditKind @map("kind")
+  actor         String           @map("actor")
+  payload       Json             @map("payload")
+  payloadHash   String           @map("payload_hash")
+  prevHash      String           @map("prev_hash")
+  eventHash     String           @map("event_hash")
+  ts            DateTime         @default(now()) @map("ts")
+
+  @@index([workspaceId, ts])
+  @@index([workspaceId, correlationId])
+  @@map("flywheel_audit_events")
+}

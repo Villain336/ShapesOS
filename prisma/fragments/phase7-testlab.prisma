@@ -1,0 +1,73 @@
+// Marketr — Phase 7 F3 Test Lab data model (FRAGMENT).
+//
+// NOT YET MERGED into prisma/schema.prisma (the coordinator merges all
+// Phase 7 fragments, then regenerates the client). lib/flywheel/testlab/store.ts
+// runs against these tables via raw SQL (with a readiness probe) until then;
+// the memory store is the battery/fake twin.
+//
+// Conventions: cuid() ids, @map snake_case columns, workspace isolation on
+// every table, @@map table names. Spec §4 (F3).
+
+model ExperimentIdea {
+  id          String   @id @default(cuid()) @map("id")
+  workspaceId String   @map("workspace_id")
+  title       String   @map("title")
+  sourceSignal String? @map("source_signal") // phase2..6 signal reference
+  pieIceScore Float    @map("pie_ice_score")
+  status      String   @default("queued") @map("status") // queued | promoted | discarded
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([workspaceId, status])
+  @@map("experiment_ideas")
+}
+
+model Experiment {
+  id                 String    @id @default(cuid()) @map("id")
+  workspaceId        String    @map("workspace_id")
+  name               String    @map("name")
+  hypothesis         String    @map("hypothesis") @db.Text
+  pieIceScore        Float     @map("pie_ice_score")
+  channel            String    @map("channel") // web | email | ads | mail
+  variantsJson       Json      @map("variants_json")
+  audience           String    @map("audience")
+  primaryMetric      String    @map("primary_metric")
+  metricType         String    @default("binomial") @map("metric_type") // binomial | gaussian
+  guardrailMetricsJson Json    @default("[]") @map("guardrail_metrics_json")
+  status             String    @default("draft") @map("status") // draft | qa | running | paused | complete | archived
+  profitGuardrailJson Json?    @map("profit_guardrail_json")
+  trafficFloorNote   String?   @map("traffic_floor_note") @db.Text
+  minRuntimeDays     Int       @default(7) @map("min_runtime_days")
+  statedMde          Float     @map("stated_mde")
+  verdict            String?   @map("verdict") // winner | loser | inconclusive | compromised
+  baselineRate       Float     @map("baseline_rate")
+  monthlyTraffic     Float     @map("monthly_traffic")
+  launchedAt         DateTime? @map("launched_at")
+  completedAt        DateTime? @map("completed_at")
+  qaReportJson       Json?     @map("qa_report_json")
+  createdBy          String    @map("created_by")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  results ExperimentResult[]
+
+  @@index([workspaceId, status])
+  @@index([workspaceId, channel])
+  @@map("experiments")
+}
+
+model ExperimentResult {
+  id                String   @id @default(cuid()) @map("id")
+  experimentId      String   @map("experiment_id")
+  experiment        Experiment @relation(fields: [experimentId], references: [id], onDelete: Cascade)
+  statsJson         Json     @map("stats_json") // prob_to_beat, expected_loss, sequential_ci, frequentist_p
+  srmJson           Json     @map("srm_json")    // { status: pass|fail, pValue }
+  guardrailChecksJson Json   @default("[]") @map("guardrail_checks_json")
+  verdict           String?  @map("verdict")
+  archivedToMemory  Boolean  @default(false) @map("archived_to_memory")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  @@unique([experimentId])
+  @@map("experiment_results")
+}

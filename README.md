@@ -1,6 +1,36 @@
 # Marketr
 
-Marketr is the open-source marketing & SEO workspace/OS: keyword research, competitor gap analysis, an AI content engine, rank tracking (including AI Overview presence), site audits with an auto-fix agent, and white-label client reporting for agencies — in one self-serve workspace. Self-host it free with your own API keys, or run the hosted version with data bundled in.
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](./LICENSE)
+[![CI](https://github.com/marketr/marketr/actions/workflows/ci.yml/badge.svg)](./.github/workflows/ci.yml)
+[![Self-host quickstart](https://img.shields.io/badge/self--host-%3C10_min-green)](./docs/quickstart.md)
+
+> **Tagline:** the open-source marketing & SEO workspace/OS — keyword research, competitor gaps, an AI content engine, rank tracking, site audits with an auto-fix agent, and white-label client reporting, in one self-serve workspace.
+
+- **Self-host it free** with your own API keys (DataForSEO, LLM) — or run the hosted version with data bundled in.
+- **Credential-light start:** [get running in under 10 minutes, no API keys needed](./docs/quickstart.md) — everything provider-backed degrades loudly to mock mode.
+- **Agencies:** white-label client reporting; **founders:** one workspace for the whole growth loop.
+- **Launch readiness (internal):** tracked live in the app at `/dashboard/flywheel/launch` — readiness only, no public flip until the open-core split is decided (see [docs/open-core-options.md](./docs/open-core-options.md)).
+
+## Open vs. commercial
+
+| | Open (AGPLv3) | Commercial |
+|---|---|---|
+| Core marketing & SEO workspace | ✓ | ✓ |
+| Self-hosting | ✓ | ✓ |
+| White-label / agency resale | — (see note) | ✓ |
+| Hosted SaaS with bundled data | — | ✓ |
+| SLA & priority support | — | ✓ |
+
+> **Note:** the exact open-vs-commercial boundary is **undecided** — options A–D
+> are staged neutrally in [docs/open-core-options.md](./docs/open-core-options.md)
+> with no recommendation. The table above is the *shape* of the answer, not the
+> answer. Commercial terms: [docs/commercial-license-terms.md](./docs/commercial-license-terms.md) (draft).
+
+## Screenshots
+
+> Staged — 3–5 real-UI screenshots (hero + dashboard + keyword research +
+> content engine + launch tracker) to be captured from a current build before
+> any public launch. No mockups or staged pixels.
 
 Full product spec: [SPEC.md](./SPEC.md)
 

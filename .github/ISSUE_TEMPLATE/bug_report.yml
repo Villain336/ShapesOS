@@ -1,0 +1,59 @@
+name: Bug report
+description: Something is broken
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. **Security issues go to SECURITY.md's private channel, not here.**
+  - type: input
+    id: version
+    attributes:
+      label: Version / commit
+      description: The commit SHA or release tag you ran.
+      placeholder: "e.g. 63c71ce"
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - keywords / SERP
+        - content engine
+        - fix agent
+        - media buying / safety
+        - authority (outreach, PR, listings, AEO, reviews)
+        - flywheel (reallocation, test lab, CTV, DSP)
+        - auth / workspace
+        - self-host / deploy
+        - other
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: Minimal steps. Include workspace role used and whether mock mode was on.
+      placeholder: "1. …\n2. …\n3. …"
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected vs actual
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / screenshots
+      description: Redact secrets, client names, and API keys before pasting.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Verification
+      options:
+        - label: I reproduced this on a clean clone (or explain why not above)
+        - label: I checked existing issues for duplicates
+        - label: No secrets or real client data are included in this report

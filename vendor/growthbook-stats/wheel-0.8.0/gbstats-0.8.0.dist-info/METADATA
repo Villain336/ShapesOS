@@ -1,0 +1,42 @@
+Metadata-Version: 2.1
+Name: gbstats
+Version: 0.8.0
+Summary: Stats engine for GrowthBook, the open source feature flagging and A/B testing platform.
+Home-page: https://github.com/growthbook/growthbook/tree/main/packages/stats
+License: MIT
+Author: Jeremy Dorn
+Author-email: jeremy@growthbook.io
+Requires-Python: >=3.8,<4.0
+Classifier: Development Status :: 2 - Pre-Alpha
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Natural Language :: English
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.8
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Requires-Dist: nbformat (>=5.8.0,<6.0.0)
+Requires-Dist: numpy (>=1.23.4,<2.0.0)
+Requires-Dist: packaging (>=20.0.0)
+Requires-Dist: pandas (>=1.5.1,<2.0.0)
+Requires-Dist: pydantic (>=2.5.3,<3.0.0)
+Requires-Dist: scipy (>=1.9.2,<2.0.0)
+Description-Content-Type: text/markdown
+
+# GrowthBook Stats
+
+The stats engine for GrowthBook, the open source A/B testing platform.
+
+## Installation
+
+```
+pip install gbstats
+```
+
+## Usage
+
+```python
+import gbstats
+```
+

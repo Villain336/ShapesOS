@@ -1,0 +1,45 @@
+name: Feature request
+description: Propose an idea for Marketr
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Feature ideas start as issues. Per CONTRIBUTING.md, substantial features need an
+        approved spec (`SPEC-*.md`) before code. The open-vs-commercial boundary in
+        CONTRIBUTING.md applies — check which side your idea falls on first.
+  - type: input
+    id: summary
+    attributes:
+      label: One-line summary
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What job-to-be-done does this serve? Who is it for (agency, founder, self-hoster)?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: How should it work? Include the money-safety angle if it touches spend, billing, or payouts.
+    validations:
+      required: true
+  - type: dropdown
+    id: side
+    attributes:
+      label: Open or commercial?
+      description: Your read of the open-vs-commercial boundary (maintainers decide).
+      options:
+        - Open (AGPLv3) — core product
+        - Commercial — white-label / SSO / governance / managed
+        - Unsure
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered

@@ -1,0 +1,93 @@
+// Marketr — Phase 7 F5 DSP READINESS track: Prisma fragment.
+//
+// Merged into prisma/schema.prisma by the coordinator's schema-merge step.
+// Do NOT edit prisma/schema.prisma directly (track ownership rule).
+// Conventions: cuid() ids, @map snake_case columns, workspace isolation,
+// @@map table names. Margin ledger is append-only (post-only, never update).
+//
+// HARD CONSTRAINTS this model enforces (SPEC-PHASE7 §9.13, MASTER-PLAN §3.3):
+// - ZERO custody: no table may hold a client payment instrument. dsp_adapters
+//   holds only a config_ref (vault://...) — never credential material, PANs,
+//   or tokens. Contracts and billing sit with the agency/client — never
+//   Marketr. Marketr orchestrates, approves, kill-switches, and accounts.
+// - The margin ledger keeps client-billed spend, platform fees, passthroughs,
+//   and Marketr margin as DISTINCT columns. There is no combined-total
+//   column; the service layer (lib/flywheel/dsp/ledger.ts) refuses any row
+//   where client_billed != platform_fees + passthrough + marketr_margin, so
+//   the margin can never be silently folded into another line.
+// - fee_schedules are versioned (version + effective_from); every
+//   margin_ledger row pins the fee_schedule_version live at the spend period.
+
+enum DspKind {
+  ttd
+  dv360
+  amazon
+  basis
+}
+
+enum DspSeatStatus {
+  none
+  pending
+  connected
+}
+
+// Seat-agnostic DSP adapter: the DSP is a plug-in behind a stable internal
+// interface. v1 ships the model, not the seats — adapters fail closed
+// without a connected agency seat.
+model DspAdapter {
+  id           String        @id @default(cuid()) @map("id")
+  workspaceId  String        @map("workspace_id")
+  dsp          DspKind       @map("dsp")
+  seatStatus   DspSeatStatus @default(none) @map("seat_status")
+  // Vault reference ONLY (vault://...). Never credential material.
+  configRef    String?       @map("config_ref")
+  connectedAt  DateTime?     @map("connected_at")
+  connectedBy  String?       @map("connected_by")
+  createdAt    DateTime      @default(now()) @map("created_at")
+  updatedAt    DateTime      @updatedAt @map("updated_at")
+
+  @@unique([workspaceId, dsp])
+  @@index([workspaceId])
+  @@map("dsp_adapters")
+}
+
+// Versioned fee-schedule registry. fee_lines holds take rates, tech fees,
+// minimums (JSON — versioned atomically with version/effective_from).
+// Margin math is always audited against the schedule live at the spend time.
+model FeeSchedule {
+  id            String   @id @default(cuid()) @map("id")
+  workspaceId   String   @map("workspace_id")
+  dsp           DspKind  @map("dsp")
+  version       Int      @map("version")
+  feeLinesJson  Json     @map("fee_lines_json")
+  effectiveFrom DateTime @map("effective_from")
+  createdBy     String   @map("created_by")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@unique([workspaceId, dsp, version])
+  @@index([workspaceId, dsp, effectiveFrom])
+  @@map("fee_schedules")
+}
+
+// Margin accounting ledger (append-only). Four distinct money lines — never
+// commingled. fee_schedule_version pins the live schedule for the period so
+// margin math is auditable against the schedule that was live then.
+model MarginLedgerRow {
+  id                   String   @id @default(cuid()) @map("id")
+  workspaceId          String   @map("workspace_id")
+  period               String   @map("period") // YYYY-MM
+  dspAdapterId         String   @map("dsp_adapter_id")
+  dsp                  DspKind  @map("dsp")
+  clientBilledCents    Int      @map("client_billed_cents")
+  platformFeesCents    Int      @map("platform_fees_cents")
+  passthroughCents     Int      @map("passthrough_cents")
+  marketrMarginCents   Int      @map("marketr_margin_cents")
+  feeScheduleVersion   Int      @map("fee_schedule_version")
+  note                 String?  @map("note")
+  postedBy             String   @map("posted_by")
+  postedAt             DateTime @default(now()) @map("posted_at")
+
+  @@index([workspaceId, period])
+  @@index([workspaceId, dspAdapterId])
+  @@map("margin_ledger")
+}

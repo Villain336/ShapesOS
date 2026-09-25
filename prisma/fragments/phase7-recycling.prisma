@@ -1,0 +1,85 @@
+// Marketr — Phase 7 F2: creative recycling pipeline, Prisma fragment.
+//
+// Merged into prisma/schema.prisma by the Phase 7 coordinator merge step.
+// Do NOT edit prisma/schema.prisma directly (track ownership rule).
+// Conventions: cuid() ids, @map snake_case columns, workspace isolation,
+// @@map table names.
+//
+// HARD CONSTRAINTS this model reflects (SPEC-PHASE7 §9.9):
+// - The brief status union deliberately has NO "published" state. Routing a
+//   variant into the studio approval flow is a review-queue entry, never a
+//   publish. Regenerated assets re-enter studio approval flows and enter a
+//   buy only through that buy's own Phase 5 per-buy creative-hash binding.
+// - creative_hash_lineage_json is the tamper-evident chain: source entry
+//   commits to the trigger signal, variant entries commit to their
+//   deterministic adaptation specs, regenerated entries carry the studio's
+//   attestation hash of the produced creative bytes.
+
+enum RecyclingBriefStatus {
+  draft
+  approved
+  regenerating
+  ready
+}
+
+enum RecyclingAuditAction {
+  brief_created
+  brief_approved
+  brief_rejected
+  rewrite_proposed
+  variant_routed
+  asset_regenerated
+  publish_blocked
+}
+
+model RecyclingBrief {
+  id          String               @id @default(cuid()) @map("id")
+  workspaceId String               @map("workspace_id")
+  // Opaque source ref, e.g. "content_item:<id>", "tracking_link:<id>",
+  // "mail_campaign:<id>", "aeo:<engine>:<domain>".
+  sourceAssetId String             @map("source_asset_id")
+  sourceChannel String             @map("source_channel")
+  // { kind, signalId, metricValue, metricUnit, observedAt, source }
+  triggerSignalJson Json           @map("trigger_signal_json")
+  targetChannels    String[]       @map("target_channels")
+  // { [channel]: VariantSpec } — aspectRatio, copyDensityCeiling, ctaFormats, notes, rulesVersion
+  variantSpecsJson Json            @map("variant_specs_json")
+  // LineageEntry[] — tamper-evident chain over the brief's creative history
+  creativeHashLineageJson Json     @default("[]") @map("creative_hash_lineage_json")
+  status          RecyclingBriefStatus @default(draft) @map("status")
+  // Set on human approval: routing handle for the studio-approval-flow entries.
+  approvalId      String?          @map("approval_id")
+  // StudioRouteReceipt[] — per-variant routing receipts into studio review.
+  studioRoutingJson Json           @default("[]") @map("studio_routing_json")
+  createdBy       String           @map("created_by")
+  createdAt       DateTime         @default(now()) @map("created_at")
+  updatedAt       DateTime         @updatedAt @map("updated_at")
+
+  events RecyclingBriefEvent[]
+
+  @@index([workspaceId, status])
+  @@index([workspaceId, sourceAssetId])
+  @@map("recycling_briefs")
+}
+
+// Workspace-scoped, append-only, hash-chained audit for brief lifecycle
+// events: creation, approval, rewrite proposals, variant routing,
+// regeneration, and blocked publish attempts.
+// event_hash = sha256(prev_hash || canonical(ts, brief_id, actor, action, payload_hash)).
+model RecyclingBriefEvent {
+  id          String              @id @default(cuid()) @map("id")
+  briefId     String              @map("brief_id")
+  brief       RecyclingBrief      @relation(fields: [briefId], references: [id], onDelete: Cascade)
+  workspaceId String              @map("workspace_id")
+  ts          DateTime            @default(now()) @map("ts")
+  actor       String              @map("actor")
+  action      RecyclingAuditAction @map("action")
+  payloadHash String              @map("payload_hash")
+  prevHash    String              @map("prev_hash")
+  eventHash   String              @map("event_hash")
+  detail      Json?               @map("detail")
+
+  @@index([briefId, ts])
+  @@index([workspaceId, ts])
+  @@map("recycling_brief_events")
+}

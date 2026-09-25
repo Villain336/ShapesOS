@@ -1,0 +1,168 @@
+// Marketr — Phase 7 F4 (CTV/commercials buying path) data models.
+//
+// ASSEMBLY NOTE: this fragment is merged into prisma/schema.prisma by the
+// phase-7 coordinator. It is a fragment — do NOT `prisma generate` against
+// it directly. Validate the assembled schema with `prisma validate`.
+//
+// Table names: ctv_campaigns, ctv_creative_validations, ctv_spots, ctv_ios,
+// ctv_pixels (spec §4, F4 tables). This fragment owns only these five.
+// The `approvalObjectId` scalar references the phase-5 safety track's
+// media_approvals(id); the `qrId`/`purlId` scalars on ctv_spots reference
+// phase-5 tracking_links rows. Relations are scalar-only until the
+// fragments are merged.
+//
+// All rows are workspace-isolated. Money values are integer cents.
+// No key material, no raw credentials — only config refs (see ctv_campaigns
+// vibeConfigRef → Secure Vault). Pixel URLs are signed but carry no PII.
+
+// F4: CTV campaign. platform ∈ vibe | mntn | roku | tatari | tvscientific |
+// seat:ttd | seat:dv360 | seat:amazon | seat:basis. mode ∈ api | concierge.
+// status: draft | pending_vendor_approval | human_placed | live |
+// reconciling | paused | complete | cancelled.
+model CtvCampaign {
+  id          String @id @default(cuid())
+  workspaceId String @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  name     String
+  platform String // "vibe" | "mntn" | "roku" | "tatari" | "tvscientific" | "seat:ttd" | "seat:dv360" | "seat:amazon" | "seat:basis"
+  mode     String @default("concierge") // "api" | "concierge"
+  status   String @default("draft") @map("status")
+
+  // Phase 5 per-buy approval object binding this buy. Every spend action
+  // behind this object; autopilot drafts, never executes.
+  approvalObjectId String? @map("approval_object_id")
+
+  budgetCents    Int? @map("budget_cents")
+  currency       String  @default("USD")
+  flightStart    DateTime? @map("flight_start")
+  flightEnd      DateTime? @map("flight_end")
+  targetingJson  Json? @map("targeting_json")
+  creativeIds    String[] @map("creative_ids")
+  creativeHashes String[] @map("creative_hashes")
+
+  // Vibe adapter binding: external campaign id + advertiser id once created
+  // in Vibe (test-mode campaigns are flagged here, never billed).
+  vibeAdvertiserId String? @map("vibe_advertiser_id")
+  vibeCampaignId   String? @map("vibe_campaign_id")
+  vibeTestMode     Boolean @default(true) @map("vibe_test_mode")
+  vibeConfigRef    String? @map("vibe_config_ref") // vault ref, never raw creds
+
+  createdBy String? @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  spots       CtvSpot[]
+  ios         CtvIo[]
+  pixels      CtvPixel[]
+  validations CtvCreativeValidation[]
+
+  @@index([workspaceId, status])
+  @@map("ctv_campaigns")
+}
+
+// F4: ffprobe creative validation result. Blocks submission of
+// non-compliant creative. ffprobeJson is the raw parsed probe; checks are
+// the named pass/fail list; publisherRulesVersion pins the publisher table.
+model CtvCreativeValidation {
+  id          String @id @default(cuid())
+  workspaceId String @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  campaignId String? @map("campaign_id")
+  campaign   CtvCampaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  creativeId String @map("creative_id") // file-asset id or content hash
+  creativeSha256 String? @map("creative_sha256")
+
+  ffprobeJson Json @map("ffprobe_json")
+  pass        Boolean
+  checks      Json // [{ name, passed, detail }]
+  durationSeconds Float? @map("duration_seconds")
+  publisher   String? // publisher the rules were evaluated against
+  publisherRulesVersion String @map("publisher_rules_version")
+
+  validatedBy String? @map("validated_by")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([workspaceId, creativeId])
+  @@map("ctv_creative_validations")
+}
+
+// F4: per-spot QR/pURL assignment. One dynamic QR + pURL per placement
+// (show genre, daypart, demo). qrId/purlId reference phase-5 tracking_links.
+model CtvSpot {
+  id          String @id @default(cuid())
+  workspaceId String @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  campaignId String @map("campaign_id")
+  campaign   CtvCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  placementLabel String @map("placement_label")
+  showGenre      String? @map("show_genre")
+  daypart        String? @map("daypart")
+  demo           String? @map("demo")
+  creativeId     String? @map("creative_id")
+
+  qrId   String? @map("qr_id")   // phase-5 tracking_links(id)
+  purlId String? @map("purl_id") // phase-5 tracking_links(id)
+  qrSvg  String? @map("qr_svg")  // rendered couch-distance QR (SVG)
+
+  flightFrom DateTime? @map("flight_from")
+  flightTo   DateTime? @map("flight_to")
+  status     String @default("active") // "active" | "ended"
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([workspaceId, campaignId])
+  @@map("ctv_spots")
+}
+
+// F4: concierge IO. state: draft | pending_vendor_approval | human_placed |
+// live | reconciling | cancelled. IO payload carries the IO document +
+// creative brief generated by Marketr; the human places the buy in the
+// vendor UI. Alert-only: Marketr cannot pause these buys.
+model CtvIo {
+  id          String @id @default(cuid())
+  workspaceId String @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  campaignId String @map("campaign_id")
+  campaign   CtvCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  vendor String // "mntn" | "roku" | "tatari" | "tvscientific"
+  ioPayload Json @map("io_payload") // IO doc + creative brief (generated)
+  state     String @default("draft") @map("state")
+  placedBy  String? @map("placed_by")
+  placedAt  DateTime? @map("placed_at")
+  vendorConfirmation String? @map("vendor_confirmation") // human-entered confirmation ref
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([workspaceId, campaignId])
+  @@map("ctv_ios")
+}
+
+// F4: impression-pixel hosting. pixelUrl is a signed Marketr-hosted 1x1
+// pixel; impressions log to the local ledger (never a third party).
+model CtvPixel {
+  id          String @id @default(cuid())
+  workspaceId String @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  campaignId String @map("campaign_id")
+  campaign   CtvCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  pixelUrl String @map("pixel_url") // signed Marketr-hosted pixel URL
+  pixelToken String @map("pixel_token") // HMAC of campaign id
+  viewThroughWindowDays Int @default(14) @map("view_through_window_days")
+  impressionsCount Int @default(0) @map("impressions_count")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([pixelToken])
+  @@map("ctv_pixels")
+}

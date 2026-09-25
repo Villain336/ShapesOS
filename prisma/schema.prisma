@@ -338,6 +338,14 @@ model Workspace {
   pipelines              Pipeline[]
   leads                  Lead[]
   leadActivities         LeadActivity[]
+  // Phase 7 (F4/F6): flywheel back-relations for fragment models with
+  // explicit Workspace relations (CTV track + launch checklist).
+  ctvCampaigns           CtvCampaign[]
+  ctvCreativeValidations CtvCreativeValidation[]
+  ctvSpots               CtvSpot[]
+  ctvIos                 CtvIo[]
+  ctvPixels              CtvPixel[]
+  launchChecklists       LaunchChecklist[]
   leadCaptureForms       LeadCaptureForm[]
   // Phase 2 (C2): revenue attribution back-relations.
   attributionTouches     AttributionTouch[]
@@ -5479,4 +5487,728 @@ model IntelligenceReport {
 
   @@index([workspaceId, status])
   @@map("intelligence_reports")
+}
+
+// ============================================================
+// Phase 7 F-track fragment: reallocation (merged by coordinator, 2026-09-25)
+// ============================================================
+// Marketr — Phase 7 F1 REALLOCATION track: Prisma fragment.
+//
+// Merged into prisma/schema.prisma by the coordinator's schema-merge step.
+// Do NOT edit prisma/schema.prisma directly (track ownership rule).
+// Conventions: cuid() ids, @map snake_case columns, workspace isolation,
+// @@map table names. Money in integer cents. Audit-adjacent tables are
+// append-only; state changes go through the lib state machines.
+//
+// HARD CONSTRAINTS this model supports:
+// - §9.1/§9.2: every dollar human-signed; the SRA is a pool-cap object with
+//   mandatory ≤30d expiry, never standing authority.
+// - §9.3: three-plane separation — proposals, policy decisions, and
+//   executions are distinct rows; the optimizer cannot write executions.
+
+enum ReallocationMode {
+  a
+  b
+}
+
+enum ProposalStatus {
+  proposed
+  policy_approved
+  policy_denied
+  human_approved
+  executed
+  rejected
+}
+
+enum SraStatus {
+  active
+  revoked
+  expired
+}
+
+enum PolicyDecisionKind {
+  allow
+  deny
+}
+
+enum CurveType {
+  hill
+  power
+  loglog
+}
+
+enum BreakerType {
+  performance
+  velocity
+  measurement
+  error_rate
+  attribution_regime
+}
+
+enum FlywheelAuditKind {
+  proposal_created
+  proposal_status
+  policy_decision
+  sra_created
+  sra_revoked
+  sra_expired
+  execution
+  execution_halted
+  breaker_fired
+  breaker_acknowledged
+  run_completed
+  approval_materialized
+}
+
+// Human-signed bounded envelope: channel allowlist, caps, band, cool-down,
+// mandatory expiry, instant revocation. Pre-signed for a window, not perpetual.
+model SraEnvelope {
+  id                     String    @id @default(cuid()) @map("id")
+  workspaceId            String    @map("workspace_id")
+  name                   String    @map("name")
+  channels               Json      @map("channels") // string[] allowlist — explicit only
+  perShiftCapCents       Int       @map("per_shift_cap_cents")
+  dailyAggregateCapCents Int       @map("daily_aggregate_cap_cents")
+  weeklyAggregateCapCents Int      @map("weekly_aggregate_cap_cents")
+  perChannelBandPct      Float     @map("per_channel_band_pct")
+  explorationFloorPct    Float     @map("exploration_floor_pct")
+  cooldownHours          Int       @map("cooldown_hours")
+  validFrom              DateTime  @map("valid_from")
+  validUntil             DateTime  @map("valid_until") // mandatory expiry ≤30d
+  revocationId           String    @unique @map("revocation_id")
+  status                 SraStatus @default(active) @map("status")
+  signerIds              Json      @map("signer_ids") // string[] — 2 required for ≥$1k cumulative
+  signatureHash          String    @map("signature_hash")
+  createdBy              String    @map("created_by")
+  createdAt              DateTime  @default(now()) @map("created_at")
+  revokedAt              DateTime? @map("revoked_at")
+  revokedBy              String?   @map("revoked_by")
+
+  proposals ReallocationProposal[]
+
+  @@index([workspaceId, status])
+  @@map("sra_envelopes")
+}
+
+// Optimizer output with the full decision record (data window, curve
+// params, R², model version) — the audit answer for every shift.
+model ReallocationProposal {
+  id                String         @id @default(cuid()) @map("id")
+  workspaceId       String         @map("workspace_id")
+  mode              ReallocationMode @map("mode")
+  sraId             String?        @map("sra_id")
+  sra               SraEnvelope?   @relation(fields: [sraId], references: [id])
+  sourceChannel     String         @map("source_channel")
+  destChannel       String         @map("dest_channel")
+  sourceCampaignRef String         @map("source_campaign_ref")
+  destCampaignRef   String         @map("dest_campaign_ref")
+  amountCents       Int            @map("amount_cents")
+  marginalRoasDelta Float          @map("marginal_roas_delta")
+  decisionRecord    Json           @map("decision_record")
+  status            ProposalStatus @default(proposed) @map("status")
+  humanApprovalId   String?        @map("human_approval_id") // Phase 5 MediaApproval id (mode a)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  decisions PolicyDecision[]
+
+  @@index([workspaceId, status])
+  @@index([workspaceId, sraId])
+  @@map("reallocation_proposals")
+}
+
+// Every policy decision, allow AND deny — denials carry investigative value.
+model PolicyDecision {
+  id                 String            @id @default(cuid()) @map("id")
+  proposalId         String            @map("proposal_id")
+  proposal           ReallocationProposal @relation(fields: [proposalId], references: [id])
+  workspaceId        String            @map("workspace_id")
+  decision           PolicyDecisionKind @map("decision")
+  reasons            Json              @map("reasons") // string[]
+  sraId              String?           @map("sra_id")
+  revocationCheckedAt DateTime        @map("revocation_checked_at")
+
+  @@index([proposalId])
+  @@map("policy_decisions")
+}
+
+// Fitted diminishing-returns curves per channel (best of hill/power/loglog
+// by R²), with adstock + seasonality and optional holdout calibration.
+model MarginalCurve {
+  id                    String    @id @default(cuid()) @map("id")
+  workspaceId           String    @map("workspace_id")
+  channel               String    @map("channel")
+  curveType             CurveType @map("curve_type")
+  params                Json      @map("params")
+  adstock               Json      @map("adstock")
+  seasonality           Json      @map("seasonality") // number[7]
+  rSquared              Float     @map("r_squared")
+  dataWindow            String    @map("data_window")
+  iroasCalibrationFactor Float?   @map("iroas_calibration_factor")
+  fittedAt              DateTime  @default(now()) @map("fitted_at")
+  modelVersion          String    @map("model_version")
+
+  @@index([workspaceId, channel])
+  @@map("marginal_curves")
+}
+
+// Per-channel learning-viable floors: below ~10× target CPA/day campaigns
+// can't exit learning — the optimizer would optimize noise.
+model ChannelFloor {
+  workspaceId                String @map("workspace_id")
+  channel                    String @map("channel")
+  learningViableMinCentsDay  Int    @map("learning_viable_min_cents_day")
+  stabilizationHours         Int    @map("stabilization_hours")
+
+  @@id([workspaceId, channel])
+  @@map("channel_floors")
+}
+
+// Optimizer run summary: proposals, executions, denials, freeze state.
+model ReallocationRun {
+  id               String  @id @default(cuid()) @map("id")
+  workspaceId      String  @map("workspace_id")
+  runAt            DateTime @default(now()) @map("run_at")
+  mode             ReallocationMode @map("mode")
+  proposalsCount   Int     @map("proposals_count")
+  executedCount    Int     @map("executed_count")
+  deniedCount      Int     @map("denied_count")
+  frozen           Boolean @default(false) @map("frozen")
+  dataHealthSnapshot Json  @map("data_health_snapshot")
+
+  @@index([workspaceId, runAt])
+  @@map("reallocation_runs")
+}
+
+// Breaker events: one-way ratchets — pause/freeze only, never authorize.
+// Resume needs human acknowledgment + mandatory cool-down.
+model BreakerEvent {
+  id             String      @id @default(cuid()) @map("id")
+  workspaceId    String      @map("workspace_id")
+  breakerType    BreakerType @map("breaker_type")
+  scope          String      @map("scope") // channel ref or "global"
+  reason         String      @map("reason")
+  firedAt        DateTime    @default(now()) @map("fired_at")
+  acknowledgedBy String?     @map("acknowledged_by")
+  acknowledgedAt DateTime?   @map("acknowledged_at")
+  cooldownUntil  DateTime    @map("cooldown_until")
+
+  @@index([workspaceId, breakerType])
+  @@index([workspaceId, scope])
+  @@map("breaker_events")
+}
+
+// Immutable hash-chained audit log (F1 scope): proposals, policy decisions,
+// signature checks, executions, breaker events — with correlation IDs.
+model FlywheelAuditEvent {
+  id            String           @id @default(cuid()) @map("id")
+  workspaceId   String           @map("workspace_id")
+  correlationId String           @map("correlation_id")
+  kind          FlywheelAuditKind @map("kind")
+  actor         String           @map("actor")
+  payload       Json             @map("payload")
+  payloadHash   String           @map("payload_hash")
+  prevHash      String           @map("prev_hash")
+  eventHash     String           @map("event_hash")
+  ts            DateTime         @default(now()) @map("ts")
+
+  @@index([workspaceId, ts])
+  @@index([workspaceId, correlationId])
+  @@map("flywheel_audit_events")
+}
+
+// ============================================================
+// Phase 7 F-track fragment: recycling (merged by coordinator, 2026-09-25)
+// ============================================================
+// Marketr — Phase 7 F2: creative recycling pipeline, Prisma fragment.
+//
+// Merged into prisma/schema.prisma by the Phase 7 coordinator merge step.
+// Do NOT edit prisma/schema.prisma directly (track ownership rule).
+// Conventions: cuid() ids, @map snake_case columns, workspace isolation,
+// @@map table names.
+//
+// HARD CONSTRAINTS this model reflects (SPEC-PHASE7 §9.9):
+// - The brief status union deliberately has NO "published" state. Routing a
+//   variant into the studio approval flow is a review-queue entry, never a
+//   publish. Regenerated assets re-enter studio approval flows and enter a
+//   buy only through that buy's own Phase 5 per-buy creative-hash binding.
+// - creative_hash_lineage_json is the tamper-evident chain: source entry
+//   commits to the trigger signal, variant entries commit to their
+//   deterministic adaptation specs, regenerated entries carry the studio's
+//   attestation hash of the produced creative bytes.
+
+enum RecyclingBriefStatus {
+  draft
+  approved
+  regenerating
+  ready
+}
+
+enum RecyclingAuditAction {
+  brief_created
+  brief_approved
+  brief_rejected
+  rewrite_proposed
+  variant_routed
+  asset_regenerated
+  publish_blocked
+}
+
+model RecyclingBrief {
+  id          String               @id @default(cuid()) @map("id")
+  workspaceId String               @map("workspace_id")
+  // Opaque source ref, e.g. "content_item:<id>", "tracking_link:<id>",
+  // "mail_campaign:<id>", "aeo:<engine>:<domain>".
+  sourceAssetId String             @map("source_asset_id")
+  sourceChannel String             @map("source_channel")
+  // { kind, signalId, metricValue, metricUnit, observedAt, source }
+  triggerSignalJson Json           @map("trigger_signal_json")
+  targetChannels    String[]       @map("target_channels")
+  // { [channel]: VariantSpec } — aspectRatio, copyDensityCeiling, ctaFormats, notes, rulesVersion
+  variantSpecsJson Json            @map("variant_specs_json")
+  // LineageEntry[] — tamper-evident chain over the brief's creative history
+  creativeHashLineageJson Json     @default("[]") @map("creative_hash_lineage_json")
+  status          RecyclingBriefStatus @default(draft) @map("status")
+  // Set on human approval: routing handle for the studio-approval-flow entries.
+  approvalId      String?          @map("approval_id")
+  // StudioRouteReceipt[] — per-variant routing receipts into studio review.
+  studioRoutingJson Json           @default("[]") @map("studio_routing_json")
+  createdBy       String           @map("created_by")
+  createdAt       DateTime         @default(now()) @map("created_at")
+  updatedAt       DateTime         @updatedAt @map("updated_at")
+
+  events RecyclingBriefEvent[]
+
+  @@index([workspaceId, status])
+  @@index([workspaceId, sourceAssetId])
+  @@map("recycling_briefs")
+}
+
+// Workspace-scoped, append-only, hash-chained audit for brief lifecycle
+// events: creation, approval, rewrite proposals, variant routing,
+// regeneration, and blocked publish attempts.
+// event_hash = sha256(prev_hash || canonical(ts, brief_id, actor, action, payload_hash)).
+model RecyclingBriefEvent {
+  id          String              @id @default(cuid()) @map("id")
+  briefId     String              @map("brief_id")
+  brief       RecyclingBrief      @relation(fields: [briefId], references: [id], onDelete: Cascade)
+  workspaceId String              @map("workspace_id")
+  ts          DateTime            @default(now()) @map("ts")
+  actor       String              @map("actor")
+  action      RecyclingAuditAction @map("action")
+  payloadHash String              @map("payload_hash")
+  prevHash    String              @map("prev_hash")
+  eventHash   String              @map("event_hash")
+  detail      Json?               @map("detail")
+
+  @@index([briefId, ts])
+  @@index([workspaceId, ts])
+  @@map("recycling_brief_events")
+}
+
+// ============================================================
+// Phase 7 F-track fragment: testlab (merged by coordinator, 2026-09-25)
+// ============================================================
+// Marketr — Phase 7 F3 Test Lab data model (FRAGMENT).
+//
+// NOT YET MERGED into prisma/schema.prisma (the coordinator merges all
+// Phase 7 fragments, then regenerates the client). lib/flywheel/testlab/store.ts
+// runs against these tables via raw SQL (with a readiness probe) until then;
+// the memory store is the battery/fake twin.
+//
+// Conventions: cuid() ids, @map snake_case columns, workspace isolation on
+// every table, @@map table names. Spec §4 (F3).
+
+model ExperimentIdea {
+  id          String   @id @default(cuid()) @map("id")
+  workspaceId String   @map("workspace_id")
+  title       String   @map("title")
+  sourceSignal String? @map("source_signal") // phase2..6 signal reference
+  pieIceScore Float    @map("pie_ice_score")
+  status      String   @default("queued") @map("status") // queued | promoted | discarded
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([workspaceId, status])
+  @@map("experiment_ideas")
+}
+
+model Experiment {
+  id                 String    @id @default(cuid()) @map("id")
+  workspaceId        String    @map("workspace_id")
+  name               String    @map("name")
+  hypothesis         String    @map("hypothesis") @db.Text
+  pieIceScore        Float     @map("pie_ice_score")
+  channel            String    @map("channel") // web | email | ads | mail
+  variantsJson       Json      @map("variants_json")
+  audience           String    @map("audience")
+  primaryMetric      String    @map("primary_metric")
+  metricType         String    @default("binomial") @map("metric_type") // binomial | gaussian
+  guardrailMetricsJson Json    @default("[]") @map("guardrail_metrics_json")
+  status             String    @default("draft") @map("status") // draft | qa | running | paused | complete | archived
+  profitGuardrailJson Json?    @map("profit_guardrail_json")
+  trafficFloorNote   String?   @map("traffic_floor_note") @db.Text
+  minRuntimeDays     Int       @default(7) @map("min_runtime_days")
+  statedMde          Float     @map("stated_mde")
+  verdict            String?   @map("verdict") // winner | loser | inconclusive | compromised
+  baselineRate       Float     @map("baseline_rate")
+  monthlyTraffic     Float     @map("monthly_traffic")
+  launchedAt         DateTime? @map("launched_at")
+  completedAt        DateTime? @map("completed_at")
+  qaReportJson       Json?     @map("qa_report_json")
+  createdBy          String    @map("created_by")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  results ExperimentResult[]
+
+  @@index([workspaceId, status])
+  @@index([workspaceId, channel])
+  @@map("experiments")
+}
+
+model ExperimentResult {
+  id                String   @id @default(cuid()) @map("id")
+  experimentId      String   @map("experiment_id")
+  experiment        Experiment @relation(fields: [experimentId], references: [id], onDelete: Cascade)
+  statsJson         Json     @map("stats_json") // prob_to_beat, expected_loss, sequential_ci, frequentist_p
+  srmJson           Json     @map("srm_json")    // { status: pass|fail, pValue }
+  guardrailChecksJson Json   @default("[]") @map("guardrail_checks_json")
+  verdict           String?  @map("verdict")
+  archivedToMemory  Boolean  @default(false) @map("archived_to_memory")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  @@unique([experimentId])
+  @@map("experiment_results")
+}
+
+// ============================================================
+// Phase 7 F-track fragment: ctv (merged by coordinator, 2026-09-25)
+// ============================================================
+// Marketr — Phase 7 F4 (CTV/commercials buying path) data models.
+//
+// ASSEMBLY NOTE: this fragment is merged into prisma/schema.prisma by the
+// phase-7 coordinator. It is a fragment — do NOT `prisma generate` against
+// it directly. Validate the assembled schema with `prisma validate`.
+//
+// Table names: ctv_campaigns, ctv_creative_validations, ctv_spots, ctv_ios,
+// ctv_pixels (spec §4, F4 tables). This fragment owns only these five.
+// The `approvalObjectId` scalar references the phase-5 safety track's
+// media_approvals(id); the `qrId`/`purlId` scalars on ctv_spots reference
+// phase-5 tracking_links rows. Relations are scalar-only until the
+// fragments are merged.
+//
+// All rows are workspace-isolated. Money values are integer cents.
+// No key material, no raw credentials — only config refs (see ctv_campaigns
+// vibeConfigRef → Secure Vault). Pixel URLs are signed but carry no PII.
+
+// F4: CTV campaign. platform ∈ vibe | mntn | roku | tatari | tvscientific |
+// seat:ttd | seat:dv360 | seat:amazon | seat:basis. mode ∈ api | concierge.
+// status: draft | pending_vendor_approval | human_placed | live |
+// reconciling | paused | complete | cancelled.
+model CtvCampaign {
+  id          String @id @default(cuid())
+  workspaceId String @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  name     String
+  platform String // "vibe" | "mntn" | "roku" | "tatari" | "tvscientific" | "seat:ttd" | "seat:dv360" | "seat:amazon" | "seat:basis"
+  mode     String @default("concierge") // "api" | "concierge"
+  status   String @default("draft") @map("status")
+
+  // Phase 5 per-buy approval object binding this buy. Every spend action
+  // behind this object; autopilot drafts, never executes.
+  approvalObjectId String? @map("approval_object_id")
+
+  budgetCents    Int? @map("budget_cents")
+  currency       String  @default("USD")
+  flightStart    DateTime? @map("flight_start")
+  flightEnd      DateTime? @map("flight_end")
+  targetingJson  Json? @map("targeting_json")
+  creativeIds    String[] @map("creative_ids")
+  creativeHashes String[] @map("creative_hashes")
+
+  // Vibe adapter binding: external campaign id + advertiser id once created
+  // in Vibe (test-mode campaigns are flagged here, never billed).
+  vibeAdvertiserId String? @map("vibe_advertiser_id")
+  vibeCampaignId   String? @map("vibe_campaign_id")
+  vibeTestMode     Boolean @default(true) @map("vibe_test_mode")
+  vibeConfigRef    String? @map("vibe_config_ref") // vault ref, never raw creds
+
+  createdBy String? @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  spots       CtvSpot[]
+  ios         CtvIo[]
+  pixels      CtvPixel[]
+  validations CtvCreativeValidation[]
+
+  @@index([workspaceId, status])
+  @@map("ctv_campaigns")
+}
+
+// F4: ffprobe creative validation result. Blocks submission of
+// non-compliant creative. ffprobeJson is the raw parsed probe; checks are
+// the named pass/fail list; publisherRulesVersion pins the publisher table.
+model CtvCreativeValidation {
+  id          String @id @default(cuid())
+  workspaceId String @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  campaignId String? @map("campaign_id")
+  campaign   CtvCampaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  creativeId String @map("creative_id") // file-asset id or content hash
+  creativeSha256 String? @map("creative_sha256")
+
+  ffprobeJson Json @map("ffprobe_json")
+  pass        Boolean
+  checks      Json // [{ name, passed, detail }]
+  durationSeconds Float? @map("duration_seconds")
+  publisher   String? // publisher the rules were evaluated against
+  publisherRulesVersion String @map("publisher_rules_version")
+
+  validatedBy String? @map("validated_by")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([workspaceId, creativeId])
+  @@map("ctv_creative_validations")
+}
+
+// F4: per-spot QR/pURL assignment. One dynamic QR + pURL per placement
+// (show genre, daypart, demo). qrId/purlId reference phase-5 tracking_links.
+model CtvSpot {
+  id          String @id @default(cuid())
+  workspaceId String @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  campaignId String @map("campaign_id")
+  campaign   CtvCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  placementLabel String @map("placement_label")
+  showGenre      String? @map("show_genre")
+  daypart        String? @map("daypart")
+  demo           String? @map("demo")
+  creativeId     String? @map("creative_id")
+
+  qrId   String? @map("qr_id")   // phase-5 tracking_links(id)
+  purlId String? @map("purl_id") // phase-5 tracking_links(id)
+  qrSvg  String? @map("qr_svg")  // rendered couch-distance QR (SVG)
+
+  flightFrom DateTime? @map("flight_from")
+  flightTo   DateTime? @map("flight_to")
+  status     String @default("active") // "active" | "ended"
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([workspaceId, campaignId])
+  @@map("ctv_spots")
+}
+
+// F4: concierge IO. state: draft | pending_vendor_approval | human_placed |
+// live | reconciling | cancelled. IO payload carries the IO document +
+// creative brief generated by Marketr; the human places the buy in the
+// vendor UI. Alert-only: Marketr cannot pause these buys.
+model CtvIo {
+  id          String @id @default(cuid())
+  workspaceId String @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  campaignId String @map("campaign_id")
+  campaign   CtvCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  vendor String // "mntn" | "roku" | "tatari" | "tvscientific"
+  ioPayload Json @map("io_payload") // IO doc + creative brief (generated)
+  state     String @default("draft") @map("state")
+  placedBy  String? @map("placed_by")
+  placedAt  DateTime? @map("placed_at")
+  vendorConfirmation String? @map("vendor_confirmation") // human-entered confirmation ref
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([workspaceId, campaignId])
+  @@map("ctv_ios")
+}
+
+// F4: impression-pixel hosting. pixelUrl is a signed Marketr-hosted 1x1
+// pixel; impressions log to the local ledger (never a third party).
+model CtvPixel {
+  id          String @id @default(cuid())
+  workspaceId String @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  campaignId String @map("campaign_id")
+  campaign   CtvCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  pixelUrl String @map("pixel_url") // signed Marketr-hosted pixel URL
+  pixelToken String @map("pixel_token") // HMAC of campaign id
+  viewThroughWindowDays Int @default(14) @map("view_through_window_days")
+  impressionsCount Int @default(0) @map("impressions_count")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([pixelToken])
+  @@map("ctv_pixels")
+}
+
+// ============================================================
+// Phase 7 F-track fragment: dsp (merged by coordinator, 2026-09-25)
+// ============================================================
+// Marketr — Phase 7 F5 DSP READINESS track: Prisma fragment.
+//
+// Merged into prisma/schema.prisma by the coordinator's schema-merge step.
+// Do NOT edit prisma/schema.prisma directly (track ownership rule).
+// Conventions: cuid() ids, @map snake_case columns, workspace isolation,
+// @@map table names. Margin ledger is append-only (post-only, never update).
+//
+// HARD CONSTRAINTS this model enforces (SPEC-PHASE7 §9.13, MASTER-PLAN §3.3):
+// - ZERO custody: no table may hold a client payment instrument. dsp_adapters
+//   holds only a config_ref (vault://...) — never credential material, PANs,
+//   or tokens. Contracts and billing sit with the agency/client — never
+//   Marketr. Marketr orchestrates, approves, kill-switches, and accounts.
+// - The margin ledger keeps client-billed spend, platform fees, passthroughs,
+//   and Marketr margin as DISTINCT columns. There is no combined-total
+//   column; the service layer (lib/flywheel/dsp/ledger.ts) refuses any row
+//   where client_billed != platform_fees + passthrough + marketr_margin, so
+//   the margin can never be silently folded into another line.
+// - fee_schedules are versioned (version + effective_from); every
+//   margin_ledger row pins the fee_schedule_version live at the spend period.
+
+enum DspKind {
+  ttd
+  dv360
+  amazon
+  basis
+}
+
+enum DspSeatStatus {
+  none
+  pending
+  connected
+}
+
+// Seat-agnostic DSP adapter: the DSP is a plug-in behind a stable internal
+// interface. v1 ships the model, not the seats — adapters fail closed
+// without a connected agency seat.
+model DspAdapter {
+  id           String        @id @default(cuid()) @map("id")
+  workspaceId  String        @map("workspace_id")
+  dsp          DspKind       @map("dsp")
+  seatStatus   DspSeatStatus @default(none) @map("seat_status")
+  // Vault reference ONLY (vault://...). Never credential material.
+  configRef    String?       @map("config_ref")
+  connectedAt  DateTime?     @map("connected_at")
+  connectedBy  String?       @map("connected_by")
+  createdAt    DateTime      @default(now()) @map("created_at")
+  updatedAt    DateTime      @updatedAt @map("updated_at")
+
+  @@unique([workspaceId, dsp])
+  @@index([workspaceId])
+  @@map("dsp_adapters")
+}
+
+// Versioned fee-schedule registry. fee_lines holds take rates, tech fees,
+// minimums (JSON — versioned atomically with version/effective_from).
+// Margin math is always audited against the schedule live at the spend time.
+model FeeSchedule {
+  id            String   @id @default(cuid()) @map("id")
+  workspaceId   String   @map("workspace_id")
+  dsp           DspKind  @map("dsp")
+  version       Int      @map("version")
+  feeLinesJson  Json     @map("fee_lines_json")
+  effectiveFrom DateTime @map("effective_from")
+  createdBy     String   @map("created_by")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@unique([workspaceId, dsp, version])
+  @@index([workspaceId, dsp, effectiveFrom])
+  @@map("fee_schedules")
+}
+
+// Margin accounting ledger (append-only). Four distinct money lines — never
+// commingled. fee_schedule_version pins the live schedule for the period so
+// margin math is auditable against the schedule that was live then.
+model MarginLedgerRow {
+  id                   String   @id @default(cuid()) @map("id")
+  workspaceId          String   @map("workspace_id")
+  period               String   @map("period") // YYYY-MM
+  dspAdapterId         String   @map("dsp_adapter_id")
+  dsp                  DspKind  @map("dsp")
+  clientBilledCents    Int      @map("client_billed_cents")
+  platformFeesCents    Int      @map("platform_fees_cents")
+  passthroughCents     Int      @map("passthrough_cents")
+  marketrMarginCents   Int      @map("marketr_margin_cents")
+  feeScheduleVersion   Int      @map("fee_schedule_version")
+  note                 String?  @map("note")
+  postedBy             String   @map("posted_by")
+  postedAt             DateTime @default(now()) @map("posted_at")
+
+  @@index([workspaceId, period])
+  @@index([workspaceId, dspAdapterId])
+  @@map("margin_ledger")
+}
+
+// ============================================================
+// Phase 7 F-track fragment: launch (merged by coordinator, 2026-09-25)
+// ============================================================
+// Marketr — Phase 7 launch-readiness track (F6) data models.
+//
+// ASSEMBLY NOTE: this fragment is merged into prisma/schema.prisma by the
+// phase-7 coordinator. It is a fragment — do NOT `prisma generate` against
+// it directly. Validate the assembled schema with `prisma validate`.
+//
+// This fragment owns: launch_checklist.
+//
+// The checklist rows are seeded from the canonical catalog in
+// lib/flywheel/launch/catalog.ts (the spec §F6 item list). Each row tracks
+// one readiness item: its category (security|legal|community|build), its
+// status, an evidence URL proving completion, and when it completed.
+//
+// All rows are workspace-isolated. No secrets, no PII, no credentials —
+// evidence URLs only. The launch_checklist table itself is workspace-
+// isolated per the F6 hard constraint.
+//
+// SPEC: SPEC-PHASE7.md §2/F6, §4 (launch_checklist), §5 (routes), §10 (exit
+// gate 9). The open-core split is DEFERRED — this table tracks readiness
+// only; no public-flip state lives here.
+
+model LaunchChecklist {
+  id          String @id @default(cuid())
+  workspaceId String @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  // Stable catalog key (e.g. "secret-history-scan") from
+  // lib/flywheel/launch/catalog.ts. Unique per workspace so re-seeding is
+  // idempotent.
+  key String @map("key")
+
+  // Human-readable item title (denormalized from the catalog at seed time
+  // so history survives catalog edits).
+  item String @map("item")
+
+  // security | legal | community | build
+  category String @map("category")
+
+  // pending | in_progress | complete
+  status String @map("status") @default("pending")
+
+  // Proof of completion (commit link, doc path, CI run URL). Nullable until
+  // complete.
+  evidenceUrl String? @map("evidence_url")
+
+  // Optional operator note (e.g. why an item is N/A, rotation ticket ref).
+  note String? @map("note")
+
+  completedAt DateTime? @map("completed_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@unique([workspaceId, key])
+  @@index([workspaceId, category])
+  @@index([workspaceId, status])
+  @@map("launch_checklist")
 }

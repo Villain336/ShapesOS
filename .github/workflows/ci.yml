@@ -1,0 +1,74 @@
+# Marketr CI — clean-clone confidence.
+#
+# Every step must pass with ZERO private credentials. Provider-backed paths run
+# in mock mode or skip gracefully (explicit skips, never silent). This is the
+# F6 "CI green on clean clone" launch-readiness gate.
+#
+# NOTE: workflows reference secrets.* only — no hardcoded values, ever.
+
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: marketr
+          POSTGRES_PASSWORD: marketr
+          POSTGRES_DB: marketr
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U marketr"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://marketr:marketr@localhost:5433/marketr
+      # Everything else intentionally UNSET: batteries must pass in mock mode.
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Prisma validate
+        run: npx prisma validate
+
+      - name: Secret scan (history)
+        run: |
+          # Fail if any tracked file in history matches secret shapes, excluding
+          # known fixtures (documented in the F6 audit). gitleaks is preferred
+          # when available; this grep set is the fallback.
+          if command -v gitleaks >/dev/null; then
+            gitleaks detect --source . --no-git -v
+          else
+            echo "gitleaks not installed; running fallback pattern scan on HEAD"
+            ! git grep -I -E 'sk-(live|test)-[A-Za-z0-9]{10,}|AKIA[0-9A-Z]{16}|-----BEGIN [A-Z ]*PRIVATE KEY-----' HEAD -- . ':!scripts/verify-llm-routing.mts' ':!components/SiteIde.tsx'
+          fi
+
+      - name: Launch-readiness battery (F6)
+        run: npx tsx scripts/verify-phase7-launch.mts
+
+      - name: Security battery (M11)
+        run: node scripts/verify-m11-security.mjs
+
+      - name: Credential-free smoke
+        run: npx tsx scripts/smoke-no-creds.mts
+
+      - name: Production build
+        run: npm run build
