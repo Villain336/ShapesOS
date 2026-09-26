@@ -35,9 +35,20 @@ import {
   assetCounts,
 } from "../lib/intelligence/corpus/store";
 import type { CorpusManifest, CorpusSourceRecord } from "../lib/intelligence/corpus/types";
+import { listRemovals } from "../lib/intelligence/corpus/proposals";
 
 const dryRun = process.argv.includes("--dry-run");
 const TODAY = new Date().toISOString().slice(0, 10);
+
+// Removal flags honored by the Knowledge Brain UI (data/corpus/removals.json).
+// Flagged sources are excluded from the build, never silently deleted.
+const removalFlags = (() => {
+  try {
+    return listRemovals();
+  } catch {
+    return {};
+  }
+})();
 
 function pad(s: string, n: number): string {
   return s.length >= n ? s.slice(0, n) : s + " ".repeat(n - s.length);
@@ -64,6 +75,24 @@ async function main(): Promise<void> {
   }
 
   for (const def of SEED_SOURCES) {
+    // Removal flags (data/corpus/removals.json, set from the Knowledge Brain
+    // UI): a flagged source is NOT ingested — recorded pending with the flag
+    // reason. Ingested data is never silently deleted; the flag simply
+    // excludes the source from this build.
+    const removal = removalFlags[def.id];
+    if (removal) {
+      records.push({
+        id: def.id, title: def.title, author: def.author, tier: def.tier,
+        license: def.license, licenseUrl: def.licenseUrl, sourceUrl: "",
+        status: "pending", mode: def.tier === "learn-only" ? "synthesis-1s" : "verbatim",
+        chunks: 0, version: nextVersion, retrievedDate: TODAY,
+        segregatedAsset: false,
+        pendingReason: `Flagged for removal by ${removal.flaggedBy} on ${removal.flaggedAt.slice(0, 10)}: ${removal.reason}`,
+      });
+      pending++;
+      console.log(`  ✕ ${pad(def.id, 38)} removal-flagged — excluded from this build`);
+      continue;
+    }
     if (def.tier === "learn-only") {
       // Learn-only → Tier 1S synthesis playbook only. Never verbatim.
       const pb = def.playbook ?? SYNTHESIS_PLAYBOOKS.find((p) => p.sourceId === def.id);

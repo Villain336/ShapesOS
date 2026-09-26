@@ -4,8 +4,10 @@
 // House style per StudioApp.tsx (diffed class-by-class).
 
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import fs from "node:fs";
 import path from "node:path";
+import { Brain } from "lucide-react";
 import { requireUser, getOrCreateWorkspace } from "@/lib/session";
 import { requireWorkspaceRole } from "@/lib/authz";
 import { CorpusClient } from "./CorpusClient";
@@ -40,13 +42,21 @@ export default async function CorpusPage() {
 
   return (
     <div className="flex h-full flex-col gap-4 bg-[#FAFAF7] p-4 md:p-6">
-      <div>
-        <h1 className="text-xl font-bold tracking-tight text-stone-900">Expert corpus</h1>
-        <p className="mt-0.5 max-w-2xl text-[13px] text-stone-500">
-          The marketing knowledge the Chief Strategy Agent reasons with: licensed
-          sources ingested verbatim, learn-only sources shipped as Marketr-original
-          Tier 1S syntheses, and the precision gate every corpus build must pass.
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-xl font-bold tracking-tight text-stone-900">Expert corpus</h1>
+          <p className="mt-0.5 max-w-2xl text-[13px] text-stone-500">
+            The marketing knowledge the Chief Strategy Agent reasons with: licensed
+            sources ingested verbatim, learn-only sources shipped as Marketr-original
+            Tier 1S syntheses, and the precision gate every corpus build must pass.
+          </p>
+        </div>
+        <Link
+          href="/dashboard/intelligence/corpus/brain"
+          className="flex shrink-0 items-center gap-1.5 rounded-md bg-violet-600 px-3 py-1.5 text-[13px] font-medium text-white hover:bg-violet-700"
+        >
+          <Brain className="h-3.5 w-3.5" /> Knowledge Brain
+        </Link>
       </div>
       <CorpusClient manifest={manifest} />
     </div>

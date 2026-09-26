@@ -101,6 +101,10 @@ export interface SeedSourceDef {
    * refuses learn-only material there).
    */
   playbook?: { file: string; synthesizedFrom: string[] };
+  /** Knowledge-brain pillar: which expert discipline this source teaches. */
+  pillar?: "marketing" | "growth" | "design";
+  /** One-line summary of what Marketr learns from this source (for the brain). */
+  teaches?: string;
 }
 
 export const SEED_SOURCES: readonly SeedSourceDef[] = [
@@ -111,6 +115,8 @@ export const SEED_SOURCES: readonly SeedSourceDef[] = [
     tier: 1,
     license: "CC-BY-4.0",
     licenseUrl: "https://creativecommons.org/licenses/by/4.0/",
+    pillar: "marketing",
+    teaches: "SEO ground truth: crawl, index, helpful content, spam policies, structured data.",
     fetchUrls: [
       "https://developers.google.com/search/docs/fundamentals/seo-starter-guide",
       "https://developers.google.com/search/docs/fundamentals/how-search-works",
@@ -126,6 +132,8 @@ export const SEED_SOURCES: readonly SeedSourceDef[] = [
     tier: 2,
     license: "CC-BY-4.0",
     licenseUrl: "https://creativecommons.org/licenses/by/4.0/",
+    pillar: "marketing",
+    teaches: "Modern digital marketing foundations: channels, frameworks, KPIs, attribution.",
     // Canonical opentextbc.ca copy (the uregina.ca mirror 403'd 2026-09-26).
     // Chapter URLs extracted from the book's table of contents.
     fetchUrls: [
@@ -159,6 +167,8 @@ export const SEED_SOURCES: readonly SeedSourceDef[] = [
     tier: 2,
     license: "public-domain",
     licenseUrl: "https://archive.org/details/scientific-advertising-by-calude-hopkins",
+    pillar: "growth",
+    teaches: "Measurable direct-response discipline — the ancestor of A/B testing.",
     fetchUrls: [
       "https://archive.org/download/scientific-advertising-by-calude-hopkins/ScientificAdvertising%20by%20calude%20hopkins_djvu.txt",
     ],
@@ -171,6 +181,8 @@ export const SEED_SOURCES: readonly SeedSourceDef[] = [
     tier: 2,
     license: "public-domain",
     licenseUrl: "https://archive.org/details/mylifeinadvertis0000clau",
+    pillar: "marketing",
+    teaches: "Worked campaign case studies with real budgets and hard lessons.",
     fetchUrls: [
       "https://archive.org/download/mylifeinadvertis0000clau/mylifeinadvertis0000clau_djvu.txt",
     ],
@@ -184,6 +196,8 @@ export const SEED_SOURCES: readonly SeedSourceDef[] = [
     tier: 2,
     license: "CC-BY-3.0",
     licenseUrl: "https://creativecommons.org/licenses/by/3.0/",
+    pillar: "marketing",
+    teaches: "Classical marketing foundations: strategy, consumer behavior, marketing mix.",
     fetchUrls: [],
     format: "html",
     pendingReason:
@@ -196,6 +210,8 @@ export const SEED_SOURCES: readonly SeedSourceDef[] = [
     tier: 2,
     license: "CC-BY-4.0",
     licenseUrl: "https://creativecommons.org/licenses/by/4.0/",
+    pillar: "marketing",
+    teaches: "Introductory marketing curriculum: segmentation, positioning, mix.",
     // CC BY 4.0 confirmed by the book's version-history page (adapted from
     // Lumen Learning's Principles of Marketing, CC BY 4.0). Pressbooks
     // mirrors 403 bot UAs — fetch with a browser UA (verified 2026-09-26).
@@ -216,6 +232,8 @@ export const SEED_SOURCES: readonly SeedSourceDef[] = [
     tier: 2,
     license: "public-domain",
     licenseUrl: "https://archive.org/details/psychologyadver00scotgoog",
+    pillar: "marketing",
+    teaches: "First psychology of advertising: suggestion, emotion, attention, habit.",
     fetchUrls: [
       "https://archive.org/download/psychologyadver00scotgoog/psychologyadver00scotgoog_djvu.txt",
     ],
@@ -229,6 +247,8 @@ export const SEED_SOURCES: readonly SeedSourceDef[] = [
     tier: 2,
     license: "public-domain",
     licenseUrl: "https://archive.org/details/businessofadvert00calk",
+    pillar: "marketing",
+    teaches: "Full-funnel 1910s practice: media types, agency process, message coherence.",
     // Original 1915 D. Appleton edition scan (Duke/UNC libraries, 2008) —
     // raw OCR of the PD text, not an annotated reprint (verified 2026-09-26).
     fetchUrls: [
@@ -243,6 +263,8 @@ export const SEED_SOURCES: readonly SeedSourceDef[] = [
     tier: 2,
     license: "public-domain",
     licenseUrl: "https://www.usa.gov/government-works",
+    pillar: "marketing",
+    teaches: "SMB-practical marketing plans, market research, and pricing.",
     fetchUrls: [
       "https://www.sba.gov/business-guide/plan-your-business/market-research-competitive-analysis",
       "https://www.sba.gov/business-guide/manage-your-business/marketing-sales",
@@ -256,6 +278,8 @@ export const SEED_SOURCES: readonly SeedSourceDef[] = [
     tier: 2,
     license: "public-domain",
     licenseUrl: "https://www.usa.gov/government-works",
+    pillar: "marketing",
+    teaches: "Clear-and-conspicuous disclosure rules for digital advertising.",
     // PENDING (2026-09-26): the HTML page yields only navigation chrome
     // (ingest produced 2 junk chunks — discarded, nothing ingested). The
     // substantive staff guidance is the linked PDF "bus41" (public domain),
@@ -274,6 +298,8 @@ export const SEED_SOURCES: readonly SeedSourceDef[] = [
     tier: 2,
     license: "CC-BY-SA-4.0",
     licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0/",
+    pillar: "marketing",
+    teaches: "Encyclopedic marketing concepts, models, and terminology.",
     fetchUrls: [
       "Marketing",
       "Digital_marketing",
@@ -293,6 +319,8 @@ export const SEED_SOURCES: readonly SeedSourceDef[] = [
     tier: 2,
     license: "MIT",
     licenseUrl: "https://opensource.org/licenses/MIT",
+    pillar: "growth",
+    teaches: "Practitioner marketing skills: analytics, SEO, and growth tooling.",
     // 2026-09-26: repo lists as existing (MIT, branch main) but every
     // contents/raw/API endpoint returns 404 — contents unreachable.
     fetchUrls: [],
@@ -307,6 +335,8 @@ export const SEED_SOURCES: readonly SeedSourceDef[] = [
     tier: 2,
     license: "CC0-1.0",
     licenseUrl: "https://creativecommons.org/publicdomain/zero/1.0/",
+    pillar: "growth",
+    teaches: "Zero-budget growth tactics: partnerships, community, and scrappy distribution.",
     fetchUrls: [
       "https://raw.githubusercontent.com/edljx/marketing-without-money/main/README.md",
     ],
@@ -324,6 +354,8 @@ export const SEED_SOURCES: readonly SeedSourceDef[] = [
     tier: "learn-only",
     license: "learn-only",
     licenseUrl: "",
+    pillar: "marketing",
+    teaches: "Paid-social buying, strategy, measurement, and creative across Meta's apps.",
     fetchUrls: [],
     format: "html",
     pendingReason: undefined,
@@ -336,6 +368,8 @@ export const SEED_SOURCES: readonly SeedSourceDef[] = [
     tier: "learn-only",
     license: "learn-only",
     licenseUrl: "",
+    pillar: "marketing",
+    teaches: "Google Ads (Search/Display/Video/Shopping/Apps), Analytics, and Business Profile.",
     fetchUrls: [],
     format: "html",
     pendingReason: undefined,
@@ -348,6 +382,8 @@ export const SEED_SOURCES: readonly SeedSourceDef[] = [
     tier: "learn-only",
     license: "learn-only",
     licenseUrl: "",
+    pillar: "marketing",
+    teaches: "Bing crawling and quality rules; AI-grounding controls for GEO.",
     fetchUrls: [],
     format: "html",
     pendingReason: undefined,
@@ -360,6 +396,8 @@ export const SEED_SOURCES: readonly SeedSourceDef[] = [
     tier: "learn-only",
     license: "learn-only",
     licenseUrl: "",
+    pillar: "marketing",
+    teaches: "TikTok ad products, creative best practices, and Shop ads.",
     fetchUrls: [],
     format: "html",
     pendingReason: undefined,
@@ -372,6 +410,8 @@ export const SEED_SOURCES: readonly SeedSourceDef[] = [
     tier: "learn-only",
     license: "learn-only",
     licenseUrl: "",
+    pillar: "marketing",
+    teaches: "B2B advertising: targeting, measurement, and creative.",
     fetchUrls: [],
     format: "html",
     pendingReason: undefined,
@@ -384,6 +424,8 @@ export const SEED_SOURCES: readonly SeedSourceDef[] = [
     tier: "learn-only",
     license: "learn-only",
     licenseUrl: "",
+    pillar: "marketing",
+    teaches: "Inbound, content, SEO, and email — the best-structured free marketing curriculum.",
     fetchUrls: [],
     format: "html",
     pendingReason:
@@ -397,6 +439,8 @@ export const SEED_SOURCES: readonly SeedSourceDef[] = [
     tier: "learn-only",
     license: "learn-only",
     licenseUrl: "",
+    pillar: "marketing",
+    teaches: "Marketing Cloud engagement, email, and personalization.",
     fetchUrls: [],
     format: "html",
     pendingReason:
@@ -410,6 +454,8 @@ export const SEED_SOURCES: readonly SeedSourceDef[] = [
     tier: "learn-only",
     license: "learn-only",
     licenseUrl: "",
+    pillar: "growth",
+    teaches: "Experimentation discipline: A/B testing, CRO research, and statistical rigor.",
     fetchUrls: [],
     format: "html",
     pendingReason:
@@ -423,6 +469,8 @@ export const SEED_SOURCES: readonly SeedSourceDef[] = [
     tier: "learn-only",
     license: "learn-only",
     licenseUrl: "",
+    pillar: "growth",
+    teaches: "Conversion copywriting: voice-of-customer research and message testing.",
     fetchUrls: [],
     format: "html",
     pendingReason:
@@ -436,6 +484,8 @@ export const SEED_SOURCES: readonly SeedSourceDef[] = [
     tier: "learn-only",
     license: "learn-only",
     licenseUrl: "",
+    pillar: "growth",
+    teaches: "Startup acquisition playbooks across paid, content, and lifecycle channels.",
     fetchUrls: [],
     format: "html",
     pendingReason:
@@ -449,6 +499,8 @@ export const SEED_SOURCES: readonly SeedSourceDef[] = [
     tier: "learn-only",
     license: "learn-only",
     licenseUrl: "",
+    pillar: "growth",
+    teaches: "SEO tactics: keyword research, link building, and content operations.",
     fetchUrls: [],
     format: "html",
     pendingReason:
@@ -464,6 +516,8 @@ export const SEED_SOURCES: readonly SeedSourceDef[] = [
     tier: "learn-only",
     license: "learn-only",
     licenseUrl: "",
+    pillar: "marketing",
+    teaches: "X ad products and Flight School creative guidance.",
     fetchUrls: [],
     format: "html",
     pendingReason:
@@ -477,6 +531,8 @@ export const SEED_SOURCES: readonly SeedSourceDef[] = [
     tier: "learn-only",
     license: "learn-only",
     licenseUrl: "",
+    pillar: "marketing",
+    teaches: "Pinterest advertising and visual discovery creative.",
     fetchUrls: [],
     format: "html",
     pendingReason:
@@ -490,6 +546,8 @@ export const SEED_SOURCES: readonly SeedSourceDef[] = [
     tier: "learn-only",
     license: "learn-only",
     licenseUrl: "",
+    pillar: "marketing",
+    teaches: "Snapchat ad formats and full-funnel measurement.",
     fetchUrls: [],
     format: "html",
     pendingReason:
@@ -503,6 +561,8 @@ export const SEED_SOURCES: readonly SeedSourceDef[] = [
     tier: "learn-only",
     license: "learn-only",
     licenseUrl: "",
+    pillar: "marketing",
+    teaches: "YouTube channel growth, audience development, and video creative.",
     fetchUrls: [],
     format: "html",
     pendingReason:
@@ -516,6 +576,8 @@ export const SEED_SOURCES: readonly SeedSourceDef[] = [
     tier: "learn-only",
     license: "learn-only",
     licenseUrl: "",
+    pillar: "marketing",
+    teaches: "Amazon DSP and Sponsored Ads buying and measurement.",
     fetchUrls: [],
     format: "html",
     pendingReason:
@@ -529,6 +591,8 @@ export const SEED_SOURCES: readonly SeedSourceDef[] = [
     tier: "learn-only",
     license: "learn-only",
     licenseUrl: "",
+    pillar: "marketing",
+    teaches: "Reddit advertising and community-native creative.",
     fetchUrls: [],
     format: "html",
     pendingReason:
@@ -542,6 +606,8 @@ export const SEED_SOURCES: readonly SeedSourceDef[] = [
     tier: "learn-only",
     license: "learn-only",
     licenseUrl: "",
+    pillar: "design",
+    teaches: "Platform interaction idioms: clarity, deference, depth, and accessibility expectations.",
     fetchUrls: [],
     format: "html",
     pendingReason:
@@ -555,6 +621,8 @@ export const SEED_SOURCES: readonly SeedSourceDef[] = [
     tier: "learn-only",
     license: "learn-only",
     licenseUrl: "",
+    pillar: "design",
+    teaches: "Component-level design system: color roles, elevation, expressive motion, shape.",
     fetchUrls: [],
     format: "html",
     pendingReason:
@@ -568,6 +636,8 @@ export const SEED_SOURCES: readonly SeedSourceDef[] = [
     tier: "learn-only",
     license: "learn-only",
     licenseUrl: "",
+    pillar: "design",
+    teaches: "Depth, light, motion, and materials across web, Windows, and mobile.",
     fetchUrls: [],
     format: "html",
     pendingReason:
@@ -581,6 +651,8 @@ export const SEED_SOURCES: readonly SeedSourceDef[] = [
     tier: "learn-only",
     license: "learn-only",
     licenseUrl: "",
+    pillar: "design",
+    teaches: "Evidence-based UX heuristics and usability research methods.",
     fetchUrls: [],
     format: "html",
     pendingReason:
@@ -594,6 +666,8 @@ export const SEED_SOURCES: readonly SeedSourceDef[] = [
     tier: "learn-only",
     license: "learn-only",
     licenseUrl: "",
+    pillar: "design",
+    teaches: "Psychology principles behind interface design, framed as heuristics.",
     fetchUrls: [],
     format: "html",
     pendingReason:
@@ -607,6 +681,8 @@ export const SEED_SOURCES: readonly SeedSourceDef[] = [
     tier: "learn-only",
     license: "learn-only",
     licenseUrl: "",
+    pillar: "design",
+    teaches: "Typography as a working system: the reasoning behind readable type.",
     fetchUrls: [],
     format: "html",
     pendingReason:
@@ -620,6 +696,8 @@ export const SEED_SOURCES: readonly SeedSourceDef[] = [
     tier: "learn-only",
     license: "learn-only",
     licenseUrl: "",
+    pillar: "design",
+    teaches: "Checkout UX diagnostics from large-scale usability research.",
     fetchUrls: [],
     format: "html",
     pendingReason:
@@ -633,6 +711,8 @@ export const SEED_SOURCES: readonly SeedSourceDef[] = [
     tier: "learn-only",
     license: "learn-only",
     licenseUrl: "",
+    pillar: "design",
+    teaches: "Component hierarchy thinking: atoms to pages in design systems.",
     fetchUrls: [],
     format: "html",
     pendingReason:
@@ -646,6 +726,8 @@ export const SEED_SOURCES: readonly SeedSourceDef[] = [
     tier: "learn-only",
     license: "learn-only",
     licenseUrl: "",
+    pillar: "design",
+    teaches: "Operating a design system: documentation, governance, and contribution.",
     fetchUrls: [],
     format: "html",
     pendingReason:
@@ -659,6 +741,8 @@ export const SEED_SOURCES: readonly SeedSourceDef[] = [
     tier: "learn-only",
     license: "learn-only",
     licenseUrl: "",
+    pillar: "design",
+    teaches: "Practical interface design tactics: hierarchy, spacing, color, and restraint.",
     fetchUrls: [],
     format: "html",
     pendingReason:
@@ -672,6 +756,8 @@ export const SEED_SOURCES: readonly SeedSourceDef[] = [
     tier: "learn-only",
     license: "learn-only",
     licenseUrl: "",
+    pillar: "design",
+    teaches: "Motion craft: interruptible transitions and animation that serves comprehension.",
     fetchUrls: [],
     format: "html",
     pendingReason:
@@ -685,6 +771,8 @@ export const SEED_SOURCES: readonly SeedSourceDef[] = [
     tier: "learn-only",
     license: "learn-only",
     licenseUrl: "",
+    pillar: "design",
+    teaches: "Product teardown method: diagnosing UX through behavioral psychology.",
     fetchUrls: [],
     format: "html",
     pendingReason:
@@ -702,6 +790,8 @@ export const SEED_SOURCES: readonly SeedSourceDef[] = [
     tier: "learn-only",
     license: "learn-only",
     licenseUrl: "",
+    pillar: "design",
+    teaches: "Enterprise design system operations at IBM scale.",
     fetchUrls: [],
     format: "html",
     pendingReason:
@@ -715,6 +805,8 @@ export const SEED_SOURCES: readonly SeedSourceDef[] = [
     tier: "learn-only",
     license: "learn-only",
     licenseUrl: "",
+    pillar: "design",
+    teaches: "Atlassian's product design language and team collaboration patterns.",
     fetchUrls: [],
     format: "html",
     pendingReason:
@@ -728,6 +820,8 @@ export const SEED_SOURCES: readonly SeedSourceDef[] = [
     tier: "learn-only",
     license: "learn-only",
     licenseUrl: "",
+    pillar: "design",
+    teaches: "Adobe's cross-platform design system: tokens, theming, accessibility.",
     fetchUrls: [],
     format: "html",
     pendingReason:
@@ -741,6 +835,8 @@ export const SEED_SOURCES: readonly SeedSourceDef[] = [
     tier: "learn-only",
     license: "learn-only",
     licenseUrl: "",
+    pillar: "design",
+    teaches: "Commerce-focused component patterns for merchant experiences.",
     fetchUrls: [],
     format: "html",
     pendingReason:
@@ -754,6 +850,8 @@ export const SEED_SOURCES: readonly SeedSourceDef[] = [
     tier: "learn-only",
     license: "learn-only",
     licenseUrl: "",
+    pillar: "design",
+    teaches: "Developer-tool interface patterns and Primer's component system.",
     fetchUrls: [],
     format: "html",
     pendingReason:
@@ -767,6 +865,8 @@ export const SEED_SOURCES: readonly SeedSourceDef[] = [
     tier: "learn-only",
     license: "learn-only",
     licenseUrl: "",
+    pillar: "design",
+    teaches: "Enterprise CRM design language and SLDS component patterns.",
     fetchUrls: [],
     format: "html",
     pendingReason:
