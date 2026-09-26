@@ -588,6 +588,9 @@ model Workspace {
   gbpAccounts            GbpAccount[]
   // Milestone 18: content autopilot kill switches (workspace-level).
   autopilotKills         AutopilotKillSwitch[]
+  // Phase 9 (M1): workspace-freeze kill switch. Non-null = frozen; every
+  // executor entry point checks this FIRST and halts while set.
+  frozenAt               DateTime? @map("frozen_at")
   // Milestone 21: skills, connectors, settings.
   skills                 Skill[]
   customConnectors       Connector[]
@@ -666,6 +669,14 @@ model Workspace {
   mediaCallWebhookEvents CallWebhookEvent[]
   mediaLiftSnapshots     LiftSnapshot[]
   mediaSpendEntries      MediaSpendEntry[]
+  // Phase 9 (M1): GrowthOS orchestrator back-relations.
+  missions               Mission[]
+  missionEvents          MissionEvent[]
+  missionApprovals       MissionApproval[]
+  playbooks              Playbook[]
+  playbookVersions       PlaybookVersion[]
+  automationSettings     AutomationSetting[]
+  commandAudits          CommandAudit[]
 
   @@map("workspaces")
 }
@@ -6806,4 +6817,202 @@ model PlaybookLearning {
 
   @@index([reviewedAt])
   @@map("playbook_learnings")
+}
+
+// ============================================================
+// Phase 9 (M1): GrowthOS orchestrator — data + safety core.
+// SPEC-PHASE9.md §5. All workspace-scoped, RLS-isolated (migration
+// 20260926093000_phase9_growthos_core). Additive only — existing models
+// untouched except Workspace.frozenAt (workspace-freeze kill switch).
+// ============================================================
+
+enum MissionStatus {
+  planned
+  active
+  paused
+  complete
+  archived
+}
+
+model Mission {
+  id           String        @id @default(cuid()) @map("id")
+  workspaceId  String        @map("workspace_id")
+  workspace    Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  template     String        @map("template")
+  goal         Json          @map("goal")
+  status       MissionStatus @default(planned) @map("status")
+  planSnapshot Json          @map("plan_snapshot")
+  checkpoints  Json          @map("checkpoints")
+  budgetCaps   Json          @map("budget_caps")
+  termination  Json          @map("termination")
+  createdBy    String        @map("created_by")
+  createdAt    DateTime      @default(now()) @map("created_at")
+  updatedAt    DateTime      @updatedAt @map("updated_at")
+
+  events    MissionEvent[]
+  approvals MissionApproval[]
+
+  @@index([workspaceId, status])
+  @@map("missions")
+}
+
+// APPEND-ONLY: app code must never update or delete rows. The hash chain
+// (prevHash -> eventHash) makes tampering detectable.
+model MissionEvent {
+  id          String    @id @default(cuid()) @map("id")
+  missionId   String    @map("mission_id")
+  mission     Mission   @relation(fields: [missionId], references: [id], onDelete: Cascade)
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  ts          DateTime  @default(now()) @map("ts")
+  actor       String    @map("actor")
+  step        String?   @map("step")
+  tool        String?   @map("tool")
+  args        Json      @default("{}") @map("args")
+  observation Json      @default("{}") @map("observation")
+  costCents   Int       @default(0) @map("cost_cents")
+  eventHash   String    @map("event_hash")
+  prevHash    String    @map("prev_hash")
+
+  @@index([missionId, ts])
+  @@index([workspaceId, ts])
+  @@map("mission_events")
+}
+
+enum MissionApprovalStatus {
+  pending
+  approved
+  denied
+  expired
+  revoked
+  executed
+}
+
+// Extends the Phase 5 (media_approvals) / Phase 6 (authority_approvals)
+// approval object pattern: canonicalized binding JSON + SHA-256 binding
+// hash; the executor re-verifies the exact payload before acting.
+model MissionApproval {
+  id          String                @id @default(cuid()) @map("id")
+  missionId   String?               @map("mission_id")
+  mission     Mission?              @relation(fields: [missionId], references: [id], onDelete: SetNull)
+  workspaceId String                @map("workspace_id")
+  workspace   Workspace             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  action      String                @map("action")
+  tier        Int                   @map("tier")
+  bindingJson Json                  @map("binding_json")
+  bindingHash String                @map("binding_hash")
+  status      MissionApprovalStatus @default(pending) @map("status")
+  approvers   String[]              @default([]) @map("approvers")
+  decidedBy   String?               @map("decided_by")
+  decidedAt   DateTime?             @map("decided_at")
+  expiresAt   DateTime              @map("expires_at")
+  createdBy   String                @map("created_by")
+  createdAt   DateTime              @default(now()) @map("created_at")
+
+  @@index([workspaceId, status])
+  @@index([missionId, status])
+  @@map("mission_approvals")
+}
+
+enum PlaybookSource {
+  learned
+  community
+  seed
+}
+
+model Playbook {
+  id          String         @id @default(cuid()) @map("id")
+  workspaceId String         @map("workspace_id")
+  workspace   Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name        String         @map("name")
+  source      PlaybookSource @map("source")
+  description String?        @db.Text @map("description")
+  createdBy   String         @map("created_by")
+  createdAt   DateTime       @default(now()) @map("created_at")
+
+  versions PlaybookVersion[]
+
+  @@index([workspaceId, source])
+  @@map("playbooks")
+}
+
+enum PlaybookVersionStatus {
+  draft
+  eval
+  review
+  canary
+  production
+  deprecated
+}
+
+// IMMUTABLE: app code must never update or delete rows. New content = new
+// version row. Rollback = move the label pointers (labels), never rewrite.
+model PlaybookVersion {
+  id                 String               @id @default(cuid()) @map("id")
+  playbookId         String               @map("playbook_id")
+  playbook           Playbook             @relation(fields: [playbookId], references: [id], onDelete: Cascade)
+  workspaceId        String               @map("workspace_id")
+  workspace          Workspace            @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  version            Int                  @map("version")
+  content            Json                 @map("content")
+  contentHash        String               @map("content_hash")
+  status             PlaybookVersionStatus @default(draft) @map("status")
+  labels             String[]             @default([]) @map("labels")
+  evalResults        Json?                @map("eval_results")
+  outcomeAttribution Json?                @map("outcome_attribution")
+  createdBy          String               @map("created_by")
+  createdAt          DateTime             @default(now()) @map("created_at")
+
+  @@unique([playbookId, version])
+  @@index([workspaceId, status])
+  @@map("playbook_versions")
+}
+
+enum AutomationBehavior {
+  auto
+  ask
+  never
+}
+
+// Per-action automation behavior (Tico's decision: user-customizable
+// automation). Resolved by the DoA tier evaluator at execution time.
+model AutomationSetting {
+  id             String            @id @default(cuid()) @map("id")
+  workspaceId    String            @map("workspace_id")
+  workspace      Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  action         String            @map("action")
+  behavior       AutomationBehavior @map("behavior")
+  thresholdCents Int?              @map("threshold_cents")
+  updatedBy      String            @map("updated_by")
+  updatedAt      DateTime          @updatedAt @map("updated_at")
+
+  @@unique([workspaceId, action])
+  @@map("automation_settings")
+}
+
+enum CommandKind {
+  template
+  ask
+  go
+  doAction @map("do")
+}
+
+// APPEND-ONLY: every command-bar invocation. Templated actions log
+// {template_id, prompt_hash}; free-form asks log the FULL prompt
+// (prompt_full is ONLY written for kind=ask — enforced in
+// lib/orchestrator/audit.ts).
+model CommandAudit {
+  id            String      @id @default(cuid()) @map("id")
+  workspaceId   String      @map("workspace_id")
+  workspace     Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  userId        String      @map("user_id")
+  kind          CommandKind @map("kind")
+  templateId    String?     @map("template_id")
+  promptHash    String?     @map("prompt_hash")
+  promptFull    String?     @db.Text @map("prompt_full")
+  resultSummary String?     @db.Text @map("result_summary")
+  createdAt     DateTime    @default(now()) @map("created_at")
+
+  @@index([workspaceId, createdAt])
+  @@map("command_audit")
 }
