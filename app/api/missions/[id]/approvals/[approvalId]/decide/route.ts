@@ -8,6 +8,8 @@
 import type { NextRequest } from "next/server";
 import { missionsGuard, badRequest, safetyError, readJson, serializeApproval, missionDeps } from "../../../../_lib";
 import { decideApproval, type ApprovalDecision } from "@/lib/missions/engine";
+import { withWorkspaceScope } from "@/lib/substrate/graph/rls";
+import { appendApprovalEvent } from "@/lib/automation/decide";
 
 export const dynamic = "force-dynamic";
 
@@ -31,6 +33,17 @@ export async function POST(
       decision: decision as ApprovalDecision,
       decidedBy: gate.userId,
     });
+    // Hash-chained approval event (M6's mission_approval_events trail) —
+    // best-effort: the mission timeline event above is the primary record.
+    await withWorkspaceScope(gate.workspaceId, (tx) =>
+      appendApprovalEvent(tx, {
+        approvalId,
+        workspaceId: gate.workspaceId,
+        actor: gate.userId,
+        action: `decided:${decision}`,
+        detail: { missionId: id, status: approval.status },
+      }),
+    ).catch(() => {});
     return Response.json({ approval: serializeApproval(approval) });
   } catch (err) {
     return safetyError(err);

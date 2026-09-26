@@ -651,6 +651,6 @@ describe("Prisma MissionApprovalStore", () => {
       createdBy: "u1",
       expiresAt: exp,
     });
-    assert.equal(created.expiresAt.getTime(), exp.getTime());
+    assert.equal(created.expiresAt!.getTime(), exp.getTime());
   });
 });

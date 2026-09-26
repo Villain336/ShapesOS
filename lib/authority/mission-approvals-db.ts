@@ -103,7 +103,11 @@ function chainStepPrefix(approvalId: string): string {
 }
 
 export function createPrismaMissionApprovalStore(
-  scope: ScopeRunner = withWorkspaceScope as ScopeRunner,
+  scope: ScopeRunner = (workspaceId, fn) =>
+    // The real Prisma tx client structurally satisfies the minimal ApprovalTx
+    // surface (create/findFirst/update on missionApproval); the double cast
+    // keeps the store testable against fakes while running on the real client.
+    withWorkspaceScope(workspaceId, (tx) => fn(tx as unknown as ApprovalTx)),
 ): MissionApprovalStore {
   /** Fetch the approval or throw — always workspace-scoped (defense in depth). */
   async function scoped(
