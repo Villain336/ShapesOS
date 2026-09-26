@@ -6,7 +6,13 @@
 import { redirect } from "next/navigation";
 import { requireUser, getOrCreateWorkspace } from "@/lib/session";
 import { requireWorkspaceRole } from "@/lib/authz";
-import { Badge } from "@/components/vault/shadcn/badge";
+function chip(text: React.ReactNode, cls: string) {
+  return (
+    <span className={`inline-flex items-center gap-0.5 whitespace-nowrap rounded-full border px-1.5 py-0.5 text-[10px] font-medium leading-tight ${cls}`}>
+      {text}
+    </span>
+  );
+}
 import { Progress } from "@/components/vault/shadcn/progress";
 import {
   launchTablesReady,
@@ -24,10 +30,10 @@ export const metadata = {
   description: "Public-launch readiness checklist: security, legal, community, build. Readiness only — no public flip.",
 };
 
-const STATUS_STYLE: Record<string, string> = {
-  complete: "default",
-  in_progress: "outline",
-  pending: "secondary",
+const STATUS_CHIP: Record<string, string> = {
+  complete: "border-emerald-200 bg-emerald-50 text-emerald-700",
+  in_progress: "border-violet-200 bg-violet-50 text-violet-700",
+  pending: "border-stone-200 bg-stone-100 text-stone-600",
 };
 
 export default async function LaunchReadinessPage() {
@@ -52,18 +58,16 @@ export default async function LaunchReadinessPage() {
   const pct = progress.total === 0 ? 0 : Math.round((progress.complete / progress.total) * 100);
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-start justify-between gap-4">
+    <div className="flex h-full flex-col gap-4 bg-[#FAFAF7] p-4 md:p-6">
+      <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Public-launch readiness</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <h1 className="text-xl font-bold tracking-tight text-stone-900">Public-launch readiness</h1>
+          <p className="mt-0.5 text-[13px] text-stone-500">
             Repo hygiene, license, and community bar for going public — tracked with evidence, not vibes.
           </p>
         </div>
-        <Badge variant={pct === 100 ? "default" : "secondary"} className="text-sm">
-          {progress.complete}/{progress.total} complete
-        </Badge>
-      </div>
+        <span className="text-[13px] font-semibold text-stone-700">{progress.complete}/{progress.total} complete</span>
+      </header>
 
       <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
         <strong>Readiness only.</strong> The open-core split is deferred by standing decision (SPEC-PHASE7 §12.5).
@@ -78,10 +82,10 @@ export default async function LaunchReadinessPage() {
 
       {ready && (
         <>
-          <div className="rounded-xl border bg-card p-5 shadow-sm">
-            <div className="flex items-center justify-between text-sm">
-              <span className="font-medium">Overall readiness</span>
-              <span className="text-muted-foreground">{pct}%</span>
+          <div className="rounded-xl border border-stone-200 bg-white p-4">
+            <div className="flex items-center justify-between text-[13px]">
+              <span className="font-medium text-stone-900">Overall readiness</span>
+              <span className="text-stone-500">{pct}%</span>
             </div>
             <Progress value={pct} className="mt-2" />
             <div className="mt-3 grid gap-2 sm:grid-cols-4">
@@ -91,8 +95,8 @@ export default async function LaunchReadinessPage() {
                 return (
                   <div key={c.key} className="text-xs">
                     <div className="flex justify-between">
-                      <span className="font-medium">{c.title}</span>
-                      <span className="text-muted-foreground">
+                      <span className="font-medium text-stone-800">{c.title}</span>
+                      <span className="text-stone-500">
                         {p.complete}/{p.total}
                       </span>
                     </div>
@@ -103,91 +107,101 @@ export default async function LaunchReadinessPage() {
             </div>
           </div>
 
-          {LAUNCH_CATEGORIES.map((c) => (
-            <section key={c.key} className="space-y-3">
-              <div>
-                <h2 className="text-lg font-semibold">{c.title}</h2>
-                <p className="text-sm text-muted-foreground">{c.blurb}</p>
-              </div>
-              <div className="grid gap-3">
-                {rows
-                  .filter((r) => r.category === c.key)
-                  .map((r) => {
-                    const cat = catalog.get(r.key);
-                    return (
-                      <div key={r.id} className="rounded-xl border bg-card p-4 shadow-sm">
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <h3 className="text-sm font-semibold">{r.item}</h3>
-                              <Badge variant={(STATUS_STYLE[r.status] ?? "secondary") as "default" | "outline" | "secondary"}>
-                                {r.status.replace("_", " ")}
-                              </Badge>
-                            </div>
-                            {cat && <p className="mt-1 text-xs text-muted-foreground">{cat.doneWhen}</p>}
-                            {r.note && <p className="mt-1 text-xs italic text-stone-500">Note: {r.note}</p>}
-                            <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+          {LAUNCH_CATEGORIES.map((c) => {
+            const catRows = rows.filter((r) => r.category === c.key);
+            return (
+              <section key={c.key} className="space-y-2">
+                <div>
+                  <h2 className="text-sm font-semibold tracking-tight text-stone-900">{c.title}</h2>
+                  <p className="text-[13px] text-stone-500">{c.blurb}</p>
+                </div>
+                <div className="overflow-x-auto rounded-xl border border-stone-200 bg-white">
+                  <table className="w-full text-left text-[13px]">
+                    <thead>
+                      <tr className="border-b border-stone-100 bg-stone-50/60 text-[11px] uppercase tracking-wide text-stone-500">
+                        <th className="px-3 py-2 font-medium">Checklist item</th>
+                        <th className="px-3 py-2 font-medium">Status</th>
+                        <th className="px-3 py-2 font-medium">Evidence</th>
+                        <th className="px-3 py-2 font-medium">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {catRows.map((r) => {
+                        const cat = catalog.get(r.key);
+                        return (
+                          <tr key={r.id} className="border-b border-stone-100 last:border-0 hover:bg-violet-50/40">
+                            <td className="max-w-sm px-3 py-2">
+                              <span className="font-medium text-stone-900">{r.item}</span>
+                              {cat && <span className="block text-[12px] text-stone-500">{cat.doneWhen}</span>}
+                              {r.note && <span className="block text-[12px] italic text-stone-500">Note: {r.note}</span>}
+                              {cat && (
+                                <span className="block text-[11px] text-stone-400">
+                                  {cat.specRef} · hint: {cat.evidenceHint}
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-3 py-2">
+                              {chip(r.status.replace("_", " "), STATUS_CHIP[r.status] ?? STATUS_CHIP.pending)}
+                            </td>
+                            <td className="px-3 py-2 text-[12px] text-stone-500">
                               {r.evidenceUrl ? (
                                 /^https?:\/\//.test(r.evidenceUrl) ? (
                                   <a
                                     href={r.evidenceUrl}
                                     target="_blank"
                                     rel="noreferrer"
-                                    className="text-blue-600 underline"
+                                    className="text-violet-700 underline hover:text-violet-800"
                                   >
                                     Evidence ↗
                                   </a>
                                 ) : (
-                                  <span className="font-mono text-stone-600">{r.evidenceUrl}</span>
+                                  <span className="font-mono">{r.evidenceUrl}</span>
                                 )
                               ) : (
                                 <span className="text-stone-400">No evidence yet</span>
                               )}
                               {r.completedAt && (
-                                <span className="text-stone-400">
+                                <span className="block text-stone-400">
                                   completed {new Date(r.completedAt).toLocaleDateString()}
                                 </span>
                               )}
-                              {cat && <span className="text-stone-400">{cat.specRef}</span>}
-                            </div>
-                            {cat && (
-                              <p className="mt-1 text-[11px] text-stone-400">Evidence hint: {cat.evidenceHint}</p>
-                            )}
-                          </div>
-                          {canEdit && (
-                            <div className="shrink-0">
-                              {r.status === "complete" ? <ReopenButton id={r.id} /> : <CompleteButton id={r.id} />}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-              </div>
-            </section>
-          ))}
+                            </td>
+                            <td className="px-3 py-2">
+                              {canEdit && (r.status === "complete" ? <ReopenButton id={r.id} /> : <CompleteButton id={r.id} />)}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+            );
+          })}
 
-          <section className="rounded-xl border bg-card p-5 shadow-sm">
-            <h2 className="text-lg font-semibold">Decision brief: the open-core split (deferred)</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
+          <section className="rounded-xl border border-stone-200 bg-white p-4">
+            <h2 className="text-sm font-semibold tracking-tight text-stone-900">Decision brief: the open-core split (deferred)</h2>
+            <p className="mt-0.5 text-[13px] text-stone-500">
               Four options mapped in <span className="font-mono">docs/open-core-options.md</span> — presented
               with tradeoffs, no recommendation. The split is genuinely undecided; this phase builds readiness
               and the brief, not the decision.
             </p>
-            <ul className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
-              <li className="rounded-lg border p-3">
-                <strong>A — Open everything.</strong> All code AGPL; commercial = white-label license + hosted + support.
-              </li>
-              <li className="rounded-lg border p-3">
-                <strong>B — AGPL core + closed enterprise pack.</strong> SSO/RBAC/audit, white-label sub-accounts, premium integrations.
-              </li>
-              <li className="rounded-lg border p-3">
-                <strong>C — Three-layer GPL/AGPL/closed.</strong> GrowthOS orchestrator closed. Finest IP protection, highest complexity.
-              </li>
-              <li className="rounded-lg border p-3">
-                <strong>D — AGPL everything + cloud premium.</strong> No closed code; Cloud wins on cadence + managed keys.
-              </li>
-            </ul>
+            <div className="mt-2 overflow-x-auto rounded-xl border border-stone-200">
+              <table className="w-full text-left text-[13px]">
+                <thead>
+                  <tr className="border-b border-stone-100 bg-stone-50/60 text-[11px] uppercase tracking-wide text-stone-500">
+                    <th className="px-3 py-2 font-medium">Option</th>
+                    <th className="px-3 py-2 font-medium">Model</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr className="border-b border-stone-100 hover:bg-violet-50/40"><td className="px-3 py-2 font-medium text-stone-900">A — Open everything</td><td className="px-3 py-2 text-stone-600">All code AGPL; commercial = white-label license + hosted + support.</td></tr>
+                  <tr className="border-b border-stone-100 hover:bg-violet-50/40"><td className="px-3 py-2 font-medium text-stone-900">B — AGPL core + closed enterprise pack</td><td className="px-3 py-2 text-stone-600">SSO/RBAC/audit, white-label sub-accounts, premium integrations.</td></tr>
+                  <tr className="border-b border-stone-100 hover:bg-violet-50/40"><td className="px-3 py-2 font-medium text-stone-900">C — Three-layer GPL/AGPL/closed</td><td className="px-3 py-2 text-stone-600">GrowthOS orchestrator closed. Finest IP protection, highest complexity.</td></tr>
+                  <tr className="hover:bg-violet-50/40"><td className="px-3 py-2 font-medium text-stone-900">D — AGPL everything + cloud premium</td><td className="px-3 py-2 text-stone-600">No closed code; Cloud wins on cadence + managed keys.</td></tr>
+                </tbody>
+              </table>
+            </div>
             <p className="mt-3 text-xs text-stone-500">
               Staged alongside: CLA-vs-DCO (must-decide-before-public), the AGPLv3 §7 trademark note (OnlyOffice 2026
               precedent), and the Product Hunt playbook.

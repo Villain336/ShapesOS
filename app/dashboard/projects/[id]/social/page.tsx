@@ -59,7 +59,7 @@ export default async function SocialPage({ params }: { params: Promise<{ id: str
     <main className="mx-auto max-w-7xl px-4 py-8">
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-zinc-900">Social</h1>
+          <h1 className="text-xl font-bold tracking-tight text-ink">Social</h1>
           <p className="mt-1 text-sm text-zinc-500">
             Content calendar and scheduled publishing through Buffer.
           </p>

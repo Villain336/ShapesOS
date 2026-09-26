@@ -31,7 +31,7 @@ export default async function SitesPage({
         <Link href={`/dashboard/projects/${project.id}`} className="text-sm text-zinc-500 hover:text-zinc-600">
           ← {project.domain}
         </Link>
-        <h1 className="mt-1 text-2xl font-bold tracking-tight">Sites & landing pages</h1>
+        <h1 className="mt-1 text-xl font-bold tracking-tight text-ink">Sites & landing pages</h1>
         <p className="mt-1 text-sm text-zinc-500">
           Build landing pages from scratch, or connect a GitHub repo, WordPress, Webflow, SFTP host, or uploaded .zip — then edit, deploy, or publish content.
         </p>

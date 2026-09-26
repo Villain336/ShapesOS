@@ -2,7 +2,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { CaretDown, Plus, ArrowSquareOut } from "@phosphor-icons/react";
+import { ChevronDown, Plus, SquareArrowOutUpRight, Users, KanbanSquare, TrendingUp, ClipboardList, type LucideIcon } from "lucide-react";
 import type { CrmLead, CrmPipeline } from "./types";
 import { formatMoney } from "./types";
 import { FilterToolbar, DEFAULT_FILTERS, type LeadFilters } from "./FilterToolbar";
@@ -22,11 +22,11 @@ interface Summary {
   avgScore: number | null;
 }
 
-const TABS: { id: Tab; label: string }[] = [
-  { id: "leads", label: "Leads" },
-  { id: "pipeline", label: "Pipeline" },
-  { id: "forecast", label: "Forecast" },
-  { id: "forms", label: "Forms" },
+const TABS: { id: Tab; label: string; icon: LucideIcon }[] = [
+  { id: "leads", label: "Leads", icon: Users },
+  { id: "pipeline", label: "Pipeline", icon: KanbanSquare },
+  { id: "forecast", label: "Forecast", icon: TrendingUp },
+  { id: "forms", label: "Forms", icon: ClipboardList },
 ];
 
 export function CrmApp() {
@@ -177,20 +177,20 @@ export function CrmApp() {
                     </option>
                   ))}
                 </select>
-                <CaretDown size={14} className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-stone-500" />
+                <ChevronDown size={14} className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-stone-500" />
               </div>
               <button
                 className="rounded-lg p-1.5 text-stone-400 hover:bg-violet-50 hover:text-violet-700"
                 onClick={() => setModal("newPipeline")}
                 title="New pipeline"
               >
-                <Plus size={15} weight="bold" />
+                <Plus size={15} strokeWidth={2.5} />
               </button>
             </div>
           </div>
           {pipeline?.client && (
             <span className="crm-chip crm-chip-violet">
-              <ArrowSquareOut size={12} /> {pipeline.client.name}
+              <SquareArrowOutUpRight size={12} /> {pipeline.client.name}
             </span>
           )}
         </div>
@@ -198,10 +198,11 @@ export function CrmApp() {
           {TABS.map((t) => (
             <button
               key={t.id}
-              className="crm-tab"
+              className="crm-tab inline-flex items-center gap-1.5"
               data-active={tab === t.id}
               onClick={() => setTab(t.id)}
             >
+              <t.icon size={15} />
               {t.label}
             </button>
           ))}

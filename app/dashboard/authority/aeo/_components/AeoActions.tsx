@@ -112,14 +112,14 @@ export function CreatePromptSetForm() {
   return (
     <form onSubmit={submit} className="space-y-3">
       <div>
-        <Label htmlFor="aeo-prompts">Prompts (one per line, 20–50 money prompts)</Label>
+        <Label htmlFor="aeo-prompts" className="text-[13px] font-medium text-stone-700">Prompts (one per line, 20–50 money prompts)</Label>
         <Textarea
           id="aeo-prompts"
           value={text}
           onChange={(e) => setText(e.target.value)}
           rows={8}
           placeholder={"Best CRM for a 10-person agency\nAgency accounting software vs QuickBooks\n…"}
-          className="mt-1 font-mono text-xs"
+          className="mt-1 font-mono text-xs border-stone-200 bg-white text-[13px] placeholder:text-stone-400 focus-visible:border-violet-400 focus-visible:ring-violet-200/60"
         />
       </div>
       <div className="flex items-center justify-between">
@@ -162,23 +162,23 @@ export function TriggerRunCard({ hasActiveSet, brand }: { hasActiveSet: boolean;
     <form onSubmit={submit} className="space-y-3">
       <div className="grid gap-3 md:grid-cols-2">
         <div>
-          <Label htmlFor="aeo-brand">Brand (for entity matching)</Label>
+          <Label htmlFor="aeo-brand" className="text-[13px] font-medium text-stone-700">Brand (for entity matching)</Label>
           <Input
             id="aeo-brand"
             value={brandInput}
             onChange={(e) => setBrandInput(e.target.value)}
             placeholder="Acme Studio"
-            className="mt-1"
+            className="mt-1 border-stone-200 bg-white text-[13px] placeholder:text-stone-400 focus-visible:border-violet-400 focus-visible:ring-violet-200/60"
           />
         </div>
         <div>
-          <Label htmlFor="aeo-domain">Owned domain (optional)</Label>
+          <Label htmlFor="aeo-domain" className="text-[13px] font-medium text-stone-700">Owned domain (optional)</Label>
           <Input
             id="aeo-domain"
             value={ownedDomain}
             onChange={(e) => setOwnedDomain(e.target.value)}
             placeholder="acme.com"
-            className="mt-1"
+            className="mt-1 border-stone-200 bg-white text-[13px] placeholder:text-stone-400 focus-visible:border-violet-400 focus-visible:ring-violet-200/60"
           />
         </div>
       </div>

@@ -68,16 +68,16 @@ export default function ApprovalActions({
     <div className="flex flex-col items-end gap-2">
       <div className="flex gap-2">
         {status === "draft" && (
-          <Button onClick={() => call(`/api/media/approvals/${approvalId}/submit`, "POST", {})} disabled={busy}>
+          <Button className="bg-violet-600 text-white hover:bg-violet-700" onClick={() => call(`/api/media/approvals/${approvalId}/submit`, "POST", {})} disabled={busy}>
             Submit for approval
           </Button>
         )}
         {status === "pending" && canAct && (
           <>
-            <Button variant="outline" onClick={mintOtp} disabled={busy}>
+            <Button variant="outline" className="border border-stone-200 bg-white text-stone-700 hover:bg-stone-50" onClick={mintOtp} disabled={busy}>
               Mint OTP
             </Button>
-            <Button onClick={approve} disabled={busy || (showOtp && otpCode.trim().length === 0)}>
+            <Button className="bg-violet-600 text-white hover:bg-violet-700" onClick={approve} disabled={busy || (showOtp && otpCode.trim().length === 0)}>
               Approve{showOtp ? " with OTP" : ""}
             </Button>
             <Button variant="destructive" onClick={() => setShowRevoke((v) => !v)} disabled={busy}>
@@ -86,7 +86,7 @@ export default function ApprovalActions({
           </>
         )}
         {status === "approved" && canAct && (
-          <Button onClick={() => call(`/api/media/buys/${approvalId}/execute`, "POST", {})} disabled={busy}>
+          <Button className="bg-violet-600 text-white hover:bg-violet-700" onClick={() => call(`/api/media/buys/${approvalId}/execute`, "POST", {})} disabled={busy}>
             Run pre-flight + execute
           </Button>
         )}
@@ -99,7 +99,7 @@ export default function ApprovalActions({
             value={otpCode}
             onChange={(e) => setOtpCode(e.target.value)}
             placeholder="Enter OTP code"
-            className="mt-2"
+            className="mt-2 rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-[13px] text-stone-900 placeholder:text-stone-400 focus:border-violet-400 focus:outline-none"
           />
           <p className="mt-1">Production delivers the code out-of-band (authenticator/SMS).</p>
         </div>
@@ -111,6 +111,7 @@ export default function ApprovalActions({
             value={revokeReason}
             onChange={(e) => setRevokeReason(e.target.value)}
             placeholder="Revocation reason"
+            className="rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-[13px] text-stone-900 placeholder:text-stone-400 focus:border-violet-400 focus:outline-none"
           />
           <Button
             variant="destructive"

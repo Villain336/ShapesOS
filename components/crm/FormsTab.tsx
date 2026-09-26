@@ -2,7 +2,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Plus, Trash, Copy, Check, GlobeHemisphereWest } from "@phosphor-icons/react";
+import { Plus, Trash, Copy, Check, Earth } from "lucide-react";
 import { EmptyState } from "./ui";
 
 interface CrmForm {
@@ -111,13 +111,13 @@ export function FormsTab({ pipelineId }: { pipelineId: string }) {
           onKeyDown={(e) => { if (e.key === "Enter") create(); }}
         />
         <button className="crm-btn-primary" onClick={create} disabled={creating || !name.trim()}>
-          <Plus size={15} weight="bold" /> {creating ? "Creating…" : "Create form"}
+          <Plus size={15} strokeWidth={2.5} /> {creating ? "Creating…" : "Create form"}
         </button>
       </div>
 
       {forms.length === 0 ? (
         <EmptyState
-          icon={GlobeHemisphereWest}
+          icon={Earth}
           title="No capture forms"
           hint="Create an embeddable form to turn website visitors into pipeline leads automatically."
         />

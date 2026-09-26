@@ -31,33 +31,33 @@ import {
 import {
   Play,
   Clock,
-  TrendDown,
+  TrendingDown,
   Target,
   Leaf,
-  WebhooksLogo,
-  Lightning,
+  Webhook,
+  Zap,
   Scan,
-  LinkSimple,
+  Link as LinkIcon,
   Bell,
-  ChartBar,
+  ChartColumn,
   Rocket,
   ShieldCheck,
   GitFork,
   Timer,
   Plus,
-  FloppyDisk,
+  Save,
   Trash,
   X,
   ArrowLeft,
-  CaretLeft,
-  CaretRight,
-  Warning,
-  CircleNotch,
+  ChevronLeft,
+  ChevronRight,
+  TriangleAlert,
+  LoaderCircle,
   GitBranch as WorkflowIcon,
-  GearSix,
-  ClockCounterClockwise,
-  Cursor,
-} from "@phosphor-icons/react";
+  Settings,
+  History,
+  MousePointer,
+} from "lucide-react";
 import {
   NODE_CATALOG,
   NODE_KINDS,
@@ -176,10 +176,14 @@ interface ServerRun {
 }
 
 const ICONS: Record<string, typeof Play> = {
-  Play, Clock, TrendDown, Target, Leaf, WebhooksLogo, Lightning, Scan, LinkSimple,
-  Bell, ChartBar, Rocket, ShieldCheck, GitFork, Timer,
+  Play, Clock, TrendingDown, Target, Leaf, Webhook, Zap, Scan, Link: LinkIcon,
+  Bell, ChartColumn, Rocket, ShieldCheck, GitFork, Timer,
+  // Legacy aliases: node catalogs stored phosphor icon names as strings.
+  TrendDown: TrendingDown, WebhooksLogo: Webhook, Lightning: Zap, LinkSimple: LinkIcon,
+  ChartBar: ChartColumn, FloppyDisk: Save, Warning: TriangleAlert, CircleNotch: LoaderCircle,
+  GearSix: Settings, ClockCounterClockwise: History,
   // Legacy alias: pre-redesign workflows stored the "Sparkle" icon name.
-  Sparkle: Lightning,
+  Sparkle: Zap,
 };
 
 /* Kind tiles — icons are always warm ink (never orange/red); kind is
@@ -253,7 +257,7 @@ function WfNodeView({ data, selected }: NodeProps<WfNode>) {
       <Handle type="target" position={Position.Top} className="!h-2.5 !w-2.5 !border-2 !border-surface !bg-ink-3" />
       <div className="flex items-center gap-2 px-3 py-2">
         <span className={cn("flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ring-1 ring-line", isApproval && "ring-amber", KIND_STYLES[data.kind] ?? "bg-field text-ink-2")}>
-          <Icon className="h-3.5 w-3.5" weight="duotone" />
+          <Icon className="h-3.5 w-3.5" />
         </span>
         <div className="min-w-0">
           <div className="truncate text-[13px] font-semibold text-ink">{data.label}</div>
@@ -402,7 +406,7 @@ function Palette({ canEdit }: { canEdit: boolean }) {
                     )}
                   >
                     <span className={cn("flex h-6 w-6 shrink-0 items-center justify-center rounded-md ring-1 ring-line", KIND_STYLES[kind])}>
-                      <Icon className="h-3.5 w-3.5" weight="duotone" />
+                      <Icon className="h-3.5 w-3.5" />
                     </span>
                     <span className="truncate font-medium">{def.label}</span>
                   </div>
@@ -811,7 +815,7 @@ function CanvasInner({
         {!wf ? (
           <div className="flex h-full items-center justify-center">
             <EmptyState
-              icon={<WorkflowIcon className="size-5" weight="duotone" />}
+              icon={<WorkflowIcon className="size-5" />}
               title="No workflow selected"
               description="Create or select a workflow to start building."
             />
@@ -856,14 +860,14 @@ function CanvasInner({
           <TooltipTrigger
             render={
               <Button type="button" size="xs" variant="quiet" onClick={refreshRuns} aria-label="Refresh run history">
-                <ClockCounterClockwise className="size-3.5" />
+                <History className="size-3.5" />
               </Button>
             }
           />
           <TooltipContent>Refresh run history</TooltipContent>
         </Tooltip>
         <Button type="button" size="xs" variant="secondary" onClick={handleSave} disabled={!canEdit || !dirty || saving}>
-          {saving ? <CircleNotch className="size-3.5 animate-spin" /> : <FloppyDisk className="size-3.5" />}
+          {saving ? <LoaderCircle className="size-3.5 animate-spin" /> : <Save className="size-3.5" />}
           Save
         </Button>
         <Tooltip>
@@ -877,7 +881,7 @@ function CanvasInner({
                 disabled={!canEdit || running || !wf}
                 aria-label={dirty ? "Saves first, then runs" : "Run now"}
               >
-                {running ? <CircleNotch className="size-3.5 animate-spin" /> : <Play className="size-3.5" />}
+                {running ? <LoaderCircle className="size-3.5 animate-spin" /> : <Play className="size-3.5" />}
                 {running ? "Running…" : "Run now"}
               </Button>
             }
@@ -891,7 +895,7 @@ function CanvasInner({
         <div className="absolute left-1/2 top-[68px] z-20 flex w-full max-w-xl -translate-x-1/2 flex-col gap-2 px-4">
           {error && (
             <div className="flex items-start gap-2 rounded-card bg-red-tint px-4 py-2 text-sm text-red shadow-float-sm ring-1 ring-line">
-              <Warning className="mt-0.5 size-4 shrink-0" />
+              <TriangleAlert className="mt-0.5 size-4 shrink-0" />
               <span className="flex-1">{error}</span>
               <Button type="button" size="xs" variant="quiet" onClick={() => setError(null)} aria-label="Dismiss error">
                 <X className="size-3.5" />
@@ -933,7 +937,7 @@ function CanvasInner({
               <span className="truncate">{projectDomain}</span>
             </Link>
             <Button type="button" size="xs" variant="quiet" onClick={() => setLeftOpen(false)} aria-label="Collapse panel">
-              <CaretLeft className="size-3.5" />
+              <ChevronLeft className="size-3.5" />
             </Button>
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto">
@@ -958,7 +962,7 @@ function CanvasInner({
                             active && "bg-accent-tint shadow-hairline",
                           )}
                         >
-                          <WorkflowIcon className={cn("size-4 shrink-0", active ? "text-ink" : "text-ink-3")} weight="duotone" />
+                          <WorkflowIcon className={cn("size-4 shrink-0", active ? "text-ink" : "text-ink-3")} />
                           <span className="min-w-0 flex-1">
                             <span className="block truncate font-medium text-ink">{w.name}</span>
                             <span className="block text-[11px] text-ink-3">
@@ -994,7 +998,7 @@ function CanvasInner({
                           aria-label="Create workflow"
                           className="shrink-0"
                         >
-                          {creating ? <CircleNotch className="size-3.5 animate-spin" /> : <Plus className="size-3.5" />}
+                          {creating ? <LoaderCircle className="size-3.5 animate-spin" /> : <Plus className="size-3.5" />}
                         </Button>
                       }
                     />
@@ -1016,7 +1020,7 @@ function CanvasInner({
           aria-label="Open workflows and palette"
           className="material-float absolute left-4 top-4 z-10 flex items-center gap-2 rounded-full py-2 pl-3 pr-4 text-[13px] font-medium text-ink-2 shadow-float-md ring-1 ring-line transition-colors hover:text-ink"
         >
-          <WorkflowIcon className="size-4" weight="duotone" />
+          <WorkflowIcon className="size-4" />
           Workflows
         </button>
       )}
@@ -1028,14 +1032,14 @@ function CanvasInner({
             <div className="flex items-center justify-between gap-1 px-2 pt-1">
               <TabsList variant="line" className="min-w-0 flex-1">
                 <TabsTrigger value="inspector" className="flex-1">
-                  <Cursor className="size-3.5" /> Inspector
+                  <MousePointer className="size-3.5" /> Inspector
                 </TabsTrigger>
                 <TabsTrigger value="runs" className="flex-1">
-                  <ClockCounterClockwise className="size-3.5" /> Runs
+                  <History className="size-3.5" /> Runs
                 </TabsTrigger>
               </TabsList>
               <Button type="button" size="xs" variant="quiet" onClick={() => setRightOpen(false)} aria-label="Collapse inspector" className="shrink-0">
-                <CaretRight className="size-3.5" />
+                <ChevronRight className="size-3.5" />
               </Button>
             </div>
             <TabsContent value="inspector" className="min-h-0 flex-1 overflow-y-auto p-3">
@@ -1065,7 +1069,7 @@ function CanvasInner({
           aria-label="Open inspector"
           className="material-float absolute right-4 top-4 z-10 flex items-center gap-2 rounded-full py-2 pl-3 pr-4 text-[13px] font-medium text-ink-2 shadow-float-md ring-1 ring-line transition-colors hover:text-ink"
         >
-          <GearSix className="size-4" />
+          <Settings className="size-4" />
           Inspector
         </button>
       )}
@@ -1225,7 +1229,7 @@ function WorkflowSettings({
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center gap-2 text-sm font-semibold text-ink">
-        <GearSix className="h-4 w-4 text-ink-3" />
+        <Settings className="h-4 w-4 text-ink-3" />
         Workflow settings
       </div>
       <Field label="Name">
@@ -1257,7 +1261,7 @@ function WorkflowSettings({
       {canEdit && (
         <div className="flex gap-2">
           <Button type="button" size="sm" variant="accent" onClick={onSave} disabled={saving} className="flex-1">
-            {saving ? <CircleNotch className="h-3.5 w-3.5 animate-spin" /> : <FloppyDisk className="h-3.5 w-3.5" />}
+            {saving ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
             Save settings
           </Button>
           <Tooltip>
@@ -1307,7 +1311,7 @@ function RunsPanel({
   if (runs.length === 0) {
     return (
       <EmptyState
-        icon={<ClockCounterClockwise className="h-5 w-5" />}
+        icon={<History className="h-5 w-5" />}
         title="No runs yet"
         description="Press “Run now” to execute the saved graph."
       />
@@ -1336,7 +1340,7 @@ function RunsPanel({
                 </div>
                 <div className="mt-1 flex items-center justify-between text-[11px] text-ink-3">
                   <span>{r.triggerKind} · {r._count?.steps ?? r.steps?.length ?? 0} steps</span>
-                  <CaretRight className="h-3.5 w-3.5" />
+                  <ChevronRight className="h-3.5 w-3.5" />
                 </div>
                 {r.error && <div className="mt-1 truncate text-[11px] text-red">{r.error}</div>}
               </button>

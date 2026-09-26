@@ -45,12 +45,12 @@
   --line: rgba(28, 25, 23, 0.08);
   --line-strong: rgba(28, 25, 23, 0.16);
 
-  /* accent — scarab green, disciplined: actions, links, active states, focus */
-  --accent: #0e7c66;
-  --accent-hover: #0a5f4e;
-  --accent-ink: #0e7c66;
-  --accent-tint: #e8f4ef;
-  --accent-deep: #084c40;
+  /* accent — violet (locked 2026-09-25 UI audit): actions, links, active states, focus */
+  --accent: #7c3aed;
+  --accent-hover: #6d28d9;
+  --accent-ink: #6d28d9;
+  --accent-tint: #f5f3ff;
+  --accent-deep: #5b21b6;
 
   /* semantic — muted, never orange-adjacent warning */
   --green: #2e7d4f;

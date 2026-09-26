@@ -8,7 +8,9 @@ import { useCallback, useEffect, useState } from "react";
 import {
   PhoneCall,
   Phone,
-  CalendarBlank,
+  Calendar,
+  CalendarDays,
+  CalendarCheck,
   CalendarPlus,
   Plus,
   Trash,
@@ -17,7 +19,8 @@ import {
   Check,
   Copy,
   Code,
-} from "@phosphor-icons/react";
+  type LucideIcon,
+} from "lucide-react";
 import { EmptyState } from "../crm/ui";
 import { formatMoney } from "../crm/types";
 
@@ -29,11 +32,11 @@ const thNum = "px-3 py-2 text-right text-[11px] font-semibold uppercase tracking
 
 type Tab = "numbers" | "calls" | "pages" | "bookings";
 
-const TABS: { id: Tab; label: string }[] = [
-  { id: "numbers", label: "Numbers" },
-  { id: "calls", label: "Call log" },
-  { id: "pages", label: "Booking pages" },
-  { id: "bookings", label: "Bookings" },
+const TABS: { id: Tab; label: string; icon: LucideIcon }[] = [
+  { id: "numbers", label: "Numbers", icon: Phone },
+  { id: "calls", label: "Call log", icon: PhoneCall },
+  { id: "pages", label: "Booking pages", icon: CalendarDays },
+  { id: "bookings", label: "Bookings", icon: CalendarCheck },
 ];
 
 interface CallNumberRow {
@@ -85,7 +88,7 @@ export function CallsApp() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <div className="text-[12px] font-medium text-stone-500">Marketr · R5</div>
-            <h1 className="text-[20px] font-semibold tracking-tight text-stone-900">Calls & Booking</h1>
+            <h1 className="text-xl font-bold tracking-tight text-stone-900">Calls & Booking</h1>
           </div>
         </div>
         <div className="mt-3 flex gap-1">
@@ -93,10 +96,11 @@ export function CallsApp() {
             <button
               key={t.id}
               onClick={() => setTab(t.id)}
-              className={`rounded-t-[8px] border-b-2 px-3.5 py-2 text-[13px] font-medium transition-colors ${
+              className={`flex items-center gap-1.5 rounded-t-[8px] border-b-2 px-3.5 py-2 text-[13px] font-medium transition-colors ${
                 tab === t.id ? "border-violet-600 text-violet-700" : "border-transparent text-stone-500 hover:text-stone-800"
               }`}
             >
+              <t.icon size={15} />
               {t.label}
             </button>
           ))}
@@ -546,7 +550,7 @@ function BookingsPanel() {
     <section className={cardCls}>
       <div className="mb-3 flex items-center justify-between">
         <h2 className="flex items-center gap-2 text-[14px] font-semibold text-stone-900">
-          <CalendarBlank size={16} className="text-violet-600" /> Bookings
+          <Calendar size={16} className="text-violet-600" /> Bookings
         </h2>
         <select value={status} onChange={(e) => setStatus(e.target.value)} className="crm-select !py-[6px] !text-[12.5px]" aria-label="Status filter">
           <option value="">All statuses</option>
@@ -558,7 +562,7 @@ function BookingsPanel() {
       {loading ? (
         <p className="py-8 text-center text-sm text-stone-500">Loading bookings…</p>
       ) : bookings.length === 0 ? (
-        <EmptyState icon={CalendarBlank} title="No bookings yet" hint="Bookings made through your public booking pages appear here." />
+        <EmptyState icon={Calendar} title="No bookings yet" hint="Bookings made through your public booking pages appear here." />
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full">

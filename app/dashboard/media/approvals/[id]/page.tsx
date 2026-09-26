@@ -40,7 +40,7 @@ export default async function ApprovalPage({ params }: { params: Promise<{ id: s
   const b = approval.binding;
 
   return (
-    <div className="flex h-full flex-col gap-6 bg-[#FAFAF7] p-4 md:p-6">
+    <div className="flex h-full flex-col gap-4 bg-[#FAFAF7] p-4 md:p-6">
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="text-xs font-medium uppercase tracking-wide text-stone-400">
@@ -71,20 +71,33 @@ export default async function ApprovalPage({ params }: { params: Promise<{ id: s
             <div className="flex justify-between gap-4"><dt className="text-stone-500">Terms version</dt><dd className="font-mono text-xs text-stone-900">{b.operatorTermsVersion}</dd></div>
           </dl>
           <h3 className="mb-2 mt-4 text-xs font-semibold uppercase tracking-wide text-stone-400">Line items</h3>
-          <ul className="space-y-2">
-            {b.lineItems.map((li, i) => (
-              <li key={i} className="rounded-lg border border-stone-100 p-3 text-sm">
-                <div className="flex justify-between">
-                  <span className="font-medium text-stone-900">{li.inventory}</span>
-                  <span className="font-semibold">{money(li.maxAllowedCents, b.currency)}</span>
-                </div>
-                <p className="mt-0.5 text-xs text-stone-500">{li.pricingModel} · {li.flightStart.slice(0, 10)} → {li.flightEnd.slice(0, 10)}</p>
-                <p className="mt-1 font-mono text-[10px] text-stone-400">
-                  creatives: {li.creativeIds.join(", ")} · hashes {li.creativeHashes.map((h) => h.slice(0, 8)).join(", ")}
-                </p>
-              </li>
-            ))}
-          </ul>
+          <div className="overflow-x-auto rounded-xl border border-stone-200">
+            <table className="w-full text-left text-[13px]">
+              <thead>
+                <tr className="border-b border-stone-100 bg-stone-50/60 text-[11px] uppercase tracking-wide text-stone-500">
+                  <th className="px-3 py-2 font-medium">Inventory</th>
+                  <th className="px-3 py-2 font-medium">Pricing</th>
+                  <th className="px-3 py-2 font-medium">Flight</th>
+                  <th className="px-3 py-2 font-medium">Max</th>
+                </tr>
+              </thead>
+              <tbody>
+                {b.lineItems.map((li, i) => (
+                  <tr key={i} className="border-b border-stone-100 last:border-0 hover:bg-violet-50/40">
+                    <td className="px-3 py-2 font-medium text-stone-900">
+                      {li.inventory}
+                      <span className="block font-mono text-[10px] font-normal text-stone-400">
+                        creatives {li.creativeHashes.map((h) => h.slice(0, 8)).join(", ")}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2 text-stone-600">{li.pricingModel}</td>
+                    <td className="px-3 py-2 text-[12px] text-stone-600">{li.flightStart.slice(0, 10)} → {li.flightEnd.slice(0, 10)}</td>
+                    <td className="px-3 py-2 font-medium text-stone-900">{money(li.maxAllowedCents, b.currency)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </section>
 
         <div className="space-y-4">
@@ -93,17 +106,26 @@ export default async function ApprovalPage({ params }: { params: Promise<{ id: s
             {approval.approvers.length === 0 ? (
               <p className="text-sm text-stone-500">No approvals recorded yet.</p>
             ) : (
-              <ul className="space-y-2 text-sm">
-                {approval.approvers.map((r, i) => (
-                  <li key={i} className="rounded-lg border border-stone-100 p-3">
-                    <div className="flex justify-between">
-                      <span className="font-medium text-stone-900">{r.userId}</span>
-                      <span className="text-xs text-stone-500">{r.method} · {r.decidedAt.slice(0, 16)}</span>
-                    </div>
-                    <p className="mt-1 font-mono text-[10px] text-stone-400">receipt {r.receipt.slice(0, 24)}…</p>
-                  </li>
-                ))}
-              </ul>
+              <div className="overflow-x-auto rounded-xl border border-stone-200">
+                <table className="w-full text-left text-[13px]">
+                  <thead>
+                    <tr className="border-b border-stone-100 bg-stone-50/60 text-[11px] uppercase tracking-wide text-stone-500">
+                      <th className="px-3 py-2 font-medium">Approver</th>
+                      <th className="px-3 py-2 font-medium">Method</th>
+                      <th className="px-3 py-2 font-medium">Decided</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {approval.approvers.map((r, i) => (
+                      <tr key={i} className="border-b border-stone-100 last:border-0 hover:bg-violet-50/40">
+                        <td className="px-3 py-2 font-medium text-stone-900">{r.userId}</td>
+                        <td className="px-3 py-2 text-stone-600">{r.method}</td>
+                        <td className="px-3 py-2 text-[12px] text-stone-600">{r.decidedAt.slice(0, 16)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
             <p className="mt-3 text-xs text-stone-500">
               Two-person satisfied: <span className="font-semibold">{approval.twoPersonSatisfied ? "yes" : "no"}</span> ·
@@ -113,16 +135,28 @@ export default async function ApprovalPage({ params }: { params: Promise<{ id: s
 
           <section className="rounded-xl border border-stone-200 bg-white p-4">
             <h2 className="mb-3 text-sm font-semibold text-stone-900">Event log (hash-chained)</h2>
-            <ul className="max-h-80 space-y-1.5 overflow-y-auto text-xs">
-              {events.map((e) => (
-                <li key={e.id} className="rounded-md bg-stone-50 px-2.5 py-1.5">
-                  <span className="font-mono text-stone-400">{e.ts.toISOString().slice(0, 19)}</span>{" "}
-                  <span className="font-semibold text-stone-800">{e.action}</span>{" "}
-                  <span className="text-stone-500">by {e.actor}</span>
-                  <span className="block font-mono text-[10px] text-stone-400">{e.eventHash.slice(0, 24)}…</span>
-                </li>
-              ))}
-            </ul>
+            <div className="max-h-80 overflow-y-auto rounded-xl border border-stone-200">
+              <table className="w-full text-left text-[13px]">
+                <thead className="sticky top-0">
+                  <tr className="border-b border-stone-100 bg-stone-50 text-[11px] uppercase tracking-wide text-stone-500">
+                    <th className="px-3 py-2 font-medium">Time</th>
+                    <th className="px-3 py-2 font-medium">Action</th>
+                    <th className="px-3 py-2 font-medium">Actor</th>
+                    <th className="px-3 py-2 font-medium">Hash</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {events.map((e) => (
+                    <tr key={e.id} className="border-b border-stone-100 last:border-0 hover:bg-violet-50/40">
+                      <td className="px-3 py-2 font-mono text-[11px] text-stone-500">{e.ts.toISOString().slice(0, 19)}</td>
+                      <td className="px-3 py-2 font-semibold text-stone-800">{e.action}</td>
+                      <td className="px-3 py-2 text-[12px] text-stone-600">{e.actor}</td>
+                      <td className="px-3 py-2 font-mono text-[10px] text-stone-400">{e.eventHash.slice(0, 16)}…</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </section>
         </div>
       </div>

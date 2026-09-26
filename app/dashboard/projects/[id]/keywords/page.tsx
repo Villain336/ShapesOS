@@ -33,7 +33,7 @@ export default async function KeywordsPage({
         >
           ← {project.domain}
         </Link>
-        <h1 className="mt-1 text-2xl font-bold tracking-tight">
+        <h1 className="mt-1 text-xl font-bold tracking-tight text-ink">
           Keyword research
         </h1>
       </div>

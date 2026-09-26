@@ -1,6 +1,6 @@
 // Marketr — shared settings UI primitives (milestone 21, part D1).
-// Tailwind classes follow the members-page pattern; accent = scarab green,
-// warm-paper surfaces come from the global theme.
+// Tailwind classes follow the members-page pattern; accent = violet (locked
+// 2026-09-25 UI audit), warm-paper surfaces come from the global theme.
 
 export const inputCls =
   "rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-accent focus:outline-none";
@@ -10,6 +10,11 @@ export const btnCls =
 
 export const primaryBtnCls =
   "rounded-md bg-accent px-3 py-2 text-sm font-medium text-white hover:bg-accent-hover disabled:opacity-50";
+
+// Locked house style (Creative Studio): primary buttons are violet, never teal.
+// Use this for every primary action on settings pages.
+export const primaryBtnVioletCls =
+  "flex items-center gap-1.5 rounded-md bg-violet-600 px-3 py-1.5 text-[13px] font-medium text-white hover:bg-violet-700 disabled:opacity-40";
 
 export const dangerBtnCls =
   "rounded-md border border-red-200 bg-red-50 px-2 py-1 text-xs text-red-700 hover:bg-red-100 disabled:opacity-50";

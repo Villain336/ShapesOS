@@ -269,7 +269,7 @@ export default function McpManager() {
             type="button"
             onClick={createKey}
             disabled={creating || enabled !== true}
-            className="self-start rounded-md bg-emerald-700 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+            className="flex items-center gap-1.5 self-start rounded-md bg-violet-600 px-3 py-1.5 text-[13px] font-medium text-white hover:bg-violet-700 disabled:opacity-40"
           >
             {creating ? "Creating…" : "Create key"}
           </button>

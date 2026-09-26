@@ -211,7 +211,7 @@ export default function BacklinksExplorer({
                 onClick={toggleEnabled}
                 disabled={toggling}
                 title="Weekly backlink refresh for this project"
-                className={`relative h-5 w-9 rounded-full transition-colors disabled:opacity-50 ${enabled ? "bg-emerald-600" : "bg-zinc-200"}`}
+                className={`relative h-5 w-9 rounded-full transition-colors disabled:opacity-50 ${enabled ? "bg-violet-600" : "bg-zinc-200"}`}
               >
                 <span
                   className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition-[left] duration-150 ${enabled ? "left-[18px]" : "left-0.5"}`}

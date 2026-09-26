@@ -50,42 +50,42 @@ export default function BriefBuilder() {
   }
 
   return (
-    <div className="rounded-xl border bg-card p-5 shadow-sm">
+    <div className="rounded-xl border border-stone-200 bg-white p-5">
       <div className="flex items-center gap-2">
-        <FileText className="h-4 w-4 text-muted-foreground" />
-        <h2 className="text-base font-semibold">Citation-brief builder</h2>
+        <FileText className="h-4 w-4 text-stone-500" />
+        <h2 className="text-sm font-semibold tracking-tight text-stone-900">Citation-brief builder</h2>
       </div>
-      <p className="mt-1 text-sm text-muted-foreground">
+      <p className="mt-1 text-[13px] text-stone-500">
         Competitor-gap analysis against the top-3 local directories, pre-filled NAP payloads, and a tracked
         manual-submission checklist. Done-for-you or DIY — never automatic.
       </p>
       <div className="mt-4 grid gap-3 md:grid-cols-2">
         <div>
-          <Label htmlFor="brief-dirs">Directories you&apos;re already on (comma-separated)</Label>
-          <Input id="brief-dirs" value={clientDirs} onChange={(e) => setClientDirs(e.target.value)} placeholder="yelp, facebook, bbb" />
+          <Label htmlFor="brief-dirs" className="text-[13px] font-medium text-stone-700">Directories you&apos;re already on (comma-separated)</Label>
+          <Input id="brief-dirs" value={clientDirs} onChange={(e) => setClientDirs(e.target.value)} placeholder="yelp, facebook, bbb" className="border-stone-200 bg-white text-[13px] placeholder:text-stone-400 focus-visible:border-violet-400 focus-visible:ring-violet-200/60" />
         </div>
         <div>
-          <Label htmlFor="brief-name">Business name (canonical NAP)</Label>
-          <Input id="brief-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Acme Plumbing Co." />
+          <Label htmlFor="brief-name" className="text-[13px] font-medium text-stone-700">Business name (canonical NAP)</Label>
+          <Input id="brief-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Acme Plumbing Co." className="border-stone-200 bg-white text-[13px] placeholder:text-stone-400 focus-visible:border-violet-400 focus-visible:ring-violet-200/60" />
         </div>
         <div>
-          <Label htmlFor="brief-address">Address</Label>
-          <Input id="brief-address" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="123 Main St, Greensboro, NC 27401" />
+          <Label htmlFor="brief-address" className="text-[13px] font-medium text-stone-700">Address</Label>
+          <Input id="brief-address" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="123 Main St, Greensboro, NC 27401" className="border-stone-200 bg-white text-[13px] placeholder:text-stone-400 focus-visible:border-violet-400 focus-visible:ring-violet-200/60" />
         </div>
         <div>
-          <Label htmlFor="brief-phone">Phone</Label>
-          <Input id="brief-phone" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(336) 555-0100" />
+          <Label htmlFor="brief-phone" className="text-[13px] font-medium text-stone-700">Phone</Label>
+          <Input id="brief-phone" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(336) 555-0100" className="border-stone-200 bg-white text-[13px] placeholder:text-stone-400 focus-visible:border-violet-400 focus-visible:ring-violet-200/60" />
         </div>
         <div className="md:col-span-2">
-          <Label htmlFor="brief-website">Website</Label>
-          <Input id="brief-website" value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="https://acmeplumbing.example.com" />
+          <Label htmlFor="brief-website" className="text-[13px] font-medium text-stone-700">Website</Label>
+          <Input id="brief-website" value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="https://acmeplumbing.example.com" className="border-stone-200 bg-white text-[13px] placeholder:text-stone-400 focus-visible:border-violet-400 focus-visible:ring-violet-200/60" />
         </div>
       </div>
       <div className="mt-4">
-        <Button onClick={build} disabled={busy}>{busy ? "Building…" : "Build citation brief"}</Button>
+        <Button onClick={build} disabled={busy} className="bg-violet-600 text-white hover:bg-violet-700">{busy ? "Building…" : "Build citation brief"}</Button>
       </div>
-      {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
-      {result && <p className="mt-2 text-sm text-emerald-700">{result}</p>}
+      {error && <p className="mt-2 text-[13px] text-red-600">{error}</p>}
+      {result && <p className="mt-2 text-[13px] text-emerald-700">{result}</p>}
     </div>
   );
 }

@@ -8,7 +8,16 @@ import { requireWorkspaceRole } from "@/lib/authz";
 import { mediaStores, safetyTablesReady } from "@/lib/media/db";
 import { mediaRoleForWorkspaceRole } from "@/lib/media/safety";
 import { poolUtilization } from "@/lib/media/pools";
-import { Badge } from "@/components/vault/shadcn/badge";
+
+const chip =
+  "inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-1.5 py-0.5 text-[10px] font-medium leading-tight";
+const chipSlate = `${chip} bg-stone-100 text-stone-600 border-stone-200`;
+const chipGreen = `${chip} bg-emerald-50 text-emerald-700 border-emerald-200`;
+const chipRed = `${chip} bg-red-50 text-red-700 border-red-200`;
+
+function poolStatusTone(status: string): string {
+  return status === "active" ? chipGreen : status === "frozen" ? chipRed : chipSlate;
+}
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Budget pools — Media — Marketr" };
@@ -45,38 +54,54 @@ export default async function PoolsPage() {
           cap, period, platform allowlist, then attach the client&apos;s virtual card.
         </div>
       ) : (
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {pools.map((p) => {
-            const util = poolUtilization(p) * 100;
-            return (
-              <Link
-                key={p.id}
-                href={`/dashboard/media/pools/${p.id}`}
-                className="rounded-xl border border-stone-200 bg-white p-4 hover:border-stone-400"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-semibold text-stone-900">{p.name}</span>
-                  <Badge variant={p.status === "active" ? "default" : p.status === "frozen" ? "secondary" : "destructive"}>
-                    {p.status}
-                  </Badge>
-                </div>
-                <p className="mt-1 text-xs text-stone-500">{p.period} · {p.platformAllowlist.join(", ")}</p>
-                <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-stone-100">
-                  <div
-                    className={`h-full rounded-full ${util >= 90 ? "bg-red-500" : util >= 75 ? "bg-amber-500" : "bg-emerald-500"}`}
-                    style={{ width: `${Math.min(100, util).toFixed(1)}%` }}
-                  />
-                </div>
-                <div className="mt-2 flex justify-between text-xs text-stone-500">
-                  <span>{money(p.remainingCents, p.currency)} remaining</span>
-                  <span>{money(p.encumberedCents, p.currency)} encumbered</span>
-                </div>
-                <p className="mt-1 font-mono text-[10px] text-stone-400">
-                  card: {p.virtualCardRef ?? "none attached"} ({p.cardProvider})
-                </p>
-              </Link>
-            );
-          })}
+        <div className="overflow-x-auto rounded-xl border border-stone-200 bg-white">
+          <table className="w-full text-left text-[13px]">
+            <thead>
+              <tr className="border-b border-stone-100 bg-stone-50/60 text-[11px] uppercase tracking-wide text-stone-500">
+                <th className="px-3 py-2 font-medium">Pool</th>
+                <th className="px-3 py-2 font-medium">Status</th>
+                <th className="px-3 py-2 font-medium">Period</th>
+                <th className="px-3 py-2 font-medium">Platforms</th>
+                <th className="px-3 py-2 font-medium">Remaining</th>
+                <th className="px-3 py-2 font-medium">Encumbered</th>
+                <th className="px-3 py-2 font-medium">Utilization</th>
+                <th className="px-3 py-2 font-medium">Card</th>
+              </tr>
+            </thead>
+            <tbody>
+              {pools.map((p) => {
+                const util = poolUtilization(p) * 100;
+                return (
+                  <tr key={p.id} className="border-b border-stone-100 last:border-0 hover:bg-violet-50/40">
+                    <td className="px-3 py-2">
+                      <Link href={`/dashboard/media/pools/${p.id}`} className="font-medium text-stone-900 hover:underline">
+                        {p.name}
+                      </Link>
+                    </td>
+                    <td className="px-3 py-2"><span className={poolStatusTone(p.status)}>{p.status}</span></td>
+                    <td className="px-3 py-2 text-stone-600">{p.period}</td>
+                    <td className="px-3 py-2 text-[12px] text-stone-600">{p.platformAllowlist.join(", ")}</td>
+                    <td className="px-3 py-2 font-medium text-stone-900">{money(p.remainingCents, p.currency)}</td>
+                    <td className="px-3 py-2 text-stone-600">{money(p.encumberedCents, p.currency)}</td>
+                    <td className="px-3 py-2">
+                      <span className="inline-flex w-28 items-center gap-2">
+                        <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-stone-100">
+                          <span
+                            className={`block h-full rounded-full ${util >= 90 ? "bg-red-500" : util >= 75 ? "bg-amber-500" : "bg-emerald-500"}`}
+                            style={{ width: `${Math.min(100, util).toFixed(1)}%` }}
+                          />
+                        </span>
+                        <span className="text-[11px] text-stone-500">{util.toFixed(0)}%</span>
+                      </span>
+                    </td>
+                    <td className="px-3 py-2 font-mono text-[11px] text-stone-500">
+                      {p.virtualCardRef ?? "none"} ({p.cardProvider})
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       )}
     </div>

@@ -7,24 +7,24 @@
 
 import { useCallback, useEffect, useState } from "react";
 import {
-  Warning,
+  TriangleAlert,
   Check,
   Download,
-  ArrowSquareOut,
+  SquareArrowOutUpRight,
   Globe,
   Image as ImageIcon,
-  Stack,
-  LinkSimple,
-  CircleNotch,
+  Layers,
+  Link,
+  LoaderCircle,
   Palette,
   Plug,
-  ArrowClockwise,
-  MagnifyingGlass,
-  PaperPlane,
-  GearSix,
+  RotateCw,
+  Search,
+  Send,
+  Settings,
   Trash,
   XCircle,
-} from "@phosphor-icons/react";
+} from "lucide-react";
 
 interface Props {
   projectId: string;
@@ -489,7 +489,7 @@ export default function StudioStudio({ projectId, workspaceId, canEdit, isOwnerA
   const tabs: Array<{ id: Tab; label: string; icon: React.ReactNode }> = [
     { id: "canva", label: "Canva", icon: <Palette className="h-4 w-4" /> },
     { id: "domains", label: "Domains", icon: <Globe className="h-4 w-4" /> },
-    { id: "assets", label: "Assets", icon: <Stack className="h-4 w-4" /> },
+    { id: "assets", label: "Assets", icon: <Layers className="h-4 w-4" /> },
   ];
 
   return (
@@ -502,18 +502,18 @@ export default function StudioStudio({ projectId, workspaceId, canEdit, isOwnerA
               : "border-red-200 bg-red-50/40 text-red-700"
           }`}
         >
-          {notice.kind === "ok" ? <Check className="h-4 w-4" /> : <Warning className="h-4 w-4" />}
+          {notice.kind === "ok" ? <Check className="h-4 w-4" /> : <TriangleAlert className="h-4 w-4" />}
           {notice.text}
         </div>
       )}
 
-      <div className="mb-6 flex flex-wrap gap-1 rounded-xl border border-zinc-200 bg-zinc-50 p-1">
+      <div className="mb-6 flex flex-wrap gap-1 border-b border-zinc-200">
         {tabs.map((t) => (
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
-            className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium ${press} ${fade} ${
-              tab === t.id ? "bg-zinc-900 text-white" : "text-zinc-500 hover:text-zinc-600"
+            className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-[13.5px] font-medium transition-colors ${press} ${
+              tab === t.id ? "border-violet-600 text-violet-700" : "border-transparent text-stone-500 hover:text-stone-800"
             }`}
           >
             {t.icon}
@@ -539,7 +539,7 @@ export default function StudioStudio({ projectId, workspaceId, canEdit, isOwnerA
                   disabled={busy}
                   className={`inline-flex items-center gap-2 rounded-lg bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-900 ${press}`}
                 >
-                  {busy ? <CircleNotch className="h-4 w-4 animate-spin" /> : <Plug className="h-4 w-4" />}
+                  {busy ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Plug className="h-4 w-4" />}
                   Connect Canva
                 </button>
               ) : (
@@ -558,7 +558,7 @@ export default function StudioStudio({ projectId, workspaceId, canEdit, isOwnerA
                     onClick={() => run(refreshCanva)}
                     className={`rounded-md border border-zinc-200 px-3 py-1.5 text-sm text-zinc-500 ${press}`}
                   >
-                    <ArrowClockwise className="h-4 w-4" />
+                    <RotateCw className="h-4 w-4" />
                   </button>
                   {canEdit && (
                     <button
@@ -616,7 +616,7 @@ export default function StudioStudio({ projectId, workspaceId, canEdit, isOwnerA
                   <input
                     value={designQuery}
                     onChange={(e) => setDesignQuery(e.target.value)}
-                    placeholder="MagnifyingGlass designs…"
+                    placeholder="Search designs…"
                     className="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-1.5 text-sm text-zinc-800"
                   />
                   {folders.length > 0 && (
@@ -637,7 +637,7 @@ export default function StudioStudio({ projectId, workspaceId, canEdit, isOwnerA
                     onClick={searchDesigns}
                     className={`rounded-md border border-zinc-200 px-3 py-1.5 text-sm text-zinc-500 ${press}`}
                   >
-                    <MagnifyingGlass className="h-4 w-4" />
+                    <Search className="h-4 w-4" />
                   </button>
                 </div>
               </div>
@@ -660,7 +660,7 @@ export default function StudioStudio({ projectId, workspaceId, canEdit, isOwnerA
                         rel="noreferrer"
                         className={`inline-flex items-center gap-1 rounded-md border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-800 ${press}`}
                       >
-                        <ArrowSquareOut className="h-3 w-3" /> Open in Canva
+                        <SquareArrowOutUpRight className="h-3 w-3" /> Open in Canva
                       </a>
                       {canEdit && (
                         <>
@@ -670,7 +670,7 @@ export default function StudioStudio({ projectId, workspaceId, canEdit, isOwnerA
                             className={`inline-flex items-center gap-1 rounded-md bg-zinc-100 px-3 py-1.5 text-xs font-medium text-zinc-900 ${press}`}
                           >
                             {exporting === d.id ? (
-                              <CircleNotch className="h-3 w-3 animate-spin" />
+                              <LoaderCircle className="h-3 w-3 animate-spin" />
                             ) : (
                               <Download className="h-3 w-3" />
                             )}
@@ -722,7 +722,7 @@ export default function StudioStudio({ projectId, workspaceId, canEdit, isOwnerA
           {isOwnerAdmin && (
             <div className="mb-6 rounded-xl border border-zinc-200 bg-zinc-50 p-5">
               <h3 className="mb-1 flex items-center gap-2 text-sm font-semibold text-zinc-800">
-                <GearSix className="h-4 w-4" /> Porkbun API keys
+                <Settings className="h-4 w-4" /> Porkbun API keys
               </h3>
               <p className="mb-4 text-sm text-zinc-500">
                 {porkbunConfigured
@@ -755,7 +755,7 @@ export default function StudioStudio({ projectId, workspaceId, canEdit, isOwnerA
             </div>
           )}
 
-          {/* MagnifyingGlass */}
+          {/* Search */}
           {porkbunConfigured && (
             <div className="mb-6 rounded-xl border border-zinc-200 bg-zinc-50 p-5">
               <h3 className="mb-3 text-sm font-semibold text-zinc-800">Check availability</h3>
@@ -771,7 +771,7 @@ export default function StudioStudio({ projectId, workspaceId, canEdit, isOwnerA
                   disabled={busy || !searchDomain.trim()}
                   className={`rounded-md bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-900 ${press}`}
                 >
-                  MagnifyingGlass
+                  Search
                 </button>
               </div>
               {searchResult && (
@@ -818,7 +818,7 @@ export default function StudioStudio({ projectId, workspaceId, canEdit, isOwnerA
           {preview && (
             <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50/20 p-5">
               <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold text-amber-800">
-                <Warning className="h-4 w-4" /> Confirm purchase
+                <TriangleAlert className="h-4 w-4" /> Confirm purchase
               </h3>
               <p className="mb-1 text-lg font-semibold text-zinc-900">{preview.domain}</p>
               <p className="mb-3 text-sm text-zinc-500">
@@ -850,7 +850,7 @@ export default function StudioStudio({ projectId, workspaceId, canEdit, isOwnerA
                   disabled={busy || !agreeTerms}
                   className={`rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-40 ${press}`}
                 >
-                  {busy ? <CircleNotch className="h-4 w-4 animate-spin" /> : "Confirm purchase"}
+                  {busy ? <LoaderCircle className="h-4 w-4 animate-spin" /> : "Confirm purchase"}
                 </button>
                 <button
                   onClick={() => setPreview(null)}
@@ -909,7 +909,7 @@ export default function StudioStudio({ projectId, workspaceId, canEdit, isOwnerA
           </h3>
           {domains.length === 0 ? (
             <p className="rounded-xl border border-dashed border-zinc-200 p-8 text-center text-sm text-zinc-500">
-              No domains yet. MagnifyingGlass above to register one through Porkbun.
+              No domains yet. Search above to register one through Porkbun.
             </p>
           ) : (
             <div className="grid gap-3">
@@ -996,7 +996,7 @@ export default function StudioStudio({ projectId, workspaceId, canEdit, isOwnerA
                       rel="noreferrer"
                       className={`inline-flex items-center gap-1 rounded-md border border-zinc-200 px-3 py-1.5 text-xs text-zinc-800 ${press}`}
                     >
-                      <LinkSimple className="h-3 w-3" /> Open
+                      <Link className="h-3 w-3" /> Open
                     </a>
                     {canEdit && (
                       <>
@@ -1004,7 +1004,7 @@ export default function StudioStudio({ projectId, workspaceId, canEdit, isOwnerA
                           onClick={() => openUseInSocial(a)}
                           className={`inline-flex items-center gap-1 rounded-md bg-zinc-100 px-3 py-1.5 text-xs font-medium text-zinc-900 ${press}`}
                         >
-                          <PaperPlane className="h-3 w-3" /> Use in social post
+                          <Send className="h-3 w-3" /> Use in social post
                         </button>
                         <button
                           onClick={() => deleteAsset(a.id)}

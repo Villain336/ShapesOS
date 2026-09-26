@@ -9,7 +9,13 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowDown, ArrowUp, Loader2, Hand } from "lucide-react";
-import { Badge } from "@/components/vault/shadcn/badge";
+function chip(text: React.ReactNode, cls: string) {
+  return (
+    <span className={`inline-flex items-center gap-0.5 whitespace-nowrap rounded-full border px-1.5 py-0.5 text-[10px] font-medium leading-tight ${cls}`}>
+      {text}
+    </span>
+  );
+}
 import type { PlanInitiative } from "@/lib/authority/intelligence/types";
 
 const SPRINTS = [
@@ -18,10 +24,10 @@ const SPRINTS = [
   { sprint: 90 as const, label: "Days 61–90", sub: "Scale: invest in what the data proved." },
 ];
 
-const EFFORT_STYLES: Record<string, string> = {
-  low: "bg-emerald-50 text-emerald-700 border-emerald-200",
-  medium: "bg-amber-50 text-amber-700 border-amber-200",
-  high: "bg-rose-50 text-rose-700 border-rose-200",
+const EFFORT_CHIP: Record<string, string> = {
+  low: "border-emerald-200 bg-emerald-50 text-emerald-700",
+  medium: "border-amber-200 bg-amber-50 text-amber-700",
+  high: "border-rose-200 bg-rose-50 text-rose-700",
 };
 
 export function PlanBoard({ reportId, initial }: { reportId: string; initial: PlanInitiative[] }) {
@@ -62,7 +68,7 @@ export function PlanBoard({ reportId, initial }: { reportId: string; initial: Pl
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-4">
       {(error || saving) && (
         <div className="flex items-center gap-2 text-xs text-stone-500">
           {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
@@ -79,33 +85,25 @@ export function PlanBoard({ reportId, initial }: { reportId: string; initial: Pl
               <h3 className="text-sm font-semibold tracking-tight text-stone-900">{s.label}</h3>
               <p className="text-xs text-stone-500">{s.sub}</p>
             </div>
-            <ol className="space-y-3">
+            <ol className="space-y-2">
               {items.map((i) => (
                 <li
                   key={i.id}
-                  className="rounded-xl border border-stone-200 bg-white p-4 shadow-sm transition hover:shadow-md"
+                  className="rounded-xl border border-stone-200 bg-white p-4"
                 >
                   <div className="flex items-start gap-3">
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-indigo-50 text-sm font-bold text-indigo-700">
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-violet-50 text-sm font-bold text-violet-700">
                       {i.priority}
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <p className="text-sm font-semibold text-stone-900">{i.title}</p>
-                        {i.adjustedByHuman && (
-                          <Badge variant="outline" className="gap-1 border-indigo-200 bg-indigo-50 text-indigo-700">
-                            <Hand className="h-3 w-3" /> human-adjusted
-                          </Badge>
-                        )}
+                        {i.adjustedByHuman && chip(<><Hand className="h-3 w-3" /> human-adjusted</>, "border-violet-200 bg-violet-50 text-violet-700")}
                       </div>
                       <p className="mt-1 text-sm text-stone-600">{i.description}</p>
                       <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
-                        <Badge variant="secondary" className="bg-stone-100 text-stone-700">
-                          Executes in: {i.module}
-                        </Badge>
-                        <Badge variant="outline" className={EFFORT_STYLES[i.effort] ?? ""}>
-                          {i.effort} effort
-                        </Badge>
+                        {chip(`Executes in: ${i.module}`, "border-stone-200 bg-stone-100 text-stone-700")}
+                        {chip(`${i.effort} effort`, EFFORT_CHIP[i.effort] ?? "border-stone-200 bg-stone-100 text-stone-500")}
                         <span className="text-stone-500">Expected: {i.expectedOutcome}</span>
                       </div>
                     </div>

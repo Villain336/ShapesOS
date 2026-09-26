@@ -5,7 +5,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Notice, btnCls, cardCls, primaryBtnCls, type NoticeState } from "./ui";
+import { Notice, btnCls, cardCls, primaryBtnVioletCls, type NoticeState } from "./ui";
 
 interface SummaryData {
   used: number;
@@ -292,7 +292,7 @@ function CapForm({
         onChange={(e) => setCapCredits(e.target.value)}
         className="w-32 rounded-md border border-zinc-200 px-2 py-1.5 text-sm"
       />
-      <button type="submit" disabled={saving} className={primaryBtnCls}>
+      <button type="submit" disabled={saving} className={primaryBtnVioletCls}>
         {saving ? "Saving…" : "Save cap"}
       </button>
     </form>

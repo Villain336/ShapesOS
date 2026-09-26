@@ -294,7 +294,7 @@ function CampaignsTab({ onNew }: { onNew: () => void }) {
         <div className="overflow-x-auto rounded-[10px] border border-stone-200 bg-white">
           <table className="w-full min-w-[680px] text-left text-[13px]">
             <thead>
-              <tr className="border-b border-stone-200 text-[11px] uppercase tracking-wide text-stone-400">
+              <tr className="border-b border-stone-100 bg-stone-50/60 text-[11px] uppercase tracking-wide text-stone-500">
                 <th className="px-3 py-2 font-medium">Campaign</th>
                 <th className="px-3 py-2 font-medium">Status</th>
                 <th className="px-3 py-2 font-medium">Pieces</th>
@@ -304,7 +304,7 @@ function CampaignsTab({ onNew }: { onNew: () => void }) {
             </thead>
             <tbody className="divide-y divide-stone-100">
               {(campaigns ?? []).map((c) => (
-                <tr key={c.id} className="cursor-pointer hover:bg-stone-50" onClick={() => openDetail(c.id)}>
+                <tr key={c.id} className="cursor-pointer border-b border-stone-100 last:border-0 hover:bg-violet-50/40" onClick={() => openDetail(c.id)}>
                   <td className="px-3 py-2 font-medium text-stone-900">{c.name}</td>
                   <td className="px-3 py-2"><StatusChip status={c.status} /></td>
                   <td className="px-3 py-2 text-stone-600">{c.pieceCount ?? "—"}</td>
@@ -381,7 +381,7 @@ function PiecesTab() {
         <div className="overflow-x-auto rounded-[10px] border border-stone-200 bg-white">
           <table className="w-full min-w-[980px] text-left text-[13px]">
             <thead>
-              <tr className="border-b border-stone-200 text-[11px] uppercase tracking-wide text-stone-400">
+              <tr className="border-b border-stone-100 bg-stone-50/60 text-[11px] uppercase tracking-wide text-stone-500">
                 <th className="px-3 py-2 font-medium">Lead</th>
                 <th className="px-3 py-2 font-medium">Channel</th>
                 <th className="px-3 py-2 font-medium">Status</th>
@@ -395,7 +395,7 @@ function PiecesTab() {
             </thead>
             <tbody className="divide-y divide-stone-100">
               {(pieces ?? []).map((p) => (
-                <tr key={p.pieceId} className="hover:bg-stone-50">
+                <tr key={p.pieceId} className="border-b border-stone-100 last:border-0 hover:bg-violet-50/40">
                   <td className="px-3 py-2">
                     <div className="font-medium text-stone-900">{p.leadName ?? "—"}</div>
                     <div className="text-[12px] text-stone-500">{p.stepIndex != null ? `step ${p.stepIndex + 1}` : p.campaignName}</div>
@@ -811,24 +811,26 @@ function BuilderWizard() {
 
 export function MailApp() {
   const [tab, setTab] = useState<Tab>("campaigns");
+  const TABS = [
+    { id: "campaigns" as const, label: "Campaigns", icon: Mailbox },
+    { id: "pieces" as const, label: "Nurture mail", icon: Truck },
+    { id: "builder" as const, label: "New campaign", icon: Plus },
+  ];
   return (
     <div className="flex h-full flex-col gap-3">
-      <div className="flex items-center gap-1 border-b border-stone-200 pb-2">
-        {(
-          [
-            { id: "campaigns", label: "Campaigns" },
-            { id: "pieces", label: "Nurture mail" },
-            { id: "builder", label: "New campaign" },
-          ] as const
-        ).map((t) => (
+      <div className="mb-4 flex gap-1 border-b border-stone-200">
+        {TABS.map(({ id, label, icon: Icon }) => (
           <button
-            key={t.id}
-            onClick={() => setTab(t.id)}
-            className={`rounded-md px-3 py-1.5 text-[13px] font-medium ${
-              tab === t.id ? "bg-violet-100 text-violet-800" : "text-stone-500 hover:bg-stone-100 hover:text-stone-700"
+            key={id}
+            onClick={() => setTab(id)}
+            className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-[13.5px] font-medium transition ${
+              tab === id
+                ? "border-violet-600 text-violet-700"
+                : "border-transparent text-stone-500 hover:text-stone-800"
             }`}
           >
-            {t.label}
+            <Icon size={15} />
+            {label}
           </button>
         ))}
       </div>

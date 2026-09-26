@@ -2,7 +2,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { AlertTriangle, FileDown, Loader2, Plus, ShieldCheck, Trash2 } from "lucide-react";
+import { AlertTriangle, FileDown, FileText, Loader2, Plus, ShieldCheck, Trash2 } from "lucide-react";
 
 class ApiError extends Error {
   status: number;
@@ -105,14 +105,26 @@ export function AudioApp() {
     }
   }
 
-  const inputCls = "mt-1 w-full rounded-md border border-stone-300 px-2 py-1.5 text-sm";
+  const inputCls = "mt-1 w-full rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-[13px] text-stone-900 placeholder:text-stone-400 focus:border-violet-400 focus:outline-none";
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex gap-2 border-b border-stone-200">
-        {(["briefs", "new"] as const).map((t) => (
-          <button key={t} onClick={() => setTab(t)} className={`px-3 pb-2 text-sm font-medium ${tab === t ? "border-b-2 border-stone-900 text-stone-900" : "text-stone-500"}`}>
-            {t === "briefs" ? `Briefs (${buys.length})` : "New brief"}
+      <div className="mb-4 flex gap-1 border-b border-stone-200">
+        {([
+          { id: "briefs" as const, label: `Briefs (${buys.length})`, icon: FileText },
+          { id: "new" as const, label: "New brief", icon: Plus },
+        ]).map(({ id, label, icon: Icon }) => (
+          <button
+            key={id}
+            onClick={() => setTab(id)}
+            className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-[13.5px] font-medium transition ${
+              tab === id
+                ? "border-violet-600 text-violet-700"
+                : "border-transparent text-stone-500 hover:text-stone-800"
+            }`}
+          >
+            <Icon size={15} />
+            {label}
           </button>
         ))}
       </div>
@@ -150,11 +162,11 @@ export function AudioApp() {
             {stations.map((s, i) => (
               <div key={i} className="mt-1 flex gap-1">
                 <input value={s.name} onChange={(e) => setStations((x) => x.map((r, j) => (j === i ? { ...r, name: e.target.value } : r)))} placeholder="Station / show" className={inputCls} />
-                <select value={s.type} onChange={(e) => setStations((x) => x.map((r, j) => (j === i ? { ...r, type: e.target.value } : r)))} className="mt-1 rounded-md border border-stone-300 px-2 py-1.5 text-sm">
+                <select value={s.type} onChange={(e) => setStations((x) => x.map((r, j) => (j === i ? { ...r, type: e.target.value } : r)))} className="mt-1 w-full rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-[13px] text-stone-900 placeholder:text-stone-400 focus:border-violet-400 focus:outline-none">
                   <option value="streaming">streaming</option><option value="podcast">podcast</option>
                 </select>
                 <input value={s.market} onChange={(e) => setStations((x) => x.map((r, j) => (j === i ? { ...r, market: e.target.value } : r)))} placeholder="Market" className={`${inputCls} w-28`} />
-                <button onClick={() => setStations((x) => x.filter((_, j) => j !== i))} className="mt-1 rounded-md border border-stone-300 px-2"><Trash2 className="h-3 w-3" /></button>
+                <button onClick={() => setStations((x) => x.filter((_, j) => j !== i))} className="mt-1 rounded-md border border-stone-200 bg-white px-2 py-1.5 text-stone-600 hover:bg-stone-50"><Trash2 className="h-3 w-3" /></button>
               </div>
             ))}
             <button onClick={() => setStations((x) => [...x, { name: "", type: "streaming", market: "" }])} className="mt-1 text-xs text-stone-600 underline">+ station</button>
@@ -165,11 +177,11 @@ export function AudioApp() {
             {spotMix.map((s, i) => (
               <div key={i} className="mt-1 flex gap-1">
                 <input value={s.label} onChange={(e) => setSpotMix((x) => x.map((r, j) => (j === i ? { ...r, label: e.target.value } : r)))} placeholder="Label" className={inputCls} />
-                <select value={s.lengthSec} onChange={(e) => setSpotMix((x) => x.map((r, j) => (j === i ? { ...r, lengthSec: Number(e.target.value) } : r)))} className="mt-1 rounded-md border border-stone-300 px-2 py-1.5 text-sm">
+                <select value={s.lengthSec} onChange={(e) => setSpotMix((x) => x.map((r, j) => (j === i ? { ...r, lengthSec: Number(e.target.value) } : r)))} className="mt-1 w-full rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-[13px] text-stone-900 placeholder:text-stone-400 focus:border-violet-400 focus:outline-none">
                   <option value={15}>:15</option><option value={30}>:30</option><option value={60}>:60</option>
                 </select>
                 <input type="number" value={s.spotsPerDay} onChange={(e) => setSpotMix((x) => x.map((r, j) => (j === i ? { ...r, spotsPerDay: Number(e.target.value) } : r)))} min={1} placeholder="/day" className={`${inputCls} w-24`} />
-                <button onClick={() => setSpotMix((x) => x.filter((_, j) => j !== i))} className="mt-1 rounded-md border border-stone-300 px-2"><Trash2 className="h-3 w-3" /></button>
+                <button onClick={() => setSpotMix((x) => x.filter((_, j) => j !== i))} className="mt-1 rounded-md border border-stone-200 bg-white px-2 py-1.5 text-stone-600 hover:bg-stone-50"><Trash2 className="h-3 w-3" /></button>
               </div>
             ))}
             <button onClick={() => setSpotMix((x) => [...x, { lengthSec: 30, spotsPerDay: 10, label: "30s" }])} className="mt-1 text-xs text-stone-600 underline">+ spot</button>
@@ -179,11 +191,11 @@ export function AudioApp() {
                 <input value={p.stationRef} onChange={(e) => setPromoCodes((x) => x.map((r, j) => (j === i ? { ...r, stationRef: e.target.value } : r)))} placeholder="Station" className={inputCls} />
                 <input value={p.code} onChange={(e) => setPromoCodes((x) => x.map((r, j) => (j === i ? { ...r, code: e.target.value } : r)))} placeholder="CODE20" className={`${inputCls} w-28`} />
                 <input value={p.vanityUrl} onChange={(e) => setPromoCodes((x) => x.map((r, j) => (j === i ? { ...r, vanityUrl: e.target.value } : r)))} placeholder="brand.link/wxyz" className={inputCls} />
-                <button onClick={() => setPromoCodes((x) => x.filter((_, j) => j !== i))} className="mt-1 rounded-md border border-stone-300 px-2"><Trash2 className="h-3 w-3" /></button>
+                <button onClick={() => setPromoCodes((x) => x.filter((_, j) => j !== i))} className="mt-1 rounded-md border border-stone-200 bg-white px-2 py-1.5 text-stone-600 hover:bg-stone-50"><Trash2 className="h-3 w-3" /></button>
               </div>
             ))}
             <button onClick={() => setPromoCodes((x) => [...x, { stationRef: "", code: "", vanityUrl: "" }])} className="mt-1 text-xs text-stone-600 underline">+ promo code</button>
-            <button onClick={createBrief} disabled={loading || !name || !flightStart || !flightEnd} className="mt-4 flex items-center gap-1 rounded-md bg-stone-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50">
+            <button onClick={createBrief} disabled={loading || !name || !flightStart || !flightEnd} className="mt-4 flex items-center gap-1.5 rounded-md bg-violet-600 px-4 py-2 text-sm font-medium text-white hover:bg-violet-700 disabled:opacity-40">
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />} Generate brief
             </button>
             <p className="mt-2 text-xs text-stone-500">Vendor minimums are enforced in the plan. The brief is a self-serve handoff — the client executes in their own account.</p>
@@ -192,28 +204,42 @@ export function AudioApp() {
       )}
 
       {tab === "briefs" && (
-        <div className="space-y-3">
-          {buys.map((b) => (
-            <div key={b.id} className="rounded-lg border border-stone-200 bg-white p-4">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <h3 className="text-sm font-semibold text-stone-900">{b.name}</h3>
-                  <p className="text-xs text-stone-500">
-                    {b.vendor} · {(b.stationsJson.stations ?? []).length} stations · envelope {money(b.budgetCents, b.currency)} · {b.stationsJson.flightStart} → {b.stationsJson.flightEnd}
-                  </p>
-                  {(b.budgetJson.notes ?? []).slice(0, 2).map((n, i) => (
-                    <p key={i} className="text-[11px] text-stone-500">• {n}</p>
-                  ))}
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs text-amber-700">{b.status}</span>
-                  {b.briefUrl && <a href={b.briefUrl} className="flex items-center gap-1 text-xs text-stone-700 underline"><FileDown className="h-3 w-3" /> PDF</a>}
-                </div>
-              </div>
-            </div>
-          ))}
-          {buys.length === 0 && <p className="text-sm text-stone-500">No briefs yet.</p>}
-        </div>
+        buys.length === 0 ? (
+          <p className="text-sm text-stone-500">No briefs yet.</p>
+        ) : (
+          <div className="overflow-x-auto rounded-xl border border-stone-200 bg-white">
+            <table className="w-full text-left text-[13px]">
+              <thead>
+                <tr className="border-b border-stone-100 bg-stone-50/60 text-[11px] uppercase tracking-wide text-stone-500">
+                  <th className="px-3 py-2 font-medium">Brief</th>
+                  <th className="px-3 py-2 font-medium">Vendor</th>
+                  <th className="px-3 py-2 font-medium">Stations</th>
+                  <th className="px-3 py-2 font-medium">Envelope</th>
+                  <th className="px-3 py-2 font-medium">Flight</th>
+                  <th className="px-3 py-2 font-medium">Status</th>
+                  <th className="px-3 py-2 font-medium">Brief PDF</th>
+                </tr>
+              </thead>
+              <tbody>
+                {buys.map((b) => (
+                  <tr key={b.id} className="border-b border-stone-100 last:border-0 hover:bg-violet-50/40">
+                    <td className="px-3 py-2 font-medium text-stone-900">{b.name}</td>
+                    <td className="px-3 py-2 text-stone-600">{b.vendor}</td>
+                    <td className="px-3 py-2 text-stone-600">{(b.stationsJson.stations ?? []).length}</td>
+                    <td className="px-3 py-2 font-medium text-stone-900">{money(b.budgetCents, b.currency)}</td>
+                    <td className="px-3 py-2 text-[12px] text-stone-600">{b.stationsJson.flightStart} → {b.stationsJson.flightEnd}</td>
+                    <td className="px-3 py-2">
+                      <span className="inline-flex items-center whitespace-nowrap rounded-full border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium leading-tight text-amber-700">{b.status}</span>
+                    </td>
+                    <td className="px-3 py-2">
+                      {b.briefUrl ? <a href={b.briefUrl} className="flex items-center gap-1 text-xs text-stone-700 underline"><FileDown className="h-3 w-3" /> PDF</a> : <span className="text-stone-400">—</span>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )
       )}
     </div>
   );

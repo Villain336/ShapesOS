@@ -64,16 +64,16 @@ export function TestLabActions({ experiment }: { experiment: Experiment }) {
   }
 
   return (
-    <section className="rounded-xl border bg-card p-5">
-      <h2 className="text-base font-semibold">Lifecycle actions</h2>
+    <section className="rounded-xl border border-stone-200 bg-white p-4">
+      <h2 className="text-sm font-semibold tracking-tight text-stone-900">Lifecycle actions</h2>
       <div className="mt-3 flex flex-wrap gap-2">
         {experiment.status === "draft" && (
-          <Button disabled={!!busy} onClick={() => call(`/api/flywheel/tests/${id}/qa`, { method: "POST", body: "{}" })}>
+          <Button className="bg-violet-600 text-white hover:bg-violet-700" disabled={!!busy} onClick={() => call(`/api/flywheel/tests/${id}/qa`, { method: "POST", body: "{}" })}>
             {busy ? "Running…" : "Run QA"}
           </Button>
         )}
         {experiment.status === "qa" && (
-          <Button disabled={!!busy} onClick={() => call(`/api/flywheel/tests/${id}/launch`, { method: "POST" })}>
+          <Button className="bg-violet-600 text-white hover:bg-violet-700" disabled={!!busy} onClick={() => call(`/api/flywheel/tests/${id}/launch`, { method: "POST" })}>
             {busy ? "Launching…" : "Launch"}
           </Button>
         )}
@@ -87,7 +87,7 @@ export function TestLabActions({ experiment }: { experiment: Experiment }) {
           <Button variant="outline" disabled={!!busy} onClick={readResults}>Read results</Button>
         )}
         {experiment.status === "complete" && (
-          <Button disabled={!!busy} onClick={() => call(`/api/flywheel/tests/${id}/archive`, { method: "POST" })}>
+          <Button className="bg-violet-600 text-white hover:bg-violet-700" disabled={!!busy} onClick={() => call(`/api/flywheel/tests/${id}/archive`, { method: "POST" })}>
             {busy ? "Archiving…" : "Archive to Growth Memory"}
           </Button>
         )}
@@ -95,11 +95,11 @@ export function TestLabActions({ experiment }: { experiment: Experiment }) {
 
       {(experiment.status === "running" || experiment.status === "paused") && (
         <div className="mt-4 grid max-w-2xl grid-cols-2 gap-3 md:grid-cols-5">
-          <div><Label htmlFor="aConv">Control conv.</Label><Input id="aConv" value={aConv} onChange={(e) => setAConv(e.target.value)} /></div>
-          <div><Label htmlFor="aN">Control n</Label><Input id="aN" value={aN} onChange={(e) => setAN(e.target.value)} /></div>
-          <div><Label htmlFor="bConv">Treatment conv.</Label><Input id="bConv" value={bConv} onChange={(e) => setBConv(e.target.value)} /></div>
-          <div><Label htmlFor="bN">Treatment n</Label><Input id="bN" value={bN} onChange={(e) => setBN(e.target.value)} /></div>
-          <div><Label htmlFor="days">Days running</Label><Input id="days" value={days} onChange={(e) => setDays(e.target.value)} /></div>
+          <div><Label htmlFor="aConv" className="text-[13px] font-medium text-stone-700">Control conv.</Label><Input id="aConv" className="border-stone-200 bg-white text-[13px] placeholder:text-stone-400 focus-visible:border-violet-400 focus-visible:ring-violet-200/60" value={aConv} onChange={(e) => setAConv(e.target.value)} /></div>
+          <div><Label htmlFor="aN" className="text-[13px] font-medium text-stone-700">Control n</Label><Input id="aN" className="border-stone-200 bg-white text-[13px] placeholder:text-stone-400 focus-visible:border-violet-400 focus-visible:ring-violet-200/60" value={aN} onChange={(e) => setAN(e.target.value)} /></div>
+          <div><Label htmlFor="bConv" className="text-[13px] font-medium text-stone-700">Treatment conv.</Label><Input id="bConv" className="border-stone-200 bg-white text-[13px] placeholder:text-stone-400 focus-visible:border-violet-400 focus-visible:ring-violet-200/60" value={bConv} onChange={(e) => setBConv(e.target.value)} /></div>
+          <div><Label htmlFor="bN" className="text-[13px] font-medium text-stone-700">Treatment n</Label><Input id="bN" className="border-stone-200 bg-white text-[13px] placeholder:text-stone-400 focus-visible:border-violet-400 focus-visible:ring-violet-200/60" value={bN} onChange={(e) => setBN(e.target.value)} /></div>
+          <div><Label htmlFor="days" className="text-[13px] font-medium text-stone-700">Days running</Label><Input id="days" className="border-stone-200 bg-white text-[13px] placeholder:text-stone-400 focus-visible:border-violet-400 focus-visible:ring-violet-200/60" value={days} onChange={(e) => setDays(e.target.value)} /></div>
         </div>
       )}
 

@@ -6,7 +6,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { CalendarBlank, Check } from "@phosphor-icons/react";
+import { Calendar, Check } from "lucide-react";
 
 interface Slot { startAt: string; endAt: string }
 
@@ -94,7 +94,7 @@ export function BookingWidget({ token }: { token: string }) {
         <div className="rounded-[12px] border border-stone-200 bg-white p-6 shadow-sm">
           {notFound ? (
             <div className="py-8 text-center">
-              <CalendarBlank size={28} className="mx-auto text-stone-300" />
+              <Calendar size={28} className="mx-auto text-stone-300" />
               <p className="mt-3 text-[15px] font-semibold text-stone-900">This booking page is no longer available.</p>
               <p className="mt-1 text-[13px] text-stone-500">The link may be expired or the page was disabled.</p>
             </div>

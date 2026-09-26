@@ -7,7 +7,7 @@
 // system prompt for this project's sessions (spec §6).
 
 import { useState } from "react";
-import { Warning } from "@/components/vault/phosphor";
+import { TriangleAlert } from "lucide-react";
 import { Switch } from "@/components/vault/shadcn/switch";
 
 export interface ProjectSkillRow {
@@ -99,7 +99,7 @@ export default function SkillsClient({
       ))}
       {error && (
         <p className="flex items-center gap-1.5 pt-2 text-[12.5px] text-red">
-          <Warning className="size-3.5" />
+          <TriangleAlert className="size-3.5" />
           {error}
         </p>
       )}

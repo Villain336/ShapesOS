@@ -7,7 +7,7 @@
 //   DELETE /api/projects/[id]/data-sources/[bindingId]
 
 import { useState } from "react";
-import { LinkSimple, Warning } from "@/components/vault/phosphor";
+import { Link, TriangleAlert } from "lucide-react";
 import { Field } from "@/components/vault/Field";
 import { Textarea } from "@/components/vault/shadcn/textarea";
 import {
@@ -148,7 +148,7 @@ export default function DataClient({
     <div className="flex flex-col gap-6">
       {bindings.length === 0 ? (
         <EmptyState
-          icon={<LinkSimple className="size-5" weight="duotone" />}
+          icon={<Link className="size-5" />}
           title="No data sources bound"
           description="Bind a workspace connection below to give this project — and Marketr — access to it."
         />
@@ -260,7 +260,7 @@ export default function DataClient({
 
       {error && (
         <p className="flex items-center gap-1.5 text-[12.5px] text-red">
-          <Warning className="size-3.5" />
+          <TriangleAlert className="size-3.5" />
           {error}
         </p>
       )}

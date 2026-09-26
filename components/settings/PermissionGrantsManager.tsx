@@ -5,13 +5,14 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { UserPlus, Users } from "lucide-react";
 import {
   Notice,
   cardCls,
   dangerBtnCls,
   inputCls,
   labelCls,
-  primaryBtnCls,
+  primaryBtnVioletCls,
   type NoticeState,
 } from "./ui";
 
@@ -155,20 +156,29 @@ export default function PermissionGrantsManager({
           fine-grained permissions below to individual members or whole roles.
         </p>
 
-        <div className="mt-3 flex gap-1 rounded-xl border border-zinc-200 bg-white p-1.5">
-          {(["member", "role"] as const).map((m) => (
-            <button
-              key={m}
-              onClick={() => setMode(m)}
-              className={`rounded-md px-3 py-1.5 text-sm ${
-                mode === m
-                  ? "bg-zinc-900 text-white"
-                  : "text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900"
-              }`}
-            >
-              {m === "member" ? "Grant to a member" : "Grant to a role"}
-            </button>
-          ))}
+        <div className="mb-4 mt-3 flex gap-1 border-b border-stone-200">
+          {(
+            [
+              { id: "member", label: "Grant to a member", icon: UserPlus },
+              { id: "role", label: "Grant to a role", icon: Users },
+            ] as const
+          ).map((m) => {
+            const Icon = m.icon;
+            return (
+              <button
+                key={m.id}
+                onClick={() => setMode(m.id)}
+                className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-[13.5px] font-medium transition ${
+                  mode === m.id
+                    ? "border-violet-600 text-violet-700"
+                    : "border-transparent text-stone-500 hover:text-stone-800"
+                }`}
+              >
+                <Icon size={15} />
+                {m.label}
+              </button>
+            );
+          })}
         </div>
 
         <div className="mt-3 grid gap-2 md:grid-cols-3">
@@ -224,7 +234,7 @@ export default function PermissionGrantsManager({
             <button
               onClick={grant}
               disabled={busy || (mode === "member" && !userId)}
-              className={primaryBtnCls}
+              className={primaryBtnVioletCls}
             >
               {busy ? "Granting…" : "Grant"}
             </button>

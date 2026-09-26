@@ -11,7 +11,7 @@ import {
   Notice,
   btnCls,
   cardCls,
-  primaryBtnCls,
+  primaryBtnVioletCls,
   type NoticeState,
 } from "./ui";
 
@@ -195,7 +195,7 @@ export default function ConnectorHealthTab({
                   {(h.status === "needs_reauth" || h.status === "error") && (
                     <button
                       onClick={() => onReconnect(h.connectorKey, h.authType)}
-                      className={primaryBtnCls}
+                      className={primaryBtnVioletCls}
                     >
                       Reconnect
                     </button>

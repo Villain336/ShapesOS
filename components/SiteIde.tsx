@@ -11,6 +11,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { diffLines } from "diff";
+import { Folder, FileText, Plus, Lock, FlaskConical } from "lucide-react";
 
 const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
   ssr: false,
@@ -146,7 +147,7 @@ function TreeNode({
       <div
         className={`group flex items-center gap-1 rounded px-2 py-1 text-sm ${
           openPath === entry.path
-            ? "bg-zinc-900 text-white"
+            ? "bg-violet-600 text-white"
             : "text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800"
         }`}
         style={{ paddingLeft: `${depth * 12 + 8}px` }}
@@ -160,7 +161,7 @@ function TreeNode({
             className="flex flex-1 items-center gap-1 text-left"
           >
             <span className="w-3 text-zinc-500">{expanded ? "▾" : "▸"}</span>
-            <span>📁</span>
+            <Folder size={14} className="text-zinc-500" />
             <span className="truncate">{entry.name}</span>
           </button>
         ) : (
@@ -170,15 +171,15 @@ function TreeNode({
               className="flex min-w-0 flex-1 items-center gap-1 text-left"
             >
               <span className="w-3" />
-              <span>📄</span>
+              <FileText size={14} className="text-zinc-500" />
               <span className="truncate font-mono text-[13px]">{entry.name}</span>
             </button>
             <button
               onClick={() => onAttach(entry)}
               title="Attach to AI chat"
-              className="hidden rounded px-1 text-xs text-zinc-500 hover:text-zinc-800 group-hover:block"
+              className="hidden rounded px-1 text-zinc-500 hover:text-zinc-800 group-hover:block"
             >
-              ＋
+              <Plus size={13} />
             </button>
           </>
         )}
@@ -625,16 +626,16 @@ export default function SiteIde({
             {pageSubtitle ?? "Edit client website code with AI assistance. The AI proposes — you approve."}
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-1 border-b border-stone-200">
           <button
             onClick={() => setTab("editor")}
-            className={`rounded-md px-3 py-1.5 text-sm font-medium ${tab === "editor" ? "bg-zinc-900 text-white" : "border border-zinc-200 text-zinc-500"}`}
+            className={`border-b-2 px-3 py-2 text-[13.5px] font-medium transition-colors ${tab === "editor" ? "border-violet-600 text-violet-700" : "border-transparent text-stone-500 hover:text-stone-800"}`}
           >
             Editor
           </button>
           <button
             onClick={() => setTab("activity")}
-            className={`rounded-md px-3 py-1.5 text-sm font-medium ${tab === "activity" ? "bg-zinc-900 text-white" : "border border-zinc-200 text-zinc-500"}`}
+            className={`border-b-2 px-3 py-2 text-[13.5px] font-medium transition-colors ${tab === "activity" ? "border-violet-600 text-violet-700" : "border-transparent text-stone-500 hover:text-stone-800"}`}
           >
             Activity
           </button>
@@ -696,7 +697,7 @@ export default function SiteIde({
               onClick={() => setShowForm((s) => !s)}
               className="rounded-md border border-zinc-200 px-3 py-1.5 text-sm text-zinc-800 hover:border-zinc-400"
             >
-              {showForm ? "Cancel" : "＋ Add SFTP connection"}
+              {showForm ? "Cancel" : (<span className="inline-flex items-center gap-1.5"><Plus size={14} /> Add SFTP connection</span>)}
             </button>
           </div>
         </div>
@@ -754,7 +755,7 @@ export default function SiteIde({
             >
               <button onClick={() => { setSelectedId(c.id); setOpenPath(null); }} className="flex-1 text-left">
                 <span className="text-sm font-medium text-zinc-900">
-                  {c.demo ? "🧪 " : ""}{c.label}
+                  {c.demo && <FlaskConical size={13} className="mr-1 inline-block text-violet-600" />}{c.label}
                 </span>
                 <span className="ml-2 font-mono text-xs text-zinc-500">
                   {c.demo ? "demo (mock)" : `${c.username}@${c.host}:${c.port} · ${c.authType} ${c.secretHint ?? ""}`}
@@ -832,7 +833,7 @@ export default function SiteIde({
                 openPath={openPath}
               />
             )}
-            <p className="px-2 py-2 text-[11px] text-zinc-500">Hover a file and press ＋ to attach it to the AI chat.</p>
+            <p className="px-2 py-2 text-[11px] text-zinc-500">Hover a file and press + to attach it to the AI chat.</p>
           </div>
 
           {/* editor */}
@@ -905,7 +906,7 @@ export default function SiteIde({
                 </p>
               )}
               {chat.map((m, i) => (
-                <div key={i} className={`rounded-md px-2.5 py-2 text-sm ${m.role === "user" ? "bg-zinc-900 text-white" : "bg-white text-zinc-500"}`}>
+                <div key={i} className={`rounded-md px-2.5 py-2 text-sm ${m.role === "user" ? "bg-violet-600 text-white" : "bg-white text-zinc-500"}`}>
                   <div className="mb-0.5 text-[11px] font-medium text-zinc-500">{m.role === "user" ? "You" : "Assistant"}</div>
                   <div className="whitespace-pre-wrap text-[13px]">{m.text}</div>
                 </div>

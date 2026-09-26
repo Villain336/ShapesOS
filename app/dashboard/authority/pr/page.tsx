@@ -12,7 +12,6 @@ import { authorityTablesReady } from "@/lib/authority/db";
 import {
   opportunityFeed, listDrafts, listRelationships, listPlacements,
 } from "@/lib/authority/pr/service";
-import { Badge } from "@/components/vault/shadcn/badge";
 import {
   IngestButton, CreateDraftForm, ApproveButton, MarkSentButton,
   RelationshipNoteForm, PlacementForm,
@@ -30,12 +29,20 @@ export const metadata = {
 };
 
 const URGENCY_META = {
-  same_day: { icon: Flame, label: "Due today", variant: "destructive" as const },
-  within_48h: { icon: Clock, label: "48h", variant: "default" as const },
-  this_week: { icon: CalendarDays, label: "This week", variant: "outline" as const },
-  open: { icon: CircleDot, label: "Open", variant: "secondary" as const },
-  expired: { icon: XCircle, label: "Expired", variant: "secondary" as const },
+  same_day: { icon: Flame, label: "Due today", cls: "border-red-200 bg-red-50 text-red-700" },
+  within_48h: { icon: Clock, label: "48h", cls: "border-violet-200 bg-violet-50 text-violet-700" },
+  this_week: { icon: CalendarDays, label: "This week", cls: "border-stone-200 bg-stone-50 text-stone-600" },
+  open: { icon: CircleDot, label: "Open", cls: "border-stone-200 bg-stone-50 text-stone-600" },
+  expired: { icon: XCircle, label: "Expired", cls: "border-stone-200 bg-stone-100 text-stone-500" },
 };
+
+function chip(text: React.ReactNode, cls: string) {
+  return (
+    <span className={`inline-flex items-center gap-0.5 whitespace-nowrap rounded-full border px-1.5 py-0.5 text-[10px] font-medium leading-tight ${cls}`}>
+      {text}
+    </span>
+  );
+}
 
 function hoursLabel(h: number | null): string {
   if (h == null) return "no deadline";
@@ -68,7 +75,7 @@ export default async function PrPage() {
   const aeoDomains = placementData?.aeoSourceDomains ?? [];
 
   return (
-    <div className="flex h-full flex-col gap-6 bg-[#FAFAF7] p-4 md:p-6">
+    <div className="flex h-full flex-col gap-4 bg-[#FAFAF7] p-4 md:p-6">
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-xl font-bold tracking-tight text-stone-900">Digital PR</h1>
@@ -106,12 +113,9 @@ export default async function PrPage() {
               return (
                 <li key={o.id} className="rounded-lg border border-stone-100 p-3">
                   <div className="flex flex-wrap items-center gap-2">
-                    <Badge variant={um.variant} className="inline-flex items-center gap-1">
-                      <UIcon className="h-3 w-3" />
-                      {o.urgency === "same_day" ? "Due today" : um.label} · {hoursLabel(o.hoursLeft)}
-                    </Badge>
-                    <Badge variant="secondary">match {o.matchScore}</Badge>
-                    <Badge variant="outline">{o.source}</Badge>
+                    {chip(<><UIcon className="h-3 w-3" /> {o.urgency === "same_day" ? "Due today" : um.label} · {hoursLabel(o.hoursLeft)}</>, um.cls)}
+                    {chip(`match ${o.matchScore}`, "border-violet-200 bg-violet-50 text-violet-700")}
+                    {chip(o.source, "border-stone-200 bg-stone-50 text-stone-600")}
                     <span className="text-sm font-medium text-stone-900">
                       {o.journalist} · {o.outlet}
                     </span>
@@ -151,13 +155,12 @@ export default async function PrPage() {
                     <span className="text-sm font-semibold text-stone-900">
                       {d.opportunity.journalist} · {d.opportunity.outlet}
                     </span>
-                    <Badge variant={d.status === "sent" ? "default" : d.status === "human_approved" ? "outline" : "secondary"}>
-                      {d.status.replace("_", " ")}
-                    </Badge>
-                    <Badge variant={d.deAiPassed ? "default" : "destructive"} className="inline-flex items-center gap-1">
-                      {d.deAiPassed ? <CheckCircle2 className="h-3 w-3" /> : <XCircle className="h-3 w-3" />}
-                      de-AI {d.deAiPassed ? "passed" : "failed"}
-                    </Badge>
+                    {chip(d.status.replace("_", " "),
+                      d.status === "sent" ? "border-violet-200 bg-violet-50 text-violet-700"
+                        : d.status === "human_approved" ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                        : "border-stone-200 bg-stone-50 text-stone-600")}
+                    {chip(<>{d.deAiPassed ? <CheckCircle2 className="h-3 w-3" /> : <XCircle className="h-3 w-3" />} de-AI {d.deAiPassed ? "passed" : "failed"}</>,
+                      d.deAiPassed ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-red-200 bg-red-50 text-red-700")}
                   </div>
 
                   {/* Research brief */}
@@ -251,12 +254,10 @@ export default async function PrPage() {
                 <li key={r.id} className="rounded-lg border border-stone-100 p-3">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="text-sm font-medium text-stone-900">{r.journalist} · {r.outlet}</span>
-                    <Badge variant={r.followUpCount >= 2 ? "destructive" : "secondary"}>
-                      {r.followUpCount}/2 follow-ups
-                    </Badge>
-                    <Badge variant={eligible ? "outline" : "default"}>
-                      {eligible ? "re-engageable" : `cooling until ${r.reengagementEligibleAt!.toISOString().slice(0, 10)}`}
-                    </Badge>
+                    {chip(`${r.followUpCount}/2 follow-ups`,
+                      r.followUpCount >= 2 ? "border-red-200 bg-red-50 text-red-700" : "border-stone-200 bg-stone-50 text-stone-600")}
+                    {chip(eligible ? "re-engageable" : `cooling until ${r.reengagementEligibleAt!.toISOString().slice(0, 10)}`,
+                      eligible ? "border-violet-200 bg-violet-50 text-violet-700" : "border-stone-200 bg-stone-50 text-stone-600")}
                   </div>
                   {r.declinationReasons.length > 0 && (
                     <p className="mt-1 text-[12px] text-stone-500">
@@ -305,7 +306,7 @@ export default async function PrPage() {
                     </Link>
                     <p className="truncate font-mono text-[11px] text-stone-400">{p.url}</p>
                   </div>
-                  <Badge variant="outline">impact {impact?.score ?? "—"}/100</Badge>
+                  {chip(`impact ${impact?.score ?? "—"}/100`, "border-stone-200 bg-stone-50 text-stone-600")}
                 </li>
               );
             })}
@@ -318,9 +319,9 @@ export default async function PrPage() {
             </p>
             <div className="mt-1 flex flex-wrap gap-1.5">
               {aeoDomains.map((d) => (
-                <Badge key={d.domain} variant="secondary" className="font-mono">
+                <span key={d.domain} className="inline-flex items-center gap-0.5 whitespace-nowrap rounded-full border border-stone-200 bg-stone-50 px-1.5 py-0.5 font-mono text-[10px] font-medium leading-tight text-stone-600">
                   {d.domain} ×{d.placements}
-                </Badge>
+                </span>
               ))}
             </div>
           </div>

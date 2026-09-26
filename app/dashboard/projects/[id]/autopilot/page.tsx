@@ -11,8 +11,8 @@ import AutopilotStudio from "@/components/AutopilotStudio";
 import { ValuePill } from "@/components/vault/atoms/ValuePill";
 import {
   ArrowLeft,
-  Pulse as ActivityIcon,
-} from "@/components/vault/phosphor";
+  Activity as ActivityIcon,
+} from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -79,10 +79,10 @@ export default async function AutopilotPage({ params }: { params: Promise<{ id: 
         </Link>
         <div className="mt-2 flex flex-wrap items-center gap-3">
           <span className="flex size-10 items-center justify-center rounded-card bg-ink text-page">
-            <ActivityIcon className="size-5" weight="duotone" />
+            <ActivityIcon className="size-5" />
           </span>
           <div>
-            <h1 className="display-serif text-[28px] font-medium leading-tight text-ink">
+            <h1 className="text-xl font-bold tracking-tight text-ink">
               Content autopilot
             </h1>
             <p className="mt-0.5 text-[13.5px] text-ink-2">

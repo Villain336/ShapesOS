@@ -7,7 +7,7 @@
 "use client";
 
 import { useState } from "react";
-import { Notice, btnCls, primaryBtnCls, type NoticeState } from "./ui";
+import { Notice, btnCls, primaryBtnVioletCls, type NoticeState } from "./ui";
 
 export interface OverageInvoice {
   id: string;

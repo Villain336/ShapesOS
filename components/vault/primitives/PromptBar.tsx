@@ -698,7 +698,7 @@ export default function PromptBar({
               pill ? "rounded-full" : "rounded-[8px]"
             } ${wide ? "col-start-5 row-start-2" : "col-start-5 row-start-1"}`}
             style={{
-              background: canSend ? "var(--ink)" : "var(--line-strong)",
+              background: canSend ? "var(--accent)" : "var(--line-strong)",
               color: canSend ? "var(--surface)" : "var(--ink-2)",
             }}
           >

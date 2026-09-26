@@ -48,7 +48,7 @@ export default async function ProgrammaticPage({ params }: { params: Promise<{ i
         <Link href={`/dashboard/projects/${project.id}`} className="text-sm text-zinc-500 hover:text-zinc-600">
           ← {project.domain}
         </Link>
-        <h1 className="mt-1 text-2xl font-bold tracking-tight">Programmatic SEO</h1>
+        <h1 className="mt-1 text-xl font-bold tracking-tight text-ink">Programmatic SEO</h1>
         <p className="mt-1 text-sm text-zinc-500">
           Templates × datasets → hundreds of pages. Preview first, then generate, review, and publish.
           Quality gates run server-side on approve and publish.

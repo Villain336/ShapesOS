@@ -1,7 +1,7 @@
 // Marketr CRM — filter toolbar (reference: rich filter row above the table).
 "use client";
 
-import { MagnifyingGlass, DownloadSimple, Plus, UploadSimple, FunnelSimple } from "@phosphor-icons/react";
+import { Search, Download, Plus, Upload, Filter } from "lucide-react";
 import type { CrmStage } from "./types";
 import { SOURCE_LABELS } from "./types";
 
@@ -39,7 +39,7 @@ export function FilterToolbar({
   return (
     <div className="flex flex-wrap items-center gap-2">
       <div className="relative">
-        <MagnifyingGlass size={15} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-stone-400" />
+        <Search size={15} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-stone-400" />
         <input
           className="crm-input !py-[6px] pl-8 !text-[12.5px] w-[220px]"
           placeholder="Search name, email, company…"
@@ -81,17 +81,17 @@ export function FilterToolbar({
         onClick={() => set("starred", !filters.starred)}
         title="Starred only"
       >
-        <FunnelSimple size={14} /> Starred
+        <Filter size={14} /> Starred
       </button>
       <div className="ml-auto flex items-center gap-2">
         <button className="crm-btn-ghost !py-[6px] !text-[12.5px]" onClick={onImport}>
-          <UploadSimple size={14} /> Import
+          <Upload size={14} /> Import
         </button>
         <button className="crm-btn-ghost !py-[6px] !text-[12.5px]" onClick={onExport}>
-          <DownloadSimple size={14} /> Export
+          <Download size={14} /> Export
         </button>
         <button className="crm-btn-primary !py-[6px] !text-[12.5px]" onClick={onNewLead}>
-          <Plus size={14} weight="bold" /> New Lead
+          <Plus size={14} strokeWidth={2.5} /> New Lead
         </button>
       </div>
     </div>

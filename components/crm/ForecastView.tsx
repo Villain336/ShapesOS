@@ -2,7 +2,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ChartLineUp } from "@phosphor-icons/react";
+import { ChartLine } from "lucide-react";
 import type { CrmPipeline } from "./types";
 import { formatMoney } from "./types";
 import { StageBadge, EmptyState } from "./ui";
@@ -43,7 +43,7 @@ export function ForecastView({ pipelineId }: { pipelineId: string }) {
 
   if (loading) return <p className="py-12 text-center text-sm text-stone-500">Loading forecast…</p>;
   if (stages.length === 0) {
-    return <EmptyState icon={ChartLineUp} title="No forecast yet" hint="Add leads with values to see the weighted pipeline forecast." />;
+    return <EmptyState icon={ChartLine} title="No forecast yet" hint="Add leads with values to see the weighted pipeline forecast." />;
   }
 
   const max = Math.max(1, ...stages.map((s) => s.openValueCents));

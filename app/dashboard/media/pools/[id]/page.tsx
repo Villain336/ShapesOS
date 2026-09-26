@@ -8,7 +8,9 @@ import { mediaStores, safetyTablesReady } from "@/lib/media/db";
 import { mediaRoleForWorkspaceRole } from "@/lib/media/safety";
 import { poolUtilization } from "@/lib/media/pools";
 import PoolControls from "./_components/PoolControls";
-import { Badge } from "@/components/vault/shadcn/badge";
+
+const chip =
+  "inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-1.5 py-0.5 text-[10px] font-medium leading-tight bg-stone-100 text-stone-600 border-stone-200";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Pool — Media — Marketr" };
@@ -36,7 +38,7 @@ export default async function PoolPage({ params }: { params: Promise<{ id: strin
   const util = poolUtilization(pool) * 100;
 
   return (
-    <div className="flex h-full flex-col gap-6 bg-[#FAFAF7] p-4 md:p-6">
+    <div className="flex h-full flex-col gap-4 bg-[#FAFAF7] p-4 md:p-6">
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="text-xs font-medium uppercase tracking-wide text-stone-400">
@@ -81,11 +83,11 @@ export default async function PoolPage({ params }: { params: Promise<{ id: strin
 
         <section className="rounded-xl border border-stone-200 bg-white p-4">
           <h2 className="mb-2 text-sm font-semibold text-stone-900">Guardrails</h2>
-          <ul className="space-y-1.5 text-sm text-stone-700">
-            <li>· Over-encumbrance rejected at the service layer</li>
-            <li>· Expiry / revocation releases encumbrance</li>
-            <li>· One ad account per client (no cross-client contamination)</li>
-            <li>· Google has no true account cap — card + sweeper are the ceiling</li>
+          <ul className="list-disc space-y-1.5 pl-5 text-sm text-stone-700">
+            <li>Over-encumbrance rejected at the service layer</li>
+            <li>Expiry / revocation releases encumbrance</li>
+            <li>One ad account per client (no cross-client contamination)</li>
+            <li>Google has no true account cap — card + sweeper are the ceiling</li>
           </ul>
         </section>
       </div>
@@ -98,26 +100,26 @@ export default async function PoolPage({ params }: { params: Promise<{ id: strin
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
               <thead>
-                <tr className="border-b border-stone-200 text-xs uppercase tracking-wide text-stone-400">
-                  <th className="py-2 pr-4">Time</th>
-                  <th className="py-2 pr-4">Kind</th>
-                  <th className="py-2 pr-4">Amount</th>
-                  <th className="py-2 pr-4">Remaining</th>
-                  <th className="py-2 pr-4">Encumbered</th>
-                  <th className="py-2 pr-4">Actor</th>
+                <tr className="border-b border-stone-100 bg-stone-50/60 text-[11px] uppercase tracking-wide text-stone-500">
+                  <th className="px-3 py-2 font-medium">Time</th>
+                  <th className="px-3 py-2 font-medium">Kind</th>
+                  <th className="px-3 py-2 font-medium">Amount</th>
+                  <th className="px-3 py-2 font-medium">Remaining</th>
+                  <th className="px-3 py-2 font-medium">Encumbered</th>
+                  <th className="px-3 py-2 font-medium">Actor</th>
                   <th className="py-2">Note</th>
                 </tr>
               </thead>
               <tbody>
                 {txs.map((t) => (
-                  <tr key={t.id} className="border-b border-stone-100 last:border-0">
-                    <td className="py-2 pr-4 font-mono text-xs text-stone-500">{t.ts.toISOString().slice(0, 19)}</td>
-                    <td className="py-2 pr-4"><Badge variant="secondary">{t.kind}</Badge></td>
-                    <td className="py-2 pr-4 font-medium">{money(t.amountCents, pool.currency)}</td>
-                    <td className="py-2 pr-4">{money(t.runningRemainingCents, pool.currency)}</td>
-                    <td className="py-2 pr-4">{money(t.runningEncumberedCents, pool.currency)}</td>
-                    <td className="py-2 pr-4 font-mono text-xs text-stone-500">{t.actor.slice(0, 12)}</td>
-                    <td className="py-2 text-xs text-stone-500">{t.note ?? "—"}</td>
+                  <tr key={t.id} className="border-b border-stone-100 last:border-0 hover:bg-violet-50/40">
+                    <td className="px-3 py-2 font-mono text-xs text-stone-500">{t.ts.toISOString().slice(0, 19)}</td>
+                    <td className="px-3 py-2"><span className={chip}>{t.kind}</span></td>
+                    <td className="px-3 py-2 font-medium">{money(t.amountCents, pool.currency)}</td>
+                    <td className="px-3 py-2">{money(t.runningRemainingCents, pool.currency)}</td>
+                    <td className="px-3 py-2">{money(t.runningEncumberedCents, pool.currency)}</td>
+                    <td className="px-3 py-2 font-mono text-xs text-stone-500">{t.actor.slice(0, 12)}</td>
+                    <td className="px-3 py-2 text-xs text-stone-500">{t.note ?? "—"}</td>
                   </tr>
                 ))}
               </tbody>

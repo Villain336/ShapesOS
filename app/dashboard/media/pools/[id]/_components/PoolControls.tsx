@@ -59,12 +59,13 @@ export default function PoolControls({
             variant="outline"
             onClick={() => call(`/api/media/pools/${poolId}/freeze`, { reason: "manual freeze from pool page" })}
             disabled={busy}
+            className="flex items-center gap-1.5 rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-[13px] text-stone-700 hover:bg-stone-50 disabled:opacity-40"
           >
             Freeze pool
           </Button>
         )}
         {!hasCard && (
-          <Button onClick={() => setShowCard((v) => !v)} disabled={busy}>
+          <Button onClick={() => setShowCard((v) => !v)} disabled={busy} className="flex items-center gap-1.5 rounded-md bg-violet-600 px-3 py-1.5 text-[13px] font-medium text-white hover:bg-violet-700 disabled:opacity-40">
             Attach virtual card
           </Button>
         )}
@@ -76,7 +77,7 @@ export default function PoolControls({
             Issued on the client&apos;s own account — never the agency&apos;s. Limit = pool cap.
           </p>
           <Select value={provider} onValueChange={(v) => setProvider(v ?? "fake")}>
-            <SelectTrigger className="mt-2 w-full">
+            <SelectTrigger className="rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-[13px] text-stone-900 placeholder:text-stone-400 focus:border-violet-400 focus:outline-none mt-2 w-full">
               <SelectValue placeholder="Provider" />
             </SelectTrigger>
             <SelectContent>
@@ -94,7 +95,7 @@ export default function PoolControls({
           <Button
             onClick={() => accountRef.trim() && call(`/api/media/pools/${poolId}/virtual-card`, { provider, providerAccountRef: accountRef })}
             disabled={busy || !accountRef.trim()}
-            className="mt-2 w-full"
+            className="flex items-center gap-1.5 rounded-md bg-violet-600 px-3 py-1.5 text-[13px] font-medium text-white hover:bg-violet-700 disabled:opacity-40 mt-2 w-full"
           >
             Issue card
           </Button>

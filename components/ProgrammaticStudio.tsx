@@ -6,6 +6,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { LayoutTemplate, Database, FileText } from "lucide-react";
 
 export interface TemplateRow {
   id: string;
@@ -1002,7 +1003,7 @@ function PagesTab({
             <button
               key={s}
               onClick={() => setStatusFilter(s)}
-              className={`rounded-full px-3 py-1 text-xs ${statusFilter === s ? "bg-zinc-900 text-white" : "border border-zinc-200 text-zinc-500"}`}
+              className={`rounded-full px-3 py-1 text-xs ${statusFilter === s ? "bg-violet-600 text-white" : "border border-zinc-200 text-zinc-500"}`}
             >
               {s === "" ? `all (${Object.values(counts).reduce((a, b) => a + b, 0)})` : `${s} (${counts[s] ?? 0})`}
             </button>
@@ -1311,14 +1312,21 @@ export default function ProgrammaticStudio({
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="flex gap-1 rounded-lg border border-zinc-200 bg-zinc-50 p-1">
-        {(["templates", "datasets", "pages"] as const).map((t) => (
+      <div className="flex gap-1 border-b border-zinc-200">
+        {(
+          [
+            { id: "templates", label: "Templates", icon: LayoutTemplate },
+            { id: "datasets", label: "Datasets", icon: Database },
+            { id: "pages", label: "Pages", icon: FileText },
+          ] as const
+        ).map((t) => (
           <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={`flex-1 rounded-md px-4 py-2 text-sm font-medium capitalize ${tab === t ? "bg-zinc-900 text-white" : "text-zinc-500 hover:text-zinc-600"}`}
+            key={t.id}
+            onClick={() => setTab(t.id)}
+            className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-[13.5px] font-medium transition-colors ${tab === t.id ? "border-violet-600 text-violet-700" : "border-transparent text-stone-500 hover:text-stone-800"}`}
           >
-            {t}
+            <t.icon size={15} />
+            {t.label}
           </button>
         ))}
       </div>

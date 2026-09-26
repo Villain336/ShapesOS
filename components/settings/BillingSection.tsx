@@ -7,7 +7,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Notice, btnCls, cardCls, primaryBtnCls, type NoticeState } from "./ui";
+import { Notice, btnCls, cardCls, primaryBtnVioletCls, type NoticeState } from "./ui";
 import OverageBillingSection, { type OverageState } from "./OverageBillingSection";
 
 interface Pack {
@@ -158,7 +158,7 @@ export default function BillingSection({ workspaceId }: { workspaceId: string })
                     {p.credits.toLocaleString()} credits
                   </p>
                   <button
-                    className={`${primaryBtnCls} mt-3`}
+                    className={`${primaryBtnVioletCls} mt-3`}
                     disabled={buying !== null}
                     onClick={() => buy(p.id)}
                   >

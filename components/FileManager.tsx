@@ -6,18 +6,17 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  ArrowCounterClockwise,
-  DownloadSimple,
+  RotateCcw,
+  Download,
   File as FileIcon,
   FileText,
   Folder,
-  FolderSimple,
   Image as ImageIcon,
-  PencilSimple,
+  Pencil,
   Trash,
-  UploadSimple,
+  Upload,
   X,
-} from "@phosphor-icons/react";
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface FsFile {
@@ -182,7 +181,7 @@ export function FileManager({
   return (
     <div className="flex flex-col gap-4">
       {/* Root tabs */}
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-1 border-b border-stone-200">
         {ROOTS.map((r) => (
           <button
             key={r.path}
@@ -192,15 +191,15 @@ export function FileManager({
               setTrashOpen(false);
             }}
             className={cn(
-              "flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors",
+              "flex items-center gap-1.5 border-b-2 px-3 py-2 text-[13.5px] font-medium transition-colors",
               !trashOpen && (prefix === r.path || prefix.startsWith(`${r.path}/`))
-                ? "border-accent bg-accent-tint text-accent-ink"
-                : "border-line bg-surface text-ink-2 hover:bg-hover",
+                ? "border-violet-600 text-violet-700"
+                : "border-transparent text-stone-500 hover:text-stone-800",
             )}
           >
-            <FolderSimple size={16} weight="duotone" />
-            <span className="font-medium">{r.label}</span>
-            <span className="hidden text-xs text-ink-3 sm:inline">{r.hint}</span>
+            <Folder size={15} />
+            <span>{r.label}</span>
+            <span className="hidden text-xs text-stone-400 sm:inline">{r.hint}</span>
           </button>
         ))}
         {canEdit && (
@@ -208,14 +207,14 @@ export function FileManager({
             type="button"
             onClick={() => setTrashOpen((v) => !v)}
             className={cn(
-              "ml-auto flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors",
+              "ml-auto flex items-center gap-1.5 border-b-2 px-3 py-2 text-[13.5px] font-medium transition-colors",
               trashOpen
-                ? "border-accent bg-accent-tint text-accent-ink"
-                : "border-line bg-surface text-ink-2 hover:bg-hover",
+                ? "border-violet-600 text-violet-700"
+                : "border-transparent text-stone-500 hover:text-stone-800",
             )}
           >
-            <Trash size={16} />
-            <span className="font-medium">Trash</span>
+            <Trash size={15} />
+            <span>Trash</span>
           </button>
         )}
       </div>
@@ -251,7 +250,7 @@ export function FileManager({
                     disabled={busy}
                     className="flex items-center gap-1 rounded-md border border-line px-2 py-1 text-xs text-ink-2 hover:bg-hover"
                   >
-                    <ArrowCounterClockwise size={14} /> Restore
+                    <RotateCcw size={14} /> Restore
                   </button>
                   {canPurge && (
                     <button
@@ -331,7 +330,7 @@ export function FileManager({
                   disabled={busy}
                   className="flex items-center gap-2 rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-white hover:bg-accent-hover disabled:opacity-50"
                 >
-                  <UploadSimple size={16} />
+                  <Upload size={16} />
                   {busy ? "Uploading…" : "Upload"}
                 </button>
               </div>
@@ -356,7 +355,7 @@ export function FileManager({
                     onClick={() => setPrefix(d)}
                     className="flex w-full items-center gap-3 px-4 py-2.5 text-left hover:bg-hover"
                   >
-                    <Folder size={18} weight="duotone" className="shrink-0 text-accent-ink" />
+                    <Folder size={18} className="shrink-0 text-accent-ink" />
                     <span className="text-sm font-medium">{d.split("/").pop()}</span>
                   </button>
                 </li>
@@ -376,7 +375,7 @@ export function FileManager({
                       href={`/api/files/${f.id}?workspaceId=${encodeURIComponent(workspaceId)}&download=1`}
                       className="flex items-center gap-1 rounded-md border border-line px-2 py-1 text-xs text-ink-2 hover:bg-hover"
                     >
-                      <DownloadSimple size={14} /> Download
+                      <Download size={14} /> Download
                     </a>
                     {canEdit && (
                       <>
@@ -385,7 +384,7 @@ export function FileManager({
                           onClick={() => setDialog({ type: "rename", file: f, value: f.filename })}
                           className="flex items-center gap-1 rounded-md border border-line px-2 py-1 text-xs text-ink-2 hover:bg-hover"
                         >
-                          <PencilSimple size={14} /> Rename
+                          <Pencil size={14} /> Rename
                         </button>
                         <button
                           type="button"

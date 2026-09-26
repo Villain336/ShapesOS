@@ -18,16 +18,14 @@ export default async function RecyclingPage() {
   if (!user) redirect("/login");
   await getOrCreateWorkspace(user.id, user.email);
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Creative recycling</h1>
-          <p className="text-sm text-muted-foreground">
-            Winners from attribution, QR scans, AEO, and direct mail become cross-channel briefs.
-            Recycling proposes — a human approves every variant before it enters the studio flows.
-          </p>
-        </div>
-      </div>
+    <div className="flex h-full flex-col gap-4 bg-[#FAFAF7] p-4 md:p-6">
+      <header>
+        <h1 className="text-xl font-bold tracking-tight text-stone-900">Creative recycling</h1>
+        <p className="mt-0.5 text-[13px] text-stone-500">
+          Winners from attribution, QR scans, AEO, and direct mail become cross-channel briefs.
+          Recycling proposes — a human approves every variant before it enters the studio flows.
+        </p>
+      </header>
       <RecyclingApp />
     </div>
   );

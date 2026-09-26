@@ -5,25 +5,29 @@
 
 import { useCallback, useEffect, useState } from "react";
 import {
-  ChartLineUp,
-  CurrencyDollar,
+  ChartLine,
+  DollarSign,
   Plus,
   Trash,
   X,
-  CalendarBlank,
+  Calendar,
   Link as LinkIcon,
   Megaphone,
-} from "@phosphor-icons/react";
+  Flag,
+  FlagOff,
+  Equal,
+  type LucideIcon,
+} from "lucide-react";
 import { formatMoney } from "../crm/types";
 import { EmptyState } from "../crm/ui";
 import { BundlesSection } from "./BundlesSection";
 
 type Model = "first_touch" | "last_touch" | "linear";
 
-const MODELS: { id: Model; label: string; hint: string }[] = [
-  { id: "first_touch", label: "First touch", hint: "100% of revenue to the first touch" },
-  { id: "last_touch", label: "Last touch", hint: "100% of revenue to the last touch" },
-  { id: "linear", label: "Linear", hint: "Revenue split evenly across all touches" },
+const MODELS: { id: Model; label: string; hint: string; icon: LucideIcon }[] = [
+  { id: "first_touch", label: "First touch", hint: "100% of revenue to the first touch", icon: Flag },
+  { id: "last_touch", label: "Last touch", hint: "100% of revenue to the last touch", icon: FlagOff },
+  { id: "linear", label: "Linear", hint: "Revenue split evenly across all touches", icon: Equal },
 ];
 
 const RANGES = [
@@ -188,7 +192,7 @@ export function AttributionApp() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <div className="text-[12px] font-medium text-stone-500">Marketr · Analytics</div>
-            <h1 className="text-[20px] font-semibold tracking-tight text-stone-900">Revenue Attribution</h1>
+            <h1 className="text-xl font-bold tracking-tight text-stone-900">Revenue Attribution</h1>
           </div>
           <div className="flex items-center gap-2 pb-3">
             <select
@@ -217,12 +221,13 @@ export function AttributionApp() {
               key={m.id}
               onClick={() => setModel(m.id)}
               title={m.hint}
-              className={`rounded-t-[8px] border-b-2 px-3.5 py-2 text-[13px] font-medium transition-colors ${
+              className={`flex items-center gap-1.5 rounded-t-[8px] border-b-2 px-3.5 py-2 text-[13px] font-medium transition-colors ${
                 model === m.id
                   ? "border-violet-600 text-violet-700"
                   : "border-transparent text-stone-500 hover:text-stone-800"
               }`}
             >
+              <m.icon size={15} />
               {m.label}
             </button>
           ))}
@@ -259,12 +264,12 @@ export function AttributionApp() {
             <section className={cardCls}>
               <div className="mb-3 flex items-center justify-between">
                 <h2 className="flex items-center gap-2 text-[14px] font-semibold text-stone-900">
-                  <ChartLineUp size={16} className="text-violet-600" /> Channel performance
+                  <ChartLine size={16} className="text-violet-600" /> Channel performance
                 </h2>
                 <span className="text-[11.5px] text-stone-400">Revenue columns follow the {MODELS.find((m) => m.id === model)!.label.toLowerCase()} model</span>
               </div>
               {channels.length === 0 ? (
-                <EmptyState icon={ChartLineUp} title="No touches yet" hint="Capture leads with UTMs (or import a CSV with utm_* columns) and move them to Won to see channel ROAS." />
+                <EmptyState icon={ChartLine} title="No touches yet" hint="Capture leads with UTMs (or import a CSV with utm_* columns) and move them to Won to see channel ROAS." />
               ) : (
                 <div className="overflow-x-auto">
                   <table className="crm-table w-full">
@@ -373,7 +378,7 @@ export function AttributionApp() {
             <section className={cardCls}>
               <div className="mb-3 flex items-center justify-between">
                 <h2 className="flex items-center gap-2 text-[14px] font-semibold text-stone-900">
-                  <CurrencyDollar size={16} className="text-violet-600" /> Spend entries
+                  <DollarSign size={16} className="text-violet-600" /> Spend entries
                 </h2>
                 <button className="crm-btn-primary !py-[6px] !text-[12.5px]" onClick={() => setShowSpendForm((v) => !v)}>
                   {showSpendForm ? <X size={14} /> : <Plus size={14} />} {showSpendForm ? "Cancel" : "Add spend"}
@@ -417,7 +422,7 @@ export function AttributionApp() {
                 </div>
               )}
               {spend.length === 0 ? (
-                <EmptyState icon={CalendarBlank} title="No spend entries" hint="Add spend per channel and period to unlock CPL, CAC, and ROAS." />
+                <EmptyState icon={Calendar} title="No spend entries" hint="Add spend per channel and period to unlock CPL, CAC, and ROAS." />
               ) : (
                 <div className="overflow-x-auto">
                   <table className="crm-table w-full">

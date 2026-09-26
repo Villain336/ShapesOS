@@ -5,7 +5,7 @@
 
 import Link from "next/link";
 import { redirect, notFound } from "next/navigation";
-import { ArrowLeft } from "@/components/vault/phosphor";
+import { ArrowLeft } from "lucide-react";
 import { PageHeader } from "@/components/vault/PageHeader";
 import { accessibleWorkspaceWhere, requireProjectRole } from "@/lib/authz";
 import { prisma } from "@/lib/prisma";

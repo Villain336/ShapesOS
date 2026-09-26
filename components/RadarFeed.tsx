@@ -2,6 +2,7 @@
 "use client";
 
 import { useState } from "react";
+import { Radio } from "lucide-react";
 
 interface RadarEventItem {
   id: string;
@@ -84,7 +85,7 @@ export default function RadarFeed({
 
       {visible.length === 0 ? (
         <div className="rounded-lg border border-zinc-300 bg-white p-8 text-center">
-          <p className="text-lg">📡</p>
+          <Radio className="mx-auto h-6 w-6 text-stone-400" />
           <p className="mt-2 text-sm text-zinc-500">
             No radar events yet. The weekly radar needs at least two competitor snapshots — add competitors and wait for two runs.
           </p>

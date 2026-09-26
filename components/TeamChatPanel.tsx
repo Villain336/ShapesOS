@@ -5,7 +5,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Users } from "@phosphor-icons/react";
+import { Users } from "lucide-react";
 import { EmptyState } from "@/components/vault/EmptyState";
 import { ValuePill } from "@/components/vault/atoms/ValuePill";
 import PromptBar from "@/components/vault/primitives/PromptBar";
@@ -129,7 +129,7 @@ export default function TeamChatPanel({
       <div className="flex h-11 shrink-0 items-center gap-2 border-b border-line bg-surface px-4">
         <span className="text-[13px] font-medium text-ink">Project channel</span>
         <ValuePill tone="neutral">
-          <Users className="mr-1 size-3" weight="regular" />
+          <Users className="mr-1 size-3" />
           {memberCount} member{memberCount === 1 ? "" : "s"}
         </ValuePill>
         <span className="ml-auto text-[12px] text-ink-3">Refreshes every 5 seconds</span>
@@ -142,10 +142,10 @@ export default function TeamChatPanel({
               <MessageScrollerContent className="mx-auto w-full max-w-3xl gap-5 px-4 pb-48 pt-6">
                 {messages.length === 0 ? (
                   <div className="flex flex-col items-center pt-16 text-center">
-                    <span className="flex size-12 items-center justify-center rounded-full bg-ink text-page">
-                      <Users className="size-6" weight="duotone" />
+                    <span className="flex size-12 items-center justify-center rounded-full bg-violet-600 text-white">
+                      <Users className="size-6" />
                     </span>
-                    <h2 className="display-serif mt-4 text-[24px] font-medium text-ink">
+                    <h2 className="mt-4 text-[24px] font-bold tracking-tight text-stone-900">
                       No messages yet
                     </h2>
                     <p className="mt-2 max-w-[46ch] text-[13.5px] leading-relaxed text-ink-2">

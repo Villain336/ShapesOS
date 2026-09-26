@@ -13,13 +13,13 @@ import {
   Copy,
   Check,
   Download,
-  ArrowClockwise,
+  RotateCw,
   Pause,
   Play,
   Phone,
   Link as LinkIcon,
   Ticket,
-} from "@phosphor-icons/react";
+} from "lucide-react";
 import { formatMoney } from "../crm/types";
 
 interface BundleStats {
@@ -218,7 +218,7 @@ export function BundlesSection() {
                   <Download size={13} /> SVG
                 </a>
                 <button className="crm-btn-ghost !py-1 text-[12px]" onClick={() => patch(b.id, { regenerateQr: true })}>
-                  <ArrowClockwise size={13} /> Restyle QR
+                  <RotateCw size={13} /> Restyle QR
                 </button>
                 <span className="flex-1" />
                 {b.status === "active" ? (

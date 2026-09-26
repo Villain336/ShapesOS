@@ -5,7 +5,7 @@
 import { redirect, notFound } from "next/navigation";
 import { Card, CardBody, CardHeader } from "@/components/vault/Card";
 import { EmptyState } from "@/components/vault/EmptyState";
-import { ListChecks } from "@/components/vault/phosphor";
+import { ListChecks } from "lucide-react";
 import { accessibleWorkspaceWhere, requireProjectRole } from "@/lib/authz";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
@@ -68,7 +68,7 @@ export default async function SkillsSettingsPage({
         <CardBody>
           {initial.length === 0 ? (
             <EmptyState
-              icon={<ListChecks className="size-5" weight="duotone" />}
+              icon={<ListChecks className="size-5" />}
               title="No skills installed"
               description="Install skills from the workspace Skills settings first, then enable them here per project."
             />

@@ -19,7 +19,7 @@ export default async function FilesPage() {
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Files</h1>
+        <h1 className="text-xl font-bold tracking-tight text-ink">Files</h1>
         <p className="mt-1 text-sm text-ink-2">
           Your workspace&rsquo;s private filesystem — skills, memory, artifacts, and uploads.
           Everything here is scoped to this workspace.

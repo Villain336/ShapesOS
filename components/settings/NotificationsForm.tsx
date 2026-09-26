@@ -9,7 +9,7 @@ import {
   Notice,
   btnCls,
   cardCls,
-  primaryBtnCls,
+  primaryBtnVioletCls,
   type NoticeState,
 } from "./ui";
 
@@ -153,7 +153,7 @@ export default function NotificationsForm({ workspaceId }: { workspaceId: string
           </fieldset>
         </div>
         <div className="mt-4 flex gap-2">
-          <button onClick={save} disabled={busy} className={primaryBtnCls}>
+          <button onClick={save} disabled={busy} className={primaryBtnVioletCls}>
             {busy ? "Saving…" : "Save defaults"}
           </button>
           <button onClick={reset} disabled={busy} className={btnCls}>

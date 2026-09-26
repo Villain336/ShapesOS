@@ -37,7 +37,7 @@ export function GenerateReportButton() {
 
   return (
     <span className="inline-flex flex-col items-end gap-1">
-      <Button type="button" onClick={generate} disabled={busy}>
+      <Button type="button" className="bg-violet-600 text-white hover:bg-violet-700" onClick={generate} disabled={busy}>
         {busy ? <Loader2 className="animate-spin" /> : <FileSearch />}
         {busy ? "Compiling twelve audits…" : "Generate report"}
       </Button>

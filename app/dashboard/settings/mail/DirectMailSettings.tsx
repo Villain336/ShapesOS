@@ -185,9 +185,9 @@ export default function DirectMailSettings() {
         </p>
       )}
 
-      <div className="rounded-xl border border-violet-200 bg-violet-50/60 p-4 text-sm text-violet-900">
-        <p className="font-medium">Test keys are the default.</p>
-        <p className="mt-1 text-violet-800/80">
+      <div className="rounded-lg border border-stone-200 bg-stone-50 p-4 text-[12.5px] text-stone-600">
+        <p className="font-medium text-stone-800">Test keys are the default.</p>
+        <p className="mt-1">
           A test key renders postcards and letters without physically mailing
           anything. Live keys are visually fenced (red LIVE badge) and can
           only spend behind a human-approved campaign with a bound max spend.

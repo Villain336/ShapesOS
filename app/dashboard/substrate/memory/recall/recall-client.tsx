@@ -87,7 +87,11 @@ export default function RecallClient({ workspaceId }: { workspaceId: string }) {
           aria-label="as of (temporal query)"
           title="Temporal query: recall what was true at this time"
         />
-        <Button type="submit" disabled={loading || !query.trim()}>
+        <Button
+          type="submit"
+          className="bg-violet-600 text-white hover:bg-violet-700"
+          disabled={loading || !query.trim()}
+        >
           {loading ? "Recalling…" : "Recall"}
         </Button>
       </form>

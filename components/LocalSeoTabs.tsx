@@ -7,6 +7,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { MapPinned, Crosshair, Star, TrendingUp, TrendingDown, Check } from "lucide-react";
 import { diffGridRuns } from "@/lib/local/grid";
 import {
   estimateCompetitorRefreshCost,
@@ -526,8 +527,8 @@ function GridsPanel({ projectId, canEdit, initialGrids, spend }: Pick<Props, "pr
                                 {delta.avgPositionDelta != null && (
                                   <>
                                     {" "}· Avg position{" "}
-                                    <span className={delta.avgPositionDelta >= 0 ? "text-green-700" : "text-red-700"}>
-                                      {delta.avgPositionDelta >= 0 ? "▲" : "▼"}{Math.abs(delta.avgPositionDelta).toFixed(1)}
+                                    <span className={`inline-flex items-center gap-0.5 ${delta.avgPositionDelta >= 0 ? "text-green-700" : "text-red-700"}`}>
+                                      {delta.avgPositionDelta >= 0 ? <TrendingUp size={12} /> : <TrendingDown size={12} />}{Math.abs(delta.avgPositionDelta).toFixed(1)}
                                     </span>
                                   </>
                                 )}
@@ -738,78 +739,94 @@ function CompetitorsPanel({ projectId, canEdit, initialCompetitors, spend }: Pic
           No local competitors tracked yet. Add one to start snapshotting its rating and review velocity.
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          {competitors.map((c) => {
-            const latest = c.snapshots[0];
-            const prev = c.snapshots[1];
-            return (
-              <div key={c.id} className={`${cardCls} ${c.enabled ? "" : "opacity-60"}`}>
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <h3 className="text-base font-semibold text-zinc-900">{c.businessName}</h3>
-                    <p className="mt-0.5 text-xs text-zinc-500">
-                      {c.domain ?? "no domain"}{c.placeId ? ` · ${c.placeId}` : ""}
-                      {c.lastSnapshotAt ? ` · snapshot ${fmtDate(c.lastSnapshotAt)}` : " · no snapshot yet"}
-                    </p>
-                  </div>
-                  {canEdit && (
-                    <div className="flex gap-1">
-                      <button
-                        className="rounded-md border border-zinc-200 px-2 py-1 text-xs text-zinc-500 hover:border-zinc-400 disabled:opacity-50"
-                        onClick={() => handleToggle(c)}
-                        disabled={toggling === c.id}
-                        title={c.enabled ? "Pause snapshots" : "Resume snapshots"}
-                      >
-                        {c.enabled ? "Pause" : "Resume"}
-                      </button>
-                      <button
-                        className="rounded-md border border-red-200/40 px-2 py-1 text-xs text-red-700 hover:border-red-300 disabled:opacity-50"
-                        onClick={() => handleDelete(c)}
-                        disabled={deleting === c.id}
-                      >
-                        {deleting === c.id ? "…" : "Remove"}
-                      </button>
-                    </div>
-                  )}
-                </div>
-                {latest ? (
-                  <div className="mt-3">
-                    <div className="flex items-baseline gap-4">
-                      <span className="text-2xl font-semibold text-zinc-900">
-                        {latest.rating != null ? `${latest.rating.toFixed(1)}★` : "—"}
-                      </span>
-                      <span className="text-sm text-zinc-500">
-                        {latest.reviewCount != null ? `${latest.reviewCount} reviews` : "no review count"}
-                      </span>
-                      {latest.mock && <span className="text-xs text-zinc-500">(mock)</span>}
-                    </div>
-                    {latest.categories.length > 0 && (
-                      <p className="mt-1 text-xs text-zinc-500">{latest.categories.join(" · ")}</p>
-                    )}
-                    {latest.address && <p className="mt-0.5 text-xs text-zinc-500">{latest.address}</p>}
-                    {prev && (
-                      <div className="mt-2 flex gap-4 text-xs">
-                        {latest.rating != null && prev.rating != null && (
-                          <span className={latest.rating - prev.rating >= 0 ? "text-green-700" : "text-red-700"}>
-                            Rating {prev.rating.toFixed(1)} → {latest.rating.toFixed(1)} ({latest.rating - prev.rating >= 0 ? "+" : ""}{(latest.rating - prev.rating).toFixed(1)})
-                          </span>
-                        )}
-                        {latest.reviewCount != null && prev.reviewCount != null && (
-                          <span className={latest.reviewCount - prev.reviewCount >= 0 ? "text-zinc-500" : "text-red-700"}>
-                            Reviews {prev.reviewCount} → {latest.reviewCount} ({latest.reviewCount - prev.reviewCount >= 0 ? "+" : ""}{latest.reviewCount - prev.reviewCount})
-                          </span>
-                        )}
+        <div className="overflow-x-auto rounded-lg border border-stone-200">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-stone-200 bg-stone-50 text-left text-xs font-medium uppercase tracking-wide text-stone-500">
+                <th className="px-3 py-2">Competitor</th>
+                <th className="px-3 py-2">Rating</th>
+                <th className="px-3 py-2">Reviews</th>
+                <th className="px-3 py-2">Δ rating</th>
+                <th className="px-3 py-2">Δ reviews</th>
+                <th className="px-3 py-2">Snapshot</th>
+                <th className="px-3 py-2">Status</th>
+                <th className="px-3 py-2"><span className="sr-only">Actions</span></th>
+              </tr>
+            </thead>
+            <tbody>
+              {competitors.map((c) => {
+                const latest = c.snapshots[0];
+                const prev = c.snapshots[1];
+                const ratingDelta = latest && prev && latest.rating != null && prev.rating != null ? latest.rating - prev.rating : null;
+                const reviewDelta = latest && prev && latest.reviewCount != null && prev.reviewCount != null ? latest.reviewCount - prev.reviewCount : null;
+                return (
+                  <tr key={c.id} className={`border-b border-stone-100 last:border-0 hover:bg-violet-50/40 ${c.enabled ? "" : "opacity-60"}`}>
+                    <td className="px-3 py-2">
+                      <div className="font-medium text-zinc-900">{c.businessName}</div>
+                      <div className="text-xs text-zinc-500">
+                        {c.domain ?? "no domain"}{c.placeId ? ` · ${c.placeId}` : ""}
+                        {latest && latest.categories.length > 0 ? ` · ${latest.categories.join(", ")}` : ""}
                       </div>
-                    )}
-                  </div>
-                ) : (
-                  <p className="mt-3 text-sm text-zinc-500">
-                    No snapshot yet — run a refresh to pull its current listing.
-                  </p>
-                )}
-              </div>
-            );
-          })}
+                      {latest?.address && <div className="text-xs text-zinc-500">{latest.address}</div>}
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-2">
+                      <span className="inline-flex items-center gap-0.5 font-medium text-zinc-900">
+                        {latest?.rating != null ? (<>{latest.rating.toFixed(1)}<Star size={13} className="text-amber-500" fill="currentColor" /></>) : "—"}
+                      </span>
+                      {latest?.mock && <span className="ml-1 text-xs text-zinc-500">(mock)</span>}
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-2 text-zinc-800">
+                      {latest?.reviewCount != null ? latest.reviewCount : "—"}
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-2">
+                      {ratingDelta != null ? (
+                        <span className={`inline-flex items-center gap-0.5 ${ratingDelta >= 0 ? "text-green-700" : "text-red-700"}`}>
+                          {ratingDelta >= 0 ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
+                          {ratingDelta >= 0 ? "+" : ""}{ratingDelta.toFixed(1)}
+                        </span>
+                      ) : "—"}
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-2">
+                      {reviewDelta != null ? (
+                        <span className={reviewDelta >= 0 ? "text-zinc-500" : "text-red-700"}>
+                          {reviewDelta >= 0 ? "+" : ""}{reviewDelta}
+                        </span>
+                      ) : "—"}
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-2 text-xs text-zinc-500">
+                      {c.lastSnapshotAt ? fmtDate(c.lastSnapshotAt) : "no snapshot yet"}
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-2">
+                      <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${c.enabled ? "border-violet-200 bg-violet-50 text-violet-700" : "border-stone-200 bg-stone-50 text-stone-500"}`}>
+                        {c.enabled ? "Active" : "Paused"}
+                      </span>
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-2 text-right">
+                      {canEdit && (
+                        <div className="flex justify-end gap-1">
+                          <button
+                            className="rounded-md border border-zinc-200 px-2 py-1 text-xs text-zinc-500 hover:border-zinc-400 disabled:opacity-50"
+                            onClick={() => handleToggle(c)}
+                            disabled={toggling === c.id}
+                            title={c.enabled ? "Pause snapshots" : "Resume snapshots"}
+                          >
+                            {c.enabled ? "Pause" : "Resume"}
+                          </button>
+                          <button
+                            className="rounded-md border border-red-200/40 px-2 py-1 text-xs text-red-700 hover:border-red-300 disabled:opacity-50"
+                            onClick={() => handleDelete(c)}
+                            disabled={deleting === c.id}
+                          >
+                            {deleting === c.id ? "…" : "Remove"}
+                          </button>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       )}
 
@@ -966,7 +983,7 @@ function ReviewsPanel({ projectId, canEdit, reviewSummary, sentimentCounts, spen
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <div className={`${cardCls}`}>
           <p className="text-xs uppercase tracking-widest text-zinc-500">Avg rating</p>
-          <p className="mt-1 text-2xl font-semibold">{reviewSummary?.avgRating != null ? `${reviewSummary.avgRating.toFixed(1)}★` : "—"}</p>
+          <p className="mt-1 inline-flex items-center gap-1 text-2xl font-semibold">{reviewSummary?.avgRating != null ? (<>{reviewSummary.avgRating.toFixed(1)}<Star size={18} className="text-amber-500" fill="currentColor" /></>) : "—"}</p>
           <p className="mt-0.5 text-xs text-zinc-500">{reviewSummary?.count ?? 0} in latest weekly summary</p>
         </div>
         <div className={cardCls}>
@@ -1052,7 +1069,7 @@ function ReviewsPanel({ projectId, canEdit, reviewSummary, sentimentCounts, spen
                 {reviews.map((r) => (
                   <tr key={r.id} className="border-b border-zinc-200/60 align-top">
                     <td className="py-2 pr-3 text-zinc-800">{r.author ?? "—"}</td>
-                    <td className="py-2 pr-3 whitespace-nowrap text-zinc-800">{r.rating != null ? `${r.rating}★` : "—"}</td>
+                    <td className="py-2 pr-3 whitespace-nowrap text-zinc-800"><span className="inline-flex items-center gap-0.5">{r.rating != null ? (<>{r.rating}<Star size={12} className="text-amber-500" fill="currentColor" /></>) : "—"}</span></td>
                     <td className="py-2 pr-3">
                       <span className={`rounded-full border px-2 py-0.5 text-xs ${SENTIMENT_STYLE[r.sentiment] ?? SENTIMENT_STYLE.neu}`}>
                         {r.sentiment}
@@ -1074,7 +1091,7 @@ function ReviewsPanel({ projectId, canEdit, reviewSummary, sentimentCounts, spen
                           onClick={() => handleMarkResponded(r)}
                           disabled={updating === r.id}
                         >
-                          {updating === r.id ? "…" : r.responded ? "Responded ✓" : "Mark responded"}
+                          {updating === r.id ? "…" : r.responded ? (<span className="inline-flex items-center gap-1">Responded <Check size={12} /></span>) : "Mark responded"}
                         </button>
                       ) : (
                         <span className="text-xs text-zinc-500">{r.responded ? "Responded" : "Unresponded"}</span>
@@ -1128,9 +1145,9 @@ function ReviewsPanel({ projectId, canEdit, reviewSummary, sentimentCounts, spen
 // ---------------------------------------------------------------------------
 
 const TABS = [
-  { key: "grids", label: "Geo-grids" },
-  { key: "competitors", label: "Competitors" },
-  { key: "reviews", label: "Reviews" },
+  { key: "grids", label: "Geo-grids", icon: MapPinned },
+  { key: "competitors", label: "Competitors", icon: Crosshair },
+  { key: "reviews", label: "Reviews", icon: Star },
 ] as const;
 
 type TabKey = (typeof TABS)[number]["key"];
@@ -1139,17 +1156,18 @@ export default function LocalSeoTabs(props: Props) {
   const [tab, setTab] = useState<TabKey>("grids");
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex gap-2 border-b border-zinc-200 pb-2">
+      <div className="flex gap-1 border-b border-zinc-200">
         {TABS.map((t) => (
           <button
             key={t.key}
             onClick={() => setTab(t.key)}
-            className={`rounded-md px-4 py-2 text-sm font-medium ${
+            className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-[13.5px] font-medium transition-colors ${
               tab === t.key
-                ? "bg-zinc-900 text-white"
-                : "text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800"
+                ? "border-violet-600 text-violet-700"
+                : "border-transparent text-stone-500 hover:text-stone-800"
             }`}
           >
+            <t.icon size={15} />
             {t.label}
           </button>
         ))}

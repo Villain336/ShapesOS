@@ -33,7 +33,7 @@ export default async function SchedulesPage({ params }: { params: Promise<{ id: 
             </Link>{" "}
             / Schedules
           </p>
-          <h1 className="mt-1 font-display text-3xl">Scheduled skills</h1>
+          <h1 className="mt-1 text-xl font-bold tracking-tight text-ink">Scheduled skills</h1>
           <p className="mt-2 max-w-2xl text-sm text-zinc-600">
             Skills that run on a cron schedule or react to workspace events, for{" "}
             <span className="font-medium">{project.domain}</span>. Each run fans out to

@@ -6,6 +6,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Link2, PackageCheck, Store, Upload, type LucideIcon } from "lucide-react";
 import {
   Notice,
   btnCls,
@@ -13,7 +14,7 @@ import {
   dangerBtnCls,
   inputCls,
   labelCls,
-  primaryBtnCls,
+  primaryBtnVioletCls,
   type NoticeState,
 } from "./ui";
 
@@ -49,11 +50,11 @@ interface UrlPreview {
 
 type Tab = "installed" | "registry" | "url" | "upload";
 
-const TABS: { key: Tab; label: string }[] = [
-  { key: "installed", label: "Installed" },
-  { key: "registry", label: "Registry" },
-  { key: "url", label: "Install from URL" },
-  { key: "upload", label: "Upload" },
+const TABS: { key: Tab; label: string; icon: LucideIcon }[] = [
+  { key: "installed", label: "Installed", icon: PackageCheck },
+  { key: "registry", label: "Registry", icon: Store },
+  { key: "url", label: "Install from URL", icon: Link2 },
+  { key: "upload", label: "Upload", icon: Upload },
 ];
 
 const SOURCE_BADGE: Record<Skill["source"], string> = {
@@ -284,20 +285,24 @@ export default function SkillsManager({ workspaceId }: { workspaceId: string }) 
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex gap-1 rounded-xl border border-zinc-200 bg-white/60 p-1.5">
-        {TABS.map((t) => (
-          <button
-            key={t.key}
-            onClick={() => setTab(t.key)}
-            className={`rounded-md px-3 py-1.5 text-sm ${
-              tab === t.key
-                ? "bg-zinc-900 text-white"
-                : "text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900"
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
+      <div className="mb-4 flex gap-1 border-b border-stone-200">
+        {TABS.map((t) => {
+          const Icon = t.icon;
+          return (
+            <button
+              key={t.key}
+              onClick={() => setTab(t.key)}
+              className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-[13.5px] font-medium transition ${
+                tab === t.key
+                  ? "border-violet-600 text-violet-700"
+                  : "border-transparent text-stone-500 hover:text-stone-800"
+              }`}
+            >
+              <Icon size={15} />
+              {t.label}
+            </button>
+          );
+        })}
       </div>
 
       <Notice notice={notice} />
@@ -407,7 +412,7 @@ export default function SkillsManager({ workspaceId }: { workspaceId: string }) 
                   <button
                     onClick={() => installPack(p.key)}
                     disabled={busy === p.key || installed}
-                    className={installed ? btnCls : primaryBtnCls}
+                    className={installed ? btnCls : primaryBtnVioletCls}
                   >
                     {installed
                       ? "Installed"
@@ -474,7 +479,7 @@ export default function SkillsManager({ workspaceId }: { workspaceId: string }) 
                 <button
                   onClick={installUrl}
                   disabled={busy === "install-url"}
-                  className={primaryBtnCls}
+                  className={primaryBtnVioletCls}
                 >
                   {busy === "install-url" ? "Installing…" : "Confirm install"}
                 </button>
@@ -529,7 +534,7 @@ export default function SkillsManager({ workspaceId }: { workspaceId: string }) 
             <button
               onClick={installUpload}
               disabled={busy === "upload" || !skillMd.trim()}
-              className={primaryBtnCls}
+              className={primaryBtnVioletCls}
             >
               {busy === "upload" ? "Installing…" : "Install skill"}
             </button>

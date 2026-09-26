@@ -31,7 +31,13 @@ export default function SeedRulesButton({
   }
 
   return (
-    <Button variant="outline" size="sm" onClick={seed} disabled={busy}>
+    <Button
+      variant="outline"
+      size="sm"
+      onClick={seed}
+      disabled={busy}
+      className="inline-flex items-center gap-1.5 rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-[13px] text-stone-700 hover:bg-stone-50 disabled:opacity-40"
+    >
       {busy ? "Seeding…" : hasRules ? "Re-seed default pack" : "Seed default v1 pack"}
     </Button>
   );

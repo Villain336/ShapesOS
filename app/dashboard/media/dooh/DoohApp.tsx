@@ -4,8 +4,10 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   AlertTriangle,
+  ClipboardList,
   FileDown,
   Loader2,
+  Map,
   Plus,
   Search,
   ShieldCheck,
@@ -214,14 +216,22 @@ export function DoohApp() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex gap-2 border-b border-stone-200">
-        {(["planner", "plans"] as const).map((t) => (
+      <div className="mb-4 flex gap-1 border-b border-stone-200">
+        {([
+          { id: "planner" as const, label: "Planner", icon: Map },
+          { id: "plans" as const, label: `Plans (${plans.length})`, icon: ClipboardList },
+        ]).map(({ id, label, icon: Icon }) => (
           <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={`px-3 pb-2 text-sm font-medium ${tab === t ? "border-b-2 border-stone-900 text-stone-900" : "text-stone-500"}`}
+            key={id}
+            onClick={() => setTab(id)}
+            className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-[13.5px] font-medium transition ${
+              tab === id
+                ? "border-violet-600 text-violet-700"
+                : "border-transparent text-stone-500 hover:text-stone-800"
+            }`}
           >
-            {t === "planner" ? "Planner" : `Plans (${plans.length})`}
+            <Icon size={15} />
+            {label}
           </button>
         ))}
       </div>
@@ -244,22 +254,22 @@ export function DoohApp() {
           <div className="rounded-lg border border-stone-200 bg-white p-4">
             <h2 className="text-sm font-semibold text-stone-900">1 · Vendor & inventory</h2>
             <label className="mt-3 block text-xs font-medium text-stone-600">Vendor (locked order)</label>
-            <select value={vendor} onChange={(e) => setVendor(e.target.value)} className="mt-1 w-full rounded-md border border-stone-300 px-2 py-1.5 text-sm">
+            <select value={vendor} onChange={(e) => setVendor(e.target.value)} className="mt-1 w-full rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-[13px] text-stone-900 placeholder:text-stone-400 focus:border-violet-400 focus:outline-none">
               {VENDORS.map((v) => (
                 <option key={v.id} value={v.id}>{v.label}</option>
               ))}
             </select>
             <p className="mt-1 text-xs text-stone-500">{VENDORS.find((v) => v.id === vendor)?.hint}</p>
             <div className="mt-3 flex gap-2">
-              <input value={city} onChange={(e) => setCity(e.target.value)} placeholder="City" className="w-full rounded-md border border-stone-300 px-2 py-1.5 text-sm" />
-              <input value={state} onChange={(e) => setState(e.target.value)} placeholder="ST" className="w-20 rounded-md border border-stone-300 px-2 py-1.5 text-sm" />
-              <button onClick={lookupInventory} disabled={loading} className="flex items-center gap-1 rounded-md bg-stone-900 px-3 py-1.5 text-sm text-white disabled:opacity-50">
+              <input value={city} onChange={(e) => setCity(e.target.value)} placeholder="City" className="w-full rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-[13px] text-stone-900 placeholder:text-stone-400 focus:border-violet-400 focus:outline-none" />
+              <input value={state} onChange={(e) => setState(e.target.value)} placeholder="ST" className="w-20 rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-[13px] text-stone-900 focus:border-violet-400 focus:outline-none" />
+              <button onClick={lookupInventory} disabled={loading} className="flex items-center gap-1.5 rounded-md bg-violet-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-violet-700 disabled:opacity-40">
                 {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />} Lookup
               </button>
             </div>
             <div className="mt-3 max-h-64 space-y-1 overflow-y-auto">
               {inventory.map((item) => (
-                <label key={item.boardId} className="flex items-start gap-2 rounded-md border border-stone-200 p-2 text-sm hover:bg-stone-50">
+                <label key={item.boardId} className="flex items-start gap-2 rounded-md border border-stone-200 p-2 text-sm hover:border-violet-200 hover:bg-violet-50/40">
                   <input type="checkbox" checked={selected.some((b) => b.boardId === item.boardId)} onChange={() => toggleBoard(item)} className="mt-1" />
                   <span>
                     <span className="font-medium text-stone-900">{item.name}</span>
@@ -274,27 +284,27 @@ export function DoohApp() {
           <div className="rounded-lg border border-stone-200 bg-white p-4">
             <h2 className="text-sm font-semibold text-stone-900">2 · Flight, dayparts & budget</h2>
             <label className="mt-3 block text-xs font-medium text-stone-600">Plan name</label>
-            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Q4 Greensboro flight" className="mt-1 w-full rounded-md border border-stone-300 px-2 py-1.5 text-sm" />
+            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Q4 Greensboro flight" className="mt-1 w-full rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-[13px] text-stone-900 placeholder:text-stone-400 focus:border-violet-400 focus:outline-none" />
             <div className="mt-3 grid grid-cols-2 gap-2">
               <div>
                 <label className="block text-xs font-medium text-stone-600">Flight start</label>
-                <input type="date" value={flightStart} onChange={(e) => setFlightStart(e.target.value)} className="mt-1 w-full rounded-md border border-stone-300 px-2 py-1.5 text-sm" />
+                <input type="date" value={flightStart} onChange={(e) => setFlightStart(e.target.value)} className="mt-1 w-full rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-[13px] text-stone-900 placeholder:text-stone-400 focus:border-violet-400 focus:outline-none" />
               </div>
               <div>
                 <label className="block text-xs font-medium text-stone-600">Flight end</label>
-                <input type="date" value={flightEnd} onChange={(e) => setFlightEnd(e.target.value)} className="mt-1 w-full rounded-md border border-stone-300 px-2 py-1.5 text-sm" />
+                <input type="date" value={flightEnd} onChange={(e) => setFlightEnd(e.target.value)} className="mt-1 w-full rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-[13px] text-stone-900 placeholder:text-stone-400 focus:border-violet-400 focus:outline-none" />
               </div>
             </div>
             <label className="mt-3 block text-xs font-medium text-stone-600">Daypart mix</label>
             <div className="mt-1 flex flex-wrap gap-1">
               {DAYPARTS.map((d) => (
-                <button key={d} onClick={() => toggleDaypart(d)} className={`rounded-full border px-2.5 py-1 text-xs ${dayparts.includes(d) ? "border-stone-900 bg-stone-900 text-white" : "border-stone-300 text-stone-600"}`}>
+                <button key={d} onClick={() => toggleDaypart(d)} className={`rounded-full border px-2.5 py-1 text-xs ${dayparts.includes(d) ? "border-violet-600 bg-violet-600 text-white" : "border-stone-200 text-stone-600 hover:border-stone-300"}`}>
                   {d}
                 </button>
               ))}
             </div>
             <label className="mt-3 block text-xs font-medium text-stone-600">Plays per board per day</label>
-            <input type="number" value={plays} onChange={(e) => setPlays(Number(e.target.value))} min={1} className="mt-1 w-32 rounded-md border border-stone-300 px-2 py-1.5 text-sm" />
+            <input type="number" value={plays} onChange={(e) => setPlays(Number(e.target.value))} min={1} className="mt-1 w-32 rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-[13px] text-stone-900 focus:border-violet-400 focus:outline-none" />
             <label className="mt-3 block text-xs font-medium text-stone-600">Creatives (Creative Studio — hash-bound)</label>
             <div className="mt-1 max-h-32 space-y-1 overflow-y-auto">
               {creatives.map((c) => (
@@ -305,7 +315,7 @@ export function DoohApp() {
               ))}
               {creatives.length === 0 && <p className="text-xs text-stone-500">No hashed creatives found — finalize one in Creative Studio first.</p>}
             </div>
-            <button onClick={createPlan} disabled={loading || !name || selected.length === 0 || !flightStart || !flightEnd} className="mt-4 flex items-center gap-1 rounded-md bg-stone-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50">
+            <button onClick={createPlan} disabled={loading || !name || selected.length === 0 || !flightStart || !flightEnd} className="mt-4 flex items-center gap-1.5 rounded-md bg-violet-600 px-4 py-2 text-sm font-medium text-white hover:bg-violet-700 disabled:opacity-40">
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />} Create plan & estimate
             </button>
             <p className="mt-2 text-xs text-stone-500">
@@ -321,57 +331,78 @@ export function DoohApp() {
       )}
 
       {tab === "plans" && (
-        <div className="space-y-3">
-          {plans.map((plan) => (
-            <div key={plan.id} className="rounded-lg border border-stone-200 bg-white p-4">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <h3 className="text-sm font-semibold text-stone-900">{plan.name}</h3>
-                  <p className="text-xs text-stone-500">
-                    {plan.vendor} · {(plan.placementsJson.placements ?? []).length} boards · {plan.placementsJson.flightStart} → {plan.placementsJson.flightEnd} · ceiling {money(plan.estimateCents)}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs text-amber-700">{plan.status}</span>
-                  <button onClick={() => { const next = expandedPlan === plan.id ? null : plan.id; setExpandedPlan(next); if (next) loadPackets(plan.id); }} className="rounded-md border border-stone-300 px-2 py-1 text-xs">
-                    {expandedPlan === plan.id ? "Collapse" : "Packets"}
-                  </button>
-                </div>
-              </div>
-              {expandedPlan === plan.id && (
-                <div className="mt-3 border-t border-stone-200 pt-3">
-                  <h4 className="text-xs font-semibold text-stone-700">Estimate lines</h4>
-                  <ul className="mt-1 text-xs text-stone-600">
-                    {(plan.estimateJson.lines ?? []).map((l, i) => (
-                      <li key={i} className="flex justify-between gap-2 py-0.5">
-                        <span>{l.label}{l.note ? ` — ${l.note}` : ""}</span>
-                        <span className="font-medium">{money(l.totalCents)}</span>
-                      </li>
-                    ))}
-                  </ul>
-                  <h4 className="mt-3 text-xs font-semibold text-stone-700">Launch packets</h4>
-                  {(packets[plan.id] ?? []).map((pkt) => (
-                    <div key={pkt.id} className="mt-1 flex items-center justify-between rounded-md border border-stone-200 p-2 text-xs">
-                      <span>v{pkt.version} · approval {pkt.approvalId.slice(0, 8)}… · sha256 {pkt.packetSha256.slice(0, 16)}…</span>
-                      <a href={pkt.pdfUrl} className="flex items-center gap-1 text-stone-700 underline"><FileDown className="h-3 w-3" /> PDF</a>
-                    </div>
-                  ))}
-                  <div className="mt-3 rounded-md bg-stone-50 p-3">
-                    <h4 className="text-xs font-semibold text-stone-700">Compile launch packet (approved buy only)</h4>
-                    <input value={approvalId} onChange={(e) => setApprovalId(e.target.value)} placeholder="Approval ID (status: approved)" className="mt-2 w-full rounded-md border border-stone-300 px-2 py-1.5 text-xs" />
-                    <label className="mt-2 block text-xs text-stone-500">Per-placement tracking (JSON — from the attribution track)</label>
-                    <textarea value={trackingJson} onChange={(e) => setTrackingJson(e.target.value)} rows={2} placeholder='[{"placementRef":"board-47","boardName":"I-40 W","slug":"brand-board-47","destinationUrl":"https://brand.link/board-47"}]' className="mt-1 w-full rounded-md border border-stone-300 px-2 py-1.5 font-mono text-xs" />
-                    <button onClick={() => compilePacket(plan.id)} disabled={loading || !approvalId} className="mt-2 flex items-center gap-1 rounded-md bg-stone-900 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50">
-                      {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <ShieldCheck className="h-3 w-3" />} Compile packet
-                    </button>
-                    <p className="mt-1 text-[11px] text-stone-500">Fail-closed: any drift between the plan and the approved binding blocks compilation.</p>
-                  </div>
-                </div>
-              )}
-            </div>
-          ))}
-          {plans.length === 0 && <p className="text-sm text-stone-500">No plans yet — build one in the Planner tab.</p>}
-        </div>
+        plans.length === 0 ? (
+          <p className="text-sm text-stone-500">No plans yet — build one in the Planner tab.</p>
+        ) : (
+          <div className="overflow-x-auto rounded-xl border border-stone-200 bg-white">
+            <table className="w-full text-left text-[13px]">
+              <thead>
+                <tr className="border-b border-stone-100 bg-stone-50/60 text-[11px] uppercase tracking-wide text-stone-500">
+                  <th className="px-3 py-2 font-medium">Plan</th>
+                  <th className="px-3 py-2 font-medium">Vendor</th>
+                  <th className="px-3 py-2 font-medium">Boards</th>
+                  <th className="px-3 py-2 font-medium">Flight</th>
+                  <th className="px-3 py-2 font-medium">Ceiling</th>
+                  <th className="px-3 py-2 font-medium">Status</th>
+                  <th className="px-3 py-2 font-medium">Packets</th>
+                </tr>
+              </thead>
+              <tbody>
+                {plans.map((plan) => (
+                  <>
+                    <tr key={plan.id} className="border-b border-stone-100 last:border-0 hover:bg-violet-50/40">
+                      <td className="px-3 py-2 font-medium text-stone-900">{plan.name}</td>
+                      <td className="px-3 py-2 text-stone-600">{plan.vendor}</td>
+                      <td className="px-3 py-2 text-stone-600">{(plan.placementsJson.placements ?? []).length}</td>
+                      <td className="px-3 py-2 text-[12px] text-stone-600">{plan.placementsJson.flightStart} → {plan.placementsJson.flightEnd}</td>
+                      <td className="px-3 py-2 font-medium text-stone-900">{money(plan.estimateCents)}</td>
+                      <td className="px-3 py-2">
+                        <span className="inline-flex items-center whitespace-nowrap rounded-full border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium leading-tight text-amber-700">{plan.status}</span>
+                      </td>
+                      <td className="px-3 py-2">
+                        <button onClick={() => { const next = expandedPlan === plan.id ? null : plan.id; setExpandedPlan(next); if (next) loadPackets(plan.id); }} className="rounded-md border border-stone-200 bg-white px-2 py-1 text-xs text-stone-700 hover:bg-stone-50">
+                          {expandedPlan === plan.id ? "Collapse" : "Packets"}
+                        </button>
+                      </td>
+                    </tr>
+                    {expandedPlan === plan.id && (
+                      <tr key={`${plan.id}-detail`} className="border-b border-stone-100 bg-stone-50/40">
+                        <td colSpan={7} className="px-3 py-3">
+                          <h4 className="text-xs font-semibold text-stone-700">Estimate lines</h4>
+                          <ul className="mt-1 text-xs text-stone-600">
+                            {(plan.estimateJson.lines ?? []).map((l, i) => (
+                              <li key={i} className="flex justify-between gap-2 py-0.5">
+                                <span>{l.label}{l.note ? ` — ${l.note}` : ""}</span>
+                                <span className="font-medium">{money(l.totalCents)}</span>
+                              </li>
+                            ))}
+                          </ul>
+                          <h4 className="mt-3 text-xs font-semibold text-stone-700">Launch packets</h4>
+                          {(packets[plan.id] ?? []).map((pkt) => (
+                            <div key={pkt.id} className="mt-1 flex items-center justify-between rounded-md border border-stone-200 bg-white p-2 text-xs">
+                              <span>v{pkt.version} · approval {pkt.approvalId.slice(0, 8)}… · sha256 {pkt.packetSha256.slice(0, 16)}…</span>
+                              <a href={pkt.pdfUrl} className="flex items-center gap-1 text-stone-700 underline"><FileDown className="h-3 w-3" /> PDF</a>
+                            </div>
+                          ))}
+                          <div className="mt-3 rounded-lg border border-stone-200 bg-white p-3">
+                            <h4 className="text-xs font-semibold text-stone-700">Compile launch packet (approved buy only)</h4>
+                            <input value={approvalId} onChange={(e) => setApprovalId(e.target.value)} placeholder="Approval ID (status: approved)" className="mt-2 w-full rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-[13px] text-stone-900 placeholder:text-stone-400 focus:border-violet-400 focus:outline-none" />
+                            <label className="mt-2 block text-xs text-stone-500">Per-placement tracking (JSON — from the attribution track)</label>
+                            <textarea value={trackingJson} onChange={(e) => setTrackingJson(e.target.value)} rows={2} placeholder='[{"placementRef":"board-47","boardName":"I-40 W","slug":"brand-board-47","destinationUrl":"https://brand.link/board-47"}]' className="mt-1 w-full rounded-md border border-stone-200 bg-white px-2.5 py-1.5 font-mono text-[12px] text-stone-900 placeholder:text-stone-400 focus:border-violet-400 focus:outline-none" />
+                            <button onClick={() => compilePacket(plan.id)} disabled={loading || !approvalId} className="mt-2 flex items-center gap-1.5 rounded-md bg-violet-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-violet-700 disabled:opacity-40">
+                              {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <ShieldCheck className="h-3 w-3" />} Compile packet
+                            </button>
+                            <p className="mt-1 text-[11px] text-stone-500">Fail-closed: any drift between the plan and the approved binding blocks compilation.</p>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )
       )}
     </div>
   );

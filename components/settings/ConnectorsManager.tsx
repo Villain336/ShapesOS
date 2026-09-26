@@ -5,6 +5,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { Activity, Plug } from "lucide-react";
 import {
   Notice,
   btnCls,
@@ -12,7 +13,7 @@ import {
   dangerBtnCls,
   inputCls,
   labelCls,
-  primaryBtnCls,
+  primaryBtnVioletCls,
   type NoticeState,
 } from "./ui";
 import ConnectorHealthTab from "./ConnectorHealthTab";
@@ -349,7 +350,7 @@ export default function ConnectorsManager({
             <button
               onClick={() => connect(c)}
               disabled={busy === `oauth-${c.key}`}
-              className={primaryBtnCls}
+              className={primaryBtnVioletCls}
             >
               {busy === `oauth-${c.key}` ? "Starting…" : "Connect"}
             </button>
@@ -376,22 +377,31 @@ export default function ConnectorsManager({
 
       <Notice notice={notice} />
 
-      <div className="flex gap-1 border-b border-zinc-200" role="tablist" aria-label="Connectors">
-        {(["connections", "health"] as const).map((t) => (
-          <button
-            key={t}
-            role="tab"
-            aria-selected={tab === t}
-            onClick={() => setTab(t)}
-            className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium ${
-              tab === t
-                ? "border-[#0E7C66] text-[#0A5F4E]"
-                : "border-transparent text-zinc-500 hover:text-zinc-700"
-            }`}
-          >
-            {t === "connections" ? "Connections" : "Health"}
-          </button>
-        ))}
+      <div className="mb-4 flex gap-1 border-b border-stone-200" role="tablist" aria-label="Connectors">
+        {(
+          [
+            { id: "connections", label: "Connections", icon: Plug },
+            { id: "health", label: "Health", icon: Activity },
+          ] as const
+        ).map((t) => {
+          const Icon = t.icon;
+          return (
+            <button
+              key={t.id}
+              role="tab"
+              aria-selected={tab === t.id}
+              onClick={() => setTab(t.id)}
+              className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-[13.5px] font-medium transition ${
+                tab === t.id
+                  ? "border-violet-600 text-violet-700"
+                  : "border-transparent text-stone-500 hover:text-stone-800"
+              }`}
+            >
+              <Icon size={15} />
+              {t.label}
+            </button>
+          );
+        })}
       </div>
 
       {tab === "health" ? (
@@ -448,7 +458,7 @@ export default function ConnectorsManager({
           <button
             onClick={addMcp}
             disabled={busy === "add-mcp" || !mcpName.trim() || !mcpEndpoint.trim()}
-            className={primaryBtnCls}
+            className={primaryBtnVioletCls}
           >
             {busy === "add-mcp" ? "Adding…" : "Add MCP server"}
           </button>
@@ -517,7 +527,7 @@ export default function ConnectorsManager({
               <button
                 onClick={submitApiKey}
                 disabled={busy === `key-${apiKeyFor.key}` || !apiKey.trim()}
-                className={primaryBtnCls}
+                className={primaryBtnVioletCls}
               >
                 {busy === `key-${apiKeyFor.key}` ? "Saving…" : "Save & connect"}
               </button>

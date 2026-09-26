@@ -5,7 +5,7 @@ import { useState } from "react";
 import type { CrmLead, CrmPipeline } from "./types";
 import { formatMoney } from "./types";
 import { StageBadge, ScoreBar, Avatar, EmptyState } from "./ui";
-import { Kanban } from "@phosphor-icons/react";
+import { Kanban } from "lucide-react";
 
 export function KanbanBoard({
   leads, pipeline, onOpen, onMove,

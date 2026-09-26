@@ -6,6 +6,7 @@
 "use client";
 
 import { useState } from "react";
+import { BellRing, Radio } from "lucide-react";
 
 interface AlertChannel {
   id: string;
@@ -53,10 +54,10 @@ interface Project {
 }
 
 const inputCls =
-  "w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-accent focus:outline-none";
+  "w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-violet-400 focus:outline-none";
 const labelCls = "mb-1 block text-xs font-medium text-zinc-500";
 const btnPrimary =
-  "rounded-md bg-accent px-3 py-2 text-sm font-medium text-white hover:bg-accent-hover disabled:opacity-50 active:scale-[0.96] transition-[background-color,transform] duration-150 ease-[cubic-bezier(0.2,0,0,1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2";
+  "rounded-md bg-violet-600 px-3 py-2 text-sm font-medium text-white hover:bg-violet-700 disabled:opacity-50 active:scale-[0.96] transition-[background-color,transform] duration-150 ease-[cubic-bezier(0.2,0,0,1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-600 focus-visible:ring-offset-2";
 const btnGhost =
   "rounded-md border border-zinc-200 px-3 py-2 text-sm text-zinc-500 hover:border-zinc-400 disabled:opacity-50";
 
@@ -536,18 +537,29 @@ export default function AlertManager({
 
   return (
     <div>
-      <div className="mb-6 flex gap-2">
-        {(["rules", "channels"] as const).map((t) => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={`rounded-md px-3 py-2 text-sm font-medium ${
-              tab === t ? "bg-zinc-900 text-white" : "border border-zinc-200 text-zinc-500 hover:border-zinc-400"
-            }`}
-          >
-            {t === "rules" ? "Rules" : "Channels"}
-          </button>
-        ))}
+      <div className="mb-4 flex gap-1 border-b border-stone-200">
+        {(
+          [
+            { id: "rules", label: "Rules", icon: BellRing },
+            { id: "channels", label: "Channels", icon: Radio },
+          ] as const
+        ).map((t) => {
+          const Icon = t.icon;
+          return (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-[13.5px] font-medium transition ${
+                tab === t.id
+                  ? "border-violet-600 text-violet-700"
+                  : "border-transparent text-stone-500 hover:text-stone-800"
+              }`}
+            >
+              <Icon size={15} />
+              {t.label}
+            </button>
+          );
+        })}
       </div>
 
       {error && <p className="mb-4 text-sm text-red-600">{error}</p>}

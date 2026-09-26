@@ -1,13 +1,13 @@
 // Marketr CRM — dense leads table (the reference's pipeline view).
 "use client";
 
-import { Phone, EnvelopeSimple, Star, DotsThreeVertical } from "@phosphor-icons/react";
+import { Phone, Mail, Star, EllipsisVertical } from "lucide-react";
 import type { CrmLead, CrmPipeline } from "./types";
 import { SOURCE_LABELS, formatMoney, timeAgo } from "./types";
 import { StageBadge, ScoreBar, Sparkline, Avatar } from "./ui";
 
 const ACT_ICON: Record<string, typeof Phone> = {
-  call: Phone, email: EnvelopeSimple, sms: EnvelopeSimple, meeting: EnvelopeSimple, note: EnvelopeSimple,
+  call: Phone, email: Mail, sms: Mail, meeting: Mail, note: Mail,
 };
 
 export function LeadsTable({
@@ -53,7 +53,7 @@ export function LeadsTable({
                     className={l.starred ? "text-violet-600" : "text-stone-300 hover:text-stone-500"}
                     title={l.starred ? "Unstar" : "Star"}
                   >
-                    <Star size={15} weight={l.starred ? "fill" : "regular"} />
+                    <Star size={15} fill={l.starred ? "currentColor" : "none"} className={l.starred ? "text-amber-500" : "text-stone-400"} />
                   </button>
                 </td>
                 <td>
@@ -90,7 +90,7 @@ export function LeadsTable({
                 </td>
                 <td onClick={(e) => e.stopPropagation()}>
                   <button className="text-stone-400 hover:text-stone-700" onClick={() => onOpen(l.id)}>
-                    <DotsThreeVertical size={16} weight="bold" />
+                    <EllipsisVertical size={16} strokeWidth={2.5} />
                   </button>
                 </td>
               </tr>
@@ -103,6 +103,6 @@ export function LeadsTable({
 }
 
 export function LastTouchIcon({ type }: { type: string }) {
-  const Icon = ACT_ICON[type] ?? EnvelopeSimple;
+  const Icon = ACT_ICON[type] ?? Mail;
   return <Icon size={13} className="text-violet-600" />;
 }

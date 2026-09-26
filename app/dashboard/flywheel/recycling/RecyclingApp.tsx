@@ -23,9 +23,13 @@ import {
 import { Button } from "@/components/vault/shadcn/button";
 import { Input } from "@/components/vault/shadcn/input";
 import { Textarea } from "@/components/vault/shadcn/textarea";
-import { Badge } from "@/components/vault/shadcn/badge";
-import { Card, CardHeader } from "@/components/vault/Card";
-import { ValuePill } from "@/components/vault/atoms/ValuePill";
+function chip(text: React.ReactNode, cls: string) {
+  return (
+    <span className={`inline-flex items-center gap-0.5 whitespace-nowrap rounded-full border px-1.5 py-0.5 text-[10px] font-medium leading-tight ${cls}`}>
+      {text}
+    </span>
+  );
+}
 import {
   api,
   formatMetric,
@@ -36,12 +40,12 @@ import {
   type BriefView,
 } from "./api";
 
-function statusTone(s: BriefView["status"]): "neutral" | "accent" | "orange" | "green" {
+function statusChip(s: BriefView["status"]) {
   switch (s) {
-    case "draft": return "neutral";
-    case "approved": return "accent";
-    case "regenerating": return "orange";
-    case "ready": return "green";
+    case "draft": return chip(s, "border-stone-200 bg-stone-100 text-stone-600");
+    case "approved": return chip(s, "border-violet-200 bg-violet-50 text-violet-700");
+    case "regenerating": return chip(s, "border-amber-200 bg-amber-50 text-amber-700");
+    case "ready": return chip(s, "border-emerald-200 bg-emerald-50 text-emerald-700");
   }
 }
 
@@ -182,7 +186,7 @@ export function RecyclingApp() {
   );
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-4">
       {error && (
         <div className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-[13px] text-red-800">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
@@ -222,47 +226,50 @@ export function RecyclingApp() {
             <Loader2 className="h-4 w-4 animate-spin" /> Loading signals…
           </div>
         ) : signals.length === 0 ? (
-          <Card>
-            <p className="p-6 text-center text-[13px] text-stone-500">
+          <div className="rounded-xl border border-dashed border-stone-300 bg-white p-6 text-center">
+            <p className="text-[13px] text-stone-500">
               No winning creative flagged by the current readers. Signals appear when attribution revenue,
               QR scan rates, AEO lift, or mail response rates cross their thresholds.
             </p>
-          </Card>
+          </div>
         ) : (
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {signals.map((s) => (
-              <Card key={s.id}>
-                <div className="p-4">
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <div className="text-[13px] font-semibold text-stone-900">
-                        {SIGNAL_LABELS[s.kind] ?? s.kind}
-                      </div>
-                      <div className="mt-0.5 font-mono text-[11px] text-stone-500">{s.sourceAssetId}</div>
-                    </div>
-                    <Badge variant="outline">{s.source === "fake" ? "fixture" : "live"}</Badge>
-                  </div>
-                  <div className="mt-3 flex items-baseline gap-2">
-                    <span className="text-xl font-bold text-stone-900">
-                      {formatMetric(s.kind, s.metricValue, s.metricUnit)}
-                    </span>
-                    <span className="text-[11px] text-stone-500">
-                      {s.sourceChannel} → recycle
-                    </span>
-                  </div>
-                  <Button
-                    size="sm"
-                    className="mt-3"
-                    onClick={() => {
-                      setComposerSignal(s);
-                      setComposerTargets(SUPPORTED_TARGET_SUGGESTIONS[s.sourceChannel] ?? []);
-                    }}
-                  >
-                    <Recycle className="mr-1.5 h-3.5 w-3.5" /> Generate brief
-                  </Button>
-                </div>
-              </Card>
-            ))}
+          <div className="overflow-x-auto rounded-xl border border-stone-200 bg-white">
+            <table className="w-full text-left text-[13px]">
+              <thead>
+                <tr className="border-b border-stone-100 bg-stone-50/60 text-[11px] uppercase tracking-wide text-stone-500">
+                  <th className="px-3 py-2 font-medium">Signal</th>
+                  <th className="px-3 py-2 font-medium">Source asset</th>
+                  <th className="px-3 py-2 font-medium">Metric</th>
+                  <th className="px-3 py-2 font-medium">Source</th>
+                  <th className="px-3 py-2 font-medium">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {signals.map((s) => (
+                  <tr key={s.id} className="border-b border-stone-100 last:border-0 hover:bg-violet-50/40">
+                    <td className="px-3 py-2 font-medium text-stone-900">{SIGNAL_LABELS[s.kind] ?? s.kind}</td>
+                    <td className="px-3 py-2 font-mono text-[11px] text-stone-500">{s.sourceAssetId}</td>
+                    <td className="px-3 py-2">
+                      <span className="font-bold text-stone-900">{formatMetric(s.kind, s.metricValue, s.metricUnit)}</span>
+                      <span className="ml-1.5 text-[11px] text-stone-500">{s.sourceChannel} → recycle</span>
+                    </td>
+                    <td className="px-3 py-2">{chip(s.source === "fake" ? "fixture" : "live", "border-stone-200 bg-stone-50 text-stone-600")}</td>
+                    <td className="px-3 py-2">
+                      <Button
+                        size="sm"
+                        className="bg-violet-600 text-white hover:bg-violet-700"
+                        onClick={() => {
+                          setComposerSignal(s);
+                          setComposerTargets(SUPPORTED_TARGET_SUGGESTIONS[s.sourceChannel] ?? []);
+                        }}
+                      >
+                        <Recycle className="mr-1.5 h-3.5 w-3.5" /> Generate brief
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
 
@@ -270,9 +277,7 @@ export function RecyclingApp() {
           <div className="mt-3 flex flex-wrap gap-2">
             {readers.map((r) => (
               <span key={r.kind} title={r.description} className="cursor-help">
-                <Badge variant="outline">
-                  {SIGNAL_LABELS[r.kind] ?? r.kind} · {r.source}
-                </Badge>
+                {chip(`${SIGNAL_LABELS[r.kind] ?? r.kind} · ${r.source}`, "border-stone-200 bg-stone-50 text-stone-600")}
               </span>
             ))}
           </div>
@@ -281,16 +286,16 @@ export function RecyclingApp() {
 
       {/* ── Brief composer ── */}
       {composerSignal && (
-        <Card>
-          <CardHeader
-            title={`New brief from ${SIGNAL_LABELS[composerSignal.kind]}`}
-            actions={
-              <Button variant="ghost" size="sm" onClick={() => setComposerSignal(null)} aria-label="Close composer">
-                <X className="h-4 w-4" />
-              </Button>
-            }
-          />
-          <div className="flex flex-col gap-3 p-4">
+        <section className="rounded-xl border border-stone-200 bg-white p-4">
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <h3 className="text-sm font-semibold tracking-tight text-stone-900">
+              New brief from {SIGNAL_LABELS[composerSignal.kind]}
+            </h3>
+            <Button variant="ghost" size="sm" onClick={() => setComposerSignal(null)} aria-label="Close composer">
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+          <div className="flex flex-col gap-3">
             <div className="font-mono text-[11px] text-stone-500">
               {composerSignal.sourceAssetId} · {composerSignal.sourceChannel} ·{" "}
               {formatMetric(composerSignal.kind, composerSignal.metricValue, composerSignal.metricUnit)}
@@ -308,7 +313,8 @@ export function RecyclingApp() {
                     <Button
                       key={t}
                       size="sm"
-                      variant={composerTargets.includes(t) ? "default" : "outline"}
+                      variant="outline"
+                      className={composerTargets.includes(t) ? "border-violet-300 bg-violet-50 text-violet-700" : undefined}
                       onClick={() => toggleTarget(t)}
                     >
                       {t}
@@ -318,7 +324,7 @@ export function RecyclingApp() {
               )}
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <Button onClick={createBrief} disabled={creating || composerTargets.length === 0}>
+              <Button onClick={createBrief} disabled={creating || composerTargets.length === 0} className="bg-violet-600 text-white hover:bg-violet-700">
                 {creating ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Recycle className="mr-1.5 h-4 w-4" />}
                 Create draft brief
               </Button>
@@ -327,61 +333,61 @@ export function RecyclingApp() {
               </span>
             </div>
           </div>
-        </Card>
+        </section>
       )}
 
       {/* ── Brief queue ── */}
       <section>
         <SectionHead title="Recycling briefs" count={briefs.length} />
         {briefs.length === 0 ? (
-          <Card>
-            <p className="p-6 text-center text-[13px] text-stone-500">
+          <div className="rounded-xl border border-dashed border-stone-300 bg-white p-6 text-center">
+            <p className="text-[13px] text-stone-500">
               No briefs yet. Generate one from a trigger signal above.
             </p>
-          </Card>
+          </div>
         ) : (
-          <Card>
+          <div className="overflow-x-auto rounded-xl border border-stone-200 bg-white">
             <table className="w-full text-left text-[13px]">
               <thead>
-                <tr className="border-b border-stone-200 bg-stone-50 text-[11px] uppercase tracking-wide text-stone-500">
-                  <th className="px-4 py-2.5 font-medium">Source</th>
-                  <th className="px-4 py-2.5 font-medium">Signal</th>
-                  <th className="px-4 py-2.5 font-medium">Targets</th>
-                  <th className="px-4 py-2.5 font-medium">Lineage</th>
-                  <th className="px-4 py-2.5 font-medium">Status</th>
-                  <th className="px-4 py-2.5" />
+                <tr className="border-b border-stone-100 bg-stone-50/60 text-[11px] uppercase tracking-wide text-stone-500">
+                  <th className="px-3 py-2 font-medium">Source</th>
+                  <th className="px-3 py-2 font-medium">Signal</th>
+                  <th className="px-3 py-2 font-medium">Targets</th>
+                  <th className="px-3 py-2 font-medium">Lineage</th>
+                  <th className="px-3 py-2 font-medium">Status</th>
+                  <th className="px-3 py-2" />
                 </tr>
               </thead>
               <tbody>
                 {briefs.map((b) => (
-                  <tr key={b.id} className="border-b border-stone-100 last:border-0 hover:bg-stone-50/50">
-                    <td className="px-4 py-3">
+                  <tr key={b.id} className="border-b border-stone-100 last:border-0 hover:bg-violet-50/40">
+                    <td className="px-3 py-2">
                       <div className="font-mono text-[11px] text-stone-700">{b.sourceAssetId}</div>
                       <div className="text-[11px] text-stone-500">{b.sourceChannel}</div>
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-3 py-2">
                       <div className="text-stone-800">{SIGNAL_LABELS[b.triggerSignal.kind] ?? b.triggerSignal.kind}</div>
                       <div className="text-[11px] text-stone-500">
                         {formatMetric(b.triggerSignal.kind, b.triggerSignal.metricValue, b.triggerSignal.metricUnit)}
                       </div>
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-3 py-2">
                       <div className="flex flex-wrap gap-1">
                         {b.targetChannels.map((t) => (
-                          <Badge key={t} variant="outline">{t}</Badge>
+                          <span key={t}>{chip(t, "border-stone-200 bg-stone-50 text-stone-600")}</span>
                         ))}
                       </div>
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-3 py-2">
                       <span className="inline-flex items-center gap-1 font-mono text-[11px] text-stone-500">
                         <Hash className="h-3 w-3" />
                         {hashShort(b.creativeHashLineage[0]?.hash ?? "")} × {b.creativeHashLineage.length}
                       </span>
                     </td>
-                    <td className="px-4 py-3">
-                      <ValuePill tone={statusTone(b.status)}>{b.status}</ValuePill>
+                    <td className="px-3 py-2">
+                      {statusChip(b.status)}
                     </td>
-                    <td className="px-4 py-3 text-right">
+                    <td className="px-3 py-2 text-right">
                       <Button variant="ghost" size="sm" onClick={() => openBrief(b.id)}>
                         Open <ChevronRight className="ml-1 h-3.5 w-3.5" />
                       </Button>
@@ -390,7 +396,7 @@ export function RecyclingApp() {
                 ))}
               </tbody>
             </table>
-          </Card>
+          </div>
         )}
       </section>
 
@@ -448,43 +454,56 @@ function BriefDetail({
   return (
     <div className="mt-4 flex flex-col gap-5">
       <div className="flex flex-wrap items-center gap-2">
-        <ValuePill tone={statusTone(brief.status)}>{brief.status}</ValuePill>
-        <Badge variant="outline">{brief.triggerSignal.source} signal</Badge>
+        {statusChip(brief.status)}
+        {chip(`${brief.triggerSignal.source} signal`, "border-stone-200 bg-stone-50 text-stone-600")}
         <span className="font-mono text-[11px] text-stone-500">{brief.sourceAssetId}</span>
       </div>
 
       {/* Variant specs */}
       <section>
         <h4 className="mb-2 text-[13px] font-semibold text-stone-800">Variant specs (deterministic rules)</h4>
-        <div className="flex flex-col gap-2">
-          {Object.values(brief.variantSpecs).map((spec) => (
-            <Card key={spec.targetChannel}>
-              <div className="p-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-[13px] font-semibold text-stone-900">
-                    {brief.sourceChannel} <ArrowRight className="inline h-3.5 w-3.5" /> {spec.targetChannel}
-                  </span>
-                  <Badge variant="outline">{spec.aspectRatio}</Badge>
-                </div>
-                <div className="mt-2 grid grid-cols-2 gap-2 text-[12px] text-stone-600">
-                  <div>
-                    Copy ceiling: <span className="font-medium">≤{spec.copyDensityCeiling.maxWords} words</span>,
-                    ≤{spec.copyDensityCeiling.maxLines} lines
-                  </div>
-                  <div>CTA: <span className="font-medium">{spec.ctaFormats.join(", ")}</span></div>
-                </div>
-                <ul className="mt-2 list-disc space-y-1 pl-5 text-[12px] text-stone-600">
-                  {spec.notes.map((n, i) => (
-                    <li key={i}>{n}</li>
-                  ))}
-                </ul>
-                <div className="mt-2 flex items-center gap-1.5 text-[11px] text-stone-500">
-                  <Sparkles className="h-3.5 w-3.5" />
-                  Supervised rewrite (human-approved only): headline + CTA · rules {spec.rulesVersion}
-                </div>
-              </div>
-            </Card>
-          ))}
+        <div className="overflow-x-auto rounded-xl border border-stone-200 bg-white">
+          <table className="w-full text-left text-[13px]">
+            <thead>
+              <tr className="border-b border-stone-100 bg-stone-50/60 text-[11px] uppercase tracking-wide text-stone-500">
+                <th className="px-3 py-2 font-medium">Variant</th>
+                <th className="px-3 py-2 font-medium">Aspect</th>
+                <th className="px-3 py-2 font-medium">Copy ceiling</th>
+                <th className="px-3 py-2 font-medium">CTA</th>
+              </tr>
+            </thead>
+            <tbody>
+              {Object.values(brief.variantSpecs).map((spec) => (
+                <>
+                  <tr key={spec.targetChannel} className="hover:bg-violet-50/40">
+                    <td className="px-3 py-2">
+                      <span className="flex items-center gap-1.5 font-medium text-stone-900">
+                        {brief.sourceChannel} <ArrowRight className="h-3.5 w-3.5 text-stone-400" /> {spec.targetChannel}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2">{chip(spec.aspectRatio, "border-stone-200 bg-stone-50 text-stone-600")}</td>
+                    <td className="px-3 py-2 text-[12px] text-stone-600">
+                      ≤{spec.copyDensityCeiling.maxWords} words, ≤{spec.copyDensityCeiling.maxLines} lines
+                    </td>
+                    <td className="px-3 py-2 text-[12px] text-stone-600">{spec.ctaFormats.join(", ")}</td>
+                  </tr>
+                  <tr key={`${spec.targetChannel}-notes`} className="border-b border-stone-100 bg-stone-50/40">
+                    <td colSpan={4} className="px-3 py-2">
+                      <ul className="list-disc space-y-0.5 pl-4 text-[12px] text-stone-600">
+                        {spec.notes.map((n, i) => (
+                          <li key={i}>{n}</li>
+                        ))}
+                      </ul>
+                      <div className="mt-1 flex items-center gap-1.5 text-[11px] text-stone-500">
+                        <Sparkles className="h-3.5 w-3.5" />
+                        Supervised rewrite (human-approved only): headline + CTA · rules {spec.rulesVersion}
+                      </div>
+                    </td>
+                  </tr>
+                </>
+              ))}
+            </tbody>
+          </table>
         </div>
       </section>
 
@@ -495,9 +514,9 @@ function BriefDetail({
           {detail && (
             <span className="ml-1">
               {detail.lineage.ok ? (
-                <Badge variant="outline" className="text-emerald-700"><ShieldCheck className="mr-1 h-3 w-3" /> intact</Badge>
+                <span>{chip(<><ShieldCheck className="mr-1 h-3 w-3" /> intact</>, "border-emerald-200 bg-emerald-50 text-emerald-700")}</span>
               ) : (
-                <Badge variant="destructive"><XCircle className="mr-1 h-3 w-3" /> broken</Badge>
+                <span>{chip(<><XCircle className="mr-1 h-3 w-3" /> broken</>, "border-red-200 bg-red-50 text-red-700")}</span>
               )}
             </span>
           )}
@@ -505,7 +524,7 @@ function BriefDetail({
         <div className="flex flex-col gap-1.5">
           {brief.creativeHashLineage.map((e, i) => (
             <div key={i} className="flex items-center gap-2 rounded-lg border border-stone-200 bg-white px-3 py-2">
-              <Badge variant="outline">{e.stage}</Badge>
+              <span>{chip(e.stage, "border-stone-200 bg-stone-50 text-stone-600")}</span>
               <span className="text-[12px] font-medium text-stone-700">{e.channel}</span>
               <span className="font-mono text-[11px] text-stone-500" title={e.hash}>
                 {hashShort(e.hash)}
@@ -531,7 +550,7 @@ function BriefDetail({
               <div key={r.receipt} className="rounded-lg border border-stone-200 bg-white px-3 py-2 text-[12px]">
                 <span className="font-medium text-stone-800">{r.variantChannel}</span>
                 <span className="ml-2 font-mono text-[11px] text-stone-500">{r.studioRef}</span>
-                <span className="ml-2"><Badge variant="outline">{r.provider}</Badge></span>
+                <span className="ml-2">{chip(r.provider, "border-stone-200 bg-stone-50 text-stone-600")}</span>
                 <div className="mt-0.5 text-[11px] text-stone-500">
                   Routed {new Date(r.routedAt).toLocaleString()} — review-queue entry, not a publish.
                 </div>
@@ -545,25 +564,23 @@ function BriefDetail({
       {brief.status === "draft" && (
         <section>
           <h4 className="mb-2 text-[13px] font-semibold text-stone-800">Human approval</h4>
-          <Card>
-            <div className="p-3">
-              <p className="text-[12px] text-stone-600">
-                Approving routes every variant into the studio approval flows for human review and
-                regeneration. Nothing publishes. Nothing enters a buy without its own approval object.
-              </p>
-              <Textarea
-                value={approveNote}
-                onChange={(e) => setApproveNote(e.target.value)}
-                placeholder="Approval note (optional)"
-                rows={2}
-                className="mt-2"
-              />
-              <Button onClick={onApprove} disabled={approving} className="mt-2">
-                {approving ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-1.5 h-4 w-4" />}
-                Approve brief &amp; route to studio
-              </Button>
-            </div>
-          </Card>
+          <div className="rounded-xl border border-stone-200 bg-white p-4">
+            <p className="text-[12px] text-stone-600">
+              Approving routes every variant into the studio approval flows for human review and
+              regeneration. Nothing publishes. Nothing enters a buy without its own approval object.
+            </p>
+            <Textarea
+              value={approveNote}
+              onChange={(e) => setApproveNote(e.target.value)}
+              placeholder="Approval note (optional)"
+              rows={2}
+              className="mt-2 border-stone-200 bg-white text-[13px] placeholder:text-stone-400 focus-visible:border-violet-400 focus-visible:ring-violet-200/60"
+            />
+            <Button onClick={onApprove} disabled={approving} className="mt-2 bg-violet-600 text-white hover:bg-violet-700">
+              {approving ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-1.5 h-4 w-4" />}
+              Approve brief &amp; route to studio
+            </Button>
+          </div>
         </section>
       )}
 
@@ -573,9 +590,9 @@ function BriefDetail({
           <h4 className="mb-2 flex items-center gap-1.5 text-[13px] font-semibold text-stone-800">
             <Clock className="h-4 w-4" /> Audit trail
             {detail.audit.chain.ok ? (
-              <Badge variant="outline" className="text-emerald-700"><ShieldCheck className="mr-1 h-3 w-3" /> chain intact</Badge>
+              <span>{chip(<><ShieldCheck className="mr-1 h-3 w-3" /> chain intact</>, "border-emerald-200 bg-emerald-50 text-emerald-700")}</span>
             ) : (
-              <Badge variant="destructive">chain broken</Badge>
+              <span>{chip("chain broken", "border-red-200 bg-red-50 text-red-700")}</span>
             )}
           </h4>
           <div className="flex flex-col gap-1">
@@ -584,7 +601,7 @@ function BriefDetail({
                 <span className="font-mono text-[11px] text-stone-400">
                   {new Date(e.ts).toLocaleString()}
                 </span>
-                <Badge variant="outline">{e.action}</Badge>
+                <span>{chip(e.action, "border-stone-200 bg-stone-50 text-stone-600")}</span>
                 <span className="text-stone-500">{e.actor}</span>
               </div>
             ))}

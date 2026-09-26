@@ -5,7 +5,7 @@
 
 "use client";
 
-import { TrendUp } from "@phosphor-icons/react";
+import { TrendingUp } from "lucide-react";
 import PromptBar from "@/components/vault/primitives/PromptBar";
 import { StreamText } from "@/components/vault/atoms/StreamText";
 import ThinkingState from "@/components/vault/primitives/ThinkingState";
@@ -70,10 +70,10 @@ export default function AiChatPanel() {
               <MessageScrollerContent className="mx-auto w-full max-w-3xl gap-6 px-4 pb-48 pt-8">
                 {messages.length === 0 && !sending ? (
                   <div className="flex flex-col items-center pt-16 text-center">
-                    <span className="flex size-12 items-center justify-center rounded-full bg-ink text-page">
-                      <TrendUp className="size-6" weight="duotone" />
+                    <span className="flex size-12 items-center justify-center rounded-full bg-violet-600 text-white">
+                      <TrendingUp className="size-6" />
                     </span>
-                    <h2 className="display-serif mt-4 text-[24px] font-medium text-ink">
+                    <h2 className="mt-4 text-[24px] font-bold tracking-tight text-stone-900">
                       Ask Marketr to do the work
                     </h2>
                     <p className="mt-2 max-w-[52ch] text-[13.5px] leading-relaxed text-ink-2">

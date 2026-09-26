@@ -6,6 +6,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { Plus } from "lucide-react";
 
 interface ContentItem {
   id: string;
@@ -187,13 +188,13 @@ export default function ContentBrowser({ projectId, siteId, sourceType, isMock }
         {isMock && <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-amber-800">mock demo data</span>}
       </div>
 
-      <div className="mb-2 flex items-center gap-2">
+      <div className="mb-2 flex items-center gap-1 border-b border-stone-200">
         {sourceType === "wordpress" ? (
           (["page", "post"] as const).map((t) => (
             <button
               key={t}
               onClick={() => { setTab(t); setOpenId(null); setNewItem(false); }}
-              className={`rounded px-2 py-1 text-xs ${tab === t ? "bg-zinc-900 text-white" : "border border-zinc-200 text-zinc-500"}`}
+              className={`border-b-2 px-3 py-2 text-[13px] font-medium transition-colors ${tab === t ? "border-violet-600 text-violet-700" : "border-transparent text-stone-500 hover:text-stone-800"}`}
             >
               {t === "page" ? "Pages" : "Posts"}
             </button>
@@ -202,14 +203,14 @@ export default function ContentBrowser({ projectId, siteId, sourceType, isMock }
           <>
             <button
               onClick={() => { setTab("collection"); setOpenId(null); setNewItem(false); }}
-              className={`rounded px-2 py-1 text-xs ${tab === "collection" ? "bg-zinc-900 text-white" : "border border-zinc-200 text-zinc-500"}`}
+              className={`border-b-2 px-3 py-2 text-[13px] font-medium transition-colors ${tab === "collection" ? "border-violet-600 text-violet-700" : "border-transparent text-stone-500 hover:text-stone-800"}`}
             >
               Collections
             </button>
             <button
               onClick={() => void publishSite()}
               disabled={publishBusy}
-              className="rounded border border-zinc-200 px-2 py-1 text-xs text-zinc-500 hover:border-zinc-400 disabled:opacity-50"
+              className="ml-auto rounded border border-zinc-200 px-2 py-1 text-xs text-zinc-500 hover:border-zinc-400 disabled:opacity-50"
             >
               {publishBusy ? "Publishing…" : "Publish site"}
             </button>
@@ -218,9 +219,9 @@ export default function ContentBrowser({ projectId, siteId, sourceType, isMock }
         {(!isItemTab) && (
           <button
             onClick={startNew}
-            className="ml-auto rounded border border-zinc-200 px-2 py-1 text-xs text-zinc-800 hover:border-zinc-400"
+            className="ml-auto inline-flex items-center gap-1 rounded border border-zinc-200 px-2 py-1 text-xs text-zinc-800 hover:border-zinc-400"
           >
-            ＋ New {sourceType === "wordpress" ? (tab === "page" ? "page" : "post") : tab === "collection" ? "item" : "item"}
+            <Plus size={13} /> New {sourceType === "wordpress" ? (tab === "page" ? "page" : "post") : tab === "collection" ? "item" : "item"}
           </button>
         )}
       </div>

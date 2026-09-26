@@ -8,7 +8,7 @@
 // (see ChatContext.sendMessage).
 
 import { useRef, useState } from "react";
-import { FileText, Paperclip, Warning, X } from "@/components/vault/phosphor";
+import { FileText, Paperclip, TriangleAlert, X } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -167,7 +167,7 @@ export default function AttachmentMenu() {
               className="inline-flex h-7 items-center gap-1.5 rounded-full bg-field py-1 pl-2.5 pr-1 text-[12px] text-ink-2 shadow-hairline"
               style={{ animation: "pop-in 200ms cubic-bezier(0.23,1,0.32,1) both" }}
             >
-              <FileText className="size-3.5" weight="duotone" />
+              <FileText className="size-3.5" />
               <span className="max-w-40 truncate">{a.filename}</span>
               <button
                 type="button"
@@ -175,7 +175,7 @@ export default function AttachmentMenu() {
                 onClick={() => removePendingAttachment(a.id)}
                 className="flex size-5 items-center justify-center rounded-full text-ink-3 transition-colors hover:bg-line hover:text-ink"
               >
-                <X className="size-3" weight="bold" />
+                <X className="size-3" strokeWidth={2.5} />
               </button>
             </span>
           ))}
@@ -189,7 +189,7 @@ export default function AttachmentMenu() {
             aria-label="Attach a file"
             className="flex size-7 items-center justify-center rounded-[8px] text-ink-3 transition-colors hover:bg-hover hover:text-ink"
           >
-            <Paperclip className="size-4" weight="duotone" />
+            <Paperclip className="size-4" />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="w-56">
             <DropdownMenuLabel>Attach to this message</DropdownMenuLabel>
@@ -222,7 +222,7 @@ export default function AttachmentMenu() {
         )}
         {error && (
           <span className="flex items-center gap-1 text-[12px] text-red">
-            <Warning className="size-3.5" />
+            <TriangleAlert className="size-3.5" />
             {error}
           </span>
         )}
@@ -277,7 +277,7 @@ export default function AttachmentMenu() {
             </Field>
             {error && (
               <p className="flex items-center gap-1.5 text-[12.5px] text-red">
-                <Warning className="size-3.5" />
+                <TriangleAlert className="size-3.5" />
                 {error}
               </p>
             )}

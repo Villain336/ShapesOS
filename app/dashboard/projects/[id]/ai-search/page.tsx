@@ -66,7 +66,7 @@ export default async function AISearchPage({ params }: { params: Promise<{ id: s
         <Link href={`/dashboard/projects/${project.id}`} className="text-sm text-zinc-500 hover:text-zinc-600">
           ← {project.domain}
         </Link>
-        <h1 className="mt-1 text-2xl font-bold tracking-tight">AI search visibility</h1>
+        <h1 className="mt-1 text-xl font-bold tracking-tight text-ink">AI search visibility</h1>
         <p className="mt-1 text-sm text-zinc-500">
           How often AI Overviews appear for your tracked keywords — and whether your site is cited inside them.
           Snapshots are recorded on every rank check.

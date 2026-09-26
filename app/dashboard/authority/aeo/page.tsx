@@ -26,8 +26,6 @@ import {
   AEO_PROXY_DISCLAIMER,
   type AeoEngineName,
 } from "@/lib/authority/aeo/engines";
-import { Badge } from "@/components/vault/shadcn/badge";
-import { Progress } from "@/components/vault/shadcn/progress";
 import { Separator } from "@/components/vault/shadcn/separator";
 import { Input } from "@/components/vault/shadcn/input";
 import {
@@ -111,13 +109,21 @@ function SentimentBar({ sentiment }: { sentiment: PerEngineScore["sentiment"] })
   );
 }
 
-const ACTION_STATUS_BADGE: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
-  proposed: "outline",
-  approved: "secondary",
-  applied: "default",
-  done: "default",
-  dismissed: "destructive",
+const ACTION_STATUS_CHIP: Record<string, string> = {
+  proposed: "border-stone-200 bg-stone-50 text-stone-600",
+  approved: "border-violet-200 bg-violet-50 text-violet-700",
+  applied: "border-emerald-200 bg-emerald-50 text-emerald-700",
+  done: "border-emerald-200 bg-emerald-50 text-emerald-700",
+  dismissed: "border-red-200 bg-red-50 text-red-700",
 };
+
+function chip(text: React.ReactNode, cls: string) {
+  return (
+    <span className={`inline-flex items-center gap-0.5 whitespace-nowrap rounded-full border px-1.5 py-0.5 text-[10px] font-medium leading-tight ${cls}`}>
+      {text}
+    </span>
+  );
+}
 
 const PILLAR_LABELS: Record<string, string> = {
   metadata_freshness: "Metadata & freshness",
@@ -281,7 +287,7 @@ export default async function AeoPage({
   const hasActiveSet = promptSets.some((s) => s.active);
 
   return (
-    <div className="flex h-full flex-col gap-6 bg-[#FAFAF7] p-4 md:p-6">
+    <div className="flex h-full flex-col gap-4 bg-[#FAFAF7] p-4 md:p-6">
       {/* Header + honest labeling */}
       <div>
         <div className="flex items-start justify-between gap-4">
@@ -298,17 +304,17 @@ export default async function AeoPage({
               name="brand"
               defaultValue={brand}
               placeholder="Brand for matching…"
-              className="w-44 bg-white"
+              className="w-44 border-stone-200 bg-white text-[13px] placeholder:text-stone-400 focus-visible:border-violet-400 focus-visible:ring-violet-200/60"
             />
             <button
               type="submit"
-              className="rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs font-medium text-stone-800 hover:border-stone-400"
+              className="rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-violet-700"
             >
               Set
             </button>
           </form>
         </div>
-        <div className="mt-3 flex gap-2 rounded-xl border border-sky-200 bg-sky-50 p-3 text-xs text-sky-900">
+        <div className="mt-3 flex gap-2 rounded-xl border border-stone-200 bg-stone-50 p-3 text-xs text-stone-700">
           <Info className="mt-0.5 h-4 w-4 shrink-0" />
           <p>
             <strong>{AEO_PROXY_DISCLAIMER}</strong> Metrics below are reported <strong>per engine only</strong> —
@@ -326,71 +332,71 @@ export default async function AeoPage({
         </div>
       )}
 
-      {/* Per-engine cards — never a composite */}
+      {/* Per-engine metrics — never a composite */}
       <section>
         <div className="mb-3 flex items-center gap-2">
           <Sparkles className="h-4 w-4 text-stone-500" />
           <h2 className="text-sm font-semibold text-stone-900">Per-engine visibility</h2>
-          <Badge variant="outline" className="text-[10px]">No composite score</Badge>
+          {chip("No composite score", "border-stone-200 bg-stone-50 text-stone-600")}
         </div>
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          {AEO_ENGINES.map((engine) => {
-            const score = perEngine[engine];
-            const d = deltas[engine];
-            const latest = latestRunByEngine[engine];
-            return (
-              <div key={engine} className="rounded-xl border border-stone-200 bg-white p-4">
-                <div className="mb-1 flex items-center justify-between">
-                  <h3 className="text-sm font-semibold text-stone-900">{ENGINE_LABELS[engine]}</h3>
-                  <Badge variant="secondary" className="text-[10px]">{engine}</Badge>
-                </div>
-                <p className="mb-3 font-mono text-[11px] text-stone-400">{ENGINE_MODELS[engine]}</p>
-                {!score ? (
-                  <p className="text-xs text-stone-400">No completed run yet for this engine.</p>
-                ) : (
-                  <div className="space-y-3">
-                    <div>
-                      <div className="flex items-baseline justify-between">
-                        <span className="text-xs text-stone-500">Mention rate</span>
-                        <span className="flex items-center gap-2">
-                          <Delta value={d.mentionRate} />
-                          <span className="text-lg font-bold text-stone-900">{pct1(score.mentionRate)}</span>
-                        </span>
-                      </div>
-                      <Progress value={score.mentionRate} className="mt-1 h-1.5" />
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <p className="text-xs text-stone-500">Answer share of voice</p>
-                        <p className="text-lg font-bold text-stone-900">{pct1(score.answerShareOfVoice)}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-stone-500">Recommendation rate</p>
-                        <p className="flex items-center gap-1.5 text-lg font-bold text-stone-900">
-                          {pct1(score.recommendationRate)}
-                          <Delta value={d.recommendationRate} />
-                        </p>
-                      </div>
-                    </div>
-                    <div>
-                      <p className="mb-1 text-xs text-stone-500">Sentiment distribution</p>
-                      <SentimentBar sentiment={score.sentiment} />
-                    </div>
-                    <div className="flex items-center justify-between border-t border-stone-100 pt-2 text-[11px] text-stone-400">
-                      <span>
-                        {score.responses} responses · {score.prompts} prompts
-                      </span>
-                      <span>
-                        {latest
-                          ? `v${latest.version} · ${latest.startedAt.toLocaleDateString()}`
-                          : "—"}
-                      </span>
-                    </div>
-                  </div>
-                )}
-              </div>
-            );
-          })}
+        <div className="overflow-x-auto rounded-xl border border-stone-200 bg-white">
+          <table className="w-full text-left text-[13px]">
+            <thead>
+              <tr className="border-b border-stone-100 bg-stone-50/60 text-[11px] uppercase tracking-wide text-stone-500">
+                <th className="px-3 py-2 font-medium">Engine</th>
+                <th className="px-3 py-2 font-medium">Mention rate</th>
+                <th className="px-3 py-2 font-medium">Answer SoV</th>
+                <th className="px-3 py-2 font-medium">Rec rate</th>
+                <th className="px-3 py-2 font-medium">Sentiment</th>
+                <th className="px-3 py-2 font-medium">Responses</th>
+                <th className="px-3 py-2 font-medium">Latest run</th>
+              </tr>
+            </thead>
+            <tbody>
+              {AEO_ENGINES.map((engine) => {
+                const score = perEngine[engine];
+                const d = deltas[engine];
+                const latest = latestRunByEngine[engine];
+                return (
+                  <tr key={engine} className="border-b border-stone-100 last:border-0 hover:bg-violet-50/40">
+                    <td className="px-3 py-2">
+                      <span className="font-medium text-stone-900">{ENGINE_LABELS[engine]}</span>
+                      <span className="block font-mono text-[10px] text-stone-400">{ENGINE_MODELS[engine]}</span>
+                    </td>
+                    {!score ? (
+                      <td colSpan={6} className="px-3 py-2 text-xs text-stone-400">No completed run yet for this engine.</td>
+                    ) : (
+                      <>
+                        <td className="px-3 py-2">
+                          <span className="flex items-center gap-1.5 font-semibold text-stone-900">
+                            {pct1(score.mentionRate)}
+                            <Delta value={d.mentionRate} />
+                          </span>
+                          <span className="mt-1 block h-1.5 w-24 overflow-hidden rounded-full bg-stone-100">
+                            <span className="block h-full rounded-full bg-violet-500" style={{ width: `${score.mentionRate}%` }} />
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 font-semibold text-stone-900">{pct1(score.answerShareOfVoice)}</td>
+                        <td className="px-3 py-2">
+                          <span className="flex items-center gap-1.5 font-semibold text-stone-900">
+                            {pct1(score.recommendationRate)}
+                            <Delta value={d.recommendationRate} />
+                          </span>
+                        </td>
+                        <td className="px-3 py-2">
+                          <SentimentBar sentiment={score.sentiment} />
+                        </td>
+                        <td className="px-3 py-2 text-[12px] text-stone-600">{score.responses} resp · {score.prompts} prompts</td>
+                        <td className="px-3 py-2 text-[12px] text-stone-600">
+                          {latest ? `v${latest.version} · ${latest.startedAt.toLocaleDateString()}` : "—"}
+                        </td>
+                      </>
+                    )}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
         <p className="mt-2 text-[11px] text-stone-400">
           Mention rate = mean % of reps per prompt where the brand was mentioned (2/3 = 67%), not a binary flag.
@@ -405,14 +411,14 @@ export default async function AeoPage({
         <div className="mb-3 flex items-center gap-2">
           <FileSearch className="h-4 w-4 text-stone-500" />
           <h2 className="text-sm font-semibold text-stone-900">Source-impact ranking</h2>
-          <Badge variant="outline" className="text-[10px]">per engine</Badge>
+          {chip("per engine", "border-stone-200 bg-stone-50 text-stone-600")}
         </div>
         <div className="overflow-x-auto rounded-xl border border-stone-200 bg-white">
-          <table className="w-full min-w-[640px] text-left text-xs">
+          <table className="w-full min-w-[640px] text-left text-[13px]">
             <thead>
-              <tr className="border-b border-stone-200 bg-stone-50 text-stone-500">
-                <th className="px-4 py-2.5 font-medium">Domain</th>
-                <th className="px-4 py-2.5 font-medium">Engine</th>
+              <tr className="border-b border-stone-100 bg-stone-50/60 text-[11px] uppercase tracking-wide text-stone-500">
+                <th className="px-3 py-2 font-medium">Domain</th>
+                <th className="px-3 py-2 font-medium">Engine</th>
                 <th className="px-4 py-2.5 font-medium" title="Times the domain was cited across the prompt set">
                   Citation frequency
                 </th>
@@ -422,7 +428,7 @@ export default async function AeoPage({
                 <th className="px-4 py-2.5 font-medium" title="P(brand recommended | source cited) − P(brand recommended | source not cited), per engine">
                   Co-occurrence lift
                 </th>
-                <th className="px-4 py-2.5 font-medium">Computed</th>
+                <th className="px-3 py-2 font-medium">Computed</th>
               </tr>
             </thead>
             <tbody>
@@ -434,19 +440,17 @@ export default async function AeoPage({
                 </tr>
               ) : (
                 impacts.map((i) => (
-                  <tr key={i.id} className="border-b border-stone-100 last:border-0 hover:bg-stone-50">
-                    <td className="px-4 py-2.5 font-medium text-stone-900">{i.domain}</td>
-                    <td className="px-4 py-2.5">
-                      <Badge variant="secondary" className="text-[10px]">{i.engine}</Badge>
-                    </td>
-                    <td className="px-4 py-2.5 font-semibold text-stone-900">{i.citationFrequency}</td>
-                    <td className="px-4 py-2.5 text-stone-600">{i.citationEfficiency.toFixed(2)}</td>
-                    <td className="px-4 py-2.5">
+                  <tr key={i.id} className="border-b border-stone-100 last:border-0 hover:bg-violet-50/40">
+                    <td className="px-3 py-2 font-medium text-stone-900">{i.domain}</td>
+                    <td className="px-3 py-2">{chip(i.engine, "border-stone-200 bg-stone-50 text-stone-600")}</td>
+                    <td className="px-3 py-2 font-semibold text-stone-900">{i.citationFrequency}</td>
+                    <td className="px-3 py-2 text-stone-600">{i.citationEfficiency.toFixed(2)}</td>
+                    <td className="px-3 py-2">
                       <span className={`font-semibold ${i.cooccurrenceLift > 0 ? "text-emerald-700" : i.cooccurrenceLift < 0 ? "text-red-700" : "text-stone-500"}`}>
                         {liftFmt(i.cooccurrenceLift)}
                       </span>
                     </td>
-                    <td className="px-4 py-2.5 text-stone-400">{i.computedAt.toLocaleDateString()}</td>
+                    <td className="px-3 py-2 text-stone-400">{i.computedAt.toLocaleDateString()}</td>
                   </tr>
                 ))
               )}
@@ -466,7 +470,7 @@ export default async function AeoPage({
         <div className="mb-3 flex items-center gap-2">
           <Wrench className="h-4 w-4 text-stone-500" />
           <h2 className="text-sm font-semibold text-stone-900">Act — fixes & action plans</h2>
-          <Badge variant="outline" className="text-[10px]">approval-gated</Badge>
+          {chip("approval-gated", "border-stone-200 bg-stone-50 text-stone-600")}
         </div>
         <div className="grid gap-4 lg:grid-cols-2">
           <div className="rounded-xl border border-stone-200 bg-white p-4">
@@ -477,47 +481,58 @@ export default async function AeoPage({
             {ownedFixes.length === 0 ? (
               <p className="text-xs text-stone-400">No owned-domain fix proposals yet.</p>
             ) : (
-              <ul className="space-y-3">
-                {ownedFixes.map((a) => {
-                  const fix = a.fixProposalJson as FixProposal | null;
-                  return (
-                    <li key={a.id} className="rounded-lg border border-stone-100 p-3">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <p className="flex items-center gap-1.5 truncate text-xs font-medium text-stone-900">
-                            <ExternalLink className="h-3 w-3 shrink-0 text-stone-400" />
-                            {fix?.pageUrl ?? a.sourceRef}
-                          </p>
-                          <div className="mt-1 flex flex-wrap gap-1">
-                            {(a.geo16Pillars.length > 0 ? a.geo16Pillars : [fix?.pillar].filter(Boolean) as string[]).map((p) => (
-                              <Badge key={p} variant="secondary" className="text-[10px]">
-                                {PILLAR_LABELS[p] ?? p}
-                              </Badge>
-                            ))}
-                          </div>
-                        </div>
-                        <Badge variant={ACTION_STATUS_BADGE[a.status] ?? "outline"} className="shrink-0 text-[10px]">
-                          {a.status}
-                        </Badge>
-                      </div>
-                      {fix?.proposedChange && (
-                        <p className="mt-2 text-xs text-stone-600">{fix.proposedChange}</p>
-                      )}
-                      {fix?.rationale && (
-                        <p className="mt-1 text-[11px] text-stone-400">{fix.rationale}</p>
-                      )}
-                      <div className="mt-2 flex items-center justify-between">
-                        {fix?.benchmarkImpactPct != null && (
-                          <span className="text-[11px] text-stone-500">
-                            Benchmark impact: +{fix.benchmarkImpactPct}% citations (directional)
-                          </span>
-                        )}
-                        {canEdit && a.status === "proposed" && <ApproveActionButton id={a.id} />}
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
+              <div className="overflow-x-auto rounded-xl border border-stone-200">
+                <table className="w-full text-left text-[13px]">
+                  <thead>
+                    <tr className="border-b border-stone-100 bg-stone-50/60 text-[11px] uppercase tracking-wide text-stone-500">
+                      <th className="px-3 py-2 font-medium">Page</th>
+                      <th className="px-3 py-2 font-medium">Pillars</th>
+                      <th className="px-3 py-2 font-medium">Benchmark impact</th>
+                      <th className="px-3 py-2 font-medium">Status</th>
+                      <th className="px-3 py-2 font-medium">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {ownedFixes.map((a) => {
+                      const fix = a.fixProposalJson as FixProposal | null;
+                      return (
+                        <>
+                          <tr key={a.id} className="border-b border-stone-100 last:border-0 hover:bg-violet-50/40">
+                            <td className="px-3 py-2">
+                              <span className="flex items-center gap-1.5 font-medium text-stone-900">
+                                <ExternalLink className="h-3 w-3 shrink-0 text-stone-400" />
+                                {fix?.pageUrl ?? a.sourceRef}
+                              </span>
+                            </td>
+                            <td className="px-3 py-2">
+                              <span className="flex flex-wrap gap-1">
+                                {(a.geo16Pillars.length > 0 ? a.geo16Pillars : [fix?.pillar].filter(Boolean) as string[]).map((p) => (
+                                  chip(PILLAR_LABELS[p] ?? p, "border-stone-200 bg-stone-50 text-stone-600")
+                                ))}
+                              </span>
+                            </td>
+                            <td className="px-3 py-2 text-[12px] text-stone-600">
+                              {fix?.benchmarkImpactPct != null ? `+${fix.benchmarkImpactPct}% citations` : "—"}
+                            </td>
+                            <td className="px-3 py-2">{chip(a.status, ACTION_STATUS_CHIP[a.status] ?? ACTION_STATUS_CHIP.proposed)}</td>
+                            <td className="px-3 py-2">
+                              {canEdit && a.status === "proposed" && <ApproveActionButton id={a.id} />}
+                            </td>
+                          </tr>
+                          {(fix?.proposedChange || fix?.rationale) && (
+                            <tr key={`${a.id}-detail`} className="border-b border-stone-100 bg-stone-50/40">
+                              <td colSpan={5} className="px-3 py-2">
+                                {fix?.proposedChange && <p className="text-xs text-stone-600">{fix.proposedChange}</p>}
+                                {fix?.rationale && <p className="mt-1 text-[11px] text-stone-400">{fix.rationale}</p>}
+                              </td>
+                            </tr>
+                          )}
+                        </>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             )}
           </div>
 
@@ -530,45 +545,57 @@ export default async function AeoPage({
             {thirdParty.length === 0 ? (
               <p className="text-xs text-stone-400">No third-party action plans yet.</p>
             ) : (
-              <ul className="space-y-3">
-                {thirdParty.map((a) => {
-                  const plan = a.actionPlanJson as ThirdPartyPlan | null;
-                  return (
-                    <li key={a.id} className="rounded-lg border border-stone-100 p-3">
-                      <div className="flex items-start justify-between gap-2">
-                        <p className="flex items-center gap-1.5 text-xs font-medium text-stone-900">
-                          <ExternalLink className="h-3 w-3 shrink-0 text-stone-400" />
-                          {plan?.exactTarget ?? a.sourceRef}
-                        </p>
-                        <Badge variant={ACTION_STATUS_BADGE[a.status] ?? "outline"} className="shrink-0 text-[10px]">
-                          {a.status}
-                        </Badge>
-                      </div>
-                      {plan?.contributionAngle && (
-                        <p className="mt-2 text-xs text-stone-600">{plan.contributionAngle}</p>
-                      )}
-                      <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-stone-500">
-                        {(plan?.expectedLift ?? a.expectedLift) != null && (
-                          <span>
-                            Expected lift:{" "}
-                            <strong className="text-stone-800">+{Number(plan?.expectedLift ?? a.expectedLift).toFixed(1)} pts</strong>
-                          </span>
-                        )}
-                        {plan?.deadline && (
-                          <span className="flex items-center gap-1">
-                            <CalendarClock className="h-3 w-3" /> Deadline {plan.deadline}
-                          </span>
-                        )}
-                      </div>
-                      {canEdit && a.status === "proposed" && (
-                        <div className="mt-2">
-                          <ApproveActionButton id={a.id} />
-                        </div>
-                      )}
-                    </li>
-                  );
-                })}
-              </ul>
+              <div className="overflow-x-auto rounded-xl border border-stone-200">
+                <table className="w-full text-left text-[13px]">
+                  <thead>
+                    <tr className="border-b border-stone-100 bg-stone-50/60 text-[11px] uppercase tracking-wide text-stone-500">
+                      <th className="px-3 py-2 font-medium">Target</th>
+                      <th className="px-3 py-2 font-medium">Expected lift</th>
+                      <th className="px-3 py-2 font-medium">Deadline</th>
+                      <th className="px-3 py-2 font-medium">Status</th>
+                      <th className="px-3 py-2 font-medium">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {thirdParty.map((a) => {
+                      const plan = a.actionPlanJson as ThirdPartyPlan | null;
+                      return (
+                        <>
+                          <tr key={a.id} className="border-b border-stone-100 last:border-0 hover:bg-violet-50/40">
+                            <td className="px-3 py-2">
+                              <span className="flex items-center gap-1.5 font-medium text-stone-900">
+                                <ExternalLink className="h-3 w-3 shrink-0 text-stone-400" />
+                                {plan?.exactTarget ?? a.sourceRef}
+                              </span>
+                            </td>
+                            <td className="px-3 py-2 text-[12px] text-stone-600">
+                              {(plan?.expectedLift ?? a.expectedLift) != null ? `+${Number(plan?.expectedLift ?? a.expectedLift).toFixed(1)} pts` : "—"}
+                            </td>
+                            <td className="px-3 py-2 text-[12px] text-stone-600">
+                              {plan?.deadline ? (
+                                <span className="flex items-center gap-1">
+                                  <CalendarClock className="h-3 w-3" /> {plan.deadline}
+                                </span>
+                              ) : "—"}
+                            </td>
+                            <td className="px-3 py-2">{chip(a.status, ACTION_STATUS_CHIP[a.status] ?? ACTION_STATUS_CHIP.proposed)}</td>
+                            <td className="px-3 py-2">
+                              {canEdit && a.status === "proposed" && <ApproveActionButton id={a.id} />}
+                            </td>
+                          </tr>
+                          {plan?.contributionAngle && (
+                            <tr key={`${a.id}-detail`} className="border-b border-stone-100 bg-stone-50/40">
+                              <td colSpan={5} className="px-3 py-2">
+                                <p className="text-xs text-stone-600">{plan.contributionAngle}</p>
+                              </td>
+                            </tr>
+                          )}
+                        </>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             )}
           </div>
         </div>
@@ -588,26 +615,34 @@ export default async function AeoPage({
             {promptSets.length === 0 ? (
               <p className="text-xs text-stone-400">No prompt sets yet — create one below.</p>
             ) : (
-              <ul className="space-y-2">
-                {promptSets.map((s) => (
-                  <li
-                    key={s.id}
-                    className="flex items-center justify-between gap-2 rounded-lg border border-stone-100 px-3 py-2"
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-semibold text-stone-900">v{s.version}</span>
-                      {s.active && <Badge variant="default" className="text-[10px]">Active</Badge>}
-                      <span className="text-xs text-stone-500">{s.promptCount} prompts</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-[11px] text-stone-400">
-                        {s.createdAt.toLocaleDateString()}
-                      </span>
-                      {canEdit && !s.active && <ActivatePromptSetButton id={s.id} />}
-                    </div>
-                  </li>
-                ))}
-              </ul>
+              <div className="overflow-x-auto rounded-xl border border-stone-200">
+                <table className="w-full text-left text-[13px]">
+                  <thead>
+                    <tr className="border-b border-stone-100 bg-stone-50/60 text-[11px] uppercase tracking-wide text-stone-500">
+                      <th className="px-3 py-2 font-medium">Version</th>
+                      <th className="px-3 py-2 font-medium">Prompts</th>
+                      <th className="px-3 py-2 font-medium">Created</th>
+                      <th className="px-3 py-2 font-medium">Status</th>
+                      <th className="px-3 py-2 font-medium">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {promptSets.map((s) => (
+                      <tr key={s.id} className="border-b border-stone-100 last:border-0 hover:bg-violet-50/40">
+                        <td className="px-3 py-2 font-semibold text-stone-900">v{s.version}</td>
+                        <td className="px-3 py-2 text-stone-600">{s.promptCount}</td>
+                        <td className="px-3 py-2 text-[12px] text-stone-600">{s.createdAt.toLocaleDateString()}</td>
+                        <td className="px-3 py-2">
+                          {s.active ? chip("Active", "border-emerald-200 bg-emerald-50 text-emerald-700") : <span className="text-stone-400">—</span>}
+                        </td>
+                        <td className="px-3 py-2">
+                          {canEdit && !s.active && <ActivatePromptSetButton id={s.id} />}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
             {canEdit && (
               <div className="mt-4 border-t border-stone-100 pt-4">

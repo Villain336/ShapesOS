@@ -56,7 +56,7 @@ export default async function BacklinksPage({ params }: { params: Promise<{ id: 
         <Link href={`/dashboard/projects/${project.id}`} className="text-sm text-zinc-500 hover:text-zinc-600">
           ← {project.domain}
         </Link>
-        <h1 className="mt-1 text-2xl font-bold tracking-tight">Backlinks</h1>
+        <h1 className="mt-1 text-xl font-bold tracking-tight text-ink">Backlinks</h1>
         <p className="mt-1 text-sm text-zinc-500">
           Link profile, lost-link tracking, and cost-controlled refreshes. Every pull shows its
           cost before it runs and counts against the workspace monthly budget.

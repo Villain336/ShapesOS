@@ -5,7 +5,7 @@
 // Unchecked = disallowed. Persisted via PUT /api/projects/[id]/settings.
 
 import { useState } from "react";
-import { CheckCircle, Warning } from "@/components/vault/phosphor";
+import { CheckCircle, TriangleAlert } from "lucide-react";
 import { Checkbox } from "@/components/vault/shadcn/checkbox";
 
 const CONTROLS = [
@@ -101,13 +101,13 @@ export default function PublishingClient({
 
       {state === "saved" && (
         <p className="flex items-center gap-1.5 pt-2 text-[12.5px] text-green">
-          <CheckCircle className="size-3.5" weight="duotone" />
+          <CheckCircle className="size-3.5" />
           Saved
         </p>
       )}
       {state === "error" && error && (
         <p className="flex items-center gap-1.5 pt-2 text-[12.5px] text-red">
-          <Warning className="size-3.5" />
+          <TriangleAlert className="size-3.5" />
           {error}
         </p>
       )}

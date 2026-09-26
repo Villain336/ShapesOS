@@ -10,7 +10,7 @@ import {
   cardCls,
   inputCls,
   labelCls,
-  primaryBtnCls,
+  primaryBtnVioletCls,
   type NoticeState,
 } from "./ui";
 
@@ -148,7 +148,7 @@ export default function GovernanceForm({ workspaceId }: { workspaceId: string })
           />
         </div>
         <div className="mt-4">
-          <button onClick={save} disabled={busy} className={primaryBtnCls}>
+          <button onClick={save} disabled={busy} className={primaryBtnVioletCls}>
             {busy ? "Saving…" : "Save governance settings"}
           </button>
         </div>

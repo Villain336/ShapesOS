@@ -8,12 +8,12 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  CaretUpDown,
-  Chats,
+  ChevronsUpDown,
+  MessagesSquare,
   Check,
-  TrendUp,
+  TrendingUp,
   Users,
-} from "@phosphor-icons/react";
+} from "lucide-react";
 import { useChat, type ChatTab } from "./ChatContext";
 import AiChatPanel from "@/components/AiChatPanel";
 import TeamChatPanel from "@/components/TeamChatPanel";
@@ -81,11 +81,11 @@ export default function AssistantClient({
           >
             <span className="flex min-w-0 items-center gap-1.5">
               <span className="flex size-5 shrink-0 items-center justify-center rounded-control bg-ink text-page">
-                <TrendUp className="size-3" weight="duotone" />
+                <TrendingUp className="size-3" />
               </span>
               <span className="truncate text-[13px] font-medium">{project.domain}</span>
             </span>
-            <CaretUpDown className="size-3.5 shrink-0 opacity-60" />
+            <ChevronsUpDown className="size-3.5 shrink-0 opacity-60" />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="w-64">
             <DropdownMenuLabel>Project</DropdownMenuLabel>
@@ -112,7 +112,7 @@ export default function AssistantClient({
         >
           {(
             [
-              { value: "ai", label: "Marketr", Icon: TrendUp },
+              { value: "ai", label: "Marketr", Icon: TrendingUp },
               { value: "team", label: "Team chat", Icon: Users },
             ] as const
           ).map(({ value, label, Icon }) => {
@@ -130,7 +130,7 @@ export default function AssistantClient({
                     : "text-ink-2 hover:text-ink",
                 )}
               >
-                <Icon className="size-[15px]" weight="duotone" />
+                <Icon className="size-[15px]" />
                 {label}
               </button>
             );
@@ -148,8 +148,8 @@ export default function AssistantClient({
             showThreads && "bg-accent-tint font-medium text-accent-ink",
           )}
         >
-          <Chats className="size-[15px]" weight="duotone" />
-          Chats
+          <MessagesSquare className="size-[15px]" />
+          MessagesSquare
         </button>
 
         <span className="hidden items-center gap-1.5 text-[12px] text-ink-3 sm:inline-flex">

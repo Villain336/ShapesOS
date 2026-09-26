@@ -4,7 +4,7 @@
 // single AppSidebar on the assistant page (desktop), and inside a collapsible
 // on mobile. Reads all state from the chat provider.
 
-import { ChatCentered, Plus, Trash } from "@phosphor-icons/react";
+import { MessageCircle, Plus, Trash } from "lucide-react";
 import { Button } from "@/components/vault/atoms/Button";
 import { EmptyState } from "@/components/vault/EmptyState";
 import GlideMenu from "@/components/vault/primitives/GlideMenu";
@@ -38,7 +38,7 @@ export default function ThreadListSection() {
           </div>
         ) : threads.length === 0 ? (
           <EmptyState
-            icon={<ChatCentered className="size-4" weight="duotone" />}
+            icon={<MessageCircle className="size-4" />}
             title="No chats yet"
             description="Start a new chat above to begin."
             className="px-2 py-6"
@@ -59,7 +59,7 @@ export default function ThreadListSection() {
                   t.id === activeId && "bg-accent-tint font-medium",
                 )}
               >
-                <ChatCentered className="size-[15px] shrink-0 text-ink-3" weight="duotone" />
+                <MessageCircle className="size-[15px] shrink-0 text-ink-3" />
                 <span className="min-w-0 flex-1 truncate">{t.title}</span>
               </Button>
               <Button

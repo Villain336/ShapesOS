@@ -48,7 +48,7 @@ export default async function ContentPage({
         >
           ← {project.domain}
         </Link>
-        <h1 className="mt-1 text-2xl font-bold tracking-tight">
+        <h1 className="mt-1 text-xl font-bold tracking-tight text-ink">
           Content engine
         </h1>
         <p className="mt-1 text-sm text-zinc-500">

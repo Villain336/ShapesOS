@@ -4,7 +4,7 @@
 import Link from "next/link";
 import {
   Bell,
-  CaretRight,
+  ChevronRight,
   CheckCircle,
   Clock,
   FileText,
@@ -13,9 +13,9 @@ import {
   Crosshair,
   Rocket,
   ShieldCheck,
-  TrendUp,
-  Warning,
-} from "@/components/vault/phosphor";
+  TrendingUp,
+  TriangleAlert,
+} from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { getOrCreateWorkspace, requireUser } from "@/lib/session";
 import { providerStatus } from "@/lib/providers";
@@ -128,7 +128,7 @@ export default async function DashboardPage() {
   if (pendingApprovals > 0 && firstPending) {
     attention.push({
       key: "approvals",
-      icon: <ShieldCheck className="size-5" weight="duotone" />,
+      icon: <ShieldCheck className="size-5" />,
       title: `${pendingApprovals} draft${pendingApprovals === 1 ? "" : "s"} waiting for review`,
       meta: "Autopilot generated these — approve or reject to keep it moving",
       href: `/dashboard/projects/${firstPending.projectId}/autopilot`,
@@ -139,7 +139,7 @@ export default async function DashboardPage() {
     const p = projects[0];
     attention.push({
       key: "decay",
-      icon: <TrendUp className="size-5" weight="duotone" />,
+      icon: <TrendingUp className="size-5" />,
       title: `${openDecay} page${openDecay === 1 ? "" : "s"} losing traffic`,
       meta: "Content decay engine flagged pages worth refreshing",
       href: p ? `/dashboard/projects/${p.id}/decay` : "/dashboard",
@@ -149,7 +149,7 @@ export default async function DashboardPage() {
   for (const e of radarEvents) {
     attention.push({
       key: `radar-${e.id}`,
-      icon: <Crosshair className="size-5" weight="duotone" />,
+      icon: <Crosshair className="size-5" />,
       title: `Competitor move: ${e.competitorDomain}`,
       meta: `${e.project.domain} · ${timeAgo(e.detectedAt)}`,
       href: `/dashboard/projects/${e.project.id}?tab=competitors`,
@@ -159,7 +159,7 @@ export default async function DashboardPage() {
   for (const a of recentAlerts) {
     attention.push({
       key: `alert-${a.id}`,
-      icon: <Bell className="size-5" weight="duotone" />,
+      icon: <Bell className="size-5" />,
       title: a.title,
       meta: `${timeAgo(a.createdAt)}`,
       href: a.link ?? "/dashboard/alerts",
@@ -171,7 +171,7 @@ export default async function DashboardPage() {
   const suggestions: { icon: React.ReactNode; text: string; href: string; cta: string }[] = [];
   if (projects.length === 0) {
     suggestions.push({
-      icon: <Kanban className="size-4" weight="duotone" />,
+      icon: <Kanban className="size-4" />,
       text: "Add your first project to unlock keyword research.",
       href: "#new-project",
       cta: "Add a project",
@@ -179,14 +179,14 @@ export default async function DashboardPage() {
   } else {
     if (totalKeywords === 0) {
       suggestions.push({
-        icon: <Key className="size-4" weight="duotone" />,
+        icon: <Key className="size-4" />,
         text: "Run keyword research to find terms worth ranking for.",
         href: `/dashboard/projects/${projects[0]!.id}/keywords`,
         cta: "Research keywords",
       });
     } else if (totalContent === 0) {
       suggestions.push({
-        icon: <FileText className="size-4" weight="duotone" />,
+        icon: <FileText className="size-4" />,
         text: `Turn ${totalKeywords} saved keywords into content briefs.`,
         href: `/dashboard/projects/${projects[0]!.id}/content`,
         cta: "Create a brief",
@@ -194,7 +194,7 @@ export default async function DashboardPage() {
     }
     if (pendingApprovals === 0 && recentRuns.length === 0) {
       suggestions.push({
-        icon: <Rocket className="size-4" weight="duotone" />,
+        icon: <Rocket className="size-4" />,
         text: "Put refreshes and fixes on autopilot with supervised runs.",
         href: `/dashboard/projects/${projects[0]!.id}/autopilot`,
         cta: "Set up autopilot",
@@ -202,7 +202,7 @@ export default async function DashboardPage() {
     }
     if (!provider.isLive) {
       suggestions.push({
-        icon: <Warning className="size-4" weight="duotone" />,
+        icon: <TriangleAlert className="size-4" />,
         text: "Connect DataForSEO for live search data instead of mock results.",
         href: "/dashboard/settings",
         cta: "Connect data",
@@ -214,10 +214,10 @@ export default async function DashboardPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      {/* Page headline — display serif, sentence case */}
+      {/* Page headline */}
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="display-serif text-[28px] font-medium text-ink sm:text-[32px]">
+          <h1 className="text-xl font-bold tracking-tight text-ink">
             {workspace.name}
           </h1>
           <p className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[13px] text-ink-2">
@@ -244,7 +244,7 @@ export default async function DashboardPage() {
             href={`/dashboard/assistant?project=${projects[0]!.id}`}
             className="pressable inline-flex items-center gap-2 rounded-full bg-accent px-4 py-2 text-[13.5px] font-medium text-white transition-colors hover:bg-accent-hover"
           >
-            <TrendUp className="size-4" weight="duotone" />
+            <TrendingUp className="size-4" />
             Ask Marketr
           </Link>
         ) : null}
@@ -267,8 +267,8 @@ export default async function DashboardPage() {
             </div>
             {attention.length === 0 ? (
               <div className="rounded-card border border-line bg-surface px-4 py-6 text-center">
-                <CheckCircle className="mx-auto size-6 text-green" weight="duotone" />
-                <p className="display-serif mt-2 text-[17px] text-ink">All quiet</p>
+                <CheckCircle className="mx-auto size-6 text-green" />
+                <p className="text-lg font-semibold text-ink mt-2">All quiet</p>
                 <p className="mx-auto mt-1 max-w-[38ch] text-[13px] text-ink-2">
                   Nothing needs you right now. New drafts, decay alerts, and competitor moves
                   will show up here.
@@ -298,7 +298,7 @@ export default async function DashboardPage() {
                       <span className="shrink-0 text-[13px] font-medium text-accent-ink">
                         {row.cta}
                       </span>
-                      <CaretRight className="size-4 shrink-0 text-ink-3 transition-transform duration-150 group-hover:translate-x-0.5" />
+                      <ChevronRight className="size-4 shrink-0 text-ink-3 transition-transform duration-150 group-hover:translate-x-0.5" />
                     </Link>
                   </li>
                 ))}
@@ -321,7 +321,7 @@ export default async function DashboardPage() {
               <CardBody className="p-0">
                 {projects.length === 0 ? (
                   <EmptyState
-                    icon={<Kanban className="size-5" weight="duotone" />}
+                    icon={<Kanban className="size-5" />}
                     title="No projects yet"
                     description="Add a domain to start keyword research, track rankings, and generate content."
                   />
@@ -365,7 +365,7 @@ export default async function DashboardPage() {
                                 <span className="text-[9.5px] leading-none text-ink-3">score</span>
                               </span>
                             ) : null}
-                            <CaretRight className="size-4 shrink-0 text-ink-3 transition-transform duration-150 group-hover:translate-x-0.5" />
+                            <ChevronRight className="size-4 shrink-0 text-ink-3 transition-transform duration-150 group-hover:translate-x-0.5" />
                           </Link>
                         </li>
                       );

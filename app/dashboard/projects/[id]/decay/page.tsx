@@ -7,6 +7,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
+import { PartyPopper } from "lucide-react";
 import DecayActions from "@/components/DecayActions";
 
 export const dynamic = "force-dynamic";
@@ -48,7 +49,7 @@ export default async function DecayPage({ params }: { params: Promise<{ id: stri
         <Link href={`/dashboard/projects/${project.id}`} className="text-sm text-zinc-500 hover:text-zinc-600">
           ← {project.domain}
         </Link>
-        <h1 className="mt-1 text-2xl font-bold tracking-tight">Content decay</h1>
+        <h1 className="mt-1 text-xl font-bold tracking-tight text-ink">Content decay</h1>
         <p className="mt-1 text-sm text-zinc-500">
           Pages whose rankings slipped over the last 90 days. Create a refresh brief to feed the content engine,
           or dismiss findings you&apos;ve handled. {resolved > 0 && `${resolved} resolved.`}
@@ -57,7 +58,7 @@ export default async function DecayPage({ params }: { params: Promise<{ id: stri
 
       {open.length === 0 ? (
         <div className="rounded-lg border border-zinc-300 bg-white p-8 text-center">
-          <p className="text-lg">🎉</p>
+          <PartyPopper className="mx-auto h-6 w-6 text-stone-400" />
           <p className="mt-2 text-sm text-zinc-500">
             No decaying pages right now. Detection runs weekly — it needs at least two rank checks in the last 90 days.
           </p>

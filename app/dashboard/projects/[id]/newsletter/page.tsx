@@ -69,7 +69,7 @@ export default async function NewsletterPage({ params }: { params: Promise<{ id:
         <Link href={`/dashboard/projects/${project.id}`} className="text-sm text-zinc-500 hover:text-zinc-600">
           ← {project.domain}
         </Link>
-        <h1 className="mt-1 text-2xl font-bold tracking-tight">Newsletter</h1>
+        <h1 className="mt-1 text-xl font-bold tracking-tight text-ink">Newsletter</h1>
         <p className="mt-1 text-sm text-zinc-500">
           Design emails from blocks, grow lists, and send campaigns through Resend.
           {!membership && " (read-only)"}

@@ -5,29 +5,29 @@ import Link from "next/link";
 import {
   ArrowLeft,
   Rocket,
-  CodeSimple,
+  CodeXml,
   Clock,
   Crosshair,
   FileText,
   Globe,
   Key,
-  Stack,
-  LinkSimple,
+  Layers,
+  LinkIcon,
   ListChecks,
-  Envelope,
+  Mail,
   MapPin,
   Megaphone,
-  ChatCentered,
+  MessageCircle,
   Network,
   Palette,
   Target,
-  ShareNetwork,
-  Quotes,
-  TrendDown,
-  TrendUp,
-  Lightning,
-} from "@/components/vault/phosphor";
-import type { Icon as PhosphorIcon } from "@phosphor-icons/react";
+  Share2,
+  Quote,
+  TrendingDown,
+  TrendingUp,
+  Zap,
+} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { accessibleWorkspaceWhere } from "@/lib/authz";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
@@ -47,7 +47,7 @@ type ExploreLink = {
   href: string;
   label: string;
   description: string;
-  icon: PhosphorIcon;
+  icon: LucideIcon;
 };
 
 const EXPLORE_SECTIONS: { title: string; links: ExploreLink[] }[] = [
@@ -56,28 +56,28 @@ const EXPLORE_SECTIONS: { title: string; links: ExploreLink[] }[] = [
     links: [
       { href: "keywords", label: "Keyword research", description: "Find terms worth ranking for", icon: Key },
       { href: "competitors", label: "Competitor gaps", description: "What rivals rank for that you don't", icon: Crosshair },
-      { href: "rankings", label: "Rank tracking", description: "Watch positions move day by day", icon: TrendUp },
-      { href: "ai-search", label: "AI search", description: "Track citations in AI answers", icon: Quotes },
+      { href: "rankings", label: "Rank tracking", description: "Watch positions move day by day", icon: TrendingUp },
+      { href: "ai-search", label: "AI search", description: "Track citations in AI answers", icon: Quote },
       { href: "radar", label: "Competitor radar", description: "Get alerted when rivals move", icon: Target },
-      { href: "backlinks", label: "Backlinks", description: "Links pointing at your domain", icon: LinkSimple },
+      { href: "backlinks", label: "Backlinks", description: "Links pointing at your domain", icon: LinkIcon },
     ],
   },
   {
     title: "Content",
     links: [
       { href: "content", label: "Content engine", description: "Briefs, drafts, and published pieces", icon: FileText },
-      { href: "decay", label: "Content decay", description: "Pages losing traffic, and why", icon: TrendDown },
+      { href: "decay", label: "Content decay", description: "Pages losing traffic, and why", icon: TrendingDown },
       { href: "autopilot", label: "Content autopilot", description: "Supervised runs that refresh and fix", icon: Rocket },
-      { href: "newsletter", label: "Newsletter", description: "Broadcasts and subscriber lists", icon: Envelope },
-      { href: "social", label: "Social", description: "Scheduled posts across channels", icon: ShareNetwork },
+      { href: "newsletter", label: "Newsletter", description: "Broadcasts and subscriber lists", icon: Mail },
+      { href: "social", label: "Social", description: "Scheduled posts across channels", icon: Share2 },
     ],
   },
   {
     title: "Sites",
     links: [
-      { href: "ide", label: "Site IDE", description: "Edit and deploy your site", icon: CodeSimple },
+      { href: "ide", label: "Site IDE", description: "Edit and deploy your site", icon: CodeXml },
       { href: "sites", label: "Sites & landing pages", description: "Pages hosted by Marketr", icon: Globe },
-      { href: "programmatic", label: "Programmatic SEO", description: "Template-driven pages at scale", icon: Stack },
+      { href: "programmatic", label: "Programmatic SEO", description: "Template-driven pages at scale", icon: Layers },
       { href: "local", label: "Local SEO", description: "Grid rankings and reviews", icon: MapPin },
       { href: "internal-links", label: "Internal links", description: "Suggested links between your pages", icon: Network },
     ],
@@ -85,9 +85,9 @@ const EXPLORE_SECTIONS: { title: string; links: ExploreLink[] }[] = [
   {
     title: "Automate",
     links: [
-      { href: "automations", label: "Automations", description: "Workflows that run on a schedule", icon: Lightning },
+      { href: "automations", label: "Automations", description: "Workflows that run on a schedule", icon: Zap },
       { href: "automations/schedules", label: "Scheduled skills", description: "Cron & event runs with parallel subagents", icon: Clock },
-      { href: "chat", label: "Chat", description: "Ask AI, or message your team", icon: ChatCentered },
+      { href: "chat", label: "Chat", description: "Ask AI, or message your team", icon: MessageCircle },
       { href: "ads", label: "Ad factory", description: "Campaigns and creatives", icon: Megaphone },
       { href: "studio", label: "Studio", description: "Brand assets and domains", icon: Palette },
     ],
@@ -136,7 +136,7 @@ export default async function ProjectPage({
 
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="display-serif text-[28px] font-medium text-ink sm:text-[32px]">
+          <h1 className="text-xl font-bold tracking-tight text-ink">
             {project.domain}
           </h1>
           <p className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[13px] text-ink-2">
@@ -152,10 +152,10 @@ export default async function ProjectPage({
       </div>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Stat label="Keywords saved" value={project.keywords.length} icon={<Key className="size-4" weight="duotone" />} />
-        <Stat label="Tracked" value={trackedCount} icon={<TrendUp className="size-4" weight="duotone" />} />
-        <Stat label="Competitors" value={project.competitors.length} icon={<Crosshair className="size-4" weight="duotone" />} />
-        <Stat label="Content items" value={project.contentItems.length} icon={<FileText className="size-4" weight="duotone" />} />
+        <Stat label="Keywords saved" value={project.keywords.length} icon={<Key className="size-4" />} />
+        <Stat label="Tracked" value={trackedCount} icon={<TrendingUp className="size-4" />} />
+        <Stat label="Competitors" value={project.competitors.length} icon={<Crosshair className="size-4" />} />
+        <Stat label="Content items" value={project.contentItems.length} icon={<FileText className="size-4" />} />
       </div>
 
       <VisibilityScoreWidget projectId={project.id} />
@@ -178,7 +178,7 @@ export default async function ProjectPage({
                         className="group flex items-center gap-3 rounded-control px-2 py-2 transition-[background-color] duration-150 hover:bg-hover"
                       >
                         <span className="flex size-8 shrink-0 items-center justify-center rounded-control bg-inset text-ink-2">
-                          <Icon className="size-4" weight="duotone" />
+                          <Icon className="size-4" />
                         </span>
                         <span className="min-w-0 flex-1">
                           <span className="block text-[13.5px] font-medium text-ink">
@@ -207,12 +207,12 @@ export default async function ProjectPage({
         <CardBody className="p-0">
           {lists.size === 0 ? (
             <EmptyState
-              icon={<ListChecks className="size-5" weight="duotone" />}
+              icon={<ListChecks className="size-5" />}
               title="Nothing saved yet"
               description="Run keyword research and save winners to a list."
               action={
                 <Link href={`${base}/keywords`} className={buttonVariants({ variant: "accent", size: "sm" })}>
-                  <Key className="size-3.5" weight="duotone" />
+                  <Key className="size-3.5" />
                   Start keyword research
                 </Link>
               }

@@ -1,7 +1,7 @@
 // Marketr CRM — visual primitives: StageBadge, ScoreBar, Sparkline, Avatar.
 "use client";
 
-import { UsersThree, type Icon as PhosphorIcon } from "@phosphor-icons/react";
+import { Users, type LucideIcon } from "lucide-react";
 import { initials } from "./types";
 
 export function StageBadge({ label, color }: { label: string; color: string }) {
@@ -110,16 +110,16 @@ export function Avatar({ name, size = 28 }: { name: string; size?: number }) {
 export function EmptyState({
   title,
   hint,
-  icon: Icon = UsersThree,
+  icon: Icon = Users,
 }: {
   title: string;
   hint: string;
-  icon?: PhosphorIcon;
+  icon?: LucideIcon;
 }) {
   return (
     <div className="flex flex-col items-center justify-center py-16 text-center">
       <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-violet-100 text-violet-700">
-        <Icon size={22} weight="duotone" />
+        <Icon size={22} />
       </div>
       <p className="text-sm font-semibold text-stone-800">{title}</p>
       <p className="mt-1 max-w-xs text-[13px] text-stone-500">{hint}</p>

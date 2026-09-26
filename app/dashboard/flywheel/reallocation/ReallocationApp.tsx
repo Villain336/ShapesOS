@@ -4,12 +4,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Card, CardHeader } from "@/components/vault/Card";
-import { ValuePill } from "@/components/vault/atoms/ValuePill";
-import { Badge } from "@/components/vault/shadcn/badge";
 import { Button } from "@/components/vault/shadcn/button";
 import { Input } from "@/components/vault/shadcn/input";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/vault/shadcn/tabs";
 import { Textarea } from "@/components/vault/shadcn/textarea";
 import {
   AlertTriangle,
@@ -21,6 +17,8 @@ import {
   ShieldCheck,
   ShieldX,
   XCircle,
+  BarChart3,
+  ScrollText,
 } from "lucide-react";
 
 type Tab = "proposals" | "sras" | "breakers" | "curves" | "audit" | "run";
@@ -28,12 +26,57 @@ type Tab = "proposals" | "sras" | "breakers" | "curves" | "audit" | "run";
 const money = (cents: number) =>
   new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(cents / 100);
 
-function statusTone(s: string): "neutral" | "green" | "orange" | "red" | "accent" {
-  if (s === "executed" || s === "human_approved" || s === "active") return "green";
-  if (s === "policy_approved") return "accent";
-  if (s === "policy_denied" || s === "revoked" || s === "expired") return "red";
-  if (s === "proposed") return "neutral";
-  return "orange";
+function chip(text: React.ReactNode, cls: string) {
+  return (
+    <span className={`inline-flex items-center gap-0.5 whitespace-nowrap rounded-full border px-1.5 py-0.5 text-[10px] font-medium leading-tight ${cls}`}>
+      {text}
+    </span>
+  );
+}
+
+function statusChip(s: string) {
+  if (s === "executed" || s === "human_approved" || s === "active") return chip(s, "border-emerald-200 bg-emerald-50 text-emerald-700");
+  if (s === "policy_approved") return chip(s, "border-violet-200 bg-violet-50 text-violet-700");
+  if (s === "policy_denied" || s === "revoked" || s === "expired") return chip(s, "border-red-200 bg-red-50 text-red-700");
+  if (s === "proposed") return chip(s, "border-stone-200 bg-stone-100 text-stone-600");
+  return chip(s, "border-amber-200 bg-amber-50 text-amber-700");
+}
+
+const HI = "mt-1 border-stone-200 bg-white text-[13px] placeholder:text-stone-400 focus-visible:border-violet-400 focus-visible:ring-violet-200/60";
+const HSELECT = "rounded-md border border-stone-200 bg-white px-2 py-1 text-[13px] text-stone-800 focus-visible:border-violet-400 focus-visible:outline-none";
+
+function DataTable({ headers, children }: { headers: string[]; children: React.ReactNode }) {
+  return (
+    <div className="overflow-x-auto rounded-xl border border-stone-200">
+      <table className="w-full text-left text-[13px]">
+        <thead>
+          <tr className="border-b border-stone-100 bg-stone-50/60 text-[11px] uppercase tracking-wide text-stone-500">
+            {headers.map((h) => (
+              <th key={h} className="px-3 py-2 font-medium">{h}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>{children}</tbody>
+      </table>
+    </div>
+  );
+}
+
+function Panel({ title, description, action, children }: {
+  title: string; description?: string; action?: React.ReactNode; children: React.ReactNode;
+}) {
+  return (
+    <section className="rounded-xl border border-stone-200 bg-white p-4">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h2 className="text-sm font-semibold tracking-tight text-stone-900">{title}</h2>
+          {description && <p className="mt-0.5 text-xs text-stone-500">{description}</p>}
+        </div>
+        {action}
+      </div>
+      {children}
+    </section>
+  );
 }
 
 async function api(path: string, init?: RequestInit) {
@@ -263,8 +306,17 @@ export default function ReallocationApp({ isOwner }: { isOwner: boolean }) {
     }
   };
 
+  const TABS: { id: Tab; label: string; icon: typeof FileText; count?: number }[] = [
+    { id: "proposals", label: `Proposals (${proposals.length})`, icon: FileText, count: proposals.length },
+    { id: "sras", label: `SRA envelopes (${sras.length})`, icon: ShieldCheck },
+    { id: "breakers", label: `Breakers (${breakers.length})`, icon: AlertTriangle },
+    { id: "curves", label: `Curves (${curves.length})`, icon: BarChart3 },
+    { id: "run", label: "Run optimizer", icon: Play },
+    { id: "audit", label: "Audit log", icon: ScrollText },
+  ];
+
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex h-full flex-col gap-4">
       {error && (
         <div className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-[13px] text-red-900">
           <XCircle className="mt-0.5 h-4 w-4 shrink-0" />
@@ -281,196 +333,219 @@ export default function ReallocationApp({ isOwner }: { isOwner: boolean }) {
         </div>
       )}
 
-      <Tabs value={tab} onValueChange={(v) => setTab(v as Tab)}>
-        <TabsList>
-          <TabsTrigger value="proposals">Proposals ({proposals.length})</TabsTrigger>
-          <TabsTrigger value="sras">SRA envelopes ({sras.length})</TabsTrigger>
-          <TabsTrigger value="breakers">Breakers ({breakers.length})</TabsTrigger>
-          <TabsTrigger value="curves">Curves ({curves.length})</TabsTrigger>
-          <TabsTrigger value="run">Run optimizer</TabsTrigger>
-          <TabsTrigger value="audit">Audit log</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="proposals" className="mt-4">
-          <Card>
-            <CardHeader
-              title="Shift proposals"
-              description="Each carries the full decision record: data window, curve params, R², model version."
-              actions={<Button size="sm" variant="outline" onClick={refresh} disabled={loading}>Refresh</Button>}
-            />
-            <div className="divide-y divide-stone-100">
-              {proposals.length === 0 && (
-                <p className="p-4 text-[13px] text-stone-500">No proposals yet — trigger an optimizer run.</p>
-              )}
-              {proposals.map((p) => (
-                <div key={p.id} className="flex flex-wrap items-center gap-3 p-4">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2 text-[13px] font-medium text-stone-900">
-                      <span>{money(p.amountCents)}</span>
-                      <span className="text-stone-400">{p.sourceChannel}</span>
-                      <ArrowRight className="h-3.5 w-3.5 text-stone-400" />
-                      <span className="text-stone-400">{p.destChannel}</span>
-                      <ValuePill tone={statusTone(p.status)}>{p.status}</ValuePill>
-                      <Badge variant="outline">mode {p.mode}</Badge>
-                    </div>
-                    <p className="mt-1 text-[12px] text-stone-500">
-                      Δ marginal ROAS {Number(p.marginalRoasDelta).toFixed(2)}x ·{" "}
+      <div className="flex gap-1 overflow-x-auto border-b border-stone-200">
+        {TABS.map(({ id, label, icon: Icon }) => (
+          <button
+            key={id}
+            type="button"
+            onClick={() => setTab(id)}
+            className={`-mb-px flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2 text-[13px] font-medium transition ${
+              tab === id
+                ? "border-violet-600 text-violet-700"
+                : "border-transparent text-stone-500 hover:border-stone-300 hover:text-stone-800"
+            }`}
+          >
+            <Icon className="h-4 w-4" />
+            {label}
+          </button>
+        ))}
+      </div>
+      <div className="mt-1">
+        {tab === "proposals" && (
+          <Panel
+            title="Shift proposals"
+            description="Each carries the full decision record: data window, curve params, R², model version."
+            action={<Button size="sm" variant="outline" onClick={refresh} disabled={loading}>Refresh</Button>}
+          >
+            {proposals.length === 0 ? (
+              <p className="py-2 text-[13px] text-stone-500">No proposals yet — trigger an optimizer run.</p>
+            ) : (
+              <DataTable headers={["Amount", "Shift", "Status", "Δ marginal ROAS", "Decision record", "Action"]}>
+                {proposals.map((p) => (
+                  <tr key={p.id} className="border-b border-stone-100 last:border-0 hover:bg-violet-50/40">
+                    <td className="px-3 py-2 font-semibold text-stone-900">{money(p.amountCents)}</td>
+                    <td className="px-3 py-2">
+                      <span className="flex items-center gap-1.5 text-[12px] text-stone-600">
+                        <span className="text-stone-400">{p.sourceChannel}</span>
+                        <ArrowRight className="h-3.5 w-3.5 text-stone-400" />
+                        <span className="text-stone-400">{p.destChannel}</span>
+                      </span>
+                    </td>
+                    <td className="px-3 py-2">
+                      <span className="flex flex-wrap gap-1">
+                        {statusChip(p.status)}
+                        {chip(`mode ${p.mode}`, "border-stone-200 bg-stone-50 text-stone-600")}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2 font-medium text-stone-800">{Number(p.marginalRoasDelta).toFixed(2)}x</td>
+                    <td className="max-w-xs px-3 py-2 text-[12px] text-stone-500">
                       {p.decisionRecord?.curveParams
                         ? Object.entries(p.decisionRecord.curveParams)
                             .map(([ch, c]: any) => `${ch}: ${c.curveType} R²=${Number(c.rSquared).toFixed(2)}`)
                             .join(" · ")
                         : "no curve record"}
                       {p.decisionRecord?.calibrationNote ? ` · ${p.decisionRecord.calibrationNote}` : ""}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {p.mode === "a" && p.status === "proposed" && isOwner && (
-                      <Button size="sm" onClick={() => approveProposal(p.id)} disabled={busy}>
-                        <CheckCircle2 className="mr-1 h-3.5 w-3.5" /> Approve → approval object
-                      </Button>
-                    )}
-                    {(p.status === "human_approved" || p.status === "policy_approved") && isOwner && (
-                      <Button size="sm" variant="outline" onClick={() => executeProposal(p)} disabled={busy}>
-                        <Play className="mr-1 h-3.5 w-3.5" /> Execute
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </Card>
-        </TabsContent>
+                    </td>
+                    <td className="px-3 py-2">
+                      <span className="flex items-center gap-2">
+                        {p.mode === "a" && p.status === "proposed" && isOwner && (
+                          <Button size="sm" className="bg-violet-600 text-white hover:bg-violet-700" onClick={() => approveProposal(p.id)} disabled={busy}>
+                            <CheckCircle2 className="mr-1 h-3.5 w-3.5" /> Approve → approval object
+                          </Button>
+                        )}
+                        {(p.status === "human_approved" || p.status === "policy_approved") && isOwner && (
+                          <Button size="sm" variant="outline" onClick={() => executeProposal(p)} disabled={busy}>
+                            <Play className="mr-1 h-3.5 w-3.5" /> Execute
+                          </Button>
+                        )}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </DataTable>
+            )}
+          </Panel>
+        )}
 
-        <TabsContent value="sras" className="mt-4 flex flex-col gap-4">
-          <Card>
-            <CardHeader
+        {tab === "sras" && (
+          <div className="flex flex-col gap-4">
+            <Panel
               title="Standing Reallocation Approvals"
               description="Pre-signed bounded envelopes — pool caps, not standing authority. Explicit opt-in; defaults to disabled; ≤30d expiry; instant revocation."
-            />
-            <div className="divide-y divide-stone-100">
-              {sras.length === 0 && (
-                <p className="p-4 text-[13px] text-stone-500">No SRA envelopes. Mode (b) is disabled until one is signed.</p>
+            >
+              {sras.length === 0 ? (
+                <p className="py-2 text-[13px] text-stone-500">No SRA envelopes. Mode (b) is disabled until one is signed.</p>
+              ) : (
+                <DataTable headers={["Envelope", "Status", "Caps", "Allowlist / expiry", "Action"]}>
+                  {sras.map((s) => (
+                    <tr key={s.id} className="border-b border-stone-100 last:border-0 hover:bg-violet-50/40">
+                      <td className="px-3 py-2">
+                        <span className="font-medium text-stone-900">{s.name}</span>
+                        {s.consequences && (
+                          <ul className="mt-1 list-disc space-y-0.5 pl-4 text-[12px] text-stone-500">
+                            {s.consequences.map((c: string, i: number) => (
+                              <li key={i}>{c}</li>
+                            ))}
+                          </ul>
+                        )}
+                      </td>
+                      <td className="px-3 py-2">{statusChip(s.computedStatus ?? s.status)}</td>
+                      <td className="px-3 py-2 text-[12px] text-stone-600">
+                        {money(s.perShiftCapCents)}/shift · {money(s.dailyAggregateCapCents)}/day · {money(s.weeklyAggregateCapCents)}/wk · ±{s.perChannelBandPct}% band
+                      </td>
+                      <td className="px-3 py-2 text-[12px] text-stone-500">
+                        {Array.isArray(s.channels) ? s.channels.join(", ") : ""} · expires{" "}
+                        {new Date(s.validUntil).toLocaleDateString()} · signers: {(s.signerIds ?? []).length}
+                      </td>
+                      <td className="px-3 py-2">
+                        {isOwner && (s.computedStatus ?? s.status) === "active" && (
+                          <Button size="sm" variant="destructive" onClick={() => revokeSra(s.id)} disabled={busy}>
+                            <ShieldX className="mr-1 h-3.5 w-3.5" /> Revoke instantly
+                          </Button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </DataTable>
               )}
-              {sras.map((s) => (
-                <div key={s.id} className="p-4">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-[14px] font-medium text-stone-900">{s.name}</span>
-                    <ValuePill tone={statusTone(s.computedStatus ?? s.status)}>{s.computedStatus ?? s.status}</ValuePill>
-                    <span className="text-[12px] text-stone-500">
-                      {money(s.perShiftCapCents)}/shift · {money(s.dailyAggregateCapCents)}/day · {money(s.weeklyAggregateCapCents)}/wk · ±{s.perChannelBandPct}% band
-                    </span>
-                    {isOwner && (s.computedStatus ?? s.status) === "active" && (
-                      <Button size="sm" variant="destructive" onClick={() => revokeSra(s.id)} disabled={busy}>
-                        <ShieldX className="mr-1 h-3.5 w-3.5" /> Revoke instantly
-                      </Button>
-                    )}
-                  </div>
-                  <p className="mt-1 text-[12px] text-stone-500">
-                    Allowlist: {Array.isArray(s.channels) ? s.channels.join(", ") : ""} · expires{" "}
-                    {new Date(s.validUntil).toLocaleDateString()} · signers: {(s.signerIds ?? []).length}
-                  </p>
-                  {s.consequences && (
-                    <ul className="mt-2 list-disc space-y-0.5 pl-5 text-[12px] text-stone-600">
-                      {s.consequences.map((c: string, i: number) => (
-                        <li key={i}>{c}</li>
-                      ))}
-                    </ul>
+            </Panel>
+
+            {isOwner && (
+              <Panel title="Sign a new SRA" description="Deliberate act with plain-language consequences. Conservative defaults.">
+                <div className="grid gap-3 md:grid-cols-2">
+                  <label className="text-[13px] font-medium text-stone-700">Name<Input value={sraName} onChange={(e) => setSraName(e.target.value)} className={HI} /></label>
+                  <label className="text-[13px] font-medium text-stone-700">Channels (comma-separated allowlist)<Input value={sraChannels} onChange={(e) => setSraChannels(e.target.value)} className={HI} /></label>
+                  <label className="text-[13px] font-medium text-stone-700">Valid until<Input type="date" value={sraValidUntil} onChange={(e) => setSraValidUntil(e.target.value)} className={HI} /></label>
+                  <label className="text-[13px] font-medium text-stone-700">Pool daily budget ($)<Input value={sraPool} onChange={(e) => setSraPool(e.target.value)} className={HI} /></label>
+                  <label className="text-[13px] font-medium text-stone-700 md:col-span-2">Signer IDs (comma-separated — 2 required when cumulative movement can reach $1k)<Input value={sraSigners} onChange={(e) => setSraSigners(e.target.value)} className={HI} placeholder="user_1, user_2" /></label>
+                </div>
+                <div className="mt-3 flex items-center gap-3 border-t border-stone-100 pt-4">
+                  <Button className="bg-violet-600 text-white hover:bg-violet-700" onClick={createSra} disabled={busy}>
+                    <ShieldCheck className="mr-1 h-3.5 w-3.5" /> Sign envelope
+                  </Button>
+                  {sraResult && (
+                    <p className="text-[12px] text-emerald-700">Signed. Mode (b) is now available inside this envelope only.</p>
                   )}
                 </div>
-              ))}
-            </div>
-          </Card>
+              </Panel>
+            )}
+          </div>
+        )}
 
-          {isOwner && (
-            <Card>
-              <CardHeader title="Sign a new SRA" description="Deliberate act with plain-language consequences. Conservative defaults." />
-              <div className="grid gap-3 p-4 md:grid-cols-2">
-                <label className="text-[12px] text-stone-600">Name<Input value={sraName} onChange={(e) => setSraName(e.target.value)} className="mt-1" /></label>
-                <label className="text-[12px] text-stone-600">Channels (comma-separated allowlist)<Input value={sraChannels} onChange={(e) => setSraChannels(e.target.value)} className="mt-1" /></label>
-                <label className="text-[12px] text-stone-600">Valid until<Input type="date" value={sraValidUntil} onChange={(e) => setSraValidUntil(e.target.value)} className="mt-1" /></label>
-                <label className="text-[12px] text-stone-600">Pool daily budget ($)<Input value={sraPool} onChange={(e) => setSraPool(e.target.value)} className="mt-1" /></label>
-                <label className="text-[12px] text-stone-600 md:col-span-2">Signer IDs (comma-separated — 2 required when cumulative movement can reach $1k)<Input value={sraSigners} onChange={(e) => setSraSigners(e.target.value)} className="mt-1" placeholder="user_1, user_2" /></label>
-              </div>
-              <div className="flex items-center gap-3 border-t border-stone-100 p-4">
-                <Button onClick={createSra} disabled={busy}>
-                  <ShieldCheck className="mr-1 h-3.5 w-3.5" /> Sign envelope
-                </Button>
-                {sraResult && (
-                  <p className="text-[12px] text-green-700">Signed. Mode (b) is now available inside this envelope only.</p>
-                )}
-              </div>
-            </Card>
-          )}
-        </TabsContent>
-
-        <TabsContent value="breakers" className="mt-4">
-          <Card>
-            <CardHeader title="Circuit breakers" description="One-way ratchets: pause/freeze only, never authorize. Evaluated every run + 15-min watchdog." />
-            <div className="divide-y divide-stone-100">
-              {breakers.length === 0 && <p className="p-4 text-[13px] text-stone-500">No breaker events.</p>}
-              {breakers.map((b) => (
-                <div key={b.id} className="flex flex-wrap items-center gap-3 p-4">
-                  <AlertTriangle className="h-4 w-4 text-amber-600" />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2 text-[13px] font-medium text-stone-900">
-                      <span>{b.breakerType}</span>
-                      <ValuePill tone="neutral">{b.scope}</ValuePill>
-                      {b.acknowledgedBy ? (
-                        <ValuePill tone="green">acknowledged — cool-down until {new Date(b.cooldownUntil).toLocaleString()}</ValuePill>
-                      ) : (
-                        <ValuePill tone="red">fired — awaiting acknowledgment</ValuePill>
+        {tab === "breakers" && (
+          <Panel title="Circuit breakers" description="One-way ratchets: pause/freeze only, never authorize. Evaluated every run + 15-min watchdog.">
+            {breakers.length === 0 ? (
+              <p className="py-2 text-[13px] text-stone-500">No breaker events.</p>
+            ) : (
+              <DataTable headers={["Breaker", "Scope", "Status", "Reason", "Action"]}>
+                {breakers.map((b) => (
+                  <tr key={b.id} className="border-b border-stone-100 last:border-0 hover:bg-violet-50/40">
+                    <td className="px-3 py-2">
+                      <span className="flex items-center gap-2 font-medium text-stone-900">
+                        <AlertTriangle className="h-4 w-4 text-amber-600" />
+                        {b.breakerType}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2">{chip(b.scope, "border-stone-200 bg-stone-100 text-stone-600")}</td>
+                    <td className="px-3 py-2">
+                      {b.acknowledgedBy
+                        ? chip(`acknowledged — cool-down until ${new Date(b.cooldownUntil).toLocaleString()}`, "border-emerald-200 bg-emerald-50 text-emerald-700")
+                        : chip("fired — awaiting acknowledgment", "border-red-200 bg-red-50 text-red-700")}
+                    </td>
+                    <td className="max-w-xs px-3 py-2 text-[12px] text-stone-500">{b.reason}</td>
+                    <td className="px-3 py-2">
+                      {!b.acknowledgedBy && isOwner && (
+                        <Button size="sm" variant="outline" onClick={() => acknowledgeBreaker(b.id)} disabled={busy}>
+                          Acknowledge
+                        </Button>
                       )}
-                    </div>
-                    <p className="mt-1 text-[12px] text-stone-500">{b.reason}</p>
-                  </div>
-                  {!b.acknowledgedBy && isOwner && (
-                    <Button size="sm" variant="outline" onClick={() => acknowledgeBreaker(b.id)} disabled={busy}>
-                      Acknowledge
-                    </Button>
-                  )}
-                </div>
-              ))}
-            </div>
-          </Card>
-        </TabsContent>
+                    </td>
+                  </tr>
+                ))}
+              </DataTable>
+            )}
+          </Panel>
+        )}
 
-        <TabsContent value="curves" className="mt-4">
-          <Card>
-            <CardHeader title="Marginal-ROAS curves" description="Best of Hill / power / log-log by R², with adstock + seasonality." />
-            <div className="divide-y divide-stone-100">
-              {curves.length === 0 && <p className="p-4 text-[13px] text-stone-500">No fitted curves yet.</p>}
-              {curves.map((c) => (
-                <div key={c.id} className="p-4 text-[13px]">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-medium text-stone-900">{c.channel}</span>
-                    <Badge variant="outline">{c.curveType}</Badge>
-                    <ValuePill tone={c.rSquared >= 0.7 ? "green" : "orange"}>R² {Number(c.rSquared).toFixed(2)}</ValuePill>
-                    <span className="text-[12px] text-stone-500">{c.dataWindow} · {c.modelVersion}</span>
-                    {c.iroasCalibrationFactor && (
-                      <ValuePill tone="accent">holdout-calibrated ×{Number(c.iroasCalibrationFactor).toFixed(2)}</ValuePill>
-                    )}
-                  </div>
-                  <code className="mt-1 block truncate text-[11px] text-stone-500">{JSON.stringify(c.params)}</code>
-                </div>
-              ))}
-            </div>
-          </Card>
-        </TabsContent>
+        {tab === "curves" && (
+          <Panel title="Marginal-ROAS curves" description="Best of Hill / power / log-log by R², with adstock + seasonality.">
+            {curves.length === 0 ? (
+              <p className="py-2 text-[13px] text-stone-500">No fitted curves yet.</p>
+            ) : (
+              <DataTable headers={["Channel", "Curve", "R²", "Window / model", "Params"]}>
+                {curves.map((c) => (
+                  <tr key={c.id} className="border-b border-stone-100 last:border-0 hover:bg-violet-50/40">
+                    <td className="px-3 py-2 font-medium text-stone-900">{c.channel}</td>
+                    <td className="px-3 py-2">{chip(c.curveType, "border-stone-200 bg-stone-50 text-stone-600")}</td>
+                    <td className="px-3 py-2">
+                      {chip(`R² ${Number(c.rSquared).toFixed(2)}`,
+                        c.rSquared >= 0.7 ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-amber-200 bg-amber-50 text-amber-700")}
+                    </td>
+                    <td className="px-3 py-2 text-[12px] text-stone-500">{c.dataWindow} · {c.modelVersion}</td>
+                    <td className="px-3 py-2">
+                      <code className="block max-w-xs truncate text-[11px] text-stone-500">{JSON.stringify(c.params)}</code>
+                      {c.iroasCalibrationFactor && chip(`holdout-calibrated ×${Number(c.iroasCalibrationFactor).toFixed(2)}`, "border-violet-200 bg-violet-50 text-violet-700")}
+                    </td>
+                  </tr>
+                ))}
+              </DataTable>
+            )}
+          </Panel>
+        )}
 
-        <TabsContent value="run" className="mt-4">
-          <Card>
-            <CardHeader
-              title="Trigger optimizer run"
-              description="Measurement-health pre-check runs first — degraded data freezes the run. Mode (b) additionally requires an active SRA."
-            />
-            <div className="flex flex-col gap-3 p-4">
+        {tab === "run" && (
+          <Panel
+            title="Trigger optimizer run"
+            description="Measurement-health pre-check runs first — degraded data freezes the run. Mode (b) additionally requires an active SRA."
+          >
+            <div className="flex flex-col gap-3">
               <div className="flex flex-wrap items-center gap-3">
-                <label className="flex items-center gap-2 text-[13px] text-stone-700">
+                <label className="flex items-center gap-2 text-[13px] font-medium text-stone-700">
                   Mode
                   <select
                     value={runMode}
                     onChange={(e) => setRunMode(e.target.value as "a" | "b")}
-                    className="rounded-md border border-stone-200 bg-white px-2 py-1 text-[13px]"
+                    className={HSELECT}
                   >
                     <option value="a">(a) propose-only</option>
                     <option value="b" disabled={!activeSra}>(b) SRA guardrails{activeSra ? "" : " — no active SRA"}</option>
@@ -479,55 +554,55 @@ export default function ReallocationApp({ isOwner }: { isOwner: boolean }) {
                 {runMode === "b" && activeSra && (
                   <span className="text-[12px] text-stone-500">Using SRA: {activeSra.name}</span>
                 )}
-                <Button onClick={triggerRun} disabled={busy}>
+                <Button className="bg-violet-600 text-white hover:bg-violet-700" onClick={triggerRun} disabled={busy}>
                   <Play className="mr-1 h-3.5 w-3.5" /> Run optimizer
                 </Button>
               </div>
-              <label className="text-[12px] text-stone-600">
+              <label className="text-[13px] font-medium text-stone-700">
                 Channels JSON (lagged data points; the fixture below is pre-filled)
-                <Textarea value={runChannels} onChange={(e) => setRunChannels(e.target.value)} rows={10} className="mt-1 font-mono text-[11px]" />
+                <Textarea value={runChannels} onChange={(e) => setRunChannels(e.target.value)} rows={10} className="mt-1 border-stone-200 bg-white font-mono text-[11px] placeholder:text-stone-400 focus-visible:border-violet-400 focus-visible:ring-violet-200/60" />
               </label>
               {runResult && (
-                <div className="rounded-xl border border-stone-200 bg-stone-50 p-3 text-[12px] text-stone-700">
+                <div className="rounded-lg border border-stone-200 bg-stone-50 p-3 text-[12px] text-stone-700">
                   Run {runResult.run?.id}: {runResult.proposals?.length ?? 0} proposals,{" "}
                   {runResult.run?.deniedCount ?? 0} denied, frozen={String(runResult.run?.frozen)}.{" "}
                   {runResult.run?.frozen ? "Frozen — see health snapshot / breaker trips." : ""}
                 </div>
               )}
             </div>
-          </Card>
-        </TabsContent>
+          </Panel>
+        )}
 
-        <TabsContent value="audit" className="mt-4">
-          <Card>
-            <CardHeader
-              title="Audit log"
-              description="Hash-chained, replayable. Every proposal, policy decision (allow and deny), execution, and breaker event."
-              actions={
-                chainIntact === null ? undefined : chainIntact ? (
-                  <span className="flex items-center gap-1 text-[12px] text-green-700"><FileText className="h-3.5 w-3.5" /> chain intact</span>
-                ) : (
-                  <span className="flex items-center gap-1 text-[12px] text-red-700"><XCircle className="h-3.5 w-3.5" /> CHAIN BROKEN</span>
-                )
-              }
-            />
-            <div className="divide-y divide-stone-100">
-              {audit.length === 0 && <p className="p-4 text-[13px] text-stone-500">No audit events yet.</p>}
-              {audit.map((e) => (
-                <div key={e.id} className="p-3 text-[12px]">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <ValuePill tone="neutral">{e.kind}</ValuePill>
-                    <span className="text-stone-500">{new Date(e.ts).toLocaleString()}</span>
-                    <span className="text-stone-400">actor {e.actor}</span>
-                    <code className="text-[10px] text-stone-400">{e.correlationId}</code>
-                  </div>
-                  <code className="mt-1 block truncate text-[11px] text-stone-500">{JSON.stringify(e.payload)}</code>
-                </div>
-              ))}
-            </div>
-          </Card>
-        </TabsContent>
-      </Tabs>
+        {tab === "audit" && (
+          <Panel
+            title="Audit log"
+            description="Hash-chained, replayable. Every proposal, policy decision (allow and deny), execution, and breaker event."
+            action={
+              chainIntact === null ? undefined : chainIntact ? (
+                <span className="flex items-center gap-1 text-[12px] text-emerald-700"><CheckCircle2 className="h-3.5 w-3.5" /> chain intact</span>
+              ) : (
+                <span className="flex items-center gap-1 text-[12px] text-red-700"><XCircle className="h-3.5 w-3.5" /> CHAIN BROKEN</span>
+              )
+            }
+          >
+            {audit.length === 0 ? (
+              <p className="py-2 text-[13px] text-stone-500">No audit events yet.</p>
+            ) : (
+              <DataTable headers={["Kind", "Time", "Actor", "Correlation", "Payload"]}>
+                {audit.map((e) => (
+                  <tr key={e.id} className="border-b border-stone-100 last:border-0 hover:bg-violet-50/40">
+                    <td className="px-3 py-2">{chip(e.kind, "border-stone-200 bg-stone-100 text-stone-600")}</td>
+                    <td className="px-3 py-2 text-[12px] text-stone-500">{new Date(e.ts).toLocaleString()}</td>
+                    <td className="px-3 py-2 text-[12px] text-stone-500">{e.actor}</td>
+                    <td className="px-3 py-2"><code className="text-[10px] text-stone-400">{e.correlationId}</code></td>
+                    <td className="px-3 py-2"><code className="block max-w-xs truncate text-[11px] text-stone-500">{JSON.stringify(e.payload)}</code></td>
+                  </tr>
+                ))}
+              </DataTable>
+            )}
+          </Panel>
+        )}
+      </div>
     </div>
   );
 }

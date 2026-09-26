@@ -34,24 +34,18 @@ import {
 } from "@/components/vault/shadcn/select";
 import { Switch } from "@/components/vault/shadcn/switch";
 import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/vault/shadcn/tabs";
-import {
-  Warning,
+  TriangleAlert,
   Eye,
-  Tray,
+  Inbox,
   ListChecks,
-  Pulse as ActivityIcon,
-  CircleNotch,
-  WarningOctagon,
+  Activity as ActivityIcon,
+  LoaderCircle,
+  OctagonAlert,
   Pencil,
   Play,
   Plus,
   Trash,
-} from "@phosphor-icons/react";
+} from "lucide-react";
 
 export interface RuleRow {
   id: string;
@@ -274,7 +268,7 @@ export default function AutopilotStudio({ projectId, canEdit, isAdmin, initialRu
     <div className="flex flex-col gap-6">
       {killed && (
         <div className="flex items-start gap-2.5 rounded-card bg-red-tint px-4 py-3 text-sm text-red">
-          <WarningOctagon className="mt-0.5 h-4 w-4 shrink-0" />
+          <OctagonAlert className="mt-0.5 h-4 w-4 shrink-0" />
           <span>
             Autopilot is <strong>killed</strong>
             {projectKilled && workspaceKilled ? " at project and workspace level" : projectKilled ? " for this project" : " at workspace level"}
@@ -284,7 +278,7 @@ export default function AutopilotStudio({ projectId, canEdit, isAdmin, initialRu
       )}
       {error && (
         <div className="flex items-start gap-2.5 rounded-card bg-red-tint px-4 py-3 text-sm text-red">
-          <Warning className="mt-0.5 h-4 w-4 shrink-0" />
+          <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" />
           <span className="flex-1">{error}</span>
           <Button type="button" size="xs" variant="quiet" onClick={() => setError(null)}>
             Dismiss
@@ -292,23 +286,43 @@ export default function AutopilotStudio({ projectId, canEdit, isAdmin, initialRu
         </div>
       )}
 
-      <Tabs value={tab} onValueChange={(v) => setTab(v as "rules" | "queue" | "activity")}>
+      <div>
         <div className="flex items-end justify-between gap-2 border-b border-line">
-          <TabsList variant="line">
-            <TabsTrigger value="queue" className="capitalize">Queue</TabsTrigger>
-            <TabsTrigger value="rules" className="capitalize">Rules</TabsTrigger>
-            <TabsTrigger value="activity" className="capitalize">Activity</TabsTrigger>
-          </TabsList>
+          <div className="flex gap-1" role="tablist" aria-label="Autopilot">
+            {(
+              [
+                { id: "queue", label: "Queue", icon: Inbox },
+                { id: "rules", label: "Rules", icon: ListChecks },
+                { id: "activity", label: "Activity", icon: ActivityIcon },
+              ] as const
+            ).map((t) => (
+              <button
+                key={t.id}
+                role="tab"
+                aria-selected={tab === t.id}
+                onClick={() => setTab(t.id)}
+                className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-[13.5px] font-medium capitalize transition-colors ${
+                  tab === t.id
+                    ? "border-accent text-accent-ink"
+                    : "border-transparent text-ink-2 hover:text-ink"
+                }`}
+              >
+                <t.icon size={15} />
+                {t.label}
+              </button>
+            ))}
+          </div>
           <a
             href="#kill-switch"
             className={`mb-2 inline-flex items-center gap-1.5 text-[13px] font-medium ${killed ? "text-red" : "text-ink-3 hover:text-ink-2"}`}
           >
-            <WarningOctagon className="h-4 w-4" />
+            <OctagonAlert className="h-4 w-4" />
             {killed ? "Kill switch ENGAGED" : "Kill switch"}
           </a>
         </div>
 
-        <TabsContent value="queue" className="pt-4">
+        {tab === "queue" && (
+          <div className="pt-4">
           <div className="flex flex-col gap-4">
             <div className="flex flex-wrap items-center gap-3">
               <Select value={queueStatus} onValueChange={(v) => { if (v !== null) setQueueStatus(v); }}>
@@ -333,14 +347,14 @@ export default function AutopilotStudio({ projectId, canEdit, isAdmin, initialRu
               )}
               {busy && (
                 <span className="inline-flex items-center gap-1.5 text-sm text-ink-3">
-                  <CircleNotch className="h-3.5 w-3.5 animate-spin" /> Working…
+                  <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> Working…
                 </span>
               )}
             </div>
 
             {items.length === 0 ? (
               <EmptyState
-                icon={<Tray className="h-5 w-5" />}
+                icon={<Inbox className="h-5 w-5" />}
                 title={`No ${queueStatus} items`}
                 description="Run a rule to generate drafts."
               />
@@ -409,9 +423,11 @@ export default function AutopilotStudio({ projectId, canEdit, isAdmin, initialRu
               </div>
             )}
           </div>
-        </TabsContent>
+          </div>
+        )}
 
-        <TabsContent value="rules" className="pt-4">
+        {tab === "rules" && (
+          <div className="pt-4">
           <div className="flex flex-col gap-4">
             {canEdit && !killed && (
               <div>
@@ -503,9 +519,11 @@ export default function AutopilotStudio({ projectId, canEdit, isAdmin, initialRu
               </div>
             )}
           </div>
-        </TabsContent>
+          </div>
+        )}
 
-        <TabsContent value="activity" className="pt-4">
+        {tab === "activity" && (
+          <div className="pt-4">
           {runs.length === 0 ? (
             <EmptyState
               icon={<ActivityIcon className="h-5 w-5" />}
@@ -515,8 +533,9 @@ export default function AutopilotStudio({ projectId, canEdit, isAdmin, initialRu
           ) : (
             <TaskRows variant="List" rows={runs.map(runTaskRow)} />
           )}
-        </TabsContent>
-      </Tabs>
+          </div>
+        )}
+      </div>
 
       {/* Approval gate: preview dialog */}
       <Dialog open={!!preview} onOpenChange={(open) => { if (!open) setPreview(null); }}>
@@ -580,7 +599,7 @@ export default function AutopilotStudio({ projectId, canEdit, isAdmin, initialRu
         <CardHeader
           title={
             <span className="flex items-center gap-2 text-red">
-              <WarningOctagon className="h-4 w-4" /> Kill switch
+              <OctagonAlert className="h-4 w-4" /> Kill switch
             </span>
           }
         />
@@ -815,7 +834,7 @@ function RuleForm({ projectId, templates, sites, editing, onClose, onSaved }: {
             Cancel
           </Button>
           <Button type="button" size="sm" variant="accent" onClick={save} disabled={saving}>
-            {saving ? <CircleNotch className="h-3.5 w-3.5 animate-spin" /> : null}
+            {saving ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : null}
             {saving ? "Saving…" : editing ? "Save changes" : "Create rule"}
           </Button>
         </DialogFooter>

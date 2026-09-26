@@ -6,7 +6,7 @@
 // domains means the project's own domain is the only one.
 
 import { useState } from "react";
-import { CheckCircle, Warning, X } from "@/components/vault/phosphor";
+import { CheckCircle, TriangleAlert, X } from "lucide-react";
 import { Card, CardBody, CardHeader } from "@/components/vault/Card";
 import { Field } from "@/components/vault/Field";
 import { Textarea } from "@/components/vault/shadcn/textarea";
@@ -164,7 +164,7 @@ export default function GeneralForm({
                         }
                         className="flex size-5 items-center justify-center rounded-full text-ink-3 transition-colors hover:bg-line hover:text-ink"
                       >
-                        <X className="size-3" weight="bold" />
+                        <X className="size-3" strokeWidth={2.5} />
                       </button>
                     )}
                   </span>
@@ -199,13 +199,13 @@ export default function GeneralForm({
 
         {state === "error" && error && (
           <p className="flex items-center gap-1.5 text-[12.5px] text-red">
-            <Warning className="size-3.5" />
+            <TriangleAlert className="size-3.5" />
             {error}
           </p>
         )}
         {state === "saved" && (
           <p className="flex items-center gap-1.5 text-[12.5px] text-green">
-            <CheckCircle className="size-3.5" weight="duotone" />
+            <CheckCircle className="size-3.5" />
             Saved
           </p>
         )}

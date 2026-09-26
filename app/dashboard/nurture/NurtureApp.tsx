@@ -170,20 +170,20 @@ export function NurtureApp() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex rounded-lg border border-stone-200 bg-white p-0.5">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-stone-200">
+        <div className="flex gap-1">
           {tabs.map(({ id, label, Icon, badge }) => (
             <button
               key={id}
               onClick={() => setTab(id)}
-              className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[13px] font-medium ${
-                tab === id ? "bg-violet-600 text-white" : "text-stone-600 hover:bg-stone-100"
+              className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-[13.5px] font-medium transition-colors ${
+                tab === id ? "border-violet-600 text-violet-700" : "border-transparent text-stone-500 hover:text-stone-800"
               }`}
             >
-              <Icon size={14} />
+              <Icon size={15} />
               {label}
               {badge ? (
-                <span className={`rounded-full px-1.5 text-[11px] font-semibold ${tab === id ? "bg-white/25 text-white" : "bg-amber-100 text-amber-800"}`}>
+                <span className={`rounded-full px-1.5 text-[11px] font-semibold ${tab === id ? "bg-violet-100 text-violet-700" : "bg-amber-100 text-amber-800"}`}>
                   {badge}
                 </span>
               ) : null}

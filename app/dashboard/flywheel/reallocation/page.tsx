@@ -24,8 +24,8 @@ export default async function ReallocationPage() {
   const isOwner = membership.role === "owner" || membership.role === "admin";
 
   return (
-    <div className="space-y-6">
-      <div>
+    <div className="flex h-full flex-col gap-4 bg-[#FAFAF7] p-4 md:p-6">
+      <header>
         <h1 className="text-xl font-bold tracking-tight text-stone-900">Budget reallocation</h1>
         <p className="mt-0.5 max-w-3xl text-[13px] text-stone-500">
           Marginal-ROAS equalization across channels on diminishing-returns curves — never greedy
@@ -33,7 +33,7 @@ export default async function ReallocationPage() {
           inside a human-signed, expiring Standing Reallocation Approval. Every dollar stays
           human-signed — that is the exit gate, not a feature.
         </p>
-      </div>
+      </header>
       <ReallocationApp isOwner={isOwner} />
     </div>
   );

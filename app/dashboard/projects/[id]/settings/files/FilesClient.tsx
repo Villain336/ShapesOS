@@ -8,7 +8,7 @@
 //   Refresh:  GET  /api/projects/[id]/files
 
 import { useRef, useState } from "react";
-import { FileText, Warning } from "@/components/vault/phosphor";
+import { FileText, TriangleAlert } from "lucide-react";
 import { Field } from "@/components/vault/Field";
 import { Input } from "@/components/vault/shadcn/input";
 import {
@@ -156,7 +156,7 @@ export default function FilesClient({
     <div className="flex flex-col gap-6">
       {files.length === 0 ? (
         <EmptyState
-          icon={<FileText className="size-5" weight="duotone" />}
+          icon={<FileText className="size-5" />}
           title="No files yet"
           description="Upload a brief or reference one from a connected Drive/Notion, then attach it to a Marketr chat."
         />
@@ -169,7 +169,7 @@ export default function FilesClient({
             >
               <div className="flex min-w-0 items-center gap-3">
                 <span className="flex size-8 shrink-0 items-center justify-center rounded-control bg-inset text-ink-2">
-                  <FileText className="size-4" weight="duotone" />
+                  <FileText className="size-4" />
                 </span>
                 <div className="min-w-0">
                   <p className="truncate text-[13.5px] font-medium text-ink">
@@ -288,7 +288,7 @@ export default function FilesClient({
 
       {error && (
         <p className="flex items-center gap-1.5 text-[12.5px] text-red">
-          <Warning className="size-3.5" />
+          <TriangleAlert className="size-3.5" />
           {error}
         </p>
       )}

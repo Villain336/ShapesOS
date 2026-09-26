@@ -6,7 +6,7 @@
 // nothing a skill does can outrun the project's approval mode.
 
 import { useState } from "react";
-import { CheckCircle, ShieldCheck, Warning } from "@/components/vault/phosphor";
+import { CheckCircle, ShieldCheck, TriangleAlert } from "lucide-react";
 import { Field } from "@/components/vault/Field";
 import {
   Select,
@@ -91,7 +91,7 @@ export default function AutomationClient({
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center gap-2">
-        <ShieldCheck className="size-4 text-accent-ink" weight="duotone" />
+        <ShieldCheck className="size-4 text-accent-ink" />
         <span className="text-[13px] text-ink-2">
           {overridden ? (
             <>
@@ -158,13 +158,13 @@ export default function AutomationClient({
 
       {state === "saved" && (
         <p className="flex items-center gap-1.5 text-[12.5px] text-green">
-          <CheckCircle className="size-3.5" weight="duotone" />
+          <CheckCircle className="size-3.5" />
           Saved
         </p>
       )}
       {state === "error" && error && (
         <p className="flex items-center gap-1.5 text-[12.5px] text-red">
-          <Warning className="size-3.5" />
+          <TriangleAlert className="size-3.5" />
           {error}
         </p>
       )}

@@ -35,7 +35,7 @@ export default async function NewSchedulePage({ params }: { params: Promise<{ id
           </Link>{" "}
           / New
         </p>
-        <h1 className="mt-1 font-display text-3xl">New schedule</h1>
+        <h1 className="mt-1 text-xl font-bold tracking-tight text-ink">New schedule</h1>
         <p className="mt-2 text-sm text-zinc-600">
           For <span className="font-medium">{project.domain}</span>. Schedules are project-scoped; workspace-wide
           schedules are created by admins.

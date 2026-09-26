@@ -10,7 +10,7 @@ import {
   cardCls,
   inputCls,
   labelCls,
-  primaryBtnCls,
+  primaryBtnVioletCls,
   type NoticeState,
 } from "./ui";
 
@@ -142,7 +142,7 @@ export default function DefaultsForm({ workspaceId }: { workspaceId: string }) {
           </label>
         </div>
         <div className="mt-4">
-          <button onClick={save} disabled={busy} className={primaryBtnCls}>
+          <button onClick={save} disabled={busy} className={primaryBtnVioletCls}>
             {busy ? "Saving…" : "Save defaults"}
           </button>
         </div>

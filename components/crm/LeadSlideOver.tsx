@@ -3,24 +3,24 @@
 
 import { useEffect, useMemo, useState } from "react";
 import {
-  X, Star, ArrowSquareOut, PencilSimple, Phone, EnvelopeSimple,
-  ChatText, CalendarBlank, NotePencil, Flag,
-} from "@phosphor-icons/react";
+  X, Star, SquareArrowOutUpRight, Pencil, Phone, Mail,
+  MessageSquareText, Calendar, NotebookPen, Flag,
+} from "lucide-react";
 import type { CrmActivity, CrmLead, CrmPipeline, CrmStage } from "./types";
 import { SOURCE_LABELS, formatMoney, timeAgo } from "./types";
 import { StageBadge, ScoreBar, MiniBars, Avatar } from "./ui";
 
 const ACT_META: Record<string, { label: string; icon: typeof Phone; tint: string }> = {
   created: { label: "Created", icon: Flag, tint: "bg-violet-100 text-violet-700" },
-  note: { label: "Note", icon: NotePencil, tint: "bg-stone-200 text-stone-600" },
-  email: { label: "Email", icon: EnvelopeSimple, tint: "bg-blue-100 text-blue-700" },
+  note: { label: "Note", icon: NotebookPen, tint: "bg-stone-200 text-stone-600" },
+  email: { label: "Email", icon: Mail, tint: "bg-blue-100 text-blue-700" },
   call: { label: "Call", icon: Phone, tint: "bg-green-100 text-green-700" },
-  sms: { label: "SMS", icon: ChatText, tint: "bg-teal-100 text-teal-700" },
-  meeting: { label: "Meeting", icon: CalendarBlank, tint: "bg-amber-100 text-amber-700" },
+  sms: { label: "SMS", icon: MessageSquareText, tint: "bg-teal-100 text-teal-700" },
+  meeting: { label: "Meeting", icon: Calendar, tint: "bg-amber-100 text-amber-700" },
   stage_change: { label: "Stage", icon: Flag, tint: "bg-violet-100 text-violet-700" },
   score_change: { label: "Score", icon: Flag, tint: "bg-stone-200 text-stone-600" },
-  form_submit: { label: "Form", icon: ChatText, tint: "bg-blue-100 text-blue-700" },
-  import: { label: "Import", icon: ChatText, tint: "bg-stone-200 text-stone-600" },
+  form_submit: { label: "Form", icon: MessageSquareText, tint: "bg-blue-100 text-blue-700" },
+  import: { label: "Import", icon: MessageSquareText, tint: "bg-stone-200 text-stone-600" },
 };
 
 function weeklyBuckets(activities: CrmActivity[]): number[] {
@@ -197,7 +197,7 @@ export function LeadSlideOver({
               className={`crm-btn-ghost !px-2.5 ${lead.starred ? "!text-violet-700 !border-violet-300 !bg-violet-50" : ""}`}
               title={lead.starred ? "Unfollow" : "Follow"}
             >
-              <Star size={15} weight={lead.starred ? "fill" : "regular"} />
+              <Star size={15} fill={lead.starred ? "currentColor" : "none"} className={lead.starred ? "text-amber-500" : "text-stone-400"} />
               <span className="hidden sm:inline text-[12.5px]">{lead.starred ? "Following" : "Follow"}</span>
             </button>
             <a
@@ -205,7 +205,7 @@ export function LeadSlideOver({
               className="crm-btn-ghost !px-2.5"
               title="Open full view"
             >
-              <ArrowSquareOut size={15} />
+              <SquareArrowOutUpRight size={15} />
               <span className="hidden sm:inline text-[12.5px]">Open</span>
             </a>
             <button onClick={onClose} className="rounded-lg p-2 text-stone-400 hover:bg-stone-100 hover:text-stone-700">
@@ -226,7 +226,7 @@ export function LeadSlideOver({
             <h3 className="crm-section-title !mb-0">Lead Details</h3>
             {!editing ? (
               <button className="crm-btn-ghost !py-1 !px-2.5 !text-[12px]" onClick={() => setEditing(true)}>
-                <PencilSimple size={13} /> Edit
+                <Pencil size={13} /> Edit
               </button>
             ) : (
               <div className="flex gap-2">
@@ -397,7 +397,7 @@ export function LeadSlideOver({
               return (
                 <li key={a.id} className="flex gap-2.5">
                   <span className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${m.tint}`}>
-                    <Icon size={14} weight="duotone" />
+                    <Icon size={14} />
                   </span>
                   <div className="min-w-0 flex-1 rounded-lg border border-stone-200 bg-white px-3 py-2">
                     <div className="flex items-baseline justify-between gap-2">

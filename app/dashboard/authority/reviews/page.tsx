@@ -10,7 +10,6 @@ import { authorityTablesReady } from "@/lib/authority/db";
 import { listQueue, listVelocity } from "@/lib/authority/reviews/service";
 import { channelCapabilities } from "@/lib/authority/reviews/appleBing";
 import { GUARDRAIL_EXPLANATIONS } from "@/lib/authority/reviews/guardrails";
-import { Badge } from "@/components/vault/shadcn/badge";
 import { ApproveButton, PostButton } from "./_components/ReviewActions";
 import {
   MessageSquareText,
@@ -31,24 +30,39 @@ export const metadata = {
   description: "Review-reply approval queue, moderation-state tracking, velocity, and listing upkeep.",
 };
 
-const SENTIMENT_BADGE: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
-  pos: "default",
-  neu: "secondary",
-  neg: "destructive",
+const SENTIMENT_CHIP: Record<string, string> = {
+  pos: "border-emerald-200 bg-emerald-50 text-emerald-700",
+  neu: "border-stone-200 bg-stone-50 text-stone-600",
+  neg: "border-red-200 bg-red-50 text-red-700",
 };
-const STATUS_BADGE: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
-  pending: "outline",
-  approved: "secondary",
-  posted: "default",
-  rejected: "destructive",
-  escalated: "destructive",
+const STATUS_CHIP: Record<string, string> = {
+  pending: "border-stone-200 bg-stone-50 text-stone-600",
+  approved: "border-violet-200 bg-violet-50 text-violet-700",
+  posted: "border-emerald-200 bg-emerald-50 text-emerald-700",
+  rejected: "border-red-200 bg-red-50 text-red-700",
+  escalated: "border-red-200 bg-red-50 text-red-700",
 };
-const REPLY_STATE_BADGE: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
-  none: "outline",
-  pending_mod: "secondary",
-  approved: "default",
-  rejected: "destructive",
+const REPLY_STATE_CHIP: Record<string, string> = {
+  none: "border-stone-200 bg-stone-50 text-stone-600",
+  pending_mod: "border-amber-200 bg-amber-50 text-amber-700",
+  approved: "border-emerald-200 bg-emerald-50 text-emerald-700",
+  rejected: "border-red-200 bg-red-50 text-red-700",
 };
+
+function chip(text: React.ReactNode, cls: string) {
+  return (
+    <span className={`inline-flex items-center gap-0.5 whitespace-nowrap rounded-full border px-1.5 py-0.5 text-[10px] font-medium leading-tight ${cls}`}>
+      {text}
+    </span>
+  );
+}
+
+function ReplyStateLabel({ state }: { state: string }) {
+  if (state === "pending_mod") return "PENDING";
+  if (state === "approved") return "APPROVED";
+  if (state === "rejected") return "REJECTED";
+  return state;
+}
 
 export default async function ReviewsPage() {
   const user = await requireUser();
@@ -74,7 +88,7 @@ export default async function ReviewsPage() {
   const capabilities = channelCapabilities();
 
   return (
-    <div className="flex h-full flex-col gap-6 bg-[#FAFAF7] p-4 md:p-6">
+    <div className="flex h-full flex-col gap-4 bg-[#FAFAF7] p-4 md:p-6">
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-xl font-bold tracking-tight text-stone-900">Reviews</h1>
@@ -85,12 +99,12 @@ export default async function ReviewsPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Badge variant="outline">
-            <ShieldCheck className="mr-1 h-3 w-3" /> v1: drafts only
-          </Badge>
-          <Badge variant="secondary">
-            <Clock3 className="mr-1 h-3 w-3" /> {pending.length} awaiting approval
-          </Badge>
+          <span className="inline-flex items-center gap-1 rounded-full border border-stone-200 bg-stone-50 px-2 py-0.5 text-[11px] font-medium text-stone-600">
+            <ShieldCheck className="h-3 w-3" /> v1: drafts only
+          </span>
+          <span className="inline-flex items-center gap-1 rounded-full border border-stone-200 bg-stone-50 px-2 py-0.5 text-[11px] font-medium text-stone-600">
+            <Clock3 className="h-3 w-3" /> {pending.length} awaiting approval
+          </span>
         </div>
       </div>
 
@@ -112,7 +126,7 @@ export default async function ReviewsPage() {
         {urgent.length === 0 ? (
           <p className="text-sm text-stone-500">No negative reviews awaiting a reply.</p>
         ) : (
-          <ul className="space-y-2">{urgent.map((q) => <QueueRow key={q.id} q={q} />)}</ul>
+          <QueueTable rows={urgent} />
         )}
       </section>
 
@@ -127,7 +141,7 @@ export default async function ReviewsPage() {
         {standard.length === 0 ? (
           <p className="text-sm text-stone-500">Nothing in the standard queue.</p>
         ) : (
-          <ul className="space-y-2">{standard.map((q) => <QueueRow key={q.id} q={q} />)}</ul>
+          <QueueTable rows={standard} />
         )}
       </section>
 
@@ -143,34 +157,31 @@ export default async function ReviewsPage() {
           {posted.length === 0 ? (
             <p className="text-sm text-stone-500">No posted replies yet.</p>
           ) : (
-            <ul className="space-y-1.5">
-              {posted.slice(0, 8).map((q) => (
-                <li
-                  key={q.id}
-                  className="flex items-center justify-between rounded-lg border border-stone-100 px-3 py-2 text-sm"
-                >
-                  <span className="truncate text-stone-800">
-                    {q.reviewerName ?? "Reviewer"} · {"★".repeat(Math.min(5, q.rating))}
-                  </span>
-                  <span className="flex items-center gap-1.5">
-                    <Badge variant={REPLY_STATE_BADGE[q.replyState] ?? "outline"}>
-                      {q.replyState === "pending_mod"
-                        ? "PENDING"
-                        : q.replyState === "approved"
-                          ? "APPROVED"
-                          : q.replyState === "rejected"
-                            ? "REJECTED"
-                            : "none"}
-                    </Badge>
-                    {q.rejectionCount > 0 && (
-                      <span className="text-[11px] text-stone-500">
-                        {q.rejectionCount} rejection{q.rejectionCount > 1 ? "s" : ""}
-                      </span>
-                    )}
-                  </span>
-                </li>
-              ))}
-            </ul>
+            <div className="overflow-x-auto rounded-xl border border-stone-200">
+              <table className="w-full text-left text-[13px]">
+                <thead>
+                  <tr className="border-b border-stone-100 bg-stone-50/60 text-[11px] uppercase tracking-wide text-stone-500">
+                    <th className="px-3 py-2 font-medium">Reviewer</th>
+                    <th className="px-3 py-2 font-medium">State</th>
+                    <th className="px-3 py-2 font-medium">Rejections</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {posted.slice(0, 8).map((q) => (
+                    <tr key={q.id} className="border-b border-stone-100 last:border-0 hover:bg-violet-50/40">
+                      <td className="px-3 py-2 font-medium text-stone-900">
+                        {q.reviewerName ?? "Reviewer"}
+                        <span className="ml-1.5 text-amber-500">{"★".repeat(Math.min(5, q.rating))}</span>
+                      </td>
+                      <td className="px-3 py-2">{chip(<ReplyStateLabel state={q.replyState} />, REPLY_STATE_CHIP[q.replyState] ?? REPLY_STATE_CHIP.none)}</td>
+                      <td className="px-3 py-2 text-[12px] text-stone-600">
+                        {q.rejectionCount > 0 ? `${q.rejectionCount} rejection${q.rejectionCount > 1 ? "s" : ""}` : "—"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </section>
 
@@ -188,20 +199,30 @@ export default async function ReviewsPage() {
               from CRM/POS webhooks — channels: receipt, thank-you email, end-of-chat, in-store QR.
             </p>
           ) : (
-            <ul className="space-y-1.5">
-              {velocity.slice(0, 8).map((v) => (
-                <li
-                  key={v.id}
-                  className="flex items-center justify-between rounded-lg border border-stone-100 px-3 py-2 text-sm"
-                >
-                  <span className="font-medium text-stone-800">{v.locationRef}</span>
-                  <span className="text-xs text-stone-500">
-                    {v.velocity7d.toFixed(1)}/day (7d) · {v.velocity30d.toFixed(1)}/day (30d) ·{" "}
-                    {v.requestsSent} sent / {v.reviewsReceived} received
-                  </span>
-                </li>
-              ))}
-            </ul>
+            <div className="overflow-x-auto rounded-xl border border-stone-200">
+              <table className="w-full text-left text-[13px]">
+                <thead>
+                  <tr className="border-b border-stone-100 bg-stone-50/60 text-[11px] uppercase tracking-wide text-stone-500">
+                    <th className="px-3 py-2 font-medium">Location</th>
+                    <th className="px-3 py-2 font-medium">7d velocity</th>
+                    <th className="px-3 py-2 font-medium">30d velocity</th>
+                    <th className="px-3 py-2 font-medium">Requests</th>
+                    <th className="px-3 py-2 font-medium">Received</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {velocity.slice(0, 8).map((v) => (
+                    <tr key={v.id} className="border-b border-stone-100 last:border-0 hover:bg-violet-50/40">
+                      <td className="px-3 py-2 font-medium text-stone-900">{v.locationRef}</td>
+                      <td className="px-3 py-2 text-stone-600">{v.velocity7d.toFixed(1)}/day</td>
+                      <td className="px-3 py-2 text-stone-600">{v.velocity30d.toFixed(1)}/day</td>
+                      <td className="px-3 py-2 text-stone-600">{v.requestsSent}</td>
+                      <td className="px-3 py-2 text-stone-600">{v.reviewsReceived}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </section>
 
@@ -229,69 +250,104 @@ export default async function ReviewsPage() {
             </h2>
             <span className="text-xs text-stone-500">true tier labels</span>
           </div>
-          <ul className="space-y-2">
-            {Object.entries(capabilities).map(([channel, c]) => (
-              <li key={channel} className="rounded-lg border border-stone-100 px-3 py-2 text-sm">
-                <div className="flex items-center justify-between">
-                  <span className="font-medium capitalize text-stone-900">{channel}</span>
-                  <Badge variant="outline">{c.tier}</Badge>
-                </div>
-                <p className="mt-1 text-xs text-stone-500">Replies: {c.reviewReplies}</p>
-              </li>
-            ))}
-          </ul>
+          <div className="overflow-x-auto rounded-xl border border-stone-200">
+            <table className="w-full text-left text-[13px]">
+              <thead>
+                <tr className="border-b border-stone-100 bg-stone-50/60 text-[11px] uppercase tracking-wide text-stone-500">
+                  <th className="px-3 py-2 font-medium">Channel</th>
+                  <th className="px-3 py-2 font-medium">Tier</th>
+                  <th className="px-3 py-2 font-medium">Replies</th>
+                </tr>
+              </thead>
+              <tbody>
+                {Object.entries(capabilities).map(([channel, c]) => (
+                  <tr key={channel} className="border-b border-stone-100 last:border-0 hover:bg-violet-50/40">
+                    <td className="px-3 py-2 font-medium capitalize text-stone-900">{channel}</td>
+                    <td className="px-3 py-2">{chip(c.tier, "border-stone-200 bg-stone-50 text-stone-600")}</td>
+                    <td className="px-3 py-2 text-[12px] text-stone-600">{c.reviewReplies}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </section>
       </div>
     </div>
   );
 }
 
-function QueueRow({ q }: { q: Awaited<ReturnType<typeof listQueue>>[number] }) {
+function QueueTable({ rows }: { rows: Awaited<ReturnType<typeof listQueue>> }) {
   return (
-    <li className="rounded-lg border border-stone-100 p-3">
-      <div className="flex items-center justify-between gap-2 text-sm">
-        <span className="font-medium text-stone-900">
-          {q.reviewerName ?? "Anonymous"} · {"★".repeat(Math.min(5, q.rating))}
-          <span className="ml-2 text-xs font-normal text-stone-500">{q.locationRef}</span>
-        </span>
-        <span className="flex items-center gap-1.5">
-          <Badge variant={SENTIMENT_BADGE[q.sentiment] ?? "secondary"}>{q.sentiment}</Badge>
-          <Badge variant={STATUS_BADGE[q.status] ?? "outline"}>{q.status}</Badge>
-          {q.status === "posted" && (
-            <Badge variant={REPLY_STATE_BADGE[q.replyState] ?? "outline"}>
-              {q.replyState === "pending_mod" ? "PENDING" : q.replyState}
-            </Badge>
-          )}
-        </span>
-      </div>
-      {q.reviewText && <p className="mt-1 text-[13px] text-stone-600 line-clamp-2">{q.reviewText}</p>}
-      {q.guardrailFlags.length > 0 && (
-        <div className="mt-1.5 flex flex-wrap gap-1">
-          {q.guardrailFlags.map((f) => (
-            <span
-              key={f}
-              title={GUARDRAIL_EXPLANATIONS[f] ?? f}
-              className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2 py-0.5 text-[11px] font-medium text-red-700"
-            >
-              <XCircle className="h-3 w-3" /> {f}
-            </span>
+    <div className="overflow-x-auto rounded-xl border border-stone-200 bg-white">
+      <table className="w-full text-left text-[13px]">
+        <thead>
+          <tr className="border-b border-stone-100 bg-stone-50/60 text-[11px] uppercase tracking-wide text-stone-500">
+            <th className="px-3 py-2 font-medium">Reviewer</th>
+            <th className="px-3 py-2 font-medium">Review</th>
+            <th className="px-3 py-2 font-medium">Sentiment</th>
+            <th className="px-3 py-2 font-medium">Status</th>
+            <th className="px-3 py-2 font-medium">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((q) => (
+            <>
+              <tr key={q.id} className="border-b border-stone-100 last:border-0 hover:bg-violet-50/40">
+                <td className="px-3 py-2">
+                  <span className="font-medium text-stone-900">
+                    {q.reviewerName ?? "Anonymous"}
+                    <span className="ml-1.5 text-amber-500">{"★".repeat(Math.min(5, q.rating))}</span>
+                  </span>
+                  <span className="block text-[11px] text-stone-500">{q.locationRef}</span>
+                </td>
+                <td className="max-w-xs px-3 py-2">
+                  {q.reviewText && <p className="line-clamp-2 text-[12px] text-stone-600">{q.reviewText}</p>}
+                  {q.guardrailFlags.length > 0 && (
+                    <div className="mt-1 flex flex-wrap gap-1">
+                      {q.guardrailFlags.map((f) => (
+                        <span
+                          key={f}
+                          title={GUARDRAIL_EXPLANATIONS[f] ?? f}
+                          className="inline-flex items-center gap-1 rounded-full bg-red-50 px-1.5 py-0.5 text-[10px] font-medium text-red-700"
+                        >
+                          <XCircle className="h-3 w-3" /> {f}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </td>
+                <td className="px-3 py-2">{chip(q.sentiment, SENTIMENT_CHIP[q.sentiment] ?? SENTIMENT_CHIP.neu)}</td>
+                <td className="px-3 py-2">
+                  <span className="flex items-center gap-1">
+                    {chip(q.status, STATUS_CHIP[q.status] ?? STATUS_CHIP.pending)}
+                    {q.status === "posted" && chip(<ReplyStateLabel state={q.replyState} />, REPLY_STATE_CHIP[q.replyState] ?? REPLY_STATE_CHIP.none)}
+                  </span>
+                </td>
+                <td className="px-3 py-2">
+                  <span className="flex gap-1.5">
+                    <ApproveButton id={q.id} draftReply={q.draftReply} />
+                    {q.status === "approved" && <PostButton id={q.id} />}
+                  </span>
+                </td>
+              </tr>
+              <tr key={`${q.id}-draft`} className="border-b border-stone-100 bg-stone-50/40">
+                <td colSpan={5} className="px-3 py-2">
+                  {q.draftReply ? (
+                    <p className="rounded-md bg-stone-50 p-2 text-[13px] italic text-stone-700">
+                      Draft: {q.draftReply}
+                    </p>
+                  ) : (
+                    <p className="text-[13px] text-red-600">
+                      Draft blocked by guardrails — write the reply manually, then approve.
+                    </p>
+                  )}
+                </td>
+              </tr>
+            </>
           ))}
-        </div>
-      )}
-      {q.draftReply ? (
-        <p className="mt-1.5 rounded-md bg-stone-50 p-2 text-[13px] italic text-stone-700">
-          Draft: {q.draftReply}
-        </p>
-      ) : (
-        <p className="mt-1.5 text-[13px] text-red-600">
-          Draft blocked by guardrails — write the reply manually, then approve.
-        </p>
-      )}
-      <div className="mt-2 flex gap-2">
-        <ApproveButton id={q.id} draftReply={q.draftReply} />
-        {q.status === "approved" && <PostButton id={q.id} />}
-      </div>
-    </li>
+        </tbody>
+      </table>
+    </div>
   );
 }
 

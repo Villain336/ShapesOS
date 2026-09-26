@@ -99,13 +99,13 @@ export function CreateCampaignForm({ domains }: { domains: { id: string; domain:
     >
       <div className="grid gap-3 md:grid-cols-2">
         <div className="space-y-1.5">
-          <Label>Campaign name</Label>
-          <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Q4 guest-post push" required />
+          <Label className="text-[13px] font-medium text-stone-700">Campaign name</Label>
+          <Input className="border-stone-200 bg-white text-[13px] placeholder:text-stone-400 focus-visible:border-violet-400 focus-visible:ring-violet-200/60" value={name} onChange={(e) => setName(e.target.value)} placeholder="Q4 guest-post push" required />
         </div>
         <div className="space-y-1.5">
-          <Label>Ladder depth</Label>
+          <Label className="text-[13px] font-medium text-stone-700">Ladder depth</Label>
           <Select value={depth} onValueChange={(v) => setDepth(v ?? "1")}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectTrigger className="border-stone-200 bg-white text-[13px] placeholder:text-stone-400 focus-visible:border-violet-400 focus-visible:ring-violet-200/60"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="1">1 — Prospecting only (no sending)</SelectItem>
               <SelectItem value="2">2 — Drafts for human send</SelectItem>
@@ -114,9 +114,9 @@ export function CreateCampaignForm({ domains }: { domains: { id: string; domain:
           </Select>
         </div>
         <div className="space-y-1.5">
-          <Label>Sending domain</Label>
+          <Label className="text-[13px] font-medium text-stone-700">Sending domain</Label>
           <Select value={sendingDomainId} onValueChange={(v) => setSendingDomainId(v ?? "")}>
-            <SelectTrigger><SelectValue placeholder="Choose a domain…" /></SelectTrigger>
+            <SelectTrigger className="border-stone-200 bg-white text-[13px] placeholder:text-stone-400 focus-visible:border-violet-400 focus-visible:ring-violet-200/60"><SelectValue placeholder="Choose a domain…" /></SelectTrigger>
             <SelectContent>
               {domains.map((d) => (
                 <SelectItem key={d.id} value={d.id}>{d.domain}</SelectItem>
@@ -126,8 +126,8 @@ export function CreateCampaignForm({ domains }: { domains: { id: string; domain:
           <p className="text-[11px] text-stone-500">Depth 3 requires a secondary domain. Primary domains never cold-send.</p>
         </div>
         <div className="space-y-1.5">
-          <Label>Daily cap (1–50)</Label>
-          <Input type="number" min={1} max={50} value={dailyCap} onChange={(e) => setDailyCap(e.target.value)} />
+          <Label className="text-[13px] font-medium text-stone-700">Daily cap (1–50)</Label>
+          <Input className="border-stone-200 bg-white text-[13px] placeholder:text-stone-400 focus-visible:border-violet-400 focus-visible:ring-violet-200/60" type="number" min={1} max={50} value={dailyCap} onChange={(e) => setDailyCap(e.target.value)} />
         </div>
       </div>
       <div className="flex items-center gap-3">
@@ -323,13 +323,13 @@ export function CreateDomainForm() {
     >
       <div className="grid gap-3 md:grid-cols-2">
         <div className="space-y-1.5">
-          <Label>Domain</Label>
-          <Input value={domain} onChange={(e) => setDomain(e.target.value)} placeholder="outreach.example.com" required />
+          <Label className="text-[13px] font-medium text-stone-700">Domain</Label>
+          <Input className="border-stone-200 bg-white text-[13px] placeholder:text-stone-400 focus-visible:border-violet-400 focus-visible:ring-violet-200/60" value={domain} onChange={(e) => setDomain(e.target.value)} placeholder="outreach.example.com" required />
         </div>
         <div className="space-y-1.5">
-          <Label>DMARC policy</Label>
+          <Label className="text-[13px] font-medium text-stone-700">DMARC policy</Label>
           <Select value={dmarcPolicy} onValueChange={(v) => setDmarcPolicy(v ?? "")}>
-            <SelectTrigger><SelectValue placeholder="None yet" /></SelectTrigger>
+            <SelectTrigger className="border-stone-200 bg-white text-[13px] placeholder:text-stone-400 focus-visible:border-violet-400 focus-visible:ring-violet-200/60"><SelectValue placeholder="None yet" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="none">p=none</SelectItem>
               <SelectItem value="quarantine">p=quarantine</SelectItem>
@@ -338,8 +338,8 @@ export function CreateDomainForm() {
           </Select>
         </div>
         <div className="space-y-1.5">
-          <Label>Warmup started</Label>
-          <Input type="date" value={warmupStartedAt} onChange={(e) => setWarmupStartedAt(e.target.value)} />
+          <Label className="text-[13px] font-medium text-stone-700">Warmup started</Label>
+          <Input className="border-stone-200 bg-white text-[13px] placeholder:text-stone-400 focus-visible:border-violet-400 focus-visible:ring-violet-200/60" type="date" value={warmupStartedAt} onChange={(e) => setWarmupStartedAt(e.target.value)} />
           <p className="text-[11px] text-stone-500">Depth 3 needs 30+ days of warmup with ramp history.</p>
         </div>
         <div className="space-y-2 pt-1">
@@ -427,8 +427,8 @@ export function DiscoverButton({ campaignId }: { campaignId: string }) {
   const [niche, setNiche] = useState("");
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <Input className="h-8 w-56 text-xs" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="SERP query" />
-      <Input className="h-8 w-40 text-xs" value={niche} onChange={(e) => setNiche(e.target.value)} placeholder="Client niche" />
+      <Input className="h-8 w-56 border-stone-200 bg-white text-[13px] placeholder:text-stone-400 focus-visible:border-violet-400 focus-visible:ring-violet-200/60" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="SERP query" />
+      <Input className="h-8 w-40 border-stone-200 bg-white text-[13px] placeholder:text-stone-400 focus-visible:border-violet-400 focus-visible:ring-violet-200/60" value={niche} onChange={(e) => setNiche(e.target.value)} placeholder="Client niche" />
       <Button
         size="sm"
         disabled={busy || !query.trim() || !niche.trim()}
@@ -509,21 +509,21 @@ export function DraftSequenceForm({ campaignId, prospectId, depth }: { campaignI
       }}
     >
       <div className="space-y-1.5">
-        <Label className="text-xs">Subject</Label>
-        <Input className="h-8 text-xs" value={subject} onChange={(e) => setSubject(e.target.value)} required />
+        <Label className="text-[13px] font-medium text-stone-700">Subject</Label>
+        <Input className="h-8 border-stone-200 bg-white text-[13px] placeholder:text-stone-400 focus-visible:border-violet-400 focus-visible:ring-violet-200/60" value={subject} onChange={(e) => setSubject(e.target.value)} required />
       </div>
       <div className="space-y-1.5">
-        <Label className="text-xs">Pitch body (first-line + angle personalization)</Label>
-        <Textarea className="text-xs" rows={4} value={body} onChange={(e) => setBody(e.target.value)} required />
+        <Label className="text-[13px] font-medium text-stone-700">Pitch body (first-line + angle personalization)</Label>
+        <Textarea className="border-stone-200 bg-white text-[13px] placeholder:text-stone-400 focus-visible:border-violet-400 focus-visible:ring-violet-200/60" rows={4} value={body} onChange={(e) => setBody(e.target.value)} required />
       </div>
       <div className="grid gap-2 md:grid-cols-2">
         <div className="space-y-1.5">
-          <Label className="text-xs">One-click unsubscribe URL (CAN-SPAM)</Label>
-          <Input className="h-8 text-xs" type="url" value={unsubscribeUrl} onChange={(e) => setUnsubscribeUrl(e.target.value)} required />
+          <Label className="text-[13px] font-medium text-stone-700">One-click unsubscribe URL (CAN-SPAM)</Label>
+          <Input className="h-8 border-stone-200 bg-white text-[13px] placeholder:text-stone-400 focus-visible:border-violet-400 focus-visible:ring-violet-200/60" type="url" value={unsubscribeUrl} onChange={(e) => setUnsubscribeUrl(e.target.value)} required />
         </div>
         <div className="space-y-1.5">
-          <Label className="text-xs">Physical mailing address (CAN-SPAM)</Label>
-          <Input className="h-8 text-xs" value={physicalAddress} onChange={(e) => setPhysicalAddress(e.target.value)} required />
+          <Label className="text-[13px] font-medium text-stone-700">Physical mailing address (CAN-SPAM)</Label>
+          <Input className="h-8 border-stone-200 bg-white text-[13px] placeholder:text-stone-400 focus-visible:border-violet-400 focus-visible:ring-violet-200/60" value={physicalAddress} onChange={(e) => setPhysicalAddress(e.target.value)} required />
         </div>
       </div>
       <div className="flex items-center gap-3">

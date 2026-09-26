@@ -6,7 +6,6 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Badge } from "@/components/vault/shadcn/badge";
 import { Button } from "@/components/vault/shadcn/button";
 import { Plug, RefreshCw, Unplug, AlertTriangle } from "lucide-react";
 
@@ -37,10 +36,12 @@ interface CatalogEntry {
   honestyNote: string;
 }
 
-function statusVariant(s: string): "secondary" | "outline" | "destructive" {
-  if (s === "connected") return "secondary";
-  if (s === "pending") return "outline";
-  return "destructive";
+function statusPill(s: string): string {
+  const base =
+    "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium";
+  if (s === "connected") return `${base} bg-emerald-50 text-emerald-700`;
+  if (s === "pending") return `${base} bg-amber-50 text-amber-700`;
+  return `${base} bg-red-50 text-red-700`;
 }
 
 export default function ConnectorsClient({ workspaceId }: { workspaceId: string }) {
@@ -138,18 +139,20 @@ export default function ConnectorsClient({ workspaceId }: { workspaceId: string 
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Connectors</h1>
-          <p className="text-sm text-muted-foreground">
+          <h1 className="text-xl font-bold tracking-tight text-stone-900">Connectors</h1>
+          <p className="mt-0.5 text-[13px] text-stone-500">
             Webhook-first where real, scheduled pulls with per-platform rate budgets
             elsewhere. Credentials live in the vault — never in the graph. Fake mode
             is the default until credentials are connected.
           </p>
         </div>
         <div className="flex shrink-0 gap-2">
-          <Badge variant="secondary">
+          <span className="inline-flex items-center rounded-full bg-stone-100 px-2 py-0.5 text-xs font-medium text-stone-600">
             {connectors.filter((c) => c.status === "connected").length} connected
-          </Badge>
-          <Badge variant="outline">{connectors.length} registered</Badge>
+          </span>
+          <span className="inline-flex items-center rounded-full bg-stone-100 px-2 py-0.5 text-xs font-medium text-stone-600">
+            {connectors.length} registered
+          </span>
         </div>
       </div>
 
@@ -166,83 +169,113 @@ export default function ConnectorsClient({ workspaceId }: { workspaceId: string 
       )}
       {loading && <div className="text-sm text-muted-foreground">Loading connectors…</div>}
 
-      <div className="grid gap-4 md:grid-cols-2">
-        {catalog.map((entry) => {
-          const c = byPlatform.get(entry.platform);
-          return (
-            <div key={entry.platform} className="rounded-xl border bg-card p-5 shadow-sm">
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <h2 className="text-base font-semibold">{entry.displayName}</h2>
-                  <p className="mt-1 text-xs text-muted-foreground">{entry.honestyNote}</p>
-                </div>
-                <div className="flex shrink-0 flex-col items-end gap-1.5">
-                  <Badge variant="outline">{entry.tier}</Badge>
-                  {c && <Badge variant={statusVariant(c.status)}>{c.status}</Badge>}
-                </div>
-              </div>
-
-              {c && (
-                <div className="mt-3 space-y-1.5 text-xs text-muted-foreground">
-                  <div>
-                    Vault auth: {c.hasAuth ? "present" : "missing"} · webhook secret:{" "}
-                    {c.hasWebhookSecret ? "present" : "missing"}
-                  </div>
-                  {c.syncJobs.map((j) => (
-                    <div key={j.id} className="flex items-center justify-between rounded-md bg-muted px-2 py-1">
-                      <span>
-                        {j.tier} · {j.status}
-                        {j.errorCount > 0 && ` · ${j.errorCount} error(s)`}
-                      </span>
-                      <span>
-                        {j.lastSuccessAt
-                          ? `last success ${new Date(j.lastSuccessAt).toLocaleString()}`
-                          : "never synced"}
-                      </span>
+      <div className="overflow-hidden rounded-lg border border-stone-200 bg-white">
+        <table className="w-full text-[13px]">
+          <thead>
+            <tr className="border-b border-stone-200 text-left text-[11px] uppercase tracking-wide text-stone-500">
+              <th className="px-3 py-2 font-medium">Connector</th>
+              <th className="px-3 py-2 font-medium">Tier</th>
+              <th className="px-3 py-2 font-medium">Status</th>
+              <th className="px-3 py-2 font-medium">Sync</th>
+              <th className="px-3 py-2 text-right font-medium">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {catalog.map((entry) => {
+              const c = byPlatform.get(entry.platform);
+              return (
+                <tr
+                  key={entry.platform}
+                  className="border-b border-stone-100 transition hover:bg-violet-50/40"
+                >
+                  <td className="px-3 py-2">
+                    <div className="font-medium text-stone-900">{entry.displayName}</div>
+                    <div className="text-xs text-stone-500">{entry.honestyNote}</div>
+                    {c && (
+                      <div className="text-xs text-stone-500">
+                        Vault auth: {c.hasAuth ? "present" : "missing"} · webhook secret:{" "}
+                        {c.hasWebhookSecret ? "present" : "missing"}
+                      </div>
+                    )}
+                  </td>
+                  <td className="px-3 py-2">
+                    <span className="inline-flex items-center rounded-full bg-stone-100 px-2 py-0.5 text-xs font-medium text-stone-600">
+                      {entry.tier}
+                    </span>
+                  </td>
+                  <td className="px-3 py-2">
+                    {c ? (
+                      <span className={statusPill(c.status)}>{c.status}</span>
+                    ) : (
+                      <span className="text-xs text-stone-400">not connected</span>
+                    )}
+                  </td>
+                  <td className="px-3 py-2 text-xs text-stone-500">
+                    {c && c.syncJobs.length > 0 ? (
+                      <div className="space-y-0.5">
+                        {c.syncJobs.map((j) => (
+                          <div key={j.id}>
+                            {j.tier} · {j.status}
+                            {j.errorCount > 0 && ` · ${j.errorCount} error(s)`} ·{" "}
+                            {j.lastSuccessAt
+                              ? `last success ${new Date(j.lastSuccessAt).toLocaleString()}`
+                              : "never synced"}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      "—"
+                    )}
+                  </td>
+                  <td className="px-3 py-2">
+                    <div className="flex justify-end gap-2">
+                      {!c && (
+                        <Button
+                          size="sm"
+                          className="bg-violet-600 text-white hover:bg-violet-700"
+                          disabled={busy === `connect:${entry.platform}`}
+                          onClick={() => connect(entry.platform)}
+                        >
+                          <Plug className="mr-1 h-3.5 w-3.5" /> Connect
+                        </Button>
+                      )}
+                      {c && c.status !== "revoked" && (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={busy === `sync:${c.id}`}
+                            onClick={() => syncNow(c.id, entry.displayName)}
+                          >
+                            <RefreshCw className="mr-1 h-3.5 w-3.5" /> Sync now
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={busy === `revoke:${c.id}`}
+                            onClick={() => revoke(c.id, entry.displayName)}
+                          >
+                            <Unplug className="mr-1 h-3.5 w-3.5" /> Revoke
+                          </Button>
+                        </>
+                      )}
+                      {c && c.status === "revoked" && (
+                        <Button
+                          size="sm"
+                          className="bg-violet-600 text-white hover:bg-violet-700"
+                          disabled={busy === `connect:${entry.platform}`}
+                          onClick={() => connect(entry.platform)}
+                        >
+                          <Plug className="mr-1 h-3.5 w-3.5" /> Re-connect
+                        </Button>
+                      )}
                     </div>
-                  ))}
-                </div>
-              )}
-
-              <div className="mt-4 flex gap-2">
-                {!c && (
-                  <Button
-                    size="sm"
-                    disabled={busy === `connect:${entry.platform}`}
-                    onClick={() => connect(entry.platform)}
-                  >
-                    <Plug className="mr-1 h-3.5 w-3.5" /> Connect
-                  </Button>
-                )}
-                {c && c.status !== "revoked" && (
-                  <>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={busy === `sync:${c.id}`}
-                      onClick={() => syncNow(c.id, entry.displayName)}
-                    >
-                      <RefreshCw className="mr-1 h-3.5 w-3.5" /> Sync now
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={busy === `revoke:${c.id}`}
-                      onClick={() => revoke(c.id, entry.displayName)}
-                    >
-                      <Unplug className="mr-1 h-3.5 w-3.5" /> Revoke
-                    </Button>
-                  </>
-                )}
-                {c && c.status === "revoked" && (
-                  <Button size="sm" disabled={busy === `connect:${entry.platform}`} onClick={() => connect(entry.platform)}>
-                    <Plug className="mr-1 h-3.5 w-3.5" /> Re-connect
-                  </Button>
-                )}
-              </div>
-            </div>
-          );
-        })}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
     </div>
   );

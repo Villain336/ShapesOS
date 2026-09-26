@@ -133,7 +133,7 @@ export default function BrandKitManager({ initial }: { initial: BrandKit[] }) {
         </p>
         <button
           onClick={startCreate}
-          className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-hover"
+          className="rounded-md bg-violet-600 px-3 py-1.5 text-[13px] font-medium text-white hover:bg-violet-700"
         >
           New brand kit
         </button>
@@ -201,7 +201,7 @@ export default function BrandKitManager({ initial }: { initial: BrandKit[] }) {
             <button
               onClick={save}
               disabled={saving}
-              className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-hover disabled:opacity-50"
+              className="rounded-md bg-violet-600 px-3 py-1.5 text-[13px] font-medium text-white hover:bg-violet-700 disabled:opacity-50"
             >
               {saving ? "Saving…" : "Save"}
             </button>

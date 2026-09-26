@@ -32,7 +32,7 @@ export default async function RankingsPage({
         >
           ← {project.domain}
         </Link>
-        <h1 className="mt-1 text-2xl font-bold tracking-tight">Rank tracking</h1>
+        <h1 className="mt-1 text-xl font-bold tracking-tight text-ink">Rank tracking</h1>
         <p className="mt-1 text-sm text-zinc-500">
           Track positions over time, watch the visibility score, and catch big
           movers.

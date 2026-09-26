@@ -25,8 +25,8 @@ export default async function BrandKitsPage() {
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Brand kits</h1>
-        <p className="mt-1 text-sm text-zinc-500">
+        <h1 className="text-xl font-bold tracking-tight text-stone-900">Brand kits</h1>
+        <p className="mt-0.5 text-[13px] text-stone-500">
           White-label identity for client reports — logo, colors, fonts, tone. The default kit
           applies wherever a template doesn&apos;t pick one.
         </p>

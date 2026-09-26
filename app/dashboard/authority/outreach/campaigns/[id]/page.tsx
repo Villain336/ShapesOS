@@ -11,10 +11,8 @@ import {
   prismaCampaignStore, prismaDomainStore, prismaProspectStore, prismaSequenceStore,
   isDraftExpired, DRAFT_EXPIRY_DAYS,
 } from "@/lib/authority/outreach";
-import { Badge } from "@/components/vault/shadcn/badge";
-import { Progress } from "@/components/vault/shadcn/progress";
 import {
-  ArrowLeft, Users, MailOpen, TriangleAlert, BadgeCheck, Hourglass,
+  ArrowLeft, Users, TriangleAlert, BadgeCheck, Hourglass,
   Inbox, Link2, ExternalLink,
 } from "lucide-react";
 import {
@@ -29,16 +27,29 @@ export const metadata = {
   description: "Prospects, sequences, replies, and placement verification for one campaign.",
 };
 
-const STATUS_VARIANT: Record<string, "default" | "secondary" | "outline" | "destructive"> = {
-  new: "secondary",
-  qualified: "outline",
-  contacted: "default",
-  replied: "default",
-  placed: "default",
-  bounced: "destructive",
-  suppressed: "destructive",
-  declined: "secondary",
+
+const STATUS_CHIP: Record<string, string> = {
+  active: "border-emerald-200 bg-emerald-50 text-emerald-700",
+  draft: "border-stone-200 bg-stone-50 text-stone-600",
+  new: "border-stone-200 bg-stone-50 text-stone-600",
+  qualified: "border-violet-200 bg-violet-50 text-violet-700",
+  contacted: "border-violet-200 bg-violet-50 text-violet-700",
+  replied: "border-emerald-200 bg-emerald-50 text-emerald-700",
+  placed: "border-emerald-200 bg-emerald-50 text-emerald-700",
+  bounced: "border-red-200 bg-red-50 text-red-700",
+  suppressed: "border-red-200 bg-red-50 text-red-700",
+  declined: "border-stone-200 bg-stone-50 text-stone-600",
 };
+
+function chip(text: string, key: string) {
+  return (
+    <span className={`inline-flex items-center whitespace-nowrap rounded-full border px-1.5 py-0.5 text-[10px] font-medium leading-tight ${STATUS_CHIP[key] ?? "border-stone-200 bg-stone-50 text-stone-600"}`}>
+      {text}
+    </span>
+  );
+}
+
+
 
 const SEQ_STATUS_LABEL: Record<string, string> = {
   draft: "Draft",
@@ -49,14 +60,13 @@ const SEQ_STATUS_LABEL: Record<string, string> = {
   completed: "Completed",
 };
 
-function ScoreBar({ label, value }: { label: string; value: number }) {
+function ScoreCell({ value }: { value: number }) {
   return (
-    <div className="w-24">
-      <div className="flex justify-between text-[10px] text-stone-500">
-        <span>{label}</span>
-        <span className="font-medium text-stone-700">{value}</span>
-      </div>
-      <Progress value={value} className="mt-0.5 h-1.5" />
+    <div className="flex items-center gap-1.5">
+      <span className="h-1.5 w-14 overflow-hidden rounded-full bg-stone-100">
+        <span className="block h-full rounded-full bg-violet-500" style={{ width: `${Math.min(100, Math.max(0, value))}%` }} />
+      </span>
+      <span className="font-medium text-stone-700">{value}</span>
     </div>
   );
 }
@@ -126,7 +136,7 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
   }
 
   return (
-    <div className="flex h-full flex-col gap-6 bg-[#FAFAF7] p-4 md:p-6">
+    <div className="flex h-full flex-col gap-4 bg-[#FAFAF7] p-4 md:p-6">
       <div>
         <Link
           href="/dashboard/authority/outreach"
@@ -143,8 +153,8 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
             </p>
           </div>
           <div className="flex gap-2">
-            <Badge variant={campaign.status === "active" ? "default" : "secondary"}>{campaign.status}</Badge>
-            <Badge variant="outline">Depth {campaign.depth}</Badge>
+            {chip(campaign.status, campaign.status)}
+            {chip(`Depth ${campaign.depth}`, "draft")}
           </div>
         </div>
       </div>
@@ -179,21 +189,27 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
             No replies yet. Any reply stops its sequence and suppresses the sender in the same cycle.
           </div>
         ) : (
-          <div className="space-y-2">
-            {replies.map((r) => (
-              <div key={`${r.sequenceId}-${r.ts.getTime()}`} className="flex items-center gap-3 rounded-lg border border-stone-200 bg-white p-3">
-                <MailOpen className="h-4 w-4 shrink-0 text-emerald-600" />
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs font-medium text-stone-800">
-                    {prospectById.get(r.prospectId)?.domain ?? "unknown"} — sequence stopped on reply
-                  </p>
-                  <p className="text-[11px] text-stone-500">
-                    Reply {r.replyId.slice(0, 12)}… · {r.ts.toLocaleString()}
-                  </p>
-                </div>
-                <Badge variant="outline">auto-suppressed</Badge>
-              </div>
-            ))}
+          <div className="overflow-x-auto rounded-xl border border-stone-200 bg-white">
+            <table className="w-full text-left text-[13px]">
+              <thead>
+                <tr className="border-b border-stone-100 bg-stone-50/60 text-[11px] uppercase tracking-wide text-stone-500">
+                  <th className="px-3 py-2 font-medium">Prospect</th>
+                  <th className="px-3 py-2 font-medium">Reply</th>
+                  <th className="px-3 py-2 font-medium">Received</th>
+                  <th className="px-3 py-2 font-medium">State</th>
+                </tr>
+              </thead>
+              <tbody>
+                {replies.map((r) => (
+                  <tr key={`${r.sequenceId}-${r.ts.getTime()}`} className="border-b border-stone-100 last:border-0 hover:bg-violet-50/40">
+                    <td className="px-3 py-2 font-medium text-stone-900">{prospectById.get(r.prospectId)?.domain ?? "unknown"}</td>
+                    <td className="px-3 py-2 font-mono text-[11px] text-stone-500">{r.replyId.slice(0, 12)}…</td>
+                    <td className="px-3 py-2 text-[12px] text-stone-600">{r.ts.toLocaleString()}</td>
+                    <td className="px-3 py-2">{chip("auto-suppressed", "draft")}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
       </section>
@@ -211,81 +227,98 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
             No prospects yet. Run discovery to find guest-post opportunities and score them.
           </div>
         ) : (
-          <div className="space-y-3">
-            {prospects.map((p) => {
-              const seq = seqByProspect.get(p.id);
-              const expired = seq ? isDraftExpired(seq.createdAt) && seq.status === "draft" : false;
-              return (
-                <div key={p.id} className="rounded-xl border border-stone-200 bg-white p-4">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="flex items-center gap-1.5 text-sm font-semibold text-stone-900">
-                        {p.domain}
-                        <a
-                          href={p.url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-stone-400 hover:text-stone-700"
-                          aria-label="Open guidelines"
-                        >
-                          <ExternalLink className="h-3.5 w-3.5" />
-                        </a>
-                      </p>
-                      <p className="mt-0.5 text-xs text-stone-500">
-                        {p.contactName ?? "No contact"}
-                        {p.emailVerified && (
-                          <span className="ml-2 inline-flex items-center gap-1 text-emerald-700">
-                            <BadgeCheck className="h-3 w-3" /> email verified
+          <div className="overflow-x-auto rounded-xl border border-stone-200 bg-white">
+            <table className="w-full text-left text-[13px]">
+              <thead>
+                <tr className="border-b border-stone-100 bg-stone-50/60 text-[11px] uppercase tracking-wide text-stone-500">
+                  <th className="px-3 py-2 font-medium">Site</th>
+                  <th className="px-3 py-2 font-medium">Contact</th>
+                  <th className="px-3 py-2 font-medium">Quality</th>
+                  <th className="px-3 py-2 font-medium">Relevance</th>
+                  <th className="px-3 py-2 font-medium">Status</th>
+                  <th className="px-3 py-2 font-medium">Sequence</th>
+                </tr>
+              </thead>
+              <tbody>
+                {prospects.map((p) => {
+                  const seq = seqByProspect.get(p.id);
+                  const expired = seq ? isDraftExpired(seq.createdAt) && seq.status === "draft" : false;
+                  return (
+                    <>
+                      <tr key={p.id} className="border-b border-stone-100 last:border-0 hover:bg-violet-50/40">
+                        <td className="px-3 py-2">
+                          <span className="flex items-center gap-1.5 font-medium text-stone-900">
+                            {p.domain}
+                            <a
+                              href={p.url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-stone-400 hover:text-stone-700"
+                              aria-label="Open guidelines"
+                            >
+                              <ExternalLink className="h-3.5 w-3.5" />
+                            </a>
                           </span>
-                        )}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <ScoreBar label="Quality" value={p.qualityScore} />
-                      <ScoreBar label="Relevance" value={p.relevanceScore} />
-                      <Badge variant={STATUS_VARIANT[p.status] ?? "secondary"}>{p.status}</Badge>
-                    </div>
-                  </div>
-
-                  <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-stone-100 pt-3">
-                    {canEdit && p.status === "new" && <QualifyButton prospectId={p.id} />}
-                    {seq ? (
-                      <>
-                        <Badge variant="outline" className="text-[11px]">
-                          {SEQ_STATUS_LABEL[seq.status] ?? seq.status}
-                          {seq.status === "draft" && !expired && (
-                            <span className="ml-1 inline-flex items-center gap-0.5 text-amber-700">
-                              <Hourglass className="h-3 w-3" /> expires in{" "}
-                              {Math.max(
-                                0,
-                                DRAFT_EXPIRY_DAYS -
-                                  Math.floor((Date.now() - new Date(seq.createdAt).getTime()) / 86_400_000),
-                              )}
-                              d
+                        </td>
+                        <td className="px-3 py-2">
+                          <span className="text-stone-600">{p.contactName ?? "—"}</span>
+                          {p.emailVerified && (
+                            <span className="ml-1.5 inline-flex items-center gap-0.5 text-[11px] text-emerald-700">
+                              <BadgeCheck className="h-3 w-3" /> verified
                             </span>
                           )}
-                        </Badge>
-                        {canEdit && ["draft", "sending"].includes(seq.status) && !expired && campaign.depth !== 1 && (
-                          <SendSequenceButton sequenceId={seq.id} depth={seq.depth} />
-                        )}
-                        {canEdit && ["contacted", "replied", "placed"].includes(p.status) && (
-                          <VerifyPlacementButton sequenceId={seq.id} />
-                        )}
-                      </>
-                    ) : (
-                      canEdit &&
-                      p.status === "qualified" &&
-                      campaign.depth !== 1 && (
-                        <DraftSequenceForm campaignId={campaign.id} prospectId={p.id} depth={campaign.depth} />
-                      )
-                    )}
-                    {campaign.depth === 1 && !seq && (
-                      <span className="text-[11px] text-stone-400">Depth 1: prospecting only — no drafts or sends.</span>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
+                        </td>
+                        <td className="px-3 py-2"><ScoreCell value={p.qualityScore} /></td>
+                        <td className="px-3 py-2"><ScoreCell value={p.relevanceScore} /></td>
+                        <td className="px-3 py-2">{chip(p.status, p.status)}</td>
+                        <td className="px-3 py-2">
+                          {seq ? (
+                            <span className="inline-flex items-center gap-1 text-[11px] text-stone-600">
+                              {SEQ_STATUS_LABEL[seq.status] ?? seq.status}
+                              {seq.status === "draft" && !expired && (
+                                <span className="inline-flex items-center gap-0.5 text-amber-700">
+                                  <Hourglass className="h-3 w-3" />
+                                  {Math.max(
+                                    0,
+                                    DRAFT_EXPIRY_DAYS -
+                                      Math.floor((Date.now() - new Date(seq.createdAt).getTime()) / 86_400_000),
+                                  )}d left
+                                </span>
+                              )}
+                            </span>
+                          ) : (
+                            <span className="text-stone-400">—</span>
+                          )}
+                        </td>
+                      </tr>
+                      <tr key={`${p.id}-actions`} className="border-b border-stone-100 bg-stone-50/40">
+                        <td colSpan={6} className="px-3 py-2">
+                          <div className="flex flex-wrap items-center gap-2">
+                            {canEdit && p.status === "new" && <QualifyButton prospectId={p.id} />}
+                            {seq ? (
+                              <>
+                                {canEdit && ["draft", "sending"].includes(seq.status) && !expired && campaign.depth !== 1 && (
+                                  <SendSequenceButton sequenceId={seq.id} depth={seq.depth} />
+                                )}
+                                {canEdit && ["contacted", "replied", "placed"].includes(p.status) && (
+                                  <VerifyPlacementButton sequenceId={seq.id} />
+                                )}
+                              </>
+                            ) : null}
+                            {campaign.depth === 1 && !seq && (
+                              <span className="text-[11px] text-stone-400">Depth 1: prospecting only — no drafts or sends.</span>
+                            )}
+                          </div>
+                          {!seq && canEdit && p.status === "qualified" && campaign.depth !== 1 && (
+                            <DraftSequenceForm campaignId={campaign.id} prospectId={p.id} depth={campaign.depth} />
+                          )}
+                        </td>
+                      </tr>
+                    </>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         )}
       </section>

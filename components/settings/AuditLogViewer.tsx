@@ -12,7 +12,7 @@ import {
   cardCls,
   inputCls,
   labelCls,
-  primaryBtnCls,
+  primaryBtnVioletCls,
   type NoticeState,
 } from "./ui";
 
@@ -155,7 +155,7 @@ export default function AuditLogViewer({ workspaceId }: { workspaceId: string })
             />
           </label>
           <div className="flex items-end gap-2">
-            <button onClick={load} disabled={loading} className={primaryBtnCls}>
+            <button onClick={load} disabled={loading} className={primaryBtnVioletCls}>
               {loading ? "Loading…" : "Apply filters"}
             </button>
             <button onClick={clearFilters} disabled={loading} className={btnCls}>

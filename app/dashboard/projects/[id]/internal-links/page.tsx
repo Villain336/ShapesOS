@@ -34,7 +34,7 @@ export default async function InternalLinksPage({ params }: { params: Promise<{ 
         <Link href={`/dashboard/projects/${project.id}`} className="text-sm text-zinc-500 hover:text-zinc-600">
           ← {project.domain}
         </Link>
-        <h1 className="mt-1 text-2xl font-bold tracking-tight">Internal links</h1>
+        <h1 className="mt-1 text-xl font-bold tracking-tight text-ink">Internal links</h1>
         <p className="mt-1 text-sm text-zinc-500">
           Orphan pages, under-linked money pages, and keyword-relevant link opportunities —
           computed from your ranking data. Applying a suggestion files it in the fix-agent

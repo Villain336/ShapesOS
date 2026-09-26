@@ -7,6 +7,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import ContentBrowser from "./ContentBrowser";
+import { Plus } from "lucide-react";
 
 interface SiteSummary {
   id: string;
@@ -512,9 +513,9 @@ export default function SitesManager({ projectId }: { projectId: string }) {
         <div className="flex gap-2">
           <Link
             href={`/dashboard/projects/${projectId}/sites/new`}
-            className="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white hover:bg-accent-hover active:scale-[0.96] transition-[background-color,transform] duration-150 ease-[cubic-bezier(0.2,0,0,1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2"
+            className="inline-flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white hover:bg-accent-hover active:scale-[0.96] transition-[background-color,transform] duration-150 ease-[cubic-bezier(0.2,0,0,1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2"
           >
-            ＋ AI landing-page builder
+            <Plus size={15} strokeWidth={2.5} /> AI landing-page builder
           </Link>
           <button
             onClick={() => { setForm(form === "github" ? null : "github"); setError(null); }}
@@ -594,7 +595,7 @@ export default function SitesManager({ projectId }: { projectId: string }) {
                 >
                   {ghRepos.map((r) => (
                     <option key={r.fullName} value={r.fullName}>
-                      {r.fullName}{r.mock ? " (mock)" : ""}{r.private ? " 🔒" : ""}
+                      {r.fullName}{r.mock ? " (mock)" : ""}{r.private ? " (private)" : ""}
                     </option>
                   ))}
                 </select>

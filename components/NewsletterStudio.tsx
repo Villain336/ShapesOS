@@ -13,28 +13,32 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import {
-  Warning,
-  ChartBarHorizontal,
+  TriangleAlert,
+  ChartBar,
   Check,
-  CaretDown,
-  CaretUp,
+  ChevronDown,
+  ChevronUp,
   Clock,
   Copy,
   Eye,
   FileText,
   Globe,
   Image as ImageIcon,
-  Envelope,
+  Mail,
   Megaphone,
   Minus,
-  CursorClick,
-  Rectangle,
+  MousePointerClick,
+  RectangleHorizontal,
   Plus,
-  PaperPlane,
+  Send,
   Trash,
-  TextT,
+  Type,
   Users,
-} from "@phosphor-icons/react";
+  PenLine,
+  LayoutTemplate,
+  Settings,
+  type LucideIcon,
+} from "lucide-react";
 import {
   blockLabel,
   createBlock,
@@ -48,14 +52,14 @@ const TemplateEditor = dynamic(() => import("@/components/TemplateEditor"), { ss
 
 type Tab = "compose" | "templates" | "lists" | "broadcasts" | "domains";
 
-const BLOCK_ICONS: Record<EmailBlockType, typeof TextT> = {
-  emailHeader: Rectangle,
+const BLOCK_ICONS: Record<EmailBlockType, typeof Type> = {
+  emailHeader: RectangleHorizontal,
   emailHero: Megaphone,
-  emailText: TextT,
+  emailText: Type,
   emailImage: ImageIcon,
-  emailButton: CursorClick,
+  emailButton: MousePointerClick,
   emailDivider: Minus,
-  emailFooter: ChartBarHorizontal,
+  emailFooter: ChartBar,
 };
 
 const BTN_PRIMARY =
@@ -338,10 +342,10 @@ function Composer({
                   <span className="text-sm font-medium text-zinc-800">{blockLabel(node.type)}</span>
                   <span className="ml-auto flex items-center gap-1">
                     <button className="rounded p-1 text-zinc-500 transition-colors duration-150 hover:text-zinc-800 disabled:opacity-30" disabled={i === 0} onClick={() => moveBlock(i, -1)} aria-label="Move up">
-                      <CaretUp size={15} />
+                      <ChevronUp size={15} />
                     </button>
                     <button className="rounded p-1 text-zinc-500 transition-colors duration-150 hover:text-zinc-800 disabled:opacity-30" disabled={i === doc.content.length - 1} onClick={() => moveBlock(i, 1)} aria-label="Move down">
-                      <CaretDown size={15} />
+                      <ChevronDown size={15} />
                     </button>
                     <button className="rounded p-1 text-zinc-500 transition-colors duration-150 hover:text-red-700" onClick={() => deleteBlock(i)} aria-label="Delete block">
                       <Trash size={15} />
@@ -390,7 +394,7 @@ function Composer({
             {saving ? "Saving…" : templateId ? "Save template" : "Save as template"}
           </button>
           <button className={BTN_GHOST} onClick={() => onUseInBroadcast(doc)} disabled={!doc.content.length}>
-            <PaperPlane size={14} />
+            <Send size={14} />
             Use in broadcast
           </button>
           {notice && <span className="text-sm text-zinc-500">{notice}</span>}
@@ -690,14 +694,14 @@ function BroadcastsTab({
     onRefresh();
   };
   const sendNow = async (id: string) => {
-    if (!confirm("PaperPlane this broadcast now?")) return;
+    if (!confirm("Send this broadcast now?")) return;
     setBusy(`send-${id}`);
     const res = await fetch(`/api/newsletter/broadcasts/${id}/send`, {
       method: "POST", headers: { "content-type": "application/json" },
       body: JSON.stringify({ projectId }),
     });
     const data = await res.json();
-    setNotice(res.ok ? `Sent to ${data.sent} subscriber${data.sent === 1 ? "" : "s"}.` : (data.error ?? "PaperPlane failed."));
+    setNotice(res.ok ? `Sent to ${data.sent} subscriber${data.sent === 1 ? "" : "s"}.` : (data.error ?? "Send failed."));
     setBusy(null);
     onRefresh();
   };
@@ -740,7 +744,7 @@ function BroadcastsTab({
           </Field>
           {domains.length > 0 && verifiedDomains.length === 0 && (
             <p className="flex items-start gap-1.5 text-xs text-amber-700">
-              <Warning size={14} className="mt-0.5 shrink-0" />
+              <TriangleAlert size={14} className="mt-0.5 shrink-0" />
               No verified domains yet — add and verify one in the Domains tab before sending.
             </p>
           )}
@@ -775,7 +779,7 @@ function BroadcastsTab({
                         Test
                       </button>
                       <button className={BTN_PRIMARY} onClick={() => sendNow(b.id)} disabled={busy === `send-${b.id}`}>
-                        <PaperPlane size={14} /> PaperPlane now
+                        <Send size={14} /> Send now
                       </button>
                       {b.status === "scheduled" && (
                         <button className={BTN_DANGER} onClick={() => cancel(b.id)}>Cancel</button>
@@ -789,7 +793,7 @@ function BroadcastsTab({
                 <div className="mt-2 flex gap-2">
                   <input className={`${INPUT} max-w-xs`} placeholder="you@company.com" value={testEmail} onChange={(e) => setTestEmail(e.target.value)} />
                   <button className={BTN_PRIMARY} onClick={() => testSend(b.id)} disabled={busy === `test-${b.id}`}>
-                    {busy === `test-${b.id}` ? "Sending…" : "PaperPlane test"}
+                    {busy === `test-${b.id}` ? "Sending…" : "Send test"}
                   </button>
                 </div>
               )}
@@ -908,7 +912,7 @@ function DomainsTab({
     <div className="grid gap-6 lg:grid-cols-3">
       <div className={`${CARD} h-fit p-5`}>
         <h3 className="mb-3 flex items-center gap-2 text-sm font-medium text-zinc-800">
-          <Envelope size={15} /> Sending settings
+          <Mail size={15} /> Sending settings
         </h3>
         <div className="grid gap-3">
           <Field label={settingsHint ? `Resend API key (saved: ${settingsHint})` : "Resend API key"}>
@@ -958,7 +962,7 @@ function DomainsTab({
               <table className="w-full text-xs">
                 <thead>
                   <tr className="bg-zinc-50 text-left text-zinc-500">
-                    <th className="px-3 py-2 font-medium">TextT</th>
+                    <th className="px-3 py-2 font-medium">Type</th>
                     <th className="px-3 py-2 font-medium">Name</th>
                     <th className="px-3 py-2 font-medium">Value</th>
                     <th className="px-3 py-2 font-medium">Purpose</th>
@@ -1002,12 +1006,12 @@ function DomainsTab({
 // Studio shell
 // ---------------------------------------------------------------------------
 
-const TABS: { id: Tab; label: string }[] = [
-  { id: "compose", label: "Compose" },
-  { id: "templates", label: "Templates" },
-  { id: "lists", label: "Lists" },
-  { id: "broadcasts", label: "Broadcasts" },
-  { id: "domains", label: "Domains & settings" },
+const TABS: { id: Tab; label: string; icon: LucideIcon }[] = [
+  { id: "compose", label: "Compose", icon: PenLine },
+  { id: "templates", label: "Templates", icon: LayoutTemplate },
+  { id: "lists", label: "Lists", icon: Users },
+  { id: "broadcasts", label: "Broadcasts", icon: Send },
+  { id: "domains", label: "Domains & settings", icon: Settings },
 ];
 
 export default function NewsletterStudio(props: Props) {
@@ -1092,12 +1096,13 @@ export default function NewsletterStudio(props: Props) {
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
-            className={`whitespace-nowrap px-4 py-2.5 text-sm font-medium transition-[color,border-color] duration-150 ease-[cubic-bezier(0.2,0,0,1)] ${
+            className={`flex items-center gap-1.5 whitespace-nowrap border-b-2 px-3 py-2 text-[13.5px] font-medium transition-colors ${
               tab === t.id
-                ? "border-b-2 border-indigo-500 text-zinc-900"
-                : "border-b-2 border-transparent text-zinc-500 hover:text-zinc-600"
+                ? "border-violet-600 text-violet-700"
+                : "border-transparent text-stone-500 hover:text-stone-800"
             }`}
           >
+            <t.icon size={15} />
             {t.label}
           </button>
         ))}

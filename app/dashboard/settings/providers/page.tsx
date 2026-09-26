@@ -36,8 +36,8 @@ export default async function ProvidersSettingsPage() {
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Providers</h1>
-        <p className="mt-1 text-sm text-zinc-500">
+        <h1 className="text-xl font-bold tracking-tight text-stone-900">Providers</h1>
+        <p className="mt-0.5 text-[13px] text-stone-500">
           {workspace.name} — which external providers Marketr is using. These
           are configured via environment variables on the host; change them
           there and restart to apply. Key material is never displayed here.

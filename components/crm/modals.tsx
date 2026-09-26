@@ -2,7 +2,7 @@
 "use client";
 
 import { useState } from "react";
-import { X, UploadSimple } from "@phosphor-icons/react";
+import { X, Upload } from "lucide-react";
 import type { CrmPipeline } from "./types";
 import { SOURCE_LABELS } from "./types";
 
@@ -209,7 +209,7 @@ export function ImportModal({
             onDrop={(e) => { e.preventDefault(); pickFile(e.dataTransfer.files?.[0]); }}
             onDragOver={(e) => e.preventDefault()}
           >
-            <UploadSimple size={18} className="text-violet-600" />
+            <Upload size={18} className="text-violet-600" />
             Drop a CSV file here, or click to browse
             <input
               type="file" accept=".csv,text/csv" className="hidden"

@@ -7,9 +7,14 @@
 import { redirect } from "next/navigation";
 import { requireUser, getOrCreateWorkspace } from "@/lib/session";
 import { requireWorkspaceRole } from "@/lib/authz";
-import { Card, CardHeader, CardBody } from "@/components/vault/Card";
-import { Badge } from "@/components/vault/shadcn/badge";
-import { ValuePill } from "@/components/vault/atoms/ValuePill";
+function chip(text: React.ReactNode, cls: string) {
+  return (
+    <span className={`inline-flex items-center gap-0.5 whitespace-nowrap rounded-full border px-1.5 py-0.5 text-[10px] font-medium leading-tight ${cls}`}>
+      {text}
+    </span>
+  );
+}
+
 import {
   DSP_LABELS,
   DSP_KINDS,
@@ -77,157 +82,172 @@ export default async function DspPage() {
   const preview = await loadPreview();
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="flex h-full flex-col gap-4 bg-[#FAFAF7] p-4 md:p-6">
+      <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">DSP readiness</h1>
-          <p className="text-sm text-muted-foreground">
+          <h1 className="text-xl font-bold tracking-tight text-stone-900">DSP readiness</h1>
+          <p className="mt-0.5 max-w-3xl text-[13px] text-stone-500">
             Seat-agnostic programmatic rails — adapters for TTD, DV360, Amazon, and Basis. No
             seat ships in v1: every adapter fails closed until your agency connects its own
             seat. Preview data below; live tables land when the Phase 7 schema merges.
           </p>
         </div>
-        <Badge variant="outline">Preview</Badge>
-      </div>
+        {chip("Preview", "border-stone-200 bg-stone-100 text-stone-600")}
+      </header>
 
-      {/* Zero custody */}
-      <Card>
-        <CardHeader title="Zero custody — structural" />
-        <CardBody>
-          <p className="text-sm text-muted-foreground">{ZERO_CUSTODY_COPY}</p>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Seat connection requires a vault reference only — Marketr never accepts raw seat
-            credentials, and no field anywhere in this track can hold a client payment
-            instrument.
-          </p>
-        </CardBody>
-      </Card>
+      {/* Zero custody — stone note */}
+      <div className="rounded-xl border border-stone-200 bg-stone-50 p-4">
+        <h2 className="text-sm font-semibold tracking-tight text-stone-900">Zero custody — structural</h2>
+        <p className="mt-1 text-[13px] text-stone-600">{ZERO_CUSTODY_COPY}</p>
+        <p className="mt-2 text-[13px] text-stone-600">
+          Seat connection requires a vault reference only — Marketr never accepts raw seat
+          credentials, and no field anywhere in this track can hold a client payment
+          instrument.
+        </p>
+      </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
         {/* Adapters */}
-        <Card>
-          <CardHeader title="DSP adapters" />
-          <CardBody>
-            <div className="divide-y divide-stone-100">
-              {DSP_KINDS.map((dsp) => (
-                <div key={dsp} className="flex items-center justify-between py-2.5">
-                  <div>
-                    <p className="text-sm font-medium text-stone-900">{DSP_LABELS[dsp]}</p>
-                    <p className="text-xs text-stone-500">Bring your own seat</p>
-                  </div>
-                  <Badge variant="outline">No seat</Badge>
-                </div>
-              ))}
-            </div>
-            <p className="mt-3 text-xs text-stone-500">
-              Without a seat, pause, cap, and report calls fail closed with “connect your agency
-              seat” guidance — they never pretend to act on a buy Marketr cannot reach.
-            </p>
-          </CardBody>
-        </Card>
+        <section className="rounded-xl border border-stone-200 bg-white p-4">
+          <h2 className="text-sm font-semibold tracking-tight text-stone-900">DSP adapters</h2>
+          <div className="mt-2 overflow-x-auto rounded-xl border border-stone-200">
+            <table className="w-full text-left text-[13px]">
+              <thead>
+                <tr className="border-b border-stone-100 bg-stone-50/60 text-[11px] uppercase tracking-wide text-stone-500">
+                  <th className="px-3 py-2 font-medium">Adapter</th>
+                  <th className="px-3 py-2 font-medium">Seat</th>
+                </tr>
+              </thead>
+              <tbody>
+                {DSP_KINDS.map((dsp) => (
+                  <tr key={dsp} className="border-b border-stone-100 last:border-0 hover:bg-violet-50/40">
+                    <td className="px-3 py-2">
+                      <span className="font-medium text-stone-900">{DSP_LABELS[dsp]}</span>
+                      <span className="block text-[12px] text-stone-500">Bring your own seat</span>
+                    </td>
+                    <td className="px-3 py-2">
+                      {chip("No seat", "border-amber-200 bg-amber-50 text-amber-700")}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="mt-3 text-xs text-stone-500">
+            Without a seat, pause, cap, and report calls fail closed with “connect your agency
+            seat” guidance — they never pretend to act on a buy Marketr cannot reach.
+          </p>
+        </section>
 
         {/* Tripwire */}
-        <Card>
-          <CardHeader
-            title="Volume tripwire"
-            actions={<Badge variant="outline">$30K/mo fixture</Badge>}
-          />
-          <CardBody>
-            <p className="text-sm font-medium text-stone-900">{preview.tripwire.bandLabel}</p>
-            <p className="mt-1 text-sm text-stone-600">{preview.tripwire.recommendation}</p>
-            <div className="mt-3 space-y-1.5">
-              {preview.tripwire.railCostings.map((r) => (
-                <div key={r.rail} className="flex items-center justify-between text-xs text-stone-600">
-                  <span className="font-mono">{r.rail.toUpperCase()} · effective/mo</span>
-                  <span className="font-mono font-semibold text-stone-900">
-                    {money(r.effectiveMonthlyCents)}
-                  </span>
-                </div>
-              ))}
-            </div>
-            <p className="mt-3 text-xs text-stone-500">
-              The report recommends; a human decides. Every figure pins the fee-schedule version it
-              was computed against.
-            </p>
-          </CardBody>
-        </Card>
+        <section className="rounded-xl border border-stone-200 bg-white p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-sm font-semibold tracking-tight text-stone-900">Volume tripwire</h2>
+            {chip("$30K/mo fixture", "border-stone-200 bg-stone-100 text-stone-600")}
+          </div>
+          <p className="mt-2 text-[13px] font-medium text-stone-900">{preview.tripwire.bandLabel}</p>
+          <p className="mt-1 text-[13px] text-stone-600">{preview.tripwire.recommendation}</p>
+          <div className="mt-2 overflow-x-auto rounded-xl border border-stone-200">
+            <table className="w-full text-left text-[13px]">
+              <thead>
+                <tr className="border-b border-stone-100 bg-stone-50/60 text-[11px] uppercase tracking-wide text-stone-500">
+                  <th className="px-3 py-2 font-medium">Rail</th>
+                  <th className="px-3 py-2 font-medium text-right">Effective / mo</th>
+                </tr>
+              </thead>
+              <tbody>
+                {preview.tripwire.railCostings.map((r) => (
+                  <tr key={r.rail} className="border-b border-stone-100 last:border-0 hover:bg-violet-50/40">
+                    <td className="px-3 py-2 font-mono text-stone-700">{r.rail.toUpperCase()}</td>
+                    <td className="px-3 py-2 text-right font-mono font-semibold text-stone-900">
+                      {money(r.effectiveMonthlyCents)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="mt-3 text-xs text-stone-500">
+            The report recommends; a human decides. Every figure pins the fee-schedule version it
+            was computed against.
+          </p>
+        </section>
 
         {/* Fee schedules */}
-        <Card>
-          <CardHeader title="Fee schedules" />
-          <CardBody>
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="text-left text-stone-500">
-                    <th className="pb-2 pr-3 font-medium">DSP</th>
-                    <th className="pb-2 pr-3 font-medium">Ver</th>
-                    <th className="pb-2 pr-3 font-medium">Take</th>
-                    <th className="pb-2 pr-3 font-medium">Tech</th>
-                    <th className="pb-2 font-medium">Min/mo</th>
+        <section className="rounded-xl border border-stone-200 bg-white p-4">
+          <h2 className="text-sm font-semibold tracking-tight text-stone-900">Fee schedules</h2>
+          <div className="mt-2 overflow-x-auto rounded-xl border border-stone-200">
+            <table className="w-full text-left text-[13px]">
+              <thead>
+                <tr className="border-b border-stone-100 bg-stone-50/60 text-[11px] uppercase tracking-wide text-stone-500">
+                  <th className="px-3 py-2 font-medium">DSP</th>
+                  <th className="px-3 py-2 font-medium">Ver</th>
+                  <th className="px-3 py-2 font-medium">Take</th>
+                  <th className="px-3 py-2 font-medium">Tech</th>
+                  <th className="px-3 py-2 font-medium text-right">Min / mo</th>
+                </tr>
+              </thead>
+              <tbody>
+                {preview.schedules.map((s) => (
+                  <tr key={s.id} className="border-b border-stone-100 font-mono text-stone-700 last:border-0 hover:bg-violet-50/40">
+                    <td className="px-3 py-2">{s.dsp.toUpperCase()}</td>
+                    <td className="px-3 py-2">v{s.version}</td>
+                    <td className="px-3 py-2">{(s.feeLines.takeRateBps / 100).toFixed(1)}%</td>
+                    <td className="px-3 py-2">{(s.feeLines.techFeeBps / 100).toFixed(1)}%</td>
+                    <td className="px-3 py-2 text-right">{money(s.feeLines.monthlyMinimumCents)}</td>
                   </tr>
-                </thead>
-                <tbody className="divide-y divide-stone-100">
-                  {preview.schedules.map((s) => (
-                    <tr key={s.id} className="font-mono text-stone-700">
-                      <td className="py-2 pr-3">{s.dsp.toUpperCase()}</td>
-                      <td className="py-2 pr-3">v{s.version}</td>
-                      <td className="py-2 pr-3">{(s.feeLines.takeRateBps / 100).toFixed(1)}%</td>
-                      <td className="py-2 pr-3">{(s.feeLines.techFeeBps / 100).toFixed(1)}%</td>
-                      <td className="py-2">{money(s.feeLines.monthlyMinimumCents)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <p className="mt-3 text-xs text-stone-500">
-              Placeholder v1 — replace with your agency’s signed rate cards. Margin math always
-              audits against the schedule live when the spend happened.
-            </p>
-          </CardBody>
-        </Card>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="mt-3 text-xs text-stone-500">
+            Placeholder v1 — replace with your agency’s signed rate cards. Margin math always
+            audits against the schedule live when the spend happened.
+          </p>
+        </section>
 
         {/* Margin ledger */}
-        <Card>
-          <CardHeader
-            title="Margin ledger"
-            actions={
-              preview.reconciliation.balanced ? (
-                <ValuePill tone="green">Lines distinct</ValuePill>
-              ) : (
-                <ValuePill tone="red">Imbalanced</ValuePill>
-              )
-            }
-          />
-          <CardBody>
-            {preview.ledgerRows.map((r) => (
-              <div key={r.id} className="rounded-lg bg-stone-50 p-3">
-                <p className="text-xs font-medium text-stone-500">
-                  {r.period} · {r.dsp.toUpperCase()} · fee schedule v{r.feeScheduleVersion}
-                </p>
-                <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
-                  {(
-                    [
-                      ["Client billed", r.clientBilledCents],
-                      ["Platform fees", r.platformFeesCents],
-                      ["Passthrough (at cost)", r.passthroughCents],
-                      ["Marketr margin", r.marketrMarginCents],
-                    ] as const
-                  ).map(([label, cents]) => (
-                    <div key={label} className="flex items-center justify-between">
-                      <dt className="text-stone-500">{label}</dt>
-                      <dd className="font-mono font-semibold text-stone-900">{money(cents)}</dd>
-                    </div>
-                  ))}
-                </dl>
-              </div>
-            ))}
-            <p className="mt-3 text-xs text-stone-500">
-              Four distinct lines — never commingled. A row cannot post unless client-billed equals
-              fees + passthrough + margin, so the margin can never hide inside another line.
-            </p>
-          </CardBody>
-        </Card>
+        <section className="rounded-xl border border-stone-200 bg-white p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-sm font-semibold tracking-tight text-stone-900">Margin ledger</h2>
+            {chip(
+              preview.reconciliation.balanced ? "Lines distinct" : "Imbalanced",
+              preview.reconciliation.balanced ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-red-200 bg-red-50 text-red-700"
+            )}
+          </div>
+          <div className="mt-2 overflow-x-auto rounded-xl border border-stone-200">
+            <table className="w-full text-left text-[13px]">
+              <thead>
+                <tr className="border-b border-stone-100 bg-stone-50/60 text-[11px] uppercase tracking-wide text-stone-500">
+                  <th className="px-3 py-2 font-medium">Line</th>
+                  <th className="px-3 py-2 font-medium text-right">Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                {preview.ledgerRows.flatMap((r) => (
+                  [
+                    ["Client billed", r.clientBilledCents],
+                    ["Platform fees", r.platformFeesCents],
+                    ["Passthrough (at cost)", r.passthroughCents],
+                    ["Marketr margin", r.marketrMarginCents],
+                  ] as const
+                ).map(([label, cents]) => (
+                  <tr key={`${r.id}-${label}`} className="border-b border-stone-100 last:border-0 hover:bg-violet-50/40">
+                    <td className="px-3 py-2 text-stone-700">
+                      {label}
+                      <span className="block text-[11px] text-stone-400">{r.period} · {r.dsp.toUpperCase()} · fee schedule v{r.feeScheduleVersion}</span>
+                    </td>
+                    <td className="px-3 py-2 text-right font-mono font-semibold text-stone-900">{money(cents)}</td>
+                  </tr>
+                )))}
+              </tbody>
+            </table>
+          </div>
+          <p className="mt-3 text-xs text-stone-500">
+            Four distinct lines — never commingled. A row cannot post unless client-billed equals
+            fees + passthrough + margin, so the margin can never hide inside another line.
+          </p>
+        </section>
       </div>
     </div>
   );

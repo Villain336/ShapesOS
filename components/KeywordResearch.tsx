@@ -245,7 +245,7 @@ export default function KeywordResearch({ projectId }: { projectId: string }) {
                   onClick={() => toggleIntent(intent)}
                   className={`rounded-full border px-3 py-1 text-xs ${
                     intentFilter.includes(intent)
-                      ? "border-zinc-900 bg-zinc-900 text-white"
+                      ? "border-violet-600 bg-violet-600 text-white"
                       : "border-zinc-200 text-zinc-500 hover:border-zinc-400"
                   }`}
                 >
