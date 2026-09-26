@@ -51,7 +51,7 @@ async function main() {
 
   // Confirm the 3D view is the default and a WebGL canvas exists.
   await page.waitForSelector('canvas', { timeout: 30000 }).catch(() => {});
-  const viewLabel = await page.getByText('Live neural map', { exact: false }).count();
+  const viewLabel = await page.getByText('Bead model', { exact: false }).count();
   console.log(`3d-legend visible: ${viewLabel > 0}`);
 
   // Let bloom, auto-rotation, and the breathing glow settle.
