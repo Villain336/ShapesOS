@@ -10,6 +10,7 @@ import {
 import { AppSidebar, MobileNav } from "@/components/AppSidebar";
 import { DashboardMain } from "@/components/DashboardMain";
 import { ChatProvider } from "@/components/chat/ChatContext";
+import { CommandBar } from "@/components/command-bar/CommandBar";
 
 export default async function DashboardLayout({
   children,
@@ -31,6 +32,7 @@ export default async function DashboardLayout({
   return (
     <div className="min-h-screen bg-page font-sans text-ink">
       <ChatProvider>
+        <CommandBar />
         <MobileNav {...sidebarProps} />
         <div className="flex">
           <AppSidebar {...sidebarProps} />
