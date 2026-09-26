@@ -13,6 +13,9 @@ import {
   isDimmed3D,
   insideBrain,
   mulberry32,
+  normalizedRadius,
+  LOBE_Z_BAND,
+  TIER_RADIAL_BAND,
   BRAIN_RX,
   BRAIN_RY,
   BRAIN_RZ,
@@ -26,16 +29,19 @@ function input(partial: Partial<Brain3DInput> & { id: string }): Brain3DInput {
     pillar: "marketing",
     chunks: 50,
     kind: "source",
+    tier: "2",
     ...partial,
   };
 }
 
 function corpusLike(n: number): Brain3DInput[] {
   const pillars: BrainPillar[] = ["marketing", "growth", "design"];
+  const tiers: BrainNode["tier"][] = ["1", "2", "1S"];
   return Array.from({ length: n }, (_, i) =>
     input({
       id: `src-${i}`,
       pillar: pillars[i % 3],
+      tier: tiers[i % 3],
       chunks: 5 + ((i * 37) % 500),
       kind: i % 11 === 0 ? "removal-flagged" : "source",
     }),
@@ -136,5 +142,65 @@ describe("brain volume constants", () => {
   it("gap is positive and smaller than the x semi-axis", () => {
     assert.ok(BRAIN_GAP > 0 && BRAIN_GAP < BRAIN_RX);
     assert.ok(BRAIN_RX > 0 && BRAIN_RY > 0 && BRAIN_RZ > 0);
+  });
+});
+
+describe("layoutBrain3D — lobe organization", () => {
+  it("places pillars in front→back lobes: marketing z > 0, design z < 0, growth near the middle", () => {
+    const placed = layoutBrain3D(corpusLike(60));
+    for (const p of placed) {
+      if (p.pillar === "marketing") assert.ok(p.z > 0.05, `${p.id} marketing z=${p.z.toFixed(2)}`);
+      if (p.pillar === "design") assert.ok(p.z < -0.05, `${p.id} design z=${p.z.toFixed(2)}`);
+      if (p.pillar === "growth") assert.ok(Math.abs(p.z) < 1.0, `${p.id} growth z=${p.z.toFixed(2)}`);
+    }
+  });
+
+  it("lobe bands are disjoint and ordered front→back", () => {
+    assert.ok(LOBE_Z_BAND.marketing[0] > LOBE_Z_BAND.growth[1]);
+    assert.ok(LOBE_Z_BAND.growth[0] > LOBE_Z_BAND.design[1]);
+  });
+
+  it("bands tiers core→rim: tier 1 inner, tier 2 middle, 1S outer, proposed on the rim", () => {
+    const tiers: BrainNode["tier"][] = ["1", "2", "1S"];
+    const inputs: Brain3DInput[] = [];
+    tiers.forEach((t, ti) =>
+      ["marketing", "growth", "design"].forEach((pillar, pi) =>
+        inputs.push(
+          input({ id: `t${ti}-${pi}`, pillar: pillar as BrainPillar, tier: t, chunks: 100 }),
+        ),
+      ),
+    );
+    inputs.push(input({ id: "prop-1", kind: "proposed", tier: "1S", chunks: 0, pillar: "marketing" }));
+    const placed = layoutBrain3D(inputs);
+    const rho = (id: string) => {
+      const p = placed.find((x) => x.id === id)!;
+      return normalizedRadius(p.x, p.y, p.z);
+    };
+    const bands: Record<string, [number, number]> = {
+      "1": [0.42, 0.68],
+      "2": [0.59, 0.84],
+      "1S": [0.75, 0.97],
+    };
+    for (const t of tiers) {
+      for (const id of inputs.filter((i) => i.tier === t && i.kind !== "proposed").map((i) => i.id)) {
+        const r = rho(id);
+        assert.ok(r >= bands[t][0] && r <= bands[t][1], `${id} tier ${t} rho=${r.toFixed(2)}`);
+      }
+    }
+    assert.ok(rho("prop-1") >= 0.87, `proposed rho=${rho("prop-1").toFixed(2)}`);
+    const mean = (t: string) =>
+      inputs.filter((i) => i.tier === t && i.kind !== "proposed").reduce((a, i) => a + rho(i.id), 0) /
+      inputs.filter((i) => i.tier === t && i.kind !== "proposed").length;
+    assert.ok(mean("1") < mean("2") && mean("2") < mean("1S"), "tier means ordered core→rim");
+  });
+
+  it("tier band constants are ordered and inside the unit ball", () => {
+    const b = TIER_RADIAL_BAND;
+    assert.ok(b["1"][0] < b["1"][1] && b["1"][1] <= b["2"][0]);
+    assert.ok(b["2"][0] < b["2"][1] && b["2"][1] <= b["1S"][0]);
+    assert.ok(b["1S"][0] < b["1S"][1] && b["1S"][1] < 1);
+    assert.ok(b.proposed[0] < b.proposed[1] && b.proposed[1] <= 1);
+    // Rims touch: 1S outer edge meets the proposed rim.
+    assert.ok(b.proposed[0] <= b["1S"][1]);
   });
 });

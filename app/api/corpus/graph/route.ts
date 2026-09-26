@@ -11,6 +11,7 @@ import { requireWorkspaceRole, forbidden } from "@/lib/authz";
 import { loadManifest } from "@/lib/intelligence/corpus/store";
 import { buildCorpusGraph } from "@/lib/intelligence/corpus/graph";
 import { listProposed, removalIdMap } from "@/lib/intelligence/corpus/proposals";
+import { loadEvalSummary, readRetrievalUsage } from "@/lib/intelligence/corpus/activity";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +24,22 @@ export async function GET() {
   const manifest = loadManifest();
   if (!manifest) return Response.json({ error: "Corpus manifest not found" }, { status: 404 });
 
-  const graph = buildCorpusGraph(manifest, listProposed(), removalIdMap());
+  // Audit data — all real: eval results file, retrieval-usage counter.
+  const evalSummary = loadEvalSummary();
+  const usage = readRetrievalUsage();
+  const graph = buildCorpusGraph(manifest, listProposed(), removalIdMap(), {
+    eval: evalSummary
+      ? {
+          precision: evalSummary.precision,
+          questions: evalSummary.questions,
+          correct: evalSummary.correct,
+          runAt: evalSummary.runAt,
+        }
+      : null,
+    evalHitsBySource: evalSummary?.hitsBySource,
+    retrievalHitsBySource: new Map(
+      [...usage.entries()].map(([id, u]) => [id, u.hits] as const),
+    ),
+  });
   return Response.json(graph);
 }

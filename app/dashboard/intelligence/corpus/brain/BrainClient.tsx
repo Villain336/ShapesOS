@@ -1,8 +1,8 @@
-// Marketr — Knowledge Brain client orchestrator.
+// Marketr — Knowledge Brain command center.
 // State, data fetching, toolbar (search + fly-to, pillar/tier filters,
-// 2D/3D toggle), viewport, detail panel, and corpus management dialogs.
-// The 3D scene is code-split (dynamic, ssr:false); the 2D canvas is kept as
-// a toggleable view. House style per app/dashboard/studio/StudioApp.tsx.
+// 2D/3D toggle), 3D viewport, source dossier, systemized sources table,
+// corpus-health audit strip, and the real activity feed. House style per
+// app/dashboard/studio/StudioApp.tsx. The 3D scene is code-split.
 
 "use client";
 
@@ -23,17 +23,17 @@ import {
 import type { BrainGraph, BrainNode, BrainPillar } from "@/lib/intelligence/corpus/graph";
 import { BrainCanvas2D, type FocusRequest } from "./BrainCanvas2D";
 import { NodePanel } from "./NodePanel";
+import { BrainSourcesTable } from "./BrainSourcesTable";
+import { BrainHealthStrip } from "./BrainHealthStrip";
+import { BrainActivityFeed } from "./BrainActivityFeed";
 import { AddSourceDialog, RebuildDialog } from "./BrainDialogs";
 import { inputCls, btnPrimary, btnGhost, PILLAR_COLORS, PILLAR_LABEL } from "./brain-ui";
 
 const BrainScene3D = dynamic(() => import("./BrainScene3D").then((m) => m.BrainScene3D), {
   ssr: false,
   loading: () => (
-    <div
-      className="flex min-h-[420px] flex-1 items-center justify-center gap-2 rounded-lg border border-stone-800 text-[13px] text-violet-300"
-      style={{ background: "#06060a" }}
-    >
-      <Loader2 className="h-4 w-4 animate-spin" /> Summoning the brain…
+    <div className="flex min-h-[420px] flex-1 items-center justify-center gap-2 rounded-lg border border-stone-200 bg-[#FAFAF7] text-[13px] text-stone-500">
+      <Loader2 className="h-4 w-4 animate-spin" /> Growing the brain…
     </div>
   ),
 });
@@ -55,6 +55,7 @@ export function BrainClient({ canManage }: { canManage: boolean }) {
   const [flagReason, setFlagReason] = useState("");
   const [flagging, setFlagging] = useState(false);
   const [focusRequest, setFocusRequest] = useState<FocusRequest | null>(null);
+  const [activityKey, setActivityKey] = useState(0);
   const [actionMsg, setActionMsg] = useState<{ tone: "green" | "red"; text: string } | null>(null);
 
   const filterRef = useRef({ q: "", pillars: pillarFilter, tiers: tierFilter });
@@ -150,6 +151,7 @@ export function BrainClient({ canManage }: { canManage: boolean }) {
         setFlagReason("");
       }
       await fetchGraph();
+      setActivityKey((k) => k + 1);
     } catch {
       setActionMsg({ tone: "red", text: "Action failed — please retry." });
     } finally {
@@ -174,6 +176,9 @@ export function BrainClient({ canManage }: { canManage: boolean }) {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
+      {/* Corpus health — the audit strip. Every metric is real data. */}
+      <BrainHealthStrip graph={graph} />
+
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative">
@@ -265,10 +270,6 @@ export function BrainClient({ canManage }: { canManage: boolean }) {
           ))}
         </div>
         <div className="ml-auto flex items-center gap-2">
-          <span className="hidden text-[12px] text-stone-500 md:inline">
-            {graph.stats.sources} sources · {graph.stats.chunks.toLocaleString()} chunks · corpus v
-            {graph.version}
-          </span>
           {canManage && (
             <>
               <button className={btnGhost} onClick={() => setShowAdd(true)}>
@@ -302,33 +303,38 @@ export function BrainClient({ canManage }: { canManage: boolean }) {
         </div>
       )}
 
-      {/* Viewport + detail panel */}
+      {/* Viewport + dossier rail */}
       <div className="flex min-h-0 flex-1 flex-col gap-3 lg:flex-row">
-        {view === "3d" ? (
-          <BrainScene3D
-            graph={graph}
-            nodeById={nodeById}
-            isDimmed={isDimmed}
-            selectedId={selectedId}
-            hoverId={hoverId}
-            onHover={setHoverId}
-            onSelect={setSelectedId}
-            focusRequest={focusRequest}
-          />
-        ) : (
-          <BrainCanvas2D
-            graph={graph}
-            nodeById={nodeById}
-            isVisible={isVisible}
-            selectedId={selectedId}
-            hoverId={hoverId}
-            onHover={setHoverId}
-            onSelect={setSelectedId}
-            focusRequest={focusRequest}
-          />
-        )}
+        <div className="flex min-h-[420px] flex-1 flex-col gap-3">
+          {view === "3d" ? (
+            <BrainScene3D
+              graph={graph}
+              nodeById={nodeById}
+              isDimmed={isDimmed}
+              selectedId={selectedId}
+              hoverId={hoverId}
+              onHover={setHoverId}
+              onSelect={setSelectedId}
+              focusRequest={focusRequest}
+            />
+          ) : (
+            <BrainCanvas2D
+              graph={graph}
+              nodeById={nodeById}
+              isVisible={isVisible}
+              selectedId={selectedId}
+              hoverId={hoverId}
+              onHover={setHoverId}
+              onSelect={setSelectedId}
+              focusRequest={focusRequest}
+            />
+          )}
 
-        <div className="w-full shrink-0 lg:w-80">
+          {/* Systemized sources register */}
+          <BrainSourcesTable graph={graph} selectedId={selectedId} onFlyTo={flyTo} />
+        </div>
+
+        <div className="flex w-full shrink-0 flex-col gap-3 lg:w-80">
           {selected ? (
             <NodePanel
               node={selected}
@@ -339,18 +345,26 @@ export function BrainClient({ canManage }: { canManage: boolean }) {
               onFlag={() => doFlag(false)}
               onUnflag={() => doFlag(true)}
               onClose={() => setSelectedId(null)}
+              evalQuestions={graph.stats.eval?.questions ?? null}
             />
           ) : (
-            <div className="flex h-full min-h-[200px] flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-stone-300 bg-white/60 p-6 text-center">
+            <div className="flex min-h-[200px] flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-stone-300 bg-white/60 p-6 text-center">
               <Orbit className="h-6 w-6 text-violet-300" />
               <p className="max-w-[220px] text-[13px] text-stone-500">
                 Click any neuron to inspect the source — what it taught Marketr, its license basis,
-                and its chunk weight.
+                and its provenance.
               </p>
             </div>
           )}
+          <BrainActivityFeed refreshKey={activityKey} />
         </div>
       </div>
+
+      <p className="text-[11px] text-stone-400">
+        Every metric on this page is real: it reads the corpus manifest, the eval results file, the
+        retrieval-usage log, and the proposal/removal/rebuild records. Nothing is fabricated —
+        counters read 0 until the event actually happens.
+      </p>
 
       {showAdd && (
         <AddSourceDialog
@@ -358,10 +372,19 @@ export function BrainClient({ canManage }: { canManage: boolean }) {
           onAdded={async () => {
             setShowAdd(false);
             await fetchGraph();
+            setActivityKey((k) => k + 1);
           }}
         />
       )}
-      {showRebuild && <RebuildDialog onClose={() => setShowRebuild(false)} onDone={fetchGraph} />}
+      {showRebuild && (
+        <RebuildDialog
+          onClose={() => setShowRebuild(false)}
+          onDone={() => {
+            fetchGraph();
+            setActivityKey((k) => k + 1);
+          }}
+        />
+      )}
     </div>
   );
 }

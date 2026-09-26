@@ -1,10 +1,29 @@
-// Marketr — Knowledge Brain: source detail panel.
-// Moved verbatim out of BrainClient.tsx (3D rebuild refactor); the panel is
-// view-agnostic and serves both the 2D canvas and the 3D scene.
+// Marketr — Knowledge Brain: source dossier.
+//
+// A STRICT dossier: identical section order for every source, so the brain
+// doubles as an audit surface. Sections:
+//   1. Source (title + pillar/tier/status badges)
+//   2. What Marketr learned
+//   3. Chunks
+//   4. Ingest mode
+//   5. Author
+//   6. License basis
+//   7. Provenance (manifest version, retrieved date, eval participation, agent retrieval hits)
+//   8. Distilled from (Tier 1S only)
+//   9. Removal-flag controls (managers only)
 
 import { X, Flag, FlagOff, Loader2 } from "lucide-react";
 import type { BrainNode } from "@/lib/intelligence/corpus/graph";
 import { Chip, inputCls, btnGhost, PILLAR_COLORS, PILLAR_TONE, PILLAR_LABEL } from "./brain-ui";
+
+function Section({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <dt className="text-[11px] font-medium uppercase tracking-wide text-stone-400">{label}</dt>
+      <dd className="mt-0.5 text-[13px] leading-snug text-stone-700">{children}</dd>
+    </div>
+  );
+}
 
 export function NodePanel({
   node,
@@ -15,6 +34,7 @@ export function NodePanel({
   onFlag,
   onUnflag,
   onClose,
+  evalQuestions,
 }: {
   node: BrainNode;
   canManage: boolean;
@@ -24,9 +44,12 @@ export function NodePanel({
   onFlag: () => void;
   onUnflag: () => void;
   onClose: () => void;
+  /** Total eval questions this run (null when the eval never ran). */
+  evalQuestions: number | null;
 }) {
   return (
     <div className="flex max-h-[560px] flex-col overflow-hidden rounded-lg border border-stone-200 bg-white">
+      {/* 1 · Source */}
       <div className="flex items-start gap-2 border-b border-stone-100 p-3">
         <span
           className="mt-0.5 inline-block h-3 w-3 shrink-0 rounded-full"
@@ -46,34 +69,63 @@ export function NodePanel({
           <X className="h-4 w-4" />
         </button>
       </div>
+
       <div className="flex-1 overflow-y-auto p-3">
-        <dl className="space-y-2.5 text-[13px]">
+        <dl className="space-y-2.5">
+          {/* 2 · What Marketr learned */}
+          <Section label="What Marketr learned">{node.teaches}</Section>
+
+          <div className="grid grid-cols-2 gap-2">
+            {/* 3 · Chunks */}
+            <Section label="Chunks">
+              <span className="font-semibold text-stone-900">{node.chunks.toLocaleString()}</span>
+            </Section>
+            {/* 4 · Ingest mode */}
+            <Section label="Ingest mode">
+              {node.mode === "verbatim" ? "Ingested verbatim" : "Marketr synthesis"}
+            </Section>
+          </div>
+
+          {/* 5 · Author */}
+          <Section label="Author">{node.author}</Section>
+
+          {/* 6 · License basis */}
+          <Section label="License basis">{node.licenseBasis}</Section>
+
+          {/* 7 · Provenance */}
           <div>
             <dt className="text-[11px] font-medium uppercase tracking-wide text-stone-400">
-              What Marketr learned
+              Provenance
             </dt>
-            <dd className="mt-0.5 leading-snug text-stone-700">{node.teaches}</dd>
+            <dd className="mt-1 space-y-1 text-[13px] text-stone-700">
+              <div className="flex justify-between gap-2">
+                <span className="text-stone-400">Ingested under</span>
+                <span className="font-medium text-stone-800">
+                  {node.manifestVersion != null ? `Corpus v${node.manifestVersion}` : "—"}
+                </span>
+              </div>
+              <div className="flex justify-between gap-2">
+                <span className="text-stone-400">Retrieved</span>
+                <span className="font-medium text-stone-800">{node.retrievedDate ?? "—"}</span>
+              </div>
+              <div className="flex justify-between gap-2">
+                <span className="text-stone-400">Eval top-hits</span>
+                <span className="font-medium text-stone-800">
+                  {evalQuestions != null
+                    ? `${node.evalHits} of ${evalQuestions} questions`
+                    : "eval not run"}
+                </span>
+              </div>
+              <div className="flex justify-between gap-2">
+                <span className="text-stone-400">Agent retrievals</span>
+                <span className="font-medium text-stone-800">
+                  {node.retrievalHits.toLocaleString()} hits
+                </span>
+              </div>
+            </dd>
           </div>
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <dt className="text-[11px] font-medium uppercase tracking-wide text-stone-400">Chunks</dt>
-              <dd className="mt-0.5 font-semibold text-stone-900">{node.chunks.toLocaleString()}</dd>
-            </div>
-            <div>
-              <dt className="text-[11px] font-medium uppercase tracking-wide text-stone-400">Mode</dt>
-              <dd className="mt-0.5 text-stone-700">
-                {node.mode === "verbatim" ? "Ingested verbatim" : "Marketr synthesis"}
-              </dd>
-            </div>
-          </div>
-          <div>
-            <dt className="text-[11px] font-medium uppercase tracking-wide text-stone-400">Author</dt>
-            <dd className="mt-0.5 text-stone-700">{node.author}</dd>
-          </div>
-          <div>
-            <dt className="text-[11px] font-medium uppercase tracking-wide text-stone-400">License basis</dt>
-            <dd className="mt-0.5 leading-snug text-stone-700">{node.licenseBasis}</dd>
-          </div>
+
+          {/* 8 · Distilled from (Tier 1S only) */}
           {node.synthesizedFrom.length > 0 && (
             <div>
               <dt className="text-[11px] font-medium uppercase tracking-wide text-stone-400">
@@ -88,6 +140,7 @@ export function NodePanel({
               </dd>
             </div>
           )}
+
           {node.removalReason && (
             <div className="rounded-md border border-red-200 bg-red-50 p-2">
               <dt className="text-[11px] font-medium uppercase tracking-wide text-red-500">
@@ -98,6 +151,8 @@ export function NodePanel({
           )}
         </dl>
       </div>
+
+      {/* 9 · Removal-flag controls */}
       {canManage && node.kind === "source" && (
         <div className="border-t border-stone-100 p-3">
           <div className="flex flex-col gap-2">

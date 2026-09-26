@@ -33,6 +33,15 @@ export interface BrainNode {
   synthesizedFrom: string[];
   kind: BrainNodeKind;
   removalReason?: string;
+  // ── Provenance (audit center; all real manifest/eval/usage data) ──
+  /** Corpus version this source was last (re)ingested under. Null for proposed. */
+  manifestVersion: number | null;
+  /** ISO date the source material was retrieved/synthesized. Null for proposed. */
+  retrievedDate: string | null;
+  /** Eval questions where this source was the top hit (0 when eval never ran). */
+  evalHits: number;
+  /** Real agent retrieval hits via retrieveExpertContext (0 = never retrieved). */
+  retrievalHits: number;
 }
 
 export interface BrainEdge {
@@ -48,8 +57,14 @@ export interface BrainGraph {
     sources: number;
     chunks: number;
     pillars: Record<BrainPillar, number>;
+    /** Chunk counts per pillar (audit strip). */
+    pillarChunks: Record<BrainPillar, number>;
     proposed: number;
     flagged: number;
+    /** Corpus eval summary (null until scripts/eval-corpus.mts has run). */
+    eval: { precision: number; questions: number; correct: number; runAt: string } | null;
+    /** Total real agent retrieval hits across all sources. */
+    retrievalHitsTotal: number;
   };
   nodes: BrainNode[];
   edges: BrainEdge[];
@@ -121,13 +136,20 @@ function sharedPlaybookGroups(): Map<string, string[]> {
 }
 
 /**
- * Build the brain graph. Pure function of (manifest, proposed, removalIds)
- * — unit-testable without the filesystem.
+ * Build the brain graph. Pure function of (manifest, proposed, removalIds,
+ * audit) — unit-testable without the filesystem. The audit argument is
+ * optional: eval summaries, retrieval usage, and per-source eval hits all
+ * come from real runtime data loaded by the caller (see activity.ts).
  */
 export function buildCorpusGraph(
   manifest: CorpusManifest,
   proposed: ProposedSource[] = [],
   removalIds: Map<string, string> = new Map(),
+  audit: {
+    eval?: { precision: number; questions: number; correct: number; runAt: string } | null;
+    evalHitsBySource?: Map<string, number>;
+    retrievalHitsBySource?: Map<string, number>;
+  } = {},
 ): BrainGraph {
   const nodes: BrainNode[] = manifest.sources.map((r) => {
     const playbook = SYNTHESIS_PLAYBOOKS.find((p) => p.sourceId === r.id);
@@ -147,6 +169,10 @@ export function buildCorpusGraph(
       synthesizedFrom: playbook?.synthesizedFrom ?? [],
       kind: flagged ? "removal-flagged" : "source",
       removalReason: flagged,
+      manifestVersion: r.version,
+      retrievedDate: r.retrievedDate,
+      evalHits: audit.evalHitsBySource?.get(r.id) ?? 0,
+      retrievalHits: audit.retrievalHitsBySource?.get(r.id) ?? 0,
     };
   });
 
@@ -194,9 +220,18 @@ export function buildCorpusGraph(
       teaches: p.teaches ?? "Awaiting ingest — will teach Marketr once vetted and built.",
       synthesizedFrom: [],
       kind: "proposed",
+      manifestVersion: null,
+      retrievedDate: null,
+      evalHits: 0,
+      retrievalHits: 0,
     });
   }
 
+  const pillarChunks = {
+    marketing: nodes.filter((n) => n.pillar === "marketing").reduce((a, n) => a + n.chunks, 0),
+    growth: nodes.filter((n) => n.pillar === "growth").reduce((a, n) => a + n.chunks, 0),
+    design: nodes.filter((n) => n.pillar === "design").reduce((a, n) => a + n.chunks, 0),
+  };
   const stats = {
     sources: nodes.filter((n) => n.kind === "source" || n.kind === "removal-flagged").length,
     chunks: nodes.reduce((a, n) => a + n.chunks, 0),
@@ -205,8 +240,11 @@ export function buildCorpusGraph(
       growth: nodes.filter((n) => n.pillar === "growth").length,
       design: nodes.filter((n) => n.pillar === "design").length,
     },
+    pillarChunks,
     proposed: proposed.length,
     flagged: removalIds.size,
+    eval: audit.eval ?? null,
+    retrievalHitsTotal: nodes.reduce((a, n) => a + n.retrievalHits, 0),
   };
 
   return { version: manifest.corpusVersion, updatedAt: manifest.updatedAt, stats, nodes, edges };

@@ -1,4 +1,4 @@
-// Marketr — Knowledge Brain: 3D hemisphere layout.
+// Marketr — Knowledge Brain: 3D lobe layout.
 //
 // Pure, dependency-free mapping from corpus graph nodes to positions inside
 // a brain-like volume (two ellipsoid hemispheres with a center gap).
@@ -7,12 +7,22 @@
 //
 //   const placed = layoutBrain3D(nodes); // Brain3DNode[] with x/y/z/radius
 //
+// ORGANIZATION (the audit-center read):
+// - Three LOBES by pillar along the brain's front→back axis, like cortical
+//   lobes: marketing = frontal, growth = middle, design = occipital. Each
+//   lobe spans both hemispheres.
+// - Within a lobe, TIER BANDS run core→rim: Tier 1 inner core, Tier 2 middle
+//   band, Tier 1S outer band, proposed sources on the rim.
+// - Floating lobe labels anchor above each lobe (see LOBE_LABEL_ANCHORS).
+//
 // Invariants (all asserted in __tests__/brain3d-layout.test.ts):
 // - every node respects the hemisphere gap (|x| >= GAP)
 // - every node sits inside the ellipsoid volume
 // - deterministic: same input → same output (seeded PRNG)
 // - radius grows monotonically with chunk count
 // - proposed (0-chunk) nodes get the minimum radius
+// - lobe z-bands: marketing z > 0, design z < 0, growth near the middle
+// - tier radial bands: mean normalized radius ordered 1 < 2 < 1S < proposed
 
 import type { BrainPillar, BrainNode } from "./graph";
 
@@ -27,11 +37,48 @@ export const BRAIN_GAP = 0.55;
 const GOLDEN_ANGLE = 2.399963;
 const LAYOUT_SEED = 1337;
 
+/**
+ * Lobe sectors: pillar → z-band on the unit sphere (front→back lobes).
+ * marketing = frontal lobe, growth = middle lobe, design = occipital lobe.
+ */
+export const LOBE_Z_BAND: Record<BrainPillar, readonly [number, number]> = {
+  marketing: [0.33, 0.9],
+  growth: [-0.3, 0.3],
+  design: [-0.9, -0.33],
+};
+
+/**
+ * Tier radial bands: ellipsoid-normalized radius (0 = center, 1 = shell).
+ * Tier 1 = inner core, Tier 2 = middle band, Tier 1S = outer band,
+ * proposed = rim. The tier-1 floor (0.45) keeps the fissure gap feasible:
+ * at rho >= 0.45 the gap needs |xu| <= 0.381, and 0.381² + 0.9² + 0.03 < 1.
+ */
+export const TIER_RADIAL_BAND: Record<string, readonly [number, number]> = {
+  "1": [0.45, 0.62],
+  "2": [0.62, 0.78],
+  "1S": [0.78, 0.92],
+  proposed: [0.9, 0.985],
+};
+
+/**
+ * Floating lobe-label anchors (world units). Each label rides outside its
+ * lobe's front face so the three never stack on screen: marketing and
+ * design flank the brain front/back, growth crowns the top. The DOM pills
+ * are projected from these anchors every frame, so each label tracks its
+ * lobe as the camera orbits.
+ */
+export const LOBE_LABEL_ANCHORS: Record<BrainPillar, readonly [number, number, number]> = {
+  marketing: [0, 0.9, BRAIN_RZ + 1.15],
+  growth: [0, BRAIN_RY + 0.85, 0],
+  design: [0, 0.9, -(BRAIN_RZ + 1.15)],
+};
+
 export interface Brain3DInput {
   id: string;
   pillar: BrainPillar;
   chunks: number;
   kind: BrainNode["kind"];
+  tier: BrainNode["tier"];
 }
 
 export interface Brain3DNode extends Brain3DInput {
@@ -63,22 +110,29 @@ export function nodeRadius3D(chunks: number, kind: BrainNode["kind"]): number {
   return Math.min(0.46, Math.max(0.11, r));
 }
 
-/**
- * Pillar lobe bias: rotates each pillar's fibonacci points into its own
- * angular sector, so pillars read as brain lobes inside each hemisphere.
- */
-const PILLAR_THETA_OFFSET: Record<BrainPillar, number> = {
-  marketing: 0,
-  growth: 2.1,
-  design: 4.2,
-};
+/** Ellipsoid-normalized radius (0 = center, 1 = shell). */
+export function normalizedRadius(x: number, y: number, z: number): number {
+  return Math.sqrt((x / BRAIN_RX) ** 2 + (y / BRAIN_RY) ** 2 + (z / BRAIN_RZ) ** 2);
+}
+
+function tierBandOf(input: Brain3DInput): readonly [number, number] {
+  if (input.kind === "proposed") return TIER_RADIAL_BAND.proposed;
+  return TIER_RADIAL_BAND[input.tier] ?? TIER_RADIAL_BAND["2"];
+}
+
+const frac = (n: number) => n - Math.floor(n);
 
 /**
- * Lay nodes out in the brain volume. Nodes are grouped by pillar; within a
- * pillar they alternate hemispheres (each half-brain gets a mix of colors,
- * like a real brain), and within a hemisphere they sit on a fibonacci
- * lattice scaled into the ellipsoid, with seeded radial jitter so neurons
- * fill the volume rather than just the shell.
+ * Lay nodes out in the brain volume, organized into pillar lobes with tier
+ * banding. Nodes are grouped by pillar; within a pillar they alternate
+ * hemispheres (each half-brain gets a mix of colors, like a real brain).
+ * Within a (pillar, hemisphere) group:
+ *   - z spreads evenly across the pillar's lobe band (golden-ratio),
+ *   - y spreads evenly across the lobe's available vertical span
+ *     (golden-ratio coverage, so large beads don't all pile at one pole),
+ *   - x is solved on the unit sphere with the fissure gap enforced —
+ *     the tier band's radial floor keeps this feasible (see TIER_RADIAL_BAND),
+ *   - the radial distance is drawn from the node's tier band (seeded).
  */
 export function layoutBrain3D(inputs: Brain3DInput[]): Brain3DNode[] {
   const rand = mulberry32(LAYOUT_SEED);
@@ -99,36 +153,35 @@ export function layoutBrain3D(inputs: Brain3DInput[]): Brain3DNode[] {
     (g.left.length <= g.right.length ? g.left : g.right).push(n);
   }
 
+  const gapFrac = BRAIN_GAP / BRAIN_RX;
   const out: Brain3DNode[] = [];
   (Object.keys(hemi) as BrainPillar[]).forEach((pillar) => {
+    const [zLo, zHi] = LOBE_Z_BAND[pillar];
     ([
       [-1, hemi[pillar].left],
       [1, hemi[pillar].right],
     ] as const).forEach(([sign, list]) => {
-      const m = list.length;
       list.forEach((n, i) => {
-        // Fibonacci lattice on the unit sphere…
-        const y = m === 1 ? 0 : 1 - (2 * (i + 0.5)) / m;
-        const r = Math.sqrt(Math.max(0, 1 - y * y));
-        const theta = i * GOLDEN_ANGLE + PILLAR_THETA_OFFSET[pillar];
-        const gapFrac = BRAIN_GAP / BRAIN_RX;
-        // …mirrored into this hemisphere with the fissure gap enforced in
-        // unit space (the radial fill below can only shrink |x|, so the
-        // projection step re-enforces the gap with margin afterwards).
-        const ux = sign * (gapFrac + (1 - gapFrac) * Math.abs(r * Math.cos(theta)));
-        const uy = y;
-        const uz = r * Math.sin(theta);
-        // Radial jitter: fill the volume, not just the shell. Larger nodes
-        // drift slightly outward so the heavy neurons read on the surface.
-        const sizeBias = Math.min(1, n.chunks / 400);
-        const radial = 0.42 + rand() * 0.58 * (0.75 + 0.25 * sizeBias);
-        let x = ux * BRAIN_RX * radial;
-        let y3 = uy * BRAIN_RY * radial;
-        let z = uz * BRAIN_RZ * radial;
-        // Project into the feasible set: inside the ellipsoid AND outside
-        // the fissure. The gap push can add at most (GAP/RX)² to the
-        // ellipsoid value, so a 3% gap margin survives the final
-        // containment clamp with room to spare (bounded in the tests).
+        // Golden-ratio z: even coverage of the pillar's lobe band.
+        const zUnit = zLo + (zHi - zLo) * frac(i * GOLDEN_ANGLE);
+        // Tier band → target normalized radius (seeded).
+        const [rLo, rHi] = tierBandOf(n);
+        const rho = rLo + rand() * (rHi - rLo);
+        // Minimum |xu| so the bead clears the fissure at this radius.
+        const xuMin = Math.max(gapFrac * 1.1, (BRAIN_GAP * 1.06) / (BRAIN_RX * rho));
+        // y spreads evenly across the lobe's available vertical span (the
+        // tier-1 floor keeps zUnit² + xuMin² < 1 feasible — see
+        // TIER_RADIAL_BAND). Golden-ratio coverage so large beads don't all
+        // pile at one pole.
+        const yuMax = Math.sqrt(Math.max(0.02, 1 - zUnit * zUnit - xuMin * xuMin));
+        const yu = (2 * frac(i * 0.618033988749895 + 0.5) - 1) * yuMax;
+        // x solves the unit sphere; the gap floor is satisfied by
+        // construction (|xu| >= xuMin).
+        const xu = sign * Math.sqrt(Math.max(xuMin * xuMin, 1 - zUnit * zUnit - yu * yu));
+        let x = xu * BRAIN_RX * rho;
+        let y3 = yu * BRAIN_RY * rho;
+        let z = zUnit * BRAIN_RZ * rho;
+        // Safety projection: inside the ellipsoid AND outside the fissure.
         const GAP_EFF = BRAIN_GAP * 1.03;
         for (let k = 0; k < 4; k++) {
           const v = (x / BRAIN_RX) ** 2 + (y3 / BRAIN_RY) ** 2 + (z / BRAIN_RZ) ** 2;

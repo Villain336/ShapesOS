@@ -13,6 +13,7 @@
 import type { CorpusChunk, ExpertHit } from "./types";
 import { loadChunks } from "./store";
 import { embedCorpusText, cosineSimilarity } from "./embed";
+import { recordRetrievalHits } from "./activity";
 
 export interface RetrieveOptions {
   topK?: number;
@@ -44,7 +45,11 @@ async function retrieveWith(
   }
   scored.sort((a, b) => b.score - a.score);
 
-  return scored.slice(0, topK).map(({ chunk }) => ({
+  const hits = scored.slice(0, topK);
+  // Audit trail: per-source retrieval counters (best-effort, never throws).
+  // The public ExpertHit shape is unchanged — sourceIds stay internal.
+  recordRetrievalHits(hits.map(({ chunk }) => chunk.provenance.sourceId));
+  return hits.map(({ chunk }) => ({
     text: chunk.text,
     sourceTitle: chunk.provenance.sourceTitle,
     author: chunk.provenance.author,

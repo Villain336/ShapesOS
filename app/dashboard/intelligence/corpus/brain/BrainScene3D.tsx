@@ -22,10 +22,11 @@ import {
   BRAIN_RX,
   BRAIN_RY,
   BRAIN_RZ,
+  LOBE_LABEL_ANCHORS,
   type Brain3DNode,
 } from "@/lib/intelligence/corpus/brain3d-layout";
-import type { BrainGraph, BrainNode } from "@/lib/intelligence/corpus/graph";
-import { PILLAR_COLORS } from "./brain-ui";
+import type { BrainGraph, BrainNode, BrainPillar } from "@/lib/intelligence/corpus/graph";
+import { PILLAR_COLORS, PILLAR_LABEL } from "./brain-ui";
 import type { FocusRequest } from "./BrainCanvas2D";
 
 export interface BrainScene3DProps {
@@ -204,6 +205,50 @@ function useEdgeItems(
   }, [graph, byId, dimSet]);
 }
 
+// ── Lobe labels: DOM pills pinned to 3D anchors ─────────────────────────────
+// The pills themselves are plain DOM rendered by BrainScene3D (below the
+// Canvas); this projector lives inside the Canvas and only moves them — each
+// frame the three lobe anchors are projected with the live camera and the
+// pills are repositioned via direct DOM writes. Crisp text, constant screen
+// size, zero re-renders. (Pills must NOT be JSX inside the Canvas: R3F's
+// reconciler would try to build THREE objects out of the divs.)
+
+const _projV = new THREE.Vector3();
+
+function LabelProjector({
+  pillRefs,
+}: {
+  pillRefs: React.RefObject<Record<BrainPillar, HTMLDivElement | null>>;
+}) {
+  const camera = useThree((s) => s.camera);
+  const size = useThree((s) => s.size);
+  const pillars = useMemo(() => Object.keys(LOBE_LABEL_ANCHORS) as BrainPillar[], []);
+
+  useFrame(() => {
+    const w = size.width;
+    const h = size.height;
+    if (!w || !h) return;
+    camera.updateMatrixWorld();
+    for (const p of pillars) {
+      const el = pillRefs.current[p];
+      if (!el) continue;
+      const a = LOBE_LABEL_ANCHORS[p];
+      _projV.set(a[0], a[1], a[2]).project(camera);
+      if (_projV.z > 1 || _projV.z < -1) {
+        el.style.display = "none";
+        continue;
+      }
+      el.style.display = "";
+      el.style.visibility = "visible";
+      const x = ((_projV.x * 0.5 + 0.5) * w).toFixed(1);
+      const y = ((-_projV.y * 0.5 + 0.5) * h).toFixed(1);
+      el.style.transform = `translate3d(${x}px, ${y}px, 0) translate(-50%, -50%)`;
+    }
+  });
+
+  return null;
+}
+
 // ── Camera rig: auto-rotate, idle resume, search fly-to ─────────────────────
 
 function Rig({
@@ -261,13 +306,13 @@ function Rig({
 
 // ── Scene ──────────────────────────────────────────────────────────────────
 
-function Scene(props: BrainScene3DProps) {
+function Scene(props: BrainScene3DProps & { pillRefs: React.RefObject<Record<BrainPillar, HTMLDivElement | null>> }) {
   const { graph, nodeById, isDimmed, selectedId, hoverId, onHover, onSelect, focusRequest } = props;
 
   const placed = useMemo(
     () =>
       layoutBrain3D(
-        graph.nodes.map((n) => ({ id: n.id, pillar: n.pillar, chunks: n.chunks, kind: n.kind })),
+        graph.nodes.map((n) => ({ id: n.id, pillar: n.pillar, chunks: n.chunks, kind: n.kind, tier: n.tier })),
       ),
     [graph],
   );
@@ -334,6 +379,9 @@ function Scene(props: BrainScene3DProps) {
           </group>
         ))}
 
+        {/* Floating lobe labels (projected DOM pills tracking each pillar region) */}
+        <LabelProjector pillRefs={props.pillRefs} />
+
         {/* Synapse threads */}
         {edgeItems.map((it) => (
           <primitive key={it.key} object={it.line} visible={!it.dimmed} />
@@ -379,8 +427,19 @@ function Scene(props: BrainScene3DProps) {
 // ── Exported viewport ──────────────────────────────────────────────────────
 
 export function BrainScene3D(props: BrainScene3DProps) {
-  const { hoverId, nodeById, onSelect } = props;
+  const { graph, hoverId, nodeById, onSelect } = props;
   const hoverNode = hoverId ? nodeById.get(hoverId) : undefined;
+  const pillRefs = useRef<Record<BrainPillar, HTMLDivElement | null>>({
+    marketing: null,
+    growth: null,
+    design: null,
+  });
+  const lobeCounts = useMemo(() => {
+    const c: Record<BrainPillar, number> = { marketing: 0, growth: 0, design: 0 };
+    for (const n of graph.nodes) if (n.kind !== "proposed") c[n.pillar]++;
+    return c;
+  }, [graph]);
+  const lobePillars = useMemo(() => Object.keys(LOBE_LABEL_ANCHORS) as BrainPillar[], []);
 
   return (
     <div
@@ -397,15 +456,31 @@ export function BrainScene3D(props: BrainScene3DProps) {
         }
       >
         <Canvas
-          camera={{ position: [1.1, 1.8, 9.0], fov: 50 }}
+          camera={{ position: [6.9, 2.8, 7.4], fov: 50 }}
           dpr={[1, 2]}
           gl={{ antialias: true, alpha: true, powerPreference: "high-performance" }}
           onPointerMissed={() => onSelect(null)}
         >
           <fog attach="fog" args={["#f0eeea", 14, 28]} />
-          <Scene {...props} />
+          <Scene {...props} pillRefs={pillRefs} />
         </Canvas>
       </Suspense>
+
+      {/* Projected lobe-label pills (positioned each frame by LabelProjector) */}
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        {lobePillars.map((p) => (
+          <div
+            key={p}
+            ref={(d) => {
+              pillRefs.current[p] = d;
+            }}
+            className="absolute left-0 top-0 whitespace-nowrap rounded-full border border-stone-200 bg-white/90 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-stone-500 shadow-sm backdrop-blur"
+            style={{ pointerEvents: "none", visibility: "hidden" }}
+          >
+            {PILLAR_LABEL[p]} · {lobeCounts[p]}
+          </div>
+        ))}
+      </div>
 
       {/* Light legend */}
       <div className="pointer-events-none absolute left-3 top-3 flex flex-col gap-1.5 rounded-md border border-stone-200 bg-white/80 px-2.5 py-2 shadow-sm backdrop-blur">

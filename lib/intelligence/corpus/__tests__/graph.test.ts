@@ -124,3 +124,57 @@ describe("buildCorpusGraph — data-driven contract", () => {
     assert.equal(g.stats.pillars.marketing, 1);
   });
 });
+
+describe("buildCorpusGraph — audit fields (real data only)", () => {
+  it("attaches manifest provenance to every node", () => {
+    const g = buildCorpusGraph(
+      manifest([rec({ id: "apple-hig", tier: "learn-only", license: "learn-only", mode: "synthesis-1s" })]),
+    );
+    const n = g.nodes[0];
+    assert.equal(n.manifestVersion, 7);
+    assert.equal(n.retrievedDate, "2026-09-26");
+  });
+
+  it("proposed nodes have null provenance and zero counters", () => {
+    const g = buildCorpusGraph(manifest([]), [
+      { id: "p1", title: "Proposed", kind: "url", url: "https://x.com", pillar: "marketing" },
+    ] as ProposedSource[]);
+    const n = g.nodes.find((x) => x.id === "proposed:p1")!;
+    assert.equal(n.manifestVersion, null);
+    assert.equal(n.retrievedDate, null);
+    assert.equal(n.evalHits, 0);
+    assert.equal(n.retrievalHits, 0);
+  });
+
+  it("computes pillar chunk distribution and real eval/audit stats", () => {
+    const g = buildCorpusGraph(
+      manifest([
+        rec({ id: "a", chunks: 100 }), // marketing (default), tier 2
+        rec({ id: "b", chunks: 40 }), // marketing (default), tier 2
+      ]),
+      [],
+      new Map(),
+      {
+        eval: { precision: 1, questions: 22, correct: 22, runAt: "2026-09-26T00:00:00Z" },
+        evalHitsBySource: new Map([["a", 5]]),
+        retrievalHitsBySource: new Map([["a", 3], ["b", 7]]),
+      },
+    );
+    assert.equal(g.stats.pillarChunks.marketing, 140);
+    assert.equal(g.stats.pillarChunks.growth, 0);
+    assert.equal(g.stats.pillarChunks.design, 0);
+    assert.equal(g.stats.eval!.correct, 22);
+    assert.equal(g.stats.eval!.questions, 22);
+    assert.equal(g.stats.retrievalHitsTotal, 10);
+    assert.equal(g.nodes.find((n) => n.id === "a")!.evalHits, 5);
+    assert.equal(g.nodes.find((n) => n.id === "b")!.retrievalHits, 7);
+  });
+
+  it("defaults to null eval and zero counters when no audit data is passed", () => {
+    const g = buildCorpusGraph(manifest([rec({ id: "a", chunks: 10 })]));
+    assert.equal(g.stats.eval, null);
+    assert.equal(g.stats.retrievalHitsTotal, 0);
+    assert.equal(g.nodes[0].evalHits, 0);
+    assert.equal(g.nodes[0].retrievalHits, 0);
+  });
+});
