@@ -9,6 +9,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Bell,
+  Bot,
   Cloud,
   Gauge,
   Lock,
@@ -31,6 +32,7 @@ const LINKS = [
   { href: "/dashboard/settings/members", label: "Members", icon: Users },
   { href: "/dashboard/settings/providers", label: "Providers", icon: Cloud },
   { href: "/dashboard/settings/governance", label: "Governance", icon: Scale },
+  { href: "/dashboard/settings/automation", label: "Automation", icon: Bot },
   { href: "/dashboard/settings/security", label: "Security", icon: Lock },
   { href: "/dashboard/settings/notifications", label: "Notifications", icon: Bell },
   { href: "/dashboard/settings/defaults", label: "Defaults", icon: SlidersHorizontal },

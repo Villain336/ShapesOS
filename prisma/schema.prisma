@@ -673,6 +673,8 @@ model Workspace {
   missions               Mission[]
   missionEvents          MissionEvent[]
   missionApprovals       MissionApproval[]
+  missionApprovalEvents MissionApprovalEvent[]
+  escalationRules        EscalationRule[]
   playbooks              Playbook[]
   playbookVersions       PlaybookVersion[]
   automationSettings     AutomationSetting[]
@@ -6909,9 +6911,51 @@ model MissionApproval {
   createdBy   String                @map("created_by")
   createdAt   DateTime              @default(now()) @map("created_at")
 
+  approvalEvents MissionApprovalEvent[]
+
   @@index([workspaceId, status])
   @@index([missionId, status])
   @@map("mission_approvals")
+}
+
+// APPEND-ONLY: hash-chained approval event trail (M1 gap #2, M6). One chain
+// per approval_id: prev_hash = previous eventHash ("GENESIS" for the first).
+// App code must never update or delete rows.
+model MissionApprovalEvent {
+  id          String   @id @default(cuid()) @map("id")
+  approvalId  String   @map("approval_id")
+  approval    MissionApproval @relation(fields: [approvalId], references: [id], onDelete: Cascade)
+  workspaceId String   @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  ts          DateTime @default(now()) @map("ts")
+  actor       String   @map("actor")
+  action      String   @map("action")
+  payloadHash String   @map("payload_hash")
+  prevHash    String   @map("prev_hash")
+  eventHash   String   @map("event_hash")
+
+  @@index([approvalId, ts])
+  @@index([workspaceId, ts])
+  @@map("mission_approval_events")
+}
+
+// User-editable escalation rules for the automation policy (§P9E).
+// condition_json: { kind: "amount_above"|"unseen_treatment"|"no_source_record"|"external_audience", value? }.
+// action: "require_approval" | "notify".
+model EscalationRule {
+  id            String   @id @default(cuid()) @map("id")
+  workspaceId   String   @map("workspace_id")
+  workspace     Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name          String   @map("name")
+  conditionJson Json     @map("condition_json")
+  action        String   @map("action")
+  enabled       Boolean  @default(true) @map("enabled")
+  position      Int      @default(0) @map("position")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@index([workspaceId, position])
+  @@map("escalation_rules")
 }
 
 enum PlaybookSource {
