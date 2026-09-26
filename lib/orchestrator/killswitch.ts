@@ -9,6 +9,7 @@
 // M1 ships the hook; M4 implements the real re-verification checklist.
 
 import { prisma } from "@/lib/prisma";
+import { withWorkspaceScope } from "@/lib/substrate/graph/rls";
 import { appendMissionEvent } from "./audit";
 
 export class KillSwitchError extends Error {
@@ -52,13 +53,17 @@ export async function isWorkspaceFrozen(workspaceId: string): Promise<boolean> {
   return ws?.frozenAt != null;
 }
 
-/** Kill-switch check #2 for executor entry points (approvals bound to a mission). */
+/** Kill-switch check #2 for executor entry points (approvals bound to a mission).
+ *  The missions table has FORCE RLS — the tenant GUC must be pinned or the
+ *  query silently sees zero rows (fail-closed). */
 export async function isMissionPaused(missionId: string, workspaceId: string): Promise<boolean> {
-  const m = await prisma.mission.findFirst({
-    where: { id: missionId, workspaceId },
-    select: { status: true },
+  return withWorkspaceScope(workspaceId, async (tx) => {
+    const m = await tx.mission.findFirst({
+      where: { id: missionId, workspaceId },
+      select: { status: true },
+    });
+    return m?.status === "paused";
   });
-  return m?.status === "paused";
 }
 
 /**
@@ -70,16 +75,20 @@ export async function pauseMission(
   workspaceId: string,
   actor = "killswitch",
 ): Promise<void> {
-  const m = await prisma.mission.findFirst({ where: { id: missionId, workspaceId } });
-  if (!m) throw new KillSwitchError("Mission not found in workspace.");
-  if (m.status === "paused") return;
-  if (m.status === "complete" || m.status === "archived") {
-    throw new KillSwitchError(`Cannot pause mission in status "${m.status}".`);
-  }
-  await prisma.mission.update({
-    where: { id: missionId },
-    data: { status: "paused" },
+  const m = await withWorkspaceScope(workspaceId, async (tx) => {
+    const found = await tx.mission.findFirst({ where: { id: missionId, workspaceId } });
+    if (!found) throw new KillSwitchError("Mission not found in workspace.");
+    if (found.status === "paused") return found;
+    if (found.status === "complete" || found.status === "archived") {
+      throw new KillSwitchError(`Cannot pause mission in status "${found.status}".`);
+    }
+    await tx.mission.update({
+      where: { id: missionId },
+      data: { status: "paused" },
+    });
+    return found;
   });
+  if (m.status === "paused") return;
   await appendMissionEvent({
     missionId,
     workspaceId,
@@ -101,11 +110,14 @@ export async function resumeMission(
     verifyStaleness?: () => Promise<StalenessReport>;
   } = {},
 ): Promise<StalenessReport> {
-  const m = await prisma.mission.findFirst({ where: { id: missionId, workspaceId } });
-  if (!m) throw new KillSwitchError("Mission not found in workspace.");
-  if (m.status !== "paused") {
-    throw new KillSwitchError(`Cannot resume mission in status "${m.status}" — only paused missions resume.`);
-  }
+  const m = await withWorkspaceScope(workspaceId, async (tx) => {
+    const found = await tx.mission.findFirst({ where: { id: missionId, workspaceId } });
+    if (!found) throw new KillSwitchError("Mission not found in workspace.");
+    if (found.status !== "paused") {
+      throw new KillSwitchError(`Cannot resume mission in status "${found.status}" — only paused missions resume.`);
+    }
+    return found;
+  });
   const verify = opts.verifyStaleness ?? defaultStalenessVerification;
   const report = await verify();
   if (!report.fresh) {
@@ -123,9 +135,11 @@ export async function resumeMission(
         .join(", ")}`,
     );
   }
-  await prisma.mission.update({
-    where: { id: missionId },
-    data: { status: "active" },
+  await withWorkspaceScope(workspaceId, async (tx) => {
+    await tx.mission.update({
+      where: { id: missionId },
+      data: { status: "active" },
+    });
   });
   await appendMissionEvent({
     missionId,
@@ -154,16 +168,19 @@ export async function freezeWorkspace(
     data: { frozenAt: new Date() },
   });
   // Workspace-level event (no mission context): recorded as a command-audit
-  // entry so the freeze is in the append-only trail.
-  await prisma.commandAudit.create({
-    data: {
-      workspaceId,
-      userId: actor,
-      kind: "doAction",
-      promptHash: null,
-      promptFull: null,
-      resultSummary: `workspace frozen${reason ? `: ${reason}` : ""}`,
-    },
+  // entry so the freeze is in the append-only trail. command_audit has FORCE
+  // RLS — the GUC must be pinned for the insert to pass its WITH CHECK.
+  await withWorkspaceScope(workspaceId, async (tx) => {
+    await tx.commandAudit.create({
+      data: {
+        workspaceId,
+        userId: actor,
+        kind: "doAction",
+        promptHash: null,
+        promptFull: null,
+        resultSummary: `workspace frozen${reason ? `: ${reason}` : ""}`,
+      },
+    });
   });
 }
 
@@ -176,24 +193,56 @@ export async function unfreezeWorkspace(workspaceId: string, actor = "killswitch
     where: { id: workspaceId },
     data: { frozenAt: null },
   });
-  await prisma.commandAudit.create({
-    data: {
-      workspaceId,
-      userId: actor,
-      kind: "doAction",
-      resultSummary: "workspace unfrozen",
-    },
+  await withWorkspaceScope(workspaceId, async (tx) => {
+    await tx.commandAudit.create({
+      data: {
+        workspaceId,
+        userId: actor,
+        kind: "doAction",
+        resultSummary: "workspace unfrozen",
+      },
+    });
   });
 }
 
 /**
  * globalHalt — emergency: pauses ALL active missions across ALL workspaces.
  * Does not freeze workspaces (use freezeWorkspace per workspace for that).
+ *
+ * The missions table has FORCE RLS: a session without the tenant GUC sees
+ * zero rows, so a single cross-workspace UPDATE would silently pause nothing.
+ * Instead we enumerate workspaces (the workspaces table has no RLS) and pause
+ * per workspace inside its own tenant scope. Honest and auditable.
  */
 export async function globalHalt(actor = "killswitch", reason?: string): Promise<{ paused: number }> {
-  const res = await prisma.mission.updateMany({
-    where: { status: "active" },
-    data: { status: "paused" },
-  });
-  return { paused: res.count };
+  const workspaces = await prisma.workspace.findMany({ select: { id: true } });
+  let paused = 0;
+  for (const ws of workspaces) {
+    const res = await withWorkspaceScope(ws.id, async (tx) => {
+      const targets = await tx.mission.findMany({
+        where: { status: "active" },
+        select: { id: true },
+      });
+      for (const t of targets) {
+        await tx.mission.update({ where: { id: t.id }, data: { status: "paused" } });
+      }
+      return targets.length;
+    });
+    paused += res;
+    if (res > 0) {
+      // Workspace-level audit entry (missions have per-mission event chains;
+      // the halt itself is recorded at workspace level).
+      await withWorkspaceScope(ws.id, async (tx) => {
+        await tx.commandAudit.create({
+          data: {
+            workspaceId: ws.id,
+            userId: actor,
+            kind: "doAction",
+            resultSummary: `global halt: ${res} mission(s) paused${reason ? ` — ${reason}` : ""}`,
+          },
+        });
+      });
+    }
+  }
+  return { paused };
 }
