@@ -22,6 +22,7 @@ import {
   useNodesState,
   useEdgesState,
   useReactFlow,
+  useStoreApi,
   type Node,
   type Edge,
   type NodeProps,
@@ -273,6 +274,7 @@ function GraphCanvas({
   const animRef = useRef<number | null>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const { fitView } = useReactFlow();
+  const storeApi = useStoreApi();
 
   const selectNode = useCallback(
     (id: string) => {
@@ -403,6 +405,43 @@ function GraphCanvas({
   useEffect(() => {
     setNodes((cur) => cur.map((nd) => ({ ...nd, selected: nd.id === selectedId })));
   }, [selectedId, setNodes]);
+
+  // React Flow v12 resets a node's measured dimensions + handle bounds
+  // whenever setNodes() receives brand-new node objects (adoptUserNodes only
+  // preserves internals when the object identity is unchanged or the new
+  // objects carry `measured`). Our intro animation, selection sync and drags
+  // all create new objects — without this, every animation frame unmounts
+  // every edge (isNodeInitialized fails) and the ResizeObserver never
+  // re-fires (node size doesn't change, only position), so edges
+  // intermittently never render at all. Seed the DOM-measured dimensions
+  // onto our node objects as soon as React Flow measures them; every later
+  // setNodes then carries `measured` via object spread and node internals
+  // (hence edges) survive.
+  useEffect(() => {
+    const seedMeasured = () => {
+      const { nodeLookup } = storeApi.getState();
+      setNodes((cur) => {
+        if (cur.length === 0) return cur;
+        let changed = false;
+        const next = cur.map((nd) => {
+          const m = nodeLookup.get(nd.id)?.measured;
+          if (
+            m?.width != null &&
+            m?.height != null &&
+            (nd.measured?.width !== m.width || nd.measured?.height !== m.height)
+          ) {
+            changed = true;
+            return { ...nd, measured: { width: m.width, height: m.height } };
+          }
+          return nd;
+        });
+        return changed ? next : cur;
+      });
+    };
+    seedMeasured();
+    const unsub = storeApi.subscribe(seedMeasured);
+    return unsub;
+  }, [storeApi, setNodes]);
 
   // A user grab cancels the intro animation so it never fights the drag.
   const cancelIntro = useCallback(() => {
