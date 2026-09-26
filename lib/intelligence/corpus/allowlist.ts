@@ -455,13 +455,332 @@ export const SEED_SOURCES: readonly SeedSourceDef[] = [
       "High-signal free practitioner content, all-rights-reserved: synthesis only. Original-synthesis playbook below.",
     playbook: { file: "seo-tactics-playbook.md", synthesizedFrom: ["Ahrefs blog"] },
   },
+  // ── Tier 1S wave 2 (2026-09-26): 19 new playbooks, 24 learn-only sources.
+  // All Marketr-original synthesis; the verbatim gate REFUSES them.
+  {
+    id: "x-for-business",
+    title: "X for Business / Flight School",
+    author: "X",
+    tier: "learn-only",
+    license: "learn-only",
+    licenseUrl: "",
+    fetchUrls: [],
+    format: "html",
+    pendingReason:
+      "Free platform academy, all-rights-reserved: synthesis only. Original-synthesis playbook below.",
+    playbook: { file: "x-business-playbook.md", synthesizedFrom: ["X for Business / Flight School"] },
+  },
+  {
+    id: "pinterest-academy",
+    title: "Pinterest Academy",
+    author: "Pinterest",
+    tier: "learn-only",
+    license: "learn-only",
+    licenseUrl: "",
+    fetchUrls: [],
+    format: "html",
+    pendingReason:
+      "Free platform academy, all-rights-reserved: synthesis only. Original-synthesis playbook below.",
+    playbook: { file: "pinterest-academy-playbook.md", synthesizedFrom: ["Pinterest Academy"] },
+  },
+  {
+    id: "snapchat-ads",
+    title: "Snapchat for Business",
+    author: "Snap",
+    tier: "learn-only",
+    license: "learn-only",
+    licenseUrl: "",
+    fetchUrls: [],
+    format: "html",
+    pendingReason:
+      "Free platform business docs, all-rights-reserved: synthesis only. Original-synthesis playbook below.",
+    playbook: { file: "snapchat-ads-playbook.md", synthesizedFrom: ["Snapchat for Business"] },
+  },
+  {
+    id: "youtube-creator-academy",
+    title: "YouTube Creator Academy",
+    author: "YouTube",
+    tier: "learn-only",
+    license: "learn-only",
+    licenseUrl: "",
+    fetchUrls: [],
+    format: "html",
+    pendingReason:
+      "Free platform academy, all-rights-reserved: synthesis only. Original-synthesis playbook below.",
+    playbook: { file: "youtube-creator-playbook.md", synthesizedFrom: ["YouTube Creator Academy"] },
+  },
+  {
+    id: "amazon-ads-learning",
+    title: "Amazon Ads Learning Console",
+    author: "Amazon",
+    tier: "learn-only",
+    license: "learn-only",
+    licenseUrl: "",
+    fetchUrls: [],
+    format: "html",
+    pendingReason:
+      "Free platform academy, all-rights-reserved: synthesis only. Original-synthesis playbook below.",
+    playbook: { file: "amazon-ads-playbook.md", synthesizedFrom: ["Amazon Ads Learning Console"] },
+  },
+  {
+    id: "reddit-for-business",
+    title: "Reddit for Business",
+    author: "Reddit",
+    tier: "learn-only",
+    license: "learn-only",
+    licenseUrl: "",
+    fetchUrls: [],
+    format: "html",
+    pendingReason:
+      "Free platform business docs, all-rights-reserved: synthesis only. Original-synthesis playbook below.",
+    playbook: { file: "reddit-ads-playbook.md", synthesizedFrom: ["Reddit for Business"] },
+  },
+  {
+    id: "apple-hig",
+    title: "Apple Human Interface Guidelines",
+    author: "Apple",
+    tier: "learn-only",
+    license: "learn-only",
+    licenseUrl: "",
+    fetchUrls: [],
+    format: "html",
+    pendingReason:
+      "Free to read, all rights reserved: learn-and-synthesize only, never ingest. Original-synthesis playbook below.",
+    playbook: { file: "apple-hig-playbook.md", synthesizedFrom: ["Apple Human Interface Guidelines"] },
+  },
+  {
+    id: "material-3",
+    title: "Material Design 3",
+    author: "Google",
+    tier: "learn-only",
+    license: "learn-only",
+    licenseUrl: "",
+    fetchUrls: [],
+    format: "html",
+    pendingReason:
+      "Guideline text all-rights-reserved (icons are Apache 2.0, code aside): synthesis only. Original-synthesis playbook below.",
+    playbook: { file: "material-3-playbook.md", synthesizedFrom: ["Material Design 3"] },
+  },
+  {
+    id: "microsoft-fluent",
+    title: "Microsoft Fluent (Fluent 2)",
+    author: "Microsoft",
+    tier: "learn-only",
+    license: "learn-only",
+    licenseUrl: "",
+    fetchUrls: [],
+    format: "html",
+    pendingReason:
+      "Guidance text all-rights-reserved (Fluent UI code is MIT): synthesis only. Original-synthesis playbook below.",
+    playbook: { file: "fluent-playbook.md", synthesizedFrom: ["Microsoft Fluent"] },
+  },
+  {
+    id: "nng",
+    title: "Nielsen Norman Group",
+    author: "Nielsen Norman Group",
+    tier: "learn-only",
+    license: "learn-only",
+    licenseUrl: "",
+    fetchUrls: [],
+    format: "html",
+    pendingReason:
+      "Free articles, all-rights-reserved: synthesis only. Original-synthesis playbook below.",
+    playbook: { file: "nng-heuristics-playbook.md", synthesizedFrom: ["Nielsen Norman Group"] },
+  },
+  {
+    id: "laws-of-ux",
+    title: "Laws of UX",
+    author: "Jon Yablonski",
+    tier: "learn-only",
+    license: "learn-only",
+    licenseUrl: "",
+    fetchUrls: [],
+    format: "html",
+    pendingReason:
+      "Free site, author-retained rights [UNVERIFIED license]: synthesize ideas only. Original-synthesis playbook below.",
+    playbook: { file: "laws-of-ux-playbook.md", synthesizedFrom: ["Laws of UX"] },
+  },
+  {
+    id: "practical-typography",
+    title: "Practical Typography",
+    author: "Matthew Butterick",
+    tier: "learn-only",
+    license: "learn-only",
+    licenseUrl: "",
+    fetchUrls: [],
+    format: "html",
+    pendingReason:
+      "Free to read online, © all-rights-reserved ('no part may be reproduced'): PARAPHRASE ONLY, never ingest. Original-synthesis playbook below.",
+    playbook: { file: "practical-typography-playbook.md", synthesizedFrom: ["Practical Typography"] },
+  },
+  {
+    id: "baymard",
+    title: "Baymard Institute (free articles)",
+    author: "Baymard Institute",
+    tier: "learn-only",
+    license: "learn-only",
+    licenseUrl: "",
+    fetchUrls: [],
+    format: "html",
+    pendingReason:
+      "Free articles, all-rights-reserved: synthesis only; percentages are study-bound benchmarks, never constants. Original-synthesis playbook below.",
+    playbook: { file: "baymard-checkout-playbook.md", synthesizedFrom: ["Baymard Institute"] },
+  },
+  {
+    id: "atomic-design",
+    title: "Atomic Design",
+    author: "Brad Frost",
+    tier: "learn-only",
+    license: "learn-only",
+    licenseUrl: "",
+    fetchUrls: [],
+    format: "html",
+    pendingReason:
+      "Free book, no verifiable license [UNVERIFIED]: synthesize ideas only. Original-synthesis playbook below.",
+    playbook: { file: "atomic-design-playbook.md", synthesizedFrom: ["Atomic Design (Brad Frost)"] },
+  },
+  {
+    id: "style-guide-guide",
+    title: "Style Guide Guide",
+    author: "Brad Frost",
+    tier: "learn-only",
+    license: "learn-only",
+    licenseUrl: "",
+    fetchUrls: [],
+    format: "html",
+    pendingReason:
+      "Free site, author-retained rights: synthesize ideas only. Original-synthesis playbook below.",
+    playbook: { file: "style-guide-ops-playbook.md", synthesizedFrom: ["Style Guide Guide (Brad Frost)"] },
+  },
+  {
+    id: "refactoring-ui",
+    title: "Refactoring UI (public writing)",
+    author: "Adam Wathan & Steve Schoger",
+    tier: "learn-only",
+    license: "learn-only",
+    licenseUrl: "",
+    fetchUrls: [],
+    format: "html",
+    pendingReason:
+      "The book is paywalled (Tier 3, never ingested); this playbook synthesizes the authors' free public writing and talks only. Original-synthesis playbook below.",
+    playbook: { file: "refactoring-ui-playbook.md", synthesizedFrom: ["Refactoring UI (public writing)"] },
+  },
+  {
+    id: "emil-kowalski",
+    title: "Emil Kowalski (design-engineering writing)",
+    author: "Emil Kowalski",
+    tier: "learn-only",
+    license: "learn-only",
+    licenseUrl: "",
+    fetchUrls: [],
+    format: "html",
+    pendingReason:
+      "Free blog/newsletter, author-retained rights: synthesize ideas only. Original-synthesis playbook below.",
+    playbook: { file: "motion-craft-playbook.md", synthesizedFrom: ["Emil Kowalski"] },
+  },
+  {
+    id: "growth-design",
+    title: "Growth.Design",
+    author: "Growth.Design",
+    tier: "learn-only",
+    license: "learn-only",
+    licenseUrl: "",
+    fetchUrls: [],
+    format: "html",
+    pendingReason:
+      "Free case-study teardowns, all-rights-reserved: synthesis only. Original-synthesis playbook below.",
+    playbook: { file: "growth-design-teardowns-playbook.md", synthesizedFrom: ["Growth.Design"] },
+  },
+  // Enterprise design-systems survey: six registry entries, ONE shared
+  // comparative-survey playbook file (ingested once — the ingest script
+  // dedupes shared playbook files; the other five entries record as
+  // covered-by-survey, never re-ingested).
+  {
+    id: "ibm-carbon",
+    title: "IBM Carbon Design System",
+    author: "IBM",
+    tier: "learn-only",
+    license: "learn-only",
+    licenseUrl: "",
+    fetchUrls: [],
+    format: "html",
+    pendingReason:
+      "Guidance text all-rights-reserved: synthesis only, via the comparative survey playbook below.",
+    playbook: { file: "enterprise-design-systems-playbook.md", synthesizedFrom: ["IBM Carbon", "Atlassian Design System", "Adobe Spectrum", "Shopify Polaris", "GitHub Primer", "Salesforce Lightning Design System"] },
+  },
+  {
+    id: "atlassian-design",
+    title: "Atlassian Design System",
+    author: "Atlassian",
+    tier: "learn-only",
+    license: "learn-only",
+    licenseUrl: "",
+    fetchUrls: [],
+    format: "html",
+    pendingReason:
+      "Guidance text all-rights-reserved: synthesis only, via the comparative survey playbook below.",
+    playbook: { file: "enterprise-design-systems-playbook.md", synthesizedFrom: ["IBM Carbon", "Atlassian Design System", "Adobe Spectrum", "Shopify Polaris", "GitHub Primer", "Salesforce Lightning Design System"] },
+  },
+  {
+    id: "adobe-spectrum",
+    title: "Adobe Spectrum",
+    author: "Adobe",
+    tier: "learn-only",
+    license: "learn-only",
+    licenseUrl: "",
+    fetchUrls: [],
+    format: "html",
+    pendingReason:
+      "Guidance text all-rights-reserved: synthesis only, via the comparative survey playbook below.",
+    playbook: { file: "enterprise-design-systems-playbook.md", synthesizedFrom: ["IBM Carbon", "Atlassian Design System", "Adobe Spectrum", "Shopify Polaris", "GitHub Primer", "Salesforce Lightning Design System"] },
+  },
+  {
+    id: "shopify-polaris",
+    title: "Shopify Polaris",
+    author: "Shopify",
+    tier: "learn-only",
+    license: "learn-only",
+    licenseUrl: "",
+    fetchUrls: [],
+    format: "html",
+    pendingReason:
+      "Guidance text all-rights-reserved: synthesis only, via the comparative survey playbook below.",
+    playbook: { file: "enterprise-design-systems-playbook.md", synthesizedFrom: ["IBM Carbon", "Atlassian Design System", "Adobe Spectrum", "Shopify Polaris", "GitHub Primer", "Salesforce Lightning Design System"] },
+  },
+  {
+    id: "github-primer",
+    title: "GitHub Primer",
+    author: "GitHub",
+    tier: "learn-only",
+    license: "learn-only",
+    licenseUrl: "",
+    fetchUrls: [],
+    format: "html",
+    pendingReason:
+      "Guidance text all-rights-reserved: synthesis only, via the comparative survey playbook below.",
+    playbook: { file: "enterprise-design-systems-playbook.md", synthesizedFrom: ["IBM Carbon", "Atlassian Design System", "Adobe Spectrum", "Shopify Polaris", "GitHub Primer", "Salesforce Lightning Design System"] },
+  },
+  {
+    id: "salesforce-lightning",
+    title: "Salesforce Lightning Design System",
+    author: "Salesforce",
+    tier: "learn-only",
+    license: "learn-only",
+    licenseUrl: "",
+    fetchUrls: [],
+    format: "html",
+    pendingReason:
+      "Guidance text all-rights-reserved: synthesis only, via the comparative survey playbook below.",
+    playbook: { file: "enterprise-design-systems-playbook.md", synthesizedFrom: ["IBM Carbon", "Atlassian Design System", "Adobe Spectrum", "Shopify Polaris", "GitHub Primer", "Salesforce Lightning Design System"] },
+  },
 ];
 
 /**
  * Tier 1S synthesis playbooks, in ingestion order. Each entry names the
  * Marketr-original playbook file and the learn-only registry source(s) it
  * was distilled from (learn-only registry ids only — enforced at ingest).
- * These are the 11 Tier 1S playbooks v1 ships.
+ * 30 entries: the 11 wave-1 playbooks plus the 19 wave-2 files (one entry
+ * per file; the enterprise survey file is shared by six registry sources).
  */
 export const SYNTHESIS_PLAYBOOKS: readonly SynthesisPlaybookRef[] = [
   { sourceId: "meta-blueprint", file: "paid-social-playbook.md", title: "Paid Social Campaign Playbook", synthesizedFrom: ["Meta Blueprint"] },
@@ -475,6 +794,27 @@ export const SYNTHESIS_PLAYBOOKS: readonly SynthesisPlaybookRef[] = [
   { sourceId: "copyhackers-blog", file: "conversion-copy-playbook.md", title: "Conversion Copy Playbook", synthesizedFrom: ["Copyhackers blog"] },
   { sourceId: "demand-curve-blog", file: "startup-acquisition-playbook.md", title: "Startup Acquisition Playbook", synthesizedFrom: ["Demand Curve blog"] },
   { sourceId: "ahrefs-blog", file: "seo-tactics-playbook.md", title: "SEO Tactics Playbook", synthesizedFrom: ["Ahrefs blog"] },
+  // Tier 1S wave 2 (2026-09-26): 19 new playbook files (one entry per file;
+  // the enterprise survey file is shared by six registry sources).
+  { sourceId: "x-for-business", file: "x-business-playbook.md", title: "X for Business Playbook", synthesizedFrom: ["X for Business / Flight School"] },
+  { sourceId: "pinterest-academy", file: "pinterest-academy-playbook.md", title: "Pinterest Academy Playbook", synthesizedFrom: ["Pinterest Academy"] },
+  { sourceId: "snapchat-ads", file: "snapchat-ads-playbook.md", title: "Snapchat Ads Playbook", synthesizedFrom: ["Snapchat for Business"] },
+  { sourceId: "youtube-creator-academy", file: "youtube-creator-playbook.md", title: "YouTube Creator Playbook", synthesizedFrom: ["YouTube Creator Academy"] },
+  { sourceId: "amazon-ads-learning", file: "amazon-ads-playbook.md", title: "Amazon Ads Playbook", synthesizedFrom: ["Amazon Ads Learning Console"] },
+  { sourceId: "reddit-for-business", file: "reddit-ads-playbook.md", title: "Reddit Ads Playbook", synthesizedFrom: ["Reddit for Business"] },
+  { sourceId: "apple-hig", file: "apple-hig-playbook.md", title: "Apple HIG Playbook", synthesizedFrom: ["Apple Human Interface Guidelines"] },
+  { sourceId: "material-3", file: "material-3-playbook.md", title: "Material Design 3 Playbook", synthesizedFrom: ["Material Design 3"] },
+  { sourceId: "microsoft-fluent", file: "fluent-playbook.md", title: "Fluent Design Playbook", synthesizedFrom: ["Microsoft Fluent"] },
+  { sourceId: "nng", file: "nng-heuristics-playbook.md", title: "NN/g Heuristics Playbook", synthesizedFrom: ["Nielsen Norman Group"] },
+  { sourceId: "laws-of-ux", file: "laws-of-ux-playbook.md", title: "Laws of UX Playbook", synthesizedFrom: ["Laws of UX"] },
+  { sourceId: "practical-typography", file: "practical-typography-playbook.md", title: "Practical Typography Playbook", synthesizedFrom: ["Practical Typography"] },
+  { sourceId: "baymard", file: "baymard-checkout-playbook.md", title: "Baymard Checkout Playbook", synthesizedFrom: ["Baymard Institute"] },
+  { sourceId: "atomic-design", file: "atomic-design-playbook.md", title: "Atomic Design Playbook", synthesizedFrom: ["Atomic Design (Brad Frost)"] },
+  { sourceId: "style-guide-guide", file: "style-guide-ops-playbook.md", title: "Style Guide Ops Playbook", synthesizedFrom: ["Style Guide Guide (Brad Frost)"] },
+  { sourceId: "refactoring-ui", file: "refactoring-ui-playbook.md", title: "Refactoring UI Playbook", synthesizedFrom: ["Refactoring UI (public writing)"] },
+  { sourceId: "emil-kowalski", file: "motion-craft-playbook.md", title: "Motion Craft Playbook", synthesizedFrom: ["Emil Kowalski"] },
+  { sourceId: "growth-design", file: "growth-design-teardowns-playbook.md", title: "Growth Design Teardowns Playbook", synthesizedFrom: ["Growth.Design"] },
+  { sourceId: "ibm-carbon", file: "enterprise-design-systems-playbook.md", title: "Enterprise Design Systems Survey Playbook", synthesizedFrom: ["IBM Carbon", "Atlassian Design System", "Adobe Spectrum", "Shopify Polaris", "GitHub Primer", "Salesforce Lightning Design System"] },
 ];
 
 /** Registry lookup (for the ingest script + manifest writer). */

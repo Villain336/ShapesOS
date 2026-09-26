@@ -52,6 +52,10 @@ async function main(): Promise<void> {
   let verbatim = 0;
   let synthesized = 0;
   let pending = 0;
+  // A playbook FILE is ingested at most once per run: several learn-only
+  // registry entries may share one comparative-survey file (e.g. the six
+  // enterprise design systems). Later entries record as covered-by-survey.
+  const ingestedPlaybookFiles = new Map<string, string>(); // file -> first sourceId
 
   if (!dryRun) {
     clearAsset("main");
@@ -69,6 +73,21 @@ async function main(): Promise<void> {
         console.log(`  … ${pad(def.id, 38)} pending (no 1S playbook yet)`);
         continue;
       }
+      const sharedBy = ingestedPlaybookFiles.get(pb.file);
+      if (sharedBy) {
+        // Same file already ingested this run under another registry entry:
+        // covered, not re-ingested (avoids duplicate chunks).
+        records.push({
+          id: def.id, title: def.title, author: def.author, tier: "learn-only",
+          license: "learn-only", licenseUrl: "", sourceUrl: "", status: "pending",
+          mode: "synthesis-1s", chunks: 0, version: nextVersion, retrievedDate: TODAY,
+          segregatedAsset: false,
+          pendingReason: `1S playbook shared — ingested once under "${sharedBy}" (file: ${pb.file}); synthesizedFrom covers this source.`,
+        });
+        pending++;
+        console.log(`  ~ ${pad(def.id, 38)} 1S shared (covered under ${sharedBy})`);
+        continue;
+      }
       if (dryRun) {
         records.push({
           id: def.id, title: def.title, author: def.author, tier: "learn-only",
@@ -77,6 +96,7 @@ async function main(): Promise<void> {
           segregatedAsset: false,
         });
         synthesized++;
+        ingestedPlaybookFiles.set(pb.file, def.id);
         console.log(`  ~ ${pad(def.id, 38)} 1S playbook (dry run): ${pb.file}`);
         continue;
       }
@@ -96,6 +116,7 @@ async function main(): Promise<void> {
       records.push(record);
       if (record.status === "active") {
         synthesized++;
+        ingestedPlaybookFiles.set(pb.file, def.id);
         console.log(`  ✓ ${pad(def.id, 38)} 1S: ${record.chunks} chunks (${pb.file})`);
       } else {
         pending++;

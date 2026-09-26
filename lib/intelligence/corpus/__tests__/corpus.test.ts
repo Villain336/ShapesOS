@@ -211,7 +211,7 @@ describe("allowlist (binding clean-sourcing tiers)", () => {
     const bad = results.filter((r) => !r.ok);
     assert.deepEqual(bad, [], `registry violations: ${JSON.stringify(bad)}`);
     const refused = results.filter((r) => r.reason.startsWith("correctly refused"));
-    assert.equal(refused.length, 11, `expected exactly 11 learn-only entries refused, got ${refused.length}`);
+    assert.equal(refused.length, 35, `expected exactly 35 learn-only entries refused, got ${refused.length}`);
     for (const s of SEED_SOURCES) {
       if (s.tier !== "learn-only") {
         assert.ok(s.licenseUrl.length > 0, `${s.id}: shippable sources need a license URL`);
@@ -293,21 +293,24 @@ describe("retrieval", () => {
   });
 });
 
-describe("registry (all 24 target sources)", () => {
-  it("covers exactly the 24 sources #1–24 from M9-CORPUS-SOURCES.md", () => {
-    assert.equal(SEED_SOURCES.length, 24, `registry has ${SEED_SOURCES.length} sources`);
+describe("registry (all 48 sources: 24 shippable + 24 learn-only)", () => {
+  it("covers exactly the 48 registered sources", () => {
+    assert.equal(SEED_SOURCES.length, 48, `registry has ${SEED_SOURCES.length} sources`);
     const ids = SEED_SOURCES.map((s) => s.id);
-    assert.equal(new Set(ids).size, 24, "source ids are unique");
+    assert.equal(new Set(ids).size, 48, "source ids are unique");
   });
 
-  it("registers exactly 11 Tier 1S synthesis playbooks, one per learn-only source", () => {
+  it("registers 30 Tier 1S synthesis playbook files; every learn-only source is covered", () => {
     const playbooks: readonly SynthesisPlaybookRef[] = SYNTHESIS_PLAYBOOKS;
-    assert.equal(playbooks.length, 11);
-    const learnOnly = SEED_SOURCES.filter((s) => s.tier === "learn-only").map((s) => s.id);
-    assert.equal(learnOnly.length, 11);
-    const playbookIds = new Set(playbooks.map((p) => p.sourceId));
-    for (const id of learnOnly) {
-      assert.ok(playbookIds.has(id), `learn-only source ${id} needs a 1S playbook`);
+    assert.equal(playbooks.length, 30);
+    const learnOnly = SEED_SOURCES.filter((s) => s.tier === "learn-only");
+    assert.equal(learnOnly.length, 35);
+    for (const s of learnOnly) {
+      // Covered either by a dedicated SYNTHESIS_PLAYBOOKS entry or by the
+      // registry entry's own playbook pointer (shared survey files).
+      const covered =
+        playbooks.some((p) => p.sourceId === s.id) || s.playbook !== undefined;
+      assert.ok(covered, `learn-only source ${s.id} needs a 1S playbook`);
     }
     for (const p of playbooks) {
       assert.ok(p.file.endsWith(".md"), `${p.sourceId}: playbook file is markdown`);
