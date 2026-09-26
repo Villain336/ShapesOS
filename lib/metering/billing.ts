@@ -129,12 +129,13 @@ export async function setAutoOverage(args: OverageToggle): Promise<{ workspaceId
   return { workspaceId: args.workspaceId, autoOverage: cap.autoOverage };
 }
 
-// ── Exactly-once guard (INTERIM) ────────────────────────────────────────────
+// ── Exactly-once guard ──────────────────────────────────────────────────────
 // billing_topup_idempotency: PK on the idempotency key. Insert-first (not
 // check-then-insert) so concurrent double-deliveries of the same webhook
-// cannot double-apply. Created lazily via DDL — this track owns no Prisma
-// migration. INTERIM: the sibling's idempotent applyTopUp is authoritative
-// when it lands; this table then doubles as purchase history for the UI.
+// cannot double-apply. Created lazily via DDL as a safety net AND adopted by
+// Prisma (migration 20260926180000_drift_reconciliation); the runtime DDL
+// stays so code paths that run before migrations still work. This table
+// doubles as purchase history for the UI.
 
 const IDEMPOTENCY_DDL = `
 CREATE TABLE IF NOT EXISTS billing_topup_idempotency (

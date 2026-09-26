@@ -557,6 +557,9 @@ model Workspace {
   usageEvents            UsageEvent[]
   creditBalance          CreditBalance?
   spendCap               SpendCap?
+  // Drift reconciliation (2026-09-26): billing_topup_idempotency was
+  // runtime-created by lib/metering/billing.ts; now Prisma-adopted.
+  billingTopups          BillingTopupIdempotency[]
   // Milestone 12: white-label brand kits and report templates.
   brandKits              BrandKit[]
   reportTemplates        ReportTemplate[]
@@ -3463,6 +3466,25 @@ model BillingSetupIdempotency {
   appliedAt       DateTime @default(now()) @map("applied_at")
 
   @@map("billing_setup_idempotency")
+}
+
+// Drift reconciliation (2026-09-26): billing_topup_idempotency was created
+// lazily at runtime by lib/metering/billing.ts (ensureIdempotencyTable) and
+// therefore existed in the DB without a Prisma model. It is now adopted:
+// the migration uses CREATE TABLE IF NOT EXISTS (no-op where it exists),
+// and the runtime DDL remains as a safety net for code paths that run
+// before migrations. Doubles as the credit top-up purchase history.
+model BillingTopupIdempotency {
+  idempotencyKey  String    @id @map("idempotency_key")
+  workspaceId     String    @map("workspace_id")
+  workspace       Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  credits         Int       @map("credits")
+  amountCents     Int       @map("amount_cents")
+  stripeSessionId String    @map("stripe_session_id")
+  source          String    @map("source")
+  appliedAt       DateTime  @default(now()) @map("applied_at")
+
+  @@map("billing_topup_idempotency")
 }
 
 // ── Lead Pipeline CRM (Phase 1 / R1) ─────────────────────────────────────
@@ -6729,9 +6751,17 @@ model MemoryEpisode {
   refs        Json             @default("{}") @map("refs")
   startedAt   DateTime         @map("started_at")
   endedAt     DateTime?        @map("ended_at")
+  // Drift reconciliation (2026-09-26): this column existed in the DB
+  // (DEFAULT CURRENT_TIMESTAMP) with no schema field; adopted so a
+  // migrate-from-schema never proposes dropping it.
+  createdAt   DateTime         @default(now()) @map("created_at")
   // 384-d MiniLM embedding, written via raw SQL (Prisma Unsupported).
   // NULL until the embedder backfills it.
   embedding   Unsupported("vector(384)")? @map("embedding")
+  // Full-text search vector, GENERATED ALWAYS by migration
+  // 20260925180000_phase8_memory. Declared Unsupported (same as embedding)
+  // so Prisma Migrate never tries to manage or drop it.
+  search_tsv  Unsupported("tsvector")? @map("search_tsv")
 
   learnings MemoryLearning[] @relation("LearningSourceEpisode")
   facts     MemoryFact[]     @relation("FactSourceEpisode")
@@ -6768,6 +6798,10 @@ model MemoryFact {
   // user_told facts persist; agent_inferred fade; imported follows policy.
   origin          String    @default("agent_inferred") @map("origin")
   embedding       Unsupported("vector(384)")? @map("embedding")
+  // Full-text search vector, GENERATED ALWAYS by migration
+  // 20260925180000_phase8_memory. Declared Unsupported so Prisma Migrate
+  // never tries to manage or drop it.
+  search_tsv      Unsupported("tsvector")? @map("search_tsv")
 
   @@index([workspaceId, predicate])
   @@index([workspaceId, subjectNodeId])
@@ -6793,6 +6827,10 @@ model MemoryLearning {
   sourceEpisodeId String?              @map("source_episode_id")
   sourceEpisode   MemoryEpisode?       @relation("LearningSourceEpisode", fields: [sourceEpisodeId], references: [id], onDelete: SetNull)
   embedding       Unsupported("vector(384)")? @map("embedding")
+  // Full-text search vector, GENERATED ALWAYS by migration
+  // 20260925180000_phase8_memory. Declared Unsupported so Prisma Migrate
+  // never tries to manage or drop it.
+  search_tsv      Unsupported("tsvector")? @map("search_tsv")
 
   @@index([workspaceId, result])
   @@index([workspaceId, observedAt])
