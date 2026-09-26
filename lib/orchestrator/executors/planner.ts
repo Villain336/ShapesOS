@@ -13,6 +13,21 @@ import {
   estimateCostCents,
   type GuardDeps,
 } from "./_guard";
+// Phase 10 M9: Expert Constitution Pack v1 — the mission planner's
+// system-prompt layer. The M2 planner is deterministic (defaultCompose),
+// but any LLM composer swapped in behind the PlannerInput.compose
+// contract MUST use MISSION_PLANNER_SYSTEM_PROMPT as its system prompt,
+// with M9 retrieval grounding placed after it (see groundedPrompt()).
+import { constitutionSystemPrompt } from "@/lib/expert/constitution";
+
+/**
+ * The mission planner's system-prompt layer (Expert Constitution Pack v1:
+ * global hard rules + mission-planner constitution). Any LLM composer
+ * behind PlannerInput.compose must send this as the system prompt, with
+ * retrieval grounding after it — never before.
+ */
+export const MISSION_PLANNER_SYSTEM_PROMPT =
+  constitutionSystemPrompt("mission-planner");
 
 export const PLANNER_TOOLS = Object.freeze([
   "substrate.context",
@@ -105,7 +120,13 @@ export interface PlannerInput {
   missionId?: string | null;
   goal: string;
   budgetCents?: number;
-  /** Optional composer override (tests / future LLM composer behind the same contract). */
+  /**
+   * Optional composer override (tests / future LLM composer behind the same
+   * contract). An LLM composer MUST use MISSION_PLANNER_SYSTEM_PROMPT
+   * (exported above) as its system prompt, with any M9 retrieval grounding
+   * placed after the constitution — see groundedPrompt() in
+   * lib/expert/constitution.ts.
+   */
   compose?: (goal: string, budgetCents: number) => MissionPlan | Promise<MissionPlan>;
 }
 

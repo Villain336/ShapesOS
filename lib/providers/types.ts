@@ -16,6 +16,12 @@ export interface KeywordIdea {
   volume: number | null;
   /** 0–100, null when the provider doesn't report it. */
   difficulty: number | null;
+  /**
+   * M5-GATE: which pipeline produced `difficulty` — "vendor" until the
+   * difficulty-model eval bar passes, "model" after the gate opens.
+   * Unset means "vendor" (pre-M5 rows and gate-closed paths).
+   */
+  difficultySource?: "vendor" | "model";
   /** Cost per click in USD, null when the provider doesn't report it. */
   cpc: number | null;
   intent: KeywordIntentLabel;

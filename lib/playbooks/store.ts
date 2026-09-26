@@ -28,6 +28,21 @@
 import { randomUUID } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@prisma/client";
+// Phase 10 M9: Expert Constitution Pack v1 — the playbook generator's
+// system-prompt layer. Playbook generation today is deterministic
+// (proposeFromLearning); any future LLM generator MUST use
+// PLAYBOOK_GENERATOR_SYSTEM_PROMPT as its system prompt, with M9
+// retrieval grounding placed after it (see groundedPrompt()).
+import { constitutionSystemPrompt } from "@/lib/expert/constitution";
+
+/**
+ * The playbook generator's system-prompt layer (Expert Constitution Pack
+ * v1: global hard rules + playbook-generator constitution). Any LLM
+ * playbook generator must send this as the system prompt, with retrieval
+ * grounding after it — never before.
+ */
+export const PLAYBOOK_GENERATOR_SYSTEM_PROMPT =
+  constitutionSystemPrompt("playbook-generator");
 import { withWorkspaceScope } from "@/lib/substrate/graph/rls";
 import { canonicalize, sha256Hex } from "@/lib/authority/approvals";
 import { anonymizeForPlaybook } from "@/lib/substrate/memory/anonymize";

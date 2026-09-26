@@ -6,17 +6,26 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
 import ContentList from "@/components/ContentList";
+import GapHandoffBanner from "./_components/GapHandoffBanner";
 
 export const dynamic = "force-dynamic";
 
 export default async function ContentPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{
+    gapKeyword?: string;
+    gapEngines?: string;
+    gapCompetitors?: string;
+    gapFacts?: string;
+  }>;
 }) {
   const user = await requireUser();
   if (!user) return null; // layout already redirects
   const { id } = await params;
+  const gap = await searchParams;
 
   const project = await prisma.project.findFirst({
     where: { id, workspace: accessibleWorkspaceWhere(user.id) },
@@ -55,6 +64,19 @@ export default async function ContentPage({
           Brief → draft → edit → publish.
         </p>
       </div>
+      {/* M3 citation-gap handoff: the gap context arrives here via deep link.
+          The banner is read-only — the brief is built by the normal flow
+          (save the keyword → Create brief) fed with the handoff inputs. */}
+      {gap.gapKeyword && (
+        <GapHandoffBanner
+          handoff={{
+            keyword: gap.gapKeyword,
+            engines: gap.gapEngines ?? "",
+            competitors: gap.gapCompetitors ?? "",
+            facts: gap.gapFacts ?? "",
+          }}
+        />
+      )}
       <ContentList
         projectId={project.id}
         keywords={project.keywords}

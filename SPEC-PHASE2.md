@@ -131,7 +131,9 @@ Done = 6 ad variants (3 hooks × 2 formats) generated from one brief.
 Canva Connect API as the **default studio** (OAuth; programmatic design creation, asset sync, brand
 templates, export; note: public integrations require Canva review, brand-template autofill is
 Enterprise-oriented). Polotno deprioritized — no commercial license spend. **Future goal: build our
-own open-source Canva alternative** (tracked as a later milestone, not this wave). Porkbun
+own open-source Canva alternative** (tracked as a later milestone, not this wave; Tico 2026-09-26:
+named as a Polotno — polotno.com, MIT open-source core — reference implementation that **replaces
+the Canva Connect integration**; Phase 12 candidate per SPEC-PHASE10.md §11). Porkbun
 integration: availability check + purchase without leaving Marketr (registrant flow + ICANN
 verification handled in UI). Done = Canva-connected workspace creating/exporting an on-brand design;
 test domain checked (real purchase only on Tico's approval).

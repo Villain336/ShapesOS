@@ -112,11 +112,18 @@ export async function answerAsk(input: AskInput, deps: AskDeps = {}): Promise<As
 
   const result: AskResult = { answer, citations: research.citations, proposedAction };
 
+  // M9: the ask audit log records this workspace's expert-corpus retrieval.
+  const expertCiteCount = result.citations.filter((c) => c.type === "expert_corpus").length;
   await logAsk({
     workspaceId: input.workspaceId,
     userId: input.userId,
     query,
-    summary: `${result.citations.length} citation(s)${proposedAction ? `, drafted Tier-${proposedAction.tier} request` : ""}${tier === 3 ? ", Tier-3 refused" : ""}`,
+    summary:
+      `${result.citations.length} citation(s)` +
+      (expertCiteCount > 0
+        ? ` (${expertCiteCount} expert-corpus: ${research.expertCorpus?.sources.join("; ") ?? "unknown source"})`
+        : "") +
+      `${proposedAction ? `, drafted Tier-${proposedAction.tier} request` : ""}${tier === 3 ? ", Tier-3 refused" : ""}`,
   });
 
   return result;

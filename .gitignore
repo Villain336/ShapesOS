@@ -60,3 +60,7 @@ playwright-report/
 # Call-tracking verification artifacts (never commit)
 screenshots/
 .pgdata/
+
+# Phase 10: corpus chunk data (9MB+; manifest.json is the version record) + DB backups (never commit)
+data/
+db-backups/

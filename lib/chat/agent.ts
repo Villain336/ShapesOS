@@ -26,6 +26,10 @@ import { TOOLS, getTool, toolCatalogForPrompt, type ToolContext, type ToolDef } 
 import { getEnabledProjectSkills } from "@/lib/skills/service";
 import { skillManifestSection } from "@/lib/skills/disclosure";
 import { connectorToolsSection, resolveConnectorTool } from "./connector-tools";
+// Phase 10 M9: Expert Constitution Pack v1 — the Chief Strategy Agent's
+// system-prompt layer (global hard rules + CSA constitution), wired in
+// front of all project context and retrieval grounding.
+import { constitutionSystemPrompt } from "@/lib/expert/constitution";
 
 const MAX_ITERATIONS = 6;
 
@@ -111,6 +115,11 @@ async function buildProjectContext(projectId: string, workspaceId: string): Prom
 
 function systemPrompt(projectContext: string, mockMode: boolean, supplements: string): string {
   return [
+    // Expert Constitution Pack v1: the constitution is the system-prompt
+    // layer — it sits in front of the project context (which carries M9
+    // retrieval grounding downstream) and is never overridden by it.
+    constitutionSystemPrompt("chief-strategy"),
+    "",
     "You are Marketr, an expert SEO strategist embedded in the user's marketing workspace.",
     "You can ACT on the user's project using the tools below. Use read tools to ground your answers in real data; prefer a tool call over guessing.",
     "",

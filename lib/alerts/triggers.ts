@@ -204,6 +204,15 @@ export const TRIGGERS: TriggerDef[] = [
     live: true, // Phase B (B3): emitted by the connector health checker.
   },
   {
+    key: "platform_rollout",
+    label: "Platform rollout impact",
+    description:
+      "A confirmed Google/Bing ranking rollout (Platform-change radar, Phase 10 M2) moved your pages beyond the noise band. Verification checklist included; never auto-fix prescriptions.",
+    conditionKeys: ["projectIds", "severities"],
+    dedupAvailable: true,
+    live: true, // Phase 10 M2: emitted by the daily platform-radar cron.
+  },
+  {
     key: "metering_cap_warning",
     label: "Credit usage warning",
     description:

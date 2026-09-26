@@ -1,0 +1,1 @@
+{"evaluatedAt":null,"metrics":null,"modelVersion":"m5-v1","note":"No live eval has run yet. Run `npx tsx scripts/eval-difficulty.mts` (fixture mode, CI-safe) and `npx tsx scripts/eval-difficulty.mts --live --write-state` (paid DataForSEO reference) — see EVAL.md.","passed":false}

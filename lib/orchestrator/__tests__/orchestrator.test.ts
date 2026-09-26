@@ -654,3 +654,74 @@ describe("Prisma MissionApprovalStore", () => {
     assert.equal(created.expiresAt!.getTime(), exp.getTime());
   });
 });
+
+// ---------------------------------------------------------------------------
+// M9: Expert corpus wiring in the Researcher (behind MARKETR_EXPERT_CORPUS).
+// ---------------------------------------------------------------------------
+
+function emptyPacket(query: string) {
+  return {
+    query,
+    asOf: new Date().toISOString(),
+    generatedAt: new Date().toISOString(),
+    budgets: { memories: 0, graphNodes: 0 },
+    graph: { nodes: [], edges: [] },
+    memories: [],
+  };
+}
+
+describe("researcher expert corpus (M9)", () => {
+  const expertRetriever = async () => [
+    {
+      text: "Attract strangers with useful content; engage them; delight customers.",
+      sourceTitle: "Marketr Tier 1S synthesis from HubSpot Academy",
+      author: "Marketr (original synthesis)",
+      license: "CC-BY-4.0",
+    },
+  ];
+
+  it("is OFF by default: no expert section, no expert_corpus citations", async () => {
+    const res = await runResearcher(
+      { workspaceId: WS, query: "inbound marketing" },
+      { contextPacket: async (_ws, q) => emptyPacket(q), expertRetriever },
+    );
+    assert.ok(!res.summary.includes("Expert corpus context"), "no expert section");
+    assert.ok(!res.citations.some((c) => c.type === "expert_corpus"));
+    assert.equal(res.expertCorpus, null);
+  });
+
+  it("appends an explicitly labeled Expert corpus context section + expert_corpus citations when enabled", async () => {
+    const res = await runResearcher(
+      { workspaceId: WS, query: "inbound marketing" },
+      { contextPacket: async (_ws, q) => emptyPacket(q), expertCorpus: true, expertRetriever },
+    );
+    assert.ok(res.summary.includes("Expert corpus context"), "labeled section present");
+    assert.ok(
+      res.summary.includes("not workspace-owned facts"),
+      "does not imply passages are workspace-owned facts",
+    );
+    const expert = res.citations.filter((c) => c.type === "expert_corpus");
+    assert.equal(expert.length, 1);
+    assert.equal(expert[0]!.id, "Marketr Tier 1S synthesis from HubSpot Academy");
+    assert.ok(expert[0]!.label.includes("CC-BY-4.0"), "license in citation label");
+    assert.deepEqual(res.expertCorpus, {
+      hits: 1,
+      sources: ["Marketr Tier 1S synthesis from HubSpot Academy"],
+    });
+  });
+
+  it("degrades gracefully when the expert retriever throws", async () => {
+    const res = await runResearcher(
+      { workspaceId: WS, query: "inbound marketing" },
+      {
+        contextPacket: async (_ws, q) => emptyPacket(q),
+        expertCorpus: true,
+        expertRetriever: async () => {
+          throw new Error("no corpus built");
+        },
+      },
+    );
+    assert.ok(res.summary.includes("Expert corpus context: unavailable"), "failure noted in summary");
+    assert.equal(res.expertCorpus, null);
+  });
+});

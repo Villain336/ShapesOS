@@ -2,8 +2,14 @@
 // Turns a ContentBrief into the full prompt sent to the LlmProvider.
 // The differentiator is the SERP-informed brief baked into the prompt,
 // not the prose itself.
+//
+// Phase 10 M9: the Expert Constitution Pack v1 content/brief constitution
+// is the system-prompt layer — prepended here so it sits in front of the
+// SERP brief grounding (the brief informs the expert; it never overrides
+// the hard rules).
 
 import type { ContentBrief } from "./brief";
+import { constitutionSystemPrompt } from "@/lib/expert/constitution";
 
 export function buildDraftPrompt(brief: ContentBrief): string {
   const outline = [
@@ -18,6 +24,10 @@ export function buildDraftPrompt(brief: ContentBrief): string {
   const entities = brief.entities.length ? brief.entities.join(", ") : "(none)";
 
   return [
+    // Constitution first: the content agent's system-prompt layer, in front
+    // of the SERP-brief grounding below.
+    constitutionSystemPrompt("content-brief"),
+    ``,
     `You are an expert SEO content writer. Write a complete, original article targeting the keyword: "${brief.keyword}".`,
     ``,
     `Search intent: ${brief.intent}`,

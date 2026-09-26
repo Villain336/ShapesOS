@@ -74,12 +74,16 @@ them over via the Secure Vault flow and Z7 writes them server-side.
    - `0 6 * * * curl -s -X POST -H "Authorization: Bearer $CRON_SECRET" https://marketr.launchabl.com/api/rankings/check -d '{"scope":"all"}'`
    - `30 6 * * * curl -s -X POST -H "Authorization: Bearer $CRON_SECRET" https://marketr.launchabl.com/api/cron/fix-agent`
    - `0 7 * * * curl -s -X POST -H "Authorization: Bearer $CRON_SECRET" https://marketr.launchabl.com/api/cron/reports`
+   - `30 7 * * * curl -s -X POST -H "Authorization: Bearer $CRON_SECRET" https://marketr.launchabl.com/api/cron/platform-radar` (Phase 10 M2: daily platform-change radar — ingests official sources only, classifies rollout/docs/volatility, correlates confirmed rollouts against GSC deltas, writes Growth Memory, emits platform_rollout alerts)
    - `*/15 * * * * curl -s -X POST -H "Authorization: Bearer $CRON_SECRET" https://marketr.launchabl.com/api/cron/alerts`
    - `0 8 * * * curl -s -X POST -H "Authorization: Bearer $CRON_SECRET" https://marketr.launchabl.com/api/cron/visibility-score` (milestone 14: daily composite score + visibility_delta alerts)
+   - `5 * * * * curl -s -X POST -H "Authorization: Bearer $CRON_SECRET" https://marketr.launchabl.com/api/cron/gsc-pull` (Phase 10 M1: hourly GSC Search Analytics pull — last 3h of HOURLY_ALL per GSC-bound project into gsc_snapshot; feeds the delta engine + M2 radar)
+   - `*/15 * * * * curl -s -X POST -H "Authorization: Bearer $CRON_SECRET" https://marketr.launchabl.com/api/cron/gsc-inspection` (Phase 10 M1: URL Inspection queue drain — priority-ordered, fair-share across projects, 2,000 QPD/site hard wall; never sweeps)
    - `0 9 * * 1 curl -s -X POST -H "Authorization: Bearer $CRON_SECRET" https://marketr.launchabl.com/api/cron/decay` (milestone 14: weekly content-decay detection)
    - `30 9 * * 1 curl -s -X POST -H "Authorization: Bearer $CRON_SECRET" https://marketr.launchabl.com/api/cron/radar` (milestone 14: weekly competitor radar)
    - `0 10 * * 1 curl -s -X POST -H "Authorization: Bearer $CRON_SECRET" https://marketr.launchabl.com/api/cron/backlinks` (milestone 15: weekly backlink refresh; per-project backlinksEnabled toggle; cost caps enforced server-side)
    - `30 10 * * 1 curl -s -X POST -H "Authorization: Bearer $CRON_SECRET" https://marketr.launchabl.com/api/cron/internal-links` (milestone 15: weekly internal-link suggestions)
+   - `0 11 * * 1 curl -s -X POST -H "Authorization: Bearer $CRON_SECRET" https://marketr.launchabl.com/api/cron/fleet` (Phase 10 M4: weekly competitor-fleet sweep — sitemap/index diffing, robots-aware polite fetch, AI summaries, licensed review adapters only, weekly digest; propose-only)
    - `0 11 * * 1 curl -s -X POST -H "Authorization: Bearer $CRON_SECRET" https://marketr.launchabl.com/api/cron/local-grid` (milestone 16: weekly geo-grid runs; enabled weekly grids due since last run; cost caps enforced server-side)
    - `30 11 * * 1 curl -s -X POST -H "Authorization: Bearer $CRON_SECRET" https://marketr.launchabl.com/api/cron/local-competitors` (milestone 16: weekly local-competitor snapshot refresh; enabled competitors only)
    - `0 12 * * 1 curl -s -X POST -H "Authorization: Bearer $CRON_SECRET" https://marketr.launchabl.com/api/cron/reviews` (milestone 16: weekly review ingest + sentiment summaries + negative-review alerts)

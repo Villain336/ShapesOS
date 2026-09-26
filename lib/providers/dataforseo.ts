@@ -66,6 +66,12 @@ interface SerpApiItem {
   references?: Array<{ domain?: string | null; url?: string | null }> | null;
 }
 
+// M5-GATE: this is the VENDOR side of the difficulty seam. The model does NOT
+// replace this function in place — lib/keywords/research.ts routes the ideas
+// this provider produces through resolveIdeaDifficulties()
+// (lib/intelligence/difficulty/service.ts), which swaps vendor values for
+// modeled ones only when the eval bar (gate.ts) records a PASS for the
+// current model version. Single seam, no forked second path.
 function competitionToDifficulty(item: LabsItem): number | null {
   const props = item.keyword_properties ?? {};
   if (props.keyword_difficulty != null) return props.keyword_difficulty;

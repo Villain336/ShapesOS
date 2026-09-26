@@ -13,6 +13,7 @@ import { checkCap, meter } from "@/lib/metering/service";
 import { dayBucket, seedHash } from "@/lib/metering/wiring";
 import { getSeoProvider, providerStatus } from "@/lib/providers";
 import type { KeywordIdea, KeywordIntentLabel } from "@/lib/providers/types";
+import { resolveIdeaDifficulties } from "@/lib/intelligence/difficulty/service";
 import { ActionError } from "@/lib/serp/analyze";
 
 export interface ResearchKeywordsInput {
@@ -137,6 +138,17 @@ export async function researchKeywordsUnmetered(
       502,
     );
   }
+
+  // M5-GATE: the owned difficulty model slots behind the vendor difficulty
+  // call site HERE — this is the one seam every keywordIdeas() difficulty
+  // value flows through (vendor values originate in
+  // lib/providers/dataforseo.ts competitionToDifficulty). While the eval bar
+  // is unmet (the normal state), vendor difficulty passes through unchanged:
+  // single path, no fork. When a live eval records a PASS for the current
+  // model version, the model replaces the vendor value per keyword
+  // (resolveIdeaDifficulties marks those rows difficultySource: "model").
+  // See lib/intelligence/difficulty/EVAL.md.
+  ideas = (await resolveIdeaDifficulties(workspaceId, ideas, "en-US")).ideas;
 
   const seedRow = ideas.find(
     (i) => i.phrase.trim().toLowerCase() === seed.toLowerCase(),
