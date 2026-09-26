@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import "@/components/crm/crm.css"; // CRM visual system, scoped under .crm
+import "@xyflow/react/dist/style.css"; // React Flow base styles (Business Graph mind-map view)
 
 /* Type comes from @fontsource/inter + @fontsource/newsreader, imported in
  * globals.css — no next/font needed. */

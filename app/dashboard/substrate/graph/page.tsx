@@ -9,11 +9,12 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { requireUser, getOrCreateWorkspace } from "@/lib/session";
 import { requireWorkspaceRole } from "@/lib/authz";
-import { Search, Network, GitBranch, ScrollText, ArrowLeftRight } from "lucide-react";
+import { Search, Network, GitBranch, ScrollText, ArrowLeftRight, Table2, Share2 } from "lucide-react";
 import { withWorkspaceScope } from "@/lib/substrate/graph/rls";
 import { freshnessLabel } from "@/lib/substrate/graph/freshness";
 import { listFacts } from "@/lib/substrate/graph/facts";
 import { ENTITY_TYPES } from "@/lib/substrate/graph/types";
+import { GraphMindmap } from "./mindmap-client";
 import {
   Chip,
   PageTitle,
@@ -99,7 +100,7 @@ async function nodeDetail(workspaceId: string, id: string) {
 export default async function GraphExplorerPage({
   searchParams,
 }: {
-  searchParams: Promise<{ type?: string; q?: string; node?: string }>;
+  searchParams: Promise<{ type?: string; q?: string; node?: string; view?: string }>;
 }) {
   const user = await requireUser();
   if (!user) redirect("/login");
@@ -111,6 +112,26 @@ export default async function GraphExplorerPage({
   const type = params.type ?? "all";
   const q = params.q ?? "";
   const selectedId = params.node;
+  const view: "table" | "graph" = params.view === "graph" ? "graph" : "table";
+
+  const viewHref = (v: "table" | "graph") => {
+    const p = new URLSearchParams();
+    if (type && type !== "all") p.set("type", type);
+    if (q) p.set("q", q);
+    if (selectedId) p.set("node", selectedId);
+    if (v === "graph") p.set("view", "graph");
+    const qs = p.toString();
+    return `/dashboard/substrate/graph${qs ? `?${qs}` : ""}`;
+  };
+
+  // Detail-panel links keep the current view so the graph view doesn't
+  // bounce the user back to the table.
+  const nodeHref = (id: string) => {
+    const p = new URLSearchParams();
+    if (view === "graph") p.set("view", "graph");
+    p.set("node", id);
+    return `/dashboard/substrate/graph?${p.toString()}`;
+  };
 
   const [nodes, detail, typeCounts] = await Promise.all([
     searchNodes(workspace.id, type, q),
@@ -132,11 +153,38 @@ export default async function GraphExplorerPage({
           title="Business Graph"
           subtitle="The per-client knowledge graph: every entity with provenance and honest freshness labels. The substrate reads and computes — it never touches spend."
         />
-        <div className="flex shrink-0 gap-1.5">
+        <div className="flex shrink-0 flex-wrap items-center gap-1.5">
           <Chip>{nodes.length} entities shown</Chip>
           <Chip>
             {countByType.size}/{ENTITY_TYPES.length} types covered
           </Chip>
+          <span
+            className="ml-1 inline-flex items-center rounded-md border border-stone-200 bg-white p-0.5"
+            role="tablist"
+            aria-label="Explorer view"
+          >
+            {(
+              [
+                { v: "table", label: "Table", Icon: Table2 },
+                { v: "graph", label: "Graph", Icon: Share2 },
+              ] as const
+            ).map(({ v, label, Icon }) => (
+              <Link
+                key={v}
+                href={viewHref(v)}
+                role="tab"
+                aria-selected={view === v}
+                className={`flex items-center gap-1.5 rounded-[5px] px-2.5 py-1.5 text-[12.5px] font-medium transition active:scale-[0.97] ${
+                  view === v
+                    ? "bg-violet-600 text-white shadow-sm"
+                    : "text-stone-500 hover:text-stone-800"
+                }`}
+              >
+                <Icon size={14} />
+                {label}
+              </Link>
+            ))}
+          </span>
         </div>
       </div>
 
@@ -145,6 +193,7 @@ export default async function GraphExplorerPage({
         method="get"
         className="mb-3 mt-4 flex flex-wrap items-center gap-2"
       >
+        {view === "graph" && <input type="hidden" name="view" value="graph" />}
         <div className="relative">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-400" />
           <input
@@ -168,51 +217,55 @@ export default async function GraphExplorerPage({
       </form>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <div className={tableShell}>
-          <table className="w-full text-left text-[13px]">
-            <thead>
-              <tr className={theadCls}>
-                <th className={thCls}>Name</th>
-                <th className={thCls}>Type</th>
-                <th className={thCls}>Freshness</th>
-                <th className={thCls}>Source</th>
-              </tr>
-            </thead>
-            <tbody>
-              {nodes.map((n) => {
-                const f = freshnessLabel(n.asOf, n.asOfSource);
-                const selected = n.id === selectedId;
-                return (
-                  <tr key={n.id} className={`${rowCls}${selected ? " bg-violet-50/60" : ""}`}>
-                    <td className="px-3 py-2 font-medium text-stone-900">
-                      <Link
-                        href={`/dashboard/substrate/graph?type=${encodeURIComponent(type)}&q=${encodeURIComponent(q)}&node=${n.id}`}
-                        className="hover:underline"
-                      >
-                        {n.displayName}
-                      </Link>
-                    </td>
-                    <td className="px-3 py-2">
-                      <Chip>{n.entityType}</Chip>
-                    </td>
-                    <td className="px-3 py-2 text-stone-500" title={f.label}>
-                      {f.label}
-                    </td>
-                    <td className="px-3 py-2 text-stone-500">{n.asOfSource}</td>
-                  </tr>
-                );
-              })}
-              {nodes.length === 0 && (
-                <tr>
-                  <td colSpan={4} className="px-3 py-8 text-center text-[13px] text-stone-400">
-                    No entities yet. Seed the graph from the onboarding bootstrap or connect a
-                    source — every fact lands here with provenance.
-                  </td>
+        {view === "table" ? (
+          <div className={tableShell}>
+            <table className="w-full text-left text-[13px]">
+              <thead>
+                <tr className={theadCls}>
+                  <th className={thCls}>Name</th>
+                  <th className={thCls}>Type</th>
+                  <th className={thCls}>Freshness</th>
+                  <th className={thCls}>Source</th>
                 </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {nodes.map((n) => {
+                  const f = freshnessLabel(n.asOf, n.asOfSource);
+                  const selected = n.id === selectedId;
+                  return (
+                    <tr key={n.id} className={`${rowCls}${selected ? " bg-violet-50/60" : ""}`}>
+                      <td className="px-3 py-2 font-medium text-stone-900">
+                        <Link
+                          href={`/dashboard/substrate/graph?type=${encodeURIComponent(type)}&q=${encodeURIComponent(q)}&node=${n.id}`}
+                          className="hover:underline"
+                        >
+                          {n.displayName}
+                        </Link>
+                      </td>
+                      <td className="px-3 py-2">
+                        <Chip>{n.entityType}</Chip>
+                      </td>
+                      <td className="px-3 py-2 text-stone-500" title={f.label}>
+                        {f.label}
+                      </td>
+                      <td className="px-3 py-2 text-stone-500">{n.asOfSource}</td>
+                    </tr>
+                  );
+                })}
+                {nodes.length === 0 && (
+                  <tr>
+                    <td colSpan={4} className="px-3 py-8 text-center text-[13px] text-stone-400">
+                      No entities yet. Seed the graph from the onboarding bootstrap or connect a
+                      source — every fact lands here with provenance.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <GraphMindmap workspaceId={workspace.id} type={type} q={q} selectedId={selectedId} />
+        )}
 
         <div>
           {!detail && (
@@ -240,7 +293,7 @@ export default async function GraphExplorerPage({
                     Merged into{" "}
                     <Link
                       className="underline"
-                      href={`/dashboard/substrate/graph?node=${detail.node.mergedInto.id}`}
+                      href={nodeHref(detail.node.mergedInto.id)}
                     >
                       {detail.node.mergedInto.displayName}
                     </Link>{" "}
@@ -274,9 +327,12 @@ export default async function GraphExplorerPage({
                     const other = e.fromNodeId === detail.node.id ? e.toNode : e.fromNode;
                     const dir = e.fromNodeId === detail.node.id ? "→" : "←";
                     const dead = e.expiredAt !== null;
-                    // sourceFactId is a required FK — every edge has an asserting fact.
-                    const sf = e.sourceFact!;
-                    const edgeFresh = freshnessLabel(sf.observedAt, sf.source);
+                    // sourceFactId is optional (onDelete: SetNull) — edges without an
+                    // asserting fact fall back to the edge's own validAt.
+                    const edgeFresh = freshnessLabel(
+                      e.sourceFact?.observedAt ?? e.validAt,
+                      e.sourceFact?.source ?? "unasserted",
+                    );
                     return (
                       <li
                         key={e.id}
@@ -287,7 +343,7 @@ export default async function GraphExplorerPage({
                           <span className="font-mono font-medium text-stone-800">{e.edgeType}</span>
                           <span className="text-stone-400">{dir}</span>
                           <Link
-                            href={`/dashboard/substrate/graph?node=${other.id}`}
+                            href={nodeHref(other.id)}
                             className="truncate text-stone-700 underline"
                           >
                             {other.displayName}
@@ -296,7 +352,11 @@ export default async function GraphExplorerPage({
                         <div className="flex shrink-0 items-center gap-1.5">
                           <span
                             className="text-stone-500"
-                            title={`asserted ${sf.observedAt.toLocaleString()} via ${sf.source}`}
+                            title={
+                              e.sourceFact
+                                ? `asserted ${e.sourceFact.observedAt.toLocaleString()} via ${e.sourceFact.source}`
+                                : `edge valid since ${e.validAt.toLocaleString()} · no asserting fact`
+                            }
                           >
                             {edgeFresh.label}
                           </span>

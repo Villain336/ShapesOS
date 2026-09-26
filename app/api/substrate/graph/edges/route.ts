@@ -36,7 +36,7 @@ export async function GET(req: NextRequest) {
         ...(edgeType ? { edgeType } : {}),
         validAt: { lte: asOf },
         AND: [{ OR: [{ invalidAt: null }, { invalidAt: { gt: asOf } }] }],
-        ...(currentOnly ? [{ expiredAt: null }] : []),
+        ...(currentOnly ? { expiredAt: null } : {}),
       },
       include: {
         fromNode: { select: { id: true, displayName: true, entityType: true } },
@@ -53,9 +53,11 @@ export async function GET(req: NextRequest) {
   return Response.json({
     asOf: asOf.toISOString(),
     edges: edges.map((e) => {
-      // sourceFactId is a required FK — every edge has an asserting fact.
-      const sf = e.sourceFact!;
-      const f = freshnessLabel(sf.observedAt, sf.source, asOf);
+      // sourceFactId is optional (onDelete: SetNull) — edges projected
+      // without an asserting fact fall back to the edge's own validAt.
+      const observedAt = e.sourceFact?.observedAt ?? e.validAt;
+      const source = e.sourceFact?.source ?? "unasserted";
+      const f = freshnessLabel(observedAt, source, asOf);
       return {
         id: e.id,
         edgeType: e.edgeType,
@@ -66,8 +68,8 @@ export async function GET(req: NextRequest) {
         invalidAt: e.invalidAt?.toISOString() ?? null,
         properties: e.properties,
         sourceFactId: e.sourceFactId,
-        asOf: sf.observedAt.toISOString(),
-        asOfSource: sf.source,
+        asOf: observedAt.toISOString(),
+        asOfSource: source,
         freshness: f,
       };
     }),
