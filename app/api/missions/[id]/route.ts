@@ -1,0 +1,33 @@
+// Marketr — GET /api/missions/:id (viewer+)
+// Full mission detail: mission, event timeline, approvals, derived state.
+
+import { missionsGuard, safetyError, serializeMission, serializeApproval, serializeEvent, missionDeps } from "../_lib";
+import { loadMission } from "@/lib/missions/engine";
+
+export const dynamic = "force-dynamic";
+
+export async function GET(
+  _req: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const gate = await missionsGuard("viewer");
+  if (gate instanceof Response) return gate;
+  const { id } = await params;
+  try {
+    const loaded = await loadMission(missionDeps(), id, gate.workspaceId);
+    return Response.json({
+      mission: serializeMission(loaded.mission),
+      events: loaded.events.map(serializeEvent),
+      approvals: loaded.approvals.map(serializeApproval),
+      stepCount: loaded.stepCount,
+      planStepCount: loaded.planStepCount,
+      totalCostCents: loaded.totalCostCents,
+      consecutiveFailures: loaded.consecutiveFailures,
+      progress: loaded.progress,
+      termination: loaded.termination,
+      nextCheckpoint: loaded.nextCheckpoint,
+    });
+  } catch (err) {
+    return safetyError(err);
+  }
+}
