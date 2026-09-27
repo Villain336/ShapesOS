@@ -59,6 +59,9 @@ export default async function ReviewLandingPage({
       businessName={req.workspace.name}
       reviewUrl={req.reviewUrl ?? "https://www.google.com/maps"}
       brandColor={req.workspace.whiteLabelBrandColor}
+      // Logo + domain are white-label fields set under Settings → White-label.
+      logoUrl={req.workspace.whiteLabelLogoUrl ? `/api/public/workspaces/${req.workspace.id}/logo` : null}
+      customDomain={req.workspace.whiteLabelCustomDomain}
     />
   );
 }

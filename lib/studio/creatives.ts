@@ -17,7 +17,7 @@
 
 import { createHash } from "crypto";
 import type { PrismaClient } from "@prisma/client";
-import { auditStudio, getValidCanvaToken } from "./service";
+import { auditStudio } from "./service";
 import {
   getFormatTrack,
   getSizeSpec,
@@ -26,7 +26,6 @@ import {
   type ChannelTemplateId,
   type FormatTrack,
 } from "./formats";
-import type { CanvaExportFormat, CanvaPort } from "./canva";
 
 /** Re-exported for route modules that type against the creative service. */
 export type { ChannelTemplateId };
@@ -62,7 +61,7 @@ export function computeCreativeHash(pdfBytes: Buffer | Uint8Array): string {
 //
 // Best-effort parse of the PDF header: page size from the first /MediaBox and
 // page count from the /Pages /Count. Works on PDFs with plain (uncompressed)
-// page trees — which covers Canva exports and most print-ready PDFs. Returns
+// page trees — which covers most print-ready PDFs. Returns
 // nulls for linearized/compressed-object PDFs; validation treats that as a
 // soft "could not determine" issue rather than a hard failure.
 // ---------------------------------------------------------------------------
@@ -137,7 +136,7 @@ export interface ValidationReport {
   heightIn: number | null;
   pages: number | null;
   issues: ValidationIssue[];
-  /** Print-production notes (e.g. Canva API export caveats). */
+  /** Print-production notes. */
   printNotes: string[];
   attestation: ValidationAttestation | null;
   /** Workspace filesystem file id of the validated PDF (set by setCreativePdf). */
@@ -147,13 +146,6 @@ export interface ValidationReport {
 
 const FIXED_TRIM_TOLERANCE_IN = 0.02; // exact-trim match window
 const BLEED_WARN_OVER_IN = 0.375; // beyond this over trim => warning (likely bleed)
-
-export const CANVA_API_PRINT_NOTES =
-  "Exported via the Canva Connect API as a standard PDF (RGB). The Connect API " +
-  "exposes no bleed/crop-mark or CMYK options (verified against Canva's API " +
-  "reference 2026-09-24) — for press-ready files with bleed and crop marks, " +
-  "download PDF Print manually in the Canva editor and upload it via Upload PDF; " +
-  "the design-link flow uses this same API export, not the editor's PDF Print.";
 
 function issuesOk(issues: ValidationIssue[]): boolean {
   return !issues.some((i) => i.severity === "error");
@@ -213,7 +205,7 @@ export function validateFormat(
   if (!pdfBytes || pdfBytes.length === 0) {
     base.issues.push({
       severity: "info",
-      message: "No PDF stored yet — validation will run when the PDF is uploaded or the Canva export is pulled.",
+      message: "No PDF stored yet — validation will run when the PDF is uploaded.",
     });
     return base;
   }
@@ -320,38 +312,14 @@ export function validateFormat(
     });
   }
 
-  if (opts?.source === "canva" || opts?.source === "canva_link") {
-    base.printNotes.push(CANVA_API_PRINT_NOTES);
-  }
   return base;
-}
-
-// ---------------------------------------------------------------------------
-// Canva share-URL -> design id (design-link round-trip)
-// ---------------------------------------------------------------------------
-
-/** Accepts https://www.canva.com/design/<id>/edit, /view, /... — returns <id>. */
-export function parseDesignIdFromShareUrl(url: string): string | null {
-  const m = /canva\.com\/design\/([A-Za-z0-9_-]{6,})(?:[\/?#]|$)/i.exec(url.trim());
-  return m ? m[1] : null;
-}
-
-/** Enterprise gate: autofill/brand-template flows need brandtemplate scopes. */
-export function requireCanvaEnterprise(scopes: string[]): void {
-  const has = scopes.some((s) => s.startsWith("brandtemplate:"));
-  if (!has) {
-    throw new CreativeHttpError(
-      409,
-      "Brand-template autofill requires Canva Enterprise — the connected account has not granted brand-template scopes.",
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------
 // DB row helpers (all workspace-scoped)
 // ---------------------------------------------------------------------------
 
-export type CreativeSource = "canva" | "canva_link" | "upload";
+export type CreativeSource = "upload";
 export type CreativeStatus = "draft" | "ready" | "archived";
 
 function serialize(row: Record<string, unknown>) {
@@ -363,8 +331,6 @@ function serialize(row: Record<string, unknown>) {
     formatTrack: String(row.formatTrack),
     size: String(row.size),
     source: String(row.source) as CreativeSource,
-    canvaDesignId: (row.canvaDesignId as string | null) ?? null,
-    canvaExportId: (row.canvaExportId as string | null) ?? null,
     pdfUrl: (row.pdfUrl as string | null) ?? null,
     creativeHash: (row.creativeHash as string | null) ?? null,
     version: Number(row.version),
@@ -407,7 +373,6 @@ export interface CreateCreativeInput {
   formatTrack: string;
   size: string;
   source?: CreativeSource;
-  canvaDesignId?: string;
   createdBy?: string;
 }
 
@@ -431,7 +396,7 @@ export async function createCreative(
     }
   }
   const source: CreativeSource = input.source ?? "upload";
-  if (!["canva", "canva_link", "upload"].includes(source)) {
+  if (source !== "upload") {
     throw new CreativeHttpError(400, `Unknown source "${source}".`);
   }
   const validation = validateFormat(channelTemplate, input.formatTrack, input.size, null, { source });
@@ -443,7 +408,6 @@ export async function createCreative(
       formatTrack: input.formatTrack,
       size: input.size,
       source,
-      canvaDesignId: input.canvaDesignId ?? null,
       validation: validation as unknown as object,
       createdBy: input.createdBy ?? null,
     },
@@ -542,8 +506,8 @@ export async function setCreativePdf(
 
 /**
  * New version = NEW ROW (version+1); the prior row is archived. The new row
- * starts as a draft with no PDF/hash — attach one via setCreativePdf or the
- * Canva export flow. Prior row is returned for convenience.
+ * starts as a draft with no PDF/hash — attach one via setCreativePdf.
+ * Prior row is returned for convenience.
  */
 export async function versionCreative(
   db: Db,
@@ -564,7 +528,6 @@ export async function versionCreative(
       formatTrack: row.formatTrack,
       size: row.size,
       source: row.source,
-      canvaDesignId: row.canvaDesignId,
       version: row.version + 1,
       status: "draft",
       createdBy: opts?.createdBy ?? row.createdBy,
@@ -641,154 +604,17 @@ export async function archiveCreative(
   return serialize(updated as unknown as Record<string, unknown>);
 }
 
-// ---------------------------------------------------------------------------
-// Canva PDF export -> creative (server-side polling, then pull + store).
-// Note: "PDF Print" is only the UI label for the max-quality alias
-// { type: "pdf", export_quality: "pro" } — the Connect API exposes no
-// bleed/crop-mark or CMYK options (verified 2026-09-24). It is NOT the
-// editor's PDF Print.
-//
-// Money rule: never initiates without a connected account — getValidCanvaToken
-// returns null and we throw before any export call.
-//
-// Print-quality findings (probed 2026-09-24 against Canva's API reference):
-//   - POST /exports takes format as an OBJECT: { type: "pdf", export_quality:
-//     "regular"|"pro", size?, pages? }. There is NO pdf_print variant, NO
-//     bleed/crop-mark flag, and NO CMYK option in the Connect API.
-//   - "pdf_print" below is a Marketr alias for { type:"pdf", export_quality:"pro" };
-//     the production port falls back to "regular" when the plan rejects "pro".
-//   - The exported PDF is Canva's standard (RGB) PDF. The validation report
-//     carries CANVA_API_PRINT_NOTES so nobody mistakes it for press-ready.
-// ---------------------------------------------------------------------------
 
-export interface ExportFlowOptions {
-  fetchImpl?: typeof fetch;
-  storePdf?: typeof defaultStoreCreativePdf;
-  createdBy?: string;
-  actor?: Actor;
-  pollIntervalMs?: number;
-  maxAttempts?: number;
-}
-
-async function resolveCanvaToken(
-  db: Db,
-  workspaceId: string,
-  port: CanvaPort,
-  client: { clientId: string; clientSecret: string },
-): Promise<string> {
-  const token = await getValidCanvaToken(db, workspaceId, port, client);
-  if (!token) {
-    throw new CreativeHttpError(409, "No Canva account connected — connect Canva in the studio first.");
-  }
-  return token;
-}
 
 /** Start a max-quality PDF export for a creative's design. Returns the export job id. */
-export async function startCreativePdfExport(
-  db: Db,
-  workspaceId: string,
-  port: CanvaPort,
-  client: { clientId: string; clientSecret: string },
-  creativeId: string,
-  designId: string,
-  actor: Actor = "user",
-): Promise<{ creativeId: string; exportId: string }> {
-  const row = await db.mailCreative.findFirst({ where: { id: creativeId, workspaceId } });
-  if (!row) throw new CreativeHttpError(404, "Creative not found.");
-  if (row.status !== "draft") {
-    throw new CreativeHttpError(409, "Exports can only start on draft creatives — version first.");
-  }
-  const token = await resolveCanvaToken(db, workspaceId, port, client);
-  const { exportId } = await port.startExport(token, designId, "pdf_print" as CanvaExportFormat);
-  await db.mailCreative.update({
-    where: { id: row.id },
-    data: { canvaDesignId: designId, canvaExportId: exportId },
-  });
-  await auditStudio(db, workspaceId, null, "studio_creative_exported", `Creative "${row.name}" PDF export started (job ${exportId}).`, actor);
-  return { creativeId: row.id, exportId };
-}
 
 /**
  * Poll an export job once; when it succeeds, download the PDF and attach it
  * to the creative (validation + hash + storage). Idempotent: re-running after
  * success is a no-op returning the creative.
  */
-export async function pollCreativePdfExport(
-  db: Db,
-  workspaceId: string,
-  port: CanvaPort,
-  client: { clientId: string; clientSecret: string },
-  creativeId: string,
-  opts?: ExportFlowOptions,
-): Promise<{ status: "in_progress" | "success" | "failed"; creative: Creative | null }> {
-  const row = await db.mailCreative.findFirst({ where: { id: creativeId, workspaceId } });
-  if (!row) throw new CreativeHttpError(404, "Creative not found.");
-  if (row.pdfUrl && row.creativeHash) {
-    return { status: "success", creative: serialize(row as unknown as Record<string, unknown>) };
-  }
-  const exportId = row.canvaExportId;
-  if (!exportId) throw new CreativeHttpError(409, "No export job is running for this creative — start one first.");
-  const token = await resolveCanvaToken(db, workspaceId, port, client);
-  const job = await port.getExport(token, exportId);
-  if (job.status === "in_progress") return { status: "in_progress", creative: null };
-  if (job.status === "failed" || job.downloadUrls.length === 0) {
-    await db.mailCreative.update({ where: { id: row.id }, data: { canvaExportId: null } });
-    return { status: "failed", creative: null };
-  }
-  const fetchImpl = opts?.fetchImpl ?? fetch;
-  const res = await fetchImpl(job.downloadUrls[0]);
-  if (!res.ok) throw new CreativeHttpError(502, `Could not download the Canva export (HTTP ${res.status}).`);
-  const bytes = Buffer.from(await res.arrayBuffer());
-  const creative = await setCreativePdf(db, workspaceId, row.id, bytes, {
-    storePdf: opts?.storePdf,
-    createdBy: opts?.createdBy,
-    actor: opts?.actor,
-  });
-  return { status: "success", creative };
-}
 
 /**
  * Full flow convenience: start the export, poll until done (bounded), then
  * attach. Used by the UI's "Export PDF" button.
  */
-export async function exportCreativePdf(
-  db: Db,
-  workspaceId: string,
-  port: CanvaPort,
-  client: { clientId: string; clientSecret: string },
-  creativeId: string,
-  designId: string,
-  opts?: ExportFlowOptions,
-): Promise<Creative> {
-  const { exportId } = await startCreativePdfExport(db, workspaceId, port, client, creativeId, designId, opts?.actor);
-  const intervalMs = opts?.pollIntervalMs ?? 2000;
-  const maxAttempts = opts?.maxAttempts ?? 30;
-  for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    const result = await pollCreativePdfExport(db, workspaceId, port, client, creativeId, opts);
-    if (result.status === "success" && result.creative) return result.creative;
-    if (result.status === "failed") {
-      throw new CreativeHttpError(502, `Canva export ${exportId} failed.`);
-    }
-    await new Promise((r) => setTimeout(r, intervalMs));
-  }
-  throw new CreativeHttpError(504, `Canva export ${exportId} is still in progress — poll again.`);
-}
-
-/** Design-link round-trip: resolve a pasted Canva share URL to a design id. */
-export async function resolveCanvaDesignLink(
-  db: Db,
-  workspaceId: string,
-  port: CanvaPort,
-  client: { clientId: string; clientSecret: string },
-  shareUrl: string,
-): Promise<{ designId: string; title: string }> {
-  const designId = parseDesignIdFromShareUrl(shareUrl);
-  if (!designId) {
-    throw new CreativeHttpError(400, "That doesn't look like a Canva share link — paste the full https://www.canva.com/design/… URL.");
-  }
-  const token = await resolveCanvaToken(db, workspaceId, port, client);
-  const design = await port.getDesign(token, designId).catch((err) => {
-    throw new CreativeHttpError(502, `Could not load that Canva design: ${err instanceof Error ? err.message : "unknown"}`);
-  });
-  return { designId: design.id, title: design.title };
-}

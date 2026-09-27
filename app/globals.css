@@ -70,11 +70,26 @@
   --line: rgba(28, 25, 23, 0.08);
   --line-strong: rgba(28, 25, 23, 0.16);
 
-  /* accent — violet (locked 2026-09-25 UI audit): actions, links, active states, focus */
-  --accent: #7c3aed;
-  --accent-hover: #6d28d9;
-  --accent-ink: #6d28d9;
-  --accent-tint: #f5f3ff;
+  /* brand accent — Phase 13 Wave A (Tico 2026-09-27 amendment): the locked
+   * static violet primary is now a runtime-overridable brand color. Each
+   * workspace's DEFAULT brand kit drives these at runtime, scoped to the
+   * dashboard theme root (components/BrandTheme.tsx); lib/brand-theme.ts is
+   * the single writer. Only --brand-600 is ever overridden — --brand-700 /
+   * --brand-50 auto-derive from it via color-mix (7.6%-white reproduces
+   * violet-50 exactly at default). Defaults = today's violet scale, so
+   * nothing visually changes until a brand color is set. Full law:
+   * docs/audit/THEMING.md */
+  --brand-600: #7c3aed;
+  --brand-700: #6d28d9;
+  --brand-50: #f5f3ff;
+
+  /* accent — actions, links, active states, focus.
+   * Aliased to the brand vars so the whole UI re-tints with the workspace
+   * brand. --accent-deep stays fixed (deep-violet detail uses; Wave C). */
+  --accent: var(--brand-600);
+  --accent-hover: var(--brand-700);
+  --accent-ink: var(--brand-700);
+  --accent-tint: var(--brand-50);
   --accent-deep: #5b21b6;
 
   /* semantic — muted, never orange-adjacent warning */
@@ -118,6 +133,14 @@
   --color-accent-ink: var(--accent-ink);
   --color-accent-tint: var(--accent-tint);
   --color-accent-deep: var(--accent-deep);
+
+  /* brand — runtime-overridable primary (Phase 13 Wave A, Tico 2026-09-27).
+   * `inline` keeps the var() reference live so utilities re-tint when the
+   * tenant brand overrides them. Consume as bg-brand-600 / text-brand-700 /
+   * bg-brand-50 — NEVER hardcode a primary color again. */
+  --color-brand-600: var(--brand-600);
+  --color-brand-700: var(--brand-700);
+  --color-brand-50: var(--brand-50);
   --color-green: var(--green);
   --color-green-tint: var(--green-tint);
   --color-amber: var(--amber);

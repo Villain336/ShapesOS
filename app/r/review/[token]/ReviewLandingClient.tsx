@@ -13,11 +13,17 @@ export function ReviewLandingClient({
   businessName,
   reviewUrl,
   brandColor,
+  logoUrl,
+  customDomain,
 }: {
   token: string;
   businessName: string;
   reviewUrl: string;
   brandColor: string | null;
+  /** Public white-label logo URL (/api/public/workspaces/[id]/logo), or null. */
+  logoUrl: string | null;
+  /** White-label custom domain, or null (displayed as brand text only). */
+  customDomain: string | null;
 }) {
   const [state, setState] = useState<"idle" | "sending" | "done">("idle");
   const accent = brandColor?.trim() || "#6d28d9";
@@ -40,13 +46,19 @@ export function ReviewLandingClient({
   return (
     <main className="flex min-h-dvh items-center justify-center bg-stone-50 px-6 py-12">
       <div className="w-full max-w-sm rounded-2xl border border-stone-200 bg-white p-8 text-center shadow-sm">
-        <div
-          className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl text-white"
-          style={{ backgroundColor: accent }}
-          aria-hidden
-        >
-          <Star size={26} fill="currentColor" strokeWidth={0} />
-        </div>
+        {logoUrl ? (
+          // White-label logo replaces the default star badge when set.
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={logoUrl} alt={`${businessName} logo`} className="mx-auto h-14 max-w-[10rem] rounded-2xl object-contain" />
+        ) : (
+          <div
+            className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl text-white"
+            style={{ backgroundColor: accent }}
+            aria-hidden
+          >
+            <Star size={26} fill="currentColor" strokeWidth={0} />
+          </div>
+        )}
         <h1 className="mt-5 text-xl font-semibold tracking-tight text-stone-900">
           How was your experience with {businessName}?
         </h1>
@@ -77,6 +89,9 @@ export function ReviewLandingClient({
         <p className="mt-4 text-[11px] text-stone-400">
           You&apos;ll be taken to Google to post your review.
         </p>
+        {customDomain && (
+          <p className="mt-1 text-[11px] text-stone-400">{customDomain}</p>
+        )}
       </div>
     </main>
   );

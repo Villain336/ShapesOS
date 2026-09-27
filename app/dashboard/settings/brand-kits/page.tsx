@@ -6,6 +6,7 @@ import { requireUser, getOrCreateWorkspace } from "@/lib/session";
 import { requireWorkspaceRole } from "@/lib/authz";
 import { prisma } from "@/lib/prisma";
 import BrandKitManager from "@/components/BrandKitManager";
+import SettingsNav from "@/components/settings/SettingsNav";
 
 export const dynamic = "force-dynamic";
 
@@ -31,6 +32,7 @@ export default async function BrandKitsPage() {
           applies wherever a template doesn&apos;t pick one.
         </p>
       </div>
+      <SettingsNav />
       <BrandKitManager
         initial={brandKits.map((k) => ({
           id: k.id,

@@ -15,36 +15,24 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { createMockCanvaPort, type CanvaPort } from "@/lib/studio/canva";
 import { createMockPorkbunPort, type PorkbunPort } from "@/lib/studio/porkbun";
 import {
   __resetStudioTestState,
   __seedPurchaseConfirmation,
-  autofillStudioTemplate,
   checkDomainAvailability,
   confirmDomainPurchase,
   createAsset,
-  createCanvaAuthorizeUrl,
   deleteAsset,
-  disconnectCanva,
-  getCanvaStatus,
   getPorkbunPort,
-  getRegistrant,
   getStudioAutofillDefaults,
+  getRegistrant,
   getTldPricing,
-  getValidCanvaToken,
-  handleCanvaCallback,
-  importCanvaDesignAsAsset,
-  importCanvaExportAsAsset,
   listAssets,
-  listStudioDesigns,
-  pollStudioExport,
   previewDomainPurchase,
   removePorkbunKeys,
   removeStudioDomain,
   savePorkbunKeys,
   saveRegistrant,
-  startStudioExport,
   useAssetInSocialPost,
   validateDomainName,
 } from "@/lib/studio/service";
@@ -88,7 +76,6 @@ async function throwsOk(fn: () => Promise<unknown> | unknown, needle: string): P
 }
 
 type Row = Record<string, unknown>;
-const CLIENT = { clientId: "edge-client", clientSecret: "edge-secret" };
 
 // ---------------------------------------------------------------------------
 // Fake Prisma (deterministic ids via counter — no Math.random)
@@ -98,7 +85,6 @@ function fakeDb(opts: { domainUpsertThrows?: boolean } = {}) {
   let n = 0;
   const id = (p: string) => `${p}-${++n}`;
   const state = {
-    canva: new Map<string, Row>(),
     porkbun: new Map<string, Row>(),
     registrants: new Map<string, Row>(),
     domains: new Map<string, Row>(),
@@ -107,25 +93,6 @@ function fakeDb(opts: { domainUpsertThrows?: boolean } = {}) {
     audit: [] as Row[],
   };
   const db = {
-    studioCanvaAccount: {
-      findUnique: async ({ where }: { where: { workspaceId: string } }) =>
-        state.canva.get(where.workspaceId) ?? null,
-      upsert: async ({ where, update, create }: { where: { workspaceId: string }; update: Row; create: Row }) => {
-        const prev = state.canva.get(where.workspaceId) ?? {};
-        const row = { id: id("canva"), connectedAt: new Date(1700000000000), updatedAt: new Date(1700000000000), ...prev, ...create, ...update };
-        state.canva.set(where.workspaceId, row);
-        return row;
-      },
-      update: async ({ where, data }: { where: { workspaceId: string }; data: Row }) => {
-        const row = { ...(state.canva.get(where.workspaceId) ?? {}), ...data };
-        state.canva.set(where.workspaceId, row);
-        return row;
-      },
-      deleteMany: async ({ where }: { where: { workspaceId: string } }) => {
-        const had = state.canva.delete(where.workspaceId);
-        return { count: had ? 1 : 0 };
-      },
-    },
     studioPorkbunSettings: {
       findUnique: async ({ where }: { where: { workspaceId: string } }) =>
         state.porkbun.get(where.workspaceId) ?? null,
@@ -263,17 +230,6 @@ const REGISTRANT = {
   country: "US",
 };
 
-async function connectCanva(db: PrismaClient, port: CanvaPort, ws: string, user = "u1") {
-  const { state: st } = createCanvaAuthorizeUrl(port, ws, user, {
-    clientId: CLIENT.clientId,
-    redirectUri: "https://app.example/cb",
-  });
-  await handleCanvaCallback(db, port, {
-    state: st, code: "c", clientId: CLIENT.clientId, clientSecret: CLIENT.clientSecret,
-    redirectUri: "https://app.example/cb", expectedUserId: user,
-  });
-}
-
 // ---------------------------------------------------------------------------
 // Fake fetch infra (no network — deterministic canned routers)
 // ---------------------------------------------------------------------------
@@ -295,189 +251,6 @@ function tx(status: number, body: string): Response {
 }
 const b64 = (s: string) => Buffer.from(s, "utf8").toString("base64");
 const unb64 = (s: string) => Buffer.from(s, "base64").toString("utf8");
-
-// ---------------------------------------------------------------------------
-// A. lib/studio/canva.ts — mock port edge cases
-// ---------------------------------------------------------------------------
-{
-  const M = "studio/canva";
-  __resetStudioTestState();
-
-  // Empty/null-ish inputs through the port
-  const port = createMockCanvaPort();
-  const { designs } = await port.listDesigns("tok", { query: "" });
-  check(M, "empty query returns all designs", designs.length === 2);
-  const ws = await port.listDesigns("tok", { query: "   " });
-  check(M, "whitespace query matches nothing (no crash)", ws.designs.length === 0);
-  const uni = await port.listDesigns("tok", { query: "🚀 héllo 世界" });
-  check(M, "unicode query returns no crash", uni.designs.length === 0);
-
-  // failNext exhaustion: exactly N failures then recovery
-  const flaky = createMockCanvaPort({ failNext: 2, failMessage: "flaky" });
-  check(M, "fail 1/2", await throwsOk(() => flaky.listDesigns("t"), "flaky"));
-  check(M, "fail 2/2", await throwsOk(() => flaky.listDesigns("t"), "flaky"));
-  check(M, "recovers after exhaustion", (await flaky.listDesigns("t")).designs.length === 2);
-
-  // Export idempotency: same design+format → same export id (mock overwrites)
-  const { exportId: e1 } = await port.startExport("t", "DAGmock001", "png");
-  const { exportId: e2 } = await port.startExport("t", "DAGmock001", "png");
-  check(M, "repeat export start is idempotent", e1 === e2);
-  // Export for unknown design still "starts" in mock (no validation)
-  const { exportId: e3 } = await port.startExport("t", "DAG-nope", "mp4");
-  const job3 = await port.getExport("t", e3);
-  check(M, "mock export for unknown design still succeeds", job3.status === "success");
-
-  // Runtime format passthrough (type system says png|jpg|pdf|mp4 only)
-  const { exportId: eGif } = await port.startExport("t", "DAGmock001", "gif" as "png");
-  check(M, "invalid format string passes through unvalidated", eGif.includes("gif"));
-
-  // Unicode / emoji autofill data passes through
-  const { designId } = await port.autofill("t", "TPLmock001", {
-    headline: { type: "text", text: "🚀 Héllo wörld — 100% ünïcodé ✓" },
-  });
-  check(M, "unicode autofill data accepted", designId.length > 0);
-
-  // getDesign with empty / weird ids
-  check(M, "empty design id → not found", await throwsOk(() => port.getDesign("t", ""), "not found"));
-  check(M, "design id with slashes → not found", await throwsOk(() => port.getDesign("t", "../../x"), "not found"));
-}
-
-// ---------------------------------------------------------------------------
-// B. lib/studio/service.ts — OAuth state machine edges
-// ---------------------------------------------------------------------------
-{
-  const M = "studio/service";
-  __resetStudioTestState();
-  const { db } = fakeDb();
-  const port = createMockCanvaPort();
-
-  check(M, "blank clientId fails closed", await throwsOk(
-    () => createCanvaAuthorizeUrl(port, "ws", "u", { clientId: "", redirectUri: "https://x/cb" }),
-    "not configured"));
-  check(M, "whitespace clientId slips through (no trim)", (() => {
-    try { createCanvaAuthorizeUrl(port, "ws", "u", { clientId: "   ", redirectUri: "https://x/cb" }); return true; }
-    catch { return false; }
-  })());
-
-  // Callback delivered twice (webhook replay) → second rejected
-  const { state: st } = createCanvaAuthorizeUrl(port, "ws-b", "u1", {
-    clientId: CLIENT.clientId, redirectUri: "https://app.example/cb",
-  });
-  await handleCanvaCallback(db, port, {
-    state: st, code: "c", clientId: CLIENT.clientId, clientSecret: CLIENT.clientSecret,
-    redirectUri: "https://app.example/cb", expectedUserId: "u1",
-  });
-  check(M, "OAuth callback replay rejected", await throwsOk(
-    () => handleCanvaCallback(db, port, {
-      state: st, code: "c", clientId: CLIENT.clientId, clientSecret: CLIENT.clientSecret,
-      redirectUri: "https://app.example/cb", expectedUserId: "u1",
-    }), "expired or invalid"));
-
-  // Empty-string state
-  check(M, "empty state rejected", await throwsOk(
-    () => handleCanvaCallback(db, port, {
-      state: "", code: "c", clientId: CLIENT.clientId, clientSecret: CLIENT.clientSecret,
-      redirectUri: "https://app.example/cb", expectedUserId: "u1",
-    }), "expired or invalid"));
-
-  // Expired state (10-min TTL) via Date.now shift
-  const { state: stExp } = createCanvaAuthorizeUrl(port, "ws-b", "u1", {
-    clientId: CLIENT.clientId, redirectUri: "https://app.example/cb",
-  });
-  const DC = Date as unknown as { now: () => number };
-  const realNow = DC.now;
-  DC.now = () => realNow() + 11 * 60 * 1000;
-  let expiredOk = false;
-  try {
-    expiredOk = await throwsOk(() => handleCanvaCallback(db, port, {
-      state: stExp, code: "c", clientId: CLIENT.clientId, clientSecret: CLIENT.clientSecret,
-      redirectUri: "https://app.example/cb", expectedUserId: "u1",
-    }), "expired");
-  } finally { DC.now = realNow; }
-  check(M, "11-minute-old state rejected as expired", expiredOk);
-
-  // getProfile failure mid-callback → still connects with null canvaUserId
-  const { state: stP } = createCanvaAuthorizeUrl(port, "ws-b", "u1", {
-    clientId: CLIENT.clientId, redirectUri: "https://app.example/cb",
-  });
-  const noProfile: CanvaPort = { ...createMockCanvaPort(), getProfile: async () => { throw new Error("profile down"); } };
-  const resP = await handleCanvaCallback(db, noProfile, {
-    state: stP, code: "c", clientId: CLIENT.clientId, clientSecret: CLIENT.clientSecret,
-    redirectUri: "https://app.example/cb", expectedUserId: "u1",
-  });
-  check(M, "profile failure still connects (null canvaUserId)", resP.workspaceId === "ws-b");
-  const stRow = await getCanvaStatus(db, "ws-b");
-  check(M, "status connected after profile failure", stRow.connected === true);
-
-  // disconnect without port still deletes + audits
-  await disconnectCanva(db, "ws-b");
-  check(M, "disconnect without port works", (await getCanvaStatus(db, "ws-b")).connected === false);
-  // disconnect whose revoke throws still deletes (best-effort)
-  await connectCanva(db, port, "ws-b");
-  const badRevoke: CanvaPort = { ...createMockCanvaPort(), revokeToken: async () => { throw new Error("revoke down"); } };
-  await disconnectCanva(db, "ws-b", badRevoke);
-  check(M, "revoke failure does not block disconnect", (await getCanvaStatus(db, "ws-b")).connected === false);
-
-  // status on never-connected workspace
-  check(M, "status on empty workspace", (await getCanvaStatus(db, "ws-void")).connected === false);
-}
-
-// ---------------------------------------------------------------------------
-// C. service.ts — token refresh edges
-// ---------------------------------------------------------------------------
-{
-  const M = "studio/service";
-  __resetStudioTestState();
-  const { db, state } = fakeDb();
-  const port = createMockCanvaPort();
-  await connectCanva(db, port, "ws-c");
-
-  const row = () => state.canva.get("ws-c") as Row;
-  // 4 minutes left (< 5-min margin) → refresh path
-  row().tokenExpiresAt = new Date(Date.now() + 4 * 60 * 1000);
-  const t1 = await getValidCanvaToken(db, "ws-c", port, CLIENT);
-  check(M, "token inside 5-min margin is refreshed", t1 === "mock-access-token-refreshed");
-  // 6 minutes left (> margin) → cached, no port call
-  row().tokenExpiresAt = new Date(Date.now() + 6 * 60 * 1000);
-  const callsBefore = port.calls.length;
-  const t2 = await getValidCanvaToken(db, "ws-c", port, CLIENT);
-  check(M, "token outside margin served from cache", t2 === "mock-access-token-refreshed" && port.calls.length === callsBefore);
-
-  // Retry exhaustion: always-failing refresh port → single attempt, clear error
-  row().tokenExpiresAt = new Date(Date.now() - 1000);
-  let attempts = 0;
-  const alwaysFail: CanvaPort = {
-    ...createMockCanvaPort(),
-    refreshToken: async () => { attempts += 1; throw new Error("refresh always down"); },
-  };
-  check(M, "always-failing refresh → reconnect error", await throwsOk(
-    () => getValidCanvaToken(db, "ws-c", alwaysFail, CLIENT), "reconnect"));
-  check(M, "no retry loop on refresh (1 attempt)", attempts === 1);
-  check(M, "refresh failure audited as studio_canva_failed",
-    state.audit.some((a) => a.action === "studio_canva_failed"));
-
-  // Expired OAuth token mid-flow: listing with dying refresh
-  check(M, "mid-flow expired token surfaces reconnect", await throwsOk(
-    () => listStudioDesigns(db, "ws-c", alwaysFail, CLIENT), "reconnect"));
-
-  // Import design with no thumbnail → clear error (custom port)
-  const noThumb: CanvaPort = {
-    ...createMockCanvaPort(),
-    getDesign: async () => ({
-      id: "D1", title: "T", designType: "x", thumbnailUrl: null,
-      editUrl: "https://x", updatedAt: "2026-01-01",
-    }),
-  };
-  row().tokenExpiresAt = new Date(Date.now() + 3600 * 1000);
-  check(M, "thumbnail-less design import rejected", await throwsOk(
-    () => importCanvaDesignAsAsset(db, "ws-c", "proj", noThumb, CLIENT, "D1"), "no thumbnail"));
-
-  // Autofill data null
-  check(M, "null autofill data rejected", await throwsOk(
-    () => autofillStudioTemplate(db, "ws-c", "proj", port, CLIENT,
-      { brandTemplateId: "TPLmock001", data: null as unknown as Record<string, { type: "text" }> }),
-    "provide autofill data"));
-}
 
 // ---------------------------------------------------------------------------
 // D. service.ts — Porkbun keys + domain validation edges
@@ -810,19 +583,12 @@ const unb64 = (s: string) => Buffer.from(s, "base64").toString("utf8");
   check(M, "asset name trimmed", (a1 as Row).name === "hero");
   check(M, "asset creation audited", state.audit.some((a) => a.action === "studio_asset_created"));
 
-  const imp = await importCanvaExportAsAsset(db, "ws-f", "proj",
-    { name: "Export 1", downloadUrl: "https://mock.canva.example/e.png", designId: "D1", format: "png" });
-  check(M, "export import creates canva asset", (imp as Row).source === "canva");
-  check(M, "blank export name rejected", await throwsOk(
-    () => importCanvaExportAsAsset(db, "ws-f", "proj",
-      { name: "   ", downloadUrl: "https://x/e.png", designId: "D1", format: "png" }),
-    "name is required"));
+  check(M, "assets filtered by source", (await listAssets(db, "proj", "upload")).length === 1);
 
   check(M, "delete missing asset throws", await throwsOk(
     () => deleteAsset(db, "ws-f", "proj", "nope"), "not found"));
   await deleteAsset(db, "ws-f", "proj", (a1 as Row).id as string);
   check(M, "delete audited", state.audit.some((a) => a.action === "studio_asset_deleted"));
-  check(M, "assets filtered by source", (await listAssets(db, "proj", "canva")).length === 1);
 
   // useAssetInSocialPost with no channels and no services → clear error
   check(M, "social post with no channels blocked", await throwsOk(

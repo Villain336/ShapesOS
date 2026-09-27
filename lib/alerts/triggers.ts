@@ -179,14 +179,6 @@ export const TRIGGERS: TriggerDef[] = [
     live: true, // milestone 21: emitted by the ad factory service.
   },
   {
-    key: "studio_canva_failed",
-    label: "Canva Connect failed",
-    description: "A Canva Connect operation failed (token refresh, design listing, export, or autofill).",
-    conditionKeys: [],
-    dedupAvailable: true,
-    live: true, // milestone 22: emitted by the studio service.
-  },
-  {
     key: "domain_purchase_failed",
     label: "Domain purchase failed",
     description: "A Porkbun domain purchase failed after confirmation (provider error or availability loss).",

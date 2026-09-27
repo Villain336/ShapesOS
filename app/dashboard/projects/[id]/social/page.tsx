@@ -59,7 +59,12 @@ export default async function SocialPage({ params }: { params: Promise<{ id: str
     <main className="mx-auto max-w-7xl px-4 py-8">
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-ink">Social</h1>
+          {/* Phase 13 A8: scope indicator — this is the project-scoped social
+              page, not the workspace-wide Social page. */}
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-stone-400">
+            Project
+          </p>
+          <h1 className="mt-1 text-xl font-bold tracking-tight text-ink">Social</h1>
           <p className="mt-1 text-sm text-zinc-500">
             Content calendar and scheduled publishing through Buffer.
           </p>

@@ -1,7 +1,6 @@
 // Marketr — studio API: project asset library (milestone 22).
 // GET    /api/studio/assets?projectId=&source=
-// POST   /api/studio/assets { projectId, name, source, url, mimeType?, metadata?, canvaDesignId? } (editor+)
-// POST   /api/studio/assets/import-canva { projectId, name, downloadUrl, designId, format } (editor+)
+// POST   /api/studio/assets { projectId, name, source, url, mimeType?, metadata? } (editor+)
 // DELETE /api/studio/assets/[id] { projectId } (editor+)
 // POST   /api/studio/assets/[id]/use-in-social { projectId, text, services } (editor+)
 
@@ -10,14 +9,13 @@ import { requireUser } from "@/lib/session";
 import {
   createAsset,
   deleteAsset,
-  importCanvaExportAsAsset,
   listAssets,
   useAssetInSocialPost,
   type AssetSource,
 } from "@/lib/studio/service";
 import { ownedProject, readJson, requireEditor } from "../_lib";
 
-const SOURCES: AssetSource[] = ["canva", "upload", "generated"];
+const SOURCES: AssetSource[] = ["upload", "generated"];
 
 function serialize(r: Awaited<ReturnType<typeof listAssets>>[number]) {
   return {
@@ -27,7 +25,6 @@ function serialize(r: Awaited<ReturnType<typeof listAssets>>[number]) {
     url: r.url,
     mimeType: r.mimeType,
     metadata: r.metadata ? (JSON.parse(r.metadata) as Record<string, unknown>) : null,
-    canvaDesignId: r.canvaDesignId,
     createdAt: r.createdAt.toISOString(),
   };
 }
@@ -66,36 +63,11 @@ export async function POST(req: Request) {
       url: String(body.url ?? ""),
       mimeType: body.mimeType != null ? String(body.mimeType) : undefined,
       metadata: (body.metadata ?? undefined) as Record<string, unknown> | undefined,
-      canvaDesignId: body.canvaDesignId != null ? String(body.canvaDesignId) : undefined,
     });
     return Response.json({ asset: serialize(row) });
   } catch (err) {
     return Response.json(
       { error: err instanceof Error ? err.message : "Failed to add asset." },
-      { status: 400 },
-    );
-  }
-}
-
-export async function importCanvaHandler(req: Request) {
-  const user = await requireUser();
-  if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
-  const body = await readJson(req);
-  const project = await ownedProject(user.id, body.projectId);
-  if (!project) return Response.json({ error: "Project not found" }, { status: 404 });
-  const denied = await requireEditor(user.id, project.id);
-  if (denied) return denied;
-  try {
-    const row = await importCanvaExportAsAsset(prisma, project.workspaceId, project.id, {
-      name: String(body.name ?? "Canva export"),
-      downloadUrl: String(body.downloadUrl ?? ""),
-      designId: String(body.designId ?? ""),
-      format: String(body.format ?? "png"),
-    });
-    return Response.json({ asset: serialize(row) });
-  } catch (err) {
-    return Response.json(
-      { error: err instanceof Error ? err.message : "Failed to import asset." },
       { status: 400 },
     );
   }

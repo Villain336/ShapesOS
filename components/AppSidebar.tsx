@@ -8,7 +8,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
 import type { ComponentType } from "react";
-import { Mail, Paintbrush, Megaphone, RefreshCw, Brain, Target, BookOpen, Inbox, Share2 } from "lucide-react";
+import { useState } from "react";
+import { Mail, Paintbrush, Megaphone, RefreshCw, Brain, Target, BookOpen, Inbox, Share2, LayoutDashboard } from "lucide-react";
 import {
   ChartBar,
   Bell,
@@ -19,14 +20,10 @@ import {
   CaretUpDown,
   FolderSimple,
   GlobeHemisphereWest,
-  SquaresFour,
   SignOut,
   List,
-  Palette,
   Phone,
-  SlidersHorizontal,
   TrendUp,
-  Users,
   Kanban,
   Star,
 } from "@phosphor-icons/react";import { cn } from "@/lib/utils";
@@ -56,8 +53,8 @@ const NAV_SECTIONS: {
 }[] = [
   {
     items: [
-      { href: "/dashboard", label: "Projects", icon: SquaresFour },
-      { href: "/dashboard/assistant", label: "Marketr", icon: TrendUp },
+      { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
+      { href: "/dashboard/assistant", label: "Assistant", icon: TrendUp },
       { href: "/dashboard/crm", label: "CRM", icon: Kanban },
       { href: "/dashboard/attribution", label: "Attribution", icon: ChartLineUp },
       { href: "/dashboard/reviews", label: "Reviews", icon: Star },
@@ -88,15 +85,11 @@ const NAV_SECTIONS: {
       { href: "/dashboard/approvals", label: "Approvals", icon: Inbox },
     ],
   },
-  {
-    title: "Settings",
-    items: [
-      { href: "/dashboard/settings/alerts", label: "Alert rules", icon: SlidersHorizontal },
-      { href: "/dashboard/settings/brand-kits", label: "Brand kits", icon: Palette },
-      { href: "/dashboard/settings/members", label: "Members", icon: Users },
-    ],
-  },
 ];
+// Phase 13 A1: the sidebar's separate "Settings" island (alert rules, brand
+// kits, members) was deleted — all 17 settings subpages now live in the single
+// SettingsNav tab strip on every settings page, including the new
+// /dashboard/settings landing.
 
 function isActive(pathname: string, href: string) {
   return href === "/dashboard" ? pathname === href : pathname.startsWith(href);
@@ -160,6 +153,30 @@ function WorkspaceSwitcher({
   currentId: string;
 }) {
   const current = workspaces.find((w) => w.id === currentId) ?? workspaces[0];
+  // Phase 13 Wave A (white-label ops): workspace switching is enabled.
+  // Any member may switch — switching is scoping, not privilege; every API
+  // route still enforces its own RBAC for the resolved workspace, and the
+  // cookie is validated against the user's accessible workspaces server-side.
+  const [switchingId, setSwitchingId] = useState<string | null>(null);
+
+  async function switchTo(id: string) {
+    if (id === currentId || switchingId) return;
+    setSwitchingId(id);
+    try {
+      const res = await fetch("/api/workspaces/active", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ workspaceId: id }),
+      });
+      if (!res.ok) throw new Error("switch failed");
+      // Full reload so every server component re-resolves the workspace
+      // from the new preference cookie (BrandTheme re-tints, lists refetch).
+      window.location.reload();
+    } catch {
+      setSwitchingId(null);
+    }
+  }
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
@@ -173,15 +190,23 @@ function WorkspaceSwitcher({
         <DropdownMenuLabel>Workspace</DropdownMenuLabel>
         {workspaces.map((w) => {
           const selected = w.id === currentId;
+          const switching = w.id === switchingId;
           return (
             <DropdownMenuItem
               key={w.id}
-              disabled={!selected}
               className="justify-between"
-              title={selected ? "Current workspace" : "Workspace switching is not enabled"}
+              title={selected ? "Current workspace" : `Switch to ${w.name}`}
+              onSelect={(e) => {
+                e.preventDefault();
+                void switchTo(w.id);
+              }}
             >
               <span className="truncate">{w.name}</span>
-              {selected ? <Check className="size-3.5" /> : null}
+              {selected ? (
+                <Check className="size-3.5" />
+              ) : switching ? (
+                <RefreshCw className="size-3.5 animate-spin opacity-60" />
+              ) : null}
             </DropdownMenuItem>
           );
         })}

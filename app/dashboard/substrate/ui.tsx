@@ -9,7 +9,7 @@ export const inputCls =
   "rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-[13px] text-stone-900 placeholder:text-stone-400 focus:border-violet-400 focus:outline-none";
 
 export const btnPrimary =
-  "flex items-center gap-1.5 rounded-md bg-violet-600 px-3 py-1.5 text-[13px] font-medium text-white transition-[transform,background-color] duration-150 ease-out hover:bg-violet-700 active:scale-[0.97] disabled:opacity-40";
+  "flex items-center gap-1.5 rounded-md bg-brand-600 px-3 py-1.5 text-[13px] font-medium text-white transition-[transform,background-color] duration-150 ease-out hover:bg-brand-700 active:scale-[0.97] disabled:opacity-40";
 
 export const btnGhost =
   "flex items-center gap-1.5 rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-[13px] text-stone-700 transition-[transform,background-color] duration-150 ease-out hover:bg-stone-50 active:scale-[0.97] disabled:opacity-40";
@@ -21,7 +21,7 @@ export const theadCls =
 
 export const thCls = "px-3 py-2 text-left font-medium";
 
-export const rowCls = "border-b border-stone-100 last:border-0 hover:bg-violet-50/40";
+export const rowCls = "border-b border-stone-100 last:border-0 hover:bg-brand-50/40";
 
 export const infoNoteCls =
   "rounded-lg border border-stone-200 bg-stone-50 p-4 text-[12.5px] text-stone-600";
@@ -33,7 +33,8 @@ type ChipTone = "slate" | "violet" | "green" | "amber" | "red" | "blue";
 export function Chip({ children, tone = "slate" }: { children: ReactNode; tone?: ChipTone }) {
   const tones: Record<ChipTone, string> = {
     slate: "bg-slate-100 text-slate-600 border-slate-200",
-    violet: "bg-violet-50 text-violet-700 border-violet-200",
+    // "violet" is the legacy tone name — resolves to runtime brand vars (Wave A).
+    violet: "bg-brand-50 text-brand-700 border-violet-200",
     green: "bg-emerald-50 text-emerald-700 border-emerald-200",
     amber: "bg-amber-50 text-amber-700 border-amber-200",
     red: "bg-red-50 text-red-700 border-red-200",

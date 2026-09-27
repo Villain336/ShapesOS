@@ -16,18 +16,12 @@
 //      drafts; validation is a no-op info note; mark-ready gated until their
 //      tracks are defined.
 //   E. Tenant isolation: workspace B sees nothing of workspace A.
-//   F. Canva flows against the MOCK port only: brand-template list,
-//      Enterprise 409 gate ("requires Canva Enterprise" — never faked),
-//      plan-limited autofill raises instead of faking, PDF Print export
-//      poll -> download -> store -> hash, design-link round-trip resolution,
-//      no connected account -> clean 409. Asserts no real Canva API host is
-//      ever fetched.
-//
+
 // Strategy: real lib modules (lib/studio/formats, lib/studio/creatives,
-// lib/studio/canva mock port, lib/studio/service) against a fresh Postgres
+// lib/studio/service) against a fresh Postgres
 // database. Each run uses uniquely-named workspaces so runs never interfere.
 // The PDF store and the export-download fetch are stubbed in-memory — the
-// battery never touches the workspace filesystem, the network, or real Canva.
+// battery never touches the workspace filesystem or the network.
 
 if (!process.env.DATABASE_URL) {
   console.error("DATABASE_URL is required.");
@@ -40,7 +34,6 @@ process.env.MARKETR_CREDENTIALS_KEY =
 const { prisma } = await import("@/lib/prisma");
 const creatives = await import("@/lib/studio/creatives");
 const formats = await import("@/lib/studio/formats");
-const canva = await import("@/lib/studio/canva");
 const service = await import("@/lib/studio/service");
 const { secrets } = await import("@/lib/secrets");
 
@@ -87,7 +80,7 @@ async function makeWorkspace(name: string) {
 
 // --- Minimal PDF builder -----------------------------------------------------
 // Plain page tree (no compressed object streams) so parsePdfInfo can read the
-// MediaBox and /Count — the same shape Canva exports and most print PDFs use.
+// MediaBox and /Count — the same shape most print-ready PDFs use.
 
 function makePdf(widthPt: number, heightPt: number, pages = 1): Buffer {
   const kids = Array.from({ length: pages }, (_, i) => `${3 + i} 0 R`).join(" ");
@@ -125,24 +118,6 @@ async function stubStorePdf(
   return { fileId };
 }
 
-// --- Stub download fetch: serves mock Canva URLs from memory, throws on
-// anything else — proving the battery never hits the real network. ----------
-
-let nextDownloadBytes: Buffer = p46();
-let realNetworkAttempts = 0;
-async function stubFetch(input: string | URL | Request): Promise<Response> {
-  const u = String(input);
-  if (u.startsWith("https://mock.canva.example/")) {
-    // Copy into a fresh ArrayBuffer so the Response body typing is exact.
-    const bytes = Uint8Array.from(nextDownloadBytes);
-    return new Response(bytes.buffer as ArrayBuffer, {
-      status: 200,
-      headers: { "content-type": "application/pdf" },
-    });
-  }
-  realNetworkAttempts++;
-  throw new Error(`BLOCKED real network fetch: ${u}`);
-}
 
 // --- A. Format validation matrix (pure) --------------------------------------
 
@@ -259,22 +234,7 @@ console.log("B. creative hash determinism");
 const wsA = await makeWorkspace("a");
 const wsB = await makeWorkspace("b");
 
-async function seedCanvaAccount(workspaceId: string, scopes: string) {
-  return prisma.studioCanvaAccount.create({
-    data: {
-      workspaceId,
-      canvaUserId: "mock-user-1",
-      accessTokenEnc: secrets().encrypt("mock-access-token"),
-      refreshTokenEnc: secrets().encrypt("mock-refresh-token"),
-      tokenExpiresAt: new Date(Date.now() + 3 * 3600 * 1000),
-      scopes,
-    },
-  });
-}
 
-const mockPort = canva.createMockCanvaPort();
-const noBrandScopes = "design:meta:read design:content:read";
-const canvaClient = { clientId: "test-client", clientSecret: "test-secret" };
 
 try {
   // --- C. Versioning + lifecycle ---------------------------------------------
@@ -429,174 +389,8 @@ try {
     );
   }
 
-  // --- F. Canva flows (MOCK port only) -----------------------------------------
-  console.log("F. canva mock-port flows");
-  {
-    // No account connected -> clean 409, never a fake export
-    const lonely = await creatives.createCreative(prisma, wsB.id, {
-      name: tag("lonely"),
-      channelTemplate: "print",
-      formatTrack: "addressed",
-      size: "4x6_postcard",
-      source: "canva",
-    });
-    check(
-      "export with no Canva account -> 409",
-      await throwsAsync(
-        () => creatives.startCreativePdfExport(prisma, wsB.id, mockPort, canvaClient, lonely.id, "DAGmock001", "user"),
-        "409",
-      ),
-    );
-
-    await seedCanvaAccount(wsA.id, noBrandScopes);
-    const status = await service.getCanvaStatus(prisma, wsA.id);
-    check("getCanvaStatus: connected, no tokens exposed", status.connected === true);
-    check(
-      "getCanvaStatus never exposes token material",
-      !("accessToken" in status) && !("accessTokenEnc" in status) && !("refreshTokenEnc" in status),
-    );
-
-    // Enterprise gate: scopes without brandtemplate:* -> clean 409
-    const scopesForGate = status.connected ? status.scopes : [];
-    check(
-      "requireCanvaEnterprise without brand scopes -> 409 requires Canva Enterprise",
-      await throwsAsync(() => Promise.resolve(creatives.requireCanvaEnterprise(scopesForGate)), "requires Canva Enterprise"),
-    );
-    check(
-      "requireCanvaEnterprise with brand scopes -> passes",
-      await (async () => {
-        creatives.requireCanvaEnterprise(["brandtemplate:meta:read", "design:content:read"]);
-        return true;
-      })(),
-    );
-
-    // Brand-template list via mock port
-    const token = (await service.getValidCanvaToken(prisma, wsA.id, mockPort, canvaClient)) ?? "";
-    check("getValidCanvaToken resolves from seeded account", token === "mock-access-token");
-    const templates = await mockPort.listBrandTemplates(token);
-    check("mock brand templates listed", templates.length === 1 && templates[0].id === "TPLmock001");
-
-    // Plan-limited autofill is never faked — it raises
-    const limitedPort = canva.createMockCanvaPort({ planLimited: true });
-    check(
-      "plan-limited autofill raises (never faked)",
-      await throwsAsync(
-        () => limitedPort.autofill("t", "TPLmock001", { headline: { type: "text", text: "hi" } }),
-        "not available on this Canva plan",
-      ),
-    );
-
-    // Design-link round-trip: bad URL -> 400; good URL resolves via mock
-    check(
-      "bad share URL -> 400",
-      await throwsAsync(
-        () => creatives.resolveCanvaDesignLink(prisma, wsA.id, mockPort, canvaClient, "https://example.com/nope"),
-        "400",
-      ),
-    );
-    const resolved = await creatives.resolveCanvaDesignLink(
-      prisma, wsA.id, mockPort, canvaClient,
-      "https://www.canva.com/design/DAGmock001/edit",
-    );
-    check("share URL resolves to mock design", resolved.designId === "DAGmock001");
-
-    // Export flow: start -> poll -> download (stub fetch) -> store -> hash
-    const exp = await creatives.createCreative(prisma, wsA.id, {
-      name: tag("canva export"),
-      channelTemplate: "print",
-      formatTrack: "addressed",
-      size: "4x6_postcard",
-      source: "canva",
-      canvaDesignId: "DAGmock001",
-    });
-    nextDownloadBytes = p46();
-    const { exportId } = await creatives.startCreativePdfExport(
-      prisma, wsA.id, mockPort, canvaClient, exp.id, "DAGmock001", "user",
-    );
-    check("export started with job id", exportId.length > 0);
-    check(
-      "export requested as pdf_print (max-quality alias)",
-      mockPort.calls.some((c) => c.method === "startExport" && (c.args as { format: string }).format === "pdf_print"),
-    );
-    const polled = await creatives.pollCreativePdfExport(prisma, wsA.id, mockPort, canvaClient, exp.id, {
-      fetchImpl: stubFetch as unknown as typeof fetch,
-      storePdf: stubStorePdf,
-      createdBy: "battery",
-    });
-    check("export poll -> success with creative", polled.status === "success" && polled.creative !== null);
-    check(
-      "exported creative hash == hash of downloaded bytes",
-      polled.creative?.creativeHash === creatives.computeCreativeHash(p46()),
-    );
-    check(
-      "exported creative validation passed (4x6 pdf on addressed)",
-      polled.creative?.validation?.ok === true,
-    );
-
-    // Idempotent re-poll: no second download
-    const callsBefore = mockPort.calls.filter((c) => c.method === "getExport").length;
-    const repolled = await creatives.pollCreativePdfExport(prisma, wsA.id, mockPort, canvaClient, exp.id, {
-      fetchImpl: stubFetch as unknown as typeof fetch,
-      storePdf: stubStorePdf,
-    });
-    check("re-poll after success is a no-op success", repolled.status === "success");
-    check(
-      "re-poll made no extra export calls",
-      mockPort.calls.filter((c) => c.method === "getExport").length === callsBefore,
-    );
-
-    // Full convenience flow with bounded polling
-    const exp2 = await creatives.createCreative(prisma, wsA.id, {
-      name: tag("canva export 2"),
-      channelTemplate: "print",
-      formatTrack: "addressed",
-      size: "4x6_postcard",
-      source: "canva_link",
-    });
-    nextDownloadBytes = p46Bleed(); // bleed-sized: validation passes with warning
-    const done = await creatives.exportCreativePdf(prisma, wsA.id, mockPort, canvaClient, exp2.id, "DAGmock002", {
-      fetchImpl: stubFetch as unknown as typeof fetch,
-      storePdf: stubStorePdf,
-      createdBy: "battery",
-      pollIntervalMs: 1,
-      maxAttempts: 10,
-    });
-    check("exportCreativePdf full flow -> creative", done.creativeHash !== null);
-    check(
-      "bleed export: validation ok with bleed warning note",
-      done.validation?.ok === true &&
-        (done.validation?.issues ?? []).some((i) => i.severity === "warning" && /bleed/i.test(i.message)),
-    );
-    check(
-      "canva-sourced validation carries print-production notes",
-      (done.validation?.printNotes ?? []).some((n) => /bleed\/crop/i.test(n)),
-    );
-
-    check("no real network fetches attempted", realNetworkAttempts === 0);
-    check(
-      "no call ever targeted api.canva.com",
-      !mockPort.calls.some((c) => JSON.stringify(c.args).includes("api.canva.com")),
-    );
-
-    // Failed export surfaces cleanly
-    const failingPort = canva.createMockCanvaPort({ failNext: 1, failMessage: "Mock export boom" });
-    const exp3 = await creatives.createCreative(prisma, wsA.id, {
-      name: tag("canva export 3"),
-      channelTemplate: "print",
-      formatTrack: "addressed",
-      size: "4x6_postcard",
-      source: "canva",
-    });
-    check(
-      "export start failure surfaces as error",
-      await throwsAsync(
-        () => creatives.startCreativePdfExport(prisma, wsA.id, failingPort, canvaClient, exp3.id, "DAGmock001", "user"),
-        "Mock export boom",
-      ),
-    );
-  }
 } finally {
-  // Unique workspaces cascade-delete creatives, canva accounts, and audit rows.
+  // Unique workspaces cascade-delete creatives and audit rows.
   await prisma.workspace.deleteMany({ where: { id: { in: [wsA.id, wsB.id] } } });
   await prisma.$disconnect();
 }

@@ -7,7 +7,9 @@ import { FileText, Mail, Mailbox, MessageCircle, Phone, X } from "lucide-react";
 export type Tone = "violet" | "green" | "amber" | "red" | "blue" | "stone" | "zinc";
 
 const TONE_CLASSES: Record<Tone, string> = {
-  violet: "bg-violet-50 text-violet-700 border-violet-200",
+  // "violet" is the legacy tone name — it resolves to the runtime brand vars
+  // (Phase 13 Wave A theming), NOT a hardcoded violet.
+  violet: "bg-brand-50 text-brand-700 border-violet-200",
   green: "bg-emerald-50 text-emerald-700 border-emerald-200",
   amber: "bg-amber-50 text-amber-700 border-amber-200",
   red: "bg-red-50 text-red-700 border-red-200",
@@ -133,7 +135,7 @@ export const inputCls =
   "w-full rounded-md border border-stone-300 bg-white px-2 py-1.5 text-[13px] text-stone-900 placeholder:text-stone-400 focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500";
 
 export const btnPrimary =
-  "inline-flex items-center gap-1.5 rounded-md bg-violet-600 px-2.5 py-1.5 text-[13px] font-medium text-white hover:bg-violet-700 disabled:opacity-50";
+  "inline-flex items-center gap-1.5 rounded-md bg-brand-600 px-2.5 py-1.5 text-[13px] font-medium text-white hover:bg-brand-700 disabled:opacity-50";
 
 export const btnSecondary =
   "inline-flex items-center gap-1.5 rounded-md border border-stone-300 bg-white px-2.5 py-1.5 text-[13px] font-medium text-stone-700 hover:bg-stone-50 disabled:opacity-50";

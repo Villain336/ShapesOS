@@ -107,7 +107,7 @@ for (const f of readdirSync(nativeDir)) {
   if (/MOCK-ONLY/.test(body)) mockFromHeaders.add(f.replace(/\.ts$/, ""));
 }
 const keyOf: Record<string, string> = {
-  buffer: "buffer", canva: "canva", dataforseo: "dataforseo", ga4: "ga4",
+  buffer: "buffer", dataforseo: "dataforseo", ga4: "ga4",
   "google-ads": "google-ads", "google-drive": "google-drive",
   "google-search-console": "google-search-console", "meta-ads": "meta-ads",
   notion: "notion", resend: "resend", webflow: "webflow", wordpress: "wordpress",

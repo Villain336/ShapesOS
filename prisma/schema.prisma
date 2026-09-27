@@ -211,13 +211,7 @@ enum FileChangeAction {
   ad_creative_rejected
   ad_creative_regenerated
   ad_sent_to_social
-  // Milestone 22: Canva Connect studio + Porkbun domains.
-  studio_canva_connected
-  studio_canva_disconnected
-  studio_canva_failed
-  studio_canva_refreshed
-  studio_canva_exported
-  studio_canva_autofilled
+  // Milestone 22: studio + Porkbun domains.
   studio_asset_created
   studio_asset_deleted
   studio_porkbun_keys_updated
@@ -576,8 +570,7 @@ model Workspace {
   socialSettings          SocialSettings?
   // Milestone 21: ad factory (BYO Higgsfield API key).
   adSettings              AdSettings?
-  // Milestone 22: Canva Connect OAuth account + Porkbun keys + registrant contact.
-  studioCanvaAccount      StudioCanvaAccount?
+  // Milestone 22: Porkbun keys + registrant contact.
   studioPorkbunSettings   StudioPorkbunSettings?
   studioRegistrant        StudioRegistrant?
   // Milestone 14: composite visibility score weights per workspace.
@@ -2489,28 +2482,8 @@ model AdCreative {
 }
 
 // ---------------------------------------------------------------------------
-// Milestone 22 — Marketing studio (Canva Connect) + Porkbun domains
+// Milestone 22 — Marketing studio + Porkbun domains
 // ---------------------------------------------------------------------------
-
-// OAuth account for Canva Connect, workspace-scoped. Tokens are encrypted
-// AES-256-GCM envelopes (lib/secrets) — never returned to clients.
-model StudioCanvaAccount {
-  id String @id @default(cuid())
-
-  workspaceId String    @unique @map("workspace_id")
-  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-
-  canvaUserId     String?  @map("canva_user_id")
-  accessTokenEnc  String   @map("access_token_enc") @db.Text
-  refreshTokenEnc String   @map("refresh_token_enc") @db.Text
-  tokenExpiresAt  DateTime @map("token_expires_at")
-  scopes          String   @default("")
-
-  connectedAt DateTime @default(now()) @map("connected_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
-
-  @@map("studio_canva_accounts")
-}
 
 // BYO Porkbun API keys, workspace-scoped. Encrypted AES-256-GCM envelopes
 // (lib/secrets) — never returned to clients. Owner/admin only.
@@ -2581,7 +2554,7 @@ model StudioDomain {
   @@map("studio_domains")
 }
 
-// Unified project asset library — Canva exports, uploads, generated assets.
+// Unified project asset library — uploads and generated assets.
 model ProjectAsset {
   id String @id @default(cuid())
 
@@ -2589,11 +2562,10 @@ model ProjectAsset {
   project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   name          String
-  source        String // canva | upload | generated
+  source        String // upload | generated
   url           String  @db.Text
   mimeType      String? @map("mime_type")
-  metadata      String? @db.Text // JSON: canva design id, export format, dimensions…
-  canvaDesignId String? @map("canva_design_id")
+  metadata      String? @db.Text // JSON: export format, dimensions…
 
   createdAt DateTime @default(now()) @map("created_at")
 
@@ -4276,10 +4248,8 @@ model MailCreative {
   channelTemplate String  @default("print") @map("channel_template")
   formatTrack     String  @map("format_track")
   size            String
-  // "canva" | "canva_link" | "upload"
+  // "upload"
   source          String  @default("upload")
-  canvaDesignId   String? @map("canva_design_id")
-  canvaExportId   String? @map("canva_export_id")
   pdfUrl          String? @map("pdf_url")
   // SHA-256 of the canonical PDF bytes; bound to approvals.
   creativeHash    String? @map("creative_hash")

@@ -1,6 +1,6 @@
 // Marketr — Creative Studio home (Phase 4, T2).
-// The central home for all creative and design work across Marketr, powered by
-// Canva. Tabs: [Creatives] [Assets] [QR codes] [Canva connection].
+// The central home for all creative and design work across Marketr.
+// Tabs: [Creatives] [Designs] [Pages] [Assets] [QR codes].
 // v1 ships print/mail creative + the asset library; email/social channel
 // templates are registered as coming_soon and plug in without rework.
 "use client";
@@ -15,13 +15,11 @@ import {
   FileText,
   FileUp,
   FolderOpen,
-  Link2,
   Loader2,
   Mail,
   Monitor,
   Palette,
   PenTool,
-  Plug,
   Plus,
   QrCode,
   RefreshCw,
@@ -32,7 +30,6 @@ import { GRAPES_TEMPLATES, type GrapesTemplateKind } from "@/lib/grapes/template
 import {
   api,
   hashShort,
-  pollPdfExport,
   type ChannelTemplate,
   type Creative,
   type ValidationReport,
@@ -176,7 +173,7 @@ function CreativesTab() {
                 <td className="px-3 py-2 text-stone-600">
                   <Chip>{trackLabel(c.formatTrack)}</Chip> <span className="text-stone-500">{c.size}</span>
                 </td>
-                <td className="px-3 py-2 text-stone-500">{c.source === "canva_link" ? "canva link" : c.source}</td>
+                <td className="px-3 py-2 text-stone-500">{c.source}</td>
                 <td className="px-3 py-2"><Chip tone="violet">v{c.version}</Chip></td>
                 <td className="px-3 py-2 font-mono text-[11px] text-stone-500">{hashShort(c.creativeHash)}</td>
                 <td className="px-3 py-2"><Chip tone={statusTone(c.status)}>{c.status}</Chip></td>
@@ -216,11 +213,7 @@ function CreativeDrawer({ creative, onClose, onChange }: { creative: Creative; o
   const [c, setC] = useState(creative);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [designId, setDesignId] = useState(c.canvaDesignId ?? "");
-  const [shareUrl, setShareUrl] = useState("");
   const [attested, setAttested] = useState(false);
-  const [showExport, setShowExport] = useState(false);
-  const [showLink, setShowLink] = useState(false);
 
   useEffect(() => setC(creative), [creative]);
 
@@ -245,26 +238,6 @@ function CreativeDrawer({ creative, onClose, onChange }: { creative: Creative; o
       api<{ creative: Creative }>(`/api/studio/creatives/${c.id}/upload`, { method: "POST", body: form }).then((r) => r.creative),
     );
   };
-
-  const exportPdf = () =>
-    run("export", async () => {
-      await api("/api/studio/creatives/canva/export-pdf", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ creativeId: c.id, designId: designId.trim() }),
-      });
-      return pollPdfExport(c.id);
-    });
-
-  const designLink = () =>
-    run("export", async () => {
-      await api("/api/studio/creatives/canva/design-link", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ creativeId: c.id, shareUrl: shareUrl.trim() }),
-      });
-      return pollPdfExport(c.id);
-    });
 
   const report: ValidationReport | null = c.validation;
 
@@ -326,40 +299,7 @@ function CreativeDrawer({ creative, onClose, onChange }: { creative: Creative; o
                 <button onClick={() => api<{ creative: Creative }>(`/api/studio/creatives/${c.id}/validate`, { method: "POST" }).then((r) => { setC(r.creative); onChange(); }).catch((e) => setError(e.message))} className={btnGhost} disabled={!!busy}>
                   <RefreshCw size={14} /> Re-validate
                 </button>
-                <button onClick={() => setShowExport((s) => !s)} className={btnGhost}>
-                  <Copy size={14} /> Export from Canva
-                </button>
-                <button onClick={() => setShowLink((s) => !s)} className={btnGhost}>
-                  <Link2 size={14} /> Canva link
-                </button>
               </div>
-
-              {showExport && (
-                <div className="flex gap-2">
-                  <input
-                    value={designId}
-                    onChange={(e) => setDesignId(e.target.value)}
-                    placeholder="Canva design id (DAG…)"
-                    className={`${inputCls} flex-1`}
-                  />
-                  <button onClick={exportPdf} disabled={busy === "export" || !designId.trim()} className={btnPrimary}>
-                    {busy === "export" && <Loader2 size={14} className="animate-spin" />} Export PDF
-                  </button>
-                </div>
-              )}
-              {showLink && (
-                <div className="flex gap-2">
-                  <input
-                    value={shareUrl}
-                    onChange={(e) => setShareUrl(e.target.value)}
-                    placeholder="https://www.canva.com/design/…"
-                    className={`${inputCls} flex-1`}
-                  />
-                  <button onClick={designLink} disabled={busy === "export" || !shareUrl.trim()} className={btnPrimary}>
-                    {busy === "export" && <Loader2 size={14} className="animate-spin" />} Pull PDF
-                  </button>
-                </div>
-              )}
 
               <div className="flex flex-wrap gap-2 pt-1">
                 <button
@@ -392,7 +332,7 @@ function CreativeDrawer({ creative, onClose, onChange }: { creative: Creative; o
                 }).then((r) => r.creative))}
                 disabled={!!busy || !attested || !report?.ok}
                 title={!report?.ok ? "Validation must pass before marking ready" : undefined}
-                className="flex items-center gap-1.5 rounded-md bg-emerald-600 px-3.5 py-1.5 text-[13px] font-medium text-white hover:bg-emerald-700 disabled:opacity-40"
+                className="flex items-center gap-1.5 rounded-md bg-[var(--brand-600)] px-3.5 py-1.5 text-[13px] font-medium text-white hover:bg-[var(--brand-700)] disabled:opacity-40"
               >
                 {busy === "ready" && <Loader2 size={14} className="animate-spin" />}
                 <CheckCircle2 size={14} /> Mark ready
@@ -504,158 +444,6 @@ function AssetsTab() {
       {assets.length === 0 && !loading && (
         <p className="py-8 text-center text-[13px] text-stone-400">No assets in this project yet.</p>
       )}
-    </div>
-  );
-}
-
-// ── Canva tab ────────────────────────────────────────────────────────────────
-
-interface CanvaStatus {
-  connected: boolean;
-  canvaUserId?: string | null;
-  scopes?: string[];
-  connectedAt?: string;
-}
-
-function CanvaTab() {
-  const [status, setStatus] = useState<CanvaStatus | null>(null);
-  const [workspaceId, setWorkspaceId] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [templates, setTemplates] = useState<Array<{ id: string; title: string }> | null>(null);
-  const [enterpriseError, setEnterpriseError] = useState<string | null>(null);
-
-  const load = useCallback(async () => {
-    try {
-      const r = await api<{ status: CanvaStatus; workspaceId: string }>("/api/studio/creatives/canva/status");
-      setStatus(r.status);
-      setWorkspaceId(r.workspaceId);
-    } catch {
-      setStatus(null);
-    }
-  }, []);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
-
-  const connect = async () => {
-    setBusy(true);
-    setError(null);
-    try {
-      const r = await api<{ authorizeUrl: string }>("/api/studio/canva/connect", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ workspaceId }),
-      });
-      window.location.href = r.authorizeUrl;
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Connect failed.");
-      setBusy(false);
-    }
-  };
-
-  const disconnect = async () => {
-    setBusy(true);
-    setError(null);
-    try {
-      await api("/api/studio/canva/disconnect", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ workspaceId }),
-      });
-      setStatus({ connected: false });
-      setTemplates(null);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Disconnect failed.");
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const loadTemplates = async () => {
-    setEnterpriseError(null);
-    setTemplates(null);
-    try {
-      const r = await api<{ templates: Array<{ id: string; title: string }> }>("/api/studio/creatives/canva/templates");
-      setTemplates(r.templates);
-    } catch (e) {
-      setEnterpriseError(e instanceof Error ? e.message : "Failed to load templates.");
-    }
-  };
-
-  return (
-    <div className="max-w-2xl space-y-4">
-      {error && (
-        <div className="flex items-start gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-700">
-          <AlertTriangle size={14} className="mt-0.5 shrink-0" />
-          <span>{error}</span>
-        </div>
-      )}
-      <div className="rounded-lg border border-stone-200 bg-white p-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="text-[14px] font-semibold text-stone-900">Canva connection</div>
-            <div className="mt-0.5 text-[12.5px] text-stone-500">
-              {status?.connected
-                ? `Connected${status.canvaUserId ? ` · ${status.canvaUserId}` : ""}`
-                : "Not connected — connect Canva to export PDF files into creatives."}
-            </div>
-          </div>
-          {status?.connected ? (
-            <button onClick={disconnect} disabled={busy} className={btnGhost}>
-              {busy && <Loader2 size={14} className="animate-spin" />} Disconnect
-            </button>
-          ) : (
-            <button onClick={connect} disabled={busy || !workspaceId} className={btnPrimary}>
-              {busy && <Loader2 size={14} className="animate-spin" />} Connect Canva
-            </button>
-          )}
-        </div>
-        {status?.connected && status.scopes && (
-          <div className="mt-3 flex flex-wrap gap-1.5">
-            {status.scopes.map((s) => (
-              <Chip key={s} tone="blue">{s}</Chip>
-            ))}
-          </div>
-        )}
-      </div>
-
-      <div className="rounded-lg border border-stone-200 bg-white p-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="text-[14px] font-semibold text-stone-900">Brand templates</div>
-            <div className="mt-0.5 text-[12.5px] text-stone-500">
-              Autofill requires Canva Enterprise — otherwise you get a clean 409, never a fake success.
-            </div>
-          </div>
-          <button onClick={loadTemplates} disabled={!status?.connected} className={btnGhost}>
-            Load templates
-          </button>
-        </div>
-        {enterpriseError && (
-          <div className="mt-3 flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[13px] text-amber-800">
-            <AlertTriangle size={14} className="mt-0.5 shrink-0" />
-            <span>{enterpriseError}</span>
-          </div>
-        )}
-        {templates && (
-          <ul className="mt-3 space-y-1.5">
-            {templates.map((t) => (
-              <li key={t.id} className="rounded-md border border-stone-100 px-3 py-2 text-[13px] text-stone-700">
-                {t.title}
-              </li>
-            ))}
-            {templates.length === 0 && <li className="text-[13px] text-stone-400">No brand templates on this account.</li>}
-          </ul>
-        )}
-      </div>
-
-      <div className="rounded-lg border border-stone-200 bg-stone-50 p-4 text-[12.5px] text-stone-600">
-        <span className="font-medium text-stone-800">Print-quality note. </span>
-        The Canva Connect API exports a standard PDF (RGB) — it cannot add bleed/crop marks or convert to CMYK.
-        For press-ready files with bleed and crop marks, download PDF Print manually in the Canva editor, then upload the PDF here (Upload PDF).
-      </div>
     </div>
   );
 }
@@ -1166,7 +954,6 @@ const TABS = [
   { id: "pages", label: "Pages", icon: FileText },
   { id: "assets", label: "Assets", icon: FolderOpen },
   { id: "qr", label: "QR codes", icon: QrCode },
-  { id: "canva", label: "Canva connection", icon: Plug },
 ] as const;
 
 export function StudioApp() {
@@ -1194,7 +981,6 @@ export function StudioApp() {
       {tab === "pages" && <PagesTab />}
       {tab === "assets" && <AssetsTab />}
       {tab === "qr" && <QrDesignerTab />}
-      {tab === "canva" && <CanvaTab />}
     </div>
   );
 }

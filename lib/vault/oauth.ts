@@ -86,13 +86,6 @@ export const OAUTH_CONFIGS: Record<string, OAuthProviderConfig> = {
     clientIdEnv: "META_OAUTH_CLIENT_ID",
     clientSecretEnv: "META_OAUTH_CLIENT_SECRET",
   },
-  canva: {
-    authorizeUrl: "https://www.canva.com/api/oauth/authorize",
-    tokenUrl: "https://api.canva.com/rest/v1/oauth/token",
-    scopes: ["design:content:read", "asset:read"],
-    clientIdEnv: "CANVA_OAUTH_CLIENT_ID",
-    clientSecretEnv: "CANVA_OAUTH_CLIENT_SECRET",
-  },
 };
 
 export interface OAuthState {

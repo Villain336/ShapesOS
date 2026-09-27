@@ -131,7 +131,7 @@ export default async function ProjectPage({
         className={cn(buttonVariants({ variant: "quiet", size: "xs" }), "self-start")}
       >
         <ArrowLeft className="size-3.5" />
-        Projects
+        Overview
       </Link>
 
       <div className="flex flex-wrap items-end justify-between gap-3">

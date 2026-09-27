@@ -40,6 +40,17 @@ async function loadShare(token: string) {
           name: true,
           document: true,
           approvalStatus: true,
+          // White-label identity (Phase 13 Wave A): the editors under
+          // Settings → White-label write these fields; the share page
+          // renders them below (logo, brand color, custom domain).
+          workspace: {
+            select: {
+              id: true,
+              whiteLabelBrandColor: true,
+              whiteLabelLogoUrl: true,
+              whiteLabelCustomDomain: true,
+            },
+          },
         },
       },
     },
@@ -78,21 +89,44 @@ export default async function PublicSharePage({
   const status = STATUS_LABEL[share.design.approvalStatus] ?? STATUS_LABEL.draft!;
   const umami = umamiSnippetConfig();
 
+  // White-label read path: logo + brand color + custom domain for this
+  // design's workspace. Missing/empty fields fall back to the defaults.
+  const wl = share.design.workspace;
+  const brandAccent = wl.whiteLabelBrandColor?.trim() || "#7c3aed";
+  const wlLogoUrl = wl.whiteLabelLogoUrl
+    ? `/api/public/workspaces/${wl.id}/logo`
+    : null;
+  const wlDomain = wl.whiteLabelCustomDomain?.trim() || null;
+
   return (
     <div className="min-h-screen bg-[#FAFAF7] px-4 py-8 md:px-8">
       {umami && <UmamiTracker websiteId={umami.websiteId} scriptUrl={umami.scriptUrl} />}
       {share.replayOptIn && <RrwebRecorder token={token} />}
       <div className="mx-auto max-w-4xl">
         <header className="mb-6 flex flex-wrap items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-violet-600 text-white">
-            <FileText className="h-5 w-5" />
-          </div>
+          {wlLogoUrl ? (
+            // White-label logo replaces the default icon badge when set.
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={wlLogoUrl}
+              alt="Workspace logo"
+              className="h-10 w-10 rounded-lg border border-stone-200 bg-white object-contain"
+            />
+          ) : (
+            <div
+              className="flex h-10 w-10 items-center justify-center rounded-lg text-white"
+              style={{ backgroundColor: brandAccent }}
+            >
+              <FileText className="h-5 w-5" />
+            </div>
+          )}
           <div className="min-w-0 flex-1">
             <h1 className="truncate text-xl font-bold tracking-tight text-stone-900">
               {share.design.name}
             </h1>
             <p className="text-[13px] text-stone-500">
               Shared design preview — {pages.length} page{pages.length === 1 ? "" : "s"}
+              {wlDomain ? ` · ${wlDomain}` : ""}
             </p>
           </div>
           <span
@@ -128,7 +162,7 @@ export default async function PublicSharePage({
 
         <section className="mt-10">
           <h2 className="mb-3 flex items-center gap-2 text-[15px] font-semibold text-stone-900">
-            <MessageSquare className="h-4 w-4 text-violet-600" />
+            <MessageSquare className="h-4 w-4" style={{ color: brandAccent }} />
             Comments ({comments.length})
           </h2>
           {comments.length === 0 ? (

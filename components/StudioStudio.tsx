@@ -1,5 +1,5 @@
-// Marketr — marketing studio: Canva Connect + Porkbun domains + asset library (milestone 22).
-// Client island: Canva, Domains, Assets tabs.
+// Marketr — marketing studio: Porkbun domains + asset library (milestone 22).
+// Client island: Domains, Assets tabs.
 // Motion language (better-ui / emil-design-eng): press scale 0.96, named
 // transitions with cubic-bezier(0.2,0,0,1), 150ms tab fades, Lucide-only.
 
@@ -9,47 +9,23 @@ import { useCallback, useEffect, useState } from "react";
 import {
   TriangleAlert,
   Check,
-  Download,
-  SquareArrowOutUpRight,
   Globe,
   Image as ImageIcon,
   Layers,
   Link,
   LoaderCircle,
-  Palette,
-  Plug,
-  RotateCw,
-  Search,
   Send,
   Settings,
   Trash,
-  XCircle,
 } from "lucide-react";
 
 interface Props {
   projectId: string;
-  workspaceId: string;
   canEdit: boolean;
   isOwnerAdmin: boolean;
 }
 
-type Tab = "canva" | "domains" | "assets";
-
-interface CanvaDesign {
-  id: string;
-  title: string;
-  designType: string;
-  thumbnailUrl: string | null;
-  editUrl: string;
-}
-
-interface BrandTemplate {
-  id: string;
-  title: string;
-  designType: string;
-  thumbnailUrl: string | null;
-  dataset: Array<{ name: string; type: string }> | null;
-}
+type Tab = "domains" | "assets";
 
 interface StudioDomain {
   id: string;
@@ -70,7 +46,6 @@ interface StudioAsset {
   source: string;
   url: string;
   mimeType: string | null;
-  canvaDesignId: string | null;
   createdAt: string;
 }
 
@@ -90,29 +65,11 @@ async function api(path: string, init?: RequestInit) {
   return body;
 }
 
-export default function StudioStudio({ projectId, workspaceId, canEdit, isOwnerAdmin }: Props) {
-  const [tab, setTab] = useState<Tab>("canva");
+export default function StudioStudio({ projectId, canEdit, isOwnerAdmin }: Props) {
+  const [tab, setTab] = useState<Tab>("domains");
   const [notice, setNotice] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
 
-  // Canva state
-  const [canvaConnected, setCanvaConnected] = useState(false);
-  const [designs, setDesigns] = useState<CanvaDesign[]>([]);
-  const [designQuery, setDesignQuery] = useState("");
-  const [folders, setFolders] = useState<Array<{ id: string; name: string }>>([]);
-  const [folderId, setFolderId] = useState("");
-  const [templates, setTemplates] = useState<BrandTemplate[]>([]);
-  const [templatesPlanLimited, setTemplatesPlanLimited] = useState(false);
-  const [exporting, setExporting] = useState<string | null>(null);
-  // Brand-kit defaults (M12) for autofill prefill.
-  const [brandDefaults, setBrandDefaults] = useState<{
-    brandKitName: string;
-    businessName: string | null;
-    tagline: string | null;
-    tone: string | null;
-  } | null>(null);
-  const [autofillTpl, setAutofillTpl] = useState<BrandTemplate | null>(null);
-  const [autofillVals, setAutofillVals] = useState<Record<string, string>>({});
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [socialAsset, setSocialAsset] = useState<StudioAsset | null>(null);
   const [socialText, setSocialText] = useState("");
@@ -144,35 +101,6 @@ export default function StudioStudio({ projectId, workspaceId, canEdit, isOwnerA
   const ok = (text: string) => setNotice({ kind: "ok", text });
   const err = (e: unknown) => setNotice({ kind: "err", text: e instanceof Error ? e.message : "Something went wrong." });
 
-  const refreshCanva = useCallback(async () => {
-    const s = (await api(`/api/studio/canva/status?projectId=${projectId}`)) as {
-      status: { connected: boolean };
-    };
-    setCanvaConnected(s.status.connected);
-    if (s.status.connected) {
-      const d = (await api(`/api/studio/canva/designs?projectId=${projectId}`)) as { designs: CanvaDesign[] };
-      setDesigns(d.designs);
-      const f = (await api(`/api/studio/canva/folders?projectId=${projectId}`)) as {
-        folders: Array<{ id: string; name: string }>;
-      };
-      setFolders(f.folders);
-      const t = (await api(`/api/studio/canva/brand-templates?projectId=${projectId}`)) as {
-        templates: BrandTemplate[];
-        planLimited: boolean;
-      };
-      setTemplates(t.templates);
-      setTemplatesPlanLimited(t.planLimited);
-      const bd = (await api(`/api/studio/canva/brand-defaults?projectId=${projectId}`)) as {
-        defaults: {
-          brandKitName: string;
-          businessName: string | null;
-          tagline: string | null;
-          tone: string | null;
-        } | null;
-      };
-      setBrandDefaults(bd.defaults);
-    }
-  }, [projectId]);
 
   const refreshDomains = useCallback(async () => {
     const s = (await api(`/api/studio/domains/settings?projectId=${projectId}`)) as {
@@ -195,7 +123,6 @@ export default function StudioStudio({ projectId, workspaceId, canEdit, isOwnerA
   }, [projectId]);
 
   useEffect(() => {
-    refreshCanva().catch(err);
     refreshDomains().catch(err);
     refreshAssets().catch(err);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -212,131 +139,6 @@ export default function StudioStudio({ projectId, workspaceId, canEdit, isOwnerA
     } finally {
       setBusy(false);
     }
-  }
-
-  // --- Canva actions ---
-  async function connectCanva() {
-    await run(async () => {
-      const r = (await api("/api/studio/canva/connect", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ workspaceId }),
-      })) as { authorizeUrl: string };
-      window.location.href = r.authorizeUrl;
-    });
-  }
-
-  async function disconnectCanva() {
-    await run(async () => {
-      await api("/api/studio/canva/disconnect", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ workspaceId }),
-      });
-      setCanvaConnected(false);
-      setDesigns([]);
-      setTemplates([]);
-      ok("Canva disconnected.");
-    });
-  }
-
-  async function searchDesigns() {
-    await run(async () => {
-      const q = new URLSearchParams({ projectId, query: designQuery });
-      if (folderId) q.set("folderId", folderId);
-      const d = (await api(`/api/studio/canva/designs?${q.toString()}`)) as { designs: CanvaDesign[] };
-      setDesigns(d.designs);
-    });
-  }
-
-  async function importDesignThumbnail(design: CanvaDesign) {
-    await run(async () => {
-      await api("/api/studio/assets/import-design", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ projectId, designId: design.id }),
-      });
-      await refreshAssets();
-      ok("Design thumbnail imported to the asset library.");
-    });
-  }
-
-  async function exportDesign(design: CanvaDesign, format: "png" | "jpg" | "pdf" | "mp4") {
-    setExporting(design.id);
-    try {
-      const s = (await api("/api/studio/canva/export", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ projectId, designId: design.id, format }),
-      })) as { exportId: string };
-      // Poll the export job (bounded: ~12 polls).
-      for (let i = 0; i < 12; i++) {
-        await new Promise((r) => setTimeout(r, 1500));
-        const j = (await api(
-          `/api/studio/canva/export/${s.exportId}?projectId=${projectId}`,
-        )) as { export: { status: string; downloadUrls: string[] } };
-        if (j.export.status === "success" && j.export.downloadUrls.length > 0) {
-          await api("/api/studio/assets/import-canva", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              projectId,
-              name: design.title,
-              downloadUrl: j.export.downloadUrls[0],
-              designId: design.id,
-              format,
-            }),
-          });
-          await refreshAssets();
-          ok(`“${design.title}” exported and added to the asset library.`);
-          return;
-        }
-        if (j.export.status === "failed") throw new Error("Canva export failed.");
-      }
-      throw new Error("Export is taking too long — check the asset library later.");
-    } catch (e) {
-      err(e);
-    } finally {
-      setExporting(null);
-    }
-  }
-
-  // Prefill heuristics: map template text fields to the workspace brand kit.
-  function brandPrefill(fieldName: string): string {
-    const n = fieldName.toLowerCase();
-    if (/business|brand|company|organization/.test(n)) return brandDefaults?.businessName ?? "";
-    if (/tagline|slogan|subtitle/.test(n)) return brandDefaults?.tagline ?? brandDefaults?.tone ?? "";
-    return "";
-  }
-
-  function openAutofill(t: BrandTemplate) {
-    const vals: Record<string, string> = {};
-    for (const field of t.dataset ?? []) {
-      if (field.type === "text") vals[field.name] = brandPrefill(field.name);
-    }
-    setAutofillVals(vals);
-    setAutofillTpl(t);
-  }
-
-  async function submitAutofill() {
-    if (!autofillTpl) return;
-    await run(async () => {
-      const data: Record<string, { type: "text"; text: string }> = {};
-      for (const field of autofillTpl.dataset ?? []) {
-        if (field.type !== "text") continue;
-        const text = (autofillVals[field.name] ?? "").trim();
-        if (!text) throw new Error(`Fill in “${field.name}” before autofill.`);
-        data[field.name] = { type: "text", text };
-      }
-      const r = (await api("/api/studio/canva/autofill", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ projectId, brandTemplateId: autofillTpl.id, data }),
-      })) as { designId: string };
-      setAutofillTpl(null);
-      ok(`New design created from template: ${r.designId}.`);
-      await refreshCanva();
-    });
   }
 
   // --- Domain actions ---
@@ -487,7 +289,6 @@ export default function StudioStudio({ projectId, workspaceId, canEdit, isOwnerA
   }
 
   const tabs: Array<{ id: Tab; label: string; icon: React.ReactNode }> = [
-    { id: "canva", label: "Canva", icon: <Palette className="h-4 w-4" /> },
     { id: "domains", label: "Domains", icon: <Globe className="h-4 w-4" /> },
     { id: "assets", label: "Assets", icon: <Layers className="h-4 w-4" /> },
   ];
@@ -521,192 +322,6 @@ export default function StudioStudio({ projectId, workspaceId, canEdit, isOwnerA
           </button>
         ))}
       </div>
-
-      {/* CANVA */}
-      {tab === "canva" && (
-        <div className={fade}>
-          {!canvaConnected ? (
-            <div className="rounded-xl border border-dashed border-zinc-200 p-10 text-center">
-              <Palette className="mx-auto mb-3 h-8 w-8 text-zinc-500" />
-              <h3 className="mb-1 font-medium text-zinc-800">Connect Canva</h3>
-              <p className="mx-auto mb-5 max-w-md text-sm text-zinc-500">
-                Browse your designs, export them into Marketr, and autofill brand templates — without
-                leaving the studio.
-              </p>
-              {canEdit ? (
-                <button
-                  onClick={connectCanva}
-                  disabled={busy}
-                  className={`inline-flex items-center gap-2 rounded-lg bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-900 ${press}`}
-                >
-                  {busy ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Plug className="h-4 w-4" />}
-                  Connect Canva
-                </button>
-              ) : (
-                <p className="text-sm text-zinc-500">An editor can connect the Canva account.</p>
-              )}
-            </div>
-          ) : (
-            <div>
-              <div className="mb-6 flex items-center justify-between rounded-xl border border-zinc-200 bg-zinc-50 p-4">
-                <div className="flex items-center gap-3">
-                  <span className="flex h-2 w-2 rounded-full bg-emerald-400" />
-                  <span className="text-sm text-zinc-500">Canva connected</span>
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => run(refreshCanva)}
-                    className={`rounded-md border border-zinc-200 px-3 py-1.5 text-sm text-zinc-500 ${press}`}
-                  >
-                    <RotateCw className="h-4 w-4" />
-                  </button>
-                  {canEdit && (
-                    <button
-                      onClick={disconnectCanva}
-                      className={`inline-flex items-center gap-2 rounded-md border border-zinc-200 px-3 py-1.5 text-sm text-zinc-500 ${press}`}
-                    >
-                      <XCircle className="h-4 w-4" /> Disconnect
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {/* Brand templates */}
-              <h3 className="mb-3 text-sm font-semibold uppercase tracking-widest text-zinc-500">
-                Brand templates
-              </h3>
-              {templatesPlanLimited && (
-                <p className="mb-4 rounded-lg border border-amber-200 bg-amber-50/40 px-4 py-2.5 text-sm text-amber-700">
-                  No brand templates are visible on this Canva plan — autofill needs a plan with brand
-                  templates (typically Pro/Teams/Enterprise).
-                </p>
-              )}
-              {templates.length > 0 && (
-                <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  {templates.map((t) => (
-                    <div key={t.id} className="rounded-xl border border-zinc-200 bg-zinc-50 p-4">
-                      {t.thumbnailUrl && (
-                        <img
-                          src={t.thumbnailUrl}
-                          alt={t.title}
-                          className="mb-3 aspect-video w-full rounded-lg object-cover outline outline-1 outline-[oklch(0_0_0/0.1)]"
-                        />
-                      )}
-                      <p className="text-sm font-medium text-zinc-800">{t.title}</p>
-                      <p className="mb-3 text-xs text-zinc-500">{t.designType}</p>
-                      {canEdit && (
-                        <button
-                          onClick={() => openAutofill(t)}
-                          className={`rounded-md border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-800 ${press}`}
-                        >
-                          Autofill template
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* Designs */}
-              <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-                <h3 className="text-sm font-semibold uppercase tracking-widest text-zinc-500">
-                  Your designs
-                </h3>
-                <div className="flex gap-2">
-                  <input
-                    value={designQuery}
-                    onChange={(e) => setDesignQuery(e.target.value)}
-                    placeholder="Search designs…"
-                    className="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-1.5 text-sm text-zinc-800"
-                  />
-                  {folders.length > 0 && (
-                    <select
-                      value={folderId}
-                      onChange={(e) => setFolderId(e.target.value)}
-                      className="rounded-md border border-zinc-200 bg-zinc-50 px-2 py-1.5 text-sm text-zinc-500"
-                    >
-                      <option value="">All folders</option>
-                      {folders.map((f) => (
-                        <option key={f.id} value={f.id}>
-                          {f.name}
-                        </option>
-                      ))}
-                    </select>
-                  )}
-                  <button
-                    onClick={searchDesigns}
-                    className={`rounded-md border border-zinc-200 px-3 py-1.5 text-sm text-zinc-500 ${press}`}
-                  >
-                    <Search className="h-4 w-4" />
-                  </button>
-                </div>
-              </div>
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {designs.map((d) => (
-                  <div key={d.id} className="rounded-xl border border-zinc-200 bg-zinc-50 p-4">
-                    {d.thumbnailUrl && (
-                      <img
-                        src={d.thumbnailUrl}
-                        alt={d.title}
-                        className="mb-3 aspect-video w-full rounded-lg object-cover outline outline-1 outline-[oklch(0_0_0/0.1)]"
-                      />
-                    )}
-                    <p className="text-sm font-medium text-zinc-800">{d.title}</p>
-                    <p className="mb-3 text-xs text-zinc-500">{d.designType}</p>
-                    <div className="flex flex-wrap gap-2">
-                      <a
-                        href={d.editUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className={`inline-flex items-center gap-1 rounded-md border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-800 ${press}`}
-                      >
-                        <SquareArrowOutUpRight className="h-3 w-3" /> Open in Canva
-                      </a>
-                      {canEdit && (
-                        <>
-                          <button
-                            onClick={() => exportDesign(d, "png")}
-                            disabled={exporting === d.id}
-                            className={`inline-flex items-center gap-1 rounded-md bg-zinc-100 px-3 py-1.5 text-xs font-medium text-zinc-900 ${press}`}
-                          >
-                            {exporting === d.id ? (
-                              <LoaderCircle className="h-3 w-3 animate-spin" />
-                            ) : (
-                              <Download className="h-3 w-3" />
-                            )}
-                            Export PNG
-                          </button>
-                          <button
-                            onClick={() => exportDesign(d, "pdf")}
-                            disabled={exporting === d.id}
-                            className={`inline-flex items-center gap-1 rounded-md border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-800 ${press}`}
-                          >
-                            PDF
-                          </button>
-                          {d.thumbnailUrl && (
-                            <button
-                              onClick={() => importDesignThumbnail(d)}
-                              title="Save the design's thumbnail + metadata to the asset library"
-                              className={`inline-flex items-center gap-1 rounded-md border border-zinc-200 px-3 py-1.5 text-xs text-zinc-500 ${press}`}
-                            >
-                              <ImageIcon className="h-3 w-3" /> Import thumbnail
-                            </button>
-                          )}
-                        </>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-              {designs.length === 0 && (
-                <p className="rounded-xl border border-dashed border-zinc-200 p-8 text-center text-sm text-zinc-500">
-                  No designs found.
-                </p>
-              )}
-            </div>
-          )}
-        </div>
-      )}
 
       {/* DOMAINS */}
       {tab === "domains" && (
@@ -848,7 +463,7 @@ export default function StudioStudio({ projectId, workspaceId, canEdit, isOwnerA
                 <button
                   onClick={confirmPurchase}
                   disabled={busy || !agreeTerms}
-                  className={`rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-40 ${press}`}
+                  className={`rounded-md bg-[var(--brand-600)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--brand-700)] disabled:opacity-40 ${press}`}
                 >
                   {busy ? <LoaderCircle className="h-4 w-4 animate-spin" /> : "Confirm purchase"}
                 </button>
@@ -974,7 +589,7 @@ export default function StudioStudio({ projectId, workspaceId, canEdit, isOwnerA
           )}
           {assets.length === 0 ? (
             <p className="rounded-xl border border-dashed border-zinc-200 p-8 text-center text-sm text-zinc-500">
-              No assets yet. Export a Canva design above or add a URL.
+              No assets yet. Add a URL below.
             </p>
           ) : (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -1019,53 +634,6 @@ export default function StudioStudio({ projectId, workspaceId, canEdit, isOwnerA
               ))}
             </div>
           )}
-        </div>
-      )}
-      {/* Autofill editor */}
-      {autofillTpl && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-          <div className={`w-full max-w-lg rounded-2xl border border-zinc-200 bg-zinc-50 p-6 ${fade}`}>
-            <h3 className="text-base font-semibold text-zinc-900">Autofill “{autofillTpl.title}”</h3>
-            <p className="mt-1 text-xs text-zinc-500">
-              Text fields are prefilled from your brand kit
-              {brandDefaults ? ` “${brandDefaults.brandKitName}”` : ""} where the field name matches —
-              edit anything before creating the design.
-            </p>
-            <div className="mt-4 space-y-3">
-              {(autofillTpl.dataset ?? [])
-                .filter((f) => f.type === "text")
-                .map((f) => (
-                  <label key={f.name} className="block">
-                    <span className="mb-1 block text-xs font-medium text-zinc-500">{f.name}</span>
-                    <input
-                      value={autofillVals[f.name] ?? ""}
-                      onChange={(e) => setAutofillVals((v) => ({ ...v, [f.name]: e.target.value }))}
-                      className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900"
-                    />
-                  </label>
-                ))}
-              {(autofillTpl.dataset ?? []).some((f) => f.type !== "text") && (
-                <p className="text-xs text-zinc-500">
-                  Image/chart fields are autofilled in Canva — add them when editing the new design.
-                </p>
-              )}
-            </div>
-            <div className="mt-6 flex justify-end gap-2">
-              <button
-                onClick={() => setAutofillTpl(null)}
-                className={`rounded-md border border-zinc-200 px-4 py-2 text-sm text-zinc-500 ${press}`}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={submitAutofill}
-                disabled={busy}
-                className={`rounded-md bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-900 ${press}`}
-              >
-                Create design
-              </button>
-            </div>
-          </div>
         </div>
       )}
       {/* Delete confirmation */}

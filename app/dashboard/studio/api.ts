@@ -29,8 +29,6 @@ export interface Creative {
   formatTrack: string;
   size: string;
   source: string;
-  canvaDesignId: string | null;
-  canvaExportId: string | null;
   pdfUrl: string | null;
   creativeHash: string | null;
   version: number;
@@ -66,25 +64,6 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const body = (await res.json().catch(() => ({}))) as { error?: string } & T;
   if (!res.ok) throw new Error(body.error ?? `Request failed (${res.status})`);
   return body as T;
-}
-
-/** Poll the Canva PDF export until it succeeds/fails. Returns the creative. */
-export async function pollPdfExport(
-  creativeId: string,
-  opts?: { intervalMs?: number; maxAttempts?: number; onTick?: (n: number) => void },
-): Promise<Creative> {
-  const intervalMs = opts?.intervalMs ?? 2000;
-  const maxAttempts = opts?.maxAttempts ?? 45;
-  for (let n = 0; n < maxAttempts; n++) {
-    opts?.onTick?.(n);
-    const r = await api<{ status: string; creative: Creative | null }>(
-      `/api/studio/creatives/canva/export-pdf?creativeId=${encodeURIComponent(creativeId)}`,
-    );
-    if (r.status === "success" && r.creative) return r.creative;
-    if (r.status === "failed") throw new Error("The Canva export failed — check the design and try again.");
-    await new Promise((res) => setTimeout(res, intervalMs));
-  }
-  throw new Error("The Canva export is taking longer than expected — try Validate/refresh in a moment.");
 }
 
 export function hashShort(hash: string | null): string {

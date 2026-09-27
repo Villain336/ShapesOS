@@ -3,7 +3,8 @@
 
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { previewBrandTheme, sanitizeBrandHex } from "@/lib/brand-theme";
 
 interface BrandKit {
   id: string;
@@ -44,6 +45,18 @@ export default function BrandKitManager({ initial }: { initial: BrandKit[] }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [uploadingId, setUploadingId] = useState<string | null>(null);
+
+  // Phase 13 Wave A — LIVE PREVIEW: while editing, broadcast the picked
+  // primary color so the whole dashboard re-tints immediately, BEFORE
+  // saving. Closing the editor (or unmount) clears the preview and reverts
+  // to the workspace's saved brand. Saving keeps the preview applied, which
+  // is then the new saved state on next render.
+  const primaryPreview = sanitizeBrandHex((form.colors as Record<string, string>).primary);
+  useEffect(() => {
+    if (!editingId) return;
+    previewBrandTheme(primaryPreview);
+    return () => previewBrandTheme(null);
+  }, [editingId, primaryPreview]);
 
   function startCreate() {
     setEditingId("new");
@@ -133,7 +146,7 @@ export default function BrandKitManager({ initial }: { initial: BrandKit[] }) {
         </p>
         <button
           onClick={startCreate}
-          className="rounded-md bg-violet-600 px-3 py-1.5 text-[13px] font-medium text-white hover:bg-violet-700"
+          className="rounded-md bg-brand-600 px-3 py-1.5 text-[13px] font-medium text-white hover:bg-brand-700"
         >
           New brand kit
         </button>
@@ -179,6 +192,23 @@ export default function BrandKitManager({ initial }: { initial: BrandKit[] }) {
               </label>
             ))}
           </div>
+          <p className="mt-2 text-[12px] text-zinc-500">
+            Primary drives this workspace&apos;s UI accent too — the whole app re-tints live
+            as you pick. Save to apply.
+          </p>
+          {/* Live preview strip — these brand utilities follow the preview broadcast. */}
+          <div className="mt-3 flex items-center gap-3 rounded-lg border border-zinc-200 bg-zinc-50 p-3">
+            <span className="text-[12px] font-medium text-zinc-500">Live preview</span>
+            <span className="inline-flex items-center rounded-md bg-brand-600 px-2.5 py-1.5 text-[13px] font-medium text-white">
+              Primary button
+            </span>
+            <span className="inline-flex items-center rounded-full border border-brand-600/30 bg-brand-50 px-2 py-0.5 text-[11px] font-medium text-brand-700">
+              Soft tint chip
+            </span>
+            <span className="font-mono text-[12px] text-zinc-400">
+              {primaryPreview ?? "#7c3aed"}
+            </span>
+          </div>
           <label className="mt-4 flex flex-col gap-1 text-sm">
             <span className="text-zinc-500">Tone / voice notes (guides AI copy in reports)</span>
             <textarea
@@ -201,7 +231,7 @@ export default function BrandKitManager({ initial }: { initial: BrandKit[] }) {
             <button
               onClick={save}
               disabled={saving}
-              className="rounded-md bg-violet-600 px-3 py-1.5 text-[13px] font-medium text-white hover:bg-violet-700 disabled:opacity-50"
+              className="rounded-md bg-brand-600 px-3 py-1.5 text-[13px] font-medium text-white hover:bg-brand-700 disabled:opacity-50"
             >
               {saving ? "Saving…" : "Save"}
             </button>

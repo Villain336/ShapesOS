@@ -358,7 +358,17 @@ export async function getRequestByToken(token: string) {
   const req = await prisma.reviewRequest.findUnique({
     where: { token },
     include: {
-      workspace: { select: { id: true, name: true, whiteLabelBrandColor: true } },
+      // White-label identity (Phase 13 Wave A): the editors under
+      // Settings → White-label write these fields; the page renders them.
+      workspace: {
+        select: {
+          id: true,
+          name: true,
+          whiteLabelBrandColor: true,
+          whiteLabelLogoUrl: true,
+          whiteLabelCustomDomain: true,
+        },
+      },
     },
   });
   if (!req) return null;

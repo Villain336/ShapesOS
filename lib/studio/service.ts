@@ -1,4 +1,4 @@
-// Marketr — studio service: Canva Connect + Porkbun domains + asset library (milestone 22).
+// Marketr — studio service: Porkbun domains + asset library (milestone 22).
 //
 // All verification runs against mock ports — never live. Production ports are
 // constructed only when real credentials are configured.
@@ -9,16 +9,6 @@ import { randomBytes } from "crypto";
 import { emitAlert } from "@/lib/alerts/evaluate";
 import { secrets } from "@/lib/secrets";
 import { createPost as createSocialPost } from "@/lib/social/service";
-import {
-  CANVA_SCOPES,
-  createCanvaPort,
-  type CanvaBrandTemplate,
-  type CanvaDesign,
-  type CanvaExport,
-  type CanvaExportFormat,
-  type CanvaFolder,
-  type CanvaPort,
-} from "./canva";
 import {
   createMockPorkbunPort,
   createPorkbunPort,
@@ -35,12 +25,6 @@ type Actor = "user" | "system";
 // ---------------------------------------------------------------------------
 
 type AuditAction =
-  | "studio_canva_connected"
-  | "studio_canva_disconnected"
-  | "studio_canva_failed"
-  | "studio_canva_refreshed"
-  | "studio_canva_exported"
-  | "studio_canva_autofilled"
   | "studio_asset_created"
   | "studio_asset_deleted"
   | "studio_creative_created"
@@ -107,314 +91,8 @@ export async function auditStudio(
 }
 
 // ---------------------------------------------------------------------------
-// Canva OAuth state machine
-// ---------------------------------------------------------------------------
-
-interface PendingOAuth {
-  workspaceId: string;
-  userId: string;
-  expiresAt: number;
-}
-
-// In-memory pending OAuth states (10-min TTL). Single-process only —
-// multi-instance deployments need a shared store (noted in DEPLOY.md).
-const pendingOAuth = new Map<string, PendingOAuth>();
-
-export function createCanvaAuthorizeUrl(
-  port: CanvaPort,
-  workspaceId: string,
-  userId: string,
-  opts: { clientId: string; redirectUri: string },
-): { url: string; state: string } {
-  if (!opts.clientId) throw new Error("CANVA_CLIENT_ID is not configured.");
-  const state = randomBytes(24).toString("hex");
-  pendingOAuth.set(state, {
-    workspaceId,
-    userId,
-    expiresAt: Date.now() + 10 * 60 * 1000,
-  });
-  const url = port.authorizeUrl({
-    clientId: opts.clientId,
-    redirectUri: opts.redirectUri,
-    scopes: CANVA_SCOPES,
-    state,
-  });
-  return { url, state };
-}
-
-function consumeOAuthState(state: string): PendingOAuth {
-  const pending = pendingOAuth.get(state);
-  pendingOAuth.delete(state);
-  if (!pending) throw new Error("OAuth state expired or invalid — restart the connect flow.");
-  if (pending.expiresAt < Date.now()) throw new Error("OAuth state expired — restart the connect flow.");
-  return pending;
-}
-
-export async function handleCanvaCallback(
-  db: Db,
-  port: CanvaPort,
-  params: {
-    state: string;
-    code: string;
-    clientId: string;
-    clientSecret: string;
-    redirectUri: string;
-    // The currently signed-in user: must match the user who started the flow.
-    expectedUserId: string;
-  },
-): Promise<{ workspaceId: string; userId: string }> {
-  const pending = consumeOAuthState(params.state);
-  // Bind the callback to the user who started the OAuth flow — a signed-in
-  // user who did not start it cannot attach a Canva account to the workspace.
-  if (pending.userId !== params.expectedUserId) {
-    throw new Error("This Canva connection was started by a different user — restart the connect flow.");
-  }
-  let tokens;
-  try {
-    tokens = await port.exchangeCode({
-      clientId: params.clientId,
-      clientSecret: params.clientSecret,
-      redirectUri: params.redirectUri,
-      code: params.code,
-    });
-  } catch (err) {
-    await auditStudio(db, pending.workspaceId, null, "studio_canva_connected", "Canva connect failed at token exchange.", "system");
-    throw err;
-  }
-  const profile = await port.getProfile(tokens.accessToken).catch(() => null);
-  await db.studioCanvaAccount.upsert({
-    where: { workspaceId: pending.workspaceId },
-    update: {
-      canvaUserId: profile?.id ?? null,
-      accessTokenEnc: secrets().encrypt(tokens.accessToken),
-      refreshTokenEnc: secrets().encrypt(tokens.refreshToken),
-      tokenExpiresAt: new Date(Date.now() + Math.max(0, tokens.expiresInSeconds - 60) * 1000),
-      scopes: tokens.scopes.join(" "),
-    },
-    create: {
-      workspaceId: pending.workspaceId,
-      canvaUserId: profile?.id ?? null,
-      accessTokenEnc: secrets().encrypt(tokens.accessToken),
-      refreshTokenEnc: secrets().encrypt(tokens.refreshToken),
-      tokenExpiresAt: new Date(Date.now() + Math.max(0, tokens.expiresInSeconds - 60) * 1000),
-      scopes: tokens.scopes.join(" "),
-    },
-  });
-  await auditStudio(db, pending.workspaceId, null, "studio_canva_connected", "Canva account connected.", "user");
-  return { workspaceId: pending.workspaceId, userId: pending.userId };
-}
-
-export async function getCanvaStatus(db: Db, workspaceId: string) {
-  const acct = await db.studioCanvaAccount.findUnique({ where: { workspaceId } });
-  if (!acct) return { connected: false as const };
-  return {
-    connected: true as const,
-    canvaUserId: acct.canvaUserId,
-    scopes: acct.scopes.split(" ").filter(Boolean),
-    connectedAt: acct.connectedAt.toISOString(),
-    expiresAt: acct.tokenExpiresAt.toISOString(),
-  };
-}
-
-/**
- * Resolve a valid access token, refreshing 5 minutes before expiry.
- * Returns null when no account is connected.
- */
-export async function getValidCanvaToken(
-  db: Db,
-  workspaceId: string,
-  port: CanvaPort,
-  client: { clientId: string; clientSecret: string },
-): Promise<string | null> {
-  const acct = await db.studioCanvaAccount.findUnique({ where: { workspaceId } });
-  if (!acct) return null;
-  const margin = 5 * 60 * 1000;
-  if (acct.tokenExpiresAt.getTime() - Date.now() > margin) {
-    return secrets().decrypt(acct.accessTokenEnc);
-  }
-  try {
-    const tokens = await port.refreshToken({
-      clientId: client.clientId,
-      clientSecret: client.clientSecret,
-      refreshToken: secrets().decrypt(acct.refreshTokenEnc),
-    });
-    await db.studioCanvaAccount.update({
-      where: { workspaceId },
-      data: {
-        accessTokenEnc: secrets().encrypt(tokens.accessToken),
-        refreshTokenEnc: secrets().encrypt(tokens.refreshToken),
-        tokenExpiresAt: new Date(Date.now() + Math.max(0, tokens.expiresInSeconds - 60) * 1000),
-        scopes: tokens.scopes.length > 0 ? tokens.scopes.join(" ") : acct.scopes,
-      },
-    });
-    await auditStudio(db, workspaceId, null, "studio_canva_refreshed", "Canva token refreshed.", "system");
-    return tokens.accessToken;
-  } catch (err) {
-    // Refresh failed — the connection is stale; user must reconnect.
-    await auditStudio(db, workspaceId, null, "studio_canva_failed", "Canva token refresh failed; reconnect required.", "system");
-    try {
-      await emitAlert({
-        workspaceId,
-        projectId: null,
-        trigger: "studio_canva_failed",
-        severity: "warn",
-        title: "Canva token refresh failed",
-        body: err instanceof Error ? err.message : "Refresh failed",
-        dedupKey: `studio_canva_failed:refresh:${workspaceId}`,
-      });
-    } catch {
-      // alert failures never break the flow
-    }
-    throw new Error("Canva token refresh failed — reconnect the account in studio settings.");
-  }
-}
-
-export async function disconnectCanva(
-  db: Db,
-  workspaceId: string,
-  port?: CanvaPort,
-): Promise<void> {
-  // Best-effort token revocation before local deletion. Canva does not
-  // document a public OAuth revocation endpoint, so this may be a no-op on
-  // some accounts — the local delete is the source of truth either way.
-  if (port) {
-    try {
-      const acct = await db.studioCanvaAccount.findUnique({ where: { workspaceId } });
-      if (acct) {
-        await port.revokeToken({
-          clientId: process.env.CANVA_CLIENT_ID ?? "",
-          accessToken: secrets().decrypt(acct.accessTokenEnc),
-        });
-      }
-    } catch {
-      // Revocation is best-effort; a failed revoke must not block disconnect.
-    }
-  }
-  await db.studioCanvaAccount.deleteMany({ where: { workspaceId } });
-  await auditStudio(db, workspaceId, null, "studio_canva_disconnected", "Canva account disconnected.", "user");
-}
-
-// ---------------------------------------------------------------------------
-// Canva designs / exports / autofill (server-side; require a valid token)
-// ---------------------------------------------------------------------------
-
-export async function listStudioDesigns(
-  db: Db,
-  workspaceId: string,
-  port: CanvaPort,
-  client: { clientId: string; clientSecret: string },
-  opts?: { query?: string; folderId?: string },
-): Promise<CanvaDesign[]> {
-  const token = await getValidCanvaToken(db, workspaceId, port, client);
-  if (!token) throw new Error("No Canva account connected — connect Canva in the studio first.");
-  try {
-    const { designs } = await port.listDesigns(token, { query: opts?.query, folderId: opts?.folderId, limit: 50 });
-    return designs;
-  } catch (err) {
-    await fireCanvaAlert(db, workspaceId, "list designs", err);
-    throw err;
-  }
-}
-
-export async function listStudioFolders(
-  db: Db,
-  workspaceId: string,
-  port: CanvaPort,
-  client: { clientId: string; clientSecret: string },
-): Promise<CanvaFolder[]> {
-  const token = await getValidCanvaToken(db, workspaceId, port, client);
-  if (!token) throw new Error("No Canva account connected — connect Canva in the studio first.");
-  try {
-    return await port.listFolders(token);
-  } catch (err) {
-    await fireCanvaAlert(db, workspaceId, "list folders", err);
-    throw err;
-  }
-}
-
-/** Import a design's thumbnail + metadata directly into the asset library
- *  (no export needed). The thumbnail is a Canva-hosted preview, not a
- *  production asset — noted in the row metadata. */
-export async function importCanvaDesignAsAsset(
-  db: Db,
-  workspaceId: string,
-  projectId: string,
-  port: CanvaPort,
-  client: { clientId: string; clientSecret: string },
-  designId: string,
-) {
-  const token = await getValidCanvaToken(db, workspaceId, port, client);
-  if (!token) throw new Error("No Canva account connected — connect Canva in the studio first.");
-  const design = await port.getDesign(token, designId).catch((err) => {
-    throw new Error(`Could not load Canva design: ${err instanceof Error ? err.message : "unknown"}`);
-  });
-  if (!design.thumbnailUrl) throw new Error("This design has no thumbnail to import.");
-  return createAsset(db, workspaceId, projectId, {
-    name: design.title || "Canva design",
-    source: "canva",
-    url: design.thumbnailUrl,
-    mimeType: "image/png",
-    canvaDesignId: design.id,
-    metadata: {
-      designId: design.id,
-      designType: design.designType,
-      kind: "thumbnail",
-      note: "Canva-hosted preview thumbnail, not a full-resolution export.",
-      editUrl: design.editUrl,
-    },
-  });
-}
-
-export async function listStudioBrandTemplates(
-  db: Db,
-  workspaceId: string,
-  port: CanvaPort,
-  client: { clientId: string; clientSecret: string },
-): Promise<{ templates: CanvaBrandTemplate[]; planLimited: boolean }> {
-  const token = await getValidCanvaToken(db, workspaceId, port, client);
-  if (!token) throw new Error("No Canva account connected — connect Canva in the studio first.");
-  try {
-    const templates = await port.listBrandTemplates(token);
-    // Empty list can mean "no templates" OR "plan lacks brandtemplate scopes" —
-    // surface it honestly so the UI can show the plan-limitation notice.
-    return { templates, planLimited: templates.length === 0 };
-  } catch (err) {
-    await fireCanvaAlert(db, workspaceId, "list brand templates", err);
-    throw err;
-  }
-}
-
-export async function autofillStudioTemplate(
-  db: Db,
-  workspaceId: string,
-  projectId: string,
-  port: CanvaPort,
-  client: { clientId: string; clientSecret: string },
-  args: {
-    brandTemplateId: string;
-    data: Record<string, { type: "text" | "image"; text?: string; assetId?: string }>;
-  },
-): Promise<{ designId: string }> {
-  if (!args.brandTemplateId) throw new Error("Select a brand template.");
-  if (!args.data || Object.keys(args.data).length === 0) throw new Error("Provide autofill data.");
-  const token = await getValidCanvaToken(db, workspaceId, port, client);
-  if (!token) throw new Error("No Canva account connected — connect Canva in the studio first.");
-  try {
-    const { designId } = await port.autofill(token, args.brandTemplateId, args.data);
-    await auditStudio(db, workspaceId, projectId, "studio_canva_autofilled", `Brand template autofilled → design ${designId}.`);
-    return { designId };
-  } catch (err) {
-    await fireCanvaAlert(db, workspaceId, "autofill brand template", err);
-    throw err;
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Brand-kit defaults (M12 reuse) for Canva brand-template autofill.
-// Brand-template datasets are arbitrary per template, so there is no
-// universal automatic mapping: this returns the workspace's default (or
-// first) brand kit and the UI offers one-click prefill of text/image fields
-// whose names look like business-name, tagline, or logo slots.
+// Brand-kit defaults (M12 reuse): the workspace's default (or first)
+// brand kit, offered to the UI for one-click prefill of brand fields.
 // ---------------------------------------------------------------------------
 
 export type StudioAutofillDefaults = {
@@ -460,58 +138,6 @@ export async function getStudioAutofillDefaults(db: Db, workspaceId: string): Pr
   };
 }
 
-export async function startStudioExport(
-  db: Db,
-  workspaceId: string,
-  port: CanvaPort,
-  client: { clientId: string; clientSecret: string },
-  args: { designId: string; format: CanvaExportFormat },
-): Promise<{ exportId: string }> {
-  if (!args.designId) throw new Error("Select a design.");
-  const token = await getValidCanvaToken(db, workspaceId, port, client);
-  if (!token) throw new Error("No Canva account connected — connect Canva in the studio first.");
-  try {
-    return await port.startExport(token, args.designId, args.format);
-  } catch (err) {
-    await fireCanvaAlert(db, workspaceId, "export design", err);
-    throw err;
-  }
-}
-
-export async function pollStudioExport(
-  db: Db,
-  workspaceId: string,
-  port: CanvaPort,
-  client: { clientId: string; clientSecret: string },
-  exportId: string,
-): Promise<CanvaExport> {
-  const token = await getValidCanvaToken(db, workspaceId, port, client);
-  if (!token) throw new Error("No Canva account connected — connect Canva in the studio first.");
-  return port.getExport(token, exportId);
-}
-
-async function fireCanvaAlert(db: Db, workspaceId: string, op: string, err: unknown) {
-  const message = err instanceof Error ? err.message : "Unknown error";
-  await auditStudio(db, workspaceId, null, "studio_canva_failed", `Canva ${op} failed: ${message.slice(0, 120)}`, "system");
-  try {
-    await emitAlert({
-      workspaceId,
-      projectId: null,
-      trigger: "studio_canva_failed",
-      severity: "warn",
-      title: `Canva ${op} failed`,
-      body: message,
-      dedupKey: `studio_canva_failed:${op}:${workspaceId}`,
-    });
-  } catch {
-    // alert failures never break the flow
-  }
-}
-
-/** Production Canva port — real HTTPS. Requires CANVA_CLIENT_ID/SECRET. */
-export function getProductionCanvaPort(): CanvaPort {
-  return createCanvaPort();
-}
 
 // ---------------------------------------------------------------------------
 // Porkbun — BYO keys (encrypted), availability, pricing, purchase
@@ -947,7 +573,7 @@ export async function removeStudioDomain(
 // Project asset library
 // ---------------------------------------------------------------------------
 
-export type AssetSource = "canva" | "upload" | "generated";
+export type AssetSource = "upload" | "generated";
 
 export async function createAsset(
   db: Db,
@@ -959,7 +585,6 @@ export async function createAsset(
     url: string;
     mimeType?: string;
     metadata?: Record<string, unknown>;
-    canvaDesignId?: string;
   },
   actor: Actor = "user",
 ) {
@@ -975,36 +600,12 @@ export async function createAsset(
       url,
       mimeType: args.mimeType ?? undefined,
       metadata: args.metadata ? JSON.stringify(args.metadata) : null,
-      canvaDesignId: args.canvaDesignId ?? null,
     },
   });
   await auditStudio(db, workspaceId, projectId, "studio_asset_created", `Asset added: ${name} (${args.source}).`, actor);
   return row;
 }
 
-/** Import a Canva export into the project asset library. */
-export async function importCanvaExportAsAsset(
-  db: Db,
-  workspaceId: string,
-  projectId: string,
-  args: { name: string; downloadUrl: string; designId: string; format: string; mimeType?: string },
-  actor: Actor = "user",
-) {
-  return createAsset(
-    db,
-    workspaceId,
-    projectId,
-    {
-      name: args.name,
-      source: "canva",
-      url: args.downloadUrl,
-      mimeType: args.mimeType ?? undefined,
-      metadata: { designId: args.designId, exportFormat: args.format, importedAt: new Date().toISOString() },
-      canvaDesignId: args.designId,
-    },
-    actor,
-  );
-}
 
 export async function listAssets(db: Db, projectId: string, source?: AssetSource) {
   return db.projectAsset.findMany({
@@ -1063,7 +664,6 @@ export async function useAssetInSocialPost(
 
 /** Test-only: clear in-memory OAuth/purchase state between fixture runs. */
 export function __resetStudioTestState() {
-  pendingOAuth.clear();
   purchaseConfirmations.clear();
 }
 

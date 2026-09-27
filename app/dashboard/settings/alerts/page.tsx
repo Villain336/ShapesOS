@@ -8,6 +8,7 @@ import { requireWorkspaceRole, roleAtLeast } from "@/lib/authz";
 import { prisma } from "@/lib/prisma";
 import { TRIGGERS } from "@/lib/alerts/triggers";
 import AlertManager from "@/components/AlertManager";
+import SettingsNav from "@/components/settings/SettingsNav";
 
 export const dynamic = "force-dynamic";
 
@@ -48,6 +49,7 @@ export default async function AlertsSettingsPage() {
           then notify Slack, Telegram, or email. Cooldowns keep it quiet.
         </p>
       </div>
+      <SettingsNav />
       <AlertManager
         initialChannels={channels.map((c) => ({
           id: c.id,

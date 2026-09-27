@@ -12,10 +12,18 @@
 // paid amount matches a known pack. See THREAT-MODEL-BILLING.md.
 
 import Stripe from "stripe";
-import { Prisma, type BillingOverageInvoice } from "@prisma/client";
+import { Prisma, type BillingOverageInvoice, type Plan } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { applyTopUp, setSpendCap } from "./service";
 import { TOPUP_PACKS, OVERAGE_CREDITS_PER_CENT } from "./credits";
+import {
+  PLANS,
+  planById,
+  planIdForStripePrice,
+  stripePriceIdFor,
+  type BillingPlan,
+  type PaidPlanId,
+} from "@/lib/billing/plans";
 
 // ── Errors ───────────────────────────────────────────────────────────────────
 
@@ -353,6 +361,12 @@ export class StripeBillingSink implements BillingSink {
    *   - invoice.paid: marks the overage invoice row paid (B13).
    *   - invoice.payment_failed: marks the row failed, audit-logs, and the
    *     UI surfaces it (B13). Dunning is a documented follow-up.
+   *   - checkout.session.completed (mode=subscription, kind=plan-subscription):
+   *     plan subscription purchase — upserts the subscription row and sets
+   *     workspace.plan from signed metadata (idempotent per session).
+   *   - customer.subscription.updated / .deleted: syncs the subscription
+   *     row; a deleted/ended subscription returns the workspace to
+   *     self_hosted (fail closed — no included pool without a paid tier).
    *   - anything else: ignored (never 500 — Stripe would retry forever).
    */
   async handleWebhook(rawBody: string, signature: string | null): Promise<WebhookResult> {
@@ -368,11 +382,18 @@ export class StripeBillingSink implements BillingSink {
     switch (event.type) {
       case "checkout.session.completed": {
         const session = event.data.object as Stripe.Checkout.Session;
+        if (session.mode === "subscription" || session.metadata?.kind === "plan-subscription") {
+          return this.handleSubscriptionCheckout(session);
+        }
         if (session.mode === "setup" || session.metadata?.kind === "overage-payment-method") {
           return this.handleSetupCompleted(session);
         }
         return this.handleTopUpCompleted(session);
       }
+      case "customer.subscription.updated":
+        return this.handleSubscriptionChanged(event.data.object as Stripe.Subscription, false);
+      case "customer.subscription.deleted":
+        return this.handleSubscriptionChanged(event.data.object as Stripe.Subscription, true);
       case "invoice.paid":
         return this.handleInvoicePaid(event.data.object as Stripe.Invoice, true);
       case "invoice.payment_failed":
@@ -622,6 +643,140 @@ export class StripeBillingSink implements BillingSink {
     });
     if (!session.url) throw new Error("Stripe did not return a checkout URL");
     return { url: session.url, sessionId: session.id, customerId };
+  }
+
+  /**
+   * Create a Stripe Checkout Session for a recurring plan subscription
+   * (Phase 13 Wave A). The Stripe Price comes from the plan's env var in
+   * lib/billing/plans.ts — never from client input. workspaceId is bound
+   * server-side from the authenticated admin's workspace (the route
+   * enforces this). Upgrade and downgrade are the same call with a
+   * different planId; Stripe Checkout handles proration display.
+   */
+  async createSubscriptionCheckout(
+    req: SubscriptionCheckoutRequest,
+  ): Promise<{ url: string; sessionId: string }> {
+    this.requireConfigured();
+    const plan = planById(req.planId);
+    const priceId = stripePriceIdFor(plan);
+    if (!priceId) {
+      throw new Error(
+        `Plan "${plan.name}" isn't linked to a Stripe price yet — ` +
+          `set ${plan.stripePriceEnv} on the hosted deployment to make it purchasable.`,
+      );
+    }
+    const workspaceId = (req.workspaceId ?? "").trim();
+    if (!workspaceId) throw new Error("workspaceId is required");
+    for (const [label, url] of [["successUrl", req.successUrl], ["cancelUrl", req.cancelUrl]] as const) {
+      if (!/^https?:\/\//.test(url ?? "")) throw new Error(`${label} must be an http(s) URL`);
+    }
+    const bw = await getOrCreateBillingWorkspace(workspaceId);
+    const session = await this.client().checkout.sessions.create({
+      mode: "subscription",
+      ...(bw.stripeCustomerId ? { customer: bw.stripeCustomerId } : { customer_creation: "always" }),
+      line_items: [{ price: priceId, quantity: 1 }],
+      metadata: { workspaceId, planId: plan.id, kind: "plan-subscription" },
+      subscription_data: { metadata: { workspaceId, planId: plan.id } },
+      success_url: req.successUrl,
+      cancel_url: req.cancelUrl,
+    });
+    if (!session.url) throw new Error("Stripe did not return a checkout URL");
+    return { url: session.url, sessionId: session.id };
+  }
+
+  /**
+   * Create a Stripe Customer Portal session — the honest cancel/manage
+   * path (Phase 13 Wave A). Cancellation, card updates, and invoice
+   * history happen on Stripe's own UI; Marketr never hand-rolls them.
+   * The signed customer.subscription.updated/.deleted webhooks sync the
+   * result back to workspace.plan.
+   */
+  async createBillingPortalSession(
+    req: PortalSessionRequest,
+  ): Promise<{ url: string }> {
+    this.requireConfigured();
+    const workspaceId = (req.workspaceId ?? "").trim();
+    if (!workspaceId) throw new Error("workspaceId is required");
+    if (!/^https?:\/\//.test(req.returnUrl ?? "")) throw new Error("returnUrl must be an http(s) URL");
+    const bw = await getOrCreateBillingWorkspace(workspaceId);
+    if (!bw.stripeCustomerId) {
+      throw new Error("No Stripe customer on file for this workspace yet — start a subscription first.");
+    }
+    const portal = await this.client().billingPortal.sessions.create({
+      customer: bw.stripeCustomerId,
+      return_url: req.returnUrl,
+    });
+    return { url: portal.url };
+  }
+
+  /**
+   * Plan-subscription purchase path (Phase 13 Wave A). Only
+   * checkout.session.completed (mode=subscription) with a planId from
+   * signed metadata applies. The workspace plan is set ONLY here — never
+   * from UI input. Idempotent per subscription: a replay for an already-
+   * recorded subscription id returns the prior result.
+   */
+  private async handleSubscriptionCheckout(session: Stripe.Checkout.Session): Promise<WebhookResult> {
+    const workspaceId = (session.metadata?.workspaceId ?? "").trim();
+    if (!workspaceId) return { ok: false, reason: "missing_workspace" };
+    let planId: PaidPlanId;
+    try {
+      planId = planById(session.metadata?.planId ?? "").id;
+    } catch {
+      return { ok: false, reason: "unknown_plan" };
+    }
+    const customerId = typeof session.customer === "string" ? session.customer : session.customer?.id;
+    if (!customerId) return { ok: false, reason: "missing_customer" };
+    const subscriptionId =
+      typeof session.subscription === "string" ? session.subscription : session.subscription?.id;
+    if (!subscriptionId) return { ok: false, reason: "missing_subscription" };
+
+    const prior = await readSubscriptionRow(workspaceId);
+    if (prior?.stripeSubscriptionId === subscriptionId) {
+      return {
+        ok: true,
+        applied: { workspaceId, credits: 0, alreadyApplied: true, kind: "subscription_checkout" },
+      };
+    }
+
+    const sub = await this.client().subscriptions.retrieve(subscriptionId);
+    const subCustomer = typeof sub.customer === "string" ? sub.customer : sub.customer?.id;
+    if (subCustomer !== customerId) return { ok: false, reason: "customer_mismatch" };
+
+    await writeSubscriptionRow({
+      workspaceId,
+      stripeSubscriptionId: subscriptionId,
+      stripeCustomerId: customerId,
+      stripeCheckoutSessionId: session.id,
+      planId,
+      status: sub.status,
+      cancelAtPeriodEnd: sub.cancel_at_period_end,
+      currentPeriodEnd: subscriptionPeriodEnd(sub),
+    });
+    await prisma.billingWorkspace
+      .update({ where: { workspaceId }, data: { stripeCustomerId: customerId } })
+      .catch(() => null);
+    if (!prior || prior.planId !== planId) {
+      await setWorkspacePlan(workspaceId, planId as Plan, `subscribed via Stripe (${subscriptionId})`);
+    }
+    return {
+      ok: true,
+      applied: { workspaceId, credits: 0, alreadyApplied: false, kind: "subscription_checkout" },
+    };
+  }
+
+  /**
+   * Sync from customer.subscription.updated/.deleted (Phase 13 Wave A).
+   * Delegates to the module-level sync so the logic is testable without a
+   * sink instance; the plan tier follows the Stripe Price on the
+   * subscription (reverse-looked-up against the plan catalogue) and a
+   * deleted/ended subscription returns the workspace to self_hosted.
+   */
+  private async handleSubscriptionChanged(
+    sub: Stripe.Subscription,
+    deleted: boolean,
+  ): Promise<WebhookResult> {
+    return syncSubscriptionFromStripe(sub, deleted);
   }
 
   /**
@@ -1104,5 +1259,218 @@ export async function getOverageState(workspaceId: string): Promise<OverageState
       invoicePdfUrl: r.invoicePdfUrl,
       createdAt: r.createdAt,
     })),
+  };
+}
+
+// ── Plan subscriptions (Phase 13 Wave A) ─────────────────────────────────────
+// Recurring plan tiers (Starter/Pro/Agency) on top of the existing top-up +
+// overage plumbing. The plan catalogue lives in lib/billing/plans.ts — this
+// section is the Stripe money pipe for it.
+//
+// Money invariant: the plan tier is set ONLY from signed Stripe events
+// (checkout.session.completed mode=subscription, customer.subscription.*).
+// The UI/API never sets workspace.plan directly for a paid tier.
+
+export interface SubscriptionCheckoutRequest {
+  workspaceId: string;
+  planId: string;
+  successUrl: string;
+  cancelUrl: string;
+}
+
+export interface PortalSessionRequest {
+  workspaceId: string;
+  returnUrl: string;
+}
+
+// Same CREATE TABLE IF NOT EXISTS safety-net pattern as the top-up
+// idempotency table above: no migration coordination needed.
+const SUBSCRIPTIONS_DDL = `
+CREATE TABLE IF NOT EXISTS billing_subscriptions (
+  workspace_id               TEXT PRIMARY KEY REFERENCES workspaces(id) ON DELETE CASCADE,
+  stripe_subscription_id     TEXT NOT NULL UNIQUE,
+  stripe_customer_id         TEXT NOT NULL,
+  stripe_checkout_session_id TEXT,
+  plan_id                    TEXT NOT NULL,
+  status                     TEXT NOT NULL,
+  cancel_at_period_end       BOOLEAN NOT NULL DEFAULT false,
+  current_period_end         TIMESTAMPTZ,
+  created_at                 TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at                 TIMESTAMPTZ NOT NULL DEFAULT now()
+)`;
+
+let subscriptionsReady = false;
+async function ensureSubscriptionsTable(): Promise<void> {
+  if (subscriptionsReady) return;
+  await prisma.$executeRawUnsafe(SUBSCRIPTIONS_DDL);
+  subscriptionsReady = true;
+}
+
+export interface SubscriptionRow {
+  workspaceId: string;
+  stripeSubscriptionId: string;
+  stripeCustomerId: string;
+  planId: string;
+  status: string;
+  cancelAtPeriodEnd: boolean;
+  currentPeriodEnd: Date | null;
+}
+
+async function readSubscriptionRow(workspaceId: string): Promise<SubscriptionRow | null> {
+  await ensureSubscriptionsTable();
+  const rows = await prisma.$queryRaw<
+    Array<{
+      workspace_id: string;
+      stripe_subscription_id: string;
+      stripe_customer_id: string;
+      plan_id: string;
+      status: string;
+      cancel_at_period_end: boolean;
+      current_period_end: Date | null;
+    }>
+  >`SELECT workspace_id, stripe_subscription_id, stripe_customer_id, plan_id,
+          status, cancel_at_period_end, current_period_end
+     FROM billing_subscriptions WHERE workspace_id = ${workspaceId} LIMIT 1`;
+  const r = rows[0];
+  if (!r) return null;
+  return {
+    workspaceId: r.workspace_id,
+    stripeSubscriptionId: r.stripe_subscription_id,
+    stripeCustomerId: r.stripe_customer_id,
+    planId: r.plan_id,
+    status: r.status,
+    cancelAtPeriodEnd: r.cancel_at_period_end,
+    currentPeriodEnd: r.current_period_end,
+  };
+}
+
+async function writeSubscriptionRow(row: {
+  workspaceId: string;
+  stripeSubscriptionId: string;
+  stripeCustomerId: string;
+  stripeCheckoutSessionId?: string | null;
+  planId: string;
+  status: string;
+  cancelAtPeriodEnd: boolean;
+  currentPeriodEnd: Date | null;
+}): Promise<void> {
+  await ensureSubscriptionsTable();
+  await prisma.$executeRaw`
+    INSERT INTO billing_subscriptions
+      (workspace_id, stripe_subscription_id, stripe_customer_id,
+       stripe_checkout_session_id, plan_id, status, cancel_at_period_end,
+       current_period_end, updated_at)
+    VALUES (${row.workspaceId}, ${row.stripeSubscriptionId}, ${row.stripeCustomerId},
+            ${row.stripeCheckoutSessionId ?? null}, ${row.planId}, ${row.status},
+            ${row.cancelAtPeriodEnd}, ${row.currentPeriodEnd}, now())
+    ON CONFLICT (workspace_id) DO UPDATE SET
+      stripe_subscription_id = EXCLUDED.stripe_subscription_id,
+      stripe_customer_id = EXCLUDED.stripe_customer_id,
+      stripe_checkout_session_id = COALESCE(EXCLUDED.stripe_checkout_session_id, billing_subscriptions.stripe_checkout_session_id),
+      plan_id = EXCLUDED.plan_id,
+      status = EXCLUDED.status,
+      cancel_at_period_end = EXCLUDED.cancel_at_period_end,
+      current_period_end = EXCLUDED.current_period_end,
+      updated_at = now()`;
+}
+
+function subscriptionPeriodEnd(sub: Stripe.Subscription): Date | null {
+  const ts = (sub as { current_period_end?: number }).current_period_end;
+  return typeof ts === "number" ? new Date(ts * 1000) : null;
+}
+
+/**
+ * Set the workspace's plan tier, audit-logged. Only ever called from
+ * signed Stripe webhook paths in this module — never from UI input.
+ */
+async function setWorkspacePlan(workspaceId: string, planId: Plan, reason: string): Promise<void> {
+  await prisma.workspace.update({ where: { id: workspaceId }, data: { plan: planId } });
+  await auditBilling(workspaceId, `Billing: plan set to ${planId} (${reason})`);
+}
+
+export interface SubscriptionState {
+  configured: boolean;
+  /** Current workspace plan tier (Prisma Plan enum value). */
+  plan: string;
+  subscription: SubscriptionRow | null;
+  hasPaymentMethod: boolean;
+  /** Per-plan purchasability: false when the host hasn't linked a Stripe Price. */
+  purchasable: Record<string, boolean>;
+}
+
+/**
+ * Subscription + plan state for the billing hub. Never exposes keys,
+ * secrets, Price ids, or card data.
+ */
+export async function getSubscriptionState(workspaceId: string): Promise<SubscriptionState> {
+  const [ws, subscription, bw] = await Promise.all([
+    prisma.workspace.findUnique({ where: { id: workspaceId }, select: { plan: true } }),
+    readSubscriptionRow(workspaceId),
+    prisma.billingWorkspace.findUnique({ where: { workspaceId } }),
+  ]);
+  const purchasable: Record<string, boolean> = {};
+  for (const plan of PLANS) purchasable[plan.id] = stripePriceIdFor(plan) !== null;
+  return {
+    configured: isBillingConfigured(),
+    plan: ws?.plan ?? "self_hosted",
+    subscription,
+    hasPaymentMethod: bw?.hasPaymentMethod ?? false,
+    purchasable,
+  };
+}
+
+/**
+ * Sync the subscription row from customer.subscription.updated/.deleted.
+ * The plan tier follows the Stripe Price on the subscription (reverse
+ * looked up against the plan catalogue) — an unknown price never changes
+ * the plan. A deleted/ended subscription returns the workspace to
+ * self_hosted: no paid tier, no included pool (fail closed).
+ */
+export async function syncSubscriptionFromStripe(
+  sub: Stripe.Subscription,
+  deleted: boolean,
+): Promise<WebhookResult> {
+  const customerId = typeof sub.customer === "string" ? sub.customer : sub.customer?.id;
+  if (!customerId) return { ok: false, reason: "missing_customer" };
+  const bw = await prisma.billingWorkspace.findFirst({ where: { stripeCustomerId: customerId } });
+  if (!bw) return { ok: true, ignored: true, reason: "unknown_customer" };
+  const workspaceId = bw.workspaceId;
+
+  const priceId = sub.items?.data?.[0]?.price?.id ?? null;
+  const planId = planIdForStripePrice(priceId);
+  const ended = deleted || ["canceled", "unpaid", "incomplete_expired"].includes(sub.status);
+
+  const prior = await readSubscriptionRow(workspaceId);
+  await writeSubscriptionRow({
+    workspaceId,
+    stripeSubscriptionId: sub.id,
+    stripeCustomerId: customerId,
+    planId: planId ?? prior?.planId ?? "starter",
+    status: deleted ? "canceled" : sub.status,
+    cancelAtPeriodEnd: sub.cancel_at_period_end,
+    currentPeriodEnd: subscriptionPeriodEnd(sub),
+  });
+
+  if (ended) {
+    await setWorkspacePlan(workspaceId, "self_hosted" as Plan, `subscription ${sub.id} ended (${sub.status})`);
+  } else if (planId) {
+    const ws = await prisma.workspace.findUnique({ where: { id: workspaceId }, select: { plan: true } });
+    if (ws && ws.plan !== planId) {
+      await setWorkspacePlan(workspaceId, planId as Plan, `subscription ${sub.id} changed plan`);
+    }
+  } else {
+    await auditBilling(
+      workspaceId,
+      `Billing: subscription ${sub.id} updated with an unrecognized Stripe price — plan left unchanged`,
+    );
+  }
+  return {
+    ok: true,
+    applied: {
+      workspaceId,
+      credits: 0,
+      alreadyApplied: false,
+      kind: deleted ? "subscription_deleted" : "subscription_updated",
+    },
   };
 }

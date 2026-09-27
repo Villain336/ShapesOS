@@ -50,7 +50,7 @@ async function api<T>(url: string, opts?: RequestInit): Promise<T> {
 const inputCls =
   "w-full rounded-md border border-stone-300 bg-white px-2 py-1.5 text-[13px] text-stone-900 placeholder:text-stone-400 focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500";
 const btnPrimary =
-  "inline-flex items-center gap-1.5 rounded-md bg-violet-600 px-2.5 py-1.5 text-[13px] font-medium text-white hover:bg-violet-700 disabled:opacity-50";
+  "inline-flex items-center gap-1.5 rounded-md bg-brand-600 px-2.5 py-1.5 text-[13px] font-medium text-white hover:bg-brand-700 disabled:opacity-50";
 const btnSecondary =
   "inline-flex items-center gap-1.5 rounded-md border border-stone-300 bg-white px-2.5 py-1.5 text-[13px] font-medium text-stone-700 hover:bg-stone-50 disabled:opacity-50";
 
@@ -59,7 +59,7 @@ function Chip({ tone, children }: { tone: string; children: ReactNode }) {
     green: "bg-emerald-50 text-emerald-700 border-emerald-200",
     amber: "bg-amber-50 text-amber-700 border-amber-200",
     red: "bg-red-50 text-red-700 border-red-200",
-    violet: "bg-violet-50 text-violet-700 border-violet-200",
+    violet: "bg-brand-50 text-brand-700 border-violet-200",
     stone: "bg-stone-100 text-stone-600 border-stone-200",
     blue: "bg-sky-50 text-sky-700 border-sky-200",
   };
@@ -164,13 +164,13 @@ export function SocialApp() {
               key={id}
               onClick={() => setTab(id)}
               className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-[13.5px] font-medium transition-colors ${
-                tab === id ? "border-violet-600 text-violet-700" : "border-transparent text-stone-500 hover:text-stone-800"
+                tab === id ? "border-brand-600 text-brand-700" : "border-transparent text-stone-500 hover:text-stone-800"
               }`}
             >
               <Icon size={15} />
               {label}
               {id === "channels" && channels.length ? (
-                <span className={`rounded-full px-1.5 text-[11px] font-semibold ${tab === id ? "bg-violet-100 text-violet-700" : "bg-zinc-100 text-zinc-600"}`}>
+                <span className={`rounded-full px-1.5 text-[11px] font-semibold ${tab === id ? "bg-brand-50 text-brand-700" : "bg-zinc-100 text-zinc-600"}`}>
                   {channels.length}
                 </span>
               ) : null}
@@ -221,7 +221,7 @@ export function SocialApp() {
                 </thead>
                 <tbody className="divide-y divide-stone-100">
                   {filtered.map((p) => (
-                    <tr key={p.id} className="hover:bg-violet-50/40">
+                    <tr key={p.id} className="hover:bg-brand-50/40">
                       <td className="max-w-[380px] px-3 py-2">
                         <div className="truncate text-stone-900">{p.content ?? "—"}</div>
                         <div className="text-[11px] text-stone-400">created {fmtDate(p.createdAt)}</div>
@@ -281,13 +281,13 @@ export function SocialApp() {
                 </thead>
                 <tbody className="divide-y divide-stone-100">
                   {channels.map((c) => (
-                    <tr key={c.id} className="hover:bg-violet-50/40">
+                    <tr key={c.id} className="hover:bg-brand-50/40">
                       <td className="px-3 py-2">
                         <div className="flex items-center gap-2">
                           {c.picture ? (
                             <img src={c.picture} alt="" className="h-6 w-6 rounded-full object-cover" />
                           ) : (
-                            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-violet-100 text-violet-700">
+                            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-brand-50 text-brand-700">
                               <Share2 size={12} />
                             </span>
                           )}
@@ -385,7 +385,7 @@ function ComposeModal({
               </p>
             ) : channels.map((c) => (
               <label key={c.id} className="flex cursor-pointer items-center gap-2 rounded px-1 py-1 hover:bg-stone-50">
-                <input type="checkbox" checked={picked.has(c.id)} onChange={() => toggle(c.id)} className="accent-violet-600" />
+                <input type="checkbox" checked={picked.has(c.id)} onChange={() => toggle(c.id)} className="accent-brand-600" />
                 <span className="text-[13px] text-stone-800">{c.name ?? c.identifier}</span>
                 <span className="ml-auto"><Chip tone="blue">{c.identifier}</Chip></span>
               </label>
@@ -398,7 +398,7 @@ function ComposeModal({
                   key={m}
                   onClick={() => setMode(m)}
                   className={`rounded-md border px-2.5 py-1.5 text-[13px] font-medium ${
-                    mode === m ? "border-violet-600 bg-violet-50 text-violet-700" : "border-stone-300 text-stone-600 hover:bg-stone-50"
+                    mode === m ? "border-brand-600 bg-brand-50 text-brand-700" : "border-stone-300 text-stone-600 hover:bg-stone-50"
                   }`}
                 >
                   {m === "now" ? "Publish now" : m === "schedule" ? "Schedule" : "Save draft"}

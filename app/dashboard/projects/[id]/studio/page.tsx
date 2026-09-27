@@ -1,5 +1,5 @@
-// Marketr — marketing studio: Canva Connect + Porkbun domains + asset library (milestone 22).
-// Server page with a client studio island (Canva, Domains, Assets tabs).
+// Marketr — marketing studio: Porkbun domains + asset library (milestone 22).
+// Server page with a client studio island (Domains, Assets tabs).
 
 import { accessibleWorkspaceWhere, getMembership, requireProjectRole } from "@/lib/authz";
 import Link from "next/link";
@@ -30,14 +30,18 @@ export default async function StudioPage({ params }: { params: Promise<{ id: str
         <Link href={`/dashboard/projects/${project.id}`} className="text-sm text-zinc-500 hover:text-zinc-600">
           ← {project.domain}
         </Link>
-        <h1 className="mt-2 text-xl font-bold tracking-tight text-ink">Marketing studio</h1>
+        {/* Phase 13 A8: scope indicator — this is the project-scoped studio,
+            not the workspace-wide Creative Studio. */}
+        <p className="mt-3 text-[11px] font-semibold uppercase tracking-wider text-stone-400">
+          Project
+        </p>
+        <h1 className="mt-1 text-xl font-bold tracking-tight text-ink">Marketing studio</h1>
         <p className="mt-1 text-sm text-zinc-500">
-          Canva designs, domain purchasing, and a shared asset library.
+          Design assets, domain purchasing, and a shared asset library.
         </p>
       </div>
       <StudioStudio
         projectId={project.id}
-        workspaceId={project.workspaceId}
         canEdit={canEdit}
         isOwnerAdmin={isOwnerAdmin}
       />

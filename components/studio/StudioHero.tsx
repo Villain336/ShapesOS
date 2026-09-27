@@ -28,7 +28,7 @@ export function StudioHero() {
     <div>
       <h1 className="text-xl font-bold tracking-tight text-stone-900">Creative Studio</h1>
       <p className="mt-0.5 text-[13px] text-stone-500">
-        The central home for all creative and design work across Marketr — powered by Canva.
+        The central home for all creative and design work across Marketr.
         v1 ships print/mail creative plus the asset library; email and social templates plug in later.
       </p>
     </div>

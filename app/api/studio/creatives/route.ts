@@ -1,6 +1,6 @@
 // Marketr — studio creatives API (Phase 4, T2).
 // GET  /api/studio/creatives?channelTemplate=&formatTrack=&status=&q=
-// POST /api/studio/creatives { name, channelTemplate?, formatTrack, size, source?, canvaDesignId? } (editor)
+// POST /api/studio/creatives { name, channelTemplate?, formatTrack, size, source? } (editor)
 
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
@@ -18,8 +18,7 @@ const CreateSchema = z.object({
   channelTemplate: z.enum(["print", "email", "social"]).default("print"),
   formatTrack: z.string().trim().min(1).max(40),
   size: z.string().trim().min(1).max(40),
-  source: z.enum(["canva", "canva_link", "upload"]).default("upload"),
-  canvaDesignId: z.string().trim().max(120).optional(),
+  source: z.enum(["upload"]).default("upload"),
 });
 
 export async function GET(req: Request) {
@@ -51,7 +50,6 @@ export async function POST(req: Request) {
       formatTrack: parsed.data.formatTrack,
       size: parsed.data.size,
       source: parsed.data.source,
-      canvaDesignId: parsed.data.canvaDesignId,
       createdBy: user.id,
     });
     return Response.json({ creative }, { status: 201 });

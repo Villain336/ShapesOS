@@ -56,10 +56,10 @@ async function main() {
   const { isStdioAllowed, mcpToolToDef } = await import("@/lib/connectors/m21/mcp");
 
   const metas = listBuiltinConnectors();
-  check("12 built-in connectors registered", metas.length === 12);
+  check("11 built-in connectors registered", metas.length === 11);
   const expectedKeys = [
     "google-search-console", "ga4", "wordpress", "webflow", "google-drive",
-    "notion", "buffer", "resend", "dataforseo", "meta-ads", "google-ads", "canva",
+    "notion", "buffer", "resend", "dataforseo", "meta-ads", "google-ads",
   ];
   for (const k of expectedKeys) {
     check(`registry has ${k}`, metas.some((m) => m.key === k));

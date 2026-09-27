@@ -7,6 +7,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
+import { ArrowRight } from "lucide-react";
 import { Notice, btnCls, cardCls, primaryBtnVioletCls, type NoticeState } from "./ui";
 import OverageBillingSection, { type OverageState } from "./OverageBillingSection";
 
@@ -34,12 +36,24 @@ interface StatusData {
   overage: OverageState;
 }
 
+interface CatalogPlan {
+  id: string;
+  name: string;
+  includedCredits: number;
+}
+
+interface PlanInfo {
+  currentPlan: string;
+  plans: CatalogPlan[];
+}
+
 function money(cents: number): string {
   return `$${(cents / 100).toFixed(2)}`;
 }
 
 export default function BillingSection({ workspaceId }: { workspaceId: string }) {
   const [data, setData] = useState<StatusData | null>(null);
+  const [planInfo, setPlanInfo] = useState<PlanInfo | null>(null);
   const [notice, setNotice] = useState<NoticeState | null>(null);
   const [loading, setLoading] = useState(true);
   const [buying, setBuying] = useState<string | null>(null);
@@ -50,9 +64,13 @@ export default function BillingSection({ workspaceId }: { workspaceId: string })
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const r = await fetch(`/api/billing/status?${q}`);
+      const [r, pr] = await Promise.all([
+        fetch(`/api/billing/status?${q}`),
+        fetch(`/api/billing/plans?${q}`),
+      ]);
       if (!r.ok) throw new Error("Failed to load billing status");
       setData(await r.json());
+      if (pr.ok) setPlanInfo(await pr.json());
     } catch (err) {
       setNotice({ kind: "error", message: err instanceof Error ? err.message : "Failed to load billing" });
     } finally {
@@ -131,6 +149,35 @@ export default function BillingSection({ workspaceId }: { workspaceId: string })
       <p className="mt-1 text-sm text-zinc-500">
         Buy credit top-ups and control what happens when you hit your spend cap. 1 credit = $0.01.
       </p>
+      {/* Plan & subscription: wires the plan catalogue (lib/billing/plans.ts)
+          into the usage drawer without duplicating the billing hub. */}
+      {planInfo && (
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-zinc-200 bg-zinc-50/60 px-4 py-3">
+          <p className="text-sm">
+            <span className="text-zinc-500">Current plan:</span>{" "}
+            <strong className="text-zinc-800">
+              {planInfo.plans.find((p) => p.id === planInfo.currentPlan)?.name ??
+                (planInfo.currentPlan === "self_hosted" ? "Self-hosted" : planInfo.currentPlan)}
+            </strong>
+            <span className="text-zinc-500">
+              {" · "}
+              {(() => {
+                const p = planInfo.plans.find((x) => x.id === planInfo.currentPlan);
+                return p
+                  ? `${p.includedCredits.toLocaleString()} credits / month included`
+                  : "BYO keys — no included pool";
+              })()}
+            </span>
+          </p>
+          <Link
+            href="/dashboard/billing"
+            className="inline-flex items-center gap-1 text-sm font-medium text-[var(--brand-700)] hover:underline"
+          >
+            Plans &amp; subscription
+            <ArrowRight className="h-3.5 w-3.5" />
+          </Link>
+        </div>
+      )}
       {notice && (
         <div className="mt-3">
           <Notice notice={notice} />

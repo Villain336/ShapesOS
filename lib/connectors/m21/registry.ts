@@ -135,17 +135,6 @@ export const BUILT_IN_CONNECTORS: BuiltinConnectorMeta[] = [
     },
     authNote: "Google OAuth2 + a developer token (per-user).",
   },
-  {
-    key: "canva",
-    displayName: "Canva",
-    authType: "oauth2",
-    description: "Read and export Canva designs and brand assets.",
-    oauth: {
-      scopes: ["design:content:read", "asset:read"],
-      envVars: ["CANVA_OAUTH_CLIENT_ID", "CANVA_OAUTH_CLIENT_SECRET"],
-    },
-    authNote: "Canva Connect API OAuth (review-gated in production).",
-  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -202,7 +191,6 @@ import { ResendAdapter } from "./native/resend";
 import { DataForSeoAdapter } from "./native/dataforseo";
 import { MetaAdsAdapter } from "./native/meta-ads";
 import { GoogleAdsAdapter } from "./native/google-ads";
-import { CanvaAdapter } from "./native/canva";
 
 const ADAPTER_CLASSES: Record<string, () => ConnectorAdapter> = {
   "google-search-console": () => new GoogleSearchConsoleAdapter(),
@@ -216,7 +204,6 @@ const ADAPTER_CLASSES: Record<string, () => ConnectorAdapter> = {
   dataforseo: () => new DataForSeoAdapter(),
   "meta-ads": () => new MetaAdsAdapter(),
   "google-ads": () => new GoogleAdsAdapter(),
-  canva: () => new CanvaAdapter(),
 };
 
 /** Resolve a built-in connector key to its native adapter. Throws on unknown key. */
@@ -243,7 +230,6 @@ export const MOCK_ONLY_ADAPTER_KEYS: ReadonlySet<string> = new Set([
   "notion",
   "meta-ads",
   "google-ads",
-  "canva",
 ]);
 
 /** True when the adapter has a real provider path the checker can reason about. */

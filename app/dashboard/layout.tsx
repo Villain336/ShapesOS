@@ -19,6 +19,10 @@ import { chatwootWidgetConfig } from "@/lib/integrations/chatwoot";
 // defaults when the sidecar is unconfigured.
 import { GrowthBookProvider } from "@/components/experiments/GrowthBookProvider";
 import { growthBookSdkConfig } from "@/lib/integrations/growthbook";
+// Phase 13 Wave A (theming): tenant-scoped brand theme root.
+import { BrandTheme } from "@/components/BrandTheme";
+import { sanitizeBrandHex } from "@/lib/brand-theme";
+import { prisma } from "@/lib/prisma";
 
 export default async function DashboardLayout({
   children,
@@ -44,8 +48,19 @@ export default async function DashboardLayout({
   // by design; the Admin API key never leaves the server).
   const gbConfig = growthBookSdkConfig();
 
+  // Phase 13 Wave A (theming): the workspace's DEFAULT brand kit drives the
+  // primary accent. Null = default violet (globals.css :root). Scoped to the
+  // BrandTheme root below so it can never leak across workspaces.
+  const defaultKit = await prisma.brandKit.findFirst({
+    where: { workspaceId: workspace.id, isDefault: true },
+    select: { colors: true },
+  });
+  const brandPrimary = sanitizeBrandHex(
+    (defaultKit?.colors as Record<string, string> | null)?.primary,
+  );
+
   return (
-    <div className="min-h-screen bg-page font-sans text-ink">
+    <BrandTheme primary={brandPrimary}>
       <ChatProvider>
         <CommandBar />
         {chatwoot && (
@@ -61,6 +76,6 @@ export default async function DashboardLayout({
           </div>
         </div>
       </ChatProvider>
-    </div>
+    </BrandTheme>
   );
 }

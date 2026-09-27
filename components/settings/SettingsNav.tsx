@@ -13,8 +13,10 @@ import {
   Cloud,
   FlaskConical,
   Gauge,
+  Globe,
   Lock,
   Mail,
+  Palette,
   PenLine,
   Plug,
   Scale,
@@ -44,6 +46,13 @@ const LINKS = [
   { href: "/dashboard/settings/api-mcp", label: "API / MCP", icon: Terminal },
   { href: "/dashboard/settings/audit", label: "Audit log", icon: ScrollText },
   { href: "/dashboard/settings/usage", label: "Usage", icon: Gauge },
+  // Phase 13 A1: the two pages that used to live in the sidebar's separate
+  // "Settings" island (alert rules, brand kits) are merged into this single
+  // tab strip — every settings subpage is one click away from every other.
+  { href: "/dashboard/settings/alerts", label: "Alert rules", icon: SlidersHorizontal },
+  { href: "/dashboard/settings/brand-kits", label: "Brand kits", icon: Palette },
+  // Phase 13 Wave A (white-label ops): logo, custom domain, brand color.
+  { href: "/dashboard/settings/white-label", label: "White-label", icon: Globe },
 ];
 
 export default function SettingsNav() {

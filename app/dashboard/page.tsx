@@ -204,7 +204,7 @@ export default async function DashboardPage() {
       suggestions.push({
         icon: <TriangleAlert className="size-4" />,
         text: "Connect DataForSEO for live search data instead of mock results.",
-        href: "/dashboard/settings",
+        href: "/dashboard/settings/providers",
         cta: "Connect data",
       });
     }
@@ -217,7 +217,10 @@ export default async function DashboardPage() {
       {/* Page headline */}
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-ink">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-stone-400">
+            Overview
+          </p>
+          <h1 className="mt-1 text-xl font-bold tracking-tight text-ink">
             {workspace.name}
           </h1>
           <p className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[13px] text-ink-2">

@@ -1,7 +1,7 @@
 // Marketr — studio creative re-validation (Phase 4, T2).
 // POST /api/studio/creatives/[id]/validate (editor)
 // Re-runs format validation against the stored PDF and persists the report.
-// (Uploads and Canva export pulls validate automatically.)
+// (Uploads validate automatically.)
 
 import { prisma } from "@/lib/prisma";
 import { readFile } from "@/lib/filesystem/service";

@@ -1,6 +1,6 @@
 // Marketr — Creative Studio home (Phase 4, T2).
-// The central home for all creative and design work across Marketr, powered by
-// Canva. v1: print/mail creative + asset library, architected so email/social
+// The central home for all creative and design work across Marketr.
+// v1: print/mail creative + asset library, architected so email/social
 // channel templates plug in later without rework.
 
 import { redirect } from "next/navigation";
@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
 
 export const metadata = {
   title: "Creative Studio — Marketr",
-  description: "The central home for all creative and design work across Marketr: mail/print creatives, asset library, and Canva.",
+  description: "The central home for all creative and design work across Marketr: mail/print creatives and the asset library.",
 };
 
 export default async function StudioPage() {
