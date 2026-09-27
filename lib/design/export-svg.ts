@@ -11,10 +11,8 @@
 //  - Defensive: unknown/future element types are skipped with an XML
 //    comment, never a crash. Invalid documents are rejected with a result
 //    object, never a throw.
-//  - Charts are drawn with deterministic layout math defined here
-//    (DEFAULT_CHART_BOX, bar/line/pie geometry). There is no shared
-//    canvas geometry yet — when the canvas chart renderer lands it should
-//    import these layout helpers so both outputs agree.
+//  - Charts are drawn with the shared chart-math layout models — the same
+//    models the Konva canvas renderer uses — so canvas and SVG agree.
 //  - Images embed as data URLs. A data: URL src is embedded verbatim.
 //    Callers may pre-resolve remote URLs into data URLs via the
 //    `imageSources` option (id -> data URL); unresolved remote URLs are kept
@@ -45,6 +43,16 @@ import {
   type SvgElement,
   type TextElement,
 } from "./types";
+import {
+  barModel,
+  lineModel,
+  pieSlices,
+  pieLayout,
+  chartSize,
+  formatChartValue,
+  truncateLabel,
+  withAlpha,
+} from "./chart-math";
 import { validateDesignDocument } from "./validate";
 
 export type SvgExportResult = { ok: true; svg: string } | { ok: false; error: string };
@@ -57,7 +65,6 @@ export interface SvgExportOptions {
 /** Default chart box (element-local, px). Charts have no width/height in
  *  the schema, so this constant IS the layout contract — the canvas
  *  renderer should import and use it too. */
-export const DEFAULT_CHART_BOX = { width: 360, height: 240 } as const;
 
 /** Approx. baseline offset (Konva y = top of text box). */
 const BASELINE_RATIO = 0.8;
@@ -267,91 +274,142 @@ function imageToSvg(el: ImageElement, opts: SvgExportOptions): string {
 }
 
 // ── Chart ────────────────────────────────────────────────────────────────
+// Geometry comes from the shared chart-math models (same as the Konva canvas
+// renderer), so canvas and SVG output always agree.
 
-function chartColors(el: ChartElement, i: number): string {
-  return el.colors.length > 0 ? el.colors[i % el.colors.length]! : "#7c3aed";
+const CHART_FONT = "Inter";
+const CHART_LABEL_FILL = "#78716c";
+const CHART_VALUE_FILL = "#44403c";
+const CHART_TICK_FILL = "#a8a29e";
+const CHART_GRID = "#eceae6";
+const CHART_BASELINE = "#d8d4cf";
+
+function chartText(
+  x: number,
+  y: number,
+  content: string,
+  opts: { size?: number; fill?: string; anchor?: string; weight?: number } = {},
+): string {
+  const { size = 11, fill = CHART_LABEL_FILL, anchor = "middle", weight } = opts;
+  return `<text x="${formatNumber(x)}" y="${formatNumber(y)}" font-family="${CHART_FONT}" font-size="${size}"${weight ? ` font-weight="${weight}"` : ""} fill="${escapeXml(fill)}" text-anchor="${anchor}">${escapeXml(content)}</text>`;
 }
 
-function chartValueLabel(x: number, y: number, value: number): string {
-  return `<text x="${formatNumber(x)}" y="${formatNumber(y)}" font-size="11" fill="#57534e" text-anchor="middle">${escapeXml(String(value))}</text>`;
+/** Gridlines + y-axis tick labels, mirroring ChartNode's Gridlines. */
+function chartGridSvg(m: { plot: { x: number; y: number; w: number; h: number }; ticks: { value: number; y: number }[] }): string {
+  let out = "";
+  for (const t of m.ticks) {
+    const stroke = t.value === 0 ? CHART_BASELINE : CHART_GRID;
+    out += `<line x1="${formatNumber(m.plot.x)}" y1="${formatNumber(t.y)}" x2="${formatNumber(m.plot.x + m.plot.w)}" y2="${formatNumber(t.y)}" stroke="${stroke}" stroke-width="1"/>`;
+    out += chartText(m.plot.x - 6, t.y + 4, formatChartValue(t.value), {
+      fill: CHART_TICK_FILL,
+      anchor: "end",
+    });
+  }
+  return out;
+}
+
+function polylinePoints(pts: number[]): string {
+  return pts.reduce(
+    (acc, p, i) => acc + (i > 0 ? (i % 2 === 0 ? " " : ",") : "") + formatNumber(p),
+    "",
+  );
 }
 
 /** Bar chart geometry in element-local coords. */
 export function barChartSvg(el: ChartElement): string {
-  const { width, height } = DEFAULT_CHART_BOX;
-  const pad = 16;
-  const plotW = width - pad * 2;
-  const plotH = height - pad * 2 - 18; // room for axis labels
-  const n = el.values.length;
-  if (n === 0) return "";
-  const max = Math.max(1, ...el.values.map((v) => Math.max(0, v)));
-  const slot = plotW / n;
-  const barW = Math.min(slot * 0.6, 64);
-  let out = "";
-  for (let i = 0; i < n; i++) {
-    const v = Math.max(0, el.values[i]!);
-    const h = (v / max) * plotH;
-    const bx = pad + slot * i + (slot - barW) / 2;
-    const by = pad + plotH - h;
-    out += `<rect x="${formatNumber(bx)}" y="${formatNumber(by)}" width="${formatNumber(barW)}" height="${formatNumber(h)}" fill="${escapeXml(chartColors(el, i))}"/>`;
-    out += `<text x="${formatNumber(bx + barW / 2)}" y="${formatNumber(pad + plotH + 14)}" font-size="11" fill="#57534e" text-anchor="middle">${escapeXml(el.labels[i] ?? "")}</text>`;
-    if (el.showValues) out += chartValueLabel(bx + barW / 2, by - 5, el.values[i]!);
+  const { w, h } = chartSize(el);
+  if (el.values.length === 0) return "";
+  const m = barModel(el.labels, el.values, el.colors, w, h);
+  let out = chartGridSvg(m);
+  for (let i = 0; i < m.bars.length; i++) {
+    const b = m.bars[i]!;
+    out += `<rect x="${formatNumber(b.x)}" y="${formatNumber(b.y)}" width="${formatNumber(b.w)}" height="${formatNumber(b.h)}" rx="6" fill="${escapeXml(b.color)}"/>`;
+    if (el.showValues) {
+      out += chartText(b.cx, b.labelY, formatChartValue(b.value), {
+        size: 12,
+        fill: CHART_VALUE_FILL,
+        weight: 600,
+      });
+    }
+    if (i % m.labelStep === 0) {
+      out += chartText(b.cx, m.plot.y + m.plot.h + 8, truncateLabel(b.label, 12));
+    }
   }
   return out;
 }
 
 /** Line chart geometry in element-local coords. */
 export function lineChartSvg(el: ChartElement): string {
-  const { width, height } = DEFAULT_CHART_BOX;
-  const pad = 16;
-  const plotW = width - pad * 2;
-  const plotH = height - pad * 2 - 18;
-  const n = el.values.length;
-  if (n === 0) return "";
-  const min = Math.min(...el.values);
-  const max = Math.max(...el.values);
-  const span = max - min || 1;
-  const px = (i: number) => pad + (n === 1 ? plotW / 2 : (i / (n - 1)) * plotW);
-  const py = (v: number) => pad + plotH - ((v - min) / span) * plotH;
-  const color = chartColors(el, 0);
-  let out = `<polyline points="${el.values.map((v, i) => `${formatNumber(px(i))},${formatNumber(py(v))}`).join(" ")}" fill="none" stroke="${escapeXml(color)}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>`;
-  for (let i = 0; i < n; i++) {
-    out += `<circle cx="${formatNumber(px(i))}" cy="${formatNumber(py(el.values[i]!))}" r="3.5" fill="${escapeXml(color)}"/>`;
-    out += `<text x="${formatNumber(px(i))}" y="${formatNumber(pad + plotH + 14)}" font-size="11" fill="#57534e" text-anchor="middle">${escapeXml(el.labels[i] ?? "")}</text>`;
-    if (el.showValues) out += chartValueLabel(px(i), py(el.values[i]!) - 8, el.values[i]!);
+  const { w, h } = chartSize(el);
+  if (el.values.length === 0) return "";
+  const m = lineModel(el.labels, el.values, el.colors, w, h);
+  let out = chartGridSvg(m);
+  if (m.areaPoints.length > 3) {
+    out += `<polygon points="${polylinePoints(m.areaPoints)}" fill="${escapeXml(withAlpha(m.color, 0.12))}"/>`;
+  }
+  if (m.points.length > 1) {
+    out += `<polyline points="${polylinePoints(m.points)}" fill="none" stroke="${escapeXml(m.color)}" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>`;
+  }
+  for (const d of m.dots) {
+    out += `<circle cx="${formatNumber(d.x)}" cy="${formatNumber(d.y)}" r="5.5" fill="#ffffff" stroke="${escapeXml(d.color)}" stroke-width="3"/>`;
+    if (el.showValues) {
+      out += chartText(d.x, d.y - 14, formatChartValue(d.value), {
+        size: 12,
+        fill: CHART_VALUE_FILL,
+        weight: 600,
+      });
+    }
+  }
+  const step = m.categories.length > 12 ? 2 : 1;
+  for (let i = 0; i < m.categories.length; i++) {
+    if (i % step !== 0) continue;
+    const c = m.categories[i]!;
+    out += chartText(c.x, m.plot.y + m.plot.h + 8, truncateLabel(c.label, 12));
   }
   return out;
 }
 
 /** Pie chart geometry in element-local coords. */
 export function pieChartSvg(el: ChartElement): string {
-  const { width, height } = DEFAULT_CHART_BOX;
-  const n = el.values.length;
-  const total = el.values.reduce((a, v) => a + Math.max(0, v), 0);
-  if (n === 0 || total <= 0) return "";
-  const cx = width / 2;
-  const cy = height / 2;
-  const r = Math.min(width, height) / 2 - 12;
+  const { w, h } = chartSize(el);
+  const slices = pieSlices(el.labels, el.values, el.colors);
+  if (slices.length === 0) return "";
+  const L = pieLayout(w, h, slices.length);
   let out = "";
-  let angle = -Math.PI / 2;
-  for (let i = 0; i < n; i++) {
-    const frac = Math.max(0, el.values[i]!) / total;
-    const a2 = angle + frac * Math.PI * 2;
-    const large = frac > 0.5 ? 1 : 0;
-    const x1 = cx + r * Math.cos(angle);
-    const y1 = cy + r * Math.sin(angle);
-    const x2 = cx + r * Math.cos(a2);
-    const y2 = cy + r * Math.sin(a2);
-    out += `<path d="M ${formatNumber(cx)},${formatNumber(cy)} L ${formatNumber(x1)},${formatNumber(y1)} A ${formatNumber(r)},${formatNumber(r)} 0 ${large},1 ${formatNumber(x2)},${formatNumber(y2)} Z" fill="${escapeXml(chartColors(el, i))}"/>`;
-    if (el.showValues && frac > 0.06) {
-      const mid = angle + (frac * Math.PI * 2) / 2;
-      out += `<text x="${formatNumber(cx + (r * 0.65) * Math.cos(mid))}" y="${formatNumber(cy + (r * 0.65) * Math.sin(mid))}" font-size="11" fill="#ffffff" text-anchor="middle">${escapeXml(String(el.values[i]!))}</text>`;
+  for (const s of slices) {
+    if (s.sweepDeg <= 0) continue;
+    const a1 = (s.startDeg * Math.PI) / 180;
+    const a2 = ((s.startDeg + s.sweepDeg) * Math.PI) / 180;
+    const x1 = L.cx + L.r * Math.cos(a1);
+    const y1 = L.cy + L.r * Math.sin(a1);
+    const x2 = L.cx + L.r * Math.cos(a2);
+    const y2 = L.cy + L.r * Math.sin(a2);
+    const large = s.sweepDeg > 180 ? 1 : 0;
+    out += `<path d="M ${formatNumber(L.cx)},${formatNumber(L.cy)} L ${formatNumber(x1)},${formatNumber(y1)} A ${formatNumber(L.r)},${formatNumber(L.r)} 0 ${large},1 ${formatNumber(x2)},${formatNumber(y2)} Z" fill="${escapeXml(s.color)}" stroke="#ffffff" stroke-width="2"/>`;
+    if (s.fraction >= 0.06) {
+      const mid = ((s.startDeg + s.sweepDeg / 2) * Math.PI) / 180;
+      out += chartText(L.cx + Math.cos(mid) * L.r * 0.62, L.cy + Math.sin(mid) * L.r * 0.62, `${Math.round(s.fraction * 100)}%`, {
+        fill: "#ffffff",
+        weight: 600,
+      });
     }
-    angle = a2;
+  }
+  for (let i = 0; i < slices.length; i++) {
+    const s = slices[i]!;
+    const y = 44 + i * L.rowH;
+    out += `<circle cx="${formatNumber(L.legendX + 6)}" cy="${formatNumber(y + 7)}" r="5" fill="${escapeXml(s.color)}"/>`;
+    out += chartText(L.legendX + 18, y + 14, truncateLabel(s.label, 16), {
+      size: 12,
+      fill: CHART_VALUE_FILL,
+      anchor: "start",
+    });
+    out += chartText(L.legendX + L.legendW - 4, y + 14, formatChartValue(s.value), {
+      size: 12,
+      anchor: "end",
+    });
   }
   return out;
 }
-
 export function chartToSvg(el: ChartElement): string {
   const body =
     el.chartType === "bar" ? barChartSvg(el) : el.chartType === "line" ? lineChartSvg(el) : pieChartSvg(el);
