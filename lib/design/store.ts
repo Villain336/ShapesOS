@@ -54,6 +54,11 @@ export interface DesignState {
   appendPages(pages: DesignPage[]): void;
   setActivePage(id: string): void;
   setPageBackground(id: string, color: string): void;
+  /**
+   * Generic page patch (e.g. page-level `custom` metadata such as texture
+   * provenance — see lib/design/textures.ts). Undoable via commit().
+   */
+  patchPage(id: string, patch: Partial<DesignPage>): void;
   setPageSize(id: string, w: number, h: number): void;
   /**
    * "Magic resize": convert a page to new dimensions, scaling every element's
@@ -349,6 +354,10 @@ export const useDesignStore = create<DesignState>()((set, get) => ({
     commit(set, get, (doc) =>
       withPage(doc, id, (p) => ({ ...p, background: color })),
     );
+  },
+
+  patchPage: (id, patch) => {
+    commit(set, get, (doc) => withPage(doc, id, (p) => ({ ...p, ...patch })));
   },
 
   setPageSize: (id, w, h) => {

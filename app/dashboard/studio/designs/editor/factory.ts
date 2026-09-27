@@ -2,6 +2,7 @@
 // Builds well-formed DesignElements (per lib/design/types.ts) centered on a page.
 
 import { newId } from "@/lib/design/types";
+import { parseViewBoxSize } from "@/lib/design/iconify";
 import type {
   ChartElement,
   DesignElement,
@@ -124,6 +125,44 @@ export function makeSvg(opts: {
     width: size,
     height: size,
     fill: opts.fill ?? "#7c3aed",
+  };
+}
+
+/**
+ * Builds an svg element from a sanitized Iconify icon (see
+ * lib/design/iconify.ts). The body + viewBox are stored in the document at
+ * insert time; `path` stays "" so legacy path rendering is skipped.
+ * Dimensions preserve the source viewBox aspect ratio at the given size.
+ */
+export function makeIconifySvg(opts: {
+  iconRef: string;
+  body: string;
+  viewBox: string;
+  fill?: string;
+  size?: number;
+  pageW: number;
+  pageH: number;
+  name?: string;
+}): SvgElement {
+  const { w, h } = parseViewBoxSize(opts.viewBox);
+  const size = opts.size ?? 96;
+  const scale = size / Math.max(w, h);
+  const width = Math.max(8, Math.round(w * scale));
+  const height = Math.max(8, Math.round(h * scale));
+  return {
+    ...base(
+      opts.name ?? opts.iconRef,
+      opts.pageW / 2 - width / 2,
+      opts.pageH / 2 - height / 2,
+    ),
+    type: "svg",
+    path: "",
+    width,
+    height,
+    fill: opts.fill ?? "#7c3aed",
+    iconRef: opts.iconRef,
+    body: opts.body,
+    viewBox: opts.viewBox,
   };
 }
 

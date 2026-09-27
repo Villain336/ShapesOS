@@ -7,6 +7,7 @@
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  Box,
   Image as ImageIcon,
   Layers,
   LayoutTemplate,
@@ -16,6 +17,7 @@ import {
   Plus,
   Shapes,
   Sparkles,
+  Sticker,
   Type,
   Upload,
 } from "lucide-react";
@@ -28,7 +30,9 @@ import { TemplatesPanel } from "./panels/TemplatesPanel";
 import { TextPanel } from "./panels/TextPanel";
 import { UploadsPanel } from "./panels/UploadsPanel";
 import { StockPhotosPanel } from "./panels/StockPhotosPanel";
+import { ThreeDPanel } from "./panels/ThreeDPanel";
 import { ElementsPanel } from "./panels/ElementsPanel";
+import { IconsPanel } from "./panels/IconsPanel";
 import { BrandPanel } from "./panels/BrandPanel";
 import { LayersPanel } from "./panels/LayersPanel";
 import { CommentsPanel } from "./panels/CommentsPanel";
@@ -44,14 +48,16 @@ const DesignCanvas = dynamic(() => import("./DesignCanvas").then((m) => m.Design
   ),
 });
 
-type PanelKey = "templates" | "text" | "uploads" | "photos" | "elements" | "brand" | "layers" | "comments" | "ai";
+type PanelKey = "templates" | "text" | "uploads" | "photos" | "3d" | "elements" | "icons" | "brand" | "layers" | "comments" | "ai";
 
 const RAIL: { key: PanelKey; label: string; icon: React.ReactNode }[] = [
   { key: "templates", label: "Templates", icon: <LayoutTemplate className="h-5 w-5" /> },
   { key: "text", label: "Text", icon: <Type className="h-5 w-5" /> },
   { key: "uploads", label: "Uploads", icon: <Upload className="h-5 w-5" /> },
   { key: "photos", label: "Photos", icon: <ImageIcon className="h-5 w-5" /> },
+  { key: "3d", label: "3D", icon: <Box className="h-5 w-5" /> },
   { key: "elements", label: "Elements", icon: <Shapes className="h-5 w-5" /> },
+  { key: "icons", label: "Icons", icon: <Sticker className="h-5 w-5" /> },
   { key: "brand", label: "Brand", icon: <Palette className="h-5 w-5" /> },
   { key: "layers", label: "Layers", icon: <Layers className="h-5 w-5" /> },
   { key: "comments", label: "Comments", icon: <MessageSquare className="h-5 w-5" /> },
@@ -241,7 +247,9 @@ export function CanvasEditor({ designId }: { designId: string }) {
         {panel === "text" && <TextPanel />}
         {panel === "uploads" && <UploadsPanel />}
         {panel === "photos" && <StockPhotosPanel />}
+        {panel === "3d" && <ThreeDPanel />}
         {panel === "elements" && <ElementsPanel />}
+        {panel === "icons" && <IconsPanel />}
         {panel === "brand" && <BrandPanel onFontsLoaded={setBrandFonts} />}
         {panel === "layers" && <LayersPanel />}
         {panel === "comments" && <CommentsPanel designId={designId} />}

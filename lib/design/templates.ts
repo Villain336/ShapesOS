@@ -666,6 +666,18 @@ export const TEMPLATES: DesignTemplate[] = [
   },
 ];
 
+import { PACK_TEMPLATES } from "./template-pack";
+
 export function getTemplate(key: string): DesignTemplate | undefined {
   return TEMPLATES.find((t) => t.key === key);
+}
+
+/**
+ * The full gallery: hand-built starters first, then the 232-template curated
+ * pack (generated, validated, native DesignDocuments).
+ */
+export const ALL_TEMPLATES: DesignTemplate[] = [...TEMPLATES, ...PACK_TEMPLATES];
+
+export function getAnyTemplate(key: string): DesignTemplate | undefined {
+  return ALL_TEMPLATES.find((t) => t.key === key);
 }

@@ -20,7 +20,11 @@ import {
 } from "react-konva";
 import Konva from "konva";
 import { useCanvasStore } from "@/lib/design/store";
-import type { DesignElement, ImageElement, TextElement } from "@/lib/design/types";
+import type { DesignElement, ImageElement, SvgElement, TextElement } from "@/lib/design/types";
+import { iconDataUrl } from "@/lib/design/iconify";
+/* TEXTURES (integration #10) */
+import { textureFillProps, useTextureTile } from "@/lib/design/textures";
+/* END */
 import { chartSize } from "@/lib/design/chart-math";
 import {
   hasRichFragments,
@@ -99,6 +103,9 @@ function ElementNode({ el, registerRef, onSelect, onDragEnd, onSnapMove, onSnapE
     },
   };
 
+  /* TEXTURES (integration #10) — pattern fill from custom.texture provenance. */
+  const textureImg = useTextureTile(el.custom);
+
   switch (el.type) {
     case "text":
       return <TextNode el={el} common={common} />;
@@ -119,6 +126,8 @@ function ElementNode({ el, registerRef, onSelect, onDragEnd, onSnapMove, onSnapE
           width={el.width}
           height={el.height}
           fill={el.gradient ? undefined : el.fill}
+          /* TEXTURES (integration #10) — pattern tile; skipped when a gradient owns the fill. */
+          {...(el.gradient ? {} : textureFillProps(textureImg))}
           cornerRadius={el.cornerRadius}
           stroke={el.stroke}
           strokeWidth={el.strokeWidth}
@@ -132,6 +141,8 @@ function ElementNode({ el, registerRef, onSelect, onDragEnd, onSnapMove, onSnapE
           radiusX={el.radiusX}
           radiusY={el.radiusY}
           fill={el.fill}
+          /* TEXTURES (integration #10) */
+          {...textureFillProps(textureImg)}
           stroke={el.stroke}
           strokeWidth={el.strokeWidth}
         />
@@ -148,11 +159,14 @@ function ElementNode({ el, registerRef, onSelect, onDragEnd, onSnapMove, onSnapE
         />
       );
     case "svg":
+      if (el.body) return <IconifySvgNode el={el} common={common} />;
       return (
         <Path
           {...common}
           data={el.path}
           fill={el.fill}
+          /* TEXTURES (integration #10) */
+          {...textureFillProps(textureImg)}
           scaleX={el.width / 24}
           scaleY={el.height / 24}
         />
@@ -324,6 +338,29 @@ function ImageNode({
   );
 }
 
+/**
+ * Iconify icon node — renders the sanitized SVG body stored in the document
+ * as a data URL (built once per fill). No network at render or export time.
+ */
+function IconifySvgNode({
+  el,
+  common,
+}: {
+  el: SvgElement;
+  common: Record<string, unknown>;
+}) {
+  const img = useImage(iconDataUrl(el.body ?? "", el.viewBox ?? "0 0 24 24", el.fill));
+  if (!img) return null;
+  return (
+    <KonvaImage
+      {...(common as object)}
+      image={img}
+      width={el.width}
+      height={el.height}
+    />
+  );
+}
+
 export function DesignCanvas({ stageRef }: { stageRef: StageRef }) {
   const document = useCanvasStore((s) => s.document);
   const activePageId = useCanvasStore((s) => s.activePageId);
@@ -341,6 +378,9 @@ export function DesignCanvas({ stageRef }: { stageRef: StageRef }) {
   });
 
   const page = document?.pages.find((p) => p.id === activePageId) ?? null;
+
+  /* TEXTURES (integration #10) — page-background pattern from page.custom.texture. */
+  const pageTextureImg = useTextureTile(page?.custom);
 
   const registerRef = (id: string, node: Konva.Node | null) => {
     if (node) nodeRefs.current.set(id, node);
@@ -487,6 +527,8 @@ export function DesignCanvas({ stageRef }: { stageRef: StageRef }) {
             width={page.width}
             height={page.height}
             fill={page.background}
+            /* TEXTURES (integration #10) */
+            {...textureFillProps(pageTextureImg)}
           />
           {page.elements
             .filter((el) => el.visible)

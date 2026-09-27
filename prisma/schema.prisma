@@ -954,6 +954,10 @@ model BrandKit {
   clientId  String? @map("client_id")
   client    Client? @relation(fields: [clientId], references: [id], onDelete: SetNull)
   isDefault Boolean @default(false) @map("is_default")
+  // PROVIDER:brandfetch
+  // Provenance metadata (JSON) — e.g. { source: "brandfetch", domain, logoUrl, fetchedAt }.
+  metadata  Json @default("{}")
+  // END
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")

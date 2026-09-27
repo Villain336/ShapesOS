@@ -4,11 +4,13 @@
 
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useCanvasStore } from "@/lib/design/store";
-import { TEMPLATES } from "@/lib/design/templates";
+import { ALL_TEMPLATES } from "@/lib/design/templates";
 import type { DesignTemplate } from "@/lib/design/types";
 import { btnGhost, inputCls, panelSectionLabel, panelTitle } from "../ui";
+
+const CATEGORIES = ["all", "social", "ads", "web", "print"] as const;
 
 const BLANK_PRESETS = [
   { name: "Square post", w: 1080, h: 1080 },
@@ -37,6 +39,19 @@ export function TemplatesPanel({ onDocumentReplaced }: TemplatesPanelProps) {
   const renamePage = useCanvasStore((s) => s.renamePage);
   const [customW, setCustomW] = useState("1080");
   const [customH, setCustomH] = useState("1080");
+  const [query, setQuery] = useState("");
+  const [cat, setCat] = useState<(typeof CATEGORIES)[number]>("all");
+
+  const visible = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return ALL_TEMPLATES.filter(
+      (t) =>
+        (cat === "all" || t.category === cat) &&
+        (!q ||
+          t.name.toLowerCase().includes(q) ||
+          t.description.toLowerCase().includes(q)),
+    );
+  }, [query, cat]);
 
   const applyTemplate = (t: DesignTemplate) => {
     const ok = window.confirm(
@@ -104,9 +119,35 @@ export function TemplatesPanel({ onDocumentReplaced }: TemplatesPanelProps) {
         </div>
 
         <div>
-          <div className={panelSectionLabel}>Starter templates</div>
-          <div className="grid grid-cols-2 gap-2">
-            {TEMPLATES.map((t) => (
+          <div className={panelSectionLabel}>
+            Starter templates · {visible.length} of {ALL_TEMPLATES.length}
+          </div>
+          <div className="mb-2 flex items-center gap-1.5">
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search templates…"
+              aria-label="Search templates"
+              className={`${inputCls} w-full px-2 py-1 text-[12px]`}
+            />
+          </div>
+          <div className="mb-2 flex flex-wrap gap-1">
+            {CATEGORIES.map((c) => (
+              <button
+                key={c}
+                onClick={() => setCat(c)}
+                className={`rounded-full px-2 py-0.5 text-[11px] font-medium capitalize ${
+                  cat === c
+                    ? "bg-violet-600 text-white"
+                    : "border border-stone-200 bg-white text-stone-600 hover:border-violet-300"
+                }`}
+              >
+                {c}
+              </button>
+            ))}
+          </div>
+          <div className="grid max-h-[420px] grid-cols-2 gap-2 overflow-y-auto pr-0.5">
+            {visible.map((t) => (
               <div
                 key={t.key}
                 className="overflow-hidden rounded-md border border-stone-200 bg-white"

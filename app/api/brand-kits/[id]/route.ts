@@ -3,6 +3,7 @@
 
 import { requireWorkspaceRole, forbidden } from "@/lib/authz";
 import type { NextRequest } from "next/server";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireUser, getOrCreateWorkspace } from "@/lib/session";
 
@@ -36,6 +37,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     tone?: string | null;
     clientId?: string | null;
     isDefault?: boolean;
+    /* PROVIDER:brandfetch */
+    // Typed as InputJsonValue: req.json() can only ever produce JSON values.
+    metadata?: Prisma.InputJsonValue | null;
+    /* END */
   };
   try {
     body = await req.json();
@@ -56,6 +61,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         ...(body.tone !== undefined ? { tone: body.tone?.slice(0, 2000) || null } : {}),
         ...(body.clientId !== undefined ? { clientId: body.clientId || null } : {}),
         ...(body.isDefault !== undefined ? { isDefault: Boolean(body.isDefault) } : {}),
+        /* PROVIDER:brandfetch */
+        ...(body.metadata !== undefined ? { metadata: body.metadata ?? {} } : {}),
+        /* END */
       },
     });
   });

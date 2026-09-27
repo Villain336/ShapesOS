@@ -62,6 +62,15 @@ export const CREDIT_COSTS = {
   publish: { credits: 0, basis: "free", description: "Publish (free — never punish the outcome)" },
   /** Connector syncs are never charged. */
   connector_sync: { credits: 0, basis: "free", description: "Connector sync (free)" },
+  // ── Integration #7: Cloudinary upload pipeline (added 2026-09-27) ──
+  // BEGIN: integration-7 cloudinary_upload (passthrough, zero credit)
+  /** Signed Cloudinary upload minted. The user's own Cloudinary account is
+   * billed by Cloudinary (free tier 25 credits/month) — Marketr never
+   * charges ledger credits for it and never blocks on it. The zero-credit
+   * event exists so each tenant's upload count is visible in the usage
+   * ledger for quota awareness. */
+  cloudinary_upload: { credits: 0, basis: "passthrough", description: "Cloudinary upload: user's own account (quota awareness)" },
+  // END: integration-7 cloudinary_upload
   /** Per GB-month beyond the included storage quota. */
   storage_over_quota: { credits: 1, basis: "value", description: "Storage over quota: per GB-month" },
 
@@ -84,6 +93,13 @@ export const CREDIT_COSTS = {
   mail_piece: { credits: 250, basis: "cost-plus", description: "Direct mail: 1 addressed piece sent (R3 mail channel)" },
   /** One address verification (CASS) lookup ahead of a mail piece. */
   mail_verification: { credits: 5, basis: "cost-plus", description: "Address verification: 1 CASS lookup (R3 mail channel)" },
+
+  /* PROVIDER:brandfetch */
+  /** Brandfetch brand lookup: 0 credits — vendor-billed on the user's own
+   * BYO key; the ledger event exists for per-tenant usage visibility only.
+   * Follows the publish/connector_sync free-action precedent. */
+  brandfetch_lookup: { credits: 0, basis: "free", description: "Brandfetch brand lookup (BYO key, vendor-billed)" },
+  /* END */
 } as const satisfies Record<string, CreditCostDef>;
 
 /** Action keys meter() accepts. */

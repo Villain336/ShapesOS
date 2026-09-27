@@ -88,6 +88,11 @@ function validateElement(el: unknown, index: number, pageIndex: number): string 
       break;
     case "svg":
       if (typeof el.path !== "string") return `${where}.path: must be a string`;
+      for (const k of ["iconRef", "body", "viewBox"] as const) {
+        const v = (el as unknown as Record<string, unknown>)[k];
+        if (v !== undefined && typeof v !== "string")
+          return `${where}.${k}: must be a string when present`;
+      }
       break;
     case "chart":
       if (!["bar", "line", "pie"].includes(el.chartType as string))

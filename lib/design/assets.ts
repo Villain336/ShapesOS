@@ -12,6 +12,17 @@ export interface SessionAsset {
   width: number;
   height: number;
   origin: "upload" | "generated";
+  // BEGIN: integration-7 cloudinary (2026-09-27)
+  // Cloudinary-backed uploads: `dataUrl` carries the w_400 thumb delivery
+  // URL for the shelf preview, `fullUrl` carries the f_auto,q_auto
+  // full-res delivery URL that is actually placed in the design (never
+  // base64), and `cloudinaryPublicId` is the signed public_id the asset was
+  // uploaded under. Absent for local data-URL and AI-generated assets.
+  /** Full-res Cloudinary delivery URL (f_auto,q_auto); used when placing. */
+  fullUrl?: string;
+  /** Cloudinary public_id; stored in the placed element's `custom` bag. */
+  cloudinaryPublicId?: string;
+  // END: integration-7 cloudinary
 }
 
 interface AssetsState {

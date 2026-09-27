@@ -243,8 +243,21 @@ function lineToSvg(el: LineElement): string {
 // ── SVG icon path ────────────────────────────────────────────────────────
 
 function svgPathToSvg(el: SvgElement): string {
-  // 24x24 viewBox icon convention (matches the Konva renderer scale).
   if (el.width <= 0 || el.height <= 0) return `<!-- svg element ${escapeXml(el.id)} skipped: non-positive size -->`;
+  if (el.body) {
+    // Iconify icon: the sanitized body stored in the document is inlined in a
+    // nested <svg> (valid SVG) with the element's fill as `color`, tinting
+    // currentColor artwork. No network — everything is in the document.
+    const vb = el.viewBox && el.viewBox.trim().length > 0 ? el.viewBox : "0 0 24 24";
+    return (
+      `<g transform="translate(${formatNumber(el.x)},${formatNumber(el.y)})"${opacityAttr(el)}>` +
+      `<svg x="0" y="0" width="${formatNumber(el.width)}" height="${formatNumber(el.height)}"` +
+      ` viewBox="${escapeXml(vb)}" xmlns="http://www.w3.org/2000/svg" color="${escapeXml(el.fill)}">` +
+      el.body +
+      `</svg></g>`
+    );
+  }
+  // 24x24 viewBox icon convention (matches the Konva renderer scale).
   return (
     `<path d="${escapeXml(el.path)}" fill="${escapeXml(el.fill)}"` +
     ` transform="translate(${formatNumber(el.x)},${formatNumber(el.y)}) scale(${formatNumber(el.width / 24)},${formatNumber(el.height / 24)})"` +

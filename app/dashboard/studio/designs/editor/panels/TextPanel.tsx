@@ -25,23 +25,14 @@ import {
   rangeUniformStyle,
   toggleFragmentFlag,
 } from "@/lib/design/rich-text";
+import { FontPicker } from "../FontPicker";
+import { PANEL_FONTS } from "@/lib/design/fonts";
 
 const PRESETS = [
   { label: "Heading", fontSize: 64, fontStyle: "bold" as const, fill: "#1c1917" },
   { label: "Subheading", fontSize: 36, fontStyle: "bold" as const, fill: "#1c1917" },
   { label: "Body", fontSize: 20, fontStyle: "normal" as const, fill: "#44403c" },
   { label: "Caption", fontSize: 14, fontStyle: "normal" as const, fill: "#78716c" },
-];
-
-const PANEL_FONTS = [
-  "Inter",
-  "Arial",
-  "Helvetica",
-  "Georgia",
-  "Times New Roman",
-  "Courier New",
-  "Verdana",
-  "Trebuchet MS",
 ];
 
 interface Range {
@@ -183,8 +174,8 @@ function RangeStyleForm({
         aria-label="Range font"
       >
         {PANEL_FONTS.map((f) => (
-          <option key={f} value={f}>
-            {f}
+          <option key={f.cssFamily} value={f.cssFamily}>
+            {f.label}
           </option>
         ))}
       </select>

@@ -105,11 +105,22 @@ export interface LineElement extends BaseElement {
 
 export interface SvgElement extends BaseElement {
   type: "svg";
-  /** Raw SVG path data (24x24 viewBox icon convention). */
+  /** Raw SVG path data (24x24 viewBox icon convention) — original icons. */
   path: string;
   width: number;
   height: number;
   fill: string;
+  /**
+   * Iconify icon reference, e.g. "lucide:rocket". When set (with `body`),
+   * the renderer/exporter draws the stored SVG body instead of `path`.
+   * The body is sanitized at insert time and stored in the document, so
+   * rendering and exports never touch the network afterward.
+   */
+  iconRef?: string;
+  /** Sanitized inner-SVG body for `iconRef` icons (no scripts/handlers/styles). */
+  body?: string;
+  /** viewBox from the source SVG, e.g. "0 0 24 24". */
+  viewBox?: string;
 }
 
 export interface ChartElement extends BaseElement {
@@ -151,6 +162,12 @@ export interface DesignPage {
   height: number;
   /** Page background fill. */
   background: string;
+  /**
+   * Schemaless host-app metadata — mirrors the element `custom` bag.
+   * Used for page-level provenance (e.g. applied texture, see
+   * lib/design/textures.ts). Never interpreted by the renderer directly.
+   */
+  custom?: Record<string, unknown>;
   elements: DesignElement[];
 }
 

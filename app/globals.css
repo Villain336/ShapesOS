@@ -7,6 +7,31 @@
 @import "@fontsource/newsreader/500.css";
 @import "@fontsource/newsreader/600.css";
 
+/* Phase 11 integration #4 — self-hosted brand fonts (Fontsource, OFL-1.1
+ * only; no Google Fonts CSS API in the default path). Variable families ship
+ * latin(+bundled subsets); woff2 files download lazily on first use
+ * (unicode-range + font-display:swap), so this costs ~0 bytes until a family
+ * is rendered. Registry + loader: lib/design/fonts.ts */
+@import "@fontsource-variable/space-grotesk";
+@import "@fontsource-variable/sora";
+@import "@fontsource-variable/dm-sans";
+@import "@fontsource-variable/manrope";
+@import "@fontsource-variable/outfit";
+@import "@fontsource-variable/work-sans";
+@import "@fontsource-variable/libre-franklin";
+@import "@fontsource-variable/playfair-display";
+@import "@fontsource-variable/archivo";
+@import "@fontsource-variable/bricolage-grotesque";
+@import "@fontsource-variable/ibm-plex-sans";
+@import "@fontsource/dm-serif-display/latin-400.css";
+@import "@fontsource/dm-serif-display/latin-400-italic.css";
+@import "@fontsource/instrument-serif/latin-400.css";
+@import "@fontsource/instrument-serif/latin-400-italic.css";
+@import "@fontsource/bebas-neue/latin-400.css";
+@import "@fontsource/ibm-plex-mono/latin-400.css";
+@import "@fontsource/ibm-plex-mono/latin-500.css";
+@import "@fontsource/ibm-plex-mono/latin-600.css";
+
 @custom-variant dark (&:where(.dark, .dark *));
 
 /* ══════════════════════════════════════════════════════════

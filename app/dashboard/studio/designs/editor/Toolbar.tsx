@@ -45,21 +45,12 @@ import { AI_DESIGN_SIZES } from "@/lib/design/ai";
 import { btnGhost, iconBtn, iconBtnActive, inputCls } from "./ui";
 import { BatchModal } from "./BatchModal";
 import { ChartDataEditor } from "./ChartDataEditor";
+import { FontPicker } from "./FontPicker";
 import { QrEditor } from "./QrEditor";
 import { ShareModal } from "./ShareModal";
+import { awaitFontsReady, ensureFontLoaded } from "@/lib/design/fonts";
 
 export type SaveState = "idle" | "saving" | "saved" | "error";
-
-const SYSTEM_FONTS = [
-  "Inter",
-  "Arial",
-  "Helvetica",
-  "Georgia",
-  "Times New Roman",
-  "Courier New",
-  "Verdana",
-  "Trebuchet MS",
-];
 
 interface ToolbarProps {
   stageRef: StageRef;
@@ -220,13 +211,33 @@ export function Toolbar({ stageRef, designId, designName, onNameChange, saveStat
   const textEls = selected.filter(isText);
   const singleText = textEls.length === 1 && selected.length === 1 ? textEls[0]! : null;
   const allLocked = selected.length > 0 && selected.every((el) => el.locked);
-  const fonts = [...SYSTEM_FONTS, ...brandFonts.filter((f) => !SYSTEM_FONTS.includes(f))];
+
+  /**
+   * Apply a picked family, then redraw once it is usable. Konva rasterizes
+   * with whatever font is loaded at draw time, so without the post-load
+   * batchDraw() a freshly-picked webfont would sit in a fallback face until
+   * the next unrelated render.
+   */
+  const pickFont = (cssFamily: string) => {
+    for (const t of textEls) updateElement(t.id, { fontFamily: cssFamily });
+    void ensureFontLoaded(cssFamily).then(() => {
+      stageRef.current?.getLayers().forEach((l) => l.batchDraw());
+    });
+  };
 
   const doExport = async (fmt: "png" | "jpg" | "pdf" | "svg") => {
     const stage = stageRef.current;
     if (!stage || !page || exporting) return;
     setExporting(true);
+    let fontWarning: string[] = [];
     try {
+      // Export gate (fonts.ts): canvas uses whatever is loaded AT DRAW TIME.
+      // Await every family/weight/style the document uses before rasterizing,
+      // otherwise text silently exports in a fallback font and the file lies.
+      if (doc) {
+        const gate = await awaitFontsReady(doc);
+        fontWarning = gate.missing;
+      }
       // Brief pause so in-flight images settle before capture.
       await new Promise((r) => setTimeout(r, 350));
       const base = (designName || "design").replace(/[^\w\- ]+/g, "").trim() || "design";
@@ -288,6 +299,13 @@ export function Toolbar({ stageRef, designId, designName, onNameChange, saveStat
         a.href = dataUrl;
         a.download = `${base}.${fmt}`;
         a.click();
+      }
+      if (fontWarning.length > 0) {
+        if (noticeTimer.current) clearTimeout(noticeTimer.current);
+        setNotice(
+          `Exported, but ${fontWarning.length === 1 ? "this font" : "these fonts"} could not be loaded — fallback used: ${fontWarning.join(", ")}`,
+        );
+        noticeTimer.current = setTimeout(() => setNotice(null), 8000);
       }
     } catch {
       // Export failed — leave the button usable.
@@ -400,20 +418,11 @@ export function Toolbar({ stageRef, designId, designName, onNameChange, saveStat
 
       {textEls.length > 0 && (
         <div className="flex flex-wrap items-center gap-1.5">
-          <select
+          <FontPicker
             value={textEls[0]!.fontFamily}
-            onChange={(e) => {
-              for (const t of textEls) updateElement(t.id, { fontFamily: e.target.value });
-            }}
-            className={`${inputCls} max-w-40 py-1 text-[12px]`}
-            title="Font family"
-          >
-            {fonts.map((f) => (
-              <option key={f} value={f}>
-                {f}
-              </option>
-            ))}
-          </select>
+            brandFonts={brandFonts}
+            onChange={pickFont}
+          />
           <input
             type="number"
             min={8}

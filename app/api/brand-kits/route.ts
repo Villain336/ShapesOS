@@ -5,6 +5,7 @@
 
 import { requireWorkspaceRole, forbidden } from "@/lib/authz";
 import type { NextRequest } from "next/server";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireUser, getOrCreateWorkspace } from "@/lib/session";
 
@@ -38,6 +39,10 @@ export async function POST(req: NextRequest) {
     tone?: string;
     clientId?: string;
     isDefault?: boolean;
+    /* PROVIDER:brandfetch */
+    // Typed as InputJsonValue: req.json() can only ever produce JSON values.
+    metadata?: Prisma.InputJsonValue;
+    /* END */
   };
   try {
     body = await req.json();
@@ -56,6 +61,9 @@ export async function POST(req: NextRequest) {
     tone: body.tone?.slice(0, 2000) || null,
     clientId: body.clientId || null,
     isDefault: Boolean(body.isDefault),
+    /* PROVIDER:brandfetch */
+    metadata: body.metadata ?? {},
+    /* END */
   };
 
   const brandKit = await prisma.$transaction(async (tx) => {
