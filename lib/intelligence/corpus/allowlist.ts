@@ -13,6 +13,12 @@ const MAIN_ASSET_LICENSES: ReadonlySet<CorpusLicenseKind> = new Set([
   "CC-BY-3.0",
   "CC0-1.0",
   "MIT",
+  "ISC",
+  "BSD-3",
+  "Apache-2.0",
+  "OFL-1.1",
+  "OGL-3.0",
+  "W3C-Document",
   "public-domain",
 ]);
 
@@ -20,6 +26,7 @@ const MAIN_ASSET_LICENSES: ReadonlySet<CorpusLicenseKind> = new Set([
  *  (data/corpus/by-sa/ with its own LICENSE note). Never in the main asset. */
 const SEGREGATED_LICENSES: ReadonlySet<CorpusLicenseKind> = new Set([
   "CC-BY-SA-4.0",
+  "CC-BY-SA-2.5",
 ]);
 
 export type IngestDecision =

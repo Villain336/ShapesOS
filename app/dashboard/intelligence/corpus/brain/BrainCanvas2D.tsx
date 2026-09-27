@@ -83,7 +83,9 @@ export function BrainCanvas2D({
     let { w, h, dpr } = resize();
 
     const radiusOf = (n: BrainNode) =>
-      n.kind === "proposed" ? 9 : Math.min(26, 8 + Math.sqrt(Math.max(n.chunks, 1)) * 1.35);
+      n.kind === "proposed" || n.kind === "catalog"
+        ? 9
+        : Math.min(26, 8 + Math.sqrt(Math.max(n.chunks, 1)) * 1.35);
 
     const sim = createLayout(
       graph.nodes.map((n) => ({ id: n.id, pillar: n.pillar as BrainPillar, radius: radiusOf(n) })),
@@ -198,7 +200,7 @@ export function BrainCanvas2D({
 
         // Tier ring treatment.
         ctx.lineWidth = 1.6;
-        if (n.kind === "proposed") {
+        if (n.kind === "proposed" || n.kind === "catalog") {
           ctx.strokeStyle = "#a8a29e";
           ctx.setLineDash([3, 4]);
           ctx.beginPath();

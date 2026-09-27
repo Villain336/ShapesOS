@@ -117,7 +117,7 @@ export function mulberry32(seed: number): () => number {
 
 /** Luminous core radius for a chunk count. */
 export function nodeRadius3D(chunks: number, kind: BrainNode["kind"]): number {
-  if (kind === "proposed") return 0.14;
+  if (kind === "proposed" || kind === "catalog") return 0.14;
   const r = 0.16 + Math.sqrt(Math.max(chunks, 1)) * 0.038;
   return Math.min(0.85, Math.max(0.16, r));
 }

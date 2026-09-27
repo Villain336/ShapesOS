@@ -104,7 +104,7 @@ function DashedRing({
 
 function TierRings({ node, radius }: { node: BrainNode; radius: number }) {
   const color = PILLAR_COLORS[node.pillar];
-  if (node.kind === "proposed") {
+  if (node.kind === "proposed" || node.kind === "catalog") {
     return <DashedRing radius={radius + 0.22} color="#a8a29e" dashSize={0.05} gapSize={0.08} opacity={0.9} />;
   }
   if (node.kind === "removal-flagged") {

@@ -16,13 +16,23 @@ function tierTone(tier: string): "amber" | "slate" | "violet" {
   return tier === "1" ? "amber" : tier === "1S" ? "violet" : "slate";
 }
 
+function statusOf(n: BrainNode): { label: string; tone: "green" | "amber" | "slate" | "violet" | "red" } {
+  if (n.kind === "proposed") return { label: "Proposed", tone: "amber" };
+  if (n.kind === "removal-flagged") return { label: "Flagged", tone: "red" };
+  if (n.catalogStatus === "rights-review-pending") return { label: "Rights review", tone: "amber" };
+  if (n.catalogStatus === "acquisition-pending") return { label: "Acquisition", tone: "slate" };
+  if (n.catalogStatus === "segregated" || n.catalogStatus === "ingested")
+    return { label: n.catalogStatus === "segregated" ? "Segregated" : "Ingested", tone: "green" };
+  return { label: "Ingested", tone: "green" };
+}
+
 function sortedNodes(graph: BrainGraph): BrainNode[] {
   return [...graph.nodes].sort((a, b) => {
     const pg = PILLAR_ORDER.indexOf(a.pillar) - PILLAR_ORDER.indexOf(b.pillar);
     if (pg !== 0) return pg;
-    // Proposed sources sink to the bottom of their pillar group.
-    const ka = a.kind === "proposed" ? 1 : 0;
-    const kb = b.kind === "proposed" ? 1 : 0;
+    // Proposed and catalog-only sources sink to the bottom of their pillar group.
+    const ka = a.kind === "proposed" || a.kind === "catalog" ? 1 : 0;
+    const kb = b.kind === "proposed" || b.kind === "catalog" ? 1 : 0;
     if (ka !== kb) return ka - kb;
     const tg = TIER_ORDER[a.tier] - TIER_ORDER[b.tier];
     if (tg !== 0) return tg;
@@ -58,6 +68,7 @@ export function BrainSourcesTable({
               <th className="px-3 py-2 font-medium">Tier</th>
               <th className="px-3 py-2 text-right font-medium">Chunks</th>
               <th className="px-3 py-2 font-medium">Mode</th>
+              <th className="px-3 py-2 font-medium">Status</th>
               <th className="hidden px-3 py-2 font-medium md:table-cell">License basis</th>
               <th className="hidden px-3 py-2 font-medium lg:table-cell">Updated</th>
               <th className="w-8 px-3 py-2" />
@@ -68,10 +79,11 @@ export function BrainSourcesTable({
               const header = n.pillar !== lastPillar;
               lastPillar = n.pillar;
               const selected = selectedId === n.id;
+              const st = statusOf(n);
               return [
                 header ? (
                   <tr key={`hdr-${n.pillar}`} className="bg-stone-50/70">
-                    <td colSpan={7} className="px-3 py-1.5">
+                    <td colSpan={8} className="px-3 py-1.5">
                       <span className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-stone-500">
                         <span
                           className="inline-block h-2 w-2 rounded-full"
@@ -102,6 +114,7 @@ export function BrainSourcesTable({
                     </div>
                     <span className="mt-1 flex gap-1">
                       {n.kind === "proposed" && <Chip tone="amber">proposed</Chip>}
+                      {n.kind === "catalog" && <Chip tone="slate">cataloged</Chip>}
                       {n.kind === "removal-flagged" && <Chip tone="red">flagged</Chip>}
                     </span>
                   </td>
@@ -115,6 +128,9 @@ export function BrainSourcesTable({
                     <Chip tone={n.mode === "verbatim" ? "green" : "violet"}>
                       {n.mode === "verbatim" ? "verbatim" : "synthesis"}
                     </Chip>
+                  </td>
+                  <td className="px-3 py-2">
+                    <Chip tone={st.tone}>{st.label}</Chip>
                   </td>
                   <td
                     className="hidden max-w-[220px] truncate px-3 py-2 text-stone-500 md:table-cell"

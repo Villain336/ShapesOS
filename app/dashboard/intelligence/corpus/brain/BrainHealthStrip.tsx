@@ -51,12 +51,18 @@ export function BrainHealthStrip({ graph }: { graph: BrainGraph }) {
 
   return (
     <div>
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-7">
         <Metric
           icon={<BrainCircuit className="h-3.5 w-3.5" />}
           label="Sources"
           value={s.sources.toLocaleString()}
           sub={`${s.pillars.marketing} marketing · ${s.pillars.growth} growth · ${s.pillars.design} design`}
+        />
+        <Metric
+          icon={<Database className="h-3.5 w-3.5" />}
+          label="Cataloged"
+          value={s.cataloged.toLocaleString()}
+          sub="metadata only · 0 chunks"
         />
         <Metric
           icon={<Database className="h-3.5 w-3.5" />}

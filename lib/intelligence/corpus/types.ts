@@ -24,8 +24,15 @@ export type CorpusLicenseKind =
   | "CC-BY-4.0"
   | "CC-BY-3.0"
   | "CC-BY-SA-4.0"
+  | "CC-BY-SA-2.5"
   | "CC0-1.0"
   | "MIT"
+  | "ISC"
+  | "BSD-3"
+  | "Apache-2.0"
+  | "OFL-1.1"
+  | "OGL-3.0"
+  | "W3C-Document"
   | "public-domain";
 
 /** Provenance carried on EVERY chunk. License metadata is mandatory — a
@@ -87,12 +94,20 @@ export interface ExpertHit {
 
 export type SourceStatus = "active" | "pending";
 
+/** Acquisition status for cataloged (v8+) sources. "ingested" = chunks in
+ *  the corpus; the other three = metadata-only, zero chunks, never ingested. */
+export type CatalogStatus =
+  | "ingested"
+  | "rights-review-pending"
+  | "acquisition-pending"
+  | "segregated";
+
 export interface CorpusSourceRecord {
   id: string;
   title: string;
   author: string;
   tier: 1 | 2 | "learn-only";
-  license: CorpusLicenseKind | "learn-only";
+  license: CorpusLicenseKind | "learn-only" | "unverified";
   licenseUrl: string;
   sourceUrl: string;
   status: SourceStatus;
@@ -107,6 +122,21 @@ export interface CorpusSourceRecord {
   retrievedDate: string;
   /** True for BY-SA material: lives in data/corpus/by-sa/, separately licensed. */
   segregatedAsset: boolean;
+  // ── v8 catalog fields (optional; present on sources from the 2026-09-26
+  // source-library intake) ──
+  /** Corpus pillar for brain placement (v8+; older records resolve via the
+   *  allowlist registry fallback in graph.ts). */
+  pillar?: "marketing" | "growth" | "design";
+  /** v8 acquisition status. Absent = pre-v8 record (ingested or learn-only). */
+  catalogStatus?: CatalogStatus;
+  /** The catalog's own license class label, e.g. "OPEN (verify)". */
+  catalogLicenseClass?: string;
+  /** Exact license-basis text from the catalog (verbatim, for cataloged sources). */
+  catalogLicenseBasis?: string;
+  /** Canonical access URL from the source catalog. */
+  catalogUrl?: string;
+  /** ISO date the source's chunks were actually ingested (ingested only). */
+  ingestedAt?: string;
 }
 
 /** Versioned manifest. corpusVersion increments ONLY when sources change

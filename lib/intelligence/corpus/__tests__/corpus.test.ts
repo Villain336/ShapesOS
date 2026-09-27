@@ -516,3 +516,50 @@ describe("ingestSynthesisPlaybook (local 1S ingest, no network)", () => {
     assert.equal(loadChunks("main").length, 0, "nothing written on failure");
   });
 });
+
+describe("v8 intake: expanded open licenses + catalog rendering", () => {
+  it("allows the new v8 open licenses into the main asset (Tier 2)", () => {
+    for (const lic of ["OGL-3.0", "W3C-Document", "ISC", "BSD-3", "Apache-2.0", "OFL-1.1"] as const) {
+      const d = assertIngestAllowed({ id: `v8-${lic}`, title: lic, tier: 2, license: lic });
+      assert.equal(d.allowed, true, lic);
+      if (d.allowed) assert.equal(d.segregatedAsset, false, lic);
+    }
+  });
+
+  it("routes CC-BY-SA-2.5 (MDN) to the segregated asset only", () => {
+    const d = assertIngestAllowed({ id: "v8-mdn-web-docs", title: "MDN", tier: 2, license: "CC-BY-SA-2.5" });
+    assert.equal(d.allowed, true);
+    if (d.allowed) assert.equal(d.segregatedAsset, true);
+  });
+
+  it("REFUSES 'unverified' catalog licenses — catalog-only sources can't pass the ingest gate", () => {
+    assert.throws(
+      () => assertIngestAllowed({ id: "v8-some-catalog", title: "Some catalog entry", tier: 2, license: "unverified" }),
+      /license unverified is not a shippable open license/,
+    );
+  });
+
+  it("renders catalog-only records as catalog nodes with zero chunks and honest stats", async () => {
+    const { buildCorpusGraph } = await import("../graph");
+    const manifest = {
+      corpusVersion: 8,
+      updatedAt: "2026-09-27",
+      assets: { main: 100, "by-sa": 0 },
+      evalPrecision: 1,
+      evalRunAt: "2026-09-27",
+      sources: [
+        { id: "a", title: "A", author: "A", tier: 2, license: "MIT", licenseUrl: "", sourceUrl: "https://a.example", status: "active", mode: "verbatim", chunks: 100, version: 7, retrievedDate: "2026-09-26", segregatedAsset: false, pillar: "design" },
+        { id: "v8-cat", title: "Catalog Entry", author: "", tier: "learn-only", license: "unverified", licenseUrl: "", sourceUrl: "https://cat.example", status: "pending", mode: "verbatim", chunks: 0, version: 8, retrievedDate: "2026-09-27", segregatedAsset: false, pillar: "marketing", catalogStatus: "rights-review-pending", catalogLicenseClass: "OPEN (verify)", catalogLicenseBasis: "verify per item" },
+      ],
+    } as any;
+    const g = buildCorpusGraph(manifest);
+    assert.equal(g.stats.sources, 2);
+    assert.equal(g.stats.cataloged, 1);
+    assert.equal(g.stats.chunks, 100, "catalog entries contribute zero chunks");
+    const cat = g.nodes.find((n) => n.id === "v8-cat")!;
+    assert.equal(cat.kind, "catalog");
+    assert.equal(cat.chunks, 0);
+    assert.equal(cat.catalogStatus, "rights-review-pending");
+    assert.equal(cat.licenseBasis, "Cataloged — rights review pending (OPEN (verify)). Zero chunks; nothing ingested.");
+  });
+});

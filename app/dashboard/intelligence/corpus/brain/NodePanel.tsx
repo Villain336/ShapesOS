@@ -16,6 +16,13 @@ import { X, Flag, FlagOff, Loader2 } from "lucide-react";
 import type { BrainNode } from "@/lib/intelligence/corpus/graph";
 import { Chip, inputCls, btnGhost, PILLAR_COLORS, PILLAR_TONE, PILLAR_LABEL } from "./brain-ui";
 
+const STATUS_SHORT: Record<string, string> = {
+  ingested: "ingested",
+  "rights-review-pending": "rights review",
+  "acquisition-pending": "acquisition",
+  segregated: "segregated",
+};
+
 function Section({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
@@ -61,6 +68,11 @@ export function NodePanel({
             <Chip tone={PILLAR_TONE[node.pillar]}>{PILLAR_LABEL[node.pillar]}</Chip>
             <Chip tone="violet">Tier {node.tier}</Chip>
             {node.kind === "proposed" && <Chip tone="amber">proposed</Chip>}
+            {node.kind === "catalog" && (
+              <Chip tone="amber">
+                cataloged{node.catalogStatus ? ` · ${STATUS_SHORT[node.catalogStatus] ?? node.catalogStatus}` : ""}
+              </Chip>
+            )}
             {node.kind === "removal-flagged" && <Chip tone="red">flagged for removal</Chip>}
             {node.status === "pending" && node.kind === "source" && <Chip tone="amber">pending</Chip>}
           </div>
@@ -82,7 +94,11 @@ export function NodePanel({
             </Section>
             {/* 4 · Ingest mode */}
             <Section label="Ingest mode">
-              {node.mode === "verbatim" ? "Ingested verbatim" : "Marketr synthesis"}
+              {node.kind === "catalog"
+                ? "Not ingested — cataloged only"
+                : node.mode === "verbatim"
+                  ? "Ingested verbatim"
+                  : "Marketr synthesis"}
             </Section>
           </div>
 

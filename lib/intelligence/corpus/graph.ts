@@ -14,7 +14,7 @@ import type { CorpusManifest, CorpusSourceRecord } from "./types";
 import { SEED_SOURCES, SYNTHESIS_PLAYBOOKS } from "./allowlist";
 
 export type BrainPillar = "marketing" | "growth" | "design";
-export type BrainNodeKind = "source" | "proposed" | "removal-flagged";
+export type BrainNodeKind = "source" | "proposed" | "removal-flagged" | "catalog";
 
 export interface BrainNode {
   id: string;
@@ -33,6 +33,8 @@ export interface BrainNode {
   synthesizedFrom: string[];
   kind: BrainNodeKind;
   removalReason?: string;
+  /** v8 acquisition status for cataloged sources (absent for pre-v8 nodes). */
+  catalogStatus?: import("./types").CatalogStatus;
   // ── Provenance (audit center; all real manifest/eval/usage data) ──
   /** Corpus version this source was last (re)ingested under. Null for proposed. */
   manifestVersion: number | null;
@@ -61,6 +63,8 @@ export interface BrainGraph {
     pillarChunks: Record<BrainPillar, number>;
     proposed: number;
     flagged: number;
+    /** v8+ catalog-only sources (metadata only, zero chunks). */
+    cataloged: number;
     /** Corpus eval summary (null until scripts/eval-corpus.mts has run). */
     eval: { precision: number; questions: number; correct: number; runAt: string } | null;
     /** Total real agent retrieval hits across all sources. */
@@ -87,12 +91,19 @@ export interface ProposedSource {
 const PILLARS: BrainPillar[] = ["marketing", "growth", "design"];
 
 function pillarOf(record: CorpusSourceRecord): BrainPillar {
+  // v8+ records carry their pillar directly on the manifest.
+  if (record.pillar && PILLARS.includes(record.pillar)) return record.pillar;
   const def = SEED_SOURCES.find((d) => d.id === record.id);
   if (def?.pillar && PILLARS.includes(def.pillar)) return def.pillar;
   return "marketing";
 }
 
 function teachesOf(record: CorpusSourceRecord): string {
+  if (
+    record.catalogStatus === "rights-review-pending" ||
+    record.catalogStatus === "acquisition-pending"
+  )
+    return "Cataloged source — not yet ingested. It will teach Marketr once rights are cleared and the corpus build runs.";
   const def = SEED_SOURCES.find((d) => d.id === record.id);
   if (def?.teaches) return def.teaches;
   if (record.mode === "synthesis-1s")
@@ -102,19 +113,35 @@ function teachesOf(record: CorpusSourceRecord): string {
 
 function tierOf(record: CorpusSourceRecord): BrainNode["tier"] {
   if (record.mode === "synthesis-1s") return "1S";
+  // Catalog-only learn-only sources can only ever enter via 1S synthesis.
+  if (record.tier === "learn-only" && record.catalogStatus && record.catalogStatus !== "ingested")
+    return "1S";
   return record.tier === 1 ? "1" : "2";
 }
 
 function licenseBasisOf(record: CorpusSourceRecord): string {
+  // Catalog-only records are honest about not being ingested.
+  if (record.catalogStatus === "rights-review-pending")
+    return `Cataloged — rights review pending (${record.catalogLicenseClass ?? "license unverified"}). Zero chunks; nothing ingested.`;
+  if (record.catalogStatus === "acquisition-pending")
+    return `Cataloged acquisition target (${record.catalogLicenseClass ?? "license gated"}). Metadata only; never ingested without clearance.`;
   if (record.mode === "synthesis-1s")
     return "Marketr-original synthesis (CC-BY-4.0); source is learn-only, never ingested verbatim.";
   if (record.license === "public-domain") return "U.S. public domain — shippable verbatim.";
   if (record.license === "CC0-1.0") return "CC0 public domain dedication — shippable verbatim.";
   if (record.license === "CC-BY-4.0" || record.license === "CC-BY-3.0")
     return `${record.license} — shippable verbatim with attribution.`;
-  if (record.license === "CC-BY-SA-4.0")
-    return "CC-BY-SA-4.0 — shippable verbatim into the segregated BY-SA asset only.";
+  if (record.license === "CC-BY-SA-4.0" || record.license === "CC-BY-SA-2.5")
+    return `${record.license} — shippable verbatim into the segregated BY-SA asset only.`;
   if (record.license === "MIT") return "MIT licensed — shippable verbatim with attribution.";
+  if (record.license === "ISC") return "ISC licensed — shippable verbatim with attribution.";
+  if (record.license === "BSD-3") return "BSD 3-clause — shippable verbatim with attribution.";
+  if (record.license === "Apache-2.0") return "Apache 2.0 — shippable verbatim with attribution.";
+  if (record.license === "OFL-1.1") return "SIL Open Font License 1.1 — shippable with attribution.";
+  if (record.license === "OGL-3.0")
+    return "Open Government Licence v3.0 — shippable verbatim with attribution.";
+  if (record.license === "W3C-Document")
+    return "W3C Document License — shippable verbatim with attribution.";
   return "License recorded in the corpus manifest.";
 }
 
@@ -154,6 +181,10 @@ export function buildCorpusGraph(
   const nodes: BrainNode[] = manifest.sources.map((r) => {
     const playbook = SYNTHESIS_PLAYBOOKS.find((p) => p.sourceId === r.id);
     const flagged = removalIds.get(r.id);
+    // v8 catalog-only sources (rights-review-pending / acquisition-pending)
+    // render as small rim nodes — visible, honest, zero chunks.
+    const isCatalogOnly =
+      r.catalogStatus === "rights-review-pending" || r.catalogStatus === "acquisition-pending";
     return {
       id: r.id,
       title: r.title,
@@ -167,10 +198,11 @@ export function buildCorpusGraph(
       mode: r.mode,
       teaches: teachesOf(r),
       synthesizedFrom: playbook?.synthesizedFrom ?? [],
-      kind: flagged ? "removal-flagged" : "source",
+      kind: isCatalogOnly ? "catalog" : flagged ? "removal-flagged" : "source",
       removalReason: flagged,
-      manifestVersion: r.version,
-      retrievedDate: r.retrievedDate,
+      catalogStatus: r.catalogStatus,
+      manifestVersion: isCatalogOnly ? null : r.version,
+      retrievedDate: isCatalogOnly ? null : r.retrievedDate,
       evalHits: audit.evalHitsBySource?.get(r.id) ?? 0,
       retrievalHits: audit.retrievalHitsBySource?.get(r.id) ?? 0,
     };
@@ -233,7 +265,9 @@ export function buildCorpusGraph(
     design: nodes.filter((n) => n.pillar === "design").reduce((a, n) => a + n.chunks, 0),
   };
   const stats = {
-    sources: nodes.filter((n) => n.kind === "source" || n.kind === "removal-flagged").length,
+    sources: nodes.filter(
+      (n) => n.kind === "source" || n.kind === "removal-flagged" || n.kind === "catalog",
+    ).length,
     chunks: nodes.reduce((a, n) => a + n.chunks, 0),
     pillars: {
       marketing: nodes.filter((n) => n.pillar === "marketing").length,
@@ -243,6 +277,8 @@ export function buildCorpusGraph(
     pillarChunks,
     proposed: proposed.length,
     flagged: removalIds.size,
+    /** v8+ catalog-only sources (metadata only, zero chunks) — honest count. */
+    cataloged: nodes.filter((n) => n.kind === "catalog").length,
     eval: audit.eval ?? null,
     retrievalHitsTotal: nodes.reduce((a, n) => a + n.retrievalHits, 0),
   };
