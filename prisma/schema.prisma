@@ -635,6 +635,7 @@ model Workspace {
   mailProviders          MailProvider[]
   mailCreatives          MailCreative[]
   mailCampaigns          MailCampaign[]
+  designs                Design[]
   eddmOrders             EddmOrder[]
   // Phase 5 (S1–S4): media safety back-relations.
   mediaApprovals         MediaApproval[]
@@ -956,6 +957,7 @@ model BrandKit {
 
   templates           ReportTemplate[]
   reports             Report[]
+  designs             Design[]
   // Milestone 19: newsletter templates using this brand kit.
   newsletterTemplates NewsletterTemplate[]
 
@@ -4272,6 +4274,34 @@ model MailCreative {
   @@index([workspaceId, formatTrack, status])
   @@index([workspaceId, channelTemplate])
   @@map("mail_creative")
+}
+
+// Phase 11: native design editor ("Canvas"). One design = one multi-page
+// canvas document stored as JSON (pages → elements). Workspace-scoped;
+// the editor never auto-publishes — exports are human-downloaded.
+model Design {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  name String
+  // Design document: { version, pages: [{ id, width, height, background,
+  // elements: [{ id, type: text|image|shape|group, ... }] }] }
+  document Json @default("{}")
+  // PNG data-URL thumbnail for the designs list (regenerated on save).
+  thumbnail   String?   @db.Text
+  // Template key this design was started from, if any (see lib/design/templates).
+  templateKey String?    @map("template_key")
+  // Brand kit applied — client colors/fonts feed text presets and swatches.
+  brandKitId  String?   @map("brand_kit_id")
+  brandKit    BrandKit? @relation(fields: [brandKitId], references: [id], onDelete: SetNull)
+
+  createdBy String?  @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([workspaceId, updatedAt])
+  @@map("designs")
 }
 
 // T1: a mail campaign. Approval binds creativeHash + pieceCount + maxSpend.

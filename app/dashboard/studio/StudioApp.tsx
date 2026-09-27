@@ -17,6 +17,7 @@ import {
   Link2,
   Loader2,
   Palette,
+  PenTool,
   Plug,
   Plus,
   QrCode,
@@ -34,6 +35,7 @@ import {
 } from "./api";
 import { CreativeWizard, ValidationView } from "./CreativeWizard";
 import { QrDesignerTab } from "./QrDesigner";
+import { TEMPLATES } from "@/lib/design/templates";
 
 // ── Small atoms ──────────────────────────────────────────────────────────────
 
@@ -654,10 +656,238 @@ function CanvaTab() {
   );
 }
 
+// ── Designs tab (Phase 11 "Canvas") ─────────────────────────────────────────
+
+interface DesignSummary {
+  id: string;
+  name: string;
+  thumbnail: string | null;
+  templateKey: string | null;
+  pageCount: number;
+  elementCount: number;
+  updatedAt: string;
+}
+
+function templateLabel(key: string | null): string {
+  if (!key) return "Blank";
+  return TEMPLATES.find((t) => t.key === key)?.name ?? key;
+}
+
+function NewDesignModal({ onClose }: { onClose: () => void }) {
+  const [name, setName] = useState("");
+  const [templateKey, setTemplateKey] = useState<string | null>("instagram-post");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const create = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const r = await api<{ design: { id: string } }>("/api/studio/designs", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          name: name.trim() || "Untitled design",
+          ...(templateKey ? { templateKey } : {}),
+        }),
+      });
+      window.location.href = `/dashboard/studio/designs/${r.design.id}`;
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Create failed.");
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/40 p-4">
+      <div className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-xl bg-white shadow-xl">
+        <div className="flex items-center justify-between border-b border-stone-100 px-5 py-3.5">
+          <h2 className="text-[15px] font-semibold text-stone-900">New design</h2>
+          <button onClick={onClose} className="rounded-md p-1.5 text-stone-400 hover:bg-stone-100 hover:text-stone-600" aria-label="Close">
+            <X size={16} />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-5 py-4">
+          {error && (
+            <div className="mb-4 flex items-start gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-700">
+              <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+              <span>{error}</span>
+            </div>
+          )}
+
+          <label className="mb-1 block text-[12px] font-medium text-stone-600">Name</label>
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Untitled design"
+            className={`${inputCls} mb-4 w-full`}
+            maxLength={120}
+          />
+
+          <div className="mb-2 text-[12px] font-medium text-stone-600">Start from</div>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            <button
+              type="button"
+              onClick={() => setTemplateKey(null)}
+              className={`rounded-lg border p-3 text-left transition ${
+                templateKey === null
+                  ? "border-violet-600 bg-violet-50/40"
+                  : "border-stone-200 hover:border-stone-300"
+              }`}
+            >
+              <div className="text-[13px] font-medium text-stone-900">Blank canvas</div>
+              <div className="mt-0.5 text-[11px] text-stone-500">1080 × 1080</div>
+            </button>
+            {TEMPLATES.map((t) => (
+              <button
+                key={t.key}
+                type="button"
+                onClick={() => setTemplateKey(t.key)}
+                className={`rounded-lg border p-3 text-left transition ${
+                  templateKey === t.key
+                    ? "border-violet-600 bg-violet-50/40"
+                    : "border-stone-200 hover:border-stone-300"
+                }`}
+              >
+                <div className="flex items-center justify-between gap-1">
+                  <div className="truncate text-[13px] font-medium text-stone-900">{t.name}</div>
+                </div>
+                <div className="mt-0.5 text-[11px] text-stone-500">{t.width} × {t.height}</div>
+                <div className="mt-1"><Chip tone="violet">{t.category}</Chip></div>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex items-center justify-end gap-2 border-t border-stone-100 px-5 py-3.5">
+          <button onClick={onClose} className={btnGhost} disabled={busy}>Cancel</button>
+          <button onClick={create} className={btnPrimary} disabled={busy}>
+            {busy ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+            Create design
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DesignsTab() {
+  const [designs, setDesigns] = useState<DesignSummary[]>([]);
+  const [q, setQ] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [modalOpen, setModalOpen] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const r = await api<{ designs: DesignSummary[] }>("/api/studio/designs");
+      setDesigns(r.designs);
+    } catch {
+      // keep previous list on transient failure
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const filtered = useMemo(() => {
+    const needle = q.trim().toLowerCase();
+    if (!needle) return designs;
+    return designs.filter(
+      (d) =>
+        d.name.toLowerCase().includes(needle) ||
+        templateLabel(d.templateKey).toLowerCase().includes(needle),
+    );
+  }, [designs, q]);
+
+  const remove = async (d: DesignSummary, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!window.confirm(`Delete “${d.name}”? This cannot be undone.`)) return;
+    try {
+      await api(`/api/studio/designs/${d.id}`, { method: "DELETE" });
+      load();
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : "Delete failed.");
+    }
+  };
+
+  return (
+    <div>
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search designs…" className={`${inputCls} w-44`} />
+        <div className="ml-auto">
+          <button onClick={() => setModalOpen(true)} className={btnPrimary}>
+            <Plus size={14} /> New design
+          </button>
+        </div>
+      </div>
+
+      <div className="overflow-hidden rounded-lg border border-stone-200 bg-white">
+        <table className="w-full text-left text-[13px]">
+          <thead>
+            <tr className="border-b border-stone-100 bg-stone-50/60 text-[11px] uppercase tracking-wide text-stone-500">
+              <th className="px-3 py-2 font-medium">Name</th>
+              <th className="px-3 py-2 font-medium">Template</th>
+              <th className="px-3 py-2 font-medium">Pages</th>
+              <th className="px-3 py-2 font-medium">Elements</th>
+              <th className="px-3 py-2 font-medium">Updated</th>
+              <th className="px-3 py-2 font-medium"><span className="sr-only">Actions</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map((d) => (
+              <tr
+                key={d.id}
+                onClick={() => {
+                  window.location.href = `/dashboard/studio/designs/${d.id}`;
+                }}
+                className="cursor-pointer border-b border-stone-100 last:border-0 hover:bg-violet-50/40"
+              >
+                <td className="px-3 py-2 font-medium text-stone-900">{d.name}</td>
+                <td className="px-3 py-2">
+                  <Chip tone={d.templateKey ? "blue" : "slate"}>{templateLabel(d.templateKey)}</Chip>
+                </td>
+                <td className="px-3 py-2 text-stone-600">{d.pageCount}</td>
+                <td className="px-3 py-2 text-stone-600">{d.elementCount}</td>
+                <td className="px-3 py-2 text-stone-500">
+                  {new Date(d.updatedAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
+                </td>
+                <td className="px-3 py-2 text-right">
+                  <button
+                    onClick={(e) => remove(d, e)}
+                    className="rounded-md p-1.5 text-stone-400 hover:bg-red-50 hover:text-red-600"
+                    aria-label={`Delete ${d.name}`}
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </td>
+              </tr>
+            ))}
+            {filtered.length === 0 && !loading && (
+              <tr>
+                <td colSpan={6} className="px-3 py-8 text-center text-[13px] text-stone-400">
+                  {q ? "No designs match your search." : "No designs yet — create the first one with “New design”."}
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {modalOpen && <NewDesignModal onClose={() => setModalOpen(false)} />}
+    </div>
+  );
+}
+
 // ── Studio app shell ─────────────────────────────────────────────────────────
 
 const TABS = [
   { id: "creatives", label: "Creatives", icon: Palette },
+  { id: "designs", label: "Designs", icon: PenTool },
   { id: "assets", label: "Assets", icon: FolderOpen },
   { id: "qr", label: "QR codes", icon: QrCode },
   { id: "canva", label: "Canva connection", icon: Plug },
@@ -684,6 +914,7 @@ export function StudioApp() {
         ))}
       </div>
       {tab === "creatives" && <CreativesTab />}
+      {tab === "designs" && <DesignsTab />}
       {tab === "assets" && <AssetsTab />}
       {tab === "qr" && <QrDesignerTab />}
       {tab === "canva" && <CanvaTab />}
