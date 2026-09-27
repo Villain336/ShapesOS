@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { withPayload } from "@payloadcms/next/withPayload";
 
 // Milestone 11: baseline security headers.
 // - HSTS is only sent when the app URL is https (never on http://localhost).
@@ -36,9 +37,18 @@ const nextConfig: NextConfig = {
   // (readFileSync-based wasm load) instead of Turbopack bundling the
   // Vite-specific `?url` entry and failing the build.
   serverExternalPackages: ["takumi-pdf"],
+  // Phase 12: the standalone trace copies onnxruntime's .node binding but not
+  // its companion libonnxruntime.so, so any route touching @xenova/transformers
+  // (embeddings — e.g. /dashboard/intelligence/repurpose) 500s at runtime with
+  // "cannot open shared object file". Force-include the native lib.
+  outputFileTracingIncludes: {
+    "/*": [
+      "./node_modules/onnxruntime-node/bin/napi-v3/linux/x64/libonnxruntime.so.1.14.0",
+    ],
+  },
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },
 };
 
-export default nextConfig;
+export default withPayload(nextConfig);

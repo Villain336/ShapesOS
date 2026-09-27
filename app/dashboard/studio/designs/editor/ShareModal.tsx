@@ -5,11 +5,13 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import {
   Check,
   Copy,
   Link2,
   Loader2,
+  MonitorPlay,
   Plus,
   ShieldCheck,
   Trash2,
@@ -22,6 +24,8 @@ interface ShareInfo {
   expiresAt: string | null;
   revokedAt: string | null;
   active: boolean;
+  // Phase 12 (embeds): rrweb session replay opt-in for this link.
+  replayOptIn: boolean;
 }
 
 interface Approval {
@@ -51,6 +55,9 @@ export function ShareModal({
   const [saving, setSaving] = useState(false);
   const [note, setNote] = useState("");
   const [expiryDays, setExpiryDays] = useState("");
+  // Phase 12 (embeds): rrweb session replay opt-in for new share links.
+  // Off by default; enabling records visitor sessions with masked inputs.
+  const [replayOptIn, setReplayOptIn] = useState(false);
   const [newToken, setNewToken] = useState<{ url: string; token: string } | null>(null);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -117,9 +124,10 @@ export function ShareModal({
     setSaving(true);
     setError(null);
     try {
-      const body: { expiresInDays?: number } = {};
+      const body: { expiresInDays?: number; replayOptIn?: boolean } = {};
       const days = parseInt(expiryDays, 10);
       if (Number.isFinite(days) && days > 0) body.expiresInDays = Math.min(365, days);
+      if (replayOptIn) body.replayOptIn = true;
       const res = await fetch(`${base}/shares`, {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -244,7 +252,7 @@ export function ShareModal({
                     </div>
                   </div>
                 )}
-                <div className="mb-3 flex items-center gap-2">
+                <div className="mb-3 flex flex-wrap items-center gap-2">
                   <input
                     value={expiryDays}
                     onChange={(e) => setExpiryDays(e.target.value.replace(/\D/g, ""))}
@@ -252,6 +260,18 @@ export function ShareModal({
                     inputMode="numeric"
                     className="w-48 rounded-md border border-stone-200 px-2.5 py-1.5 text-[13px] focus:border-violet-400 focus:outline-none"
                   />
+                  <label
+                    className="flex cursor-pointer items-center gap-1.5 rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-[13px] text-stone-700 hover:bg-stone-50"
+                    title="Record visitor sessions (rrweb). Inputs are masked; recordings are workspace-visible only."
+                  >
+                    <input
+                      type="checkbox"
+                      checked={replayOptIn}
+                      onChange={(e) => setReplayOptIn(e.target.checked)}
+                      className="h-3.5 w-3.5 accent-violet-600"
+                    />
+                    Session replay
+                  </label>
                   <button
                     onClick={() => void createShare()}
                     disabled={saving}
@@ -284,6 +304,20 @@ export function ShareModal({
                             className={`text-[11px] ${s.active ? "text-emerald-600" : "text-stone-400"}`}
                           >
                             {s.active ? "Active" : "Revoked"}
+                            {s.replayOptIn && s.active && (
+                              <Link
+                                href={`/dashboard/studio/designs/${encodeURIComponent(designId)}/replay/${encodeURIComponent(s.id)}`}
+                                className="ml-1.5 inline-flex items-center gap-0.5 rounded-full bg-violet-100 px-1.5 py-0.5 text-[10px] font-semibold text-violet-700 hover:bg-violet-200"
+                                title="Watch session recordings for this link"
+                              >
+                                <MonitorPlay className="h-3 w-3" /> replay · watch
+                              </Link>
+                            )}
+                            {s.replayOptIn && !s.active && (
+                              <span className="ml-1.5 rounded-full bg-violet-100 px-1.5 py-0.5 text-[10px] font-semibold text-violet-700">
+                                replay on
+                              </span>
+                            )}
                           </p>
                         </div>
                         {s.active && (

@@ -1,0 +1,133 @@
+# Activepieces community engine sidecar (Phase 12, Worker 3).
+#
+# LICENSE: Activepieces community edition is MIT (repo: github.com/activepieces/activepieces).
+# `packages/ee/` in the upstream repo is commercial — this manifest never enables it:
+# it does NOT set AP_EDITION=ee, does not pass a license key, and does not mount
+# or build the ee tree. Without AP_EDITION the official image runs the Community
+# edition by default.
+#
+# USAGE (optional — never required for the core app):
+#   Start:   docker compose -f ../../docker-compose.yml -f docker/integrations/activepieces.yml \
+#              --profile activepieces up -d
+#   Or alone: docker compose -f docker/integrations/activepieces.yml up -d
+#   Engine UI/API: http://localhost:8080  (set ACTIVEPIECES_URL on the app host)
+#   Then generate an API key inside the Activepieces UI (Settings → API keys)
+#   and set ACTIVEPIECES_API_KEY on the app host. Without both env vars every
+#   Marketr automation surface degrades to an honest "not connected" state.
+#
+# Secrets: generate with `openssl rand -hex 16` for AP_ENCRYPTION_KEY and
+# AP_JWT_SECRET (each 32 hex chars), and a strong password for AP_POSTGRES_PASSWORD.
+
+name: marketr-activepieces
+
+services:
+  # The Activepieces app serves both the UI/API and the execution worker in
+  # the community edition (AP_CONTAINER_TYPE=MAIN). A dedicated worker
+  # container (AP_CONTAINER_TYPE=WORKER) handles flow execution; it must see
+  # the same API so it can report results.
+  activepieces:
+    image: activepieces/activepieces:latest
+    profiles: ["activepieces"]
+    restart: unless-stopped
+    environment:
+      AP_CONTAINER_TYPE: MAIN
+      AP_FRONTEND_URL: ${AP_FRONTEND_URL:-http://localhost:8080}
+      AP_DATABASE_TYPE: POSTGRES
+      AP_POSTGRES_HOST: ap-db
+      AP_POSTGRES_PORT: "5432"
+      AP_POSTGRES_DATABASE: ${AP_POSTGRES_DATABASE:-activepieces}
+      AP_POSTGRES_USERNAME: ${AP_POSTGRES_USERNAME:-activepieces}
+      AP_POSTGRES_PASSWORD: <redacted>
+      AP_REDIS_HOST: ap-redis
+      AP_REDIS_PORT: "6379"
+      AP_ENCRYPTION_KEY: ${AP_ENCRYPTION_KEY:?AP_ENCRYPTION_KEY is required — generate with `openssl rand -hex 16`}
+      AP_JWT_SECRET: ${AP_JWT_SECRET:?AP_JWT_SECRET is required — generate with `openssl rand -hex 16`}
+      AP_EXECUTION_MODE: UNSANDBOXED
+      AP_TELEMETRY_ENABLED: "false"
+      AP_SYNC_PIECES_ON_STARTUP: "true"
+      # Community edition: never set AP_EDITION=ee without a commercial license.
+      TZ: ${TZ:-America/New_York}
+    ports:
+      - "${AP_PORT:-8080}:80"
+    depends_on:
+      ap-db:
+        condition: service_healthy
+      ap-redis:
+        condition: service_healthy
+    # Health = the web app serving its UI. (API paths moved between /api/v1
+    # and /v1 across engine versions, so the API is not probed here.)
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:80/ >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    volumes:
+      - activepieces-data:/root/.activepieces
+
+  activepieces-worker:
+    image: activepieces/activepieces:latest
+    profiles: ["activepieces"]
+    restart: unless-stopped
+    environment:
+      AP_CONTAINER_TYPE: WORKER
+      AP_FRONTEND_URL: http://activepieces
+      AP_DATABASE_TYPE: POSTGRES
+      AP_POSTGRES_HOST: ap-db
+      AP_POSTGRES_PORT: "5432"
+      AP_POSTGRES_DATABASE: ${AP_POSTGRES_DATABASE:-activepieces}
+      AP_POSTGRES_USERNAME: ${AP_POSTGRES_USERNAME:-activepieces}
+      AP_POSTGRES_PASSWORD: <redacted>
+      AP_REDIS_HOST: ap-redis
+      AP_REDIS_PORT: "6379"
+      AP_ENCRYPTION_KEY: ${AP_ENCRYPTION_KEY:?AP_ENCRYPTION_KEY is required}
+      AP_JWT_SECRET: ${AP_JWT_SECRET:?AP_JWT_SECRET is required}
+      AP_EXECUTION_MODE: UNSANDBOXED
+      AP_TELEMETRY_ENABLED: "false"
+      TZ: ${TZ:-America/New_York}
+    depends_on:
+      ap-db:
+        condition: service_healthy
+      ap-redis:
+        condition: service_healthy
+      activepieces:
+        condition: service_healthy
+    volumes:
+      - activepieces-data:/root/.activepieces
+
+  ap-db:
+    image: postgres:16-alpine
+    profiles: ["activepieces"]
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${AP_POSTGRES_USERNAME:-activepieces}
+      POSTGRES_PASSWORD: <redacted>
+      POSTGRES_DB: ${AP_POSTGRES_DATABASE:-activepieces}
+    volumes:
+      - activepieces-db:/var/lib/postgresql/data
+    # Avoid colliding with the host's Postgres ports (marketr dev uses 5433).
+    ports:
+      - "${AP_POSTGRES_PORT:-5434}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${AP_POSTGRES_USERNAME:-activepieces}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  ap-redis:
+    image: redis:7-alpine
+    profiles: ["activepieces"]
+    restart: unless-stopped
+    volumes:
+      - activepieces-redis:/data
+    ports:
+      - "${AP_REDIS_PORT:-6380}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  activepieces-data:
+  activepieces-db:
+  activepieces-redis:

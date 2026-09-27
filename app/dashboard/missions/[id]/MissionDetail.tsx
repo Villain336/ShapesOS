@@ -11,13 +11,16 @@ import {
   AlertTriangle,
   Check,
   ChevronLeft,
+  ExternalLink,
   History,
+  KanbanSquare,
   ListChecks,
   Loader2,
   Pause,
   Play,
   ShieldCheck,
   X,
+  Zap,
 } from "lucide-react";
 
 async function api<T>(url: string, init?: RequestInit): Promise<T> {
@@ -350,12 +353,207 @@ function PlanTab({ steps }: { steps: PlanStep[] }) {
   );
 }
 
+// ── Tasks tab (Phase 12: Plane sidecar) ──────────────────────────────────────
+// Live Plane issues for a chosen project, surfaced inside the mission.
+// Honest unconfigured state — never fabricated tasks.
+
+interface PlaneProject {
+  id: string;
+  name: string;
+  identifier: string;
+}
+
+interface PlaneIssueRow {
+  id: string;
+  name: string;
+  sequenceId: number | null;
+  state: string | null;
+  stateGroup: string | null;
+  priority: string | null;
+  labels: string[];
+  url: string | null;
+  updatedAt: string | null;
+}
+
+function stateGroupTone(g: string | null): "slate" | "violet" | "green" | "amber" | "blue" {
+  switch (g) {
+    case "completed": return "green";
+    case "started": return "violet";
+    case "cancelled": return "slate";
+    case "backlog": return "amber";
+    default: return "blue";
+  }
+}
+
+function TasksTab() {
+  const [projects, setProjects] = useState<PlaneProject[] | null>(null);
+  const [projectId, setProjectId] = useState("");
+  const [issues, setIssues] = useState<PlaneIssueRow[] | null>(null);
+  const [openCount, setOpenCount] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [loadingIssues, setLoadingIssues] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [notConfigured, setNotConfigured] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const r = await api<{ projects: PlaneProject[] }>(
+          "/api/integrations/plane/projects",
+        );
+        setProjects(r.projects);
+        if (r.projects.length > 0) setProjectId(r.projects[0].id);
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "Load failed.";
+        if (/isn't connected|not connected|not_configured/i.test(msg)) setNotConfigured(true);
+        else setError(msg);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  useEffect(() => {
+    if (!projectId) {
+      setIssues(null);
+      return;
+    }
+    (async () => {
+      setLoadingIssues(true);
+      try {
+        const r = await api<{ issues: PlaneIssueRow[]; openCount: number }>(
+          `/api/integrations/plane/issues?projectId=${encodeURIComponent(projectId)}`,
+        );
+        setIssues(r.issues);
+        setOpenCount(r.openCount);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Load failed.");
+      } finally {
+        setLoadingIssues(false);
+      }
+    })();
+  }, [projectId]);
+
+  if (loading) {
+    return (
+      <p className="flex items-center gap-2 py-8 text-[13px] text-stone-500">
+        <Loader2 size={14} className="animate-spin" /> Loading Plane tasks…
+      </p>
+    );
+  }
+
+  if (notConfigured) {
+    return (
+      <div className="rounded-md border border-stone-200 bg-stone-50 px-4 py-6 text-center">
+        <KanbanSquare className="mx-auto h-6 w-6 text-stone-300" />
+        <p className="mt-2 text-[13px] font-medium text-stone-700">Plane isn&apos;t connected</p>
+        <p className="mt-1 text-[13px] text-stone-500">
+          Set <span className="font-mono text-[12px]">PLANE_BASE_URL</span>,{" "}
+          <span className="font-mono text-[12px]">PLANE_API_KEY</span> and{" "}
+          <span className="font-mono text-[12px]">PLANE_WORKSPACE_SLUG</span> under{" "}
+          <Link href="/dashboard/settings/providers" className="text-violet-700 hover:underline">
+            Settings → Providers
+          </Link>{" "}
+          to sync project tasks into this mission.
+        </p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="mb-3 flex items-start gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-700">
+        <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+        <span>{error}</span>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <select
+          value={projectId}
+          onChange={(e) => setProjectId(e.target.value)}
+          className="rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-[13px] text-stone-700 focus:border-violet-400 focus:outline-none"
+        >
+          {(projects ?? []).map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.name}{p.identifier ? ` (${p.identifier})` : ""}
+            </option>
+          ))}
+        </select>
+        {issues && (
+          <span className="text-[12px] text-stone-500">
+            {openCount} open · {issues.length} total
+          </span>
+        )}
+        {loadingIssues && <Loader2 size={14} className="animate-spin text-stone-400" />}
+      </div>
+      {!issues || issues.length === 0 ? (
+        <p className="py-6 text-center text-[13px] text-stone-500">
+          {issues ? "No issues in this project." : "Pick a project to load its tasks."}
+        </p>
+      ) : (
+        <div className="overflow-x-auto rounded-md border border-stone-200">
+          <table className="w-full text-left text-[13px]">
+            <thead>
+              <tr className="border-b border-stone-200 bg-stone-50 text-[11px] uppercase tracking-wide text-stone-400">
+                <th className="px-3 py-2 font-semibold">Task</th>
+                <th className="px-3 py-2 font-semibold">State</th>
+                <th className="px-3 py-2 font-semibold">Priority</th>
+                <th className="px-3 py-2 font-semibold">Updated</th>
+              </tr>
+            </thead>
+            <tbody>
+              {issues.map((t) => (
+                <tr key={t.id} className="border-b border-stone-100 last:border-0 hover:bg-violet-50/40">
+                  <td className="px-3 py-2">
+                    {t.url ? (
+                      <a
+                        href={t.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1 font-medium text-stone-800 hover:text-violet-700"
+                      >
+                        {t.sequenceId !== null && (
+                          <span className="text-stone-400">#{t.sequenceId}</span>
+                        )}{" "}
+                        {t.name}
+                        <ExternalLink size={12} className="text-stone-300" />
+                      </a>
+                    ) : (
+                      <span className="font-medium text-stone-800">{t.name}</span>
+                    )}
+                  </td>
+                  <td className="px-3 py-2">
+                    <Chip tone={stateGroupTone(t.stateGroup)}>{t.state ?? "—"}</Chip>
+                  </td>
+                  <td className="px-3 py-2 text-stone-500">{t.priority ?? "—"}</td>
+                  <td className="px-3 py-2 text-stone-500">
+                    {t.updatedAt ? new Date(t.updatedAt).toLocaleDateString() : "—"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      <p className="mt-2 text-[11px] leading-snug text-stone-400">
+        Live from your Plane sidecar — tasks are managed in Plane; this tab is a
+        read-only window into the selected project.
+      </p>
+    </div>
+  );
+}
+
 // ── Detail shell ─────────────────────────────────────────────────────────────
 
 const TABS = [
   { id: "timeline", label: "Timeline", icon: History },
   { id: "approvals", label: "Approvals", icon: ShieldCheck },
   { id: "plan", label: "Plan", icon: ListChecks },
+  { id: "tasks", label: "Tasks", icon: KanbanSquare },
 ] as const;
 
 export function MissionDetail({ missionId }: { missionId: string }) {
@@ -365,6 +563,7 @@ export function MissionDetail({ missionId }: { missionId: string }) {
   const [busy, setBusy] = useState<"pause" | "resume" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notFound, setNotFound] = useState(false);
+  const [showAutomation, setShowAutomation] = useState(false);
 
   const load = useCallback(async () => {
     setError(null);
@@ -465,6 +664,14 @@ export function MissionDetail({ missionId }: { missionId: string }) {
           )}
         </div>
         <div className="flex gap-2">
+          <button
+            onClick={() => setShowAutomation(true)}
+            disabled={m.status === "complete" || m.status === "archived"}
+            className={btnGhost}
+            title="Trigger an Activepieces webhook flow and log it on this mission"
+          >
+            <Zap size={14} /> Automation
+          </button>
           {m.status === "paused" ? (
             <button onClick={() => void pauseResume("resume")} disabled={busy !== null} className={btnPrimary}>
               {busy === "resume" ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />} Resume
@@ -509,6 +716,240 @@ export function MissionDetail({ missionId }: { missionId: string }) {
       {tab === "timeline" && <TimelineTab events={data.events} />}
       {tab === "approvals" && <ApprovalsTab missionId={missionId} approvals={data.approvals} onDecided={load} />}
       {tab === "plan" && <PlanTab steps={steps} />}
+      {tab === "tasks" && <TasksTab />}
+
+      {showAutomation && (
+        <AutomationModal
+          missionId={missionId}
+          onClose={() => setShowAutomation(false)}
+          onTriggered={() => {
+            setShowAutomation(false);
+            void load();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+// ── Run-automation modal (Phase 12, Worker 3) ───────────────────────────────
+// Fires a published Activepieces webhook flow through the mission-scoped
+// route (so the trigger lands in the mission event log), then offers a
+// status poll. Honest about unconfigured engines and non-webhook flows.
+
+interface ApFlow {
+  id: string;
+  displayName: string;
+  status: string;
+  published: boolean;
+  triggerPiece: string | null;
+  triggerName: string | null;
+  triggerableViaWebhook: boolean;
+}
+
+interface ApRunStatus {
+  id: string;
+  flowId: string;
+  status: string;
+  terminal: boolean;
+  succeeded: boolean;
+  startTime: string | null;
+  finishTime: string | null;
+  failure: { stepName: string | null; errorMessage: string | null } | null;
+}
+
+function AutomationModal({
+  missionId,
+  onClose,
+  onTriggered,
+}: {
+  missionId: string;
+  onClose: () => void;
+  onTriggered: () => void;
+}) {
+  const [flows, setFlows] = useState<ApFlow[] | null>(null);
+  const [notConfigured, setNotConfigured] = useState<string | null>(null);
+  const [flowId, setFlowId] = useState("");
+  const [payloadText, setPayloadText] = useState("{}");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<{ runId: string | null; note: string } | null>(null);
+  const [runStatus, setRunStatus] = useState<ApRunStatus | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const r = await api<{ configured: boolean; flows: ApFlow[]; error?: string }>(
+          "/api/integrations/activepieces/flows?limit=100",
+        );
+        setFlows(r.flows);
+        const first = r.flows.find((f) => f.triggerableViaWebhook);
+        if (first) setFlowId(first.id);
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "Load failed.";
+        if (/not connected|503/i.test(msg)) setNotConfigured(msg);
+        else setError(msg);
+      }
+    })();
+  }, []);
+
+  async function trigger() {
+    if (!flowId) {
+      setError("Pick a flow first.");
+      return;
+    }
+    let payload: Record<string, unknown> = {};
+    try {
+      const parsed: unknown = JSON.parse(payloadText.trim() || "{}");
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("must be an object");
+      payload = parsed as Record<string, unknown>;
+    } catch (e) {
+      setError(`Payload must be a JSON object: ${e instanceof Error ? e.message : String(e)}`);
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    setRunStatus(null);
+    try {
+      const r = await api<{ ok: boolean; runId: string | null; note?: string }>(
+        `/api/missions/${missionId}/automations`,
+        { method: "POST", body: JSON.stringify({ flowId, payload }) },
+      );
+      setResult({ runId: r.runId ?? null, note: r.note ?? "Flow accepted." });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Trigger failed.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function pollStatus() {
+    if (!result?.runId) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const r = await api<{ run: ApRunStatus | null }>(
+        `/api/integrations/activepieces/runs/${encodeURIComponent(result.runId)}`,
+      );
+      setRunStatus(r.run);
+      if (r.run?.terminal) onTriggered();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Status check failed.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4" onClick={onClose}>
+      <div
+        className="w-full max-w-lg rounded-lg border border-stone-200 bg-white shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between border-b border-stone-200 px-4 py-3">
+          <h3 className="flex items-center gap-2 text-[14px] font-semibold text-stone-800">
+            <Zap size={15} className="text-violet-600" /> Run automation
+          </h3>
+          <button onClick={onClose} className="rounded p-1 text-stone-400 hover:bg-stone-100 hover:text-stone-700">
+            <X size={15} />
+          </button>
+        </div>
+
+        <div className="space-y-3 px-4 py-4">
+          {notConfigured && (
+            <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[13px] text-amber-800">
+              <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+              <span>
+                {notConfigured} Connect the engine under{" "}
+                <Link href="/dashboard/settings/providers" className="font-medium underline">
+                  Settings → Providers
+                </Link>
+                .
+              </span>
+            </div>
+          )}
+
+          {error && (
+            <div className="flex items-start gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-700">
+              <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+              <span>{error}</span>
+            </div>
+          )}
+
+          {flows === null && !notConfigured && (
+            <p className="flex items-center gap-2 text-[13px] text-stone-500">
+              <Loader2 size={14} className="animate-spin" /> Loading flows…
+            </p>
+          )}
+
+          {flows && (
+            <>
+              <label className="block">
+                <span className="mb-1 block text-[12px] font-medium text-stone-600">Flow</span>
+                <select
+                  value={flowId}
+                  onChange={(e) => setFlowId(e.target.value)}
+                  className="w-full rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-[13px] text-stone-800"
+                >
+                  <option value="">— pick a flow —</option>
+                  {flows.map((f) => (
+                    <option key={f.id} value={f.id} disabled={!f.triggerableViaWebhook}>
+                      {f.displayName} {!f.published ? "(unpublished)" : ""}{" "}
+                      {f.triggerableViaWebhook
+                        ? ""
+                        : `— ${f.triggerPiece ?? "non-webhook"} trigger can't be fired externally`}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="block">
+                <span className="mb-1 block text-[12px] font-medium text-stone-600">Payload (JSON object)</span>
+                <textarea
+                  value={payloadText}
+                  onChange={(e) => setPayloadText(e.target.value)}
+                  rows={5}
+                  spellCheck={false}
+                  className="w-full rounded-md border border-stone-200 bg-stone-50 px-2.5 py-1.5 font-mono text-[12px] text-stone-800"
+                />
+              </label>
+            </>
+          )}
+
+          {result && (
+            <div className="rounded-md border border-violet-200 bg-violet-50 px-3 py-2 text-[13px] text-violet-800">
+              <p className="font-medium">Flow accepted.</p>
+              {result.runId ? (
+                <p className="mt-1 text-violet-700">
+                  Run <span className="font-mono text-[12px]">{result.runId}</span>
+                  {runStatus && (
+                    <Chip tone={runStatus.terminal ? (runStatus.succeeded ? "green" : "red") : "amber"}>
+                      {runStatus.status}
+                    </Chip>
+                  )}
+                </p>
+              ) : (
+                <p className="mt-1 text-violet-700">{result.note}</p>
+              )}
+            </div>
+          )}
+        </div>
+
+        <div className="flex justify-end gap-2 border-t border-stone-200 px-4 py-3">
+          {result?.runId && (
+            <button onClick={() => void pollStatus()} disabled={busy} className={btnGhost}>
+              {busy ? <Loader2 size={14} className="animate-spin" /> : <History size={14} />} Check status
+            </button>
+          )}
+          {!result && (
+            <button onClick={() => void trigger()} disabled={busy || !flowId} className={btnPrimary}>
+              {busy ? <Loader2 size={14} className="animate-spin" /> : <Zap size={14} />} Trigger flow
+            </button>
+          )}
+          <button onClick={onClose} className={btnGhost}>
+            {result ? "Close" : "Cancel"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

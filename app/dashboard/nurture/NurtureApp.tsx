@@ -14,6 +14,7 @@ import {
   Plus,
   Pencil,
   Search,
+  Send,
   ShieldCheck,
   Users,
   X,
@@ -29,6 +30,7 @@ import type {
   OutboundMessageRow,
 } from "./types";
 import { SequenceBuilder } from "./SequenceBuilder";
+import { BroadcastsTab } from "./BroadcastsTab";
 import {
   APPROVAL_STATUS_TONE,
   CONSENT_STATUS_TONE,
@@ -45,7 +47,7 @@ import {
   inputCls,
 } from "./ui";
 
-type Tab = "sequences" | "enrollments" | "approvals" | "log" | "consent";
+type Tab = "sequences" | "broadcasts" | "enrollments" | "approvals" | "log" | "consent";
 
 async function api<T>(url: string, opts?: RequestInit): Promise<T> {
   const res = await fetch(url, { ...opts, headers: { "content-type": "application/json", ...(opts?.headers ?? {}) } });
@@ -160,6 +162,7 @@ export function NurtureApp() {
 
   const tabs: Array<{ id: Tab; label: string; Icon: typeof Users; badge?: number }> = [
     { id: "sequences", label: "Sequences", Icon: MessageSquarePlus },
+    { id: "broadcasts", label: "Broadcasts", Icon: Send },
     { id: "enrollments", label: "Enrollments", Icon: Users },
     { id: "approvals", label: "Approvals", Icon: ClipboardCheck, badge: pendingApprovals },
     { id: "log", label: "Message log", Icon: History },
@@ -210,6 +213,7 @@ export function NurtureApp() {
           onEnrolled={() => refreshSequences()}
         />
       ) : null}
+      {tab === "broadcasts" ? <BroadcastsTab /> : null}
       {tab === "enrollments" ? <EnrollmentsTab /> : null}
       {tab === "approvals" ? <ApprovalsTab /> : null}
       {tab === "log" ? <MessageLogTab /> : null}

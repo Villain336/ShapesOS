@@ -8,10 +8,11 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
 import type { ComponentType } from "react";
-import { Mail, Paintbrush, Megaphone, RefreshCw, Brain, Target, BookOpen, Inbox } from "lucide-react";
+import { Mail, Paintbrush, Megaphone, RefreshCw, Brain, Target, BookOpen, Inbox, Share2 } from "lucide-react";
 import {
   ChartBar,
   Bell,
+  ChartLine,
   ChartLineUp,
   Check,
   CaretDown,
@@ -62,12 +63,16 @@ const NAV_SECTIONS: {
       { href: "/dashboard/reviews", label: "Reviews", icon: Star },
       { href: "/dashboard/calls", label: "Calls", icon: Phone },
       { href: "/dashboard/reports", label: "Reports", icon: ChartBar },
+      // Phase 12 (embeds): Umami-backed analytics dashboard.
+      { href: "/dashboard/analytics", label: "Analytics", icon: ChartLine },
       { href: "/dashboard/files", label: "Files", icon: FolderSimple },
       { href: "/dashboard/alerts", label: "Alerts", icon: Bell },
       // Phase 4: Creative Studio (T2, central creative home) + Direct Mail
       // (R3/T1 mail engine — page lands with that track; nav is wired here).
       { href: "/dashboard/studio", label: "Studio", icon: Paintbrush },
       { href: "/dashboard/mail", label: "Direct Mail", icon: Mail },
+      // Phase 12: social publishing via the Postiz sidecar (raw REST).
+      { href: "/dashboard/social", label: "Social", icon: Share2 },
       // Phase 5 SAFETY: media buying command center (pools, approvals, kill switches).
       { href: "/dashboard/media", label: "Media", icon: Megaphone },
       // Phase 6: authority & relevance command center (outreach, PR, listings,

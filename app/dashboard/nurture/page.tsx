@@ -20,7 +20,7 @@ export default async function NurturePage() {
         <h1 className="text-xl font-bold tracking-tight text-stone-900">Nurture Sequences</h1>
         <p className="mt-0.5 text-[13px] text-stone-500">
           Approval-gated drip sequences across SMS, email, voice, and direct mail. Every send requires a human approval —
-          nothing auto-sends.
+          nothing auto-sends. The Broadcasts tab runs newsletter campaigns through the Listmonk email sidecar.
         </p>
       </div>
       <NurtureApp />

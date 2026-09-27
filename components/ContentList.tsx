@@ -6,6 +6,8 @@
 
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+// Phase 12 (embeds): `content.brief-v2` flag wires the v2 brief treatment.
+import { useFlag } from "@/components/experiments/GrowthBookProvider";
 
 export type ContentListItem = {
   id: string;
@@ -56,6 +58,8 @@ export default function ContentList({
   const [keywordId, setKeywordId] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Phase 12 (embeds): `content.brief-v2` flag — the v2 brief form treatment.
+  const briefV2 = useFlag("content.brief-v2");
 
   async function onCreateBrief(e: FormEvent) {
     e.preventDefault();
@@ -83,10 +87,12 @@ export default function ContentList({
 
   return (
     <div className="flex flex-col gap-8">
-      {/* Create brief */}
+      {/* Create brief — v2 treatment when the `content.brief-v2` flag is on. */}
       <form
         onSubmit={onCreateBrief}
-        className="flex flex-col gap-3 rounded-xl border border-zinc-200 bg-white/60 p-5 sm:flex-row sm:items-end"
+        className={`flex flex-col gap-3 rounded-xl border p-5 sm:flex-row sm:items-end ${
+          briefV2 ? "border-violet-200 bg-violet-50/40" : "border-zinc-200 bg-white/60"
+        }`}
       >
         <div className="flex-1">
           <label
@@ -94,6 +100,11 @@ export default function ContentList({
             className="mb-1 block text-xs font-medium uppercase tracking-widest text-zinc-500"
           >
             Saved keyword
+            {briefV2 && (
+              <span className="ml-1.5 rounded-full bg-violet-600 px-1.5 py-0.5 text-[10px] font-bold normal-case tracking-normal text-white">
+                v2
+              </span>
+            )}
           </label>
           <select
             id="keyword"

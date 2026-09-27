@@ -1,0 +1,91 @@
+# Marketr — Postiz social-publishing sidecar (Phase 12).
+#
+# SIDECAR CONTRACT (read this before touching):
+#   - Postiz is AGPL-3.0. It runs as a separate container/process and is
+#     ONLY ever talked to over HTTP (raw fetch against its public REST
+#     API at <host>/public/v1). Never `npm i` or import the AGPL
+#     `@postiz/node` SDK — that would link AGPL code into Marketr's
+#     process. Raw fetch only. (See integration-survey.md §Tier 1 #3.)
+#   - Postiz needs its own Postgres database (Postgres + Redis are its
+#     official requirements). Reusing the Marketr PG cluster on 5433 is
+#     possible ONLY with a dedicated database; the default below uses a
+#     dedicated postgres container so the sidecar works with zero changes.
+#   - SCHEDULING GOTCHA (verified 2026-09-27): Postiz v2.12+ requires
+#     Temporal for scheduled posts — older docs that skip it leave
+#     scheduling broken. Point TEMPORAL_* vars at a Temporal server or
+#     add the temporal service profile before expecting `type: "schedule"`
+#     to publish on time.
+#   - Optional: enable with `--profile postiz`. Never required for core
+#     Marketr boot.
+#
+# Up:   docker compose -f docker/integrations/postiz.yml --profile postiz up -d
+# Down: docker compose -f docker/integrations/postiz.yml --profile postiz down
+#
+# Postiz app: official `ghcr.io/gitroomhq/postiz-app:latest` from the
+# project maintainers. Default UI: http://localhost:5000
+# API base for Marketr: POSTIZ_URL=http://localhost:5000 (the Marketr
+# Postiz client appends /public/v1 itself).
+
+name: marketr-postiz
+
+services:
+  postiz-postgres:
+    image: postgres:16-alpine
+    container_name: marketr-postiz-postgres
+    profiles: ["postiz"]
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTIZ_DB_USER:-postiz}
+      POSTGRES_PASSWORD: ${POSTIZ_DB_PASSWORD:-postiz}
+      POSTGRES_DB: ${POSTIZ_DB_NAME:-postiz}
+    volumes:
+      - postiz-pgdata:/var/lib/postgresql/data
+    # No published ports by default: only the postiz container talks to it.
+    # To inspect the DB directly, uncomment:
+    # ports: ["5435:5432"]
+
+  postiz-redis:
+    image: redis:7-alpine
+    container_name: marketr-postiz-redis
+    profiles: ["postiz"]
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - postiz-redisdata:/data
+
+  postiz:
+    image: ghcr.io/gitroomhq/postiz-app:latest
+    container_name: marketr-postiz
+    profiles: ["postiz"]
+    restart: unless-stopped
+    depends_on:
+      postiz-postgres:
+        condition: service_started
+      postiz-redis:
+        condition: service_started
+    environment:
+      MAIN_URL: ${POSTIZ_MAIN_URL:-http://localhost:5000}
+      FRONTEND_URL: ${POSTIZ_FRONTEND_URL:-http://localhost:5000}
+      NEXT_PUBLIC_BACKEND_URL: ${POSTIZ_BACKEND_URL:-http://localhost:5000/api}
+      # JWT signing secret for the self-hosted instance.
+      JWT_SECRET: ${POSTIZ_JWT_SECRET:-change-me-to-a-long-random-string}
+      DATABASE_URL: postgresql://${POSTIZ_DB_USER:-postiz}:${POSTIZ_DB_PASSWORD:-postiz}@postiz-postgres:5432/${POSTIZ_DB_NAME:-postiz}?schema=public
+      REDIS_URL: redis://postiz-redis:6379
+      # Scheduling requires Temporal (Postiz v2.12+). Defaults assume a
+      # locally running Temporal on its standard port; override via .env.
+      TEMPORAL_ADDRESS: ${TEMPORAL_ADDRESS:-localhost:7233}
+      TEMPORAL_NAMESPACE: ${TEMPORAL_NAMESPACE:-default}
+    ports:
+      - "${POSTIZ_PORT:-5000}:5000"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:5000/api/public/v1/is-connected"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    # NOTE: the healthcheck probe hits the public API; /is-connected
+    # requires an API key to report true, but the endpoint itself responds
+    # 200/401 either way once the app is booted.
+
+volumes:
+  postiz-pgdata:
+  postiz-redisdata:

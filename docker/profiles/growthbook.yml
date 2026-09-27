@@ -1,0 +1,49 @@
+# Marketr — Phase 12 "embeds": GrowthBook sidecar (open core, MIT bulk).
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker/profiles/growthbook.yml \
+#     --profile growthbook up -d
+#
+# Then in the GrowthBook UI (http://localhost:3003): create an SDK
+# connection (gives GROWTHBOOK_CLIENT_KEY) and an Admin API key
+# (GROWTHBOOK_API_KEY), and set on the Marketr host:
+#   GROWTHBOOK_API_HOST=http://growthbook:3000
+#   GROWTHBOOK_API_KEY=<admin api key>   (server-side; never leaves the server)
+#   GROWTHBOOK_CLIENT_KEY=<sdk key>      (public — sent to the browser)
+#
+# GrowthBook was picked over Unleash (see docs/phase12/integration-survey.md
+# §1: Unleash went AGPLv3 in 2026, which taxes the white-label pattern; the
+# MIT-bulk open core stays clean). Single container + MongoDB, no fleet.
+
+services:
+  growthbook-mongo:
+    image: mongo:6
+    profiles: ["growthbook"]
+    restart: unless-stopped
+    volumes:
+      - growthbook-mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  growthbook:
+    image: growthbook/growthbook:latest
+    profiles: ["growthbook"]
+    restart: unless-stopped
+    depends_on:
+      growthbook-mongo:
+        condition: service_healthy
+    ports:
+      - "${GROWTHBOOK_PORT:-3003}:3000"
+    environment:
+      MONGODB_URI: mongodb://growthbook-mongo:27017/growthbook
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  growthbook-mongo-data:

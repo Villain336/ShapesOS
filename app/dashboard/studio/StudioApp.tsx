@@ -12,10 +12,13 @@ import {
   CheckCircle2,
   Copy,
   Download,
+  FileText,
   FileUp,
   FolderOpen,
   Link2,
   Loader2,
+  Mail,
+  Monitor,
   Palette,
   PenTool,
   Plug,
@@ -25,6 +28,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
+import { GRAPES_TEMPLATES, type GrapesTemplateKind } from "@/lib/grapes/templates";
 import {
   api,
   hashShort,
@@ -883,11 +887,283 @@ function DesignsTab() {
   );
 }
 
+// ── Pages tab (Phase 12 "Pages" — GrapesJS) ──────────────────────────────────
+// Responsive landing pages and email templates. Complementary to the Canvas
+// (Designs) tab: Canvas makes PNG/SVG assets; Pages make HTML documents.
+
+interface PageSummary {
+  id: string;
+  name: string;
+  kind: string;
+  templateKey: string | null;
+  templateName: string | null;
+  updatedAt: string;
+}
+
+function NewPageModal({ onClose }: { onClose: () => void }) {
+  const [name, setName] = useState("");
+  const [kind, setKind] = useState<GrapesTemplateKind>("landing");
+  const [templateKey, setTemplateKey] = useState<string | null>("hero-saas");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const templates = useMemo(
+    () => GRAPES_TEMPLATES.filter((t) => t.kind === kind),
+    [kind],
+  );
+
+  useEffect(() => {
+    setTemplateKey(templates[0]?.key ?? null);
+  }, [templates]);
+
+  const create = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const r = await api<{ page: { id: string } }>("/api/studio/pages", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          name: name.trim() || "Untitled page",
+          kind,
+          ...(templateKey ? { templateKey } : {}),
+        }),
+      });
+      window.location.href = `/dashboard/studio/pages/${r.page.id}`;
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Create failed.");
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/40 p-4">
+      <div className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-xl bg-white shadow-xl">
+        <div className="flex items-center justify-between border-b border-stone-100 px-5 py-3.5">
+          <h2 className="text-[15px] font-semibold text-stone-900">New page</h2>
+          <button onClick={onClose} className="rounded-md p-1.5 text-stone-400 hover:bg-stone-100 hover:text-stone-600" aria-label="Close">
+            <X size={16} />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-5 py-4">
+          {error && (
+            <div className="mb-4 flex items-start gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-700">
+              <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+              <span>{error}</span>
+            </div>
+          )}
+
+          <label className="mb-1 block text-[12px] font-medium text-stone-600">Name</label>
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Untitled page"
+            className={`${inputCls} mb-4 w-full`}
+            maxLength={120}
+          />
+
+          <div className="mb-2 text-[12px] font-medium text-stone-600">Page type</div>
+          <div className="mb-4 flex gap-1 border-b border-stone-200">
+            {(
+              [
+                { id: "landing", label: "Landing page", icon: Monitor },
+                { id: "email", label: "Email template", icon: Mail },
+              ] as const
+            ).map(({ id, label, icon: Icon }) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setKind(id)}
+                className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-[13.5px] font-medium transition ${
+                  kind === id
+                    ? "border-violet-600 text-violet-700"
+                    : "border-transparent text-stone-500 hover:text-stone-800"
+                }`}
+              >
+                <Icon size={15} />
+                {label}
+              </button>
+            ))}
+          </div>
+
+          <div className="mb-2 text-[12px] font-medium text-stone-600">Start from</div>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            <button
+              type="button"
+              onClick={() => setTemplateKey(null)}
+              className={`rounded-lg border p-3 text-left transition ${
+                templateKey === null
+                  ? "border-violet-600 bg-violet-50/40"
+                  : "border-stone-200 hover:border-stone-300"
+              }`}
+            >
+              <div className="text-[13px] font-medium text-stone-900">Blank page</div>
+              <div className="mt-0.5 text-[11px] text-stone-500">Empty canvas</div>
+            </button>
+            {templates.map((t) => (
+              <button
+                key={t.key}
+                type="button"
+                onClick={() => setTemplateKey(t.key)}
+                className={`rounded-lg border p-3 text-left transition ${
+                  templateKey === t.key
+                    ? "border-violet-600 bg-violet-50/40"
+                    : "border-stone-200 hover:border-stone-300"
+                }`}
+              >
+                <div className="truncate text-[13px] font-medium text-stone-900">{t.name}</div>
+                <div className="mt-0.5 line-clamp-2 text-[11px] text-stone-500">{t.description}</div>
+                <div className="mt-1"><Chip tone="violet">{t.category}</Chip></div>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex items-center justify-end gap-2 border-t border-stone-100 px-5 py-3.5">
+          <button onClick={onClose} className={btnGhost} disabled={busy}>Cancel</button>
+          <button onClick={create} className={btnPrimary} disabled={busy}>
+            {busy ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+            Create page
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PagesTab() {
+  const [pages, setPages] = useState<PageSummary[]>([]);
+  const [fKind, setFKind] = useState("");
+  const [q, setQ] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [modalOpen, setModalOpen] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const r = await api<{ pages: PageSummary[] }>("/api/studio/pages");
+      setPages(r.pages);
+    } catch {
+      // keep previous list on transient failure
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const filtered = useMemo(() => {
+    const needle = q.trim().toLowerCase();
+    return pages.filter(
+      (p) =>
+        (!fKind || p.kind === fKind) &&
+        (!needle ||
+          p.name.toLowerCase().includes(needle) ||
+          (p.templateName ?? "").toLowerCase().includes(needle)),
+    );
+  }, [pages, fKind, q]);
+
+  const remove = async (p: PageSummary, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!window.confirm(`Delete “${p.name}”? This cannot be undone.`)) return;
+    try {
+      await api(`/api/studio/pages/${p.id}`, { method: "DELETE" });
+      load();
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : "Delete failed.");
+    }
+  };
+
+  return (
+    <div>
+      <div className="mb-3 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2.5 text-[12.5px] text-stone-600">
+        <span className="font-medium text-stone-800">Canvas vs Pages. </span>
+        Designs (Canvas) produce PNG/SVG assets; Pages produce responsive HTML —
+        landing pages and email templates. Build the hero in Canvas, drop the asset into a Page.
+      </div>
+
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <select value={fKind} onChange={(e) => setFKind(e.target.value)} className={inputCls}>
+          <option value="">All types</option>
+          <option value="landing">Landing pages</option>
+          <option value="email">Email templates</option>
+        </select>
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search pages…" className={`${inputCls} w-44`} />
+        <div className="ml-auto">
+          <button onClick={() => setModalOpen(true)} className={btnPrimary}>
+            <Plus size={14} /> New page
+          </button>
+        </div>
+      </div>
+
+      <div className="overflow-hidden rounded-lg border border-stone-200 bg-white">
+        <table className="w-full text-left text-[13px]">
+          <thead>
+            <tr className="border-b border-stone-100 bg-stone-50/60 text-[11px] uppercase tracking-wide text-stone-500">
+              <th className="px-3 py-2 font-medium">Name</th>
+              <th className="px-3 py-2 font-medium">Type</th>
+              <th className="px-3 py-2 font-medium">Template</th>
+              <th className="px-3 py-2 font-medium">Updated</th>
+              <th className="px-3 py-2 font-medium"><span className="sr-only">Actions</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map((p) => (
+              <tr
+                key={p.id}
+                onClick={() => {
+                  window.location.href = `/dashboard/studio/pages/${p.id}`;
+                }}
+                className="cursor-pointer border-b border-stone-100 last:border-0 hover:bg-violet-50/40"
+              >
+                <td className="px-3 py-2 font-medium text-stone-900">{p.name}</td>
+                <td className="px-3 py-2">
+                  <Chip tone={p.kind === "email" ? "amber" : "blue"}>
+                    {p.kind === "email" ? "Email" : "Landing page"}
+                  </Chip>
+                </td>
+                <td className="px-3 py-2">
+                  <Chip tone={p.templateName ? "violet" : "slate"}>{p.templateName ?? "Blank"}</Chip>
+                </td>
+                <td className="px-3 py-2 text-stone-500">
+                  {new Date(p.updatedAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
+                </td>
+                <td className="px-3 py-2 text-right">
+                  <button
+                    onClick={(e) => remove(p, e)}
+                    className="rounded-md p-1.5 text-stone-400 hover:bg-red-50 hover:text-red-600"
+                    aria-label={`Delete ${p.name}`}
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </td>
+              </tr>
+            ))}
+            {filtered.length === 0 && !loading && (
+              <tr>
+                <td colSpan={5} className="px-3 py-8 text-center text-[13px] text-stone-400">
+                  {q || fKind ? "No pages match your filters." : "No pages yet — create the first one with “New page”."}
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {modalOpen && <NewPageModal onClose={() => setModalOpen(false)} />}
+    </div>
+  );
+}
+
 // ── Studio app shell ─────────────────────────────────────────────────────────
 
 const TABS = [
   { id: "creatives", label: "Creatives", icon: Palette },
   { id: "designs", label: "Designs", icon: PenTool },
+  { id: "pages", label: "Pages", icon: FileText },
   { id: "assets", label: "Assets", icon: FolderOpen },
   { id: "qr", label: "QR codes", icon: QrCode },
   { id: "canva", label: "Canva connection", icon: Plug },
@@ -915,6 +1191,7 @@ export function StudioApp() {
       </div>
       {tab === "creatives" && <CreativesTab />}
       {tab === "designs" && <DesignsTab />}
+      {tab === "pages" && <PagesTab />}
       {tab === "assets" && <AssetsTab />}
       {tab === "qr" && <QrDesignerTab />}
       {tab === "canva" && <CanvaTab />}

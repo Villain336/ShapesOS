@@ -49,6 +49,9 @@ export default async function ContentDetailPage({
           bodyMarkdown: contentItem.bodyMarkdown,
           seoScore: contentItem.seoScore,
           outlineJson: contentItem.outlineJson as ContentBrief | null,
+          ghostPostId: contentItem.ghostPostId,
+          ghostStatus: contentItem.ghostStatus,
+          ghostUrl: contentItem.ghostUrl,
         }}
       />
     </div>

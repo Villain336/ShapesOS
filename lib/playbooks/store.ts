@@ -34,6 +34,14 @@ import type { Prisma } from "@prisma/client";
 // PLAYBOOK_GENERATOR_SYSTEM_PROMPT as its system prompt, with M9
 // retrieval grounding placed after it (see groundedPrompt()).
 import { constitutionSystemPrompt } from "@/lib/expert/constitution";
+// Phase 12: Agency-Agents persona seeds (MIT, original distillations) as
+// selectable strategist personas for playbook generation.
+import {
+  assertPersonaForSurface,
+  PERSONAS,
+  personaSystemPrompt,
+  type PersonaId,
+} from "@/lib/expert/personas";
 
 /**
  * The playbook generator's system-prompt layer (Expert Constitution Pack
@@ -43,6 +51,29 @@ import { constitutionSystemPrompt } from "@/lib/expert/constitution";
  */
 export const PLAYBOOK_GENERATOR_SYSTEM_PROMPT =
   constitutionSystemPrompt("playbook-generator");
+
+/**
+ * Phase 12: selectable strategist personas for playbook generation
+ * (Agency-Agents seeds, MIT, original distillations). When a persona is
+ * selected, its seed is appended behind the base playbook-generator
+ * constitution — same layering contract: hard rules first, persona lens
+ * second, retrieval grounding and task after. Omitting the persona keeps
+ * the base v1 prompt unchanged.
+ */
+export const PLAYBOOK_STRATEGIST_PERSONAS: readonly PersonaId[] = [
+  "multi-agent-systems-architect",
+  "workflow-architect",
+] as const;
+
+export function playbookGeneratorPrompt(persona?: PersonaId): string {
+  if (persona === undefined) return PLAYBOOK_GENERATOR_SYSTEM_PROMPT;
+  assertPersonaForSurface(persona, "playbooks");
+  return [
+    PLAYBOOK_GENERATOR_SYSTEM_PROMPT,
+    personaSystemPrompt(persona),
+    `<!-- persona provenance: ${PERSONAS[persona].provenance.repo} (${PERSONAS[persona].provenance.license}), ${PERSONAS[persona].provenance.sourceFile} -->`,
+  ].join("\n\n");
+}
 import { withWorkspaceScope } from "@/lib/substrate/graph/rls";
 import { canonicalize, sha256Hex } from "@/lib/authority/approvals";
 import { anonymizeForPlaybook } from "@/lib/substrate/memory/anonymize";
@@ -67,6 +98,19 @@ export interface PlaybookStep {
   detail?: string;
   /** Executor that would perform the step (researcher|planner|drafter|analyst|scheduler). */
   executor?: string;
+  // Phase 12, Worker 3: automation steps. Playbook versions are immutable JSON
+  // snapshots, so this additive shape needs no Prisma migration.
+  /** Step kind: "task" (default) runs like every step before; "automation" fires an Activepieces webhook flow. */
+  stepType?: "task" | "automation";
+  /** Automation configuration (present when stepType === "automation"). */
+  automation?: {
+    /** Activepieces flow id to trigger. */
+    flowId?: string;
+    /** Optional display name for the flow (cosmetic; flowId is authoritative). */
+    flowName?: string;
+    /** Optional default payload template merged into the trigger payload. */
+    payloadTemplate?: Record<string, unknown>;
+  };
 }
 
 export interface PlaybookContent {

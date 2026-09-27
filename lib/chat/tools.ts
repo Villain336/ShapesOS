@@ -857,6 +857,100 @@ const design_qr_code: ToolDef = {
   },
 };
 
+// ---------------------------------------------------------------------------
+// ACTIVEPIECES AUTOMATION (Phase 12, Worker 3 — the automation backbone)
+// ---------------------------------------------------------------------------
+
+const trigger_automation_flow: ToolDef = {
+  name: "trigger_automation_flow",
+  description:
+    "Trigger a published Activepieces webhook flow on the workspace's automation engine with a JSON payload. Free (BYO self-hosted engine). Only flows with a published “Catch Webhook” trigger can fire — use automation_flow_status afterwards to poll the run.",
+  kind: "spend",
+  minRole: "editor",
+  argsSchema: {
+    type: "object",
+    properties: {
+      flowId: { type: "string", description: "Activepieces flow id to trigger." },
+      payload: { type: "string", description: "JSON object payload for the flow (optional, default {})." },
+    },
+    required: ["flowId"],
+  },
+  async execute(ctx, args) {
+    const flowId = str(args.flowId);
+    if (!flowId) throw new Error("flowId is required");
+    if (!hasRole(ctx, "editor")) throw new Error("editor role required");
+    const { isActivepiecesConfigured, triggerFlow } = await import("@/lib/integrations/activepieces");
+    if (!isActivepiecesConfigured()) {
+      throw new Error(
+        "Activepieces is not connected: set ACTIVEPIECES_URL and ACTIVEPIECES_API_KEY on the host (Settings → Providers). No flow was triggered.",
+      );
+    }
+    let payload: Record<string, unknown> = {};
+    if (args.payload !== undefined) {
+      try {
+        const parsed: unknown = JSON.parse(String(args.payload));
+        if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+          throw new Error("payload must be a JSON object");
+        }
+        payload = parsed as Record<string, unknown>;
+      } catch (e) {
+        throw new Error(`payload must be valid JSON: ${e instanceof Error ? e.message : String(e)}`);
+      }
+    }
+    const result = await triggerFlow(flowId, payload);
+    // Ledger the trigger (0-credit visibility event, brandfetch precedent).
+    await meter({
+      workspaceId: ctx.workspaceId,
+      action: "automation_flow_trigger",
+      idempotencyKey: `apflow:${ctx.workspaceId}:${flowId}:${hourBucket()}:${seedHash(JSON.stringify(payload))}`,
+      evidenceRef: `chat-automation:${flowId}`,
+    }).catch(() => {});
+    const runLine = result.runId
+      ? `run ${result.runId}`
+      : "accepted (the engine returned no run id — poll automation_flow_status with the flowId)";
+    return {
+      summary: `Flow "${flowId}" triggered — ${runLine}.`,
+      details: { accepted: result.accepted, flowId: result.flowId, runId: result.runId },
+    };
+  },
+};
+
+const automation_flow_status: ToolDef = {
+  name: "automation_flow_status",
+  description:
+    "Read the status of an Activepieces flow run: terminal state (SUCCEEDED/FAILED/…), timing, and failure detail. Pass runId for a specific run or flowId for the newest run of a flow. Read-only.",
+  kind: "safe",
+  minRole: "viewer",
+  argsSchema: {
+    type: "object",
+    properties: {
+      runId: { type: "string", description: "Flow run id to poll (optional)." },
+      flowId: { type: "string", description: "Flow id — reads the newest run (optional)." },
+    },
+  },
+  async execute(ctx, args) {
+    void ctx;
+    const runId = str(args.runId);
+    const flowId = str(args.flowId);
+    if (!runId && !flowId) throw new Error("runId or flowId is required");
+    const { isActivepiecesConfigured, getFlowRun, latestFlowRun } = await import("@/lib/integrations/activepieces");
+    if (!isActivepiecesConfigured()) {
+      throw new Error(
+        "Activepieces is not connected: set ACTIVEPIECES_URL and ACTIVEPIECES_API_KEY on the host (Settings → Providers).",
+      );
+    }
+    const run = runId ? await getFlowRun(runId) : await latestFlowRun(flowId as string);
+    if (!run) {
+      return { summary: `No runs recorded for flow "${flowId}" yet.`, details: { run: null } };
+    }
+    const state = run.terminal ? (run.succeeded ? "SUCCEEDED" : run.status) : `${run.status} (still running)`;
+    return {
+      summary: `Run ${run.id}: ${state}${run.failure?.errorMessage ? ` — ${run.failure.errorMessage}` : ""}`,
+      details: { run },
+    };
+  },
+};
+
 export const TOOLS: ToolDef[] = [
   get_keywords,
   get_rankings,
@@ -873,6 +967,8 @@ export const TOOLS: ToolDef[] = [
   run_workflow,
   approve_autopilot_item,
   design_qr_code,
+  trigger_automation_flow,
+  automation_flow_status,
 ];
 
 export function getTool(name: string): ToolDef | undefined {

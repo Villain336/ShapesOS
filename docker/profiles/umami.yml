@@ -1,0 +1,55 @@
+# Marketr — Phase 12 "embeds": Umami analytics sidecar (MIT, cookieless).
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker/profiles/umami.yml \
+#     --profile umami up -d
+#
+# Then create a website in the Umami UI (http://localhost:3002) and set on
+# the Marketr host:
+#   UMAMI_URL=http://umami:3000          (server-side stats API)
+#   UMAMI_API_KEY=<umami api key>        (server-side; never leaves the server)
+#   UMAMI_WEBSITE_ID=<website id>        (browser snippet — public)
+#   UMAMI_SCRIPT_URL=http://<host>:3002/script.js  (browser snippet — public)
+#
+# Umami is the one analytics pick (see docs/phase12/integration-survey.md
+# §2b): MIT with no enterprise partition, Next.js + Postgres (same stack
+# family), ~100MB idle, cookieless (no consent-banner friction).
+
+services:
+  umami-db:
+    image: postgres:16-alpine
+    profiles: ["umami"]
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${UMAMI_POSTGRES_DB:-umami}
+      POSTGRES_USER: ${UMAMI_POSTGRES_USER:-umami}
+      POSTGRES_PASSWORD: ${UMAMI_POSTGRES_PASSWORD:-umami-sidecar-secret}
+    volumes:
+      - umami-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${UMAMI_POSTGRES_USER:-umami}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  umami:
+    image: ghcr.io/umami-software/umami:postgresql-latest
+    profiles: ["umami"]
+    restart: unless-stopped
+    depends_on:
+      umami-db:
+        condition: service_healthy
+    ports:
+      - "${UMAMI_PORT:-3002}:3000"
+    environment:
+      DATABASE_URL: postgresql://${UMAMI_POSTGRES_USER:-umami}:${UMAMI_POSTGRES_PASSWORD:-umami-sidecar-secret}@umami-db:5432/${UMAMI_POSTGRES_DB:-umami}
+      DATABASE_TYPE: postgresql
+      APP_SECRET: ${UMAMI_APP_SECRET:-change-me-to-a-random-secret}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/heartbeat || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  umami-db-data:

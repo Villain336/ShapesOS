@@ -366,8 +366,8 @@ enum LinkProposalStatus {
 // Stage statuses are derived on attach/detach (refs added/removed); humans
 // drive status transitions via the UI.
 model GrowthCampaign {
-  id          String @id @default(cuid()) @map("id")
-  workspaceId String @map("workspace_id")
+  id          String    @id @default(cuid()) @map("id")
+  workspaceId String    @map("workspace_id")
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   name      String                  @map("name")
@@ -384,15 +384,15 @@ model GrowthCampaign {
 
   // HubSpot-style hierarchy, ≤3 levels, enforced in code with cycle
   // detection (lib/substrate/campaigns).
-  parentCampaignId String?         @map("parent_campaign_id")
-  parentCampaign   GrowthCampaign? @relation("CampaignHierarchy", fields: [parentCampaignId], references: [id], onDelete: SetNull)
+  parentCampaignId String?          @map("parent_campaign_id")
+  parentCampaign   GrowthCampaign?  @relation("CampaignHierarchy", fields: [parentCampaignId], references: [id], onDelete: SetNull)
   children         GrowthCampaign[] @relation("CampaignHierarchy")
 
   createdBy String?  @map("created_by")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  links CampaignLink[]
+  links         CampaignLink[]
   // G2 stub completeness: opposite of CampaignLinkProposal.campaign
   // (added by G1 track so the schema validates; G2 owns the semantics).
   linkProposals CampaignLinkProposal[]
@@ -405,8 +405,8 @@ model GrowthCampaign {
 // First-class link rows with provenance — never a JSON array — so unlinking
 // is surgical and auditable.
 model CampaignLink {
-  id         String @id @default(cuid()) @map("id")
-  campaignId String @map("campaign_id")
+  id         String         @id @default(cuid()) @map("id")
+  campaignId String         @map("campaign_id")
   campaign   GrowthCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
 
   linkedType CampaignLinkedType @map("linked_type")
@@ -432,8 +432,8 @@ model CampaignLink {
 // Human review queue for the backfill proposer. Precision over recall:
 // proposals never auto-materialize into links.
 model CampaignLinkProposal {
-  id          String @id @default(cuid()) @map("id")
-  workspaceId String @map("workspace_id")
+  id          String    @id @default(cuid()) @map("id")
+  workspaceId String    @map("workspace_id")
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   campaignId String?         @map("campaign_id")
@@ -444,7 +444,7 @@ model CampaignLinkProposal {
 
   // [{ signal: name_similarity|utm_campaign|date_proximity|shared_audience|shared_creative,
   //    detail, score }]
-  matchSignals Json @default("[]") @map("match_signals")
+  matchSignals Json  @default("[]") @map("match_signals")
   confidence   Float @default(0) @map("confidence")
 
   status    LinkProposalStatus @default(pending) @map("status")
@@ -496,209 +496,218 @@ model Workspace {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  projects               Project[]
-  clients                Client[]
-  apiUsage               ApiUsage[]
+  projects                Project[]
+  clients                 Client[]
+  apiUsage                ApiUsage[]
   // Phase 8 G2: campaign object back-relations.
-  growthCampaigns        GrowthCampaign[]
-  campaignLinkProposals  CampaignLinkProposal[]
+  growthCampaigns         GrowthCampaign[]
+  campaignLinkProposals   CampaignLinkProposal[]
   // Phase 1 (R1): Lead Pipeline CRM back-relations.
-  pipelines              Pipeline[]
-  leads                  Lead[]
-  leadActivities         LeadActivity[]
+  pipelines               Pipeline[]
+  leads                   Lead[]
+  leadActivities          LeadActivity[]
   // Phase 7 (F4/F6): flywheel back-relations for fragment models with
   // explicit Workspace relations (CTV track + launch checklist).
-  ctvCampaigns           CtvCampaign[]
-  ctvCreativeValidations CtvCreativeValidation[]
-  ctvSpots               CtvSpot[]
+  ctvCampaigns            CtvCampaign[]
+  ctvCreativeValidations  CtvCreativeValidation[]
+  ctvSpots                CtvSpot[]
   // Phase 8 (G1): business-graph substrate back-relations.
-  graphFacts     GraphFact[]
-  graphNodes     GraphNode[]
-  graphEdges     GraphEdge[]
-  graphErQueue   GraphErQueue[]
-  graphConnectors GraphConnector[]
-  graphSyncJobs  GraphSyncJob[]
+  graphFacts              GraphFact[]
+  graphNodes              GraphNode[]
+  graphEdges              GraphEdge[]
+  graphErQueue            GraphErQueue[]
+  graphConnectors         GraphConnector[]
+  graphSyncJobs           GraphSyncJob[]
   // Phase 8 (G3): growth-memory substrate back-relations.
-  memoryEpisodes         MemoryEpisode[]
-  memoryFacts            MemoryFact[]
-  memoryLearnings        MemoryLearning[]
+  memoryEpisodes          MemoryEpisode[]
+  memoryFacts             MemoryFact[]
+  memoryLearnings         MemoryLearning[]
   memoryConsolidationRuns MemoryConsolidationRun[]
   // Phase 10 (intelligence depth): owned data assets back-relations.
-  dataSources         DataSource[]
-  serpVendorConfigs   SerpVendorConfig[]
-  apiMeterEntries   ApiMeterEntry[]
-  gscSnapshots        GscSnapshot[]
-  platformEvents      PlatformEvent[]
-  pageImpacts         PageImpact[]
-  geoPromptPanels     GeoPromptPanel[]
-  geoObservations     GeoObservation[]
-  competitorWatches   CompetitorWatch[]
-  competitorChanges   CompetitorChange[]
-  difficultyEstimates DifficultyEstimate[]
-  linkVerifications   LinkVerification[]
-  ctvIos                 CtvIo[]
-  ctvPixels              CtvPixel[]
-  launchChecklists       LaunchChecklist[]
-  leadCaptureForms       LeadCaptureForm[]
+  dataSources             DataSource[]
+  serpVendorConfigs       SerpVendorConfig[]
+  apiMeterEntries         ApiMeterEntry[]
+  gscSnapshots            GscSnapshot[]
+  platformEvents          PlatformEvent[]
+  pageImpacts             PageImpact[]
+  geoPromptPanels         GeoPromptPanel[]
+  geoObservations         GeoObservation[]
+  competitorWatches       CompetitorWatch[]
+  competitorChanges       CompetitorChange[]
+  difficultyEstimates     DifficultyEstimate[]
+  linkVerifications       LinkVerification[]
+  ctvIos                  CtvIo[]
+  ctvPixels               CtvPixel[]
+  launchChecklists        LaunchChecklist[]
+  leadCaptureForms        LeadCaptureForm[]
   // Phase 2 (C2): revenue attribution back-relations.
-  attributionTouches     AttributionTouch[]
-  attributionSpend       AttributionSpend[]
+  attributionTouches      AttributionTouch[]
+  attributionSpend        AttributionSpend[]
   // Phase 2 (R5): call tracking & booking back-relations.
-  callNumbers            CallNumber[]
-  calls                  Call[]
-  bookingPages           BookingPage[]
-  bookings               Booking[]
-  reminders              Reminder[]
+  callNumbers             CallNumber[]
+  calls                   Call[]
+  bookingPages            BookingPage[]
+  bookings                Booking[]
+  reminders               Reminder[]
   // Milestone 11: workspace membership for RBAC (owner/admin/editor/viewer).
-  members                WorkspaceMember[]
+  members                 WorkspaceMember[]
   // Milestone 11: workspace-scoped audit events.
-  auditEvents            FileChangeLog[]
+  auditEvents             FileChangeLog[]
   // Phase C (W4): hosted metering.
-  usageEvents            UsageEvent[]
-  creditBalance          CreditBalance?
-  spendCap               SpendCap?
+  usageEvents             UsageEvent[]
+  creditBalance           CreditBalance?
+  spendCap                SpendCap?
   // Drift reconciliation (2026-09-26): billing_topup_idempotency was
   // runtime-created by lib/metering/billing.ts; now Prisma-adopted.
-  billingTopups          BillingTopupIdempotency[]
+  billingTopups           BillingTopupIdempotency[]
   // Milestone 12: white-label brand kits and report templates.
-  brandKits              BrandKit[]
-  reportTemplates        ReportTemplate[]
+  brandKits               BrandKit[]
+  reportTemplates         ReportTemplate[]
   // Milestone 13: alerting hub (channels, rules, event history).
-  alertChannels          AlertChannel[]
-  alertRules             AlertRule[]
-  alertEvents            AlertEvent[]
+  alertChannels           AlertChannel[]
+  alertRules              AlertRule[]
+  alertEvents             AlertEvent[]
   // Milestone 15: backlink pull audit trail (cost accounting).
-  backlinkPulls          BacklinkPull[]
+  backlinkPulls           BacklinkPull[]
   // Milestone 19: newsletter settings (BYO Resend key) and sending domains.
-  newsletterSettings     NewsletterSettings?
-  newsletterDomains      NewsletterDomain[]
+  newsletterSettings      NewsletterSettings?
+  newsletterDomains       NewsletterDomain[]
   // Milestone 20: social scheduling (BYO Buffer access token).
-  socialSettings         SocialSettings?
+  socialSettings          SocialSettings?
   // Milestone 21: ad factory (BYO Higgsfield API key).
-  adSettings             AdSettings?
+  adSettings              AdSettings?
   // Milestone 22: Canva Connect OAuth account + Porkbun keys + registrant contact.
-  studioCanvaAccount     StudioCanvaAccount?
-  studioPorkbunSettings  StudioPorkbunSettings?
-  studioRegistrant       StudioRegistrant?
+  studioCanvaAccount      StudioCanvaAccount?
+  studioPorkbunSettings   StudioPorkbunSettings?
+  studioRegistrant        StudioRegistrant?
   // Milestone 14: composite visibility score weights per workspace.
   // { rankings?: number, aiPresence?: number, freshness?: number, coverage?: number }
   // Null = defaults in lib/retention/visibility-score.ts.
   // NOTE (milestone 15): a `backlinks` component is reserved for a later
   // milestone — do not add it to the score until the backlink quality
   // signal is calibrated. visibility-score.ts documents the same note.
-  visibilityWeights      Json?                   @map("visibility_weights")
+  visibilityWeights       Json?                     @map("visibility_weights")
   // Milestone 15: workspace-level monthly cap (USD) on DataForSEO Backlinks
   // spend. Null = DEFAULT_MONTHLY_SPEND_CAP_USD in lib/seo/backlinks-cost.ts.
-  backlinksSpendCapUsd   Float?                  @map("backlinks_spend_cap_usd")
+  backlinksSpendCapUsd    Float?                    @map("backlinks_spend_cap_usd")
   // Milestone 16: workspace-level monthly cap (USD) on DataForSEO local-SEO
   // spend (maps SERP, business data, reviews). Null = DEFAULT_LOCAL_SPEND_CAP_USD.
-  localSeoSpendCapUsd    Float?                  @map("local_seo_spend_cap_usd")
+  localSeoSpendCapUsd     Float?                    @map("local_seo_spend_cap_usd")
   // Phase B (W3, track B1): private workspace filesystem. WorkspaceFile is
   // the authorization boundary — every FS operation re-checks workspace_id
   // against these rows. Storage keys are opaque UUIDs; user filenames never
   // touch storage paths.
-  files                  WorkspaceFile[]
-  quota                  WorkspaceQuota?
+  files                   WorkspaceFile[]
+  quota                   WorkspaceQuota?
   // Milestone 16: local-SEO pull audit trail (cost accounting) + GBP scaffold.
-  localPulls             LocalPull[]
-  gbpAccounts            GbpAccount[]
+  localPulls              LocalPull[]
+  gbpAccounts             GbpAccount[]
   // Milestone 18: content autopilot kill switches (workspace-level).
-  autopilotKills         AutopilotKillSwitch[]
+  autopilotKills          AutopilotKillSwitch[]
   // Phase 9 (M1): workspace-freeze kill switch. Non-null = frozen; every
   // executor entry point checks this FIRST and halts while set.
-  frozenAt               DateTime? @map("frozen_at")
+  frozenAt                DateTime?                 @map("frozen_at")
   // Milestone 21: skills, connectors, settings.
-  skills                 Skill[]
-  customConnectors       Connector[]
-  connectorConnections   ConnectorConnection[]
-  permissionGrants       PermissionGrant[]
-  workspaceSettings      WorkspaceSettings?
+  skills                  Skill[]
+  customConnectors        Connector[]
+  connectorConnections    ConnectorConnection[]
+  permissionGrants        PermissionGrant[]
+  workspaceSettings       WorkspaceSettings?
   // Phase B (W2, track B2): scheduled skills + parallel subagent runs.
-  scheduledSkills        ScheduledSkill[]
-  skillRuns              SkillRun[]
+  scheduledSkills         ScheduledSkill[]
+  skillRuns               SkillRun[]
   // Hosted Stripe track: overage invoicing state + invoice history.
-  billingWorkspace       BillingWorkspace?
-  billingOverageInvoices BillingOverageInvoice[]
+  billingWorkspace        BillingWorkspace?
+  billingOverageInvoices  BillingOverageInvoice[]
   // Phase 3 (R3): acquisition-loop messaging back-relations.
-  contactConsents        ContactConsent[]
-  outboundMessages       OutboundMessage[]
-  approvalItems          ApprovalItem[]
-  nurtureSequences       NurtureSequence[]
-  sequenceEnrollments    SequenceEnrollment[]
+  contactConsents         ContactConsent[]
+  outboundMessages        OutboundMessage[]
+  approvalItems           ApprovalItem[]
+  nurtureSequences        NurtureSequence[]
+  sequenceEnrollments     SequenceEnrollment[]
   // Phase 3 (R4): review engine back-relations.
-  reviewRequests         ReviewRequest[]
-  reviewSiteConfigs      ReviewSiteConfig[]
+  reviewRequests          ReviewRequest[]
+  reviewSiteConfigs       ReviewSiteConfig[]
   // Phase 3 (R6): prospecting & enrichment back-relations.
-  prospectLists          ProspectList[]
-  prospects              Prospect[]
-  enrichmentLookups      EnrichmentLookup[]
-  mailProviders          MailProvider[]
-  mailCreatives          MailCreative[]
-  mailCampaigns          MailCampaign[]
-  designs                Design[]
+  prospectLists           ProspectList[]
+  prospects               Prospect[]
+  enrichmentLookups       EnrichmentLookup[]
+  mailProviders           MailProvider[]
+  mailCreatives           MailCreative[]
+  mailCampaigns           MailCampaign[]
+  designs                 Design[]
+  // Phase 12 (Worker 1): GrapesJS page drafts.
+  pageDrafts              PageDraft[]
   // Phase 11 (Feature 6): collaboration back-relations.
-  designShares           DesignShare[]
-  designComments         DesignComment[]
-  eddmOrders             EddmOrder[]
+  designShares            DesignShare[]
+  designComments          DesignComment[]
+  // Phase 12 (embeds): rrweb replay sessions + Documenso signing requests.
+  designReplaySessions    DesignReplaySession[]
+  signingRequests         SigningRequest[]
+  // Phase 12 (embeds): tenant-scoped GrowthBook flag overrides.
+  flagOverrides           WorkspaceFlagOverride[]
+  eddmOrders              EddmOrder[]
   // Phase 5 (S1–S4): media safety back-relations.
-  mediaApprovals         MediaApproval[]
-  mediaApprovalEvents    MediaApprovalEvent[]
-  mediaAuditEvents       MediaAuditEvent[]
-  budgetPools            BudgetPool[]
-  poolTransactions       PoolTransaction[]
-  mediaBuys              MediaBuy[]
-  killRules              KillRule[]
+  mediaApprovals          MediaApproval[]
+  mediaApprovalEvents     MediaApprovalEvent[]
+  mediaAuditEvents        MediaAuditEvent[]
+  budgetPools             BudgetPool[]
+  poolTransactions        PoolTransaction[]
+  mediaBuys               MediaBuy[]
+  killRules               KillRule[]
   // Phase 5 (B1–B3): buying-path back-relations.
-  doohPlans              DoohPlan[]
-  launchPackets          LaunchPacket[]
-  audioBuys              AudioBuy[]
-  ioBriefs               IoBrief[]
-  mediaReceipts          MediaReceipt[]
+  doohPlans               DoohPlan[]
+  launchPackets           LaunchPacket[]
+  audioBuys               AudioBuy[]
+  ioBriefs                IoBrief[]
+  mediaReceipts           MediaReceipt[]
   // Phase 6: authority & relevance back-relations.
-  authorityApprovals     AuthorityApproval[]
-  authorityAuditEvents   AuthorityAuditEvent[]
-  outreachCampaigns      OutreachCampaign[]
-  sendingDomains         SendingDomain[]
-  outreachProspects      OutreachProspect[]
-  outreachSequences      OutreachSequence[]
-  outreachEvents         OutreachEvent[]
-  suppressionLists       SuppressionList[]
-  prOpportunities        PrOpportunity[]
-  prDrafts               PrDraft[]
-  prRelationships        PrRelationship[]
-  prPlacements           PrPlacement[]
-  listingChannels        ListingChannel[]
-  listingProfiles        ListingProfile[]
-  listingSyncJobs        ListingSyncJob[]
-  citationBriefs         CitationBrief[]
-  reviewQueue            ReviewQueue[]
-  reviewVelocity         ReviewVelocity[]
-  aeoPromptSets          AeoPromptSet[]
-  aeoRuns                AeoRun[]
-  aeoSourceImpact        AeoSourceImpact[]
-  aeoActions             AeoAction[]
-  intelligenceReports    IntelligenceReport[]
-  mediaBuyingEvents      MediaBuyingEvent[]
+  authorityApprovals      AuthorityApproval[]
+  authorityAuditEvents    AuthorityAuditEvent[]
+  outreachCampaigns       OutreachCampaign[]
+  sendingDomains          SendingDomain[]
+  outreachProspects       OutreachProspect[]
+  outreachSequences       OutreachSequence[]
+  outreachEvents          OutreachEvent[]
+  suppressionLists        SuppressionList[]
+  prOpportunities         PrOpportunity[]
+  prDrafts                PrDraft[]
+  prRelationships         PrRelationship[]
+  prPlacements            PrPlacement[]
+  listingChannels         ListingChannel[]
+  listingProfiles         ListingProfile[]
+  listingSyncJobs         ListingSyncJob[]
+  citationBriefs          CitationBrief[]
+  reviewQueue             ReviewQueue[]
+  reviewVelocity          ReviewVelocity[]
+  aeoPromptSets           AeoPromptSet[]
+  aeoRuns                 AeoRun[]
+  aeoSourceImpact         AeoSourceImpact[]
+  aeoActions              AeoAction[]
+  intelligenceReports     IntelligenceReport[]
+  mediaBuyingEvents       MediaBuyingEvent[]
   // Phase 5 (A1): offline attribution back-relations.
   // (MediaCallNumber is the A1 model — `CallNumber` was already taken by
   // Phase 2 R5 call tracking, which maps to the `call_number` table.)
-  mediaTrackingLinks     TrackingLink[]
-  mediaPromoCodes        PromoCode[]
+  mediaTrackingLinks      TrackingLink[]
+  mediaPromoCodes         PromoCode[]
   // RedemptionEvent is reached via PromoCode.redemptions (no workspaceId).
-  mediaCallNumbers       MediaCallNumber[]
-  mediaCallWebhookEvents CallWebhookEvent[]
-  mediaLiftSnapshots     LiftSnapshot[]
-  mediaSpendEntries      MediaSpendEntry[]
+  mediaCallNumbers        MediaCallNumber[]
+  mediaCallWebhookEvents  CallWebhookEvent[]
+  mediaLiftSnapshots      LiftSnapshot[]
+  mediaSpendEntries       MediaSpendEntry[]
   // Phase 9 (M1): GrowthOS orchestrator back-relations.
-  missions               Mission[]
-  missionEvents          MissionEvent[]
-  missionApprovals       MissionApproval[]
-  missionApprovalEvents MissionApprovalEvent[]
-  escalationRules        EscalationRule[]
-  playbooks              Playbook[]
-  playbookVersions       PlaybookVersion[]
-  automationSettings     AutomationSetting[]
-  commandAudits          CommandAudit[]
+  missions                Mission[]
+  missionEvents           MissionEvent[]
+  missionApprovals        MissionApproval[]
+  missionApprovalEvents   MissionApprovalEvent[]
+  // Phase 12 "Reconsider trio": one Plane project link per mission (optional).
+  missionPlaneLinks       MissionPlaneLink[]
+  escalationRules         EscalationRule[]
+  playbooks               Playbook[]
+  playbookVersions        PlaybookVersion[]
+  automationSettings      AutomationSetting[]
+  commandAudits           CommandAudit[]
 
   @@map("workspaces")
 }
@@ -749,9 +758,9 @@ model Project {
   // Milestone 14: retention loops.
   aiVisibilitySnapshots   AIVisibilitySnapshot[]
   // Phase 10 (intelligence depth): project-scoped intelligence assets.
-  gscSnapshots        GscSnapshot[]
-  pageImpacts         PageImpact[]
-  competitorWatches   CompetitorWatch[]
+  gscSnapshots            GscSnapshot[]
+  pageImpacts             PageImpact[]
+  competitorWatches       CompetitorWatch[]
   decayFindings           ContentDecayFinding[]
   competitorSnapshots     CompetitorSnapshot[]
   radarEvents             CompetitorRadarEvent[]
@@ -865,6 +874,13 @@ model ContentItem {
   seoScore     Float?        @map("seo_score")
   publishedUrl String?       @map("published_url")
 
+  // Phase 12 (embeds): Ghost Admin API publish target. ghostPostId is the
+  // Ghost post id returned at publish time; ghostStatus mirrors Ghost's own
+  // status ("draft" | "published") refreshed on demand.
+  ghostPostId String? @map("ghost_post_id")
+  ghostStatus String? @map("ghost_status")
+  ghostUrl    String? @map("ghost_url")
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -956,7 +972,7 @@ model BrandKit {
   isDefault Boolean @default(false) @map("is_default")
   // PROVIDER:brandfetch
   // Provenance metadata (JSON) — e.g. { source: "brandfetch", domain, logoUrl, fetchedAt }.
-  metadata  Json @default("{}")
+  metadata  Json    @default("{}")
   // END
 
   createdAt DateTime @default(now()) @map("created_at")
@@ -4291,14 +4307,14 @@ model Design {
   workspaceId String    @map("workspace_id")
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
-  name String
+  name        String
   // Design document: { version, pages: [{ id, width, height, background,
   // elements: [{ id, type: text|image|shape|group, ... }] }] }
-  document Json @default("{}")
+  document    Json      @default("{}")
   // PNG data-URL thumbnail for the designs list (regenerated on save).
   thumbnail   String?   @db.Text
   // Template key this design was started from, if any (see lib/design/templates).
-  templateKey String?    @map("template_key")
+  templateKey String?   @map("template_key")
   // Brand kit applied — client colors/fonts feed text presets and swatches.
   brandKitId  String?   @map("brand_kit_id")
   brandKit    BrandKit? @relation(fields: [brandKitId], references: [id], onDelete: SetNull)
@@ -4319,6 +4335,80 @@ model Design {
   @@map("designs")
 }
 
+// Phase 12 (embeds): rrweb replay sessions for opt-in public share links.
+// Events are the rrweb `eventWithTime` payloads, stored as a JSON array.
+// Tenant-scoped via workspaceId; the public share token hash is the only
+// lookup key from the outside (no oracle — see lib/integrations/replay.ts).
+model DesignReplaySession {
+  id          String      @id @default(cuid())
+  shareId     String      @map("share_id")
+  share       DesignShare @relation(fields: [shareId], references: [id], onDelete: Cascade)
+  workspaceId String      @map("workspace_id")
+  workspace   Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  designId    String      @map("design_id")
+
+  events    Json      @default("[]")
+  startedAt DateTime  @default(now()) @map("started_at")
+  endedAt   DateTime? @map("ended_at")
+
+  @@index([shareId, startedAt])
+  @@index([workspaceId])
+  @@map("design_replay_sessions")
+}
+
+// Phase 12 (embeds): Documenso API-only signing requests. Marketr creates
+// the document + signers and tracks status via the Documenso v1 API against
+// an unmodified CE instance. NO embedded signing UI (Enterprise feature —
+// see the Documenso license row in docs/phase12/integration-survey.md).
+model SigningRequest {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  title               String
+  templateName        String? @map("template_name")
+  documensoDocumentId String? @map("documenso_document_id")
+  // draft | pending (sent, awaiting signatures) | completed | declined | ...
+  status              String  @default("draft") @map("status")
+  signers             Json    @default("[]") @map("signers")
+
+  createdBy String?  @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([workspaceId, updatedAt])
+  @@map("signing_requests")
+}
+
+// Phase 12 (Worker 1): GrapesJS page drafts — responsive landing pages and
+// email templates. Complementary to the Konva Canvas editor (Canvas = PNG/SVG
+// assets; GrapesJS = HTML documents). html/css/components all snapshot the
+// editor state; the freshest authoritative copy is components (project data).
+model PageDraft {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  name        String
+  // landing | email
+  kind        String  @default("landing") @map("kind")
+  // Seed template key this draft was started from, if any (see
+  // lib/grapes/templates).
+  templateKey String? @map("template_key")
+  // Exported HTML/CSS snapshot for download + copy.
+  html        String? @map("html") @db.Text
+  css         String? @map("css") @db.Text
+  // GrapesJS project data (editor.getProjectData()) — reloads the canvas exactly.
+  components  Json?   @map("components")
+
+  createdBy String?  @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([workspaceId, updatedAt])
+  @@map("page_drafts")
+}
+
 // Phase 11 (Feature 6): public share links for designs. Only the SHA-256 of
 // the token is stored — the raw token is shown once at creation and is never
 // persisted. Lookup is by token hash; unknown / revoked / expired all 404
@@ -4336,6 +4426,12 @@ model DesignShare {
   expiresAt DateTime? @map("expires_at")
   revokedAt DateTime? @map("revoked_at")
   createdAt DateTime  @default(now()) @map("created_at")
+
+  // Phase 12 (embeds): rrweb session replay opt-in for this share link.
+  // Off by default — the workspace explicitly enables it per link.
+  replayOptIn Boolean @default(false) @map("replay_opt_in")
+
+  replaySessions DesignReplaySession[]
 
   @@unique([tokenHash])
   @@index([designId])
@@ -4644,34 +4740,34 @@ model MediaAuditEvent {
 // Per-buy binding approval (S3). binding_json is IMMUTABLE once approved —
 // any change invalidates binding_hash and the executor HALTs (TOCTOU kill).
 model MediaApproval {
-  id                   String               @id @default(cuid()) @map("id")
-  workspaceId          String               @map("workspace_id")
-  workspace            Workspace            @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  clientId             String?              @map("client_id")
-  type                 MediaApprovalType    @map("type")
-  status               MediaApprovalStatus  @default(draft) @map("status")
-  bindingJson          Json                 @map("binding_json")
-  bindingHash          String               @map("binding_hash")
-  maxSpendCents        Int                  @map("max_spend_cents")
-  currency             String               @default("USD") @map("currency")
-  poolId               String?              @map("pool_id")
-  quoteId              String?              @map("quote_id")
-  quoteExpiresAt       DateTime?            @map("quote_expires_at")
-  driftToleranceJson   Json                 @default("{\"pricePct\": 10, \"spendPct\": 5}") @map("drift_tolerance_json")
-  createdBy            String               @map("created_by")
-  approversJson        Json                 @default("[]") @map("approvers_json")
-  twoPersonSatisfied   Boolean              @default(false) @map("two_person_satisfied")
-  approvalMethod       MediaApprovalMethod  @default(none) @map("approval_method")
+  id                 String              @id @default(cuid()) @map("id")
+  workspaceId        String              @map("workspace_id")
+  workspace          Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  clientId           String?             @map("client_id")
+  type               MediaApprovalType   @map("type")
+  status             MediaApprovalStatus @default(draft) @map("status")
+  bindingJson        Json                @map("binding_json")
+  bindingHash        String              @map("binding_hash")
+  maxSpendCents      Int                 @map("max_spend_cents")
+  currency           String              @default("USD") @map("currency")
+  poolId             String?             @map("pool_id")
+  quoteId            String?             @map("quote_id")
+  quoteExpiresAt     DateTime?           @map("quote_expires_at")
+  driftToleranceJson Json                @default("{\"pricePct\": 10, \"spendPct\": 5}") @map("drift_tolerance_json")
+  createdBy          String              @map("created_by")
+  approversJson      Json                @default("[]") @map("approvers_json")
+  twoPersonSatisfied Boolean             @default(false) @map("two_person_satisfied")
+  approvalMethod     MediaApprovalMethod @default(none) @map("approval_method")
   // HMAC(approval_secret, approvalId || bindingHash || approver || decidedAt):
   // the cryptographically verified approval record (PubMatic AgenticOS pattern).
-  approvalReceipt      String?              @map("approval_receipt")
-  approvalsExpiresAt   DateTime?            @map("approvals_expires_at")
-  approvedAt           DateTime?            @map("approved_at")
-  revokedAt            DateTime?            @map("revoked_at")
-  revokedBy            String?              @map("revoked_by")
-  executedAt           DateTime?            @map("executed_at")
-  createdAt            DateTime             @default(now()) @map("created_at")
-  updatedAt            DateTime             @updatedAt @map("updated_at")
+  approvalReceipt    String?             @map("approval_receipt")
+  approvalsExpiresAt DateTime?           @map("approvals_expires_at")
+  approvedAt         DateTime?           @map("approved_at")
+  revokedAt          DateTime?           @map("revoked_at")
+  revokedBy          String?             @map("revoked_by")
+  executedAt         DateTime?           @map("executed_at")
+  createdAt          DateTime            @default(now()) @map("created_at")
+  updatedAt          DateTime            @updatedAt @map("updated_at")
 
   events MediaApprovalEvent[]
 
@@ -4683,17 +4779,17 @@ model MediaApproval {
 // Append-only, hash-chained event log (IAB event-bus pattern).
 // event_hash = sha256(prev_hash || canonical(ts, approval_id, actor, action, payload_hash)).
 model MediaApprovalEvent {
-  id          String                    @id @default(cuid()) @map("id")
-  approvalId  String                    @map("approval_id")
-  workspaceId String                    @map("workspace_id")
-  workspace   Workspace                 @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  ts          DateTime                  @default(now()) @map("ts")
-  actor       String                    @map("actor")
-  action      MediaApprovalEventAction  @map("action")
-  payloadHash String                    @map("payload_hash")
-  prevHash    String                    @map("prev_hash")
-  eventHash   String                    @map("event_hash")
-  detail      Json?                     @map("detail")
+  id          String                   @id @default(cuid()) @map("id")
+  approvalId  String                   @map("approval_id")
+  workspaceId String                   @map("workspace_id")
+  workspace   Workspace                @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  ts          DateTime                 @default(now()) @map("ts")
+  actor       String                   @map("actor")
+  action      MediaApprovalEventAction @map("action")
+  payloadHash String                   @map("payload_hash")
+  prevHash    String                   @map("prev_hash")
+  eventHash   String                   @map("event_hash")
+  detail      Json?                    @map("detail")
 
   approval MediaApproval @relation(fields: [approvalId], references: [id], onDelete: Cascade)
 
@@ -4770,7 +4866,7 @@ model MediaBuy {
   executedAt          DateTime?      @map("executed_at")
   actualSpendCents    Int?           @map("actual_spend_cents")
   failureCount        Int            @default(0) @map("failure_count")
-  killRulesRegistered Json          @default("[]") @map("kill_rules_registered")
+  killRulesRegistered Json           @default("[]") @map("kill_rules_registered")
   createdAt           DateTime       @default(now()) @map("created_at")
   updatedAt           DateTime       @updatedAt @map("updated_at")
 
@@ -4811,29 +4907,29 @@ model KillRule {
 // packet (launch_packet_url). Status: draft → planned → packet_ready →
 // launched (client-account execution) | cancelled.
 model DoohPlan {
-  id          String @id @default(cuid())
-  workspaceId String @map("workspace_id")
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   // Optional back-link to the safety track's media_buys row (the approval
   // binding lives there, not here).
   buyId String? @map("buy_id")
 
-  name   String
-  vendor String @map("vendor") // "blip" | "blindspot" | "adomni" | "fake"
+  name           String
+  vendor         String @map("vendor") // "blip" | "blindspot" | "adomni" | "fake"
   // { markets: [{ city, state, radius_mi }], placements: [{ boardId, name,
   //   city, state, lat?, lng?, formats: [wIn x hIn] }], dayparts: [{ name,
   //   hours: [start,end], weight }], flightStart, flightEnd }
-  placementsJson Json @map("placements_json")
+  placementsJson Json   @map("placements_json")
   // Estimate provenance: { basis: "documented_estimate", vendor,
   //   lineItems: [{ label, units, unitCents, totalCents }], notes }
-  estimateJson Json @map("estimate_json")
-  estimateCents Int @map("estimate_cents")
-  currency String @default("USD")
+  estimateJson   Json   @map("estimate_json")
+  estimateCents  Int    @map("estimate_cents")
+  currency       String @default("USD")
 
   // Creative Studio references (id + sha256). DOOH sizes are validated by
   // the planner against DOOH_SIZE_SPECS in lib/media/dooh.ts.
-  creativeIds   String[] @map("creative_ids")
+  creativeIds    String[] @map("creative_ids")
   creativeHashes String[] @map("creative_hashes")
 
   // Per-placement tracking assignments (placement_ref → link slug),
@@ -4843,7 +4939,7 @@ model DoohPlan {
   launchPacketUrl String? @map("launch_packet_url")
   status          String  @default("draft") @map("status")
 
-  createdBy String? @map("created_by")
+  createdBy String?  @map("created_by")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -4857,19 +4953,19 @@ model DoohPlan {
 // One packet per plan revision; the packet_sha256 covers the rendered PDF
 // bytes so the executor can prove the packet hasn't drifted since approval.
 model LaunchPacket {
-  id          String @id @default(cuid())
-  workspaceId String @map("workspace_id")
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
-  planId String @map("plan_id")
+  planId String   @map("plan_id")
   plan   DoohPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
 
   // Approval binding this packet was compiled from (safety track object).
-  approvalId  String  @map("approval_id")
-  bindingHash String  @map("binding_hash")
+  approvalId   String @map("approval_id")
+  bindingHash  String @map("binding_hash")
   packetSha256 String @map("packet_sha256")
-  pdfUrl      String  @map("pdf_url")
-  version     Int     @default(1)
+  pdfUrl       String @map("pdf_url")
+  version      Int    @default(1)
 
   generatedBy String?  @map("generated_by")
   generatedAt DateTime @default(now()) @map("generated_at")
@@ -4881,22 +4977,22 @@ model LaunchPacket {
 // B2: streaming-audio buy plan + generated brief (Spotify Ads Manager /
 // Acast / AudioGo). Execution is self-serve in the client's own account.
 model AudioBuy {
-  id          String @id @default(cuid())
-  workspaceId String @map("workspace_id")
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   buyId String? @map("buy_id")
 
-  name   String
-  vendor String // "spotify" | "acast" | "audiogo" | "fake"
+  name         String
+  vendor       String // "spotify" | "acast" | "audiogo" | "fake"
   // { markets, stations: [{ name, type: streaming|podcast, dayparts }],
   //   spotMix: [{ lengthSec, count, label }], flightStart, flightEnd }
-  stationsJson Json @map("stations_json")
+  stationsJson Json   @map("stations_json")
   // { spotLengthSec, spotCount, dailyBudgetCents, lifetimeCents,
   //   productionCents, basis: "documented_estimate" }
-  budgetJson Json @map("budget_json")
-  budgetCents Int @map("budget_cents")
-  currency String @default("USD")
+  budgetJson   Json   @map("budget_json")
+  budgetCents  Int    @map("budget_cents")
+  currency     String @default("USD")
 
   creativeIds    String[] @map("creative_ids")
   creativeHashes String[] @map("creative_hashes")
@@ -4907,7 +5003,7 @@ model AudioBuy {
   briefUrl String? @map("brief_url")
   status   String  @default("draft") @map("status") // draft → briefed → launched | cancelled
 
-  createdBy String? @map("created_by")
+  createdBy String?  @map("created_by")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -4919,8 +5015,8 @@ model AudioBuy {
 // magazine buys. The rep keeps the signature; Marketr plans, briefs,
 // and captures proof-of-run.
 model IoBrief {
-  id          String @id @default(cuid())
-  workspaceId String @map("workspace_id")
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   buyId String? @map("buy_id")
@@ -4930,28 +5026,28 @@ model IoBrief {
 
   // Station/publication selection: [{ name, market, callSign?, daypartMix?,
   //   placement }].
-  inventoryJson Json @map("inventory_json")
+  inventoryJson Json   @map("inventory_json")
   // IAB/AAAA terms: { deliverables[], prices[], maximumSpendCents (THE
   // binding max), flightStart, flightEnd, thirdPartyAdServer, cancelTerms,
   //  paymentTerms, notes }.
-  ioTermsJson Json @map("io_terms_json")
-  maxSpendCents Int @map("max_spend_cents")
-  currency String @default("USD")
+  ioTermsJson   Json   @map("io_terms_json")
+  maxSpendCents Int    @map("max_spend_cents")
+  currency      String @default("USD")
 
   creativeIds    String[] @map("creative_ids")
   creativeHashes String[] @map("creative_hashes")
 
   // Rep contact: { name, email, phone, company, rateCardRef }.
-  repContact Json? @map("rep_contact")
+  repContact      Json?     @map("rep_contact")
   // "draft" | "sent_to_rep" | "signed" | "proof_received" | "cancelled".
-  signatureStatus String @default("draft") @map("signature_status")
+  signatureStatus String    @default("draft") @map("signature_status")
   signedAt        DateTime? @map("signed_at")
-  proofOfRunUrl   String?  @map("proof_of_run_url")
+  proofOfRunUrl   String?   @map("proof_of_run_url")
 
   briefPdfUrl String? @map("brief_pdf_url")
   status      String  @default("draft") @map("status")
 
-  createdBy String? @map("created_by")
+  createdBy String?  @map("created_by")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -4968,25 +5064,25 @@ model IoBrief {
 // approvalRef is REQUIRED: every receipt traces to a safety-track approval
 // (zero-custody invariant).
 model MediaReceipt {
-  id          String @id @default(cuid())
-  workspaceId String @map("workspace_id")
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
-  buyId String @map("buy_id")
+  buyId              String  @map("buy_id")
   // "browser_executor" | "human_upload".
-  capturedBy String @map("captured_by")
+  capturedBy         String  @map("captured_by")
   // Operator invoice/reference number, when parseable.
   platformInvoiceRef String? @map("platform_invoice_ref")
-  amountCents Int? @map("amount_cents")
-  currency String @default("USD")
-  receiptUrl String? @map("receipt_url")
+  amountCents        Int?    @map("amount_cents")
+  currency           String  @default("USD")
+  receiptUrl         String? @map("receipt_url")
   // Parsed order-confirmation terms from the DOM-verified screen (browser
   // executor) or the uploaded invoice (human).
-  parsedTermsJson Json? @map("parsed_terms_json")
-  verified Boolean @default(false) @map("verified")
-  reconciled Boolean @default(false) @map("reconciled")
-  varianceCents Int? @map("variance_cents")
-  approvalRef String @map("approval_ref")
+  parsedTermsJson    Json?   @map("parsed_terms_json")
+  verified           Boolean @default(false) @map("verified")
+  reconciled         Boolean @default(false) @map("reconciled")
+  varianceCents      Int?    @map("variance_cents")
+  approvalRef        String  @map("approval_ref")
 
   capturedAt DateTime @default(now()) @map("captured_at")
 
@@ -5004,16 +5100,16 @@ model MediaReceipt {
 // moved, receipt recorded. Append-only by API surface (no UPDATE/DELETE
 // exposure) — the approval-event chain is the legal record.
 model MediaBuyingEvent {
-  id          String @id @default(cuid())
-  workspaceId String @map("workspace_id")
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
-  actor String @map("actor")
-  action String @map("action")
-  entityType String @map("entity_type")
-  entityId String @map("entity_id")
+  actor       String  @map("actor")
+  action      String  @map("action")
+  entityType  String  @map("entity_type")
+  entityId    String  @map("entity_id")
   payloadHash String? @map("payload_hash")
-  detail Json @default("{}") @map("detail")
+  detail      Json    @default("{}") @map("detail")
 
   ts DateTime @default(now()) @map("ts")
 
@@ -5035,7 +5131,7 @@ model TrackingLink {
   destinationUrl String    @map("destination_url")
   utmJson        Json      @default("{}") @map("utm_json")
   engine         String    @default("marketr") @map("engine") // marketr | dub
-  status         String    @default("active") @map("status")  // active | paused | archived
+  status         String    @default("active") @map("status") // active | paused | archived
   scansCount     Int       @default(0) @map("scans_count")
   createdAt      DateTime  @default(now()) @map("created_at")
   updatedAt      DateTime  @updatedAt @map("updated_at")
@@ -5061,16 +5157,16 @@ model ScanEvent {
 }
 
 model PromoCode {
-  id               String   @id @default(cuid()) @map("id")
-  workspaceId      String   @map("workspace_id")
+  id               String    @id @default(cuid()) @map("id")
+  workspaceId      String    @map("workspace_id")
   workspace        Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  buyId            String?  @map("buy_id")
-  code             String   @map("code")
-  channelRef       String   @map("channel_ref")
-  redemptionsCount Int      @default(0) @map("redemptions_count")
-  maxRedemptions   Int?     @map("max_redemptions")
-  status           String   @default("active") @map("status") // active | paused | expired
-  createdAt        DateTime @default(now()) @map("created_at")
+  buyId            String?   @map("buy_id")
+  code             String    @map("code")
+  channelRef       String    @map("channel_ref")
+  redemptionsCount Int       @default(0) @map("redemptions_count")
+  maxRedemptions   Int?      @map("max_redemptions")
+  status           String    @default("active") @map("status") // active | paused | expired
+  createdAt        DateTime  @default(now()) @map("created_at")
 
   redemptions RedemptionEvent[]
 
@@ -5131,15 +5227,15 @@ model CallWebhookEvent {
 }
 
 model LiftSnapshot {
-  id           String   @id @default(cuid()) @map("id")
-  workspaceId  String   @map("workspace_id")
+  id           String    @id @default(cuid()) @map("id")
+  workspaceId  String    @map("workspace_id")
   workspace    Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  buyId        String   @map("buy_id")
-  source       String   @map("source") // gsc | gtrends | ga4 | gbp
-  baselineJson Json     @map("baseline_json")
-  flightJson   Json     @map("flight_json")
-  holdoutJson  Json?    @map("holdout_json")
-  capturedAt   DateTime @default(now()) @map("captured_at")
+  buyId        String    @map("buy_id")
+  source       String    @map("source") // gsc | gtrends | ga4 | gbp
+  baselineJson Json      @map("baseline_json")
+  flightJson   Json      @map("flight_json")
+  holdoutJson  Json?     @map("holdout_json")
+  capturedAt   DateTime  @default(now()) @map("captured_at")
 
   @@index([workspaceId, buyId, source])
   @@map("lift_snapshots")
@@ -5149,15 +5245,15 @@ model LiftSnapshot {
 // approvalRef (REQUIRED — zero-custody invariant). Autopilot never buys;
 // this ledger cannot be a backdoor.
 model MediaSpendEntry {
-  id           String   @id @default(cuid()) @map("id")
-  workspaceId  String   @map("workspace_id")
-  workspace    Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  buyId        String   @map("buy_id")
-  kind         String   @map("kind") // estimate | encumbrance | spend | release | adjust
-  amountCents  Int      @map("amount_cents")
-  approvalRef  String   @map("approval_ref")
-  note         String?  @map("note")
-  createdAt    DateTime @default(now()) @map("created_at")
+  id          String    @id @default(cuid()) @map("id")
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  buyId       String    @map("buy_id")
+  kind        String    @map("kind") // estimate | encumbrance | spend | release | adjust
+  amountCents Int       @map("amount_cents")
+  approvalRef String    @map("approval_ref")
+  note        String?   @map("note")
+  createdAt   DateTime  @default(now()) @map("created_at")
 
   @@index([workspaceId, buyId, kind])
   @@map("media_spend_entries")
@@ -5355,23 +5451,23 @@ enum IntelligenceReportStatus {
 // the exact payload before any external action. Two-person rule: depth-3
 // activation and review-reply-post require two distinct approvers.
 model AuthorityApproval {
-  id               String                 @id @default(cuid()) @map("id")
-  workspaceId      String                 @map("workspace_id")
-  workspace        Workspace              @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  type             AuthorityApprovalType  @map("type")
-  status           AuthorityApprovalStatus @default(draft) @map("status")
-  bindingJson      Json                   @map("binding_json")
-  bindingHash      String                 @map("binding_hash")
-  createdBy        String                 @map("created_by")
-  approversJson    Json                   @default("[]") @map("approvers_json")
-  twoPersonRequired Boolean               @default(false) @map("two_person_required")
-  approvalReceipt  String?                @map("approval_receipt")
-  decidedAt        DateTime?              @map("decided_at")
-  executedAt       DateTime?              @map("executed_at")
-  revokedAt        DateTime?              @map("revoked_at")
-  revokedBy        String?                @map("revoked_by")
-  expiresAt        DateTime?              @map("expires_at")
-  createdAt        DateTime               @default(now()) @map("created_at")
+  id                String                  @id @default(cuid()) @map("id")
+  workspaceId       String                  @map("workspace_id")
+  workspace         Workspace               @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  type              AuthorityApprovalType   @map("type")
+  status            AuthorityApprovalStatus @default(draft) @map("status")
+  bindingJson       Json                    @map("binding_json")
+  bindingHash       String                  @map("binding_hash")
+  createdBy         String                  @map("created_by")
+  approversJson     Json                    @default("[]") @map("approvers_json")
+  twoPersonRequired Boolean                 @default(false) @map("two_person_required")
+  approvalReceipt   String?                 @map("approval_receipt")
+  decidedAt         DateTime?               @map("decided_at")
+  executedAt        DateTime?               @map("executed_at")
+  revokedAt         DateTime?               @map("revoked_at")
+  revokedBy         String?                 @map("revoked_by")
+  expiresAt         DateTime?               @map("expires_at")
+  createdAt         DateTime                @default(now()) @map("created_at")
 
   events AuthorityApprovalEvent[]
 
@@ -5380,35 +5476,35 @@ model AuthorityApproval {
 }
 
 model AuthorityApprovalEvent {
-  id         String            @id @default(cuid()) @map("id")
-  approvalId String            @map("approval_id")
-  approval   AuthorityApproval @relation(fields: [approvalId], references: [id], onDelete: Cascade)
-  workspaceId String           @map("workspace_id")
-  ts         DateTime          @default(now()) @map("ts")
-  actor      String            @map("actor")
-  action     String            @map("action") // created|submitted|approved|approval_rejected|revoked|expired|executed
-  payloadHash String           @map("payload_hash")
-  prevHash   String            @map("prev_hash")
-  eventHash  String            @map("event_hash")
-  detail     Json?             @map("detail")
+  id          String            @id @default(cuid()) @map("id")
+  approvalId  String            @map("approval_id")
+  approval    AuthorityApproval @relation(fields: [approvalId], references: [id], onDelete: Cascade)
+  workspaceId String            @map("workspace_id")
+  ts          DateTime          @default(now()) @map("ts")
+  actor       String            @map("actor")
+  action      String            @map("action") // created|submitted|approved|approval_rejected|revoked|expired|executed
+  payloadHash String            @map("payload_hash")
+  prevHash    String            @map("prev_hash")
+  eventHash   String            @map("event_hash")
+  detail      Json?             @map("detail")
 
   @@index([approvalId, ts])
   @@map("authority_approval_events")
 }
 
 model AuthorityAuditEvent {
-  id         String   @id @default(cuid()) @map("id")
-  workspaceId String  @map("workspace_id")
-  workspace  Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  ts         DateTime @default(now()) @map("ts")
-  actor      String   @map("actor")
-  action     String   @map("action")
-  entityType String   @map("entity_type")
-  entityId   String   @map("entity_id")
-  payloadHash String  @map("payload_hash")
-  prevHash   String   @map("prev_hash")
-  eventHash  String   @map("event_hash")
-  detail     Json?    @map("detail")
+  id          String    @id @default(cuid()) @map("id")
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  ts          DateTime  @default(now()) @map("ts")
+  actor       String    @map("actor")
+  action      String    @map("action")
+  entityType  String    @map("entity_type")
+  entityId    String    @map("entity_id")
+  payloadHash String    @map("payload_hash")
+  prevHash    String    @map("prev_hash")
+  eventHash   String    @map("event_hash")
+  detail      Json?     @map("detail")
 
   @@index([workspaceId, ts])
   @@map("authority_audit_events")
@@ -5431,27 +5527,27 @@ model OutreachCampaign {
   createdBy        String                 @map("created_by")
   createdAt        DateTime               @default(now()) @map("created_at")
 
-  prospects  OutreachProspect[]
-  sequences  OutreachSequence[]
+  prospects OutreachProspect[]
+  sequences OutreachSequence[]
 
   @@index([workspaceId, status])
   @@map("outreach_campaigns")
 }
 
 model SendingDomain {
-  id             String              @id @default(cuid()) @map("id")
-  workspaceId    String              @map("workspace_id")
-  workspace      Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  domain         String              @map("domain")
-  isPrimary      Boolean             @default(false) @map("is_primary") // primary = NEVER cold-send
-  spfOk          Boolean             @default(false) @map("spf_ok")
-  dkimOk         Boolean             @default(false) @map("dkim_ok")
-  dmarcPolicy    String?             @map("dmarc_policy")
-  warmupStartedAt DateTime?          @map("warmup_started_at")
-  warmupStage    Int                 @default(0) @map("warmup_stage") // days elapsed
-  trackingCnameOk Boolean            @default(false) @map("tracking_cname_ok")
-  status         SendingDomainStatus @default(pending) @map("status")
-  createdAt      DateTime            @default(now()) @map("created_at")
+  id              String              @id @default(cuid()) @map("id")
+  workspaceId     String              @map("workspace_id")
+  workspace       Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  domain          String              @map("domain")
+  isPrimary       Boolean             @default(false) @map("is_primary") // primary = NEVER cold-send
+  spfOk           Boolean             @default(false) @map("spf_ok")
+  dkimOk          Boolean             @default(false) @map("dkim_ok")
+  dmarcPolicy     String?             @map("dmarc_policy")
+  warmupStartedAt DateTime?           @map("warmup_started_at")
+  warmupStage     Int                 @default(0) @map("warmup_stage") // days elapsed
+  trackingCnameOk Boolean             @default(false) @map("tracking_cname_ok")
+  status          SendingDomainStatus @default(pending) @map("status")
+  createdAt       DateTime            @default(now()) @map("created_at")
 
   campaigns OutreachCampaign[]
 
@@ -5460,39 +5556,39 @@ model SendingDomain {
 }
 
 model OutreachProspect {
-  id             String         @id @default(cuid()) @map("id")
-  workspaceId    String         @map("workspace_id")
-  workspace      Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  campaignId     String         @map("campaign_id")
+  id             String           @id @default(cuid()) @map("id")
+  workspaceId    String           @map("workspace_id")
+  workspace      Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  campaignId     String           @map("campaign_id")
   campaign       OutreachCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  domain         String         @map("domain")
-  url            String         @map("url")
-  contactName    String?        @map("contact_name")
-  email          String?        @map("email")
-  emailVerified  Boolean        @default(false) @map("email_verified")
-  qualityScore   Int            @default(0) @map("quality_score")
-  relevanceScore Int            @default(0) @map("relevance_score")
-  status         ProspectStatus @default(new) @map("status")
-  createdAt      DateTime       @default(now()) @map("created_at")
+  domain         String           @map("domain")
+  url            String           @map("url")
+  contactName    String?          @map("contact_name")
+  email          String?          @map("email")
+  emailVerified  Boolean          @default(false) @map("email_verified")
+  qualityScore   Int              @default(0) @map("quality_score")
+  relevanceScore Int              @default(0) @map("relevance_score")
+  status         ProspectStatus   @default(new) @map("status")
+  createdAt      DateTime         @default(now()) @map("created_at")
 
   @@index([workspaceId, campaignId, status])
   @@map("outreach_prospects")
 }
 
 model OutreachSequence {
-  id          String         @id @default(cuid()) @map("id")
-  workspaceId String         @map("workspace_id")
-  workspace   Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  campaignId  String         @map("campaign_id")
+  id          String           @id @default(cuid()) @map("id")
+  workspaceId String           @map("workspace_id")
+  workspace   Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  campaignId  String           @map("campaign_id")
   campaign    OutreachCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  prospectId  String         @map("prospect_id")
-  depth       Int            @map("depth")
-  stepsJson   Json           @default("[]") @map("steps_json")
-  status      SequenceStatus @default(draft) @map("status")
-  sentCount   Int            @default(0) @map("sent_count")
-  replyId     String?        @map("reply_id")
-  stoppedAt   DateTime?      @map("stopped_at")
-  createdAt   DateTime       @default(now()) @map("created_at")
+  prospectId  String           @map("prospect_id")
+  depth       Int              @map("depth")
+  stepsJson   Json             @default("[]") @map("steps_json")
+  status      SequenceStatus   @default(draft) @map("status")
+  sentCount   Int              @default(0) @map("sent_count")
+  replyId     String?          @map("reply_id")
+  stoppedAt   DateTime?        @map("stopped_at")
+  createdAt   DateTime         @default(now()) @map("created_at")
 
   events OutreachEvent[]
 
@@ -5501,15 +5597,15 @@ model OutreachSequence {
 }
 
 model OutreachEvent {
-  id          String           @id @default(cuid()) @map("id")
-  workspaceId String           @map("workspace_id")
-  workspace   Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  sequenceId  String           @map("sequence_id")
-  sequence    OutreachSequence @relation(fields: [sequenceId], references: [id], onDelete: Cascade)
-  ts          DateTime         @default(now()) @map("ts")
+  id          String            @id @default(cuid()) @map("id")
+  workspaceId String            @map("workspace_id")
+  workspace   Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  sequenceId  String            @map("sequence_id")
+  sequence    OutreachSequence  @relation(fields: [sequenceId], references: [id], onDelete: Cascade)
+  ts          DateTime          @default(now()) @map("ts")
   event       OutreachEventType @map("event")
-  payloadHash String           @map("payload_hash")
-  detail      Json?            @map("detail")
+  payloadHash String            @map("payload_hash")
+  detail      Json?             @map("detail")
 
   @@index([sequenceId, ts])
   @@map("outreach_events")
@@ -5531,20 +5627,20 @@ model SuppressionList {
 
 // O2 — Digital PR
 model PrOpportunity {
-  id           String              @id @default(cuid()) @map("id")
-  workspaceId  String              @map("workspace_id")
-  workspace    Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  source       PrSource            @map("source")
-  journalist   String              @map("journalist")
-  outlet       String              @map("outlet")
-  queryText    String              @map("query_text")
-  deadline     DateTime?           @map("deadline")
-  matchScore   Int                 @default(0) @map("match_score")
-  expertiseTags String[]           @default([]) @map("expertise_tags")
-  status       PrOpportunityStatus @default(new) @map("status")
-  createdAt    DateTime            @default(now()) @map("created_at")
+  id            String              @id @default(cuid()) @map("id")
+  workspaceId   String              @map("workspace_id")
+  workspace     Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  source        PrSource            @map("source")
+  journalist    String              @map("journalist")
+  outlet        String              @map("outlet")
+  queryText     String              @map("query_text")
+  deadline      DateTime?           @map("deadline")
+  matchScore    Int                 @default(0) @map("match_score")
+  expertiseTags String[]            @default([]) @map("expertise_tags")
+  status        PrOpportunityStatus @default(new) @map("status")
+  createdAt     DateTime            @default(now()) @map("created_at")
 
-  drafts PrDraft[]
+  drafts     PrDraft[]
   placements PrPlacement[]
 
   @@index([workspaceId, status, deadline])
@@ -5552,18 +5648,18 @@ model PrOpportunity {
 }
 
 model PrDraft {
-  id               String       @id @default(cuid()) @map("id")
-  workspaceId      String       @map("workspace_id")
-  workspace        Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  opportunityId    String       @map("opportunity_id")
-  opportunity      PrOpportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
-  researchBriefJson Json        @default("{}") @map("research_brief_json")
-  quoteSkeleton    String       @default("") @map("quote_skeleton")
-  checklistJson    Json         @default("{}") @map("checklist_json")
-  deAiPassed       Boolean      @default(false) @map("de_ai_passed")
-  status           PrDraftStatus @default(draft) @map("status")
-  approvalId       String?      @map("approval_id") // pr_send approval before human marks sent
-  createdAt        DateTime     @default(now()) @map("created_at")
+  id                String        @id @default(cuid()) @map("id")
+  workspaceId       String        @map("workspace_id")
+  workspace         Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  opportunityId     String        @map("opportunity_id")
+  opportunity       PrOpportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  researchBriefJson Json          @default("{}") @map("research_brief_json")
+  quoteSkeleton     String        @default("") @map("quote_skeleton")
+  checklistJson     Json          @default("{}") @map("checklist_json")
+  deAiPassed        Boolean       @default(false) @map("de_ai_passed")
+  status            PrDraftStatus @default(draft) @map("status")
+  approvalId        String?       @map("approval_id") // pr_send approval before human marks sent
+  createdAt         DateTime      @default(now()) @map("created_at")
 
   @@index([workspaceId, opportunityId])
   @@map("pr_drafts")
@@ -5585,15 +5681,15 @@ model PrRelationship {
 }
 
 model PrPlacement {
-  id                  String        @id @default(cuid()) @map("id")
-  workspaceId         String        @map("workspace_id")
-  workspace           Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  opportunityId       String?       @map("opportunity_id")
-  opportunity         PrOpportunity? @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
-  url                 String        @map("url")
-  outlet              String        @map("outlet")
-  publishDate         DateTime?     @map("publish_date")
-  visibilityImpactJson Json         @default("{}") @map("visibility_impact_json")
+  id                   String         @id @default(cuid()) @map("id")
+  workspaceId          String         @map("workspace_id")
+  workspace            Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  opportunityId        String?        @map("opportunity_id")
+  opportunity          PrOpportunity? @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
+  url                  String         @map("url")
+  outlet               String         @map("outlet")
+  publishDate          DateTime?      @map("publish_date")
+  visibilityImpactJson Json           @default("{}") @map("visibility_impact_json")
 
   @@index([workspaceId, publishDate])
   @@map("pr_placements")
@@ -5601,32 +5697,32 @@ model PrPlacement {
 
 // L1 — Listings/citations (honest three-tier)
 model ListingChannel {
-  id            String        @id @default(cuid()) @map("id")
-  workspaceId   String        @map("workspace_id")
-  workspace     Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  channel       String        @map("channel") // gbp|bing|apple|yelp|facebook|...
-  tier          ListingTier   @map("tier")    // true tier, always labeled in UI
-  status        ChannelStatus @default(disconnected) @map("status")
-  lastSyncAt    DateTime?     @map("last_sync_at")
-  lastVerifiedAt DateTime?    @map("last_verified_at")
-  syncErrorsJson Json         @default("[]") @map("sync_errors_json")
-  configJson    Json          @default("{}") @map("config_json")
+  id             String        @id @default(cuid()) @map("id")
+  workspaceId    String        @map("workspace_id")
+  workspace      Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  channel        String        @map("channel") // gbp|bing|apple|yelp|facebook|...
+  tier           ListingTier   @map("tier") // true tier, always labeled in UI
+  status         ChannelStatus @default(disconnected) @map("status")
+  lastSyncAt     DateTime?     @map("last_sync_at")
+  lastVerifiedAt DateTime?     @map("last_verified_at")
+  syncErrorsJson Json          @default("[]") @map("sync_errors_json")
+  configJson     Json          @default("{}") @map("config_json")
 
   @@unique([workspaceId, channel])
   @@map("listing_channels")
 }
 
 model ListingProfile {
-  id                String   @id @default(cuid()) @map("id")
-  workspaceId       String   @map("workspace_id")
-  workspace         Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  channel           String   @map("channel")
-  locationRef       String   @map("location_ref")
-  napJson           Json     @default("{}") @map("nap_json")
-  hoursJson         Json     @default("{}") @map("hours_json")
-  attributesJson    Json     @default("{}") @map("attributes_json")
-  photosJson        Json     @default("[]") @map("photos_json")
-  verificationStatus String  @default("unverified") @map("verification_status")
+  id                 String    @id @default(cuid()) @map("id")
+  workspaceId        String    @map("workspace_id")
+  workspace          Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  channel            String    @map("channel")
+  locationRef        String    @map("location_ref")
+  napJson            Json      @default("{}") @map("nap_json")
+  hoursJson          Json      @default("{}") @map("hours_json")
+  attributesJson     Json      @default("{}") @map("attributes_json")
+  photosJson         Json      @default("[]") @map("photos_json")
+  verificationStatus String    @default("unverified") @map("verification_status")
 
   @@unique([workspaceId, channel, locationRef])
   @@map("listing_profiles")
@@ -5651,13 +5747,13 @@ model ListingSyncJob {
 }
 
 model CitationBrief {
-  id               String              @id @default(cuid()) @map("id")
-  workspaceId      String              @map("workspace_id")
-  workspace        Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  competitorGapJson Json               @default("{}") @map("competitor_gap_json")
-  directoriesJson  Json                @default("[]") @map("directories_json") // {directory, prefilled_nap, status, verified_at}
-  checklistStatus  CitationBriefStatus @default(draft) @map("checklist_status")
-  createdAt        DateTime            @default(now()) @map("created_at")
+  id                String              @id @default(cuid()) @map("id")
+  workspaceId       String              @map("workspace_id")
+  workspace         Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  competitorGapJson Json                @default("{}") @map("competitor_gap_json")
+  directoriesJson   Json                @default("[]") @map("directories_json") // {directory, prefilled_nap, status, verified_at}
+  checklistStatus   CitationBriefStatus @default(draft) @map("checklist_status")
+  createdAt         DateTime            @default(now()) @map("created_at")
 
   @@index([workspaceId])
   @@map("citation_briefs")
@@ -5676,7 +5772,7 @@ model ReviewQueue {
   reviewText     String?           @map("review_text")
   reviewerName   String?           @map("reviewer_name")
   draftReply     String?           @map("draft_reply")
-  guardrailFlags String[]         @default([]) @map("guardrail_flags")
+  guardrailFlags String[]          @default([]) @map("guardrail_flags")
   status         ReviewQueueStatus @default(pending) @map("status")
   replyState     ReviewReplyState  @default(none) @map("reply_state") // Google pre-pub moderation
   postedAt       DateTime?         @map("posted_at")
@@ -5689,16 +5785,16 @@ model ReviewQueue {
 }
 
 model ReviewVelocity {
-  id              String   @id @default(cuid()) @map("id")
-  workspaceId     String   @map("workspace_id")
-  workspace      Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  locationRef     String   @map("location_ref")
-  requestsSent    Int      @default(0) @map("requests_sent")
-  reviewsReceived Int      @default(0) @map("reviews_received")
-  velocity7d      Float    @default(0) @map("velocity_7d")
-  velocity30d     Float    @default(0) @map("velocity_30d")
-  funnelJson      Json     @default("{}") @map("funnel_json")
-  updatedAt       DateTime @updatedAt @map("updated_at")
+  id              String    @id @default(cuid()) @map("id")
+  workspaceId     String    @map("workspace_id")
+  workspace       Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  locationRef     String    @map("location_ref")
+  requestsSent    Int       @default(0) @map("requests_sent")
+  reviewsReceived Int       @default(0) @map("reviews_received")
+  velocity7d      Float     @default(0) @map("velocity_7d")
+  velocity30d     Float     @default(0) @map("velocity_30d")
+  funnelJson      Json      @default("{}") @map("funnel_json")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
 
   @@unique([workspaceId, locationRef])
   @@map("review_velocity")
@@ -5706,14 +5802,14 @@ model ReviewVelocity {
 
 // A1 — AEO agent
 model AeoPromptSet {
-  id          String   @id @default(cuid()) @map("id")
-  workspaceId String   @map("workspace_id")
+  id          String    @id @default(cuid()) @map("id")
+  workspaceId String    @map("workspace_id")
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  version     Int      @map("version")
-  promptsJson Json     @map("prompts_json") // 20-50 money prompts
-  createdBy   String   @map("created_by")
-  active      Boolean  @default(false) @map("active")
-  createdAt   DateTime @default(now()) @map("created_at")
+  version     Int       @map("version")
+  promptsJson Json      @map("prompts_json") // 20-50 money prompts
+  createdBy   String    @map("created_by")
+  active      Boolean   @default(false) @map("active")
+  createdAt   DateTime  @default(now()) @map("created_at")
 
   runs AeoRun[]
 
@@ -5722,18 +5818,18 @@ model AeoPromptSet {
 }
 
 model AeoRun {
-  id               String       @id @default(cuid()) @map("id")
-  workspaceId      String       @map("workspace_id")
-  workspace        Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  promptSetId      String       @map("prompt_set_id")
-  promptSet        AeoPromptSet @relation(fields: [promptSetId], references: [id], onDelete: Cascade)
-  promptSetVersion Int          @map("prompt_set_version")
-  engine           AeoEngine    @map("engine")
-  startedAt        DateTime     @default(now()) @map("started_at")
-  completedAt      DateTime?    @map("completed_at")
-  reps             Int          @default(3) @map("reps")
-  status           AeoRunStatus @default(queued) @map("status")
-  costEstimateCents Int         @default(0) @map("cost_estimate_cents")
+  id                String       @id @default(cuid()) @map("id")
+  workspaceId       String       @map("workspace_id")
+  workspace         Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  promptSetId       String       @map("prompt_set_id")
+  promptSet         AeoPromptSet @relation(fields: [promptSetId], references: [id], onDelete: Cascade)
+  promptSetVersion  Int          @map("prompt_set_version")
+  engine            AeoEngine    @map("engine")
+  startedAt         DateTime     @default(now()) @map("started_at")
+  completedAt       DateTime?    @map("completed_at")
+  reps              Int          @default(3) @map("reps")
+  status            AeoRunStatus @default(queued) @map("status")
+  costEstimateCents Int          @default(0) @map("cost_estimate_cents")
 
   mentions AeoMention[]
 
@@ -5742,18 +5838,18 @@ model AeoRun {
 }
 
 model AeoMention {
-  id             String   @id @default(cuid()) @map("id")
-  runId          String   @map("run_id")
-  run            AeoRun   @relation(fields: [runId], references: [id], onDelete: Cascade)
-  promptIdx      Int      @map("prompt_idx")
-  rep            Int      @map("rep")
-  mentioned      Boolean  @map("mentioned")
-  position       Int?     @map("position")
-  sentiment      String?  @map("sentiment")
-  competitors    String[] @default([]) @map("competitors")
-  citedSources   String[] @default([]) @map("cited_sources")
-  judgeModel     String   @map("judge_model")
-  judgeConfidence Float   @default(0) @map("judge_confidence")
+  id              String   @id @default(cuid()) @map("id")
+  runId           String   @map("run_id")
+  run             AeoRun   @relation(fields: [runId], references: [id], onDelete: Cascade)
+  promptIdx       Int      @map("prompt_idx")
+  rep             Int      @map("rep")
+  mentioned       Boolean  @map("mentioned")
+  position        Int?     @map("position")
+  sentiment       String?  @map("sentiment")
+  competitors     String[] @default([]) @map("competitors")
+  citedSources    String[] @default([]) @map("cited_sources")
+  judgeModel      String   @map("judge_model")
+  judgeConfidence Float    @default(0) @map("judge_confidence")
 
   @@unique([runId, promptIdx, rep])
   @@map("aeo_mentions")
@@ -5775,18 +5871,18 @@ model AeoSourceImpact {
 }
 
 model AeoAction {
-  id             String          @id @default(cuid()) @map("id")
-  workspaceId    String          @map("workspace_id")
-  workspace      Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  kind           AeoActionKind   @map("kind")
-  sourceRef      String          @map("source_ref")
-  geo16Pillars   String[]        @default([]) @map("geo16_pillars")
-  fixProposalJson Json           @default("{}") @map("fix_proposal_json")
-  actionPlanJson Json           @default("{}") @map("action_plan_json")
-  expectedLift   Float?          @map("expected_lift")
-  status         AeoActionStatus @default(proposed) @map("status")
-  approvalId     String?         @map("approval_id")
-  createdAt      DateTime        @default(now()) @map("created_at")
+  id              String          @id @default(cuid()) @map("id")
+  workspaceId     String          @map("workspace_id")
+  workspace       Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  kind            AeoActionKind   @map("kind")
+  sourceRef       String          @map("source_ref")
+  geo16Pillars    String[]        @default([]) @map("geo16_pillars")
+  fixProposalJson Json            @default("{}") @map("fix_proposal_json")
+  actionPlanJson  Json            @default("{}") @map("action_plan_json")
+  expectedLift    Float?          @map("expected_lift")
+  status          AeoActionStatus @default(proposed) @map("status")
+  approvalId      String?         @map("approval_id")
+  createdAt       DateTime        @default(now()) @map("created_at")
 
   @@index([workspaceId, kind, status])
   @@map("aeo_actions")
@@ -5794,19 +5890,19 @@ model AeoAction {
 
 // I1 — Intelligence Report
 model IntelligenceReport {
-  id                   String                  @id @default(cuid()) @map("id")
-  workspaceId          String                  @map("workspace_id")
-  workspace            Workspace               @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  version              Int                     @default(1) @map("version")
-  auditCompletenessJson Json                   @default("{}") @map("audit_completeness_json")
-  auditsJson           Json                    @default("{}") @map("audits_json") // the 12 audits
-  opportunitiesJson    Json                    @default("[]") @map("opportunities_json")
-  plan90dJson          Json                    @default("{}") @map("plan_90d_json")
-  pdfUrl               String?                 @map("pdf_url")
-  status               IntelligenceReportStatus @default(draft) @map("status")
-  generatedAt          DateTime?               @map("generated_at")
-  generatedBy          String?                 @map("generated_by")
-  createdAt            DateTime                @default(now()) @map("created_at")
+  id                    String                   @id @default(cuid()) @map("id")
+  workspaceId           String                   @map("workspace_id")
+  workspace             Workspace                @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  version               Int                      @default(1) @map("version")
+  auditCompletenessJson Json                     @default("{}") @map("audit_completeness_json")
+  auditsJson            Json                     @default("{}") @map("audits_json") // the 12 audits
+  opportunitiesJson     Json                     @default("[]") @map("opportunities_json")
+  plan90dJson           Json                     @default("{}") @map("plan_90d_json")
+  pdfUrl                String?                  @map("pdf_url")
+  status                IntelligenceReportStatus @default(draft) @map("status")
+  generatedAt           DateTime?                @map("generated_at")
+  generatedBy           String?                  @map("generated_by")
+  createdAt             DateTime                 @default(now()) @map("created_at")
 
   @@index([workspaceId, status])
   @@map("intelligence_reports")
@@ -5901,26 +5997,26 @@ enum FlywheelAuditKind {
 // Human-signed bounded envelope: channel allowlist, caps, band, cool-down,
 // mandatory expiry, instant revocation. Pre-signed for a window, not perpetual.
 model SraEnvelope {
-  id                     String    @id @default(cuid()) @map("id")
-  workspaceId            String    @map("workspace_id")
-  name                   String    @map("name")
-  channels               Json      @map("channels") // string[] allowlist — explicit only
-  perShiftCapCents       Int       @map("per_shift_cap_cents")
-  dailyAggregateCapCents Int       @map("daily_aggregate_cap_cents")
-  weeklyAggregateCapCents Int      @map("weekly_aggregate_cap_cents")
-  perChannelBandPct      Float     @map("per_channel_band_pct")
-  explorationFloorPct    Float     @map("exploration_floor_pct")
-  cooldownHours          Int       @map("cooldown_hours")
-  validFrom              DateTime  @map("valid_from")
-  validUntil             DateTime  @map("valid_until") // mandatory expiry ≤30d
-  revocationId           String    @unique @map("revocation_id")
-  status                 SraStatus @default(active) @map("status")
-  signerIds              Json      @map("signer_ids") // string[] — 2 required for ≥$1k cumulative
-  signatureHash          String    @map("signature_hash")
-  createdBy              String    @map("created_by")
-  createdAt              DateTime  @default(now()) @map("created_at")
-  revokedAt              DateTime? @map("revoked_at")
-  revokedBy              String?   @map("revoked_by")
+  id                      String    @id @default(cuid()) @map("id")
+  workspaceId             String    @map("workspace_id")
+  name                    String    @map("name")
+  channels                Json      @map("channels") // string[] allowlist — explicit only
+  perShiftCapCents        Int       @map("per_shift_cap_cents")
+  dailyAggregateCapCents  Int       @map("daily_aggregate_cap_cents")
+  weeklyAggregateCapCents Int       @map("weekly_aggregate_cap_cents")
+  perChannelBandPct       Float     @map("per_channel_band_pct")
+  explorationFloorPct     Float     @map("exploration_floor_pct")
+  cooldownHours           Int       @map("cooldown_hours")
+  validFrom               DateTime  @map("valid_from")
+  validUntil              DateTime  @map("valid_until") // mandatory expiry ≤30d
+  revocationId            String    @unique @map("revocation_id")
+  status                  SraStatus @default(active) @map("status")
+  signerIds               Json      @map("signer_ids") // string[] — 2 required for ≥$1k cumulative
+  signatureHash           String    @map("signature_hash")
+  createdBy               String    @map("created_by")
+  createdAt               DateTime  @default(now()) @map("created_at")
+  revokedAt               DateTime? @map("revoked_at")
+  revokedBy               String?   @map("revoked_by")
 
   proposals ReallocationProposal[]
 
@@ -5931,20 +6027,20 @@ model SraEnvelope {
 // Optimizer output with the full decision record (data window, curve
 // params, R², model version) — the audit answer for every shift.
 model ReallocationProposal {
-  id                String         @id @default(cuid()) @map("id")
-  workspaceId       String         @map("workspace_id")
+  id                String           @id @default(cuid()) @map("id")
+  workspaceId       String           @map("workspace_id")
   mode              ReallocationMode @map("mode")
-  sraId             String?        @map("sra_id")
-  sra               SraEnvelope?   @relation(fields: [sraId], references: [id])
-  sourceChannel     String         @map("source_channel")
-  destChannel       String         @map("dest_channel")
-  sourceCampaignRef String         @map("source_campaign_ref")
-  destCampaignRef   String         @map("dest_campaign_ref")
-  amountCents       Int            @map("amount_cents")
-  marginalRoasDelta Float          @map("marginal_roas_delta")
-  decisionRecord    Json           @map("decision_record")
-  status            ProposalStatus @default(proposed) @map("status")
-  humanApprovalId   String?        @map("human_approval_id") // Phase 5 MediaApproval id (mode a)
+  sraId             String?          @map("sra_id")
+  sra               SraEnvelope?     @relation(fields: [sraId], references: [id])
+  sourceChannel     String           @map("source_channel")
+  destChannel       String           @map("dest_channel")
+  sourceCampaignRef String           @map("source_campaign_ref")
+  destCampaignRef   String           @map("dest_campaign_ref")
+  amountCents       Int              @map("amount_cents")
+  marginalRoasDelta Float            @map("marginal_roas_delta")
+  decisionRecord    Json             @map("decision_record")
+  status            ProposalStatus   @default(proposed) @map("status")
+  humanApprovalId   String?          @map("human_approval_id") // Phase 5 MediaApproval id (mode a)
 
   createdAt DateTime @default(now()) @map("created_at")
 
@@ -5957,14 +6053,14 @@ model ReallocationProposal {
 
 // Every policy decision, allow AND deny — denials carry investigative value.
 model PolicyDecision {
-  id                 String            @id @default(cuid()) @map("id")
-  proposalId         String            @map("proposal_id")
-  proposal           ReallocationProposal @relation(fields: [proposalId], references: [id])
-  workspaceId        String            @map("workspace_id")
-  decision           PolicyDecisionKind @map("decision")
-  reasons            Json              @map("reasons") // string[]
-  sraId              String?           @map("sra_id")
-  revocationCheckedAt DateTime        @map("revocation_checked_at")
+  id                  String               @id @default(cuid()) @map("id")
+  proposalId          String               @map("proposal_id")
+  proposal            ReallocationProposal @relation(fields: [proposalId], references: [id])
+  workspaceId         String               @map("workspace_id")
+  decision            PolicyDecisionKind   @map("decision")
+  reasons             Json                 @map("reasons") // string[]
+  sraId               String?              @map("sra_id")
+  revocationCheckedAt DateTime             @map("revocation_checked_at")
 
   @@index([proposalId])
   @@map("policy_decisions")
@@ -5973,18 +6069,18 @@ model PolicyDecision {
 // Fitted diminishing-returns curves per channel (best of hill/power/loglog
 // by R²), with adstock + seasonality and optional holdout calibration.
 model MarginalCurve {
-  id                    String    @id @default(cuid()) @map("id")
-  workspaceId           String    @map("workspace_id")
-  channel               String    @map("channel")
-  curveType             CurveType @map("curve_type")
-  params                Json      @map("params")
-  adstock               Json      @map("adstock")
-  seasonality           Json      @map("seasonality") // number[7]
-  rSquared              Float     @map("r_squared")
-  dataWindow            String    @map("data_window")
-  iroasCalibrationFactor Float?   @map("iroas_calibration_factor")
-  fittedAt              DateTime  @default(now()) @map("fitted_at")
-  modelVersion          String    @map("model_version")
+  id                     String    @id @default(cuid()) @map("id")
+  workspaceId            String    @map("workspace_id")
+  channel                String    @map("channel")
+  curveType              CurveType @map("curve_type")
+  params                 Json      @map("params")
+  adstock                Json      @map("adstock")
+  seasonality            Json      @map("seasonality") // number[7]
+  rSquared               Float     @map("r_squared")
+  dataWindow             String    @map("data_window")
+  iroasCalibrationFactor Float?    @map("iroas_calibration_factor")
+  fittedAt               DateTime  @default(now()) @map("fitted_at")
+  modelVersion           String    @map("model_version")
 
   @@index([workspaceId, channel])
   @@map("marginal_curves")
@@ -5993,10 +6089,10 @@ model MarginalCurve {
 // Per-channel learning-viable floors: below ~10× target CPA/day campaigns
 // can't exit learning — the optimizer would optimize noise.
 model ChannelFloor {
-  workspaceId                String @map("workspace_id")
-  channel                    String @map("channel")
-  learningViableMinCentsDay  Int    @map("learning_viable_min_cents_day")
-  stabilizationHours         Int    @map("stabilization_hours")
+  workspaceId               String @map("workspace_id")
+  channel                   String @map("channel")
+  learningViableMinCentsDay Int    @map("learning_viable_min_cents_day")
+  stabilizationHours        Int    @map("stabilization_hours")
 
   @@id([workspaceId, channel])
   @@map("channel_floors")
@@ -6004,15 +6100,15 @@ model ChannelFloor {
 
 // Optimizer run summary: proposals, executions, denials, freeze state.
 model ReallocationRun {
-  id               String  @id @default(cuid()) @map("id")
-  workspaceId      String  @map("workspace_id")
-  runAt            DateTime @default(now()) @map("run_at")
-  mode             ReallocationMode @map("mode")
-  proposalsCount   Int     @map("proposals_count")
-  executedCount    Int     @map("executed_count")
-  deniedCount      Int     @map("denied_count")
-  frozen           Boolean @default(false) @map("frozen")
-  dataHealthSnapshot Json  @map("data_health_snapshot")
+  id                 String           @id @default(cuid()) @map("id")
+  workspaceId        String           @map("workspace_id")
+  runAt              DateTime         @default(now()) @map("run_at")
+  mode               ReallocationMode @map("mode")
+  proposalsCount     Int              @map("proposals_count")
+  executedCount      Int              @map("executed_count")
+  deniedCount        Int              @map("denied_count")
+  frozen             Boolean          @default(false) @map("frozen")
+  dataHealthSnapshot Json             @map("data_health_snapshot")
 
   @@index([workspaceId, runAt])
   @@map("reallocation_runs")
@@ -6039,16 +6135,16 @@ model BreakerEvent {
 // Immutable hash-chained audit log (F1 scope): proposals, policy decisions,
 // signature checks, executions, breaker events — with correlation IDs.
 model FlywheelAuditEvent {
-  id            String           @id @default(cuid()) @map("id")
-  workspaceId   String           @map("workspace_id")
-  correlationId String           @map("correlation_id")
+  id            String            @id @default(cuid()) @map("id")
+  workspaceId   String            @map("workspace_id")
+  correlationId String            @map("correlation_id")
   kind          FlywheelAuditKind @map("kind")
-  actor         String           @map("actor")
-  payload       Json             @map("payload")
-  payloadHash   String           @map("payload_hash")
-  prevHash      String           @map("prev_hash")
-  eventHash     String           @map("event_hash")
-  ts            DateTime         @default(now()) @map("ts")
+  actor         String            @map("actor")
+  payload       Json              @map("payload")
+  payloadHash   String            @map("payload_hash")
+  prevHash      String            @map("prev_hash")
+  eventHash     String            @map("event_hash")
+  ts            DateTime          @default(now()) @map("ts")
 
   @@index([workspaceId, ts])
   @@index([workspaceId, correlationId])
@@ -6093,27 +6189,27 @@ enum RecyclingAuditAction {
 }
 
 model RecyclingBrief {
-  id          String               @id @default(cuid()) @map("id")
-  workspaceId String               @map("workspace_id")
+  id                      String               @id @default(cuid()) @map("id")
+  workspaceId             String               @map("workspace_id")
   // Opaque source ref, e.g. "content_item:<id>", "tracking_link:<id>",
   // "mail_campaign:<id>", "aeo:<engine>:<domain>".
-  sourceAssetId String             @map("source_asset_id")
-  sourceChannel String             @map("source_channel")
+  sourceAssetId           String               @map("source_asset_id")
+  sourceChannel           String               @map("source_channel")
   // { kind, signalId, metricValue, metricUnit, observedAt, source }
-  triggerSignalJson Json           @map("trigger_signal_json")
-  targetChannels    String[]       @map("target_channels")
+  triggerSignalJson       Json                 @map("trigger_signal_json")
+  targetChannels          String[]             @map("target_channels")
   // { [channel]: VariantSpec } — aspectRatio, copyDensityCeiling, ctaFormats, notes, rulesVersion
-  variantSpecsJson Json            @map("variant_specs_json")
+  variantSpecsJson        Json                 @map("variant_specs_json")
   // LineageEntry[] — tamper-evident chain over the brief's creative history
-  creativeHashLineageJson Json     @default("[]") @map("creative_hash_lineage_json")
-  status          RecyclingBriefStatus @default(draft) @map("status")
+  creativeHashLineageJson Json                 @default("[]") @map("creative_hash_lineage_json")
+  status                  RecyclingBriefStatus @default(draft) @map("status")
   // Set on human approval: routing handle for the studio-approval-flow entries.
-  approvalId      String?          @map("approval_id")
+  approvalId              String?              @map("approval_id")
   // StudioRouteReceipt[] — per-variant routing receipts into studio review.
-  studioRoutingJson Json           @default("[]") @map("studio_routing_json")
-  createdBy       String           @map("created_by")
-  createdAt       DateTime         @default(now()) @map("created_at")
-  updatedAt       DateTime         @updatedAt @map("updated_at")
+  studioRoutingJson       Json                 @default("[]") @map("studio_routing_json")
+  createdBy               String               @map("created_by")
+  createdAt               DateTime             @default(now()) @map("created_at")
+  updatedAt               DateTime             @updatedAt @map("updated_at")
 
   events RecyclingBriefEvent[]
 
@@ -6127,17 +6223,17 @@ model RecyclingBrief {
 // regeneration, and blocked publish attempts.
 // event_hash = sha256(prev_hash || canonical(ts, brief_id, actor, action, payload_hash)).
 model RecyclingBriefEvent {
-  id          String              @id @default(cuid()) @map("id")
-  briefId     String              @map("brief_id")
-  brief       RecyclingBrief      @relation(fields: [briefId], references: [id], onDelete: Cascade)
-  workspaceId String              @map("workspace_id")
-  ts          DateTime            @default(now()) @map("ts")
-  actor       String              @map("actor")
+  id          String               @id @default(cuid()) @map("id")
+  briefId     String               @map("brief_id")
+  brief       RecyclingBrief       @relation(fields: [briefId], references: [id], onDelete: Cascade)
+  workspaceId String               @map("workspace_id")
+  ts          DateTime             @default(now()) @map("ts")
+  actor       String               @map("actor")
   action      RecyclingAuditAction @map("action")
-  payloadHash String              @map("payload_hash")
-  prevHash    String              @map("prev_hash")
-  eventHash   String              @map("event_hash")
-  detail      Json?               @map("detail")
+  payloadHash String               @map("payload_hash")
+  prevHash    String               @map("prev_hash")
+  eventHash   String               @map("event_hash")
+  detail      Json?                @map("detail")
 
   @@index([briefId, ts])
   @@index([workspaceId, ts])
@@ -6158,45 +6254,45 @@ model RecyclingBriefEvent {
 // every table, @@map table names. Spec §4 (F3).
 
 model ExperimentIdea {
-  id          String   @id @default(cuid()) @map("id")
-  workspaceId String   @map("workspace_id")
-  title       String   @map("title")
-  sourceSignal String? @map("source_signal") // phase2..6 signal reference
-  pieIceScore Float    @map("pie_ice_score")
-  status      String   @default("queued") @map("status") // queued | promoted | discarded
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  id           String   @id @default(cuid()) @map("id")
+  workspaceId  String   @map("workspace_id")
+  title        String   @map("title")
+  sourceSignal String?  @map("source_signal") // phase2..6 signal reference
+  pieIceScore  Float    @map("pie_ice_score")
+  status       String   @default("queued") @map("status") // queued | promoted | discarded
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
 
   @@index([workspaceId, status])
   @@map("experiment_ideas")
 }
 
 model Experiment {
-  id                 String    @id @default(cuid()) @map("id")
-  workspaceId        String    @map("workspace_id")
-  name               String    @map("name")
-  hypothesis         String    @map("hypothesis") @db.Text
-  pieIceScore        Float     @map("pie_ice_score")
-  channel            String    @map("channel") // web | email | ads | mail
-  variantsJson       Json      @map("variants_json")
-  audience           String    @map("audience")
-  primaryMetric      String    @map("primary_metric")
-  metricType         String    @default("binomial") @map("metric_type") // binomial | gaussian
-  guardrailMetricsJson Json    @default("[]") @map("guardrail_metrics_json")
-  status             String    @default("draft") @map("status") // draft | qa | running | paused | complete | archived
-  profitGuardrailJson Json?    @map("profit_guardrail_json")
-  trafficFloorNote   String?   @map("traffic_floor_note") @db.Text
-  minRuntimeDays     Int       @default(7) @map("min_runtime_days")
-  statedMde          Float     @map("stated_mde")
-  verdict            String?   @map("verdict") // winner | loser | inconclusive | compromised
-  baselineRate       Float     @map("baseline_rate")
-  monthlyTraffic     Float     @map("monthly_traffic")
-  launchedAt         DateTime? @map("launched_at")
-  completedAt        DateTime? @map("completed_at")
-  qaReportJson       Json?     @map("qa_report_json")
-  createdBy          String    @map("created_by")
-  createdAt          DateTime  @default(now()) @map("created_at")
-  updatedAt          DateTime  @updatedAt @map("updated_at")
+  id                   String    @id @default(cuid()) @map("id")
+  workspaceId          String    @map("workspace_id")
+  name                 String    @map("name")
+  hypothesis           String    @map("hypothesis") @db.Text
+  pieIceScore          Float     @map("pie_ice_score")
+  channel              String    @map("channel") // web | email | ads | mail
+  variantsJson         Json      @map("variants_json")
+  audience             String    @map("audience")
+  primaryMetric        String    @map("primary_metric")
+  metricType           String    @default("binomial") @map("metric_type") // binomial | gaussian
+  guardrailMetricsJson Json      @default("[]") @map("guardrail_metrics_json")
+  status               String    @default("draft") @map("status") // draft | qa | running | paused | complete | archived
+  profitGuardrailJson  Json?     @map("profit_guardrail_json")
+  trafficFloorNote     String?   @map("traffic_floor_note") @db.Text
+  minRuntimeDays       Int       @default(7) @map("min_runtime_days")
+  statedMde            Float     @map("stated_mde")
+  verdict              String?   @map("verdict") // winner | loser | inconclusive | compromised
+  baselineRate         Float     @map("baseline_rate")
+  monthlyTraffic       Float     @map("monthly_traffic")
+  launchedAt           DateTime? @map("launched_at")
+  completedAt          DateTime? @map("completed_at")
+  qaReportJson         Json?     @map("qa_report_json")
+  createdBy            String    @map("created_by")
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
 
   results ExperimentResult[]
 
@@ -6206,16 +6302,16 @@ model Experiment {
 }
 
 model ExperimentResult {
-  id                String   @id @default(cuid()) @map("id")
-  experimentId      String   @map("experiment_id")
-  experiment        Experiment @relation(fields: [experimentId], references: [id], onDelete: Cascade)
-  statsJson         Json     @map("stats_json") // prob_to_beat, expected_loss, sequential_ci, frequentist_p
-  srmJson           Json     @map("srm_json")    // { status: pass|fail, pValue }
-  guardrailChecksJson Json   @default("[]") @map("guardrail_checks_json")
-  verdict           String?  @map("verdict")
-  archivedToMemory  Boolean  @default(false) @map("archived_to_memory")
-  createdAt         DateTime @default(now()) @map("created_at")
-  updatedAt         DateTime @updatedAt @map("updated_at")
+  id                  String     @id @default(cuid()) @map("id")
+  experimentId        String     @map("experiment_id")
+  experiment          Experiment @relation(fields: [experimentId], references: [id], onDelete: Cascade)
+  statsJson           Json       @map("stats_json") // prob_to_beat, expected_loss, sequential_ci, frequentist_p
+  srmJson             Json       @map("srm_json") // { status: pass|fail, pValue }
+  guardrailChecksJson Json       @default("[]") @map("guardrail_checks_json")
+  verdict             String?    @map("verdict")
+  archivedToMemory    Boolean    @default(false) @map("archived_to_memory")
+  createdAt           DateTime   @default(now()) @map("created_at")
+  updatedAt           DateTime   @updatedAt @map("updated_at")
 
   @@unique([experimentId])
   @@map("experiment_results")
@@ -6246,8 +6342,8 @@ model ExperimentResult {
 // status: draft | pending_vendor_approval | human_placed | live |
 // reconciling | paused | complete | cancelled.
 model CtvCampaign {
-  id          String @id @default(cuid())
-  workspaceId String @map("workspace_id")
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   name     String
@@ -6259,13 +6355,13 @@ model CtvCampaign {
   // behind this object; autopilot drafts, never executes.
   approvalObjectId String? @map("approval_object_id")
 
-  budgetCents    Int? @map("budget_cents")
-  currency       String  @default("USD")
+  budgetCents    Int?      @map("budget_cents")
+  currency       String    @default("USD")
   flightStart    DateTime? @map("flight_start")
   flightEnd      DateTime? @map("flight_end")
-  targetingJson  Json? @map("targeting_json")
-  creativeIds    String[] @map("creative_ids")
-  creativeHashes String[] @map("creative_hashes")
+  targetingJson  Json?     @map("targeting_json")
+  creativeIds    String[]  @map("creative_ids")
+  creativeHashes String[]  @map("creative_hashes")
 
   // Vibe adapter binding: external campaign id + advertiser id once created
   // in Vibe (test-mode campaigns are flagged here, never billed).
@@ -6274,7 +6370,7 @@ model CtvCampaign {
   vibeTestMode     Boolean @default(true) @map("vibe_test_mode")
   vibeConfigRef    String? @map("vibe_config_ref") // vault ref, never raw creds
 
-  createdBy String? @map("created_by")
+  createdBy String?  @map("created_by")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -6291,24 +6387,24 @@ model CtvCampaign {
 // non-compliant creative. ffprobeJson is the raw parsed probe; checks are
 // the named pass/fail list; publisherRulesVersion pins the publisher table.
 model CtvCreativeValidation {
-  id          String @id @default(cuid())
-  workspaceId String @map("workspace_id")
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
-  campaignId String? @map("campaign_id")
-  campaign   CtvCampaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
-  creativeId String @map("creative_id") // file-asset id or content hash
-  creativeSha256 String? @map("creative_sha256")
+  campaignId     String?      @map("campaign_id")
+  campaign       CtvCampaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  creativeId     String       @map("creative_id") // file-asset id or content hash
+  creativeSha256 String?      @map("creative_sha256")
 
-  ffprobeJson Json @map("ffprobe_json")
-  pass        Boolean
-  checks      Json // [{ name, passed, detail }]
-  durationSeconds Float? @map("duration_seconds")
-  publisher   String? // publisher the rules were evaluated against
-  publisherRulesVersion String @map("publisher_rules_version")
+  ffprobeJson           Json    @map("ffprobe_json")
+  pass                  Boolean
+  checks                Json // [{ name, passed, detail }]
+  durationSeconds       Float?  @map("duration_seconds")
+  publisher             String? // publisher the rules were evaluated against
+  publisherRulesVersion String  @map("publisher_rules_version")
 
-  validatedBy String? @map("validated_by")
-  createdAt DateTime @default(now()) @map("created_at")
+  validatedBy String?  @map("validated_by")
+  createdAt   DateTime @default(now()) @map("created_at")
 
   @@index([workspaceId, creativeId])
   @@map("ctv_creative_validations")
@@ -6317,26 +6413,26 @@ model CtvCreativeValidation {
 // F4: per-spot QR/pURL assignment. One dynamic QR + pURL per placement
 // (show genre, daypart, demo). qrId/purlId reference phase-5 tracking_links.
 model CtvSpot {
-  id          String @id @default(cuid())
-  workspaceId String @map("workspace_id")
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
-  campaignId String @map("campaign_id")
+  campaignId String      @map("campaign_id")
   campaign   CtvCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
 
-  placementLabel String @map("placement_label")
+  placementLabel String  @map("placement_label")
   showGenre      String? @map("show_genre")
   daypart        String? @map("daypart")
   demo           String? @map("demo")
   creativeId     String? @map("creative_id")
 
-  qrId   String? @map("qr_id")   // phase-5 tracking_links(id)
+  qrId   String? @map("qr_id") // phase-5 tracking_links(id)
   purlId String? @map("purl_id") // phase-5 tracking_links(id)
-  qrSvg  String? @map("qr_svg")  // rendered couch-distance QR (SVG)
+  qrSvg  String? @map("qr_svg") // rendered couch-distance QR (SVG)
 
   flightFrom DateTime? @map("flight_from")
   flightTo   DateTime? @map("flight_to")
-  status     String @default("active") // "active" | "ended"
+  status     String    @default("active") // "active" | "ended"
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -6350,19 +6446,19 @@ model CtvSpot {
 // creative brief generated by Marketr; the human places the buy in the
 // vendor UI. Alert-only: Marketr cannot pause these buys.
 model CtvIo {
-  id          String @id @default(cuid())
-  workspaceId String @map("workspace_id")
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
-  campaignId String @map("campaign_id")
+  campaignId String      @map("campaign_id")
   campaign   CtvCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
 
-  vendor String // "mntn" | "roku" | "tatari" | "tvscientific"
-  ioPayload Json @map("io_payload") // IO doc + creative brief (generated)
-  state     String @default("draft") @map("state")
-  placedBy  String? @map("placed_by")
-  placedAt  DateTime? @map("placed_at")
-  vendorConfirmation String? @map("vendor_confirmation") // human-entered confirmation ref
+  vendor             String // "mntn" | "roku" | "tatari" | "tvscientific"
+  ioPayload          Json      @map("io_payload") // IO doc + creative brief (generated)
+  state              String    @default("draft") @map("state")
+  placedBy           String?   @map("placed_by")
+  placedAt           DateTime? @map("placed_at")
+  vendorConfirmation String?   @map("vendor_confirmation") // human-entered confirmation ref
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -6374,17 +6470,17 @@ model CtvIo {
 // F4: impression-pixel hosting. pixelUrl is a signed Marketr-hosted 1x1
 // pixel; impressions log to the local ledger (never a third party).
 model CtvPixel {
-  id          String @id @default(cuid())
-  workspaceId String @map("workspace_id")
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
-  campaignId String @map("campaign_id")
+  campaignId String      @map("campaign_id")
   campaign   CtvCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
 
-  pixelUrl String @map("pixel_url") // signed Marketr-hosted pixel URL
-  pixelToken String @map("pixel_token") // HMAC of campaign id
-  viewThroughWindowDays Int @default(14) @map("view_through_window_days")
-  impressionsCount Int @default(0) @map("impressions_count")
+  pixelUrl              String @map("pixel_url") // signed Marketr-hosted pixel URL
+  pixelToken            String @map("pixel_token") // HMAC of campaign id
+  viewThroughWindowDays Int    @default(14) @map("view_through_window_days")
+  impressionsCount      Int    @default(0) @map("impressions_count")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -6433,16 +6529,16 @@ enum DspSeatStatus {
 // interface. v1 ships the model, not the seats — adapters fail closed
 // without a connected agency seat.
 model DspAdapter {
-  id           String        @id @default(cuid()) @map("id")
-  workspaceId  String        @map("workspace_id")
-  dsp          DspKind       @map("dsp")
-  seatStatus   DspSeatStatus @default(none) @map("seat_status")
+  id          String        @id @default(cuid()) @map("id")
+  workspaceId String        @map("workspace_id")
+  dsp         DspKind       @map("dsp")
+  seatStatus  DspSeatStatus @default(none) @map("seat_status")
   // Vault reference ONLY (vault://...). Never credential material.
-  configRef    String?       @map("config_ref")
-  connectedAt  DateTime?     @map("connected_at")
-  connectedBy  String?       @map("connected_by")
-  createdAt    DateTime      @default(now()) @map("created_at")
-  updatedAt    DateTime      @updatedAt @map("updated_at")
+  configRef   String?       @map("config_ref")
+  connectedAt DateTime?     @map("connected_at")
+  connectedBy String?       @map("connected_by")
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
 
   @@unique([workspaceId, dsp])
   @@index([workspaceId])
@@ -6471,19 +6567,19 @@ model FeeSchedule {
 // commingled. fee_schedule_version pins the live schedule for the period so
 // margin math is auditable against the schedule that was live then.
 model MarginLedgerRow {
-  id                   String   @id @default(cuid()) @map("id")
-  workspaceId          String   @map("workspace_id")
-  period               String   @map("period") // YYYY-MM
-  dspAdapterId         String   @map("dsp_adapter_id")
-  dsp                  DspKind  @map("dsp")
-  clientBilledCents    Int      @map("client_billed_cents")
-  platformFeesCents    Int      @map("platform_fees_cents")
-  passthroughCents     Int      @map("passthrough_cents")
-  marketrMarginCents   Int      @map("marketr_margin_cents")
-  feeScheduleVersion   Int      @map("fee_schedule_version")
-  note                 String?  @map("note")
-  postedBy             String   @map("posted_by")
-  postedAt             DateTime @default(now()) @map("posted_at")
+  id                 String   @id @default(cuid()) @map("id")
+  workspaceId        String   @map("workspace_id")
+  period             String   @map("period") // YYYY-MM
+  dspAdapterId       String   @map("dsp_adapter_id")
+  dsp                DspKind  @map("dsp")
+  clientBilledCents  Int      @map("client_billed_cents")
+  platformFeesCents  Int      @map("platform_fees_cents")
+  passthroughCents   Int      @map("passthrough_cents")
+  marketrMarginCents Int      @map("marketr_margin_cents")
+  feeScheduleVersion Int      @map("fee_schedule_version")
+  note               String?  @map("note")
+  postedBy           String   @map("posted_by")
+  postedAt           DateTime @default(now()) @map("posted_at")
 
   @@index([workspaceId, period])
   @@index([workspaceId, dspAdapterId])
@@ -6515,8 +6611,8 @@ model MarginLedgerRow {
 // only; no public-flip state lives here.
 
 model LaunchChecklist {
-  id          String @id @default(cuid())
-  workspaceId String @map("workspace_id")
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   // Stable catalog key (e.g. "secret-history-scan") from
@@ -6532,7 +6628,7 @@ model LaunchChecklist {
   category String @map("category")
 
   // pending | in_progress | complete
-  status String @map("status") @default("pending")
+  status String @default("pending") @map("status")
 
   // Proof of completion (commit link, doc path, CI run URL). Nullable until
   // complete.
@@ -6627,20 +6723,20 @@ enum GraphSyncJobStatus {
 // here (safety invariant §9.4) — corrections are new facts; retention
 // archival moves rows to cold storage without mutating them.
 model GraphFact {
-  id             String   @id @default(cuid()) @map("id")
-  workspaceId    String   @map("workspace_id")
+  id             String    @id @default(cuid()) @map("id")
+  workspaceId    String    @map("workspace_id")
   workspace      Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   // connector id | manual | import | onboarding
-  source         String   @map("source")
-  sourceRecordId String   @map("source_record_id")
+  source         String    @map("source")
+  sourceRecordId String    @map("source_record_id")
   // deterministic node key hint, e.g. "customer:email:amy@example.com"
-  entityRef      String   @map("entity_ref")
-  factType       String   @map("fact_type")
-  payload        Json     @map("payload")
-  observedAt     DateTime @map("observed_at")
-  ingestedAt     DateTime @default(now()) @map("ingested_at")
+  entityRef      String    @map("entity_ref")
+  factType       String    @map("fact_type")
+  payload        Json      @map("payload")
+  observedAt     DateTime  @map("observed_at")
+  ingestedAt     DateTime  @default(now()) @map("ingested_at")
   // sha256 of the canonicalized payload — idempotent re-ingest
-  contentHash    String   @map("content_hash")
+  contentHash    String    @map("content_hash")
 
   edges GraphEdge[]
 
@@ -6675,10 +6771,10 @@ model GraphNode {
   mergedInto   GraphNode?      @relation("GraphNodeMerge", fields: [mergedIntoId], references: [id], onDelete: SetNull)
   absorbed     GraphNode[]     @relation("GraphNodeMerge")
 
-  edgesFrom GraphEdge[] @relation("GraphEdgeFrom")
-  edgesTo   GraphEdge[] @relation("GraphEdgeTo")
-  erQueueA  GraphErQueue[] @relation("GraphErQueueA")
-  erQueueB  GraphErQueue[] @relation("GraphErQueueB")
+  edgesFrom   GraphEdge[]    @relation("GraphEdgeFrom")
+  edgesTo     GraphEdge[]    @relation("GraphEdgeTo")
+  erQueueA    GraphErQueue[] @relation("GraphErQueueA")
+  erQueueB    GraphErQueue[] @relation("GraphErQueueB")
   // Phase 8 (G3): memory facts may anchor to a graph subject node.
   memoryFacts MemoryFact[]
 
@@ -6693,24 +6789,24 @@ model GraphNode {
 // INVALIDATE old edges (set invalid_at/expired_at + superseded_by_id) —
 // rows are never deleted, so point-in-time queries stay answerable.
 model GraphEdge {
-  id             String    @id @default(cuid()) @map("id")
-  workspaceId    String    @map("workspace_id")
-  workspace      Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  fromNodeId     String    @map("from_node_id")
-  fromNode       GraphNode @relation("GraphEdgeFrom", fields: [fromNodeId], references: [id], onDelete: Cascade)
-  toNodeId       String    @map("to_node_id")
-  toNode         GraphNode @relation("GraphEdgeTo", fields: [toNodeId], references: [id], onDelete: Cascade)
-  edgeType       String    @map("edge_type")
-  properties     Json      @default("{}") @map("properties")
-  confidence     Float     @default(1.0) @map("confidence")
-  validAt        DateTime  @map("valid_at")
-  invalidAt      DateTime? @map("invalid_at")
-  createdAt      DateTime  @default(now()) @map("created_at")
-  expiredAt      DateTime? @map("expired_at")
-  sourceFactId   String?   @map("source_fact_id")
-  sourceFact     GraphFact? @relation(fields: [sourceFactId], references: [id], onDelete: SetNull)
-  supersededById String?   @map("superseded_by_id")
-  supersededBy   GraphEdge? @relation("GraphEdgeSupersede", fields: [supersededById], references: [id], onDelete: SetNull)
+  id             String      @id @default(cuid()) @map("id")
+  workspaceId    String      @map("workspace_id")
+  workspace      Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  fromNodeId     String      @map("from_node_id")
+  fromNode       GraphNode   @relation("GraphEdgeFrom", fields: [fromNodeId], references: [id], onDelete: Cascade)
+  toNodeId       String      @map("to_node_id")
+  toNode         GraphNode   @relation("GraphEdgeTo", fields: [toNodeId], references: [id], onDelete: Cascade)
+  edgeType       String      @map("edge_type")
+  properties     Json        @default("{}") @map("properties")
+  confidence     Float       @default(1.0) @map("confidence")
+  validAt        DateTime    @map("valid_at")
+  invalidAt      DateTime?   @map("invalid_at")
+  createdAt      DateTime    @default(now()) @map("created_at")
+  expiredAt      DateTime?   @map("expired_at")
+  sourceFactId   String?     @map("source_fact_id")
+  sourceFact     GraphFact?  @relation(fields: [sourceFactId], references: [id], onDelete: SetNull)
+  supersededById String?     @map("superseded_by_id")
+  supersededBy   GraphEdge?  @relation("GraphEdgeSupersede", fields: [supersededById], references: [id], onDelete: SetNull)
   supersedes     GraphEdge[] @relation("GraphEdgeSupersede")
 
   @@index([workspaceId, fromNodeId, edgeType])
@@ -6829,30 +6925,29 @@ enum MemoryLearningSource {
   import
 }
 
-
 // Episodic store: raw what-happened. Immutable, never edited.
 model MemoryEpisode {
-  id          String           @id @default(cuid()) @map("id")
-  workspaceId String           @map("workspace_id")
-  workspace   Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  episodeType MemoryEpisodeType @map("episode_type")
-  actor       String           @map("actor")
-  summary     String           @db.Text @map("summary")
+  id          String                      @id @default(cuid()) @map("id")
+  workspaceId String                      @map("workspace_id")
+  workspace   Workspace                   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  episodeType MemoryEpisodeType           @map("episode_type")
+  actor       String                      @map("actor")
+  summary     String                      @map("summary") @db.Text
   // links to graph nodes / campaigns / fragments (ids + kinds)
-  refs        Json             @default("{}") @map("refs")
-  startedAt   DateTime         @map("started_at")
-  endedAt     DateTime?        @map("ended_at")
+  refs        Json                        @default("{}") @map("refs")
+  startedAt   DateTime                    @map("started_at")
+  endedAt     DateTime?                   @map("ended_at")
   // Drift reconciliation (2026-09-26): this column existed in the DB
   // (DEFAULT CURRENT_TIMESTAMP) with no schema field; adopted so a
   // migrate-from-schema never proposes dropping it.
-  createdAt   DateTime         @default(now()) @map("created_at")
+  createdAt   DateTime                    @default(now()) @map("created_at")
   // 384-d MiniLM embedding, written via raw SQL (Prisma Unsupported).
   // NULL until the embedder backfills it.
   embedding   Unsupported("vector(384)")? @map("embedding")
   // Full-text search vector, GENERATED ALWAYS by migration
   // 20260925180000_phase8_memory. Declared Unsupported (same as embedding)
   // so Prisma Migrate never tries to manage or drop it.
-  search_tsv  Unsupported("tsvector")? @map("search_tsv")
+  search_tsv  Unsupported("tsvector")?    @map("search_tsv")
 
   learnings MemoryLearning[] @relation("LearningSourceEpisode")
   facts     MemoryFact[]     @relation("FactSourceEpisode")
@@ -6866,33 +6961,33 @@ model MemoryEpisode {
 // Contradictions resolve by invalidation (invalid_at/expired_at +
 // superseded_by_id), never deletion (spec §9.5).
 model MemoryFact {
-  id              String    @id @default(cuid()) @map("id")
-  workspaceId     String    @map("workspace_id")
-  workspace       Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  subjectNodeId   String?   @map("subject_node_id")
-  subjectNode     GraphNode? @relation(fields: [subjectNodeId], references: [id], onDelete: SetNull)
-  predicate       String    @map("predicate")
-  object          Json      @map("object")
-  confidence      Float     @default(1.0) @map("confidence")
+  id              String                      @id @default(cuid()) @map("id")
+  workspaceId     String                      @map("workspace_id")
+  workspace       Workspace                   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  subjectNodeId   String?                     @map("subject_node_id")
+  subjectNode     GraphNode?                  @relation(fields: [subjectNodeId], references: [id], onDelete: SetNull)
+  predicate       String                      @map("predicate")
+  object          Json                        @map("object")
+  confidence      Float                       @default(1.0) @map("confidence")
   // world time: when the fact was true
-  validAt         DateTime  @map("valid_at")
-  invalidAt       DateTime? @map("invalid_at")
+  validAt         DateTime                    @map("valid_at")
+  invalidAt       DateTime?                   @map("invalid_at")
   // transaction time: when we believed it
-  createdAt       DateTime  @default(now()) @map("created_at")
-  expiredAt       DateTime? @map("expired_at")
-  sourceEpisodeId String?   @map("source_episode_id")
-  sourceEpisode   MemoryEpisode? @relation("FactSourceEpisode", fields: [sourceEpisodeId], references: [id], onDelete: SetNull)
-  supersededById  String?   @map("superseded_by_id")
-  supersededBy    MemoryFact? @relation("FactSupersede", fields: [supersededById], references: [id], onDelete: SetNull)
-  supersedes      MemoryFact[] @relation("FactSupersede")
+  createdAt       DateTime                    @default(now()) @map("created_at")
+  expiredAt       DateTime?                   @map("expired_at")
+  sourceEpisodeId String?                     @map("source_episode_id")
+  sourceEpisode   MemoryEpisode?              @relation("FactSourceEpisode", fields: [sourceEpisodeId], references: [id], onDelete: SetNull)
+  supersededById  String?                     @map("superseded_by_id")
+  supersededBy    MemoryFact?                 @relation("FactSupersede", fields: [supersededById], references: [id], onDelete: SetNull)
+  supersedes      MemoryFact[]                @relation("FactSupersede")
   // Decay-to-floor needs to know what survives a prune sweep:
   // user_told facts persist; agent_inferred fade; imported follows policy.
-  origin          String    @default("agent_inferred") @map("origin")
+  origin          String                      @default("agent_inferred") @map("origin")
   embedding       Unsupported("vector(384)")? @map("embedding")
   // Full-text search vector, GENERATED ALWAYS by migration
   // 20260925180000_phase8_memory. Declared Unsupported so Prisma Migrate
   // never tries to manage or drop it.
-  search_tsv      Unsupported("tsvector")? @map("search_tsv")
+  search_tsv      Unsupported("tsvector")?    @map("search_tsv")
 
   @@index([workspaceId, predicate])
   @@index([workspaceId, subjectNodeId])
@@ -6903,25 +6998,25 @@ model MemoryFact {
 // Procedural store: what worked / what failed / when. The F3 archive sink
 // schema made real (lib/flywheel/testlab/memory-sink.ts).
 model MemoryLearning {
-  id              String               @id @default(cuid()) @map("id")
-  workspaceId     String               @map("workspace_id")
-  workspace       Workspace            @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  hypothesis      String               @db.Text @map("hypothesis")
-  action          String               @db.Text @map("action")
-  result          MemoryLearningResult @map("result")
-  metricDelta     Json                 @default("{}") @map("metric_delta")
-  observedAt      DateTime             @map("observed_at")
-  invalidatedAt   DateTime?            @map("invalidated_at")
+  id              String                      @id @default(cuid()) @map("id")
+  workspaceId     String                      @map("workspace_id")
+  workspace       Workspace                   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  hypothesis      String                      @map("hypothesis") @db.Text
+  action          String                      @map("action") @db.Text
+  result          MemoryLearningResult        @map("result")
+  metricDelta     Json                        @default("{}") @map("metric_delta")
+  observedAt      DateTime                    @map("observed_at")
+  invalidatedAt   DateTime?                   @map("invalidated_at")
   // campaign / experiment / channel context refs
-  contextRefs     Json                 @default("{}") @map("context_refs")
-  source          MemoryLearningSource @map("source")
-  sourceEpisodeId String?              @map("source_episode_id")
-  sourceEpisode   MemoryEpisode?       @relation("LearningSourceEpisode", fields: [sourceEpisodeId], references: [id], onDelete: SetNull)
+  contextRefs     Json                        @default("{}") @map("context_refs")
+  source          MemoryLearningSource        @map("source")
+  sourceEpisodeId String?                     @map("source_episode_id")
+  sourceEpisode   MemoryEpisode?              @relation("LearningSourceEpisode", fields: [sourceEpisodeId], references: [id], onDelete: SetNull)
   embedding       Unsupported("vector(384)")? @map("embedding")
   // Full-text search vector, GENERATED ALWAYS by migration
   // 20260925180000_phase8_memory. Declared Unsupported so Prisma Migrate
   // never tries to manage or drop it.
-  search_tsv      Unsupported("tsvector")? @map("search_tsv")
+  search_tsv      Unsupported("tsvector")?    @map("search_tsv")
 
   @@index([workspaceId, result])
   @@index([workspaceId, observedAt])
@@ -6942,7 +7037,7 @@ model MemoryConsolidationRun {
   factsInvalidated Int       @default(0) @map("facts_invalidated")
   learningsDeduped Int       @default(0) @map("learnings_deduped")
   rowsPruned       Int       @default(0) @map("rows_pruned")
-  error            String?   @db.Text @map("error")
+  error            String?   @map("error") @db.Text
 
   @@index([workspaceId, startedAt])
   @@map("memory_consolidation_runs")
@@ -6954,14 +7049,14 @@ model MemoryConsolidationRun {
 // review gate (reviewed_at + anonymization_reviewed_by set). Unreviewed
 // patterns never publish (spec §9.3; enforced by RLS + API + battery).
 model PlaybookLearning {
-  id                     String    @id @default(cuid()) @map("id")
-  patternTitle           String    @map("pattern_title")
-  patternBody            String    @db.Text @map("pattern_body")
-  supportingClientCount  Int       @default(1) @map("supporting_client_count")
-  firstObserved          DateTime  @default(now()) @map("first_observed")
-  lastObserved           DateTime  @default(now()) @map("last_observed")
-  anonymizationReviewedBy String?  @map("anonymization_reviewed_by")
-  reviewedAt             DateTime? @map("reviewed_at")
+  id                      String    @id @default(cuid()) @map("id")
+  patternTitle            String    @map("pattern_title")
+  patternBody             String    @map("pattern_body") @db.Text
+  supportingClientCount   Int       @default(1) @map("supporting_client_count")
+  firstObserved           DateTime  @default(now()) @map("first_observed")
+  lastObserved            DateTime  @default(now()) @map("last_observed")
+  anonymizationReviewedBy String?   @map("anonymization_reviewed_by")
+  reviewedAt              DateTime? @map("reviewed_at")
 
   @@index([reviewedAt])
   @@map("playbook_learnings")
@@ -6999,9 +7094,32 @@ model Mission {
 
   events    MissionEvent[]
   approvals MissionApproval[]
+  // Phase 12 "Reconsider trio": optional link to a Plane project (sidecar).
+  planeLink MissionPlaneLink?
 
   @@index([workspaceId, status])
   @@map("missions")
+}
+
+// Phase 12 "Reconsider trio": link one Marketr mission to one Plane project
+// (the AGPL-3.0 project-management sidecar, talked to over HTTP only).
+// The link is data, not Plane code — no license contamination. Deleting the
+// mission or workspace cascades the link; the Plane side is untouched.
+model MissionPlaneLink {
+  id               String    @id @default(cuid()) @map("id")
+  missionId        String    @unique @map("mission_id")
+  mission          Mission   @relation(fields: [missionId], references: [id], onDelete: Cascade)
+  workspaceId      String    @map("workspace_id")
+  workspace        Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  // Plane identifiers (from PLANE_WORKSPACE_SLUG + the project list API).
+  planeSlug        String    @map("plane_slug")
+  planeProjectId   String    @map("plane_project_id")
+  planeProjectName String    @map("plane_project_name")
+  createdBy        String    @map("created_by")
+  createdAt        DateTime  @default(now()) @map("created_at")
+
+  @@index([workspaceId])
+  @@map("mission_plane_links")
 }
 
 // APPEND-ONLY: app code must never update or delete rows. The hash chain
@@ -7068,17 +7186,17 @@ model MissionApproval {
 // per approval_id: prev_hash = previous eventHash ("GENESIS" for the first).
 // App code must never update or delete rows.
 model MissionApprovalEvent {
-  id          String   @id @default(cuid()) @map("id")
-  approvalId  String   @map("approval_id")
+  id          String          @id @default(cuid()) @map("id")
+  approvalId  String          @map("approval_id")
   approval    MissionApproval @relation(fields: [approvalId], references: [id], onDelete: Cascade)
-  workspaceId String   @map("workspace_id")
-  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  ts          DateTime @default(now()) @map("ts")
-  actor       String   @map("actor")
-  action      String   @map("action")
-  payloadHash String   @map("payload_hash")
-  prevHash    String   @map("prev_hash")
-  eventHash   String   @map("event_hash")
+  workspaceId String          @map("workspace_id")
+  workspace   Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  ts          DateTime        @default(now()) @map("ts")
+  actor       String          @map("actor")
+  action      String          @map("action")
+  payloadHash String          @map("payload_hash")
+  prevHash    String          @map("prev_hash")
+  eventHash   String          @map("event_hash")
 
   @@index([approvalId, ts])
   @@index([workspaceId, ts])
@@ -7089,16 +7207,16 @@ model MissionApprovalEvent {
 // condition_json: { kind: "amount_above"|"unseen_treatment"|"no_source_record"|"external_audience", value? }.
 // action: "require_approval" | "notify".
 model EscalationRule {
-  id            String   @id @default(cuid()) @map("id")
-  workspaceId   String   @map("workspace_id")
+  id            String    @id @default(cuid()) @map("id")
+  workspaceId   String    @map("workspace_id")
   workspace     Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  name          String   @map("name")
-  conditionJson Json     @map("condition_json")
-  action        String   @map("action")
-  enabled       Boolean  @default(true) @map("enabled")
-  position      Int      @default(0) @map("position")
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
+  name          String    @map("name")
+  conditionJson Json      @map("condition_json")
+  action        String    @map("action")
+  enabled       Boolean   @default(true) @map("enabled")
+  position      Int       @default(0) @map("position")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
 
   @@index([workspaceId, position])
   @@map("escalation_rules")
@@ -7116,7 +7234,7 @@ model Playbook {
   workspace   Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   name        String         @map("name")
   source      PlaybookSource @map("source")
-  description String?        @db.Text @map("description")
+  description String?        @map("description") @db.Text
   createdBy   String         @map("created_by")
   createdAt   DateTime       @default(now()) @map("created_at")
 
@@ -7138,20 +7256,20 @@ enum PlaybookVersionStatus {
 // IMMUTABLE: app code must never update or delete rows. New content = new
 // version row. Rollback = move the label pointers (labels), never rewrite.
 model PlaybookVersion {
-  id                 String               @id @default(cuid()) @map("id")
-  playbookId         String               @map("playbook_id")
-  playbook           Playbook             @relation(fields: [playbookId], references: [id], onDelete: Cascade)
-  workspaceId        String               @map("workspace_id")
-  workspace          Workspace            @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  version            Int                  @map("version")
-  content            Json                 @map("content")
-  contentHash        String               @map("content_hash")
+  id                 String                @id @default(cuid()) @map("id")
+  playbookId         String                @map("playbook_id")
+  playbook           Playbook              @relation(fields: [playbookId], references: [id], onDelete: Cascade)
+  workspaceId        String                @map("workspace_id")
+  workspace          Workspace             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  version            Int                   @map("version")
+  content            Json                  @map("content")
+  contentHash        String                @map("content_hash")
   status             PlaybookVersionStatus @default(draft) @map("status")
-  labels             String[]             @default([]) @map("labels")
-  evalResults        Json?                @map("eval_results")
-  outcomeAttribution Json?                @map("outcome_attribution")
-  createdBy          String               @map("created_by")
-  createdAt          DateTime             @default(now()) @map("created_at")
+  labels             String[]              @default([]) @map("labels")
+  evalResults        Json?                 @map("eval_results")
+  outcomeAttribution Json?                 @map("outcome_attribution")
+  createdBy          String                @map("created_by")
+  createdAt          DateTime              @default(now()) @map("created_at")
 
   @@unique([playbookId, version])
   @@index([workspaceId, status])
@@ -7167,14 +7285,14 @@ enum AutomationBehavior {
 // Per-action automation behavior (Tico's decision: user-customizable
 // automation). Resolved by the DoA tier evaluator at execution time.
 model AutomationSetting {
-  id             String            @id @default(cuid()) @map("id")
-  workspaceId    String            @map("workspace_id")
-  workspace      Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  action         String            @map("action")
+  id             String             @id @default(cuid()) @map("id")
+  workspaceId    String             @map("workspace_id")
+  workspace      Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  action         String             @map("action")
   behavior       AutomationBehavior @map("behavior")
-  thresholdCents Int?              @map("threshold_cents")
-  updatedBy      String            @map("updated_by")
-  updatedAt      DateTime          @updatedAt @map("updated_at")
+  thresholdCents Int?               @map("threshold_cents")
+  updatedBy      String             @map("updated_by")
+  updatedAt      DateTime           @updatedAt @map("updated_at")
 
   @@unique([workspaceId, action])
   @@map("automation_settings")
@@ -7199,8 +7317,8 @@ model CommandAudit {
   kind          CommandKind @map("kind")
   templateId    String?     @map("template_id")
   promptHash    String?     @map("prompt_hash")
-  promptFull    String?     @db.Text @map("prompt_full")
-  resultSummary String?     @db.Text @map("result_summary")
+  promptFull    String?     @map("prompt_full") @db.Text
+  resultSummary String?     @map("result_summary") @db.Text
   createdAt     DateTime    @default(now()) @map("created_at")
 
   @@index([workspaceId, createdAt])
@@ -7416,20 +7534,20 @@ model PlatformEvent {
 
 // M2 correlation output: per-page/per-query deltas around an event.
 model PageImpact {
-  id              String        @id @default(cuid()) @map("id")
-  workspaceId     String        @map("workspace_id")
-  workspace       Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  platformEventId String        @map("platform_event_id")
-  platformEvent   PlatformEvent @relation(fields: [platformEventId], references: [id], onDelete: Cascade)
-  projectId       String        @map("project_id")
-  project         Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  page            String        @map("page")
-  query           String?       @map("query")
-  deltaClicks     Int?          @map("delta_clicks")
-  deltaImpressions Int?         @map("delta_impressions")
-  impactScore     Float?        @map("impact_score")
-  confidenceBand  Json?         @map("confidence_band") // [lower, upper] honest band, never a point score
-  createdAt       DateTime      @default(now()) @map("created_at")
+  id               String        @id @default(cuid()) @map("id")
+  workspaceId      String        @map("workspace_id")
+  workspace        Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  platformEventId  String        @map("platform_event_id")
+  platformEvent    PlatformEvent @relation(fields: [platformEventId], references: [id], onDelete: Cascade)
+  projectId        String        @map("project_id")
+  project          Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  page             String        @map("page")
+  query            String?       @map("query")
+  deltaClicks      Int?          @map("delta_clicks")
+  deltaImpressions Int?          @map("delta_impressions")
+  impactScore      Float?        @map("impact_score")
+  confidenceBand   Json?         @map("confidence_band") // [lower, upper] honest band, never a point score
+  createdAt        DateTime      @default(now()) @map("created_at")
 
   @@index([platformEventId, projectId])
   @@index([workspaceId, impactScore])
@@ -7438,16 +7556,16 @@ model PageImpact {
 
 // M3: versioned prompt panels per AI engine.
 model GeoPromptPanel {
-  id               String        @id @default(cuid()) @map("id")
-  workspaceId      String        @map("workspace_id")
-  workspace        Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  engine           String        @map("engine")
-  promptSetVersion Int           @map("prompt_set_version")
-  prompts          Json          @map("prompts")
-  cadence          String        @default("weekly") @map("cadence")
-  nReps            Int           @default(3) @map("n_reps")
-  createdAt        DateTime      @default(now()) @map("created_at")
-  updatedAt        DateTime      @updatedAt @map("updated_at")
+  id               String    @id @default(cuid()) @map("id")
+  workspaceId      String    @map("workspace_id")
+  workspace        Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  engine           String    @map("engine")
+  promptSetVersion Int       @map("prompt_set_version")
+  prompts          Json      @map("prompts")
+  cadence          String    @default("weekly") @map("cadence")
+  nReps            Int       @default(3) @map("n_reps")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
 
   observations GeoObservation[]
 
@@ -7459,18 +7577,18 @@ model GeoPromptPanel {
 // M3: raw observations — never aggregated into a single score at write
 // time (the honest-labeling contract; §6).
 model GeoObservation {
-  id                String        @id @default(cuid()) @map("id")
-  workspaceId       String        @map("workspace_id")
-  workspace         Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  panelId           String        @map("panel_id")
+  id                String         @id @default(cuid()) @map("id")
+  workspaceId       String         @map("workspace_id")
+  workspace         Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  panelId           String         @map("panel_id")
   panel             GeoPromptPanel @relation(fields: [panelId], references: [id], onDelete: Cascade)
-  runAt             DateTime      @default(now()) @map("run_at")
-  rep               Int           @default(1) @map("rep")
-  brandMentioned    Boolean       @default(false) @map("brand_mentioned")
-  citationUrls      String[]      @default([]) @map("citation_urls")
-  sentiment         GeoSentiment? @map("sentiment")
-  stabilityMetadata Json?         @map("stability_metadata")
-  createdAt         DateTime      @default(now()) @map("created_at")
+  runAt             DateTime       @default(now()) @map("run_at")
+  rep               Int            @default(1) @map("rep")
+  brandMentioned    Boolean        @default(false) @map("brand_mentioned")
+  citationUrls      String[]       @default([]) @map("citation_urls")
+  sentiment         GeoSentiment?  @map("sentiment")
+  stabilityMetadata Json?          @map("stability_metadata")
+  createdAt         DateTime       @default(now()) @map("created_at")
 
   @@index([panelId, runAt])
   @@index([workspaceId, runAt])
@@ -7501,19 +7619,19 @@ model CompetitorWatch {
 // M4: detected change + semantic summary + recommended response.
 // Actions always go through the Phase 9 approval executor (§4.3).
 model CompetitorChange {
-  id                  String                @id @default(cuid()) @map("id")
-  workspaceId         String                @map("workspace_id")
-  workspace           Workspace             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  watchId             String                @map("watch_id")
-  watch               CompetitorWatch       @relation(fields: [watchId], references: [id], onDelete: Cascade)
-  url                 String                @map("url")
-  detectedAt          DateTime              @default(now()) @map("detected_at")
-  changeType          CompetitorChangeType  @map("change_type")
-  semanticSummary     String?               @db.Text @map("semantic_summary")
-  whyItMatters        String?               @db.Text @map("why_it_matters")
-  recommendedResponse String?               @db.Text @map("recommended_response")
+  id                  String                 @id @default(cuid()) @map("id")
+  workspaceId         String                 @map("workspace_id")
+  workspace           Workspace              @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  watchId             String                 @map("watch_id")
+  watch               CompetitorWatch        @relation(fields: [watchId], references: [id], onDelete: Cascade)
+  url                 String                 @map("url")
+  detectedAt          DateTime               @default(now()) @map("detected_at")
+  changeType          CompetitorChangeType   @map("change_type")
+  semanticSummary     String?                @map("semantic_summary") @db.Text
+  whyItMatters        String?                @map("why_it_matters") @db.Text
+  recommendedResponse String?                @map("recommended_response") @db.Text
   status              CompetitorChangeStatus @default(new) @map("status")
-  createdAt           DateTime              @default(now()) @map("created_at")
+  createdAt           DateTime               @default(now()) @map("created_at")
 
   @@index([watchId, detectedAt])
   @@index([workspaceId, status])
@@ -7522,17 +7640,17 @@ model CompetitorChange {
 
 // M5: versioned difficulty outputs with input provenance.
 model DifficultyEstimate {
-  id               String   @id @default(cuid()) @map("id")
-  workspaceId      String   @map("workspace_id")
+  id               String    @id @default(cuid()) @map("id")
+  workspaceId      String    @map("workspace_id")
   workspace        Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  keyword          String   @map("keyword")
-  locale           String   @default("en-US") @map("locale")
-  estimate         Float    @map("estimate")
-  uncertaintyBand  Json?    @map("uncertainty_band") // [lower, upper] — "estimated range," never a score
-  inputsProvenance Json?    @map("inputs_provenance")
-  modelVersion     String   @map("model_version")
-  evaluatedAt      DateTime @default(now()) @map("evaluated_at")
-  createdAt        DateTime @default(now()) @map("created_at")
+  keyword          String    @map("keyword")
+  locale           String    @default("en-US") @map("locale")
+  estimate         Float     @map("estimate")
+  uncertaintyBand  Json?     @map("uncertainty_band") // [lower, upper] — "estimated range," never a score
+  inputsProvenance Json?     @map("inputs_provenance")
+  modelVersion     String    @map("model_version")
+  evaluatedAt      DateTime  @default(now()) @map("evaluated_at")
+  createdAt        DateTime  @default(now()) @map("created_at")
 
   @@unique([workspaceId, keyword, locale, modelVersion])
   @@index([workspaceId, evaluatedAt])
@@ -7554,4 +7672,23 @@ model LinkVerification {
   @@unique([workspaceId, targetUrl, sourceUrl])
   @@index([workspaceId, status])
   @@map("link_verification")
+}
+
+// Phase 12 (embeds): tenant-scoped GrowthBook flag overrides. Marketr
+// keeps the flag *definitions* in GrowthBook (open core) but the admin's
+// toggle writes a per-workspace override here — one tenant's experiment
+// never leaks into another's. The SDK is seeded with the effective
+// (overridden) values; GrowthBook's global default stays untouched unless
+// changed in GrowthBook itself.
+model WorkspaceFlagOverride {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  key         String
+  value       Json
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@unique([workspaceId, key])
+  @@index([workspaceId])
+  @@map("workspace_flag_overrides")
 }

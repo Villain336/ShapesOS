@@ -12,6 +12,9 @@ import { Globe2, Loader2, Settings, TriangleAlert, Wand2 } from "lucide-react";
 import { btnGhost, btnPrimary, inputCls } from "../ui";
 import type { BrandKitImport } from "@/lib/design/brandfetch";
 /* END */
+/* PROVIDER:penpot */
+import { PenpotSection } from "./PenpotSection";
+/* END */
 /* COLORMIND (integration #10) */
 import { Palette } from "lucide-react";
 import { colormindStatus } from "@/lib/design/colormind";
@@ -535,6 +538,9 @@ export function BrandPanel({ onFontsLoaded }: { onFontsLoaded?: (fonts: string[]
           )}
         </div>
         {/* END */}
+        {/* PROVIDER:penpot */}
+        <PenpotSection kits={kits} onKitsChanged={bfRefreshKits} />
+        {/* END */}
         {loading && <p className="text-[12px] text-stone-500">Loading brand kits…</p>}
         {error && (
           <p className="rounded-md border border-stone-200 bg-stone-50 px-2.5 py-2 text-[12px] text-stone-600">
@@ -564,6 +570,18 @@ export function BrandPanel({ onFontsLoaded }: { onFontsLoaded?: (fonts: string[]
                 <p className="pt-0.5 text-[11px] text-stone-400">
                   Imported from{" "}
                   <span className="font-mono">{String(kit.metadata.domain ?? "")}</span>
+                </p>
+              )}
+              {/* END */}
+              {/* PROVIDER:penpot */}
+              {kit.metadata?.source === "penpot" && (
+                <p className="pt-0.5 text-[11px] text-stone-400">
+                  Imported from Penpot
+                  {kit.metadata.fileName ? (
+                    <>
+                      {" "}· <span className="font-mono">{String(kit.metadata.fileName).slice(0, 60)}</span>
+                    </>
+                  ) : null}
                 </p>
               )}
               {/* END */}

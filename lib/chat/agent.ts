@@ -30,8 +30,38 @@ import { connectorToolsSection, resolveConnectorTool } from "./connector-tools";
 // system-prompt layer (global hard rules + CSA constitution), wired in
 // front of all project context and retrieval grounding.
 import { constitutionSystemPrompt } from "@/lib/expert/constitution";
+// Phase 12: Agency-Agents persona seeds (MIT, original distillations) as
+// selectable advisor personas for the Chief Strategy Agent.
+import {
+  assertPersonaForSurface,
+  PERSONAS,
+  personaSystemPrompt,
+  personasForSurface,
+  type PersonaId,
+} from "@/lib/expert/personas";
 
 const MAX_ITERATIONS = 6;
+
+/**
+ * Phase 12: selectable advisor personas for the Chief Strategy Agent.
+ * Business Strategist + Agents Orchestrator sharpen the CSA's mandatory
+ * reasoning order with a consulting lens (tradeoffs, assumptions, moat)
+ * and an orchestration lens (phase gates, evidence, escalation).
+ * advisorSystemPrompt(personaId) composes the persona's seed BEHIND the
+ * global hard rules — the same layering contract as the CSA constitution.
+ * A UI advisor picker or future prompt-layer selection should offer
+ * exactly these ids, sourced from personasForSurface("csa").
+ */
+export const CSA_ADVISOR_PERSONAS: readonly PersonaId[] =
+  personasForSurface("csa");
+
+export function advisorSystemPrompt(persona: PersonaId): string {
+  assertPersonaForSurface(persona, "csa");
+  return [
+    personaSystemPrompt(persona),
+    `<!-- advisor provenance: ${PERSONAS[persona].provenance.repo} (${PERSONAS[persona].provenance.license}), ${PERSONAS[persona].provenance.sourceFile} -->`,
+  ].join("\n\n");
+}
 
 export interface ChatToolCall {
   tool: string;

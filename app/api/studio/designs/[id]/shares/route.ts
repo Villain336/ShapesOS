@@ -13,6 +13,8 @@ export const dynamic = "force-dynamic";
 
 const CreateSchema = z.object({
   expiresInDays: z.number().int().min(1).max(365).optional(),
+  // Phase 12 (embeds): rrweb session replay opt-in for this link.
+  replayOptIn: z.boolean().optional(),
 });
 
 async function getDesign(id: string, workspaceId: string) {
@@ -37,6 +39,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
         createdAt: true,
         expiresAt: true,
         revokedAt: true,
+        replayOptIn: true,
       },
     });
     return Response.json({
@@ -46,6 +49,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
         expiresAt: s.expiresAt?.toISOString() ?? null,
         revokedAt: s.revokedAt?.toISOString() ?? null,
         active: !s.revokedAt && (!s.expiresAt || s.expiresAt > new Date()),
+        replayOptIn: s.replayOptIn,
       })),
     });
   } catch (e) {
@@ -81,8 +85,9 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
         expiresAt: parsed.data.expiresInDays
           ? new Date(Date.now() + parsed.data.expiresInDays * 86400_000)
           : null,
+        replayOptIn: parsed.data.replayOptIn === true,
       },
-      select: { id: true, createdAt: true, expiresAt: true },
+      select: { id: true, createdAt: true, expiresAt: true, replayOptIn: true },
     });
     return Response.json(
       {
@@ -90,6 +95,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
           id: share.id,
           createdAt: share.createdAt.toISOString(),
           expiresAt: share.expiresAt?.toISOString() ?? null,
+          replayOptIn: share.replayOptIn,
         },
         // Raw token — shown ONCE. It is never stored or retrievable again.
         token,

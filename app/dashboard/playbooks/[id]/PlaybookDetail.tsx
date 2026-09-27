@@ -21,6 +21,7 @@ import {
   Share2,
   Upload,
   X,
+  Zap,
 } from "lucide-react";
 
 type Status = "draft" | "eval" | "review" | "canary" | "production" | "deprecated";
@@ -127,9 +128,24 @@ function Modal({ title, onClose, children, wide }: { title: string; onClose: () 
   );
 }
 
-function contentSteps(content: unknown): { title: string; detail?: string; executor?: string }[] {
+// Phase 12, Worker 3: full step shape including the automation variant
+// (lib/playbooks/store.ts PlaybookStep). Versions are immutable JSON
+// snapshots; older versions simply omit these fields.
+interface StepView {
+  title: string;
+  detail?: string;
+  executor?: string;
+  stepType?: "task" | "automation";
+  automation?: {
+    flowId?: string;
+    flowName?: string;
+    payloadTemplate?: Record<string, unknown>;
+  };
+}
+
+function contentSteps(content: unknown): StepView[] {
   if (content && typeof content === "object" && Array.isArray((content as { steps?: unknown }).steps)) {
-    return (content as { steps: { title: string; detail?: string; executor?: string }[] }).steps;
+    return (content as { steps: StepView[] }).steps;
   }
   return [];
 }
@@ -486,6 +502,12 @@ function VersionsTab({
                             <span className="font-medium">{s.title}</span>
                             {s.detail && <span className="text-stone-500"> — {s.detail}</span>}
                             {s.executor && <Chip>{s.executor}</Chip>}
+                            {s.stepType === "automation" && (
+                              <Chip tone="violet">
+                                <Zap size={10} className="inline" /> automation
+                                {s.automation?.flowName ? `: ${s.automation.flowName}` : s.automation?.flowId ? `: ${s.automation.flowId}` : ""}
+                              </Chip>
+                            )}
                           </li>
                         ))}
                       </ol>
@@ -676,19 +698,46 @@ function NewVersionModal({
   const [steps, setSteps] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Phase 12, Worker 3: optional automation step (Activepieces webhook flow).
+  const [autoFlowId, setAutoFlowId] = useState("");
+  const [autoFlowName, setAutoFlowName] = useState("");
+  const [autoPayload, setAutoPayload] = useState("{}");
 
   const save = async () => {
     if (!title.trim()) {
       setError("Title is required.");
       return;
     }
-    const stepList = steps
+    const stepList: StepView[] = steps
       .split("\n")
       .map((s) => s.trim())
       .filter(Boolean)
       .map((s) => ({ title: s }));
+    if (autoFlowId.trim()) {
+      let payloadTemplate: Record<string, unknown> | undefined;
+      try {
+        const parsed: unknown = JSON.parse(autoPayload.trim() || "{}");
+        if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+          throw new Error("payload template must be a JSON object");
+        }
+        payloadTemplate = parsed as Record<string, unknown>;
+      } catch (e) {
+        setError(`Payload template must be valid JSON: ${e instanceof Error ? e.message : String(e)}`);
+        return;
+      }
+      stepList.push({
+        title: autoFlowName.trim() ? `Run automation: ${autoFlowName.trim()}` : `Run automation flow ${autoFlowId.trim()}`,
+        stepType: "automation",
+        executor: "scheduler",
+        automation: {
+          flowId: autoFlowId.trim(),
+          flowName: autoFlowName.trim() || undefined,
+          payloadTemplate,
+        },
+      });
+    }
     if (stepList.length === 0) {
-      setError("At least one step is required (one per line).");
+      setError("At least one step is required (one per line), or add an automation step.");
       return;
     }
     setSaving(true);
@@ -720,6 +769,23 @@ function NewVersionModal({
       <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Review sprint v2" className={`${inputCls} mb-3 w-full`} />
       <label className="mb-1 block text-[12px] font-medium text-stone-600">Steps (one per line)</label>
       <textarea value={steps} onChange={(e) => setSteps(e.target.value)} rows={6} placeholder="Pull the GBP insights report&#10;Draft the review asks&#10;Schedule the Friday photo post" className={`${inputCls} mb-4 w-full`} />
+      <div className="mb-4 rounded-md border border-stone-200 bg-stone-50 px-3 py-3">
+        <div className="mb-2 flex items-center gap-1.5 text-[12px] font-medium text-stone-600">
+          <Zap size={12} className="text-violet-600" /> Automation step (optional) — fires an Activepieces webhook flow
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <label className="mb-1 block text-[11px] font-medium text-stone-500">Flow ID</label>
+            <input value={autoFlowId} onChange={(e) => setAutoFlowId(e.target.value)} placeholder="e.g. abc123…" className={`${inputCls} w-full font-mono`} />
+          </div>
+          <div>
+            <label className="mb-1 block text-[11px] font-medium text-stone-500">Flow name (label)</label>
+            <input value={autoFlowName} onChange={(e) => setAutoFlowName(e.target.value)} placeholder="Weekly rank digest" className={`${inputCls} w-full`} />
+          </div>
+        </div>
+        <label className="mb-1 mt-2 block text-[11px] font-medium text-stone-500">Payload template (JSON object)</label>
+        <textarea value={autoPayload} onChange={(e) => setAutoPayload(e.target.value)} rows={2} spellCheck={false} className={`${inputCls} w-full font-mono`} />
+      </div>
       <div className="flex justify-end gap-2">
         <button onClick={onClose} className={btnGhost} disabled={saving}>
           Cancel

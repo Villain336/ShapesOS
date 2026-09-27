@@ -100,6 +100,16 @@ export const CREDIT_COSTS = {
    * Follows the publish/connector_sync free-action precedent. */
   brandfetch_lookup: { credits: 0, basis: "free", description: "Brandfetch brand lookup (BYO key, vendor-billed)" },
   /* END */
+  /* INTEGRATION:activepieces */
+  /** Activepieces flow trigger: 0 credits — the automation engine is the
+   * user's own self-hosted sidecar (BYO, vendor-billed by nobody); the ledger
+   * event exists for per-tenant usage visibility only. Follows the
+   * brandfetch_lookup free-action precedent. */
+  automation_flow_trigger: { credits: 0, basis: "free", description: "Activepieces flow trigger (BYO engine)" },
+  /** Activepieces run status read: 0 credits — local ledger read of the
+   * engine's run list on the user's own sidecar. */
+  automation_flow_status: { credits: 0, basis: "free", description: "Activepieces flow run status read (BYO engine)" },
+  /* END */
 } as const satisfies Record<string, CreditCostDef>;
 
 /** Action keys meter() accepts. */

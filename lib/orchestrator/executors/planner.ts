@@ -19,6 +19,14 @@ import {
 // contract MUST use MISSION_PLANNER_SYSTEM_PROMPT as its system prompt,
 // with M9 retrieval grounding placed after it (see groundedPrompt()).
 import { constitutionSystemPrompt } from "@/lib/expert/constitution";
+// Phase 12: Agency-Agents persona seeds (MIT, original distillations) as
+// selectable mission-planning personas.
+import {
+  assertPersonaForSurface,
+  PERSONAS,
+  personaSystemPrompt,
+  type PersonaId,
+} from "@/lib/expert/personas";
 
 /**
  * The mission planner's system-prompt layer (Expert Constitution Pack v1:
@@ -28,6 +36,28 @@ import { constitutionSystemPrompt } from "@/lib/expert/constitution";
  */
 export const MISSION_PLANNER_SYSTEM_PROMPT =
   constitutionSystemPrompt("mission-planner");
+
+/**
+ * Phase 12: selectable mission-planning persona for mission planning
+ * (Agency-Agents seed, MIT, original distillation). When selected, its
+ * seed is appended behind the base mission-planner constitution — same
+ * layering contract: hard rules first, persona lens second, retrieval
+ * grounding and task after. Omitting the persona keeps the base v1 prompt
+ * unchanged.
+ */
+export const MISSION_PLANNING_PERSONAS: readonly PersonaId[] = [
+  "studio-producer",
+] as const;
+
+export function missionPlannerPrompt(persona?: PersonaId): string {
+  if (persona === undefined) return MISSION_PLANNER_SYSTEM_PROMPT;
+  assertPersonaForSurface(persona, "missions");
+  return [
+    MISSION_PLANNER_SYSTEM_PROMPT,
+    personaSystemPrompt(persona),
+    `<!-- persona provenance: ${PERSONAS[persona].provenance.repo} (${PERSONAS[persona].provenance.license}), ${PERSONAS[persona].provenance.sourceFile} -->`,
+  ].join("\n\n");
+}
 
 export const PLANNER_TOOLS = Object.freeze([
   "substrate.context",

@@ -45,7 +45,7 @@ export interface MissionGoalDef {
   baselineHint?: string;
 }
 
-export type PlanStepKind = "research" | "plan" | "draft" | "approval" | "execute" | "analyze" | "schedule";
+export type PlanStepKind = "research" | "plan" | "draft" | "approval" | "execute" | "analyze" | "schedule" | "automation";
 
 /** The 5 Phase 9 executors (spec §P9A) + human for approval steps. */
 export type ExecutorName = "researcher" | "planner" | "drafter" | "analyst" | "scheduler" | "human";

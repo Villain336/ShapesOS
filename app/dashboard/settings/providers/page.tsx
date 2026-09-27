@@ -13,6 +13,15 @@ import { unsplashStatus } from "@/lib/design/unsplash";
 /* PROVIDER:cloudinary */ import { cloudinaryStatus } from "@/lib/design/cloudinary"; /* END */
 /* PROVIDER:brandfetch */ import { brandfetchStatus } from "@/lib/design/brandfetch"; /* END */
 import SettingsNav from "@/components/settings/SettingsNav";
+// Phase 12 (embeds): integration status helpers.
+import { umamiStatus } from "@/lib/integrations/umami";
+import { chatwootStatus } from "@/lib/integrations/chatwoot";
+import { ghostStatus } from "@/lib/integrations/ghost";
+import { growthBookStatus } from "@/lib/integrations/growthbook";
+import { documensoStatus } from "@/lib/integrations/documenso";
+/* INTEGRATION:activepieces */ import { activepiecesStatus } from "@/lib/integrations/activepieces"; /* END */
+/* PROVIDER:listmonk */ import { listmonkStatus } from "@/lib/integrations/listmonk"; /* END */
+/* PROVIDER:postiz */ import { postizStatus } from "@/lib/integrations/postiz"; /* END */
 
 export const dynamic = "force-dynamic";
 
@@ -44,6 +53,15 @@ export default async function ProvidersSettingsPage() {
   const cloudinary = cloudinaryStatus();
   /* PROVIDER:pexels */ const pexels = pexelsStatus(); /* END */
   /* PROVIDER:pixabay */ const pixabay = pixabayStatus(); /* END */
+  // Phase 12 (embeds).
+  const umami = umamiStatus();
+  const chatwoot = chatwootStatus();
+  const ghost = ghostStatus();
+  const growthbook = growthBookStatus();
+  const documenso = documensoStatus();
+  /* PROVIDER:listmonk */ const listmonk = listmonkStatus(); /* END */
+  /* PROVIDER:postiz */ const postiz = postizStatus(); /* END */
+  /* INTEGRATION:activepieces */ const activepieces = activepiecesStatus(); /* END */
 
   return (
     <div className="flex flex-col gap-6">
@@ -318,6 +336,343 @@ export default async function ProvidersSettingsPage() {
             with the Cloudinary pipeline in the design editor.
           </p>
         )}
+      </div>
+      {/* END */}
+
+      {/* PROVIDER:listmonk */}
+      <div className="rounded-xl border border-zinc-200 bg-white/60 p-5">
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="font-medium">Newsletter engine (Listmonk)</h2>
+          <StatusBadge
+            ok={listmonk.configured}
+            label={listmonk.configured ? "connected" : "not connected"}
+          />
+        </div>
+        <dl className="mt-3 grid gap-2 text-sm md:grid-cols-2">
+          <div>
+            <dt className="text-xs text-zinc-500">Provider</dt>
+            <dd className="font-mono text-xs">{listmonk.name}</dd>
+          </div>
+          <div>
+            <dt className="text-xs text-zinc-500">Live data</dt>
+            <dd>
+              {listmonk.isLive
+                ? "Yes — broadcasts run on your Listmonk sidecar"
+                : "No — the Broadcasts tab in Nurture is disabled until you connect"}
+            </dd>
+          </div>
+          <div className="md:col-span-2">
+            <dt className="text-xs text-zinc-500">Environment variables</dt>
+            <dd className="font-mono text-xs">
+              LISTMONK_URL, LISTMONK_USER, LISTMONK_TOKEN
+            </dd>
+          </div>
+        </dl>
+        <p className="mt-3 text-xs text-zinc-500">
+          Listmonk is a self-hosted AGPL-3.0 email engine sidecar (separate
+          process, own Postgres — see docker/integrations/listmonk.yml). Marketr
+          talks to it over its REST API only, with Basic auth (user + token).
+        </p>
+        {!listmonk.configured && (
+          <p className="mt-2 text-xs text-zinc-500">
+            Bring up the sidecar and set LISTMONK_URL, LISTMONK_USER, and
+            LISTMONK_TOKEN on the host. Key material is never displayed here.
+          </p>
+        )}
+      </div>
+      {/* END */}
+
+      {/* PROVIDER:postiz */}
+      <div className="rounded-xl border border-zinc-200 bg-white/60 p-5">
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="font-medium">Social publishing (Postiz)</h2>
+          <StatusBadge
+            ok={postiz.configured}
+            label={postiz.configured ? "connected" : "not connected"}
+          />
+        </div>
+        <dl className="mt-3 grid gap-2 text-sm md:grid-cols-2">
+          <div>
+            <dt className="text-xs text-zinc-500">Provider</dt>
+            <dd className="font-mono text-xs">{postiz.name}</dd>
+          </div>
+          <div>
+            <dt className="text-xs text-zinc-500">Live data</dt>
+            <dd>
+              {postiz.isLive
+                ? "Yes — scheduling runs on your Postiz sidecar"
+                : "No — the Social workspace is disabled until you connect"}
+            </dd>
+          </div>
+          <div className="md:col-span-2">
+            <dt className="text-xs text-zinc-500">Environment variables</dt>
+            <dd className="font-mono text-xs">POSTIZ_URL, POSTIZ_API_KEY</dd>
+          </div>
+        </dl>
+        <p className="mt-3 text-xs text-zinc-500">
+          Postiz is a self-hosted AGPL-3.0 social-publishing sidecar (~30
+          channels behind one OAuth surface — see
+          docker/integrations/postiz.yml). Marketr uses its public REST API
+          over raw fetch only — never the AGPL <span className="font-mono">@postiz/node</span> SDK.
+          Channel OAuth tokens stay inside Postiz.
+        </p>
+        {!postiz.configured && (
+          <p className="mt-2 text-xs text-zinc-500">
+            Bring up the sidecar, create an API key in its Settings → Public
+            API, and set POSTIZ_URL and POSTIZ_API_KEY on the host. Key
+            material is never displayed here.
+          </p>
+        )}
+      </div>
+      {/* END */}
+
+      {/* INTEGRATION:activepieces */}
+      <div className="rounded-xl border border-zinc-200 bg-white/60 p-5">
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="font-medium">Automation engine (Activepieces)</h2>
+          <StatusBadge
+            ok={activepieces.configured}
+            label={activepieces.configured ? "connected" : "not connected"}
+          />
+        </div>
+        <dl className="mt-3 grid gap-2 text-sm md:grid-cols-2">
+          <div>
+            <dt className="text-xs text-zinc-500">Engine</dt>
+            <dd className="font-mono text-xs">
+              {activepieces.configured ? activepieces.url : "—"}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-xs text-zinc-500">Flows</dt>
+            <dd>
+              {activepieces.configured
+                ? "Yes — Missions, Playbooks, and the Strategy Agent can trigger published webhook flows"
+                : "No — automation features stay hidden until you connect"}
+            </dd>
+          </div>
+          <div className="md:col-span-2">
+            <dt className="text-xs text-zinc-500">Environment variables</dt>
+            <dd className="font-mono text-xs">ACTIVEPIECES_URL, ACTIVEPIECES_API_KEY, ACTIVEPIECES_API_PREFIX (optional)</dd>
+          </div>
+        </dl>
+        <p className="mt-3 text-xs text-zinc-500">
+          Activepieces Community Edition (MIT) is the optional automation
+          backbone: self-host with{" "}
+          <code className="font-mono">
+            docker compose -f docker/integrations/activepieces.yml --profile activepieces up -d
+          </code>
+          , create an API key in its Settings, and set ACTIVEPIECES_URL and
+          ACTIVEPIECES_API_KEY on the host. Key material is never displayed
+          here. Only published flows with a “Catch Webhook” trigger can be
+          fired externally — schedule and piece triggers run inside the engine.
+        </p>
+        {!activepieces.configured && (
+          <p className="mt-2 text-xs text-zinc-500">
+            Unconnected: the Run automation action, automation playbook steps,
+            and automation tools report an honest “not connected” state and
+            nothing is fabricated.
+          </p>
+        )}
+      </div>
+      {/* END */}
+
+      {/* PHASE12:umami */}
+      <div className="rounded-xl border border-zinc-200 bg-white/60 p-5">
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="font-medium">Analytics (Umami)</h2>
+          <StatusBadge
+            ok={umami.statsConfigured}
+            label={umami.statsConfigured ? "configured" : "not configured"}
+          />
+        </div>
+        <dl className="mt-3 grid gap-2 text-sm md:grid-cols-2">
+          <div>
+            <dt className="text-xs text-zinc-500">Provider</dt>
+            <dd className="font-mono text-xs">{umami.name}</dd>
+          </div>
+          <div>
+            <dt className="text-xs text-zinc-500">Stats API</dt>
+            <dd>
+              {umami.statsConfigured
+                ? "Yes — the Analytics dashboard reads this sidecar"
+                : "No — the Analytics page shows the setup guide"}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-xs text-zinc-500">Tracking snippet</dt>
+            <dd>
+              {umami.snippetConfigured
+                ? "Yes — cookieless tracking on public pages"
+                : "No — public pages send no analytics"}
+            </dd>
+          </div>
+          <div className="md:col-span-2">
+            <dt className="text-xs text-zinc-500">Environment variables</dt>
+            <dd className="font-mono text-xs">
+              UMAMI_URL, UMAMI_API_KEY, UMAMI_WEBSITE_ID, UMAMI_SCRIPT_URL
+            </dd>
+          </div>
+        </dl>
+        <p className="mt-3 text-xs text-zinc-500">
+          Self-host with{" "}
+          <code className="font-mono">
+            docker compose -f docker-compose.yml -f docker/profiles/umami.yml --profile umami up -d
+          </code>
+          . MIT, cookieless, ~100MB idle. Key material is never displayed here.
+        </p>
+      </div>
+      {/* END */}
+
+      {/* PHASE12:chatwoot */}
+      <div className="rounded-xl border border-zinc-200 bg-white/60 p-5">
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="font-medium">Live chat (Chatwoot)</h2>
+          <StatusBadge
+            ok={chatwoot.active}
+            label={
+              chatwoot.active
+                ? "active"
+                : chatwoot.configured
+                  ? "configured — off"
+                  : "not configured"
+            }
+          />
+        </div>
+        <dl className="mt-3 grid gap-2 text-sm md:grid-cols-2">
+          <div>
+            <dt className="text-xs text-zinc-500">Provider</dt>
+            <dd className="font-mono text-xs">{chatwoot.name}</dd>
+          </div>
+          <div>
+            <dt className="text-xs text-zinc-500">Widget</dt>
+            <dd>
+              {chatwoot.active
+                ? "Live in the dashboard"
+                : "Off — the widget loads only with an explicit opt-in"}
+            </dd>
+          </div>
+          <div className="md:col-span-2">
+            <dt className="text-xs text-zinc-500">Environment variables</dt>
+            <dd className="font-mono text-xs">
+              CHATWOOT_BASE_URL, CHATWOOT_WEBSITE_TOKEN, CHATWOOT_WIDGET_ENABLED=true
+            </dd>
+          </div>
+        </dl>
+        <p className="mt-3 text-xs text-zinc-500">
+          MIT core. Off by default even with credentials set — the widget
+          mounts only when CHATWOOT_WIDGET_ENABLED=true. Key material is never
+          displayed here.
+        </p>
+      </div>
+      {/* END */}
+
+      {/* PHASE12:ghost */}
+      <div className="rounded-xl border border-zinc-200 bg-white/60 p-5">
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="font-medium">Blog publishing (Ghost)</h2>
+          <StatusBadge
+            ok={ghost.configured}
+            label={ghost.configured ? "configured" : "not configured"}
+          />
+        </div>
+        <dl className="mt-3 grid gap-2 text-sm md:grid-cols-2">
+          <div>
+            <dt className="text-xs text-zinc-500">Provider</dt>
+            <dd className="font-mono text-xs">{ghost.name}</dd>
+          </div>
+          <div>
+            <dt className="text-xs text-zinc-500">Content engine</dt>
+            <dd>
+              {ghost.configured
+                ? "Yes — “Publish to Ghost” is live on content items"
+                : "No — “Publish to Ghost” is disabled with an honest message"}
+            </dd>
+          </div>
+          <div className="md:col-span-2">
+            <dt className="text-xs text-zinc-500">Environment variables</dt>
+            <dd className="font-mono text-xs">GHOST_URL, GHOST_ADMIN_API_KEY</dd>
+          </div>
+        </dl>
+        <p className="mt-3 text-xs text-zinc-500">
+          MIT. Posts go out as Ghost drafts by default. Key material is never
+          displayed here.
+        </p>
+      </div>
+      {/* END */}
+
+      {/* PHASE12:growthbook */}
+      <div className="rounded-xl border border-zinc-200 bg-white/60 p-5">
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="font-medium">Feature flags (GrowthBook)</h2>
+          <StatusBadge
+            ok={growthbook.managementConfigured}
+            label={growthbook.managementConfigured ? "configured" : "not configured"}
+          />
+        </div>
+        <dl className="mt-3 grid gap-2 text-sm md:grid-cols-2">
+          <div>
+            <dt className="text-xs text-zinc-500">Provider</dt>
+            <dd className="font-mono text-xs">{growthbook.name}</dd>
+          </div>
+          <div>
+            <dt className="text-xs text-zinc-500">SDK (live flag values)</dt>
+            <dd>
+              {growthbook.sdkConfigured
+                ? "Yes — flags resolve from the sidecar"
+                : "No — Marketr's built-in flag defaults apply"}
+            </dd>
+          </div>
+          <div className="md:col-span-2">
+            <dt className="text-xs text-zinc-500">Environment variables</dt>
+            <dd className="font-mono text-xs">
+              GROWTHBOOK_API_HOST, GROWTHBOOK_API_KEY, GROWTHBOOK_CLIENT_KEY
+            </dd>
+          </div>
+        </dl>
+        <p className="mt-3 text-xs text-zinc-500">
+          Open core, MIT bulk. Self-host with{" "}
+          <code className="font-mono">
+            docker compose -f docker-compose.yml -f docker/profiles/growthbook.yml --profile growthbook up -d
+          </code>
+          . Flags are managed at Settings → Experiments. Key material is never
+          displayed here.
+        </p>
+      </div>
+      {/* END */}
+
+      {/* PHASE12:documenso */}
+      <div className="rounded-xl border border-zinc-200 bg-white/60 p-5">
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="font-medium">E-signatures (Documenso)</h2>
+          <StatusBadge
+            ok={documenso.configured}
+            label={documenso.configured ? "configured" : "not configured"}
+          />
+        </div>
+        <dl className="mt-3 grid gap-2 text-sm md:grid-cols-2">
+          <div>
+            <dt className="text-xs text-zinc-500">Provider</dt>
+            <dd className="font-mono text-xs">{documenso.name}</dd>
+          </div>
+          <div>
+            <dt className="text-xs text-zinc-500">Signing requests</dt>
+            <dd>
+              {documenso.configured
+                ? "Yes — API-only, at Settings → Signing"
+                : "No — the Signing page shows the setup guide"}
+            </dd>
+          </div>
+          <div className="md:col-span-2">
+            <dt className="text-xs text-zinc-500">Environment variables</dt>
+            <dd className="font-mono text-xs">DOCUMENSO_URL, DOCUMENSO_API_KEY</dd>
+          </div>
+        </dl>
+        <p className="mt-3 text-xs text-zinc-500">
+          AGPL Community Edition, API-only against an unmodified instance —
+          signers use Documenso&apos;s own emailed link. The white-labeled
+          embedded signing UI is the paid Enterprise feature and is not
+          offered. Key material is never displayed here.
+        </p>
       </div>
       {/* END */}
     </div>

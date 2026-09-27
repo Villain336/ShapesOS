@@ -17,6 +17,14 @@ import type { McpToolName } from "./scopes";
 import { readUsageSummary } from "./metering";
 import { analyzeSerpUnmetered, ActionError } from "@/lib/serp/analyze";
 import { researchKeywordsUnmetered } from "@/lib/keywords/research";
+/* INTEGRATION:activepieces */
+import {
+  getFlowRun,
+  isActivepiecesConfigured,
+  latestFlowRun,
+  triggerFlow,
+} from "@/lib/integrations/activepieces";
+/* END */
 
 export interface ToolResult {
   /** JSON-serializable payload. */
@@ -338,6 +346,83 @@ const tools: ToolDef[] = [
       }
     },
   },
+  /* INTEGRATION:activepieces */
+  {
+    name: "automation_trigger_flow",
+    description:
+      "Trigger a published Activepieces webhook flow on the workspace's automation engine with a JSON payload. Free (the engine is the workspace's own sidecar). Only flows with a published \"Catch Webhook\" trigger can be fired externally — schedule/piece triggers run inside the engine. Returns accepted/runId, never fabricated results.",
+    inputSchema: z
+      .object({
+        flowId: z.string().min(1),
+        payload: z.record(z.string(), z.unknown()).optional(),
+      })
+      .strict(),
+    inputJsonSchema: {"type":"object","properties":{"flowId":{"type":"string"},"payload":{"type":"object"}},"required":["flowId"],"additionalProperties":false},
+    handler: async (ctx, args) => {
+      const { flowId, payload } = args as { flowId: string; payload?: Record<string, unknown> };
+      void ctx;
+      if (!isActivepiecesConfigured()) {
+        throw new ToolError(
+          "automation_not_connected",
+          "Activepieces is not connected: set ACTIVEPIECES_URL and ACTIVEPIECES_API_KEY on the host (Settings → Providers). No flow was triggered.",
+        );
+      }
+      try {
+        const result = await triggerFlow(flowId, payload ?? {});
+        return {
+          data: {
+            accepted: result.accepted,
+            flowId: result.flowId,
+            runId: result.runId,
+            note: result.runId
+              ? "Flow accepted. Use automation_flow_status with this runId to poll it."
+              : "Flow accepted, but the engine returned no run id. Use automation_flow_status with flowId to read the newest run.",
+          },
+        };
+      } catch (e) {
+        throw new ToolError("automation_trigger_failed", e instanceof Error ? e.message : String(e));
+      }
+    },
+  },
+  {
+    name: "automation_flow_status",
+    description:
+      "Read the status of an Activepieces flow run: terminal (SUCCEEDED/FAILED/…), start/finish times, and failure detail when present. Pass runId to poll a specific run, or flowId to read the newest run for that flow. Read-only, free.",
+    inputSchema: z
+      .object({
+        runId: z.string().min(1).optional(),
+        flowId: z.string().min(1).optional(),
+      })
+      .strict()
+      .refine((v) => v.runId || v.flowId, { message: "runId or flowId is required" }),
+    inputJsonSchema: {"type":"object","properties":{"runId":{"type":"string"},"flowId":{"type":"string"}},"required":[],"additionalProperties":false},
+    handler: async (ctx, args) => {
+      const { runId, flowId } = args as { runId?: string; flowId?: string };
+      void ctx;
+      if (!isActivepiecesConfigured()) {
+        throw new ToolError(
+          "automation_not_connected",
+          "Activepieces is not connected: set ACTIVEPIECES_URL and ACTIVEPIECES_API_KEY on the host (Settings → Providers).",
+        );
+      }
+      try {
+        if (runId) {
+          const run = await getFlowRun(runId);
+          return { data: { run } };
+        }
+        const run = await latestFlowRun(flowId as string);
+        return {
+          data: {
+            run,
+            note: run ? undefined : "No runs recorded for this flow yet.",
+          },
+        };
+      } catch (e) {
+        throw new ToolError("automation_status_failed", e instanceof Error ? e.message : String(e));
+      }
+    },
+  },
+  /* END */
 ];
 
 export function getTool(name: string): ToolDef | undefined {

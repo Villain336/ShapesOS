@@ -10,6 +10,11 @@ import { CheckCircle2, Clock3, FileText, MessageSquare } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { hashShareToken } from "@/lib/design/sharing";
 import { exportPageToSvg } from "@/lib/design/export-svg";
+// Phase 12 (embeds): optional rrweb replay + Umami cookieless analytics on
+// public share pages. Both are inert unless configured / opted in.
+import { RrwebRecorder } from "@/components/replay/RrwebRecorder";
+import { UmamiTracker } from "@/components/analytics/UmamiTracker";
+import { umamiSnippetConfig } from "@/lib/integrations/umami";
 
 export const dynamic = "force-dynamic";
 
@@ -28,6 +33,7 @@ async function loadShare(token: string) {
       id: true,
       expiresAt: true,
       revokedAt: true,
+      replayOptIn: true,
       design: {
         select: {
           id: true,
@@ -70,9 +76,12 @@ export default async function PublicSharePage({
   } | null;
   const pages = Array.isArray(doc?.pages) ? doc.pages : [];
   const status = STATUS_LABEL[share.design.approvalStatus] ?? STATUS_LABEL.draft!;
+  const umami = umamiSnippetConfig();
 
   return (
     <div className="min-h-screen bg-[#FAFAF7] px-4 py-8 md:px-8">
+      {umami && <UmamiTracker websiteId={umami.websiteId} scriptUrl={umami.scriptUrl} />}
+      {share.replayOptIn && <RrwebRecorder token={token} />}
       <div className="mx-auto max-w-4xl">
         <header className="mb-6 flex flex-wrap items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-violet-600 text-white">

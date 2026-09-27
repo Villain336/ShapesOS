@@ -6,6 +6,8 @@
 import { redirect } from "next/navigation";
 import { requireUser, getOrCreateWorkspace } from "@/lib/session";
 import { StudioApp } from "./StudioApp";
+// Phase 12 (embeds): hero is flag-driven via `studio.compact-hero`.
+import { StudioHero } from "@/components/studio/StudioHero";
 
 export const dynamic = "force-dynamic";
 
@@ -20,13 +22,7 @@ export default async function StudioPage() {
   await getOrCreateWorkspace(user.id, user.email);
   return (
     <div className="flex h-full flex-col gap-4 bg-[#FAFAF7] p-4 md:p-6">
-      <div>
-        <h1 className="text-xl font-bold tracking-tight text-stone-900">Creative Studio</h1>
-        <p className="mt-0.5 text-[13px] text-stone-500">
-          The central home for all creative and design work across Marketr — powered by Canva.
-          v1 ships print/mail creative plus the asset library; email and social templates plug in later.
-        </p>
-      </div>
+      <StudioHero />
       <StudioApp />
     </div>
   );

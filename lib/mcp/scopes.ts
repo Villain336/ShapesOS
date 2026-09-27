@@ -15,6 +15,10 @@ export const MCP_TOOL_NAMES = [
   "get_usage_summary",
   "analyze_serp",
   "research_keywords",
+  /* INTEGRATION:activepieces */
+  "automation_trigger_flow",
+  "automation_flow_status",
+  /* END */
 ] as const;
 
 export type McpToolName = (typeof MCP_TOOL_NAMES)[number];
@@ -48,6 +52,10 @@ export const TOOL_CREDIT_PASSTHROUGH: Record<McpToolName, { action: string; cred
   get_usage_summary: { action: "usage_summary", credits: 0 },
   analyze_serp: { action: "serp_analysis", credits: 1 },
   research_keywords: { action: "keyword_research", credits: 40 },
+  /* INTEGRATION:activepieces */
+  automation_trigger_flow: { action: "automation_flow_trigger", credits: 0 },
+  automation_flow_status: { action: "automation_flow_status", credits: 0 },
+  /* END */
 };
 
 /** Human-readable scope labels for the consent screen and key UI. */
@@ -92,4 +100,14 @@ export const SCOPE_LABELS: Record<McpToolName, { title: string; description: str
     title: "Keyword research",
     description: "Full keyword research task: seed metrics plus a clustered ideas report (40 credits per call).",
   },
+  /* INTEGRATION:activepieces */
+  automation_trigger_flow: {
+    title: "Automation flows",
+    description: "Trigger a published Activepieces webhook flow on the workspace's automation engine (free; requires the engine to be connected).",
+  },
+  automation_flow_status: {
+    title: "Flow run status",
+    description: "Read the status of an Activepieces flow run (read-only, free).",
+  },
+  /* END */
 };

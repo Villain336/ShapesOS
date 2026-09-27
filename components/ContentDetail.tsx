@@ -19,6 +19,10 @@ export type ContentDetailItem = {
   bodyMarkdown: string | null;
   seoScore: number | null;
   outlineJson: ContentBrief | null;
+  // Phase 12 (embeds): Ghost publish target state (null = never published).
+  ghostPostId: string | null;
+  ghostStatus: string | null;
+  ghostUrl: string | null;
 };
 
 const inputCls =
@@ -44,9 +48,21 @@ export default function ContentDetail({
     isLive: boolean;
     model: string | null;
   } | null>(null);
-  const [busy, setBusy] = useState<"draft" | "save" | "publish" | null>(null);
+  const [busy, setBusy] = useState<"draft" | "save" | "publish" | "ghost" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  // Phase 12 (embeds): Ghost publish state, refreshed from Ghost on mount.
+  const [ghost, setGhost] = useState<{
+    postId: string | null;
+    status: string | null;
+    url: string | null;
+    stale: boolean;
+  }>({
+    postId: item.ghostPostId,
+    status: item.ghostStatus,
+    url: item.ghostUrl,
+    stale: false,
+  });
 
   const brief = item.outlineJson;
 
@@ -159,6 +175,54 @@ export default function ContentDetail({
     }
   }
 
+  // Phase 12 (embeds): refresh the Ghost draft/published status on mount.
+  useEffect(() => {
+    fetch(`/api/content/ghost?contentId=${encodeURIComponent(item.id)}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((json) => {
+        const c = json?.contentItem;
+        if (c) {
+          setGhost({
+            postId: c.ghostPostId ?? null,
+            status: c.ghostStatus ?? null,
+            url: c.ghostUrl ?? null,
+            stale: json.stale === true,
+          });
+        }
+      })
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [item.id]);
+
+  async function onPublishToGhost(publish: boolean) {
+    setBusy("ghost");
+    setError(null);
+    setNotice(null);
+    try {
+      const res = await fetch("/api/content/ghost", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contentId: item.id, publish }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setError(json.error ?? "Ghost publish failed.");
+        return;
+      }
+      const c = json.contentItem;
+      setGhost({ postId: c.ghostPostId, status: c.ghostStatus, url: c.ghostUrl, stale: false });
+      setNotice(
+        publish
+          ? "Published to Ghost."
+          : "Sent to Ghost as a draft. Review it in Ghost before publishing.",
+      );
+    } catch {
+      setError("Network error. Is the app server running?");
+    } finally {
+      setBusy(null);
+    }
+  }
+
   if (!brief) {
     return (
       <p className="text-sm text-red-600">
@@ -186,8 +250,48 @@ export default function ContentDetail({
               {busy === "publish" ? "Publishing…" : "Mark published"}
             </button>
           )}
+          {/* Phase 12 (embeds): Ghost Admin API publish — draft by default. */}
+          {body && (
+            <button
+              onClick={() => void onPublishToGhost(false)}
+              disabled={busy === "ghost"}
+              className={btnGhost}
+              title="Send to your Ghost blog as a draft (needs GHOST_URL + GHOST_ADMIN_API_KEY)"
+            >
+              {busy === "ghost" ? "Sending…" : "Publish to Ghost"}
+            </button>
+          )}
         </div>
       </div>
+
+      {/* Phase 12 (embeds): Ghost publish status. */}
+      {ghost.postId && (
+        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-zinc-200 bg-zinc-50/60 px-4 py-2.5 text-sm">
+          <span className="font-medium text-zinc-700">Ghost</span>
+          <span
+            className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+              ghost.status === "published"
+                ? "bg-emerald-100 text-emerald-700"
+                : "bg-amber-100 text-amber-700"
+            }`}
+          >
+            {ghost.status === "published" ? "Published" : "Draft"}
+          </span>
+          {ghost.stale && (
+            <span className="text-xs text-zinc-500">(last known — Ghost unreachable)</span>
+          )}
+          {ghost.url && (
+            <a
+              href={ghost.url}
+              target="_blank"
+              rel="noreferrer"
+              className="text-xs font-medium text-violet-700 hover:text-violet-800"
+            >
+              Open in Ghost ↗
+            </a>
+          )}
+        </div>
+      )}
 
       {/* SERP provider banner */}
       <div
