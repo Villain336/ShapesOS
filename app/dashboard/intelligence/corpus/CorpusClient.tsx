@@ -64,7 +64,7 @@ function StatusCell({ r }: { r: CorpusSourceRecord }) {
   if (r.mode === "synthesis-1s") {
     return (
       <Chip tone="violet">
-        <FileText className="h-3 w-3" /> synthesized 1S
+        <FileText className="h-3 w-3" /> Learned through synthesis
       </Chip>
     );
   }

@@ -11,6 +11,10 @@ import { assertIngestAllowed, type SeedSourceDef } from "./allowlist";
 import { chunkDocument, htmlToText, plainTextClean, assertProvenanceComplete } from "./chunker";
 import { appendChunks, writeLicenseNotes, type CorpusAsset } from "./store";
 import { embedCorpusText } from "./embed";
+import { execFileSync } from "node:child_process";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 export interface FetchResult {
   url: string;
@@ -73,10 +77,44 @@ export async function fetchWikipediaExtract(title: string): Promise<string> {
   return `# ${page.title}\n\n${page.extract}`;
 }
 
+/** Fetch one URL as PDF → plain text via poppler pdftotext. Throws on non-OK.
+ *  Fail-closed: non-PDF content-type throws; scanned PDFs yield ~0 chars and
+ *  are rejected by the <200-char cleaned check in ingestSeedSource (PENDING). */
+export async function fetchPdf(url: string): Promise<string> {
+  const res = await fetch(url, {
+    headers: {
+      "User-Agent":
+        "Marketr-M9-Corpus-Ingest/1.0 (open-licensed content only; contact: corpus@marketr)",
+      Accept: "application/pdf,*/*",
+      "Accept-Language": "en-US,en;q=0.9",
+    },
+    redirect: "follow",
+  });
+  if (!res.ok) {
+    throw new Error(`fetch ${url}: HTTP ${res.status}`);
+  }
+  const ct = res.headers.get("content-type") ?? "";
+  if (!/pdf/i.test(ct)) {
+    throw new Error(`fetch ${url}: expected PDF, got content-type ${ct}`);
+  }
+  const dir = mkdtempSync(join(tmpdir(), "marketr-pdf-"));
+  try {
+    const pdfPath = join(dir, "doc.pdf");
+    const txtPath = join(dir, "doc.txt");
+    writeFileSync(pdfPath, Buffer.from(await res.arrayBuffer()));
+    // Fixed argv, no shell. 120s timeout; VM without poppler → throws → PENDING.
+    execFileSync("pdftotext", ["-layout", pdfPath, txtPath], { timeout: 120000 });
+    return readFileSync(txtPath, "utf8");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
 /** Clean raw fetch output per source format. */
 export function cleanFetched(kind: SeedSourceDef["format"], raw: string): string {
   if (kind === "html") return htmlToText(raw);
   if (kind === "mediawiki") return plainTextClean(raw);
+  if (kind === "pdf") return plainTextClean(raw); // pdftotext output is plain text
   return plainTextClean(raw);
 }
 
@@ -142,7 +180,11 @@ export async function ingestSeedSource(
   try {
     for (const url of def.fetchUrls) {
       const raw =
-        def.format === "mediawiki" ? await fetchWikipediaExtract(url) : await fetchText(url, { ua: def.ua });
+        def.format === "mediawiki"
+          ? await fetchWikipediaExtract(url)
+          : def.format === "pdf"
+            ? await fetchPdf(url)
+            : await fetchText(url, { ua: def.ua });
       const cleaned = cleanFetched(def.format, raw);
       if (cleaned.length < 200) {
         throw new Error(`cleaned text too short (${cleaned.length} chars) — likely a block page or empty extract`);
@@ -289,6 +331,8 @@ export async function ingestSynthesisPlaybook(
     registry?: readonly Pick<SeedSourceDef, "id" | "tier">[];
     /** Injected embedder (tests). Default: the local corpus embedder. */
     embed?: (text: string) => Promise<number[]>;
+    /** Extra provenance fields merged onto every chunk (v9: NC flag, synthesis depth). */
+    provenanceExtra?: Partial<ChunkProvenance>;
   },
 ): Promise<{ record: CorpusSourceRecord; chunks: CorpusChunk[] }> {
   const { default: fs } = await import("node:fs");
@@ -343,6 +387,7 @@ export async function ingestSynthesisPlaybook(
     synthesizedFrom: [...def.synthesizedFrom],
     synthesisDate: retrievedDate,
     original: true,
+    ...(opts?.provenanceExtra ?? {}),
   };
 
   let chunks: CorpusChunk[];

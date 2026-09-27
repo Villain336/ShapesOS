@@ -66,6 +66,13 @@ export interface ChunkProvenance {
   synthesisDate?: string;
   /** 1S only: must be true — marks Marketr-original expression. */
   original?: boolean;
+  /** 1S only: how the synthesis was grounded — "parametric" (model knowledge +
+   *  catalog metadata) or "catalog-only" (catalog description only, no parametric
+   *  specifics). Honest depth labeling for the v9 synthesis wave (2026-09-27). */
+  synthesisDepth?: string;
+  /** 1S only: true when the underlying source carries a non-commercial license
+   *  class (ideas distilled, original expression; NC flag preserved for honesty). */
+  ncFlaggedSource?: boolean;
 }
 
 export interface CorpusChunk {

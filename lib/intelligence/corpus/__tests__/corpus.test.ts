@@ -211,7 +211,10 @@ describe("allowlist (binding clean-sourcing tiers)", () => {
     const bad = results.filter((r) => !r.ok);
     assert.deepEqual(bad, [], `registry violations: ${JSON.stringify(bad)}`);
     const refused = results.filter((r) => r.reason.startsWith("correctly refused"));
-    assert.equal(refused.length, 35, `expected exactly 35 learn-only entries refused, got ${refused.length}`);
+    // Every learn-only entry must be refused by the verbatim gate (v9: 312 —
+    // 53 pre-v9 + 259 from the 281-source 1S synthesis wave).
+    const learnOnlyCount = SEED_SOURCES.filter((s) => s.tier === "learn-only").length;
+    assert.equal(refused.length, learnOnlyCount, `expected every learn-only entry refused, got ${refused.length}/${learnOnlyCount}`);
     for (const s of SEED_SOURCES) {
       if (s.tier !== "learn-only") {
         assert.ok(s.licenseUrl.length > 0, `${s.id}: shippable sources need a license URL`);
@@ -293,18 +296,18 @@ describe("retrieval", () => {
   });
 });
 
-describe("registry (all 48 sources: 24 shippable + 24 learn-only)", () => {
-  it("covers exactly the 48 registered sources", () => {
-    assert.equal(SEED_SOURCES.length, 48, `registry has ${SEED_SOURCES.length} sources`);
+describe("registry (v9: 352 sources — 40 shippable + 312 learn-only)", () => {
+  it("covers exactly the 352 registered sources", () => {
+    assert.equal(SEED_SOURCES.length, 352, `registry has ${SEED_SOURCES.length} sources`);
     const ids = SEED_SOURCES.map((s) => s.id);
-    assert.equal(new Set(ids).size, 48, "source ids are unique");
+    assert.equal(new Set(ids).size, 352, "source ids are unique");
   });
 
-  it("registers 30 Tier 1S synthesis playbook files; every learn-only source is covered", () => {
+  it("registers 306 Tier 1S synthesis playbook files; every learn-only source is covered", () => {
     const playbooks: readonly SynthesisPlaybookRef[] = SYNTHESIS_PLAYBOOKS;
-    assert.equal(playbooks.length, 30);
+    assert.equal(playbooks.length, 306);
     const learnOnly = SEED_SOURCES.filter((s) => s.tier === "learn-only");
-    assert.equal(learnOnly.length, 35);
+    assert.equal(learnOnly.length, 312);
     for (const s of learnOnly) {
       // Covered either by a dedicated SYNTHESIS_PLAYBOOKS entry or by the
       // registry entry's own playbook pointer (shared survey files).
@@ -514,6 +517,78 @@ describe("ingestSynthesisPlaybook (local 1S ingest, no network)", () => {
     assert.equal(record.status, "pending");
     assert.deepEqual(chunks, []);
     assert.equal(loadChunks("main").length, 0, "nothing written on failure");
+  });
+});
+
+describe("v9 1S wave: synthesisDepth + ncFlaggedSource provenance", () => {
+  it("accepts synthesisDepth and ncFlaggedSource as optional 1S provenance fields", () => {
+    assert.doesNotThrow(() =>
+      assertProvenanceComplete({
+        ...S1S_PROV,
+        synthesisDepth: "catalog-only",
+        ncFlaggedSource: true,
+      }),
+    );
+  });
+
+  it("merges provenanceExtra (depth + NC flag) onto every ingested 1S chunk", async () => {
+    const dir = tmpCorpus();
+    clearAsset("main");
+    const synthDir = path.join(dir, "synthesis");
+    fs.mkdirSync(synthDir, { recursive: true });
+    const md = "# NC Source Playbook\n\n" + "Original words about ideas only. ".repeat(200);
+    fs.writeFileSync(path.join(synthDir, "v9-nc-test-playbook.md"), md, "utf8");
+
+    const def: SynthesisPlaybookDef = {
+      sourceId: "v9-nc-test",
+      title: "NC Test Source",
+      targetTitle: "NC Test Source",
+      author: "Marketr (original synthesis)",
+      file: "v9-nc-test-playbook.md",
+      synthesizedFrom: ["NC Test Source"],
+    };
+    const { record, chunks } = await ingestSynthesisPlaybook(def, "2026-09-27", {
+      synthesisDir: synthDir,
+      registry: [{ id: "v9-nc-test", tier: "learn-only" }],
+      embed: async () => [1, 0],
+      provenanceExtra: { synthesisDepth: "catalog-only", ncFlaggedSource: true },
+    });
+    assert.equal(record.status, "active");
+    assert.ok(chunks.length > 0);
+    for (const c of chunks) {
+      assert.equal(c.provenance.synthesisDepth, "catalog-only");
+      assert.equal(c.provenance.ncFlaggedSource, true);
+      assert.equal(c.provenance.tier, "1S");
+      assert.equal(c.provenance.original, true);
+      assert.equal(c.provenance.license, "CC-BY-4.0");
+    }
+  });
+
+  it("defaults to no NC flag and parametric-unset depth when provenanceExtra is absent", async () => {
+    const dir = tmpCorpus();
+    clearAsset("main");
+    const synthDir = path.join(dir, "synthesis");
+    fs.mkdirSync(synthDir, { recursive: true });
+    const md = "# Plain Playbook\n\n" + "Original words here. ".repeat(200);
+    fs.writeFileSync(path.join(synthDir, "v9-plain-test-playbook.md"), md, "utf8");
+
+    const def: SynthesisPlaybookDef = {
+      sourceId: "v9-plain-test",
+      title: "Plain Test Source",
+      author: "Marketr (original synthesis)",
+      file: "v9-plain-test-playbook.md",
+      synthesizedFrom: ["Plain Test Source"],
+    };
+    const { chunks } = await ingestSynthesisPlaybook(def, "2026-09-27", {
+      synthesisDir: synthDir,
+      registry: [{ id: "v9-plain-test", tier: "learn-only" }],
+      embed: async () => [1, 0],
+    });
+    assert.ok(chunks.length > 0);
+    for (const c of chunks) {
+      assert.equal(c.provenance.ncFlaggedSource, undefined);
+      assert.equal(c.provenance.synthesisDepth, undefined);
+    }
   });
 });
 
