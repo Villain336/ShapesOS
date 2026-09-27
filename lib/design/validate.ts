@@ -18,6 +18,8 @@ const ELEMENT_TYPES: ReadonlySet<string> = new Set([
   "ellipse",
   "line",
   "svg",
+  "chart",
+  "qr",
 ] satisfies ElementType[]);
 
 function isRecord(v: unknown): v is Record<string, unknown> {
@@ -57,6 +59,19 @@ function validateElement(el: unknown, index: number, pageIndex: number): string 
       if (typeof el.text !== "string") return `${where}.text: must be a string`;
       if (typeof el.fontFamily !== "string") return `${where}.fontFamily: must be a string`;
       if (!isPositiveNumber(el.fontSize)) return `${where}.fontSize: must be a positive number`;
+      if (el.fragments !== undefined) {
+        if (!Array.isArray(el.fragments))
+          return `${where}.fragments: must be an array`;
+        for (let f = 0; f < el.fragments.length; f++) {
+          const fr = el.fragments[f];
+          if (!isRecord(fr) || typeof fr.text !== "string")
+            return `${where}.fragments[${f}].text: must be a string`;
+          if (fr.fontSize !== undefined && !isPositiveNumber(fr.fontSize))
+            return `${where}.fragments[${f}].fontSize: must be a positive number`;
+        }
+      }
+      if (el.textPath !== undefined && typeof el.textPath !== "string")
+        return `${where}.textPath: must be a string`;
       break;
     case "image":
       if (typeof el.src !== "string") return `${where}.src: must be a string`;
@@ -73,6 +88,27 @@ function validateElement(el: unknown, index: number, pageIndex: number): string 
       break;
     case "svg":
       if (typeof el.path !== "string") return `${where}.path: must be a string`;
+      break;
+    case "chart":
+      if (!["bar", "line", "pie"].includes(el.chartType as string))
+        return `${where}.chartType: must be bar|line|pie`;
+      if (!Array.isArray(el.labels) || !el.labels.every((l) => typeof l === "string"))
+        return `${where}.labels: must be an array of strings`;
+      if (!Array.isArray(el.values) || !el.values.every(isFiniteNumber))
+        return `${where}.values: must be an array of finite numbers`;
+      if (el.labels.length !== el.values.length)
+        return `${where}: labels and values must have the same length`;
+      if (el.labels.length === 0 || el.labels.length > 24)
+        return `${where}: must have 1..24 data points`;
+      if (!Array.isArray(el.colors) || !el.colors.every((c) => typeof c === "string"))
+        return `${where}.colors: must be an array of strings`;
+      break;
+    case "qr":
+      if (typeof el.payload !== "string" || el.payload.length === 0)
+        return `${where}.payload: must be a non-empty string`;
+      if (el.payload.length > 2048)
+        return `${where}.payload: must be at most 2048 chars`;
+      if (!isPositiveNumber(el.size)) return `${where}.size: must be a positive number`;
       break;
   }
   return null;

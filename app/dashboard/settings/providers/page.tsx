@@ -7,6 +7,7 @@ import { requireUser, getOrCreateWorkspace } from "@/lib/session";
 import { requireWorkspaceRole } from "@/lib/authz";
 import { providerStatus } from "@/lib/providers";
 import { llmStatus } from "@/lib/llm";
+import { unsplashStatus } from "@/lib/design/unsplash";
 import SettingsNav from "@/components/settings/SettingsNav";
 
 export const dynamic = "force-dynamic";
@@ -32,6 +33,7 @@ export default async function ProvidersSettingsPage() {
 
   const seo = providerStatus();
   const llm = llmStatus();
+  const unsplash = unsplashStatus();
 
   return (
     <div className="flex flex-col gap-6">
@@ -107,6 +109,41 @@ export default async function ProvidersSettingsPage() {
           <p className="mt-3 text-xs text-zinc-500">
             Set LLM_API_KEY (or OPENAI_API_KEY) on the host to use a live
             OpenAI-compatible endpoint instead of the mock.
+          </p>
+        )}
+      </div>
+
+      <div className="rounded-xl border border-zinc-200 bg-white/60 p-5">
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="font-medium">Stock photos (Unsplash)</h2>
+          <StatusBadge
+            ok={unsplash.configured}
+            label={unsplash.configured ? "configured" : "not configured"}
+          />
+        </div>
+        <dl className="mt-3 grid gap-2 text-sm md:grid-cols-2">
+          <div>
+            <dt className="text-xs text-zinc-500">Provider</dt>
+            <dd className="font-mono text-xs">{unsplash.name}</dd>
+          </div>
+          <div>
+            <dt className="text-xs text-zinc-500">Live data</dt>
+            <dd>
+              {unsplash.isLive
+                ? "Yes"
+                : "No — stock photo search is disabled in the Canvas editor"}
+            </dd>
+          </div>
+          <div className="md:col-span-2">
+            <dt className="text-xs text-zinc-500">Environment variable</dt>
+            <dd className="font-mono text-xs">UNSPLASH_ACCESS_KEY</dd>
+          </div>
+        </dl>
+        {!unsplash.configured && (
+          <p className="mt-3 text-xs text-zinc-500">
+            Get a free key at unsplash.com/developers and set
+            UNSPLASH_ACCESS_KEY on the host to enable stock photo search in
+            the design editor. Key material is never displayed here.
           </p>
         )}
       </div>

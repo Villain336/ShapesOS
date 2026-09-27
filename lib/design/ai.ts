@@ -13,6 +13,12 @@ Element types (every element needs: id, type, name, x, y, rotation, opacity, vis
 - svg:    + path (raw SVG path data, 24x24 viewBox), width, height, fill (hex)
 NOTE: do NOT emit image elements — there is no valid src available. Compose with shapes and text.
 
+Template variables: a text element's text may contain {{variable}} placeholders
+(name = letters/digits/underscore, e.g. {{headline}}, {{product}}, {{date}}).
+Use them when the request mentions personalization, variants, or batch output —
+e.g. write "{{headline}}" as the headline text so one template can generate many
+variants. Only use variables the request implies; never invent values for them.
+
 Fonts: use only Inter, Arial, Helvetica, Georgia. Colors: hex strings.
 IDs: unique strings like "ai-1", "ai-2". Page: {id, name, width, height, background (hex), elements}.
 Coordinates: x/y are the element's top-left (text/rect/svg/image) or center (ellipse); keep everything inside the page bounds.
@@ -71,6 +77,37 @@ export function extractJsonObject(text: string): unknown | undefined {
   } catch {
     return undefined;
   }
+}
+
+/**
+ * Build the constrained prompt for batch "Fill from brief": the model must
+ * return ONLY a JSON array of row objects — no prose, no markdown fences.
+ * Each row maps every variable name to a value. The route validates the
+ * rows against the variable list and rejects anything off-schema.
+ */
+export function buildBatchFillPrompt(
+  brief: string,
+  variables: string[],
+  count: number,
+): string {
+  return [
+    "You are a marketing copy assistant inside the Marketr canvas editor.",
+    "Given a creative brief and a list of template variables, write distinct, on-brief values for each variable.",
+    "Return ONLY a JSON array — nothing else, no prose, no markdown fences.",
+    "",
+    `Variables: ${variables.map((v) => `{{${v}}}`).join(", ")}`,
+    `Rows to produce: exactly ${count}.`,
+    "Rules:",
+    "- Each array item is an object with EXACTLY these keys: " +
+      variables.map((v) => `"${v}"`).join(", ") +
+      ". No extra keys, no missing keys.",
+    "- Values are short marketing copy strings (a word to a sentence), never lorem ipsum.",
+    "- Make every row distinct — vary the angle, offer, or wording across rows.",
+    "- Keep values plain text: no markdown, no quotes around the whole value.",
+    "",
+    "Brief:",
+    brief.trim(),
+  ].join("\n");
 }
 
 /** Human-friendly label for AI sizes offered in the panel. */

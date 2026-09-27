@@ -636,6 +636,9 @@ model Workspace {
   mailCreatives          MailCreative[]
   mailCampaigns          MailCampaign[]
   designs                Design[]
+  // Phase 11 (Feature 6): collaboration back-relations.
+  designShares           DesignShare[]
+  designComments         DesignComment[]
   eddmOrders             EddmOrder[]
   // Phase 5 (S1–S4): media safety back-relations.
   mediaApprovals         MediaApproval[]
@@ -4296,12 +4299,66 @@ model Design {
   brandKitId  String?   @map("brand_kit_id")
   brandKit    BrandKit? @relation(fields: [brandKitId], references: [id], onDelete: SetNull)
 
+  // Feature 6: approval workflow. draft | in_review | approved | changes_requested.
+  approvalStatus String  @default("draft") @map("approval_status")
+  approvalNote   String? @map("approval_note")
+
+  // Feature 6: collaboration back-relations.
+  shares   DesignShare[]
+  comments DesignComment[]
+
   createdBy String?  @map("created_by")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@index([workspaceId, updatedAt])
   @@map("designs")
+}
+
+// Phase 11 (Feature 6): public share links for designs. Only the SHA-256 of
+// the token is stored — the raw token is shown once at creation and is never
+// persisted. Lookup is by token hash; unknown / revoked / expired all 404
+// identically (no oracle).
+model DesignShare {
+  id          String    @id @default(cuid())
+  designId    String    @map("design_id")
+  design      Design    @relation(fields: [designId], references: [id], onDelete: Cascade)
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  // SHA-256 hex of the share token. Never the raw token.
+  tokenHash String    @map("token_hash")
+  createdBy String?   @map("created_by")
+  expiresAt DateTime? @map("expires_at")
+  revokedAt DateTime? @map("revoked_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  @@unique([tokenHash])
+  @@index([designId])
+  @@map("design_shares")
+}
+
+// Phase 11 (Feature 6): team comments on a design. Comments are workspace-
+// internal (require login); the public share page renders them read-only.
+// elementId + x/y optionally pin a comment to an element / a canvas position.
+model DesignComment {
+  id          String    @id @default(cuid())
+  designId    String    @map("design_id")
+  design      Design    @relation(fields: [designId], references: [id], onDelete: Cascade)
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  authorName  String    @map("author_name")
+  authorEmail String?   @map("author_email")
+  body        String    @db.Text
+  elementId   String?   @map("element_id")
+  x           Float?
+  y           Float?
+  resolvedAt  DateTime? @map("resolved_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@index([designId, createdAt])
+  @@map("design_comments")
 }
 
 // T1: a mail campaign. Approval binds creativeHash + pieceCount + maxSpend.

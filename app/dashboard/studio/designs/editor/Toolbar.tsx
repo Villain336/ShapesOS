@@ -29,15 +29,24 @@ import {
   Lock,
   Plus,
   Redo,
+  Scaling,
+  Share2,
   Trash2,
   Undo,
   Unlock,
+  Wand2,
+  X,
 } from "lucide-react";
 import { useCanvasStore, type AlignEdge } from "@/lib/design/store";
-import type { DesignElement, ImageElement, TextElement } from "@/lib/design/types";
+import type { ChartElement, DesignElement, ImageElement, QrElement, TextElement } from "@/lib/design/types";
 import type { StageRef } from "./DesignCanvas";
 import { removeImageBackground } from "@/lib/design/background-removal";
-import { iconBtn, iconBtnActive, inputCls } from "./ui";
+import { AI_DESIGN_SIZES } from "@/lib/design/ai";
+import { btnGhost, iconBtn, iconBtnActive, inputCls } from "./ui";
+import { BatchModal } from "./BatchModal";
+import { ChartDataEditor } from "./ChartDataEditor";
+import { QrEditor } from "./QrEditor";
+import { ShareModal } from "./ShareModal";
 
 export type SaveState = "idle" | "saving" | "saved" | "error";
 
@@ -54,6 +63,7 @@ const SYSTEM_FONTS = [
 
 interface ToolbarProps {
   stageRef: StageRef;
+  designId: string;
   designName: string;
   onNameChange: (name: string) => void;
   saveState: SaveState;
@@ -67,6 +77,8 @@ function isText(el: DesignElement): el is TextElement {
 function fillablePatch(el: DesignElement, color: string): Record<string, unknown> {
   if (el.type === "line") return { stroke: color };
   if (el.type === "image") return {};
+  if (el.type === "chart") return { colors: [color] };
+  if (el.type === "qr") return { foreground: color };
   return { fill: color };
 }
 
@@ -136,7 +148,7 @@ function BgRemovalControl({ el }: { el: ImageElement }) {
   );
 }
 
-export function Toolbar({ stageRef, designName, onNameChange, saveState, brandFonts }: ToolbarProps) {
+export function Toolbar({ stageRef, designId, designName, onNameChange, saveState, brandFonts }: ToolbarProps) {
   const doc = useCanvasStore((s) => s.document);
   const activePageId = useCanvasStore((s) => s.activePageId);
   const selectedIds = useCanvasStore((s) => s.selectedIds);
@@ -147,6 +159,7 @@ export function Toolbar({ stageRef, designName, onNameChange, saveState, brandFo
   const alignElements = useCanvasStore((s) => s.alignElements);
   const setPageBackground = useCanvasStore((s) => s.setPageBackground);
   const addPage = useCanvasStore((s) => s.addPage);
+  const magicResize = useCanvasStore((s) => s.magicResize);
   const undo = useCanvasStore((s) => s.undo);
   const redo = useCanvasStore((s) => s.redo);
   const canUndo = useCanvasStore((s) => s.canUndo);
@@ -154,15 +167,53 @@ export function Toolbar({ stageRef, designName, onNameChange, saveState, brandFo
 
   const [exportOpen, setExportOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [resizeOpen, setResizeOpen] = useState(false);
+  const [batchOpen, setBatchOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
   const exportRef = useRef<HTMLDivElement>(null);
+  const resizeRef = useRef<HTMLDivElement>(null);
+  const noticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const close = (e: MouseEvent) => {
       if (exportRef.current && !exportRef.current.contains(e.target as Node)) setExportOpen(false);
+      if (resizeRef.current && !resizeRef.current.contains(e.target as Node)) setResizeOpen(false);
     };
     document.addEventListener("mousedown", close);
     return () => document.removeEventListener("mousedown", close);
   }, []);
+
+  useEffect(() => {
+    return () => {
+      if (noticeTimer.current) clearTimeout(noticeTimer.current);
+    };
+  }, []);
+
+  /** Run a magic resize on the current page and confirm with an undoable notice. */
+  const doMagicResize = (preset: (typeof AI_DESIGN_SIZES)[number]) => {
+    if (!page) return;
+    const result = magicResize(page.id, preset.width, preset.height);
+    setResizeOpen(false);
+    if (!result) return;
+    if (noticeTimer.current) clearTimeout(noticeTimer.current);
+    const lockedNote =
+      result.lockedCount > 0
+        ? ` · ${result.lockedCount} locked element${result.lockedCount === 1 ? "" : "s"} resized`
+        : "";
+    setNotice(`Resized to ${preset.label} — undo available${lockedNote}`);
+    noticeTimer.current = setTimeout(() => setNotice(null), 6000);
+  };
+
+  /** Batch generation finished: close the modal, confirm with an undoable notice. */
+  const onBatchGenerated = (count: number) => {
+    setBatchOpen(false);
+    if (noticeTimer.current) clearTimeout(noticeTimer.current);
+    setNotice(
+      `${count} variant page${count === 1 ? "" : "s"} added — review each one before exporting`,
+    );
+    noticeTimer.current = setTimeout(() => setNotice(null), 6000);
+  };
 
   const page = doc?.pages.find((p) => p.id === activePageId) ?? null;
   const selected = (page?.elements ?? []).filter((el) => selectedIds.includes(el.id));
@@ -171,7 +222,7 @@ export function Toolbar({ stageRef, designName, onNameChange, saveState, brandFo
   const allLocked = selected.length > 0 && selected.every((el) => el.locked);
   const fonts = [...SYSTEM_FONTS, ...brandFonts.filter((f) => !SYSTEM_FONTS.includes(f))];
 
-  const doExport = async (fmt: "png" | "jpg" | "pdf") => {
+  const doExport = async (fmt: "png" | "jpg" | "pdf" | "svg") => {
     const stage = stageRef.current;
     if (!stage || !page || exporting) return;
     setExporting(true);
@@ -179,7 +230,47 @@ export function Toolbar({ stageRef, designName, onNameChange, saveState, brandFo
       // Brief pause so in-flight images settle before capture.
       await new Promise((r) => setTimeout(r, 350));
       const base = (designName || "design").replace(/[^\w\- ]+/g, "").trim() || "design";
-      if (fmt === "pdf") {
+      if (fmt === "svg") {
+        const { exportPageToSvg, svgFilename } = await import("@/lib/design/export-svg");
+        // Pre-resolve remote image URLs to data URLs so the SVG is
+        // self-contained. Failures fall back to the external href (the
+        // serializer notes it with a warning comment).
+        const imageSources: Record<string, string> = {};
+        for (const el of page.elements) {
+          if (el.type !== "image" || !el.visible) continue;
+          if (el.src.startsWith("data:")) continue;
+          try {
+            const res = await fetch(el.src);
+            if (!res.ok) continue;
+            const blob = await res.blob();
+            imageSources[el.id] = await new Promise<string>((resolve, reject) => {
+              const fr = new FileReader();
+              fr.onload = () => resolve(String(fr.result));
+              fr.onerror = () => reject(new Error("readAsDataURL failed"));
+              fr.readAsDataURL(blob);
+            });
+          } catch {
+            // Keep the remote href; noted in the exported SVG.
+          }
+        }
+        const res = exportPageToSvg(doc, page.id, { imageSources });
+        if (!res.ok) throw new Error(res.error);
+        const blob = new Blob([res.svg], { type: "image/svg+xml" });
+        const url = URL.createObjectURL(blob);
+        const a = window.document.createElement("a");
+        a.href = url;
+        a.download = svgFilename(base, page.name);
+        a.click();
+        URL.revokeObjectURL(url);
+      } else if (fmt === "pdf") {
+        // PRINT-GRADE PDF (CMYK / bleed / crop marks) is deliberately NOT
+        // offered. jsPDF is RGB-only: it writes no ICC OutputIntent and no
+        // DeviceCMYK color operators, so any "CMYK" export would be fake.
+        // A real print pipeline would need: a vector path (this doc's SVG
+        // serializer -> svg2pdf.js into jsPDF) + pdf-lib (or patched jsPDF)
+        // to inject OutputIntents + an ICC profile, an RGB->CMYK conversion
+        // pass over every fill, and bleed/crop-mark geometry with page boxes.
+        // Until then, PDF export stays a rasterized RGB screen proof.
         const { jsPDF } = await import("jspdf");
         const dataUrl = stage.toDataURL({ pixelRatio: 2, mimeType: "image/png" });
         // 96dpi px → pt.
@@ -262,6 +353,45 @@ export function Toolbar({ stageRef, designName, onNameChange, saveState, brandFo
           <span className="rounded bg-stone-100 px-1.5 py-0.5 font-mono text-[11px] text-stone-600">
             {page.width} × {page.height}
           </span>
+          <div ref={resizeRef} className="relative">
+            <button
+              onClick={() => setResizeOpen((o) => !o)}
+              className={`${btnGhost} !py-1 text-[12px]`}
+              title="Magic resize — convert this page to another size"
+            >
+              <Scaling className="h-3.5 w-3.5 text-violet-600" />
+              Magic resize
+              <ChevronDown className="h-3.5 w-3.5" />
+            </button>
+            {resizeOpen && (
+              <div className="absolute left-0 z-30 mt-1 w-56 overflow-hidden rounded-md border border-stone-200 bg-white shadow-lg">
+                <p className="px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-stone-400">
+                  Resize page to…
+                </p>
+                {AI_DESIGN_SIZES.map((preset) => {
+                  const current = preset.width === page.width && preset.height === page.height;
+                  return (
+                    <button
+                      key={preset.key}
+                      disabled={current}
+                      onClick={() => doMagicResize(preset)}
+                      className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-[13px] text-stone-700 hover:bg-violet-50/40 disabled:cursor-default disabled:hover:bg-transparent"
+                    >
+                      <span className={current ? "text-stone-400" : ""}>{preset.label}</span>
+                      {current ? (
+                        <span className="text-[11px] font-medium text-stone-400">Current</span>
+                      ) : (
+                        <Scaling className="h-3.5 w-3.5 text-violet-400" />
+                      )}
+                    </button>
+                  );
+                })}
+                <p className="border-t border-stone-100 px-3 py-2 text-[11px] leading-snug text-stone-400">
+                  Layout scales proportionally. Locked elements resize too. Undo with Ctrl+Z.
+                </p>
+              </div>
+            )}
+          </div>
           <button onClick={addPage} className={iconBtn} title="Add page">
             <Plus className="h-4 w-4" />
           </button>
@@ -353,6 +483,14 @@ export function Toolbar({ stageRef, designName, onNameChange, saveState, brandFo
         <BgRemovalControl key={selected[0]!.id} el={selected[0]! as ImageElement} />
       )}
 
+      {selected.length === 1 && selected[0]!.type === "chart" && (
+        <ChartDataEditor key={selected[0]!.id} el={selected[0]! as ChartElement} />
+      )}
+
+      {selected.length === 1 && selected[0]!.type === "qr" && (
+        <QrEditor key={selected[0]!.id} el={selected[0]! as QrElement} />
+      )}
+
       {selected.length > 0 && (
         <div className="flex flex-wrap items-center gap-1.5">
           <label className="flex items-center gap-1 text-[12px] text-stone-600" title="Opacity">
@@ -374,6 +512,8 @@ export function Toolbar({ stageRef, designName, onNameChange, saveState, brandFo
               const el = selected[0]!;
               if (el.type === "line") return el.stroke;
               if (el.type === "image") return "#ffffff";
+              if (el.type === "chart") return el.colors[0] ?? "#7c3aed";
+              if (el.type === "qr") return el.foreground;
               return el.fill;
             })()}
             onChange={(e) => {
@@ -426,6 +566,22 @@ export function Toolbar({ stageRef, designName, onNameChange, saveState, brandFo
       )}
 
       <div className="ml-auto flex items-center gap-1.5">
+        <button
+          onClick={() => setBatchOpen(true)}
+          className="flex items-center gap-1.5 rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-[13px] text-stone-700 hover:bg-stone-50"
+          title="Batch generate variants from {{variables}} on this page"
+        >
+          <Wand2 className="h-4 w-4" />
+          Batch
+        </button>
+        <button
+          onClick={() => setShareOpen(true)}
+          className="flex items-center gap-1.5 rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-[13px] text-stone-700 hover:bg-stone-50"
+          title="Share links, comments, and approval"
+        >
+          <Share2 className="h-4 w-4" />
+          Share
+        </button>
         <button onClick={undo} disabled={!canUndo()} className={iconBtn} title="Undo (Ctrl+Z)">
           <Undo className="h-4 w-4" />
         </button>
@@ -448,6 +604,7 @@ export function Toolbar({ stageRef, designName, onNameChange, saveState, brandFo
                 [
                   ["png", "PNG image"],
                   ["jpg", "JPG image"],
+                  ["svg", "SVG vector"],
                   ["pdf", "PDF document"],
                 ] as const
               ).map(([fmt, label]) => (
@@ -474,6 +631,36 @@ export function Toolbar({ stageRef, designName, onNameChange, saveState, brandFo
           </span>
         )}
       </div>
+
+      {notice && (
+        <div className="fixed bottom-6 left-1/2 z-50 flex -translate-x-1/2 items-center gap-3 rounded-lg bg-stone-900 py-2.5 pl-4 pr-2.5 text-[13px] text-white shadow-xl">
+          <Check className="h-4 w-4 shrink-0 text-emerald-400" />
+          <span>{notice}</span>
+          <button
+            onClick={() => {
+              undo();
+              setNotice(null);
+            }}
+            className="rounded-md bg-violet-600 px-2.5 py-1 text-[12px] font-semibold text-white hover:bg-violet-500"
+          >
+            Undo
+          </button>
+          <button
+            onClick={() => setNotice(null)}
+            aria-label="Dismiss"
+            className="rounded p-1 text-stone-400 hover:bg-stone-700 hover:text-white"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )}
+
+      <BatchModal
+        open={batchOpen}
+        onClose={() => setBatchOpen(false)}
+        onGenerated={onBatchGenerated}
+      />
+      <ShareModal designId={designId} open={shareOpen} onClose={() => setShareOpen(false)} />
     </div>
   );
 }

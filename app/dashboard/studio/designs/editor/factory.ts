@@ -3,10 +3,12 @@
 
 import { newId } from "@/lib/design/types";
 import type {
+  ChartElement,
   DesignElement,
   EllipseElement,
   ImageElement,
   LineElement,
+  QrElement,
   RectElement,
   SvgElement,
   TextElement,
@@ -147,6 +149,61 @@ export function makeImage(opts: {
 export function fitBox(w: number, h: number, max: number): { width: number; height: number } {
   const scale = Math.min(1, max / Math.max(w, h));
   return { width: Math.round(w * scale), height: Math.round(h * scale) };
+}
+
+const CHART_SEED_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun"];
+const CHART_SEED_VALUES = [42, 68, 35, 81, 57, 74];
+const CHART_W = 480;
+const CHART_H = 300;
+
+/** House palette shared by chart factories and the Elements panel swatches. */
+export const DEFAULT_FACTORY_COLORS = [
+  "#7c3aed",
+  "#8b5cf6",
+  "#0ea5e9",
+  "#10b981",
+  "#f59e0b",
+];
+
+/** A chart with starter data so the user sees a real chart immediately. */
+export function makeChart(opts: {
+  chartType: ChartElement["chartType"];
+  pageW: number;
+  pageH: number;
+  name?: string;
+}): ChartElement {
+  return {
+    ...base(
+      opts.name ?? "Chart",
+      opts.pageW / 2 - CHART_W / 2,
+      opts.pageH / 2 - CHART_H / 2,
+    ),
+    type: "chart",
+    chartType: opts.chartType,
+    labels: [...CHART_SEED_LABELS],
+    values: [...CHART_SEED_VALUES],
+    colors: [...DEFAULT_FACTORY_COLORS],
+    showValues: true,
+  };
+}
+
+/** A QR code with a starter payload. */
+export function makeQr(opts: {
+  payload?: string;
+  size?: number;
+  pageW: number;
+  pageH: number;
+  name?: string;
+}): QrElement {
+  const size = opts.size ?? 160;
+  return {
+    ...base(opts.name ?? "QR code", opts.pageW / 2 - size / 2, opts.pageH / 2 - size / 2),
+    type: "qr",
+    payload: opts.payload ?? "https://marketr.app",
+    size,
+    foreground: "#1c1917",
+    background: "#ffffff",
+  };
 }
 
 export type { DesignElement };

@@ -4,9 +4,10 @@
 
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Ellipse,
+  Group,
   Image as KonvaImage,
   Layer,
   Line,
@@ -14,11 +15,20 @@ import {
   Rect,
   Stage,
   Text,
+  TextPath,
   Transformer,
 } from "react-konva";
-import type Konva from "konva";
+import Konva from "konva";
 import { useCanvasStore } from "@/lib/design/store";
-import type { DesignElement, ImageElement } from "@/lib/design/types";
+import type { DesignElement, ImageElement, TextElement } from "@/lib/design/types";
+import { chartSize } from "@/lib/design/chart-math";
+import {
+  hasRichFragments,
+  layoutRichText,
+  type MeasureFn,
+} from "@/lib/design/rich-text";
+import { ChartNode } from "./ChartNode";
+import { QrNode } from "./QrNode";
 
 export type StageRef = { current: Konva.Stage | null };
 
@@ -91,21 +101,7 @@ function ElementNode({ el, registerRef, onSelect, onDragEnd, onSnapMove, onSnapE
 
   switch (el.type) {
     case "text":
-      return (
-        <Text
-          {...common}
-          text={el.text}
-          fontFamily={el.fontFamily}
-          fontSize={el.fontSize}
-          fontStyle={konvaFontStyle(el)}
-          fill={el.fill}
-          align={el.align}
-          lineHeight={el.lineHeight}
-          letterSpacing={el.letterSpacing}
-          width={el.width}
-          wrap={el.width !== undefined ? "word" : "none"}
-        />
-      );
+      return <TextNode el={el} common={common} />;
     case "image":
       return <ImageNode el={el} common={common} />;
     case "rect": {
@@ -161,7 +157,151 @@ function ElementNode({ el, registerRef, onSelect, onDragEnd, onSnapMove, onSnapE
           scaleY={el.height / 24}
         />
       );
+    case "chart":
+      return <ChartNode el={el} common={common} />;
+    case "qr":
+      return <QrNode el={el} common={common} />;
   }
+}
+
+// FEATURE 1 — richer text: text-on-a-path when textPath holds usable SVG path
+// data (fragments are ignored in path mode, per the schema contract),
+// per-fragment runs when fragments are present, plain Konva Text otherwise.
+// Degenerate path data falls back to styled text — content is never dropped.
+function hasUsablePathData(d: string | undefined): d is string {
+  if (!d || !d.trim()) return false;
+  try {
+    return (Konva.Path.parsePathData(d) as unknown[]).length > 0;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Width measurer backed by a scratch Konva.Text. Konva cannot construct
+ * nodes without DOM ("Konva.js unsupported environment"), so the SSR
+ * prerender gets a font-metric estimate; the client re-measures on first
+ * render (document exists by then) and the estimate is never committed.
+ */
+function useTextMeasure(): MeasureFn {
+  const scratchRef = useRef<Konva.Text | null>(null);
+  return useCallback<MeasureFn>((text, style) => {
+    if (typeof document === "undefined") {
+      return text.length * style.fontSize * 0.55;
+    }
+    let n = scratchRef.current;
+    if (!n) {
+      n = new Konva.Text({});
+      scratchRef.current = n;
+    }
+    n.text(text);
+    n.fontFamily(style.fontFamily);
+    n.fontSize(style.fontSize);
+    n.fontStyle(style.fontStyle);
+    n.letterSpacing(style.letterSpacing);
+    return n.getTextWidth();
+  }, []);
+}
+
+/** Per-fragment runs inside the element's Group (see TextNode). */
+function RichTextRuns({ el, measure }: { el: TextElement; measure: MeasureFn }) {
+  const runs = useMemo(
+    () =>
+      layoutRichText({
+        fragments: el.fragments ?? [],
+        base: {
+          fontFamily: el.fontFamily,
+          fontSize: el.fontSize,
+          fontStyle: el.fontStyle,
+          fill: el.fill,
+          lineHeight: el.lineHeight,
+          letterSpacing: el.letterSpacing,
+          width: el.width,
+          align: el.align,
+        },
+        measure,
+      }),
+    [
+      el.fragments,
+      el.fontFamily,
+      el.fontSize,
+      el.fontStyle,
+      el.fill,
+      el.lineHeight,
+      el.letterSpacing,
+      el.width,
+      el.align,
+      measure,
+    ],
+  );
+  return (
+    <>
+      {runs.map((r, i) => (
+        <Text
+          key={i}
+          x={r.x}
+          y={r.y}
+          text={r.text}
+          fontFamily={r.fontFamily}
+          fontSize={r.fontSize}
+          fontStyle={r.fontStyle}
+          fill={r.fill}
+          letterSpacing={el.letterSpacing}
+        />
+      ))}
+    </>
+  );
+}
+
+function TextNode({
+  el,
+  common,
+}: {
+  el: TextElement;
+  common: Record<string, unknown>;
+}) {
+  const measure = useTextMeasure();
+
+  if (hasUsablePathData(el.textPath)) {
+    return (
+      <TextPath
+        {...(common as object)}
+        data={el.textPath}
+        text={el.text}
+        fontFamily={el.fontFamily}
+        fontSize={el.fontSize}
+        fontStyle={konvaFontStyle(el)}
+        fill={el.fill}
+        letterSpacing={el.letterSpacing}
+      />
+    );
+  }
+
+  if (hasRichFragments(el)) {
+    // The Group carries the element's id/handlers so selection, drag,
+    // snapping and the transformer treat the runs as one element.
+    return (
+      <Group {...(common as object)}>
+        <RichTextRuns el={el} measure={measure} />
+      </Group>
+    );
+  }
+
+  return (
+    <Text
+      {...(common as object)}
+      text={el.text}
+      fontFamily={el.fontFamily}
+      fontSize={el.fontSize}
+      fontStyle={konvaFontStyle(el)}
+      fill={el.fill}
+      align={el.align}
+      lineHeight={el.lineHeight}
+      letterSpacing={el.letterSpacing}
+      width={el.width}
+      wrap={el.width !== undefined ? "word" : "none"}
+    />
+  );
 }
 
 function ImageNode({
@@ -285,6 +425,17 @@ export function DesignCanvas({ stageRef }: { stageRef: StageRef }) {
     if (el.type === "text") {
       patch.fontSize = Math.max(8, Math.round(el.fontSize * sy));
       if (el.width !== undefined) patch.width = Math.max(40, el.width * sx);
+      if (el.fragments && el.fragments.length > 0) {
+        // FEATURE 1: keep per-fragment sizes proportional to the transform.
+        patch.fragments = el.fragments.map((f) =>
+          f.fontSize === undefined
+            ? f
+            : {
+                ...f,
+                fontSize: Math.max(1, Math.round(f.fontSize * sy * 10) / 10),
+              },
+        );
+      }
     } else if (el.type === "rect" || el.type === "image") {
       patch.width = Math.max(4, el.width * sx);
       patch.height = Math.max(4, el.height * sy);
@@ -296,6 +447,14 @@ export function DesignCanvas({ stageRef }: { stageRef: StageRef }) {
       patch.height = Math.max(4, el.height * sy);
     } else if (el.type === "line") {
       patch.points = el.points.map((p, i) => (i % 2 === 0 ? p * sx : p * sy));
+    } else if (el.type === "chart") {
+      // FEATURE 3 — charts stay crisp by re-rendering at a new stored size.
+      const cur = chartSize(el);
+      const w = Math.max(60, Math.round(cur.w * sx));
+      const h = Math.max(40, Math.round(cur.h * sy));
+      patch.custom = { ...(el.custom ?? {}), w, h };
+    } else if (el.type === "qr") {
+      patch.size = Math.max(48, Math.round(el.size * Math.max(sx, sy)));
     }
     updateElement(el.id, patch as Partial<DesignElement>);
   };

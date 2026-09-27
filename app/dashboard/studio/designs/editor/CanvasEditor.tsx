@@ -7,8 +7,10 @@
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  Image as ImageIcon,
   Layers,
   LayoutTemplate,
+  MessageSquare,
   Minus,
   Palette,
   Plus,
@@ -25,9 +27,11 @@ import { PagesStrip } from "./PagesStrip";
 import { TemplatesPanel } from "./panels/TemplatesPanel";
 import { TextPanel } from "./panels/TextPanel";
 import { UploadsPanel } from "./panels/UploadsPanel";
+import { StockPhotosPanel } from "./panels/StockPhotosPanel";
 import { ElementsPanel } from "./panels/ElementsPanel";
 import { BrandPanel } from "./panels/BrandPanel";
 import { LayersPanel } from "./panels/LayersPanel";
+import { CommentsPanel } from "./panels/CommentsPanel";
 import { AiPanel } from "./panels/AiPanel";
 
 // react-konva needs a real DOM — never SSR it.
@@ -40,15 +44,17 @@ const DesignCanvas = dynamic(() => import("./DesignCanvas").then((m) => m.Design
   ),
 });
 
-type PanelKey = "templates" | "text" | "uploads" | "elements" | "brand" | "layers" | "ai";
+type PanelKey = "templates" | "text" | "uploads" | "photos" | "elements" | "brand" | "layers" | "comments" | "ai";
 
 const RAIL: { key: PanelKey; label: string; icon: React.ReactNode }[] = [
   { key: "templates", label: "Templates", icon: <LayoutTemplate className="h-5 w-5" /> },
   { key: "text", label: "Text", icon: <Type className="h-5 w-5" /> },
   { key: "uploads", label: "Uploads", icon: <Upload className="h-5 w-5" /> },
+  { key: "photos", label: "Photos", icon: <ImageIcon className="h-5 w-5" /> },
   { key: "elements", label: "Elements", icon: <Shapes className="h-5 w-5" /> },
   { key: "brand", label: "Brand", icon: <Palette className="h-5 w-5" /> },
   { key: "layers", label: "Layers", icon: <Layers className="h-5 w-5" /> },
+  { key: "comments", label: "Comments", icon: <MessageSquare className="h-5 w-5" /> },
   { key: "ai", label: "AI", icon: <Sparkles className="h-5 w-5" /> },
 ];
 
@@ -234,9 +240,11 @@ export function CanvasEditor({ designId }: { designId: string }) {
         {panel === "templates" && <TemplatesPanel onDocumentReplaced={onDocumentReplaced} />}
         {panel === "text" && <TextPanel />}
         {panel === "uploads" && <UploadsPanel />}
+        {panel === "photos" && <StockPhotosPanel />}
         {panel === "elements" && <ElementsPanel />}
         {panel === "brand" && <BrandPanel onFontsLoaded={setBrandFonts} />}
         {panel === "layers" && <LayersPanel />}
+        {panel === "comments" && <CommentsPanel designId={designId} />}
         {panel === "ai" && <AiPanel />}
       </div>
 
@@ -244,6 +252,7 @@ export function CanvasEditor({ designId }: { designId: string }) {
       <div className="flex min-w-0 flex-1 flex-col">
         <Toolbar
           stageRef={stageRef}
+          designId={designId}
           designName={designName}
           onNameChange={(n) => {
             setDesignName(n);

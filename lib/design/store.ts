@@ -11,6 +11,12 @@ import {
   type DesignElement,
   type DesignPage,
 } from "./types";
+import { scalePage } from "./magic-resize";
+import { chartSize } from "./chart-math";
+import {
+  applyFragmentStyle as applyFragmentStyleTo,
+  type FragmentStyleInput,
+} from "./rich-text";
 
 const HISTORY_CAP = 50;
 const ZOOM_MIN = 0.1;
@@ -49,11 +55,45 @@ export interface DesignState {
   setActivePage(id: string): void;
   setPageBackground(id: string, color: string): void;
   setPageSize(id: string, w: number, h: number): void;
+  /**
+   * "Magic resize": convert a page to new dimensions, scaling every element's
+   * geometry proportionally (see lib/design/magic-resize.ts). A page-level
+   * operation — locked elements resize too. Runs through commit(), so it is a
+   * single undoable step. Returns per-page stats (for the toast) or null when
+   * the page or dimensions are invalid.
+   */
+  magicResize(
+    pageId: string,
+    newWidth: number,
+    newHeight: number,
+  ): { lockedCount: number; elementCount: number } | null;
 
   addElement(el: DesignElement): void;
   updateElement(id: string, patch: Partial<DesignElement>): void;
   removeElements(ids: string[]): void;
   duplicateElements(ids: string[]): void;
+  /**
+   * FEATURE 1 — richer text. Apply a partial style to the character range
+   * [start, end) of a text element, building the fragment model (created
+   * from plain text when absent). No-op when the range is empty, out of
+   * bounds, or the style changes nothing. Undoable.
+   */
+  applyFragmentStyle(
+    elementId: string,
+    start: number,
+    end: number,
+    style: FragmentStyleInput,
+  ): void;
+  /**
+   * FEATURE 1 — drop all per-fragment styling (the element's own styling
+   * remains). No-op when the element has no fragments. Undoable.
+   */
+  clearFragments(elementId: string): void;
+  /**
+   * FEATURE 1 — set the SVG path data for text-on-a-path. Falsy/blank clears
+   * it. No-op when the value is unchanged. Undoable.
+   */
+  setTextPath(elementId: string, path?: string): void;
   moveElement(id: string, dir: ZOrderDir): void;
   alignElements(ids: string[], edge: AlignEdge): void;
 
@@ -108,6 +148,41 @@ function withPage(
   };
 }
 
+/**
+ * FEATURE 1 — fragment↔text sync guard. A wholesale `text` replacement that
+ * does not carry `fragments` cannot be mapped onto the old runs, so stale
+ * fragments are dropped instead of being left contradicting `text`.
+ */
+function applyTextPatch(
+  el: DesignElement,
+  patch: Partial<DesignElement>,
+): DesignElement {
+  const merged = { ...el, ...patch } as DesignElement;
+  if (
+    merged.type === "text" &&
+    "text" in patch &&
+    !("fragments" in patch) &&
+    merged.fragments !== undefined &&
+    merged.fragments.length > 0
+  ) {
+    merged.fragments = undefined;
+  }
+  return merged;
+}
+
+function textElementOf(
+  document: DesignDocument | null,
+  activePageId: string | null,
+  elementId: string,
+): { page: DesignPage; el: Extract<DesignElement, { type: "text" }> } | null {
+  if (!document) return null;
+  const page = activePageOf(document, activePageId);
+  if (!page) return null;
+  const el = page.elements.find((e) => e.id === elementId);
+  if (!el || el.type !== "text") return null;
+  return { page, el };
+}
+
 function emptyPage(name: string): DesignPage {
   return {
     id: newId("page"),
@@ -149,6 +224,12 @@ function boundsOf(el: DesignElement): { x: number; y: number; w: number; h: numb
       const maxY = Math.max(...ys);
       return { x: el.x + minX, y: el.y + minY, w: maxX - minX, h: maxY - minY };
     }
+    case "chart": {
+      const { w, h } = chartSize(el);
+      return { x: el.x, y: el.y, w, h };
+    }
+    case "qr":
+      return { x: el.x, y: el.y, w: el.size, h: el.size };
   }
 }
 
@@ -276,6 +357,22 @@ export const useDesignStore = create<DesignState>()((set, get) => ({
     );
   },
 
+  magicResize: (pageId, newWidth, newHeight) => {
+    const { document } = get();
+    if (!document) return null;
+    const page = document.pages.find((p) => p.id === pageId);
+    if (!page) return null;
+    if (page.width <= 0 || page.height <= 0 || newWidth <= 0 || newHeight <= 0) {
+      return null;
+    }
+    const lockedCount = page.elements.filter((e) => e.locked).length;
+    const elementCount = page.elements.length;
+    commit(set, get, (doc) =>
+      withPage(doc, pageId, (p) => scalePage(p, newWidth, newHeight)),
+    );
+    return { lockedCount, elementCount };
+  },
+
   // ── Elements ───────────────────────────────────────────────────────
   addElement: (el) => {
     const { document, activePageId } = get();
@@ -299,10 +396,50 @@ export const useDesignStore = create<DesignState>()((set, get) => ({
       withPage(doc, page.id, (p) => ({
         ...p,
         elements: p.elements.map((e) =>
-          e.id === id ? ({ ...e, ...patch } as DesignElement) : e,
+          e.id === id ? applyTextPatch(e, patch) : e,
         ),
       })),
     );
+  },
+
+  applyFragmentStyle: (elementId, start, end, style) => {
+    const { document, activePageId } = get();
+    const found = textElementOf(document, activePageId, elementId);
+    if (!found) return;
+    const { el } = found;
+    const res = applyFragmentStyleTo(
+      el.fragments ?? [],
+      el.text,
+      start,
+      end,
+      style,
+      {
+        fontFamily: el.fontFamily,
+        fontSize: el.fontSize,
+        fontStyle: el.fontStyle,
+        fill: el.fill,
+      },
+    );
+    if (!res) return;
+    // Both fields patched together: the sync guard only fires when `text`
+    // is patched WITHOUT `fragments`.
+    get().updateElement(elementId, { fragments: res.fragments, text: res.text });
+  },
+
+  clearFragments: (elementId) => {
+    const { document, activePageId } = get();
+    const found = textElementOf(document, activePageId, elementId);
+    if (!found || !found.el.fragments || found.el.fragments.length === 0) return;
+    get().updateElement(elementId, { fragments: undefined });
+  },
+
+  setTextPath: (elementId, path) => {
+    const { document, activePageId } = get();
+    const found = textElementOf(document, activePageId, elementId);
+    if (!found) return;
+    const next = path && path.trim() ? path : undefined;
+    if ((found.el.textPath ?? undefined) === next) return;
+    get().updateElement(elementId, { textPath: next });
   },
 
   removeElements: (ids) => {

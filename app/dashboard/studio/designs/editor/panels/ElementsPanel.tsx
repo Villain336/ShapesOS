@@ -3,8 +3,9 @@
 
 "use client";
 
+import { BarChart3, LineChart, PieChart, QrCode } from "lucide-react";
 import { useCanvasStore } from "@/lib/design/store";
-import { makeEllipse, makeLine, makeRect, makeSvg } from "../factory";
+import { makeChart, makeEllipse, makeLine, makeQr, makeRect, makeSvg } from "../factory";
 import { panelSectionLabel, panelTitle } from "../ui";
 
 interface IconDef {
@@ -79,6 +80,39 @@ export function ElementsPanel() {
               <span className="h-[3px] w-9 bg-stone-800" />
             </button>
           </div>
+        </div>
+        <div>
+          <div className={panelSectionLabel}>Charts & QR</div>
+          <div className="grid grid-cols-2 gap-2">
+            {(
+              [
+                { key: "bar", label: "Bar chart", icon: <BarChart3 className="h-6 w-6" /> },
+                { key: "line", label: "Line chart", icon: <LineChart className="h-6 w-6" /> },
+                { key: "pie", label: "Pie chart", icon: <PieChart className="h-6 w-6" /> },
+              ] as const
+            ).map((c) => (
+              <button
+                key={c.key}
+                onClick={() => addElement(makeChart({ chartType: c.key, ...dims, name: c.label }))}
+                title={`Insert ${c.label}`}
+                className="flex h-14 flex-col items-center justify-center gap-1 rounded-md border border-stone-200 bg-white text-violet-600 hover:border-violet-400 hover:bg-violet-50/40"
+              >
+                {c.icon}
+                <span className="text-[10px] font-medium text-stone-600">{c.label}</span>
+              </button>
+            ))}
+            <button
+              onClick={() => addElement(makeQr({ ...dims, name: "QR code" }))}
+              title="Insert QR code"
+              className="flex h-14 flex-col items-center justify-center gap-1 rounded-md border border-stone-200 bg-white text-violet-600 hover:border-violet-400 hover:bg-violet-50/40"
+            >
+              <QrCode className="h-6 w-6" />
+              <span className="text-[10px] font-medium text-stone-600">QR code</span>
+            </button>
+          </div>
+          <p className="pt-2 text-[11px] leading-snug text-stone-500">
+            Charts and QR codes drop in with starter content — edit data, colors, and links from the toolbar once selected.
+          </p>
         </div>
         <div>
           <div className={panelSectionLabel}>Icons</div>

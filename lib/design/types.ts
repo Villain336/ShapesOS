@@ -6,7 +6,15 @@
 
 export const DESIGN_SCHEMA_VERSION = 1;
 
-export type ElementType = "text" | "image" | "rect" | "ellipse" | "line" | "svg";
+export type ElementType =
+  | "text"
+  | "image"
+  | "rect"
+  | "ellipse"
+  | "line"
+  | "svg"
+  | "chart"
+  | "qr";
 
 export interface BaseElement {
   id: string;
@@ -33,6 +41,28 @@ export interface TextElement extends BaseElement {
   lineHeight: number;
   letterSpacing: number;
   width?: number; // wrap width; undefined = no wrap
+  /**
+   * Per-fragment styling (richer text). When present and non-empty, the
+   * renderer styles each fragment individually; `text` remains the
+   * plain-text concatenation (used for export fallbacks, search, and
+   * {{variable}} substitution). Fragment fields fall back to the element's
+   * own fontFamily/fontSize/fontStyle/fill when omitted.
+   */
+  fragments?: TextFragment[];
+  /**
+   * Text-on-a-path: SVG path data string. When set, text follows the path
+   * (Konva TextPath). Fragments are ignored in path mode.
+   */
+  textPath?: string;
+}
+
+/** One styled run inside a TextElement. All style fields optional. */
+export interface TextFragment {
+  text: string;
+  fontFamily?: string;
+  fontSize?: number;
+  fontStyle?: "normal" | "bold" | "italic" | "bold-italic";
+  fill?: string;
 }
 
 export interface ImageElement extends BaseElement {
@@ -82,13 +112,37 @@ export interface SvgElement extends BaseElement {
   fill: string;
 }
 
+export interface ChartElement extends BaseElement {
+  type: "chart";
+  chartType: "bar" | "line" | "pie";
+  /** Series data: labels[i] pairs with values[i]. */
+  labels: string[];
+  values: number[];
+  /** Brand palette; cycles when shorter than the data. */
+  colors: string[];
+  /** Show value labels on the chart. */
+  showValues: boolean;
+}
+
+export interface QrElement extends BaseElement {
+  type: "qr";
+  /** Encoded payload (URL or text). */
+  payload: string;
+  /** Rendered square size. */
+  size: number;
+  foreground: string;
+  background: string;
+}
+
 export type DesignElement =
   | TextElement
   | ImageElement
   | RectElement
   | EllipseElement
   | LineElement
-  | SvgElement;
+  | SvgElement
+  | ChartElement
+  | QrElement;
 
 export interface DesignPage {
   id: string;
