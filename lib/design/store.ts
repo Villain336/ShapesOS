@@ -41,6 +41,11 @@ export interface DesignState {
   duplicatePage(id: string): void;
   removePage(id: string): void;
   renamePage(id: string, name: string): void;
+  /**
+   * Append externally-built pages (e.g. AI-generated drafts) with fresh ids.
+   * The first appended page becomes active. Always a draft — the human edits.
+   */
+  appendPages(pages: DesignPage[]): void;
   setActivePage(id: string): void;
   setPageBackground(id: string, color: string): void;
   setPageSize(id: string, w: number, h: number): void;
@@ -190,8 +195,7 @@ export const useDesignStore = create<DesignState>()((set, get) => ({
     });
   },
 
-  duplicatePage: (id) => {
-    const { document } = get();
+  duplicatePage: (id) => {    const { document } = get();
     if (!document) return;
     const src = document.pages.find((p) => p.id === id);
     if (!src) return;
@@ -214,6 +218,24 @@ export const useDesignStore = create<DesignState>()((set, get) => ({
         pages: [...doc.pages.slice(0, idx + 1), copy, ...doc.pages.slice(idx + 1)],
       }),
       { activePageId: copy.id, selectedIds: [] },
+    );
+  },
+
+  appendPages: (pages) => {
+    const { document } = get();
+    if (!document || pages.length === 0) return;
+    const base = document.pages.length;
+    const fresh: DesignPage[] = pages.map((p, i) => ({
+      ...p,
+      id: newId("page"),
+      name: p.name?.trim() ? p.name : `AI draft ${base + i + 1}`,
+      elements: p.elements.map((el) => ({ ...el, id: newId("el") })),
+    }));
+    commit(
+      set,
+      get,
+      (doc) => ({ ...doc, pages: [...doc.pages, ...fresh] }),
+      { activePageId: fresh[0]!.id, selectedIds: [] },
     );
   },
 

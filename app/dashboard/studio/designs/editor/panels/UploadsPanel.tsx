@@ -1,21 +1,16 @@
 // Marketr — Phase 11 "Canvas": Uploads panel. Browser-session image uploads
-// (data URLs). Uploads stay in this browser session and are saved into the design.
+// (data URLs) plus AI-generated images — one shared shelf (see
+// lib/design/assets.ts). Assets are placed on canvas by the user, never
+// automatically, and are saved into the design.
 
 "use client";
 
 import { useRef, useState } from "react";
-import { ImagePlus } from "lucide-react";
+import { ImagePlus, Sparkles } from "lucide-react";
 import { useCanvasStore } from "@/lib/design/store";
+import { imageDimensions, newAssetId, useSessionAssets, type SessionAsset } from "@/lib/design/assets";
 import { fitBox, makeImage } from "../factory";
 import { btnPrimary, panelTitle } from "../ui";
-
-interface SessionUpload {
-  id: string;
-  name: string;
-  dataUrl: string;
-  width: number;
-  height: number;
-}
 
 const MAX_DIM = 800;
 
@@ -28,20 +23,12 @@ function readAsDataUrl(file: File): Promise<string> {
   });
 }
 
-function naturalSize(dataUrl: string): Promise<{ width: number; height: number }> {
-  return new Promise((resolve, reject) => {
-    const img = new window.Image();
-    img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
-    img.onerror = () => reject(new Error("Could not decode image"));
-    img.src = dataUrl;
-  });
-}
-
 export function UploadsPanel() {
   const document = useCanvasStore((s) => s.document);
   const activePageId = useCanvasStore((s) => s.activePageId);
   const addElement = useCanvasStore((s) => s.addElement);
-  const [uploads, setUploads] = useState<SessionUpload[]>([]);
+  const assets = useSessionAssets((s) => s.assets);
+  const addAssets = useSessionAssets((s) => s.addAssets);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -49,7 +36,7 @@ export function UploadsPanel() {
   const page = document?.pages.find((p) => p.id === activePageId);
   if (!page) return null;
 
-  const place = (u: SessionUpload) => {
+  const place = (u: SessionAsset) => {
     const { width, height } = fitBox(u.width, u.height, MAX_DIM);
     addElement(
       makeImage({
@@ -68,23 +55,24 @@ export function UploadsPanel() {
     setBusy(true);
     setError(null);
     try {
-      const next: SessionUpload[] = [];
+      const next: SessionAsset[] = [];
       for (const file of Array.from(files).slice(0, 5)) {
         if (!file.type.startsWith("image/")) continue;
         const dataUrl = await readAsDataUrl(file);
-        const size = await naturalSize(dataUrl);
+        const size = await imageDimensions(dataUrl);
         next.push({
-          id: `up-${Date.now()}-${next.length}`,
+          id: newAssetId("up"),
           name: file.name.replace(/\.[a-z0-9]+$/i, "").slice(0, 40) || "Upload",
           dataUrl,
           width: size.width,
           height: size.height,
+          origin: "upload",
         });
       }
       if (next.length === 0) {
         setError("No image files in that selection.");
       } else {
-        setUploads((prev) => [...next, ...prev]);
+        addAssets(next);
         place(next[0]!);
       }
     } catch {
@@ -116,17 +104,23 @@ export function UploadsPanel() {
             {error}
           </p>
         )}
-        {uploads.length > 0 ? (
+        {assets.length > 0 ? (
           <div className="grid grid-cols-2 gap-2">
-            {uploads.map((u) => (
+            {assets.map((u) => (
               <button
                 key={u.id}
                 onClick={() => place(u)}
                 title={`Place ${u.name}`}
-                className="group overflow-hidden rounded-md border border-stone-200 bg-white hover:border-violet-400"
+                className="group relative overflow-hidden rounded-md border border-stone-200 bg-white hover:border-violet-400"
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={u.dataUrl} alt={u.name} className="h-20 w-full object-cover" />
+                {u.origin === "generated" && (
+                  <span className="absolute left-1 top-1 flex items-center gap-0.5 rounded bg-violet-600 px-1 py-0.5 text-[9px] font-semibold text-white">
+                    <Sparkles className="h-2.5 w-2.5" />
+                    AI
+                  </span>
+                )}
                 <div className="truncate px-1.5 py-1 text-left text-[11px] text-stone-600 group-hover:text-violet-700">
                   {u.name}
                 </div>

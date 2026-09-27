@@ -22,7 +22,10 @@ import {
   ChevronDown,
   Copy,
   Download,
+  Eraser,
+  History,
   Italic,
+  Loader2,
   Lock,
   Plus,
   Redo,
@@ -31,8 +34,9 @@ import {
   Unlock,
 } from "lucide-react";
 import { useCanvasStore, type AlignEdge } from "@/lib/design/store";
-import type { DesignElement, TextElement } from "@/lib/design/types";
+import type { DesignElement, ImageElement, TextElement } from "@/lib/design/types";
 import type { StageRef } from "./DesignCanvas";
+import { removeImageBackground } from "@/lib/design/background-removal";
 import { iconBtn, iconBtnActive, inputCls } from "./ui";
 
 export type SaveState = "idle" | "saving" | "saved" | "error";
@@ -64,6 +68,72 @@ function fillablePatch(el: DesignElement, color: string): Record<string, unknown
   if (el.type === "line") return { stroke: color };
   if (el.type === "image") return {};
   return { fill: color };
+}
+
+/**
+ * Background removal for a single selected image element. Non-destructive:
+ * the original src is stashed in custom.originalSrc so the user can revert.
+ * Runs 100% in the browser (WASM) — no key, no uploads leave the device.
+ */
+function BgRemovalControl({ el }: { el: ImageElement }) {
+  const updateElement = useCanvasStore((s) => s.updateElement);
+  const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const originalSrc =
+    el.custom && typeof el.custom.originalSrc === "string" ? el.custom.originalSrc : null;
+
+  const remove = async () => {
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    setProgress("Loading engine…");
+    try {
+      const cutout = await removeImageBackground(el.src, (_label, done, total) => {
+        const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+        setProgress(pct > 0 ? `Removing background… ${pct}%` : "Removing background…");
+      });
+      updateElement(el.id, {
+        src: cutout,
+        custom: { ...(el.custom ?? {}), originalSrc: el.src },
+      });
+      setProgress(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Background removal failed.");
+      setProgress(null);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const restore = () => {
+    if (!originalSrc) return;
+    const { originalSrc: _dropped, ...rest } = (el.custom ?? {}) as Record<string, unknown>;
+    updateElement(el.id, { src: originalSrc, custom: rest });
+    setError(null);
+  };
+
+  return (
+    <div className="flex flex-wrap items-center gap-1.5" title="Background removal">
+      {originalSrc ? (
+        <button onClick={restore} disabled={busy} className={iconBtn} title="Restore original image">
+          <History className="h-3.5 w-3.5" />
+        </button>
+      ) : (
+        <button
+          onClick={() => void remove()}
+          disabled={busy}
+          className={`${iconBtn} ${busy ? "" : "!w-auto !px-2.5 gap-1.5 text-[12px] font-medium"}`}
+          title="Remove background (runs in your browser)"
+        >
+          {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Eraser className="h-3.5 w-3.5" />}
+          {busy ? progress ?? "Working…" : "Remove background"}
+        </button>
+      )}
+      {error && <span className="max-w-64 text-[11px] leading-snug text-red-600">{error}</span>}
+    </div>
+  );
 }
 
 export function Toolbar({ stageRef, designName, onNameChange, saveState, brandFonts }: ToolbarProps) {
@@ -277,6 +347,10 @@ export function Toolbar({ stageRef, designName, onNameChange, saveState, brandFo
             />
           )}
         </div>
+      )}
+
+      {selected.length === 1 && selected[0]!.type === "image" && (
+        <BgRemovalControl key={selected[0]!.id} el={selected[0]! as ImageElement} />
       )}
 
       {selected.length > 0 && (

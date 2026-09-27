@@ -13,6 +13,7 @@ import {
   Palette,
   Plus,
   Shapes,
+  Sparkles,
   Type,
   Upload,
 } from "lucide-react";
@@ -27,6 +28,7 @@ import { UploadsPanel } from "./panels/UploadsPanel";
 import { ElementsPanel } from "./panels/ElementsPanel";
 import { BrandPanel } from "./panels/BrandPanel";
 import { LayersPanel } from "./panels/LayersPanel";
+import { AiPanel } from "./panels/AiPanel";
 
 // react-konva needs a real DOM — never SSR it.
 const DesignCanvas = dynamic(() => import("./DesignCanvas").then((m) => m.DesignCanvas), {
@@ -38,7 +40,7 @@ const DesignCanvas = dynamic(() => import("./DesignCanvas").then((m) => m.Design
   ),
 });
 
-type PanelKey = "templates" | "text" | "uploads" | "elements" | "brand" | "layers";
+type PanelKey = "templates" | "text" | "uploads" | "elements" | "brand" | "layers" | "ai";
 
 const RAIL: { key: PanelKey; label: string; icon: React.ReactNode }[] = [
   { key: "templates", label: "Templates", icon: <LayoutTemplate className="h-5 w-5" /> },
@@ -47,6 +49,7 @@ const RAIL: { key: PanelKey; label: string; icon: React.ReactNode }[] = [
   { key: "elements", label: "Elements", icon: <Shapes className="h-5 w-5" /> },
   { key: "brand", label: "Brand", icon: <Palette className="h-5 w-5" /> },
   { key: "layers", label: "Layers", icon: <Layers className="h-5 w-5" /> },
+  { key: "ai", label: "AI", icon: <Sparkles className="h-5 w-5" /> },
 ];
 
 interface DesignPayload {
@@ -234,6 +237,7 @@ export function CanvasEditor({ designId }: { designId: string }) {
         {panel === "elements" && <ElementsPanel />}
         {panel === "brand" && <BrandPanel onFontsLoaded={setBrandFonts} />}
         {panel === "layers" && <LayersPanel />}
+        {panel === "ai" && <AiPanel />}
       </div>
 
       {/* Center column */}
