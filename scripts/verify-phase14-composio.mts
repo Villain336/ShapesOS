@@ -80,9 +80,12 @@ const ov = classifyAction("GMAIL_SEND_EMAIL", { GMAIL_SEND_EMAIL: "high" });
 check("override wins over derivation", ov.tier === "high" && ov.overridden);
 check("override high is not auto", !ov.autoExecutable);
 const ovLow = classifyAction("SLACK_DELETE_MESSAGE", { SLACK_DELETE_MESSAGE: "low" });
-check("override can downgrade", ovLow.tier === "low" && ovLow.autoExecutable);
+// Conservative floor (locked): overrides may escalate risk but never
+// downgrade below the derived tier — every destructive action stays gated.
+check("override cannot downgrade below floor", ovLow.tier === "high" && !ovLow.autoExecutable);
 const ovDraft = classifyAction("GMAIL_CREATE_DRAFT", { GMAIL_CREATE_DRAFT: "high" });
-check("draft creator stays auto even when overridden high", ovDraft.autoExecutable);
+// Explicit escalation to high revokes the draft-creator auto privilege.
+check("draft creator escalated to high is no longer auto", !ovDraft.autoExecutable);
 
 // ── 3. Fail-closed without API key ────────────────────────────────────────
 const savedKey = process.env.COMPOSIO_API_KEY;

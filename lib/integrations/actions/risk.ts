@@ -26,6 +26,20 @@ export interface ClassifiedAction {
   autoExecutable: boolean;
   /** Whether a manual override decided the tier. */
   overridden: boolean;
+  /**
+   * Whether an override tried to go below the derived tier and the
+   * conservative floor clamped it. Locked invariant: overrides may
+   * ESCALATE risk, never downgrade — every external write and all
+   * destructive actions go through the approve/deny queue.
+   */
+  clamped: boolean;
+}
+
+const TIER_RANK: Record<RiskTier, number> = { low: 0, medium: 1, high: 2 };
+
+/** The riskier of two tiers. */
+function riskier(a: RiskTier, b: RiskTier): RiskTier {
+  return TIER_RANK[a] >= TIER_RANK[b] ? a : b;
 }
 
 // Verb stems that mark a tool destructive. Checked before write verbs so
@@ -97,7 +111,14 @@ export function isValidTier(t: unknown): t is RiskTier {
 
 /**
  * Classify a tool. Manual overrides (from
- * WorkspaceSettings.toolTierOverrides) win over derivation.
+ * WorkspaceSettings.toolTierOverrides) may ESCALATE risk but never
+ * downgrade below the derived tier (conservative floor, locked): a
+ * derived high can never become medium/low, and a derived external
+ * write can never become low.
+ *
+ * Auto-executability: reads (low) and draft-creators (medium) may run
+ * automatically — but an explicit override escalation to high revokes
+ * the draft-creator privilege.
  */
 export function classifyAction(
   toolName: string,
@@ -106,22 +127,26 @@ export function classifyAction(
   const slug = toolName.toUpperCase();
   const override = overrides?.[slug] ?? overrides?.[toolName];
   const draftCreator = isDraftCreator(toolName);
+  const derived = deriveTierFromName(toolName);
   if (override !== undefined && isValidTier(override)) {
+    const tier = riskier(derived, override);
     return {
       toolName,
-      tier: override,
+      tier,
       draftCreator,
-      autoExecutable: override === "low" || draftCreator,
+      autoExecutable:
+        tier === "low" || (draftCreator && tier === "medium" && override !== "high"),
       overridden: true,
+      clamped: TIER_RANK[override] < TIER_RANK[derived],
     };
   }
-  const tier = deriveTierFromName(toolName);
   return {
     toolName,
-    tier,
+    tier: derived,
     draftCreator,
-    autoExecutable: tier === "low" || draftCreator,
+    autoExecutable: derived === "low" || draftCreator,
     overridden: false,
+    clamped: false,
   };
 }
 
