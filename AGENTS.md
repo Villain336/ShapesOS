@@ -2,6 +2,9 @@
 
 # This is NOT the Next.js you know
 
+## VoiceStudio backend realities (lesson 2026-09-28)
+The local VoiceStudio backend (`~/workspace/voicestudio`, :3900) is a SINGLE-worker CPU engine: one generation at a time, minutes per request on this box (a 12-char test took >5 min while loaded; ~50 chars took ~4 min idle). Consequences: (1) never fire concurrent syntheses — the backend 429s ("pool saturated", safe to retry in ~66s) and abandoned >600s jobs keep holding the device; (2) client timeout must be minutes, not seconds (lib/voice/voicestudio.ts defaults 600s, and classifies OUR OWN timeout as engine-slow, never "down"); (3) if a stuck job wedges it, restart with `bash ~/workspace/voicestudio/run-backend.sh` (idempotent, kills + relaunches + waits for /health) — /health stays instant even when the worker is saturated, so it is NOT proof the engine is free. Voice ids are discovered via GET /v1/audio/voices (14 OpenAI aliases + demo0001 as of 2026-09-28) — never invent them.
+
 This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
 
 This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.

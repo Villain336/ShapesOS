@@ -528,6 +528,12 @@ model Workspace {
   clipSources             ClipSource[]
   clips                   Clip[]
   clipJobs                ClipJob[]
+  // Phase 13D: voice/text agents back-relations.
+  voiceAgents             VoiceAgent[]
+  callScripts             CallScript[]
+  callSessions            CallSession[]
+  voiceoverJobs           VoiceoverJob[]
+  pronunciationEntries    PronunciationEntry[]
   // Phase 10 (intelligence depth): owned data assets back-relations.
   dataSources             DataSource[]
   serpVendorConfigs       SerpVendorConfig[]
@@ -3599,6 +3605,8 @@ model Lead {
   sequenceEnrollments SequenceEnrollment[]
   reviewRequests      ReviewRequest[]
   convertedProspects  Prospect[]
+  // Phase 13D: voice/text agent sessions.
+  callSessions        CallSession[]
 
   @@unique([workspaceId, dedupKey])
   @@index([workspaceId, pipelineId, stage])
@@ -8015,4 +8023,140 @@ model ClipJob {
 
   @@index([workspaceId, status])
   @@map("clip_jobs")
+}
+
+// ── Phase 13D: voice/text agents (LiveKit + VoiceStudio) ──
+
+// A configured agent in a workspace: lead follow-up (voice/text) or
+// voiceover narration. TTS backend defaults to VoiceStudio (local).
+model VoiceAgent {
+  id           String   @id @default(cuid())
+  workspaceId  String   @map("workspace_id")
+  workspace    Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name         String
+  purpose      String   // followup | voiceover
+  // VoiceStudio voice id (default backend) or provider voice id when the
+  // workspace opts into a BYO provider key.
+  voiceId      String   @map("voice_id")
+  voiceBackend String   @default("voicestudio") @map("voice_backend") // voicestudio | byo_provider
+  // Persona prompt seed, hours, escalation rules, consent-list refs.
+  config       Json     @default("{}")
+  // Workspace kill switch: when true the agent refuses all new sessions.
+  killSwitch   Boolean  @default(false) @map("kill_switch")
+  status       String   @default("active") // active | paused | archived
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  scripts      CallScript[]
+  sessions     CallSession[]
+  voiceoverJobs VoiceoverJob[]
+
+  @@index([workspaceId, purpose, status])
+  @@map("voice_agents")
+}
+
+// A call script. Drafts can NEVER dial — only human-approved scripts may
+// be attached to a live session. New objection branches flag for review.
+model CallScript {
+  id          String     @id @default(cuid())
+  workspaceId String     @map("workspace_id")
+  workspace   Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  agentId     String     @map("agent_id")
+  agent       VoiceAgent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  name        String
+  version     Int        @default(1)
+  // { opening (with AI disclosure), branches, objection handlers, closing }.
+  body        Json
+  status      String     @default("draft") // draft | approved | rejected | archived
+  approvedBy  String?    @map("approved_by")
+  approvedAt  DateTime?  @map("approved_at")
+  createdAt   DateTime   @default(now()) @map("created_at")
+  updatedAt   DateTime   @updatedAt @map("updated_at")
+
+  sessions    CallSession[]
+
+  @@index([workspaceId, agentId, status])
+  @@map("call_scripts")
+}
+
+// One voice/text session with a prospect. Consent-gated: a session may
+// only go live when ContactConsent shows opted-in for the channel AND the
+// script is approved AND the kill switch is off. Everything else is
+// rehearsal. Full transcript + audit trail on every session.
+model CallSession {
+  id               String      @id @default(cuid())
+  workspaceId      String      @map("workspace_id")
+  workspace        Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  agentId          String      @map("agent_id")
+  agent            VoiceAgent  @relation(fields: [agentId], references: [id], onDelete: Restrict)
+  leadId           String      @map("lead_id")
+  lead             Lead        @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  scriptId         String?     @map("script_id")
+  script           CallScript? @relation(fields: [scriptId], references: [id], onDelete: SetNull)
+  channel          String      // voice | sms | chat
+  direction        String      @default("outbound") // outbound | inbound
+  // Snapshot of the consent record at session start (first-class proof).
+  consentProof     Json        @default("{}") @map("consent_proof")
+  // Full transcript: [{ role: agent|prospect|system, text, ts }].
+  transcript       Json        @default("[]")
+  recordingRef     String?     @map("recording_ref")
+  recordingConsent Boolean     @default(false) @map("recording_consent")
+  outcome          String?     // qualified | booked | callback | not_interested | no_answer | refused_no_consent ...
+  // Every state transition + human override, for the audit trail.
+  auditTrail       Json        @default("[]") @map("audit_trail")
+  status           String      @default("rehearsal") // rehearsal | queued | in_progress | completed | cancelled | blocked
+  // Set when a consent/killswitch/script gate refuses the session.
+  blockReason      String?     @map("block_reason")
+  startedAt        DateTime?   @map("started_at")
+  endedAt          DateTime?   @map("ended_at")
+  createdAt        DateTime    @default(now()) @map("created_at")
+
+  @@index([workspaceId, status])
+  @@index([agentId, createdAt])
+  @@index([leadId])
+  @@map("call_sessions")
+}
+
+// A TTS narration job: script -> VoiceStudio -> audio, attached to a 13C
+// clip or Studio video. Pronunciation snapshot applied at render time.
+model VoiceoverJob {
+  id            String      @id @default(cuid())
+  workspaceId   String      @map("workspace_id")
+  workspace     Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  agentId       String?     @map("agent_id")
+  agent         VoiceAgent? @relation(fields: [agentId], references: [id], onDelete: SetNull)
+  script        String      @db.Text
+  voiceId       String      @map("voice_id")
+  voiceBackend  String      @default("voicestudio") @map("voice_backend")
+  // Pronunciation entries applied at render: [{ term, phonetic }].
+  pronunciation Json        @default("[]")
+  audioRef      String?     @map("audio_ref")
+  // Optional attach target: 13C clip id or Studio asset ref.
+  clipId        String?     @map("clip_id")
+  status        String      @default("pending") // pending | processing | ready | failed
+  progress      Float       @default(0)
+  error         String?
+  durationSec   Float?      @map("duration_sec")
+  createdAt     DateTime    @default(now()) @map("created_at")
+  updatedAt     DateTime    @updatedAt @map("updated_at")
+
+  @@index([workspaceId, status])
+  @@map("voiceover_jobs")
+}
+
+// Workspace pronunciation dictionary, seeded from the 13B knowledge
+// graph (product names, people) and editable per workspace.
+model PronunciationEntry {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  term        String
+  phonetic    String
+  source      String    @default("manual") // knowledge_graph | manual
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@unique([workspaceId, term])
+  @@index([workspaceId])
+  @@map("pronunciation_entries")
 }
