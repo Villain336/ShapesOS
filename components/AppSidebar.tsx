@@ -9,7 +9,7 @@ import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
 import type { ComponentType } from "react";
 import { useState } from "react";
-import { Mail, Paintbrush, Megaphone, RefreshCw, Brain, Target, BookOpen, Inbox, Share2, LayoutDashboard, Scissors } from "lucide-react";
+import { Mail, Paintbrush, Megaphone, RefreshCw, Brain, Target, BookOpen, Inbox, Share2, LayoutDashboard, Scissors, Briefcase } from "lucide-react";
 import {
   ChartBar,
   Bell,
@@ -85,6 +85,8 @@ const NAV_SECTIONS: {
       { href: "/dashboard/missions", label: "Missions", icon: Target },
       { href: "/dashboard/playbooks", label: "Playbooks", icon: BookOpen },
       { href: "/dashboard/approvals", label: "Approvals", icon: Inbox },
+      // Phase 14: the office surface — sheets/docs/decks stored by Marketr.
+      { href: "/dashboard/office", label: "Office", icon: Briefcase },
     ],
   },
 ];
