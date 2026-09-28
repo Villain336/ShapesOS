@@ -207,13 +207,21 @@ export async function getComposioAuthConfigId(
 }
 
 /** Mint a fresh OAuth connect link. The redirect_url expires in ~12 minutes —
- *  call this at click time, never cache or persist the URL. */
+ *  call this at click time, never cache or persist the URL.
+ *  redirectUrl (optional): where Composio sends the user after the OAuth
+ *  round-trip, with ?connected_account_id= appended. Phase 14 passes our
+ *  signed-state callback URL here so the callback can bind the handshake. */
 export async function createComposioConnectLink(
-  opts: { authConfigId: string; userId: string },
+  opts: { authConfigId: string; userId: string; redirectUrl?: string },
   http: ComposioHttp = createComposioHttp(),
 ): Promise<ComposioConnectLink> {
+  const body: Record<string, unknown> = {
+    auth_config_id: opts.authConfigId,
+    user_id: opts.userId,
+  };
+  if (opts.redirectUrl) body.redirect_url = opts.redirectUrl;
   return http.request<ComposioConnectLink>(`/connected_accounts/link`, {
     method: "POST",
-    body: { auth_config_id: opts.authConfigId, user_id: opts.userId },
+    body,
   });
 }

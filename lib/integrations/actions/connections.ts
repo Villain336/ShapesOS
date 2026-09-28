@@ -18,10 +18,20 @@ import {
   type ComposioHttp,
 } from "@/lib/integrations/composio";
 import { getV1App, isValidTier } from "@/lib/integrations/actions/risk";
+import { signOAuthState } from "@/lib/integrations/actions/oauth-state";
 
 export interface InitiateConnectResult {
   connectUrl: string;
   expiresAt: string | null;
+}
+
+/** Public origin for the OAuth callback (same pattern as the messaging dispatcher). */
+function publicOrigin(): string {
+  return (
+    process.env.APP_URL ??
+    process.env.NEXT_PUBLIC_APP_URL ??
+    "http://localhost:3000"
+  ).replace(/\/$/, "");
 }
 
 function requireV1App(appKey: string) {
@@ -35,7 +45,12 @@ function requireV1App(appKey: string) {
 }
 
 /** Mint a fresh OAuth connect link for (workspace, app). No DB row yet —
- *  the row lands in confirmConnection() after the OAuth round-trip. */
+ *  the row lands in confirmConnection() after the OAuth round-trip.
+ *
+ *  Hardened (slice 4): the link request carries a redirect_url pointing at
+ *  our callback with a SIGNED state token binding (workspaceId, appKey,
+ *  userId). The callback verifies the signature before confirming — an
+ *  unsigned/forged callback cannot bind an arbitrary connected_account_id. */
 export async function initiateConnect(
   opts: { workspaceId: string; appKey: string; userId: string },
   http?: ComposioHttp,
@@ -50,8 +65,18 @@ export async function initiateConnect(
     );
     authConfigId = created.id;
   }
+  // Hardened (slice 4): sign the (workspaceId, appKey, userId) binding and
+  // carry it as ?state= on the callback URL. signOAuthState runs FIRST
+  // (fail-closed): no secret -> no link. The callback verifies the
+  // signature before confirming — forged callbacks can't bind.
+  const state = signOAuthState({
+    workspaceId: opts.workspaceId,
+    appKey: opts.appKey,
+    userId: opts.userId,
+  });
+  const redirectUrl = `${publicOrigin()}/api/integrations/actions/callback?state=${encodeURIComponent(state)}`;
   const link = await createComposioConnectLink(
-    { authConfigId, userId: opts.userId },
+    { authConfigId, userId: opts.userId, redirectUrl },
     http,
   );
   if (!link.redirect_url) throw new Error("Composio returned no redirect_url");

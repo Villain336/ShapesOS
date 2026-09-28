@@ -26,6 +26,7 @@ import { runPlanner, type MissionPlan } from "./executors/planner";
 import { runDrafter } from "./executors/drafter";
 import { runAnalyst } from "./executors/analyst";
 import { runScheduler } from "./executors/scheduler";
+import { runActor } from "./executors/actor";
 
 /** Circuit breaker: hard cap on routing hops per run (research: ~15–25). */
 export const MAX_ROUTING_HOPS = 20;
@@ -35,7 +36,7 @@ export const DEFAULT_MAX_CONSECUTIVE_FAILURES = 3;
 export const DEFAULT_TIMEOUT_MS = 600_000; // 10 min
 export const DEFAULT_COST_BUDGET_CENTS = 10_000; // $100 (illustrative; no marketing standard exists)
 
-export type ExecutorName = "researcher" | "planner" | "drafter" | "analyst" | "scheduler";
+export type ExecutorName = "researcher" | "planner" | "drafter" | "analyst" | "scheduler" | "actor";
 
 /**
  * ROUTING_TABLE — known task kinds map to executors. Routing TABLES, not
@@ -63,6 +64,12 @@ export const ROUTING_TABLE: Readonly<Record<string, ExecutorName>> = Object.free
   timeline: "scheduler",
   remind: "scheduler",
   checkpoint: "scheduler",
+  // Phase 14: connected-app actions (Chief Strategy Agent's hands).
+  // The actor routes through the action gate — reads/draft-creators run
+  // logged, writes/destructive land in the approve/deny queue.
+  act: "actor",
+  action: "actor",
+  "tool-call": "actor",
 });
 
 /** Reverse lookup for plan steps -> task kinds. */
@@ -72,6 +79,7 @@ const EXECUTOR_TO_KIND: Readonly<Record<ExecutorName, string>> = Object.freeze({
   drafter: "draft",
   analyst: "analyze",
   scheduler: "schedule",
+  actor: "act",
 });
 
 export interface MissionTask {
@@ -183,6 +191,16 @@ async function defaultDispatch(executor: ExecutorName, task: MissionTask): Promi
         ...base,
         plan: p.plan as MissionPlan,
         startAt: typeof p.startAt === "string" ? p.startAt : undefined,
+      });
+      return { summary: r.summary, costCents: r.costCents };
+    }
+    case "actor": {
+      const r = await runActor({
+        ...base,
+        appKey: String(p.appKey ?? ""),
+        toolName: String(p.toolName ?? ""),
+        args: (p.args as Record<string, unknown> | undefined) ?? {},
+        invokedBy: `chief-strategy-agent${base.missionId ? `:${base.missionId}` : ""}`,
       });
       return { summary: r.summary, costCents: r.costCents };
     }
