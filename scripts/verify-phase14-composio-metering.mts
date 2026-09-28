@@ -67,7 +67,7 @@ async function main() {
   check("composio_tool_call costs 1 credit", creditsFor("composio_tool_call") === 1);
 
   // ---- constants ----------------------------------------------------------
-  check("free-tier allowance is 1000", COMPOSIO_HOSTED_MONTHLY_FREE_CALLS === 1000);
+  check("free-tier allowance is 20000", COMPOSIO_HOSTED_MONTHLY_FREE_CALLS === 20000);
   check("warn ratio is 0.8", BUDGET_WARN_RATIO === 0.8);
   const ms = monthStartUtc(new Date(Date.UTC(2026, 8, 15, 12, 0, 0)));
   check(
@@ -126,7 +126,7 @@ async function main() {
   check("usage credits = calls x 1", usage.credits === 2, String(usage.credits));
 
   const budget = await checkComposioBudget();
-  check("budget allowance 1000", budget.allowance === 1000);
+  check("budget allowance 20000", budget.allowance === 20000);
   check("budget shape", budget.calls >= 2 && typeof budget.pct === "number" && typeof budget.warn === "boolean" && typeof budget.over === "boolean");
   check(
     "platform counter tracks the 2 executed calls",

@@ -15,8 +15,10 @@ import { emitAlert } from "@/lib/alerts/evaluate";
 
 type TxClient = Prisma.TransactionClient | PrismaClient;
 
-/** Composio hosted free tier: action executions per calendar month. */
-export const COMPOSIO_HOSTED_MONTHLY_FREE_CALLS = 1000;
+/** Composio hosted free tier: action executions per calendar month.
+ * Per PHASE14-COMPOSIO-UNIVER-SPEC.md: "free tier is genuinely usable
+ * (20K calls/mo, no card)". Re-verify at build time — pricing moves fast. */
+export const COMPOSIO_HOSTED_MONTHLY_FREE_CALLS = 20_000;
 /** Warn when the platform crosses this share of the free tier. */
 export const BUDGET_WARN_RATIO = 0.8;
 

@@ -217,7 +217,7 @@ export const TRIGGERS: TriggerDef[] = [
     key: "composio_budget_warning",
     label: "Composio budget warning",
     description:
-      "Platform Composio hosted free-tier usage crossed 80% of the monthly allowance (1,000 calls). Fires once per period; critical when exceeded. Advisory only — never blocks an action.",
+      "Platform Composio hosted free-tier usage crossed 80% of the monthly allowance (20,000 calls). Fires once per period; critical when exceeded. Advisory only — never blocks an action.",
     conditionKeys: [],
     dedupAvailable: true,
     live: true, // Phase 14 slice 10: emitted by lib/integrations/actions/budget.ts.

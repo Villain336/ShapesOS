@@ -425,6 +425,7 @@ export function ActionsClient({
                               <button
                                 disabled={busy === `decide-${a.id}`}
                                 onClick={() => decide(a.id, "approved")}
+                                aria-label={`Approve ${a.toolName}`}
                                 className="inline-flex items-center gap-1 rounded-md bg-[var(--brand-600)] px-2 py-1 text-[12px] font-medium text-white hover:bg-[var(--brand-700)] disabled:opacity-50"
                               >
                                 <Check className="h-3.5 w-3.5" /> Approve
@@ -432,6 +433,7 @@ export function ActionsClient({
                               <button
                                 disabled={busy === `decide-${a.id}`}
                                 onClick={() => setDenyFor(a.id)}
+                                aria-label={`Deny ${a.toolName}`}
                                 className="inline-flex items-center gap-1 rounded-md border border-red-200 px-2 py-1 text-[12px] text-red-700 hover:bg-red-50 disabled:opacity-50"
                               >
                                 <X className="h-3.5 w-3.5" /> Deny

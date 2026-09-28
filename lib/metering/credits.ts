@@ -112,7 +112,7 @@ export const CREDIT_COSTS = {
   /* END */
   // ── Phase 14 slice 10: Composio tool-call metering ──
   /** One executed Composio hosted tool call. cost-plus (~4x) on an estimated
-   * ~$0.0025/action hosted execution cost (Composio free tier: 1,000
+   * ~$0.0025/action hosted execution cost (Composio free tier: 20,000
    * actions/month on the platform key; see lib/integrations/actions/budget.ts).
    * 1 credit = $0.01. */
   composio_tool_call: { credits: 1, basis: "cost-plus", description: "Composio action: 1 hosted tool call" },
