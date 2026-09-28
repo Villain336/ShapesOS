@@ -19,12 +19,14 @@ import {
 // contract MUST use MISSION_PLANNER_SYSTEM_PROMPT as its system prompt,
 // with M9 retrieval grounding placed after it (see groundedPrompt()).
 import { constitutionSystemPrompt } from "@/lib/expert/constitution";
+import { captureEpisode } from "@/lib/agents/learning/capture";
 // Phase 12: Agency-Agents persona seeds (MIT, original distillations) as
 // selectable mission-planning personas.
 import {
   assertPersonaForSurface,
   PERSONAS,
   personaSystemPrompt,
+  personaSystemPromptFor,
   type PersonaId,
 } from "@/lib/expert/personas";
 
@@ -55,6 +57,25 @@ export function missionPlannerPrompt(persona?: PersonaId): string {
   return [
     MISSION_PLANNER_SYSTEM_PROMPT,
     personaSystemPrompt(persona),
+    `<!-- persona provenance: ${PERSONAS[persona].provenance.repo} (${PERSONAS[persona].provenance.license}), ${PERSONAS[persona].provenance.sourceFile} -->`,
+  ].join("\n\n");
+}
+
+/**
+ * Phase 13B: workspace-aware variant — layers the PersonaProfile voice
+ * block (user override if one exists, built-in default otherwise). Any
+ * live mission-planning LLM call MUST use this instead of
+ * missionPlannerPrompt().
+ */
+export async function missionPlannerPromptFor(
+  workspaceId: string,
+  persona?: PersonaId,
+): Promise<string> {
+  if (persona === undefined) return MISSION_PLANNER_SYSTEM_PROMPT;
+  assertPersonaForSurface(persona, "missions");
+  return [
+    MISSION_PLANNER_SYSTEM_PROMPT,
+    await personaSystemPromptFor(persona, workspaceId),
     `<!-- persona provenance: ${PERSONAS[persona].provenance.repo} (${PERSONAS[persona].provenance.license}), ${PERSONAS[persona].provenance.sourceFile} -->`,
   ].join("\n\n");
 }
@@ -160,7 +181,10 @@ export interface PlannerInput {
   compose?: (goal: string, budgetCents: number) => MissionPlan | Promise<MissionPlan>;
 }
 
-export interface PlannerDeps extends GuardDeps {}
+export interface PlannerDeps extends GuardDeps {
+  /** Phase 13B: episode capture hook (fail-soft). Override in tests. */
+  capture?: typeof captureEpisode;
+}
 
 export interface PlannerResult {
   executor: "planner";
@@ -255,6 +279,18 @@ export async function runPlanner(
     `(${plan.steps.map((s) => `${s.id}→${s.executor}`).join(", ")}), ` +
     `${plan.checkpoints.length} checkpoint(s), budget ${plan.budgetCents}¢. ` +
     `Nothing executed — all steps are proposals awaiting routing.`;
+
+  // Phase 13B: episode capture — fail-soft (never breaks planning), skipped
+  // when the workspace paused learning. Fire-and-forget by design.
+  const capture = deps.capture ?? captureEpisode;
+  void capture({
+    workspaceId: input.workspaceId,
+    agentId: "mission-planner",
+    promptSummary: input.goal,
+    outputSummary: summary,
+    outcome: "plan_drafted",
+    refs: { missionId: input.missionId ?? null, steps: plan.steps.length },
+  });
 
   return {
     executor: "planner",

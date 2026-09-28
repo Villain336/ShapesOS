@@ -1,0 +1,106 @@
+{
+  "date": "2026-09-27T23:29:35.790Z",
+  "outcomes": [
+    {
+      "file": "01-lesson-quality",
+      "title": "Lesson quality (consolidation contract + rubric)",
+      "status": "FAIL",
+      "passed": 5,
+      "skipped": 0,
+      "failed": 3,
+      "skipReasons": [],
+      "failureLines": [
+        "not ok 1 - end-to-end extract→dedupe→write uses the real extractor # SKIP",
+        "not ok 2 - lesson-quality: real consolidation extractor (pending until worker 6)"
+      ]
+    },
+    {
+      "file": "02-preference-precision",
+      "title": "Preference-retrieval precision (20 prefs, tenant isolation)",
+      "status": "PASS",
+      "passed": 7,
+      "skipped": 0,
+      "failed": 0,
+      "skipReasons": [],
+      "failureLines": []
+    },
+    {
+      "file": "03-style-rule-enforcement",
+      "title": "Style-rule enforcement (contract + violation battery)",
+      "status": "FAIL",
+      "passed": 4,
+      "skipped": 0,
+      "failed": 14,
+      "skipReasons": [],
+      "failureLines": [
+        "not ok 1 - battery: ban-phrase-blocked # SKIP",
+        "not ok 2 - battery: ban-regex-blocked # SKIP",
+        "not ok 3 - battery: ban-phrase-case-insensitive # SKIP",
+        "not ok 4 - battery: require-line-missing-blocked # SKIP",
+        "not ok 5 - battery: require-line-present-clean # SKIP",
+        "not ok 6 - battery: disclaimer-missing-flagged # SKIP",
+        "not ok 7 - battery: disclaimer-present-clean # SKIP",
+        "not ok 8 - battery: tone-sycophancy-blocked # SKIP",
+        "not ok 9 - battery: tone-guidance-clean-output # SKIP",
+        "not ok 10 - battery: clean-output-no-violations # SKIP",
+        "not ok 11 - battery: ban-substring-not-whole-word-still-caught # SKIP",
+        "not ok 12 - battery: pinned-rule-survives-learner-proposal # SKIP",
+        "not ok 2 - style-rule-enforcement: violation battery (pending until worker 2)"
+      ]
+    },
+    {
+      "file": "04-voice-fidelity",
+      "title": "Voice-fidelity blind eval (automated + human-rated)",
+      "status": "FAIL",
+      "passed": 6,
+      "skipped": 1,
+      "failed": 3,
+      "skipReasons": [
+        "run with EVAL_HUMAN=1 to write the review file"
+      ],
+      "failureLines": [
+        "not ok 1 - deriveVoiceProfile from 5+ samples → ≥4/5 human rating # SKIP",
+        "not ok 4 - voice-fidelity: real derivation (pending until worker 2)"
+      ]
+    },
+    {
+      "file": "05-no-ghost-recall",
+      "title": "No-ghost-recall (learnings, prefs, episodes)",
+      "status": "PASS",
+      "passed": 7,
+      "skipped": 0,
+      "failed": 0,
+      "skipReasons": [],
+      "failureLines": []
+    },
+    {
+      "file": "06-stop-asking",
+      "title": "\"Stops asking known things\" (prompt injection proxy)",
+      "status": "FAIL",
+      "passed": 4,
+      "skipped": 0,
+      "failed": 3,
+      "skipReasons": [],
+      "failureLines": [
+        "not ok 1 - agent system prompt contains known preferences without being re-told # SKIP",
+        "not ok 2 - stop-asking: real buildIntelligenceContext (pending until worker 5)"
+      ]
+    },
+    {
+      "file": "07-feedback-diff",
+      "title": "Feedback-diff sanity (pairs + contract)",
+      "status": "FAIL",
+      "passed": 8,
+      "skipped": 0,
+      "failed": 6,
+      "skipReasons": [],
+      "failureLines": [
+        "not ok 1 - pipeline summary captures \"user deleted the fluffy intro, kept only the substance\" # SKIP",
+        "not ok 2 - pipeline summary captures \"user removed buzzwords, replaced with plain language\" # SKIP",
+        "not ok 3 - pipeline summary captures \"user appended the compliance disclaimer\" # SKIP",
+        "not ok 4 - pipeline summary captures \"user stripped sycophantic tone, kept it direct\" # SKIP",
+        "not ok 3 - feedback-diff: summarizeEditDiff (pending until worker 4)"
+      ]
+    }
+  ]
+}

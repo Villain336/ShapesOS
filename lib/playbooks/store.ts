@@ -34,12 +34,14 @@ import type { Prisma } from "@prisma/client";
 // PLAYBOOK_GENERATOR_SYSTEM_PROMPT as its system prompt, with M9
 // retrieval grounding placed after it (see groundedPrompt()).
 import { constitutionSystemPrompt } from "@/lib/expert/constitution";
+import { captureEpisode } from "@/lib/agents/learning/capture";
 // Phase 12: Agency-Agents persona seeds (MIT, original distillations) as
 // selectable strategist personas for playbook generation.
 import {
   assertPersonaForSurface,
   PERSONAS,
   personaSystemPrompt,
+  personaSystemPromptFor,
   type PersonaId,
 } from "@/lib/expert/personas";
 
@@ -71,6 +73,25 @@ export function playbookGeneratorPrompt(persona?: PersonaId): string {
   return [
     PLAYBOOK_GENERATOR_SYSTEM_PROMPT,
     personaSystemPrompt(persona),
+    `<!-- persona provenance: ${PERSONAS[persona].provenance.repo} (${PERSONAS[persona].provenance.license}), ${PERSONAS[persona].provenance.sourceFile} -->`,
+  ].join("\n\n");
+}
+
+/**
+ * Phase 13B: workspace-aware variant — layers the PersonaProfile voice
+ * block (user override if one exists, built-in default otherwise). Any
+ * live playbook-generator LLM call MUST use this instead of
+ * playbookGeneratorPrompt().
+ */
+export async function playbookGeneratorPromptFor(
+  workspaceId: string,
+  persona?: PersonaId,
+): Promise<string> {
+  if (persona === undefined) return PLAYBOOK_GENERATOR_SYSTEM_PROMPT;
+  assertPersonaForSurface(persona, "playbooks");
+  return [
+    PLAYBOOK_GENERATOR_SYSTEM_PROMPT,
+    await personaSystemPromptFor(persona, workspaceId),
     `<!-- persona provenance: ${PERSONAS[persona].provenance.repo} (${PERSONAS[persona].provenance.license}), ${PERSONAS[persona].provenance.sourceFile} -->`,
   ].join("\n\n");
 }
@@ -429,8 +450,9 @@ export async function proposeFromLearning(
   workspaceId: string,
   learningId: string,
   createdBy: string,
+  opts: { capture?: typeof captureEpisode } = {},
 ): Promise<{ playbookId: string; versionId: string; version: number }> {
-  return withWorkspaceScope(workspaceId, async (tx) => {
+  const result = await withWorkspaceScope(workspaceId, async (tx) => {
     const learning = await tx.memoryLearning.findUnique({ where: { id: learningId } });
     if (!learning || learning.workspaceId !== workspaceId) {
       throw new Error("Learning not found in this workspace.");
@@ -486,6 +508,20 @@ export async function proposeFromLearning(
     });
     return { playbookId: playbook.id, versionId: version.id, version: 1 };
   });
+
+  // Phase 13B: episode capture — fail-soft (never breaks generation), skipped
+  // when the workspace paused learning. Fire-and-forget by design.
+  const capture = opts.capture ?? captureEpisode;
+  void capture({
+    workspaceId,
+    agentId: "playbook-generator",
+    promptSummary: `Propose playbook from learning ${learningId}`,
+    outputSummary: `Playbook ${result.playbookId} v${result.version} proposed (status: review).`,
+    outcome: "playbook_proposed",
+    refs: { learningId, playbookId: result.playbookId, versionId: result.versionId },
+  });
+
+  return result;
 }
 
 // ── Outcome evals (honest uncertainty) ────────────────────────────────────────

@@ -62,7 +62,7 @@ export default async function DashboardLayout({
   return (
     <BrandTheme primary={brandPrimary}>
       <ChatProvider>
-        <CommandBar />
+        <CommandBar workspaceId={workspace.id} />
         {chatwoot && (
           <ChatwootWidget baseUrl={chatwoot.baseUrl} websiteToken={chatwoot.websiteToken} />
         )}

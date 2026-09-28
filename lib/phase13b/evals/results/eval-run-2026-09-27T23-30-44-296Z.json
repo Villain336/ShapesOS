@@ -1,0 +1,75 @@
+{
+  "date": "2026-09-27T23:30:44.296Z",
+  "outcomes": [
+    {
+      "file": "01-lesson-quality",
+      "title": "Lesson quality (consolidation contract + rubric)",
+      "status": "PENDING",
+      "passed": 6,
+      "skipped": 1,
+      "failed": 0,
+      "skipReasons": [],
+      "failureLines": []
+    },
+    {
+      "file": "02-preference-precision",
+      "title": "Preference-retrieval precision (20 prefs, tenant isolation)",
+      "status": "PASS",
+      "passed": 7,
+      "skipped": 0,
+      "failed": 0,
+      "skipReasons": [],
+      "failureLines": []
+    },
+    {
+      "file": "03-style-rule-enforcement",
+      "title": "Style-rule enforcement (contract + violation battery)",
+      "status": "PENDING",
+      "passed": 5,
+      "skipped": 12,
+      "failed": 0,
+      "skipReasons": [],
+      "failureLines": []
+    },
+    {
+      "file": "04-voice-fidelity",
+      "title": "Voice-fidelity blind eval (automated + human-rated)",
+      "status": "PENDING",
+      "passed": 7,
+      "skipped": 2,
+      "failed": 0,
+      "skipReasons": [],
+      "failureLines": []
+    },
+    {
+      "file": "05-no-ghost-recall",
+      "title": "No-ghost-recall (learnings, prefs, episodes)",
+      "status": "PASS",
+      "passed": 7,
+      "skipped": 0,
+      "failed": 0,
+      "skipReasons": [],
+      "failureLines": []
+    },
+    {
+      "file": "06-stop-asking",
+      "title": "\"Stops asking known things\" (prompt injection proxy)",
+      "status": "PENDING",
+      "passed": 5,
+      "skipped": 1,
+      "failed": 0,
+      "skipReasons": [],
+      "failureLines": []
+    },
+    {
+      "file": "07-feedback-diff",
+      "title": "Feedback-diff sanity (pairs + contract)",
+      "status": "PENDING",
+      "passed": 9,
+      "skipped": 4,
+      "failed": 0,
+      "skipReasons": [],
+      "failureLines": []
+    }
+  ]
+}

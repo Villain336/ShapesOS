@@ -1,0 +1,81 @@
+{
+  "date": "2026-09-28T00:15:19.536Z",
+  "outcomes": [
+    {
+      "file": "01-lesson-quality",
+      "title": "Lesson quality (consolidation contract + rubric)",
+      "status": "PASS",
+      "passed": 7,
+      "skipped": 0,
+      "failed": 0,
+      "skipReasons": [],
+      "failureLines": []
+    },
+    {
+      "file": "02-preference-precision",
+      "title": "Preference-retrieval precision (20 prefs, tenant isolation)",
+      "status": "PASS",
+      "passed": 7,
+      "skipped": 0,
+      "failed": 0,
+      "skipReasons": [],
+      "failureLines": []
+    },
+    {
+      "file": "03-style-rule-enforcement",
+      "title": "Style-rule enforcement (contract + violation battery)",
+      "status": "FAIL",
+      "passed": 14,
+      "skipped": 0,
+      "failed": 4,
+      "skipReasons": [],
+      "failureLines": [
+        "not ok 8 - battery: tone-sycophancy-blocked",
+        "not ok 11 - battery: ban-substring-not-whole-word-still-caught",
+        "not ok 2 - style-rule-enforcement: violation battery (real checkOutput)"
+      ]
+    },
+    {
+      "file": "04-voice-fidelity",
+      "title": "Voice-fidelity blind eval (automated + human-rated)",
+      "status": "PENDING",
+      "passed": 8,
+      "skipped": 1,
+      "failed": 0,
+      "skipReasons": [
+        "run with EVAL_HUMAN=1 to write the review file"
+      ],
+      "failureLines": []
+    },
+    {
+      "file": "05-no-ghost-recall",
+      "title": "No-ghost-recall (learnings, prefs, episodes)",
+      "status": "PASS",
+      "passed": 7,
+      "skipped": 0,
+      "failed": 0,
+      "skipReasons": [],
+      "failureLines": []
+    },
+    {
+      "file": "06-stop-asking",
+      "title": "\"Stops asking known things\" (prompt injection proxy)",
+      "status": "PASS",
+      "passed": 6,
+      "skipped": 0,
+      "failed": 0,
+      "skipReasons": [],
+      "failureLines": []
+    },
+    {
+      "file": "07-feedback-diff",
+      "title": "Feedback-diff sanity (pairs + contract)",
+      "status": "PASS",
+      "passed": 13,
+      "skipped": 0,
+      "failed": 0,
+      "skipReasons": [],
+      "failureLines": []
+    }
+  ]
+}

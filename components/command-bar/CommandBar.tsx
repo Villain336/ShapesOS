@@ -35,6 +35,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import FeedbackButtons from "@/components/agents/FeedbackButtons";
 import {
   AsyncBudgetExceeded,
   buildAskAuditPayload,
@@ -118,7 +119,7 @@ async function postAudit(payload: AuditPayload): Promise<void> {
   }
 }
 
-export function CommandBar() {
+export function CommandBar({ workspaceId }: { workspaceId: string }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [page, setPage] = useState<Page>({ name: "root" });
@@ -598,6 +599,10 @@ export function CommandBar() {
                 {page.status === "done" && (
                   <div className="mt-3">
                     <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-stone-800">{page.answer}</p>
+                    {/* Phase 13B: explicit feedback affordance on the strategist answer */}
+                    <div className="mt-2 flex justify-end">
+                      <FeedbackButtons agentId="business-strategist" workspaceId={workspaceId} />
+                    </div>
                     {page.citations && page.citations.length > 0 && (
                       <div className="mt-3 flex flex-wrap gap-1.5">
                         {page.citations.map((c, i) => (

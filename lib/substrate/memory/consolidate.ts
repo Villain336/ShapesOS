@@ -17,6 +17,11 @@ import { PrismaClient, Prisma } from "@prisma/client";
 import { WORKSPACE_GUC } from "./rls";
 import { scrubJson } from "./scrub";
 import { recordFact } from "./write";
+import {
+  executeLearningPass,
+  learningPassBookkeeping,
+  type LearningPassReport,
+} from "./learning-pass";
 
 const WORKER_POOL_SIZE = 3;
 
@@ -92,6 +97,8 @@ export interface ConsolidationReport {
   factsInvalidated: number;
   learningsDeduped: number;
   rowsPruned: number;
+  /** Phase 13B nightly learning pass ("sleep") — null until the step runs. */
+  learning: LearningPassReport | null;
   errors: string[];
 }
 
@@ -326,6 +333,7 @@ export async function executeConsolidationRun(
     factsInvalidated: 0,
     learningsDeduped: 0,
     rowsPruned: 0,
+    learning: null,
     errors: [],
   };
   const distilledIds = await loadDistilledIds(workspaceId).catch(() => new Set<string>());
@@ -370,8 +378,37 @@ export async function executeConsolidationRun(
       report.errors.push(`dedupe: ${err instanceof Error ? err.message : String(err)}`);
     }
 
+    // 5. Phase 13B nightly learning pass ("sleep"): LLM lesson extraction
+    //    from recent agent_call episodes + feedback, with reviewable-diff
+    //    write-back to the intelligence layer. Self-guarding (pause toggle,
+    //    one-pass-per-night, no-live-LLM skip) — safe on manual triggers too.
+    try {
+      report.learning = await executeLearningPass(workspaceId);
+      report.learningsDeduped +=
+        report.learning.learningsSkippedDup + report.learning.learningsDecayed;
+      if (report.learning.status === "failed") {
+        report.errors.push(
+          `learning pass: ${report.learning.errors.join("; ") || "failed"}`,
+        );
+      }
+    } catch (err) {
+      report.errors.push(
+        `learning pass: ${err instanceof Error ? err.message : String(err)}`,
+      );
+      report.learning = null;
+    }
+
     const status = report.errors.length > 0 ? "completed_with_errors" : "succeeded";
     await withWorkerScope(workspaceId, async (tx) => {
+      // Bookkeeping rides on the run row (episodes are immutable; no second
+      // bookkeeping system): distilledIds + the learning-pass outcome used
+      // for the one-pass-per-night guard.
+      const bookkeeping: Record<string, unknown> = {
+        distilledIds: [...distilledIds],
+      };
+      if (report.learning) {
+        bookkeeping.learningPass = learningPassBookkeeping(report.learning);
+      }
       await tx.memoryConsolidationRun.update({
         where: { id: runId },
         data: {
@@ -382,9 +419,9 @@ export async function executeConsolidationRun(
           factsInvalidated: report.factsInvalidated,
           learningsDeduped: report.learningsDeduped,
           rowsPruned: report.rowsPruned,
-          // Bookkeeping: distilled episode ids ride on the run row so
-          // memory_episodes stays immutable (spec §9.4).
-          error: JSON.stringify({ distilledIds: [...distilledIds] }).slice(0, 8000),
+          // Bookkeeping: distilled episode ids + learning-pass outcome ride
+          // on the run row so memory_episodes stays immutable (spec §9.4).
+          error: JSON.stringify(bookkeeping).slice(0, 8000),
         },
       });
     });

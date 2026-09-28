@@ -8,7 +8,7 @@ import { accessibleWorkspaceWhere, getMembership, requireProjectRole, forbidden 
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
 import { validateBody, z, boundedString } from "@/lib/api/validate";
-import { runAgentTurn, maybeAutoTitle, type ChatToolCall } from "@/lib/chat/agent";
+import { runAgentTurnWithCapture, maybeAutoTitle, type ChatToolCall } from "@/lib/chat/agent";
 
 export const dynamic = "force-dynamic";
 
@@ -65,7 +65,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   let turn: { assistantText: string; toolCalls: ChatToolCall[] };
   try {
-    turn = await runAgentTurn({
+    // Phase 13B: the capture wrapper records one agent_call episode per turn
+    // (fail-soft — capture never breaks the turn).
+    turn = await runAgentTurnWithCapture({
       projectId: thread.projectId,
       workspaceId: thread.project.workspaceId,
       userId: user.id,

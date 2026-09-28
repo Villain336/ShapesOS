@@ -12,7 +12,8 @@ export type MemoryLearningSource =
   | "reallocation"
   | "campaign"
   | "human"
-  | "import";
+  | "import"
+  | "consolidation"; // Phase 13B: distilled by the nightly consolidation pass
 export type MemoryStoreKind = "episode" | "fact" | "learning";
 
 /** Decay-to-floor provenance: what survives a prune sweep. */

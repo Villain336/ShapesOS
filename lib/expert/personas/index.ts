@@ -121,6 +121,20 @@ export const PERSONAS: Record<PersonaId, PersonaSeed> = {
   },
 };
 
+export {
+  DEFAULT_PERSONA_VOICES,
+  resolvePersonaVoice,
+  personaVoiceBlock,
+  BANNED_SYCOPHANCY_OPENERS,
+  assertNoSycophancyOpener,
+  type PersonaVoice,
+} from "./voices";
+export {
+  getPersonaProfileOverride,
+  personaSystemPromptFor,
+  type PersonaProfileOverride,
+} from "./profiles";
+
 export const PERSONA_IDS: readonly PersonaId[] = [
   "multi-agent-systems-architect",
   "workflow-architect",

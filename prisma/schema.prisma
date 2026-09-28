@@ -517,6 +517,13 @@ model Workspace {
   memoryFacts             MemoryFact[]
   memoryLearnings         MemoryLearning[]
   memoryConsolidationRuns MemoryConsolidationRun[]
+  // Phase 13B: agent learning + company intelligence back-relations.
+  agentFeedback           AgentFeedback[]
+  brandVoiceProfiles      BrandVoiceProfile[]
+  companyKnowledge        CompanyKnowledge[]
+  styleRules              StyleRule[]
+  contentRecords          ContentRecord[]
+  personaProfiles         PersonaProfile[]
   // Phase 10 (intelligence depth): owned data assets back-relations.
   dataSources             DataSource[]
   serpVendorConfigs       SerpVendorConfig[]
@@ -6893,6 +6900,9 @@ enum MemoryLearningSource {
   campaign
   human
   import
+  // Phase 13B: lessons distilled by the nightly consolidation pass
+  // (episodic → durable learning), as opposed to human/import sources.
+  consolidation
 }
 
 // Episodic store: raw what-happened. Immutable, never edited.
@@ -6921,6 +6931,10 @@ model MemoryEpisode {
 
   learnings MemoryLearning[] @relation("LearningSourceEpisode")
   facts     MemoryFact[]     @relation("FactSourceEpisode")
+  // Phase 13B: feedback signals attached to agent-call episodes
+  // (explicit thumbs, edit-diffs, accepts, regenerations).
+  feedback  AgentFeedback[]  @relation("FeedbackSourceEpisode")
+  knowledge CompanyKnowledge[] @relation("KnowledgeSourceEpisode")
 
   @@index([workspaceId, episodeType])
   @@index([workspaceId, startedAt])
@@ -7030,6 +7044,263 @@ model PlaybookLearning {
 
   @@index([reviewedAt])
   @@map("playbook_learnings")
+}
+
+// ============================================================
+// Phase 13B (G0): Agent Learning + Company Intelligence data model.
+// SPEC: docs/phases/PHASE13B-AGENT-LEARNING-SPEC.md §3; full decision
+// record: docs/phases/13b/DATA-MODEL.md.
+//
+// MAPPING DOCTRINE — "no second memory system" (spec §9: Growth Memory
+// consolidate is EXTENDED, not replaced):
+//   • AgentEpisode      → memory_episodes, episodeType="agent_call".
+//     The episodic store IS the immutable "what happened" log; an agent
+//     interaction (prompt in, output out, outcome) is already expressible
+//     with EpisodeInput{actor=agentId, summary, refs={promptSummary,
+//     outputSummary, outcome}}. A separate AgentEpisode table would
+//     duplicate the episodic store with a worse audit story — so it
+//     does not exist.
+//   • AgentLesson       → memory_learnings, source="consolidation".
+//     Lessons are procedural ("what worked / failed / when") — exactly
+//     the F3 sink schema. lesson text → hypothesis, action → the
+//     consolidation pass description, status active|retired →
+//     invalidatedAt NULL vs set (retire = invalidate, NEVER delete),
+//     confidence → metricDelta.confidence (the JSON extensibility point).
+//     Enum gains "consolidation" because the existing sources
+//     (test_lab/reallocation/campaign/human/import) describe where a
+//     learning came from, and consolidation is a new source.
+//   • WorkspacePreference → memory_facts, predicate="pref:<key>",
+//     object={value, pinned?}, subjectNodeId=NULL.
+//     DEVIATION from the task brief ("subjectNodeId='workspace'"): the
+//     FK to graph_nodes would REJECT a literal "workspace" id. NULL +
+//     the "pref:" predicate namespace is the honest convention. The
+//     semantic store's bi-temporality (validAt/invalidAt, supersede
+//     chain) is exactly how preferences evolve; user-pinned prefs use
+//     origin="user_told" (decay-to-floor survivor), learner-derived
+//     ones use origin="agent_inferred". Helper:
+//     lib/substrate/memory/preferences.ts.
+//   • LearningPause       → memory_facts, predicate="pref:learning_paused",
+//     object={value: bool, pausedAt}. DEVIATION from the task brief
+//     (LearningPause model): the pause toggle IS a preference — a
+//     dedicated table would be a mini preference system duplicating
+//     memory_facts' confidence/bi-temporal/pin semantics. See the same
+//     helper module (getLearningPaused / setLearningPaused).
+//
+// NEW models below are the structured COMPANY-INTELLIGENCE ARTIFACTS,
+// not memory: user-editable documents with taxonomy, pin/lock, reviewable
+// learner diffs. Memory is the engine; these are the artifacts (§2).
+// All six are tenant-scoped (workspace_id NOT NULL), FORCE RLS with the
+// app.workspace_id GUC, fail-closed (see migration
+// <ts>_phase13b_intelligence).
+// ============================================================
+
+// Feedback signals on agent-call episodes — the richest raw material
+// for the learning loop (spec §1). Distinct from memory_episodes:
+// feedback is a *signal about* an episode (kind + payload), not a
+// what-happened narrative.
+enum FeedbackKind {
+  explicit_up
+  explicit_down
+  edit_diff
+  accepted
+  regenerated
+}
+
+model AgentFeedback {
+  id          String       @id @default(cuid()) @map("id")
+  workspaceId String       @map("workspace_id")
+  workspace   Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  // Nullable: feedback can attach to a non-episode artifact (e.g. a
+  // static suggestion); when it cites an agent call it links here.
+  episodeId   String?      @map("episode_id")
+  episode     MemoryEpisode? @relation("FeedbackSourceEpisode", fields: [episodeId], references: [id], onDelete: SetNull)
+  // Which agent persona produced the output (e.g. "strategist").
+  agentId     String       @map("agent_id")
+  kind        FeedbackKind @map("kind")
+  // Kind-specific payload: thumbs → {source}; edit_diff → {before,
+  // after, diffStats}; accepted → {withEdits: bool}; regenerated →
+  // {reason}. Never raw user PII beyond what episodes already carry —
+  // scrubbed by the feedback pipeline (worker 4).
+  signal      Json         @map("signal")
+  createdAt   DateTime     @default(now()) @map("created_at")
+
+  @@index([workspaceId, createdAt])
+  @@index([workspaceId, kind])
+  @@index([workspaceId, episodeId])
+  @@map("agent_feedback")
+}
+
+// The living Brand Voice profile (spec §2). One row per workspace; the
+// consolidation loop (worker 6) writes PROPOSALS into pendingUpdates —
+// never directly into dimensions — so the user always sees a reviewable
+// diff ("I updated your voice profile from your last 12 edits —
+// review"). pinnedByUser=true makes the whole profile read-only to the
+// learner (spec: "don't touch the voice profile").
+model BrandVoiceProfile {
+  id           String   @id @default(cuid()) @map("id")
+  workspaceId  String   @unique @map("workspace_id")
+  workspace    Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  // {vocabulary: [...], rhythm, formality, pov, humor, doExamples: [...],
+  //  dontExamples: [...]} — vocabulary per Jasper's voice engine shape.
+  dimensions   Json     @map("dimensions")
+  // {samples: [...ids/hashes], editCount, lastDerivedAt} — provenance so
+  // the user can see WHAT the voice was learned from.
+  derivedFrom  Json     @map("derived_from")
+  confidence   Float    @default(0.0) @map("confidence")
+  pinnedByUser Boolean  @default(false) @map("pinned_by_user")
+  // Proposed by the learner, awaiting user review; applied to
+  // dimensions only on explicit accept (worker 6 + UI worker 7).
+  pendingUpdates Json?  @map("pending_updates")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@map("brand_voice_profiles")
+}
+
+// Company knowledge graph entries (spec §2): products, pricing,
+// audiences, competitors, messaging pillars, proof points, positioning.
+// A structured, user-editable, agent-readable document — NOT a memory
+// fact: it carries a taxonomy, pins, validity eras, and learner-diff
+// semantics that semantic triples don't.
+enum KnowledgeKind {
+  product
+  pricing
+  audience
+  competitor
+  pillar
+  proof
+  positioning
+  other
+}
+
+model CompanyKnowledge {
+  id              String         @id @default(cuid()) @map("id")
+  workspaceId     String         @map("workspace_id")
+  workspace       Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  kind            KnowledgeKind  @map("kind")
+  title           String         @map("title")
+  // Structured body; shape per kind (e.g. pricing → {tiers: [...]};
+  // competitor → {strengths, weaknesses, url}). Documented in
+  // docs/phases/13b/DATA-MODEL.md contract section.
+  body            Json           @map("body")
+  confidence      Float          @default(1.0) @map("confidence")
+  // Pinned = learner may not modify or propose updates to this entry.
+  pinned          Boolean        @default(false) @map("pinned")
+  sourceEpisodeId String?        @map("source_episode_id")
+  sourceEpisode   MemoryEpisode? @relation("KnowledgeSourceEpisode", fields: [sourceEpisodeId], references: [id], onDelete: SetNull)
+  // Validity era: pricing that changed has a closed era, history kept.
+  validFrom       DateTime?      @map("valid_from")
+  validTo         DateTime?      @map("valid_to")
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
+
+  @@index([workspaceId, kind])
+  @@index([workspaceId, createdAt])
+  @@map("company_knowledge")
+}
+
+// Hard style constraints checked on EVERY agent output, pre-delivery
+// (spec §2): banned words/phrases, required disclaimers, compliance
+// lines. Fail-closed: severity=block violations block delivery;
+// severity=flag surfaces a warning. Learner-proposed rules arrive with
+// active=false (worker 6) and go live only on user accept.
+enum StyleRuleKind {
+  ban
+  require
+  disclaimer
+  tone
+}
+
+enum StyleRuleSeverity {
+  block
+  flag
+}
+
+model StyleRule {
+  id          String           @id @default(cuid()) @map("id")
+  workspaceId String           @map("workspace_id")
+  workspace   Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  kind        StyleRuleKind    @map("kind")
+  // ban → the forbidden phrase/regex; require → the required line;
+  // disclaimer → compliance text; tone → guidance snippet.
+  pattern     String           @map("pattern") @db.Text
+  // ban → suggested replacement; require/disclaimer → insertion
+  // context; tone → null.
+  replacement String?          @map("replacement") @db.Text
+  severity    StyleRuleSeverity @map("severity")
+  pinned      Boolean          @default(false) @map("pinned")
+  active      Boolean          @default(true) @map("active")
+  // "user" | "onboarding" | "consolidation" — who/what created it.
+  source      String           @map("source")
+  createdAt   DateTime         @default(now()) @map("created_at")
+  updatedAt   DateTime         @updatedAt @map("updated_at")
+
+  @@index([workspaceId, kind, active])
+  @@index([workspaceId, createdAt])
+  @@map("style_rules")
+}
+
+// Content memory (spec §2): everything ever made for this company,
+// retrievable for consistency ("we already ran this angle in March —
+// here's how it performed"). Distinct from memory_episodes: this is a
+// curated artifact with angle/channel/performance, not an immutable
+// what-happened log. bodyRef points at the actual artifact (editor doc
+// id / URL / asset id) — the body itself is NOT duplicated here.
+model ContentRecord {
+  id          String   @id @default(cuid()) @map("id")
+  workspaceId String   @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  // Free-string taxonomy (blog_post, email, social_post, ad, landing,
+  // video_script, ...) — kinds grow faster than enums.
+  kind        String   @map("kind")
+  title       String   @map("title")
+  bodyRef     String?  @map("body_ref")
+  // The creative angle/hook, for dedupe ("did we already run this?").
+  angle       String?  @map("angle") @db.Text
+  // Channel it ran on (blog, linkedin, tiktok, email, ...) — null for
+  // drafts that never shipped.
+  channel     String?  @map("channel")
+  // {impressions, clicks, conversions, rankDelta, ...} — fed by the
+  // analytics integrations; null until measured. Closes the loop:
+  // learn → create → measure → learn (spec §2).
+  performance Json?    @map("performance")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([workspaceId, createdAt])
+  @@index([workspaceId, kind])
+  @@map("content_records")
+}
+
+// The "human" layer per persona (spec §5). The five personas exist as
+// roles from Phase 12; this gives each a persistent voice, continuity,
+// and honesty posture.
+// DEVIATION from the task brief ("agentId unique"): uniqueness MUST be
+// per (workspaceId, agentId). A globally-unique agentId would forbid
+// every workspace but the first from defining its own voice for the
+// same persona — incoherent under tenant scoping. All reads/writes go
+// through withWorkspaceScope (fail-closed).
+model PersonaProfile {
+  id              String    @id @default(cuid()) @map("id")
+  workspaceId     String    @map("workspace_id")
+  workspace       Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  // Phase-12 persona key (canonical five, see lib/expert/personas/):
+  // "business-strategist" | "agents-orchestrator" |
+  // "multi-agent-systems-architect" | "workflow-architect" |
+  // "studio-producer".
+  agentId         String    @map("agent_id")
+  // {register, manner, quirks: [...], taboos: [...]} — how it talks.
+  voice           Json      @map("voice")
+  // Long-lived continuity: commitments, running jokes, known user
+  // facts this persona keeps ("last week you decided X").
+  continuityNotes String    @map("continuity_notes") @db.Text
+  // How this persona expresses uncertainty ("my best read is X, I'm
+  // not sure about Y") vs. asking a clarifying question.
+  uncertaintyStyle String   @map("uncertainty_style") @db.Text
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  @@unique([workspaceId, agentId])
+  @@map("persona_profiles")
 }
 
 // ============================================================

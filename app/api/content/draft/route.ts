@@ -19,6 +19,18 @@ import { buildDraftPrompt } from "@/lib/content/draft";
 import { wordCount, type ContentBrief } from "@/lib/content/brief";
 import { recordUsage } from "@/lib/usage";
 import { meter } from "@/lib/metering/service";
+// Phase 13B: fail-closed style-rule enforcement on generated drafts +
+// content-memory recording.
+import {
+  enforceStyleRules,
+  StyleRuleBlockedError,
+} from "@/lib/intelligence/enforce";
+import { recordContent } from "@/lib/intelligence/company/content-record";
+import {
+  captureEpisode,
+  recordFeedback,
+  findLatestDraftEpisode,
+} from "@/lib/agents/learning/capture";
 
 export async function POST(req: NextRequest) {
   const user = await requireUser();
@@ -66,10 +78,36 @@ export async function POST(req: NextRequest) {
     return Response.json({ error: message }, { status: 502 });
   }
 
+  // Phase 13B: fail-closed style-rule check BEFORE the draft is saved or
+  // returned. A severity=block violation refuses delivery (422) — the
+  // violating draft never reaches the user.
+  try {
+    await enforceStyleRules(draft, contentItem.project.workspaceId);
+  } catch (err) {
+    if (err instanceof StyleRuleBlockedError) {
+      return Response.json(
+        {
+          error: "Draft blocked by a style rule",
+          violations: err.violations,
+        },
+        { status: 422 },
+      );
+    }
+    // Infra failure in the checker: degrade open (see agent.ts note).
+  }
+
   const updated = await prisma.contentItem.update({
     where: { id: contentItem.id },
     data: { bodyMarkdown: draft, status: "draft" },
   });
+
+  // Phase 13B: if the item already carried an agent draft, this generation
+  // is a REGENERATION — look up the previous draft's episode for the signal.
+  const hadDraft =
+    contentItem.status === "draft" || (contentItem.bodyMarkdown ?? "").trim().length > 0;
+  const prevDraft = hadDraft
+    ? await findLatestDraftEpisode(contentItem.project.workspaceId, contentItem.id)
+    : null;
 
   // Phase C gaps (G1): ledger one ai_article per generated draft. The key
   // binds the pre-generation updatedAt: a retry after a failed generation
@@ -87,6 +125,42 @@ export async function POST(req: NextRequest) {
     () => {},
   );
 
+  // Phase 13B: content memory — index the generated draft so the company
+  // intelligence layer can answer "we already ran this angle" later.
+  // bodyRef points at the artifact; the body itself is never duplicated.
+  recordContent(contentItem.project.workspaceId, {
+    kind: "blog_post",
+    title: contentItem.keyword?.phrase ?? brief.keyword,
+    bodyRef: `content_item:${updated.id}`,
+    angle: brief.h1,
+  }).catch(() => {});
+
+  // Phase 13B: episode capture — the full draft rides in refs.draftFull so
+  // the editor-save hook can diff user edits against it. The episode id is
+  // returned so the UI can attach thumbs (explicit_up/down) to this draft.
+  // Fail-soft: capture never breaks draft generation.
+  const episodeId = await captureEpisode({
+    workspaceId: contentItem.project.workspaceId,
+    agentId: "content-brief",
+    promptSummary: `Draft article for keyword "${brief.keyword}"`,
+    outputSummary: draft,
+    outcome: hadDraft ? "draft_regenerated" : "draft_generated",
+    refs: {
+      contentItemId: contentItem.id,
+      keyword: brief.keyword,
+      draftFull: draft,
+    },
+  });
+  if (hadDraft && prevDraft) {
+    await recordFeedback({
+      workspaceId: contentItem.project.workspaceId,
+      episodeId: prevDraft.id,
+      agentId: "content-brief",
+      kind: "regenerated",
+      signal: { reason: "user_regenerated_draft", newEpisodeId: episodeId },
+    });
+  }
+
   return Response.json({
     contentItem: {
       id: updated.id,
@@ -95,5 +169,6 @@ export async function POST(req: NextRequest) {
     },
     draft,
     llm: llmStatus(),
+    episodeId,
   });
 }

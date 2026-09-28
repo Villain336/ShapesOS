@@ -26,6 +26,7 @@ import { Bubble, BubbleContent } from "@/components/vault/shadcn/bubble";
 import type { ChatToolCall } from "@/lib/chat/agent";
 import { useChat } from "./chat/ChatContext";
 import AttachmentMenu from "./chat/AttachmentMenu";
+import FeedbackButtons from "@/components/agents/FeedbackButtons";
 
 /** Pick a vault tool icon from the tool name. */
 function stepIcon(tool: string): ToolStep["icon"] {
@@ -55,7 +56,7 @@ function toolLabels(count: number) {
   };
 }
 
-export default function AiChatPanel() {
+export default function AiChatPanel({ workspaceId }: { workspaceId: string }) {
   const { messages, sending, sendMessage, session } = useChat();
   const canEdit = session?.canEdit ?? false;
   const mockMode = session?.mockMode ?? false;
@@ -145,6 +146,13 @@ export default function AiChatPanel() {
                                   />
                                 </div>
                               )}
+                              {/* Phase 13B: explicit feedback affordance on agent outputs */}
+                              <div className="mt-1 flex justify-end">
+                                <FeedbackButtons
+                                  agentId="business-strategist"
+                                  workspaceId={workspaceId}
+                                />
+                              </div>
                             </Bubble>
                           </MessageContent>
                         </Message>

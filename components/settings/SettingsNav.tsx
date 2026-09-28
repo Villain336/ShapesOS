@@ -10,6 +10,8 @@ import { usePathname } from "next/navigation";
 import {
   Bell,
   Bot,
+  Brain,
+  BrainCog,
   Cloud,
   FlaskConical,
   Gauge,
@@ -37,6 +39,8 @@ const LINKS = [
   { href: "/dashboard/settings/providers", label: "Providers", icon: Cloud },
   { href: "/dashboard/settings/governance", label: "Governance", icon: Scale },
   { href: "/dashboard/settings/automation", label: "Automation", icon: Bot },
+  // Phase 13B: agent learning surface (Memory + Personas).
+  { href: "/dashboard/settings/agents", label: "Agents", icon: Brain },
   // Phase 12 (embeds): GrowthBook flags + Documenso signing requests.
   { href: "/dashboard/settings/experiments", label: "Experiments", icon: FlaskConical },
   { href: "/dashboard/settings/signing", label: "Signing", icon: PenLine },
@@ -51,6 +55,9 @@ const LINKS = [
   // tab strip — every settings subpage is one click away from every other.
   { href: "/dashboard/settings/alerts", label: "Alert rules", icon: SlidersHorizontal },
   { href: "/dashboard/settings/brand-kits", label: "Brand kits", icon: Palette },
+  // Phase 13B: company intelligence layer (Brand Voice, Knowledge, Style
+  // Rules, Content) — lives under /dashboard/settings/brand/intelligence.
+  { href: "/dashboard/settings/brand/intelligence", label: "Intelligence", icon: BrainCog },
   // Phase 13 Wave A (white-label ops): logo, custom domain, brand color.
   { href: "/dashboard/settings/white-label", label: "White-label", icon: Globe },
 ];

@@ -49,6 +49,7 @@ export default async function AssistantPage({
         memberCount={memberCount}
         currentUserId={user.id}
         initialTab={initialTab}
+        workspaceId={workspace.id}
       />
     </div>
   );

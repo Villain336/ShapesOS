@@ -17,8 +17,7 @@ import {
 import { useChat, type ChatTab } from "./ChatContext";
 import AiChatPanel from "@/components/AiChatPanel";
 import TeamChatPanel from "@/components/TeamChatPanel";
-import ThreadListSection from "./ThreadListSection";
-import { buttonVariants } from "@/components/vault/atoms/Button";
+import ThreadListSection from "./ThreadListSection";import { buttonVariants } from "@/components/vault/atoms/Button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -41,6 +40,7 @@ export default function AssistantClient({
   memberCount,
   currentUserId,
   initialTab,
+  workspaceId,
 }: {
   project: AssistantProject;
   projects: AssistantProject[];
@@ -49,6 +49,7 @@ export default function AssistantClient({
   memberCount: number;
   currentUserId: string;
   initialTab: ChatTab;
+  workspaceId: string;
 }) {
   const { setSession, tab, setTab } = useChat();
   const router = useRouter();
@@ -170,7 +171,7 @@ export default function AssistantClient({
       {/* Panels */}
       <div className="min-h-0 flex-1">
         {tab === "ai" ? (
-          <AiChatPanel />
+          <AiChatPanel workspaceId={workspaceId} />
         ) : (
           <TeamChatPanel
             projectId={project.id}

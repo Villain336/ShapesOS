@@ -1,0 +1,87 @@
+{
+  "date": "2026-09-27T23:30:09.638Z",
+  "outcomes": [
+    {
+      "file": "01-lesson-quality",
+      "title": "Lesson quality (consolidation contract + rubric)",
+      "status": "FAIL",
+      "passed": 5,
+      "skipped": 1,
+      "failed": 2,
+      "skipReasons": [],
+      "failureLines": [
+        "not ok 2 - lesson-quality: real consolidation extractor (pending until worker 6)"
+      ]
+    },
+    {
+      "file": "02-preference-precision",
+      "title": "Preference-retrieval precision (20 prefs, tenant isolation)",
+      "status": "PASS",
+      "passed": 7,
+      "skipped": 0,
+      "failed": 0,
+      "skipReasons": [],
+      "failureLines": []
+    },
+    {
+      "file": "03-style-rule-enforcement",
+      "title": "Style-rule enforcement (contract + violation battery)",
+      "status": "FAIL",
+      "passed": 4,
+      "skipped": 12,
+      "failed": 2,
+      "skipReasons": [],
+      "failureLines": [
+        "not ok 2 - style-rule-enforcement: violation battery (pending until worker 2)"
+      ]
+    },
+    {
+      "file": "04-voice-fidelity",
+      "title": "Voice-fidelity blind eval (automated + human-rated)",
+      "status": "FAIL",
+      "passed": 6,
+      "skipped": 2,
+      "failed": 2,
+      "skipReasons": [
+        "run with EVAL_HUMAN=1 to write the review file"
+      ],
+      "failureLines": [
+        "not ok 4 - voice-fidelity: real derivation (pending until worker 2)"
+      ]
+    },
+    {
+      "file": "05-no-ghost-recall",
+      "title": "No-ghost-recall (learnings, prefs, episodes)",
+      "status": "PASS",
+      "passed": 7,
+      "skipped": 0,
+      "failed": 0,
+      "skipReasons": [],
+      "failureLines": []
+    },
+    {
+      "file": "06-stop-asking",
+      "title": "\"Stops asking known things\" (prompt injection proxy)",
+      "status": "FAIL",
+      "passed": 4,
+      "skipped": 1,
+      "failed": 2,
+      "skipReasons": [],
+      "failureLines": [
+        "not ok 2 - stop-asking: real buildIntelligenceContext (pending until worker 5)"
+      ]
+    },
+    {
+      "file": "07-feedback-diff",
+      "title": "Feedback-diff sanity (pairs + contract)",
+      "status": "FAIL",
+      "passed": 8,
+      "skipped": 4,
+      "failed": 2,
+      "skipReasons": [],
+      "failureLines": [
+        "not ok 3 - feedback-diff: summarizeEditDiff (pending until worker 4)"
+      ]
+    }
+  ]
+}

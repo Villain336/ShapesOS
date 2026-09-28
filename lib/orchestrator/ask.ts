@@ -14,6 +14,7 @@ import { logCommand } from "./audit";
 import { runResearcher } from "./executors/researcher";
 import type { Citation } from "./executors/_guard";
 import { checkKillSwitchesFirst, type GuardDeps } from "./executors/_guard";
+import { captureEpisode } from "@/lib/agents/learning/capture";
 
 export interface AskInput {
   workspaceId: string;
@@ -39,6 +40,8 @@ export interface AskResult {
 export interface AskDeps extends GuardDeps {
   researcher?: typeof runResearcher;
   logAsk?: (input: { workspaceId: string; userId: string; query: string; summary: string }) => Promise<unknown>;
+  /** Phase 13B: episode capture hook (fail-soft). Override in tests. */
+  capture?: typeof captureEpisode;
 }
 
 const TIER_NOTE: Record<1 | 2, string> = {
@@ -124,6 +127,23 @@ export async function answerAsk(input: AskInput, deps: AskDeps = {}): Promise<As
         ? ` (${expertCiteCount} expert-corpus: ${research.expertCorpus?.sources.join("; ") ?? "unknown source"})`
         : "") +
       `${proposedAction ? `, drafted Tier-${proposedAction.tier} request` : ""}${tier === 3 ? ", Tier-3 refused" : ""}`,
+  });
+
+  // Phase 13B: episode capture — fail-soft (never breaks the ask), skipped
+  // when the workspace paused learning. Fire-and-forget by design.
+  const capture = deps.capture ?? captureEpisode;
+  void capture({
+    workspaceId: input.workspaceId,
+    agentId: "chief-strategy",
+    promptSummary: query,
+    outputSummary: result.answer,
+    outcome:
+      tier === 3
+        ? "refused_tier_3"
+        : proposedAction
+          ? `drafted_request_tier_${proposedAction.tier}`
+          : "answered",
+    refs: { missionId: input.missionId ?? null, citationCount: result.citations.length },
   });
 
   return result;

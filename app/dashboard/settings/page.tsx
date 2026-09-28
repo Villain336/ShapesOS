@@ -10,6 +10,7 @@ import { redirect } from "next/navigation";
 import {
   Bell,
   Bot,
+  Brain,
   Cloud,
   FlaskConical,
   Gauge,
@@ -47,6 +48,9 @@ const SECTIONS: { href: string; label: string; description: string; icon: Lucide
   { href: "/dashboard/settings/providers", label: "Providers", description: "Which external providers Marketr is using.", icon: Cloud },
   { href: "/dashboard/settings/governance", label: "Governance", description: "Retention and sharing defaults, inherited by every project.", icon: Scale },
   { href: "/dashboard/settings/automation", label: "Automation", description: "What Marketr may do on its own, what asks first, and what never runs.", icon: Bot },
+  // Phase 13B: agent learning + company intelligence — the "what I've learned"
+  // surface, preference profile, and the five personas.
+  { href: "/dashboard/settings/agents", label: "Agents", description: "What Marketr's agents have learned — lessons, preferences, personas.", icon: Brain },
   { href: "/dashboard/settings/experiments", label: "Experiments", description: "Feature flags and growth experiments.", icon: FlaskConical },
   { href: "/dashboard/settings/signing", label: "Signing", description: "Document signing requests and status.", icon: PenLine },
   { href: "/dashboard/settings/security", label: "Security", description: "Authentication, SSO, and secret-storage posture.", icon: Lock },

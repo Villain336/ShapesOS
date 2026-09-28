@@ -12,6 +12,7 @@ import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
 import { scoreContent } from "@/lib/content/seoScore";
 import type { ContentBrief } from "@/lib/content/brief";
+import { captureContentSaveDiff } from "@/lib/agents/learning/capture";
 
 export async function POST(req: NextRequest) {
   const user = await requireUser();
@@ -66,6 +67,14 @@ export async function POST(req: NextRequest) {
       seoScore: result.score,
       status: nextStatus,
     },
+  });
+
+  // Phase 13B: edit-diff pipeline — diff the saved body against the stored
+  // agent draft (when one exists) and record edit_diff / accepted feedback.
+  // Fail-soft: capture never breaks the save.
+  await captureContentSaveDiff(contentItem.project.workspaceId, contentItem.id, bodyMarkdown, {
+    agentId: "content-brief",
+    source: "content_editor",
   });
 
   return Response.json({

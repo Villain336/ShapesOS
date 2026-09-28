@@ -26,16 +26,26 @@ import { TOOLS, getTool, toolCatalogForPrompt, type ToolContext, type ToolDef } 
 import { getEnabledProjectSkills } from "@/lib/skills/service";
 import { skillManifestSection } from "@/lib/skills/disclosure";
 import { connectorToolsSection, resolveConnectorTool } from "./connector-tools";
+import { captureEpisode } from "@/lib/agents/learning/capture";
 // Phase 10 M9: Expert Constitution Pack v1 — the Chief Strategy Agent's
 // system-prompt layer (global hard rules + CSA constitution), wired in
 // front of all project context and retrieval grounding.
 import { constitutionSystemPrompt } from "@/lib/expert/constitution";
+// Phase 13B: company-intelligence prompt injection (style rules → voice →
+// knowledge → lessons/preferences → episodes) + fail-closed style-rule
+// enforcement on the delivery path.
+import { buildIntelligenceContext } from "@/lib/intelligence/company/prompt-context";
+import {
+  enforceStyleRules,
+  StyleRuleBlockedError,
+} from "@/lib/intelligence/enforce";
 // Phase 12: Agency-Agents persona seeds (MIT, original distillations) as
 // selectable advisor personas for the Chief Strategy Agent.
 import {
   assertPersonaForSurface,
   PERSONAS,
   personaSystemPrompt,
+  personaSystemPromptFor,
   personasForSurface,
   type PersonaId,
 } from "@/lib/expert/personas";
@@ -59,6 +69,23 @@ export function advisorSystemPrompt(persona: PersonaId): string {
   assertPersonaForSurface(persona, "csa");
   return [
     personaSystemPrompt(persona),
+    `<!-- advisor provenance: ${PERSONAS[persona].provenance.repo} (${PERSONAS[persona].provenance.license}), ${PERSONAS[persona].provenance.sourceFile} -->`,
+  ].join("\n\n");
+}
+
+/**
+ * Phase 13B: workspace-aware variant — layers the PersonaProfile voice
+ * block (user override if one exists, built-in default otherwise) behind
+ * the hard rules and the seed. Any live CSA call MUST use this instead of
+ * advisorSystemPrompt().
+ */
+export async function advisorSystemPromptFor(
+  workspaceId: string,
+  persona: PersonaId,
+): Promise<string> {
+  assertPersonaForSurface(persona, "csa");
+  return [
+    await personaSystemPromptFor(persona, workspaceId),
     `<!-- advisor provenance: ${PERSONAS[persona].provenance.repo} (${PERSONAS[persona].provenance.license}), ${PERSONAS[persona].provenance.sourceFile} -->`,
   ].join("\n\n");
 }
@@ -143,13 +170,22 @@ async function buildProjectContext(projectId: string, workspaceId: string): Prom
   return lines.join("\n");
 }
 
-function systemPrompt(projectContext: string, mockMode: boolean, supplements: string): string {
+function systemPrompt(
+  projectContext: string,
+  mockMode: boolean,
+  supplements: string,
+  intelligenceSection = "",
+): string {
   return [
     // Expert Constitution Pack v1: the constitution is the system-prompt
     // layer — it sits in front of the project context (which carries M9
     // retrieval grounding downstream) and is never overridden by it.
     constitutionSystemPrompt("chief-strategy"),
     "",
+    // Phase 13B: company intelligence injects directly behind the global
+    // hard rules — style rules are the first intelligence layer (hard
+    // constraints, verbatim) so they always win on conflict.
+    intelligenceSection,
     "You are Marketr, an expert SEO strategist embedded in the user's marketing workspace.",
     "You can ACT on the user's project using the tools below. Use read tools to ground your answers in real data; prefer a tool call over guessing.",
     "",
@@ -589,15 +625,19 @@ export async function runAgentTurn(input: AgentTurnInput): Promise<AgentTurnOutp
 
   // 3. Live mode: prompt-engineered agent loop.
   const ctx: ToolContext = { projectId, workspaceId, userId, role, confirmed: false, loadedSkills };
-  const [projectContext, supplements, attachmentSection] = await Promise.all([
+  const [projectContext, supplements, attachmentSection, intelligenceSection] = await Promise.all([
     buildProjectContext(projectId, workspaceId),
     buildAgentSupplements(projectId, workspaceId),
     buildAttachmentSection(projectId, threadId, attachmentIds),
+    // Phase 13B: layered company intelligence (rules → voice → knowledge →
+    // lessons/prefs → episodes); degrades to "" when the workspace has none.
+    buildIntelligenceContext(workspaceId, trimmed).catch(() => ""),
   ]);
   const sys = systemPrompt(
     projectContext,
     false,
     [supplements, attachmentSection].filter(Boolean).join("\n\n"),
+    intelligenceSection,
   );
   // Phase D: the chat agent loop runs on the "bulk" workload.
   const llm = getLlmProviderFor("bulk");
@@ -670,8 +710,60 @@ export async function runAgentTurn(input: AgentTurnInput): Promise<AgentTurnOutp
   if (!finalText) {
     finalText = "I checked everything I could. Let me know if you'd like me to dig deeper.";
   }
+  // Phase 13B: fail-closed style-rule enforcement on the Chief Strategy
+  // Agent delivery path. A severity=block violation refuses delivery — the
+  // violating text is replaced with a refusal naming the rule. Infra
+  // failures in the checker degrade open so a broken style subsystem can't
+  // take down the whole agent; rule-compile failures are already contained
+  // per-rule inside checkOutput.
+  try {
+    await enforceStyleRules(finalText, workspaceId);
+  } catch (err) {
+    if (err instanceof StyleRuleBlockedError) {
+      finalText =
+        `I can't deliver that response as written — it violates your style ` +
+        `rule${err.violations.length > 1 ? "s" : ""}: ` +
+        err.violations.map((v) => `"${v.pattern}" (${v.kind})`).join(", ") +
+        `. Adjust the request or the rule and try again.`;
+    }
+    // Non-block errors: deliver as-is (see note above).
+  }
   await saveMessage(threadId, "assistant", finalText, turnCalls);
   return { assistantText: finalText, toolCalls: turnCalls, threadTitle: null };
+}
+
+/**
+ * Phase 13B: runAgentTurn with episode capture. Records one agent_call
+ * episode per chat turn (outcome "error" when the turn throws) via the
+ * fail-soft capture path — a capture failure never breaks the turn, and
+ * learning-paused workspaces record nothing. Prefer this entry point over
+ * bare runAgentTurn in request handlers.
+ */
+export async function runAgentTurnWithCapture(
+  input: AgentTurnInput,
+  opts: { capture?: typeof captureEpisode } = {},
+): Promise<AgentTurnOutput> {
+  const startedAt = new Date();
+  let output: AgentTurnOutput | undefined;
+  let outcome = "error";
+  try {
+    output = await runAgentTurn(input);
+    const executed = output.toolCalls.filter((c) => c.status === "executed").length;
+    outcome = executed > 0 ? `tools_executed:${executed}` : "answered";
+    return output;
+  } finally {
+    const capture = opts.capture ?? captureEpisode;
+    void capture({
+      workspaceId: input.workspaceId,
+      agentId: "chief-strategy",
+      promptSummary: input.userContent,
+      outputSummary: output?.assistantText,
+      outcome,
+      startedAt,
+      endedAt: new Date(),
+      refs: { threadId: input.threadId, projectId: input.projectId },
+    });
+  }
 }
 
 /** Auto-title a thread from its first user message (called by the route). */

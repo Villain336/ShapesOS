@@ -10,6 +10,7 @@ import { requireUser, getOrCreateWorkspace } from "@/lib/session";
 import { requireWorkspaceRole } from "@/lib/authz";
 import { readJson } from "@/lib/enrichment/guard";
 import { repurposeContent, REPURPOSE_FORMATS } from "@/lib/content/repurpose";
+import { captureEpisode } from "@/lib/agents/learning/capture";
 
 export async function POST(req: Request) {
   const user = await requireUser();
@@ -38,6 +39,15 @@ export async function POST(req: Request) {
       topic: body.topic ?? "",
       format: format.id,
       topK: body.topK,
+    });
+    // Phase 13B: episode capture — fail-soft, never breaks the response.
+    void captureEpisode({
+      workspaceId: workspace.id,
+      agentId: "content-brief",
+      promptSummary: `Repurpose "${body.topic ?? ""}" as ${format.id}`,
+      outputSummary: `Repurposed asset generated (${result.asset?.length ?? 0} chars, ${result.sources?.length ?? 0} sources).`,
+      outcome: "repurpose_generated",
+      refs: { format: format.id, topic: body.topic ?? "" },
     });
     return NextResponse.json(result);
   } catch (e) {

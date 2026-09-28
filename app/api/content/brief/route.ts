@@ -15,6 +15,7 @@ import { pullSerp } from "@/lib/serp/pull";
 import { buildBrief, type ContentBrief } from "@/lib/content/brief";
 import { recordUsage } from "@/lib/usage";
 import { meter } from "@/lib/metering/service";
+import { captureEpisode } from "@/lib/agents/learning/capture";
 
 export async function POST(req: NextRequest) {
   const user = await requireUser();
@@ -65,6 +66,17 @@ export async function POST(req: NextRequest) {
       status: "brief",
       outlineJson: brief as unknown as Prisma.InputJsonValue,
     },
+  });
+
+  // Phase 13B: episode capture — the brief is the agent's first output for
+  // this item. Fail-soft: capture never breaks brief generation.
+  void captureEpisode({
+    workspaceId: keyword.project.workspaceId,
+    agentId: "content-brief",
+    promptSummary: `Brief for keyword "${keyword.phrase}" (${keyword.intent ?? "unknown intent"})`,
+    outputSummary: `Brief created: ${brief.h1 ?? brief.keyword} (${brief.h2s?.length ?? 0} H2s).`,
+    outcome: "brief_generated",
+    refs: { contentItemId: contentItem.id, keyword: keyword.phrase },
   });
 
   // Phase C gaps (G1): ledger one content_brief per generated brief. The
