@@ -15,7 +15,9 @@ import {
   Play,
   Loader2,
   ExternalLink,
+  AlertTriangle,
 } from "lucide-react";
+import { describeBulk, extractBulkItems } from "@/lib/integrations/actions/bulk";
 
 interface AppDef {
   appKey: string;
@@ -83,7 +85,9 @@ function statusBadge(status: string) {
         ? "bg-amber-50 text-amber-700 border-amber-200"
         : status === "denied" || status === "failed"
           ? "bg-red-50 text-red-700 border-red-200"
-          : "bg-stone-100 text-stone-500 border-stone-200";
+          : status === "executed"
+            ? "bg-blue-50 text-blue-700 border-blue-200"
+            : "bg-stone-100 text-stone-500 border-stone-200";
   return (
     <span className={`inline-block rounded-full border px-2 py-0.5 text-[11px] font-medium ${cls}`}>
       {status}
@@ -126,6 +130,10 @@ export function ActionsClient({
   const [denyReason, setDenyReason] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [filter, setFilter] = useState("pending");
+  // Slice 5: destructive second-confirmation. confirmExec holds the approval
+  // id the user has clicked "Execute" on for a HIGH-tier action — the inline
+  // confirm panel collects the explicit confirmation before the POST.
+  const [confirmExec, setConfirmExec] = useState<string | null>(null);
 
   const connByApp = useMemo(() => {
     const m = new Map<string, Connection>();
@@ -202,6 +210,29 @@ export function ActionsClient({
       setDenyReason("");
       setEditing(null);
     });
+  }
+
+  /** Execute an approved action. High tier always passes destructiveConfirm
+   *  + the reviewed bulk count; the gate enforces both server-side. */
+  async function executeApproval(
+    a: Approval,
+    confirm?: { destructiveConfirm: boolean; confirmedBulkCount?: number },
+  ) {
+    await run(`exec-${a.id}`, async () => {
+      await api(`/api/integrations/actions/approvals/${a.id}/execute`, {
+        method: "POST",
+        body: JSON.stringify(confirm ?? {}),
+      });
+      setConfirmExec(null);
+    });
+  }
+
+  /** Bulk info for the destructive-confirm panel (from the loaded detail). */
+  function bulkFor(a: Approval) {
+    if (expanded !== a.id || !detail) return null;
+    const args =
+      (detail as { proposedArgs?: Record<string, unknown> }).proposedArgs ?? {};
+    return extractBulkItems(args);
   }
 
   async function batchApprove() {
@@ -328,6 +359,7 @@ export function ActionsClient({
               <option value="approved">Approved</option>
               <option value="denied">Denied</option>
               <option value="expired">Expired</option>
+              <option value="executed">Executed</option>
               <option value="all">All</option>
             </select>
             {selected.size > 0 && (
@@ -406,23 +438,85 @@ export function ActionsClient({
                               </button>
                             </>
                           )}
-                          {a.status === "approved" && (
+                          {a.status === "approved" && a.riskTier !== "high" && (
                             <button
                               disabled={busy === `exec-${a.id}`}
-                              onClick={() =>
-                                run(`exec-${a.id}`, async () => {
-                                  await api(`/api/integrations/actions/approvals/${a.id}/execute`, { method: "POST" });
-                                })
-                              }
+                              onClick={() => executeApproval(a)}
                               className="inline-flex items-center gap-1 rounded-md border border-stone-200 px-2 py-1 text-[12px] text-stone-700 hover:bg-stone-50 disabled:opacity-50"
                             >
                               {busy === `exec-${a.id}` ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
                               Execute
                             </button>
                           )}
+                          {a.status === "approved" && a.riskTier === "high" && confirmExec !== a.id && (
+                            <button
+                              disabled={busy === `exec-${a.id}`}
+                              onClick={async () => {
+                                setConfirmExec(a.id);
+                                if (expanded !== a.id) await openDetail(a.id);
+                              }}
+                              className="inline-flex items-center gap-1 rounded-md border border-red-200 px-2 py-1 text-[12px] font-medium text-red-700 hover:bg-red-50 disabled:opacity-50"
+                            >
+                              <AlertTriangle className="h-3.5 w-3.5" />
+                              Execute
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
+                    {confirmExec === a.id && a.status === "approved" && a.riskTier === "high" && (
+                      <tr key={`${a.id}-confirm`} className="border-b border-red-100 bg-red-50/60">
+                        <td />
+                        <td colSpan={5} className="px-3 py-3">
+                          {(() => {
+                            const bulk = bulkFor(a);
+                            return (
+                              <div className="rounded-md border border-red-200 bg-white p-3">
+                                <div className="flex items-center gap-1.5 text-[13px] font-semibold text-red-800">
+                                  <AlertTriangle className="h-4 w-4" />
+                                  Destructive action — explicit confirmation required
+                                </div>
+                                <div className="mt-1 text-[12px] text-stone-600">{a.plainSummary}</div>
+                                {bulk ? (
+                                  <div className="mt-1 text-[12px] font-medium text-red-700">
+                                    Bulk review: {describeBulk(bulk)}
+                                  </div>
+                                ) : (
+                                  <div className="mt-1 text-[12px] text-stone-500">
+                                    {expanded === a.id ? "Single target." : "Loading target details…"}
+                                  </div>
+                                )}
+                                <div className="mt-2.5 flex gap-1.5">
+                                  <button
+                                    disabled={busy === `exec-${a.id}`}
+                                    onClick={() =>
+                                      executeApproval(a, {
+                                        destructiveConfirm: true,
+                                        ...(bulk ? { confirmedBulkCount: bulk.count } : {}),
+                                      })
+                                    }
+                                    className="inline-flex items-center gap-1 rounded-md bg-red-600 px-2.5 py-1 text-[12px] font-medium text-white hover:bg-red-700 disabled:opacity-50"
+                                  >
+                                    {busy === `exec-${a.id}` ? (
+                                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                    ) : (
+                                      <AlertTriangle className="h-3.5 w-3.5" />
+                                    )}
+                                    Confirm — execute now
+                                  </button>
+                                  <button
+                                    onClick={() => setConfirmExec(null)}
+                                    className="rounded-md border border-stone-200 px-2.5 py-1 text-[12px] text-stone-600 hover:bg-stone-50"
+                                  >
+                                    Cancel
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })()}
+                        </td>
+                      </tr>
+                    )}
                     {expanded === a.id && detail && (
                       <tr key={`${a.id}-detail`} className="border-b border-stone-100 bg-stone-50/60">
                         <td />

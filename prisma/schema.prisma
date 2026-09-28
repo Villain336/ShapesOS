@@ -8215,7 +8215,7 @@ model ComposioActionApproval {
   proposedArgs Json      @map("proposed_args")
   // Plain-language "what will happen" — never raw JSON in the UI.
   plainSummary String    @map("plain_summary") @db.Text
-  // pending | approved | denied | expired
+  // pending | approved | denied | expired | executed (executed = replay lock)
   status       String    @default("pending")
   decidedBy    String?   @map("decided_by")
   decidedAt    DateTime? @map("decided_at")

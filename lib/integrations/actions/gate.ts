@@ -24,10 +24,13 @@ import {
 import { getToolTierOverrides, requireConnectedEntity } from "@/lib/integrations/actions/connections";
 import { redactArgs, summarizeArgs } from "@/lib/integrations/actions/redact";
 import { summarizeAction } from "@/lib/integrations/actions/summarize";
+import { describeBulk, extractBulkItems } from "@/lib/integrations/actions/bulk";
 
 export const APPROVAL_TTL_MS = Number(process.env.ACTION_APPROVAL_TTL_MS ?? 24 * 3600_000);
 
-export type ApprovalStatus = "pending" | "approved" | "denied" | "expired";
+// pending -> approved|denied|expired; approved -> executed (terminal).
+// "executed" is the replay lock: an approval executes AT MOST ONCE.
+export type ApprovalStatus = "pending" | "approved" | "denied" | "expired" | "executed";
 
 interface AuditEvent {
   at: string;
@@ -128,6 +131,13 @@ export async function decideApproval(input: DecideInput) {
       throw new Error("Approval expired before decision");
     }
     const redacted = input.editedArgs ? redactArgs(input.editedArgs) : undefined;
+    // Edit-before-approve reclassifies with FRESH overrides (slice 5): the
+    // tier is re-derived so an edit can't silently change the action's risk
+    // profile. The conservative floor in classifyAction still holds.
+    const reclassified = input.editedArgs
+      ? classifyAction(approval.toolName, await getToolTierOverrides(input.workspaceId))
+      : null;
+    const tierChanged = reclassified !== null && reclassified.tier !== approval.riskTier;
     const updated = await tx.composioActionApproval.update({
       where: { id: approval.id },
       data: {
@@ -139,13 +149,18 @@ export async function decideApproval(input: DecideInput) {
           ? {
               proposedArgs: toJson(redacted),
               plainSummary: summarizeAction(approval.appKey, approval.toolName, redacted),
+              ...(tierChanged ? { riskTier: (reclassified as { tier: RiskTier }).tier } : {}),
             }
           : {}),
         auditTrail: toJson(trail(approval.auditTrail, {
           at: nowIso(),
           actor: input.decidedBy,
           event: input.decision,
-          detail: input.reason?.trim() || (redacted ? "args edited before approve" : undefined),
+          detail:
+            input.reason?.trim() ||
+            (redacted
+              ? `args edited before approve${tierChanged ? ` — tier ${approval.riskTier} -> ${(reclassified as { tier: RiskTier }).tier}` : ""}`
+              : undefined),
         })),
       },
       select: { id: true, status: true, riskTier: true, plainSummary: true },
@@ -231,6 +246,12 @@ export interface ExecuteApprovedInput {
   workspaceId: string;
   approvalId: string;
   executedBy: string;
+  /** Explicit second confirmation for HIGH-tier (destructive) actions —
+   *  the UI collects it in a confirm dialog. Required, never defaulted. */
+  destructiveConfirm?: boolean;
+  /** For bulk actions: the item count the human reviewed. Must match the
+   *  proposed args exactly — a different set fails closed. */
+  confirmedBulkCount?: number;
   http?: ComposioHttp;
 }
 
@@ -238,6 +259,14 @@ export interface ExecuteApprovedInput {
  * THE choke point for gated actions. Loads the approval, requires
  * approved + unexpired, executes via Composio, and ALWAYS writes a
  * ComposioActionLog — nothing executes without a log entry.
+ *
+ * Trust ladder (slice 5):
+ *  - replay lock: status flips approved -> executed ATOMICALLY (conditional
+ *    update); a second execute attempt finds no "approved" row and throws.
+ *  - high tier: requires destructiveConfirm (explicit second confirmation).
+ *  - bulk: confirmedBulkCount must equal the proposed item count.
+ *  - failed execution reverts to "approved" (retry allowed) with an audit
+ *    event; the failure is still logged.
  */
 export async function executeApproved(input: ExecuteApprovedInput) {
   const approval = await withWorkspaceScope(input.workspaceId, (tx) =>
@@ -246,6 +275,9 @@ export async function executeApproved(input: ExecuteApprovedInput) {
     }),
   );
   if (!approval) throw new Error("Approval not found");
+  if (approval.status === "executed") {
+    throw new Error("Cannot execute: approval already executed (replay blocked)");
+  }
   if (approval.status !== "approved") {
     throw new Error(`Cannot execute: approval is ${approval.status} (must be approved)`);
   }
@@ -253,6 +285,45 @@ export async function executeApproved(input: ExecuteApprovedInput) {
     await expireStaleApprovals(input.workspaceId);
     throw new Error("Cannot execute: approval expired");
   }
+  const tier = approval.riskTier as RiskTier;
+  if (tier === "high" && input.destructiveConfirm !== true) {
+    throw new Error(
+      "Cannot execute: destructive (high-tier) actions require an explicit second confirmation",
+    );
+  }
+  const proposedArgs = (approval.proposedArgs as Record<string, unknown>) ?? {};
+  const bulk = extractBulkItems(proposedArgs);
+  if (bulk && input.confirmedBulkCount !== bulk.count) {
+    throw new Error(
+      `Cannot execute: bulk action targets ${bulk.count} items via "${bulk.field}" — ` +
+        `the confirmed count (${input.confirmedBulkCount ?? "none"}) must match what was reviewed`,
+    );
+  }
+  // Atomic claim: approved -> executed. Concurrent/second attempts affect
+  // 0 rows and fail closed.
+  const claimed = await withWorkspaceScope(input.workspaceId, (tx) =>
+    tx.composioActionApproval.updateMany({
+      where: { id: approval.id, workspaceId: input.workspaceId, status: "approved" },
+      data: {
+        status: "executed",
+        auditTrail: toJson(trail(approval.auditTrail, {
+          at: nowIso(),
+          actor: input.executedBy,
+          event: "execution_claimed",
+          detail:
+            tier === "high"
+              ? `destructive confirmed${bulk ? `; bulk ${describeBulk(bulk)}` : ""}`
+              : bulk
+                ? `bulk ${describeBulk(bulk)}`
+                : undefined,
+        })),
+      },
+    }),
+  );
+  if (claimed.count !== 1) {
+    throw new Error("Cannot execute: approval was already claimed (replay blocked)");
+  }
+
   const connectedAccountId = await requireConnectedEntity(input.workspaceId, approval.appKey);
   const started = Date.now();
   let status: "success" | "failed" = "success";
@@ -262,7 +333,7 @@ export async function executeApproved(input: ExecuteApprovedInput) {
       {
         slug: approval.toolName,
         connectedAccountId,
-        args: (approval.proposedArgs as Record<string, unknown>) ?? {},
+        args: proposedArgs,
       },
       input.http,
     );
@@ -281,14 +352,37 @@ export async function executeApproved(input: ExecuteApprovedInput) {
     approvalId: approval.id,
     appKey: approval.appKey,
     toolName: approval.toolName,
-    riskTier: approval.riskTier as RiskTier,
-    argsSummary: (approval.proposedArgs as Record<string, unknown>) ?? {},
+    riskTier: tier,
+    argsSummary: proposedArgs,
     resultSummary,
     latencyMs: Date.now() - started,
     status,
     executedBy: input.executedBy,
   });
   if (status === "failed") {
+    // Revert to approved so a human can retry after fixing the cause.
+    // The failure stays in the log + audit trail; the replay lock only
+    // blocks SUCCESSFUL double-execution.
+    const currentTrail = await withWorkspaceScope(input.workspaceId, (tx) =>
+      tx.composioActionApproval.findFirst({
+        where: { id: approval.id, workspaceId: input.workspaceId },
+        select: { auditTrail: true },
+      }),
+    );
+    await withWorkspaceScope(input.workspaceId, (tx) =>
+      tx.composioActionApproval.updateMany({
+        where: { id: approval.id, workspaceId: input.workspaceId, status: "executed" },
+        data: {
+          status: "approved",
+          auditTrail: toJson(trail(currentTrail?.auditTrail ?? [], {
+            at: nowIso(),
+            actor: "system",
+            event: "execution_failed",
+            detail: "reverted to approved for retry",
+          })),
+        },
+      }),
+    );
     throw new Error(`Action failed: ${JSON.stringify(resultSummary).slice(0, 200)}`);
   }
   return { ok: true, latencyMs: Date.now() - started };
