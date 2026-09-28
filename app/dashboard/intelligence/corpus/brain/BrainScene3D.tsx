@@ -20,7 +20,8 @@ import * as THREE from "three";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { OrbitControls, Billboard } from "@react-three/drei";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
-import { Loader2, Play, X } from "lucide-react";
+import { Loader2, Play, Shapes, X } from "lucide-react";
+import gsap from "gsap";
 import {
   layoutGalaxy3D,
   layoutChunkSparkles,
@@ -29,8 +30,14 @@ import {
   type GalaxyCore,
   type ChunkSparkle,
 } from "@/lib/intelligence/corpus/brain3d-layout";
+import {
+  buildMorphForms,
+  MORPH_SHAPES,
+  MORPH_SHAPE_LABELS,
+} from "@/lib/intelligence/corpus/brain-morph-forms";
 import type { BrainGraph, BrainNode, BrainPillar } from "@/lib/intelligence/corpus/graph";
 import { PILLAR_COLORS } from "./brain-ui";
+import { BrainOrbFarm } from "./BrainOrbFarm";
 import type { FocusRequest } from "./BrainCanvas2D";
 
 export interface BrainScene3DProps {
@@ -142,6 +149,8 @@ function SourceCore({
   now,
   onHover,
   onSelect,
+  orbTex,
+  webgpu,
 }: {
   node: BrainNode;
   core: GalaxyCore;
@@ -152,14 +161,23 @@ function SourceCore({
   now: React.MutableRefObject<number>;
   onHover: (id: string | null) => void;
   onSelect: (id: string) => void;
+  orbTex: THREE.Texture | null;
+  webgpu: boolean;
 }) {
   const group = useRef<THREE.Group>(null);
   const mat = useRef<THREE.MeshBasicMaterial>(null);
+  const orbMat = useRef<THREE.SpriteMaterial>(null);
   const haloIn = useRef<THREE.SpriteMaterial>(null);
   const haloOut = useRef<THREE.SpriteMaterial>(null);
   const color = PILLAR_COLORS[node.pillar];
   const r = core.radius;
   const targetScale = hovered || selected ? 1.22 : 1;
+  // orb-14's luminous dome fills ~90% of the canvas width (r2 < 1 with
+  // p_radius = 0.9). Size the sprite so the dome diameter matches the
+  // previous sphere nucleus diameter — the orb stays a distinct, prominent
+  // node, not a sparkle.
+  const orbScale = (r * 2) / 0.9;
+  const useOrb = webgpu && orbTex != null;
 
   useFrame((_, dt) => {
     const age = now.current - birth;
@@ -170,6 +188,9 @@ function SourceCore({
     }
     if (mat.current) {
       mat.current.opacity = THREE.MathUtils.damp(mat.current.opacity, dimmed ? 0.14 : 1, 10, dt);
+    }
+    if (orbMat.current) {
+      orbMat.current.opacity = THREE.MathUtils.damp(orbMat.current.opacity, dimmed ? 0.14 : 1, 10, dt);
     }
     if (haloIn.current) {
       haloIn.current.opacity = THREE.MathUtils.damp(
@@ -212,23 +233,44 @@ function SourceCore({
           depthWrite={false}
         />
       </sprite>
-      {/* Saturated luminous nucleus */}
-      <mesh
-        onClick={(e) => {
-          if (dimmed) return;
-          e.stopPropagation();
-          onSelect(node.id);
-        }}
-        onPointerOver={(e) => {
-          if (dimmed) return;
-          e.stopPropagation();
-          onHover(node.id);
-        }}
-        onPointerOut={() => onHover(null)}
-      >
-        <sphereGeometry args={[r, 28, 20]} />
-        <meshBasicMaterial ref={mat} color={color} transparent />
-      </mesh>
+      {/* Thinking-orb nucleus (orb-14 "thinking" state, sampled from the
+          hidden farm canvas) — or the legacy luminous sphere when WebGPU
+          is unavailable. Hit handling is identical on both. */}
+      {useOrb ? (
+        <sprite
+          scale={[orbScale, orbScale, 1]}
+          onClick={(e) => {
+            if (dimmed) return;
+            e.stopPropagation();
+            onSelect(node.id);
+          }}
+          onPointerOver={(e) => {
+            if (dimmed) return;
+            e.stopPropagation();
+            onHover(node.id);
+          }}
+          onPointerOut={() => onHover(null)}
+        >
+          <spriteMaterial ref={orbMat} map={orbTex} transparent depthWrite={false} />
+        </sprite>
+      ) : (
+        <mesh
+          onClick={(e) => {
+            if (dimmed) return;
+            e.stopPropagation();
+            onSelect(node.id);
+          }}
+          onPointerOver={(e) => {
+            if (dimmed) return;
+            e.stopPropagation();
+            onHover(node.id);
+          }}
+          onPointerOut={() => onHover(null)}
+        >
+          <sphereGeometry args={[r, 28, 20]} />
+          <meshBasicMaterial ref={mat} color={color} transparent />
+        </mesh>
+      )}
       {!dimmed && (
         <Billboard>
           <TierRings node={node} radius={r} />
@@ -253,8 +295,10 @@ attribute float aSize;
 attribute vec3 aColor;
 attribute float aDim;
 attribute float aBirth;
+attribute vec3 aMorph;
 uniform float uScale;
 uniform float uTime;
+uniform float uMorph;
 varying vec3 vColor;
 varying float vAlpha;
 void main() {
@@ -264,7 +308,11 @@ void main() {
   float pop = (age > 0.0 && age < 1.0) ? sin(age * 3.14159) * 0.3 : 0.0;
   float s = aSize * g * (1.0 + pop);
   vAlpha = mix(1.0, 0.08, aDim) * g;
-  vec4 mv = modelViewMatrix * vec4(position, 1.0);
+  // Shape-morph: smoothstep-eased blend from the cluster position (position)
+  // to the active geometric morph target (aMorph).
+  float me = uMorph * uMorph * (3.0 - 2.0 * uMorph);
+  vec3 base = mix(position, aMorph, me);
+  vec4 mv = modelViewMatrix * vec4(base, 1.0);
   gl_PointSize = s * uScale / max(0.1, -mv.z);
   gl_Position = projectionMatrix * mv;
 }
@@ -283,16 +331,34 @@ void main() {
 }
 `;
 
+/** Shared morph state for the sparkle field.
+ *  progress 0 = clustered galaxy positions, 1 = active geometric form.
+ *  `form` indexes into morphForms; `nonce` bumps whenever it changes so the
+ *  shader re-targets the aMorph attribute. */
+export interface MorphState {
+  progress: number;
+  form: number;
+  nonce: number;
+}
+
+/** Chunk sparkle field — one GPU draw call, soft round points with stagger-in.
+ *  Shape-morphing (ported from the particle-shape-morph registry component
+ *  Tico chose) blends each sparkle from its cluster position to a shared
+ *  geometric form via the aMorph attribute + uMorph uniform. */
 function SparklePoints({
   sparkles,
   dimSet,
   now,
   seenRef,
+  morphForms,
+  morphRef,
 }: {
   sparkles: ChunkSparkle[];
   dimSet: Set<string>;
   now: React.MutableRefObject<number>;
   seenRef: React.MutableRefObject<Set<string>>;
+  morphForms: Float32Array[];
+  morphRef: React.MutableRefObject<MorphState>;
 }) {
   const matRef = useRef<THREE.ShaderMaterial>(null);
   const geoRef = useRef<THREE.BufferGeometry>(null);
@@ -332,6 +398,8 @@ function SparklePoints({
     g.setAttribute("aSize", new THREE.BufferAttribute(aSize, 1));
     g.setAttribute("aDim", new THREE.BufferAttribute(aDim, 1));
     g.setAttribute("aBirth", new THREE.BufferAttribute(aBirth, 1));
+    // Morph target: starts at the cluster position so uMorph=0 is a no-op.
+    g.setAttribute("aMorph", new THREE.BufferAttribute(Float32Array.from(pos), 3));
     return g;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sparkles]);
@@ -356,6 +424,7 @@ function SparklePoints({
     () => ({
       uScale: { value: 800 },
       uTime: { value: 0 },
+      uMorph: { value: 0 },
     }),
     [],
   );
@@ -366,8 +435,24 @@ function SparklePoints({
     uniforms.uScale.value = hPx / (2 * Math.tan(THREE.MathUtils.degToRad(persp.fov / 2)));
   }, [camera, size, dpr, uniforms]);
 
+  const morphNonce = useRef(-1);
   useFrame(() => {
-    if (matRef.current) matRef.current.uniforms.uTime.value = now.current;
+    if (!matRef.current) return;
+    matRef.current.uniforms.uTime.value = now.current;
+    const m = morphRef.current;
+    matRef.current.uniforms.uMorph.value = m.progress;
+    // Retarget the morph field when the driver advances to the next form.
+    if (m.nonce !== morphNonce.current && morphForms.length > 0) {
+      morphNonce.current = m.nonce;
+      const target = morphForms[m.form % morphForms.length];
+      const attr = geo.getAttribute("aMorph") as THREE.BufferAttribute;
+      // Length guard: a rebuilt (possibly empty) sparkle array keeps its
+      // cluster positions rather than throwing on a mismatched target.
+      if ((attr.array as Float32Array).length === target.length) {
+        (attr.array as Float32Array).set(target);
+        attr.needsUpdate = true;
+      }
+    }
   });
 
   return (
@@ -386,7 +471,15 @@ function SparklePoints({
 
 // ── Threads & edges ─────────────────────────────────────────────────────────
 
-function ThreadLines({ sparkles, cores }: { sparkles: ChunkSparkle[]; cores: GalaxyCore[] }) {
+function ThreadLines({
+  sparkles,
+  cores,
+  morphRef,
+}: {
+  sparkles: ChunkSparkle[];
+  cores: GalaxyCore[];
+  morphRef: React.MutableRefObject<MorphState>;
+}) {
   const obj = useMemo(() => {
     const byId = new Map(cores.map((c) => [c.id, c]));
     const n = sparkles.length;
@@ -429,6 +522,12 @@ function ThreadLines({ sparkles, cores }: { sparkles: ChunkSparkle[]; cores: Gal
     },
     [obj],
   );
+  // Fade threads out while the field is morphed — the cluster identity
+  // returns with them when the morph relaxes back.
+  useFrame(() => {
+    const mat = obj.material as THREE.LineBasicMaterial;
+    mat.opacity = 0.09 * (1 - morphRef.current.progress * 0.9);
+  });
   return <primitive object={obj} />;
 }
 
@@ -703,6 +802,11 @@ function Scene(
   props: BrainScene3DProps & {
     tourCtl: React.MutableRefObject<{ start: () => void; cancel: () => void } | null>;
     onTouringChange: (touring: boolean) => void;
+    touring: boolean;
+    orbTex: THREE.Texture | null;
+    webgpu: boolean;
+    morphTriggerRef: React.MutableRefObject<(() => void) | null>;
+    onMorphLabel: (label: string | null) => void;
   },
 ) {
   const { graph, nodeById, isDimmed, selectedId, hoverId, onHover, onSelect, focusRequest } = props;
@@ -738,9 +842,106 @@ function Scene(
   const seenRef = useRef<Set<string>>(new Set());
   const birthRef = useRef<Map<string, number>>(new Map());
 
+  // ── Shape-morph state & driver ─────────────────────────────────────────
+  // Morph targets for the sparkle field, ported from the particle-shape-morph
+  // registry component Tico chose: six geometric forms, one Float32Array each,
+  // index-aligned with the sparkle array.
+  const morphForms = useMemo(
+    () => buildMorphForms(Math.max(sparkles.length, 1), GALAXY_RADIUS * 0.5, [0, -0.2, 0.4]),
+    [sparkles.length],
+  );
+  const morphRef = useRef<MorphState>({ progress: 0, form: MORPH_SHAPES.length - 1, nonce: 0 });
+  const morphBusyRef = useRef(false);
+  const morphPauseRef = useRef(false);
+
   useFrame((state) => {
     now.current = state.clock.elapsedTime;
+    // Never morph while the user is touring, flying, hovering or inspecting.
+    morphPauseRef.current = props.touring || fly.current.active || hoverId != null || selectedId != null;
+    // Sample the hidden orb-14 farm canvas into the shared core texture.
+    if (props.orbTex) props.orbTex.needsUpdate = true;
   });
+
+  useEffect(() => {
+    const reduced =
+      typeof window !== "undefined" &&
+      typeof window.matchMedia === "function" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    let alive = true;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let tween: gsap.core.Tween | null = null;
+    const later = (fn: () => void, ms: number) => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        timer = null;
+        if (alive) fn();
+      }, ms);
+    };
+
+    const begin = () => {
+      if (!alive || morphBusyRef.current || morphForms.length === 0) return;
+      morphBusyRef.current = true;
+      morphRef.current.form = (morphRef.current.form + 1) % morphForms.length;
+      morphRef.current.nonce += 1;
+      props.onMorphLabel(MORPH_SHAPE_LABELS[MORPH_SHAPES[morphRef.current.form]]);
+      const out = { p: 0 };
+      tween = gsap.to(out, {
+        p: 1,
+        duration: 1.8,
+        ease: "power2.inOut",
+        onUpdate: () => {
+          morphRef.current.progress = out.p;
+        },
+        onComplete: () => {
+          later(() => {
+            const back = { p: 1 };
+            tween = gsap.to(back, {
+              p: 0,
+              duration: 1.8,
+              ease: "power2.inOut",
+              onUpdate: () => {
+                morphRef.current.progress = back.p;
+              },
+              onComplete: () => {
+                morphBusyRef.current = false;
+                tween = null;
+                props.onMorphLabel(null);
+                if (!reduced) later(schedule, 14000);
+              },
+            });
+          }, 2600);
+        },
+      });
+    };
+    const schedule = () => {
+      if (!alive) return;
+      if (morphPauseRef.current || reduced) {
+        later(schedule, 4000);
+        return;
+      }
+      begin();
+    };
+
+    props.morphTriggerRef.current = () => {
+      if (morphBusyRef.current || morphPauseRef.current) return;
+      if (timer) {
+        clearTimeout(timer);
+        timer = null;
+      }
+      tween?.kill();
+      tween = null;
+      begin();
+    };
+
+    if (!reduced) later(schedule, 9000);
+    return () => {
+      alive = false;
+      if (timer) clearTimeout(timer);
+      tween?.kill();
+      props.morphTriggerRef.current = null;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [morphForms]);
 
   // Grow-in bookkeeping: brand-new source ids bloom; known ids are instant.
   const coreIds = useMemo(() => cores.map((c) => c.id).join(","), [cores]);
@@ -768,8 +969,8 @@ function Scene(
   return (
     <>
       {/* Light-space galaxy: no armature, no beads — pure knowledge graph */}
-      <SparklePoints sparkles={sparkles} dimSet={dimSet} now={now} seenRef={seenRef} />
-      <ThreadLines sparkles={litSparkles} cores={cores} />
+      <SparklePoints sparkles={sparkles} dimSet={dimSet} now={now} seenRef={seenRef} morphForms={morphForms} morphRef={morphRef} />
+      <ThreadLines sparkles={litSparkles} cores={cores} morphRef={morphRef} />
       <EdgeLines graph={graph} byId={byId} dimSet={dimSet} />
 
       {cores.map((p) => {
@@ -787,6 +988,8 @@ function Scene(
             now={now}
             onHover={onHover}
             onSelect={onSelect}
+            orbTex={props.orbTex}
+            webgpu={props.webgpu}
           />
         );
       })}
@@ -824,6 +1027,22 @@ export function BrainScene3D(props: BrainScene3DProps) {
   const [touring, setTouring] = useState(false);
   const [introDone, setIntroDone] = useState(false);
 
+  // Hidden orb-14 "thinking" farm: one WebGPU canvas sampled as a shared
+  // texture by every source-core sprite. Falls back to luminous spheres.
+  const [orbCanvas, setOrbCanvas] = useState<HTMLCanvasElement | null>(null);
+  const [orbSupported, setOrbSupported] = useState(false);
+  const orbTex = useMemo(() => {
+    if (!orbCanvas) return null;
+    const t = new THREE.CanvasTexture(orbCanvas);
+    t.colorSpace = THREE.SRGBColorSpace;
+    return t;
+  }, [orbCanvas]);
+  useEffect(() => () => orbTex?.dispose(), [orbTex]);
+
+  // Shape-morph controls: ambient GSAP cycle plus a manual trigger button.
+  const morphTriggerRef = useRef<(() => void) | null>(null);
+  const [morphLabel, setMorphLabel] = useState<string | null>(null);
+
   useEffect(() => {
     const t = setTimeout(() => setIntroDone(true), 7000);
     return () => clearTimeout(t);
@@ -850,9 +1069,19 @@ export function BrainScene3D(props: BrainScene3DProps) {
           onPointerMissed={() => onSelect(null)}
         >
           <fog attach="fog" args={["#f1efeb", 18, 42]} />
-          <Scene {...props} tourCtl={tourCtl} onTouringChange={setTouring} />
+          <Scene
+            {...props}
+            tourCtl={tourCtl}
+            onTouringChange={setTouring}
+            touring={touring}
+            orbTex={orbTex}
+            webgpu={orbSupported}
+            morphTriggerRef={morphTriggerRef}
+            onMorphLabel={setMorphLabel}
+          />
         </Canvas>
       </Suspense>
+      <BrainOrbFarm onCanvas={setOrbCanvas} onSupport={setOrbSupported} />
 
       {/* Light legend */}
       <div className="pointer-events-none absolute left-3 top-3 flex flex-col gap-1.5 rounded-md border border-stone-200 bg-white/80 px-2.5 py-2 shadow-sm backdrop-blur">
@@ -870,15 +1099,24 @@ export function BrainScene3D(props: BrainScene3DProps) {
         </div>
       </div>
 
-      {/* Cinematic tour */}
-      <div className="absolute bottom-3 left-1/2 -translate-x-1/2">
+      {/* Cinematic tour + particle shape morph */}
+      <div className="absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-2">
         <button
           type="button"
           onClick={() => (touring ? tourCtl.current?.cancel() : tourCtl.current?.start())}
-          className="flex items-center gap-1.5 rounded-full bg-violet-600 px-4 py-2 text-[12px] font-medium text-white shadow-md hover:bg-violet-700"
+          className="flex items-center gap-1.5 rounded-full bg-[var(--brand-600)] px-4 py-2 text-[12px] font-medium text-white shadow-md hover:bg-[var(--brand-700)]"
         >
           {touring ? <X className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
           {touring ? "Skip tour" : "Cinematic tour"}
+        </button>
+        <button
+          type="button"
+          onClick={() => morphTriggerRef.current?.()}
+          title="Morph the particle field through geometric forms"
+          className="flex items-center gap-1.5 rounded-full border border-stone-200 bg-white/85 px-4 py-2 text-[12px] font-medium text-stone-700 shadow-sm backdrop-blur hover:bg-white"
+        >
+          <Shapes className="h-3.5 w-3.5" />
+          {morphLabel ? `Morphing · ${morphLabel}` : "Morph field"}
         </button>
       </div>
 

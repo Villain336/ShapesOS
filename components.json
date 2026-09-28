@@ -9,6 +9,7 @@
   },
   "iconLibrary": "phosphor",
   "registries": {
+    "@shadercn": "https://shadercn.run/r/{name}.json",
     "@pdfcn": "https://www.pdfcn.dev/r/{name}.json",
     "@editorcn": "https://editorcn.vercel.app/r/{name}.json"
   },
