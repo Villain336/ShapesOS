@@ -13,6 +13,7 @@ import {
   Trash2,
   Loader2,
   ArrowLeft,
+  Download,
 } from "lucide-react";
 
 const UniverEmbed = dynamic(() => import("@/components/office/UniverEmbed"), {
@@ -183,6 +184,23 @@ export function OfficeClient({ initialDocs, openId }: { initialDocs: DocSummary[
             <ArrowLeft className="h-4 w-4" /> All docs
           </button>
           <div className="flex items-center gap-2">
+            {openDoc.kind === "sheet" ? (
+              <a
+                href={`/api/office/docs/${openDoc.id}/export?format=csv`}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-[13px] font-medium text-stone-700 hover:bg-stone-50"
+              >
+                <Download className="h-4 w-4" />
+                Export CSV
+              </a>
+            ) : openDoc.kind === "doc" ? (
+              <a
+                href={`/api/office/docs/${openDoc.id}/export?format=pdf`}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-[13px] font-medium text-stone-700 hover:bg-stone-50"
+              >
+                <Download className="h-4 w-4" />
+                Export PDF
+              </a>
+            ) : null}
             <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${meta.badge}`}>
               <meta.icon className="h-3 w-3" /> {meta.label} · v{openDoc.version}
             </span>

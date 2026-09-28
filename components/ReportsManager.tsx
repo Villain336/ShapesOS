@@ -62,6 +62,7 @@ export default function ReportsManager({ initialTemplates, brandKits, projects }
   const [notice, setNotice] = useState<string | null>(null);
   const [history, setHistory] = useState<Report[]>([]);
   const [historyFor, setHistoryFor] = useState<string | null>(null);
+  const [openingDoc, setOpeningDoc] = useState(false);
 
   const selected = templates.find((t) => t.id === selectedId) ?? null;
 
@@ -191,6 +192,30 @@ export default function ReportsManager({ initialTemplates, brandKits, projects }
       setError(e instanceof Error ? e.message : "Generation failed");
     } finally {
       setGenerating(false);
+    }
+  }
+
+  async function openInDocs() {
+    const id = selectedId === "new" ? null : selectedId;
+    if (!id) {
+      setError("Save the template before opening in Docs");
+      return;
+    }
+    setOpeningDoc(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/office/docs/from-report-template", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ templateId: id }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Open in Docs failed");
+      window.location.href = `/dashboard/office?open=${encodeURIComponent(data.doc.id)}`;
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Open in Docs failed");
+    } finally {
+      setOpeningDoc(false);
     }
   }
 
@@ -326,6 +351,16 @@ export default function ReportsManager({ initialTemplates, brandKits, projects }
                   className="rounded-md border border-zinc-200 px-4 py-2 text-sm text-zinc-800 hover:bg-zinc-100 disabled:opacity-50"
                 >
                   {generating ? "Generating PDF…" : "Generate PDF now"}
+                </button>
+              )}
+              {selectedId !== "new" && (
+                <button
+                  onClick={openInDocs}
+                  disabled={openingDoc}
+                  className="rounded-md border border-zinc-200 px-4 py-2 text-sm text-zinc-800 hover:bg-zinc-100 disabled:opacity-50"
+                  title="Open this template as an editable Univer document"
+                >
+                  {openingDoc ? "Opening…" : "Open in Docs"}
                 </button>
               )}
               {selectedId !== "new" && (

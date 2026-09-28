@@ -84,29 +84,48 @@ export function buildSheetSnapshot(input: SheetGridInput): IWorkbookData {
 // Docs
 // ---------------------------------------------------------------------------
 
+/** A paragraph with optional bold ranges and heading level (0 = body). */
+export interface DocParagraphInput {
+  text: string;
+  /** [start, end) char offsets into text that render bold. */
+  boldRanges?: Array<[number, number]>;
+  headingLevel?: 0 | 1 | 2 | 3;
+}
+
 export interface DocTextInput {
   title: string;
-  /** Paragraphs of plain text; empty strings become blank lines. */
-  paragraphs: string[];
+  /** Paragraphs of plain text or styled paragraph inputs. */
+  paragraphs: Array<string | DocParagraphInput>;
   /** Optional heading for the first paragraph. */
   heading?: string;
 }
 
 /**
- * Build a minimal IDocumentData from plain paragraphs. Univer's dataStream
- * terminates every paragraph with \r\n; paragraphs carry startIndex offsets.
+ * Build a minimal IDocumentData from paragraphs. Univer's dataStream
+ * terminates every paragraph with \r\n; paragraphs carry startIndex offsets,
+ * heading ids (heading1..3), and bold text runs.
  */
 export function buildDocSnapshot(input: DocTextInput): IDocumentData {
   const title = input.title.trim() || "Untitled document";
-  const paras = input.heading ? [input.heading, "", ...input.paragraphs] : input.paragraphs;
+  const norm: DocParagraphInput[] = input.paragraphs.map((p) =>
+    typeof p === "string" ? { text: p } : p,
+  );
+  const paras = input.heading ? [{ text: input.heading, headingLevel: 1 as const }, { text: "" }, ...norm] : norm;
 
   let offset = 0;
-  const paragraphs = paras.map((p, i) => {
+  const paragraphs: Array<{ startIndex: number; paragraphId: string; paragraphStyle?: { headingId: string } }> = [];
+  const textRuns: Array<{ st: number; ed: number; ts: { bl: number } }> = [];
+  for (let i = 0; i < paras.length; i++) {
+    const p = paras[i];
     const startIndex = offset;
-    offset += p.length + 2; // + "\r\n"
-    return { startIndex, paragraphId: `p${i}` };
-  });
-  const dataStream = paras.map((p) => `${p}\r\n`).join("");
+    const style = p.headingLevel ? { headingId: `heading${p.headingLevel}` } : undefined;
+    paragraphs.push(style ? { startIndex, paragraphId: `p${i}`, paragraphStyle: style } : { startIndex, paragraphId: `p${i}` });
+    for (const [s, e] of p.boldRanges ?? []) {
+      if (e > s) textRuns.push({ st: startIndex + s, ed: startIndex + Math.min(e, p.text.length), ts: { bl: 1 } });
+    }
+    offset += p.text.length + 2; // + "\r\n"
+  }
+  const dataStream = paras.map((p) => `${p.text}\r\n`).join("");
 
   return {
     id: cuidish("doc"),
@@ -116,7 +135,7 @@ export function buildDocSnapshot(input: DocTextInput): IDocumentData {
     body: {
       dataStream,
       paragraphs,
-      textRuns: [],
+      textRuns,
     },
   } as IDocumentData;
 }
