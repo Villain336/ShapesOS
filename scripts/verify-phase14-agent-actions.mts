@@ -159,6 +159,35 @@ async function main() {
   check("draft-creator executes directly", draft.outcome === "executed");
   check("draft-creator wrote an audit log", executeCalls === 1);
 
+  // ---- auto path sends FULL args (redaction is storage/logs only) ----
+  executeCalls = 0;
+  recorded.length = 0;
+  const longBody = "z".repeat(800);
+  await agentInvokeAction({
+    workspaceId: WS, appKey: "gmail", toolName: "GMAIL_CREATE_DRAFT",
+    args: { to: "x@y.z", api_key: "sk-live", body: longBody }, invokedBy: "test-agent", http: mockHttp,
+  });
+  const sentArgs = (recorded.find((r) => String(r.path).startsWith("/tools/execute/"))?.body as Record<string, unknown> | undefined)?.arguments as Record<string, unknown> | undefined;
+  check("auto: full args reach the tool (no redaction)", sentArgs?.api_key === "sk-live", String(sentArgs?.api_key));
+  check("auto: non-sensitive long value not truncated", String(sentArgs?.body).length === 800);
+  const draftLogs = await withWorkspaceScope(WS, (tx) =>
+    tx.composioActionLog.findMany({ where: { workspaceId: WS, toolName: "GMAIL_CREATE_DRAFT" } }),
+  );
+  const lastArgs = ((draftLogs[draftLogs.length - 1]?.argsSummary ?? {}) as Record<string, unknown>);
+  check("auto: stored log summary redacts the secret", lastArgs.api_key === "[redacted]");
+  check("auto: stored log summary truncates long values", String(lastArgs.body).length <= 121);
+
+  // ---- auto path refuses a literal [redacted] placeholder ----
+  executeCalls = 0;
+  let placeholderThrew = false;
+  try {
+    await agentInvokeAction({
+      workspaceId: WS, appKey: "gmail", toolName: "GMAIL_CREATE_DRAFT",
+      args: { to: "x@y.z", api_key: "[redacted]" }, invokedBy: "test-agent", http: mockHttp,
+    });
+  } catch (e) { placeholderThrew = /redacted/.test((e as Error).message); }
+  check("auto: [redacted] placeholder refuses execution", placeholderThrew && executeCalls === 0);
+
   // ---- write is gated: propose, never execute ----
   executeCalls = 0;
   const write = await agentInvokeAction({

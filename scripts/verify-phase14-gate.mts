@@ -1,7 +1,9 @@
 // Marketr — Phase 14 slice 3 verification: the approval gate.
 //
 // Battery (fixture-based, DB-backed against the local durable DB):
-//   redact: secrets never land in stored args; long strings truncated
+//   redact: secrets never land in stored args; non-sensitive values stored
+//     full-length; truncation happens only in summary/log views
+//   fail-closed: execution refuses any stored "[redacted]" placeholder
 //   summarize: plain-language per slug + generic fallback
 //   conservative floor: overrides may escalate, never downgrade below the
 //     derived floor; draft-creator + explicit high => not auto-executable
@@ -15,7 +17,7 @@
 // Run: npx tsx scripts/verify-phase14-gate.mts
 // Requires: DATABASE_URL (local durable Postgres).
 
-import { redactArgs, summarizeArgs } from "../lib/integrations/actions/redact";
+import { containsRedactedPlaceholder, redactArgs, summarizeArgs } from "../lib/integrations/actions/redact";
 import { summarizeAction } from "../lib/integrations/actions/summarize";
 import {
   classifyAction,
@@ -37,11 +39,13 @@ const WS = "00000000-0000-0000-0000-000000000014";
 const mockHttp: ComposioHttp = {
   async request<T>(path: string, init?: { method?: string; body?: unknown }): Promise<T> {
     if (path.startsWith("/tools/execute/")) {
+      executeCalls++;
       return { successful: true, data: { message_id: "m-1" }, error: null } as T;
     }
     throw new Error(`unexpected path ${path}`);
   },
 };
+let executeCalls = 0;
 
 let pass = 0, fail = 0;
 function check(name: string, cond: boolean, extra?: string) {
@@ -79,7 +83,12 @@ async function main() {
   check("redact: api_key removed", red.api_key === "[redacted]");
   check("redact: nested token removed", (red.nested as Record<string, unknown>).token === "[redacted]");
   check("redact: plain field kept", red.to === "a@b.com");
-  check("redact: long string truncated", String(red.body).length <= 501);
+  check("redact: non-sensitive long string NOT truncated (full-length storage)", String(red.body).length === 600);
+  const sum = summarizeArgs({ password: "hunter2", body: "x".repeat(600) });
+  check("summarize: secret stays redacted in log view", sum.password === "[redacted]");
+  check("summarize: long string truncated only in log view", String(sum.body).length <= 121);
+  check("placeholder: detects nested", containsRedactedPlaceholder({ a: [{ b: "[redacted]" }] }) === true);
+  check("placeholder: clean args pass", containsRedactedPlaceholder({ a: "ok", n: 1 }) === false);
 
   // ── summaries ──
   const s1 = summarizeAction("gmail", "GMAIL_SEND_EMAIL", { to: "a@b.com", subject: "Hi" });
@@ -102,9 +111,11 @@ async function main() {
   check("floor: read high-override blocks auto", d5.tier === "high" && d5.autoExecutable === false);
 
   // ── propose -> approve -> execute (mock http) ──
+  // NOTE: happy-path args carry no secrets — a secret-bearing approval
+  // refuses execution fail-closed (tested below), so it cannot share this path.
   const p1 = await proposeAction({
     workspaceId: WS, appKey: "gmail", toolName: "GMAIL_SEND_EMAIL",
-    args: { to: "a@b.com", subject: "Hi", api_key: "sk-x" }, proposedBy: "user-1",
+    args: { to: "a@b.com", subject: "Hi" }, proposedBy: "user-1",
   });
   check("propose: pending", p1.approval.status === "pending");
   check("propose: tier medium", p1.classified.tier === "medium");
@@ -133,6 +144,37 @@ async function main() {
     tx.composioActionLog.findMany({ where: { workspaceId: WS, approvalId: p1.approval.id } }),
   );
   check("execute: action log written", logs1.length === 1 && logs1[0].status === "success");
+
+  // ── fail-closed: stored [redacted] placeholder refuses execution ──
+  executeCalls = 0;
+  const pRed = await proposeAction({
+    workspaceId: WS, appKey: "gmail", toolName: "GMAIL_SEND_EMAIL",
+    args: { to: "a@b.com", subject: "Hi", password: "hunter2" }, proposedBy: "user-1",
+  });
+  check(
+    "fail-closed: secret stored redacted",
+    ((await withWorkspaceScope(WS, (tx) =>
+      tx.composioActionApproval.findFirst({ where: { id: pRed.approval.id, workspaceId: WS } }),
+    ))!.proposedArgs as Record<string, unknown>).password === "[redacted]",
+  );
+  await decideApproval({ workspaceId: WS, approvalId: pRed.approval.id, decision: "approved", decidedBy: "user-1" });
+  let refused = false;
+  try {
+    await executeApproved({ workspaceId: WS, approvalId: pRed.approval.id, executedBy: "user-1", http: mockHttp });
+  } catch (e) {
+    refused = /redacted/.test((e as Error).message);
+    console.log(`       refusal: ${(e as Error).message.slice(0, 100)}…`);
+  }
+  check("fail-closed: execution with placeholder refused", refused);
+  check("fail-closed: no Composio call made", executeCalls === 0);
+  const gotRed = await withWorkspaceScope(WS, (tx) =>
+    tx.composioActionApproval.findFirst({ where: { id: pRed.approval.id, workspaceId: WS } }),
+  );
+  check("fail-closed: approval NOT consumed (still approved)", gotRed!.status === "approved");
+  const logsRed = await withWorkspaceScope(WS, (tx) =>
+    tx.composioActionLog.findMany({ where: { workspaceId: WS, approvalId: pRed.approval.id } }),
+  );
+  check("fail-closed: no execution log written", logsRed.length === 0);
 
   // ── deny with reason; denied can never execute ──
   const p2 = await proposeAction({

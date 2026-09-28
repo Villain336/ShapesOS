@@ -22,7 +22,7 @@ import {
   type RiskTier,
 } from "@/lib/integrations/actions/risk";
 import { getToolTierOverrides, requireConnectedEntity } from "@/lib/integrations/actions/connections";
-import { redactArgs, summarizeArgs } from "@/lib/integrations/actions/redact";
+import { containsRedactedPlaceholder, REDACTED_PLACEHOLDER, redactArgs, summarizeArgs } from "@/lib/integrations/actions/redact";
 import { summarizeAction } from "@/lib/integrations/actions/summarize";
 import { describeBulk, extractBulkItems } from "@/lib/integrations/actions/bulk";
 import { getComposioBudgetWarning, meterComposioCall, bumpPlatformComposioCalls } from "@/lib/integrations/actions/budget";
@@ -293,6 +293,20 @@ export async function executeApproved(input: ExecuteApprovedInput) {
     );
   }
   const proposedArgs = (approval.proposedArgs as Record<string, unknown>) ?? {};
+  // Fail closed (Tico, 2026-09-28): the gate stores secrets redacted, so a
+  // stored placeholder can never be executed — running a tool with the
+  // literal "[redacted]" string where a credential was would silently
+  // misfire. Refuse BEFORE the atomic claim so the approval stays
+  // "approved" and can be fixed via edit-before-approve (or denied).
+  // Credential-bearing tools need the encrypted-secrets path (planned).
+  if (containsRedactedPlaceholder(proposedArgs)) {
+    throw new Error(
+      `Cannot execute: stored arguments contain the ${REDACTED_PLACEHOLDER} placeholder — ` +
+        "the gate stores secrets redacted and will not run a tool with placeholder values. " +
+        "Use edit-before-approve to remove the secret-bearing argument, or deny this approval. " +
+        "Credential-bearing tools require the planned encrypted-secrets path.",
+    );
+  }
   const bulk = extractBulkItems(proposedArgs);
   if (bulk && input.confirmedBulkCount !== bulk.count) {
     throw new Error(

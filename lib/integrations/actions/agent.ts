@@ -29,7 +29,7 @@ import {
   logAction,
   proposeAction,
 } from "@/lib/integrations/actions/gate";
-import { redactArgs } from "@/lib/integrations/actions/redact";
+import { containsRedactedPlaceholder, REDACTED_PLACEHOLDER } from "@/lib/integrations/actions/redact";
 import { getComposioBudgetWarning } from "@/lib/integrations/actions/budget";
 
 export interface AgentInvokeInput {
@@ -92,11 +92,22 @@ export async function agentInvokeAction(input: AgentInvokeInput): Promise<AgentI
     toolName: input.toolName,
   });
   try {
+    // Fail closed (Tico, 2026-09-28): redaction is for storage/logs, never
+    // for the live call — and a "[redacted]" placeholder value must never
+    // reach a tool. The call carries the FULL args; logAction redacts the
+    // stored summary (summarizeArgs).
+    if (containsRedactedPlaceholder(input.args)) {
+      throw new Error(
+        `Cannot execute: arguments contain the ${REDACTED_PLACEHOLDER} placeholder — ` +
+          "redaction is for storage/logs only and will not be sent to a tool. " +
+          "Re-propose the action with real argument values.",
+      );
+    }
     const res = await executeComposioTool(
       {
         slug: input.toolName,
         connectedAccountId,
-        args: redactArgs(input.args),
+        args: input.args,
       },
       input.http,
     );
