@@ -7,6 +7,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { ReactNode } from "react";
+import { OpenInSheetsButton } from "@/components/office/OpenInSheetsButton";
 import {
   CalendarClock,
   CheckCircle2,
@@ -199,6 +200,22 @@ export function SocialApp() {
               />
             </div>
             <span className="ml-auto text-[12px] text-stone-500">{filtered.length} posts</span>
+            {filtered.length > 0 && (
+              <OpenInSheetsButton
+                title="Content calendar"
+                headers={["Scheduled for", "Post", "Channels", "Type", "Created"]}
+                rows={filtered.map((p) => [
+                  p.date ?? "—",
+                  p.content ?? "—",
+                  p.channels.join(", ") || "—",
+                  p.type,
+                  p.createdAt ?? "—",
+                ])}
+                sourceRef="social:calendar"
+                sheetName="Calendar"
+                className={btnSecondary}
+              />
+            )}
           </div>
           {loading ? (
             <div className="p-6 text-[13px] text-stone-500">Loading posts…</div>

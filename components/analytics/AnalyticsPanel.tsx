@@ -15,6 +15,7 @@ import {
   Users,
   Eye,
 } from "lucide-react";
+import { OpenInSheetsButton } from "@/components/office/OpenInSheetsButton";
 
 interface Stats {
   pageviews: number;
@@ -46,6 +47,21 @@ function fmtDuration(seconds: number): string {
   if (seconds < 60) return `${Math.round(seconds)}s`;
   if (seconds < 3600) return `${Math.round(seconds / 60)}m`;
   return `${(seconds / 3600).toFixed(1)}h`;
+}
+
+/** Flatten stats + daily series into sheet rows (blank row separates sections). */
+function sheetRows(stats: Stats, series: Bucket[]): (string | number | null)[][] {
+  const rows: (string | number | null)[][] = [
+    ["Pageviews", stats.pageviews],
+    ["Visitors", stats.visitors],
+    ["Visits", stats.visits],
+    ["Bounces", stats.bounces],
+    ["Time on site (s)", Math.round(stats.totaltime)],
+    [],
+    ["Date", "Pageviews"],
+  ];
+  for (const b of series) rows.push([b.x, b.y]);
+  return rows;
 }
 
 function Sparkline({ series }: { series: Bucket[] }) {
@@ -111,7 +127,7 @@ export function AnalyticsPanel() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <div className="flex rounded-lg border border-stone-200 bg-white p-0.5">
           {PERIODS.map((p) => (
             <button
@@ -128,6 +144,15 @@ export function AnalyticsPanel() {
             </button>
           ))}
         </div>
+        {state.kind === "ready" && (
+          <OpenInSheetsButton
+            title={`Analytics — last ${days} days`}
+            headers={["Metric", "Value"]}
+            rows={sheetRows(state.stats, state.series)}
+            sourceRef="analytics:overview"
+            sheetName="Overview"
+          />
+        )}
       </div>
 
       {state.kind === "loading" && (

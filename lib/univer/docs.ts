@@ -101,6 +101,7 @@ export async function getUniverDoc(
 
 export interface ListUniverDocsOptions {
   kind?: UniverDocKind;
+  sourceRef?: string;
   limit?: number;
 }
 
@@ -115,6 +116,7 @@ export async function listUniverDocs(
       where: {
         workspaceId,
         ...(opts.kind && isUniverDocKind(opts.kind) ? { kind: opts.kind } : {}),
+        ...(opts.sourceRef ? { sourceRef: opts.sourceRef } : {}),
       },
       orderBy: { updatedAt: "desc" },
       take: limit,

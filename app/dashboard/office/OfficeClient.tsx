@@ -3,7 +3,7 @@
 
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import {
   FileSpreadsheet,
@@ -70,12 +70,13 @@ function fmtDate(iso: string): string {
   }
 }
 
-export function OfficeClient({ initialDocs }: { initialDocs: DocSummary[] }) {
+export function OfficeClient({ initialDocs, openId }: { initialDocs: DocSummary[]; openId?: string }) {
   const [docs, setDocs] = useState<DocSummary[]>(initialDocs);
   const [openDoc, setOpenDoc] = useState<FullDoc | null>(null);
   const [loading, setLoading] = useState(false);
   const [creating, setCreating] = useState<string | null>(null);
   const [notice, setNotice] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
+  const autoOpened = useRef(false);
 
   const flash = (kind: "ok" | "err", text: string) => {
     setNotice({ kind, text });
@@ -124,6 +125,16 @@ export function OfficeClient({ initialDocs }: { initialDocs: DocSummary[] }) {
       setLoading(false);
     }
   }
+
+  // Deep link: /dashboard/office?open=<id> (from "Open as sheet" buttons).
+  useEffect(() => {
+    if (!autoOpened.current && openId) {
+      autoOpened.current = true;
+      void open(openId);
+    }
+    // open is stable (no deps); run once on mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function handleSave(snapshot: unknown) {
     if (!openDoc) return;

@@ -7,6 +7,7 @@
 // (CAN-SPAM warning shown before export).
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { OpenInSheetsButton } from "@/components/office/OpenInSheetsButton";
 import {
   Users,
   Plus,
@@ -478,6 +479,28 @@ export function ProspectsApp() {
             )}
 
             {/* Prospect table */}
+            <div className="mb-2 flex items-center justify-between">
+              <p className="text-[12px] text-slate-500">{prospects.length} prospects</p>
+              {prospects.length > 0 && (
+                <OpenInSheetsButton
+                  title={`Prospect list — ${selected?.name ?? "all"}`}
+                  headers={["Company", "Contact", "Title", "Email", "Phone", "Website", "Score", "Status"]}
+                  rows={prospects.map((p) => [
+                    p.company ?? "—",
+                    p.name ?? "—",
+                    p.title ?? "—",
+                    p.email ?? "—",
+                    p.phone ?? "—",
+                    p.website ?? "—",
+                    p.score,
+                    p.status,
+                  ])}
+                  sourceRef="prospects:list"
+                  sheetName="Prospects"
+                  className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-[12px] font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                />
+              )}
+            </div>
             <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
               <table className="w-full text-left text-xs">
                 <thead>

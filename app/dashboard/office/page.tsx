@@ -15,7 +15,11 @@ export const metadata = {
   description: "Sheets, docs and decks your agents and reports produce — editable, stored by Marketr.",
 };
 
-export default async function OfficePage() {
+export default async function OfficePage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ open?: string }>;
+}) {
   const user = await requireUser();
   if (!user) redirect("/login");
   const workspace = await getOrCreateWorkspace(user.id, user.email);
@@ -23,6 +27,7 @@ export default async function OfficePage() {
   if (!membership) redirect("/dashboard");
 
   const docs = await listUniverDocs(workspace.id, { limit: 100 });
+  const openId = (await searchParams)?.open;
 
   return (
     <div className="flex h-full flex-col gap-4 bg-[#FAFAF7] p-4 md:p-6">
@@ -33,7 +38,7 @@ export default async function OfficePage() {
           you or your agents, stored by Marketr, editable right here.
         </p>
       </div>
-      <OfficeClient initialDocs={JSON.parse(JSON.stringify(docs))} />
+      <OfficeClient initialDocs={JSON.parse(JSON.stringify(docs))} openId={openId} />
     </div>
   );
 }
