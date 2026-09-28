@@ -97,7 +97,19 @@ describe("checkOutputAgainstRules — seeded violations", () => {
     assert.equal(v!.severity, "block");
   });
 
-  it("never emits violations for tone rules", () => {
+  it("tone rules flag (never block) even when stored as severity=block", () => {
+    const { violations } = checkOutputAgainstRules("Great question, let's dig in", [
+      rule({ id: "r-tone-block", kind: "tone", pattern: "^Great question", severity: "block" }),
+    ]);
+    assert.equal(violations.length, 1, "tone match must be flagged");
+    assert.equal(violations[0].severity, "flag", "block on tone downgrades to flag");
+    assert.doesNotThrow(
+      () => enforceAgainstRules(violations),
+      "tone violations must never refuse delivery",
+    );
+  });
+
+  it("tone rules stay clean when the pattern does not match", () => {
     const { violations } = checkOutputAgainstRules(
       "anything at all",
       SEEDED.filter((r) => r.id === "r-tone"),

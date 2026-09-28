@@ -524,6 +524,10 @@ model Workspace {
   styleRules              StyleRule[]
   contentRecords          ContentRecord[]
   personaProfiles         PersonaProfile[]
+  // Phase 13C: clipper (OpusClip-style video clipping) back-relations.
+  clipSources             ClipSource[]
+  clips                   Clip[]
+  clipJobs                ClipJob[]
   // Phase 10 (intelligence depth): owned data assets back-relations.
   dataSources             DataSource[]
   serpVendorConfigs       SerpVendorConfig[]
@@ -7932,4 +7936,83 @@ model WorkspaceFlagOverride {
   @@unique([workspaceId, key])
   @@index([workspaceId])
   @@map("workspace_flag_overrides")
+}
+
+// ============================================================
+// Phase 13C: Clipper (OpusClip-style video clipping) — data model.
+// All workspace-scoped, RLS-isolated (migration *_phase13c_clipper).
+// Additive only — existing models untouched.
+// ============================================================
+
+// A long-form video ingested for clipping ("upload" = fileRef points at
+// stored media; "url" = sourceUrl points at the remote original).
+model ClipSource {
+  id               String     @id @default(cuid()) @map("id")
+  workspaceId      String     @map("workspace_id")
+  workspace        Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  origin           String     @map("origin") // "upload" | "url"
+  title            String     @map("title")
+  sourceUrl        String?    @map("source_url")
+  fileRef          String?    @map("file_ref")
+  durationSec      Float?     @map("duration_sec")
+  transcriptStatus String     @default("pending") @map("transcript_status") // pending|processing|ready|failed
+  transcript       Json?      @map("transcript") // { words: [{w,start,end}], text }
+  createdAt        DateTime   @default(now()) @map("created_at")
+
+  clips            Clip[]
+  jobs             ClipJob[]
+
+  @@index([workspaceId, createdAt])
+  @@map("clip_sources")
+}
+
+// A single generated clip candidate: time window + virality score +
+// caption styling + render + approval/delivery state.
+model Clip {
+  id            String     @id @default(cuid()) @map("id")
+  workspaceId   String     @map("workspace_id")
+  workspace     Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  sourceId      String     @map("source_id")
+  source        ClipSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  startSec      Float      @map("start_sec")
+  endSec        Float      @map("end_sec")
+  viralityScore Float      @map("virality_score")
+  // Why it scored what it did: [{label, detail, weight}, ...].
+  scoreReasons  Json       @default("[]") @map("score_reasons")
+  // Opening line of the segment (hook display in the UI).
+  hookText      String?    @map("hook_text") @db.Text
+  // Locked brand-kit caption style: {font, size, position, colors}.
+  captionStyle  Json       @default("{}") @map("caption_style")
+  // Rendered captions: { segments: [{text, start, end}], style }.
+  captions      Json?      @map("captions")
+  status        String     @default("draft") @map("status") // draft|approved|queued|posted|failed
+  renderStatus  String     @default("pending") @map("render_status") // pending|processing|ready|failed
+  outputRef     String?    @map("output_ref")
+  // Postiz draft id once handed off (draft-first, never auto-post).
+  postizRef     String?    @map("postiz_ref")
+  createdAt     DateTime   @default(now()) @map("created_at")
+
+  @@index([workspaceId, status])
+  @@index([sourceId])
+  @@map("clips")
+}
+
+// Async pipeline work for the clipper: transcribe / generate / render.
+// Progress 0..1; payload carries kind-specific inputs/outputs.
+model ClipJob {
+  id          String      @id @default(cuid()) @map("id")
+  workspaceId String      @map("workspace_id")
+  workspace   Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  sourceId    String?     @map("source_id")
+  source      ClipSource? @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  kind        String      @map("kind") // transcribe|generate|render
+  status      String      @default("pending") @map("status") // pending|processing|done|failed
+  progress    Float       @default(0) @map("progress")
+  payload     Json        @default("{}") @map("payload")
+  error       String?     @map("error")
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
+
+  @@index([workspaceId, status])
+  @@map("clip_jobs")
 }

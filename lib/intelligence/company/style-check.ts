@@ -4,11 +4,17 @@
 //   ban        → the phrase/regex must NOT appear
 //   require    → the phrase must appear
 //   disclaimer → compliance text must appear
-//   tone       → guidance (included in prompts; not machine-checkable)
+//   tone       → guidance: machine-checked, but NEVER machine-enforced —
+//                a severity=block tone rule is DOWNGRADED to flag (flagged
+//                for user review, never refused). Product decision 2026-09-27.
 //
 // Severity: "block" = refuse delivery, "flag" = warn. Fail-closed:
 // enforceStyleRules() throws on block violations — the delivery paths catch
-// it and deliver a refusal instead of the violating text.
+// it and deliver a refusal instead of the violating text. Hard ban rules on
+// banned words/phrases stay blocking; only tone rules are exempt.
+//
+// Ban-pattern matching is whole-word: plain phrases are wrapped in \b…\b
+// word boundaries, so "ass" never matches "class". Product decision 2026-09-27.
 
 import { withWorkspaceScope } from "@/lib/substrate/memory/rls";
 import type { StyleRule } from "@prisma/client";
@@ -28,7 +34,8 @@ const REGEX_META = /[\\^$.*+?()[\]{}|]/;
 
 /**
  * Compile a rule pattern. Plain phrases (no regex metacharacters) are
- * wrapped in \b…\b word boundaries so "cheap" doesn't match "cheaper".
+ * wrapped in \b…\b word boundaries so "cheap" doesn't match "cheaper"
+ * (whole-word semantics, product decision 2026-09-27).
  * Explicit regexes pass through as-is. Always case-insensitive.
  */
 export function compilePattern(pattern: string): RegExp {
@@ -55,9 +62,13 @@ export function checkRule(rule: StyleRule, text: string): StyleViolation | null 
         ? null
         : { ruleId: rule.id, kind: rule.kind, pattern: rule.pattern, severity: rule.severity };
     case "tone":
+      // Tone is guidance: machine-checked, but a severity=block tone rule is
+      // DOWNGRADED to flag — flagged for user review, never refused delivery.
+      // (Product decision 2026-09-27: tone rules flag, they don't block.)
+      return present
+        ? { ruleId: rule.id, kind: rule.kind, pattern: rule.pattern, severity: "flag" }
+        : null;
     default:
-      // Tone is guidance, not machine-checkable — it travels in the prompt,
-      // never blocks delivery.
       return null;
   }
 }
@@ -173,6 +184,10 @@ export function renderStyleRulesSection(rules: StyleRule[]): string {
     "## HARD CONSTRAINTS — STYLE RULES (never violate; these override everything below)",
   ];
   for (const rule of rules) {
+    // Tone rules never block: render the effective severity so the prompt is
+    // honest about what the enforcer will do.
+    const effectiveSeverity =
+      rule.kind === "tone" && rule.severity === "block" ? "flag" : rule.severity;
     const replacement =
       rule.kind === "ban" && rule.replacement
         ? ` — say "${rule.replacement}" instead`
@@ -182,7 +197,7 @@ export function renderStyleRulesSection(rules: StyleRule[]): string {
         ? ` (${rule.replacement})`
         : "";
     lines.push(
-      `- [${rule.kind}/${rule.severity}] "${rule.pattern}"${replacement}${context}`,
+      `- [${rule.kind}/${effectiveSeverity}] "${rule.pattern}"${replacement}${context}`,
     );
   }
   return lines.join("\n");

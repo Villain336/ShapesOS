@@ -9,7 +9,7 @@ import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
 import type { ComponentType } from "react";
 import { useState } from "react";
-import { Mail, Paintbrush, Megaphone, RefreshCw, Brain, Target, BookOpen, Inbox, Share2, LayoutDashboard } from "lucide-react";
+import { Mail, Paintbrush, Megaphone, RefreshCw, Brain, Target, BookOpen, Inbox, Share2, LayoutDashboard, Scissors } from "lucide-react";
 import {
   ChartBar,
   Bell,
@@ -70,6 +70,8 @@ const NAV_SECTIONS: {
       { href: "/dashboard/mail", label: "Direct Mail", icon: Mail },
       // Phase 12: social publishing via the Postiz sidecar (raw REST).
       { href: "/dashboard/social", label: "Social", icon: Share2 },
+      // Phase 13C: the clipper — long videos → scored clip drafts → Postiz drafts.
+      { href: "/dashboard/clips", label: "Clips", icon: Scissors },
       // Phase 5 SAFETY: media buying command center (pools, approvals, kill switches).
       { href: "/dashboard/media", label: "Media", icon: Megaphone },
       // Phase 6: authority & relevance command center (outreach, PR, listings,

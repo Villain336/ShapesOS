@@ -7,6 +7,13 @@
 //   user|onboarding|consolidation. Checked on every output pre-delivery,
 //   fail-closed (block = refuse delivery, flag = warn).
 //
+// Product decisions 2026-09-27:
+//   (1) tone rules never block: severity=block on a tone rule is downgraded
+//       to flag (flagged for user review, never refused). Hard ban rules on
+//       banned words/phrases stay blocking.
+//   (2) ban-pattern matching is whole-word: plain phrases are wrapped in
+//       \b…\b, so "ass" never matches "class".
+//
 // Acceptance: seeded violation battery → checkOutput/enforce catches 100%.
 //
 // Status: the rule-contract checks RUN (tenant isolation, proposal
@@ -121,16 +128,16 @@ export const VIOLATION_BATTERY: BatteryCase[] = [
     expectBlocked: false,
   },
   {
-    name: "tone-sycophancy-blocked",
+    name: "tone-sycophancy-flagged",
     rule: {
       kind: "tone",
       pattern: "^Great question",
-      severity: "block",
+      severity: "block", // stored block, but tone rules downgrade to flag
       source: "consolidation",
     },
     output: "Great question! Here's why you're absolutely right to ask.",
     expectViolation: true,
-    expectBlocked: true,
+    expectBlocked: false, // tone never blocks — flagged for review, let through
   },
   {
     name: "tone-guidance-clean-output",
@@ -152,11 +159,25 @@ export const VIOLATION_BATTERY: BatteryCase[] = [
     expectBlocked: false,
   },
   {
-    name: "ban-substring-not-whole-word-still-caught",
+    name: "ban-substring-whole-word-no-match",
     rule: { kind: "ban", pattern: "crypto", severity: "flag", source: "user" },
     output: "Avoid unregulated cryptocurrency schemes.",
-    expectViolation: true,
+    expectViolation: false, // whole-word: "crypto" does not match "cryptocurrency"
     expectBlocked: false,
+  },
+  {
+    name: "ban-ass-not-in-class",
+    rule: { kind: "ban", pattern: "ass", severity: "block", source: "user" },
+    output: "The class was excellent.",
+    expectViolation: false, // whole-word: "ass" must not match "class"
+    expectBlocked: false,
+  },
+  {
+    name: "ban-whole-word-positive",
+    rule: { kind: "ban", pattern: "scam", severity: "block", source: "user" },
+    output: "This is a total scam, avoid it.",
+    expectViolation: true, // whole word present → still caught and blocking
+    expectBlocked: true,
   },
   {
     name: "pinned-rule-survives-learner-proposal",
