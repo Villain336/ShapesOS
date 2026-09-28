@@ -172,7 +172,7 @@ export function OfficeClient({ initialDocs, openId }: { initialDocs: DocSummary[
 
   if (openDoc) {
     const meta = KIND_META[openDoc.kind] ?? KIND_META.sheet;
-    const editable = openDoc.kind === "sheet" || openDoc.kind === "doc";
+    const editable = openDoc.kind === "sheet" || openDoc.kind === "doc" || openDoc.kind === "slide";
     return (
       <div className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
@@ -210,18 +210,18 @@ export function OfficeClient({ initialDocs, openId }: { initialDocs: DocSummary[
         {editable ? (
           <UniverEmbed
             key={openDoc.id}
-            kind={openDoc.kind as "sheet" | "doc"}
+            kind={openDoc.kind as "sheet" | "doc" | "slide"}
             snapshot={openDoc.snapshot}
             onSave={handleSave}
           />
         ) : (
-          <div className="rounded-lg border border-stone-200 bg-white p-8 text-center">
-            <Presentation className="mx-auto h-8 w-8 text-stone-300" />
-            <p className="mt-2 text-[13px] text-stone-500">
-              Deck editing lands with the slide surface (Phase 14 slice 9). The snapshot is
-              stored and versioned.
-            </p>
-          </div>
+          <UniverEmbed
+            key={openDoc.id}
+            kind="slide"
+            snapshot={openDoc.snapshot as unknown as Record<string, unknown>}
+            height={560}
+            onSave={handleSave}
+          />
         )}
         {notice && (
           <p className={`text-[13px] ${notice.kind === "ok" ? "text-emerald-700" : "text-red-700"}`}>

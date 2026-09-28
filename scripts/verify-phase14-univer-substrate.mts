@@ -85,7 +85,11 @@ async function main() {
   check("doc paragraph offsets accumulate", JSON.stringify(starts) === JSON.stringify([0, 19, 21, 32]), JSON.stringify(starts));
 
   const deck = buildSlideSnapshot({ title: "Pitch", slides: ["Intro", "Numbers"] });
-  check("slide minimal shape", Array.isArray((deck as { slides: unknown[] }).slides) && typeof deck.id === "string");
+  check(
+    "slide shape (real ISlideData)",
+    Array.isArray((deck as unknown as { body: { pageOrder: unknown[] } }).body.pageOrder) &&
+      typeof deck.id === "string",
+  );
 
   check("kind guard", isUniverDocKind("sheet") && isUniverDocKind("doc") && isUniverDocKind("slide") && !isUniverDocKind("pdf"));
 

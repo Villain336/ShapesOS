@@ -6,11 +6,12 @@
 // snapshots come from FWorkbook.save()/FDocument.save() client-side and go
 // through the same validateSnapshot() gate on the way in.
 //
-// Kinds: "sheet" (IWorkbookData), "doc" (IDocumentData), "slide"
-// (minimal slide payload — full slide embedding is slice 9).
+// Kinds: "sheet" (IWorkbookData), "doc" (IDocumentData), "slide" (ISlideData
+// via raw OSS @univerjs/slides + @univerjs/slides-ui — no slides preset exists).
 
 import type { IWorkbookData } from "@univerjs/core";
 import type { IDocumentData } from "@univerjs/core";
+import type { ISlideData } from "@univerjs/slides";
 
 export const UNIVER_DOC_KINDS = ["sheet", "doc", "slide"] as const;
 export type UniverDocKind = (typeof UNIVER_DOC_KINDS)[number];
@@ -141,31 +142,100 @@ export function buildDocSnapshot(input: DocTextInput): IDocumentData {
 }
 
 // ---------------------------------------------------------------------------
-// Slides (minimal — full embedding is slice 9)
+// Slides (real ISlideData — raw OSS @univerjs/slides + slides-ui, no preset)
 // ---------------------------------------------------------------------------
+
+/** One slide's content. Strings stay supported for the slice 6/7/8 stubs. */
+export interface SlideInput {
+  title: string;
+  /** Body text; blank lines separate paragraphs. */
+  body?: string;
+}
 
 export interface SlideDeckInput {
   title: string;
-  /** One string per slide (title/body text). */
-  slides: string[];
+  slides: Array<string | SlideInput>;
 }
 
+const SLIDE_W = 960;
+const SLIDE_H = 540;
+
 /**
- * Minimal slide payload. The v1 slide surface (slice 9) may upgrade this to
- * a real Univer slide unit; validateSnapshot() accepts this shape so docs
- * created today keep working.
+ * Build a real ISlideData deck: each slide is a page with a title textbox
+ * and a body textbox (rich text via the shared doc builder). 16:9, white
+ * background. The OSS slides UI renders this without masters/layouts.
  */
-export function buildSlideSnapshot(input: SlideDeckInput): Record<string, unknown> {
+export function buildSlideSnapshot(input: SlideDeckInput): ISlideData {
+  const title = input.title.trim() || "Untitled deck";
+  const slides: SlideInput[] = input.slides.map((s) =>
+    typeof s === "string" ? { title: s.slice(0, 120), body: s } : s,
+  );
+
+  const pages: Record<string, unknown> = {};
+  const pageOrder: string[] = [];
+  slides.forEach((s, i) => {
+    const pageId = `page_${i}`;
+    pageOrder.push(pageId);
+    const slideTitle = s.title.trim() || `Slide ${i + 1}`;
+    const bodyParas = (s.body ?? "")
+      .split("\n")
+      .map((t) => t.trim())
+      .filter((t) => t !== "");
+
+    const titleEl = `el_${i}_title`;
+    const bodyEl = `el_${i}_body`;
+    pages[pageId] = {
+      id: pageId,
+      pageType: 0, // PageType.SLIDE
+      zIndex: i,
+      title: slideTitle,
+      description: "",
+      pageBackgroundFill: { rgb: "#FFFFFF" },
+      pageElements: {
+        [titleEl]: {
+          id: titleEl,
+          zIndex: 0,
+          left: 48,
+          top: 32,
+          width: SLIDE_W - 96,
+          height: 96,
+          title: "Title",
+          description: "",
+          type: 2, // PageElementType.TEXT
+          richText: {
+            rich: buildDocSnapshot({
+              title: slideTitle,
+              paragraphs: [{ text: slideTitle, headingLevel: 1, boldRanges: [[0, slideTitle.length]] }],
+            }),
+          },
+        },
+        [bodyEl]: {
+          id: bodyEl,
+          zIndex: 1,
+          left: 48,
+          top: 150,
+          width: SLIDE_W - 96,
+          height: SLIDE_H - 198,
+          title: "Body",
+          description: "",
+          type: 2, // PageElementType.TEXT
+          richText: {
+            rich: buildDocSnapshot({
+              title: slideTitle,
+              paragraphs: bodyParas.length > 0 ? bodyParas : [""],
+            }),
+          },
+        },
+      },
+    };
+  });
+
   return {
     id: cuidish("slide"),
-    title: input.title.trim() || "Untitled deck",
-    appVersion: APP_VERSION,
-    slides: input.slides.map((text, i) => ({
-      id: `slide_${i}`,
-      title: typeof text === "string" ? text.slice(0, 120) : `Slide ${i + 1}`,
-      body: typeof text === "string" ? text : "",
-    })),
-  };
+    title,
+    pageSize: { width: SLIDE_W, height: SLIDE_H },
+    body: { pages, pageOrder },
+  } as unknown as ISlideData;
 }
 
 // ---------------------------------------------------------------------------
@@ -201,8 +271,17 @@ export function validateSnapshot(kind: UniverDocKind, snapshot: unknown): Snapsh
       errors.push("doc snapshot.body.dataStream is required");
     }
   } else {
-    // slide: minimal shape (slice 9 may harden)
-    if (!Array.isArray(snapshot.slides)) errors.push("slide snapshot.slides is required");
+    // slide: real ISlideData (pageSize + body.pages); the slice 6/7/8 minimal
+    // stub shape ({ slides: [...] }) is still accepted so older docs load.
+    const slideBody = snapshot.body as Record<string, unknown> | undefined;
+    const pages = slideBody?.pages;
+    if (pages) {
+      if (!isRecord(pages) || Object.keys(pages).length === 0) {
+        errors.push("slide snapshot.body.pages must be a non-empty object");
+      }
+    } else if (!Array.isArray(snapshot.slides)) {
+      errors.push("slide snapshot needs body.pages or slides");
+    }
   }
 
   // Size guard: snapshots are JSONB; refuse absurd payloads before they hit the DB.

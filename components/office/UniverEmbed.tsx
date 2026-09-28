@@ -20,10 +20,10 @@ import "@univerjs/sheets/facade";
 import "@univerjs/docs-ui/facade";
 
 export interface UniverEmbedProps {
-  kind: "sheet" | "doc";
-  /** Initial snapshot (IWorkbookData / IDocumentData). */
+  kind: "sheet" | "doc" | "slide";
+  /** Initial snapshot (IWorkbookData / IDocumentData / ISlideData). */
   snapshot: unknown;
-  /** Called with fUnit.save() output when the user clicks Save. */
+  /** Called with the unit snapshot when the user clicks Save. */
   onSave?: (snapshot: unknown) => void | Promise<void>;
   height?: number;
 }
@@ -67,19 +67,31 @@ export default function UniverEmbed({ kind, snapshot, onSave, height = 560 }: Un
         const themes = await import("@univerjs/themes");
         const sheetsLocale = await import("@univerjs/preset-sheets-core/locales/en-US");
         const docsLocale = await import("@univerjs/preset-docs-core/locales/en-US");
-        const { Univer, LocaleType } = core;
+        const { Univer, LocaleType, UniverInstanceType } = core;
         const { UniverRenderEnginePlugin } = await import("@univerjs/engine-render");
         const { UniverUIPlugin } = await import("@univerjs/ui");
         const { UniverDocsPlugin } = await import("@univerjs/docs");
         const { UniverDocsUIPlugin } = await import("@univerjs/docs-ui");
         const { FUniver } = await import("@univerjs/core/facade");
+        // Slides locale (raw OSS package ships its own; no preset exists).
+        const slidesLocaleMod =
+          kind === "slide" ? await import("@univerjs/slides-ui/locale/en-US") : null;
+        const slidesLocale = (
+          slidesLocaleMod ? (slidesLocaleMod.default ?? slidesLocaleMod) : {}
+        ) as object;
 
         if (cancelled || !containerRef.current) return;
 
         const univer = new Univer({
           theme: brandTheme(themes.defaultTheme as Theme),
           locale: LocaleType.EN_US,
-          locales: { enUS: { ...(sheetsLocale.default as object), ...(docsLocale.default as object) } },
+          locales: {
+            enUS: {
+              ...(sheetsLocale.default as object),
+              ...(docsLocale.default as object),
+              ...slidesLocale,
+            },
+          },
         });
 
         univer.registerPlugin(UniverRenderEnginePlugin);
@@ -106,6 +118,13 @@ export default function UniverEmbed({ kind, snapshot, onSave, height = 560 }: Un
           univer.registerPlugin(sheetsNumfmtUI.UniverSheetsNumfmtUIPlugin);
         }
 
+        if (kind === "slide") {
+          const slides = await import("@univerjs/slides");
+          const slidesUI = await import("@univerjs/slides-ui");
+          univer.registerPlugin(slides.UniverSlidesPlugin);
+          univer.registerPlugin(slidesUI.UniverSlidesUIPlugin);
+        }
+
         if (cancelled) {
           univer.dispose();
           return;
@@ -113,14 +132,25 @@ export default function UniverEmbed({ kind, snapshot, onSave, height = 560 }: Un
 
         const univerAPI = FUniver.newAPI(univer);
         const data = snapshotRef.current as Record<string, unknown>;
+        // Slides have no FUniver facade at 1.0.2 — create the unit directly
+        // (makeCurrent defaults true) and snapshot it via the unit model.
+        const slideUnit =
+          kind === "slide"
+            ? univer.createUnit(UniverInstanceType.UNIVER_SLIDE, data)
+            : null;
         const unit =
           kind === "sheet"
             ? univerAPI.createWorkbook(data as never)
-            : univerAPI.createDocument(data as never);
+            : kind === "doc"
+              ? univerAPI.createDocument(data as never)
+              : null;
 
         apiRef.current = {
           dispose: () => univer.dispose(),
-          save: () => (unit as { save: () => unknown }).save(),
+          save: () =>
+            slideUnit
+              ? (slideUnit as unknown as { getSnapshot: () => unknown }).getSnapshot()
+              : (unit as { save: () => unknown }).save(),
         };
         setPhase("ready");
       } catch (err) {
@@ -153,7 +183,7 @@ export default function UniverEmbed({ kind, snapshot, onSave, height = 560 }: Un
     <div className="overflow-hidden rounded-lg border border-stone-200 bg-white">
       <div className="flex items-center justify-between border-b border-stone-200 bg-stone-50 px-3 py-2">
         <span className="text-[13px] font-medium text-stone-600">
-          {kind === "sheet" ? "Spreadsheet" : "Document"} — edits stay local until you save
+          {kind === "sheet" ? "Spreadsheet" : kind === "doc" ? "Document" : "Slides"} — edits stay local until you save
         </span>
         {onSave && (
           <button
