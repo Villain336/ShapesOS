@@ -148,6 +148,14 @@ function fakeDb(post: Row, channels: Row[]) {
     socialPost: {
       findUniqueOrThrow: async () => post,
       update: async ({ data }: { data: Row }) => { Object.assign(post, data); return post; },
+      // Claim helper for dispatchPost: where { id, status in [...] }.
+      updateMany: async ({ where, data }: { where: Row; data: Row }) => {
+        if (where.id !== undefined && (post as Row).id !== where.id) return { count: 0 };
+        const statuses = (where.status as Row | undefined)?.in as string[] | undefined;
+        if (statuses && !statuses.includes((post as Row).status as string)) return { count: 0 };
+        Object.assign(post, data);
+        return { count: 1 };
+      },
     },
     socialChannel: {
       findMany: async () => channels,
@@ -197,7 +205,7 @@ const chanRows = (svcs: string[]): Row[] =>
   } catch (e) { threw = e instanceof Error ? e.message : ""; }
   check("over-limit blocked", /280/.test(threw), threw);
   check("no buffer calls on validation failure", port.created.length === 0);
-  check("status untouched on validation failure", row.status === "draft");
+  check("status untouched on validation failure", row.status === "scheduled"); // claim released, not dispatched
 }
 
 // --- missing channel guard ----------------------------------------------------------------------------
@@ -238,7 +246,7 @@ const chanRows = (svcs: string[]): Row[] =>
   check("transient 1 → retrying", a1.outcome === "retrying", a1.outcome);
   check("attempts=1", row.attempts === 1);
   check("backoff scheduled", row.nextAttemptAt instanceof Date);
-  check("not failed yet", row.status === "draft");
+  check("not failed yet", row.status === "scheduled"); // claim released; retry state on the update, status untouched by attemptDispatch
 
   port.failNext(1, transientErr);
   const a2 = await attemptDispatch(db, "ws-1", row as never, port, "system");

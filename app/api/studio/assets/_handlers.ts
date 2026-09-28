@@ -100,12 +100,22 @@ export async function useInSocialHandler(req: Request, assetId: string) {
   if (!project) return Response.json({ error: "Project not found" }, { status: 404 });
   const denied = await requireEditor(user.id, project.id);
   if (denied) return denied;
+  // Wave B: queues a Postiz DRAFT (never publishes). channelIds are Postiz
+  // integration ids picked in the UI; platformTypes maps channel -> identifier.
+  const channelIds = Array.isArray(body.channelIds) ? body.channelIds.map(String).filter((s: string) => s.trim()) : [];
+  if (!channelIds.length) {
+    return Response.json({ error: "Pick at least one Postiz channel." }, { status: 400 });
+  }
   try {
-    const post = await useAssetInSocialPost(prisma, project.workspaceId, project.id, assetId, {
+    const draft = await useAssetInSocialPost(prisma, project.workspaceId, project.id, assetId, {
       text: String(body.text ?? ""),
-      services: Array.isArray(body.services) ? body.services.map(String) : [],
+      channelIds,
+      platformTypes:
+        body.platformTypes && typeof body.platformTypes === "object"
+          ? Object.fromEntries(Object.entries(body.platformTypes).map(([k, v]) => [String(k), String(v)]))
+          : undefined,
     });
-    return Response.json({ postId: post.id });
+    return Response.json({ postizRef: draft.postizRef });
   } catch (err) {
     return Response.json(
       { error: err instanceof Error ? err.message : "Failed to create social post." },

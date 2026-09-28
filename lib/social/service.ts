@@ -1,5 +1,9 @@
 // Marketr — social scheduling service (milestone 20).
 //
+// WAVE B DEPRECATION: the Buffer-based social studio is retired. New posts go
+// through Postiz (see lib/integrations/postiz.ts — queuePostizDraft). This
+// module stays ONLY so /api/cron/social can drain already-scheduled
+// SocialPost rows. Do not add new creation paths here.
 // Prisma-backed orchestration for the Buffer connection, channels, posts,
 // dispatch (with idempotency + bounded retries), status refresh, and analytics
 // pull-back. Buffer I/O goes through the injected BufferPort (real API in

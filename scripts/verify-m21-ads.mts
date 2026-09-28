@@ -191,6 +191,18 @@ function fakeDb(state: DbState) {
         Object.assign(row, data);
         return row;
       },
+      // Claim helper for submitJob: where { id, status: "queued", providerJobId: null }.
+      updateMany: async ({ where, data }: { where: Row; data: Row }) => {
+        let count = 0;
+        for (const row of state.creatives.values()) {
+          if (where.id !== undefined && row.id !== where.id) continue;
+          if (where.status !== undefined && row.status !== where.status) continue;
+          if (where.providerJobId !== undefined && where.providerJobId === null && row.providerJobId !== null) continue;
+          Object.assign(row, data);
+          count += 1;
+        }
+        return { count };
+      },
       aggregate: async () => {
         const rows = [...state.creatives.values()];
         return {
@@ -400,7 +412,21 @@ function fakeDb(state: DbState) {
   check("old prompt in history", ((regen as Row).promptHistory as { prompt: string }[])[0].prompt === oldPrompt);
 }
 
-// --- send to social guards -----------------------------------------------------------------------------
+// --- send to social guards (Wave B: Postiz drafts, draft-first) ----------------------------------------
+// Stub the Postiz sidecar: URL-aware — uploads return { id, path }, posts return a draft id.
+let capturedPostizBody: Record<string, unknown> | null = null;
+{
+  const g = globalThis as unknown as { fetch: typeof fetch };
+  g.fetch = (async (url: unknown, init?: RequestInit) => {
+    if (String(url).includes("/upload-from-url")) {
+      return { ok: true, json: async () => ({ id: "upl_1", path: "https://uploads.postiz.com/upl_1.png" }) } as Response;
+    }
+    capturedPostizBody = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
+    return { ok: true, json: async () => ({ id: "draft_123" }) } as Response;
+  }) as typeof fetch;
+  process.env.POSTIZ_URL = "https://postiz.example.com";
+  process.env.POSTIZ_API_KEY = "test-key";
+}
 {
   const state = newState();
   const db = fakeDb(state);
@@ -410,7 +436,7 @@ function fakeDb(state: DbState) {
 
   let threw = false;
   try {
-    await sendCreativeToSocial(db, "ws-1", "proj-1", id, { text: "hi", services: ["instagram"] });
+    await sendCreativeToSocial(db, "ws-1", "proj-1", id, { text: "hi", channelIds: ["ch_1"] });
   } catch (e) {
     threw = e instanceof AdGuardError;
   }
@@ -419,11 +445,28 @@ function fakeDb(state: DbState) {
   await pollCreative(db, "ws-1", id, port);
   await pollCreative(db, "ws-1", id, port);
   await approveCreative(db, "ws-1", id);
-  const post = await sendCreativeToSocial(db, "ws-1", "proj-1", id, { text: "Launch day!", services: ["instagram"] });
-  check("send creates social post", (post as Row).id !== undefined);
-  const media = ((post as Row).content as { media: { url: string }[] }).media;
-  check("creative asset attached", media.length === 1 && media[0].url.includes("cdn.example.com"));
+  const draft = await sendCreativeToSocial(db, "ws-1", "proj-1", id, { text: "Launch day!", channelIds: ["ch_1"] });
+  check("send queues a Postiz draft", typeof draft.postizRef === "string" && draft.postizRef.length > 0);
+  check("draft payload is draft-first", (capturedPostizBody as Record<string, unknown> | null)?.type === "draft");
+  check(
+    "draft payload targets the picked channel",
+    (((capturedPostizBody as Record<string, unknown> | null)?.posts as Array<{ integration: { id: string } }>)?.[0]?.integration.id) === "ch_1",
+  );
   check("audit send-to-social", state.audit.some((a) => a.action === "ad_sent_to_social"));
+  const draftImages = (
+    ((capturedPostizBody as Record<string, unknown> | null)?.posts as Array<{
+      value: Array<{ image: Array<{ path: string }> }>;
+    }>)?.[0]?.value[0].image ?? []
+  );
+  check("creative asset attached to draft", draftImages.length === 1 && draftImages[0].path.includes("uploads.postiz.com"));
+
+  let noChannelErr = "";
+  try {
+    await sendCreativeToSocial(db, "ws-1", "proj-1", id, { text: "hi", channelIds: [] });
+  } catch (e) {
+    noChannelErr = e instanceof Error ? e.message : "";
+  }
+  check("send without channels blocked", /at least one/i.test(noChannelErr), noChannelErr);
 }
 
 // --- campaign spend rollup + cron sweep ------------------------------------------------------------------

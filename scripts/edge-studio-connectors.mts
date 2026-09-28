@@ -590,14 +590,37 @@ const unb64 = (s: string) => Buffer.from(s, "base64").toString("utf8");
   await deleteAsset(db, "ws-f", "proj", (a1 as Row).id as string);
   check(M, "delete audited", state.audit.some((a) => a.action === "studio_asset_deleted"));
 
-  // useAssetInSocialPost with no channels and no services → clear error
+  // useAssetInSocialPost (Wave B: Postiz drafts) — stub the sidecar.
+  // URL-aware: uploads return { id, path }, posts return a draft id.
+  let studioPostBody: Record<string, unknown> | null = null;
+  {
+    const g = globalThis as unknown as { fetch: typeof fetch };
+    g.fetch = (async (url: unknown, init?: RequestInit) => {
+      if (String(url).includes("/upload-from-url")) {
+        return { ok: true, json: async () => ({ id: "upl_2", path: "https://uploads.postiz.com/upl_2.png" }) } as Response;
+      }
+      studioPostBody = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
+      return { ok: true, json: async () => ({ id: "draft_789" }) } as Response;
+    }) as typeof fetch;
+    process.env.POSTIZ_URL = "https://postiz.example.com";
+    process.env.POSTIZ_API_KEY = "test-key";
+  }
   check(M, "social post with no channels blocked", await throwsOk(
-    () => useAssetInSocialPost(db, "ws-f", "proj", "nope", { text: "hi", services: ["x"] }),
+    () => useAssetInSocialPost(db, "ws-f", "proj", "nope", { text: "hi", channelIds: ["ch_1"] }),
     "asset not found"));
   const a2 = await createAsset(db, "ws-f", "proj", { name: "m", source: "upload", url: "https://x/m.png" });
   check(M, "social post needs channels", await throwsOk(
-    () => useAssetInSocialPost(db, "ws-f", "proj", (a2 as Row).id as string, { text: "hi", services: [] }),
-    "no social channels"));
+    () => useAssetInSocialPost(db, "ws-f", "proj", (a2 as Row).id as string, { text: "hi", channelIds: [] }),
+    "at least one postiz channel"));
+  const draft = await useAssetInSocialPost(db, "ws-f", "proj", (a2 as Row).id as string, { text: "hi", channelIds: ["ch_1"] });
+  check(M, "social post queues Postiz draft", typeof draft.postizRef === "string" && draft.postizRef.length > 0);
+  const studioImages = (
+    ((studioPostBody as Record<string, unknown> | null)?.posts as Array<{
+      value: Array<{ image: Array<{ path: string }> }>;
+    }>)?.[0]?.value[0].image ?? []
+  );
+  check(M, "asset media attached to draft", studioImages.length === 1 && studioImages[0].path.includes("uploads.postiz.com"));
+  check(M, "social post audited", state.audit.some((a) => String(a.summary ?? "").includes("[studio_asset_sent_to_social]")));
 
   // Registrant validation edges
   check(M, "registrant missing field", await throwsOk(

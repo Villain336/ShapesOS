@@ -1871,7 +1871,21 @@ function aDb(state: AState) {
   check("regen cap gate (setup: generation blocked at cap 0)", gc === null);
 }
 
-// --- sendCreativeToSocial guards --------------------------------------------------------------------
+// --- sendCreativeToSocial guards (Wave B: Postiz drafts, draft-first) ------------------------------------
+// Stub the Postiz sidecar: URL-aware — uploads return { id, path }, posts return a draft id.
+let capturedPostizBody: Record<string, unknown> | null = null;
+{
+  const g = globalThis as unknown as { fetch: typeof fetch };
+  g.fetch = (async (url: unknown, init?: RequestInit) => {
+    if (String(url).includes("/upload-from-url")) {
+      return { ok: true, json: async () => ({ id: "upl_1", path: "https://uploads.postiz.com/upl_1.png" }) } as Response;
+    }
+    capturedPostizBody = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
+    return { ok: true, json: async () => ({ id: "draft_456" }) } as Response;
+  }) as typeof fetch;
+  process.env.POSTIZ_URL = "https://postiz.example.com";
+  process.env.POSTIZ_API_KEY = "test-key";
+}
 {
   const state = aState();
   const db = aDb(state);
@@ -1884,29 +1898,34 @@ function aDb(state: AState) {
 
   let t1 = "";
   try {
-    await sendCreativeToSocial(db, "ws-1", "proj-1", id, { text: "   ", services: ["instagram"] });
+    await sendCreativeToSocial(db, "ws-1", "proj-1", id, { text: "   ", channelIds: ["ch_1"] });
   } catch (e) {
     t1 = e instanceof Error ? e.message : "";
   }
   check("sendCreativeToSocial blank text blocked", /text is required/i.test(t1), t1);
   let t2 = "";
   try {
-    await sendCreativeToSocial(db, "ws-1", "OTHER", id, { text: "hi", services: ["instagram"] });
+    await sendCreativeToSocial(db, "ws-1", "OTHER", id, { text: "hi", channelIds: ["ch_1"] });
   } catch (e) {
     t2 = e instanceof Error ? e.message : "";
   }
   check("sendCreativeToSocial wrong project blocked", /not found/i.test(t2), t2);
   let t3 = "";
   try {
-    await sendCreativeToSocial(db, "ws-1", "proj-1", id, { text: "hi", services: ["myspace"] });
+    await sendCreativeToSocial(db, "ws-1", "proj-1", id, { text: "hi", channelIds: [] });
   } catch (e) {
     t3 = e instanceof Error ? e.message : "";
   }
-  check("sendCreativeToSocial unknown service blocked", /at least one/i.test(t3), t3);
-  const post = (await sendCreativeToSocial(db, "ws-1", "proj-1", id, { text: "Launch!", services: ["instagram"] })) as ARow;
-  check("sendCreativeToSocial creates post", typeof post.id === "string");
-  const media = ((post.content as { media: { type: string; url: string }[] }).media);
-  check("sendCreativeToSocial attaches image media", media.length === 1 && media[0].type === "image");
+  check("sendCreativeToSocial no channels blocked", /at least one/i.test(t3), t3);
+  const draft = await sendCreativeToSocial(db, "ws-1", "proj-1", id, { text: "Launch!", channelIds: ["ch_1"] });
+  check("sendCreativeToSocial queues draft", typeof draft.postizRef === "string" && draft.postizRef.length > 0);
+  check("sendCreativeToSocial draft-first", (capturedPostizBody as Record<string, unknown> | null)?.type === "draft");
+  const emImages = (
+    ((capturedPostizBody as Record<string, unknown> | null)?.posts as Array<{
+      value: Array<{ image: Array<{ path: string }> }>;
+    }>)?.[0]?.value[0].image ?? []
+  );
+  check("sendCreativeToSocial attaches creative media", emImages.length === 1 && emImages[0].path.includes("uploads.postiz.com"));
 }
 
 // --- cron overlap: two concurrent sweeps --------------------------------------------------------------

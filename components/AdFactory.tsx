@@ -278,7 +278,27 @@ export default function AdFactory({ projectId, campaigns: initial, brandKits, se
   const [regenId, setRegenId] = useState<string | null>(null);
   const [sendTarget, setSendTarget] = useState<StudioCreative | null>(null);
   const [sendText, setSendText] = useState("");
-  const [sendServices, setSendServices] = useState<string[]>(["instagram"]);
+  // Wave B: Postiz channels for the send-to-social draft (replaces the old
+  // Buffer service keys). Loaded when the modal opens.
+  const [sendChannelIds, setSendChannelIds] = useState<string[]>([]);
+  const [postizChannels, setPostizChannels] = useState<Array<{ id: string; name: string | null; identifier: string }>>([]);
+  const [postizChannelsLoading, setPostizChannelsLoading] = useState(false);
+
+  async function openSendModal(creative: StudioCreative) {
+    setSendTarget(creative);
+    setSendText("");
+    setSendChannelIds([]);
+    setPostizChannelsLoading(true);
+    try {
+      const res = await fetch("/api/integrations/postiz/channels");
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && Array.isArray(data.channels)) setPostizChannels(data.channels);
+    } catch {
+      setPostizChannels([]);
+    } finally {
+      setPostizChannelsLoading(false);
+    }
+  }
 
   async function creativeAction(id: string, action: "approve" | "reject" | "cancel") {
     const data = await mutate(`/api/ads/creatives/${id}`, "PATCH", { projectId, action });
@@ -302,16 +322,20 @@ export default function AdFactory({ projectId, campaigns: initial, brandKits, se
   }
 
   async function sendToSocial() {
-    if (!sendTarget) return;
+    if (!sendTarget || sendChannelIds.length === 0) return;
+    const platformTypes: Record<string, string> = {};
+    for (const c of postizChannels) if (sendChannelIds.includes(c.id) && c.identifier) platformTypes[c.id] = c.identifier;
     const data = await mutate(`/api/ads/creatives/${sendTarget.id}/send-to-social`, "POST", {
       projectId,
       text: sendText,
-      services: sendServices,
+      channelIds: sendChannelIds,
+      platformTypes,
     });
-    if (data?.post) {
+    if (data?.postizRef) {
       setSendTarget(null);
       setSendText("");
-      setNotice("Sent to the social studio — find it under Social → Calendar.");
+      setSendChannelIds([]);
+      setNotice("Draft created in Postiz — find it under Social.");
     }
   }
 
@@ -748,8 +772,8 @@ export default function AdFactory({ projectId, campaigns: initial, brandKits, se
                               </a>
                               <button
                                 onClick={() => {
-                                  setSendTarget(cr);
                                   setSendText(`${cr.brief.hook ?? ""} ${cr.brief.cta ?? ""}`.trim());
+                                  void openSendModal(cr);
                                 }}
                                 className={btnGhost}
                               >
@@ -893,31 +917,37 @@ export default function AdFactory({ projectId, campaigns: initial, brandKits, se
       {sendTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
           <div className="w-full max-w-lg rounded-xl border border-zinc-200 bg-zinc-50 p-5">
-            <h3 className="text-sm font-semibold text-zinc-900">Send to social studio</h3>
-            <p className="mt-1 text-xs text-zinc-500">Creates a post with this creative attached (Social → Calendar).</p>
+            <h3 className="text-sm font-semibold text-zinc-900">Send to social</h3>
+            <p className="mt-1 text-xs text-zinc-500">Creates a Postiz draft with this creative — publish it from the Social tab.</p>
             <label className={`${label} mt-4`}>Post text</label>
             <textarea value={sendText} onChange={(e) => setSendText(e.target.value)} rows={3} className={field} />
-            <label className={`${label} mt-4`}>Channels</label>
-            <div className="flex flex-wrap gap-2">
-              {CHANNELS.map((ch) => (
-                <button
-                  key={ch}
-                  onClick={() => setSendServices(sendServices.includes(ch) ? sendServices.filter((c) => c !== ch) : [...sendServices, ch])}
-                  className={`rounded-full border px-3 py-1 text-xs transition-[background-color,border-color,color,transform] duration-150 active:scale-[0.96] ${
-                    sendServices.includes(ch) ? "border-violet-600 bg-violet-600 text-white" : "border-zinc-200 text-zinc-500"
-                  }`}
-                  style={{ transitionTimingFunction: EASE }}
-                >
-                  {ch}
-                </button>
-              ))}
-            </div>
+            <label className={`${label} mt-4`}>Postiz channels</label>
+            {postizChannelsLoading ? (
+              <p className="text-xs text-zinc-500">Loading channels…</p>
+            ) : postizChannels.length === 0 ? (
+              <p className="text-xs text-zinc-500">No Postiz channels connected — connect one under Social first.</p>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {postizChannels.map((ch) => (
+                  <button
+                    key={ch.id}
+                    onClick={() => setSendChannelIds(sendChannelIds.includes(ch.id) ? sendChannelIds.filter((c) => c !== ch.id) : [...sendChannelIds, ch.id])}
+                    className={`rounded-full border px-3 py-1 text-xs transition-[background-color,border-color,color,transform] duration-150 active:scale-[0.96] ${
+                      sendChannelIds.includes(ch.id) ? "border-violet-600 bg-violet-600 text-white" : "border-zinc-200 text-zinc-500"
+                    }`}
+                    style={{ transitionTimingFunction: EASE }}
+                  >
+                    {ch.name ?? ch.identifier}
+                  </button>
+                ))}
+              </div>
+            )}
             <div className="mt-4 flex justify-end gap-2">
               <button onClick={() => setSendTarget(null)} className={btnGhost}>
                 Cancel
               </button>
-              <button onClick={() => void sendToSocial()} disabled={busy || !sendText.trim() || sendServices.length === 0} className={btnPrimary}>
-                <Send className="h-4 w-4" /> Create post
+              <button onClick={() => void sendToSocial()} disabled={busy || !sendText.trim() || sendChannelIds.length === 0} className={btnPrimary}>
+                <Send className="h-4 w-4" /> Create draft
               </button>
             </div>
           </div>

@@ -10,7 +10,7 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
 import { secrets } from "@/lib/secrets";
 import { emitAlert } from "@/lib/alerts/evaluate";
-import { createPost as createSocialPost } from "@/lib/social/service";
+import { queuePostizDraft } from "@/lib/integrations/postiz";
 import {
   buildAdPrompt,
   estimateCostCents,
@@ -812,15 +812,20 @@ export async function regenerateCreative(
 }
 
 // ---------------------------------------------------------------------------
-// Distribution — send approved creatives to the M20 social studio
+// Distribution — send approved creatives to social (Wave B: Postiz drafts)
 // ---------------------------------------------------------------------------
 
+/** Wave B: the M20 Buffer-based social studio is retired. Approved creatives
+ * go to Postiz as drafts — a human publishes from Postiz or the Social tab.
+ * The creative's finished assets are uploaded to Postiz and attached to the
+ * draft, preserving the old flow's media attachment (text-only would be a
+ * regression). Upload failures are fail-closed: no silent media drops. */
 export async function sendCreativeToSocial(
   db: Db,
   workspaceId: string,
   projectId: string,
   creativeId: string,
-  args: { text: string; services: string[]; scheduledFor?: string | null },
+  args: { text: string; channelIds: string[]; platformTypes?: Record<string, string> },
   actor: "user" | "system" = "user",
 ) {
   const creative = await db.adCreative.findUnique({ where: { id: creativeId } });
@@ -832,23 +837,15 @@ export async function sendCreativeToSocial(
   if (!assets.length) throw new AdGuardError("This creative has no finished assets yet.");
   const text = args.text.trim();
   if (!text) throw new AdGuardError("Post text is required.");
-  const post = await createSocialPost(
-    db,
-    workspaceId,
-    projectId,
-    {
-      content: {
-        text,
-        perChannel: {},
-        media: assets.map((a) => ({ type: creative.type === "video" ? "video" : "image", url: a.url })),
-      },
-      services: args.services,
-      scheduledFor: args.scheduledFor ?? null,
-    },
-    actor,
-  );
-  await auditAds(db, workspaceId, projectId, "ad_sent_to_social", `Ad creative sent to social: ${creative.name}`, actor);
-  return post;
+  if (!args.channelIds.length) throw new AdGuardError("Pick at least one Postiz channel.");
+  const draft = await queuePostizDraft({
+    content: text,
+    channelIds: args.channelIds,
+    platformTypes: args.platformTypes,
+    mediaUrls: assets.map((a) => a.url),
+  });
+  await auditAds(db, workspaceId, projectId, "ad_sent_to_social", `Ad creative queued as Postiz draft: ${creative.name}`, actor);
+  return draft;
 }
 
 // ---------------------------------------------------------------------------

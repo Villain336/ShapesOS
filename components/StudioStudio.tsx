@@ -73,6 +73,11 @@ export default function StudioStudio({ projectId, canEdit, isOwnerAdmin }: Props
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [socialAsset, setSocialAsset] = useState<StudioAsset | null>(null);
   const [socialText, setSocialText] = useState("");
+  // Wave B: Postiz channels for the use-in-social draft (replaces the old
+  // Buffer service keys). Loaded when the dialog opens.
+  const [socialChannelIds, setSocialChannelIds] = useState<string[]>([]);
+  const [postizChannels, setPostizChannels] = useState<Array<{ id: string; name: string | null; identifier: string }>>([]);
+  const [postizChannelsLoading, setPostizChannelsLoading] = useState(false);
 
   // Domain state
   const [domains, setDomains] = useState<StudioDomain[]>([]);
@@ -268,23 +273,38 @@ export default function StudioStudio({ projectId, canEdit, isOwnerAdmin }: Props
     });
   }
 
-  function openUseInSocial(asset: StudioAsset) {
+  async function openUseInSocial(asset: StudioAsset) {
     setSocialAsset(asset);
     setSocialText("");
+    setSocialChannelIds([]);
+    setPostizChannelsLoading(true);
+    try {
+      const r = (await api("/api/integrations/postiz/channels")) as {
+        channels?: Array<{ id: string; name: string | null; identifier: string }>;
+      };
+      setPostizChannels(Array.isArray(r?.channels) ? r.channels : []);
+    } catch {
+      setPostizChannels([]);
+    } finally {
+      setPostizChannelsLoading(false);
+    }
   }
 
   async function submitUseInSocial() {
-    if (!socialAsset) return;
+    if (!socialAsset || socialChannelIds.length === 0) return;
     const asset = socialAsset;
     await run(async () => {
+      const platformTypes: Record<string, string> = {};
+      for (const c of postizChannels) if (socialChannelIds.includes(c.id) && c.identifier) platformTypes[c.id] = c.identifier;
       const r = (await api(`/api/studio/assets/${asset.id}/use-in-social`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ projectId, text: socialText, services: [] }),
-      })) as { postId: string };
+        body: JSON.stringify({ projectId, text: socialText, channelIds: socialChannelIds, platformTypes }),
+      })) as { postizRef: string };
       void r;
       setSocialAsset(null);
-      ok("Draft created in the social studio.");
+      setSocialChannelIds([]);
+      ok("Draft created in Postiz — find it under Social.");
     });
   }
 
@@ -616,7 +636,7 @@ export default function StudioStudio({ projectId, canEdit, isOwnerAdmin }: Props
                     {canEdit && (
                       <>
                         <button
-                          onClick={() => openUseInSocial(a)}
+                          onClick={() => void openUseInSocial(a)}
                           className={`inline-flex items-center gap-1 rounded-md bg-zinc-100 px-3 py-1.5 text-xs font-medium text-zinc-900 ${press}`}
                         >
                           <Send className="h-3 w-3" /> Use in social post
@@ -669,7 +689,7 @@ export default function StudioStudio({ projectId, canEdit, isOwnerAdmin }: Props
           <div className={`w-full max-w-lg rounded-2xl border border-zinc-200 bg-zinc-50 p-6 ${fade}`}>
             <h3 className="text-base font-semibold text-zinc-900">Use in social post</h3>
             <p className="mt-1 text-xs text-zinc-500">
-              Creates a draft in the social studio with “{socialAsset.name}” attached.
+              Creates a Postiz draft with “{socialAsset.name}” — publish it from the Social tab.
             </p>
             <label className="mt-4 block">
               <span className="mb-1 block text-xs font-medium text-zinc-500">Post text</span>
@@ -681,6 +701,36 @@ export default function StudioStudio({ projectId, canEdit, isOwnerAdmin }: Props
                 className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900"
               />
             </label>
+            <div className="mt-4">
+              <span className="mb-1 block text-xs font-medium text-zinc-500">Postiz channels</span>
+              {postizChannelsLoading ? (
+                <p className="text-xs text-zinc-500">Loading channels…</p>
+              ) : postizChannels.length === 0 ? (
+                <p className="text-xs text-zinc-500">No Postiz channels connected — connect one under Social first.</p>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {postizChannels.map((ch) => (
+                    <button
+                      key={ch.id}
+                      onClick={() =>
+                        setSocialChannelIds(
+                          socialChannelIds.includes(ch.id)
+                            ? socialChannelIds.filter((c) => c !== ch.id)
+                            : [...socialChannelIds, ch.id],
+                        )
+                      }
+                      className={`rounded-full border px-3 py-1 text-xs transition-colors ${
+                        socialChannelIds.includes(ch.id)
+                          ? "border-violet-600 bg-violet-600 text-white"
+                          : "border-zinc-300 text-zinc-500"
+                      }`}
+                    >
+                      {ch.name ?? ch.identifier}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
             <div className="mt-6 flex justify-end gap-2">
               <button
                 onClick={() => setSocialAsset(null)}
@@ -690,7 +740,7 @@ export default function StudioStudio({ projectId, canEdit, isOwnerAdmin }: Props
               </button>
               <button
                 onClick={submitUseInSocial}
-                disabled={busy}
+                disabled={busy || socialChannelIds.length === 0}
                 className={`rounded-md bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-900 ${press}`}
               >
                 Create draft

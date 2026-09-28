@@ -174,23 +174,60 @@ export interface SchedulePostInput {
   /** Postiz settings __type per platform (e.g. "x", "linkedin"). When
       omitted, the first channel's identifier is used for all. */
   platformTypes?: Record<string, string>;
+  /** Remote media URLs (images/video) to attach. Each is uploaded to
+      Postiz via upload-from-url first — Postiz requires its own hosted
+      URLs in the post payload, and many platforms reject external links. */
+  mediaUrls?: string[];
+}
+
+/** A Postiz-hosted media reference, as returned by the upload endpoints. */
+export interface PostizMedia {
+  id?: string;
+  path: string;
+}
+
+/**
+ * Upload a remote media URL to Postiz (Wave B: media passthrough).
+ * Postiz requires media to be hosted by Postiz itself before it can be
+ * attached to a post — external URLs are rejected by several platforms.
+ * Returns the { id, path } reference for the post payload's image array.
+ */
+export async function uploadPostizMediaFromUrl(url: string): Promise<PostizMedia> {
+  if (!url.trim()) throw new PostizConfigError("Media URL is required.");
+  const body = (await postizFetch("/upload-from-url", {
+    method: "POST",
+    body: JSON.stringify({ url }),
+  })) as Record<string, unknown> | null;
+  const r = body ?? {};
+  const data = (r.data as Record<string, unknown> | undefined) ?? {};
+  const str = (v: unknown): string | null =>
+    typeof v === "string" && v.length > 0 ? v : null;
+  const id = str(r.id) ?? str(data.id);
+  const path = str(r.path) ?? str(data.path);
+  if (!id && !path) {
+    throw new PostizConfigError(`Postiz media upload failed for ${url}.`);
+  }
+  return { ...(id ? { id } : {}), path: path ?? (id as string) };
 }
 
 function defaultSettingsFor(identifier: string): Record<string, unknown> {
   return { __type: identifier || "x" };
 }
 
-export function buildPostizPayload(input: SchedulePostInput): Record<string, unknown> {
+export function buildPostizPayload(
+  input: SchedulePostInput & { images?: PostizMedia[] },
+): Record<string, unknown> {
   const content = input.content.trim();
   if (!content) throw new PostizConfigError("Post content is required.");
   if (!input.channelIds.length) throw new PostizConfigError("At least one channel is required.");
+  const images = (input.images ?? []).map((m) => ({ ...(m.id ? { id: m.id } : {}), path: m.path }));
   const payload: Record<string, unknown> = {
     type: input.type,
     shortLink: false,
     tags: [],
     posts: input.channelIds.map((channelId) => ({
       integration: { id: channelId },
-      value: [{ content, image: [] }],
+      value: [{ content, image: images }],
       settings: defaultSettingsFor(input.platformTypes?.[channelId] ?? ""),
     })),
   };
@@ -205,7 +242,13 @@ export function buildPostizPayload(input: SchedulePostInput): Record<string, unk
 }
 
 export async function schedulePostizPost(input: SchedulePostInput): Promise<unknown> {
-  const payload = buildPostizPayload(input);
+  // Upload media first: Postiz requires its own hosted URLs in the payload.
+  // Sequential (not parallel) so a failure names the offending URL.
+  const images: PostizMedia[] = [];
+  for (const url of input.mediaUrls ?? []) {
+    images.push(await uploadPostizMediaFromUrl(url));
+  }
+  const payload = buildPostizPayload({ ...input, images });
   return postizFetch("/posts", { method: "POST", body: JSON.stringify(payload) });
 }
 
@@ -245,4 +288,41 @@ export async function listPostizPosts(opts: { from?: string; to?: string } = {})
 export async function deletePostizPost(id: string): Promise<void> {
   if (!id.trim()) throw new PostizConfigError("Post id is required.");
   await postizFetch(`/posts/${encodeURIComponent(id)}`, { method: "DELETE" });
+}
+
+// ── Draft-first queue (Wave B) ─────────────────────────────────────────
+// Shared by the ads + studio "send to social" flows. The post TYPE is
+// hardcoded to "draft" here — the only draft path outside the clipper's
+// own chokepoint. Publishing happens only when a human approves the draft
+// in Postiz (or the Social tab). No caller can smuggle "now"/"schedule"
+// through this helper: the PostizPostType union is not a parameter.
+
+export interface QueuedPostizDraft {
+  /** Postiz draft id (whatever the sidecar returned), for deep-linking. */
+  postizRef: string;
+  raw: unknown;
+}
+
+export async function queuePostizDraft(input: {
+  content: string;
+  channelIds: string[];
+  platformTypes?: Record<string, string>;
+  /** Remote media URLs to upload + attach (ad creatives, studio assets). */
+  mediaUrls?: string[];
+}): Promise<QueuedPostizDraft> {
+  const raw = await schedulePostizPost({
+    type: "draft",
+    content: input.content,
+    channelIds: input.channelIds,
+    platformTypes: input.platformTypes,
+    mediaUrls: input.mediaUrls,
+  });
+  const r = raw as Record<string, unknown> | null;
+  const str = (v: unknown): string | null =>
+    typeof v === "string" && v.length > 0 ? v : null;
+  const postizRef =
+    str(r?.id) ??
+    str((r?.data as Record<string, unknown> | undefined)?.id) ??
+    "draft";
+  return { postizRef, raw };
 }

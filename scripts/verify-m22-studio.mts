@@ -128,6 +128,23 @@ function mockDb() {
         }
         return row;
       },
+      // Claim helpers for claimDomainPurchase.
+      create: async ({ data }: { data: Row }) => {
+        const row: Row = { id: id("dom"), ...data };
+        state.domains.set(row.id as string, row);
+        return row;
+      },
+      updateMany: async ({ where, data }: { where: Row; data: Row }) => {
+        let count = 0;
+        for (const r of state.domains.values()) {
+          if (where.id !== undefined && r.id !== where.id) continue;
+          const notIn = (where.status as Row | undefined)?.notIn as string[] | undefined;
+          if (notIn && notIn.includes(r.status as string)) continue;
+          Object.assign(r, data);
+          count += 1;
+        }
+        return { count };
+      },
       update: async ({ where, data }: { where: { id: string }; data: Row }) => {
         const row = state.domains.get(where.id);
         if (!row) throw new Error("not found");
@@ -503,23 +520,36 @@ const PROJ = "proj-m22";
   check("unknown asset rejected", true);
 }
 
-// --- useAssetInSocialPost (M20 wiring) -------------------------------------------------
+// --- useAssetInSocialPost (Wave B: Postiz drafts) -------------------------------------------------
 {
+  // Stub the Postiz sidecar: URL-aware — uploads return { id, path }, posts return a draft id.
+  let m22PostBody: Record<string, unknown> | null = null;
+  const g = globalThis as unknown as { fetch: typeof fetch };
+  g.fetch = (async (url: unknown, init?: RequestInit) => {
+    if (String(url).includes("/upload-from-url")) {
+      return { ok: true, json: async () => ({ id: "upl_3", path: "https://uploads.postiz.com/upl_3.png" }) } as Response;
+    }
+    m22PostBody = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
+    return { ok: true, json: async () => ({ id: "draft_m22" }) } as Response;
+  }) as typeof fetch;
+  process.env.POSTIZ_URL = "https://postiz.example.com";
+  process.env.POSTIZ_API_KEY = "test-key";
+
   const { db } = mockDb();
   await throws(
-    () => useAssetInSocialPost(db, WS, PROJ, "nope", { text: "hi", services: [] }),
+    () => useAssetInSocialPost(db, WS, PROJ, "nope", { text: "hi", channelIds: ["ch_1"] }),
     "asset not found",
   );
   const asset = await createAsset(db, WS, PROJ, { name: "Ad", source: "generated", url: "https://cdn.example/ad.png" });
 
-  // No channels and no explicit services → clear error.
+  // No channels → clear error.
   await throws(
-    () => useAssetInSocialPost(db, WS, PROJ, (asset as Row).id as string, { text: "hi", services: [] }),
-    "no social channels",
+    () => useAssetInSocialPost(db, WS, PROJ, (asset as Row).id as string, { text: "hi", channelIds: [] }),
+    "at least one postiz channel",
   );
   check("missing channels surfaced", true);
 
-  // With explicit services, the post is created with the asset as media.
+  // With explicit channelIds, a Postiz draft is queued.
   const m2 = mockDb();
   const asset2 = await createAsset(m2.db, WS, PROJ, {
     name: "Ad2",
@@ -527,12 +557,17 @@ const PROJ = "proj-m22";
     url: "https://cdn.example/ad2.png",
     mimeType: "image/png",
   });
-  // Seed channels through the mock's internal state is not exposed; instead pass services explicitly.
-  const post = await useAssetInSocialPost(m2.db, WS, PROJ, (asset2 as Row).id as string, {
+  const draft = await useAssetInSocialPost(m2.db, WS, PROJ, (asset2 as Row).id as string, {
     text: "Launch day",
-    services: ["instagram"],
+    channelIds: ["ch_1"],
   });
-  check("post created with asset media", (post as Row).id != null);
+  check("draft queued with postiz ref", typeof draft.postizRef === "string" && draft.postizRef.length > 0);
+  const m22Images = (
+    ((m22PostBody as Record<string, unknown> | null)?.posts as Array<{
+      value: Array<{ image: Array<{ path: string }> }>;
+    }>)?.[0]?.value[0].image ?? []
+  );
+  check("asset attached to draft", m22Images.length === 1 && m22Images[0].path.includes("uploads.postiz.com"));
   check("social post wiring exercised", true);
   void db;
 }

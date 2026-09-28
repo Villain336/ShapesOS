@@ -1,6 +1,10 @@
 // Marketr — scheduled social publishing sweep (milestone 20).
 // POST /api/cron/social
 //
+// WAVE B: drain-only. The Buffer-based studio is retired — new posts go
+// through Postiz. This sweep stays so already-scheduled SocialPost rows still
+// dispatch; remove it once no scheduled/draft SocialPost rows remain.
+//
 // Auth (either), same pattern as /api/cron/newsletter (milestone 19):
 //   1. Signed-in session — runs due posts for the user's workspace.
 //   2. Cron: Authorization: Bearer <CRON_SECRET> — sweeps all workspaces.

@@ -8,7 +8,7 @@ import { Prisma, type FileChangeAction } from "@prisma/client";
 import { randomBytes } from "crypto";
 import { emitAlert } from "@/lib/alerts/evaluate";
 import { secrets } from "@/lib/secrets";
-import { createPost as createSocialPost } from "@/lib/social/service";
+import { queuePostizDraft } from "@/lib/integrations/postiz";
 import {
   createMockPorkbunPort,
   createPorkbunPort,
@@ -39,7 +39,8 @@ type AuditAction =
   | "studio_registrant_saved"
   | "studio_domain_purchased"
   | "studio_domain_purchase_failed"
-  | "studio_domain_removed";
+  | "studio_domain_removed"
+  | "studio_asset_sent_to_social";
 
 /**
  * Phase-4 creative audit actions not present in the Prisma FileChangeAction
@@ -56,6 +57,7 @@ const CREATIVE_ACTION_FALLBACK: Record<string, true> = {
   studio_creative_exported: true,
   studio_qr_designed: true,
   studio_qr_print_locked: true,
+  studio_asset_sent_to_social: true,
 };
 
 export async function auditStudio(
@@ -627,39 +629,30 @@ export async function deleteAsset(
   await auditStudio(db, workspaceId, projectId, "studio_asset_deleted", `Asset deleted: ${row.name}.`, actor);
 }
 
-/** Wire an asset into the M20 social studio as post media. When no services are
- * passed, the project's enabled channels are used; errors clearly if none. */
+/** Wire an asset into social as a Postiz draft (Wave B: the M20 Buffer-based
+ * social studio is retired). The caller picks Postiz channels; a human
+ * publishes the draft from Postiz or the Social tab. */
 export async function useAssetInSocialPost(
   db: Db,
   workspaceId: string,
   projectId: string,
   assetId: string,
-  args: { text: string; services: string[] },
+  args: { text: string; channelIds: string[]; platformTypes?: Record<string, string> },
   actor: Actor = "user",
 ) {
   const asset = await db.projectAsset.findFirst({ where: { id: assetId, projectId } });
   if (!asset) throw new Error("Asset not found.");
-  let services = args.services;
-  if (services.length === 0) {
-    const channels = await db.socialChannel.findMany({
-      where: { projectId, enabled: true },
-      select: { service: true },
-    });
-    services = channels.map((c) => c.service);
+  if (!args.channelIds.length) {
+    throw new Error("Pick at least one Postiz channel — connect one under Social first.");
   }
-  if (services.length === 0) {
-    throw new Error("No social channels are connected for this project — connect one in the social studio first.");
-  }
-  return createSocialPost(
-    db,
-    workspaceId,
-    projectId,
-    {
-      content: { text: args.text, media: [{ url: asset.url, mimeType: asset.mimeType ?? undefined }] },
-      services,
-    },
-    actor,
-  );
+  const draft = await queuePostizDraft({
+    content: args.text,
+    channelIds: args.channelIds,
+    platformTypes: args.platformTypes,
+    mediaUrls: asset.url ? [asset.url] : [],
+  });
+  await auditStudio(db, workspaceId, projectId, "studio_asset_sent_to_social", `Asset queued as Postiz draft: ${asset.name}.`, actor);
+  return draft;
 }
 
 /** Test-only: clear in-memory OAuth/purchase state between fixture runs. */

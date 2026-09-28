@@ -69,7 +69,7 @@ const EXPLORE_SECTIONS: { title: string; links: ExploreLink[] }[] = [
       { href: "decay", label: "Content decay", description: "Pages losing traffic, and why", icon: TrendingDown },
       { href: "autopilot", label: "Content autopilot", description: "Supervised runs that refresh and fix", icon: Rocket },
       { href: "newsletter", label: "Newsletter", description: "Broadcasts and subscriber lists", icon: Mail },
-      { href: "social", label: "Social", description: "Scheduled posts across channels", icon: Share2 },
+      { href: "/dashboard/social", label: "Social", description: "Schedule and publish via Postiz", icon: Share2 },
     ],
   },
   {
