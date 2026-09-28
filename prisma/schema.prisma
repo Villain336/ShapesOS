@@ -534,6 +534,11 @@ model Workspace {
   callSessions            CallSession[]
   voiceoverJobs           VoiceoverJob[]
   pronunciationEntries    PronunciationEntry[]
+  // Phase 14: actions & office back-relations.
+  composioConnections     ComposioConnection[]
+  composioActionApprovals ComposioActionApproval[]
+  composioActionLogs      ComposioActionLog[]
+  univerDocs              UniverDoc[]
   // Phase 10 (intelligence depth): owned data assets back-relations.
   dataSources             DataSource[]
   serpVendorConfigs       SerpVendorConfig[]
@@ -8159,4 +8164,115 @@ model PronunciationEntry {
   @@unique([workspaceId, term])
   @@index([workspaceId])
   @@map("pronunciation_entries")
+}
+
+// ---------------------------------------------------------------------------
+// Phase 14 — Actions & Office (Composio + Univer).
+// Composio: universal action layer (hosted). Marketr stores only the
+// Composio entity/user reference per workspace — never raw OAuth tokens.
+// Univer: native office surface; host-owned snapshots persisted here.
+// ---------------------------------------------------------------------------
+
+// One connected third-party app per workspace (Composio entity reference).
+model ComposioConnection {
+  id              String    @id @default(cuid())
+  workspaceId     String    @map("workspace_id")
+  workspace       Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  // Composio app key, e.g. "gmail", "slack", "hubspot", "notion".
+  appKey          String    @map("app_key")
+  // Opaque Composio entity/user id — the only credential-adjacent value we
+  // store. Raw OAuth tokens live in Composio's cloud (hosted tier).
+  composioEntityId String   @map("composio_entity_id")
+  status          String    @default("connected") // connected | revoked | error
+  // Granted scopes as returned by the Composio OAuth flow (string array).
+  scopes          Json      @default("[]")
+  lastError       String?   @map("last_error")
+  connectedAt     DateTime  @default(now()) @map("connected_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  @@unique([workspaceId, appKey])
+  @@index([workspaceId, status])
+  @@map("composio_connections")
+}
+
+// Human-in-the-loop approval for a proposed agent action (Phase 14 §3).
+// Medium (writes) and high (destructive) tiers land here; low (reads) and
+// draft-creators execute freely but are always logged in ComposioActionLog.
+model ComposioActionApproval {
+  id           String    @id @default(cuid())
+  workspaceId  String    @map("workspace_id")
+  workspace    Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  appKey       String    @map("app_key")
+  toolName     String    @map("tool_name")
+  // low | medium | high (derived from the action name; manual overrides win).
+  riskTier     String    @map("risk_tier")
+  // Proposed tool args with sensitive values redacted at proposal time.
+  proposedArgs Json      @map("proposed_args")
+  // Plain-language "what will happen" — never raw JSON in the UI.
+  plainSummary String    @map("plain_summary") @db.Text
+  // pending | approved | denied | expired
+  status       String    @default("pending")
+  decidedBy    String?   @map("decided_by")
+  decidedAt    DateTime? @map("decided_at")
+  decisionReason String? @map("decision_reason") @db.Text
+  expiresAt    DateTime  @map("expires_at")
+  // Append-only audit trail: [{ at, actor, event, detail }].
+  auditTrail   Json      @default("[]") @map("audit_trail")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  actionLogs ComposioActionLog[]
+
+  @@index([workspaceId, status, createdAt])
+  @@index([workspaceId, toolName])
+  @@map("composio_action_approvals")
+}
+
+// Every executed (or attempted) action: the audit + metering record.
+model ComposioActionLog {
+  id           String    @id @default(cuid())
+  workspaceId  String    @map("workspace_id")
+  workspace    Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  approvalId   String?   @map("approval_id")
+  approval     ComposioActionApproval? @relation(fields: [approvalId], references: [id], onDelete: SetNull)
+  appKey       String    @map("app_key")
+  toolName     String    @map("tool_name")
+  riskTier     String    @map("risk_tier")
+  argsSummary  Json      @default("{}") @map("args_summary")
+  resultSummary Json     @default("{}") @map("result_summary")
+  latencyMs    Int?      @map("latency_ms")
+  // success | failed | denied | expired
+  status       String
+  // Who/what triggered it: user id or "agent:<surface>".
+  executedBy   String    @map("executed_by")
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  @@index([workspaceId, createdAt])
+  @@index([workspaceId, toolName, createdAt])
+  @@map("composio_action_logs")
+}
+
+// A Univer office document (sheet | doc | slide) owned by the host.
+// The snapshot is Univer IWorkbookData / IDocumentData JSON; the host owns
+// storage and versioning — Univer is the editor, not the database.
+model UniverDoc {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  // sheet | doc | slide
+  kind        String
+  title       String
+  // Univer snapshot JSON (IWorkbookData / IDocumentData / slide data).
+  snapshot    Json
+  version     Int       @default(1)
+  // Provenance, e.g. "report:<id>", "analytics:overview", "agent:mission:<id>".
+  sourceRef   String?   @map("source_ref")
+  // private | workspace | link
+  shareState  String    @default("private") @map("share_state")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@index([workspaceId, kind, updatedAt])
+  @@map("univer_docs")
 }
