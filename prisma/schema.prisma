@@ -3037,6 +3037,10 @@ model WorkspaceSettings {
   dataGovernance       Json?     @map("data_governance")
   // Tool namespaces the agent may use; empty = all enabled.
   agentAllowList       String[]  @map("agent_allow_list")
+  // Phase 14: manual risk-tier overrides for Composio tools, keyed by tool
+  // slug → "low" | "medium" | "high". Overrides win over verb-derived
+  // classification (spec §3).
+  toolTierOverrides    Json?     @map("tool_tier_overrides")
   updatedBy            String?   @map("updated_by")
   updatedAt            DateTime  @updatedAt @map("updated_at")
 
