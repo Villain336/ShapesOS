@@ -97,7 +97,15 @@ Composio ships **no native human-in-the-loop approval** in the platform (verifie
 
 ---
 
-## OPEN DECISIONS — Tico, your call (spec-first: nothing builds until you pick)
+## DECISIONS — LOCKED by Tico 2026-09-28
+
+- **(a) Composio hosted.** Fastest to value; user OAuth tokens on Composio's cloud is accepted for v1 (vault rule bent with eyes open; self-host revisit if Enterprise terms change).
+- **(b) Univer full suite** (sheets + docs + slides). xlsx question resolved: **CSV/PDF export built in-house for v1** — no Pro license budget; revisit if client demand for native .xlsx forces it.
+- **(c) Conservative gating:** reads + draft-creators run freely (logged); every external write and all destructive actions go through the approve/deny queue from day one.
+
+---
+
+## OPEN DECISIONS — (resolved 2026-09-28, see above; no build started)
 
 **(a) Composio hosted vs. open self-hosted alternative.**
 *Option 1 — Composio hosted:* fastest to value (100+ pre-built connectors, managed OAuth, free tier to start), but user OAuth tokens live on Composio's cloud and true self-host is Enterprise-quote-only — a standing vendor dependency that bends the vault rule.
