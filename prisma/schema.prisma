@@ -8257,6 +8257,20 @@ model ComposioActionLog {
   @@map("composio_action_logs")
 }
 
+// Phase 14 slice 10: platform-wide Composio hosted free-tier counter.
+// Deliberately NO row-level security: it holds only an aggregate call count
+// per calendar month (no tenant data), and the budget gauge must be readable
+// without a workspace scope (composio_action_logs is FORCE RLS, so a direct
+// platform-wide count always returns zero).
+model ComposioPlatformUsage {
+  // "2026-09"
+  periodKey String   @id @map("period_key")
+  calls     Int      @default(0)
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("composio_platform_usage")
+}
+
 // A Univer office document (sheet | doc | slide) owned by the host.
 // The snapshot is Univer IWorkbookData / IDocumentData JSON; the host owns
 // storage and versioning — Univer is the editor, not the database.

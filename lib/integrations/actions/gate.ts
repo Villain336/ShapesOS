@@ -25,6 +25,7 @@ import { getToolTierOverrides, requireConnectedEntity } from "@/lib/integrations
 import { redactArgs, summarizeArgs } from "@/lib/integrations/actions/redact";
 import { summarizeAction } from "@/lib/integrations/actions/summarize";
 import { describeBulk, extractBulkItems } from "@/lib/integrations/actions/bulk";
+import { getComposioBudgetWarning, meterComposioCall, bumpPlatformComposioCalls } from "@/lib/integrations/actions/budget";
 
 export const APPROVAL_TTL_MS = Number(process.env.ACTION_APPROVAL_TTL_MS ?? 24 * 3600_000);
 
@@ -325,6 +326,14 @@ export async function executeApproved(input: ExecuteApprovedInput) {
   }
 
   const connectedAccountId = await requireConnectedEntity(input.workspaceId, approval.appKey);
+
+  // Phase 14 slice 10: cost warning BEFORE the call. Advisory only — the
+  // action still executes; the credit ledger's own caps handle enforcement.
+  const budgetWarning = await getComposioBudgetWarning({
+    workspaceId: input.workspaceId,
+    toolName: approval.toolName,
+  });
+
   const started = Date.now();
   let status: "success" | "failed" = "success";
   let resultSummary: Record<string, unknown> = {};
@@ -354,7 +363,7 @@ export async function executeApproved(input: ExecuteApprovedInput) {
     toolName: approval.toolName,
     riskTier: tier,
     argsSummary: proposedArgs,
-    resultSummary,
+    resultSummary: budgetWarning ? { ...resultSummary, budgetWarning } : resultSummary,
     latencyMs: Date.now() - started,
     status,
     executedBy: input.executedBy,
@@ -403,8 +412,10 @@ export interface LogActionInput {
 
 /** Write the audit/metering record. Every execution path calls this. */
 export async function logAction(input: LogActionInput) {
-  return withWorkspaceScope(input.workspaceId, (tx) =>
-    tx.composioActionLog.create({
+  // Denied/expired rows are not executions — never metered, never counted.
+  const executed = input.status === "success" || input.status === "failed";
+  const row = await withWorkspaceScope(input.workspaceId, async (tx) => {
+    const created = await tx.composioActionLog.create({
       data: {
         workspaceId: input.workspaceId,
         approvalId: input.approvalId,
@@ -418,8 +429,21 @@ export async function logAction(input: LogActionInput) {
         executedBy: input.executedBy,
       },
       select: { id: true },
-    }),
-  );
+    });
+    // Phase 14 slice 10: platform free-tier counter, same transaction as the
+    // audit row — the count can never drift from the log.
+    if (executed) await bumpPlatformComposioCalls(tx);
+    return created;
+  });
+  // Phase 14 slice 10: meter executed calls through the credit ledger.
+  if (executed) {
+    await meterComposioCall({
+      workspaceId: input.workspaceId,
+      logId: row.id,
+      executedBy: input.executedBy,
+    });
+  }
+  return row;
 }
 
 /** Recent action log entries (audit view), newest first. */

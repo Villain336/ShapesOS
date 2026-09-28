@@ -6,6 +6,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Notice, btnCls, cardCls, primaryBtnVioletCls, type NoticeState } from "./ui";
+import ComposioUsageCard from "./ComposioUsageCard";
 
 interface SummaryData {
   used: number;
@@ -40,6 +41,7 @@ const ACTION_LABELS: Record<string, string> = {
   publish: "Publishes",
   connector_sync: "Connector syncs",
   storage_over_quota: "Storage over quota",
+  composio_tool_call: "Composio tool calls",
 };
 
 function actionLabel(a: string): string {
@@ -233,6 +235,8 @@ export default function UsageDashboard({ workspaceId }: { workspaceId: string })
               setNotice={setNotice}
             />
           </div>
+
+          <ComposioUsageCard workspaceId={workspaceId} />
         </>
       )}
     </div>

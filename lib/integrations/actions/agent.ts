@@ -30,6 +30,7 @@ import {
   proposeAction,
 } from "@/lib/integrations/actions/gate";
 import { redactArgs } from "@/lib/integrations/actions/redact";
+import { getComposioBudgetWarning } from "@/lib/integrations/actions/budget";
 
 export interface AgentInvokeInput {
   workspaceId: string;
@@ -85,6 +86,11 @@ export async function agentInvokeAction(input: AgentInvokeInput): Promise<AgentI
   const started = Date.now();
   let status: "success" | "failed" = "success";
   let resultSummary: Record<string, unknown> = {};
+  // Phase 14 slice 10: same advisory budget warning as the gated path.
+  const budgetWarning = await getComposioBudgetWarning({
+    workspaceId: input.workspaceId,
+    toolName: input.toolName,
+  });
   try {
     const res = await executeComposioTool(
       {
@@ -110,7 +116,7 @@ export async function agentInvokeAction(input: AgentInvokeInput): Promise<AgentI
     toolName: input.toolName,
     riskTier: classified.tier,
     argsSummary: input.args,
-    resultSummary,
+    resultSummary: budgetWarning ? { ...resultSummary, budgetWarning } : resultSummary,
     latencyMs: Date.now() - started,
     status,
     executedBy: input.invokedBy,
@@ -118,5 +124,10 @@ export async function agentInvokeAction(input: AgentInvokeInput): Promise<AgentI
   if (status === "failed") {
     throw new Error(`Action failed: ${JSON.stringify(resultSummary).slice(0, 200)}`);
   }
-  return { outcome: "executed", classified, resultSummary, latencyMs: Date.now() - started };
+  return {
+    outcome: "executed",
+    classified,
+    resultSummary: budgetWarning ? { ...resultSummary, budgetWarning } : resultSummary,
+    latencyMs: Date.now() - started,
+  };
 }
