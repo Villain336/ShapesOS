@@ -7,6 +7,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Notice, btnCls, cardCls, primaryBtnVioletCls, type NoticeState } from "./ui";
 import ComposioUsageCard from "./ComposioUsageCard";
+import RecordingStorageCard from "./RecordingStorageCard";
 
 interface SummaryData {
   used: number;
@@ -237,6 +238,7 @@ export default function UsageDashboard({ workspaceId }: { workspaceId: string })
           </div>
 
           <ComposioUsageCard workspaceId={workspaceId} />
+          <RecordingStorageCard workspaceId={workspaceId} />
         </>
       )}
     </div>

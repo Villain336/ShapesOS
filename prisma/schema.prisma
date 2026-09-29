@@ -8494,6 +8494,10 @@ model AgentRunRecording {
   sizeBytes      BigInt   @default(0) @map("size_bytes")
   // Decision (c): 30 days then summarize (slice 8 sweep drops videos).
   retentionUntil DateTime @map("retention_until")
+  // Slice 8: pinned recordings keep their video past retentionUntil.
+  pinned         Boolean  @default(false)
+  // Set when the sweep drops the video (trace always kept per decision c).
+  videoPurgedAt  DateTime? @map("video_purged_at")
   createdAt      DateTime @default(now()) @map("created_at")
 
   @@index([workspaceId, createdAt])
