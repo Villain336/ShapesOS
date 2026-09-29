@@ -538,6 +538,8 @@ model Workspace {
   composioConnections     ComposioConnection[]
   composioActionApprovals ComposioActionApproval[]
   composioActionLogs      ComposioActionLog[]
+  // Phase 15 slice 1: per-workspace discovered tool catalog back-relation.
+  composioToolCatalog     ComposioToolCatalog[]
   univerDocs              UniverDoc[]
   // Phase 10 (intelligence depth): owned data assets back-relations.
   dataSources             DataSource[]
@@ -8269,6 +8271,30 @@ model ComposioPlatformUsage {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("composio_platform_usage")
+}
+
+// Phase 15 slice 1: per-workspace discovered tool catalog (spec §1/§4).
+// Replaces the static V1_ACTION_CATALOG pinning with live discovery; the
+// v1 catalog itself stays as the verified baseline (never delete it).
+// Composio tools remain Composio's IP — we store slugs + metadata only.
+model ComposioToolCatalog {
+  id           String    @id @default(cuid())
+  workspaceId  String    @map("workspace_id")
+  workspace    Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  appKey       String    @map("app_key")
+  toolkitSlug  String    @map("toolkit_slug")
+  toolSlug     String    @map("tool_slug")
+  toolLabel    String?   @map("tool_label")
+  description  String?   @db.Text
+  // Monotonic per (workspaceId, appKey) refresh counter; bumps each refresh.
+  version      Int       @default(1)
+  discoveredAt DateTime  @default(now()) @map("discovered_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  @@unique([workspaceId, toolkitSlug, toolSlug])
+  @@index([workspaceId, appKey])
+  @@map("composio_tool_catalog")
 }
 
 // A Univer office document (sheet | doc | slide) owned by the host.

@@ -19,6 +19,7 @@ import {
 } from "@/lib/integrations/composio";
 import { getV1App, isValidTier } from "@/lib/integrations/actions/risk";
 import { signOAuthState } from "@/lib/integrations/actions/oauth-state";
+import { refreshCatalogForConnection } from "@/lib/integrations/actions/discovery";
 
 export interface InitiateConnectResult {
   connectUrl: string;
@@ -92,7 +93,7 @@ export async function confirmConnection(opts: {
 }): Promise<{ id: string; status: string }> {
   requireV1App(opts.appKey);
   if (!opts.connectedAccountId.trim()) throw new Error("connectedAccountId is required");
-  return withWorkspaceScope(opts.workspaceId, async (tx) => {
+  const row = await withWorkspaceScope(opts.workspaceId, async (tx) => {
     const row = await tx.composioConnection.upsert({
       where: {
         workspaceId_appKey: { workspaceId: opts.workspaceId, appKey: opts.appKey },
@@ -114,6 +115,17 @@ export async function confirmConnection(opts: {
     });
     return row;
   });
+  // Phase 15 slice 1: seed/refresh the per-workspace tool catalog on connect
+  // finalize (fixture-backed until COMPOSIO_API_KEY is wired). Best-effort:
+  // a catalog miss must never break connection finalize.
+  try {
+    await refreshCatalogForConnection(opts.workspaceId, opts.appKey);
+  } catch (e) {
+    console.warn(
+      `[phase15] catalog refresh for ${opts.appKey} failed: ${(e as Error).message}`,
+    );
+  }
+  return row;
 }
 
 export async function listConnections(workspaceId: string) {
