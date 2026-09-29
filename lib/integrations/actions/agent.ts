@@ -25,6 +25,7 @@ import {
   getToolTierOverrides,
   requireConnectedEntity,
 } from "@/lib/integrations/actions/connections";
+import { resolveToolkitForTool } from "@/lib/integrations/actions/toolkits";
 import {
   logAction,
   proposeAction,
@@ -63,7 +64,12 @@ export type AgentInvokeOutcome =
  */
 export async function agentInvokeAction(input: AgentInvokeInput): Promise<AgentInvokeOutcome> {
   const overrides = await getToolTierOverrides(input.workspaceId);
-  const classified = classifyAction(input.toolName, overrides, { appKey: input.appKey });
+  // Phase 15 slice 6 — resolve the toolkit so the auto-read accuracy gate
+  // inside classifyAction can escalate a derived low tier to medium when
+  // the toolkit hasn't passed the sampled tier-accuracy eval (fail-closed:
+  // reads stay usable via approval, never silent).
+  const toolkitSlug = await resolveToolkitForTool(input.workspaceId, input.toolName);
+  const classified = classifyAction(input.toolName, overrides, { appKey: input.appKey, toolkitSlug });
   // Fail-closed: no connection row -> no execution, no proposal.
   const connectedAccountId = await requireConnectedEntity(input.workspaceId, input.appKey);
 

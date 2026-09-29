@@ -1,0 +1,49 @@
+{
+  "ranAt": "2026-09-29T00:44:15.063Z",
+  "target": 90,
+  "overall": 100,
+  "entryCount": 96,
+  "goldSha": "e5bad03c0f5c0ed9028ff562c2ce11c202a6e12fd4446c4258cb5c15a04975f0",
+  "perToolkit": {
+    "gmail": {
+      "agreement": 100,
+      "n": 12,
+      "passed": true
+    },
+    "google_sheets": {
+      "agreement": 100,
+      "n": 12,
+      "passed": true
+    },
+    "hubspot": {
+      "agreement": 100,
+      "n": 12,
+      "passed": true
+    },
+    "notion": {
+      "agreement": 100,
+      "n": 12,
+      "passed": true
+    },
+    "salesforce": {
+      "agreement": 100,
+      "n": 12,
+      "passed": true
+    },
+    "slack": {
+      "agreement": 100,
+      "n": 12,
+      "passed": true
+    },
+    "stripe": {
+      "agreement": 100,
+      "n": 12,
+      "passed": true
+    },
+    "zendesk": {
+      "agreement": 100,
+      "n": 12,
+      "passed": true
+    }
+  }
+}

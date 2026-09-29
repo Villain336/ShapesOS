@@ -56,7 +56,7 @@ export {
   type DerivedTier,
 } from "./derive";
 
-import { deriveTier, isValidTier } from "./derive";
+import { deriveTier, isValidTier, isToolkitAutoReadLive } from "./derive";
 
 const TIER_RANK: Record<RiskTier, number> = { low: 0, medium: 1, high: 2 };
 
@@ -96,6 +96,21 @@ export interface ClassifyOptions {
   /** Tool description — enables the description-text fallback when the
    *  slug is ambiguous. */
   description?: string;
+  /**
+   * Phase 15 slice 6 — the toolkit the tool resolved to (null when it
+   * resolves to no known toolkit). The auto-read accuracy gate
+   * (derive.ts isToolkitAutoReadLive, spec §6) escalates a derived LOW /
+   * auto-executable tier to MEDIUM when the toolkit is not auto-read-live:
+   * reads stay usable (approval-gated) but never run silent until the
+   * sampled tier-accuracy eval passes for the toolkit (agreement ≥ target,
+   * committed result, fresh vs the gold set).
+   *
+   * undefined = the caller did not resolve a toolkit (direct unit-test
+   * calls) → the gate is skipped. The gate/agent paths always resolve, so
+   * only they enforce it. This keeps classifyAction's pure-unit contract
+   * unchanged while the load-bearing paths stay fail-closed.
+   */
+  toolkitSlug?: string | null;
 }
 
 /**
@@ -115,6 +130,13 @@ export interface ClassifyOptions {
  * high with autoExecutable=false — HIGH-GATED: the gate's existing
  * high-tier second-confirmation path (executeApproved's
  * destructiveConfirm) is required. Nothing auto-runs unclassified.
+ *
+ * Phase 15 slice 6: the auto-read accuracy gate (spec §6). When the caller
+ * passes opts.toolkitSlug, a derived LOW tier only stays low (silent
+ * auto-execution) if isToolkitAutoReadLive(toolkitSlug) — otherwise it is
+ * escalated to MEDIUM (gated, still executable with approval: reads stay
+ * usable, just not silent). The gate escalates, never downgrades: manual
+ * overrides are still clamped at the (possibly gate-raised) floor.
  */
 export function classifyAction(
   toolName: string,
@@ -125,26 +147,38 @@ export function classifyAction(
   const override = overrides?.[slug] ?? overrides?.[toolName];
   const draftCreator = isDraftCreator(toolName);
   const derived = deriveTier(toolName, opts?.description, opts?.appKey);
+  // Slice 6 — auto-read gate (escalation only, never a downgrade):
+  // a derived low/auto-executable tier goes live only for toolkits that
+  // passed the sampled tier-accuracy eval. opts.toolkitSlug === undefined
+  // means the caller never resolved a toolkit (direct unit calls) → the
+  // gate is skipped; null or a slug is always consulted, fail-closed.
+  const gateEscalated =
+    opts?.toolkitSlug !== undefined &&
+    derived.tier === "low" &&
+    !isToolkitAutoReadLive(opts.toolkitSlug);
+  const baseTier: RiskTier = gateEscalated ? "medium" : derived.tier;
   if (override !== undefined && isValidTier(override)) {
-    const tier = riskier(derived.tier, override);
+    const tier = riskier(baseTier, override);
     return {
       toolName,
       tier,
       draftCreator,
       autoExecutable:
         derived.classified &&
-        (tier === "low" || (draftCreator && tier === "medium" && override !== "high")),
+        (tier === "low" ||
+          (draftCreator && tier === "medium" && !gateEscalated && override !== "high")),
       overridden: true,
-      clamped: TIER_RANK[override] < TIER_RANK[derived.tier],
+      clamped: TIER_RANK[override] < TIER_RANK[baseTier],
       classified: derived.classified,
     };
   }
   return {
     toolName,
-    tier: derived.tier,
+    tier: baseTier,
     draftCreator,
     autoExecutable:
-      derived.classified && (derived.tier === "low" || draftCreator),
+      derived.classified &&
+      (baseTier === "low" || (draftCreator && baseTier === "medium" && !gateEscalated)),
     overridden: false,
     clamped: false,
     classified: derived.classified,

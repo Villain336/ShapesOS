@@ -92,7 +92,11 @@ export interface ProposeInput {
 export async function proposeAction(input: ProposeInput) {
   const toolkitSlug = await resolveToolkitForTool(input.workspaceId, input.toolName);
   const overrides = await getToolTierOverrides(input.workspaceId);
-  const classified = classifyAction(input.toolName, overrides, { appKey: input.appKey });
+  // Phase 15 slice 6 — the resolved toolkit feeds the auto-read accuracy
+  // gate inside classifyAction: a derived low tier escalates to medium
+  // (gated, not silent) unless the toolkit passed the sampled tier-accuracy
+  // eval (committed, fresh vs the gold set).
+  const classified = classifyAction(input.toolName, overrides, { appKey: input.appKey, toolkitSlug });
   // Refuse fail-closed ONLY for known-but-disabled toolkits (slice 3). A
   // tool that resolves to no known toolkit falls through to the slice-2
   // conservative floor (unclassified → high-gated, never auto-executed).
@@ -154,6 +158,20 @@ export interface DecideInput {
 /** Approve or deny a pending approval. Denial kills the action with a
  *  reason; approval arms it for executeApproved(). */
 export async function decideApproval(input: DecideInput) {
+  // Phase 15 slice 6 — resolve the toolkit BEFORE the transaction (the
+  // re-classify below must carry it for the auto-read gate; resolving
+  // inside the tx would nest withWorkspaceScope calls).
+  let reclassToolkitSlug: string | null | undefined;
+  if (input.editedArgs) {
+    const lite = await withWorkspaceScope(input.workspaceId, (tx) =>
+      tx.composioActionApproval.findFirst({
+        where: { id: input.approvalId, workspaceId: input.workspaceId },
+        select: { toolName: true },
+      }),
+    );
+    if (!lite) throw new Error("Approval not found");
+    reclassToolkitSlug = await resolveToolkitForTool(input.workspaceId, lite.toolName);
+  }
   return withWorkspaceScope(input.workspaceId, async (tx) => {
     const approval = await tx.composioActionApproval.findFirst({
       where: { id: input.approvalId, workspaceId: input.workspaceId },
@@ -178,7 +196,7 @@ export async function decideApproval(input: DecideInput) {
     // tier is re-derived so an edit can't silently change the action's risk
     // profile. The conservative floor in classifyAction still holds.
     const reclassified = input.editedArgs
-      ? classifyAction(approval.toolName, await getToolTierOverrides(input.workspaceId), { appKey: approval.appKey })
+      ? classifyAction(approval.toolName, await getToolTierOverrides(input.workspaceId), { appKey: approval.appKey, toolkitSlug: reclassToolkitSlug })
       : null;
     const tierChanged = reclassified !== null && reclassified.tier !== approval.riskTier;
     const updated = await tx.composioActionApproval.update({
