@@ -13,6 +13,7 @@
 
 import type { ComponentType } from "react";
 import { ApprovalCard } from "@/components/agents/ApprovalCard";
+import { ReportPreview } from "@/components/agents/ReportPreview";
 
 export interface GenerativeComponentDef {
   /** Model-facing description: when the agent should emit this component. */
@@ -31,6 +32,13 @@ export const GENERATIVE_COMPONENT_REGISTRY = {
       "Render a pending autopilot approval item in-flow. Use when the user must approve, deny, or edit " +
       "a pending autopilot item (content refresh, new page, or keyword brief). Props: itemId, projectId.",
     component: ApprovalCard,
+  },
+  report_preview: {
+    description:
+      "Render a pending branded-report send approval in-flow. Use when the user must approve, deny, or edit " +
+      "a drafted report before it renders to PDF. Shows every figure with its source pointer; figures without " +
+      "a source are flagged, never rendered. Props: approvalId.",
+    component: ReportPreview,
   },
 } as const satisfies Record<string, GenerativeComponentDef>;
 

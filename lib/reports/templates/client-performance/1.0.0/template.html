@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>{{report_title}}</title>
+</head>
+<body>
+
+  <header class="hero">
+    <!--DRAFT_BADGE-->
+    <div class="wordmark"></div>
+    <h1 class="hero-kicker">Client</h1>
+    <h1 class="hero-title">Performance</h1>
+    <p class="hero-sub">{{meta_client}} · {{meta_period}}</p>
+  </header>
+
+  <main class="content">
+    <h2 class="report-title">{{report_title}}</h2>
+
+    <table class="meta">
+      <tr>
+        <td class="label">Prepared For:</td>
+        <td class="value">{{meta_client}}</td>
+      </tr>
+      <tr>
+        <td class="label">Reporting Period:</td>
+        <td class="value">{{meta_period}}</td>
+      </tr>
+      <tr>
+        <td class="label">Prepared On:</td>
+        <td class="value">{{meta_prepared_on}}</td>
+      </tr>
+    </table>
+
+    <h3 class="section">Key Performance Indicators</h3>
+    <p class="section-lede">
+      Every figure below is measured, not estimated. Each KPI carries its
+      source — a figure with no source never reaches this page.
+    </p>
+    <div class="kpis">
+      <!--FIGURE_BLOCK-->
+    </div>
+
+    <h3 class="section">How To Read This Report</h3>
+    <p>
+      Deltas compare the reporting period against the prior period of equal
+      length. "Source" names the connected provider that measured the figure
+      and the record it came from — ask your agency partner to re-pull any
+      figure by its source reference.
+    </p>
+
+    <p class="disclaimer">
+      <strong>Measured figures only.</strong> This report renders figures from
+      connected data sources. If a figure's source was unavailable, it appears
+      here as flagged — never as a made-up number.
+    </p>
+  </main>
+
+</body>
+</html>

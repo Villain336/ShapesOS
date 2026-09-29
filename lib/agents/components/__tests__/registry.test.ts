@@ -16,9 +16,15 @@ import {
 import { ApprovalCard } from "@/components/agents/ApprovalCard";
 
 describe("generative component registry (allowlist)", () => {
-  it("registers approval_card as the first (and only) component", () => {
-    assert.deepEqual(Object.keys(GENERATIVE_COMPONENT_REGISTRY), ["approval_card"]);
+  it("registers the allowlisted components (approval_card, report_preview)", () => {
+    // Slice 9 added report_preview; the registry is designed to grow (slice 10
+    // adds the mobile subset). The allowlist is still exact — nothing else.
+    assert.deepEqual(Object.keys(GENERATIVE_COMPONENT_REGISTRY).sort(), [
+      "approval_card",
+      "report_preview",
+    ]);
     assert.equal(isRegisteredComponentName("approval_card"), true);
+    assert.equal(isRegisteredComponentName("report_preview"), true);
   });
 
   it("resolves approval_card to the ApprovalCard component", () => {

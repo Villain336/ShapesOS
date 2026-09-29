@@ -1,0 +1,232 @@
+/* ==========================================================================
+   report.css — client-performance v1.0.0 (Grow client-performance report)
+   --------------------------------------------------------------------------
+   BRAND TOKENS (brand-kit injection point). Everything below derives from
+   these variables; a tenant's brand kit restyles the whole report by
+   overriding this :root block only. No other edits needed.
+
+   WEASYPRINT RULE (linted): never use CSS Images Level 4 double-position
+   color stops (e.g. `transparent 0 22px`) — WeasyPrint silently drops the
+   whole background. Single-position stops only.
+   ========================================================================== */
+:root {
+  --brand-primary:       #7c3aed;   /* default violet — overridden by brand kit */
+  --brand-primary-deep:  #2e1065;   /* hero gradient start (dark)          */
+  --brand-primary-mid:   #6d28d9;   /* hero gradient mid                   */
+  --brand-tint:          #ede9fe;   /* light wash — KPI cards, table head  */
+  --brand-tint-soft:     #f5f3ff;   /* zebra stripe / soft panels          */
+  --brand-ink:           #1c1917;   /* body text                           */
+  --brand-muted:         #78716c;   /* secondary text                      */
+  --brand-rule:          #ddd6fe;   /* hairline rules                      */
+  --brand-font-body:     "Noto Sans", "DejaVu Sans", sans-serif;
+  --brand-font-display:  "Noto Serif", "DejaVu Serif", serif;
+  --brand-wordmark:      "MARKETR"; /* injected wordmark text (logo slot) */
+  --brand-tagline:       "REPORT";
+}
+
+/* ---------- page ---------- */
+@page {
+  size: A4;
+  margin: 0 0 16mm 0;
+  @bottom-center {
+    content: "Measured figures only — every KPI carries its source    ·    Page " counter(page) " of " counter(pages);
+    font-family: var(--brand-font-body);
+    font-size: 7.5pt;
+    letter-spacing: 0.06em;
+    color: var(--brand-muted);
+  }
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+}
+body {
+  font-family: var(--brand-font-body);
+  color: var(--brand-ink);
+  font-size: 10pt;
+  line-height: 1.55;
+}
+
+/* ---------- hero ---------- */
+.hero {
+  position: relative;
+  /* Single-position gradient stops only (see the WeasyPrint rule above). */
+  background:
+    repeating-linear-gradient(115deg,
+      rgba(255,255,255,0) 0,
+      rgba(255,255,255,0.035) 22px,
+      rgba(255,255,255,0) 24px),
+    linear-gradient(120deg,
+      var(--brand-primary-deep) 0%,
+      var(--brand-primary-mid) 55%,
+      var(--brand-primary) 100%);
+  color: #ffffff;
+  padding: 30mm 18mm 22mm 18mm;
+}
+.draft-badge {
+  position: absolute;
+  top: 10mm;
+  right: 18mm;
+  border: 1.5pt solid rgba(255,255,255,0.85);
+  color: #ffffff;
+  font-size: 7.5pt;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  padding: 3pt 10pt;
+  border-radius: 3pt;
+}
+.wordmark {
+  font-size: 9pt;
+  font-weight: 700;
+  letter-spacing: 0.34em;
+  margin-bottom: 3mm;
+}
+.wordmark::before {
+  content: var(--brand-wordmark);
+}
+.wordmark::after {
+  content: "  " var(--brand-tagline);
+  font-weight: 400;
+  letter-spacing: 0.34em;
+  opacity: 0.75;
+}
+.hero-kicker {
+  display: inline-block;
+  font-family: var(--brand-font-display);
+  font-size: 21pt;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  border-bottom: 2.5pt solid #ffffff;
+  padding-bottom: 2mm;
+  margin: 0 0 3mm 0;
+}
+.hero-title {
+  font-family: var(--brand-font-display);
+  font-size: 46pt;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin: 0;
+  line-height: 1;
+}
+.hero-sub {
+  margin: 4mm 0 0 0;
+  font-size: 11pt;
+  letter-spacing: 0.06em;
+  opacity: 0.9;
+}
+
+/* ---------- content ---------- */
+.content {
+  padding: 12mm 18mm 0 18mm;
+}
+.report-title {
+  font-family: var(--brand-font-display);
+  font-size: 22pt;
+  font-weight: 700;
+  color: var(--brand-ink);
+  margin: 0 0 6mm 0;
+}
+
+/* accent-bar section headings */
+.section {
+  font-family: var(--brand-font-display);
+  font-size: 15pt;
+  font-weight: 700;
+  color: var(--brand-ink);
+  margin: 9mm 0 4mm 0;
+  padding-bottom: 2.5mm;
+  border-bottom: 1pt solid var(--brand-rule);
+}
+.section::before {
+  content: "";
+  display: block;
+  width: 52pt;
+  height: 4.5pt;
+  background: var(--brand-primary);
+  margin-bottom: 3mm;
+}
+.section-lede {
+  color: var(--brand-muted);
+  font-size: 9.5pt;
+  margin: 0 0 5mm 0;
+}
+
+/* metadata box */
+.meta {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0 0 2mm 0;
+  font-size: 9.5pt;
+}
+.meta td {
+  padding: 2.6mm 4mm;
+  border: 0.75pt solid #ffffff;
+  vertical-align: top;
+}
+.meta td.label {
+  width: 34%;
+  background: var(--brand-tint);
+  font-weight: 700;
+  color: var(--brand-ink);
+}
+.meta td.value {
+  background: var(--brand-tint-soft);
+  color: var(--brand-muted);
+}
+
+/* KPI cards — one per figure, each with its source pointer */
+.kpis {
+  width: 100%;
+}
+.kpi {
+  background: var(--brand-tint-soft);
+  border-left: 3.5pt solid var(--brand-primary);
+  padding: 4mm 5mm;
+  margin: 0 0 4mm 0;
+}
+.kpi-label {
+  font-size: 8.5pt;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--brand-muted);
+}
+.kpi-value {
+  font-family: var(--brand-font-display);
+  font-size: 24pt;
+  font-weight: 800;
+  color: var(--brand-ink);
+  line-height: 1.15;
+}
+.kpi-delta {
+  font-size: 9.5pt;
+  font-weight: 700;
+  color: var(--brand-primary-mid);
+  margin-top: 1mm;
+}
+.kpi-source {
+  font-size: 8pt;
+  color: var(--brand-muted);
+  margin-top: 1.5mm;
+  letter-spacing: 0.02em;
+}
+.kpi-source strong {
+  color: var(--brand-ink);
+  font-weight: 700;
+}
+
+/* disclaimer */
+.disclaimer {
+  margin-top: 8mm;
+  padding: 4mm 5mm;
+  background: var(--brand-tint-soft);
+  border-left: 3pt solid var(--brand-primary);
+  font-size: 8.5pt;
+  color: var(--brand-muted);
+}
+.disclaimer strong {
+  color: var(--brand-ink);
+}

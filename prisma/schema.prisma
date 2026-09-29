@@ -220,6 +220,14 @@ enum FileChangeAction {
   studio_domain_purchased
   studio_domain_purchase_failed
   studio_domain_removed
+  // Phase 16 slice 9: branded report engine (draft → gate → render).
+  report_send_drafted
+  report_send_approved
+  report_send_denied
+  report_send_edited
+  report_send_flagged
+  report_send_rendered
+  report_send_failed
   // Day-1 hardening: authentication audit events (H1/M8).
   auth_login_failed
   auth_login_succeeded
@@ -543,6 +551,8 @@ model Workspace {
   composioToolCatalog     ComposioToolCatalog[]
   // Phase 16 slice 5: viewable agent runs back-relation.
   agentRuns               AgentRun[]
+  // Phase 16 slice 9: branded report engine back-relation.
+  reportSendApprovals     ReportSendApproval[]
   // Phase 15 slice 5: per-workspace catalog drift reports back-relation.
   composioCatalogDrift    ComposioCatalogDrift[]
   // Phase 15 slice 3: per-workspace toolkit enablement back-relation.
@@ -1009,6 +1019,8 @@ model BrandKit {
   designs             Design[]
   // Milestone 19: newsletter templates using this brand kit.
   newsletterTemplates NewsletterTemplate[]
+  // Phase 16 slice 9: branded report engine send approvals using this kit.
+  reportSendApprovals ReportSendApproval[]
 
   @@map("brand_kits")
 }
@@ -2594,11 +2606,11 @@ model ProjectAsset {
   projectId String  @map("project_id")
   project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
-  name          String
-  source        String // upload | generated
-  url           String  @db.Text
-  mimeType      String? @map("mime_type")
-  metadata      String? @db.Text // JSON: export format, dimensions…
+  name     String
+  source   String // upload | generated
+  url      String  @db.Text
+  mimeType String? @map("mime_type")
+  metadata String? @db.Text // JSON: export format, dimensions…
 
   createdAt DateTime @default(now()) @map("created_at")
 
@@ -6961,11 +6973,11 @@ model MemoryEpisode {
   // so Prisma Migrate never tries to manage or drop it.
   search_tsv  Unsupported("tsvector")?    @map("search_tsv")
 
-  learnings MemoryLearning[] @relation("LearningSourceEpisode")
-  facts     MemoryFact[]     @relation("FactSourceEpisode")
+  learnings MemoryLearning[]   @relation("LearningSourceEpisode")
+  facts     MemoryFact[]       @relation("FactSourceEpisode")
   // Phase 13B: feedback signals attached to agent-call episodes
   // (explicit thumbs, edit-diffs, accepts, regenerations).
-  feedback  AgentFeedback[]  @relation("FeedbackSourceEpisode")
+  feedback  AgentFeedback[]    @relation("FeedbackSourceEpisode")
   knowledge CompanyKnowledge[] @relation("KnowledgeSourceEpisode")
 
   @@index([workspaceId, episodeType])
@@ -7139,22 +7151,22 @@ enum FeedbackKind {
 }
 
 model AgentFeedback {
-  id          String       @id @default(cuid()) @map("id")
-  workspaceId String       @map("workspace_id")
-  workspace   Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  id          String         @id @default(cuid()) @map("id")
+  workspaceId String         @map("workspace_id")
+  workspace   Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   // Nullable: feedback can attach to a non-episode artifact (e.g. a
   // static suggestion); when it cites an agent call it links here.
-  episodeId   String?      @map("episode_id")
+  episodeId   String?        @map("episode_id")
   episode     MemoryEpisode? @relation("FeedbackSourceEpisode", fields: [episodeId], references: [id], onDelete: SetNull)
   // Which agent persona produced the output (e.g. "strategist").
-  agentId     String       @map("agent_id")
-  kind        FeedbackKind @map("kind")
+  agentId     String         @map("agent_id")
+  kind        FeedbackKind   @map("kind")
   // Kind-specific payload: thumbs → {source}; edit_diff → {before,
   // after, diffStats}; accepted → {withEdits: bool}; regenerated →
   // {reason}. Never raw user PII beyond what episodes already carry —
   // scrubbed by the feedback pipeline (worker 4).
-  signal      Json         @map("signal")
-  createdAt   DateTime     @default(now()) @map("created_at")
+  signal      Json           @map("signal")
+  createdAt   DateTime       @default(now()) @map("created_at")
 
   @@index([workspaceId, createdAt])
   @@index([workspaceId, kind])
@@ -7169,22 +7181,22 @@ model AgentFeedback {
 // review"). pinnedByUser=true makes the whole profile read-only to the
 // learner (spec: "don't touch the voice profile").
 model BrandVoiceProfile {
-  id           String   @id @default(cuid()) @map("id")
-  workspaceId  String   @unique @map("workspace_id")
-  workspace    Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  id             String    @id @default(cuid()) @map("id")
+  workspaceId    String    @unique @map("workspace_id")
+  workspace      Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   // {vocabulary: [...], rhythm, formality, pov, humor, doExamples: [...],
   //  dontExamples: [...]} — vocabulary per Jasper's voice engine shape.
-  dimensions   Json     @map("dimensions")
+  dimensions     Json      @map("dimensions")
   // {samples: [...ids/hashes], editCount, lastDerivedAt} — provenance so
   // the user can see WHAT the voice was learned from.
-  derivedFrom  Json     @map("derived_from")
-  confidence   Float    @default(0.0) @map("confidence")
-  pinnedByUser Boolean  @default(false) @map("pinned_by_user")
+  derivedFrom    Json      @map("derived_from")
+  confidence     Float     @default(0.0) @map("confidence")
+  pinnedByUser   Boolean   @default(false) @map("pinned_by_user")
   // Proposed by the learner, awaiting user review; applied to
   // dimensions only on explicit accept (worker 6 + UI worker 7).
-  pendingUpdates Json?  @map("pending_updates")
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
+  pendingUpdates Json?     @map("pending_updates")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
 
   @@map("brand_voice_profiles")
 }
@@ -7249,23 +7261,23 @@ enum StyleRuleSeverity {
 }
 
 model StyleRule {
-  id          String           @id @default(cuid()) @map("id")
-  workspaceId String           @map("workspace_id")
-  workspace   Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  kind        StyleRuleKind    @map("kind")
+  id          String            @id @default(cuid()) @map("id")
+  workspaceId String            @map("workspace_id")
+  workspace   Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  kind        StyleRuleKind     @map("kind")
   // ban → the forbidden phrase/regex; require → the required line;
   // disclaimer → compliance text; tone → guidance snippet.
-  pattern     String           @map("pattern") @db.Text
+  pattern     String            @map("pattern") @db.Text
   // ban → suggested replacement; require/disclaimer → insertion
   // context; tone → null.
-  replacement String?          @map("replacement") @db.Text
+  replacement String?           @map("replacement") @db.Text
   severity    StyleRuleSeverity @map("severity")
-  pinned      Boolean          @default(false) @map("pinned")
-  active      Boolean          @default(true) @map("active")
+  pinned      Boolean           @default(false) @map("pinned")
+  active      Boolean           @default(true) @map("active")
   // "user" | "onboarding" | "consolidation" — who/what created it.
-  source      String           @map("source")
-  createdAt   DateTime         @default(now()) @map("created_at")
-  updatedAt   DateTime         @updatedAt @map("updated_at")
+  source      String            @map("source")
+  createdAt   DateTime          @default(now()) @map("created_at")
+  updatedAt   DateTime          @updatedAt @map("updated_at")
 
   @@index([workspaceId, kind, active])
   @@index([workspaceId, createdAt])
@@ -7279,24 +7291,24 @@ model StyleRule {
 // what-happened log. bodyRef points at the actual artifact (editor doc
 // id / URL / asset id) — the body itself is NOT duplicated here.
 model ContentRecord {
-  id          String   @id @default(cuid()) @map("id")
-  workspaceId String   @map("workspace_id")
+  id          String    @id @default(cuid()) @map("id")
+  workspaceId String    @map("workspace_id")
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   // Free-string taxonomy (blog_post, email, social_post, ad, landing,
   // video_script, ...) — kinds grow faster than enums.
-  kind        String   @map("kind")
-  title       String   @map("title")
-  bodyRef     String?  @map("body_ref")
+  kind        String    @map("kind")
+  title       String    @map("title")
+  bodyRef     String?   @map("body_ref")
   // The creative angle/hook, for dedupe ("did we already run this?").
-  angle       String?  @map("angle") @db.Text
+  angle       String?   @map("angle") @db.Text
   // Channel it ran on (blog, linkedin, tiktok, email, ...) — null for
   // drafts that never shipped.
-  channel     String?  @map("channel")
+  channel     String?   @map("channel")
   // {impressions, clicks, conversions, rankDelta, ...} — fed by the
   // analytics integrations; null until measured. Closes the loop:
   // learn → create → measure → learn (spec §2).
-  performance Json?    @map("performance")
-  createdAt   DateTime @default(now()) @map("created_at")
+  performance Json?     @map("performance")
+  createdAt   DateTime  @default(now()) @map("created_at")
 
   @@index([workspaceId, createdAt])
   @@index([workspaceId, kind])
@@ -7312,24 +7324,24 @@ model ContentRecord {
 // same persona — incoherent under tenant scoping. All reads/writes go
 // through withWorkspaceScope (fail-closed).
 model PersonaProfile {
-  id              String    @id @default(cuid()) @map("id")
-  workspaceId     String    @map("workspace_id")
-  workspace       Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  id               String    @id @default(cuid()) @map("id")
+  workspaceId      String    @map("workspace_id")
+  workspace        Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   // Phase-12 persona key (canonical five, see lib/expert/personas/):
   // "business-strategist" | "agents-orchestrator" |
   // "multi-agent-systems-architect" | "workflow-architect" |
   // "studio-producer".
-  agentId         String    @map("agent_id")
+  agentId          String    @map("agent_id")
   // {register, manner, quirks: [...], taboos: [...]} — how it talks.
-  voice           Json      @map("voice")
+  voice            Json      @map("voice")
   // Long-lived continuity: commitments, running jokes, known user
   // facts this persona keeps ("last week you decided X").
-  continuityNotes String    @map("continuity_notes") @db.Text
+  continuityNotes  String    @map("continuity_notes") @db.Text
   // How this persona expresses uncertainty ("my best read is X, I'm
   // not sure about Y") vs. asking a clarifying question.
-  uncertaintyStyle String   @map("uncertainty_style") @db.Text
-  createdAt       DateTime  @default(now()) @map("created_at")
-  updatedAt       DateTime  @updatedAt @map("updated_at")
+  uncertaintyStyle String    @map("uncertainty_style") @db.Text
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
 
   @@unique([workspaceId, agentId])
   @@map("persona_profiles")
@@ -7975,20 +7987,20 @@ model WorkspaceFlagOverride {
 // A long-form video ingested for clipping ("upload" = fileRef points at
 // stored media; "url" = sourceUrl points at the remote original).
 model ClipSource {
-  id               String     @id @default(cuid()) @map("id")
-  workspaceId      String     @map("workspace_id")
-  workspace        Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  origin           String     @map("origin") // "upload" | "url"
-  title            String     @map("title")
-  sourceUrl        String?    @map("source_url")
-  fileRef          String?    @map("file_ref")
-  durationSec      Float?     @map("duration_sec")
-  transcriptStatus String     @default("pending") @map("transcript_status") // pending|processing|ready|failed
-  transcript       Json?      @map("transcript") // { words: [{w,start,end}], text }
-  createdAt        DateTime   @default(now()) @map("created_at")
+  id               String    @id @default(cuid()) @map("id")
+  workspaceId      String    @map("workspace_id")
+  workspace        Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  origin           String    @map("origin") // "upload" | "url"
+  title            String    @map("title")
+  sourceUrl        String?   @map("source_url")
+  fileRef          String?   @map("file_ref")
+  durationSec      Float?    @map("duration_sec")
+  transcriptStatus String    @default("pending") @map("transcript_status") // pending|processing|ready|failed
+  transcript       Json?     @map("transcript") // { words: [{w,start,end}], text }
+  createdAt        DateTime  @default(now()) @map("created_at")
 
-  clips            Clip[]
-  jobs             ClipJob[]
+  clips Clip[]
+  jobs  ClipJob[]
 
   @@index([workspaceId, createdAt])
   @@map("clip_sources")
@@ -8050,25 +8062,25 @@ model ClipJob {
 // A configured agent in a workspace: lead follow-up (voice/text) or
 // voiceover narration. TTS backend defaults to VoiceStudio (local).
 model VoiceAgent {
-  id           String   @id @default(cuid())
-  workspaceId  String   @map("workspace_id")
+  id           String    @id @default(cuid())
+  workspaceId  String    @map("workspace_id")
   workspace    Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   name         String
-  purpose      String   // followup | voiceover
+  purpose      String // followup | voiceover
   // VoiceStudio voice id (default backend) or provider voice id when the
   // workspace opts into a BYO provider key.
-  voiceId      String   @map("voice_id")
-  voiceBackend String   @default("voicestudio") @map("voice_backend") // voicestudio | byo_provider
+  voiceId      String    @map("voice_id")
+  voiceBackend String    @default("voicestudio") @map("voice_backend") // voicestudio | byo_provider
   // Persona prompt seed, hours, escalation rules, consent-list refs.
-  config       Json     @default("{}")
+  config       Json      @default("{}")
   // Workspace kill switch: when true the agent refuses all new sessions.
-  killSwitch   Boolean  @default(false) @map("kill_switch")
-  status       String   @default("active") // active | paused | archived
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
+  killSwitch   Boolean   @default(false) @map("kill_switch")
+  status       String    @default("active") // active | paused | archived
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
 
-  scripts      CallScript[]
-  sessions     CallSession[]
+  scripts       CallScript[]
+  sessions      CallSession[]
   voiceoverJobs VoiceoverJob[]
 
   @@index([workspaceId, purpose, status])
@@ -8093,7 +8105,7 @@ model CallScript {
   createdAt   DateTime   @default(now()) @map("created_at")
   updatedAt   DateTime   @updatedAt @map("updated_at")
 
-  sessions    CallSession[]
+  sessions CallSession[]
 
   @@index([workspaceId, agentId, status])
   @@map("call_scripts")
@@ -8113,7 +8125,7 @@ model CallSession {
   lead             Lead        @relation(fields: [leadId], references: [id], onDelete: Cascade)
   scriptId         String?     @map("script_id")
   script           CallScript? @relation(fields: [scriptId], references: [id], onDelete: SetNull)
-  channel          String      // voice | sms | chat
+  channel          String // voice | sms | chat
   direction        String      @default("outbound") // outbound | inbound
   // Snapshot of the consent record at session start (first-class proof).
   consentProof     Json        @default("{}") @map("consent_proof")
@@ -8121,7 +8133,7 @@ model CallSession {
   transcript       Json        @default("[]")
   recordingRef     String?     @map("recording_ref")
   recordingConsent Boolean     @default(false) @map("recording_consent")
-  outcome          String?     // qualified | booked | callback | not_interested | no_answer | refused_no_consent ...
+  outcome          String? // qualified | booked | callback | not_interested | no_answer | refused_no_consent ...
   // Every state transition + human override, for the audit trail.
   auditTrail       Json        @default("[]") @map("audit_trail")
   status           String      @default("rehearsal") // rehearsal | queued | in_progress | completed | cancelled | blocked
@@ -8190,21 +8202,21 @@ model PronunciationEntry {
 
 // One connected third-party app per workspace (Composio entity reference).
 model ComposioConnection {
-  id              String    @id @default(cuid())
-  workspaceId     String    @map("workspace_id")
-  workspace       Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  id               String    @id @default(cuid())
+  workspaceId      String    @map("workspace_id")
+  workspace        Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   // Composio app key, e.g. "gmail", "slack", "hubspot", "notion".
-  appKey          String    @map("app_key")
+  appKey           String    @map("app_key")
   // Opaque Composio entity/user id — the only credential-adjacent value we
   // store. Raw OAuth tokens live in Composio's cloud (hosted tier).
-  composioEntityId String   @map("composio_entity_id")
-  status          String    @default("connected") // connected | revoked | error
+  composioEntityId String    @map("composio_entity_id")
+  status           String    @default("connected") // connected | revoked | error
   // Granted scopes as returned by the Composio OAuth flow (string array).
-  scopes          Json      @default("[]")
-  lastError       String?   @map("last_error")
-  connectedAt     DateTime  @default(now()) @map("connected_at")
-  createdAt       DateTime  @default(now()) @map("created_at")
-  updatedAt       DateTime  @updatedAt @map("updated_at")
+  scopes           Json      @default("[]")
+  lastError        String?   @map("last_error")
+  connectedAt      DateTime  @default(now()) @map("connected_at")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
 
   @@unique([workspaceId, appKey])
   @@index([workspaceId, status])
@@ -8215,27 +8227,27 @@ model ComposioConnection {
 // Medium (writes) and high (destructive) tiers land here; low (reads) and
 // draft-creators execute freely but are always logged in ComposioActionLog.
 model ComposioActionApproval {
-  id           String    @id @default(cuid())
-  workspaceId  String    @map("workspace_id")
-  workspace    Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  appKey       String    @map("app_key")
-  toolName     String    @map("tool_name")
+  id             String    @id @default(cuid())
+  workspaceId    String    @map("workspace_id")
+  workspace      Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  appKey         String    @map("app_key")
+  toolName       String    @map("tool_name")
   // low | medium | high (derived from the action name; manual overrides win).
-  riskTier     String    @map("risk_tier")
+  riskTier       String    @map("risk_tier")
   // Proposed tool args with sensitive values redacted at proposal time.
-  proposedArgs Json      @map("proposed_args")
+  proposedArgs   Json      @map("proposed_args")
   // Plain-language "what will happen" — never raw JSON in the UI.
-  plainSummary String    @map("plain_summary") @db.Text
+  plainSummary   String    @map("plain_summary") @db.Text
   // pending | approved | denied | expired | executed (executed = replay lock)
-  status       String    @default("pending")
-  decidedBy    String?   @map("decided_by")
-  decidedAt    DateTime? @map("decided_at")
-  decisionReason String? @map("decision_reason") @db.Text
-  expiresAt    DateTime  @map("expires_at")
+  status         String    @default("pending")
+  decidedBy      String?   @map("decided_by")
+  decidedAt      DateTime? @map("decided_at")
+  decisionReason String?   @map("decision_reason") @db.Text
+  expiresAt      DateTime  @map("expires_at")
   // Append-only audit trail: [{ at, actor, event, detail }].
-  auditTrail   Json      @default("[]") @map("audit_trail")
-  createdAt    DateTime  @default(now()) @map("created_at")
-  updatedAt    DateTime  @updatedAt @map("updated_at")
+  auditTrail     Json      @default("[]") @map("audit_trail")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
 
   actionLogs ComposioActionLog[]
 
@@ -8246,28 +8258,28 @@ model ComposioActionApproval {
 
 // Every executed (or attempted) action: the audit + metering record.
 model ComposioActionLog {
-  id           String    @id @default(cuid())
-  workspaceId  String    @map("workspace_id")
-  workspace    Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  approvalId   String?   @map("approval_id")
-  approval     ComposioActionApproval? @relation(fields: [approvalId], references: [id], onDelete: SetNull)
-  appKey       String    @map("app_key")
-  toolName     String    @map("tool_name")
-  riskTier     String    @map("risk_tier")
-  argsSummary  Json      @default("{}") @map("args_summary")
-  resultSummary Json     @default("{}") @map("result_summary")
-  latencyMs    Int?      @map("latency_ms")
+  id            String                  @id @default(cuid())
+  workspaceId   String                  @map("workspace_id")
+  workspace     Workspace               @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  approvalId    String?                 @map("approval_id")
+  approval      ComposioActionApproval? @relation(fields: [approvalId], references: [id], onDelete: SetNull)
+  appKey        String                  @map("app_key")
+  toolName      String                  @map("tool_name")
+  riskTier      String                  @map("risk_tier")
+  argsSummary   Json                    @default("{}") @map("args_summary")
+  resultSummary Json                    @default("{}") @map("result_summary")
+  latencyMs     Int?                    @map("latency_ms")
   // Phase 15 slice 4 (spec §4/§5): toolkit attribution — which Composio
   // toolkit the executed tool belonged to (e.g. "hubspot"). Powers the
   // per-toolkit cost attribution ("HubSpot ate 40% of your calls").
   // Nullable: rows written before this slice (or where resolution failed)
   // carry no toolkit and land in the "unknown" attribution bucket.
-  toolkitSlug  String?   @map("toolkit_slug")
+  toolkitSlug   String?                 @map("toolkit_slug")
   // success | failed | denied | expired
-  status       String
+  status        String
   // Who/what triggered it: user id or "agent:<surface>".
-  executedBy   String    @map("executed_by")
-  createdAt    DateTime  @default(now()) @map("created_at")
+  executedBy    String                  @map("executed_by")
+  createdAt     DateTime                @default(now()) @map("created_at")
 
   @@index([workspaceId, createdAt])
   @@index([workspaceId, toolName, createdAt])
@@ -8347,21 +8359,21 @@ model ComposioCatalogDrift {
 // existing workspaces see zero regression without a row here.
 // RLS: same tenant-isolation pattern as Phase 14/15 slice 1 (migration SQL).
 model WorkspaceToolkit {
-  id          String   @id @default(cuid())
-  workspaceId String   @map("workspace_id")
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   // Composio toolkit slug, e.g. "gmail" / "google_sheets".
-  toolkitSlug String   @map("toolkit_slug")
+  toolkitSlug String    @map("toolkit_slug")
   // appKey snapshot at enable time, e.g. "google-sheets" (nullable — a
   // toolkit may have no v1-style appKey if the router changes shape).
-  appKey      String?  @map("app_key")
+  appKey      String?   @map("app_key")
   // User id that last enabled/disabled this toolkit (nullable — system
   // rows or backfilled defaults may carry no actor).
-  enabledBy   String?  @map("enabled_by")
-  enabled     Boolean  @default(true)
-  enabledAt   DateTime @default(now()) @map("enabled_at")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  enabledBy   String?   @map("enabled_by")
+  enabled     Boolean   @default(true)
+  enabledAt   DateTime  @default(now()) @map("enabled_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
 
   @@unique([workspaceId, toolkitSlug])
   @@index([workspaceId, enabled])
@@ -8376,21 +8388,21 @@ model WorkspaceToolkit {
 // RLS: same tenant-isolation pattern as Phase 14/15 slices 1–3 (migration
 // SQL). One row per workspace.
 model WorkspaceActionBudget {
-  id          String   @id @default(cuid())
-  workspaceId String   @unique @map("workspace_id")
-  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  id                String    @id @default(cuid())
+  workspaceId       String    @unique @map("workspace_id")
+  workspace         Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   // Monthly tool-call budget; null = no budget configured.
-  monthlyCallBudget Int?    @map("monthly_call_budget")
+  monthlyCallBudget Int?      @map("monthly_call_budget")
   // false → soft cap (alerts only). true → hard cap (fail-closed refusal).
-  hardCap           Boolean @default(false) @map("hard_cap")
+  hardCap           Boolean   @default(false) @map("hard_cap")
   // Alert fires when usage crosses this percent of the budget.
-  alertThresholdPct Int     @default(80) @map("alert_threshold_pct")
+  alertThresholdPct Int       @default(80) @map("alert_threshold_pct")
   // Last alerted percent this billing month — fire-once semantics (the
   // alert does not re-fire on every subsequent call); re-armed to null when
   // usage drops below the threshold (month turnover).
-  lastAlertedPct    Int?    @map("last_alerted_pct")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  lastAlertedPct    Int?      @map("last_alerted_pct")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
 
   @@map("workspace_action_budgets")
 }
@@ -8483,41 +8495,101 @@ model AgentRun {
 }
 
 model AgentRunRecording {
-  id             String   @id @default(cuid()) @map("id")
+  id             String    @id @default(cuid()) @map("id")
   workspaceId    String    @map("workspace_id")
   runId          String    @unique @map("run_id")
   run            AgentRun  @relation(fields: [runId], references: [id], onDelete: Cascade)
   // Host-owned artifact paths (repo-local .run-artifacts/, gitignored).
-  videoPath      String?  @map("video_path")
-  tracePath      String?  @map("trace_path")
-  stepCount      Int      @default(0) @map("step_count")
-  sizeBytes      BigInt   @default(0) @map("size_bytes")
+  videoPath      String?   @map("video_path")
+  tracePath      String?   @map("trace_path")
+  stepCount      Int       @default(0) @map("step_count")
+  sizeBytes      BigInt    @default(0) @map("size_bytes")
   // Decision (c): 30 days then summarize (slice 8 sweep drops videos).
-  retentionUntil DateTime @map("retention_until")
+  retentionUntil DateTime  @map("retention_until")
   // Slice 8: pinned recordings keep their video past retentionUntil.
-  pinned         Boolean  @default(false)
+  pinned         Boolean   @default(false)
   // Set when the sweep drops the video (trace always kept per decision c).
   videoPurgedAt  DateTime? @map("video_purged_at")
-  createdAt      DateTime @default(now()) @map("created_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
 
   @@index([workspaceId, createdAt])
   @@map("agent_run_recordings")
 }
 
 model AgentRunEvent {
-  id          String           @id @default(cuid()) @map("id")
-  workspaceId String           @map("workspace_id")
-  runId       String           @map("run_id")
-  run         AgentRun         @relation(fields: [runId], references: [id], onDelete: Cascade)
+  id          String            @id @default(cuid()) @map("id")
+  workspaceId String            @map("workspace_id")
+  runId       String            @map("run_id")
+  run         AgentRun          @relation(fields: [runId], references: [id], onDelete: Cascade)
   // Monotonic within the run (assigned atomically by the service).
-  seq         Int              @map("seq")
+  seq         Int               @map("seq")
   type        AgentRunEventType @map("type")
   // Short human-readable summary (timeline row); full detail in payload.
-  summary     String           @map("summary")
-  payload     Json?            @map("payload")
-  createdAt   DateTime         @default(now()) @map("created_at")
+  summary     String            @map("summary")
+  payload     Json?             @map("payload")
+  createdAt   DateTime          @default(now()) @map("created_at")
 
   @@unique([runId, seq])
   @@index([workspaceId, runId, seq])
   @@map("agent_run_events")
+}
+
+// ============================================================================
+// Phase 16 slice 9: branded report engine — draft-for-approval send flow.
+//
+// A ReportSendApproval is the gate object for one branded report: a template
+// name + pinned semver version, the brand kit, the reporting period, and the
+// figure payload. It moves pending → approved → rendered behind the Phase 14
+// gate (approve/deny/edit service functions in lib/reports/report-gate.ts),
+// with every transition audit-logged via FileChangeLog.
+//
+// IRON GUARDRAIL (Tico-locked): a figure with no source pointer flags the
+// report (`flagged` status) and NEVER renders — the render service refuses
+// ungrounded figures outright.
+// ============================================================================
+
+enum ReportSendStatus {
+  pending
+  flagged
+  approved
+  denied
+  rendered
+  failed
+}
+
+model ReportSendApproval {
+  id          String    @id @default(cuid()) @map("id")
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  // Template name + PINNED semver (versioned files, never edited in place).
+  templateName    String @map("template_name")
+  templateVersion String @map("template_version")
+
+  // Brand kit for this report (null = default violet per theming law).
+  brandKitId String?   @map("brand_kit_id")
+  brandKit   BrandKit? @relation(fields: [brandKitId], references: [id], onDelete: SetNull)
+
+  // Human labels.
+  clientName String @map("client_name")
+  period     String
+
+  // { meta: Record<string,string>, figures: ReportFigure[] } — see lib/reports.
+  payload Json
+
+  status     ReportSendStatus @default(pending) @map("status")
+  reviewNote String?          @map("review_note")
+  // Absolute path of the rendered PDF (set on `rendered`).
+  pdfPath    String?          @map("pdf_path")
+  error      String?
+
+  createdBy String    @map("created_by")
+  decidedBy String?   @map("decided_by")
+  decidedAt DateTime? @map("decided_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([workspaceId, status, createdAt])
+  @@map("report_send_approvals")
 }
