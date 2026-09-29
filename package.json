@@ -25,6 +25,7 @@
     "@activepieces/piece-twitter": "^0.4.0",
     "@activepieces/piece-webhook": "^0.1.42",
     "@activepieces/pieces-framework": "^0.32.0",
+    "@ag-ui/core": "1.0.0",
     "@anthropic-ai/sdk": "^0.128.0",
     "@base-ui/react": "^1.8.0",
     "@floating-ui/dom": "^1.8.0",
