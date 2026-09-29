@@ -39,6 +39,7 @@ type AuditAction =
   | "autopilot_item_approved"
   | "autopilot_item_rejected"
   | "autopilot_item_published"
+  | "autopilot_item_edited"
   | "autopilot_killed"
   | "autopilot_unkilled";
 
@@ -609,6 +610,45 @@ export async function rejectAutopilotItem(
 
 // Publishing
 // ---------------------------------------------------------------------------
+
+/**
+ * Edit a pending item's editable fields (title, draftMarkdown) and keep it
+ * pending (requeue). Phase 16 generative approval card semantics: edit is
+ * update-then-requeue-pending — the item stays in the approval queue and
+ * must still be approved before it can publish. Audit-logged like every
+ * other gate decision.
+ */
+export async function editAutopilotItem(
+  db: Db,
+  args: {
+    workspaceId: string;
+    projectId: string;
+    itemId: string;
+    actor: string;
+    title?: string;
+    draftMarkdown?: string | null;
+  },
+): Promise<void> {
+  const item = await loadItem(db, args.projectId, args.itemId);
+  if (item.status !== "pending") throw new Error(`Item cannot be edited from status "${item.status}"`);
+  const title = args.title?.trim();
+  const draftMarkdown = args.draftMarkdown?.trim();
+  if (!title && !draftMarkdown) throw new Error("Edit requires a new title and/or draft markdown");
+  await db.autopilotItem.update({
+    where: { id: item.id },
+    data: {
+      ...(title ? { title: title.slice(0, 300) } : {}),
+      ...(draftMarkdown ? { draftMarkdown: draftMarkdown.slice(0, 100_000) } : {}),
+      status: "pending",
+    },
+  });
+  const changed = [
+    title ? "title" : null,
+    draftMarkdown ? "draft" : null,
+  ].filter(Boolean).join(" + ");
+  await auditAutopilot(db, args.workspaceId, args.projectId, "autopilot_item_edited",
+    `Autopilot item edited (${changed}): "${item.title}"`);
+}
 
 /**
  * Publish an approved item. programmatic_page items go through the existing

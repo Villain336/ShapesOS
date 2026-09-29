@@ -165,6 +165,7 @@ enum FileChangeAction {
   autopilot_item_approved
   autopilot_item_rejected
   autopilot_item_published
+  autopilot_item_edited
   autopilot_killed
   autopilot_unkilled
   // Milestone 19: newsletter builder.

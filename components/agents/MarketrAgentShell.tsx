@@ -19,6 +19,7 @@ import { HttpAgent } from "@ag-ui/client";
 import "@copilotkit/react-ui/styles.css";
 import "./copilot-shell.css";
 import { buildAguiChatBody, ensureChatThread, throwIfAguiChatError } from "./agui-bridge";
+import { GenerativeComponentHost } from "@/lib/agents/components/use-generative-components";
 
 /** Agent id the shell registers under the CopilotKit provider. */
 const MARKETR_AGENT_ID = "marketr-agent";
@@ -106,6 +107,9 @@ export function MarketrAgentShell({
         ) : (
           <CopilotChat labels={CHAT_LABELS} />
         )}
+        {/* Phase 16 slice 3: allowlisted generative components (approval card
+            first, per locked decision (a)) register for the agent to emit. */}
+        <GenerativeComponentHost />
       </CopilotKit>
     </div>
   );
