@@ -53,10 +53,25 @@ interface ActionLog {
   appKey: string;
   toolName: string;
   riskTier: string;
+  toolkitSlug: string | null;
   status: string;
   executedBy: string;
   latencyMs: number | null;
   createdAt: string;
+}
+// Phase 15 slice 4: per-workspace budget + per-toolkit attribution (spec §5).
+interface WorkspaceBudgetCheck {
+  usage: number;
+  budget: number | null;
+  pct: number;
+  alertDue: boolean;
+  hardCap: boolean;
+  blocked: boolean;
+  warning?: string;
+}
+interface ToolkitAttribution {
+  total: number;
+  byToolkit: Record<string, number>;
 }
 interface ToolkitEntry {
   toolkitSlug: string;
@@ -164,18 +179,113 @@ async function api(path: string, init?: RequestInit) {
   return data as Record<string, unknown>;
 }
 
+function BudgetPanel({
+  budget,
+  attribution,
+}: {
+  budget: WorkspaceBudgetCheck;
+  attribution: ToolkitAttribution;
+}) {
+  const entries = Object.entries(attribution.byToolkit).sort((a, b) => b[1] - a[1]);
+  const top = entries.slice(0, 8);
+  return (
+    <div className="mb-3 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2.5">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+        <span className="text-[12px] font-semibold text-stone-700">Call budget</span>
+        {budget.budget == null ? (
+          <span className="text-[12px] text-stone-500">
+            No monthly budget set — usage is metered through the credit ledger.
+          </span>
+        ) : (
+          <>
+            <span className="text-[12px] text-stone-600">
+              {budget.usage.toLocaleString()} / {budget.budget.toLocaleString()} calls this month (
+              {budget.pct}%)
+            </span>
+            <span
+              className={`inline-block rounded-full border px-2 py-0.5 text-[11px] font-medium ${
+                budget.hardCap
+                  ? "bg-red-50 text-red-700 border-red-200"
+                  : "bg-stone-100 text-stone-600 border-stone-200"
+              }`}
+            >
+              {budget.hardCap ? "Hard cap" : "Soft cap"}
+            </span>
+            {budget.blocked && (
+              <span className="flex items-center gap-1 text-[12px] font-medium text-red-700">
+                <AlertTriangle className="h-3.5 w-3.5" /> Budget exhausted — new executions are
+                refused.
+              </span>
+            )}
+          </>
+        )}
+      </div>
+      {budget.budget != null && (
+        <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-stone-200">
+          <div
+            className="h-full rounded-full bg-[var(--brand-600)]"
+            style={{ width: `${Math.min(100, budget.pct)}%` }}
+          />
+        </div>
+      )}
+      {budget.warning && <div className="mt-2 text-[12px] text-amber-700">{budget.warning}</div>}
+      {top.length > 0 && (
+        <div className="mt-3 border-t border-stone-200 pt-2">
+          <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-stone-500">
+            Cost attribution — this month
+          </div>
+          <div className="grid gap-1.5 sm:grid-cols-2">
+            {top.map(([slug, count]) => {
+              const pct =
+                attribution.total > 0 ? Math.round((count / attribution.total) * 100) : 0;
+              return (
+                <div key={slug} className="flex items-center gap-2">
+                  <span className="w-28 shrink-0 truncate text-[12px] font-medium text-stone-700">
+                    {slug === "unknown" ? "Unattributed" : slug}
+                  </span>
+                  <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-stone-200">
+                    <div
+                      className="h-full rounded-full bg-[var(--brand-600)]/70"
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                  <span className="w-24 shrink-0 text-right text-[11px] text-stone-500">
+                    {pct}% · {count.toLocaleString()}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+          {entries.length > top.length && (
+            <div className="mt-1 text-[11px] text-stone-400">
+              + {entries.length - top.length} more toolkits
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// ActionsClient
+// ─────────────────────────────────────────────────────────────────────
 export function ActionsClient({
   apps,
   initialConnections,
   initialApprovals,
   initialLogs,
   initialToolkits,
+  initialBudget,
+  initialAttribution,
 }: {
   apps: AppDef[];
   initialConnections: Connection[];
   initialApprovals: Approval[];
   initialLogs: ActionLog[];
   initialToolkits: ToolkitEntry[];
+  initialBudget: WorkspaceBudgetCheck;
+  initialAttribution: ToolkitAttribution;
 }) {
   const [tab, setTab] = useState<Tab>("approvals");
   const [connections, setConnections] = useState(initialConnections);
@@ -855,7 +965,9 @@ export function ActionsClient({
 
       {/* ── Activity ────────────────────────────────────────────── */}
       {tab === "activity" && (
-        <div className="overflow-hidden rounded-lg border border-stone-200 bg-white">
+        <>
+          <BudgetPanel budget={initialBudget} attribution={initialAttribution} />
+          <div className="overflow-hidden rounded-lg border border-stone-200 bg-white">
           <table className="w-full text-[13px]">
             <thead>
               <tr className="border-b border-stone-200 bg-stone-50 text-left text-[11px] uppercase tracking-wide text-stone-500">
@@ -893,7 +1005,8 @@ export function ActionsClient({
             Reads and draft-creators execute automatically and appear here; writes and
             destructive actions only after your approval.
           </div>
-        </div>
+          </div>
+        </>
       )}
     </div>
   );

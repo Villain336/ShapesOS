@@ -542,6 +542,8 @@ model Workspace {
   composioToolCatalog     ComposioToolCatalog[]
   // Phase 15 slice 3: per-workspace toolkit enablement back-relation.
   workspaceToolkits       WorkspaceToolkit[]
+  // Phase 15 slice 4: per-workspace Composio call budget back-relation.
+  workspaceActionBudget   WorkspaceActionBudget?
   univerDocs              UniverDoc[]
   // Phase 10 (intelligence depth): owned data assets back-relations.
   dataSources             DataSource[]
@@ -8250,6 +8252,12 @@ model ComposioActionLog {
   argsSummary  Json      @default("{}") @map("args_summary")
   resultSummary Json     @default("{}") @map("result_summary")
   latencyMs    Int?      @map("latency_ms")
+  // Phase 15 slice 4 (spec §4/§5): toolkit attribution — which Composio
+  // toolkit the executed tool belonged to (e.g. "hubspot"). Powers the
+  // per-toolkit cost attribution ("HubSpot ate 40% of your calls").
+  // Nullable: rows written before this slice (or where resolution failed)
+  // carry no toolkit and land in the "unknown" attribution bucket.
+  toolkitSlug  String?   @map("toolkit_slug")
   // success | failed | denied | expired
   status       String
   // Who/what triggered it: user id or "agent:<surface>".
@@ -8258,6 +8266,8 @@ model ComposioActionLog {
 
   @@index([workspaceId, createdAt])
   @@index([workspaceId, toolName, createdAt])
+  // Phase 15 slice 4: per-toolkit cost attribution queries.
+  @@index([workspaceId, toolkitSlug, createdAt])
   @@map("composio_action_logs")
 }
 
@@ -8326,6 +8336,33 @@ model WorkspaceToolkit {
   @@unique([workspaceId, toolkitSlug])
   @@index([workspaceId, enabled])
   @@map("workspace_toolkits")
+}
+
+// Phase 15 slice 4: per-workspace Composio call budgets (spec §5).
+// Soft cap: usage alerts (default at 80%, fire-once per month) — never
+// blocks. Hard cap: executeApproved refuses fail-closed when the monthly
+// budget is exhausted. Null monthlyCallBudget = no workspace budget (the
+// platform free-tier advisory in budget.ts still applies).
+// RLS: same tenant-isolation pattern as Phase 14/15 slices 1–3 (migration
+// SQL). One row per workspace.
+model WorkspaceActionBudget {
+  id          String   @id @default(cuid())
+  workspaceId String   @unique @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  // Monthly tool-call budget; null = no budget configured.
+  monthlyCallBudget Int?    @map("monthly_call_budget")
+  // false → soft cap (alerts only). true → hard cap (fail-closed refusal).
+  hardCap           Boolean @default(false) @map("hard_cap")
+  // Alert fires when usage crosses this percent of the budget.
+  alertThresholdPct Int     @default(80) @map("alert_threshold_pct")
+  // Last alerted percent this billing month — fire-once semantics (the
+  // alert does not re-fire on every subsequent call); re-armed to null when
+  // usage drops below the threshold (month turnover).
+  lastAlertedPct    Int?    @map("last_alerted_pct")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("workspace_action_budgets")
 }
 
 // A Univer office document (sheet | doc | slide) owned by the host.

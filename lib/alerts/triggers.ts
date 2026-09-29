@@ -222,6 +222,15 @@ export const TRIGGERS: TriggerDef[] = [
     dedupAvailable: true,
     live: true, // Phase 14 slice 10: emitted by lib/integrations/actions/budget.ts.
   },
+  {
+    key: "composio_workspace_budget_alert",
+    label: "Workspace Composio budget alert",
+    description:
+      "A workspace crossed its Composio call-budget alert threshold (default 80% of the monthly budget). Fires once per billing month; critical at 100%. Hard-cap workspaces also refuse new executions at 100%.",
+    conditionKeys: [],
+    dedupAvailable: true,
+    live: true, // Phase 15 slice 4: emitted by lib/integrations/actions/budget.ts.
+  },
 ];
 
 export function triggerDef(key: string): TriggerDef | undefined {

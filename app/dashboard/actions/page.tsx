@@ -8,6 +8,7 @@ import { requireWorkspaceRole } from "@/lib/authz";
 import { listConnections } from "@/lib/integrations/actions/connections";
 import { listApprovals, listActionLogs } from "@/lib/integrations/actions/gate";
 import { listDirectory } from "@/lib/integrations/actions/toolkits";
+import { checkBudget, getUsageByToolkit } from "@/lib/integrations/actions/budget";
 import { V1_COMPOSIO_APPS } from "@/lib/integrations/actions/risk";
 import { ActionsClient } from "./ActionsClient";
 
@@ -25,11 +26,13 @@ export default async function ActionsPage() {
   const membership = await requireWorkspaceRole(user.id, workspace.id, "viewer");
   if (!membership) redirect("/dashboard");
 
-  const [connections, approvals, logs, toolkits] = await Promise.all([
+  const [connections, approvals, logs, toolkits, budgetCheck, attribution] = await Promise.all([
     listConnections(workspace.id),
     listApprovals(workspace.id, { status: "all", limit: 50 }),
     listActionLogs(workspace.id, 50),
     listDirectory(workspace.id),
+    checkBudget(workspace.id),
+    getUsageByToolkit(workspace.id),
   ]);
 
   return (
@@ -48,6 +51,8 @@ export default async function ActionsPage() {
         initialApprovals={JSON.parse(JSON.stringify(approvals))}
         initialLogs={JSON.parse(JSON.stringify(logs))}
         initialToolkits={JSON.parse(JSON.stringify(toolkits))}
+        initialBudget={JSON.parse(JSON.stringify(budgetCheck))}
+        initialAttribution={JSON.parse(JSON.stringify(attribution))}
       />
     </div>
   );

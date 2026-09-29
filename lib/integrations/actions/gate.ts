@@ -25,7 +25,7 @@ import { getToolTierOverrides, requireConnectedEntity } from "@/lib/integrations
 import { containsRedactedPlaceholder, REDACTED_PLACEHOLDER, redactArgs, summarizeArgs } from "@/lib/integrations/actions/redact";
 import { summarizeAction } from "@/lib/integrations/actions/summarize";
 import { describeBulk, extractBulkItems } from "@/lib/integrations/actions/bulk";
-import { getComposioBudgetWarning, meterComposioCall, bumpPlatformComposioCalls } from "@/lib/integrations/actions/budget";
+import { getComposioBudgetWarning, meterComposioCall, bumpPlatformComposioCalls, checkBudget } from "@/lib/integrations/actions/budget";
 import {
   isToolkitEnabled,
   resolveToolkitForTool,
@@ -105,6 +105,7 @@ export async function proposeAction(input: ProposeInput) {
       appKey: input.appKey,
       toolName: input.toolName,
       riskTier: classified.tier,
+      toolkitSlug,
       resultSummary: { toolkitGateRefusal: reason },
       status: "denied",
       executedBy: `gate:${input.proposedBy}`,
@@ -355,6 +356,31 @@ export async function executeApproved(input: ExecuteApprovedInput) {
         `the confirmed count (${input.confirmedBulkCount ?? "none"}) must match what was reviewed`,
     );
   }
+  // Phase 15 slice 4: per-workspace call budget (spec §5). Hard cap =
+  // fail-closed refusal BEFORE the atomic claim (the approval stays
+  // "approved" so it can run next month; nothing executes, the refusal is
+  // recorded as a "denied" log row — never counted as an execution). Soft
+  // cap never blocks: the threshold crossing surfaces as a warning on the
+  // execution log instead.
+  const budgetState = await checkBudget(input.workspaceId);
+  if (budgetState.blocked) {
+    const reason =
+      `workspace Composio call budget exhausted (hard cap): ` +
+      `${budgetState.usage}/${budgetState.budget} tool calls used this month. ` +
+      `No further executions until the budget resets or is raised.`;
+    await logAction({
+      workspaceId: input.workspaceId,
+      approvalId: approval.id,
+      appKey: approval.appKey,
+      toolName: approval.toolName,
+      riskTier: tier,
+      toolkitSlug: await resolveToolkitForTool(input.workspaceId, approval.toolName),
+      resultSummary: { budgetRefusal: reason },
+      status: "denied",
+      executedBy: `gate:${input.executedBy}`,
+    });
+    throw new Error(`Cannot execute: ${reason}`);
+  }
   // Atomic claim: approved -> executed. Concurrent/second attempts affect
   // 0 rows and fail closed.
   const claimed = await withWorkspaceScope(input.workspaceId, (tx) =>
@@ -411,14 +437,23 @@ export async function executeApproved(input: ExecuteApprovedInput) {
     status = "failed";
     resultSummary = { error: (e as Error).message.slice(0, 500) };
   }
+  // Phase 15 slice 4: toolkit attribution on the execution log (spec §4);
+  // resolve once — the log row is the per-toolkit cost source of truth.
+  const executedToolkitSlug = await resolveToolkitForTool(input.workspaceId, approval.toolName);
+  const workspaceBudgetWarning = budgetState.warning;
   await logAction({
     workspaceId: input.workspaceId,
     approvalId: approval.id,
     appKey: approval.appKey,
     toolName: approval.toolName,
     riskTier: tier,
+    toolkitSlug: executedToolkitSlug,
     argsSummary: proposedArgs,
-    resultSummary: budgetWarning ? { ...resultSummary, budgetWarning } : resultSummary,
+    resultSummary: {
+      ...resultSummary,
+      ...(budgetWarning ? { budgetWarning } : null),
+      ...(workspaceBudgetWarning ? { workspaceBudgetWarning } : null),
+    },
     latencyMs: Date.now() - started,
     status,
     executedBy: input.executedBy,
@@ -458,6 +493,8 @@ export interface LogActionInput {
   appKey: string;
   toolName: string;
   riskTier: RiskTier;
+  /** Toolkit attribution for per-toolkit cost breakdown (spec §5). */
+  toolkitSlug?: string | null;
   argsSummary?: Record<string, unknown>;
   resultSummary?: Record<string, unknown>;
   latencyMs?: number;
@@ -477,6 +514,7 @@ export async function logAction(input: LogActionInput) {
         appKey: input.appKey,
         toolName: input.toolName.toUpperCase(),
         riskTier: input.riskTier,
+        toolkitSlug: input.toolkitSlug ?? null,
         argsSummary: toJson(summarizeArgs(input.argsSummary ?? {})),
         resultSummary: toJson(input.resultSummary ?? {}),
         latencyMs: input.latencyMs,
@@ -513,6 +551,7 @@ export async function listActionLogs(workspaceId: string, limit = 50) {
         appKey: true,
         toolName: true,
         riskTier: true,
+        toolkitSlug: true,
         status: true,
         executedBy: true,
         latencyMs: true,
