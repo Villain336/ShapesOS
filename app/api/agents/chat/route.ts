@@ -24,6 +24,10 @@ const BodySchema = z.object({
   threadId: boundedString(120, "threadId"),
   content: boundedString(MAX_CONTENT, "content"),
   attachmentIds: z.array(boundedString(120, "attachmentId")).max(10).optional(),
+  // CoAgents shared state carried in with the run (UI→agent direction).
+  // Validated loosely here; the adapter's mappers are defensive and the
+  // applier only writes allowlisted calendar-row fields.
+  state: z.record(z.string(), z.unknown()).optional(),
 });
 
 export async function POST(req: Request) {
@@ -38,7 +42,7 @@ export async function POST(req: Request) {
   }
   const v = validateBody(BodySchema, rawBody);
   if (!v.ok) return v.error;
-  const { threadId, content, attachmentIds } = v.data;
+  const { threadId, content, attachmentIds, state } = v.data;
 
   const thread = await prisma.aiChatThread.findFirst({
     where: { id: threadId, userId: user.id },
@@ -76,6 +80,8 @@ export async function POST(req: Request) {
     threadId: thread.id,
     userContent: content,
     attachmentIds,
+    // Phase 16 slice 4: UI→agent shared state (may be absent).
+    incomingState: (state ?? undefined) as import("@/lib/agents/agui/shared-state").SharedAgentState | undefined,
   });
 
   // Title the thread once the stream completes (best-effort, non-blocking).

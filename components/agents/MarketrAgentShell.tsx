@@ -20,9 +20,10 @@ import "@copilotkit/react-ui/styles.css";
 import "./copilot-shell.css";
 import { buildAguiChatBody, ensureChatThread, throwIfAguiChatError } from "./agui-bridge";
 import { GenerativeComponentHost } from "@/lib/agents/components/use-generative-components";
+import { SharedStateDock, SharedStatePanel } from "./shared-state/widgets";
 
 /** Agent id the shell registers under the CopilotKit provider. */
-const MARKETR_AGENT_ID = "marketr-agent";
+export const MARKETR_AGENT_ID = "marketr-agent";
 
 /** react-ui chat labels (header title, input placeholder, initial message). */
 const CHAT_LABELS = {
@@ -67,12 +68,20 @@ export function MarketrAgentShell({
           const tid = threadRef.current;
           if (!tid) throw new Error("Marketr agent: no chat thread available for this workspace");
           let messages: unknown[] | undefined;
+          let state: Record<string, unknown> | undefined;
           try {
-            messages = (JSON.parse(String(requestInit.body ?? "{}")) as { messages?: unknown[] }).messages;
+            const parsed = JSON.parse(String(requestInit.body ?? "{}")) as {
+              messages?: unknown[];
+              state?: Record<string, unknown>;
+            };
+            messages = parsed.messages;
+            // Phase 16 slice 4: forward the CoAgents UI state (UI→agent)
+            // with the run — the backend diffs/applies it in the adapter.
+            state = parsed.state;
           } catch {
             messages = undefined;
           }
-          const body = buildAguiChatBody(tid, messages);
+          const body = buildAguiChatBody(tid, messages, state);
           const res = await fetch("/api/agents/chat", {
             method: "POST",
             headers: { "content-type": "application/json" },
@@ -103,9 +112,18 @@ export function MarketrAgentShell({
         }}
       >
         {variant === "sidebar" ? (
-          <CopilotSidebar defaultOpen={false} labels={CHAT_LABELS} />
+          <>
+            <CopilotSidebar defaultOpen={false} labels={CHAT_LABELS} />
+            {/* Phase 16 slice 4: shared-state dock (mission / approvals /
+                calendar) for the sidebar agent surface. */}
+            <SharedStateDock />
+          </>
         ) : (
-          <CopilotChat labels={CHAT_LABELS} />
+          <div className="flex flex-col gap-2">
+            {/* Phase 16 slice 4: shared-state panel above the inline chat. */}
+            <SharedStatePanel />
+            <CopilotChat labels={CHAT_LABELS} />
+          </div>
         )}
         {/* Phase 16 slice 3: allowlisted generative components (approval card
             first, per locked decision (a)) register for the agent to emit. */}

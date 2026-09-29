@@ -36,6 +36,8 @@ import {
   type ToolCallArgsEvent,
 } from "./events";
 import { createAguiLogger } from "./logger";
+import { mergeSharedState, type SharedAgentState } from "./shared-state";
+import type { AppliedStateChange } from "./shared-state-db";
 import type { WorkspaceRole } from "@prisma/client";
 import type { AgentTurnInput, AgentTurnOutput, ChatToolCall } from "@/lib/chat/agent";
 
@@ -50,6 +52,20 @@ export interface AguiTurnRequest {
   attachmentIds?: string[];
   /** Client-supplied run id (e.g. for resumability); generated when absent. */
   runId?: string;
+  /**
+   * Frontend CopilotKit state carried in with the run (the UI→agent half of
+   * CoAgents shared state — @ag-ui/client sends agent.state on every run).
+   * The adapter diffs it against the DB baseline and persists what the UI
+   * is allowed to change (content-calendar rows); the canonical snapshot
+   * is then re-emitted so the agent sees the applied result.
+   */
+  incomingState?: SharedAgentState;
+}
+
+/** Context passed to the shared-state loaders/applier. */
+export interface SharedStateContext {
+  workspaceId: string;
+  projectId: string;
 }
 
 export interface AguiAdapterDeps {
@@ -61,6 +77,24 @@ export interface AguiAdapterDeps {
   chunkText?: (text: string) => string[];
   /** Log-line sink (defaults to structured console lines). */
   logSink?: (line: string) => void;
+  /**
+   * Load the three shared-state domains (calendar, mission, approvals).
+   * Defaults to the prisma-backed loaders in ./shared-state-db (lazy
+   * import, same as runTurn, so tests never load prisma). Omit to skip
+   * the STATE_SNAPSHOT (e.g. surfaces without shared state).
+   */
+  loadSharedState?: (ctx: SharedStateContext) => Promise<SharedAgentState>;
+  /**
+   * Apply UI-originated state changes (calendar rows only — mission and
+   * approvals are read-only through shared state). Defaults to the
+   * prisma-backed applier. The adapter reloads state after applying so the
+   * emitted snapshot is canonical.
+   */
+  applySharedStateUpdates?: (
+    ctx: SharedStateContext,
+    prev: SharedAgentState,
+    next: SharedAgentState,
+  ) => Promise<{ applied: AppliedStateChange[] }>;
 }
 
 /** Default text chunker: fixed-width slices (no tokenization dependency). */
@@ -77,6 +111,21 @@ function defaultRunTurn(input: AgentTurnInput): Promise<AgentTurnOutput> {
   // Lazy import so loading the adapter never loads the agent (and its
   // prisma/LLM graph) — keeps the contract tests fast and side-effect free.
   return import("@/lib/chat/agent").then((m) => m.runAgentTurnWithCapture(input));
+}
+
+function defaultLoadSharedState(ctx: SharedStateContext): Promise<SharedAgentState> {
+  // Lazy for the same reason as defaultRunTurn: the DB module pulls prisma.
+  return import("./shared-state-db").then((m) => m.defaultLoadSharedState(ctx));
+}
+
+function defaultApplySharedStateUpdates(
+  ctx: SharedStateContext,
+  prev: SharedAgentState,
+  next: SharedAgentState,
+): Promise<{ applied: AppliedStateChange[] }> {
+  return import("./shared-state-db").then((m) =>
+    m.defaultApplySharedStateUpdates(ctx, prev, next),
+  );
 }
 
 function stamp<E extends AguiEvent>(event: E, meta: AguiRunMeta): E {
@@ -152,6 +201,8 @@ export async function* streamChatTurnAgui(
   const meta: AguiRunMeta = { runId, threadId: request.threadId, workspaceId: request.workspaceId };
   const log = createAguiLogger(meta, deps.logSink);
   const chunkText = deps.chunkText ?? chunkTextFixed;
+  const loadSharedState = deps.loadSharedState ?? defaultLoadSharedState;
+  const applySharedStateUpdates = deps.applySharedStateUpdates ?? defaultApplySharedStateUpdates;
 
   const emit = function* (event: AguiEvent): Generator<AguiEvent> {
     log(event);
@@ -169,6 +220,35 @@ export async function* streamChatTurnAgui(
       meta,
     ),
   );
+
+  // CoAgents shared state (Phase 16 slice 4): emit the canonical snapshot
+  // right after RUN_STARTED so the frontend's agent.state is populated
+  // before any text arrives. UI→agent direction: when the client carried
+  // updated state in with the run, apply the writable changes first, then
+  // re-load so the snapshot (and the agent's subsequent tool calls) see
+  // the canonical post-apply state. Failures here never fail the turn —
+  // the agent run is more important than the snapshot.
+  const stateCtx: SharedStateContext = {
+    workspaceId: request.workspaceId,
+    projectId: request.projectId,
+  };
+  try {
+    const baseline = await loadSharedState(stateCtx);
+    let current = baseline;
+    if (request.incomingState && Object.keys(request.incomingState).length > 0) {
+      const { applied } = await applySharedStateUpdates(stateCtx, baseline, request.incomingState);
+      if (applied.some((a) => !a.skipped)) {
+        current = await loadSharedState(stateCtx);
+      } else {
+        // Nothing was writable — still honor the client's view for
+        // domains the baseline didn't cover (offline-first optimism).
+        current = mergeSharedState(baseline, request.incomingState);
+      }
+    }
+    yield* emit(stamp({ type: EventType.STATE_SNAPSHOT, snapshot: current }, meta));
+  } catch {
+    // No snapshot this turn; the chat itself still streams.
+  }
 
   let output: AgentTurnOutput;
   try {

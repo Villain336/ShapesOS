@@ -46,10 +46,12 @@ export function lastUserText(messages: readonly unknown[] | undefined): string {
 export function buildAguiChatBody(
   threadId: string,
   messages: readonly unknown[] | undefined,
-): { threadId: string; content: string } {
+  /** CoAgents state the UI carries into the run (agent.setState writes). */
+  state?: Record<string, unknown>,
+): { threadId: string; content: string; state?: Record<string, unknown> } {
   const content = lastUserText(messages).slice(0, MAX_BRIDGE_CONTENT);
   if (!content.trim()) throw new Error("marketr: no user message to send");
-  return { threadId, content };
+  return state && Object.keys(state).length > 0 ? { threadId, content, state } : { threadId, content };
 }
 
 /**

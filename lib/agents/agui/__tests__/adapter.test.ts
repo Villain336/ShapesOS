@@ -52,6 +52,7 @@ describe("streamChatTurnAgui — plain text turn", () => {
     const kinds = events.map((e) => e.type);
     assert.deepEqual(kinds, [
       EventType.RUN_STARTED,
+      EventType.STATE_SNAPSHOT, // Phase 16 slice 4: shared-state snapshot (real DB here)
       EventType.TEXT_MESSAGE_START,
       EventType.TEXT_MESSAGE_CONTENT,
       EventType.TEXT_MESSAGE_CONTENT,
@@ -105,6 +106,7 @@ describe("streamChatTurnAgui — tool calls", () => {
     const kinds = events.map((e) => e.type);
     assert.deepEqual(kinds, [
       EventType.RUN_STARTED,
+      EventType.STATE_SNAPSHOT, // Phase 16 slice 4: shared-state snapshot (real DB here)
       EventType.TOOL_CALL_START,
       EventType.TOOL_CALL_ARGS,
       EventType.TOOL_CALL_END,
@@ -120,19 +122,20 @@ describe("streamChatTurnAgui — tool calls", () => {
       EventType.RUN_FINISHED,
     ]);
 
-    const start0 = events[1] as { toolCallName: string; toolCallId: string };
+    // Phase 16 slice 4: index 1 is the STATE_SNAPSHOT; tool events shift by one.
+    const start0 = events[2] as { toolCallName: string; toolCallId: string };
     assert.equal(start0.toolCallName, "keywords.list");
     assert.ok(start0.toolCallId.length > 0);
 
-    const args0 = events[2] as { toolCallId: string; delta: string };
+    const args0 = events[3] as { toolCallId: string; delta: string };
     assert.equal(args0.toolCallId, start0.toolCallId);
     assert.deepEqual(JSON.parse(args0.delta), { limit: 5 });
 
-    const result0 = events[4] as { toolCallId: string; content: string };
+    const result0 = events[5] as { toolCallId: string; content: string };
     assert.equal(result0.toolCallId, start0.toolCallId);
     assert.equal(result0.content, "5 keywords");
 
-    const custom = events[9] as { name: string; value: { tool: string } };
+    const custom = events[10] as { name: string; value: { tool: string } };
     assert.equal(custom.name, MARKETR_CUSTOM_NAMES.toolProposal);
     assert.equal(custom.value.tool, "content.draft");
   });
@@ -144,8 +147,9 @@ describe("streamChatTurnAgui — errors", () => {
       throw new Error("provider down");
     });
     const kinds = events.map((e) => e.type);
-    assert.deepEqual(kinds, [EventType.RUN_STARTED, EventType.RUN_ERROR]);
-    const err = events[1] as { message: string };
+    // Phase 16 slice 4: the snapshot precedes the error (state load is best-effort).
+    assert.deepEqual(kinds, [EventType.RUN_STARTED, EventType.STATE_SNAPSHOT, EventType.RUN_ERROR]);
+    const err = events[2] as { message: string };
     assert.equal(err.message, "provider down");
     for (const e of events) assert.equal(isValidAguiEvent(e), true, `invalid: ${e.type}`);
     assert.doesNotThrow(() => assertAguiSequence(events));
