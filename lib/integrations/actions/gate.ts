@@ -26,6 +26,10 @@ import { containsRedactedPlaceholder, REDACTED_PLACEHOLDER, redactArgs, summariz
 import { summarizeAction } from "@/lib/integrations/actions/summarize";
 import { describeBulk, extractBulkItems } from "@/lib/integrations/actions/bulk";
 import { getComposioBudgetWarning, meterComposioCall, bumpPlatformComposioCalls } from "@/lib/integrations/actions/budget";
+import {
+  isToolkitEnabled,
+  resolveToolkitForTool,
+} from "@/lib/integrations/actions/toolkits";
 
 export const APPROVAL_TTL_MS = Number(process.env.ACTION_APPROVAL_TTL_MS ?? 24 * 3600_000);
 
@@ -68,10 +72,47 @@ export interface ProposeInput {
  * Propose an action for human review. Classifies the tier (manual
  * overrides win), redacts sensitive args, and creates a pending approval.
  * Returns the approval id + classification so the caller can route.
+ *
+ * Phase 15 slice 3 — toolkit enablement gate (fail-closed, BEFORE anything
+ * is classified or stored): when the tool resolves to a KNOWN toolkit that
+ * is not enabled for the workspace, the proposal is refused — no approval
+ * is created, nothing executes. The v1 five (gmail, google_sheets, slack,
+ * hubspot, notion) are enabled-by-default so existing workspaces see zero
+ * regression; everything else in the firehose is opt-in per workspace.
+ *
+ * Tools that resolve to NO known toolkit are NOT refused here: they fall
+ * through to the slice-2 conservative floor (unclassified → high-gated,
+ * approval + second confirmation required, never auto-executable). The
+ * enablement gate is about known-but-disabled toolkits, not about inventing
+ * a stricter rule than the conservative doctrine already mandates.
+ *
+ * A refused proposal is logged (status "denied", executedBy gate:<actor>)
+ * and the throw message names the reason.
  */
 export async function proposeAction(input: ProposeInput) {
+  const toolkitSlug = await resolveToolkitForTool(input.workspaceId, input.toolName);
   const overrides = await getToolTierOverrides(input.workspaceId);
   const classified = classifyAction(input.toolName, overrides, { appKey: input.appKey });
+  // Refuse fail-closed ONLY for known-but-disabled toolkits (slice 3). A
+  // tool that resolves to no known toolkit falls through to the slice-2
+  // conservative floor (unclassified → high-gated, never auto-executed).
+  const toolkitAllowed =
+    toolkitSlug === null || (await isToolkitEnabled(input.workspaceId, toolkitSlug));
+  if (!toolkitAllowed) {
+    const reason = `toolkit "${toolkitSlug}" is not enabled for this workspace`;
+    await logAction({
+      workspaceId: input.workspaceId,
+      appKey: input.appKey,
+      toolName: input.toolName,
+      riskTier: classified.tier,
+      resultSummary: { toolkitGateRefusal: reason },
+      status: "denied",
+      executedBy: `gate:${input.proposedBy}`,
+    });
+    throw new Error(
+      `Refused by toolkit gate: ${reason}. No approval was created and nothing executed.`,
+    );
+  }
   const redacted = redactArgs(input.args);
   const summary = input.plainSummary ?? summarizeAction(input.appKey, input.toolName, redacted);
   const expiresAt = new Date(Date.now() + (input.ttlMs ?? APPROVAL_TTL_MS));

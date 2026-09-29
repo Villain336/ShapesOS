@@ -1,14 +1,18 @@
 "use client";
 
-// Marketr — Phase 14: Actions client (Connections | Approvals | Activity).
-// House pattern: sub-tabs with Lucide icon + brand-active state, dense
-// tables with badge columns, brand-var buttons (never hardcoded primary).
+// Marketr — Phase 14: Actions client (Connections | Toolkits | Approvals | Activity).
+// Phase 15 slice 3 adds the Toolkits tab: the full firehose directory with
+// per-workspace enable/disable (no packs). House pattern: sub-tabs with
+// Lucide icon + brand-active state, dense tables with badge columns,
+// brand-var buttons (never hardcoded primary).
 
 import { Fragment, useMemo, useState } from "react";
 import {
   Plug,
   ShieldCheck,
   History,
+  LayoutGrid,
+  Search,
   Check,
   X,
   Pencil,
@@ -54,14 +58,28 @@ interface ActionLog {
   latencyMs: number | null;
   createdAt: string;
 }
+interface ToolkitEntry {
+  toolkitSlug: string;
+  appKey: string;
+  label: string;
+  description: string;
+  category: string;
+  connected: boolean;
+  enabled: boolean;
+  toolCount: number;
+  tierBreakdown: { low: number; medium: number; high: number; unclassified: number };
+}
 
-type Tab = "connections" | "approvals" | "activity";
+type Tab = "connections" | "toolkits" | "approvals" | "activity";
 
 const TABS: Array<{ id: Tab; label: string; icon: typeof Plug }> = [
   { id: "connections", label: "Connections", icon: Plug },
+  { id: "toolkits", label: "Toolkits", icon: LayoutGrid },
   { id: "approvals", label: "Approvals", icon: ShieldCheck },
   { id: "activity", label: "Activity", icon: History },
 ];
+
+const TOOLKIT_CATEGORIES = ["comms", "crm", "files", "payments", "productivity", "support"];
 
 function tierBadge(tier: string) {
   const cls =
@@ -95,6 +113,47 @@ function statusBadge(status: string) {
   );
 }
 
+/** Category badge for the toolkit directory (stone; neutral, never a primary). */
+function categoryBadge(category: string) {
+  return (
+    <span className="inline-block rounded-full border border-stone-200 bg-stone-100 px-2 py-0.5 text-[11px] font-medium text-stone-600">
+      {category}
+    </span>
+  );
+}
+
+/** Tier breakdown cells for the toolkit directory — low/medium/high reuse
+ *  the tier palette; unclassified is its own marker (high-gated by default). */
+function tierBreakdownBadges(bd: ToolkitEntry["tierBreakdown"]) {
+  const items: Array<{ label: string; n: number }> = [
+    { label: "low", n: bd.low },
+    { label: "medium", n: bd.medium },
+    { label: "high", n: bd.high },
+    { label: "unclassified", n: bd.unclassified },
+  ];
+  return (
+    <div className="flex flex-wrap gap-1">
+      {items.map((it) => (
+        <span
+          key={it.label}
+          title={`${it.n} ${it.label} tools`}
+          className={`inline-block rounded-full border px-1.5 py-0.5 text-[11px] font-medium ${
+            it.label === "high"
+              ? "bg-red-50 text-red-700 border-red-200"
+              : it.label === "medium"
+                ? "bg-amber-50 text-amber-700 border-amber-200"
+                : it.label === "unclassified"
+                  ? "border-dashed bg-white text-stone-500 border-stone-300"
+                  : "bg-stone-100 text-stone-600 border-stone-200"
+          }`}
+        >
+          {it.label} {it.n}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 async function api(path: string, init?: RequestInit) {
   const res = await fetch(path, {
     ...init,
@@ -110,16 +169,21 @@ export function ActionsClient({
   initialConnections,
   initialApprovals,
   initialLogs,
+  initialToolkits,
 }: {
   apps: AppDef[];
   initialConnections: Connection[];
   initialApprovals: Approval[];
   initialLogs: ActionLog[];
+  initialToolkits: ToolkitEntry[];
 }) {
   const [tab, setTab] = useState<Tab>("approvals");
   const [connections, setConnections] = useState(initialConnections);
   const [approvals, setApprovals] = useState(initialApprovals);
   const [logs, setLogs] = useState(initialLogs);
+  const [toolkits, setToolkits] = useState(initialToolkits);
+  const [toolkitSearch, setToolkitSearch] = useState("");
+  const [toolkitCategory, setToolkitCategory] = useState("all");
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -147,14 +211,16 @@ export function ActionsClient({
   );
 
   async function refresh() {
-    const [c, a, l] = await Promise.all([
+    const [c, a, l, t] = await Promise.all([
       api("/api/integrations/actions/connections"),
       api("/api/integrations/actions/approvals?status=all"),
       api("/api/integrations/actions/activity"),
+      api("/api/integrations/actions/toolkits"),
     ]);
     setConnections(c.connections as Connection[]);
     setApprovals(a.approvals as Approval[]);
     setLogs(l.logs as ActionLog[]);
+    setToolkits(t.toolkits as ToolkitEntry[]);
     setSelected(new Set());
   }
 
@@ -181,6 +247,32 @@ export function ActionsClient({
       window.location.href = data.connectUrl as string;
     });
   }
+
+  /** Phase 15 slice 3: per-toolkit enable/disable (à la carte, no packs).
+   *  Agents can only propose tools from enabled toolkits; the gate refuses
+   *  anything else fail-closed. */
+  async function toggleToolkit(toolkitSlug: string, enabled: boolean) {
+    await run(`toggle-${toolkitSlug}`, async () => {
+      await api("/api/integrations/actions/toolkits", {
+        method: "POST",
+        body: JSON.stringify({ toolkitSlug, enabled }),
+      });
+    });
+  }
+
+  const visibleToolkits = useMemo(() => {
+    const q = toolkitSearch.trim().toLowerCase();
+    return toolkits.filter(
+      (t) =>
+        (toolkitCategory === "all" || t.category === toolkitCategory) &&
+        (!q ||
+          t.label.toLowerCase().includes(q) ||
+          t.toolkitSlug.toLowerCase().includes(q) ||
+          t.description.toLowerCase().includes(q)),
+    );
+  }, [toolkits, toolkitSearch, toolkitCategory]);
+
+  const enabledToolkitCount = toolkits.filter((t) => t.enabled).length;
 
   async function openDetail(id: string) {
     if (expanded === id) {
@@ -342,6 +434,123 @@ export function ActionsClient({
           <div className="border-t border-stone-200 bg-stone-50 px-3 py-2 text-[12px] text-stone-500">
             OAuth runs on Composio&apos;s hosted flow — Marketr stores only the connection
             reference, never your app tokens.
+          </div>
+        </div>
+      )}
+
+      {/* ── Toolkits (Phase 15 slice 3) ─────────────────────────────── */}
+      {tab === "toolkits" && (
+        <div className="flex flex-col gap-3">
+          {/* Filter toolbar: search + category dropdown (house pattern) */}
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-400" />
+              <input
+                value={toolkitSearch}
+                onChange={(e) => setToolkitSearch(e.target.value)}
+                placeholder="Search toolkits…"
+                aria-label="Search toolkits"
+                className="rounded-md border border-stone-200 bg-white py-1.5 pl-8 pr-2 text-[13px] placeholder:text-stone-400 focus:border-[var(--brand-600)] focus:outline-none"
+              />
+            </div>
+            <select
+              value={toolkitCategory}
+              onChange={(e) => setToolkitCategory(e.target.value)}
+              aria-label="Filter by category"
+              className="rounded-md border border-stone-200 bg-white px-2 py-1.5 text-[13px]"
+            >
+              <option value="all">All categories</option>
+              {TOOLKIT_CATEGORIES.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+            <span className="text-[12px] text-stone-500">
+              {enabledToolkitCount} of {toolkits.length} enabled — agents can only
+              propose tools from enabled toolkits; anything else is refused by
+              the gate.
+            </span>
+          </div>
+
+          <div className="overflow-hidden rounded-lg border border-stone-200 bg-white">
+            <table className="w-full text-[13px]">
+              <thead>
+                <tr className="border-b border-stone-200 bg-stone-50 text-left text-[11px] uppercase tracking-wide text-stone-500">
+                  <th className="px-3 py-2 font-medium">Toolkit</th>
+                  <th className="px-3 py-2 font-medium">Category</th>
+                  <th className="px-3 py-2 font-medium">Tools</th>
+                  <th className="px-3 py-2 font-medium">Tier breakdown</th>
+                  <th className="px-3 py-2 font-medium">Connection</th>
+                  <th className="px-3 py-2 font-medium">Enabled</th>
+                  <th className="px-3 py-2 font-medium text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {visibleToolkits.map((t) => (
+                  <tr key={t.toolkitSlug} className="border-b border-stone-100 hover:bg-[var(--brand-50)]/40">
+                    <td className="max-w-xs px-3 py-2.5">
+                      <div className="font-medium text-stone-900">{t.label}</div>
+                      <div className="text-[12px] text-stone-500">{t.description}</div>
+                    </td>
+                    <td className="px-3 py-2.5">{categoryBadge(t.category)}</td>
+                    <td className="px-3 py-2.5 text-stone-700">{t.toolCount}</td>
+                    <td className="px-3 py-2.5">{tierBreakdownBadges(t.tierBreakdown)}</td>
+                    <td className="px-3 py-2.5">
+                      {statusBadge(t.connected ? "connected" : "not connected")}
+                    </td>
+                    <td className="px-3 py-2.5">
+                      <button
+                        role="switch"
+                        aria-checked={t.enabled}
+                        aria-label={`${t.enabled ? "Disable" : "Enable"} ${t.label} toolkit`}
+                        disabled={busy === `toggle-${t.toolkitSlug}`}
+                        onClick={() => toggleToolkit(t.toolkitSlug, !t.enabled)}
+                        className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors disabled:opacity-50 ${
+                          t.enabled ? "bg-[var(--brand-600)]" : "bg-stone-300"
+                        }`}
+                      >
+                        <span
+                          className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                            t.enabled ? "translate-x-4" : "translate-x-0.5"
+                          }`}
+                        />
+                      </button>
+                    </td>
+                    <td className="px-3 py-2.5 text-right">
+                      {!t.connected ? (
+                        <button
+                          disabled={busy === `connect-${t.appKey}`}
+                          onClick={() => connect(t.appKey)}
+                          className="inline-flex items-center gap-1 rounded-md bg-[var(--brand-600)] px-2.5 py-1 text-[12px] font-medium text-white hover:bg-[var(--brand-700)] disabled:opacity-50"
+                        >
+                          {busy === `connect-${t.appKey}` ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <ExternalLink className="h-3.5 w-3.5" />
+                          )}
+                          Connect
+                        </button>
+                      ) : (
+                        <span className="text-[12px] text-stone-400">—</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+                {visibleToolkits.length === 0 && (
+                  <tr>
+                    <td colSpan={7} className="px-3 py-8 text-center text-[13px] text-stone-400">
+                      No toolkits match — try a different search or category.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+            <div className="border-t border-stone-200 bg-stone-50 px-3 py-2 text-[12px] text-stone-500">
+              Every toolkit is browsable from day one (full firehose, no packs).
+              Enablement is à la carte; unclassified tools always land
+              high-gated and need your approval plus second confirmation.
+            </div>
           </div>
         </div>
       )}

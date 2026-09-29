@@ -540,6 +540,8 @@ model Workspace {
   composioActionLogs      ComposioActionLog[]
   // Phase 15 slice 1: per-workspace discovered tool catalog back-relation.
   composioToolCatalog     ComposioToolCatalog[]
+  // Phase 15 slice 3: per-workspace toolkit enablement back-relation.
+  workspaceToolkits       WorkspaceToolkit[]
   univerDocs              UniverDoc[]
   // Phase 10 (intelligence depth): owned data assets back-relations.
   dataSources             DataSource[]
@@ -8295,6 +8297,35 @@ model ComposioToolCatalog {
   @@unique([workspaceId, toolkitSlug, toolSlug])
   @@index([workspaceId, appKey])
   @@map("composio_tool_catalog")
+}
+
+// Phase 15 slice 3: which toolkits a workspace has enabled in the full
+// firehose directory (locked: NO PACKS). Enablement is per-workspace and
+// explicit; the proposeAction gate refuses (fail-closed) any tool whose
+// toolkit is not enabled. The v1 five (gmail, google_sheets, slack,
+// hubspot, notion) are enabled-by-default in code for backward compat —
+// existing workspaces see zero regression without a row here.
+// RLS: same tenant-isolation pattern as Phase 14/15 slice 1 (migration SQL).
+model WorkspaceToolkit {
+  id          String   @id @default(cuid())
+  workspaceId String   @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  // Composio toolkit slug, e.g. "gmail" / "google_sheets".
+  toolkitSlug String   @map("toolkit_slug")
+  // appKey snapshot at enable time, e.g. "google-sheets" (nullable — a
+  // toolkit may have no v1-style appKey if the router changes shape).
+  appKey      String?  @map("app_key")
+  // User id that last enabled/disabled this toolkit (nullable — system
+  // rows or backfilled defaults may carry no actor).
+  enabledBy   String?  @map("enabled_by")
+  enabled     Boolean  @default(true)
+  enabledAt   DateTime @default(now()) @map("enabled_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@unique([workspaceId, toolkitSlug])
+  @@index([workspaceId, enabled])
+  @@map("workspace_toolkits")
 }
 
 // A Univer office document (sheet | doc | slide) owned by the host.
