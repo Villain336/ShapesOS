@@ -210,12 +210,82 @@ const FIXTURE_TOOLKITS: FixtureToolkitDef[] = [
   },
 ];
 
+// ---------------------------------------------------------------------------
+// Drift scenario — Phase 15 slice 5 (spec §1: drift detection).
+//
+// The drift battery (scripts/verify-phase15-drift.mts) flips the fixture
+// router into "drift mode": the `stripe` toolkit then returns a changed
+// tool list — gains 2 tools, loses 1 tool, renames 1 tool (same label +
+// description, different slug). All other toolkits are byte-identical, so
+// the diff isolates exactly the drift sets.
+//
+// Added-tool slugs are DELIBERATELY unclassifiable: no destructive/write/
+// read verb stem appears in slug or description, so deriveTier() hits the
+// universal conservative floor → classified=false → HIGH-GATED. The gate
+// needs no special-casing: an added tool proposed without a cache row
+// falls through resolveToolkitForTool() → null → the slice-2 floor.
+//
+// Drift mode is process-local fixture state only — never on in prod code
+// paths (nothing in app/ calls setFixtureDriftMode).
+// ---------------------------------------------------------------------------
+
+let fixtureDriftMode = false;
+
+/** Drive the fixture router in "drift mode" (batteries/simulation only). */
+export function setFixtureDriftMode(enabled: boolean): void {
+  fixtureDriftMode = enabled;
+}
+
+/** Whether the fixture router is currently serving the drift scenario. */
+export function isFixtureDriftMode(): boolean {
+  return fixtureDriftMode;
+}
+
+/**
+ * The drift scenario: the stripe toolkit with exactly four changes —
+ * added: STRIPE_ORCHESTRATE_LEDGER, STRIPE_RECONCILE_DISPUTES
+ * removed: STRIPE_LIST_PAYMENT_INTENTS
+ * renamed: STRIPE_CREATE_CUSTOMER → STRIPE_NEW_CUSTOMER (label + description
+ *          carried over verbatim, so the rename heuristic can pair them).
+ */
+export function getDriftScenario(): FixtureToolkitDef[] {
+  return FIXTURE_TOOLKITS.map((t) => {
+    if (t.toolkitSlug !== "stripe") return t;
+    const tools = t.tools
+      .filter(
+        (tool) =>
+          tool.slug !== "STRIPE_CREATE_CUSTOMER" &&
+          tool.slug !== "STRIPE_LIST_PAYMENT_INTENTS",
+      )
+      .concat([
+        {
+          slug: "STRIPE_ORCHESTRATE_LEDGER",
+          label: "Orchestrate ledger",
+          description: "Reconcile the ledger across connected accounts.",
+        },
+        {
+          slug: "STRIPE_RECONCILE_DISPUTES",
+          label: "Reconcile disputes",
+          description: "Reconcile dispute evidence bundles.",
+        },
+        {
+          slug: "STRIPE_NEW_CUSTOMER",
+          label: "Create customer",
+          description: "Create a Stripe customer.",
+        },
+      ]);
+    return { ...t, tools };
+  });
+}
+
 export const fixtureToolRouter: ComposioToolRouter = {
   async listToolkits(): Promise<ComposioToolkit[]> {
-    return FIXTURE_TOOLKITS.map(({ tools: _tools, ...rest }) => rest);
+    const defs = fixtureDriftMode ? getDriftScenario() : FIXTURE_TOOLKITS;
+    return defs.map(({ tools: _tools, ...rest }) => rest);
   },
   async getToolkitTools(toolkitSlug: string): Promise<ComposioToolkitTool[]> {
-    const found = FIXTURE_TOOLKITS.find((t) => t.toolkitSlug === toolkitSlug);
+    const defs = fixtureDriftMode ? getDriftScenario() : FIXTURE_TOOLKITS;
+    const found = defs.find((t) => t.toolkitSlug === toolkitSlug);
     if (!found) throw new Error(`Unknown toolkit "${toolkitSlug}"`);
     return found.tools;
   },

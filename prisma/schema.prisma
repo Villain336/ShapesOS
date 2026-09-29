@@ -540,6 +540,8 @@ model Workspace {
   composioActionLogs      ComposioActionLog[]
   // Phase 15 slice 1: per-workspace discovered tool catalog back-relation.
   composioToolCatalog     ComposioToolCatalog[]
+  // Phase 15 slice 5: per-workspace catalog drift reports back-relation.
+  composioCatalogDrift    ComposioCatalogDrift[]
   // Phase 15 slice 3: per-workspace toolkit enablement back-relation.
   workspaceToolkits       WorkspaceToolkit[]
   // Phase 15 slice 4: per-workspace Composio call budget back-relation.
@@ -8307,6 +8309,31 @@ model ComposioToolCatalog {
   @@unique([workspaceId, toolkitSlug, toolSlug])
   @@index([workspaceId, appKey])
   @@map("composio_tool_catalog")
+}
+
+// Phase 15 slice 5: catalog drift detection (spec §1, §6). One row per
+// detected change (added|removed|renamed) per (workspace, toolkit) — the
+// nightly diff of live discovery vs the ComposioToolCatalog cache.
+// Removed tools keep their last-known cache rows (slice-1 behavior); the
+// drift row is what flags them in Actions → Activity.
+// Acknowledging is the human's re-approval of the change: it clears the
+// banner count AND the stale-override flag for that slug (a renamed tool's
+// override must be re-pointed at the new slug before re-approval).
+// RLS: same tenant-isolation pattern as slice 1 (FORCE; see migration).
+model ComposioCatalogDrift {
+  id             String    @id @default(cuid())
+  workspaceId    String    @map("workspace_id")
+  workspace      Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  appKey         String    @map("app_key")
+  toolkitSlug    String    @map("toolkit_slug")
+  changeType     String    @map("change_type") // added | removed | renamed
+  toolSlug       String    @map("tool_slug")
+  oldSlug        String?   @map("old_slug") // renamed: the dead slug
+  detectedAt     DateTime  @default(now()) @map("detected_at")
+  acknowledgedAt DateTime? @map("acknowledged_at")
+
+  @@index([workspaceId, detectedAt])
+  @@map("composio_catalog_drift")
 }
 
 // Phase 15 slice 3: which toolkits a workspace has enabled in the full

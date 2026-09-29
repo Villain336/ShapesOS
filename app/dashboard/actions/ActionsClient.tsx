@@ -6,7 +6,7 @@
 // Lucide icon + brand-active state, dense tables with badge columns,
 // brand-var buttons (never hardcoded primary).
 
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import {
   Plug,
   ShieldCheck,
@@ -83,6 +83,26 @@ interface ToolkitEntry {
   enabled: boolean;
   toolCount: number;
   tierBreakdown: { low: number; medium: number; high: number; unclassified: number };
+}
+// Phase 15 slice 5: catalog drift detection (spec §1, §6).
+interface DriftReportRow {
+  id: string;
+  appKey: string;
+  toolkitSlug: string;
+  changeType: "added" | "removed" | "renamed";
+  toolSlug: string;
+  oldSlug: string | null;
+  detectedAt: string;
+  acknowledgedAt: string | null;
+}
+interface StaleOverrideRow {
+  toolSlug: string;
+  reason: string;
+}
+interface DriftState {
+  reports: DriftReportRow[];
+  unacknowledgedCount: number;
+  staleOverrides: StaleOverrideRow[];
 }
 
 type Tab = "connections" | "toolkits" | "approvals" | "activity";
@@ -268,6 +288,135 @@ function BudgetPanel({
 }
 
 // ─────────────────────────────────────────────────────────────────────
+// Phase 15 slice 5: catalog drift panel (spec §1, §6).
+// Sits in Actions → Activity next to the BudgetPanel. Unacknowledged
+// drift reports land here with per-change badges; acknowledging is the
+// human's re-approval (clears the banner count + any stale-override
+// flag for that slug). Stale tier overrides surface as a "re-approve"
+// affordance — the override points at a removed/renamed slug, so the
+// human re-points it before clearing.
+// House pattern: info-note container, dense table with badge columns,
+// brand-var buttons.
+// ─────────────────────────────────────────────────────────────────────
+function driftBadge(changeType: DriftReportRow["changeType"]) {
+  const cls =
+    changeType === "removed"
+      ? "bg-red-50 text-red-700 border-red-200"
+      : changeType === "renamed"
+        ? "bg-amber-50 text-amber-700 border-amber-200"
+        : "bg-blue-50 text-blue-700 border-blue-200";
+  return (
+    <span className={`inline-block rounded-full border px-2 py-0.5 text-[11px] font-medium ${cls}`}>
+      {changeType}
+    </span>
+  );
+}
+
+function driftDetail(r: DriftReportRow): string {
+  if (r.changeType === "added")
+    return "New in the live catalog — not in the cache; proposals land high-gated until classified.";
+  if (r.changeType === "removed")
+    return "Gone from the live catalog — the last-known cache row is kept; proposals on this slug fail closed.";
+  return `Was ${r.oldSlug} — re-point any override at the new slug before re-approving.`;
+}
+
+function DriftPanel({
+  data,
+  onAcknowledge,
+}: {
+  data: DriftState | null;
+  onAcknowledge: (driftId: string) => Promise<void>;
+}) {
+  if (data === null) return null;
+  const unack = data.reports.filter((r) => r.acknowledgedAt === null);
+  return (
+    <div className="mb-3 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2.5">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+        <span className="text-[12px] font-semibold text-stone-700">Catalog drift</span>
+        {unack.length === 0 ? (
+          <span className="text-[12px] text-stone-500">
+            Live catalog matches the cached tool list — no drift detected.
+          </span>
+        ) : (
+          <span className="flex items-center gap-1 text-[12px] font-medium text-amber-700">
+            <AlertTriangle className="h-3.5 w-3.5" />
+            {unack.length} unacknowledged change{unack.length === 1 ? "" : "s"}
+          </span>
+        )}
+      </div>
+      {unack.length > 0 && (
+        <div className="mt-2 overflow-hidden rounded-lg border border-stone-200 bg-white">
+          <table className="w-full text-[12px]">
+            <thead>
+              <tr className="border-b border-stone-200 bg-stone-50 text-left text-[11px] uppercase tracking-wide text-stone-500">
+                <th className="px-3 py-2 font-medium">Detected</th>
+                <th className="px-3 py-2 font-medium">Change</th>
+                <th className="px-3 py-2 font-medium">Tool</th>
+                <th className="px-3 py-2 font-medium">What changed</th>
+                <th className="px-3 py-2 font-medium">Re-approve</th>
+              </tr>
+            </thead>
+            <tbody>
+              {unack.map((r) => (
+                <tr key={r.id} className="border-b border-stone-100 hover:bg-[var(--brand-50)]/40">
+                  <td className="whitespace-nowrap px-3 py-2 text-stone-500">
+                    {new Date(r.detectedAt).toLocaleString()}
+                  </td>
+                  <td className="px-3 py-2">{driftBadge(r.changeType)}</td>
+                  <td className="px-3 py-2 font-mono text-[11px] text-stone-700">{r.toolSlug}</td>
+                  <td className="max-w-[320px] px-3 py-2 text-stone-600">{driftDetail(r)}</td>
+                  <td className="px-3 py-2">
+                    <button
+                      onClick={() => onAcknowledge(r.id)}
+                      className="rounded-md bg-[var(--brand-600)] px-2 py-1 text-[12px] font-medium text-white hover:bg-[var(--brand-700)]"
+                    >
+                      Re-approve
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {data.staleOverrides.length > 0 && (
+        <div className="mt-2 border-t border-stone-200 pt-2">
+          <div className="mb-1.5 flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-amber-700">
+            <AlertTriangle className="h-3 w-3" />
+            Stale tier overrides — needs re-approval
+          </div>
+          <div className="grid gap-1.5">
+            {data.staleOverrides.map((s) => {
+              const row = unack.find(
+                (r) =>
+                  (r.changeType === "removed" && r.toolSlug === s.toolSlug) ||
+                  (r.changeType === "renamed" && r.oldSlug === s.toolSlug),
+              );
+              return (
+                <div key={s.toolSlug} className="flex flex-wrap items-center gap-2">
+                  <span className="font-mono text-[11px] font-medium text-stone-700">
+                    {s.toolSlug}
+                  </span>
+                  <span className="flex-1 text-[12px] text-stone-600">{s.reason}</span>
+                  {row && (
+                    <button
+                      onClick={() => onAcknowledge(row.id)}
+                      className="rounded-md bg-[var(--brand-600)] px-2 py-1 text-[12px] font-medium text-white hover:bg-[var(--brand-700)]"
+                    >
+                      Re-approve
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────
 // ActionsClient
 // ─────────────────────────────────────────────────────────────────────
 export function ActionsClient({
@@ -304,6 +453,36 @@ export function ActionsClient({
   const [denyReason, setDenyReason] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [filter, setFilter] = useState("pending");
+  // Phase 15 slice 5: catalog drift panel state (fetched client-side; the
+  // panel lives in the Activity tab next to the BudgetPanel).
+  const [drift, setDrift] = useState<DriftState | null>(null);
+  async function refreshDrift() {
+    try {
+      const data = await api("/api/integrations/actions/drift");
+      setDrift({
+        reports: (data.reports as DriftReportRow[]) ?? [],
+        unacknowledgedCount: Number(data.unacknowledgedCount ?? 0),
+        staleOverrides: (data.staleOverrides as StaleOverrideRow[]) ?? [],
+      });
+    } catch {
+      // Actions is still usable without drift data; leave the panel hidden.
+    }
+  }
+  useEffect(() => {
+    refreshDrift();
+  }, []);
+  async function acknowledgeDrift(driftId: string) {
+    try {
+      setError(null);
+      await api("/api/integrations/actions/drift", {
+        method: "POST",
+        body: JSON.stringify({ driftId }),
+      });
+      await refreshDrift();
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
   // Slice 5: destructive second-confirmation. confirmExec holds the approval
   // id the user has clicked "Execute" on for a HIGH-tier action — the inline
   // confirm panel collects the explicit confirmation before the POST.
@@ -966,6 +1145,7 @@ export function ActionsClient({
       {/* ── Activity ────────────────────────────────────────────── */}
       {tab === "activity" && (
         <>
+          <DriftPanel data={drift} onAcknowledge={acknowledgeDrift} />
           <BudgetPanel budget={initialBudget} attribution={initialAttribution} />
           <div className="overflow-hidden rounded-lg border border-stone-200 bg-white">
           <table className="w-full text-[13px]">
