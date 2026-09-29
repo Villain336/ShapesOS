@@ -17,6 +17,7 @@ import {
 import { useChat, type ChatTab } from "./ChatContext";
 import AiChatPanel from "@/components/AiChatPanel";
 import TeamChatPanel from "@/components/TeamChatPanel";
+import { AssistantAgentShell } from "@/components/agents/AssistantAgentShell";
 import ThreadListSection from "./ThreadListSection";import { buttonVariants } from "@/components/vault/atoms/Button";
 import {
   DropdownMenu,
@@ -180,6 +181,10 @@ export default function AssistantClient({
           />
         )}
       </div>
+
+      {/* Phase 16 slice 2: CopilotKit shell wired to the AG-UI backend
+          (/api/agents/chat). Shell only — no generative components yet. */}
+      <AssistantAgentShell />
     </div>
   );
 }

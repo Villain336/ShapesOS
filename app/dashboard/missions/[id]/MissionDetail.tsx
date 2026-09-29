@@ -7,6 +7,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { MarketrAgentShell } from "@/components/agents/MarketrAgentShell";
 import {
   AlertTriangle,
   Check,
@@ -728,6 +729,12 @@ export function MissionDetail({ missionId }: { missionId: string }) {
           }}
         />
       )}
+
+      {/* Phase 16 slice 2: CopilotKit shell wired to the AG-UI backend
+          (/api/agents/chat). Shell only — no generative components yet.
+          No mission project context here: thread project resolves lazily
+          to the workspace's first project on first send. */}
+      <MarketrAgentShell variant="sidebar" copilotThreadId={`marketr-mission-${missionId}`} />
     </div>
   );
 }

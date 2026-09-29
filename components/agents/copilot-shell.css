@@ -1,0 +1,17 @@
+/* Marketr — Phase 16 slice 2: CopilotKit theme.
+ *
+ * Maps CopilotKit's CSS variables onto Marketr brand vars (app/globals.css
+ * @theme inline: --brand-50/600/700; tenant brand kits override them).
+ * Scoped to .marketr-copilot-shell so nothing else on the page is touched.
+ * Never CopilotKit default chrome; light mode only (Marketr is light). */
+
+.marketr-copilot-shell {
+  --copilot-kit-primary-color: var(--brand-600);
+  --copilot-kit-contrast-color: #ffffff;
+  --copilot-kit-background-color: #ffffff;
+  --copilot-kit-input-background-color: var(--brand-50);
+  --copilot-kit-secondary-color: #fafaf9;
+  --copilot-kit-secondary-contrast-color: var(--brand-700);
+  --copilot-kit-separator-color: #e7e5e4;
+  --copilot-kit-muted-color: #a8a29e;
+}

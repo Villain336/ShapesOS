@@ -7,6 +7,7 @@
 
 import { Fragment, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { MarketrAgentShell } from "@/components/agents/MarketrAgentShell";
 import {
   ArrowLeft,
   BarChart3,
@@ -960,6 +961,12 @@ function SharingTab({ playbookId, playbookName }: { playbookId: string; playbook
           {busy ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />} Import playbook
         </button>
       </div>
+
+      {/* Phase 16 slice 2: CopilotKit shell wired to the AG-UI backend
+          (/api/agents/chat). Shell only — no generative components yet.
+          No playbook project context here: thread project resolves lazily
+          to the workspace's first project on first send. */}
+      <MarketrAgentShell variant="sidebar" copilotThreadId={`marketr-playbook-${playbookId}`} />
     </div>
   );
 }
