@@ -28,6 +28,7 @@ import { requireUser, getOrCreateWorkspace } from "@/lib/session";
 import { withWorkspaceScope } from "@/lib/substrate/memory/rls";
 import { getAgentRun, listAgentRunEvents } from "@/lib/agents/runs/service";
 import type { AgentRunEventType, AgentRunStatus } from "@/lib/agents/runs/types";
+import { LiveWatch } from "./LiveWatch";
 import { Stat } from "@/components/vault/Stat";
 import { Card, CardBody, CardHeader } from "@/components/vault/Card";
 import { ValuePill } from "@/components/vault/atoms/ValuePill";
@@ -194,6 +195,10 @@ export default async function RunViewerPage({
         <Stat label="Duration" value={fmtDuration(durationMs)} icon={<Clock className="size-4" />} />
         <Stat label="Artifacts" value={fmtBytes(recording?.sizeBytes ?? 0)} icon={<Film className="size-4" />} />
       </div>
+
+      {/* Slice 7: live watch — mounted ONLY while the run is running.
+          Finished runs show the recorded video below instead. */}
+      {run.status === "running" && <LiveWatch runId={run.id} />}
 
       {/* Recording: video + trace download. Bytes stream through the
           workspace-scoped API route; no filesystem paths reach the client. */}

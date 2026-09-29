@@ -22,8 +22,9 @@
 import { promises as fs } from "node:fs";
 import * as path from "node:path";
 import { chromium } from "playwright";
-import type { Browser, BrowserContext, Page } from "playwright";
+import type { Browser, BrowserContext, CDPSession, Page } from "playwright";
 import type { AgentRunEventInput } from "./types";
+import { attachWatch } from "./watch";
 
 /** Repo-local host-owned artifact root (gitignored). */
 export const ARTIFACT_ROOT = path.join(process.cwd(), ".run-artifacts");
@@ -45,8 +46,28 @@ export class RecorderBusyError extends Error {
 
 // ---- injectable browser surface (structural; tests stub this) ----
 
+/** Screencast capture profile handed to a page that supports CDP screencast. */
+export interface ScreencastOptions {
+  quality: number;
+  everyNthFrame: number;
+  maxWidth: number;
+  maxHeight: number;
+}
+
+export type ScreencastFrameHandler = (jpeg: Buffer) => void | Promise<void>;
+
 export interface RecorderPage {
   goto(url: string): Promise<void>;
+  /**
+   * Slice 7: start CDP screencast on this page. Resolves with a stop
+   * function; every captured frame is delivered as JPEG bytes to onFrame.
+   * Absent on stub launchers and on browser builds without the CDP
+   * surface — the watch layer then skips the stream instead of failing.
+   */
+  startScreencast?: (
+    opts: ScreencastOptions,
+    onFrame: ScreencastFrameHandler,
+  ) => Promise<() => Promise<void>>;
 }
 
 export interface RecorderContext {
@@ -97,7 +118,45 @@ export const playwrightLauncher: BrowserLauncher = {
           },
           async newPage(): Promise<RecorderPage> {
             const page: Page = await ctx.newPage();
-            return { goto: (url: string) => page.goto(url).then(() => undefined) };
+            return {
+              goto: (url: string) => page.goto(url).then(() => undefined),
+              // Slice 7: real CDP screencast (Page.startScreencast → JPEG
+              // frames). The ack loop throttles capture to consumer speed:
+              // the next frame is only sent after we ack the current one.
+              startScreencast: async (opts: ScreencastOptions, onFrame: ScreencastFrameHandler) => {
+                const cdp: CDPSession = await ctx.newCDPSession(page);
+                let stopped = false;
+                const onScreencastFrame = (payload: { data: string; sessionId: number }) => {
+                  if (stopped) return;
+                  void (async () => {
+                    try {
+                      await onFrame(Buffer.from(payload.data, "base64"));
+                    } finally {
+                      if (!stopped) {
+                        await cdp
+                          .send("Page.screencastFrameAck", { sessionId: payload.sessionId })
+                          .catch(() => undefined);
+                      }
+                    }
+                  })();
+                };
+                cdp.on("Page.screencastFrame", onScreencastFrame);
+                await cdp.send("Page.startScreencast", {
+                  format: "jpeg",
+                  quality: opts.quality,
+                  maxWidth: opts.maxWidth,
+                  maxHeight: opts.maxHeight,
+                  everyNthFrame: opts.everyNthFrame,
+                });
+                return async () => {
+                  if (stopped) return;
+                  stopped = true;
+                  cdp.off("Page.screencastFrame", onScreencastFrame);
+                  await cdp.send("Page.stopScreencast").catch(() => undefined);
+                  await cdp.detach().catch(() => undefined);
+                };
+              },
+            };
           },
           async close() {
             await ctx.close();
@@ -151,6 +210,13 @@ export interface RecorderOptions {
   launcher?: BrowserLauncher;
   /** Headed (true = watchable later by slice 7; false = headless-shell). */
   headless?: boolean;
+  /**
+   * Slice 7: attach the live watch stream (CDP screencast → in-process
+   * registry → SSE). Defaults to false — the SSE route only streams while
+   * a producer is attached. Frames are transient; the WebM stays the
+   * permanent record.
+   */
+  watch?: boolean;
   /** Timeline sink — lifecycle.ts persists these as AgentRunEvent rows. */
   onTimelineEvent?: (event: AgentRunEventInput) => void | Promise<void>;
 }
@@ -177,14 +243,16 @@ export interface StoppedRecording {
  * idempotent-ish: it always releases the slot and closes the browser.
  */
 export class AgentRunRecorder {
-  private readonly opts: Required<Omit<RecorderOptions, "onTimelineEvent" | "launcher" | "artifactDir" | "headless">> &
-    Pick<RecorderOptions, "onTimelineEvent" | "launcher" | "headless"> & { artifactDir: string };
+  private readonly opts: Required<Omit<RecorderOptions, "onTimelineEvent" | "launcher" | "artifactDir" | "headless" | "watch">> &
+    Pick<RecorderOptions, "onTimelineEvent" | "launcher" | "headless" | "watch"> & { artifactDir: string };
   private browser: RecorderBrowser | null = null;
   private context: RecorderContext | null = null;
   private slotHeld = false;
   private stopped = false;
   private stepCount = 0;
   private tracePath: string;
+  /** Slice 7: detach handle for the live watch stream (null when not watching). */
+  private watchDetach: (() => Promise<void>) | null = null;
 
   constructor(options: RecorderOptions) {
     if (!options.runId) throw new Error("AgentRunRecorder: runId is required");
@@ -213,6 +281,12 @@ export class AgentRunRecorder {
       });
       await this.context.tracingStart({ screenshots: true, snapshots: true, sources: true });
       const page = await this.context.newPage();
+      // Slice 7: attach the live watch stream to the LIVE page. attachWatch
+      // is a no-op (null) when the page cannot screencast — the run
+      // proceeds unwatched rather than failing.
+      if (this.opts.watch) {
+        this.watchDetach = await attachWatch(page, this.opts.runId);
+      }
       await this.emitTimeline({
         type: "browser",
         summary: startUrl ? `Browser recording started — ${startUrl}` : "Browser recording started",
@@ -283,6 +357,14 @@ export class AgentRunRecorder {
 
   private async teardown(): Promise<void> {
     try {
+      // Slice 7: stop the live frames FIRST — the watch stream must end
+      // the moment the run finishes (or fails to start), before the
+      // browser closes.
+      if (this.watchDetach) {
+        const detach = this.watchDetach;
+        this.watchDetach = null;
+        await detach().catch(() => undefined);
+      }
       if (this.browser) await this.browser.close();
     } catch {
       // Best-effort: never mask the original error.

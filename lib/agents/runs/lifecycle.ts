@@ -37,6 +37,11 @@ export interface BrowserRunRequest extends AgentRunLinkage {
   startUrl?: string;
   /** Headed (watchable) vs headless-shell. Defaults to headless. */
   headless?: boolean;
+  /**
+   * Slice 7: attach the live watch stream (CDP screencast) to this run.
+   * Defaults to false — pass true for headed "watch it work" runs.
+   */
+  watch?: boolean;
   /** CoAgents snapshot at run start (optional). */
   agentState?: Record<string, unknown>;
 }
@@ -100,6 +105,7 @@ export async function executeBrowserRun(
     runId,
     launcher: deps.launcher,
     headless: request.headless,
+    watch: request.watch ?? false,
     onTimelineEvent: (event) => {
       void appendAgentRunEvent(workspaceId, runId, event);
     },
