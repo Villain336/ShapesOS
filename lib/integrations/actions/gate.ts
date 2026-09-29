@@ -71,7 +71,7 @@ export interface ProposeInput {
  */
 export async function proposeAction(input: ProposeInput) {
   const overrides = await getToolTierOverrides(input.workspaceId);
-  const classified = classifyAction(input.toolName, overrides);
+  const classified = classifyAction(input.toolName, overrides, { appKey: input.appKey });
   const redacted = redactArgs(input.args);
   const summary = input.plainSummary ?? summarizeAction(input.appKey, input.toolName, redacted);
   const expiresAt = new Date(Date.now() + (input.ttlMs ?? APPROVAL_TTL_MS));
@@ -90,7 +90,7 @@ export async function proposeAction(input: ProposeInput) {
           at: nowIso(),
           actor: input.proposedBy,
           event: "proposed",
-          detail: `tier=${classified.tier}${classified.overridden ? " (override)" : ""}${classified.clamped ? " — override clamped at conservative floor" : ""}${classified.draftCreator ? " draft-creator" : ""}`,
+          detail: `tier=${classified.tier}${classified.overridden ? " (override)" : ""}${classified.clamped ? " — override clamped at conservative floor" : ""}${classified.draftCreator ? " draft-creator" : ""}${classified.classified ? "" : " — unclassified (conservative high)"}`,
         })),
       },
       select: { id: true, status: true, riskTier: true, plainSummary: true, expiresAt: true },
@@ -136,7 +136,7 @@ export async function decideApproval(input: DecideInput) {
     // tier is re-derived so an edit can't silently change the action's risk
     // profile. The conservative floor in classifyAction still holds.
     const reclassified = input.editedArgs
-      ? classifyAction(approval.toolName, await getToolTierOverrides(input.workspaceId))
+      ? classifyAction(approval.toolName, await getToolTierOverrides(input.workspaceId), { appKey: approval.appKey })
       : null;
     const tierChanged = reclassified !== null && reclassified.tier !== approval.riskTier;
     const updated = await tx.composioActionApproval.update({

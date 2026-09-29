@@ -33,7 +33,30 @@ export interface ClassifiedAction {
    * destructive actions go through the approve/deny queue.
    */
   clamped: boolean;
+  /**
+   * Phase 15: whether the derivation confidently classified the tool.
+   * False EXACTLY when the universal conservative floor caught it —
+   * tier is then high AND autoExecutable is false, so the gate's
+   * high-tier second-confirmation path is required (unclassified =
+   * HIGH-GATED, locked).
+   */
+  classified: boolean;
 }
+
+// Phase 15: verb stems + derivation live in derive.ts (pattern lists,
+// description fallback, per-app override table, conservative floor).
+// Re-exported here for any consumer importing them from risk.ts.
+export {
+  DESTRUCTIVE_PATTERNS,
+  WRITE_PATTERNS,
+  READ_PATTERNS,
+  PER_APP_TIER_OVERRIDES,
+  deriveTier,
+  isValidTier,
+  type DerivedTier,
+} from "./derive";
+
+import { deriveTier, isValidTier } from "./derive";
 
 const TIER_RANK: Record<RiskTier, number> = { low: 0, medium: 1, high: 2 };
 
@@ -42,42 +65,12 @@ function riskier(a: RiskTier, b: RiskTier): RiskTier {
   return TIER_RANK[a] >= TIER_RANK[b] ? a : b;
 }
 
-// Verb stems that mark a tool destructive. Checked before write verbs so
-// e.g. DELETE_LABEL (destructive) beats a generic match.
-const DESTRUCTIVE_PATTERNS = [
-  "DELETE",
-  "REMOVE",
-  "REVOKE",
-  "ARCHIVE",
-  "CANCEL",
-  "DESTROY",
-  "PURGE",
-  "TRASH",
-  "UNSUBSCRIBE",
-  "BLOCK",
-];
-
-// Verb stems that mark a tool a write.
-const WRITE_PATTERNS = [
-  "SEND",
-  "CREATE",
-  "UPDATE",
-  "POST",
-  "PUBLISH",
-  "UPLOAD",
-  "ADD",
-  "INSERT",
-  "SET",
-  "MODIFY",
-  "EDIT",
-  "PATCH",
-  "SUBMIT",
-  "SHARE",
-  "INVITE",
-  "SCHEDULE",
-  "REPLY",
-  "APPEND",
-];
+/** Derive the base tier from the tool slug's verb stems (Phase 15: now
+ *  delegates to derive.ts, which adds read patterns, description fallback,
+ *  a per-app override table, and the conservative floor). */
+export function deriveTierFromName(toolName: string): RiskTier {
+  return deriveTier(toolName).tier;
+}
 
 // Tools whose ONLY effect is a draft artifact the human must send/approve
 // in the native app. Medium tier, auto-executable, reviewable.
@@ -89,14 +82,6 @@ const DRAFT_CREATOR_SLUGS = new Set([
   "NOTION_CREATE_PAGE", // pages start as private drafts in the workspace
 ]);
 
-/** Derive the base tier from the tool slug's verb stems. */
-export function deriveTierFromName(toolName: string): RiskTier {
-  const upper = toolName.toUpperCase();
-  if (DESTRUCTIVE_PATTERNS.some((p) => upper.includes(p))) return "high";
-  if (WRITE_PATTERNS.some((p) => upper.includes(p))) return "medium";
-  return "low";
-}
-
 export function isDraftCreator(toolName: string): boolean {
   const upper = toolName.toUpperCase();
   return (
@@ -105,8 +90,12 @@ export function isDraftCreator(toolName: string): boolean {
   );
 }
 
-export function isValidTier(t: unknown): t is RiskTier {
-  return t === "low" || t === "medium" || t === "high";
+export interface ClassifyOptions {
+  /** Marketr app key (e.g. "stripe") — activates the per-app override table. */
+  appKey?: string;
+  /** Tool description — enables the description-text fallback when the
+   *  slug is ambiguous. */
+  description?: string;
 }
 
 /**
@@ -119,34 +108,46 @@ export function isValidTier(t: unknown): t is RiskTier {
  * Auto-executability: reads (low) and draft-creators (medium) may run
  * automatically — but an explicit override escalation to high revokes
  * the draft-creator privilege.
+ *
+ * Phase 15: derivation comes from deriveTier() (slug patterns,
+ * description fallback, per-app table, conservative floor). A tool the
+ * classifier cannot confidently derive (classified=false) lands at tier
+ * high with autoExecutable=false — HIGH-GATED: the gate's existing
+ * high-tier second-confirmation path (executeApproved's
+ * destructiveConfirm) is required. Nothing auto-runs unclassified.
  */
 export function classifyAction(
   toolName: string,
   overrides?: Record<string, string> | null,
+  opts?: ClassifyOptions,
 ): ClassifiedAction {
   const slug = toolName.toUpperCase();
   const override = overrides?.[slug] ?? overrides?.[toolName];
   const draftCreator = isDraftCreator(toolName);
-  const derived = deriveTierFromName(toolName);
+  const derived = deriveTier(toolName, opts?.description, opts?.appKey);
   if (override !== undefined && isValidTier(override)) {
-    const tier = riskier(derived, override);
+    const tier = riskier(derived.tier, override);
     return {
       toolName,
       tier,
       draftCreator,
       autoExecutable:
-        tier === "low" || (draftCreator && tier === "medium" && override !== "high"),
+        derived.classified &&
+        (tier === "low" || (draftCreator && tier === "medium" && override !== "high")),
       overridden: true,
-      clamped: TIER_RANK[override] < TIER_RANK[derived],
+      clamped: TIER_RANK[override] < TIER_RANK[derived.tier],
+      classified: derived.classified,
     };
   }
   return {
     toolName,
-    tier: derived,
+    tier: derived.tier,
     draftCreator,
-    autoExecutable: derived === "low" || draftCreator,
+    autoExecutable:
+      derived.classified && (derived.tier === "low" || draftCreator),
     overridden: false,
     clamped: false,
+    classified: derived.classified,
   };
 }
 

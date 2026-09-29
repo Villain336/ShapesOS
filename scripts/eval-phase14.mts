@@ -115,9 +115,10 @@ const RISK_CORPUS: RiskCase[] = [
   { slug: "NOTION_CREATE_PAGE", tier: "medium", auto: true, draft: true },
   { slug: "NOTION_UPDATE_PAGE", tier: "medium", auto: false },
   { slug: "NOTION_ARCHIVE_PAGE", tier: "high", auto: false },
-  // Unknown slugs fail closed to low/read-only? No — unknown verbs are low
-  // tier by derivation (no destructive/write stem), which is the documented
-  // conservative default for unreadable names.
+  // Phase 15 doctrine (was: unknown slugs defaulted low in Phase 14 —
+  // superseded by the universal conservative floor): slugs with a
+  // recognized read verb still classify low; anything truly unclassified
+  // floors to high-gated (approval + second confirmation).
   { slug: "GMAIL_FETCH_ATTACHMENT", tier: "low", auto: true },
 ];
 

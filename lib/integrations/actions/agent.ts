@@ -63,7 +63,7 @@ export type AgentInvokeOutcome =
  */
 export async function agentInvokeAction(input: AgentInvokeInput): Promise<AgentInvokeOutcome> {
   const overrides = await getToolTierOverrides(input.workspaceId);
-  const classified = classifyAction(input.toolName, overrides);
+  const classified = classifyAction(input.toolName, overrides, { appKey: input.appKey });
   // Fail-closed: no connection row -> no execution, no proposal.
   const connectedAccountId = await requireConnectedEntity(input.workspaceId, input.appKey);
 
