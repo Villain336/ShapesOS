@@ -64,3 +64,6 @@ screenshots/
 # Phase 10: corpus chunk data (9MB+; manifest.json is the version record) + DB backups (never commit)
 data/
 db-backups/
+
+# Phase 16 slice 5: agent run recordings (WebM video + Playwright trace.zip, host-owned)
+.run-artifacts/

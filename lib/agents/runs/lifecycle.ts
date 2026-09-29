@@ -1,0 +1,162 @@
+// Marketr — Phase 16 slice 5: agent-run lifecycle for browser runs.
+//
+// Minimal server-side wiring of the recorder into the agent run lifecycle:
+// an agent turn (or mission step) calls executeBrowserRun() to get a
+// persisted AgentRun (linked to threadId/missionId) + recorded WebM video +
+// Playwright trace + a structured AgentRunEvent timeline.
+//
+// The actual browser driving arrives as the caller's `execute` callback —
+// this slice records and persists; it does not implement web automation.
+// Nothing here is exposed to the client; browser control stays server-side.
+// Viewer UI (slice 6) and live watch (slice 7) consume the persisted rows.
+
+import type { BrowserRunOutcome, AgentRunLinkage } from "./types";
+import {
+  AgentRunRecorder,
+  RecorderBusyError,
+  recordingRetentionUntil,
+  type BrowserLauncher,
+  type RecorderPage,
+} from "./recorder";
+import {
+  createAgentRun,
+  markAgentRunRunning,
+  appendAgentRunEvent,
+  appendAguiEvent,
+  attachAgentRunRecording,
+  finishAgentRun,
+} from "./service";
+
+export { RecorderBusyError };
+
+export interface BrowserRunRequest extends AgentRunLinkage {
+  workspaceId: string;
+  /** Human/service identity that requested the run (audit). */
+  startedBy: string;
+  /** Page the run opens with (optional; the callback may navigate itself). */
+  startUrl?: string;
+  /** Headed (watchable) vs headless-shell. Defaults to headless. */
+  headless?: boolean;
+  /** CoAgents snapshot at run start (optional). */
+  agentState?: Record<string, unknown>;
+}
+
+export interface BrowserRunDeps {
+  /** Injected launcher (tests); production uses the real Chromium launcher. */
+  launcher?: BrowserLauncher;
+  /**
+   * The agent's browser work. Receives the recorded page plus a
+   * recordAction() helper — call it after each meaningful action so the
+   * timeline reads like the run actually unfolded.
+   */
+  execute: (ctx: {
+    page: RecorderPage;
+    recordAction: (summary: string, payload?: Record<string, unknown>) => Promise<void>;
+  }) => Promise<BrowserRunOutcome>;
+}
+
+export interface BrowserRunResult {
+  runId: string;
+  status: "succeeded" | "failed";
+  videoPath: string | null;
+  tracePath: string;
+  stepCount: number;
+  sizeBytes: number;
+}
+
+/**
+ * Run one recorded browser run end-to-end:
+ *   create AgentRun (queued) → mark running → start recorder (video+trace)
+ *   → execute callback → stop recorder → attach recording → finish run.
+ *
+ * Events are appended to the timeline at every transition. On failure the
+ * run is finished `failed` with the error as a `note` event, the recorder
+ * is still stopped (artifacts kept), and the error rethrows.
+ */
+export async function executeBrowserRun(
+  request: BrowserRunRequest,
+  deps: BrowserRunDeps,
+): Promise<BrowserRunResult> {
+  if (!request.workspaceId) throw new Error("executeBrowserRun: workspaceId is required");
+
+  const run = await createAgentRun({
+    workspaceId: request.workspaceId,
+    kind: "browser",
+    startedBy: request.startedBy,
+    threadId: request.threadId,
+    missionId: request.missionId,
+    agentState: request.agentState,
+  });
+  const { workspaceId, id: runId } = { workspaceId: request.workspaceId, id: run.id };
+
+  await markAgentRunRunning(workspaceId, runId);
+  await appendAguiEvent(workspaceId, runId, "Browser run requested", {
+    threadId: request.threadId ?? null,
+    missionId: request.missionId ?? null,
+    startUrl: request.startUrl ?? null,
+  });
+
+  const recorder = new AgentRunRecorder({
+    runId,
+    launcher: deps.launcher,
+    headless: request.headless,
+    onTimelineEvent: (event) => {
+      void appendAgentRunEvent(workspaceId, runId, event);
+    },
+  });
+
+  try {
+    const { page } = await recorder.start(request.startUrl);
+    const recordAction = (summary: string, payload?: Record<string, unknown>) =>
+      recorder.recordAction(summary, payload);
+    const outcome = await deps.execute({ page, recordAction });
+    const stopped = await recorder.stop();
+    await attachAgentRunRecording(workspaceId, runId, {
+      videoPath: stopped.videoPath,
+      tracePath: stopped.tracePath,
+      stepCount: stopped.stepCount,
+      sizeBytes: stopped.sizeBytes,
+      retentionUntil: recordingRetentionUntil(),
+    });
+    await appendAguiEvent(workspaceId, runId, "Browser run finished", {
+      status: "succeeded",
+      stepCount: stopped.stepCount,
+      sizeBytes: stopped.sizeBytes,
+    });
+    await finishAgentRun(workspaceId, runId, "succeeded");
+    return {
+      runId,
+      status: "succeeded",
+      videoPath: stopped.videoPath,
+      tracePath: stopped.tracePath,
+      stepCount: stopped.stepCount,
+      sizeBytes: stopped.sizeBytes,
+    };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    // Keep the artifacts: a failed run's trace is the most valuable one.
+    let stopped = { videoPath: null as string | null, tracePath: "", stepCount: 0, sizeBytes: 0 };
+    try {
+      const s = await recorder.stop();
+      stopped = { videoPath: s.videoPath, tracePath: s.tracePath, stepCount: s.stepCount, sizeBytes: s.sizeBytes };
+      if (s.tracePath) {
+        await attachAgentRunRecording(workspaceId, runId, {
+          videoPath: s.videoPath,
+          tracePath: s.tracePath,
+          stepCount: s.stepCount,
+          sizeBytes: s.sizeBytes,
+          retentionUntil: recordingRetentionUntil(),
+        });
+      }
+    } catch {
+      // Recorder teardown already best-effort; never mask the run error.
+    }
+    await appendAgentRunEvent(workspaceId, runId, {
+      type: "note",
+      summary: `Browser run failed: ${message}`,
+      payload: { error: message },
+    });
+    await finishAgentRun(workspaceId, runId, "failed");
+    throw err;
+  }
+}

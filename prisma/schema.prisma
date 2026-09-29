@@ -541,6 +541,8 @@ model Workspace {
   composioActionLogs      ComposioActionLog[]
   // Phase 15 slice 1: per-workspace discovered tool catalog back-relation.
   composioToolCatalog     ComposioToolCatalog[]
+  // Phase 16 slice 5: viewable agent runs back-relation.
+  agentRuns               AgentRun[]
   // Phase 15 slice 5: per-workspace catalog drift reports back-relation.
   composioCatalogDrift    ComposioCatalogDrift[]
   // Phase 15 slice 3: per-workspace toolkit enablement back-relation.
@@ -8415,4 +8417,103 @@ model UniverDoc {
 
   @@index([workspaceId, kind, updatedAt])
   @@map("univer_docs")
+}
+
+// ============================================================
+// Phase 16 slice 5 — viewable agent runs (Playwright recorder).
+// AgentRun is the persisted run lifecycle (an agent turn can request a
+// browser run; it links back to the chat thread and/or mission).
+// AgentRunRecording holds host-owned artifact paths (video webm + trace
+// zip under .run-artifacts/, gitignored). AgentRunEvent is the structured
+// run timeline (agui | gate | browser | note). All three carry
+// workspace_id and are FORCE RLS fail-closed on the app.workspace_id GUC.
+// ============================================================
+enum AgentRunKind {
+  mission
+  playbook
+  browser
+  follow_up
+
+  @@map("AgentRunKind")
+}
+
+enum AgentRunStatus {
+  queued
+  running
+  succeeded
+  failed
+  cancelled
+
+  @@map("AgentRunStatus")
+}
+
+enum AgentRunEventType {
+  agui
+  gate
+  browser
+  note
+
+  @@map("AgentRunEventType")
+}
+
+model AgentRun {
+  id          String         @id @default(cuid()) @map("id")
+  workspaceId String         @map("workspace_id")
+  workspace   Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  kind        AgentRunKind   @map("kind")
+  status      AgentRunStatus @default(queued) @map("status")
+  startedBy   String         @map("started_by")
+  // Link back to the requesting surface: chat thread and/or mission.
+  threadId    String?        @map("thread_id")
+  missionId   String?        @map("mission_id")
+  // CoAgents snapshot captured at run start (JSON).
+  agentState  Json?          @map("agent_state")
+  // Next event sequence number (timeline ordering; assigned by service).
+  nextSeq     Int            @default(0) @map("next_seq")
+  createdAt   DateTime       @default(now()) @map("created_at")
+  endedAt     DateTime?      @map("ended_at")
+
+  recording AgentRunRecording?
+  events    AgentRunEvent[]
+
+  @@index([workspaceId, status, createdAt])
+  @@index([workspaceId, threadId])
+  @@index([workspaceId, missionId])
+  @@map("agent_runs")
+}
+
+model AgentRunRecording {
+  id             String   @id @default(cuid()) @map("id")
+  workspaceId    String    @map("workspace_id")
+  runId          String    @unique @map("run_id")
+  run            AgentRun  @relation(fields: [runId], references: [id], onDelete: Cascade)
+  // Host-owned artifact paths (repo-local .run-artifacts/, gitignored).
+  videoPath      String?  @map("video_path")
+  tracePath      String?  @map("trace_path")
+  stepCount      Int      @default(0) @map("step_count")
+  sizeBytes      BigInt   @default(0) @map("size_bytes")
+  // Decision (c): 30 days then summarize (slice 8 sweep drops videos).
+  retentionUntil DateTime @map("retention_until")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@index([workspaceId, createdAt])
+  @@map("agent_run_recordings")
+}
+
+model AgentRunEvent {
+  id          String           @id @default(cuid()) @map("id")
+  workspaceId String           @map("workspace_id")
+  runId       String           @map("run_id")
+  run         AgentRun         @relation(fields: [runId], references: [id], onDelete: Cascade)
+  // Monotonic within the run (assigned atomically by the service).
+  seq         Int              @map("seq")
+  type        AgentRunEventType @map("type")
+  // Short human-readable summary (timeline row); full detail in payload.
+  summary     String           @map("summary")
+  payload     Json?            @map("payload")
+  createdAt   DateTime         @default(now()) @map("created_at")
+
+  @@unique([runId, seq])
+  @@index([workspaceId, runId, seq])
+  @@map("agent_run_events")
 }
