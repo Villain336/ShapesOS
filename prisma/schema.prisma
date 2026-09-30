@@ -565,6 +565,8 @@ model Workspace {
   opsAuditEvents          OpsAuditEvent[]
   // Phase 17 slice 3: purchase orders back-relation.
   opsPurchaseOrders       OpsPurchaseOrder[]
+  // Phase 17 slice 4: project time-entry ledger back-relation.
+  opsTimeEntries          OpsTimeEntry[]
   // Phase 15 slice 5: per-workspace catalog drift reports back-relation.
   composioCatalogDrift    ComposioCatalogDrift[]
   // Phase 15 slice 3: per-workspace toolkit enablement back-relation.
@@ -8864,9 +8866,36 @@ model OpsProject {
   createdAt   DateTime        @default(now()) @map("created_at")
   updatedAt   DateTime        @updatedAt @map("updated_at")
 
+  timeEntries OpsTimeEntry[]
+
   @@index([workspaceId, status, createdAt])
   @@index([workspaceId, leadId])
   @@map("ops_projects")
+}
+
+// Project time-entry ledger (slice 4): billable/effort hours on a project.
+// Integer minutes (never floats — the same integer-math discipline as
+// money). Entries are append-only through the API: log a new row to
+// correct, never edit history. `billed` marks entries already invoiced;
+// the complete-project nudge surfaces unbilled time.
+model OpsTimeEntry {
+  id          String     @id @default(cuid())
+  workspaceId String     @map("workspace_id")
+  workspace   Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  projectId   String     @map("project_id")
+  project     OpsProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  // Duration in integer minutes.
+  minutes     Int
+  description String?    @db.Text
+  // Who logged the time: user id or "agent:<surface>".
+  actor       String?
+  occurredAt  DateTime   @default(now()) @map("occurred_at")
+  billed      Boolean    @default(false)
+  createdAt   DateTime   @default(now()) @map("created_at")
+
+  @@index([workspaceId, projectId, occurredAt])
+  @@index([workspaceId, projectId, billed])
+  @@map("ops_time_entries")
 }
 
 // Medusa-Workflows-inspired transactional record (clean-room): a named

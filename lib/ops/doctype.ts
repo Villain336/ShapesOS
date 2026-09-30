@@ -478,6 +478,13 @@ async function applyPatch(
       data.dueAt = new Date(sentAt.getTime() + 30 * 24 * 3600_000);
     }
   }
+  if (def.slug === "projects" && typeof patch.status === "string") {
+    // Slice 4: guard the status flow — planning → active → on_hold /
+    // completed / cancelled. Terminal states have no exits. Non-status
+    // patches (name, milestones, lead refs) pass through untouched.
+    const { assertLegalProjectTransition } = await import("./projects");
+    assertLegalProjectTransition(String(existing.status), patch.status);
+  }
   if (def.slug === "purchase-orders") {
     // Slice 3: PO lifecycle. Send is gated (OPS_PO_SEND); receive is a free
     // fulfillment write that atomically books restock txns for line items
