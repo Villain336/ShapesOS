@@ -146,6 +146,8 @@ function validCreateBody(slug: string): Record<string, unknown> {
       return { productId: "prod_1", delta: -2, reason: "sale" };
     case "projects":
       return { name: "Website rebuild", milestones: [{ title: "Kickoff" }] };
+    case "purchase-orders":
+      return { lineItems: [{ name: "Widget", qty: 1, priceCents: 800 }] };
     case "workflow-runs":
       return { workflowName: "order_to_fulfillment" };
     default:
@@ -154,10 +156,10 @@ function validCreateBody(slug: string): Record<string, unknown> {
 }
 
 describe("DocType convention conformance (stub tx)", () => {
-  it("registers exactly the 8 slice-1 entities", () => {
+  it("registers exactly the 9 ops entities (8 slice-1 + purchase-orders)", () => {
     assert.deepEqual(
       OPS_ENTITIES.map((d) => d.slug).sort(),
-      ["inventory-txns", "invoices", "orders", "payments", "products", "projects", "promotions", "workflow-runs"],
+      ["inventory-txns", "invoices", "orders", "payments", "products", "projects", "promotions", "purchase-orders", "workflow-runs"],
     );
     for (const d of OPS_ENTITIES) {
       assert.ok(OPS_ENTITY_MAP[d.slug] === d, `${d.slug} in map`);
@@ -192,7 +194,7 @@ describe("DocType convention conformance (stub tx)", () => {
   }
 
   it("free creates: row carries workspaceId + exactly one audit row", async () => {
-    for (const slug of ["products", "orders", "promotions", "invoices", "projects", "workflow-runs"]) {
+    for (const slug of ["products", "orders", "promotions", "invoices", "purchase-orders", "projects", "workflow-runs"]) {
       const def = OPS_ENTITY_MAP[slug]!;
       const { tx, calls } = makeStubTx();
       const res = await opsCreate(tx, def, ACTOR, validCreateBody(slug), { gatePort: stubGatePort() });
@@ -231,6 +233,19 @@ describe("DocType convention conformance (stub tx)", () => {
     if (inv.outcome !== "done") return;
     assert.equal((inv.row as Record<string, unknown>).totalCents, 3000);
     assert.equal((inv.row as Record<string, unknown>).status, "draft");
+
+    // Slice 3: purchase-order totals are server-computed too, status forced draft.
+    const poDef = OPS_ENTITY_MAP["purchase-orders"]!;
+    const po = await opsCreate(
+      tx, poDef, ACTOR,
+      { lineItems: [{ name: "Z", qty: 4, priceCents: 250 }], taxCents: 100, status: "sent", totalCents: 1 },
+      { gatePort: stubGatePort() },
+    );
+    assert.equal(po.outcome, "done");
+    if (po.outcome !== "done") return;
+    assert.equal((po.row as Record<string, unknown>).subtotalCents, 1000);
+    assert.equal((po.row as Record<string, unknown>).totalCents, 1100);
+    assert.equal((po.row as Record<string, unknown>).status, "draft");
   });
 
   it("inventory txn: atomic txn row + stock decrement; 404/422 guards", async () => {

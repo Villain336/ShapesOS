@@ -563,6 +563,8 @@ model Workspace {
   opsProjects             OpsProject[]
   opsWorkflowRuns         OpsWorkflowRun[]
   opsAuditEvents          OpsAuditEvent[]
+  // Phase 17 slice 3: purchase orders back-relation.
+  opsPurchaseOrders       OpsPurchaseOrder[]
   // Phase 15 slice 5: per-workspace catalog drift reports back-relation.
   composioCatalogDrift    ComposioCatalogDrift[]
   // Phase 15 slice 3: per-workspace toolkit enablement back-relation.
@@ -8641,6 +8643,13 @@ enum OpsPaymentStatus {
   refunded
 }
 
+enum OpsPurchaseOrderStatus {
+  draft
+  sent
+  received
+  cancelled
+}
+
 enum OpsInvoiceStatus {
   draft
   sent
@@ -8682,6 +8691,9 @@ model OpsProduct {
   priceCents   Int      @map("price_cents")
   stockQty     Int      @default(0) @map("stock_qty")
   trackInventory Boolean @default(true) @map("track_inventory")
+  // Low-stock alert threshold: alert when trackInventory && stockQty <=
+  // lowStockThreshold. Slice 3. Default 0 = alert only when out of stock.
+  lowStockThreshold Int @default(0) @map("low_stock_threshold")
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
@@ -8807,6 +8819,33 @@ model OpsInventoryTxn {
   @@index([workspaceId, productId, createdAt])
   @@index([workspaceId, reason, createdAt])
   @@map("ops_inventory_txns")
+}
+
+// Purchase order: supplier ref, line items, lifecycle.
+// Slice 3. Sending is a gated money commitment (OPS_PO_SEND); receiving
+// is a free fulfillment write that atomically books restock inventory
+// txns for line items carrying a productId.
+model OpsPurchaseOrder {
+  id          String                @id @default(cuid())
+  workspaceId String                @map("workspace_id")
+  workspace   Workspace             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  // Supplier: a CRM lead id (optional) + free-text name fallback.
+  supplierId   String? @map("supplier_id")
+  supplierName String? @map("supplier_name")
+  // [{ productId?, name, sku?, qty, priceCents }]
+  lineItems   Json    @map("line_items")
+  taxCents    Int     @default(0) @map("tax_cents")
+  subtotalCents Int    @map("subtotal_cents")
+  totalCents  Int     @map("total_cents")
+  status      OpsPurchaseOrderStatus @default(draft)
+  sentAt      DateTime? @map("sent_at")
+  receivedAt  DateTime? @map("received_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@index([workspaceId, status, createdAt])
+  @@index([workspaceId, supplierId])
+  @@map("ops_purchase_orders")
 }
 
 // Client delivery work: milestones JSON

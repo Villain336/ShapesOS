@@ -227,6 +227,52 @@ export async function opsCreate(
   return { outcome: "done", row: rows.length === 1 ? rows[0]! : toJson({ rows }), action: "create" };
 }
 
+/**
+ * Record one stock move: txn row + materialized stock balance in ONE
+ * transaction — inventory decrements exactly once per sale, never drifts.
+ * Shared by the inventory-txns create path and PO receiving (slice 3).
+ */
+export async function recordInventoryTxn(
+  tx: Tx,
+  actor: OpsActor,
+  args: {
+    productId: string;
+    delta: number;
+    reason: "sale" | "restock" | "adjustment";
+    note?: string | null;
+    /** Defaults to the acting user — callers may pass "agent:<surface>". */
+    actorName?: string | null;
+  },
+): Promise<Record<string, unknown>> {
+  if (!Number.isInteger(args.delta) || args.delta === 0) {
+    throw new OpsError(400, "Inventory delta must be a non-zero integer");
+  }
+  const products = (tx as unknown as Record<string, Delegate>)["opsProduct"];
+  const txns = (tx as unknown as Record<string, Delegate>)["opsInventoryTxn"];
+  const product = (await products.findFirst({
+    where: { id: args.productId },
+  })) as unknown as { id: string; trackInventory: boolean } | null;
+  if (!product) throw new OpsNotFoundError("products", args.productId);
+  if (!product.trackInventory) {
+    throw new OpsError(422, `Product "${args.productId}" does not track inventory`);
+  }
+  const txn = await txns.create({
+    data: {
+      workspaceId: actor.workspaceId,
+      productId: args.productId,
+      delta: args.delta,
+      reason: args.reason,
+      actor: args.actorName ?? actor.userId,
+      note: args.note ?? null,
+    },
+  });
+  await products.update({
+    where: { id: args.productId },
+    data: { stockQty: { increment: args.delta } },
+  });
+  return txn;
+}
+
 /** Materialize the create: entity-specific server-side rules. */
 async function createRows(
   tx: Tx,
@@ -239,7 +285,8 @@ async function createRows(
 
   switch (def.slug) {
     case "orders":
-    case "invoices": {
+    case "invoices":
+    case "purchase-orders": {
       const lineItems = body.lineItems as LineItem[];
       const { subtotalCents, taxCents, totalCents } = totalsFor(lineItems, (body.taxCents as number) ?? 0);
       // Slice 2: optional explicit due date on invoices (validated ISO).
@@ -258,10 +305,17 @@ async function createRows(
             // Initial statuses are set explicitly (not left to DB defaults)
             // so the service's contract is visible in code and in stubs.
             status: "draft",
-            customerId: body.customerId ?? null,
             lineItems: toJson(lineItems),
             taxCents,
-            ...(def.slug === "orders" ? { subtotalCents, totalCents } : { totalCents }),
+            totalCents,
+            // subtotalCents exists on orders + purchase-orders, not invoices.
+            ...(def.slug === "invoices" ? {} : { subtotalCents }),
+            ...(def.slug === "purchase-orders"
+              ? {
+                  supplierId: (body.supplierId as string) ?? null,
+                  supplierName: (body.supplierName as string) ?? null,
+                }
+              : { customerId: body.customerId ?? null }),
             ...(def.slug === "invoices" && body.idempotencyKey
               ? { idempotencyKey: body.idempotencyKey }
               : {}),
@@ -307,28 +361,13 @@ async function createRows(
       ];
     }
     case "inventory-txns": {
-      // Atomic: txn row + materialized stock balance in ONE transaction —
-      // inventory decrements exactly once per sale, never drifts.
-      const product = (await (tx as unknown as Record<string, Delegate>)["opsProduct"].findFirst({
-        where: { id: body.productId as string },
-      })) as unknown as { id: string; trackInventory: boolean } | null;
-      if (!product) throw new OpsNotFoundError("products", String(body.productId));
-      if (!product.trackInventory) {
-        throw new OpsError(422, `Product "${body.productId}" does not track inventory`);
-      }
-      const txn = await d.create({
-        data: {
-          ...base,
-          productId: body.productId as string,
-          delta: body.delta as number,
-          reason: body.reason as string,
-          actor: (body.actor as string) ?? actor.userId,
-          note: (body.note as string) ?? null,
-        },
-      });
-      await (tx as unknown as Record<string, Delegate>)["opsProduct"].update({
-        where: { id: body.productId as string },
-        data: { stockQty: { increment: body.delta as number } },
+      // Atomic stock move via the shared helper (same transaction).
+      const txn = await recordInventoryTxn(tx, actor, {
+        productId: body.productId as string,
+        delta: body.delta as number,
+        reason: body.reason as "sale" | "restock" | "adjustment",
+        note: (body.note as string) ?? null,
+        actorName: (body.actor as string) ?? null,
       });
       return [txn];
     }
@@ -358,15 +397,17 @@ export async function opsPatch(
   if (!def.patchable) {
     throw new OpsError(405, `${def.label} is an immutable ledger — corrections are new records, never edits`);
   }
-  const parsed = def.patchSchema.safeParse(
-    rawBody && typeof rawBody === "object" ? (rawBody as Record<string, unknown>) : {},
-  );
+  // Transport keys live outside the patch contract: strip `id` before
+  // validation so strict patch schemas (products) don't 400 on it.
+  const raw = rawBody && typeof rawBody === "object" ? (rawBody as Record<string, unknown>) : {};
+  const id = raw.id;
+  if (typeof id !== "string" || !id) throw new OpsError(400, "PATCH requires an \"id\"");
+  const { id: _id, ...patchInput } = raw;
+  const parsed = def.patchSchema.safeParse(patchInput);
   if (!parsed.success) {
     throw new OpsError(400, `Invalid ${def.label} patch: ${parsed.error.issues[0]?.message ?? "validation failed"}`);
   }
   const body = rawBody as Record<string, unknown>;
-  const id = body.id;
-  if (typeof id !== "string" || !id) throw new OpsError(400, "PATCH requires an \"id\"");
   const patch = parsed.data as Record<string, unknown>;
   const classification = classifyOpsWrite({ entity: def.slug, op: "update", body: { ...patch, id } });
   const port = opts.gatePort ?? phase14GatePort;
@@ -435,6 +476,36 @@ async function applyPatch(
     // Slice 2: no explicit due date → net-30 from send. Drives the overdue sweep.
     if (!existing.dueAt) {
       data.dueAt = new Date(sentAt.getTime() + 30 * 24 * 3600_000);
+    }
+  }
+  if (def.slug === "purchase-orders") {
+    // Slice 3: PO lifecycle. Send is gated (OPS_PO_SEND); receive is a free
+    // fulfillment write that atomically books restock txns for line items
+    // carrying a productId. Idempotent: restock only on the transition.
+    if (patch.status === "sent" && !existing.sentAt) {
+      data.sentAt = new Date();
+    }
+    if (patch.status === "received" && existing.status !== "received") {
+      data.receivedAt = new Date();
+      const items = (existing.lineItems ?? []) as Array<{
+        productId?: string;
+        qty: number;
+        name: string;
+      }>;
+      let restocked = 0;
+      for (const it of items) {
+        if (!it.productId) continue;
+        await recordInventoryTxn(tx, actor, {
+          productId: it.productId,
+          delta: it.qty,
+          reason: "restock",
+          note: `purchase order ${id}`,
+        });
+        restocked += 1;
+      }
+      const row = await d.update({ where: { id, workspaceId: actor.workspaceId }, data });
+      // Non-persisted metadata for the caller (the route passes it through).
+      return { ...row, restocked };
     }
   }
   return d.update({ where: { id, workspaceId: actor.workspaceId }, data });

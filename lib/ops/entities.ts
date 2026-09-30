@@ -98,12 +98,19 @@ const productDef: OpsEntityDef = {
   // NOTE: stockQty is deliberately NOT patchable — stock moves only through
   // inventory-txn creation (atomic txn + balance update in the same
   // transaction), so inventory can never drift from its ledger.
+  // lowStockThreshold IS patchable (free write): it only tunes alerting.
+  //
+  // The patch schema is strict ON PURPOSE (an exception to the codebase's
+  // strip-unknown convention): a silent ignore of stockQty would let a
+  // caller believe the balance was set while no ledger entry exists.
+  // Direct balance writes fail loudly (400) instead.
   patchSchema: z.object({
     name: z.string().min(1).max(200).optional(),
     sku: z.string().min(1).max(64).optional(),
     priceCents: z.number().int().min(0).optional(),
     trackInventory: z.boolean().optional(),
-  }),
+    lowStockThreshold: z.number().int().min(0).optional(),
+  }).strict(),
   patchable: true,
   filterable: [],
   gatedTransitions: [],
@@ -249,9 +256,49 @@ const inventoryTxnDef: OpsEntityDef = {
   patchSchema: z.object({}),
   // Immutable ledger — PATCH returns 405.
   patchable: false,
-  filterable: ["reason"],
+  // Slice 3: productId filterable so the UI can show per-product history
+  // through the generic route.
+  filterable: ["reason", "productId"],
   gatedTransitions: [],
   summarize: (r) => `inventory ${r.reason} ${r.delta} on ${r.productId}`,
+};
+
+const poLineItemSchema = z.object({
+  // Optional link to a catalog product: when present, receiving the PO
+  // books a restock inventory txn for it (atomic, same transaction).
+  productId: z.string().min(1).max(64).optional(),
+  name: z.string().min(1).max(200),
+  sku: z.string().max(64).optional(),
+  qty: z.number().int().min(1).max(100_000),
+  priceCents: z.number().int().min(0).max(1_000_000_000),
+});
+
+const purchaseOrderDef: OpsEntityDef = {
+  slug: "purchase-orders",
+  label: "Purchase order",
+  delegate: "opsPurchaseOrder",
+  createSchema: z.object({
+    supplierId: z.string().min(1).max(64).optional(),
+    supplierName: z.string().max(200).optional(),
+    lineItems: z.array(poLineItemSchema).min(1).max(200),
+    taxCents: z.number().int().min(0).default(0),
+  }),
+  patchSchema: z.object({
+    supplierId: z.string().min(1).max(64).optional(),
+    supplierName: z.string().max(200).optional(),
+    taxCents: z.number().int().min(0).optional(),
+    status: z.enum(["sent", "received", "cancelled"]).optional(),
+  }),
+  patchable: true,
+  filterable: ["status"],
+  gatedTransitions: [
+    // Sending a PO is a money commitment (medium, approval required —
+    // money is a red lane). Receiving is fulfillment: a free logged write
+    // that atomically books restock txns. Cancelling deletes value.
+    { field: "status", to: ["sent"], slug: "OPS_PO_SEND", label: "Send purchase order" },
+    { field: "status", to: ["cancelled"], slug: "OPS_RECORD_DELETE", label: "Cancel purchase order" },
+  ],
+  summarize: (r) => `purchase order ${r.id} → ${r.status} (${r.totalCents}c)`,
 };
 
 const projectDef: OpsEntityDef = {
@@ -308,6 +355,7 @@ export const OPS_ENTITIES: OpsEntityDef[] = [
   promotionDef,
   invoiceDef,
   inventoryTxnDef,
+  purchaseOrderDef,
   projectDef,
   workflowRunDef,
 ];

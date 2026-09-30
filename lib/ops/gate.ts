@@ -63,6 +63,10 @@ export const OPS_MONEY_ACTIONS: OpsMoneyAction[] = [
   { slug: "OPS_INVOICE_MARK_PAID", label: "Mark invoice paid", expectedTier: "medium" },
   // Slice 2: outbound payment reminders are money comms — gated like sends.
   { slug: "OPS_INVOICE_REMIND", label: "Send payment reminder", expectedTier: "medium" },
+  // Slice 3: sending a purchase order is a money commitment — gated like
+  // invoice sends. Phase 14 derives unknown OPS_* slugs as high
+  // (conservative floor), which meets the medium pin.
+  { slug: "OPS_PO_SEND", label: "Send purchase order", expectedTier: "medium" },
   { slug: "OPS_PAYMENT_RECORD_CHARGE", label: "Record charge", expectedTier: "medium" },
   { slug: "OPS_PAYMENT_REFUND", label: "Refund payment", expectedTier: "medium" },
   { slug: "OPS_PAYMENT_BULK_REFUND", label: "Bulk refund", expectedTier: "high" },

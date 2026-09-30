@@ -2,7 +2,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ChevronDown, Plus, SquareArrowOutUpRight, Users, KanbanSquare, TrendingUp, ClipboardList, ReceiptText, type LucideIcon } from "lucide-react";
+import { ChevronDown, Plus, SquareArrowOutUpRight, Users, KanbanSquare, TrendingUp, ClipboardList, ReceiptText, Boxes, Truck, type LucideIcon } from "lucide-react";
 import type { CrmLead, CrmPipeline } from "./types";
 import { formatMoney } from "./types";
 import { FilterToolbar, DEFAULT_FILTERS, type LeadFilters } from "./FilterToolbar";
@@ -12,10 +12,12 @@ import { LeadSlideOver } from "./LeadSlideOver";
 import { ForecastView } from "./ForecastView";
 import { FormsTab } from "./FormsTab";
 import { InvoicesTab } from "./InvoicesTab";
+import { InventoryTab } from "./InventoryTab";
+import { PurchaseOrdersTab } from "./PurchaseOrdersTab";
 import { NewLeadModal, PipelineModal, ImportModal } from "./modals";
 import { EmptyState } from "./ui";
 
-type Tab = "leads" | "pipeline" | "forecast" | "forms" | "invoicing";
+type Tab = "leads" | "pipeline" | "forecast" | "forms" | "invoicing" | "inventory" | "purchase-orders";
 
 interface Summary {
   count: number;
@@ -30,6 +32,9 @@ const TABS: { id: Tab; label: string; icon: LucideIcon }[] = [
   { id: "forms", label: "Forms", icon: ClipboardList },
   // Phase 17 slice 2: Operations lives under the CRM (Tico-locked).
   { id: "invoicing", label: "Invoicing", icon: ReceiptText },
+  // Phase 17 slice 3: inventory + purchase orders, same placement.
+  { id: "inventory", label: "Inventory", icon: Boxes },
+  { id: "purchase-orders", label: "Purchase orders", icon: Truck },
 ];
 
 export function CrmApp() {
@@ -216,6 +221,10 @@ export function CrmApp() {
       <div className="flex-1 overflow-y-auto px-5 py-4">
         {tab === "invoicing" ? (
           <InvoicesTab />
+        ) : tab === "inventory" ? (
+          <InventoryTab />
+        ) : tab === "purchase-orders" ? (
+          <PurchaseOrdersTab />
         ) : pipelines.length === 0 && !loading ? (
           <EmptyState
             title="No pipelines yet"

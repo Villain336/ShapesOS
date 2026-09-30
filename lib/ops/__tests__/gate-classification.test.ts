@@ -26,8 +26,8 @@ import {
 const RANK: Record<RiskTier, number> = { low: 0, medium: 1, high: 2 };
 
 describe("ops gate classification", () => {
-  it("pins 9 money actions with medium-minimum tiers (bulk refund high)", () => {
-    assert.equal(OPS_MONEY_ACTIONS.length, 9);
+  it("pins 10 money actions with medium-minimum tiers (bulk refund high)", () => {
+    assert.equal(OPS_MONEY_ACTIONS.length, 10);
     const pins: Record<string, RiskTier> = {
       OPS_INVOICE_SEND: "medium",
       OPS_INVOICE_MARK_PAID: "medium",
@@ -38,6 +38,8 @@ describe("ops gate classification", () => {
       OPS_PAYMENT_BULK_REFUND: "high",
       OPS_ORDER_CANCEL: "medium",
       OPS_ORDER_FULFILL: "medium",
+      // Slice 3: sending a purchase order is a money commitment.
+      OPS_PO_SEND: "medium",
       OPS_RECORD_DELETE: "medium",
     };
     for (const [slug, tier] of Object.entries(pins)) {
@@ -51,7 +53,7 @@ describe("ops gate classification", () => {
 
   it("Phase 14 derivation meets or exceeds every ops pin (no drift)", () => {
     const rows = assertPhase14TierMeetsPin();
-    assert.equal(rows.length, 9);
+    assert.equal(rows.length, 10);
     for (const r of rows) {
       assert.ok(
         RANK[r.derived] >= RANK[r.expected],
@@ -71,6 +73,8 @@ describe("ops gate classification", () => {
       ["orders", { lineItems: [] }],
       ["promotions", { code: "X" }],
       ["invoices", { lineItems: [] }],
+      // Slice 3: PO drafts are free logged writes; send is the gated money step.
+      ["purchase-orders", { lineItems: [] }],
       ["inventory-txns", { productId: "p", delta: 1, reason: "restock" }],
       ["projects", { name: "X" }],
       ["workflow-runs", { workflowName: "w" }],
@@ -127,12 +131,26 @@ describe("ops gate classification", () => {
   });
 
   it("deletes are gated writes on every entity", () => {
-    for (const entity of ["products", "orders", "payments", "promotions", "invoices", "inventory-txns", "projects", "workflow-runs"]) {
+    for (const entity of ["products", "orders", "payments", "promotions", "invoices", "inventory-txns", "projects", "workflow-runs", "purchase-orders"]) {
       const c = classifyOpsWrite({ entity, op: "delete", body: {} });
       assert.equal(c.mode, "gated", `${entity} delete`);
       assert.equal(c.slug, "OPS_RECORD_DELETE");
       assert.ok(RANK[c.tier] >= RANK.medium);
     }
+  });
+
+  it("PO send/cancel are gated money moves; receive is free fulfillment", () => {
+    const send = classifyOpsWrite({ entity: "purchase-orders", op: "update", body: { status: "sent" } });
+    assert.equal(send.mode, "gated");
+    assert.equal(send.slug, "OPS_PO_SEND");
+    assert.equal(send.tier, "medium");
+
+    const cancel = classifyOpsWrite({ entity: "purchase-orders", op: "update", body: { status: "cancelled" } });
+    assert.equal(cancel.mode, "gated");
+    assert.equal(cancel.slug, "OPS_RECORD_DELETE");
+
+    const receive = classifyOpsWrite({ entity: "purchase-orders", op: "update", body: { status: "received" } });
+    assert.equal(receive.mode, "free", "receive is fulfillment bookkeeping, not a money commitment");
   });
 
   it("unknown entity / unknown money action fail closed at classify time", () => {
