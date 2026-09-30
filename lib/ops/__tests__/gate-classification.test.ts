@@ -26,8 +26,8 @@ import {
 const RANK: Record<RiskTier, number> = { low: 0, medium: 1, high: 2 };
 
 describe("ops gate classification", () => {
-  it("pins 10 money actions with medium-minimum tiers (bulk refund high)", () => {
-    assert.equal(OPS_MONEY_ACTIONS.length, 10);
+  it("pins 11 money actions with medium-minimum tiers (bulk refund high)", () => {
+    assert.equal(OPS_MONEY_ACTIONS.length, 11);
     const pins: Record<string, RiskTier> = {
       OPS_INVOICE_SEND: "medium",
       OPS_INVOICE_MARK_PAID: "medium",
@@ -40,6 +40,9 @@ describe("ops gate classification", () => {
       OPS_ORDER_FULFILL: "medium",
       // Slice 3: sending a purchase order is a money commitment.
       OPS_PO_SEND: "medium",
+      // Slice 5: approving a leave request is a manager decision — gated
+      // like other ops approvals.
+      OPS_LEAVE_APPROVE: "medium",
       OPS_RECORD_DELETE: "medium",
     };
     for (const [slug, tier] of Object.entries(pins)) {
@@ -53,7 +56,7 @@ describe("ops gate classification", () => {
 
   it("Phase 14 derivation meets or exceeds every ops pin (no drift)", () => {
     const rows = assertPhase14TierMeetsPin();
-    assert.equal(rows.length, 10);
+    assert.equal(rows.length, 11);
     for (const r of rows) {
       assert.ok(
         RANK[r.derived] >= RANK[r.expected],
@@ -131,7 +134,7 @@ describe("ops gate classification", () => {
   });
 
   it("deletes are gated writes on every entity", () => {
-    for (const entity of ["products", "orders", "payments", "promotions", "invoices", "inventory-txns", "projects", "workflow-runs", "purchase-orders"]) {
+    for (const entity of ["products", "orders", "payments", "promotions", "invoices", "inventory-txns", "projects", "workflow-runs", "purchase-orders", "team-members", "leave-requests"]) {
       const c = classifyOpsWrite({ entity, op: "delete", body: {} });
       assert.equal(c.mode, "gated", `${entity} delete`);
       assert.equal(c.slug, "OPS_RECORD_DELETE");

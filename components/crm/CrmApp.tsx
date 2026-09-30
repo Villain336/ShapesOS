@@ -2,7 +2,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ChevronDown, Plus, SquareArrowOutUpRight, Users, KanbanSquare, TrendingUp, ClipboardList, ReceiptText, Boxes, Truck, FolderKanban, type LucideIcon } from "lucide-react";
+import { ChevronDown, Plus, SquareArrowOutUpRight, Users, KanbanSquare, TrendingUp, ClipboardList, ReceiptText, Boxes, Truck, FolderKanban, UserRound, type LucideIcon } from "lucide-react";
 import type { CrmLead, CrmPipeline } from "./types";
 import { formatMoney } from "./types";
 import { FilterToolbar, DEFAULT_FILTERS, type LeadFilters } from "./FilterToolbar";
@@ -15,10 +15,11 @@ import { InvoicesTab } from "./InvoicesTab";
 import { InventoryTab } from "./InventoryTab";
 import { PurchaseOrdersTab } from "./PurchaseOrdersTab";
 import { ProjectsTab } from "./ProjectsTab";
+import { TeamTab } from "./TeamTab";
 import { NewLeadModal, PipelineModal, ImportModal } from "./modals";
 import { EmptyState } from "./ui";
 
-type Tab = "leads" | "pipeline" | "forecast" | "forms" | "invoicing" | "inventory" | "purchase-orders" | "projects";
+type Tab = "leads" | "pipeline" | "forecast" | "forms" | "invoicing" | "inventory" | "purchase-orders" | "projects" | "team";
 
 interface Summary {
   count: number;
@@ -38,6 +39,8 @@ const TABS: { id: Tab; label: string; icon: LucideIcon }[] = [
   { id: "purchase-orders", label: "Purchase orders", icon: Truck },
   // Phase 17 slice 4: projects, same placement.
   { id: "projects", label: "Projects", icon: FolderKanban },
+  // Phase 17 slice 5: HR essentials — team directory + leave requests.
+  { id: "team", label: "Team", icon: UserRound },
 ];
 
 export function CrmApp() {
@@ -230,6 +233,8 @@ export function CrmApp() {
           <PurchaseOrdersTab />
         ) : tab === "projects" ? (
           <ProjectsTab />
+        ) : tab === "team" ? (
+          <TeamTab />
         ) : pipelines.length === 0 && !loading ? (
           <EmptyState
             title="No pipelines yet"

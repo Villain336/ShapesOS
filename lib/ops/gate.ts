@@ -72,6 +72,9 @@ export const OPS_MONEY_ACTIONS: OpsMoneyAction[] = [
   { slug: "OPS_PAYMENT_BULK_REFUND", label: "Bulk refund", expectedTier: "high" },
   { slug: "OPS_ORDER_CANCEL", label: "Cancel order", expectedTier: "medium" },
   { slug: "OPS_ORDER_FULFILL", label: "Fulfill order", expectedTier: "medium" },
+  // Slice 5: approving a leave request is a manager decision — gated like
+  // other ops approvals (medium pin). Denying and marking taken are free.
+  { slug: "OPS_LEAVE_APPROVE", label: "Approve leave request", expectedTier: "medium" },
   { slug: "OPS_RECORD_DELETE", label: "Delete operations record", expectedTier: "medium" },
 ];
 

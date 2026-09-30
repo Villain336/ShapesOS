@@ -148,6 +148,10 @@ function validCreateBody(slug: string): Record<string, unknown> {
       return { name: "Website rebuild", milestones: [{ title: "Kickoff" }] };
     case "purchase-orders":
       return { lineItems: [{ name: "Widget", qty: 1, priceCents: 800 }] };
+    case "team-members":
+      return { name: "Ada Lovelace", title: "Engineer" };
+    case "leave-requests":
+      return { memberId: "mem_1", type: "vacation", startDate: "2026-12-20", endDate: "2026-12-27" };
     case "workflow-runs":
       return { workflowName: "order_to_fulfillment" };
     default:
@@ -156,10 +160,10 @@ function validCreateBody(slug: string): Record<string, unknown> {
 }
 
 describe("DocType convention conformance (stub tx)", () => {
-  it("registers exactly the 9 ops entities (8 slice-1 + purchase-orders)", () => {
+  it("registers exactly the 11 ops entities (8 slice-1 + purchase-orders + projects + 2 slice-5)", () => {
     assert.deepEqual(
       OPS_ENTITIES.map((d) => d.slug).sort(),
-      ["inventory-txns", "invoices", "orders", "payments", "products", "projects", "promotions", "purchase-orders", "workflow-runs"],
+      ["inventory-txns", "invoices", "leave-requests", "orders", "payments", "products", "projects", "promotions", "purchase-orders", "team-members", "workflow-runs"],
     );
     for (const d of OPS_ENTITIES) {
       assert.ok(OPS_ENTITY_MAP[d.slug] === d, `${d.slug} in map`);
@@ -194,7 +198,7 @@ describe("DocType convention conformance (stub tx)", () => {
   }
 
   it("free creates: row carries workspaceId + exactly one audit row", async () => {
-    for (const slug of ["products", "orders", "promotions", "invoices", "purchase-orders", "projects", "workflow-runs"]) {
+    for (const slug of ["products", "orders", "promotions", "invoices", "purchase-orders", "projects", "team-members", "leave-requests", "workflow-runs"]) {
       const def = OPS_ENTITY_MAP[slug]!;
       const { tx, calls } = makeStubTx();
       const res = await opsCreate(tx, def, ACTOR, validCreateBody(slug), { gatePort: stubGatePort() });

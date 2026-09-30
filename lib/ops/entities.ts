@@ -326,6 +326,64 @@ const projectDef: OpsEntityDef = {
   summarize: (r) => `project "${r.name}" → ${r.status}`,
 };
 
+// ---------------------------------------------------------------------------
+// Slice 5: HR essentials (clean-room — original Marketr work, no ERPNext
+// code/schema/UI text anywhere in this repo).
+// ---------------------------------------------------------------------------
+
+const teamMemberDef: OpsEntityDef = {
+  slug: "team-members",
+  label: "Team member",
+  delegate: "opsTeamMember",
+  createSchema: z.object({
+    name: z.string().min(1).max(200),
+    title: z.string().max(200).optional(),
+    email: z.string().email().max(320).optional(),
+    // ISO-8601 date; parsed to a Date in createRows (validated there).
+    startDate: z.string().max(64).optional(),
+  }),
+  patchSchema: z.object({
+    title: z.string().max(200).nullable().optional(),
+    email: z.string().email().max(320).nullable().optional(),
+    startDate: z.string().max(64).nullable().optional(),
+    status: z.enum(["active", "inactive"]).optional(),
+  }),
+  patchable: true,
+  filterable: ["status"],
+  gatedTransitions: [],
+  summarize: (r) => `team member "${r.name}"${r.title ? ` (${r.title})` : ""} → ${r.status}`,
+};
+
+const leaveRequestDef: OpsEntityDef = {
+  slug: "leave-requests",
+  label: "Leave request",
+  delegate: "opsLeaveRequest",
+  createSchema: z.object({
+    memberId: z.string().min(1).max(64),
+    type: z.enum(["vacation", "sick", "personal"]),
+    // ISO-8601 dates; parsed + range-validated in createRows.
+    startDate: z.string().max(64),
+    endDate: z.string().max(64),
+  }),
+  patchSchema: z.object({
+    status: z.enum(["approved", "denied", "taken"]).optional(),
+  }),
+  patchable: true,
+  filterable: ["status", "memberId", "type"],
+  gatedTransitions: [
+    // Approving a leave request is a manager decision — gated (medium)
+    // like other ops approvals. Denying and marking taken are free
+    // logged writes.
+    {
+      field: "status",
+      to: ["approved"],
+      slug: "OPS_LEAVE_APPROVE",
+      label: "Approve leave request",
+    },
+  ],
+  summarize: (r) => `leave ${r.type} ${r.id} → ${r.status}`,
+};
+
 const workflowRunDef: OpsEntityDef = {
   slug: "workflow-runs",
   label: "Workflow run",
@@ -358,6 +416,8 @@ export const OPS_ENTITIES: OpsEntityDef[] = [
   purchaseOrderDef,
   projectDef,
   workflowRunDef,
+  teamMemberDef,
+  leaveRequestDef,
 ];
 
 export const OPS_ENTITY_MAP: Record<string, OpsEntityDef> = Object.fromEntries(

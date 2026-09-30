@@ -567,6 +567,9 @@ model Workspace {
   opsPurchaseOrders       OpsPurchaseOrder[]
   // Phase 17 slice 4: project time-entry ledger back-relation.
   opsTimeEntries          OpsTimeEntry[]
+  // Phase 17 slice 5: HR essentials back-relations.
+  opsTeamMembers          OpsTeamMember[]
+  opsLeaveRequests        OpsLeaveRequest[]
   // Phase 15 slice 5: per-workspace catalog drift reports back-relation.
   composioCatalogDrift    ComposioCatalogDrift[]
   // Phase 15 slice 3: per-workspace toolkit enablement back-relation.
@@ -8681,6 +8684,25 @@ enum OpsWorkflowRunStatus {
   compensated
 }
 
+// Phase 17 slice 5: HR essentials enums.
+enum OpsTeamMemberStatus {
+  active
+  inactive
+}
+
+enum OpsLeaveType {
+  vacation
+  sick
+  personal
+}
+
+enum OpsLeaveStatus {
+  requested
+  approved
+  denied
+  taken
+}
+
 // Catalog: sellable products/services. trackInventory=false means the
 // product is a service / non-stocked item (stockQty ignored).
 model OpsProduct {
@@ -8896,6 +8918,48 @@ model OpsTimeEntry {
   @@index([workspaceId, projectId, occurredAt])
   @@index([workspaceId, projectId, billed])
   @@map("ops_time_entries")
+}
+
+// HR essentials (Phase 17 slice 5, clean-room): team directory + leave
+// requests. v1 only — full HR (leave balances, payroll) waits for v2.
+model OpsTeamMember {
+  id          String              @id @default(cuid())
+  workspaceId String              @map("workspace_id")
+  workspace   Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name        String
+  title       String?
+  email       String?
+  startDate   DateTime?           @map("start_date")
+  status      OpsTeamMemberStatus @default(active)
+  createdAt   DateTime            @default(now()) @map("created_at")
+  updatedAt   DateTime            @updatedAt @map("updated_at")
+
+  leaveRequests OpsLeaveRequest[]
+
+  @@index([workspaceId, status, createdAt])
+  @@index([workspaceId, name])
+  @@map("ops_team_members")
+}
+
+model OpsLeaveRequest {
+  id          String         @id @default(cuid())
+  workspaceId String         @map("workspace_id")
+  workspace   Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  memberId    String         @map("member_id")
+  member      OpsTeamMember  @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  type        OpsLeaveType
+  startDate   DateTime       @map("start_date")
+  endDate     DateTime       @map("end_date")
+  status      OpsLeaveStatus @default(requested)
+  // Who approved/denied (user id), set when the decision is recorded.
+  decidedBy   String?        @map("decided_by")
+  decidedAt   DateTime?      @map("decided_at")
+  createdAt   DateTime       @default(now()) @map("created_at")
+  updatedAt   DateTime       @updatedAt @map("updated_at")
+
+  @@index([workspaceId, memberId, createdAt])
+  @@index([workspaceId, status, createdAt])
+  @@map("ops_leave_requests")
 }
 
 // Medusa-Workflows-inspired transactional record (clean-room): a named

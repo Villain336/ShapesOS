@@ -273,6 +273,15 @@ export async function recordInventoryTxn(
   return txn;
 }
 
+/** Parse an ISO date string from the API contract into a Date; 400 on garbage. */
+function parseDate(value: unknown, field: string): Date {
+  const d = new Date(String(value ?? ""));
+  if (Number.isNaN(d.getTime())) {
+    throw new OpsError(400, `Invalid ${field}: must be an ISO-8601 date`);
+  }
+  return d;
+}
+
 /** Materialize the create: entity-specific server-side rules. */
 async function createRows(
   tx: Tx,
@@ -370,6 +379,35 @@ async function createRows(
         actorName: (body.actor as string) ?? null,
       });
       return [txn];
+    }
+    case "team-members": {
+      // Slice 5: startDate arrives as an ISO string in the API contract;
+      // the model stores a Date.
+      const data: Record<string, unknown> = { ...base, ...stripInternal(body) };
+      if (body.startDate != null) data.startDate = parseDate(body.startDate, "startDate");
+      return [await d.create({ data })];
+    }
+    case "leave-requests": {
+      // Slice 5: dates parsed server-side; the range is validated (end on
+      // or after start); initial status is set explicitly to "requested"
+      // (not left to the DB default) so the contract is visible in code.
+      const startDate = parseDate(body.startDate, "startDate");
+      const endDate = parseDate(body.endDate, "endDate");
+      if (endDate.getTime() < startDate.getTime()) {
+        throw new OpsError(400, "Leave endDate must be on or after startDate");
+      }
+      return [
+        await d.create({
+          data: {
+            ...base,
+            memberId: body.memberId as string,
+            type: body.type as string,
+            startDate,
+            endDate,
+            status: "requested",
+          },
+        }),
+      ];
     }
     default:
       return [await d.create({ data: { ...base, ...stripInternal(body) } })];
@@ -484,6 +522,17 @@ async function applyPatch(
     // patches (name, milestones, lead refs) pass through untouched.
     const { assertLegalProjectTransition } = await import("./projects");
     assertLegalProjectTransition(String(existing.status), patch.status);
+  }
+  if (def.slug === "leave-requests" && typeof patch.status === "string") {
+    // Slice 5: guard the leave flow — requested → approved/denied → taken.
+    // Denied and taken are terminal. Approving records who decided and
+    // when (the gate itself ran before we got here).
+    const { assertLegalLeaveTransition } = await import("./hr");
+    assertLegalLeaveTransition(String(existing.status), patch.status);
+    if (patch.status === "approved" || patch.status === "denied") {
+      data.decidedBy = actor.userId;
+      data.decidedAt = new Date();
+    }
   }
   if (def.slug === "purchase-orders") {
     // Slice 3: PO lifecycle. Send is gated (OPS_PO_SEND); receive is a free
