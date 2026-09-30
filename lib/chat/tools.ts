@@ -31,6 +31,9 @@ import { generateReport } from "@/lib/pdf/generate";
 import { approveAutopilotItem } from "@/lib/seo/autopilot-service";
 import { designQr, printLockQr, QrDesignerError } from "@/lib/studio/qr-designer";
 import { auditStudio } from "@/lib/studio/service";
+// Phase 17 slice 7: Operations tools (read/draft/propose — money writes are
+// propose-only behind the Phase 14 gate).
+import { OPS_TOOLS } from "./ops-tools";
 
 export type ToolKind = "safe" | "destructive" | "publish" | "spend";
 
@@ -969,6 +972,9 @@ export const TOOLS: ToolDef[] = [
   design_qr_code,
   trigger_automation_flow,
   automation_flow_status,
+  // Phase 17: business operations (invoices, inventory, POs, projects, HR,
+  // workflows) — propose-only money writes.
+  ...OPS_TOOLS,
 ];
 
 export function getTool(name: string): ToolDef | undefined {

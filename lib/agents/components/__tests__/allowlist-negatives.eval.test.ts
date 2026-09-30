@@ -140,8 +140,12 @@ describe("allowlist negatives: render path", () => {
   });
 
   it("the registry is still exactly the allowlisted set (no silent growth)", () => {
+    // Phase 17 slice 7 intentionally grows the allowlist with the ops cards.
     assert.deepEqual(Object.keys(GENERATIVE_COMPONENT_REGISTRY).sort(), [
       "approval_card",
+      "ops_invoice_card",
+      "ops_order_card",
+      "ops_workflow_run_card",
       "report_preview",
     ]);
   });

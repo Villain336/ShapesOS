@@ -8,6 +8,7 @@ import {
   mapPostsToCalendar,
   mapMissionToState,
   mapItemsToApprovals,
+  mapOpsSummaryToState,
   diffSharedState,
   mergeSharedState,
   updateCalendarRowInState,
@@ -253,5 +254,38 @@ describe("changedCalendarRows", () => {
 
   it("returns empty when nothing changed", () => {
     assert.deepEqual(changedCalendarRows(prev, prev), []);
+  });
+});
+
+// Phase 17 slice 7: operations domain (read-only mirror of lib/ops/summary.ts).
+describe("operations domain", () => {
+  const ops = () =>
+    mapOpsSummaryToState({
+      openInvoices: 4,
+      overdueInvoices: 1,
+      lowStockCount: 3,
+      pendingOpsApprovals: 2,
+    });
+
+  it("maps the ops summary into shared state with an updatedAt stamp", () => {
+    const s = ops();
+    assert.equal(s.openInvoices, 4);
+    assert.equal(s.overdueInvoices, 1);
+    assert.equal(s.lowStockCount, 3);
+    assert.equal(s.pendingOpsApprovals, 2);
+    assert.ok(typeof s.updatedAt === "string" && s.updatedAt.length > 0);
+  });
+
+  it("diffs and merges the operations domain like the others", () => {
+    const prev: SharedAgentState = { operations: ops() };
+    const next: SharedAgentState = {
+      operations: { ...ops(), openInvoices: 5, updatedAt: "2026-09-30T10:00:00.000Z" },
+    };
+    const patch = diffSharedState(prev, next);
+    assert.equal(patch.length, 1);
+    assert.equal(patch[0].path, "/operations");
+    const merged = mergeSharedState(prev, { calendar: { rows: [], updatedAt: T0 } });
+    assert.equal(merged.operations?.openInvoices, 4, "operations survives an unrelated overlay");
+    assert.equal(merged.calendar?.updatedAt, T0);
   });
 });

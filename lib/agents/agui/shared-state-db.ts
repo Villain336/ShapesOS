@@ -8,6 +8,7 @@ import { prisma } from "@/lib/prisma";
 import {
   mapItemsToApprovals,
   mapMissionToState,
+  mapOpsSummaryToState,
   mapPostsToCalendar,
   changedCalendarRows,
   mergeSharedState,
@@ -18,6 +19,8 @@ import {
   type SharedAgentState,
   type SocialPostLite,
 } from "./shared-state";
+import { getOpsSummary } from "@/lib/ops/summary";
+import { withWorkspaceScope } from "@/lib/substrate/memory/rls";
 
 /** SocialPost statuses the UI is allowed to set through shared state. */
 const UI_WRITABLE_POST_STATUSES = new Set(["draft", "scheduled", "cancelled"]);
@@ -28,14 +31,15 @@ export interface SharedStateContext {
 }
 
 /**
- * Load the three shared-state domains from their sources of truth.
+ * Load the four shared-state domains from their sources of truth.
  * Bounded (50 calendar rows, 25 approval items, 5 mission events) so the
- * STATE_SNAPSHOT stays small.
+ * STATE_SNAPSHOT stays small. The operations domain is read-only: ops
+ * writes stay behind the Phase 14 gate via the ops routes.
  */
 export async function defaultLoadSharedState(
   ctx: SharedStateContext,
 ): Promise<SharedAgentState> {
-  const [posts, mission, items] = await Promise.all([
+  const [posts, mission, items, opsSummary] = await Promise.all([
     prisma.socialPost.findMany({
       where: { projectId: ctx.projectId },
       orderBy: [{ scheduledFor: "asc" }, { updatedAt: "desc" }],
@@ -82,6 +86,10 @@ export async function defaultLoadSharedState(
         updatedAt: true,
       },
     }),
+    // Phase 17: operations pulse. Ops tables are FORCE RLS, so the summary
+    // must run inside withWorkspaceScope (the shared-state loader itself
+    // queries prisma directly for the non-RLS domains above).
+    withWorkspaceScope(ctx.workspaceId, (tx) => getOpsSummary(tx, ctx.workspaceId)),
   ]);
 
   const postLites: SocialPostLite[] = posts.map((p) => ({
@@ -120,6 +128,7 @@ export async function defaultLoadSharedState(
     calendar: mapPostsToCalendar(postLites),
     mission: missionLite ? mapMissionToState(missionLite, eventLites) : null,
     approvals: mapItemsToApprovals(itemLites),
+    operations: mapOpsSummaryToState(opsSummary),
   };
 }
 

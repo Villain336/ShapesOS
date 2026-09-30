@@ -15,6 +15,11 @@
 //               gate (lib/seo/autopilot-service.ts); the gate stays
 //               authoritative — approve/deny/edit still go through the gate
 //               routes, never through state writes.
+//   operations → Operations summary (Phase 17: lib/ops/summary.ts) — counts
+//               of open invoices, overdue invoices, low-stock products, and
+//               pending ops approvals. READ-ONLY: all ops writes go through
+//               the ops services/routes behind the Phase 14 gate, never
+//               through state writes.
 //
 // This module is intentionally pure: no prisma, no LLM, no DOM. Safe for
 // node:test. DB access lives in ./shared-state-db.ts; the AG-UI wire-up
@@ -78,11 +83,24 @@ export interface ApprovalQueueState {
   updatedAt: string;
 }
 
+/**
+ * Operations pulse (Phase 17): read-only mirror of lib/ops/summary.ts.
+ * Written only by the backend loader; never by the UI.
+ */
+export interface OperationsState {
+  openInvoices: number;
+  overdueInvoices: number;
+  lowStockCount: number;
+  pendingOpsApprovals: number;
+  updatedAt: string;
+}
+
 /** The full agent↔UI shared state (keys are the CoAgents state domains). */
 export interface SharedAgentState {
   calendar?: ContentCalendarState;
   mission?: MissionSharedState | null;
   approvals?: ApprovalQueueState;
+  operations?: OperationsState;
 }
 
 // ---------------------------------------------------------------------------
@@ -121,6 +139,14 @@ export interface AutopilotItemLite {
   status: string;
   ruleId: string;
   updatedAt: string | Date;
+}
+
+/** Lite shape of the ops summary (lib/ops/summary.ts OpsSummary) for the mapper. */
+export interface OpsSummaryLite {
+  openInvoices: number;
+  overdueInvoices: number;
+  lowStockCount: number;
+  pendingOpsApprovals: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -284,6 +310,17 @@ export function mapItemsToApprovals(items: AutopilotItemLite[]): ApprovalQueueSt
   return { pendingCount, items: mapped, updatedAt: newest ?? new Date(0).toISOString() };
 }
 
+/** Ops summary → operations shared state (read-only mirror). */
+export function mapOpsSummaryToState(s: OpsSummaryLite): OperationsState {
+  return {
+    openInvoices: s.openInvoices,
+    overdueInvoices: s.overdueInvoices,
+    lowStockCount: s.lowStockCount,
+    pendingOpsApprovals: s.pendingOpsApprovals,
+    updatedAt: new Date().toISOString(),
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Diff: shared state → JSON patch (for STATE_DELTA)
 // ---------------------------------------------------------------------------
@@ -299,7 +336,7 @@ function stable(v: unknown): string {
  */
 export function diffSharedState(prev: SharedAgentState, next: SharedAgentState): JsonPatch {
   const patch: JsonPatch = [];
-  (["calendar", "mission", "approvals"] as const).forEach((domain) => {
+  (["calendar", "mission", "approvals", "operations"] as const).forEach((domain) => {
     if (stable(prev[domain]) !== stable(next[domain])) {
       patch.push({ op: "replace", path: `/${domain}`, value: next[domain] ?? null });
     }
@@ -329,6 +366,9 @@ export function mergeSharedState(
       : {}),
     ...(b.approvals !== undefined || o.approvals !== undefined
       ? { approvals: o.approvals !== undefined ? o.approvals : b.approvals }
+      : {}),
+    ...(b.operations !== undefined || o.operations !== undefined
+      ? { operations: o.operations !== undefined ? o.operations : b.operations }
       : {}),
   };
 }

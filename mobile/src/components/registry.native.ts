@@ -8,9 +8,10 @@
 // against the real registry file, so drift fails the build.
 //
 // Mapped:   approval_card  → NativeApprovalCard (approve/deny/edit via the gate)
-// Unmapped: report_preview → intentionally unmapped (slice-10 bonus, not
-//           required). If the agent emits it on mobile, the chat renderer
-//           falls back to a "open on web" note — never an unregistered render.
+// Unmapped: report_preview, ops_invoice_card, ops_order_card,
+//           ops_workflow_run_card → intentionally unmapped (web-only). If the
+//           agent emits one on mobile, the chat renderer falls back to a
+//           "open on web" note — never an unregistered render.
 
 import type { ComponentType } from "react";
 import { NativeApprovalCard, type NativeApprovalCardProps } from "./NativeApprovalCard";
@@ -62,4 +63,11 @@ export function resolveNativeComponent(
  * imports web-only modules. registry-subset.test.ts verifies this matches
  * lib/agents/components/registry.ts exactly.
  */
-export const WEB_REGISTRY_NAMES: ReadonlySet<string> = new Set(["approval_card", "report_preview"]);
+export const WEB_REGISTRY_NAMES: ReadonlySet<string> = new Set([
+  "approval_card",
+  "report_preview",
+  // Phase 17 slice 7: ops cards (web-only; mobile falls back to "open on web").
+  "ops_invoice_card",
+  "ops_order_card",
+  "ops_workflow_run_card",
+]);

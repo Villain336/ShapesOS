@@ -14,21 +14,41 @@ import {
   resolveGenerativeComponent,
 } from "../registry";
 import { ApprovalCard } from "@/components/agents/ApprovalCard";
+import { OpsInvoiceCard } from "@/components/agents/OpsInvoiceCard";
+import { OpsOrderCard } from "@/components/agents/OpsOrderCard";
+import { OpsWorkflowRunCard } from "@/components/agents/OpsWorkflowRunCard";
 
 describe("generative component registry (allowlist)", () => {
-  it("registers the allowlisted components (approval_card, report_preview)", () => {
-    // Slice 9 added report_preview; the registry is designed to grow (slice 10
-    // adds the mobile subset). The allowlist is still exact — nothing else.
+  it("registers the allowlisted components (approval_card, report_preview, ops cards)", () => {
+    // Slice 9 added report_preview; Phase 17 slice 7 adds the ops cards. The
+    // registry is designed to grow — the allowlist is still exact.
     assert.deepEqual(Object.keys(GENERATIVE_COMPONENT_REGISTRY).sort(), [
       "approval_card",
+      "ops_invoice_card",
+      "ops_order_card",
+      "ops_workflow_run_card",
       "report_preview",
     ]);
-    assert.equal(isRegisteredComponentName("approval_card"), true);
-    assert.equal(isRegisteredComponentName("report_preview"), true);
+    for (const name of [
+      "approval_card",
+      "ops_invoice_card",
+      "ops_order_card",
+      "ops_workflow_run_card",
+      "report_preview",
+    ]) {
+      assert.equal(isRegisteredComponentName(name), true, name);
+      assert.equal(assertRegisteredComponentName(name), name, name);
+    }
   });
 
   it("resolves approval_card to the ApprovalCard component", () => {
     assert.equal(resolveGenerativeComponent("approval_card"), ApprovalCard);
+  });
+
+  it("resolves the ops cards to their components", () => {
+    assert.equal(resolveGenerativeComponent("ops_invoice_card"), OpsInvoiceCard);
+    assert.equal(resolveGenerativeComponent("ops_order_card"), OpsOrderCard);
+    assert.equal(resolveGenerativeComponent("ops_workflow_run_card"), OpsWorkflowRunCard);
   });
 
   it("assert passes registered names through", () => {

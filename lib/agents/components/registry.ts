@@ -14,6 +14,10 @@
 import type { ComponentType } from "react";
 import { ApprovalCard } from "@/components/agents/ApprovalCard";
 import { ReportPreview } from "@/components/agents/ReportPreview";
+// Phase 17 slice 7: operations generative components (agent wiring).
+import { OpsInvoiceCard } from "@/components/agents/OpsInvoiceCard";
+import { OpsOrderCard } from "@/components/agents/OpsOrderCard";
+import { OpsWorkflowRunCard } from "@/components/agents/OpsWorkflowRunCard";
 
 export interface GenerativeComponentDef {
   /** Model-facing description: when the agent should emit this component. */
@@ -39,6 +43,26 @@ export const GENERATIVE_COMPONENT_REGISTRY = {
       "a drafted report before it renders to PDF. Shows every figure with its source pointer; figures without " +
       "a source are flagged, never rendered. Props: approvalId.",
     component: ReportPreview,
+  },
+  ops_invoice_card: {
+    description:
+      "Render an invoice in-flow. Use after ops_draft_invoice or ops_list_invoices when the user wants to see " +
+      "an invoice (line items, tax, totals, status, due date). Presentational only — sends happen through the " +
+      "Actions queue after human approval. Props: invoiceId.",
+    component: OpsInvoiceCard,
+  },
+  ops_order_card: {
+    description:
+      "Render an order in-flow. Use when the user wants to see an order " +
+      "(items, totals, status). Presentational only — orders are records-only (no commerce writes). Props: orderId.",
+    component: OpsOrderCard,
+  },
+  ops_workflow_run_card: {
+    description:
+      "Render an operations workflow run in-flow (step states, failure detail, rollback/compensation log). Use " +
+      "after ops_launch_workflow or ops_list_workflow_runs when the user wants to see run progress. Presentational " +
+      "only — launches and retries happen through the Actions queue after human approval. Props: runId (id or runKey).",
+    component: OpsWorkflowRunCard,
   },
 } as const satisfies Record<string, GenerativeComponentDef>;
 

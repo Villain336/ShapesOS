@@ -66,6 +66,15 @@ describe("native registry subset", () => {
   it("the web allowlist currently under test is the expected set", () => {
     // Guards against silent registry growth: a new web component must get an
     // explicit mobile mapping decision (map it or document the fallback).
-    expect([...webRegistryNames()].sort()).toEqual(["approval_card", "report_preview"]);
+    // Phase 17 slice 7 decision: the three ops cards are WEB-ONLY — mobile
+    // falls back to "open on web" for them (ops_invoice_card,
+    // ops_order_card, ops_workflow_run_card are not natively mapped).
+    expect([...webRegistryNames()].sort()).toEqual([
+      "approval_card",
+      "ops_invoice_card",
+      "ops_order_card",
+      "ops_workflow_run_card",
+      "report_preview",
+    ]);
   });
 });
