@@ -99,8 +99,8 @@ function toJson(v: unknown): Record<string, unknown> {
   return v as unknown as Record<string, unknown>;
 }
 
-/** Audit by construction: one row per request, in the same transaction. */
-async function audit(
+/** Audit by construction: one row per request, in the same transaction. Exported for the workflow runner (slice 6), which writes step/compensation audit rows. */
+export async function auditOpsEvent(
   tx: Tx,
   def: OpsEntityDef,
   actor: OpsActor,
@@ -152,7 +152,7 @@ export async function opsList(
     orderBy: { createdAt: "desc" },
     take: limit,
   });
-  await audit(tx, def, actor, "list", null, `listed ${def.slug} (${rows.length} rows)`);
+  await auditOpsEvent(tx, def, actor, "list", null, `listed ${def.slug} (${rows.length} rows)`);
   return { entity: def.slug, rows };
 }
 
@@ -203,7 +203,7 @@ export async function opsCreate(
         actor: actor.userId,
         summary: `${classification.label}: ${def.summarize(summaryRow)}`,
       });
-      await audit(tx, def, actor, "gate_proposed", null, `${classification.label} proposed (approval ${approval.id})`);
+      await auditOpsEvent(tx, def, actor, "gate_proposed", null, `${classification.label} proposed (approval ${approval.id})`);
       return { outcome: "approval_required", approval, classification };
     }
     await verifyOpsApproval(port, {
@@ -215,14 +215,14 @@ export async function opsCreate(
     });
     const rows = await createRows(tx, def, actor, body);
     for (const row of rows) {
-      await audit(tx, def, actor, "gate_executed", String(row.id), `${classification.label} (approval ${approvalId}): ${def.summarize(row)}`);
+      await auditOpsEvent(tx, def, actor, "gate_executed", String(row.id), `${classification.label} (approval ${approvalId}): ${def.summarize(row)}`);
     }
     return { outcome: "done", row: rows.length === 1 ? rows[0]! : toJson({ rows }), action: "gate_executed" };
   }
 
   const rows = await createRows(tx, def, actor, body);
   for (const row of rows) {
-    await audit(tx, def, actor, "create", String(row.id), `created ${def.summarize(row)}`);
+    await auditOpsEvent(tx, def, actor, "create", String(row.id), `created ${def.summarize(row)}`);
   }
   return { outcome: "done", row: rows.length === 1 ? rows[0]! : toJson({ rows }), action: "create" };
 }
@@ -468,7 +468,7 @@ export async function opsPatch(
         actor: actor.userId,
         summary: `${classification.label}: ${def.summarize({ ...existing, ...patch })}`,
       });
-      await audit(tx, def, actor, "gate_proposed", id, `${classification.label} proposed (approval ${approval.id})`);
+      await auditOpsEvent(tx, def, actor, "gate_proposed", id, `${classification.label} proposed (approval ${approval.id})`);
       return { outcome: "approval_required", approval, classification };
     }
     await verifyOpsApproval(port, {
@@ -480,12 +480,12 @@ export async function opsPatch(
       approvalId,
     });
     const row = await applyPatch(tx, def, actor, id, patch, existing);
-    await audit(tx, def, actor, "gate_executed", id, `${classification.label} (approval ${approvalId}): ${def.summarize(row)}`);
+    await auditOpsEvent(tx, def, actor, "gate_executed", id, `${classification.label} (approval ${approvalId}): ${def.summarize(row)}`);
     return { outcome: "done", row, action: "gate_executed" };
   }
 
   const row = await applyPatch(tx, def, actor, id, patch, existing);
-  await audit(tx, def, actor, "update", id, `updated ${def.summarize(row)}`);
+  await auditOpsEvent(tx, def, actor, "update", id, `updated ${def.summarize(row)}`);
   return { outcome: "done", row, action: "update" };
 }
 

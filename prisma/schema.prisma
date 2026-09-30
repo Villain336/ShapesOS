@@ -8971,6 +8971,9 @@ model OpsWorkflowRun {
   workspaceId     String              @map("workspace_id")
   workspace       Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   workflowName    String              @map("workflow_name")
+  // Slice 6: idempotency key — one run per (workspace, runKey), so an
+  // approved workflow plan can never execute twice (replay lock).
+  runKey          String?             @map("run_key")
   // [{ name, status, at?, detail? }] — the saga steps in order.
   steps           Json                @default("[]")
   // [{ step, action, at, result }] — append-only compensation record.
@@ -8981,6 +8984,9 @@ model OpsWorkflowRun {
 
   @@index([workspaceId, workflowName, createdAt])
   @@index([workspaceId, status])
+  // Slice 6: NULLs are distinct in a Postgres unique index, so pre-slice-6
+  // rows (runKey NULL) are unaffected; every new run carries a key.
+  @@unique([workspaceId, runKey])
   @@map("ops_workflow_runs")
 }
 

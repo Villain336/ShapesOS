@@ -2,7 +2,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ChevronDown, Plus, SquareArrowOutUpRight, Users, KanbanSquare, TrendingUp, ClipboardList, ReceiptText, Boxes, Truck, FolderKanban, UserRound, type LucideIcon } from "lucide-react";
+import { ChevronDown, Plus, SquareArrowOutUpRight, Users, KanbanSquare, TrendingUp, ClipboardList, ReceiptText, Boxes, Truck, FolderKanban, UserRound, Workflow, type LucideIcon } from "lucide-react";
 import type { CrmLead, CrmPipeline } from "./types";
 import { formatMoney } from "./types";
 import { FilterToolbar, DEFAULT_FILTERS, type LeadFilters } from "./FilterToolbar";
@@ -16,10 +16,11 @@ import { InventoryTab } from "./InventoryTab";
 import { PurchaseOrdersTab } from "./PurchaseOrdersTab";
 import { ProjectsTab } from "./ProjectsTab";
 import { TeamTab } from "./TeamTab";
+import { WorkflowsTab } from "./WorkflowsTab";
 import { NewLeadModal, PipelineModal, ImportModal } from "./modals";
 import { EmptyState } from "./ui";
 
-type Tab = "leads" | "pipeline" | "forecast" | "forms" | "invoicing" | "inventory" | "purchase-orders" | "projects" | "team";
+type Tab = "leads" | "pipeline" | "forecast" | "forms" | "invoicing" | "inventory" | "purchase-orders" | "projects" | "team" | "workflows";
 
 interface Summary {
   count: number;
@@ -41,6 +42,8 @@ const TABS: { id: Tab; label: string; icon: LucideIcon }[] = [
   { id: "projects", label: "Projects", icon: FolderKanban },
   // Phase 17 slice 5: HR essentials — team directory + leave requests.
   { id: "team", label: "Team", icon: UserRound },
+  // Phase 17 slice 6: operations workflows with compensation/rollback.
+  { id: "workflows", label: "Workflows", icon: Workflow },
 ];
 
 export function CrmApp() {
@@ -235,6 +238,8 @@ export function CrmApp() {
           <ProjectsTab />
         ) : tab === "team" ? (
           <TeamTab />
+        ) : tab === "workflows" ? (
+          <WorkflowsTab />
         ) : pipelines.length === 0 && !loading ? (
           <EmptyState
             title="No pipelines yet"

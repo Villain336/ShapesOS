@@ -75,6 +75,12 @@ export const OPS_MONEY_ACTIONS: OpsMoneyAction[] = [
   // Slice 5: approving a leave request is a manager decision — gated like
   // other ops approvals (medium pin). Denying and marking taken are free.
   { slug: "OPS_LEAVE_APPROVE", label: "Approve leave request", expectedTier: "medium" },
+  // Slice 6: running a money-moving operations workflow. ONE approval covers
+  // the full step plan + the pre-authorized rollback plan (see
+  // lib/ops/workflows.ts) — the runner verifies it once, fail-closed, and
+  // steps/compensations execute under it. Phase 14 derives unknown OPS_*
+  // slugs as high (conservative floor), which meets the medium pin.
+  { slug: "OPS_WORKFLOW_RUN", label: "Run operations workflow", expectedTier: "medium" },
   { slug: "OPS_RECORD_DELETE", label: "Delete operations record", expectedTier: "medium" },
 ];
 

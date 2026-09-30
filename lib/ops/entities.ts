@@ -390,6 +390,9 @@ const workflowRunDef: OpsEntityDef = {
   delegate: "opsWorkflowRun",
   createSchema: z.object({
     workflowName: z.string().min(1).max(200),
+    // Slice 6: idempotency key — the runner requires it; one run per
+    // (workspace, runKey) so an approved plan can never execute twice.
+    runKey: z.string().min(1).max(64).optional(),
     steps: z.array(workflowStepSchema).max(500).default([]),
     status: z.enum(["running", "succeeded", "failed", "compensated"]).default("running"),
   }),
