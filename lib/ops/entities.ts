@@ -212,6 +212,9 @@ const invoiceDef: OpsEntityDef = {
     lineItems: z.array(invoiceLineSchema).min(1).max(200),
     taxCents: z.number().int().min(0).default(0),
     idempotencyKey: z.string().max(128).optional(),
+    // ISO-8601 payment due date (optional — defaults to sentAt + 30 days
+    // when the invoice is sent). Slice 2.
+    dueAt: z.string().max(64).optional(),
   }),
   patchSchema: z.object({
     customerId: z.string().min(1).max(64).optional(),

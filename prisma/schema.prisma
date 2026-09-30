@@ -8773,6 +8773,9 @@ model OpsInvoice {
   totalCents  Int             @map("total_cents")
   status      OpsInvoiceStatus @default(draft)
   sentAt      DateTime?       @map("sent_at")
+  // Payment due date. Set explicitly at draft time or defaulted to
+  // sentAt + 30 days when the invoice is sent. Drives the overdue sweep.
+  dueAt       DateTime?       @map("due_at")
   // Idempotency / dedupe key for agent retries (nullable = not set).
   idempotencyKey String?      @map("idempotency_key")
   createdAt   DateTime        @default(now()) @map("created_at")

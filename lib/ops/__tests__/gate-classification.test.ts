@@ -26,11 +26,13 @@ import {
 const RANK: Record<RiskTier, number> = { low: 0, medium: 1, high: 2 };
 
 describe("ops gate classification", () => {
-  it("pins 8 money actions with medium-minimum tiers (bulk refund high)", () => {
-    assert.equal(OPS_MONEY_ACTIONS.length, 8);
+  it("pins 9 money actions with medium-minimum tiers (bulk refund high)", () => {
+    assert.equal(OPS_MONEY_ACTIONS.length, 9);
     const pins: Record<string, RiskTier> = {
       OPS_INVOICE_SEND: "medium",
       OPS_INVOICE_MARK_PAID: "medium",
+      // Slice 2: outbound payment reminders are money comms.
+      OPS_INVOICE_REMIND: "medium",
       OPS_PAYMENT_RECORD_CHARGE: "medium",
       OPS_PAYMENT_REFUND: "medium",
       OPS_PAYMENT_BULK_REFUND: "high",
@@ -49,7 +51,7 @@ describe("ops gate classification", () => {
 
   it("Phase 14 derivation meets or exceeds every ops pin (no drift)", () => {
     const rows = assertPhase14TierMeetsPin();
-    assert.equal(rows.length, 8);
+    assert.equal(rows.length, 9);
     for (const r of rows) {
       assert.ok(
         RANK[r.derived] >= RANK[r.expected],

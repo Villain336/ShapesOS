@@ -61,6 +61,8 @@ export interface OpsMoneyAction {
 export const OPS_MONEY_ACTIONS: OpsMoneyAction[] = [
   { slug: "OPS_INVOICE_SEND", label: "Send invoice", expectedTier: "medium" },
   { slug: "OPS_INVOICE_MARK_PAID", label: "Mark invoice paid", expectedTier: "medium" },
+  // Slice 2: outbound payment reminders are money comms — gated like sends.
+  { slug: "OPS_INVOICE_REMIND", label: "Send payment reminder", expectedTier: "medium" },
   { slug: "OPS_PAYMENT_RECORD_CHARGE", label: "Record charge", expectedTier: "medium" },
   { slug: "OPS_PAYMENT_REFUND", label: "Refund payment", expectedTier: "medium" },
   { slug: "OPS_PAYMENT_BULK_REFUND", label: "Bulk refund", expectedTier: "high" },

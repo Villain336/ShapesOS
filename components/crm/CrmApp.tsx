@@ -2,7 +2,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ChevronDown, Plus, SquareArrowOutUpRight, Users, KanbanSquare, TrendingUp, ClipboardList, type LucideIcon } from "lucide-react";
+import { ChevronDown, Plus, SquareArrowOutUpRight, Users, KanbanSquare, TrendingUp, ClipboardList, ReceiptText, type LucideIcon } from "lucide-react";
 import type { CrmLead, CrmPipeline } from "./types";
 import { formatMoney } from "./types";
 import { FilterToolbar, DEFAULT_FILTERS, type LeadFilters } from "./FilterToolbar";
@@ -11,10 +11,11 @@ import { KanbanBoard } from "./KanbanBoard";
 import { LeadSlideOver } from "./LeadSlideOver";
 import { ForecastView } from "./ForecastView";
 import { FormsTab } from "./FormsTab";
+import { InvoicesTab } from "./InvoicesTab";
 import { NewLeadModal, PipelineModal, ImportModal } from "./modals";
 import { EmptyState } from "./ui";
 
-type Tab = "leads" | "pipeline" | "forecast" | "forms";
+type Tab = "leads" | "pipeline" | "forecast" | "forms" | "invoicing";
 
 interface Summary {
   count: number;
@@ -27,6 +28,8 @@ const TABS: { id: Tab; label: string; icon: LucideIcon }[] = [
   { id: "pipeline", label: "Pipeline", icon: KanbanSquare },
   { id: "forecast", label: "Forecast", icon: TrendingUp },
   { id: "forms", label: "Forms", icon: ClipboardList },
+  // Phase 17 slice 2: Operations lives under the CRM (Tico-locked).
+  { id: "invoicing", label: "Invoicing", icon: ReceiptText },
 ];
 
 export function CrmApp() {
@@ -211,7 +214,9 @@ export function CrmApp() {
 
       {/* Body */}
       <div className="flex-1 overflow-y-auto px-5 py-4">
-        {pipelines.length === 0 && !loading ? (
+        {tab === "invoicing" ? (
+          <InvoicesTab />
+        ) : pipelines.length === 0 && !loading ? (
           <EmptyState
             title="No pipelines yet"
             hint="Create your first pipeline to start tracking leads."

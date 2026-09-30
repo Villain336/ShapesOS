@@ -242,6 +242,15 @@ async function createRows(
     case "invoices": {
       const lineItems = body.lineItems as LineItem[];
       const { subtotalCents, taxCents, totalCents } = totalsFor(lineItems, (body.taxCents as number) ?? 0);
+      // Slice 2: optional explicit due date on invoices (validated ISO).
+      let dueAt: Date | null = null;
+      if (def.slug === "invoices" && body.dueAt != null) {
+        const parsed = new Date(String(body.dueAt));
+        if (Number.isNaN(parsed.getTime())) {
+          throw new OpsError(400, "Invalid invoice dueAt: must be an ISO-8601 date");
+        }
+        dueAt = parsed;
+      }
       return [
         await d.create({
           data: {
@@ -256,6 +265,7 @@ async function createRows(
             ...(def.slug === "invoices" && body.idempotencyKey
               ? { idempotencyKey: body.idempotencyKey }
               : {}),
+            ...(def.slug === "invoices" && dueAt ? { dueAt } : {}),
           },
         }),
       ];
@@ -420,7 +430,12 @@ async function applyPatch(
     delete data.compensationAppend;
   }
   if (def.slug === "invoices" && patch.status === "sent" && !existing.sentAt) {
-    data.sentAt = new Date();
+    const sentAt = new Date();
+    data.sentAt = sentAt;
+    // Slice 2: no explicit due date → net-30 from send. Drives the overdue sweep.
+    if (!existing.dueAt) {
+      data.dueAt = new Date(sentAt.getTime() + 30 * 24 * 3600_000);
+    }
   }
   return d.update({ where: { id, workspaceId: actor.workspaceId }, data });
 }
