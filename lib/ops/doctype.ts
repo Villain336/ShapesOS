@@ -1,0 +1,436 @@
+// Marketr — Phase 17 slice 1: the DocType auto-REST service layer.
+//
+// THE convention: every entity in lib/ops/entities.ts gets GET/POST/PATCH
+// with workspace scoping + audit entries BY CONSTRUCTION — the entity
+// definition is the only thing a new entity adds.
+//
+//   opsList(tx, def, actor, query)
+//     → { entity, rows } — reads run freely; one audit row per request.
+//   opsCreate(tx, def, actor, body, opts)
+//     → { outcome: "done", row } | { outcome: "approval_required", approval, classification }
+//   opsPatch(tx, def, actor, body /* { id, ...patch, approvalId? } */, opts)
+//     → same result shape.
+//
+// Gated writes (classifyOpsWrite): without an approvalId the service
+// PROPOSES a Phase 14 approval and returns 202-style approval_required
+// (audit: gate_proposed); with an approvalId it VERIFIES (fail-closed) and
+// executes (audit: gate_executed). Nothing gated executes without an
+// approved, unexpired, binding-matching approval.
+//
+// All writes carry workspaceId explicitly AND run inside withWorkspaceScope
+// (RLS fail-closed). Reads filter by workspaceId; cross-workspace ids 404.
+
+import type { Prisma } from "@prisma/client";
+import {
+  OPS_ENTITY_MAP,
+  type OpsEntityDef,
+} from "./entities";
+import {
+  OpsGateError,
+  classifyOpsWrite,
+  opsBindingFor,
+  phase14GatePort,
+  requestOpsApproval,
+  verifyOpsApproval,
+  type OpsGatePort,
+  type OpsGateProposal,
+  type OpsWriteClassification,
+} from "./gate";
+
+/** HTTP-mappable service error. */
+export class OpsError extends Error {
+  readonly status: number;
+  constructor(status: number, message: string) {
+    super(message);
+    this.name = "OpsError";
+    this.status = status;
+  }
+}
+
+export class OpsNotFoundError extends OpsError {
+  constructor(entity: string, id: string) {
+    super(404, `${entity} "${id}" not found in workspace`);
+  }
+}
+
+export interface OpsActor {
+  workspaceId: string;
+  userId: string;
+}
+
+export interface OpsListQuery {
+  limit?: number;
+  filters?: Record<string, string>;
+}
+
+export type OpsWriteResult =
+  | { outcome: "done"; row: Record<string, unknown>; action: string }
+  | {
+      outcome: "approval_required";
+      approval: OpsGateProposal;
+      classification: OpsWriteClassification;
+    };
+
+export interface OpsServiceOpts {
+  gatePort?: OpsGatePort;
+}
+
+// The tx is a Prisma transaction client (withWorkspaceScope). Tests pass a
+// stub cast to Prisma.TransactionClient; delegates are resolved dynamically
+// from the entity def.
+type Tx = Prisma.TransactionClient;
+
+interface Delegate {
+  findMany(args: unknown): Promise<Array<Record<string, unknown>>>;
+  findFirst(args: unknown): Promise<Record<string, unknown> | null>;
+  create(args: unknown): Promise<Record<string, unknown>>;
+  update(args: unknown): Promise<Record<string, unknown>>;
+}
+
+function delegateFor(tx: Tx, def: OpsEntityDef): Delegate {
+  const d = (tx as unknown as Record<string, Delegate>)[def.delegate];
+  if (!d || typeof d.findMany !== "function") {
+    throw new OpsError(500, `Ops entity "${def.slug}" is not wired to a data delegate`);
+  }
+  return d;
+}
+
+function toJson(v: unknown): Record<string, unknown> {
+  return v as unknown as Record<string, unknown>;
+}
+
+/** Audit by construction: one row per request, in the same transaction. */
+async function audit(
+  tx: Tx,
+  def: OpsEntityDef,
+  actor: OpsActor,
+  action: string,
+  entityId: string | null,
+  summary: string,
+): Promise<void> {
+  await (tx as unknown as { opsAuditEvent: { create(a: unknown): Promise<unknown> } }).opsAuditEvent.create({
+    data: {
+      workspaceId: actor.workspaceId,
+      entity: def.slug,
+      entityId,
+      action,
+      actor: actor.userId,
+      summary: summary.slice(0, 2000),
+    },
+  });
+}
+
+interface LineItem {
+  qty: number;
+  priceCents: number;
+}
+
+/** Totals are server-computed from line items — never trusted from the client. */
+function totalsFor(lineItems: LineItem[], taxCents: number) {
+  const subtotalCents = lineItems.reduce((s, li) => s + li.qty * li.priceCents, 0);
+  return { subtotalCents, taxCents, totalCents: subtotalCents + taxCents };
+}
+
+// ---------------------------------------------------------------------------
+// GET — list. Reads run freely (logged): one audit row per request.
+// ---------------------------------------------------------------------------
+
+export async function opsList(
+  tx: Tx,
+  def: OpsEntityDef,
+  actor: OpsActor,
+  query: OpsListQuery = {},
+): Promise<{ entity: string; rows: Array<Record<string, unknown>> }> {
+  const limit = Math.min(Math.max(query.limit ?? 50, 1), 200);
+  const where: Record<string, unknown> = { workspaceId: actor.workspaceId };
+  for (const f of def.filterable) {
+    const v = query.filters?.[f];
+    if (typeof v === "string" && v) where[f] = v;
+  }
+  const rows = await delegateFor(tx, def).findMany({
+    where,
+    orderBy: { createdAt: "desc" },
+    take: limit,
+  });
+  await audit(tx, def, actor, "list", null, `listed ${def.slug} (${rows.length} rows)`);
+  return { entity: def.slug, rows };
+}
+
+// ---------------------------------------------------------------------------
+// POST — create. Draft-creators run freely (logged); payments are money
+// records, so every payment write is gated.
+// ---------------------------------------------------------------------------
+
+export async function opsCreate(
+  tx: Tx,
+  def: OpsEntityDef,
+  actor: OpsActor,
+  rawBody: unknown,
+  opts: OpsServiceOpts = {},
+): Promise<OpsWriteResult> {
+  const parsed = def.createSchema.safeParse(rawBody);
+  if (!parsed.success) {
+    throw new OpsError(400, `Invalid ${def.label}: ${parsed.error.issues[0]?.message ?? "validation failed"}`);
+  }
+  const body = parsed.data as Record<string, unknown>;
+  // approvalId travels OUTSIDE the zod contract (it's gate metadata, not
+  // entity data) — read it from the raw body; safeParse strips it.
+  const rawApprovalId = (rawBody as Record<string, unknown> | null)?.approvalId;
+  const classification = classifyOpsWrite({ entity: def.slug, op: "create", body });
+  const port = opts.gatePort ?? phase14GatePort;
+
+  if (classification.mode === "gated") {
+    // Fail-closed: no approvalId → propose and ask the human (202-style).
+    const approvalId = typeof rawApprovalId === "string" ? rawApprovalId : undefined;
+    const mutation = { ...body };
+    delete mutation.approvalId;
+    if (!approvalId) {
+      const items = body.items as Array<{ amountCents: number }> | undefined;
+      const summaryRow =
+        def.slug === "payments" && Array.isArray(items)
+          ? {
+              kind: "refund",
+              amountCents: items.reduce((s, i) => s + (i.amountCents || 0), 0),
+              status: "pending",
+              id: `(new batch of ${items.length})`,
+            }
+          : { ...mutation, id: "(new)" };
+      const approval = await requestOpsApproval(port, {
+        workspaceId: actor.workspaceId,
+        slug: classification.slug!,
+        entity: def.slug,
+        mutation,
+        actor: actor.userId,
+        summary: `${classification.label}: ${def.summarize(summaryRow)}`,
+      });
+      await audit(tx, def, actor, "gate_proposed", null, `${classification.label} proposed (approval ${approval.id})`);
+      return { outcome: "approval_required", approval, classification };
+    }
+    await verifyOpsApproval(port, {
+      workspaceId: actor.workspaceId,
+      slug: classification.slug!,
+      entity: def.slug,
+      mutation,
+      approvalId,
+    });
+    const rows = await createRows(tx, def, actor, body);
+    for (const row of rows) {
+      await audit(tx, def, actor, "gate_executed", String(row.id), `${classification.label} (approval ${approvalId}): ${def.summarize(row)}`);
+    }
+    return { outcome: "done", row: rows.length === 1 ? rows[0]! : toJson({ rows }), action: "gate_executed" };
+  }
+
+  const rows = await createRows(tx, def, actor, body);
+  for (const row of rows) {
+    await audit(tx, def, actor, "create", String(row.id), `created ${def.summarize(row)}`);
+  }
+  return { outcome: "done", row: rows.length === 1 ? rows[0]! : toJson({ rows }), action: "create" };
+}
+
+/** Materialize the create: entity-specific server-side rules. */
+async function createRows(
+  tx: Tx,
+  def: OpsEntityDef,
+  actor: OpsActor,
+  body: Record<string, unknown>,
+): Promise<Array<Record<string, unknown>>> {
+  const d = delegateFor(tx, def);
+  const base = { workspaceId: actor.workspaceId };
+
+  switch (def.slug) {
+    case "orders":
+    case "invoices": {
+      const lineItems = body.lineItems as LineItem[];
+      const { subtotalCents, taxCents, totalCents } = totalsFor(lineItems, (body.taxCents as number) ?? 0);
+      return [
+        await d.create({
+          data: {
+            ...base,
+            // Initial statuses are set explicitly (not left to DB defaults)
+            // so the service's contract is visible in code and in stubs.
+            status: "draft",
+            customerId: body.customerId ?? null,
+            lineItems: toJson(lineItems),
+            taxCents,
+            ...(def.slug === "orders" ? { subtotalCents, totalCents } : { totalCents }),
+            ...(def.slug === "invoices" && body.idempotencyKey
+              ? { idempotencyKey: body.idempotencyKey }
+              : {}),
+          },
+        }),
+      ];
+    }
+    case "payments": {
+      // Bulk refund batch → N rows in one transaction.
+      const items = body.items as Array<{ orderId?: string; amountCents: number; providerRef?: string }> | undefined;
+      if (Array.isArray(items)) {
+        const rows: Array<Record<string, unknown>> = [];
+        for (const it of items) {
+          rows.push(
+            await d.create({
+              data: {
+                ...base,
+                orderId: it.orderId ?? null,
+                provider: (body.provider as string) ?? "stripe",
+                kind: "refund",
+                amountCents: it.amountCents,
+                status: "pending",
+                providerRef: it.providerRef ?? null,
+              },
+            }),
+          );
+        }
+        return rows;
+      }
+      return [
+        await d.create({
+          data: {
+            ...base,
+            orderId: (body.orderId as string) ?? null,
+            provider: (body.provider as string) ?? "stripe",
+            kind: (body.kind as string) ?? "charge",
+            amountCents: body.amountCents as number,
+            status: (body.status as string) ?? "pending",
+            providerRef: (body.providerRef as string) ?? null,
+          },
+        }),
+      ];
+    }
+    case "inventory-txns": {
+      // Atomic: txn row + materialized stock balance in ONE transaction —
+      // inventory decrements exactly once per sale, never drifts.
+      const product = (await (tx as unknown as Record<string, Delegate>)["opsProduct"].findFirst({
+        where: { id: body.productId as string },
+      })) as unknown as { id: string; trackInventory: boolean } | null;
+      if (!product) throw new OpsNotFoundError("products", String(body.productId));
+      if (!product.trackInventory) {
+        throw new OpsError(422, `Product "${body.productId}" does not track inventory`);
+      }
+      const txn = await d.create({
+        data: {
+          ...base,
+          productId: body.productId as string,
+          delta: body.delta as number,
+          reason: body.reason as string,
+          actor: (body.actor as string) ?? actor.userId,
+          note: (body.note as string) ?? null,
+        },
+      });
+      await (tx as unknown as Record<string, Delegate>)["opsProduct"].update({
+        where: { id: body.productId as string },
+        data: { stockQty: { increment: body.delta as number } },
+      });
+      return [txn];
+    }
+    default:
+      return [await d.create({ data: { ...base, ...stripInternal(body) } })];
+  }
+}
+
+/** Fields the API contract accepts but the model doesn't store directly. */
+function stripInternal(body: Record<string, unknown>): Record<string, unknown> {
+  const { approvalId: _a, ...rest } = body;
+  return rest;
+}
+
+// ---------------------------------------------------------------------------
+// PATCH — update by id. Free updates run freely (logged); money transitions
+// (invoice send, order cancel/fulfill, ...) go through the gate.
+// ---------------------------------------------------------------------------
+
+export async function opsPatch(
+  tx: Tx,
+  def: OpsEntityDef,
+  actor: OpsActor,
+  rawBody: unknown,
+  opts: OpsServiceOpts = {},
+): Promise<OpsWriteResult> {
+  if (!def.patchable) {
+    throw new OpsError(405, `${def.label} is an immutable ledger — corrections are new records, never edits`);
+  }
+  const parsed = def.patchSchema.safeParse(
+    rawBody && typeof rawBody === "object" ? (rawBody as Record<string, unknown>) : {},
+  );
+  if (!parsed.success) {
+    throw new OpsError(400, `Invalid ${def.label} patch: ${parsed.error.issues[0]?.message ?? "validation failed"}`);
+  }
+  const body = rawBody as Record<string, unknown>;
+  const id = body.id;
+  if (typeof id !== "string" || !id) throw new OpsError(400, "PATCH requires an \"id\"");
+  const patch = parsed.data as Record<string, unknown>;
+  const classification = classifyOpsWrite({ entity: def.slug, op: "update", body: { ...patch, id } });
+  const port = opts.gatePort ?? phase14GatePort;
+  const d = delegateFor(tx, def);
+
+  // 404 for "not your workspace's row" (RLS + explicit scope).
+  const existing = await d.findFirst({ where: { id, workspaceId: actor.workspaceId } });
+  if (!existing) throw new OpsNotFoundError(def.slug, id);
+
+  if (classification.mode === "gated") {
+    const approvalId = body.approvalId as string | undefined;
+    const mutation = { id, ...patch };
+    if (!approvalId) {
+      const approval = await requestOpsApproval(port, {
+        workspaceId: actor.workspaceId,
+        slug: classification.slug!,
+        entity: def.slug,
+        entityId: id,
+        mutation,
+        actor: actor.userId,
+        summary: `${classification.label}: ${def.summarize({ ...existing, ...patch })}`,
+      });
+      await audit(tx, def, actor, "gate_proposed", id, `${classification.label} proposed (approval ${approval.id})`);
+      return { outcome: "approval_required", approval, classification };
+    }
+    await verifyOpsApproval(port, {
+      workspaceId: actor.workspaceId,
+      slug: classification.slug!,
+      entity: def.slug,
+      entityId: id,
+      mutation,
+      approvalId,
+    });
+    const row = await applyPatch(tx, def, actor, id, patch, existing);
+    await audit(tx, def, actor, "gate_executed", id, `${classification.label} (approval ${approvalId}): ${def.summarize(row)}`);
+    return { outcome: "done", row, action: "gate_executed" };
+  }
+
+  const row = await applyPatch(tx, def, actor, id, patch, existing);
+  await audit(tx, def, actor, "update", id, `updated ${def.summarize(row)}`);
+  return { outcome: "done", row, action: "update" };
+}
+
+/** Apply the patch: entity-specific rules (compensation append, sentAt). */
+async function applyPatch(
+  tx: Tx,
+  def: OpsEntityDef,
+  actor: OpsActor,
+  id: string,
+  patch: Record<string, unknown>,
+  existing: Record<string, unknown>,
+): Promise<Record<string, unknown>> {
+  const d = delegateFor(tx, def);
+  const data: Record<string, unknown> = { ...patch };
+
+  if (def.slug === "workflow-runs" && patch.compensationAppend) {
+    // Append-only compensation log: never replaced through the API.
+    const log = Array.isArray(existing.compensationLog) ? [...existing.compensationLog] : [];
+    log.push({ ...(patch.compensationAppend as Record<string, unknown>), at: new Date().toISOString() });
+    data.compensationLog = log;
+    delete data.compensationAppend;
+  }
+  if (def.slug === "invoices" && patch.status === "sent" && !existing.sentAt) {
+    data.sentAt = new Date();
+  }
+  return d.update({ where: { id, workspaceId: actor.workspaceId }, data });
+}
+
+/** Entity lookup for routes/tests. Throws OpsError 404 on unknown slugs. */
+export function opsEntityDef(slug: string): OpsEntityDef {
+  const def = OPS_ENTITY_MAP[slug];
+  if (!def) throw new OpsError(404, `Unknown ops entity "${slug}"`);
+  return def;
+}
+
+// Re-exported for the route layer's error mapping.
+export { OpsGateError, opsBindingFor };

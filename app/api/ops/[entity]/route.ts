@@ -1,0 +1,149 @@
+// Marketr — Phase 17 slice 1: GET/POST/PATCH /api/ops/{entity}.
+//
+// ONE route file serves every Operations entity — that IS the DocType
+// convention: an entity plugs in by adding one entry to
+// lib/ops/entities.ts, and the REST API + workspace scoping + audit +
+// Phase 14 money-gate come by construction (lib/ops/doctype.ts).
+//
+// Permissions by construction: reads need viewer+, mutations need editor+
+// (workspace role). Money writes additionally need an approved Phase 14
+// ops approval (see lib/ops/gate.ts) — without one the service proposes it
+// and answers 202 { approval_required: true }.
+
+import type { NextRequest } from "next/server";
+import { getOrCreateWorkspace, requireUser } from "@/lib/session";
+import { requireWorkspaceRole } from "@/lib/authz";
+import { withWorkspaceScope } from "@/lib/substrate/memory/rls";
+import { OPS_ENTITY_SLUGS } from "@/lib/ops/entities";
+import {
+  OpsError,
+  OpsGateError,
+  opsCreate,
+  opsEntityDef,
+  opsList,
+  opsPatch,
+  type OpsActor,
+} from "@/lib/ops/doctype";
+
+export const dynamic = "force-dynamic";
+
+type Role = "viewer" | "editor";
+
+async function opsGuard(min: Role): Promise<OpsActor | Response> {
+  const user = await requireUser();
+  if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
+  const workspace = await getOrCreateWorkspace(user.id, user.email);
+  if (min === "editor" && !(await requireWorkspaceRole(user.id, workspace.id, "editor"))) {
+    return Response.json({ error: "Forbidden: editor role required" }, { status: 403 });
+  }
+  return { userId: user.id, workspaceId: workspace.id };
+}
+
+function opsError(err: unknown) {
+  if (err instanceof OpsError) return Response.json({ error: err.message }, { status: err.status });
+  // Fail closed: gate bypass attempts are 422, never silent.
+  if (err instanceof OpsGateError) {
+    return Response.json({ error: err.message, code: err.code }, { status: 422 });
+  }
+  const message = err instanceof Error ? err.message : String(err);
+  return Response.json({ error: message }, { status: 500 });
+}
+
+async function readJson(req: NextRequest): Promise<unknown> {
+  try {
+    const text = await req.text();
+    return text.trim() ? (JSON.parse(text) as unknown) : {};
+  } catch {
+    return { __invalid: true };
+  }
+}
+
+export async function GET(
+  req: NextRequest,
+  { params }: { params: Promise<{ entity: string }> },
+) {
+  const gate = await opsGuard("viewer");
+  if (gate instanceof Response) return gate;
+  try {
+    const { entity } = await params;
+    const def = opsEntityDef(entity);
+    const q = req.nextUrl.searchParams;
+    const limit = Number(q.get("limit") ?? "50");
+    const filters: Record<string, string> = {};
+    for (const f of def.filterable) {
+      const v = q.get(f);
+      if (v) filters[f] = v;
+    }
+    const result = await withWorkspaceScope(gate.workspaceId, (tx) =>
+      opsList(tx, def, gate, { limit: Number.isFinite(limit) ? limit : 50, filters }),
+    );
+    return Response.json(result);
+  } catch (err) {
+    return opsError(err);
+  }
+}
+
+export async function POST(
+  req: NextRequest,
+  { params }: { params: Promise<{ entity: string }> },
+) {
+  const gate = await opsGuard("editor");
+  if (gate instanceof Response) return gate;
+  try {
+    const { entity } = await params;
+    const def = opsEntityDef(entity);
+    const body = await readJson(req);
+    if (body && typeof body === "object" && "__invalid" in (body as Record<string, unknown>)) {
+      return Response.json({ error: "Invalid JSON" }, { status: 400 });
+    }
+    const result = await withWorkspaceScope(gate.workspaceId, (tx) =>
+      opsCreate(tx, def, gate, body),
+    );
+    if (result.outcome === "approval_required") {
+      return Response.json(
+        {
+          approval_required: true,
+          approval: result.approval,
+          classification: result.classification,
+          entities: OPS_ENTITY_SLUGS,
+        },
+        { status: 202 },
+      );
+    }
+    return Response.json({ entity: def.slug, row: result.row }, { status: 201 });
+  } catch (err) {
+    return opsError(err);
+  }
+}
+
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: Promise<{ entity: string }> },
+) {
+  const gate = await opsGuard("editor");
+  if (gate instanceof Response) return gate;
+  try {
+    const { entity } = await params;
+    const def = opsEntityDef(entity);
+    const body = await readJson(req);
+    if (body && typeof body === "object" && "__invalid" in (body as Record<string, unknown>)) {
+      return Response.json({ error: "Invalid JSON" }, { status: 400 });
+    }
+    const result = await withWorkspaceScope(gate.workspaceId, (tx) =>
+      opsPatch(tx, def, gate, body),
+    );
+    if (result.outcome === "approval_required") {
+      return Response.json(
+        {
+          approval_required: true,
+          approval: result.approval,
+          classification: result.classification,
+        },
+        { status: 202 },
+      );
+    }
+    return Response.json({ entity: def.slug, row: result.row });
+  } catch (err) {
+    return opsError(err);
+  }
+}

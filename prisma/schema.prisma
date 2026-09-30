@@ -553,6 +553,16 @@ model Workspace {
   agentRuns               AgentRun[]
   // Phase 16 slice 9: branded report engine back-relation.
   reportSendApprovals     ReportSendApproval[]
+  // Phase 17 slice 1: Business Operations back-relations (DocType entities).
+  opsProducts             OpsProduct[]
+  opsOrders               OpsOrder[]
+  opsPayments             OpsPayment[]
+  opsPromotions           OpsPromotion[]
+  opsInvoices             OpsInvoice[]
+  opsInventoryTxns        OpsInventoryTxn[]
+  opsProjects             OpsProject[]
+  opsWorkflowRuns         OpsWorkflowRun[]
+  opsAuditEvents          OpsAuditEvent[]
   // Phase 15 slice 5: per-workspace catalog drift reports back-relation.
   composioCatalogDrift    ComposioCatalogDrift[]
   // Phase 15 slice 3: per-workspace toolkit enablement back-relation.
@@ -8592,4 +8602,271 @@ model ReportSendApproval {
 
   @@index([workspaceId, status, createdAt])
   @@map("report_send_approvals")
+}
+
+// ============================================================================
+// Phase 17 slice 1 — Business Operations: DocType-style entity convention.
+//
+// Every Operations entity is tenant-scoped (workspace_id FK, ON DELETE
+// CASCADE), RLS-ready (the slice-1 migration enables FORCE ROW LEVEL
+// SECURITY with the app.workspace_id tenant principal — see
+// prisma/migrations/20260930211000_phase17_ops_entities/migration.sql),
+// and agent-addressable by construction through the auto REST convention
+// GET/POST/PATCH /api/ops/{entity} (lib/ops/doctype.ts).
+//
+// Money law (locked): OpsPayment rows are RECORDS ONLY — Marketr never
+// holds funds. Amounts are integer cents. Invoice SEND and every payment
+// write are gated through the Phase 14 approval gate (lib/ops/gate.ts).
+//
+// ERPNext is patterns-only, clean-room: these models are original Marketr
+// work. No ERPNext code, schema, or UI text exists in this repo.
+// ============================================================================
+
+enum OpsOrderStatus {
+  draft
+  confirmed
+  fulfilled
+  cancelled
+}
+
+enum OpsPaymentKind {
+  charge
+  refund
+}
+
+enum OpsPaymentStatus {
+  pending
+  succeeded
+  failed
+  refunded
+}
+
+enum OpsInvoiceStatus {
+  draft
+  sent
+  paid
+  overdue
+  cancelled
+}
+
+enum OpsInventoryReason {
+  sale
+  restock
+  adjustment
+}
+
+enum OpsProjectStatus {
+  planning
+  active
+  on_hold
+  completed
+  cancelled
+}
+
+enum OpsWorkflowRunStatus {
+  running
+  succeeded
+  failed
+  compensated
+}
+
+// Catalog: sellable products/services. trackInventory=false means the
+// product is a service / non-stocked item (stockQty ignored).
+model OpsProduct {
+  id           String   @id @default(cuid())
+  workspaceId  String   @map("workspace_id")
+  workspace    Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name         String
+  sku          String
+  // Integer minor units (cents).
+  priceCents   Int      @map("price_cents")
+  stockQty     Int      @default(0) @map("stock_qty")
+  trackInventory Boolean @default(true) @map("track_inventory")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  inventoryTxns OpsInventoryTxn[]
+
+  @@unique([workspaceId, sku])
+  @@index([workspaceId, name])
+  @@map("ops_products")
+}
+
+// Commerce order: customer ref, line items, lifecycle
+// draft → confirmed → fulfilled (cancelled terminal). Totals are
+// server-computed from line items (never trusted from the client).
+model OpsOrder {
+  id          String         @id @default(cuid())
+  workspaceId String         @map("workspace_id")
+  workspace   Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  // CRM adjacency: the lead-turned-customer this order belongs to.
+  customerId  String?        @map("customer_id")
+  // [{ name, sku?, qty, priceCents }]
+  lineItems   Json           @map("line_items")
+  status      OpsOrderStatus @default(draft)
+  subtotalCents Int          @map("subtotal_cents")
+  taxCents      Int          @default(0) @map("tax_cents")
+  totalCents    Int          @map("total_cents")
+  createdAt   DateTime       @default(now()) @map("created_at")
+  updatedAt   DateTime       @updatedAt @map("updated_at")
+
+  payments OpsPayment[]
+
+  @@index([workspaceId, status, createdAt])
+  @@index([workspaceId, customerId])
+  @@map("ops_orders")
+}
+
+// Payment RECORDS ONLY — funds never touch Marketr. A row records that a
+// charge/refund happened on the provider (Stripe). Every write is a gated
+// write (medium minimum; bulk refunds high) via lib/ops/gate.ts.
+model OpsPayment {
+  id          String          @id @default(cuid())
+  workspaceId String          @map("workspace_id")
+  workspace   Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  orderId     String?         @map("order_id")
+  order       OpsOrder?       @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  provider    String          @default("stripe")
+  kind        OpsPaymentKind  @default(charge)
+  // Integer minor units (cents), always positive; kind says the direction.
+  amountCents Int             @map("amount_cents")
+  status      OpsPaymentStatus @default(pending)
+  // Provider-side reference (Stripe payment intent / charge id).
+  providerRef String?         @map("provider_ref")
+  createdAt   DateTime        @default(now()) @map("created_at")
+
+  @@index([workspaceId, orderId, createdAt])
+  @@index([workspaceId, kind, status])
+  @@map("ops_payments")
+}
+
+// Discount codes: rules JSON evaluated at order time
+// ({ percentOff?, amountOffCents?, minSubtotalCents?, productSkus? }).
+model OpsPromotion {
+  id          String   @id @default(cuid())
+  workspaceId String   @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  code        String
+  rules       Json     @default("{}")
+  usageLimit  Int?     @map("usage_limit")
+  usedCount   Int      @default(0) @map("used_count")
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@unique([workspaceId, code])
+  @@index([workspaceId, active])
+  @@map("ops_promotions")
+}
+
+// Invoice: draft → sent → paid (overdue derived by age). Sending is a
+// gated write (medium, approval required — money is a red lane).
+model OpsInvoice {
+  id          String          @id @default(cuid())
+  workspaceId String          @map("workspace_id")
+  workspace   Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  // CRM adjacency: the lead-turned-customer being billed.
+  customerId  String?         @map("customer_id")
+  // [{ description, qty, priceCents }]
+  lineItems   Json            @map("line_items")
+  taxCents    Int             @default(0) @map("tax_cents")
+  totalCents  Int             @map("total_cents")
+  status      OpsInvoiceStatus @default(draft)
+  sentAt      DateTime?       @map("sent_at")
+  // Idempotency / dedupe key for agent retries (nullable = not set).
+  idempotencyKey String?      @map("idempotency_key")
+  createdAt   DateTime        @default(now()) @map("created_at")
+  updatedAt   DateTime        @updatedAt @map("updated_at")
+
+  @@unique([workspaceId, idempotencyKey])
+  @@index([workspaceId, status, createdAt])
+  @@index([workspaceId, customerId])
+  @@map("ops_invoices")
+}
+
+// Immutable stock ledger: every stock change is a txn row; the product's
+// stockQty is the materialized balance, updated in the SAME transaction as
+// the txn row (so inventory decrements exactly once per sale).
+model OpsInventoryTxn {
+  id          String            @id @default(cuid())
+  workspaceId String            @map("workspace_id")
+  workspace   Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  productId   String            @map("product_id")
+  product     OpsProduct        @relation(fields: [productId], references: [id], onDelete: Cascade)
+  // Signed: sale = negative, restock = positive, adjustment = either.
+  delta       Int
+  reason      OpsInventoryReason
+  // Who/what moved the stock: user id or "agent:<surface>".
+  actor       String?
+  note        String?           @db.Text
+  createdAt   DateTime          @default(now()) @map("created_at")
+
+  @@index([workspaceId, productId, createdAt])
+  @@index([workspaceId, reason, createdAt])
+  @@map("ops_inventory_txns")
+}
+
+// Client delivery work: milestones JSON
+// ([{ title, dueAt?, status }]), linked to CRM lead/deal.
+model OpsProject {
+  id          String          @id @default(cuid())
+  workspaceId String          @map("workspace_id")
+  workspace   Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  customerId  String?         @map("customer_id")
+  name        String
+  milestones  Json            @default("[]")
+  status      OpsProjectStatus @default(planning)
+  // CRM adjacency (Wave B canonical models).
+  leadId      String?         @map("lead_id")
+  dealId      String?         @map("deal_id")
+  createdAt   DateTime        @default(now()) @map("created_at")
+  updatedAt   DateTime        @updatedAt @map("updated_at")
+
+  @@index([workspaceId, status, createdAt])
+  @@index([workspaceId, leadId])
+  @@map("ops_projects")
+}
+
+// Medusa-Workflows-inspired transactional record (clean-room): a named
+// multi-step operation with its steps and an append-only compensation log.
+// When a step fails, the compensation log drives rollback so a failed order
+// workflow never leaves a half-charged customer.
+model OpsWorkflowRun {
+  id              String              @id @default(cuid())
+  workspaceId     String              @map("workspace_id")
+  workspace       Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  workflowName    String              @map("workflow_name")
+  // [{ name, status, at?, detail? }] — the saga steps in order.
+  steps           Json                @default("[]")
+  // [{ step, action, at, result }] — append-only compensation record.
+  compensationLog Json                @default("[]") @map("compensation_log")
+  status          OpsWorkflowRunStatus @default(running)
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime            @updatedAt @map("updated_at")
+
+  @@index([workspaceId, workflowName, createdAt])
+  @@index([workspaceId, status])
+  @@map("ops_workflow_runs")
+}
+
+// Audit by construction: the DocType route factory (lib/ops/doctype.ts)
+// writes one row per request — reads and draft-creators included
+// ("runs freely (logged)"). Append-only; never updated or deleted by the
+// API surface.
+model OpsAuditEvent {
+  id          String   @id @default(cuid())
+  workspaceId String   @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  // Entity slug: "invoices", "products", ...
+  entity      String
+  entityId    String?  @map("entity_id")
+  // list | get | create | update | gate_proposed | gate_denied | gate_executed
+  action      String
+  actor       String
+  summary     String   @db.Text
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([workspaceId, entity, createdAt])
+  @@index([workspaceId, entityId])
+  @@map("ops_audit_events")
 }
