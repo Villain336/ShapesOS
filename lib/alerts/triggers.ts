@@ -240,6 +240,15 @@ export const TRIGGERS: TriggerDef[] = [
     dedupAvailable: true,
     live: true, // Wave 2 ChatGPT Ads slice 4: emitted by lib/adplatforms/chatgpt/reporting.ts.
   },
+  {
+    key: "legal_deadline",
+    label: "Legal deadline approaching",
+    description:
+      "A legal/compliance deadline is approaching or overdue (escalation tiers: date needed, 90, 30, 7 days out, overdue). Emitted by the legal deadline sweep.",
+    conditionKeys: ["severities"],
+    dedupAvailable: true,
+    live: true, // Legal slice 2: emitted by the legal deadline sweep cron.
+  },
 ];
 
 export function triggerDef(key: string): TriggerDef | undefined {

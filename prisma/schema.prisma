@@ -767,6 +767,7 @@ model Workspace {
   // Legal/Compliance slice 1: Obligation map.
   legalProfile           LegalProfile?
   obligations            Obligation[]
+  legalDeadlines         LegalDeadline[]
   insurancePaymentHandoffs InsurancePaymentHandoff[]
   insuranceCertificates     InsuranceCertificate[]
   // Phase 12 (embeds): tenant-scoped GrowthBook flag overrides.
@@ -10989,4 +10990,63 @@ enum ObligationStatus {
   snoozed
   dismissed
   done
+}
+
+// Legal/Compliance slice 2: Deadline engine (BUSINESS-OS-FEATURE-SPECS.md §4).
+// LegalDeadline is the per-tenant computed deadline for one obligation:
+// the tenant sets/confirms the due date (source "tenant_set"), and recurring
+// reminders are computed from the renewal cadence anchored to that real date
+// (source "computed"). A null dueDate is ALWAYS rendered as "date needed" —
+// the engine never invents calendar dates. Escalation tiers (90/30/7 days,
+// overdue) are computed at read time; lastAlertedTier records which tier the
+// sweep already emitted so each tier fires at most once.
+
+enum DeadlineRecurrence {
+  none
+  monthly
+  quarterly
+  semiannual
+  annual
+  biennial
+}
+
+enum DeadlineSource {
+  tenant_set
+  computed
+}
+
+enum DeadlineStatus {
+  open
+  done
+  dismissed
+}
+
+model LegalDeadline {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  // Obligation template key this deadline tracks (e.g. "nc-annual-report").
+  templateKey String @map("template_key")
+  // Denormalized title from the template at creation time.
+  title String
+
+  // Null = the tenant has not confirmed a date yet ("date needed").
+  dueDate DateTime? @map("due_date")
+  recurrence DeadlineRecurrence @default(none)
+  source     DeadlineSource     @default(tenant_set)
+  status     DeadlineStatus     @default(open)
+
+  // Escalation bookkeeping: the tier the sweep last emitted for this deadline.
+  lastAlertedTier String?   @map("last_alerted_tier")
+  lastAlertedAt   DateTime? @map("last_alerted_at")
+
+  note String?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([workspaceId, status])
+  @@index([workspaceId, dueDate])
+  @@map("legal_deadlines")
 }

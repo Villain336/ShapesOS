@@ -71,7 +71,7 @@ function matchesConditions(rule: AlertRule, input: TriggerInput): boolean {
     const threshold = c.thresholdPositions ?? (input.trigger === "rank_drop" ? DEFAULT_DROP_THRESHOLD : DEFAULT_GAIN_THRESHOLD);
     if ((input.movement ?? 0) < threshold) return false;
   }
-  if (input.trigger === "fix_run" || input.trigger === "content_decay" || input.trigger === "negative_review") {
+  if (input.trigger === "fix_run" || input.trigger === "content_decay" || input.trigger === "negative_review" || input.trigger === "legal_deadline") {
     if (c.severities?.length && input.severity && !c.severities.includes(input.severity)) return false;
   }
   if (input.trigger === "visibility_delta" || input.trigger === "geo_grid_change") {
