@@ -10,18 +10,18 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Loader2, Radio, VideoOff } from "lucide-react";
-import { Card, CardBody, CardHeader } from "@/components/vault/Card";
-import { ValuePill } from "@/components/vault/atoms/ValuePill";
 import { cn } from "@/lib/utils";
 
 type WatchState = "connecting" | "live" | "unavailable" | "ended";
 
+// The live dot IS a running agent state: blue circle, pulses while live.
 function LiveDot() {
   return (
-    <span className="relative flex size-2.5" aria-hidden>
-      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[var(--brand-600)] opacity-60" />
-      <span className="relative inline-flex size-2.5 rounded-full bg-[var(--brand-600)]" />
-    </span>
+    <span
+      className="aos-shape aos-shape--running aos-is-live"
+      style={{ color: "inherit" }}
+      aria-hidden
+    />
   );
 }
 
@@ -71,21 +71,29 @@ export function LiveWatch({ runId }: { runId: string }) {
   }, [runId]);
 
   return (
-    <Card>
-      <CardHeader
-        title="Watch live"
-        description="Real-time view of the agent's browser — frames are transient"
-        actions={
-          <span className="flex items-center gap-2">
-            {state === "live" && <LiveDot />}
-            <ValuePill tone={state === "live" ? "accent" : "neutral"}>
-              <Radio className="mr-1 inline size-3" />
-              {state === "live" ? "live" : state === "ended" ? "ended" : status}
-            </ValuePill>
-          </span>
-        }
-      />
-      <CardBody className="flex flex-col gap-3">
+    <section className="rounded-lg bg-paper shadow-hairline">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-4 py-3">
+        <div>
+          <h2 className="aos-subheading">Watch live</h2>
+          <p className="mt-0.5 text-sm text-muted">
+            Real-time view of the agent's browser — frames are transient
+          </p>
+        </div>
+        <span className="flex items-center gap-2">
+          {state === "live" ? (
+            <span className="inline-flex h-badge items-center gap-1.5 rounded-full bg-running px-3 text-sm font-semibold text-white">
+              <LiveDot />
+              Live
+            </span>
+          ) : (
+            <span className="inline-flex h-badge items-center gap-1.5 rounded-full bg-paper px-3 text-sm font-semibold text-muted shadow-control">
+              <Radio className="size-3.5" aria-hidden />
+              {state === "ended" ? "Ended" : status}
+            </span>
+          )}
+        </span>
+      </div>
+      <div className="flex flex-col gap-3 p-4">
         <div className="relative aspect-video w-full overflow-hidden rounded-lg bg-black">
           {frame && (state === "live" || state === "ended") ? (
             // eslint-disable-next-line @next/next/no-img-element
@@ -96,16 +104,16 @@ export function LiveWatch({ runId }: { runId: string }) {
               draggable={false}
             />
           ) : (
-            <div className="flex h-full w-full flex-col items-center justify-center gap-2 text-stone-400">
+            <div className="flex h-full w-full flex-col items-center justify-center gap-2 text-subtle">
               {state === "connecting" ? (
                 <>
-                  <Loader2 className="size-6 animate-spin" />
-                  <p className="text-[13px]">Connecting to the live stream…</p>
+                  <Loader2 className="size-6 aos-spin" />
+                  <p className="text-sm">Connecting to the live stream…</p>
                 </>
               ) : (
                 <>
                   <VideoOff className="size-6" />
-                  <p className="max-w-md px-6 text-center text-[13px]">
+                  <p className="max-w-md px-6 text-center text-sm">
                     {state === "unavailable"
                       ? "Live watch isn't available for this run — the full recording appears below when it finishes."
                       : endReason === "run-finished"
@@ -120,7 +128,7 @@ export function LiveWatch({ runId }: { runId: string }) {
             <span
               className={cn(
                 "absolute left-3 top-3 flex items-center gap-1.5 rounded-full px-2.5 py-1",
-                "bg-black/60 text-[11px] font-semibold uppercase tracking-wider text-white backdrop-blur",
+                "bg-black/60 text-xs font-semibold text-white",
               )}
             >
               <LiveDot />
@@ -128,11 +136,11 @@ export function LiveWatch({ runId }: { runId: string }) {
             </span>
           )}
         </div>
-        <p className="rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-[12.5px] text-stone-500">
+        <p className="rounded-lg border border-line bg-canvas px-3 py-2 text-xs text-muted">
           Frames stream in real time and are never stored — the recorded video below is the
           permanent record of this run.
         </p>
-      </CardBody>
-    </Card>
+      </div>
+    </section>
   );
 }

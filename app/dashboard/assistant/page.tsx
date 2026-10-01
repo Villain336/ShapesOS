@@ -40,7 +40,7 @@ export default async function AssistantPage({
   const initialTab = sp.tab === "team" ? ("team" as const) : ("ai" as const);
 
   return (
-    <div className="h-full">
+    <div className="h-full bg-canvas">
       <AssistantClient
         project={project}
         projects={projects}

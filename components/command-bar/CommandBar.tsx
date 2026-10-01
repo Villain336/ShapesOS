@@ -512,7 +512,7 @@ export function CommandBar({ workspaceId }: { workspaceId: string }) {
         onClick={toggle}
         aria-label="Open command bar"
         title="Command bar (Ctrl/⌘K)"
-        className="fixed bottom-4 right-4 z-40 rounded-full bg-violet-600 p-3.5 text-white shadow-lg hover:bg-violet-700 md:hidden"
+        className="fixed bottom-4 right-4 z-40 rounded-full bg-ink p-3.5 text-white shadow-lg aos-press md:hidden"
       >
         <Command className="h-5 w-5" aria-hidden />
       </button>
@@ -520,27 +520,27 @@ export function CommandBar({ workspaceId }: { workspaceId: string }) {
       {open && (
         <div className="fixed inset-0 z-50" role="dialog" aria-modal="true" aria-label={pageTitle}>
           <div
-            className="absolute inset-0 bg-stone-950/30"
+            className="absolute inset-0 bg-ink/30"
             onClick={close}
             aria-hidden="true"
           />
           <div
-            className="absolute left-1/2 top-[12%] w-[calc(100%-2rem)] max-w-xl -translate-x-1/2 overflow-hidden rounded-xl border border-stone-200 bg-white shadow-2xl"
+            className="absolute left-1/2 top-[12%] w-[calc(100%-2rem)] max-w-xl -translate-x-1/2 overflow-hidden rounded-lg border border-line bg-paper shadow-overlay"
             onKeyDown={onPaletteKeyDown}
           >
             {/* Input row */}
-            <div className="flex items-center gap-2 border-b border-stone-200 px-3">
+            <div className="flex items-center gap-2 border-b border-line px-3">
               {isNested && (
                 <button
                   type="button"
                   onClick={popPage}
                   aria-label="Back to command bar"
-                  className="rounded-md p-1.5 text-stone-400 hover:bg-stone-100 hover:text-stone-600"
+                  className="rounded-md p-1.5 text-subtle hover:bg-hover-paper hover:text-ink"
                 >
                   <ArrowLeft className="h-4 w-4" aria-hidden />
                 </button>
               )}
-              <Search className="h-4 w-4 shrink-0 text-stone-400" aria-hidden />
+              <Search className="h-4 w-4 shrink-0 text-subtle" aria-hidden />
               <input
                 ref={inputRef}
                 value={query}
@@ -563,10 +563,10 @@ export function CommandBar({ workspaceId }: { workspaceId: string }) {
                 aria-label={pageTitle}
                 autoComplete="off"
                 spellCheck={false}
-                className="h-12 w-full bg-transparent text-[14px] text-stone-900 outline-none placeholder:text-stone-400"
+                className="h-12 w-full bg-transparent text-[14px] text-ink outline-none placeholder:text-subtle"
               />
               {isNested && page.name !== "ask" && (
-                <span className="shrink-0 text-[11px] font-medium uppercase tracking-wide text-stone-400">
+                <span className="shrink-0 text-xs font-semibold text-muted">
                   {page.name === "missions" ? "Missions" : "Playbooks"}
                 </span>
               )}
@@ -574,7 +574,7 @@ export function CommandBar({ workspaceId }: { workspaceId: string }) {
                 type="button"
                 onClick={close}
                 aria-label="Close command bar"
-                className="shrink-0 rounded-md p-1.5 text-stone-400 hover:bg-stone-100 hover:text-stone-600"
+                className="shrink-0 rounded-md p-1.5 text-subtle hover:bg-hover-paper hover:text-ink"
               >
                 <X className="h-4 w-4" aria-hidden />
               </button>
@@ -583,22 +583,22 @@ export function CommandBar({ workspaceId }: { workspaceId: string }) {
             {/* Ask result panel */}
             {page.name === "ask" ? (
               <div className="max-h-[50vh] overflow-y-auto p-4">
-                <p className="text-[13px] font-medium text-stone-500">“{page.query}”</p>
+                <p className="text-[13px] font-medium text-muted">“{page.query}”</p>
                 {(page.status === "loading" || page.status === "slow") && (
-                  <div className="mt-3 flex items-center gap-2 text-[13px] text-stone-500">
-                    <Loader2 className="h-4 w-4 animate-spin text-violet-600" aria-hidden />
+                  <div className="mt-3 flex items-center gap-2 text-[13px] text-muted">
+                    <Loader2 className="h-4 w-4 aos-spin text-muted" aria-hidden />
                     {page.status === "slow" ? "Still thinking — the strategist is taking a while…" : "Asking the strategist…"}
                   </div>
                 )}
                 {page.status === "error" && (
-                  <div className="mt-3 flex items-start gap-2 rounded-lg border border-stone-200 bg-stone-50 p-3 text-[13px] text-stone-600">
-                    <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-stone-400" aria-hidden />
+                  <div role="alert" className="mt-3 flex items-start gap-2 rounded-lg border border-failed bg-failed-tint p-3 text-[13px] text-failed-text">
+                    <span className="mt-1 size-2.5 shrink-0 rounded-[2px] bg-failed" aria-hidden />
                     <span>{page.error}</span>
                   </div>
                 )}
                 {page.status === "done" && (
                   <div className="mt-3">
-                    <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-stone-800">{page.answer}</p>
+                    <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-ink">{page.answer}</p>
                     {/* Phase 13B: explicit feedback affordance on the strategist answer */}
                     <div className="mt-2 flex justify-end">
                       <FeedbackButtons agentId="business-strategist" workspaceId={workspaceId} />
@@ -611,7 +611,7 @@ export function CommandBar({ workspaceId }: { workspaceId: string }) {
                             href={c.url}
                             target="_blank"
                             rel="noreferrer"
-                            className="inline-flex max-w-full items-center gap-1 rounded-full border border-violet-200 bg-violet-50 px-2.5 py-1 text-[12px] font-medium text-violet-700 hover:bg-violet-100"
+                            className="inline-flex max-w-full items-center gap-1 rounded-full border-line bg-paper px-2.5 py-1 text-[12px] font-medium text-muted hover:text-ink"
                           >
                             <span className="truncate">{c.title || c.url}</span>
                           </a>
@@ -620,9 +620,9 @@ export function CommandBar({ workspaceId }: { workspaceId: string }) {
                     )}
                   </div>
                 )}
-                <p className="mt-4 text-[12px] text-stone-400">
-                  <kbd className="rounded border border-stone-200 bg-stone-50 px-1 font-sans">Esc</kbd> to close ·
-                  <kbd className="ml-1 rounded border border-stone-200 bg-stone-50 px-1 font-sans">⌫</kbd> to go back
+                <p className="mt-4 text-[12px] text-subtle">
+                  <kbd className="rounded border border-line bg-canvas px-1 font-sans text-muted">Esc</kbd> to close ·
+                  <kbd className="ml-1 rounded border border-line bg-canvas px-1 font-sans text-muted">⌫</kbd> to go back
                 </p>
               </div>
             ) : (
@@ -644,10 +644,10 @@ export function CommandBar({ workspaceId }: { workspaceId: string }) {
 
                 {/* Playbooks page states */}
                 {page.name === "playbooks" && page.status !== "ready" && (
-                  <div className="px-3 py-6 text-center text-[13px] text-stone-500">
+                  <div className="px-3 py-6 text-center text-[13px] text-muted">
                     {page.status === "loading" && (
                       <span className="inline-flex items-center gap-2">
-                        <Loader2 className="h-4 w-4 animate-spin text-violet-600" aria-hidden />
+                        <Loader2 className="h-4 w-4 aos-spin text-muted" aria-hidden />
                         Loading playbooks…
                       </span>
                     )}
@@ -667,7 +667,7 @@ export function CommandBar({ workspaceId }: { workspaceId: string }) {
                     <div key={group.section} role="group" aria-labelledby={`cmdk-h-${group.section}`}>
                       <h3
                         id={`cmdk-h-${group.section}`}
-                        className="px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wider text-stone-400"
+                        className="px-3 pb-1 pt-2 text-xs font-semibold text-muted"
                       >
                         {group.label}
                       </h3>
@@ -687,17 +687,17 @@ export function CommandBar({ workspaceId }: { workspaceId: string }) {
                             }}
                             className={cn(
                               "mx-1.5 flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px]",
-                              isActive ? "bg-violet-600 text-white" : "text-stone-700 hover:bg-violet-50/40",
+                              isActive ? "bg-ink text-white" : "text-ink hover:bg-hover-paper",
                             )}
                           >
                             <Icon
-                              className={cn("h-4 w-4 shrink-0", isActive ? "text-white" : "text-violet-600")}
+                              className={cn("h-4 w-4 shrink-0", isActive ? "text-white" : "text-muted")}
                               aria-hidden
                             />
                             <span className="min-w-0 flex-1">
                               <span className="block truncate font-medium">{item.title}</span>
                               {item.subtitle && (
-                                <span className={cn("block truncate text-[12px]", isActive ? "text-violet-100" : "text-stone-400")}>
+                                <span className={cn("block truncate text-[12px]", isActive ? "text-white/70" : "text-subtle")}>
                                   {item.subtitle}
                                 </span>
                               )}
@@ -706,14 +706,14 @@ export function CommandBar({ workspaceId }: { workspaceId: string }) {
                               <kbd
                                 className={cn(
                                   "shrink-0 rounded border px-1.5 py-0.5 font-sans text-[11px]",
-                                  isActive ? "border-violet-400 bg-violet-500 text-white" : "border-stone-200 bg-stone-50 text-stone-400",
+                                  isActive ? "border-white/20 bg-white/10 text-white" : "border-line bg-canvas text-muted",
                                 )}
                               >
                                 {item.hotkey}
                               </kbd>
                             )}
                             {isActive && (
-                              <CornerDownLeft className="h-3.5 w-3.5 shrink-0 text-violet-200" aria-hidden />
+                              <CornerDownLeft className="h-3.5 w-3.5 shrink-0 text-white/60" aria-hidden />
                             )}
                           </div>
                         );
@@ -721,11 +721,11 @@ export function CommandBar({ workspaceId }: { workspaceId: string }) {
                     </div>
                   ))}
                   {items.length === 0 && page.name !== "playbooks" && (
-                    <p className="px-3 py-6 text-center text-[13px] text-stone-400">No matching commands.</p>
+                    <p className="px-3 py-6 text-center text-[13px] text-subtle">No matching commands.</p>
                   )}
                   {page.name === "root" && !query.trim() && (
-                    <div className="mt-1 border-t border-stone-100 px-3 py-2">
-                      <p className="flex items-center gap-1.5 text-[12px] text-stone-400">
+                    <div className="mt-1 border-t border-line px-3 py-2">
+                      <p className="flex items-center gap-1.5 text-[12px] text-subtle">
                         <Sparkles className="h-3.5 w-3.5" aria-hidden />
                         Tip: type a question to ask the Chief Strategy Agent — answers come with citations.
                       </p>
@@ -734,19 +734,19 @@ export function CommandBar({ workspaceId }: { workspaceId: string }) {
                 </div>
 
                 {/* Footer hints */}
-                <div className="flex items-center gap-3 border-t border-stone-200 px-3 py-2 text-[12px] text-stone-400">
+                <div className="flex items-center gap-3 border-t border-line px-3 py-2 text-[12px] text-subtle">
                   <span className="flex items-center gap-1">
-                    <kbd className="rounded border border-stone-200 bg-stone-50 px-1 font-sans">↑↓</kbd> navigate
+                    <kbd className="rounded border border-line bg-canvas px-1 font-sans text-muted">↑↓</kbd> navigate
                   </span>
                   <span className="flex items-center gap-1">
-                    <kbd className="rounded border border-stone-200 bg-stone-50 px-1 font-sans">↵</kbd> run
+                    <kbd className="rounded border border-line bg-canvas px-1 font-sans text-muted">↵</kbd> run
                   </span>
                   <span className="flex items-center gap-1">
-                    <kbd className="rounded border border-stone-200 bg-stone-50 px-1 font-sans">esc</kbd> close
+                    <kbd className="rounded border border-line bg-canvas px-1 font-sans text-muted">esc</kbd> close
                   </span>
                   {isNested && (
                     <span className="flex items-center gap-1">
-                      <kbd className="rounded border border-stone-200 bg-stone-50 px-1 font-sans">⌫</kbd> back
+                      <kbd className="rounded border border-line bg-canvas px-1 font-sans text-muted">⌫</kbd> back
                     </span>
                   )}
                 </div>

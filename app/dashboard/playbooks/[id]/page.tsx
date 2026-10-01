@@ -17,7 +17,7 @@ export default async function PlaybookPage({ params }: { params: Promise<{ id: s
   await getOrCreateWorkspace(user.id, user.email);
   const { id } = await params;
   return (
-    <div className="bg-[#FAFAF7] p-4 md:p-6">
+    <div className="bg-canvas p-4 md:p-6">
       <PlaybookDetail playbookId={id} />
     </div>
   );

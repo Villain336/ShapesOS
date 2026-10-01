@@ -1,6 +1,4 @@
 // Marketr — Growth Missions list + template picker (Phase 9, M4).
-// House style: StudioApp.tsx class-by-class (dense table, violet primary,
-// icon sub-tabs, Lucide only, light mode).
 
 "use client";
 
@@ -9,11 +7,9 @@ import { useRouter } from "next/navigation";
 import {
   Briefcase,
   Building2,
-  CheckCircle2,
   ChevronRight,
   Home,
   Loader2,
-  PauseCircle,
   Plus,
   Rocket,
   Search,
@@ -40,42 +36,73 @@ async function api<T>(url: string, init?: RequestInit): Promise<T> {
   return j as T;
 }
 
-// ── Atoms (from StudioApp.tsx) ───────────────────────────────────────────────
+// ── Atoms (Agentic OS) ───────────────────────────────────────────────────────
 
-function Chip({ children, tone = "slate" }: { children: React.ReactNode; tone?: "slate" | "violet" | "green" | "amber" | "red" | "blue" }) {
-  const tones: Record<string, string> = {
-    slate: "bg-slate-100 text-slate-600 border-slate-200",
-    violet: "bg-violet-50 text-violet-700 border-violet-200",
-    green: "bg-emerald-50 text-emerald-700 border-emerald-200",
-    amber: "bg-amber-50 text-amber-700 border-amber-200",
-    red: "bg-red-50 text-red-700 border-red-200",
-    blue: "bg-blue-50 text-blue-700 border-blue-200",
-  };
+// All mission-list metadata (type, goal counts) is category information,
+// not agent state — always a neutral chip. The tone prop stays for
+// call-site compatibility.
+function Chip({ children, tone = "slate" }: { children: React.ReactNode; tone?: string }) {
+  void tone;
   return (
-    <span className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-1.5 py-0.5 text-[10px] font-medium leading-tight ${tones[tone]}`}>
+    <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-paper px-2 py-0.5 text-xs font-semibold text-muted shadow-control">
       {children}
     </span>
   );
 }
 
-function statusTone(status: string): "slate" | "violet" | "green" | "amber" | "red" | "blue" {
+// Mission statuses ARE genuine agent states: active work runs, paused holds,
+// complete finishes, planned waits its turn. Archived is just a shelf.
+function MissionStatusBadge({ status }: { status: string }) {
+  const base =
+    "inline-flex h-badge items-center gap-1.5 rounded-full px-3 text-sm font-semibold";
+  const shape = (extra: string) => (
+    <span className={`aos-shape ${extra}`} style={{ color: "inherit" }} aria-hidden />
+  );
   switch (status) {
-    case "active": return "violet";
-    case "paused": return "amber";
-    case "complete": return "green";
-    case "archived": return "slate";
-    default: return "slate";
+    case "active":
+      return (
+        <span className={`${base} bg-running text-white`}>
+          {shape("aos-shape--running aos-is-live")} Active
+        </span>
+      );
+    case "paused":
+      return (
+        <span className={`${base} bg-line text-ink`}>
+          {shape("aos-shape--paused")} Paused
+        </span>
+      );
+    case "complete":
+      return (
+        <span className={`${base} bg-done text-white`}>
+          {shape("aos-shape--done")} Complete
+        </span>
+      );
+    case "planned":
+      return (
+        <span className={`${base} bg-paper text-ink shadow-outline`}>
+          {shape("aos-shape--queued")} Planned
+        </span>
+      );
+    default:
+      return (
+        <span className="inline-flex h-badge items-center rounded-full bg-paper px-3 text-sm font-semibold text-muted shadow-control">
+          Archived
+        </span>
+      );
   }
 }
 
 const inputCls =
-  "rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-[13px] text-stone-900 placeholder:text-stone-400 focus:border-violet-400 focus:outline-none";
+  "h-control-sm rounded-md border-[1.5px] border-control bg-paper px-3 text-sm text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none";
 
 const btnPrimary =
-  "flex items-center gap-1.5 rounded-md bg-violet-600 px-3 py-1.5 text-[13px] font-medium text-white hover:bg-violet-700 disabled:opacity-40";
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-night-hover disabled:opacity-40";
 
-const btnGhost = "flex items-center gap-1.5 rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-[13px] text-stone-700 hover:bg-stone-50 disabled:opacity-40";
+const btnGhost =
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-paper px-4 text-sm font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper disabled:opacity-40";
 // eslint-disable-next-line @typescript-eslint/no-unused-vars -- style token for future ghost buttons
+const btnRun =
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-running px-4 text-sm font-semibold text-white aos-press disabled:opacity-40";
 
 const BT_ICONS: Record<BusinessType, typeof Home> = {
   "home-services": Home,
@@ -103,10 +130,10 @@ interface MissionListItem {
 function ProgressBar({ value }: { value: number }) {
   return (
     <div className="flex items-center gap-2">
-      <div className="h-1.5 w-24 overflow-hidden rounded-full bg-stone-200">
-        <div className="h-full rounded-full bg-violet-600" style={{ width: `${Math.round(value * 100)}%` }} />
+      <div className="h-1.5 w-24 overflow-hidden rounded-full bg-line">
+        <div className="h-full rounded-full bg-ink" style={{ width: `${Math.round(value * 100)}%` }} />
       </div>
-      <span className="text-[11px] tabular-nums text-stone-500">{Math.round(value * 100)}%</span>
+      <span className="text-[11px] tabular-nums text-muted">{Math.round(value * 100)}%</span>
     </div>
   );
 }
@@ -181,30 +208,30 @@ function TemplatePicker({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/40 p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/30 p-4" onClick={onClose}>
       <div
-        className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-xl bg-white shadow-xl"
+        className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-lg bg-paper shadow-overlay"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between border-b border-stone-100 px-4 py-3">
+        <div className="flex items-center justify-between border-b border-line px-4 py-3">
           <div>
-            <h3 className="text-[15px] font-semibold text-stone-900">New mission</h3>
-            <p className="text-[12.5px] text-stone-500">Pick a template for your business type, set the target, launch.</p>
+            <h3 className="aos-subheading">New mission</h3>
+            <p className="text-xs text-muted">Pick a template for your business type, set the target, launch.</p>
           </div>
-          <button onClick={onClose} className="rounded-md p-1.5 text-stone-400 hover:bg-stone-100" aria-label="Close">
+          <button onClick={onClose} className="rounded-full p-1.5 text-subtle hover:bg-hover-paper hover:text-ink" aria-label="Close">
             <X size={16} />
           </button>
         </div>
 
-        <div className="flex gap-1 border-b border-stone-200 px-4">
+        <div className="flex gap-1 border-b border-line px-4">
           {BUSINESS_TYPES.map((id) => {
             const Icon = BT_ICONS[id];
             return (
               <button
                 key={id}
                 onClick={() => { setBt(id); setSelectedId(null); }}
-                className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-[13.5px] font-medium transition ${
-                  bt === id ? "border-violet-600 text-violet-700" : "border-transparent text-stone-500 hover:text-stone-800"
+                className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-sm font-medium ${
+                  bt === id ? "border-ink text-ink" : "border-transparent text-muted hover:text-ink"
                 }`}
               >
                 <Icon size={15} />
@@ -219,16 +246,16 @@ function TemplatePicker({ onClose }: { onClose: () => void }) {
             {grouped[bt].map((t) => (
               <div
                 key={t.id}
-                className={`cursor-pointer rounded-lg border px-3.5 py-3 transition ${
-                  selectedId === t.id ? "border-violet-400 bg-violet-50/40" : "border-stone-200 bg-white hover:border-stone-300"
+                className={`cursor-pointer rounded-lg border px-3.5 py-3 ${
+                  selectedId === t.id ? "border-ink bg-canvas" : "border-line bg-paper hover:border-control"
                 }`}
                 onClick={() => setSelectedId(t.id === selectedId ? null : t.id)}
               >
                 <div className="flex items-center justify-between gap-2">
-                  <div className="text-[14px] font-semibold text-stone-900">{t.name}</div>
-                  <Chip tone={selectedId === t.id ? "violet" : "slate"}>{t.goals.length} goals</Chip>
+                  <div className="text-sm font-semibold text-ink">{t.name}</div>
+                  <Chip>{t.goals.length} goals</Chip>
                 </div>
-                <p className="mt-0.5 text-[12.5px] text-stone-500">{t.description}</p>
+                <p className="mt-0.5 text-xs text-muted">{t.description}</p>
                 <div className="mt-2 flex flex-wrap gap-1.5">
                   {t.goals.map((g) => (
                     <Chip key={g.metric}>
@@ -238,10 +265,10 @@ function TemplatePicker({ onClose }: { onClose: () => void }) {
                 </div>
 
                 {selectedId === t.id && (
-                  <div className="mt-3 space-y-2.5 border-t border-stone-200 pt-3" onClick={(e) => e.stopPropagation()}>
+                  <div className="mt-3 space-y-2.5 border-t border-line pt-3" onClick={(e) => e.stopPropagation()}>
                     <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
                       <label className="block">
-                        <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-stone-500">Goal</span>
+                        <span className="mb-1 block text-xs font-semibold text-muted">Goal</span>
                         <select value={goalIdx} onChange={(e) => setGoalIdx(Number(e.target.value))} className={`${inputCls} w-full`}>
                           {t.goals.map((g, i) => (
                             <option key={g.metric} value={i}>{g.label}</option>
@@ -249,29 +276,34 @@ function TemplatePicker({ onClose }: { onClose: () => void }) {
                         </select>
                       </label>
                       <label className="block">
-                        <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-stone-500">Mission name (optional)</span>
+                        <span className="mb-1 block text-xs font-semibold text-muted">Mission name (optional)</span>
                         <input value={name} onChange={(e) => setName(e.target.value)} placeholder={t.name} className={`${inputCls} w-full`} />
                       </label>
                       <label className="block">
-                        <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-stone-500">
+                        <span className="mb-1 block text-xs font-semibold text-muted">
                           Target ({t.goals[goalIdx]?.unit || "value"})
                         </span>
                         <input value={targetValue} onChange={(e) => setTargetValue(e.target.value)} inputMode="decimal" className={`${inputCls} w-full`} />
                       </label>
                       <label className="block">
-                        <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-stone-500">Timeframe (days)</span>
+                        <span className="mb-1 block text-xs font-semibold text-muted">Timeframe (days)</span>
                         <input value={timeframeDays} onChange={(e) => setTimeframeDays(e.target.value)} inputMode="numeric" className={`${inputCls} w-full`} />
                       </label>
                     </div>
                     {t.goals[goalIdx]?.baselineHint && (
-                      <p className="text-[12px] text-stone-400">Baseline hint: {t.goals[goalIdx].baselineHint}</p>
+                      <p className="text-xs text-subtle">Baseline hint: {t.goals[goalIdx].baselineHint}</p>
                     )}
-                    {error && <p className="text-[12.5px] text-red-600">{error}</p>}
+                    {error && (
+                      <p role="alert" className="flex items-center gap-1.5 text-sm text-failed-text">
+                        <span className="size-2.5 shrink-0 rounded-[2px] bg-failed" aria-hidden />
+                        {error}
+                      </p>
+                    )}
                     <div className="flex items-center gap-2">
-                      <button onClick={launch} disabled={busy} className={btnPrimary}>
-                        {busy && <Loader2 size={14} className="animate-spin" />} Launch mission
+                      <button onClick={launch} disabled={busy} className={btnRun}>
+                        {busy && <Loader2 size={14} className="aos-spin" />} Launch mission
                       </button>
-                      <span className="text-[12px] text-stone-400">
+                      <span className="text-xs text-subtle">
                         Tier 0 — launching drafts a plan; nothing executes without your approvals.
                       </span>
                     </div>
@@ -326,13 +358,13 @@ export function MissionsApp() {
   return (
     <div>
       <div className="mb-3 flex flex-wrap items-center gap-2">
-        <select value={fType} onChange={(e) => setFType(e.target.value)} className={inputCls}>
+        <select value={fType} onChange={(e) => setFType(e.target.value)} className={inputCls} aria-label="Filter by business type">
           <option value="">All business types</option>
           {BUSINESS_TYPES.map((id) => (
             <option key={id} value={id}>{BUSINESS_TYPE_LABELS[id]}</option>
           ))}
         </select>
-        <select value={fStatus} onChange={(e) => setFStatus(e.target.value)} className={inputCls}>
+        <select value={fStatus} onChange={(e) => setFStatus(e.target.value)} className={inputCls} aria-label="Filter by status">
           <option value="">All statuses</option>
           <option value="planned">Planned</option>
           <option value="active">Active</option>
@@ -341,8 +373,8 @@ export function MissionsApp() {
           <option value="archived">Archived</option>
         </select>
         <div className="relative">
-          <Search size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-stone-400" />
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search missions…" className={`${inputCls} w-44 pl-8`} />
+          <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-subtle" />
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search missions…" className={`${inputCls} w-44 pl-9`} />
         </div>
         <div className="ml-auto">
           <button onClick={() => setPickerOpen(true)} className={btnPrimary}>
@@ -351,17 +383,17 @@ export function MissionsApp() {
         </div>
       </div>
 
-      <div className="overflow-x-auto rounded-lg border border-stone-200 bg-white">
-        <table className="w-full min-w-[760px] text-left text-[13px]">
+      <div className="overflow-x-auto rounded-lg bg-paper shadow-hairline">
+        <table className="w-full min-w-[760px] text-left text-sm">
           <thead>
-            <tr className="border-b border-stone-100 bg-stone-50/60 text-[11px] uppercase tracking-wide text-stone-500">
-              <th className="px-3 py-2 font-medium">Name</th>
-              <th className="px-3 py-2 font-medium">Type</th>
-              <th className="px-3 py-2 font-medium">Goal</th>
-              <th className="px-3 py-2 font-medium">Progress</th>
-              <th className="px-3 py-2 font-medium">Status</th>
-              <th className="px-3 py-2 font-medium">Next checkpoint</th>
-              <th className="px-3 py-2 font-medium"><span className="sr-only">Open</span></th>
+            <tr className="border-b border-line text-xs font-semibold text-muted">
+              <th className="px-3 py-2 font-semibold">Name</th>
+              <th className="px-3 py-2 font-semibold">Type</th>
+              <th className="px-3 py-2 font-semibold">Goal</th>
+              <th className="px-3 py-2 font-semibold">Progress</th>
+              <th className="px-3 py-2 font-semibold">Status</th>
+              <th className="px-3 py-2 font-semibold">Next checkpoint</th>
+              <th className="px-3 py-2 font-semibold"><span className="sr-only">Open</span></th>
             </tr>
           </thead>
           <tbody>
@@ -371,33 +403,29 @@ export function MissionsApp() {
                 <tr
                   key={m.id}
                   onClick={() => router.push(`/dashboard/missions/${m.id}`)}
-                  className="cursor-pointer border-b border-stone-100 last:border-0 hover:bg-violet-50/40"
+                  className="cursor-pointer border-b border-line last:border-0 hover:bg-hover-paper"
                 >
-                  <td className="px-3 py-2 font-medium text-stone-900">{m.name}</td>
+                  <td className="px-3 py-2 font-medium text-ink">{m.name}</td>
                   <td className="px-3 py-2">
-                    <Chip tone="slate"><Icon size={10} /> {m.businessTypeLabel}</Chip>
+                    <Chip><Icon size={10} /> {m.businessTypeLabel}</Chip>
                   </td>
-                  <td className="px-3 py-2 text-stone-600">{m.goalSummary}</td>
+                  <td className="px-3 py-2 text-muted">{m.goalSummary}</td>
                   <td className="px-3 py-2"><ProgressBar value={m.progress} /></td>
                   <td className="px-3 py-2">
-                    <Chip tone={statusTone(m.status)}>
-                      {m.status === "paused" && <PauseCircle size={10} />}
-                      {m.status === "complete" && <CheckCircle2 size={10} />}
-                      {m.status}
-                    </Chip>
+                    <MissionStatusBadge status={m.status} />
                   </td>
-                  <td className="max-w-[220px] truncate px-3 py-2 text-stone-500" title={m.nextCheckpoint ?? ""}>
+                  <td className="max-w-[220px] truncate px-3 py-2 text-muted" title={m.nextCheckpoint ?? ""}>
                     {m.nextCheckpoint ?? "—"}
                   </td>
                   <td className="px-3 py-2 text-right">
-                    <ChevronRight size={14} className="ml-auto text-stone-300" />
+                    <ChevronRight size={14} className="ml-auto text-subtle" />
                   </td>
                 </tr>
               );
             })}
             {filtered.length === 0 && !loading && (
               <tr>
-                <td colSpan={7} className="px-3 py-8 text-center text-[13px] text-stone-400">
+                <td colSpan={7} className="px-3 py-8 text-center text-sm text-subtle">
                   {missions.length === 0
                     ? "No missions yet — launch the first one with “New mission”."
                     : "No missions match these filters."}
@@ -408,8 +436,8 @@ export function MissionsApp() {
         </table>
       </div>
 
-      <div className="mt-3 rounded-md border border-stone-200 bg-stone-50 px-3 py-2 text-[12.5px] text-stone-600">
-        <span className="font-medium text-stone-800">Kill switches always on. </span>
+      <div className="mt-3 rounded-lg border border-line bg-canvas px-3 py-2 text-xs text-muted">
+        <span className="font-medium text-ink">Kill switches always on. </span>
         Every mission can be paused instantly; the workspace freeze halts everything. Resume re-verifies
         budgets, data freshness, and goal assumptions before anything continues.
       </div>

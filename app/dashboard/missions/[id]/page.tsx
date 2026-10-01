@@ -17,7 +17,7 @@ export default async function MissionDetailPage({ params }: { params: Promise<{ 
   await getOrCreateWorkspace(user.id, user.email);
   const { id } = await params;
   return (
-    <div className="flex h-full flex-col gap-4 bg-[#FAFAF7] p-4 md:p-6">
+    <div className="flex h-full flex-col gap-4 bg-canvas p-4 md:p-6">
       <MissionDetail missionId={id} />
     </div>
   );

@@ -8,7 +8,6 @@
 
 import { useCallback, useEffect, useState } from "react";
 import {
-  AlertTriangle,
   Check,
   CheckCircle2,
   Inbox,
@@ -33,14 +32,9 @@ interface PendingApproval {
   expiresAt: string;
 }
 
+// Tiers are categories, not agent states — always a neutral chip.
 function TierBadge({ tier }: { tier: number }) {
   const t = (tier === 0 || tier === 1 || tier === 2 || tier === 3 ? tier : 2) as Tier;
-  const tones: Record<Tier, string> = {
-    0: "bg-slate-100 text-slate-600 border-slate-200",
-    1: "bg-violet-50 text-violet-700 border-violet-200",
-    2: "bg-amber-50 text-amber-700 border-amber-200",
-    3: "bg-red-50 text-red-700 border-red-200",
-  };
   const labels: Record<Tier, string> = {
     0: "Tier 0",
     1: "Tier 1",
@@ -48,9 +42,7 @@ function TierBadge({ tier }: { tier: number }) {
     3: "Tier 3",
   };
   return (
-    <span
-      className={`inline-flex items-center whitespace-nowrap rounded-full border px-1.5 py-0.5 text-[10px] font-medium leading-tight ${tones[t]}`}
-    >
+    <span className="inline-flex items-center whitespace-nowrap rounded-full bg-paper px-2 py-0.5 text-xs font-semibold text-muted shadow-control">
       {labels[t]}
     </span>
   );
@@ -72,6 +64,12 @@ function fmtAmount(cents: number | null): string {
   if (cents === null) return "—";
   return `$${(cents / 100).toFixed(2)}`;
 }
+
+const btnApprove =
+  "flex h-11 min-w-[88px] items-center justify-center gap-1.5 rounded-full bg-done px-4 text-sm font-semibold text-white aos-press disabled:opacity-40";
+
+const btnDeny =
+  "flex h-11 min-w-[88px] items-center justify-center gap-1.5 rounded-full bg-paper px-4 text-sm font-semibold text-failed-text aos-press shadow-[inset_0_0_0_1.5px_var(--aos-failed)] disabled:opacity-40";
 
 export default function ApprovalsInbox() {
   const [approvals, setApprovals] = useState<PendingApproval[] | null>(null);
@@ -119,8 +117,8 @@ export default function ApprovalsInbox() {
 
   if (approvals === null) {
     return (
-      <div className="flex items-center gap-2 text-[13px] text-stone-500">
-        <Loader2 size={16} className="animate-spin" />
+      <div className="flex items-center gap-2 text-sm text-muted">
+        <Loader2 size={16} className="aos-spin" />
         Loading pending approvals…
       </div>
     );
@@ -128,24 +126,36 @@ export default function ApprovalsInbox() {
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex items-center justify-between">
-        <p className="text-[13px] text-stone-500">
-          {approvals.length === 0
-            ? "Nothing waiting on you."
-            : `${approvals.length} pending — newest first.`}
-        </p>
-        <button
-          onClick={load}
-          className="flex h-9 items-center gap-1.5 rounded-lg border border-stone-200 bg-white px-3 text-[13px] font-medium text-stone-600 hover:text-stone-900"
+      {approvals.length > 0 && (
+        <div
+          role="status"
+          className="flex items-center gap-2.5 rounded-lg bg-needs px-4 py-3 text-ink"
         >
-          <RefreshCw size={14} />
-          Refresh
-        </button>
-      </div>
+          <span
+            className="aos-shape aos-shape--needs [--aos-shape-size:14px]"
+            style={{ color: "inherit" }}
+            aria-hidden
+          />
+          <p className="text-sm font-semibold">
+            {approvals.length} approval{approvals.length === 1 ? "" : "s"} waiting on your
+            sign-off — newest first.
+          </p>
+          <button
+            onClick={load}
+            className="ml-auto inline-flex h-chip shrink-0 items-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press"
+          >
+            <RefreshCw size={14} />
+            Refresh
+          </button>
+        </div>
+      )}
 
       {error && (
-        <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-700">
-          <AlertTriangle size={15} className="shrink-0" />
+        <div
+          role="alert"
+          className="flex items-center gap-2 rounded-lg border border-failed bg-failed-tint px-3 py-2 text-sm text-failed-text"
+        >
+          <span className="size-2.5 shrink-0 rounded-[2px] bg-failed" aria-hidden />
           {error}
           <button onClick={() => setError(null)} className="ml-auto" aria-label="Dismiss error">
             <X size={14} />
@@ -154,25 +164,25 @@ export default function ApprovalsInbox() {
       )}
 
       {approvals.length === 0 ? (
-        <div className="flex flex-col items-center gap-2 rounded-lg border border-stone-200 bg-white px-6 py-12 text-center">
-          <CheckCircle2 size={28} className="text-stone-300" />
-          <div className="text-[14px] font-semibold text-stone-900">All caught up</div>
-          <div className="max-w-[320px] text-[13px] text-stone-500">
+        <div className="flex flex-col items-center gap-2 rounded-lg bg-paper px-6 py-12 text-center shadow-hairline">
+          <CheckCircle2 size={28} className="text-subtle" />
+          <div className="text-sm font-semibold text-ink">All caught up</div>
+          <div className="max-w-[320px] text-sm text-muted">
             No pending approvals. When a mission needs your sign-off, it will appear here.
           </div>
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-stone-200 bg-white">
-          <table className="min-w-[760px] w-full text-left text-[13px]">
+        <div className="overflow-x-auto rounded-lg bg-paper shadow-hairline">
+          <table className="min-w-[760px] w-full text-left text-sm">
             <thead>
-              <tr className="border-b border-stone-100 bg-stone-50/60 text-[11px] uppercase tracking-wide text-stone-500">
-                <th className="px-3 py-2 font-medium">Mission</th>
-                <th className="px-3 py-2 font-medium">Action</th>
-                <th className="px-3 py-2 font-medium">Tier</th>
-                <th className="px-3 py-2 font-medium">Amount</th>
-                <th className="px-3 py-2 font-medium">Age</th>
-                <th className="px-3 py-2 font-medium">Payload</th>
-                <th className="px-3 py-2 text-right font-medium">Decision</th>
+              <tr className="border-b border-line text-xs font-semibold text-muted">
+                <th className="px-3 py-2 font-semibold">Mission</th>
+                <th className="px-3 py-2 font-semibold">Action</th>
+                <th className="px-3 py-2 font-semibold">Tier</th>
+                <th className="px-3 py-2 font-semibold">Amount</th>
+                <th className="px-3 py-2 font-semibold">Age</th>
+                <th className="px-3 py-2 font-semibold">Payload</th>
+                <th className="px-3 py-2 text-right font-semibold">Decision</th>
               </tr>
             </thead>
             <tbody>
@@ -181,35 +191,35 @@ export default function ApprovalsInbox() {
                 return (
                   <tr
                     key={a.id}
-                    className="border-b border-stone-100 last:border-0 hover:bg-violet-50/40"
+                    className="border-b border-line last:border-0 hover:bg-hover-paper"
                   >
                     <td className="max-w-[160px] px-3 py-2.5 align-top">
-                      <div className="truncate font-medium text-stone-900" title={a.missionTemplate ?? "No mission"}>
+                      <div className="truncate font-medium text-ink" title={a.missionTemplate ?? "No mission"}>
                         {a.missionTemplate ?? (
-                          <span className="inline-flex items-center gap-1 text-stone-400">
+                          <span className="inline-flex items-center gap-1 text-subtle">
                             <Inbox size={12} />
                             No mission
                           </span>
                         )}
                       </div>
-                      <div className="font-mono text-[11px] text-stone-400">{a.id.slice(0, 12)}…</div>
+                      <div className="font-mono text-xs text-subtle">{a.id.slice(0, 12)}…</div>
                     </td>
                     <td className="max-w-[180px] px-3 py-2.5 align-top">
-                      <div className="truncate font-mono text-[12px] text-stone-800" title={a.action}>
+                      <div className="truncate font-mono text-[12px] text-ink" title={a.action}>
                         {a.action}
                       </div>
                     </td>
                     <td className="px-3 py-2.5 align-top">
                       <TierBadge tier={a.tier} />
                     </td>
-                    <td className="whitespace-nowrap px-3 py-2.5 align-top font-medium text-stone-800">
+                    <td className="whitespace-nowrap px-3 py-2.5 align-top font-medium text-ink">
                       {fmtAmount(a.amountCents)}
                     </td>
-                    <td className="whitespace-nowrap px-3 py-2.5 align-top text-stone-500">
+                    <td className="whitespace-nowrap px-3 py-2.5 align-top text-muted">
                       {ageOf(a.createdAt)}
                     </td>
                     <td className="max-w-[220px] px-3 py-2.5 align-top">
-                      <div className="truncate text-[12px] text-stone-500" title={a.payloadSummary || a.bindingHash}>
+                      <div className="truncate text-xs text-muted" title={a.payloadSummary || a.bindingHash}>
                         {a.payloadSummary || (
                           <span className="font-mono text-[11px]">{a.bindingHash.slice(0, 16)}…</span>
                         )}
@@ -221,16 +231,16 @@ export default function ApprovalsInbox() {
                           onClick={() => decide(a, "approved")}
                           disabled={busy}
                           aria-label={`Approve ${a.action}`}
-                          className="flex h-11 min-w-[88px] items-center justify-center gap-1.5 rounded-lg bg-violet-600 px-4 text-sm font-medium text-white hover:bg-violet-700 disabled:opacity-50"
+                          className={btnApprove}
                         >
-                          {busy ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />}
+                          {busy ? <Loader2 size={15} className="aos-spin" /> : <Check size={15} />}
                           Approve
                         </button>
                         <button
                           onClick={() => decide(a, "denied")}
                           disabled={busy}
                           aria-label={`Deny ${a.action}`}
-                          className="flex h-11 min-w-[88px] items-center justify-center gap-1.5 rounded-lg border border-stone-300 px-4 text-sm font-medium text-stone-700 hover:bg-stone-50 disabled:opacity-50"
+                          className={btnDeny}
                         >
                           <X size={15} />
                           Deny
@@ -245,7 +255,7 @@ export default function ApprovalsInbox() {
         </div>
       )}
 
-      <p className="text-[12px] text-stone-500">
+      <p className="text-xs text-muted">
         Approving binds the exact payload the mission proposed — the executor re-verifies it at
         execution time and halts on any mismatch. Every decision is written to the hash-chained
         approval event trail.

@@ -1,7 +1,6 @@
 // Marketr — Mission detail client (Phase 9, M4).
 // Header (goal, status, progress) + icon sub-tabs (Timeline | Approvals | Plan),
 // dense event timeline, approval queue with Approve/Deny, pause/resume.
-// House style: StudioApp.tsx class-by-class.
 
 "use client";
 
@@ -9,7 +8,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { MarketrAgentShell } from "@/components/agents/MarketrAgentShell";
 import {
-  AlertTriangle,
   Check,
   ChevronLeft,
   ExternalLink,
@@ -34,50 +32,119 @@ async function api<T>(url: string, init?: RequestInit): Promise<T> {
   return j as T;
 }
 
-// ── Atoms (from StudioApp.tsx) ───────────────────────────────────────────────
+// ── Atoms (Agentic OS) ───────────────────────────────────────────────────────
 
-function Chip({ children, tone = "slate" }: { children: React.ReactNode; tone?: "slate" | "violet" | "green" | "amber" | "red" | "blue" }) {
-  const tones: Record<string, string> = {
-    slate: "bg-slate-100 text-slate-600 border-slate-200",
-    violet: "bg-violet-50 text-violet-700 border-violet-200",
-    green: "bg-emerald-50 text-emerald-700 border-emerald-200",
-    amber: "bg-amber-50 text-amber-700 border-amber-200",
-    red: "bg-red-50 text-red-700 border-red-200",
-    blue: "bg-blue-50 text-blue-700 border-blue-200",
-  };
+// Categories (business type, tier, executor, kind, state groups) are not agent
+// states — always a neutral chip.
+function Chip({ children }: { children: React.ReactNode }) {
   return (
-    <span className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-1.5 py-0.5 text-[10px] font-medium leading-tight ${tones[tone]}`}>
+    <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-paper px-2 py-0.5 text-xs font-semibold text-muted shadow-control">
       {children}
     </span>
   );
 }
 
-function statusTone(status: string): "slate" | "violet" | "green" | "amber" | "red" | "blue" {
+const badgeBase =
+  "inline-flex h-badge items-center gap-1.5 rounded-full px-3 text-sm font-semibold";
+
+function Shape({ extra, size }: { extra: string; size?: string }) {
+  return (
+    <span
+      className={`aos-shape ${extra}${size ? ` [--aos-shape-size:${size}]` : ""}`}
+      style={{ color: "inherit" }}
+      aria-hidden
+    />
+  );
+}
+
+function MissionStatusBadge({ status }: { status: string }) {
   switch (status) {
-    case "active": return "violet";
-    case "paused": return "amber";
-    case "complete": return "green";
-    case "archived": return "slate";
-    default: return "slate";
+    case "active":
+      return (
+        <span className={`${badgeBase} bg-running text-white`}>
+          <Shape extra="aos-shape--running aos-is-live" /> Active
+        </span>
+      );
+    case "paused":
+      return (
+        <span className={`${badgeBase} bg-line text-ink`}>
+          <Shape extra="aos-shape--paused" /> Paused
+        </span>
+      );
+    case "complete":
+      return (
+        <span className={`${badgeBase} bg-done text-white`}>
+          <Shape extra="aos-shape--done" /> Complete
+        </span>
+      );
+    case "planned":
+      return (
+        <span className={`${badgeBase} bg-paper text-ink shadow-outline`}>
+          <Shape extra="aos-shape--queued" /> Planned
+        </span>
+      );
+    default:
+      return (
+        <span className="inline-flex h-badge items-center rounded-full bg-paper px-3 text-sm font-semibold text-muted shadow-control">
+          Archived
+        </span>
+      );
   }
 }
 
-function approvalTone(status: string): "slate" | "violet" | "green" | "amber" | "red" | "blue" {
+// Approval decisions are genuine agent states: pending needs you, approved is
+// done, denied failed, expired is just a shelf.
+function ApprovalStatusBadge({ status }: { status: string }) {
   switch (status) {
-    case "pending": return "amber";
-    case "approved": return "green";
-    case "denied": return "red";
-    case "expired": return "slate";
-    default: return "slate";
+    case "pending":
+      return (
+        <span className={`${badgeBase} bg-needs text-ink`}>
+          <Shape extra="aos-shape--needs" /> Pending
+        </span>
+      );
+    case "approved":
+      return (
+        <span className={`${badgeBase} bg-done text-white`}>
+          <Shape extra="aos-shape--done" /> Approved
+        </span>
+      );
+    case "denied":
+      return (
+        <span className={`${badgeBase} bg-failed text-white`}>
+          <Shape extra="aos-shape--failed" /> Denied
+        </span>
+      );
+    default:
+      return (
+        <span className="inline-flex h-badge items-center rounded-full bg-paper px-3 text-sm font-semibold text-muted shadow-control">
+          Expired
+        </span>
+      );
   }
 }
+
+function ErrorBox({ message }: { message: string }) {
+  return (
+    <div role="alert" className="flex items-start gap-2 rounded-lg border border-failed bg-failed-tint px-3 py-2 text-sm text-failed-text">
+      <span className="mt-1 size-2.5 shrink-0 rounded-[2px] bg-failed" aria-hidden />
+      <span>{message}</span>
+    </div>
+  );
+}
+
+const inputCls =
+  "h-control-sm rounded-md border-[1.5px] border-control bg-paper px-3 text-sm text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none";
 
 const btnPrimary =
-  "flex items-center gap-1.5 rounded-md bg-violet-600 px-3 py-1.5 text-[13px] font-medium text-white hover:bg-violet-700 disabled:opacity-40";
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-night-hover disabled:opacity-40";
 const btnGhost =
-  "flex items-center gap-1.5 rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-[13px] text-stone-700 hover:bg-stone-50 disabled:opacity-40";
-const btnDangerGhost =
-  "flex items-center gap-1.5 rounded-md border border-red-200 bg-white px-2.5 py-1.5 text-[13px] text-red-700 hover:bg-red-50 disabled:opacity-40";
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-paper px-4 text-sm font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper disabled:opacity-40";
+const btnDeny =
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-paper px-4 text-sm font-semibold text-failed-text aos-press shadow-[inset_0_0_0_1.5px_var(--aos-failed)] disabled:opacity-40";
+const btnApprove =
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-done px-4 text-sm font-semibold text-white aos-press disabled:opacity-40";
+const btnRun =
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-running px-4 text-sm font-semibold text-white aos-press disabled:opacity-40";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -151,15 +218,6 @@ function summarizeObservation(obs: Record<string, unknown>): string {
   return s.length > 110 ? `${s.slice(0, 110)}…` : s;
 }
 
-function tierTone(tier: number): "slate" | "violet" | "amber" | "red" {
-  switch (tier) {
-    case 0: return "slate";
-    case 1: return "violet";
-    case 2: return "amber";
-    default: return "red";
-  }
-}
-
 function fmtCost(cents: number): string {
   return cents === 0 ? "—" : `$${(cents / 100).toFixed(2)}`;
 }
@@ -168,34 +226,34 @@ function fmtCost(cents: number): string {
 
 function TimelineTab({ events }: { events: DetailEvent[] }) {
   if (events.length === 0) {
-    return <p className="py-8 text-center text-[13px] text-stone-400">No events yet.</p>;
+    return <p className="py-8 text-center text-sm text-subtle">No events yet.</p>;
   }
   return (
-    <div className="overflow-x-auto rounded-lg border border-stone-200 bg-white">
-      <table className="w-full min-w-[820px] text-left text-[13px]">
+    <div className="overflow-x-auto rounded-lg bg-paper shadow-hairline">
+      <table className="w-full min-w-[820px] text-left text-sm">
         <thead>
-          <tr className="border-b border-stone-100 bg-stone-50/60 text-[11px] uppercase tracking-wide text-stone-500">
-            <th className="px-3 py-2 font-medium">Time</th>
-            <th className="px-3 py-2 font-medium">Step</th>
-            <th className="px-3 py-2 font-medium">Actor</th>
-            <th className="px-3 py-2 font-medium">Tool</th>
-            <th className="px-3 py-2 font-medium">Observation</th>
-            <th className="px-3 py-2 text-right font-medium">Cost</th>
+          <tr className="border-b border-line text-xs font-semibold text-muted">
+            <th className="px-3 py-2 font-semibold">Time</th>
+            <th className="px-3 py-2 font-semibold">Step</th>
+            <th className="px-3 py-2 font-semibold">Actor</th>
+            <th className="px-3 py-2 font-semibold">Tool</th>
+            <th className="px-3 py-2 font-semibold">Observation</th>
+            <th className="px-3 py-2 text-right font-semibold">Cost</th>
           </tr>
         </thead>
         <tbody>
           {events.map((e) => (
-            <tr key={e.id} className="border-b border-stone-100 last:border-0 hover:bg-violet-50/40">
-              <td className="whitespace-nowrap px-3 py-2 text-[11.5px] tabular-nums text-stone-500">
+            <tr key={e.id} className="border-b border-line last:border-0 hover:bg-hover-paper">
+              <td className="whitespace-nowrap px-3 py-2 text-xs tabular-nums text-muted">
                 {new Date(e.ts).toLocaleString()}
               </td>
-              <td className="px-3 py-2 font-mono text-[11.5px] text-stone-800">{e.step ?? "—"}</td>
-              <td className="px-3 py-2 text-stone-600">{e.actor}</td>
-              <td className="px-3 py-2 text-stone-600">{e.tool ?? "—"}</td>
-              <td className="max-w-[380px] truncate px-3 py-2 text-stone-600" title={summarizeObservation(e.observation)}>
+              <td className="px-3 py-2 font-mono text-xs text-ink">{e.step ?? "—"}</td>
+              <td className="px-3 py-2 text-muted">{e.actor}</td>
+              <td className="px-3 py-2 font-mono text-xs text-muted">{e.tool ?? "—"}</td>
+              <td className="max-w-[380px] truncate px-3 py-2 text-muted" title={summarizeObservation(e.observation)}>
                 {summarizeObservation(e.observation)}
               </td>
-              <td className="px-3 py-2 text-right tabular-nums text-stone-600">{fmtCost(e.costCents)}</td>
+              <td className="px-3 py-2 text-right tabular-nums text-muted">{fmtCost(e.costCents)}</td>
             </tr>
           ))}
         </tbody>
@@ -236,42 +294,43 @@ function ApprovalsTab({
 
   return (
     <div className="space-y-4">
-      {error && (
-        <div className="flex items-start gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-700">
-          <AlertTriangle size={14} className="mt-0.5 shrink-0" />
-          <span>{error}</span>
-        </div>
-      )}
+      {error && <ErrorBox message={error} />}
 
       <div>
         <div className="mb-2 flex items-center gap-2">
-          <span className="text-[12px] font-medium uppercase tracking-wide text-stone-500">Pending</span>
-          <Chip tone={pending.length > 0 ? "amber" : "slate"}>{pending.length}</Chip>
+          <span className="text-xs font-semibold text-muted">Pending</span>
+          {pending.length > 0 && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-needs px-2 py-0.5 text-xs font-semibold text-ink">
+              <Shape extra="aos-shape--needs" size="8px" />
+              {pending.length}
+            </span>
+          )}
         </div>
         {pending.length === 0 ? (
-          <p className="rounded-lg border border-stone-200 bg-white px-3 py-6 text-center text-[13px] text-stone-400">
+          <p className="rounded-lg bg-paper px-3 py-6 text-center text-sm text-subtle shadow-hairline">
             No pending approvals — nothing is waiting on you.
           </p>
         ) : (
           <div className="space-y-2">
             {pending.map((a) => (
-              <div key={a.id} className="rounded-lg border border-stone-200 bg-white px-3.5 py-3">
+              <div key={a.id} className="rounded-lg bg-needs px-3.5 py-3 text-ink">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-[13.5px] font-semibold text-stone-900">{a.action}</span>
-                  <Chip tone={tierTone(a.tier)}>Tier {a.tier}</Chip>
-                  <span className="ml-auto text-[11.5px] text-stone-400">
+                  <Shape extra="aos-shape--needs" size="12px" />
+                  <span className="text-sm font-semibold">{a.action}</span>
+                  <Chip>Tier {a.tier}</Chip>
+                  <span className="ml-auto text-xs">
                     expires {a.expiresAt ? new Date(a.expiresAt).toLocaleString() : "—"}
                   </span>
                 </div>
-                <div className="mt-1.5 max-w-full overflow-hidden text-ellipsis font-mono text-[11.5px] text-stone-500">
+                <div className="mt-1.5 max-w-full overflow-hidden text-ellipsis font-mono text-[11px]">
                   {JSON.stringify(a.bindingJson)}
                 </div>
                 <div className="mt-2.5 flex gap-2">
-                  <button onClick={() => void decide(a.id, "approved")} disabled={busyId !== null} className={btnPrimary}>
-                    {busyId === a.id ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />} Approve
+                  <button onClick={() => void decide(a.id, "approved")} disabled={busyId !== null} className={btnApprove}>
+                    {busyId === a.id ? <Loader2 size={14} className="aos-spin" /> : <Check size={14} />} Approve
                   </button>
-                  <button onClick={() => void decide(a.id, "denied")} disabled={busyId !== null} className={btnDangerGhost}>
-                    {busyId === a.id ? <Loader2 size={14} className="animate-spin" /> : <X size={14} />} Deny
+                  <button onClick={() => void decide(a.id, "denied")} disabled={busyId !== null} className={btnDeny}>
+                    {busyId === a.id ? <Loader2 size={14} className="aos-spin" /> : <X size={14} />} Deny
                   </button>
                 </div>
               </div>
@@ -282,26 +341,26 @@ function ApprovalsTab({
 
       {decided.length > 0 && (
         <div>
-          <div className="mb-2 text-[12px] font-medium uppercase tracking-wide text-stone-500">Decided</div>
-          <div className="overflow-x-auto rounded-lg border border-stone-200 bg-white">
-            <table className="w-full min-w-[640px] text-left text-[13px]">
+          <div className="mb-2 text-xs font-semibold text-muted">Decided</div>
+          <div className="overflow-x-auto rounded-lg bg-paper shadow-hairline">
+            <table className="w-full min-w-[640px] text-left text-sm">
               <thead>
-                <tr className="border-b border-stone-100 bg-stone-50/60 text-[11px] uppercase tracking-wide text-stone-500">
-                  <th className="px-3 py-2 font-medium">Action</th>
-                  <th className="px-3 py-2 font-medium">Tier</th>
-                  <th className="px-3 py-2 font-medium">Decision</th>
-                  <th className="px-3 py-2 font-medium">Decided by</th>
-                  <th className="px-3 py-2 font-medium">Decided at</th>
+                <tr className="border-b border-line text-xs font-semibold text-muted">
+                  <th className="px-3 py-2 font-semibold">Action</th>
+                  <th className="px-3 py-2 font-semibold">Tier</th>
+                  <th className="px-3 py-2 font-semibold">Decision</th>
+                  <th className="px-3 py-2 font-semibold">Decided by</th>
+                  <th className="px-3 py-2 font-semibold">Decided at</th>
                 </tr>
               </thead>
               <tbody>
                 {decided.map((a) => (
-                  <tr key={a.id} className="border-b border-stone-100 last:border-0 hover:bg-violet-50/40">
-                    <td className="px-3 py-2 font-medium text-stone-900">{a.action}</td>
-                    <td className="px-3 py-2"><Chip tone={tierTone(a.tier)}>Tier {a.tier}</Chip></td>
-                    <td className="px-3 py-2"><Chip tone={approvalTone(a.status)}>{a.status}</Chip></td>
-                    <td className="max-w-[180px] truncate px-3 py-2 text-stone-600" title={a.decidedBy ?? ""}>{a.decidedBy ?? "—"}</td>
-                    <td className="whitespace-nowrap px-3 py-2 text-[11.5px] tabular-nums text-stone-500">
+                  <tr key={a.id} className="border-b border-line last:border-0 hover:bg-hover-paper">
+                    <td className="px-3 py-2 font-medium text-ink">{a.action}</td>
+                    <td className="px-3 py-2"><Chip>Tier {a.tier}</Chip></td>
+                    <td className="px-3 py-2"><ApprovalStatusBadge status={a.status} /></td>
+                    <td className="max-w-[180px] truncate px-3 py-2 text-muted" title={a.decidedBy ?? ""}>{a.decidedBy ?? "—"}</td>
+                    <td className="whitespace-nowrap px-3 py-2 text-xs tabular-nums text-muted">
                       {a.decidedAt ? new Date(a.decidedAt).toLocaleString() : "—"}
                     </td>
                   </tr>
@@ -317,34 +376,34 @@ function ApprovalsTab({
 
 function PlanTab({ steps }: { steps: PlanStep[] }) {
   if (steps.length === 0) {
-    return <p className="py-8 text-center text-[13px] text-stone-400">No plan steps.</p>;
+    return <p className="py-8 text-center text-sm text-subtle">No plan steps.</p>;
   }
   return (
-    <div className="overflow-x-auto rounded-lg border border-stone-200 bg-white">
-      <table className="w-full min-w-[680px] text-left text-[13px]">
+    <div className="overflow-x-auto rounded-lg bg-paper shadow-hairline">
+      <table className="w-full min-w-[680px] text-left text-sm">
         <thead>
-          <tr className="border-b border-stone-100 bg-stone-50/60 text-[11px] uppercase tracking-wide text-stone-500">
-            <th className="px-3 py-2 font-medium">#</th>
-            <th className="px-3 py-2 font-medium">Step</th>
-            <th className="px-3 py-2 font-medium">Executor</th>
-            <th className="px-3 py-2 font-medium">Kind</th>
-            <th className="px-3 py-2 font-medium">Tier</th>
-            <th className="px-3 py-2 font-medium">Checkpoint</th>
+          <tr className="border-b border-line text-xs font-semibold text-muted">
+            <th className="px-3 py-2 font-semibold">#</th>
+            <th className="px-3 py-2 font-semibold">Step</th>
+            <th className="px-3 py-2 font-semibold">Executor</th>
+            <th className="px-3 py-2 font-semibold">Kind</th>
+            <th className="px-3 py-2 font-semibold">Tier</th>
+            <th className="px-3 py-2 font-semibold">Checkpoint</th>
           </tr>
         </thead>
         <tbody>
           {steps.map((s) => (
-            <tr key={s.key} className="border-b border-stone-100 last:border-0 hover:bg-violet-50/40">
-              <td className="px-3 py-2 tabular-nums text-stone-400">{s.order}</td>
+            <tr key={s.key} className="border-b border-line last:border-0 hover:bg-hover-paper">
+              <td className="px-3 py-2 tabular-nums text-subtle">{s.order}</td>
               <td className="px-3 py-2">
-                <div className="font-medium text-stone-900">{s.title}</div>
-                <div className="text-[12px] text-stone-500">{s.description}</div>
+                <div className="font-medium text-ink">{s.title}</div>
+                <div className="text-xs text-muted">{s.description}</div>
               </td>
               <td className="px-3 py-2"><Chip>{s.executor}</Chip></td>
-              <td className="px-3 py-2"><Chip tone="blue">{s.kind}</Chip></td>
-              <td className="px-3 py-2"><Chip tone={tierTone(s.tier)}>Tier {s.tier}</Chip></td>
+              <td className="px-3 py-2"><Chip>{s.kind}</Chip></td>
+              <td className="px-3 py-2"><Chip>Tier {s.tier}</Chip></td>
               <td className="px-3 py-2">
-                {s.checkpointAfter ? <Check size={14} className="text-violet-600" /> : <span className="text-stone-300">—</span>}
+                {s.checkpointAfter ? <Check size={14} className="text-ink" /> : <span className="text-subtle">—</span>}
               </td>
             </tr>
           ))}
@@ -374,16 +433,6 @@ interface PlaneIssueRow {
   labels: string[];
   url: string | null;
   updatedAt: string | null;
-}
-
-function stateGroupTone(g: string | null): "slate" | "violet" | "green" | "amber" | "blue" {
-  switch (g) {
-    case "completed": return "green";
-    case "started": return "violet";
-    case "cancelled": return "slate";
-    case "backlog": return "amber";
-    default: return "blue";
-  }
 }
 
 function TasksTab() {
@@ -437,22 +486,22 @@ function TasksTab() {
 
   if (loading) {
     return (
-      <p className="flex items-center gap-2 py-8 text-[13px] text-stone-500">
-        <Loader2 size={14} className="animate-spin" /> Loading Plane tasks…
+      <p className="flex items-center gap-2 py-8 text-sm text-muted">
+        <Loader2 size={14} className="aos-spin" /> Loading Plane tasks…
       </p>
     );
   }
 
   if (notConfigured) {
     return (
-      <div className="rounded-md border border-stone-200 bg-stone-50 px-4 py-6 text-center">
-        <KanbanSquare className="mx-auto h-6 w-6 text-stone-300" />
-        <p className="mt-2 text-[13px] font-medium text-stone-700">Plane isn&apos;t connected</p>
-        <p className="mt-1 text-[13px] text-stone-500">
-          Set <span className="font-mono text-[12px]">PLANE_BASE_URL</span>,{" "}
-          <span className="font-mono text-[12px]">PLANE_API_KEY</span> and{" "}
-          <span className="font-mono text-[12px]">PLANE_WORKSPACE_SLUG</span> under{" "}
-          <Link href="/dashboard/settings/providers" className="text-violet-700 hover:underline">
+      <div className="rounded-lg bg-paper px-4 py-6 text-center shadow-hairline">
+        <KanbanSquare className="mx-auto h-6 w-6 text-subtle" />
+        <p className="mt-2 text-sm font-medium text-ink">Plane isn&apos;t connected</p>
+        <p className="mt-1 text-sm text-muted">
+          Set <span className="font-mono text-xs">PLANE_BASE_URL</span>,{" "}
+          <span className="font-mono text-xs">PLANE_API_KEY</span> and{" "}
+          <span className="font-mono text-xs">PLANE_WORKSPACE_SLUG</span> under{" "}
+          <Link href="/dashboard/settings/providers" className="text-ink underline hover:text-focus">
             Settings → Providers
           </Link>{" "}
           to sync project tasks into this mission.
@@ -462,12 +511,7 @@ function TasksTab() {
   }
 
   if (error) {
-    return (
-      <div className="mb-3 flex items-start gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-700">
-        <AlertTriangle size={14} className="mt-0.5 shrink-0" />
-        <span>{error}</span>
-      </div>
-    );
+    return <div className="mb-3"><ErrorBox message={error} /></div>;
   }
 
   return (
@@ -476,7 +520,8 @@ function TasksTab() {
         <select
           value={projectId}
           onChange={(e) => setProjectId(e.target.value)}
-          className="rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-[13px] text-stone-700 focus:border-violet-400 focus:outline-none"
+          className={inputCls}
+          aria-label="Plane project"
         >
           {(projects ?? []).map((p) => (
             <option key={p.id} value={p.id}>
@@ -485,21 +530,21 @@ function TasksTab() {
           ))}
         </select>
         {issues && (
-          <span className="text-[12px] text-stone-500">
+          <span className="text-xs text-muted">
             {openCount} open · {issues.length} total
           </span>
         )}
-        {loadingIssues && <Loader2 size={14} className="animate-spin text-stone-400" />}
+        {loadingIssues && <Loader2 size={14} className="aos-spin text-subtle" />}
       </div>
       {!issues || issues.length === 0 ? (
-        <p className="py-6 text-center text-[13px] text-stone-500">
+        <p className="py-6 text-center text-sm text-muted">
           {issues ? "No issues in this project." : "Pick a project to load its tasks."}
         </p>
       ) : (
-        <div className="overflow-x-auto rounded-md border border-stone-200">
-          <table className="w-full text-left text-[13px]">
+        <div className="overflow-x-auto rounded-lg bg-paper shadow-hairline">
+          <table className="w-full text-left text-sm">
             <thead>
-              <tr className="border-b border-stone-200 bg-stone-50 text-[11px] uppercase tracking-wide text-stone-400">
+              <tr className="border-b border-line text-xs font-semibold text-muted">
                 <th className="px-3 py-2 font-semibold">Task</th>
                 <th className="px-3 py-2 font-semibold">State</th>
                 <th className="px-3 py-2 font-semibold">Priority</th>
@@ -508,30 +553,30 @@ function TasksTab() {
             </thead>
             <tbody>
               {issues.map((t) => (
-                <tr key={t.id} className="border-b border-stone-100 last:border-0 hover:bg-violet-50/40">
+                <tr key={t.id} className="border-b border-line last:border-0 hover:bg-hover-paper">
                   <td className="px-3 py-2">
                     {t.url ? (
                       <a
                         href={t.url}
                         target="_blank"
                         rel="noreferrer"
-                        className="inline-flex items-center gap-1 font-medium text-stone-800 hover:text-violet-700"
+                        className="inline-flex items-center gap-1 font-medium text-ink hover:text-focus hover:underline"
                       >
                         {t.sequenceId !== null && (
-                          <span className="text-stone-400">#{t.sequenceId}</span>
+                          <span className="text-subtle">#{t.sequenceId}</span>
                         )}{" "}
                         {t.name}
-                        <ExternalLink size={12} className="text-stone-300" />
+                        <ExternalLink size={12} className="text-subtle" />
                       </a>
                     ) : (
-                      <span className="font-medium text-stone-800">{t.name}</span>
+                      <span className="font-medium text-ink">{t.name}</span>
                     )}
                   </td>
                   <td className="px-3 py-2">
-                    <Chip tone={stateGroupTone(t.stateGroup)}>{t.state ?? "—"}</Chip>
+                    <Chip>{t.state ?? "—"}</Chip>
                   </td>
-                  <td className="px-3 py-2 text-stone-500">{t.priority ?? "—"}</td>
-                  <td className="px-3 py-2 text-stone-500">
+                  <td className="px-3 py-2 text-muted">{t.priority ?? "—"}</td>
+                  <td className="px-3 py-2 text-muted">
                     {t.updatedAt ? new Date(t.updatedAt).toLocaleDateString() : "—"}
                   </td>
                 </tr>
@@ -540,7 +585,7 @@ function TasksTab() {
           </table>
         </div>
       )}
-      <p className="mt-2 text-[11px] leading-snug text-stone-400">
+      <p className="mt-2 text-[11px] leading-snug text-subtle">
         Live from your Plane sidecar — tasks are managed in Plane; this tab is a
         read-only window into the selected project.
       </p>
@@ -611,8 +656,8 @@ export function MissionDetail({ missionId }: { missionId: string }) {
 
   if (loading) {
     return (
-      <div className="flex items-center gap-2 py-16 text-[13px] text-stone-500">
-        <Loader2 size={16} className="animate-spin" /> Loading mission…
+      <div className="flex items-center gap-2 py-16 text-sm text-muted">
+        <Loader2 size={16} className="aos-spin" /> Loading mission…
       </div>
     );
   }
@@ -620,8 +665,8 @@ export function MissionDetail({ missionId }: { missionId: string }) {
   if (notFound || !data) {
     return (
       <div className="py-16 text-center">
-        <p className="text-[14px] font-medium text-stone-900">Mission not found.</p>
-        <Link href="/dashboard/missions" className="mt-2 inline-block text-[13px] text-violet-700 hover:underline">
+        <p className="text-sm font-medium text-ink">Mission not found.</p>
+        <Link href="/dashboard/missions" className="mt-2 inline-block text-sm text-ink underline hover:text-focus">
           Back to missions
         </Link>
       </div>
@@ -638,30 +683,30 @@ export function MissionDetail({ missionId }: { missionId: string }) {
 
   return (
     <div>
-      <Link href="/dashboard/missions" className="mb-2 inline-flex items-center gap-1 text-[13px] text-stone-500 hover:text-stone-800">
+      <Link href="/dashboard/missions" className="mb-2 inline-flex items-center gap-1 text-sm text-muted hover:text-ink">
         <ChevronLeft size={14} /> Missions
       </Link>
 
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-xl font-bold tracking-tight text-stone-900">{m.name}</h1>
-            <Chip tone={statusTone(m.status)}>{m.status}</Chip>
+            <h1 className="aos-heading">{m.name}</h1>
+            <MissionStatusBadge status={m.status} />
             <Chip>{m.businessTypeLabel}</Chip>
           </div>
-          <p className="mt-1 text-[13px] text-stone-500">
-            <span className="font-medium text-stone-700">Goal —</span> {goalLine}
+          <p className="mt-1 text-sm text-muted">
+            <span className="font-medium text-ink">Goal —</span> {goalLine}
           </p>
           <div className="mt-2 flex items-center gap-2">
-            <div className="h-1.5 w-40 overflow-hidden rounded-full bg-stone-200">
-              <div className="h-full rounded-full bg-violet-600" style={{ width: `${Math.round(data.progress * 100)}%` }} />
+            <div className="h-1.5 w-40 overflow-hidden rounded-full bg-line">
+              <div className="h-full rounded-full bg-ink" style={{ width: `${Math.round(data.progress * 100)}%` }} />
             </div>
-            <span className="text-[11px] tabular-nums text-stone-500">
+            <span className="text-[11px] tabular-nums text-muted">
               {Math.round(data.progress * 100)}% · {data.stepCount}/{data.planStepCount} steps · {fmtCost(data.totalCostCents)} spent
             </span>
           </div>
           {data.nextCheckpoint && (
-            <p className="mt-1 text-[12px] text-stone-400">Next checkpoint: {data.nextCheckpoint}</p>
+            <p className="mt-1 text-xs text-subtle">Next checkpoint: {data.nextCheckpoint}</p>
           )}
         </div>
         <div className="flex gap-2">
@@ -674,8 +719,8 @@ export function MissionDetail({ missionId }: { missionId: string }) {
             <Zap size={14} /> Automation
           </button>
           {m.status === "paused" ? (
-            <button onClick={() => void pauseResume("resume")} disabled={busy !== null} className={btnPrimary}>
-              {busy === "resume" ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />} Resume
+            <button onClick={() => void pauseResume("resume")} disabled={busy !== null} className={btnRun}>
+              {busy === "resume" ? <Loader2 size={14} className="aos-spin" /> : <Play size={14} />} Resume
             </button>
           ) : (
             <button
@@ -683,32 +728,32 @@ export function MissionDetail({ missionId }: { missionId: string }) {
               disabled={busy !== null || m.status === "complete" || m.status === "archived"}
               className={btnGhost}
             >
-              {busy === "pause" ? <Loader2 size={14} className="animate-spin" /> : <Pause size={14} />} Pause
+              {busy === "pause" ? <Loader2 size={14} className="aos-spin" /> : <Pause size={14} />} Pause
             </button>
           )}
         </div>
       </div>
 
       {error && (
-        <div className="mb-3 flex items-start gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-700">
-          <AlertTriangle size={14} className="mt-0.5 shrink-0" />
-          <span>{error}</span>
-        </div>
+        <div className="mb-3"><ErrorBox message={error} /></div>
       )}
 
-      <div className="mb-4 flex gap-1 border-b border-stone-200">
+      <div className="mb-4 flex gap-1 border-b border-line">
         {TABS.map(({ id, label, icon: Icon }) => (
           <button
             key={id}
             onClick={() => setTab(id)}
-            className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-[13.5px] font-medium transition ${
-              tab === id ? "border-violet-600 text-violet-700" : "border-transparent text-stone-500 hover:text-stone-800"
+            className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-sm font-medium ${
+              tab === id ? "border-ink text-ink" : "border-transparent text-muted hover:text-ink"
             }`}
           >
             <Icon size={15} />
             {label}
             {id === "approvals" && pendingCount > 0 && (
-              <span className="rounded-full bg-amber-100 px-1.5 text-[10px] font-semibold text-amber-800">{pendingCount}</span>
+              <span className="inline-flex items-center gap-1 rounded-full bg-needs px-1.5 py-0.5 text-[10px] font-semibold text-ink">
+                <Shape extra="aos-shape--needs" size="8px" />
+                {pendingCount}
+              </span>
             )}
           </button>
         ))}
@@ -848,24 +893,24 @@ function AutomationModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/30 p-4" onClick={onClose}>
       <div
-        className="w-full max-w-lg rounded-lg border border-stone-200 bg-white shadow-xl"
+        className="w-full max-w-lg rounded-lg bg-paper shadow-overlay"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between border-b border-stone-200 px-4 py-3">
-          <h3 className="flex items-center gap-2 text-[14px] font-semibold text-stone-800">
-            <Zap size={15} className="text-violet-600" /> Run automation
+        <div className="flex items-center justify-between border-b border-line px-4 py-3">
+          <h3 className="aos-subheading flex items-center gap-2">
+            <Zap size={15} /> Run automation
           </h3>
-          <button onClick={onClose} className="rounded p-1 text-stone-400 hover:bg-stone-100 hover:text-stone-700">
+          <button onClick={onClose} className="rounded-full p-1 text-subtle hover:bg-hover-paper hover:text-ink">
             <X size={15} />
           </button>
         </div>
 
         <div className="space-y-3 px-4 py-4">
           {notConfigured && (
-            <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[13px] text-amber-800">
-              <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+            <div className="flex items-start gap-2 rounded-lg bg-needs-tint px-3 py-2 text-sm text-ink">
+              <span className="aos-shape aos-shape--needs aos-shape--edged mt-0.5 shrink-0 [--aos-shape-size:12px]" aria-hidden />
               <span>
                 {notConfigured} Connect the engine under{" "}
                 <Link href="/dashboard/settings/providers" className="font-medium underline">
@@ -876,27 +921,22 @@ function AutomationModal({
             </div>
           )}
 
-          {error && (
-            <div className="flex items-start gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-700">
-              <AlertTriangle size={14} className="mt-0.5 shrink-0" />
-              <span>{error}</span>
-            </div>
-          )}
+          {error && <ErrorBox message={error} />}
 
           {flows === null && !notConfigured && (
-            <p className="flex items-center gap-2 text-[13px] text-stone-500">
-              <Loader2 size={14} className="animate-spin" /> Loading flows…
+            <p className="flex items-center gap-2 text-sm text-muted">
+              <Loader2 size={14} className="aos-spin" /> Loading flows…
             </p>
           )}
 
           {flows && (
             <>
               <label className="block">
-                <span className="mb-1 block text-[12px] font-medium text-stone-600">Flow</span>
+                <span className="mb-1 block text-xs font-semibold text-muted">Flow</span>
                 <select
                   value={flowId}
                   onChange={(e) => setFlowId(e.target.value)}
-                  className="w-full rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-[13px] text-stone-800"
+                  className={`${inputCls} w-full`}
                 >
                   <option value="">— pick a flow —</option>
                   {flows.map((f) => (
@@ -910,46 +950,60 @@ function AutomationModal({
                 </select>
               </label>
               <label className="block">
-                <span className="mb-1 block text-[12px] font-medium text-stone-600">Payload (JSON object)</span>
+                <span className="mb-1 block text-xs font-semibold text-muted">Payload (JSON object)</span>
                 <textarea
                   value={payloadText}
                   onChange={(e) => setPayloadText(e.target.value)}
                   rows={5}
                   spellCheck={false}
-                  className="w-full rounded-md border border-stone-200 bg-stone-50 px-2.5 py-1.5 font-mono text-[12px] text-stone-800"
+                  className={`${inputCls} w-full font-mono text-xs`}
                 />
               </label>
             </>
           )}
 
           {result && (
-            <div className="rounded-md border border-violet-200 bg-violet-50 px-3 py-2 text-[13px] text-violet-800">
+            <div className="rounded-lg bg-canvas px-3 py-2 text-sm text-ink">
               <p className="font-medium">Flow accepted.</p>
               {result.runId ? (
-                <p className="mt-1 text-violet-700">
-                  Run <span className="font-mono text-[12px]">{result.runId}</span>
+                <p className="mt-1">
+                  Run <span className="font-mono text-xs">{result.runId}</span>
                   {runStatus && (
-                    <Chip tone={runStatus.terminal ? (runStatus.succeeded ? "green" : "red") : "amber"}>
-                      {runStatus.status}
-                    </Chip>
+                    <span className="ml-2">
+                      {runStatus.terminal ? (
+                        runStatus.succeeded ? (
+                          <span className={`${badgeBase} bg-done text-white`}>
+                            <Shape extra="aos-shape--done" /> {runStatus.status}
+                          </span>
+                        ) : (
+                          <span className={`${badgeBase} bg-failed text-white`}>
+                            <Shape extra="aos-shape--failed" /> {runStatus.status}
+                          </span>
+                        )
+                      ) : (
+                        <span className={`${badgeBase} bg-running text-white`}>
+                          <Shape extra="aos-shape--running aos-is-live" /> {runStatus.status}
+                        </span>
+                      )}
+                    </span>
                   )}
                 </p>
               ) : (
-                <p className="mt-1 text-violet-700">{result.note}</p>
+                <p className="mt-1">{result.note}</p>
               )}
             </div>
           )}
         </div>
 
-        <div className="flex justify-end gap-2 border-t border-stone-200 px-4 py-3">
+        <div className="flex justify-end gap-2 border-t border-line px-4 py-3">
           {result?.runId && (
             <button onClick={() => void pollStatus()} disabled={busy} className={btnGhost}>
-              {busy ? <Loader2 size={14} className="animate-spin" /> : <History size={14} />} Check status
+              {busy ? <Loader2 size={14} className="aos-spin" /> : <History size={14} />} Check status
             </button>
           )}
           {!result && (
-            <button onClick={() => void trigger()} disabled={busy || !flowId} className={btnPrimary}>
-              {busy ? <Loader2 size={14} className="animate-spin" /> : <Zap size={14} />} Trigger flow
+            <button onClick={() => void trigger()} disabled={busy || !flowId} className={btnRun}>
+              {busy ? <Loader2 size={14} className="aos-spin" /> : <Zap size={14} />} Trigger flow
             </button>
           )}
           <button onClick={onClose} className={btnGhost}>

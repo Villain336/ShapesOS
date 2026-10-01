@@ -17,6 +17,7 @@ import {
   Globe,
   ListOrdered,
   Monitor,
+  Radio,
   ShieldCheck,
   StickyNote,
   Video,
@@ -29,11 +30,6 @@ import { withWorkspaceScope } from "@/lib/substrate/memory/rls";
 import { getAgentRun, listAgentRunEvents } from "@/lib/agents/runs/service";
 import type { AgentRunEventType, AgentRunStatus } from "@/lib/agents/runs/types";
 import { LiveWatch } from "./LiveWatch";
-import { Stat } from "@/components/vault/Stat";
-import { Card, CardBody, CardHeader } from "@/components/vault/Card";
-import { ValuePill } from "@/components/vault/atoms/ValuePill";
-import { buttonVariants } from "@/components/vault/atoms/button-variants";
-import { cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -42,20 +38,118 @@ export const metadata = {
   description: "Watch the agent work: event timeline, recording, and trace.",
 };
 
-const EVENT_META: Record<AgentRunEventType, { icon: LucideIcon; tone: "neutral" | "accent" | "orange" }> = {
-  agui: { icon: Zap, tone: "accent" },
-  gate: { icon: ShieldCheck, tone: "orange" },
-  browser: { icon: Monitor, tone: "neutral" },
-  note: { icon: StickyNote, tone: "neutral" },
+const EVENT_ICON: Record<AgentRunEventType, LucideIcon> = {
+  agui: Zap,
+  gate: ShieldCheck,
+  browser: Monitor,
+  note: StickyNote,
 };
 
-const STATUS_TONE: Record<AgentRunStatus, "neutral" | "accent" | "green" | "orange" | "red"> = {
-  queued: "neutral",
-  running: "accent",
-  succeeded: "green",
-  failed: "red",
-  cancelled: "orange",
-};
+// Run statuses are genuine agent states → status color + shape + text label.
+// Cancelled has no status color in the system — it renders as a neutral chip.
+function RunStatusBadge({ status }: { status: AgentRunStatus }) {
+  const base =
+    "inline-flex h-badge items-center gap-1.5 rounded-full px-3 text-sm font-semibold";
+  const shape = (extra: string) => (
+    <span className={`aos-shape ${extra}`} style={{ color: "inherit" }} aria-hidden />
+  );
+  switch (status) {
+    case "running":
+      return (
+        <span className={`${base} bg-running text-white`}>
+          {shape("aos-shape--running aos-is-live")} Running
+        </span>
+      );
+    case "succeeded":
+      return (
+        <span className={`${base} bg-done text-white`}>
+          {shape("aos-shape--done")} Succeeded
+        </span>
+      );
+    case "failed":
+      return (
+        <span className={`${base} bg-failed text-white`}>
+          {shape("aos-shape--failed")} Failed
+        </span>
+      );
+    case "queued":
+      return (
+        <span className={`${base} bg-paper text-ink shadow-outline`}>
+          {shape("aos-shape--queued")} Queued
+        </span>
+      );
+    default:
+      return (
+        <span className="inline-flex h-badge items-center rounded-full bg-paper px-3 text-sm font-semibold text-muted shadow-control">
+          Cancelled
+        </span>
+      );
+  }
+}
+
+// Event types are categories, not agent states — neutral chips.
+function EventTypeChip({ type }: { type: AgentRunEventType }) {
+  const Icon = EVENT_ICON[type] ?? StickyNote;
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-paper px-2 py-0.5 text-xs font-semibold text-muted shadow-control">
+      <Icon className="size-3" aria-hidden />
+      {type}
+    </span>
+  );
+}
+
+function Section({
+  title,
+  description,
+  actions,
+  children,
+  bodyClassName,
+}: {
+  title: string;
+  description?: string;
+  actions?: React.ReactNode;
+  children: React.ReactNode;
+  bodyClassName?: string;
+}) {
+  return (
+    <section className="rounded-lg bg-paper shadow-hairline">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-4 py-3">
+        <div>
+          <h2 className="aos-subheading">{title}</h2>
+          {description && <p className="mt-0.5 text-sm text-muted">{description}</p>}
+        </div>
+        {actions}
+      </div>
+      <div className={bodyClassName ?? "p-4"}>{children}</div>
+    </section>
+  );
+}
+
+function StatTile({
+  label,
+  value,
+  icon,
+}: {
+  label: string;
+  value: React.ReactNode;
+  icon: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-lg bg-paper p-3 shadow-hairline">
+      <div className="flex items-center gap-1.5 text-xs font-semibold text-muted">
+        {icon}
+        {label}
+      </div>
+      <div className="mt-1 text-lg font-bold tabular-nums text-ink">{value}</div>
+    </div>
+  );
+}
+
+const btnPrimary =
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-night-hover";
+
+const btnSecondary =
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-paper px-4 text-sm font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper";
 
 function fmtDuration(ms: number): string {
   if (ms < 0) ms = 0;
@@ -94,18 +188,18 @@ function PayloadView({ payload }: { payload: unknown }) {
       {entries.map(([key, value]) => {
         if (value == null || typeof value === "object") {
           return (
-            <details key={key} className="text-[12px] text-stone-500">
-              <summary className="cursor-pointer hover:text-stone-700">{key} (detail)</summary>
-              <pre className="mt-1 max-h-48 overflow-auto rounded border border-stone-200 bg-stone-50 p-2 text-[11.5px] text-stone-700">
+            <details key={key} className="text-xs text-muted">
+              <summary className="cursor-pointer hover:text-ink">{key} (detail)</summary>
+              <pre className="mt-1 max-h-48 overflow-auto rounded-md border border-line bg-canvas p-2 font-mono text-[11px] text-ink">
                 {JSON.stringify(value, null, 2)}
               </pre>
             </details>
           );
         }
         return (
-          <div key={key} className="flex gap-1.5 text-[12px]">
-            <span className="shrink-0 font-medium text-stone-500">{key}:</span>
-            <span className="min-w-0 truncate text-stone-700">{String(value)}</span>
+          <div key={key} className="flex gap-1.5 text-xs">
+            <span className="shrink-0 font-medium text-muted">{key}:</span>
+            <span className="min-w-0 truncate text-ink">{String(value)}</span>
           </div>
         );
       })}
@@ -150,10 +244,10 @@ export default async function RunViewerPage({
   const gateEvents = events.filter((e) => e.type === "gate");
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-6 bg-canvas p-4 md:p-6">
       <Link
         href="/dashboard"
-        className={cn(buttonVariants({ variant: "quiet", size: "xs" }), "self-start")}
+        className="inline-flex items-center gap-1.5 self-start rounded-full px-3 py-2 text-sm font-semibold text-ink aos-press hover:bg-hover"
       >
         <ArrowLeft className="size-3.5" />
         Dashboard
@@ -161,16 +255,18 @@ export default async function RunViewerPage({
 
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-stone-900">Agent run</h1>
-          <p className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[13px] text-stone-500">
-            <ValuePill tone={STATUS_TONE[run.status]}>{run.status}</ValuePill>
-            <ValuePill>{run.kind}</ValuePill>
+          <h1 className="aos-heading">Agent run</h1>
+          <p className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-muted">
+            <RunStatusBadge status={run.status} />
+            <span className="inline-flex h-badge items-center rounded-full bg-paper px-3 text-sm font-semibold text-muted shadow-control">
+              {run.kind}
+            </span>
             <span>started by {run.startedBy}</span>
-            <span aria-hidden className="text-stone-300">·</span>
+            <span aria-hidden className="text-subtle">·</span>
             <span>{fmtTime(run.createdAt)}</span>
             {run.endedAt && (
               <>
-                <span aria-hidden className="text-stone-300">·</span>
+                <span aria-hidden className="text-subtle">·</span>
                 <span>ended {fmtTime(run.endedAt)}</span>
               </>
             )}
@@ -180,20 +276,24 @@ export default async function RunViewerPage({
           {run.missionId && (
             <Link
               href={`/dashboard/missions/${run.missionId}`}
-              className={buttonVariants({ variant: "secondary", size: "sm" })}
+              className={btnSecondary}
             >
               Mission
             </Link>
           )}
-          {run.threadId && <ValuePill>thread {run.threadId}</ValuePill>}
+          {run.threadId && (
+            <span className="inline-flex items-center rounded-full bg-paper px-2 py-0.5 font-mono text-xs text-muted shadow-control">
+              thread {run.threadId}
+            </span>
+          )}
         </div>
       </div>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Stat label="Timeline events" value={events.length} icon={<ListOrdered className="size-4" />} />
-        <Stat label="Browser steps" value={recording?.stepCount ?? 0} icon={<Monitor className="size-4" />} />
-        <Stat label="Duration" value={fmtDuration(durationMs)} icon={<Clock className="size-4" />} />
-        <Stat label="Artifacts" value={fmtBytes(recording?.sizeBytes ?? 0)} icon={<Film className="size-4" />} />
+        <StatTile label="Timeline events" value={events.length} icon={<ListOrdered className="size-4" />} />
+        <StatTile label="Browser steps" value={recording?.stepCount ?? 0} icon={<Monitor className="size-4" />} />
+        <StatTile label="Duration" value={fmtDuration(durationMs)} icon={<Clock className="size-4" />} />
+        <StatTile label="Artifacts" value={fmtBytes(recording?.sizeBytes ?? 0)} icon={<Film className="size-4" />} />
       </div>
 
       {/* Slice 7: live watch — mounted ONLY while the run is running.
@@ -202,180 +302,171 @@ export default async function RunViewerPage({
 
       {/* Recording: video + trace download. Bytes stream through the
           workspace-scoped API route; no filesystem paths reach the client. */}
-      <Card>
-        <CardHeader
-          title="Recording"
-          description="Playwright video and trace for this run"
-          actions={
-            traceUrl ? (
-              <a href={traceUrl} className={buttonVariants({ variant: "accent", size: "sm" })}>
-                <Download className="size-3.5" />
-                Download trace.zip
-              </a>
-            ) : undefined
-          }
-        />
-        <CardBody className="flex flex-col gap-3">
+      <Section
+        title="Recording"
+        description="Playwright video and trace for this run"
+        actions={
+          traceUrl ? (
+            <a href={traceUrl} className={btnPrimary}>
+              <Download className="size-3.5" />
+              Download trace.zip
+            </a>
+          ) : undefined
+        }
+      >
+        <div className="flex flex-col gap-3">
           {videoUrl ? (
             <video controls preload="metadata" src={videoUrl} className="aspect-video w-full rounded-lg bg-black" />
           ) : (
-            <p className="flex items-center gap-2 text-[13px] text-stone-500">
+            <p className="flex items-center gap-2 text-sm text-muted">
               <Video className="size-4" />
               No video was recorded for this run.
             </p>
           )}
-          <p className="rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-[12.5px] text-stone-500">
+          <p className="rounded-lg border border-line bg-canvas px-3 py-2 text-xs text-muted">
             Retention: videos are dropped 30 days after creation unless pinned; the trace is
             kept and summarized instead of deleted.
           </p>
-        </CardBody>
-      </Card>
+        </div>
+      </Section>
 
       {/* Step strip: DOM-snapshot strip from browser timeline events.
           Full frame-by-frame DOM replay = download the trace above. */}
       {browserEvents.length > 0 && (
-        <Card>
-          <CardHeader
-            title="Step strip"
-            description="Browser steps in order — from timeline events"
-          />
-          <CardBody className="p-3">
-            <ol className="flex gap-2 overflow-x-auto pb-1">
-              {browserEvents.map((e) => (
-                <li
-                  key={e.id}
-                  className="w-52 shrink-0 rounded-lg border border-stone-200 bg-white p-2.5"
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-[11px] font-semibold uppercase tracking-wide text-stone-400">
-                      step {e.seq}
-                    </span>
-                    <span className="text-[11px] tabular-nums text-stone-400">
-                      +{fmtDuration(e.createdAt.getTime() - run.createdAt.getTime())}
-                    </span>
-                  </div>
-                  <p className="mt-1 line-clamp-3 text-[12.5px] leading-snug text-stone-700">
-                    {e.summary}
-                  </p>
-                </li>
-              ))}
-            </ol>
-            <p className="mt-2 text-[12px] text-stone-500">
-              For frame-by-frame DOM replay, download the trace and open it in the Playwright
-              trace viewer.
-            </p>
-          </CardBody>
-        </Card>
+        <Section
+          title="Step strip"
+          description="Browser steps in order — from timeline events"
+          bodyClassName="p-3"
+        >
+          <ol className="flex gap-2 overflow-x-auto pb-1">
+            {browserEvents.map((e) => (
+              <li
+                key={e.id}
+                className="w-52 shrink-0 rounded-lg bg-paper p-2.5 shadow-hairline"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs font-semibold text-muted">
+                    Step {e.seq}
+                  </span>
+                  <span className="text-[11px] tabular-nums text-subtle">
+                    +{fmtDuration(e.createdAt.getTime() - run.createdAt.getTime())}
+                  </span>
+                </div>
+                <p className="mt-1 line-clamp-3 text-xs leading-snug text-ink">
+                  {e.summary}
+                </p>
+              </li>
+            ))}
+          </ol>
+          <p className="mt-2 text-xs text-muted">
+            For frame-by-frame DOM replay, download the trace and open it in the Playwright
+            trace viewer.
+          </p>
+        </Section>
       )}
 
       {/* Timeline: dense table, seq-ordered, typed with readable payloads. */}
-      <Card>
-        <CardHeader title="Timeline" description={`${events.length} event${events.length === 1 ? "" : "s"}, in order`} />
-        <CardBody className="p-0">
-          {events.length === 0 ? (
-            <p className="p-4 text-[13px] text-stone-500">No events yet.</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[640px] text-left text-[13px]">
-                <thead>
-                  <tr className="border-b border-stone-100 bg-stone-50/60 text-[11px] uppercase tracking-wide text-stone-500">
-                    <th className="w-14 px-3 py-2 font-medium">Seq</th>
-                    <th className="w-28 px-3 py-2 font-medium">Type</th>
-                    <th className="px-3 py-2 font-medium">Event</th>
-                    <th className="w-40 px-3 py-2 font-medium">Time</th>
+      <Section
+        title="Timeline"
+        description={`${events.length} event${events.length === 1 ? "" : "s"}, in order`}
+        bodyClassName="p-0"
+      >
+        {events.length === 0 ? (
+          <p className="p-4 text-sm text-muted">No events yet.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[640px] text-left text-sm">
+              <thead>
+                <tr className="border-b border-line text-xs font-semibold text-muted">
+                  <th className="w-14 px-3 py-2 font-semibold">Seq</th>
+                  <th className="w-28 px-3 py-2 font-semibold">Type</th>
+                  <th className="px-3 py-2 font-semibold">Event</th>
+                  <th className="w-40 px-3 py-2 font-semibold">Time</th>
+                </tr>
+              </thead>
+              <tbody>
+                {events.map((e) => (
+                  <tr key={e.id} className="border-b border-line last:border-b-0 hover:bg-hover-paper">
+                    <td className="px-3 py-2 tabular-nums text-muted">{e.seq}</td>
+                    <td className="px-3 py-2">
+                      <EventTypeChip type={e.type as AgentRunEventType} />
+                    </td>
+                    <td className="px-3 py-2">
+                      <div className="text-ink">{e.summary}</div>
+                      <PayloadView payload={e.payload} />
+                      {e.type === "gate" && (
+                        <Link
+                          href="/dashboard/approvals"
+                          className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-ink underline hover:text-focus"
+                        >
+                          <ShieldCheck className="size-3" />
+                          Open in approval inbox
+                        </Link>
+                      )}
+                    </td>
+                    <td className="px-3 py-2 tabular-nums text-muted">{fmtTime(e.createdAt)}</td>
                   </tr>
-                </thead>
-                <tbody>
-                  {events.map((e) => {
-                    const meta = EVENT_META[e.type as AgentRunEventType];
-                    const Icon = meta?.icon ?? StickyNote;
-                    return (
-                      <tr key={e.id} className="border-b border-stone-100 last:border-b-0 hover:bg-[var(--brand-50)]/40">
-                        <td className="px-3 py-2 tabular-nums text-stone-500">{e.seq}</td>
-                        <td className="px-3 py-2">
-                          <ValuePill tone={meta?.tone ?? "neutral"}>
-                            <Icon className="mr-1 inline size-3" />
-                            {e.type}
-                          </ValuePill>
-                        </td>
-                        <td className="px-3 py-2">
-                          <div className="text-stone-800">{e.summary}</div>
-                          <PayloadView payload={e.payload} />
-                          {e.type === "gate" && (
-                            <Link
-                              href="/dashboard/approvals"
-                              className="mt-1 inline-flex items-center gap-1 text-[12px] font-medium text-[var(--brand-700)] hover:underline"
-                            >
-                              <ShieldCheck className="size-3" />
-                              Open in approval inbox
-                            </Link>
-                          )}
-                        </td>
-                        <td className="px-3 py-2 tabular-nums text-stone-500">{fmtTime(e.createdAt)}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </CardBody>
-      </Card>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Section>
 
       {/* Approvals: pending items for the run's mission link out to the
           slice-3 approval flow. This page never decides approvals. */}
-      <Card>
-        <CardHeader
-          title="Approvals"
-          description={
-            run.missionId
-              ? "Pending items for this run's mission — decided in the approval inbox"
-              : "This run is not linked to a mission"
-          }
-          actions={
-            <Link href="/dashboard/approvals" className={buttonVariants({ variant: "secondary", size: "sm" })}>
-              <ShieldCheck className="size-3.5" />
-              Approval inbox
-            </Link>
-          }
-        />
-        <CardBody className="p-0">
-          {pendingApprovals.length === 0 ? (
-            <p className="p-4 text-[13px] text-stone-500">
-              {gateEvents.length > 0
-                ? `${gateEvents.length} gate event${gateEvents.length === 1 ? "" : "s"} in the timeline; nothing pending right now.`
-                : "No pending approvals for this run."}
-            </p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[520px] text-left text-[13px]">
-                <thead>
-                  <tr className="border-b border-stone-100 bg-stone-50/60 text-[11px] uppercase tracking-wide text-stone-500">
-                    <th className="px-3 py-2 font-medium">Action</th>
-                    <th className="w-20 px-3 py-2 font-medium">Tier</th>
-                    <th className="w-40 px-3 py-2 font-medium">Requested</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {pendingApprovals.map((a) => (
-                    <tr key={a.id} className="border-b border-stone-100 last:border-b-0 hover:bg-[var(--brand-50)]/40">
-                      <td className="px-3 py-2 text-stone-800">{a.action}</td>
-                      <td className="px-3 py-2">
-                        <ValuePill tone="orange">tier {a.tier}</ValuePill>
-                      </td>
-                      <td className="px-3 py-2 tabular-nums text-stone-500">{fmtTime(a.createdAt)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-          <p className="flex items-center gap-1.5 border-t border-stone-100 px-4 py-2.5 text-[12px] text-stone-500">
-            <Globe className="size-3.5" />
-            Approve, deny, and edit happen in the approval inbox — this page is read-only.
+      <Section
+        title="Approvals"
+        description={
+          run.missionId
+            ? "Pending items for this run's mission — decided in the approval inbox"
+            : "This run is not linked to a mission"
+        }
+        actions={
+          <Link href="/dashboard/approvals" className={btnSecondary}>
+            <ShieldCheck className="size-3.5" />
+            Approval inbox
+          </Link>
+        }
+        bodyClassName="p-0"
+      >
+        {pendingApprovals.length === 0 ? (
+          <p className="p-4 text-sm text-muted">
+            {gateEvents.length > 0
+              ? `${gateEvents.length} gate event${gateEvents.length === 1 ? "" : "s"} in the timeline; nothing pending right now.`
+              : "No pending approvals for this run."}
           </p>
-        </CardBody>
-      </Card>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[520px] text-left text-sm">
+              <thead>
+                <tr className="border-b border-line text-xs font-semibold text-muted">
+                  <th className="px-3 py-2 font-semibold">Action</th>
+                  <th className="w-20 px-3 py-2 font-semibold">Tier</th>
+                  <th className="w-40 px-3 py-2 font-semibold">Requested</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pendingApprovals.map((a) => (
+                  <tr key={a.id} className="border-b border-line last:border-b-0 hover:bg-hover-paper">
+                    <td className="px-3 py-2 text-ink">{a.action}</td>
+                    <td className="px-3 py-2">
+                      <span className="inline-flex items-center rounded-full bg-paper px-2 py-0.5 text-xs font-semibold text-muted shadow-control">
+                        Tier {a.tier}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2 tabular-nums text-muted">{fmtTime(a.createdAt)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        <p className="flex items-center gap-1.5 border-t border-line px-4 py-2.5 text-xs text-muted">
+          <Globe className="size-3.5" />
+          Approve, deny, and edit happen in the approval inbox — this page is read-only.
+        </p>
+      </Section>
     </div>
   );
 }

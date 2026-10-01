@@ -19,10 +19,10 @@ export default async function PlaybooksPage() {
   if (!user) redirect("/login");
   await getOrCreateWorkspace(user.id, user.email);
   return (
-    <div className="bg-[#FAFAF7] p-4 md:p-6">
+    <div className="bg-canvas p-4 md:p-6">
       <div>
-        <h1 className="text-xl font-bold tracking-tight text-stone-900">Agent Playbooks</h1>
-        <p className="mt-0.5 text-[13px] text-stone-500">
+        <h1 className="aos-heading">Agent Playbooks</h1>
+        <p className="mt-0.5 text-sm text-muted">
           Versioned procedures the Chief Strategy Agent follows — immutable versions, mutable
           production/staging/latest pointers, evaluated against real tenant outcomes.
         </p>

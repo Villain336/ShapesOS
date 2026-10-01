@@ -29,41 +29,45 @@ interface PlaybookListItem {
   createdAt: string;
 }
 
-const inputCls =
-  "rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-[13px] text-stone-900 placeholder:text-stone-400 focus:border-violet-400 focus:outline-none";
-const btnPrimary =
-  "flex items-center gap-1.5 rounded-md bg-violet-600 px-3 py-1.5 text-[13px] font-medium text-white hover:bg-violet-700 disabled:opacity-40";
-const btnGhost =
-  "flex items-center gap-1.5 rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-[13px] text-stone-700 hover:bg-stone-50 disabled:opacity-40";
+// ── Atoms (Agentic OS) ───────────────────────────────────────────────────────
 
-function Chip({ children, tone = "slate" }: { children: React.ReactNode; tone?: "slate" | "violet" | "green" | "amber" | "red" | "blue" }) {
-  const tones: Record<string, string> = {
-    slate: "bg-slate-100 text-slate-600 border-slate-200",
-    violet: "bg-violet-50 text-violet-700 border-violet-200",
-    green: "bg-emerald-50 text-emerald-700 border-emerald-200",
-    amber: "bg-amber-50 text-amber-700 border-amber-200",
-    red: "bg-red-50 text-red-700 border-red-200",
-    blue: "bg-blue-50 text-blue-700 border-blue-200",
-  };
+const inputCls =
+  "h-control-sm rounded-md border-[1.5px] border-control bg-paper px-3 text-sm text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none";
+
+const btnPrimary =
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-night-hover disabled:opacity-40";
+const btnGhost =
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-paper px-4 text-sm font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper disabled:opacity-40";
+
+// Source, lifecycle status, and production version are categories — always a
+// neutral chip. Lift deltas are analytic, never status-colored.
+function Chip({ children }: { children: React.ReactNode }) {
   return (
-    <span className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-1.5 py-0.5 text-[10px] font-medium leading-tight ${tones[tone]}`}>
+    <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-paper px-2 py-0.5 text-xs font-semibold text-muted shadow-control">
       {children}
     </span>
   );
 }
 
-function sourceTone(s: Source): "violet" | "blue" | "slate" {
-  return s === "learned" ? "violet" : s === "community" ? "blue" : "slate";
+function ErrorBox({ message }: { message: string }) {
+  return (
+    <div role="alert" className="flex items-start gap-2 rounded-lg border border-failed bg-failed-tint px-3 py-2 text-sm text-failed-text">
+      <span className="mt-1 size-2.5 shrink-0 rounded-[2px] bg-failed" aria-hidden />
+      <span>{message}</span>
+    </div>
+  );
 }
 
 function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="absolute inset-0 bg-stone-900/30" onClick={onClose} />
-      <div className="relative w-full max-w-lg rounded-lg border border-stone-200 bg-white p-5 shadow-xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/30 p-4" onClick={onClose}>
+      <div
+        className="relative w-full max-w-lg rounded-lg bg-paper p-5 shadow-overlay"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="mb-4 flex items-start justify-between">
-          <h3 className="text-[15px] font-semibold text-stone-900">{title}</h3>
-          <button onClick={onClose} className="rounded-md p-1 text-stone-400 hover:bg-stone-100 hover:text-stone-700" aria-label="Close">
+          <h3 className="aos-subheading">{title}</h3>
+          <button onClick={onClose} className="rounded-full p-1 text-subtle hover:bg-hover-paper hover:text-ink" aria-label="Close">
             <X size={16} />
           </button>
         </div>
@@ -110,20 +114,18 @@ export function PlaybooksApp() {
   return (
     <div>
       {error && (
-        <div className="mb-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-700">
-          {error}
-        </div>
+        <div className="mb-3"><ErrorBox message={error} /></div>
       )}
 
       <div className="mb-3 flex flex-wrap items-center gap-2">
-        <select value={fSource} onChange={(e) => setFSource(e.target.value)} className={inputCls}>
+        <select value={fSource} onChange={(e) => setFSource(e.target.value)} className={inputCls} aria-label="Filter by source">
           <option value="">All sources</option>
           <option value="learned">Learned</option>
           <option value="community">Community</option>
           <option value="seed">Seed</option>
         </select>
         <div className="relative">
-          <Search size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-stone-400" />
+          <Search size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-subtle" />
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
@@ -141,74 +143,76 @@ export function PlaybooksApp() {
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-lg border border-stone-200 bg-white">
-        <table className="w-full text-left text-[13px]">
+      <div className="overflow-hidden rounded-lg bg-paper shadow-hairline">
+        <table className="w-full text-left text-sm">
           <thead>
-            <tr className="border-b border-stone-100 bg-stone-50/60 text-[11px] uppercase tracking-wide text-stone-500">
-              <th className="px-3 py-2 font-medium">Name</th>
-              <th className="px-3 py-2 font-medium">Source</th>
-              <th className="px-3 py-2 font-medium">Production</th>
-              <th className="px-3 py-2 font-medium">Status</th>
-              <th className="px-3 py-2 font-medium">Versions</th>
-              <th className="px-3 py-2 font-medium">Outcome lift</th>
+            <tr className="border-b border-line text-xs font-semibold text-muted">
+              <th className="px-3 py-2 font-semibold">Name</th>
+              <th className="px-3 py-2 font-semibold">Source</th>
+              <th className="px-3 py-2 font-semibold">Production</th>
+              <th className="px-3 py-2 font-semibold">Status</th>
+              <th className="px-3 py-2 font-semibold">Versions</th>
+              <th className="px-3 py-2 font-semibold">Outcome lift</th>
             </tr>
           </thead>
           <tbody>
             {filtered.map((p) => (
-              <tr key={p.id} className="border-b border-stone-100 last:border-0 hover:bg-violet-50/40">
+              <tr key={p.id} className="border-b border-line last:border-0 hover:bg-hover-paper">
                 <td className="px-3 py-2">
                   <Link
                     href={`/dashboard/playbooks/${p.id}`}
-                    className="flex items-center gap-1.5 font-medium text-stone-900 hover:text-violet-700"
+                    className="flex items-center gap-1.5 font-medium text-ink hover:text-focus hover:underline"
                   >
-                    <BookOpen size={14} className="text-stone-400" />
+                    <BookOpen size={14} className="text-subtle" />
                     {p.name}
                   </Link>
                   {p.description && (
-                    <div className="mt-0.5 truncate text-[12px] text-stone-500" title={p.description}>
+                    <div className="mt-0.5 truncate text-xs text-muted" title={p.description}>
                       {p.description}
                     </div>
                   )}
                 </td>
                 <td className="px-3 py-2">
-                  <Chip tone={sourceTone(p.source)}>{p.source}</Chip>
+                  <Chip>{p.source}</Chip>
                 </td>
                 <td className="px-3 py-2">
                   {p.productionVersion != null ? (
-                    <Chip tone="violet">v{p.productionVersion}</Chip>
+                    <Chip>v{p.productionVersion}</Chip>
                   ) : (
-                    <span className="text-stone-400">—</span>
+                    <span className="text-subtle">—</span>
                   )}
                 </td>
-                <td className="px-3 py-2 text-stone-600">{p.productionStatus ?? "unpromoted"}</td>
-                <td className="px-3 py-2 text-stone-600">
-                  {p.versionCount} <span className="text-stone-400">(latest v{p.latestVersion})</span>
+                <td className="px-3 py-2">
+                  <Chip>{p.productionStatus ?? "unpromoted"}</Chip>
+                </td>
+                <td className="px-3 py-2 text-muted">
+                  {p.versionCount} <span className="text-subtle">(latest v{p.latestVersion})</span>
                 </td>
                 <td className="px-3 py-2">
                   {p.outcomeLift ? (
-                    <span className="text-stone-700">
-                      <span className="font-medium text-emerald-700">
+                    <span>
+                      <span className="font-semibold tabular-nums text-ink">
                         {p.outcomeLift.liftPct >= 0 ? "+" : ""}{p.outcomeLift.liftPct}%
                       </span>{" "}
-                      <span className="text-stone-500">{p.outcomeLift.metric}</span>
+                      <span className="text-muted">{p.outcomeLift.metric}</span>
                     </span>
                   ) : (
-                    <span className="text-stone-400">—</span>
+                    <span className="text-subtle">—</span>
                   )}
                 </td>
               </tr>
             ))}
             {filtered.length === 0 && !loading && (
               <tr>
-                <td colSpan={6} className="px-3 py-8 text-center text-[13px] text-stone-400">
+                <td colSpan={6} className="px-3 py-8 text-center text-sm text-subtle">
                   No playbooks yet — create the first one with “New playbook”.
                 </td>
               </tr>
             )}
             {loading && (
               <tr>
-                <td colSpan={6} className="px-3 py-8 text-center text-[13px] text-stone-400">
-                  <Loader2 size={16} className="mx-auto animate-spin" />
+                <td colSpan={6} className="px-3 py-8 text-center text-sm text-subtle">
+                  <Loader2 size={16} className="mx-auto aos-spin" />
                 </td>
               </tr>
             )}
@@ -216,7 +220,7 @@ export function PlaybooksApp() {
         </table>
       </div>
 
-      <div className="mt-3 rounded-md border border-stone-200 bg-stone-50 px-3 py-2 text-[12px] text-stone-500">
+      <div className="mt-3 rounded-lg bg-paper px-3 py-2 text-xs text-muted shadow-hairline">
         Versions are immutable — a change is a new version. Rollback moves the production pointer;
         nothing is ever rewritten. Every run records the resolved version.
       </div>
@@ -276,19 +280,17 @@ function CreateModal({ onClose, onDone }: { onClose: () => void; onDone: () => v
   return (
     <Modal title="New playbook" onClose={onClose}>
       {error && (
-        <div className="mb-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-700">
-          {error}
-        </div>
+        <div className="mb-3"><ErrorBox message={error} /></div>
       )}
-      <label className="mb-1 block text-[12px] font-medium text-stone-600">Name</label>
+      <label className="mb-1 block text-xs font-semibold text-muted">Name</label>
       <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Friday GBP review sprint" className={`${inputCls} mb-3 w-full`} />
-      <label className="mb-1 block text-[12px] font-medium text-stone-600">Source</label>
+      <label className="mb-1 block text-xs font-semibold text-muted">Source</label>
       <select value={source} onChange={(e) => setSource(e.target.value as Source)} className={`${inputCls} mb-3 w-full`}>
         <option value="seed">Seed — hand-authored procedure</option>
         <option value="learned">Learned — promoted from Growth Memory</option>
         <option value="community">Community — imported from the community</option>
       </select>
-      <label className="mb-1 block text-[12px] font-medium text-stone-600">Description (optional)</label>
+      <label className="mb-1 block text-xs font-semibold text-muted">Description (optional)</label>
       <textarea
         value={description}
         onChange={(e) => setDescription(e.target.value)}
@@ -301,7 +303,7 @@ function CreateModal({ onClose, onDone }: { onClose: () => void; onDone: () => v
           Cancel
         </button>
         <button onClick={save} className={btnPrimary} disabled={saving}>
-          {saving ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />} Create playbook
+          {saving ? <Loader2 size={14} className="aos-spin" /> : <Plus size={14} />} Create playbook
         </button>
       </div>
     </Modal>
@@ -338,16 +340,14 @@ function ProposeModal({ onClose, onDone }: { onClose: () => void; onDone: () => 
 
   return (
     <Modal title="Propose playbook from a Growth Memory learning" onClose={onClose}>
-      <div className="mb-3 rounded-md border border-stone-200 bg-stone-50 px-3 py-2 text-[12px] text-stone-500">
-        The playbook is drafted from the learning and lands at status <b>review</b>. A human must
+      <div className="mb-3 rounded-lg bg-canvas px-3 py-2 text-xs text-muted">
+        The playbook is drafted from the learning and lands at status <b className="text-ink">review</b>. A human must
         advance it through the lifecycle before it can be used. Nothing is auto-promoted.
       </div>
       {error && (
-        <div className="mb-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-700">
-          {error}
-        </div>
+        <div className="mb-3"><ErrorBox message={error} /></div>
       )}
-      <label className="mb-1 block text-[12px] font-medium text-stone-600">Learning ID</label>
+      <label className="mb-1 block text-xs font-semibold text-muted">Learning ID</label>
       <input
         value={learningId}
         onChange={(e) => setLearningId(e.target.value)}
@@ -359,7 +359,7 @@ function ProposeModal({ onClose, onDone }: { onClose: () => void; onDone: () => 
           Cancel
         </button>
         <button onClick={save} className={btnPrimary} disabled={saving}>
-          {saving ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />} Propose
+          {saving ? <Loader2 size={14} className="aos-spin" /> : <Sparkles size={14} />} Propose
           playbook
         </button>
       </div>
