@@ -49,7 +49,8 @@ export default async function DashboardLayout({
   const gbConfig = growthBookSdkConfig();
 
   // Phase 13 Wave A (theming): the workspace's DEFAULT brand kit drives the
-  // primary accent. Null = default violet (globals.css :root). Scoped to the
+  // primary accent. Null = the Agentic OS default: black primary actions
+  // (globals.css :root maps --brand-600/700 to black). Scoped to the
   // BrandTheme root below so it can never leak across workspaces.
   const defaultKit = await prisma.brandKit.findFirst({
     where: { workspaceId: workspace.id, isDefault: true },

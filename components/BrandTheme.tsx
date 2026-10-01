@@ -31,7 +31,7 @@ export function BrandTheme({ primary, children }: { primary: string | null; chil
   }, []);
 
   return (
-    <div ref={rootRef} className="min-h-screen bg-page font-sans text-ink">
+    <div ref={rootRef} className="min-h-screen bg-canvas font-sans text-ink">
       {children}
     </div>
   );

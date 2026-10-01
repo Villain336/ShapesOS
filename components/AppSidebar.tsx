@@ -3,30 +3,48 @@
 // Marketr — dashboard chrome: sidebar nav (desktop) + top bar (mobile).
 // Nav rows use GlideMenu's gliding highlight; workspace + user menus use
 // shadcn dropdown-menu; user avatar via shadcn avatar.
+//
+// Agentic OS: the desktop sidebar is a black night surface (aos-night,
+// 288px). Nav items are 40px rows; the current page is a white row with
+// black text and aria-current="page". Icons are Lucide only.
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
 import type { ComponentType } from "react";
 import { useState } from "react";
-import { Mail, Paintbrush, Megaphone, RefreshCw, Brain, Target, BookOpen, Inbox, Share2, LayoutDashboard, Scissors, Briefcase, PenLine, Home } from "lucide-react";
 import {
-  ChartBar,
-  Bell,
+  Mail,
+  Paintbrush,
+  Megaphone,
+  RefreshCw,
+  Brain,
+  Target,
+  BookOpen,
+  Inbox,
+  Share2,
+  LayoutDashboard,
+  Scissors,
+  Briefcase,
+  PenLine,
+  Home,
+  TrendingUp,
+  Kanban,
+  ChartColumn,
+  ChartSpline,
   ChartLine,
-  ChartLineUp,
+  Folder,
+  Bell,
   Check,
-  CaretDown,
-  CaretUpDown,
-  FolderSimple,
-  GlobeHemisphereWest,
-  SignOut,
+  ChevronDown,
+  ChevronsUpDown,
+  Globe,
+  LogOut,
   List,
   Phone,
-  TrendUp,
-  Kanban,
   Star,
-} from "@phosphor-icons/react";import { cn } from "@/lib/utils";
+} from "lucide-react";
+import { cn } from "@/lib/utils";
 import GlideMenu from "@/components/vault/primitives/GlideMenu";
 import { buttonVariants } from "@/components/vault/atoms/Button";
 import {
@@ -44,7 +62,7 @@ import ThreadListSection from "@/components/chat/ThreadListSection";
 export type SidebarUser = { name?: string | null; email?: string | null };
 export type SidebarWorkspace = { id: string; name: string };
 
-/** Nav icon: phosphor (existing entries) or Lucide (newer entries). */
+/** Nav icon: Lucide. */
 type NavIcon = ComponentType<{ className?: string }>;
 
 const NAV_SECTIONS: {
@@ -54,15 +72,15 @@ const NAV_SECTIONS: {
   {
     items: [
       { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
-      { href: "/dashboard/assistant", label: "Assistant", icon: TrendUp },
+      { href: "/dashboard/assistant", label: "Assistant", icon: TrendingUp },
       { href: "/dashboard/crm", label: "CRM", icon: Kanban },
-      { href: "/dashboard/attribution", label: "Attribution", icon: ChartLineUp },
+      { href: "/dashboard/attribution", label: "Attribution", icon: ChartSpline },
       { href: "/dashboard/reviews", label: "Reviews", icon: Star },
       { href: "/dashboard/calls", label: "Calls", icon: Phone },
-      { href: "/dashboard/reports", label: "Reports", icon: ChartBar },
+      { href: "/dashboard/reports", label: "Reports", icon: ChartColumn },
       // Phase 12 (embeds): Umami-backed analytics dashboard.
       { href: "/dashboard/analytics", label: "Analytics", icon: ChartLine },
-      { href: "/dashboard/files", label: "Files", icon: FolderSimple },
+      { href: "/dashboard/files", label: "Files", icon: Folder },
       { href: "/dashboard/alerts", label: "Alerts", icon: Bell },
       // Phase 4: Creative Studio (T2, central creative home) + Direct Mail
       // (R3/T1 mail engine — page lands with that track; nav is wired here).
@@ -76,7 +94,7 @@ const NAV_SECTIONS: {
       { href: "/dashboard/media", label: "Media", icon: Megaphone },
       // Phase 6: authority & relevance command center (outreach, PR, listings,
       // AEO, review replies, intelligence reports).
-      { href: "/dashboard/authority", label: "Authority", icon: GlobeHemisphereWest },
+      { href: "/dashboard/authority", label: "Authority", icon: Globe },
       // Phase 7: the flywheel (reallocation, recycling, Test Lab, CTV, DSP, launch).
       { href: "/dashboard/flywheel", label: "Flywheel", icon: RefreshCw },
       // Phase 8: the agentic substrate (Business Graph, Campaigns, Growth Memory).
@@ -113,17 +131,32 @@ function initials(user: SidebarUser) {
     .join("");
 }
 
-function NavItems({ pathname, onNavigate }: { pathname: string; onNavigate?: () => void }) {
+function NavItems({
+  pathname,
+  onNavigate,
+  onNight,
+}: {
+  pathname: string;
+  onNavigate?: () => void;
+  onNight?: boolean;
+}) {
   return (
     <div className="flex flex-col gap-4">
       {NAV_SECTIONS.map((section, i) => (
         <div key={section.title ?? i}>
           {section.title ? (
-            <div className="mb-1 px-3 text-[12px] font-medium text-ink-3">
+            <div
+              className={cn(
+                "mb-1 px-3 text-xs font-semibold",
+                onNight ? "text-night-muted" : "text-muted",
+              )}
+            >
               {section.title}
             </div>
           ) : null}
-          <GlideMenu highlightClassName="inset-x-0 rounded-full bg-hover">
+          <GlideMenu
+            highlightClassName={cn("inset-x-0 rounded-sm", onNight ? "bg-night-hover" : "bg-hover")}
+          >
             {section.items.map((item) => {
               const active = isActive(pathname, item.href);
               const Icon = item.icon;
@@ -135,10 +168,14 @@ function NavItems({ pathname, onNavigate }: { pathname: string; onNavigate?: () 
                   aria-current={active ? "page" : undefined}
                   onClick={onNavigate}
                   className={cn(
-                    "relative z-10 mb-0.5 flex items-center gap-2.5 rounded-full px-3 py-2 text-[13.5px] transition-[color,background-color] duration-150 ease-[cubic-bezier(0.2,0,0,1)]",
+                    "relative z-10 mb-0.5 flex h-10 items-center gap-2.5 rounded-sm px-3 text-base transition-[color,background-color] duration-150 ease-aos",
                     active
-                      ? "bg-accent-tint font-medium text-accent-ink"
-                      : "text-ink-2 hover:text-ink",
+                      ? onNight
+                        ? "bg-paper font-semibold text-ink"
+                        : "bg-ink font-semibold text-paper"
+                      : onNight
+                        ? "text-night-soft hover:text-night"
+                        : "text-ink",
                   )}
                 >
                   <Icon className="size-4 shrink-0" />
@@ -192,7 +229,7 @@ function WorkspaceSwitcher({
         aria-label="Switch workspace"
       >
         <span className="truncate">{current?.name ?? "Workspace"}</span>
-        <CaretUpDown className="size-3.5 shrink-0 opacity-60" />
+        <ChevronsUpDown className="size-3.5 shrink-0 opacity-60" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-56">
         <DropdownMenuLabel>Workspace</DropdownMenuLabel>
@@ -227,16 +264,19 @@ function UserMenu({
   user,
   triggerClassName,
   compact,
+  onNight,
 }: {
   user: SidebarUser;
   triggerClassName?: string;
   compact?: boolean;
+  onNight?: boolean;
 }) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
         className={cn(
-          "flex items-center gap-2.5 rounded-control px-2 py-1.5 text-left transition-[background-color] duration-150 ease-[cubic-bezier(0.2,0,0,1)] hover:bg-hover active:scale-[0.98]",
+          "flex items-center gap-2.5 rounded-sm px-2 py-1.5 text-left transition-[background-color] duration-150 ease-aos active:scale-[0.98]",
+          onNight ? "hover:bg-night-hover" : "hover:bg-hover",
           triggerClassName,
         )}
         aria-label="Account menu"
@@ -247,14 +287,26 @@ function UserMenu({
         {compact ? null : (
           <>
             <span className="min-w-0 flex-1">
-              <span className="block truncate text-[13px] font-medium text-ink">
+              <span
+                className={cn(
+                  "block truncate text-[13px] font-medium",
+                  onNight ? "text-night" : "text-ink",
+                )}
+              >
                 {user.name ?? user.email ?? "Signed in"}
               </span>
               {user.name && user.email ? (
-                <span className="block truncate text-[12px] text-ink-3">{user.email}</span>
+                <span
+                  className={cn(
+                    "block truncate text-xs",
+                    onNight ? "text-night-muted" : "text-muted",
+                  )}
+                >
+                  {user.email}
+                </span>
               ) : null}
             </span>
-            <CaretDown className="size-3.5 shrink-0 text-ink-3" />
+            <ChevronDown className={cn("size-3.5 shrink-0", onNight ? "text-night-muted" : "text-subtle")} />
           </>
         )}
       </DropdownMenuTrigger>
@@ -269,7 +321,7 @@ function UserMenu({
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem variant="destructive" onClick={() => signOut({ callbackUrl: "/login" })}>
-          <SignOut weight="duotone" />
+          <LogOut />
           Sign out
         </DropdownMenuItem>
       </DropdownMenuContent>
@@ -293,29 +345,29 @@ export function AppSidebar({
   const showThreads =
     pathname === "/dashboard/assistant" && chat.tab === "ai" && chat.session !== null;
   return (
-    <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col border-r border-line bg-surface md:flex">
+    <aside className="aos-night sticky top-0 hidden h-screen w-72 shrink-0 flex-col border-r border-night-line md:flex">
       <div className="flex flex-col gap-3 px-3 pt-4">
         <Link href="/dashboard" className="flex items-center gap-2 px-1" aria-label="Marketr home">
-          <span className="flex size-7 items-center justify-center rounded-control bg-ink text-page">
-            <TrendUp className="size-4" weight="duotone" />
+          <span className="flex size-7 items-center justify-center rounded-sm bg-night-raised text-night">
+            <TrendingUp className="size-4" />
           </span>
-          <span className="text-[16px] font-semibold tracking-tight text-ink">Marketr</span>
+          <span className="text-[16px] font-semibold tracking-tight text-night">Marketr</span>
         </Link>
         <WorkspaceSwitcher workspaces={workspaces} currentId={currentWorkspaceId} />
       </div>
       <nav className="flex-1 overflow-y-auto px-2 py-4" aria-label="Dashboard">
-        <NavItems pathname={pathname} />
+        <NavItems pathname={pathname} onNight />
         {showThreads ? (
-          <div className="mt-5 border-t border-line pt-3">
-            <div className="mb-2 truncate px-3 text-[12px] font-medium text-ink-3">
+          <div className="mt-5 border-t border-night-line pt-3">
+            <div className="mb-2 truncate px-3 text-xs font-semibold text-night-muted">
               Chats · {chat.session?.projectDomain}
             </div>
             <ThreadListSection />
           </div>
         ) : null}
       </nav>
-      <div className="border-t border-line p-2">
-        <UserMenu user={user} triggerClassName="w-full" />
+      <div className="border-t border-night-line p-2">
+        <UserMenu user={user} triggerClassName="w-full" onNight />
       </div>
     </aside>
   );
@@ -332,10 +384,10 @@ export function MobileNav({
 }) {
   const pathname = usePathname();
   return (
-    <header className="sticky top-0 z-40 flex items-center justify-between border-b border-line bg-surface px-4 py-2.5 md:hidden">
+    <header className="sticky top-0 z-40 flex items-center justify-between border-b border-line bg-paper px-4 py-2.5 md:hidden">
       <Link href="/dashboard" className="flex items-center gap-2" aria-label="Marketr home">
-        <span className="flex size-7 items-center justify-center rounded-control bg-ink text-page">
-          <TrendUp className="size-4" weight="duotone" />
+        <span className="flex size-7 items-center justify-center rounded-sm bg-ink text-paper">
+          <TrendingUp className="size-4" />
         </span>
         <span className="text-[16px] font-semibold tracking-tight text-ink">Marketr</span>
       </Link>
@@ -345,7 +397,7 @@ export function MobileNav({
             className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "px-2.5")}
             aria-label="Open navigation"
           >
-            <List className="size-4" weight="duotone" />
+            <List className="size-4" />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56 p-2">
             <NavItems pathname={pathname} />

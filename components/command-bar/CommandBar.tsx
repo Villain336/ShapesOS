@@ -630,18 +630,13 @@ export function CommandBar({ workspaceId }: { workspaceId: string }) {
                 {/* Notice line (Do-action results / defensive unavailability) */}
                 {notice && (
                   <div
-                    className={cn(
-                      "flex items-start gap-2 border-b px-3 py-2 text-[13px]",
-                      notice.kind === "ok"
-                        ? "border-stone-200 bg-stone-50 text-stone-600"
-                        : "border-stone-200 bg-stone-50 text-stone-600",
-                    )}
+                    className="flex items-start gap-2 border-b border-line bg-canvas px-3 py-2 text-sm text-muted"
                     role="status"
                   >
                     {notice.kind === "ok" ? (
-                      <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-violet-600" aria-hidden />
+                      <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-muted" aria-hidden />
                     ) : (
-                      <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-stone-400" aria-hidden />
+                      <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-muted" aria-hidden />
                     )}
                     <span>{notice.text}</span>
                   </div>
