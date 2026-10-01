@@ -74,9 +74,20 @@ function payloadSummary(payload: unknown): string {
   if (!payload || typeof payload !== "object") return "—";
   const p = payload as Record<string, unknown>;
   const bits: string[] = [];
+  if (typeof p.channel === "string") bits.push(`channel ${p.channel}`);
+  if (typeof p.dailyBudgetCents === "number") bits.push(`daily ${money(p.dailyBudgetCents)}`);
   if (p.budgetCents !== undefined) bits.push(`budget ${money(p.budgetCents)}`);
   if (p.flightStart || p.flightEnd) bits.push(`${p.flightStart ?? "?"} → ${p.flightEnd ?? "?"}`);
+  if (typeof p.startDate === "string") bits.push(`${p.startDate}${p.endDate ? ` → ${p.endDate}` : ""}`);
   if (p.campaignName) bits.push(String(p.campaignName));
+  if (typeof p.name === "string" && !p.campaignName) bits.push(p.name);
+  if (p.inventory && typeof p.inventory === "object") {
+    const flags = Object.entries(p.inventory as Record<string, unknown>)
+      .filter(([, v]) => v === true)
+      .map(([k]) => k.replace(/([A-Z])/g, " $1").trim().toLowerCase());
+    if (flags.length) bits.push(`inventory: ${flags.join(", ")}`);
+  }
+  if (p.externalCampaignId) bits.push(String(p.externalCampaignId));
   return bits.length ? bits.join(" · ") : "—";
 }
 
