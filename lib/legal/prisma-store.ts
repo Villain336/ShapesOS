@@ -21,6 +21,21 @@ import { normalizeLogicalPath } from "@/lib/filesystem/paths";
 import { safeFilename } from "@/lib/security/upload-safety";
 import { computeObligations, validateSeedTemplates } from "./obligations";
 import { OBLIGATION_TEMPLATES } from "./seeds";
+import { REGULATION_CHANGE_SEEDS } from "./radar-seeds";
+import {
+  changeAppliesToProfile,
+  changeToObligationSeed,
+  triageChanges,
+  validateSeedChanges,
+  type ChangeTriageRow,
+} from "./radar";
+import {
+  RADAR_TRIAGE_STATUSES,
+  type RadarTriageStatus,
+  type RegulationChangeCategory,
+  type SeedRegulationChange,
+  type TriagedChange,
+} from "./radar-types";
 import {
   LegalError,
   validateLegalProfileInput,
@@ -880,9 +895,214 @@ export class PrismaLegalStore {
       data: { lastAlertedTier: tier, lastAlertedAt: now },
     });
   }
+
+  // ------------------------------------------------------------------
+  // Slice 4: change radar
+  // ------------------------------------------------------------------
+
+  /** Idempotent seed: validate, then upsert every change by key. */
+  async seedRadarChanges(): Promise<{ seeded: number }> {
+    validateSeedChanges(REGULATION_CHANGE_SEEDS);
+    for (const c of REGULATION_CHANGE_SEEDS) {
+      await this.prisma.regulationChange.upsert({
+        where: { key: c.key },
+        create: {
+          key: c.key,
+          industries: c.industries,
+          jurisdictions: c.jurisdictions,
+          category: c.category,
+          title: c.title,
+          plainEnglishSummary: c.plainEnglishSummary,
+          sourceRef: c.sourceRef,
+          effectiveDate: c.effectiveDate ? new Date(c.effectiveDate) : null,
+          publishedAt: new Date(c.publishedAt),
+          seedFlag: c.seedFlag,
+        },
+        update: {
+          industries: c.industries,
+          jurisdictions: c.jurisdictions,
+          category: c.category,
+          title: c.title,
+          plainEnglishSummary: c.plainEnglishSummary,
+          sourceRef: c.sourceRef,
+          effectiveDate: c.effectiveDate ? new Date(c.effectiveDate) : null,
+          publishedAt: new Date(c.publishedAt),
+          seedFlag: c.seedFlag,
+          version: { increment: 1 },
+        },
+      });
+    }
+    return { seeded: REGULATION_CHANGE_SEEDS.length };
+  }
+
+  /** All seeded changes (read-only list, untriaged). */
+  async listRadarChanges(): Promise<SeedRegulationChange[]> {
+    const rows = await this.prisma.regulationChange.findMany({
+      orderBy: [{ publishedAt: "desc" }, { title: "asc" }],
+    });
+    return rows.map(toSeedChange);
+  }
+
+  /**
+   * The tenant's triaged radar: every change with a relevance verdict for
+   * their LegalProfile plus their reviewed/dismissed state merged by key.
+   * Returns profile: null when the tenant has no legal profile yet.
+   */
+  async listRadar(
+    workspaceId: string,
+  ): Promise<{
+    profile: { industry: string; jurisdictions: string[] } | null;
+    items: TriagedChange[];
+  }> {
+    const profile = await this.getProfile(workspaceId);
+    if (!profile) return { profile: null, items: [] };
+    const changes = await this.listRadarChanges();
+    const rows = await this.prisma.legalRadarTriage.findMany({
+      where: { workspaceId },
+    });
+    const triageRows: ChangeTriageRow[] = rows.map((r) => ({
+      changeKey: r.changeKey,
+      status: r.status as RadarTriageStatus,
+    }));
+    const items = triageChanges(
+      changes,
+      { industry: profile.industry, jurisdictions: profile.jurisdictions },
+      triageRows,
+    );
+    return {
+      profile: { industry: profile.industry, jurisdictions: profile.jurisdictions },
+      items,
+    };
+  }
+
+  /** Tenant marks a change reviewed or dismissed. */
+  async setRadarTriage(
+    workspaceId: string,
+    key: string,
+    status: RadarTriageStatus,
+  ): Promise<TriagedChange[]> {
+    if (!RADAR_TRIAGE_STATUSES.includes(status)) {
+      throw new LegalError(
+        "INVALID_TRIAGE_STATUS",
+        `Status must be one of: ${RADAR_TRIAGE_STATUSES.join(", ")}`,
+      );
+    }
+    const change = await this.prisma.regulationChange.findUnique({
+      where: { key },
+    });
+    if (!change) {
+      throw new LegalError("UNKNOWN_CHANGE", `No regulation change: ${key}`);
+    }
+    await this.prisma.legalRadarTriage.upsert({
+      where: { workspaceId_changeKey: { workspaceId, changeKey: key } },
+      create: { workspaceId, changeKey: key, status },
+      update: { status },
+    });
+    return (await this.listRadar(workspaceId)).items;
+  }
+
+  /**
+   * "Add to my obligations": materialize a radar change as a tenant
+   * obligation. Wires into slice 1 by creating a radar-prefixed
+   * ObligationTemplate row (industries/jurisdictions preserved, so profile
+   * re-saves keep it via the same materialization path) plus an open
+   * Obligation row. The change must be relevant to the tenant's profile —
+   * "does this affect me" triage gates the conversion.
+   */
+  async addChangeToObligations(
+    workspaceId: string,
+    key: string,
+  ): Promise<ComputedObligation> {
+    const row = await this.prisma.regulationChange.findUnique({
+      where: { key },
+    });
+    if (!row) {
+      throw new LegalError("UNKNOWN_CHANGE", `No regulation change: ${key}`);
+    }
+    const profile = await this.getProfile(workspaceId);
+    if (!profile) {
+      throw new LegalError("NO_PROFILE", "Save a legal profile before adding obligations.");
+    }
+    const change = toSeedChange(row);
+    if (!changeAppliesToProfile(change, profile)) {
+      throw new LegalError(
+        "NOT_RELEVANT",
+        "This change does not match your industry or jurisdictions, so it cannot become an obligation.",
+      );
+    }
+    const template = changeToObligationSeed(change);
+    validateSeedTemplates([template]);
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.obligationTemplate.upsert({
+        where: { key: template.key },
+        create: {
+          key: template.key,
+          industries: template.industries,
+          jurisdictions: template.jurisdictions,
+          category: template.category,
+          title: template.title,
+          description: template.description,
+          sourceRef: template.sourceRef,
+          renewalCadence: template.renewalCadence,
+          needsReview: template.needsReview,
+        },
+        // Never overwrite an existing radar template's content from here —
+        // the seed feed is the source of truth on re-seed.
+        update: {},
+      });
+      // Preserve an existing tenant status if the row already exists.
+      await tx.obligation.upsert({
+        where: {
+          workspaceId_templateKey: { workspaceId, templateKey: template.key },
+        },
+        create: { workspaceId, templateKey: template.key, status: "open" },
+        update: {},
+      });
+    });
+
+    const obligations = await this.listObligations(workspaceId);
+    const created = obligations.find((o) => o.key === template.key);
+    if (!created) {
+      throw new LegalError(
+        "OBLIGATION_NOT_CREATED",
+        "The obligation row could not be read back after creation.",
+      );
+    }
+    return created;
+  }
 }
 
 export type DeadlineStatus = "open" | "done" | "dismissed";
+
+type RegulationChangeRow = {
+  key: string;
+  title: string;
+  plainEnglishSummary: string;
+  industries: string[];
+  jurisdictions: string[];
+  category: string;
+  sourceRef: string;
+  effectiveDate: Date | null;
+  publishedAt: Date;
+  seedFlag: boolean;
+};
+
+/** DB row → seed shape the pure engine works on. */
+function toSeedChange(row: RegulationChangeRow): SeedRegulationChange {
+  return {
+    key: row.key,
+    title: row.title,
+    plainEnglishSummary: row.plainEnglishSummary,
+    industries: row.industries,
+    jurisdictions: row.jurisdictions,
+    category: row.category as RegulationChangeCategory,
+    sourceRef: row.sourceRef,
+    effectiveDate: row.effectiveDate ? row.effectiveDate.toISOString() : null,
+    publishedAt: row.publishedAt.toISOString(),
+    seedFlag: row.seedFlag,
+  };
+}
 
 export interface ComputedDeadline {
   id: string;

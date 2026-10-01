@@ -770,6 +770,8 @@ model Workspace {
   legalDeadlines         LegalDeadline[]
   // Legal/Compliance slice 3: Document vault.
   legalDocuments         LegalDocument[]
+  // Legal/Compliance slice 4: Change radar.
+  legalRadarTriage       LegalRadarTriage[]
   insurancePaymentHandoffs InsurancePaymentHandoff[]
   insuranceCertificates     InsuranceCertificate[]
   // Phase 12 (embeds): tenant-scoped GrowthBook flag overrides.
@@ -10994,6 +10996,78 @@ enum ObligationStatus {
   snoozed
   dismissed
   done
+}
+
+// Legal/Compliance slice 4: Change radar (BUSINESS-OS-FEATURE-SPECS.md §4).
+// RegulationChange is structured seed data (industry/jurisdiction filters)
+// for regulation changes that may affect the tenant — v1 = illustrative
+// seed feed, NO live scraping. LegalRadarTriage is the tenant's per-change
+// triage state; absence of a row means "new".
+// Guardrails: every output carries the information-not-advice label; changes
+// carry a source reference and never invent bill numbers, statute citations,
+// or effective dates (effectiveDate is null unless verified).
+
+model RegulationChange {
+  id String @id @default(cuid())
+  // Stable slug, e.g. "nc-privacy-update". Joins tenant triage rows.
+  key String @unique
+
+  // Empty = applies to all industries.
+  industries String[]
+  // "national" = applies in every jurisdiction; otherwise codes like "NC".
+  jurisdictions String[]
+
+  category RegulationChangeCategory
+  title                String
+  plainEnglishSummary  String   @map("plain_english_summary")
+  // Where the claim comes from. Never empty: the no-invention guardrail
+  // requires a source on every change.
+  sourceRef String @map("source_ref")
+  // Only when the date itself was verified — never a guess.
+  effectiveDate DateTime? @map("effective_date")
+  publishedAt   DateTime  @map("published_at")
+  // True for the illustrative v1 seed feed.
+  seedFlag Boolean @default(true) @map("seed_flag")
+
+  version Int @default(1)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([key])
+  @@map("regulation_changes")
+}
+
+enum RegulationChangeCategory {
+  privacy
+  licensing
+  tax
+  employment
+  insurance
+  safety
+  other
+}
+
+model LegalRadarTriage {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  changeKey String @map("change_key")
+
+  status RadarTriageStatus @default(reviewed)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([workspaceId, changeKey])
+  @@index([workspaceId, status])
+  @@map("legal_radar_triage")
+}
+
+enum RadarTriageStatus {
+  reviewed
+  dismissed
 }
 
 // Legal/Compliance slice 2: Deadline engine (BUSINESS-OS-FEATURE-SPECS.md §4).

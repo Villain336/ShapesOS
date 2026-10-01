@@ -6,7 +6,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Archive, CalendarClock, ListChecks, Loader2 } from "lucide-react";
+import { Archive, CalendarClock, ListChecks, Loader2, Radar } from "lucide-react";
 import { ChecklistView, type ObligationView } from "./views/ChecklistView";
 import {
   DeadlinesView,
@@ -14,9 +14,10 @@ import {
   type NeedsDateView,
 } from "./views/DeadlinesView";
 import { DocumentsView, type DocumentView } from "./views/DocumentsView";
+import { RadarView, type RadarItemView } from "./views/RadarView";
 import { ProfileStep, type ProfileDraft } from "./views/ProfileStep";
 
-type Tab = "obligations" | "deadlines" | "documents";
+type Tab = "obligations" | "deadlines" | "documents" | "radar";
 
 export function LegalApp() {
   const [loading, setLoading] = useState(true);
@@ -27,14 +28,17 @@ export function LegalApp() {
   const [deadlines, setDeadlines] = useState<DeadlineView[]>([]);
   const [needsDate, setNeedsDate] = useState<NeedsDateView[]>([]);
   const [documents, setDocuments] = useState<DocumentView[]>([]);
+  const [radar, setRadar] = useState<RadarItemView[]>([]);
+  const [seedFeedNotice, setSeedFeedNotice] = useState("");
   const [workspaceId, setWorkspaceId] = useState("");
   const [disclaimer, setDisclaimer] = useState("");
 
   const refresh = useCallback(async () => {
-    const [oblRes, dlRes, docRes] = await Promise.all([
+    const [oblRes, dlRes, docRes, radarRes] = await Promise.all([
       fetch("/api/legal/obligations"),
       fetch("/api/legal/deadlines"),
       fetch("/api/legal/documents"),
+      fetch("/api/legal/radar"),
     ]);
     if (oblRes.ok) {
       const json = await oblRes.json();
@@ -53,6 +57,12 @@ export function LegalApp() {
       setDisclaimer((prev) => prev || (json.disclaimer ?? ""));
       setDocuments(json.documents ?? []);
       setWorkspaceId(json.workspaceId ?? "");
+    }
+    if (radarRes.ok) {
+      const json = await radarRes.json();
+      setDisclaimer((prev) => prev || (json.disclaimer ?? ""));
+      setRadar(json.items ?? []);
+      setSeedFeedNotice(json.seedFeedNotice ?? "");
     }
     setLoading(false);
   }, []);
@@ -89,6 +99,9 @@ export function LegalApp() {
   const docAttention = documents.filter(
     (d) => d.tier && d.tier !== "due_90",
   ).length;
+  const radarAttention = radar.filter(
+    (r) => r.relevance === "relevant" && r.triage === "new",
+  ).length;
 
   const tabs = [
     { id: "obligations" as const, label: "Obligations", icon: ListChecks, badge: null as number | null },
@@ -103,6 +116,12 @@ export function LegalApp() {
       label: "Documents",
       icon: Archive,
       badge: docAttention > 0 ? docAttention : null,
+    },
+    {
+      id: "radar" as const,
+      label: "Radar",
+      icon: Radar,
+      badge: radarAttention > 0 ? radarAttention : null,
     },
   ];
 
@@ -153,10 +172,17 @@ export function LegalApp() {
           disclaimer={disclaimer}
           onChanged={() => void refresh()}
         />
-      ) : (
+      ) : tab === "documents" ? (
         <DocumentsView
           documents={documents}
           workspaceId={workspaceId}
+          disclaimer={disclaimer}
+          onChanged={() => void refresh()}
+        />
+      ) : (
+        <RadarView
+          items={radar}
+          seedFeedNotice={seedFeedNotice}
           disclaimer={disclaimer}
           onChanged={() => void refresh()}
         />
