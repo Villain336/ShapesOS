@@ -10341,6 +10341,13 @@ model InsuranceRenewal {
   // (new - prior) / prior * 100, stored when a renewal quote is bound.
   premiumDeltaPct   Float? @map("premium_delta_pct")
   alertSentAt       DateTime? @map("alert_sent_at")
+  // Carrier's auto-renewal terms snapshot (slice 4). Auto-renewals are
+  // detected and surfaced, NEVER silently accepted — the snapshot plus the
+  // delta flags go to human review before any renewal approval.
+  autoRenewTerms    Json? @map("auto_renew_terms")
+
+  // Submissions created by remarketing this renewal (slice 4).
+  submissions InsuranceSubmission[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -10392,6 +10399,10 @@ model InsuranceSubmission {
   status          InsuranceSubmissionStatus @default(draft)
   vendorRef       String? @map("vendor_ref")
   submittedBy     String  @map("submitted_by")
+  // The renewal this submission was created to remarket (slice 4). Null for
+  // ordinary new-business submissions.
+  renewalId       String? @map("renewal_id")
+  renewal         InsuranceRenewal? @relation(fields: [renewalId], references: [id], onDelete: SetNull)
 
   quotes InsuranceQuote[]
 

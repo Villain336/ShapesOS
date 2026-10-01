@@ -227,6 +227,76 @@ function approvalSummary(a: PendingApprovalRow): string {
   return `${action.replace(/_/g, " ")} · ${shortId(sid)}`;
 }
 
+// ── Slice 4: renewal remarketing workflow ────────────────────────────────────
+
+type RemarketStatus = "detected" | "remarketing" | "quoted" | "bound" | "auto_renew_surfaced";
+
+interface RenewalQuoteRow {
+  id: string;
+  carrierName: string;
+  quotedPremiumCents: number | null;
+  limitPerOccurrenceCents: number | null;
+  limitAggregateCents: number | null;
+  status: string;
+}
+
+interface RenewalSubmissionRow {
+  id: string;
+  status: string;
+  vendorRef: string | null;
+  quotes: RenewalQuoteRow[];
+}
+
+interface RenewalRow {
+  id: string;
+  renewalDate: string;
+  daysUntilRenewal: number;
+  alertLevel: RenewalAlertLevel;
+  remarketStatus: RemarketStatus;
+  statusLabel: string;
+  policyNumber: string | null;
+  line: string | null;
+  lineLabel: string | null;
+  carrierName: string | null;
+  namedInsured: string | null;
+  expiresAt: string | null;
+  priorPremiumCents: number | null;
+  newPremiumCents: number | null;
+  premiumDeltaPct: number | null;
+  deltaFlagged: boolean;
+  needsReview: boolean;
+  autoRenewTerms: Record<string, unknown> | null;
+  submission: RenewalSubmissionRow | null;
+}
+
+function remarketTone(status: RemarketStatus): "slate" | "violet" | "green" | "amber" | "red" | "blue" {
+  switch (status) {
+    case "detected": return "slate";
+    case "remarketing": return "blue";
+    case "quoted": return "violet";
+    case "bound": return "green";
+    case "auto_renew_surfaced": return "red";
+    default: return "slate";
+  }
+}
+
+function DeltaBadge({ deltaPct, flagged }: { deltaPct: number | null; flagged: boolean }) {
+  if (deltaPct == null) return <span className="text-stone-400">—</span>;
+  const sign = deltaPct > 0 ? "+" : "";
+  return (
+    <Chip tone={flagged ? "red" : "slate"}>
+      {sign}{deltaPct.toFixed(1)}%
+    </Chip>
+  );
+}
+
+function fmtTermsValue(v: unknown): string {
+  if (v == null) return "not confirmed";
+  if (typeof v === "number" && Number.isInteger(v) && v >= 1000) return fmtMoney(v);
+  if (typeof v === "string" && /^\d{4}-\d{2}-\d{2}/.test(v)) return fmtDate(v);
+  return String(v);
+}
+
 // ── Component ────────────────────────────────────────────────────────────────
 
 export function InsuranceApp() {
@@ -279,14 +349,6 @@ export function InsuranceApp() {
     const premium = policies.reduce((s, p) => s + (p.annualPremiumCents ?? 0), 0);
     return { total: policies.length, active, critical, premium };
   }, [policies]);
-
-  const renewals = useMemo(
-    () =>
-      policies
-        .filter((p) => p.alertLevel !== "none")
-        .sort((a, b) => +new Date(a.expiresAt) - +new Date(b.expiresAt)),
-    [policies],
-  );
 
   const loadSubmissions = useCallback(async () => {
     setSubsLoading(true);
@@ -523,6 +585,138 @@ export function InsuranceApp() {
     if (tab === "approvals") void loadPending();
   }, [tab, loadPending]);
 
+  // ── Renewals tab (slice 4: remarketing workflow) ──────────────────────────
+  const [renewalRows, setRenewalRows] = useState<RenewalRow[]>([]);
+  const [renewalsLoading, setRenewalsLoading] = useState(false);
+  const [renewalError, setRenewalError] = useState<string | null>(null);
+  const [renewalForm, setRenewalForm] = useState<{
+    id: string;
+    kind: "remarket" | "surface" | "quotes" | "terms";
+  } | null>(null);
+  const [remarketState, setRemarketState] = useState("");
+  const [surfacePremium, setSurfacePremium] = useState("");
+  const [surfaceCarrier, setSurfaceCarrier] = useState("");
+  const [renewalActingId, setRenewalActingId] = useState<string | null>(null);
+
+  const loadRenewals = useCallback(async () => {
+    setRenewalsLoading(true);
+    setRenewalError(null);
+    try {
+      const res = await fetch("/api/insurance/renewals");
+      if (!res.ok) throw new Error(`Load failed (${res.status})`);
+      const data = await res.json();
+      setRenewalRows(data.renewals ?? []);
+    } catch (e) {
+      setRenewalError(e instanceof Error ? e.message : "Load failed");
+    } finally {
+      setRenewalsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (tab === "renewals") void loadRenewals();
+  }, [tab, loadRenewals]);
+
+  const handleStartRemarket = useCallback(
+    async (id: string) => {
+      setRenewalActingId(id);
+      setRenewalError(null);
+      try {
+        const res = await fetch(`/api/insurance/renewals/${id}/remarket`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ state: remarketState.trim() || undefined }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          const hint =
+            data.code === "RENEWAL_STATE_REQUIRED"
+              ? " Enter the risk's 2-letter state — the policy doesn't record one."
+              : "";
+          throw new Error(`${data.error ?? `Remarket failed (${res.status})`}${hint}`);
+        }
+        setRenewalForm(null);
+        setRemarketState("");
+        await loadRenewals();
+        if (data.approval) {
+          setRenewalError(
+            `Remarket started — the request_quote approval is waiting in the Approvals tab.`,
+          );
+        }
+      } catch (e) {
+        setRenewalError(e instanceof Error ? e.message : "Remarket failed");
+      } finally {
+        setRenewalActingId(null);
+      }
+    },
+    [remarketState, loadRenewals],
+  );
+
+  const handleFetchQuotes = useCallback(
+    async (id: string) => {
+      setRenewalActingId(id);
+      setRenewalError(null);
+      try {
+        const res = await fetch(`/api/insurance/renewals/${id}/advance`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ toStatus: "quoted" }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          const hint =
+            data.code === "REQUEST_QUOTE_NOT_APPROVED"
+              ? " Approve the request_quote in the Approvals tab first, then fetch again."
+              : "";
+          throw new Error(`${data.error ?? `Fetch failed (${res.status})`}${hint}`);
+        }
+        setRenewalForm({ id, kind: "quotes" });
+        await loadRenewals();
+      } catch (e) {
+        setRenewalError(e instanceof Error ? e.message : "Fetch failed");
+      } finally {
+        setRenewalActingId(null);
+      }
+    },
+    [loadRenewals],
+  );
+
+  const handleSurfaceAutoRenew = useCallback(
+    async (id: string) => {
+      setRenewalActingId(id);
+      setRenewalError(null);
+      try {
+        const premiumDollars = Number(surfacePremium.replace(/[$,]/g, ""));
+        const terms: Record<string, unknown> = {};
+        if (surfaceCarrier.trim()) terms.carrierName = surfaceCarrier.trim();
+        if (Number.isFinite(premiumDollars) && premiumDollars > 0) {
+          terms.premiumCents = Math.round(premiumDollars * 100);
+        }
+        const res = await fetch(`/api/insurance/renewals/${id}/surface-auto-renew`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ carrierTerms: terms }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error ?? `Surface failed (${res.status})`);
+        setRenewalForm(null);
+        setSurfacePremium("");
+        setSurfaceCarrier("");
+        await loadRenewals();
+        if (data.deltaFlagged) {
+          setRenewalError(
+            `Auto-renewal surfaced — the premium moved above the flag threshold. Review before any approval.`,
+          );
+        }
+      } catch (e) {
+        setRenewalError(e instanceof Error ? e.message : "Surface failed");
+      } finally {
+        setRenewalActingId(null);
+      }
+    },
+    [surfacePremium, surfaceCarrier, loadRenewals],
+  );
+
   const handleDecide = useCallback(
     async (a: PendingApprovalRow, decision: "approve" | "reject") => {
       setDecidingId(a.id);
@@ -558,40 +752,57 @@ export function InsuranceApp() {
     [denyNote, loadPending],
   );
 
-  const handleExecuteBind = useCallback(async (bind: ApprovedBind) => {
-    if (!bind.quoteId) return;
-    setExecutingId(bind.approvalId);
-    setDecisionError(null);
-    try {
-      const res = await fetch(`/api/insurance/quotes/${bind.quoteId}/bind`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ approvalId: bind.approvalId }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? `Bind failed (${res.status})`);
-      setExecutedBinds((prev) => ({
-        ...prev,
-        [bind.approvalId]: {
-          policyNumber: data.policy.policyNumber,
-          carrierName: data.policy.carrierName,
-          carrierConfirmation: data.carrierConfirmation ?? null,
-          replayed: data.replayed === true,
-        },
-      }));
-    } catch (e) {
-      setDecisionError(e instanceof Error ? e.message : "Bind failed");
-    } finally {
-      setExecutingId(null);
-    }
-  }, []);
+  const handleExecuteBind = useCallback(
+    async (bind: ApprovedBind) => {
+      if (!bind.quoteId) return;
+      setExecutingId(bind.approvalId);
+      setDecisionError(null);
+      try {
+        const res = await fetch(`/api/insurance/quotes/${bind.quoteId}/bind`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ approvalId: bind.approvalId }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error ?? `Bind failed (${res.status})`);
+        setExecutedBinds((prev) => ({
+          ...prev,
+          [bind.approvalId]: {
+            policyNumber: data.policy.policyNumber,
+            carrierName: data.policy.carrierName,
+            carrierConfirmation: data.carrierConfirmation ?? null,
+            replayed: data.replayed === true,
+          },
+        }));
+        // If the bound quote belongs to a renewal remarket, mark the renewal
+        // bound — the advance endpoint verifies the quote is actually bound.
+        const match = renewalRows.find((r) =>
+          r.submission?.quotes.some((q) => q.id === bind.quoteId),
+        );
+        if (match) {
+          await fetch(`/api/insurance/renewals/${match.id}/advance`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ toStatus: "bound" }),
+          });
+          await loadRenewals();
+        }
+      } catch (e) {
+        setDecisionError(e instanceof Error ? e.message : "Bind failed");
+      } finally {
+        setExecutingId(null);
+      }
+    },
+    [renewalRows, loadRenewals],
+  );
 
   const handleRefresh = useCallback(() => {
     if (tab === "partners") void loadPartners();
     else if (tab === "approvals") void loadPending();
     else if (tab === "quoting") void loadSubmissions();
+    else if (tab === "renewals") void loadRenewals();
     else void load();
-  }, [tab, load, loadPartners, loadPending, loadSubmissions]);
+  }, [tab, load, loadPartners, loadPending, loadSubmissions, loadRenewals]);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4">
@@ -706,44 +917,342 @@ export function InsuranceApp() {
           </table>
         </div>
       ) : tab === "renewals" ? (
-        <div className="overflow-x-auto rounded-lg border border-stone-200 bg-white shadow-sm">
-          <table className="w-full text-left text-[13px]">
-            <thead>
-              <tr className="border-b border-stone-200 bg-stone-50 text-[11px] font-medium uppercase tracking-wide text-stone-500">
-                <th className="px-3 py-2">Policy</th>
-                <th className="px-3 py-2">Expires</th>
-                <th className="px-3 py-2">Alert</th>
-                <th className="px-3 py-2">Annual premium</th>
-                <th className="px-3 py-2">Next step</th>
-              </tr>
-            </thead>
-            <tbody>
-              {renewals.length === 0 && (
-                <tr>
-                  <td colSpan={5} className="px-3 py-10 text-center text-stone-500">
-                    <BellRing size={16} className="mx-auto mb-2 text-stone-400" />
-                    No renewals inside the 90-day window.
-                  </td>
-                </tr>
-              )}
-              {renewals.map((p) => (
-                <tr key={p.id} className="border-b border-stone-100 hover:bg-[var(--brand-50)]/40">
-                  <td className="px-3 py-2">
-                    <div className="font-medium text-stone-900">{p.policyNumber}</div>
-                    <div className="text-[11px] text-stone-500">{p.carrierName} · {p.lineLabel}</div>
-                  </td>
-                  <td className="px-3 py-2 text-stone-700">{fmtDate(p.expiresAt)}</td>
-                  <td className="px-3 py-2">
-                    <Chip tone={alertTone(p.alertLevel)}>{alertLabel(p.alertLevel)}</Chip>
-                  </td>
-                  <td className="px-3 py-2 text-stone-700">{fmtMoney(p.annualPremiumCents)}</td>
-                  <td className="px-3 py-2 text-[12px] text-stone-500">
-                    Remarket in slice 2 · agent flags deltas before approval
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="flex flex-col gap-3">
+          <div className="flex items-start gap-2 rounded-md border border-stone-200 bg-stone-50 px-3 py-2 text-[12px] text-stone-600">
+            <Info size={14} className="mt-0.5 shrink-0" />
+            <span>
+              <strong className="text-stone-800">Renew: remarket → compare → approve → bind.</strong>{" "}
+              Remarketed quotes show the premium delta against the prior term before any approval —
+              deltas above the flag threshold are marked red. Auto-renewals are surfaced for review,
+              never silently accepted.
+            </span>
+          </div>
+          {renewalError && (
+            <div className="flex items-center gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-700">
+              <AlertTriangle size={14} />
+              {renewalError}
+            </div>
+          )}
+          {renewalsLoading ? (
+            <div className="flex items-center justify-center gap-2 py-16 text-stone-500">
+              <Loader2 size={16} className="animate-spin" />
+              <span className="text-[13px]">Loading renewals…</span>
+            </div>
+          ) : (
+            <div className="overflow-x-auto rounded-lg border border-stone-200 bg-white shadow-sm">
+              <table className="w-full text-left text-[13px]">
+                <thead>
+                  <tr className="border-b border-stone-200 bg-stone-50 text-[11px] font-medium uppercase tracking-wide text-stone-500">
+                    <th className="px-3 py-2">Policy</th>
+                    <th className="px-3 py-2">Expires</th>
+                    <th className="px-3 py-2">Alert</th>
+                    <th className="px-3 py-2">Prior premium</th>
+                    <th className="px-3 py-2">Delta</th>
+                    <th className="px-3 py-2">Status</th>
+                    <th className="px-3 py-2">Next step</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {renewalRows.length === 0 && (
+                    <tr>
+                      <td colSpan={7} className="px-3 py-10 text-center text-stone-500">
+                        <BellRing size={16} className="mx-auto mb-2 text-stone-400" />
+                        No renewals yet — they are created automatically when a policy is ingested.
+                      </td>
+                    </tr>
+                  )}
+                  {renewalRows.map((r) => (
+                    <Fragment key={r.id}>
+                      <tr className="border-b border-stone-100 hover:bg-[var(--brand-50)]/40">
+                        <td className="px-3 py-2">
+                          <div className="font-medium text-stone-900">{r.policyNumber ?? "—"}</div>
+                          <div className="text-[11px] text-stone-500">
+                            {r.carrierName ?? "not confirmed"}{r.lineLabel ? ` · ${r.lineLabel}` : ""}
+                          </div>
+                        </td>
+                        <td className="px-3 py-2 text-stone-700">
+                          {fmtDate(r.expiresAt)}
+                          <div className="text-[11px] text-stone-500">
+                            {r.daysUntilRenewal >= 0 ? `${r.daysUntilRenewal}d left` : "expired"}
+                          </div>
+                        </td>
+                        <td className="px-3 py-2">
+                          <Chip tone={alertTone(r.alertLevel)}>{alertLabel(r.alertLevel)}</Chip>
+                        </td>
+                        <td className="px-3 py-2 text-stone-700">
+                          {fmtMoney(r.priorPremiumCents)}
+                          {r.newPremiumCents != null && (
+                            <div className="text-[11px] text-stone-500">→ {fmtMoney(r.newPremiumCents)} new</div>
+                          )}
+                        </td>
+                        <td className="px-3 py-2">
+                          <DeltaBadge deltaPct={r.premiumDeltaPct} flagged={r.deltaFlagged} />
+                        </td>
+                        <td className="px-3 py-2">
+                          <div className="flex flex-wrap items-center gap-1">
+                            <Chip tone={remarketTone(r.remarketStatus)}>{r.statusLabel}</Chip>
+                            {r.needsReview && <Chip tone="red">Review</Chip>}
+                          </div>
+                        </td>
+                        <td className="px-3 py-2">
+                          {r.remarketStatus === "detected" && (
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <button
+                                className={btnGhost}
+                                disabled={renewalActingId === r.id}
+                                onClick={() =>
+                                  setRenewalForm(
+                                    renewalForm?.id === r.id && renewalForm.kind === "remarket"
+                                      ? null
+                                      : { id: r.id, kind: "remarket" },
+                                  )
+                                }
+                              >
+                                <RotateCcw size={13} />
+                                Start remarket
+                              </button>
+                              <button
+                                className={btnGhost}
+                                disabled={renewalActingId === r.id}
+                                onClick={() =>
+                                  setRenewalForm(
+                                    renewalForm?.id === r.id && renewalForm.kind === "surface"
+                                      ? null
+                                      : { id: r.id, kind: "surface" },
+                                  )
+                                }
+                              >
+                                <BellRing size={13} />
+                                Surface auto-renew
+                              </button>
+                            </div>
+                          )}
+                          {r.remarketStatus === "remarketing" && (
+                            <button
+                              className={btnGhost}
+                              disabled={renewalActingId === r.id}
+                              onClick={() => void handleFetchQuotes(r.id)}
+                            >
+                              {renewalActingId === r.id ? (
+                                <Loader2 size={13} className="animate-spin" />
+                              ) : (
+                                <RefreshCw size={13} />
+                              )}
+                              Fetch quotes &amp; deltas
+                            </button>
+                          )}
+                          {r.remarketStatus === "quoted" && (
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <button
+                                className={btnGhost}
+                                onClick={() =>
+                                  setRenewalForm(
+                                    renewalForm?.id === r.id && renewalForm.kind === "quotes"
+                                      ? null
+                                      : { id: r.id, kind: "quotes" },
+                                  )
+                                }
+                              >
+                                <Eye size={13} />
+                                View quotes / deltas
+                              </button>
+                              <button className={btnPrimary} onClick={() => setTab("approvals")}>
+                                <Handshake size={13} />
+                                Bind
+                              </button>
+                            </div>
+                          )}
+                          {r.remarketStatus === "bound" && (
+                            <span className="flex items-center gap-1 text-[12px] text-stone-500">
+                              <CheckCircle2 size={13} className="text-emerald-600" />
+                              Renewed
+                            </span>
+                          )}
+                          {r.remarketStatus === "auto_renew_surfaced" && (
+                            <button
+                              className={btnGhost}
+                              onClick={() =>
+                                setRenewalForm(
+                                  renewalForm?.id === r.id && renewalForm.kind === "terms"
+                                    ? null
+                                    : { id: r.id, kind: "terms" },
+                                )
+                              }
+                            >
+                              <Eye size={13} />
+                              Review terms
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                      {renewalForm?.id === r.id && (
+                        <tr className="border-b border-stone-100 bg-stone-50/60">
+                          <td colSpan={7} className="px-4 py-3">
+                            {renewalForm.kind === "remarket" && (
+                              <div>
+                                <h3 className="text-[13px] font-semibold text-stone-900">Start remarket</h3>
+                                <p className="mt-0.5 text-[12px] text-stone-500">
+                                  Creates a draft submission pre-filled from the expiring policy and proposes the
+                                  request_quote governed action (or honors the standing quote rule for this line).
+                                </p>
+                                <div className="mt-2 flex flex-wrap items-center gap-2">
+                                  <label className="flex items-center gap-1.5 text-[12px] font-medium text-stone-600">
+                                    Risk state (2-letter)
+                                    <input
+                                      value={remarketState}
+                                      onChange={(e) => setRemarketState(e.target.value)}
+                                      placeholder="NC"
+                                      maxLength={2}
+                                      className={`${inputCls} w-20 uppercase`}
+                                    />
+                                  </label>
+                                  <button
+                                    className={btnPrimary}
+                                    disabled={renewalActingId === r.id}
+                                    onClick={() => void handleStartRemarket(r.id)}
+                                  >
+                                    {renewalActingId === r.id ? (
+                                      <Loader2 size={14} className="animate-spin" />
+                                    ) : (
+                                      <RotateCcw size={14} />
+                                    )}
+                                    Confirm remarket
+                                  </button>
+                                  <button className={btnGhost} onClick={() => setRenewalForm(null)}>
+                                    Cancel
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                            {renewalForm.kind === "surface" && (
+                              <div>
+                                <h3 className="text-[13px] font-semibold text-stone-900">Surface auto-renewal</h3>
+                                <p className="mt-0.5 text-[12px] text-stone-500">
+                                  Enter the carrier&apos;s renewal terms exactly as quoted. Surfacing never
+                                  auto-accepts — the terms go to review, and acceptance still needs a bind approval.
+                                </p>
+                                <div className="mt-2 flex flex-wrap items-center gap-2">
+                                  <label className="flex items-center gap-1.5 text-[12px] font-medium text-stone-600">
+                                    Renewal premium ($)
+                                    <input
+                                      value={surfacePremium}
+                                      onChange={(e) => setSurfacePremium(e.target.value)}
+                                      placeholder="1250"
+                                      inputMode="decimal"
+                                      className={`${inputCls} w-28`}
+                                    />
+                                  </label>
+                                  <label className="flex items-center gap-1.5 text-[12px] font-medium text-stone-600">
+                                    Carrier
+                                    <input
+                                      value={surfaceCarrier}
+                                      onChange={(e) => setSurfaceCarrier(e.target.value)}
+                                      placeholder="AmTrust"
+                                      className={`${inputCls} w-36`}
+                                    />
+                                  </label>
+                                  <button
+                                    className={btnPrimary}
+                                    disabled={renewalActingId === r.id}
+                                    onClick={() => void handleSurfaceAutoRenew(r.id)}
+                                  >
+                                    {renewalActingId === r.id ? (
+                                      <Loader2 size={14} className="animate-spin" />
+                                    ) : (
+                                      <BellRing size={14} />
+                                    )}
+                                    Surface for review
+                                  </button>
+                                  <button className={btnGhost} onClick={() => setRenewalForm(null)}>
+                                    Cancel
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                            {renewalForm.kind === "quotes" && (
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <h3 className="text-[13px] font-semibold text-stone-900">Renewal quotes</h3>
+                                  <DeltaBadge deltaPct={r.premiumDeltaPct} flagged={r.deltaFlagged} />
+                                  {r.deltaFlagged && (
+                                    <span className="text-[12px] text-red-700">
+                                      Above the flag threshold — review before approving any bind.
+                                    </span>
+                                  )}
+                                </div>
+                                {!r.submission || r.submission.quotes.length === 0 ? (
+                                  <p className="mt-1 text-[12px] text-stone-500">No quotes recorded yet.</p>
+                                ) : (
+                                  <table className="mt-2 w-full text-left text-[12px]">
+                                    <thead>
+                                      <tr className="border-b border-stone-200 text-[10px] font-medium uppercase tracking-wide text-stone-500">
+                                        <th className="px-2 py-1">Carrier</th>
+                                        <th className="px-2 py-1">Premium</th>
+                                        <th className="px-2 py-1">Limits (occ / agg)</th>
+                                        <th className="px-2 py-1">Status</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {r.submission.quotes.map((q) => (
+                                        <tr key={q.id} className="border-b border-stone-100">
+                                          <td className="px-2 py-1.5 font-medium text-stone-900">{q.carrierName}</td>
+                                          <td className="px-2 py-1.5 text-stone-700">{fmtMoney(q.quotedPremiumCents)}</td>
+                                          <td className="px-2 py-1.5 text-stone-700">
+                                            {fmtMoney(q.limitPerOccurrenceCents)} / {fmtMoney(q.limitAggregateCents)}
+                                          </td>
+                                          <td className="px-2 py-1.5">
+                                            <Chip tone={q.status === "quoted" ? "green" : "slate"}>
+                                              {q.status}
+                                            </Chip>
+                                          </td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                )}
+                                <p className="mt-2 text-[12px] text-stone-500">
+                                  To bind a renewal quote, use the <strong className="text-stone-700">Bind</strong> button
+                                  above — binding is proposed and approved in the Approvals tab, then executed on the
+                                  licensed rail.
+                                </p>
+                              </div>
+                            )}
+                            {renewalForm.kind === "terms" && r.autoRenewTerms && (
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <h3 className="text-[13px] font-semibold text-stone-900">
+                                    Carrier auto-renewal terms
+                                  </h3>
+                                  <DeltaBadge deltaPct={r.premiumDeltaPct} flagged={r.deltaFlagged} />
+                                  <Chip tone="red">Needs your decision</Chip>
+                                </div>
+                                <dl className="mt-2 grid grid-cols-2 gap-x-6 gap-y-1.5 text-[13px] md:grid-cols-3">
+                                  {Object.entries(r.autoRenewTerms).map(([k, v]) => (
+                                    <div
+                                      key={k}
+                                      className="flex justify-between gap-3 border-b border-stone-200/70 pb-1"
+                                    >
+                                      <dt className="text-stone-500">{k}</dt>
+                                      <dd className="font-medium text-stone-900">{fmtTermsValue(v)}</dd>
+                                    </div>
+                                  ))}
+                                </dl>
+                                <p className="mt-2 text-[12px] text-stone-500">
+                                  This auto-renewal was surfaced, not accepted. Accepting means remarketing and
+                                  binding through the governed flow — start a fresh remarket from the policy if the
+                                  terms are wrong.
+                                </p>
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       ) : tab === "quoting" ? (
         <div className="flex flex-col gap-4">
