@@ -595,6 +595,8 @@ model Workspace {
   // Wave 2 context.dev slice 4: monitor back-relations.
   monitors                Monitor[]
   monitorChanges          MonitorChange[]
+  // Wave 2 context.dev slice 5: brand sync back-relations.
+  brandSyncs              BrandSync[]
   // Phase 15 slice 3: per-workspace toolkit enablement back-relation.
   workspaceToolkits       WorkspaceToolkit[]
   // Phase 15 slice 4: per-workspace Composio call budget back-relation.
@@ -1061,6 +1063,8 @@ model BrandKit {
   newsletterTemplates NewsletterTemplate[]
   // Phase 16 slice 9: branded report engine send approvals using this kit.
   reportSendApprovals ReportSendApproval[]
+  // Wave 2 context.dev slice 5: brand sync proposals targeting this kit.
+  brandSyncs BrandSync[]
 
   @@map("brand_kits")
 }
@@ -9613,4 +9617,35 @@ model MonitorChange {
   @@index([monitorId, detectedAt])
   @@index([workspaceId, detectedAt])
   @@map("monitor_changes")
+}
+
+// ── Wave 2 context.dev: brand-kit sync proposals (slice 5) ──────────────────
+// BrandSync: a Context.dev brand profile fetched for a domain, diffed against
+// a BrandKit, and held for approval. Nothing touches the live kit until an
+// editor approves — the theming (BrandTheme reads the default kit per render)
+// refreshes automatically once the kit row is updated.
+model BrandSync {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  // Target kit; null = create a new kit from the profile on approval.
+  brandKitId String?   @map("brand_kit_id")
+  brandKit   BrandKit? @relation(fields: [brandKitId], references: [id], onDelete: SetNull)
+
+  domain String
+  // pending_approval | approved(legacy) | rejected | applied | unchanged | failed
+  status String @default("pending_approval")
+
+  profileJson Json @map("profile_json")
+  diffJson    Json @default("[]") @map("diff_json")
+  creditsUsed Int  @default(0) @map("credits_used")
+  error       String?
+
+  decidedAt DateTime? @map("decided_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  @@index([workspaceId, status])
+  @@map("brand_syncs")
 }

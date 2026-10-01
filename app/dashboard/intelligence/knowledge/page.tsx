@@ -4,9 +4,11 @@
 import { redirect } from "next/navigation";
 import { requireUser, getOrCreateWorkspace } from "@/lib/session";
 import { requireWorkspaceRole } from "@/lib/authz";
+import { prisma } from "@/lib/prisma";
 import { listSources } from "@/lib/knowledge/contextdev/sources";
 import { listCrawlJobs } from "@/lib/knowledge/contextdev/crawl";
 import { listMonitors } from "@/lib/knowledge/contextdev/monitor";
+import { listBrandSyncs } from "@/lib/knowledge/contextdev/brandsync";
 import { KnowledgeClient } from "./KnowledgeClient";
 
 export const dynamic = "force-dynamic";
@@ -25,10 +27,16 @@ export default async function KnowledgePage() {
   if (!membership) redirect("/dashboard");
   const canEdit = membership.role !== "viewer";
 
-  const [sources, jobs, monitors] = await Promise.all([
+  const [sources, jobs, monitors, syncs, kits] = await Promise.all([
     listSources(workspace.id),
     listCrawlJobs(workspace.id),
     listMonitors(workspace.id),
+    listBrandSyncs(workspace.id),
+    prisma.brandKit.findMany({
+      where: { workspaceId: workspace.id },
+      select: { id: true, name: true, isDefault: true },
+      orderBy: { name: "asc" },
+    }),
   ]);
 
   return (
@@ -45,6 +53,8 @@ export default async function KnowledgePage() {
         initialSources={JSON.parse(JSON.stringify(sources))}
         initialJobs={JSON.parse(JSON.stringify(jobs))}
         initialMonitors={JSON.parse(JSON.stringify(monitors))}
+        initialSyncs={JSON.parse(JSON.stringify(syncs))}
+        initialKits={JSON.parse(JSON.stringify(kits))}
         canEdit={canEdit}
       />
     </div>

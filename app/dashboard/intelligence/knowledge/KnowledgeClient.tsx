@@ -48,6 +48,26 @@ type MonitorChange = {
   researchTaskId: string | null;
 };
 
+type BrandDiffEntry = {
+  field: string;
+  current: string | null;
+  proposed: string | null;
+};
+
+type BrandSync = {
+  id: string;
+  domain: string;
+  status: string;
+  diffJson: BrandDiffEntry[];
+  creditsUsed: number;
+  error: string | null;
+  createdAt: string;
+  decidedAt: string | null;
+  brandKit: { id: string; name: string; isDefault: boolean } | null;
+};
+
+type BrandKitOption = { id: string; name: string; isDefault: boolean };
+
 const STATUS_BADGE: Record<string, string> = {
   active: "bg-emerald-50 text-emerald-700 ring-emerald-200",
   pending_approval: "bg-amber-50 text-amber-700 ring-amber-200",
@@ -61,43 +81,63 @@ const JOB_BADGE: Record<string, string> = {
   failed: "bg-red-50 text-red-700 ring-red-200",
 };
 
+const SYNC_BADGE: Record<string, string> = {
+  pending_approval: "bg-amber-50 text-amber-700 ring-amber-200",
+  applied: "bg-emerald-50 text-emerald-700 ring-emerald-200",
+  unchanged: "bg-stone-100 text-stone-600 ring-stone-200",
+  rejected: "bg-stone-100 text-stone-600 ring-stone-200",
+  failed: "bg-red-50 text-red-700 ring-red-200",
+};
+
 export function KnowledgeClient({
   initialSources,
   initialJobs,
   initialMonitors,
+  initialSyncs,
+  initialKits,
   canEdit,
 }: {
   initialSources: Source[];
   initialJobs: Job[];
   initialMonitors: Monitor[];
+  initialSyncs: BrandSync[];
+  initialKits: BrandKitOption[];
   canEdit: boolean;
 }) {
-  const [tab, setTab] = useState<"sources" | "jobs" | "monitors">("sources");
+  const [tab, setTab] = useState<"sources" | "jobs" | "monitors" | "brand">("sources");
   const [sources, setSources] = useState(initialSources);
   const [jobs, setJobs] = useState(initialJobs);
   const [monitors, setMonitors] = useState(initialMonitors);
+  const [syncs, setSyncs] = useState(initialSyncs);
+  const [kits] = useState(initialKits);
   const [showForm, setShowForm] = useState(false);
   const [showMonitorForm, setShowMonitorForm] = useState(false);
+  const [showSyncForm, setShowSyncForm] = useState(false);
   const [url, setUrl] = useState("");
   const [sourceType, setSourceType] = useState("page");
   const [monitorName, setMonitorName] = useState("");
   const [monitorUrl, setMonitorUrl] = useState("");
   const [monitorCadence, setMonitorCadence] = useState("daily");
+  const [syncDomain, setSyncDomain] = useState("");
+  const [syncKitId, setSyncKitId] = useState("");
   const [expandedMonitor, setExpandedMonitor] = useState<string | null>(null);
+  const [expandedSync, setExpandedSync] = useState<string | null>(null);
   const [changes, setChanges] = useState<Record<string, MonitorChange[]>>({});
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
   async function refresh() {
-    const [s, j, m] = await Promise.all([
+    const [s, j, m, b] = await Promise.all([
       fetch("/api/knowledge/contextdev/sources").then((r) => r.json()),
       fetch("/api/knowledge/contextdev/jobs").then((r) => r.json()),
       fetch("/api/knowledge/contextdev/monitors").then((r) => r.json()),
+      fetch("/api/knowledge/contextdev/brand-sync").then((r) => r.json()),
     ]);
     if (s.sources) setSources(s.sources);
     if (j.jobs) setJobs(j.jobs);
     if (m.monitors) setMonitors(m.monitors);
+    if (b.syncs) setSyncs(b.syncs);
   }
 
   async function post(path: string, body?: object) {
@@ -204,6 +244,50 @@ export function KnowledgeClient({
     }
   }
 
+  async function proposeSync() {
+    setError(null);
+    setNotice(null);
+    setBusy("propose-sync");
+    try {
+      const { sync } = await post("/api/knowledge/contextdev/brand-sync", {
+        domain: syncDomain,
+        brandKitId: syncKitId || undefined,
+      });
+      setSyncDomain("");
+      setSyncKitId("");
+      setShowSyncForm(false);
+      setNotice(
+        sync.status === "unchanged"
+          ? "Brand profile matches the kit — nothing to approve."
+          : "Brand profile fetched — review the diff, then approve or reject.",
+      );
+      await refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not fetch brand profile");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function syncAct(id: string, action: "approve" | "reject") {
+    setError(null);
+    setNotice(null);
+    setBusy(`sync:${action}:${id}`);
+    try {
+      await post(`/api/knowledge/contextdev/brand-sync/${id}/${action}`);
+      setNotice(
+        action === "approve"
+          ? "Brand kit updated — the dashboard theme picks up the new colors on the next render."
+          : "Sync proposal rejected — the live kit is untouched.",
+      );
+      await refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Action failed");
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function toggleChanges(id: string) {
     if (expandedMonitor === id) {
       setExpandedMonitor(null);
@@ -240,6 +324,7 @@ export function KnowledgeClient({
               ["sources", "Sources"],
               ["jobs", "Crawl jobs"],
               ["monitors", "Monitors"],
+              ["brand", "Brand sync"],
             ] as const
           ).map(([key, label]) => (
             <button
@@ -269,6 +354,14 @@ export function KnowledgeClient({
             className="flex items-center gap-1.5 rounded-md bg-[var(--brand-600)] px-3 py-1.5 text-[13px] font-medium text-white hover:bg-[var(--brand-700)]"
           >
             <Radar className="h-3.5 w-3.5" /> Watch a page
+          </button>
+        )}
+        {canEdit && tab === "brand" && (
+          <button
+            onClick={() => setShowSyncForm((v) => !v)}
+            className="flex items-center gap-1.5 rounded-md bg-[var(--brand-600)] px-3 py-1.5 text-[13px] font-medium text-white hover:bg-[var(--brand-700)]"
+          >
+            <Plus className="h-3.5 w-3.5" /> Sync brand
           </button>
         )}
       </div>
@@ -346,6 +439,44 @@ export function KnowledgeClient({
           >
             {busy === "add-monitor" && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
             Watch
+          </button>
+        </div>
+      )}
+
+      {showSyncForm && (
+        <div className="flex flex-wrap items-end gap-2 rounded-lg border border-stone-200 bg-white p-3">
+          <label className="flex min-w-64 flex-1 flex-col gap-1 text-[12px] font-medium text-stone-600">
+            Domain
+            <input
+              value={syncDomain}
+              onChange={(e) => setSyncDomain(e.target.value)}
+              placeholder="acme.com"
+              className="rounded-md border border-stone-200 px-2.5 py-1.5 text-[13px] text-stone-900 outline-none focus:border-[var(--brand-600)]"
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-[12px] font-medium text-stone-600">
+            Target kit
+            <select
+              value={syncKitId}
+              onChange={(e) => setSyncKitId(e.target.value)}
+              className="rounded-md border border-stone-200 px-2.5 py-1.5 text-[13px] text-stone-900 outline-none focus:border-[var(--brand-600)]"
+            >
+              <option value="">Default kit (or create new)</option>
+              {kits.map((k) => (
+                <option key={k.id} value={k.id}>
+                  {k.name}
+                  {k.isDefault ? " (default)" : ""}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button
+            onClick={proposeSync}
+            disabled={busy === "propose-sync" || !syncDomain.trim()}
+            className="flex items-center gap-1.5 rounded-md bg-[var(--brand-600)] px-3 py-1.5 text-[13px] font-medium text-white hover:bg-[var(--brand-700)] disabled:opacity-50"
+          >
+            {busy === "propose-sync" && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+            Fetch & diff
           </button>
         </div>
       )}
@@ -484,7 +615,7 @@ export function KnowledgeClient({
             </tbody>
           </table>
         </div>
-      ) : (
+      ) : tab === "monitors" ? (
         <div className="overflow-hidden rounded-lg border border-stone-200 bg-white">
           <table className="w-full text-[13px]">
             <thead>
@@ -609,6 +740,161 @@ export function KnowledgeClient({
                 <tr>
                   <td colSpan={canEdit ? 6 : 5} className="px-3 py-8 text-center text-stone-500">
                     No monitors yet — watch a competitor pricing page, changelog, or docs.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <div className="overflow-hidden rounded-lg border border-stone-200 bg-white">
+          <table className="w-full text-[13px]">
+            <thead>
+              <tr className="border-b border-stone-200 bg-stone-50 text-left text-[12px] font-medium text-stone-500">
+                <th className="px-3 py-2">Domain</th>
+                <th className="px-3 py-2">Target kit</th>
+                <th className="px-3 py-2">Status</th>
+                <th className="px-3 py-2 text-right">Changes</th>
+                <th className="px-3 py-2 text-right">Credits</th>
+                <th className="px-3 py-2">Proposed</th>
+                {canEdit && <th className="px-3 py-2 text-right">Actions</th>}
+              </tr>
+            </thead>
+            <tbody>
+              {syncs.map((s) => (
+                <Fragment key={s.id}>
+                  <tr className="border-b border-stone-100 hover:bg-[var(--brand-50)]/40">
+                    <td className="px-3 py-2">
+                      <button
+                        onClick={() => setExpandedSync(expandedSync === s.id ? null : s.id)}
+                        className="font-medium text-stone-900 hover:text-[var(--brand-700)]"
+                        title="Show diff"
+                      >
+                        {s.domain}
+                      </button>
+                      {s.error && <div className="text-[12px] text-red-600">{s.error}</div>}
+                    </td>
+                    <td className="px-3 py-2 text-stone-600">
+                      {s.brandKit ? (
+                        <>
+                          {s.brandKit.name}
+                          {s.brandKit.isDefault && (
+                            <span className="ml-1 text-[11px] text-stone-400">(default)</span>
+                          )}
+                        </>
+                      ) : (
+                        <span className="text-stone-400">new kit on approve</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2">
+                      <span
+                        className={`inline-flex rounded-full px-2 py-0.5 text-[12px] font-medium ring-1 ring-inset ${
+                          SYNC_BADGE[s.status] ?? "bg-stone-100 text-stone-600 ring-stone-200"
+                        }`}
+                      >
+                        {s.status.replace("_", " ")}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2 text-right tabular-nums text-stone-700">
+                      {s.diffJson.length}
+                    </td>
+                    <td className="px-3 py-2 text-right tabular-nums text-stone-700">
+                      {s.creditsUsed}
+                    </td>
+                    <td className="px-3 py-2 text-[12px] text-stone-500">
+                      {new Date(s.createdAt).toLocaleString()}
+                    </td>
+                    {canEdit && (
+                      <td className="px-3 py-2">
+                        {s.status === "pending_approval" ? (
+                          <div className="flex justify-end gap-1.5">
+                            <button
+                              onClick={() => syncAct(s.id, "approve")}
+                              disabled={busy === `sync:approve:${s.id}`}
+                              className="flex items-center gap-1 rounded-md bg-[var(--brand-600)] px-2 py-1 text-[12px] font-medium text-white hover:bg-[var(--brand-700)] disabled:opacity-50"
+                            >
+                              {busy === `sync:approve:${s.id}` ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : (
+                                <Check className="h-3 w-3" />
+                              )}
+                              Approve
+                            </button>
+                            <button
+                              onClick={() => syncAct(s.id, "reject")}
+                              disabled={busy === `sync:reject:${s.id}`}
+                              className="flex items-center gap-1 rounded-md border border-stone-200 px-2 py-1 text-[12px] font-medium text-stone-600 hover:bg-stone-50 disabled:opacity-50"
+                            >
+                              <X className="h-3 w-3" />
+                              Reject
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="text-right text-[12px] text-stone-400">
+                            {s.decidedAt ? new Date(s.decidedAt).toLocaleString() : "—"}
+                          </div>
+                        )}
+                      </td>
+                    )}
+                  </tr>
+                  {expandedSync === s.id && s.diffJson.length > 0 && (
+                    <tr key={`${s.id}-diff`}>
+                      <td colSpan={canEdit ? 7 : 6} className="border-b border-stone-200 bg-stone-50 px-4 py-2">
+                        <table className="w-full text-[12px]">
+                          <thead>
+                            <tr className="text-left text-[11px] font-medium uppercase tracking-wide text-stone-400">
+                              <th className="py-1 pr-3">Field</th>
+                              <th className="py-1 pr-3">Current</th>
+                              <th className="py-1">Proposed</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {s.diffJson.map((d) => (
+                              <tr key={d.field} className="border-t border-stone-200">
+                                <td className="py-1 pr-3 font-mono text-stone-600">{d.field}</td>
+                                <td className="py-1 pr-3 text-stone-500">
+                                  {d.field.startsWith("colors.") && d.current ? (
+                                    <span className="inline-flex items-center gap-1.5">
+                                      <span
+                                        className="inline-block h-3 w-3 rounded-sm ring-1 ring-inset ring-stone-300"
+                                        style={{ backgroundColor: d.current }}
+                                      />
+                                      {d.current}
+                                    </span>
+                                  ) : (
+                                    (d.current ?? <span className="text-stone-300">—</span>)
+                                  )}
+                                </td>
+                                <td className="py-1 font-medium text-stone-800">
+                                  {d.field.startsWith("colors.") && d.proposed ? (
+                                    <span className="inline-flex items-center gap-1.5">
+                                      <span
+                                        className="inline-block h-3 w-3 rounded-sm ring-1 ring-inset ring-stone-300"
+                                        style={{ backgroundColor: d.proposed }}
+                                      />
+                                      {d.proposed}
+                                    </span>
+                                  ) : (
+                                    (d.proposed ?? <span className="text-stone-300">—</span>)
+                                  )}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                        <p className="mt-1 text-[11px] text-stone-400">
+                          Approving applies name, colors, and fonts to the kit and downloads the
+                          logo; the dashboard theme refreshes on the next render.
+                        </p>
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
+              ))}
+              {syncs.length === 0 && (
+                <tr>
+                  <td colSpan={canEdit ? 7 : 6} className="px-3 py-8 text-center text-stone-500">
+                    No brand syncs yet — fetch a brand profile to diff it against a kit.
                   </td>
                 </tr>
               )}
