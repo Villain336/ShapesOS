@@ -2,7 +2,7 @@
 // House pattern: Lucide icon + label, active = brand border + brand text.
 
 import Link from "next/link";
-import { Home, Bell, Timer, MessagesSquare, PartyPopper } from "lucide-react";
+import { Home, Bell, Timer, MessagesSquare, PartyPopper, Receipt } from "lucide-react";
 
 const TABS = [
   { slug: "mode", label: "Mode", icon: Home, href: "/dashboard/wfh" },
@@ -10,6 +10,7 @@ const TABS = [
   { slug: "focus", label: "Focus time", icon: Timer, href: "/dashboard/wfh/focus" },
   { slug: "standups", label: "Standups", icon: MessagesSquare, href: "/dashboard/wfh/standups" },
   { slug: "rituals", label: "Rituals", icon: PartyPopper, href: "/dashboard/wfh/rituals" },
+  { slug: "expenses", label: "Expenses", icon: Receipt, href: "/dashboard/wfh/expenses" },
 ];
 
 export default function WfhTabs({ active }: { active: string }) {

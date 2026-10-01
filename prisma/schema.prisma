@@ -609,6 +609,9 @@ model Workspace {
   wfhStandups             WfhStandup[]
   // Wave 2 WFH mode slice 5: team rituals.
   wfhRituals              WfhRitual[]
+  // Wave 2 WFH mode slice 6: home-office expense pack.
+  wfhExpenseCategories    WfhExpenseCategory[]
+  wfhExpenses             WfhExpense[]
   // Phase 15 slice 3: per-workspace toolkit enablement back-relation.
   workspaceToolkits       WorkspaceToolkit[]
   // Phase 15 slice 4: per-workspace Composio call budget back-relation.
@@ -10123,4 +10126,58 @@ model WfhRitualParticipation {
 
   @@index([ritualId, occurredAt])
   @@map("wfh_ritual_participations")
+}
+
+// ── Wave 2 WFH mode (slice 6): home-office expense pack ─────────────────────
+// Pre-wired categories with allocation rules (flat % or square footage).
+// A category pack + allocation engine, NOT a full expense product. A finance
+// ledger consumes rows via the toLedgerEntry post hook (lib/wfh/expenses.ts).
+
+model WfhExpenseCategory {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  userId String @map("user_id")
+
+  // utilities | internet | phone | equipment | supplies | home-office-space
+  key              String
+  name             String
+  description      String
+  allocationMethod String  @default("flat_percent") @map("allocation_method")
+  allocationPct    Float   @default(0) @map("allocation_pct")
+  officeSqft       Float?  @map("office_sqft")
+  totalSqft        Float?  @map("total_sqft")
+
+  expenses WfhExpense[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([workspaceId, userId, key])
+  @@map("wfh_expense_categories")
+}
+
+model WfhExpense {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  userId String @map("user_id")
+
+  categoryId String             @map("category_id")
+  category   WfhExpenseCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+
+  amountCents      Int      @map("amount_cents")
+  currency         String   @default("USD")
+  occurredOn       DateTime @map("occurred_on")
+  allocationMethod String   @map("allocation_method")
+  allocationPct    Float    @map("allocation_pct")
+  deductibleCents  Int      @map("deductible_cents")
+  note             String?
+  receiptUrl       String?  @map("receipt_url")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([workspaceId, userId, occurredOn])
+  @@map("wfh_expenses")
 }
