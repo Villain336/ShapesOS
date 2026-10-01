@@ -126,6 +126,21 @@ export default function ConnectButton({
       </span>
     );
   }
+  if (platformKey === "walmart") {
+    // Outcome B (slice 4): no advertiser OAuth exists — partner-level auth
+    // only, after a business application. The guided setup flow is the
+    // product; never a dead OAuth button.
+    return (
+      <a
+        href="/dashboard/media/advertising/guided/walmart"
+        className="inline-flex items-center gap-1.5 rounded-md bg-[var(--brand-600)] px-3 py-1.5 text-[12px] font-medium text-white hover:bg-[var(--brand-700)]"
+        title="Walmart Connect is guided-only: launch in Walmart Ad Center, track spend via CSV import"
+      >
+        <ListChecks className="h-3.5 w-3.5" />
+        Guided setup
+      </a>
+    );
+  }
 
   async function connect() {
     setBusy(true);
