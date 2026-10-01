@@ -8,7 +8,13 @@
 
 import { z } from "zod";
 import { CoverForceVendor } from "./coverforce";
-import { LINE_LABELS } from "./types";
+import { InsuranceVendorError } from "./mock-vendor";
+import {
+  executeBind,
+  serializeBindPolicy,
+  serializePaymentHandoff,
+} from "./binding";
+import { InsuranceError, LINE_LABELS } from "./types";
 
 const LINE_VALUES = Object.keys(LINE_LABELS);
 
@@ -63,6 +69,11 @@ const quotesSchema = z.object({
   submissionRef: z.string().trim().min(1).max(80),
 });
 
+const bindSchema = z.object({
+  quoteId: z.string().trim().min(1).max(100),
+  approvalId: z.string().trim().min(1).max(100),
+});
+
 export const INSURANCE_SHIM_TOOLS: ShimToolDef[] = [
   {
     name: "insurance_check_appetite",
@@ -108,6 +119,41 @@ export const INSURANCE_SHIM_TOOLS: ShimToolDef[] = [
       const parsed = quotesSchema.parse(args);
       const quotes = await vendor().getQuotes({ submissionRef: parsed.submissionRef });
       return { data: { quotes, live: false } };
+    },
+  },
+  {
+    name: "insurance_bind_policy",
+    description:
+      "Execute a bind for an APPROVED bind_policy governed action. Heavy " +
+      "gate: requires the explicit human approval id, an appointed licensed " +
+      "partner, and a quoted, unexpired quote whose terms still match the " +
+      "approval disclosure. Premium moves carrier-direct (zero custody) — " +
+      "the OS never holds funds. Fixture data until CoverForce credentials " +
+      "exist; always labeled.",
+    inputSchema: bindSchema,
+    handler: async (ctx, args) => {
+      const parsed = bindSchema.parse(args);
+      try {
+        const result = await executeBind({
+          workspaceId: ctx.workspaceId,
+          quoteId: parsed.quoteId,
+          approvalId: parsed.approvalId,
+          requestedBy: ctx.actor,
+        });
+        return {
+          data: {
+            policy: serializeBindPolicy(result.policy),
+            paymentHandoff: serializePaymentHandoff(result.paymentHandoff),
+            live: result.live,
+            replayed: result.replayed,
+          },
+        };
+      } catch (e) {
+        if (e instanceof InsuranceError || e instanceof InsuranceVendorError) {
+          throw new ShimToolError(e.code, e.message);
+        }
+        throw e;
+      }
     },
   },
 ];

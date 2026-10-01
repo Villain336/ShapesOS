@@ -15,6 +15,9 @@ import {
   InsuranceVendorError,
   MockCoverForceVendor,
   type InsuranceVendor,
+  type VendorBindInput,
+  type VendorBindResult,
+  type VendorIssuePolicyResult,
 } from "./mock-vendor";
 import type { InsuranceLineOfBusiness } from "./types";
 
@@ -92,7 +95,7 @@ export class CoverForceVendor implements InsuranceVendor {
     return this.fixtures.getQuotes(input);
   }
 
-  async bind(input: { quoteRef: string; partnerId: string }): Promise<{ policyNumber: string }> {
+  async bind(input: VendorBindInput): Promise<VendorBindResult> {
     if (!input.partnerId || input.partnerId.trim().length === 0) {
       // Fail closed regardless of mode: LICENSED PARTNER model — the
       // partner holds the licenses, Marketr provides the software.
@@ -105,6 +108,21 @@ export class CoverForceVendor implements InsuranceVendor {
     }
     if (this.mode === "live") this.requireLive("bind");
     return this.fixtures.bind(input);
+  }
+
+  async issuePolicy(input: {
+    quoteId: string;
+    partnerId: string;
+  }): Promise<VendorIssuePolicyResult> {
+    if (!input.partnerId || input.partnerId.trim().length === 0) {
+      throw new InsuranceVendorError(
+        "PARTNER_NOT_APPOINTED",
+        "Issuance is blocked: no appointed licensed partner was provided.",
+      );
+    }
+    if (this.mode === "live") this.requireLive("issuePolicy");
+    // v1: issuance delegates to bind (same as the fixture adapter).
+    return this.fixtures.issuePolicy(input);
   }
 
   async getPolicyDocuments(input: {

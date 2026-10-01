@@ -39,6 +39,32 @@ export interface VendorPolicyFixture {
   status: InsurancePolicyStatus;
 }
 
+// Slice 3b — bind execution surface (SPEC-INSURANCE.md §5).
+export interface VendorBindInput {
+  /** Our quote row id (the vendor's quoteRef is carried in the quote's rawPayload). */
+  quoteId: string;
+  /** Appointed licensed partner's id — REQUIRED (LICENSED PARTNER model). */
+  partnerId: string;
+  /** Idempotency key derived from (quoteId, approvalId); replays must not double-bind. */
+  idempotencyKey: string;
+}
+
+export interface VendorBindResult {
+  policyNumber: string;
+  /** ISO date/datetime the carrier bound coverage from. */
+  effectiveDate: string;
+  /** The carrier's confirmation reference for the bind transaction. */
+  carrierConfirmation: string;
+  /** Bound premium in cents, from the carrier. Null = "not confirmed". */
+  premiumCents: number | null;
+  /** The vendor rail's carrier-direct payment reference (zero custody). */
+  paymentReference: string;
+}
+
+export interface VendorIssuePolicyResult {
+  policyId: string;
+}
+
 /**
  * The vendor adapter every rail implements. Designed so Bold Penguin's DeX ai
  * MCP surface (or any A2A surface) can replace or sit alongside the
@@ -76,8 +102,11 @@ export interface InsuranceVendor {
   >;
   /** Bind a quoted offer. FAIL-CLOSED: requires an appointed licensed
    *  partner's id (LICENSED PARTNER model, Tico 2026-10-01). Without one,
-   *  throws PARTNER_NOT_APPOINTED — never a silent skip. */
-  bind(input: { quoteRef: string; partnerId: string }): Promise<{ policyNumber: string }>;
+   *  throws PARTNER_NOT_APPOINTED — never a silent skip. The idempotency
+   *  key makes replays safe: the same key must never produce two policies. */
+  bind(input: VendorBindInput): Promise<VendorBindResult>;
+  /** Issue a bound policy's documents/issuance record. v1: may delegate to bind. */
+  issuePolicy(input: { quoteId: string; partnerId: string }): Promise<VendorIssuePolicyResult>;
   /** Policy documents for an issued policy. */
   getPolicyDocuments(input: {
     policyNumber: string;
@@ -90,6 +119,32 @@ export class InsuranceVendorError extends Error {
     super(message);
     this.name = "InsuranceVendorError";
     this.code = code;
+  }
+}
+
+/**
+ * Deterministic fixture refs: the same idempotency key always yields the
+ * same policy number / confirmation / payment reference, so replays are
+ * visibly idempotent even at the adapter level. FNV-1a, 8 hex chars.
+ */
+export function fixtureRef(input: string): string {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < input.length; i++) {
+    h ^= input.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return (h >>> 0).toString(16).padStart(8, "0").toUpperCase();
+}
+
+function requirePartnerId(partnerId: string): void {
+  if (!partnerId || partnerId.trim().length === 0) {
+    // Fail closed: LICENSED PARTNER model — no appointed partner, no bind.
+    throw new InsuranceVendorError(
+      "PARTNER_NOT_APPOINTED",
+      "Binding is blocked: no appointed licensed partner was provided. " +
+        "Register a licensed partner (producer license number + licensed " +
+        "states) before binding.",
+    );
   }
 }
 
@@ -242,20 +297,47 @@ export class MockCoverForceVendor implements InsuranceVendor {
     ];
   }
 
-  async bind(input: { quoteRef: string; partnerId: string }): Promise<{ policyNumber: string }> {
-    if (!input.partnerId || input.partnerId.trim().length === 0) {
-      // Fail closed: LICENSED PARTNER model — no appointed partner, no bind.
+  async bind(input: VendorBindInput): Promise<VendorBindResult> {
+    requirePartnerId(input.partnerId);
+    if (!input.quoteId || input.quoteId.trim().length === 0) {
+      throw new InsuranceVendorError("QUOTE_REF_REQUIRED", "bind requires a quote id.");
+    }
+    if (!input.idempotencyKey || input.idempotencyKey.trim().length === 0) {
       throw new InsuranceVendorError(
-        "PARTNER_NOT_APPOINTED",
-        "Binding is blocked: no appointed licensed partner was provided. " +
-          "Register a licensed partner (producer license number + licensed " +
-          "states) before binding.",
+        "IDEMPOTENCY_KEY_REQUIRED",
+        "bind requires an idempotency key derived from (quoteId, approvalId).",
       );
     }
-    void input.quoteRef;
+    // Fixture data, deterministic per idempotency key — clearly labeled, and
+    // the same key can never mint two different policies at this layer.
+    // premiumCents is a deterministic fixture premium (the mock has no quote
+    // context); live mode returns the carrier's real bound premium.
+    const tag = fixtureRef(input.idempotencyKey);
     return {
-      policyNumber: `MOCK-POL-${Date.now().toString(36).toUpperCase()}`,
+      policyNumber: `MOCK-POL-${tag}`,
+      effectiveDate: new Date().toISOString(),
+      carrierConfirmation: `MOCK-CONF-${fixtureRef(`${input.idempotencyKey}:confirm`)}`,
+      premiumCents: 400_000 + (parseInt(tag.slice(2, 6), 16) % 300_000),
+      paymentReference: `MOCK-PAY-${fixtureRef(`${input.idempotencyKey}:pay`)}`,
     };
+  }
+
+  async issuePolicy(input: {
+    quoteId: string;
+    partnerId: string;
+  }): Promise<VendorIssuePolicyResult> {
+    requirePartnerId(input.partnerId);
+    if (!input.quoteId || input.quoteId.trim().length === 0) {
+      throw new InsuranceVendorError("QUOTE_REF_REQUIRED", "issuePolicy requires a quote id.");
+    }
+    // v1: issuance delegates to bind; the issued-policy id is derived from
+    // the bound policy number (fixture-labeled).
+    const bound = await this.bind({
+      quoteId: input.quoteId,
+      partnerId: input.partnerId,
+      idempotencyKey: `issue:${input.quoteId}:${input.partnerId}`,
+    });
+    return { policyId: `MOCK-ISSUED-${bound.policyNumber}` };
   }
 
   async getPolicyDocuments(input: {

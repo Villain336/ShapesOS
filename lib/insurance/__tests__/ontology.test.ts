@@ -254,13 +254,39 @@ describe("mock CoverForce vendor contract", () => {
   });
   it("bind FAILS CLOSED with PARTNER_NOT_APPOINTED when no partner is given", async () => {
     await assert.rejects(
-      () => vendor.bind({ quoteRef: "Q-1", partnerId: "" }),
+      () => vendor.bind({ quoteId: "Q-1", partnerId: "", idempotencyKey: "idem-1" }),
       (e: unknown) =>
         e instanceof InsuranceVendorError && e.code === "PARTNER_NOT_APPOINTED",
     );
   });
   it("bind with an appointed partner returns a fixture policy number", async () => {
-    const result = await vendor.bind({ quoteRef: "Q-1", partnerId: "partner-1" });
+    const result = await vendor.bind({ quoteId: "Q-1", partnerId: "partner-1", idempotencyKey: "idem-1" });
     assert.ok(result.policyNumber.startsWith("MOCK-POL-"));
+    assert.ok(result.carrierConfirmation.startsWith("MOCK-CONF-"));
+    assert.ok(result.paymentReference.startsWith("MOCK-PAY-"));
+    assert.ok(result.premiumCents != null && result.premiumCents > 0);
+  });
+  it("bind requires an idempotency key", async () => {
+    await assert.rejects(
+      () => vendor.bind({ quoteId: "Q-1", partnerId: "partner-1", idempotencyKey: "  " }),
+      (e: unknown) =>
+        e instanceof InsuranceVendorError && e.code === "IDEMPOTENCY_KEY_REQUIRED",
+    );
+  });
+  it("bind is deterministic per idempotency key (same key, same refs)", async () => {
+    const a = await vendor.bind({ quoteId: "Q-1", partnerId: "partner-1", idempotencyKey: "idem-replay" });
+    const b = await vendor.bind({ quoteId: "Q-1", partnerId: "partner-1", idempotencyKey: "idem-replay" });
+    assert.equal(a.policyNumber, b.policyNumber);
+    assert.equal(a.carrierConfirmation, b.carrierConfirmation);
+    assert.equal(a.paymentReference, b.paymentReference);
+  });
+  it("issuePolicy delegates to bind in v1", async () => {
+    const result = await vendor.issuePolicy({ quoteId: "Q-1", partnerId: "partner-1" });
+    assert.ok(result.policyId.startsWith("MOCK-ISSUED-MOCK-POL-"));
+    await assert.rejects(
+      () => vendor.issuePolicy({ quoteId: "Q-1", partnerId: "" }),
+      (e: unknown) =>
+        e instanceof InsuranceVendorError && e.code === "PARTNER_NOT_APPOINTED",
+    );
   });
 });

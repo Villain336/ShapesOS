@@ -752,6 +752,7 @@ model Workspace {
   insuranceLicensedPartners InsuranceLicensedPartner[]
   insuranceAuditEvents    InsuranceAuditEvent[]
   insuranceQuoteRules     InsuranceQuoteRule[]
+  insurancePaymentHandoffs InsurancePaymentHandoff[]
   // Phase 12 (embeds): tenant-scoped GrowthBook flag overrides.
   flagOverrides           WorkspaceFlagOverride[]
   eddmOrders              EddmOrder[]
@@ -10305,6 +10306,11 @@ model InsurancePolicy {
   rawPayload Json   @default("{}") @map("raw_payload")
 
   renewals InsuranceRenewal[]
+  // Quote → policy lineage (slice 3b): quotes bound into this policy.
+  quotes InsuranceQuote[]
+  // Zero-custody payment handoffs: premium funds move carrier-direct; the OS
+  // holds nothing. This table deliberately carries NO OS account fields.
+  paymentHandoffs InsurancePaymentHandoff[]
   // Prior-term lineage: a renewal creates a new Policy row linked back here.
   priorPolicyId String?         @map("prior_policy_id")
   priorPolicy   InsurancePolicy? @relation("PolicyLineage", fields: [priorPolicyId], references: [id], onDelete: SetNull)
@@ -10413,6 +10419,12 @@ model InsuranceQuote {
   vendorNotes              String? @map("vendor_notes")
   // Raw vendor quote payload snapshot.
   rawPayload               Json @default("{}") @map("raw_payload")
+  // Set when this quote is bound: the policy it became (slice 3b lineage).
+  // A renewal quote may also reference the prior term's policy in
+  // rawPayload.renewalOfPolicyId; binding then sets the new policy's
+  // priorPolicyId.
+  policyId String?          @map("policy_id")
+  policy   InsurancePolicy? @relation(fields: [policyId], references: [id], onDelete: SetNull)
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -10420,6 +10432,40 @@ model InsuranceQuote {
   @@index([workspaceId, submissionId])
   @@index([workspaceId, status])
   @@map("insurance_quotes")
+}
+
+// ── Wave 2 Insurance slice 3b: zero-custody payment handoff ─────────────────
+// One record per bound policy documenting that premium funds move
+// carrier-direct through the vendor rail. The OS never holds, floats, or
+// routes premium funds (SPEC-INSURANCE.md §4.4 rule 2) — so this model
+// deliberately carries NO OS account fields: no account numbers, routing
+// numbers, wallet ids, or balances. custodyAssertion is always
+// "carrier_direct"; binding.ts asserts this in code (assertZeroCustodyHandoff)
+// so a future schema edit adding a custody field fails loudly instead of
+// silently.
+model InsurancePaymentHandoff {
+  id          String   @id @default(cuid())
+  workspaceId String   @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  policyId    String   @map("policy_id")
+  policy      InsurancePolicy @relation(fields: [policyId], references: [id], onDelete: Cascade)
+
+  // Premium amount the carrier will collect, from vendor bind data.
+  // Null = "not confirmed" (never a guess).
+  amountCents Int? @map("amount_cents")
+  // Who gets paid: carrier name (+ NAIC when the vendor supplies it).
+  // Always the carrier — never an OS account.
+  payeeCarrier     String  @map("payee_carrier")
+  payeeCarrierNaic String? @map("payee_carrier_naic")
+  // The vendor rail's payment reference (carrier-direct transaction).
+  vendorPaymentRef String? @map("vendor_payment_ref")
+  // Zero-custody assertion. Always "carrier_direct".
+  custodyAssertion String @default("carrier_direct") @map("custody_assertion")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([workspaceId, policyId])
+  @@map("insurance_payment_handoffs")
 }
 
 // ── Wave 2 Insurance (licensed-partner decision, Tico 2026-10-01) ────────────

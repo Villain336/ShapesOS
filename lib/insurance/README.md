@@ -50,7 +50,31 @@ The partner holds the insurance licenses; Marketr provides the software.
 | `coverforce.ts` | 2 | CoverForce adapter (fixture mode; live fails closed) |
 | `mcp-shim.ts` | 2 | Thin MCP tools: `insurance_check_appetite`, `insurance_submit_risk`, `insurance_get_quotes` |
 | `partner.ts` | 2 | Licensed-partner domain, registration validation, bind gate |
-| `__tests__/` | 1–2 | 67 tests: ontology, quoting, partner |
+| `governance.ts` | 3a | Governed actions (request_quote / bind_policy / issue_certificate), approval + audit framework |
+| `binding.ts` | 3b | `executeBind` — the ONLY bind execution entrypoint; disclosure re-verification, zero-custody payment handoff, quote → policy lineage |
+| `__tests__/` | 1–3b | ontology, quoting, partner, governance, binding |
 
-UI: `app/dashboard/insurance/` — policy inventory, renewal alerts, quoting,
-declarations import. API: `app/api/insurance/policies`, `app/api/insurance/submissions`.
+API: `app/api/insurance/policies`, `app/api/insurance/submissions`,
+`app/api/insurance/governance/*`, `app/api/insurance/quotes/[id]/bind` (slice 3b).
+
+## Bind execution (slice 3b)
+
+`executeBind({ workspaceId, quoteId, approvalId, requestedBy? })` runs the
+steps in order, each fail-closed:
+
+1. Quote exists, status is `quoted`, not expired (a `bound` quote replays the
+   existing policy — never double-binds).
+2. The approval is an **approved** `insurance_bind_policy` approval for this
+   quote, and its disclosure (carrier, premium, limits, effective date) still
+   matches the quote — drift fails with `BIND_DISCLOSURE_MISMATCH`.
+3. `requireAppointedPartner(workspaceId)` — `PARTNER_NOT_APPOINTED` otherwise.
+4. `vendor.bind({ quoteId, partnerId, idempotencyKey })` — the key derives
+   from `(quoteId, approvalId)`.
+5. `InsurancePolicy` created from **vendor data only**; limits not returned by
+   the v1 bind response read "not confirmed" (null). `priorPolicyId` is set
+   when the quote's `rawPayload.renewalOfPolicyId` names an existing policy.
+6. `InsurancePaymentHandoff` written: `custodyAssertion: "carrier_direct"`,
+   payee = the carrier, and a code-level assertion (`assertZeroCustodyHandoff`)
+   that no OS account fields exist on the record.
+7. The `InsuranceAuditEvent` for the approval is stamped with the vendor
+   transaction ref (the carrier confirmation).

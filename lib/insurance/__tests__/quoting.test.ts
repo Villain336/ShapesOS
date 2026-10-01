@@ -178,24 +178,26 @@ describe("CoverForce adapter gates", () => {
   it("bind fails closed with PARTNER_NOT_APPOINTED without an appointed partner", async () => {
     const v = new CoverForceVendor({ mode: "fixture" });
     await assert.rejects(
-      () => v.bind({ quoteRef: "Q-1", partnerId: "  " }),
+      () => v.bind({ quoteId: "Q-1", partnerId: "  ", idempotencyKey: "idem-1" }),
       (e: unknown) =>
         e instanceof InsuranceVendorError && e.code === "PARTNER_NOT_APPOINTED",
     );
   });
   it("bind with an appointed partner executes in fixture mode", async () => {
     const v = new CoverForceVendor({ mode: "fixture" });
-    const result = await v.bind({ quoteRef: "Q-1", partnerId: "partner-1" });
+    const result = await v.bind({ quoteId: "Q-1", partnerId: "partner-1", idempotencyKey: "idem-1" });
     assert.ok(result.policyNumber.startsWith("MOCK-POL-"));
+    assert.ok(result.carrierConfirmation.startsWith("MOCK-CONF-"));
+    assert.ok(result.paymentReference.startsWith("MOCK-PAY-"));
   });
 });
 
 describe("thin MCP shim", () => {
   const ctx = { workspaceId: "ws-1", actor: "user-1" };
-  it("exposes exactly three tools", () => {
+  it("exposes exactly four tools", () => {
     assert.deepEqual(
       INSURANCE_SHIM_TOOLS.map((t) => t.name).sort(),
-      ["insurance_check_appetite", "insurance_get_quotes", "insurance_submit_risk"],
+      ["insurance_bind_policy", "insurance_check_appetite", "insurance_get_quotes", "insurance_submit_risk"],
     );
   });
   it("throws a named error for unknown tools", () => {
