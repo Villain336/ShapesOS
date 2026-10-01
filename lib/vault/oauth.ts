@@ -86,6 +86,21 @@ export const OAUTH_CONFIGS: Record<string, OAuthProviderConfig> = {
     clientIdEnv: "META_OAUTH_CLIENT_ID",
     clientSecretEnv: "META_OAUTH_CLIENT_SECRET",
   },
+  // Phase 18 slice 1: Amazon Ads (Login with Amazon). Verified 2026-09-30
+  // against the Amazon Ads API docs: NA authorize https://www.amazon.com/ap/oa,
+  // token https://api.amazon.com/auth/o2/token, scope
+  // advertising::campaign_management. Refresh token is stored vault-encrypted;
+  // only the opaque vault ref lands on AdAccount.tokenRef.
+  "amazon-ads": {
+    authorizeUrl: "https://www.amazon.com/ap/oa",
+    tokenUrl: "https://api.amazon.com/auth/o2/token",
+    scopes: ["advertising::campaign_management"],
+    clientIdEnv: "AMAZON_ADS_CLIENT_ID",
+    clientSecretEnv: "AMAZON_ADS_CLIENT_SECRET",
+  },
+  // NOTE (Phase 18 slice 1): Walmart Connect is NOT registered here yet.
+  // Its partner-program authorize URL is pinned in slice 4 when the
+  // connector is built. startAdsOAuth() fails closed for walmart until then.
 };
 
 export interface OAuthState {
