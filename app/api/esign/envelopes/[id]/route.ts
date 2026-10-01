@@ -30,6 +30,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
         vendorStatus: envelope.vendorStatus,
         documentName: envelope.documentName,
         expiresAt: envelope.expiresAt?.toISOString() ?? null,
+        sourcePdfHash: envelope.sourcePdfHash,
         sealedPdfHash: envelope.sealedPdfHash,
         sealedPdfFetchedAt: envelope.sealedPdfFetchedAt?.toISOString() ?? null,
         voidReason: envelope.voidReason,
