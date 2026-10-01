@@ -605,6 +605,8 @@ model Workspace {
   // Wave 2 WFH mode slice 3: focus blocks + calendar connections.
   wfhFocusBlocks          WfhFocusBlock[]
   wfhCalendarConnections  WfhCalendarConnection[]
+  // Wave 2 WFH mode slice 4: async standups.
+  wfhStandups             WfhStandup[]
   // Phase 15 slice 3: per-workspace toolkit enablement back-relation.
   workspaceToolkits       WorkspaceToolkit[]
   // Phase 15 slice 4: per-workspace Composio call budget back-relation.
@@ -10006,4 +10008,61 @@ model WfhCalendarConnection {
 
   @@unique([workspaceId, userId, provider])
   @@map("wfh_calendar_connections")
+}
+
+// ── Wave 2 WFH mode (slice 4): async standups ───────────────────────────────
+// Written yesterday/today/blockers updates (+optional video), team visibility,
+// comment/reaction thread. One standup per user per workday. A missed standup
+// is a nudge, never a gate.
+
+model WfhStandup {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  userId String @map("user_id")
+
+  // Workday covered, normalized to noon UTC.
+  date       DateTime
+  yesterday  String
+  today      String
+  blockers   String?
+  videoUrl   String? @map("video_url")
+  // team | private
+  visibility String  @default("team")
+
+  comments  WfhStandupComment[]
+  reactions WfhStandupReaction[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([workspaceId, userId, date])
+  @@index([workspaceId, date, visibility])
+  @@map("wfh_standups")
+}
+
+model WfhStandupComment {
+  id        String     @id @default(cuid())
+  standupId String     @map("standup_id")
+  standup   WfhStandup @relation(fields: [standupId], references: [id], onDelete: Cascade)
+  userId String @map("user_id")
+  body      String
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([standupId, createdAt])
+  @@map("wfh_standup_comments")
+}
+
+model WfhStandupReaction {
+  id        String     @id @default(cuid())
+  standupId String     @map("standup_id")
+  standup   WfhStandup @relation(fields: [standupId], references: [id], onDelete: Cascade)
+  userId String @map("user_id")
+  emoji     String
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([standupId, userId])
+  @@map("wfh_standup_reactions")
 }
