@@ -752,6 +752,10 @@ model Workspace {
   insuranceLicensedPartners InsuranceLicensedPartner[]
   insuranceAuditEvents    InsuranceAuditEvent[]
   insuranceQuoteRules     InsuranceQuoteRule[]
+  // Dataset Builder slice 1: Ingest.
+  datasetSources   DatasetSource[]
+  datasetDocuments DatasetDocument[]
+  datasetChunks    DatasetChunk[]
   insurancePaymentHandoffs InsurancePaymentHandoff[]
   insuranceCertificates     InsuranceCertificate[]
   // Phase 12 (embeds): tenant-scoped GrowthBook flag overrides.
@@ -10622,4 +10626,94 @@ model InsuranceQuoteRule {
 
   @@unique([workspaceId, lineOfBusiness])
   @@map("insurance_quote_rules")
+}
+
+// Dataset Builder slice 1: Ingest (BUSINESS-OS-FEATURE-SPECS.md §1).
+// Source = where business knowledge comes from (upload, Google Drive,
+// website crawl, copy-paste). Document = one ingested file/page/text.
+// Chunk = one extract of a document, ALWAYS pointing at its document
+// (non-nullable FK, ON DELETE CASCADE) — zero orphaned chunks, enforced
+// by the database and mirrored by verifyNoOrphanedChunks() in
+// lib/datasetbuilder/register.ts.
+enum DatasetSourceKind {
+  upload
+  drive
+  web
+  paste
+}
+
+enum DatasetDocumentStatus {
+  pending
+  ready
+  failed
+}
+
+model DatasetSource {
+  id          String   @id @default(cuid())
+  workspaceId String   @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  kind DatasetSourceKind @map("kind")
+  // Human label, e.g. "Pricing one-pager.pdf" or "Acme help center crawl".
+  name String
+  // Origin identifier: drive file id, crawled URL, uploaded filename.
+  externalRef String? @map("external_ref")
+  // Kind-specific config (drive connection id, crawl depth, …).
+  config Json @default("{}")
+
+  documents DatasetDocument[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([workspaceId, kind])
+  @@map("dataset_sources")
+}
+
+model DatasetDocument {
+  id          String   @id @default(cuid())
+  workspaceId String   @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  // Non-nullable: a document always belongs to exactly one source.
+  sourceId String        @map("source_id")
+  source   DatasetSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+
+  name      String
+  mimeType  String? @map("mime_type")
+  byteSize  Int?    @map("byte_size")
+  charCount Int     @default(0) @map("char_count")
+  status    DatasetDocumentStatus @default(pending)
+  error     String?
+
+  chunks DatasetChunk[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([workspaceId, sourceId])
+  @@map("dataset_documents")
+}
+
+model DatasetChunk {
+  id          String   @id @default(cuid())
+  workspaceId String   @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  // Non-nullable: the zero-orphaned-chunks invariant. A chunk is never
+  // written without a live document pointer.
+  documentId String          @map("document_id")
+  document   DatasetDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  // Ordinal position of the chunk within its document (0-based).
+  position Int
+  // Character offsets into the document's extracted text.
+  charStart Int @map("char_start")
+  charEnd   Int @map("char_end")
+  text      String
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([documentId, position])
+  @@map("dataset_chunks")
 }

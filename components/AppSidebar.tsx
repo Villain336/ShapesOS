@@ -28,6 +28,7 @@ import {
   Briefcase,
   PenLine,
   Home,
+  Database,
   TrendingUp,
   Kanban,
   ChartColumn,
@@ -109,6 +110,9 @@ const NAV_SECTIONS: {
       { href: "/dashboard/esign", label: "E-sign", icon: PenLine },
       // Wave 2: WFH mode — per-user remote-work mode switch.
       { href: "/dashboard/wfh", label: "WFH mode", icon: Home },
+      // Business OS: Dataset Builder slice 1 — ingest business knowledge
+      // into traceable datasets (Launch pillar on-ramp).
+      { href: "/dashboard/datasets", label: "Datasets", icon: Database },
     ],
   },
 ];

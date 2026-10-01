@@ -1,0 +1,553 @@
+// Marketr — Dataset Builder slice 1: datasets dashboard app (client).
+// Source register + add-source flow (upload / Drive / URL / paste).
+// Agentic OS: tokens only, Lucide icons only, sentence case, black pill
+// primary actions, pills for pressables, cards white radius-lg.
+
+"use client";
+
+import { useCallback, useEffect, useState } from "react";
+import {
+  CheckCircle2,
+  ChevronDown,
+  ClipboardPaste,
+  FileUp,
+  Globe,
+  HardDrive,
+  Loader2,
+  Plus,
+  ShieldCheck,
+  TriangleAlert,
+  type LucideIcon,
+} from "lucide-react";
+
+type SourceKind = "upload" | "drive" | "web" | "paste";
+
+interface RegisterDocument {
+  id: string;
+  name: string;
+  mimeType: string | null;
+  status: "pending" | "ready" | "failed";
+  error: string | null;
+  chunkCount: number;
+  charCount: number;
+  createdAt: string;
+}
+
+interface RegisterSource {
+  id: string;
+  kind: SourceKind;
+  name: string;
+  externalRef: string | null;
+  createdAt: string;
+  documentCount: number;
+  chunkCount: number;
+  charCount: number;
+  documents: RegisterDocument[];
+}
+
+const KIND_META: Record<SourceKind, { label: string; icon: LucideIcon }> = {
+  upload: { label: "Upload file", icon: FileUp },
+  drive: { label: "Google Drive", icon: HardDrive },
+  web: { label: "Website URL", icon: Globe },
+  paste: { label: "Paste text", icon: ClipboardPaste },
+};
+
+function formatCount(n: number): string {
+  return n.toLocaleString("en-US");
+}
+
+export function DatasetsApp() {
+  const [sources, setSources] = useState<RegisterSource[]>([]);
+  const [totals, setTotals] = useState({ sources: 0, documents: 0, chunks: 0, chars: 0 });
+  const [integrityOk, setIntegrityOk] = useState<boolean | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [showAdd, setShowAdd] = useState(false);
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+
+  const refresh = useCallback(async () => {
+    const [regRes, intRes] = await Promise.all([
+      fetch("/api/datasets/sources"),
+      fetch("/api/datasets/integrity"),
+    ]);
+    if (regRes.ok) {
+      const json = await regRes.json();
+      setSources(json.sources);
+      setTotals(json.totals);
+    }
+    if (intRes.ok) {
+      const json = await intRes.json();
+      setIntegrityOk(json.ok === true);
+    }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
+  return (
+    <div className="flex flex-col gap-4">
+      {/* Status strip */}
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="flex items-center gap-2 rounded-full bg-paper px-4 py-2 shadow-hairline">
+          {integrityOk === null ? (
+            <Loader2 size={14} className="animate-spin text-muted" />
+          ) : integrityOk ? (
+            <ShieldCheck size={14} className="text-muted" />
+          ) : (
+            <TriangleAlert size={14} className="text-failed-text" />
+          )}
+          <span className="text-[13px] font-semibold">
+            {integrityOk === null
+              ? "Checking integrity"
+              : integrityOk
+                ? "No orphaned chunks"
+                : "Integrity issue found"}
+          </span>
+        </div>
+        <div className="flex items-center gap-2 text-[13px] text-muted">
+          <span>
+            {formatCount(totals.sources)} sources · {formatCount(totals.documents)}{" "}
+            documents · {formatCount(totals.chunks)} chunks
+          </span>
+        </div>
+        <div className="ml-auto">
+          <button
+            type="button"
+            onClick={() => setShowAdd((v) => !v)}
+            className="aos-press flex h-11 items-center gap-2 rounded-full bg-black px-6 text-[15px] font-semibold text-white"
+          >
+            <Plus size={16} />
+            Add source
+          </button>
+        </div>
+      </div>
+
+      {showAdd && (
+        <AddSourcePanel
+          onAdded={() => {
+            setShowAdd(false);
+            void refresh();
+          }}
+          onCancel={() => setShowAdd(false)}
+        />
+      )}
+
+      {loading ? (
+        <div className="flex items-center gap-2 text-sm text-muted">
+          <Loader2 size={16} className="animate-spin" />
+          Loading sources
+        </div>
+      ) : sources.length === 0 ? (
+        <div className="rounded-lg bg-paper p-8 text-center shadow-hairline">
+          <p className="text-[15px] font-semibold">No sources yet</p>
+          <p className="mt-1 text-sm text-muted">
+            Add your first source — a file, a Drive document, a website, or
+            pasted text — and it becomes chunked, traceable knowledge.
+          </p>
+          <button
+            type="button"
+            onClick={() => setShowAdd(true)}
+            className="aos-press mt-4 h-11 rounded-full bg-black px-6 text-[15px] font-semibold text-white"
+          >
+            Add source
+          </button>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-3">
+          {sources.map((source) => {
+            const meta = KIND_META[source.kind];
+            const Icon = meta.icon;
+            const isOpen = expanded[source.id] ?? false;
+            return (
+              <div key={source.id} className="rounded-lg bg-paper shadow-hairline">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setExpanded((e) => ({ ...e, [source.id]: !isOpen }))
+                  }
+                  className="flex w-full items-center gap-3 rounded-lg px-4 py-3 text-left"
+                  aria-expanded={isOpen}
+                >
+                  <span className="flex h-9 w-9 items-center justify-center rounded-full bg-canvas">
+                    <Icon size={16} />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-[15px] font-semibold">
+                      {source.name}
+                    </span>
+                    <span className="block text-[13px] text-muted">
+                      {meta.label} · {source.documentCount} document
+                      {source.documentCount === 1 ? "" : "s"} ·{" "}
+                      {formatCount(source.chunkCount)} chunks
+                    </span>
+                  </span>
+                  <ChevronDown
+                    size={16}
+                    className={`shrink-0 text-muted transition-transform ${isOpen ? "rotate-180" : ""}`}
+                  />
+                </button>
+                {isOpen && (
+                  <div className="border-t border-line px-4 py-3">
+                    {source.documents.map((doc) => (
+                      <div
+                        key={doc.id}
+                        className="flex items-center gap-3 rounded-md px-2 py-2"
+                      >
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm font-medium">
+                            {doc.name}
+                          </span>
+                          <span className="block font-mono text-[12px] text-subtle">
+                            {doc.mimeType ?? "unknown type"} ·{" "}
+                            {formatCount(doc.charCount)} chars
+                          </span>
+                          {doc.status === "failed" && doc.error && (
+                            <span className="mt-1 block text-[13px] text-failed-text">
+                              {doc.error}
+                            </span>
+                          )}
+                        </span>
+                        <span className="flex items-center gap-1.5 rounded-full bg-canvas px-3 py-1 text-[13px] font-semibold">
+                          {doc.status === "ready" ? (
+                            <CheckCircle2 size={13} />
+                          ) : doc.status === "failed" ? (
+                            <TriangleAlert size={13} className="text-failed-text" />
+                          ) : (
+                            <Loader2 size={13} className="animate-spin" />
+                          )}
+                          {doc.status === "ready"
+                            ? `${formatCount(doc.chunkCount)} chunks`
+                            : doc.status}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AddSourcePanel({
+  onAdded,
+  onCancel,
+}: {
+  onAdded: () => void;
+  onCancel: () => void;
+}) {
+  const [kind, setKind] = useState<SourceKind>("upload");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Form state per kind.
+  const [file, setFile] = useState<File | null>(null);
+  const [uploadLabel, setUploadLabel] = useState("");
+  const [connectionId, setConnectionId] = useState("");
+  const [driveFileId, setDriveFileId] = useState("");
+  const [driveFiles, setDriveFiles] = useState<
+    { id: string; name: string; mimeType: string }[]
+  >([]);
+  const [url, setUrl] = useState("");
+  const [urlLabel, setUrlLabel] = useState("");
+  const [pasteLabel, setPasteLabel] = useState("");
+  const [pasteText, setPasteText] = useState("");
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    try {
+      let res: Response;
+      if (kind === "upload") {
+        if (!file) throw new Error("Choose a file to upload (PDF, DOCX, CSV, or MD).");
+        const form = new FormData();
+        form.append("file", file);
+        if (uploadLabel.trim()) form.append("label", uploadLabel.trim());
+        res = await fetch("/api/datasets/sources", { method: "POST", body: form });
+      } else if (kind === "drive") {
+        if (!connectionId.trim() || !driveFileId.trim()) {
+          throw new Error("Enter a Nango connection id and pick a Drive file.");
+        }
+        res = await fetch("/api/datasets/sources", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            kind: "drive",
+            connectionId: connectionId.trim(),
+            fileId: driveFileId.trim(),
+          }),
+        });
+      } else if (kind === "web") {
+        if (!url.trim()) throw new Error("Enter a website URL to crawl.");
+        res = await fetch("/api/datasets/sources", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            kind: "web",
+            url: url.trim(),
+            ...(urlLabel.trim() ? { label: urlLabel.trim() } : {}),
+          }),
+        });
+      } else {
+        if (!pasteLabel.trim() || !pasteText.trim()) {
+          throw new Error("Pasted text needs an explicit source label.");
+        }
+        res = await fetch("/api/datasets/sources", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            kind: "paste",
+            label: pasteLabel.trim(),
+            text: pasteText,
+          }),
+        });
+      }
+      if (!res.ok) {
+        const json = await res.json().catch(() => null);
+        throw new Error(json?.error ?? json?.message ?? `Request failed (${res.status}).`);
+      }
+      onAdded();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function loadDriveFiles() {
+    if (!connectionId.trim()) {
+      setError("Enter a Nango connection id first.");
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(
+        `/api/datasets/drive/files?connectionId=${encodeURIComponent(connectionId.trim())}`,
+      );
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.error ?? json?.message ?? "Could not list Drive files.");
+      setDriveFiles(json.files ?? []);
+      if ((json.files ?? []).length > 0) setDriveFileId(json.files[0].id);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const inputCls =
+    "h-11 w-full rounded-md border-[1.5px] border-control bg-paper px-3 text-[15px] placeholder:text-subtle focus:border-focus focus:outline-none";
+  const labelCls = "mb-1 block text-[13px] font-semibold";
+
+  return (
+    <form
+      onSubmit={submit}
+      className="flex flex-col gap-4 rounded-lg bg-paper p-4 shadow-hairline md:p-6"
+    >
+      <div className="flex items-center justify-between">
+        <h2 className="text-[18px] font-bold" style={{ fontStretch: "115%" }}>
+          Add source
+        </h2>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="aos-press h-9 rounded-full px-4 text-[14px] font-semibold text-muted shadow-outline"
+        >
+          Cancel
+        </button>
+      </div>
+
+      {/* Kind picker */}
+      <div className="flex flex-wrap gap-2" role="tablist" aria-label="Source kind">
+        {(Object.keys(KIND_META) as SourceKind[]).map((k) => {
+          const Icon = KIND_META[k].icon;
+          const active = kind === k;
+          return (
+            <button
+              key={k}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => {
+                setKind(k);
+                setError(null);
+              }}
+              className={`aos-press flex h-9 items-center gap-2 rounded-full px-4 text-[14px] font-semibold ${
+                active ? "bg-black text-white" : "bg-canvas text-ink"
+              }`}
+            >
+              <Icon size={15} />
+              {KIND_META[k].label}
+            </button>
+          );
+        })}
+      </div>
+
+      {kind === "upload" && (
+        <div className="flex flex-col gap-3">
+          <div>
+            <label className={labelCls} htmlFor="ds-file">
+              File
+            </label>
+            <input
+              id="ds-file"
+              type="file"
+              accept=".pdf,.docx,.csv,.md,.markdown"
+              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+              className="text-[14px]"
+            />
+            <p className="mt-1 text-[13px] text-muted">PDF, DOCX, CSV, or MD — up to 10 MB.</p>
+          </div>
+          <div>
+            <label className={labelCls} htmlFor="ds-upload-label">
+              Label (optional)
+            </label>
+            <input
+              id="ds-upload-label"
+              value={uploadLabel}
+              onChange={(e) => setUploadLabel(e.target.value)}
+              placeholder="Pricing one-pager"
+              className={inputCls}
+            />
+          </div>
+        </div>
+      )}
+
+      {kind === "drive" && (
+        <div className="flex flex-col gap-3">
+          <div>
+            <label className={labelCls} htmlFor="ds-conn">
+              Nango connection id
+            </label>
+            <div className="flex gap-2">
+              <input
+                id="ds-conn"
+                value={connectionId}
+                onChange={(e) => setConnectionId(e.target.value)}
+                placeholder="google-drive-prod"
+                className={inputCls}
+              />
+              <button
+                type="button"
+                onClick={loadDriveFiles}
+                disabled={busy}
+                className="aos-press h-11 shrink-0 rounded-full bg-black px-5 text-[14px] font-semibold text-white disabled:opacity-50"
+              >
+                List files
+              </button>
+            </div>
+            <p className="mt-1 text-[13px] text-muted">
+              Connect Google Drive through Nango Cloud, then list and pick a file.
+            </p>
+          </div>
+          {driveFiles.length > 0 && (
+            <div>
+              <label className={labelCls} htmlFor="ds-drive-file">
+                Drive file
+              </label>
+              <select
+                id="ds-drive-file"
+                value={driveFileId}
+                onChange={(e) => setDriveFileId(e.target.value)}
+                className={inputCls}
+              >
+                {driveFiles.map((f) => (
+                  <option key={f.id} value={f.id}>
+                    {f.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+        </div>
+      )}
+
+      {kind === "web" && (
+        <div className="flex flex-col gap-3">
+          <div>
+            <label className={labelCls} htmlFor="ds-url">
+              Website URL
+            </label>
+            <input
+              id="ds-url"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              placeholder="https://example.com/pricing"
+              inputMode="url"
+              className={inputCls}
+            />
+          </div>
+          <div>
+            <label className={labelCls} htmlFor="ds-url-label">
+              Label (optional)
+            </label>
+            <input
+              id="ds-url-label"
+              value={urlLabel}
+              onChange={(e) => setUrlLabel(e.target.value)}
+              placeholder="Acme pricing page"
+              className={inputCls}
+            />
+          </div>
+        </div>
+      )}
+
+      {kind === "paste" && (
+        <div className="flex flex-col gap-3">
+          <div>
+            <label className={labelCls} htmlFor="ds-paste-label">
+              Source label
+            </label>
+            <input
+              id="ds-paste-label"
+              value={pasteLabel}
+              onChange={(e) => setPasteLabel(e.target.value)}
+              placeholder="Founder notes 2026-10-01"
+              className={inputCls}
+            />
+            <p className="mt-1 text-[13px] text-muted">
+              The label you give is how every chunk from this text stays traced.
+            </p>
+          </div>
+          <div>
+            <label className={labelCls} htmlFor="ds-paste-text">
+              Text
+            </label>
+            <textarea
+              id="ds-paste-text"
+              value={pasteText}
+              onChange={(e) => setPasteText(e.target.value)}
+              rows={6}
+              placeholder="Paste the text to ingest…"
+              className="w-full rounded-md border-[1.5px] border-control bg-paper px-3 py-2 text-[15px] placeholder:text-subtle focus:border-focus focus:outline-none"
+            />
+          </div>
+        </div>
+      )}
+
+      {error && (
+        <p role="alert" className="flex items-start gap-2 text-[14px] text-failed-text">
+          <TriangleAlert size={15} className="mt-0.5 shrink-0" />
+          {error}
+        </p>
+      )}
+
+      <div>
+        <button
+          type="submit"
+          disabled={busy}
+          className="aos-press flex h-11 items-center gap-2 rounded-full bg-black px-6 text-[15px] font-semibold text-white disabled:opacity-50"
+        >
+          {busy && <Loader2 size={15} className="animate-spin" />}
+          {busy ? "Adding" : `Add ${KIND_META[kind].label.toLowerCase()} source`}
+        </button>
+      </div>
+    </form>
+  );
+}
