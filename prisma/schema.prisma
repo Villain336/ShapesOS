@@ -570,6 +570,15 @@ model Workspace {
   // Phase 17 slice 5: HR essentials back-relations.
   opsTeamMembers          OpsTeamMember[]
   opsLeaveRequests        OpsLeaveRequest[]
+  // Phase 18 slice 1: ad-platforms ontology back-relations.
+  adPlatforms             AdPlatform[]
+  adAccounts              AdAccount[]
+  paidAdCampaigns         PaidAdCampaign[]
+  paidAdGroups            PaidAdGroup[]
+  paidAdCreatives         PaidAdCreative[]
+  spendProposals          SpendProposal[]
+  spendApprovals          SpendApproval[]
+  adReports               AdReport[]
   // Phase 15 slice 5: per-workspace catalog drift reports back-relation.
   composioCatalogDrift    ComposioCatalogDrift[]
   // Phase 15 slice 3: per-workspace toolkit enablement back-relation.
@@ -9010,4 +9019,289 @@ model OpsAuditEvent {
   @@index([workspaceId, entity, createdAt])
   @@index([workspaceId, entityId])
   @@map("ops_audit_events")
+}
+
+// ============================================================================
+// Phase 18 slice 1: Ad Platforms ontology — "Buy everywhere, approve everything"
+// ----------------------------------------------------------------------------
+// Platform-agnostic paid-media core for Grow pillar → Advertising. Zero
+// custody of client spend; autopilot never buys media. EVERY spend action
+// (launch, budget change, new flight) flows through SpendProposal →
+// SpendApproval and executes only against a matching, unexpired approval
+// with an identical scope hash (see lib/adplatforms/gate.ts).
+//
+// Naming note: the spec's `AdCampaign` / `AdCreative` names are already taken
+// by the creative-generation models (M12), so the paid-media entities are
+// `PaidAdCampaign` / `PaidAdGroup` / `PaidAdCreative` to avoid collision.
+// ============================================================================
+
+enum AdPlatformKey {
+  amazon
+  stackadapt
+  walmart
+  spotify
+}
+
+enum AdPlatformAuthKind {
+  oauth
+  api_key
+  guided
+}
+
+enum AdAccountStatus {
+  pending
+  connected
+  expired
+  revoked
+  error
+}
+
+enum PaidAdStatus {
+  draft
+  proposed
+  live
+  paused
+  ended
+}
+
+enum SpendProposalKind {
+  launch
+  pause
+  budget_change
+  new_flight
+}
+
+enum SpendProposalStatus {
+  pending
+  approved
+  rejected
+  executed
+  expired
+}
+
+// Platform registry row. Tenant-scoped per repo convention (each workspace
+// gets its own four rows at seed/enablement time); capability flags drive
+// which actions the UI and the gate expose per platform.
+model AdPlatform {
+  id          String           @id @default(cuid())
+  workspaceId String           @map("workspace_id")
+  workspace   Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  key         AdPlatformKey
+  displayName String           @map("display_name")
+  authKind    AdPlatformAuthKind @map("auth_kind")
+  // Capability flags — what slice-N connectors actually support.
+  supportsApiLaunch    Boolean @default(false) @map("supports_api_launch")
+  supportsReportingApi Boolean @default(false) @map("supports_reporting_api")
+  guidedOnly           Boolean @default(false) @map("guided_only")
+  enabled              Boolean @default(true)
+
+  accounts AdAccount[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([workspaceId, key])
+  @@map("ad_platforms")
+}
+
+// One linked advertiser account per platform. The OAuth/API token itself
+// lives in the Latchkey vault — tokenRef is an opaque vault reference
+// ("vault:oauth:<platform>:<id>"), NEVER the credential.
+model AdAccount {
+  id                String         @id @default(cuid())
+  workspaceId       String         @map("workspace_id")
+  workspace         Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  platformId        String         @map("platform_id")
+  platform          AdPlatform     @relation(fields: [platformId], references: [id], onDelete: Cascade)
+  name              String?
+  externalAccountId String         @map("external_account_id")
+  // Opaque vault reference to the stored credential. Nullable until the
+  // OAuth/API-key flow completes.
+  tokenRef          String?        @map("token_ref")
+  status            AdAccountStatus @default(pending)
+  // Reserved for the agency white-label open decision (Phase 18 spec §6):
+  // sub-accounts (GHL-style snapshots) get per-client ad accounts in v2.
+  subAccountId      String?        @map("sub_account_id")
+
+  campaigns PaidAdCampaign[]
+  reports   AdReport[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([workspaceId, platformId, externalAccountId])
+  @@index([workspaceId, status])
+  @@map("ad_accounts")
+}
+
+// Unified paid campaign across all platforms. Platform-native naming is
+// mapped into this shape by each slice-N connector.
+model PaidAdCampaign {
+  id          String       @id @default(cuid())
+  workspaceId String       @map("workspace_id")
+  workspace   Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  accountId   String       @map("account_id")
+  account     AdAccount    @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  // Denormalized for queries that must not join through the account.
+  platformKey AdPlatformKey @map("platform_key")
+
+  name       String
+  objective  String?
+  externalId String?        @map("external_id")
+  status     PaidAdStatus   @default(draft)
+  // Lifetime budget in minor currency units (cents). Null = unmanaged.
+  budgetCents Int?          @map("budget_cents")
+  flightStart DateTime?     @map("flight_start")
+  flightEnd   DateTime?     @map("flight_end")
+
+  groups  PaidAdGroup[]
+  reports AdReport[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([workspaceId, accountId, externalId])
+  @@index([workspaceId, status])
+  @@index([workspaceId, platformKey])
+  @@map("paid_ad_campaigns")
+}
+
+model PaidAdGroup {
+  id          String         @id @default(cuid())
+  workspaceId String         @map("workspace_id")
+  workspace   Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  campaignId  String         @map("campaign_id")
+  campaign    PaidAdCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  name        String
+  externalId  String?        @map("external_id")
+  status      PaidAdStatus   @default(draft)
+  budgetCents Int?           @map("budget_cents")
+
+  creatives PaidAdCreative[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([workspaceId, campaignId])
+  @@map("paid_ad_groups")
+}
+
+model PaidAdCreative {
+  id          String      @id @default(cuid())
+  workspaceId String      @map("workspace_id")
+  workspace   Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  groupId     String      @map("group_id")
+  group       PaidAdGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  name           String
+  externalId     String?  @map("external_id")
+  // Asset refs: [{ url, kind: image|video|audio, hash }] — hashed at
+  // approval time so the executor can re-verify (TOCTOU protection).
+  assetRefs      Json     @default("[]") @map("asset_refs")
+  platformStatus String?  @map("platform_status")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([workspaceId, groupId])
+  @@map("paid_ad_creatives")
+}
+
+// THE gate. Every launch, budget change, or new flight creates one.
+// Execution is impossible without a matching SpendApproval row — the gate
+// (lib/adplatforms/gate.ts) fails closed on: missing approval, rejected /
+// expired / already-executed proposal, or scope-hash mismatch (what was
+// approved must be byte-identical to what executes).
+model SpendProposal {
+  id          String             @id @default(cuid())
+  workspaceId String             @map("workspace_id")
+  workspace   Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  kind   SpendProposalKind
+  action String // launch | pause | adjust_budget — mirrors the governed action
+  // Polymorphic target: "campaign" | "group". Kept as strings so v2 can
+  // add targets without a schema change.
+  targetType String @map("target_type")
+  targetId   String @map("target_id")
+  // Full execution payload (budgets, flight dates, creative refs). The
+  // scopeHash binds approval → execution: canonical JSON → SHA-256.
+  payload   Json
+  scopeHash String @map("scope_hash")
+
+  status     SpendProposalStatus @default(pending)
+  proposedBy String              @map("proposed_by")
+  proposedAt DateTime            @default(now()) @map("proposed_at")
+  decidedBy  String?             @map("decided_by")
+  decidedAt  DateTime?           @map("decided_at")
+  // Proposals expire un-acted-upon so a stale approval can never fire.
+  expiresAt  DateTime            @map("expires_at")
+
+  approval SpendApproval?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([workspaceId, status])
+  @@index([workspaceId, targetType, targetId])
+  @@map("spend_proposals")
+}
+
+// Immutable approval record. NO updatedAt — the service layer never updates
+// or deletes these rows; a changed mind is a new proposal.
+model SpendApproval {
+  id          String        @id @default(cuid())
+  workspaceId String        @map("workspace_id")
+  workspace   Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  proposalId  String        @unique @map("proposal_id")
+  proposal    SpendProposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+
+  approver  String   @map("approver")
+  decidedAt DateTime @default(now()) @map("decided_at")
+  // Must equal the proposal's scopeHash at approval time AND at execution
+  // time. Any drift = fail closed.
+  scopeHash String   @map("scope_hash")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([workspaceId, approver])
+  @@map("spend_approvals")
+}
+
+// Normalized daily metrics per campaign. Connectors (slices 2–5) map raw
+// platform exports into this shape via lib/adplatforms/reporting.ts.
+// Lineage: report row → campaign → SpendApproval → platform receipt id.
+model AdReport {
+  id          String         @id @default(cuid())
+  workspaceId String         @map("workspace_id")
+  workspace   Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  platformId  String         @map("platform_id")
+  accountId   String         @map("account_id")
+  account     AdAccount      @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  campaignId  String         @map("campaign_id")
+  campaign    PaidAdCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  // The day these metrics describe (date portion only).
+  date         DateTime @db.Date
+  spendCents   Int      @default(0) @map("spend_cents")
+  impressions  Int      @default(0)
+  clicks       Int      @default(0)
+  // Stored (not derived) so a platform's own CTR survives rounding.
+  ctr          Float?   @map("ctr")
+  conversions  Float    @default(0)
+  revenueCents Int      @default(0) @map("revenue_cents")
+
+  // Lineage: which approval authorized the spend, and the platform's own
+  // receipt/report id for the row.
+  approvalId        String?       @map("approval_id")
+  platformReceiptId String?       @map("platform_receipt_id")
+  // Raw platform row for audit/reconciliation.
+  raw               Json          @default("{}")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([workspaceId, campaignId, date])
+  @@index([workspaceId, date])
+  @@map("ad_reports")
 }
