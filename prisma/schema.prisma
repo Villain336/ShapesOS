@@ -579,6 +579,9 @@ model Workspace {
   spendProposals          SpendProposal[]
   spendApprovals          SpendApproval[]
   adReports               AdReport[]
+  // Wave 2 ChatGPT Ads: conversational-intent campaign back-relations.
+  chatGPTCampaigns        ChatGPTCampaign[]
+  creativeVariants        CreativeVariant[]
   // Phase 15 slice 5: per-workspace catalog drift reports back-relation.
   composioCatalogDrift    ComposioCatalogDrift[]
   // Phase 15 slice 3: per-workspace toolkit enablement back-relation.
@@ -9156,6 +9159,8 @@ model PaidAdCampaign {
 
   groups  PaidAdGroup[]
   reports AdReport[]
+  // Wave 2 ChatGPT Ads: 1:1 conversational-intent extension (optional).
+  chatGPTExtension ChatGPTCampaign?
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -9304,4 +9309,107 @@ model AdReport {
   @@unique([workspaceId, campaignId, date])
   @@index([workspaceId, date])
   @@map("ad_reports")
+}
+
+// Wave 2 — ChatGPT Ads module: conversational-intent campaigns.
+//
+// ChatGPT ads are bought through the Phase 18 StackAdapt rail (a confirmed
+// OpenAI launch partner) — there is no public self-serve OpenAI ads API, so
+// no new AdPlatformKey is added. ChatGPTCampaign is a 1:1 extension of the
+// Phase 18 PaidAdCampaign (which carries platformKey=stackadapt, the ad
+// account link, and the external id); this model carries the
+// conversational-intent fields. Every spend action still flows through the
+// Phase 18 SpendProposal → SpendApproval gate; this module never executes
+// spend itself.
+// ============================================================================
+
+enum ChatGPTCampaignStatus {
+  draft
+  proposed
+  approved
+  live
+  paused
+  ended
+}
+
+enum ChatGPTTier {
+  free
+  go
+}
+
+enum ChatGPTBidStrategy {
+  cpc
+  cpm
+}
+
+enum CreativeVariantSource {
+  ai_generated
+  human
+}
+
+enum CreativeApprovalStatus {
+  pending
+  approved
+  rejected
+}
+
+model ChatGPTCampaign {
+  id          String   @id @default(cuid())
+  workspaceId String   @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  // 1:1 extension of the Phase 18 paid campaign (stackadapt platform key).
+  campaignId String         @unique @map("campaign_id")
+  campaign   PaidAdCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  objective  String?
+  targetTiers ChatGPTTier[] @map("target_tiers")
+  // Conversation-topic intent tags (Audience Tools, June 2026).
+  topicIntentTags String[] @map("topic_intent_tags")
+  // Budgets in minor currency units (cents). At least one must be set —
+  // propose_chatgpt_campaign fails closed without a budget cap.
+  budgetDailyCents Int? @map("budget_daily_cents")
+  budgetTotalCents Int? @map("budget_total_cents")
+  bidStrategy ChatGPTBidStrategy @default(cpc) @map("bid_strategy")
+  // StackAdapt campaign id once launched (buying on-ramp).
+  stackAdaptExternalId String? @map("stackadapt_external_id")
+  status ChatGPTCampaignStatus @default(draft)
+
+  creatives CreativeVariant[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([workspaceId, status])
+  @@map("chatgpt_campaigns")
+}
+
+model CreativeVariant {
+  id          String   @id @default(cuid())
+  workspaceId String   @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  campaignId  String   @map("campaign_id")
+  campaign    ChatGPTCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  headline String
+  body     String
+  ctaLabel String? @map("cta_label")
+  locale   String  @default("en-US")
+  source   CreativeVariantSource @default(human)
+  // Provenance: who made this ad (provider + model), answerable on demand.
+  aiProviderUsed String? @map("ai_provider_used")
+  aiModelUsed    String? @map("ai_model_used")
+  approvalStatus CreativeApprovalStatus @default(pending) @map("approval_status")
+  // OpenAI policy flags raised during review (empty = clean).
+  policyFlags String[] @default([]) @map("policy_flags")
+  // Lineage: localized/mutated variants keep their parent link.
+  parentVariantId String? @map("parent_variant_id")
+  parentVariant   CreativeVariant? @relation("VariantLineage", fields: [parentVariantId], references: [id], onDelete: SetNull)
+  childVariants   CreativeVariant[] @relation("VariantLineage")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([workspaceId, campaignId])
+  @@index([workspaceId, approvalStatus])
+  @@map("creative_variants")
 }
