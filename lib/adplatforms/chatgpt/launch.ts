@@ -21,7 +21,7 @@ import {
   type SpendProposalStore,
 } from "../gate";
 import { prismaApprovalStore, prismaProposalStore } from "../store";
-import { createStackAdaptExecutor, type StackAdaptExecutorDeps } from "../stackadapt/executor";
+import { createStackAdaptExecutor, type StackAdaptCampaignStore, type StackAdaptExecutorDeps } from "../stackadapt/executor";
 import { assertStatusTransition, ChatGPTAdsError, type ChatGPTCampaignStatus } from "./types";
 
 /** Approval-token freshness window: a launch needs a decision made within this. */
@@ -141,6 +141,43 @@ function requireFreshApproval(approval: SpendApproval | null): SpendApproval {
   return approval;
 }
 
+/**
+ * StackAdapt campaign store bound to the ChatGPT draft row. The default
+ * StackAdapt store upserts a NEW PaidAdCampaign by (workspace, account,
+ * externalId) — for ChatGPT the draft row already exists, so this store
+ * updates it in place (sets the external id) instead of duplicating it.
+ * Reporting then resolves AdReport rows to the same campaign the proposal
+ * was written against.
+ */
+function chatGPTLaunchStore(paidCampaignId: string): StackAdaptCampaignStore {
+  return {
+    async upsertLaunchedCampaign(input) {
+      await prisma.paidAdCampaign.update({
+        where: { id: paidCampaignId },
+        data: {
+          externalId: input.externalId,
+          status: input.status,
+          budgetCents: input.budgetCents,
+          flightStart: input.flightStart ?? null,
+          flightEnd: input.flightEnd ?? null,
+        },
+      });
+    },
+    async markPaused(input) {
+      await prisma.paidAdCampaign.updateMany({
+        where: { workspaceId: input.workspaceId, accountId: input.accountId, externalId: input.externalId },
+        data: { status: "paused" },
+      });
+    },
+    async setBudget(input) {
+      await prisma.paidAdCampaign.updateMany({
+        where: { workspaceId: input.workspaceId, accountId: input.accountId, externalId: input.externalId },
+        data: { budgetCents: input.budgetCents },
+      });
+    },
+  };
+}
+
 function checkChecklist(campaign: ChatGPTLaunchableCampaign, checklist: LaunchChecklist): void {
   if (!checklist.tiersConfirmed || campaign.targetTiers.length === 0) {
     throw new ChatGPTAdsError("CHECKLIST_INCOMPLETE", "Launch refused: confirm the tier targeting.");
@@ -222,7 +259,12 @@ export async function launchChatGPTCampaign(
     );
   }
 
-  const stackAdaptExecutor = createStackAdaptExecutor(ctx.stackAdapt);
+  const stackAdaptExecutor = createStackAdaptExecutor({
+    ...ctx.stackAdapt,
+    // Tests inject a stub store; production binds the launch to the existing
+    // draft row so the executor never duplicates the PaidAdCampaign.
+    campaigns: ctx.stackAdapt?.campaigns ?? chatGPTLaunchStore(campaign.paidCampaign.id),
+  });
 
   // payload is the proposal's stored payload — byte-identical to what the
   // scope hash was computed over. The executor translates it onto the

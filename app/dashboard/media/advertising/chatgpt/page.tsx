@@ -11,10 +11,16 @@ import { requireWorkspaceRole } from "@/lib/authz";
 import { prisma } from "@/lib/prisma";
 import { ensureAdPlatforms } from "@/lib/adplatforms/oauth";
 import { adsManagerDeepLink } from "@/lib/adplatforms/chatgpt/types";
+import {
+  computeCpaDrift,
+  getChatGPTReportRows,
+  summarizeAdRows,
+} from "@/lib/adplatforms/chatgpt/reporting";
 import AdsTabs from "../_components/AdsTabs";
 import ProposeCampaignForm from "./_components/ProposeCampaignForm";
 import LaunchChecklistPanel from "./_components/LaunchChecklistPanel";
 import PauseControls from "./_components/PauseControls";
+import ReportPanel from "./_components/ReportPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -86,6 +92,22 @@ export default async function ChatGPTAdsPage() {
       approvedProposalByTarget.set(p.targetId, p.id);
     }
   }
+
+  // Report data for campaigns that have run (read-only drift display — the
+  // pull-report route is what raises variance alerts).
+  const reportData = await Promise.all(
+    campaigns
+      .filter((c) => ["live", "paused", "ended"].includes(c.status))
+      .map(async (c) => {
+        const rows = await getChatGPTReportRows(workspace.id, c.campaign.id, 14);
+        return {
+          id: c.id,
+          name: c.campaign.name,
+          summary: summarizeAdRows(rows),
+          drift: computeCpaDrift(rows),
+        };
+      }),
+  );
 
   return (
     <div className="flex h-full flex-col gap-4 bg-[#FAFAF7] p-4 md:p-6">
@@ -183,6 +205,27 @@ export default async function ChatGPTAdsPage() {
           </div>
         ))}
 
+      {reportData.map((r) => (
+        <div key={r.id} className="overflow-hidden rounded-lg border border-stone-200 bg-white">
+          <div className="border-b border-stone-200 bg-stone-50 px-3 py-2 text-[12px] font-medium text-stone-600">
+            Report — {r.name}
+          </div>
+          <div className="p-3">
+            <ReportPanel
+              campaignId={r.id}
+              summary={r.summary}
+              variance={{
+                flagged: r.drift.flaggable,
+                driftRatio: r.drift.driftRatio,
+                recentCpaCents: r.drift.recentCpaCents,
+                priorCpaCents: r.drift.priorCpaCents,
+                reason: r.drift.reason,
+              }}
+            />
+          </div>
+        </div>
+      ))}
+
       <div className="rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-[13px] text-stone-500">
         There is no public OpenAI ads API — buying runs through StackAdapt and the{" "}
         <a href="https://ads.openai.com/" target="_blank" rel="noreferrer" className="underline">
@@ -192,7 +235,8 @@ export default async function ChatGPTAdsPage() {
         <Link href="/dashboard/media/advertising/proposals" className="underline">
           Open the proposal inbox
         </Link>
-        .
+        . Server-side conversion events (Conversions API) are built with hashed identifiers only —
+        sending one requires your explicit acceptance of OpenAI&apos;s ads data terms per event.
       </div>
     </div>
   );

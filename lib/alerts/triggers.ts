@@ -231,6 +231,15 @@ export const TRIGGERS: TriggerDef[] = [
     dedupAvailable: true,
     live: true, // Phase 15 slice 4: emitted by lib/integrations/actions/budget.ts.
   },
+  {
+    key: "chatgpt_cpa_drift",
+    label: "ChatGPT ads CPA drift",
+    description:
+      "A ChatGPT campaign's 7-day CPA drifted more than 20% versus the prior 7 days. Review targeting, tiers, and creative before the next flight.",
+    conditionKeys: ["thresholdRatio"],
+    dedupAvailable: true,
+    live: true, // Wave 2 ChatGPT Ads slice 4: emitted by lib/adplatforms/chatgpt/reporting.ts.
+  },
 ];
 
 export function triggerDef(key: string): TriggerDef | undefined {
