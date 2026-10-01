@@ -4,8 +4,8 @@
 
 "use client";
 
-import { useState } from "react";
-import { Plus, Globe, Check, X, Play, Loader2 } from "lucide-react";
+import { useState, Fragment } from "react";
+import { Plus, Globe, Check, X, Play, Loader2, Pause, Radar } from "lucide-react";
 
 type Source = {
   id: string;
@@ -27,6 +27,27 @@ type Job = {
   source: { url: string; sourceType: string } | null;
 };
 
+type Monitor = {
+  id: string;
+  name: string;
+  url: string;
+  cadence: string;
+  status: string;
+  lastCheckedAt: string | null;
+  lastChangeAt: string | null;
+  consecutiveFailures: number;
+  autoResearch: boolean;
+  _count: { changes: number };
+};
+
+type MonitorChange = {
+  id: string;
+  detectedAt: string;
+  digest: string;
+  excerpt: string | null;
+  researchTaskId: string | null;
+};
+
 const STATUS_BADGE: Record<string, string> = {
   active: "bg-emerald-50 text-emerald-700 ring-emerald-200",
   pending_approval: "bg-amber-50 text-amber-700 ring-amber-200",
@@ -43,29 +64,40 @@ const JOB_BADGE: Record<string, string> = {
 export function KnowledgeClient({
   initialSources,
   initialJobs,
+  initialMonitors,
   canEdit,
 }: {
   initialSources: Source[];
   initialJobs: Job[];
+  initialMonitors: Monitor[];
   canEdit: boolean;
 }) {
-  const [tab, setTab] = useState<"sources" | "jobs">("sources");
+  const [tab, setTab] = useState<"sources" | "jobs" | "monitors">("sources");
   const [sources, setSources] = useState(initialSources);
   const [jobs, setJobs] = useState(initialJobs);
+  const [monitors, setMonitors] = useState(initialMonitors);
   const [showForm, setShowForm] = useState(false);
+  const [showMonitorForm, setShowMonitorForm] = useState(false);
   const [url, setUrl] = useState("");
   const [sourceType, setSourceType] = useState("page");
+  const [monitorName, setMonitorName] = useState("");
+  const [monitorUrl, setMonitorUrl] = useState("");
+  const [monitorCadence, setMonitorCadence] = useState("daily");
+  const [expandedMonitor, setExpandedMonitor] = useState<string | null>(null);
+  const [changes, setChanges] = useState<Record<string, MonitorChange[]>>({});
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
   async function refresh() {
-    const [s, j] = await Promise.all([
+    const [s, j, m] = await Promise.all([
       fetch("/api/knowledge/contextdev/sources").then((r) => r.json()),
       fetch("/api/knowledge/contextdev/jobs").then((r) => r.json()),
+      fetch("/api/knowledge/contextdev/monitors").then((r) => r.json()),
     ]);
     if (s.sources) setSources(s.sources);
     if (j.jobs) setJobs(j.jobs);
+    if (m.monitors) setMonitors(m.monitors);
   }
 
   async function post(path: string, body?: object) {
@@ -121,6 +153,73 @@ export function KnowledgeClient({
     }
   }
 
+  async function addMonitor() {
+    setError(null);
+    setNotice(null);
+    setBusy("add-monitor");
+    try {
+      await post("/api/knowledge/contextdev/monitors", {
+        name: monitorName,
+        url: monitorUrl,
+        cadence: monitorCadence,
+      });
+      setMonitorName("");
+      setMonitorUrl("");
+      setShowMonitorForm(false);
+      setNotice("Monitor registered — its first run captures the baseline, then it watches for changes.");
+      await refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not add monitor");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function monitorAct(id: string, action: "run" | "pause" | "resume") {
+    setError(null);
+    setNotice(null);
+    setBusy(`monitor:${action}:${id}`);
+    try {
+      if (action === "run") {
+        const { result } = await post(`/api/knowledge/contextdev/monitors/${id}/run`);
+        setNotice(
+          result.outcome === "changed"
+            ? `Change detected: ${result.changeId ? "digest recorded" : ""}${result.researchTaskId ? " + research task spawned" : ""}.`
+            : `Monitor check: ${result.outcome}${result.error ? ` — ${result.error}` : ""}.`,
+        );
+      } else {
+        const res = await fetch(`/api/knowledge/contextdev/monitors/${id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: action === "pause" ? "paused" : "active" }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
+      }
+      await refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Action failed");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function toggleChanges(id: string) {
+    if (expandedMonitor === id) {
+      setExpandedMonitor(null);
+      return;
+    }
+    setExpandedMonitor(id);
+    if (!changes[id]) {
+      try {
+        const data = await fetch(`/api/knowledge/contextdev/monitors/${id}/changes`).then((r) => r.json());
+        if (data.changes) setChanges((c) => ({ ...c, [id]: data.changes }));
+      } catch {
+        /* non-fatal */
+      }
+    }
+  }
+
   return (
     <div className="flex flex-col gap-4">
       {error && (
@@ -140,6 +239,7 @@ export function KnowledgeClient({
             [
               ["sources", "Sources"],
               ["jobs", "Crawl jobs"],
+              ["monitors", "Monitors"],
             ] as const
           ).map(([key, label]) => (
             <button
@@ -161,6 +261,14 @@ export function KnowledgeClient({
             className="flex items-center gap-1.5 rounded-md bg-[var(--brand-600)] px-3 py-1.5 text-[13px] font-medium text-white hover:bg-[var(--brand-700)]"
           >
             <Plus className="h-3.5 w-3.5" /> Add source
+          </button>
+        )}
+        {canEdit && tab === "monitors" && (
+          <button
+            onClick={() => setShowMonitorForm((v) => !v)}
+            className="flex items-center gap-1.5 rounded-md bg-[var(--brand-600)] px-3 py-1.5 text-[13px] font-medium text-white hover:bg-[var(--brand-700)]"
+          >
+            <Radar className="h-3.5 w-3.5" /> Watch a page
           </button>
         )}
       </div>
@@ -195,6 +303,49 @@ export function KnowledgeClient({
           >
             {busy === "add" && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
             Register
+          </button>
+        </div>
+      )}
+
+      {showMonitorForm && (
+        <div className="flex flex-wrap items-end gap-2 rounded-lg border border-stone-200 bg-white p-3">
+          <label className="flex min-w-40 flex-col gap-1 text-[12px] font-medium text-stone-600">
+            Name
+            <input
+              value={monitorName}
+              onChange={(e) => setMonitorName(e.target.value)}
+              placeholder="Competitor pricing page"
+              className="rounded-md border border-stone-200 px-2.5 py-1.5 text-[13px] text-stone-900 outline-none focus:border-[var(--brand-600)]"
+            />
+          </label>
+          <label className="flex min-w-64 flex-1 flex-col gap-1 text-[12px] font-medium text-stone-600">
+            URL to watch
+            <input
+              value={monitorUrl}
+              onChange={(e) => setMonitorUrl(e.target.value)}
+              placeholder="https://competitor.com/pricing"
+              className="rounded-md border border-stone-200 px-2.5 py-1.5 text-[13px] text-stone-900 outline-none focus:border-[var(--brand-600)]"
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-[12px] font-medium text-stone-600">
+            Cadence
+            <select
+              value={monitorCadence}
+              onChange={(e) => setMonitorCadence(e.target.value)}
+              className="rounded-md border border-stone-200 px-2.5 py-1.5 text-[13px] text-stone-900 outline-none focus:border-[var(--brand-600)]"
+            >
+              <option value="hourly">Hourly</option>
+              <option value="daily">Daily</option>
+              <option value="weekly">Weekly</option>
+            </select>
+          </label>
+          <button
+            onClick={addMonitor}
+            disabled={busy === "add-monitor" || !monitorName.trim() || !monitorUrl.trim()}
+            className="flex items-center gap-1.5 rounded-md bg-[var(--brand-600)] px-3 py-1.5 text-[13px] font-medium text-white hover:bg-[var(--brand-700)] disabled:opacity-50"
+          >
+            {busy === "add-monitor" && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+            Watch
           </button>
         </div>
       )}
@@ -287,7 +438,7 @@ export function KnowledgeClient({
             </tbody>
           </table>
         </div>
-      ) : (
+      ) : tab === "jobs" ? (
         <div className="overflow-hidden rounded-lg border border-stone-200 bg-white">
           <table className="w-full text-[13px]">
             <thead>
@@ -327,6 +478,137 @@ export function KnowledgeClient({
                 <tr>
                   <td colSpan={4} className="px-3 py-8 text-center text-stone-500">
                     No crawl jobs yet.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <div className="overflow-hidden rounded-lg border border-stone-200 bg-white">
+          <table className="w-full text-[13px]">
+            <thead>
+              <tr className="border-b border-stone-200 bg-stone-50 text-left text-[12px] font-medium text-stone-500">
+                <th className="px-3 py-2">Monitor</th>
+                <th className="px-3 py-2">Cadence</th>
+                <th className="px-3 py-2">Status</th>
+                <th className="px-3 py-2 text-right">Changes</th>
+                <th className="px-3 py-2">Last checked</th>
+                {canEdit && <th className="px-3 py-2 text-right">Actions</th>}
+              </tr>
+            </thead>
+            <tbody>
+              {monitors.map((m) => (
+                <Fragment key={m.id}>
+                  <tr className="border-b border-stone-100 hover:bg-[var(--brand-50)]/40">
+                    <td className="px-3 py-2">
+                      <button
+                        onClick={() => toggleChanges(m.id)}
+                        className="max-w-80 truncate text-left font-medium text-stone-900 hover:text-[var(--brand-700)]"
+                        title="Show detected changes"
+                      >
+                        {m.name}
+                      </button>
+                      <div className="max-w-80 truncate text-[12px] text-stone-500">{m.url}</div>
+                      {m.consecutiveFailures > 0 && (
+                        <div className="text-[12px] text-red-600">
+                          {m.consecutiveFailures} consecutive failures
+                          {m.status === "paused" && " — auto-paused"}
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-3 py-2 text-stone-600">{m.cadence}</td>
+                    <td className="px-3 py-2">
+                      <span
+                        className={`inline-flex rounded-full px-2 py-0.5 text-[12px] font-medium ring-1 ring-inset ${
+                          m.status === "active"
+                            ? "bg-green-50 text-green-700 ring-green-200"
+                            : m.status === "paused"
+                              ? "bg-amber-50 text-amber-700 ring-amber-200"
+                              : "bg-stone-100 text-stone-600 ring-stone-200"
+                        }`}
+                      >
+                        {m.status}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2 text-right tabular-nums text-stone-700">
+                      {m._count.changes}
+                    </td>
+                    <td className="px-3 py-2 text-[12px] text-stone-500">
+                      {m.lastCheckedAt ? new Date(m.lastCheckedAt).toLocaleString() : "never"}
+                    </td>
+                    {canEdit && (
+                      <td className="px-3 py-2">
+                        <div className="flex justify-end gap-1.5">
+                          <button
+                            onClick={() => monitorAct(m.id, "run")}
+                            disabled={busy === `monitor:run:${m.id}` || m.status !== "active"}
+                            className="flex items-center gap-1 rounded-md border border-stone-200 px-2 py-1 text-[12px] font-medium text-stone-600 hover:bg-stone-50 disabled:opacity-50"
+                            title="Check now"
+                          >
+                            {busy === `monitor:run:${m.id}` ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                              <Play className="h-3 w-3" />
+                            )}
+                            Run
+                          </button>
+                          <button
+                            onClick={() => monitorAct(m.id, m.status === "active" ? "pause" : "resume")}
+                            disabled={busy?.startsWith(`monitor:pause:${m.id}`) || busy?.startsWith(`monitor:resume:${m.id}`)}
+                            className="flex items-center gap-1 rounded-md border border-stone-200 px-2 py-1 text-[12px] font-medium text-stone-600 hover:bg-stone-50 disabled:opacity-50"
+                          >
+                            <Pause className="h-3 w-3" />
+                            {m.status === "active" ? "Pause" : "Resume"}
+                          </button>
+                        </div>
+                      </td>
+                    )}
+                  </tr>
+                  {expandedMonitor === m.id && (
+                    <tr key={`${m.id}-changes`}>
+                      <td colSpan={canEdit ? 6 : 5} className="border-b border-stone-200 bg-stone-50 px-4 py-2">
+                        {changes[m.id] ? (
+                          changes[m.id].length === 0 ? (
+                            <p className="py-2 text-[12px] text-stone-500">
+                              No changes detected since baselining.
+                            </p>
+                          ) : (
+                            <ul className="divide-y divide-stone-200">
+                              {changes[m.id].map((c) => (
+                                <li key={c.id} className="py-2">
+                                  <div className="flex items-center gap-2 text-[12px]">
+                                    <span className="font-medium text-stone-700">{c.digest}</span>
+                                    <span className="text-stone-400">
+                                      {new Date(c.detectedAt).toLocaleString()}
+                                    </span>
+                                    {c.researchTaskId && (
+                                      <span className="rounded-full bg-[var(--brand-50)] px-2 py-0.5 text-[11px] font-medium text-[var(--brand-700)] ring-1 ring-inset ring-[var(--brand-200)]">
+                                        research spawned
+                                      </span>
+                                    )}
+                                  </div>
+                                  {c.excerpt && (
+                                    <pre className="mt-1 max-h-32 overflow-auto whitespace-pre-wrap rounded bg-white p-2 text-[11px] text-stone-600 ring-1 ring-inset ring-stone-200">
+                                      {c.excerpt}
+                                    </pre>
+                                  )}
+                                </li>
+                              ))}
+                            </ul>
+                          )
+                        ) : (
+                          <p className="py-2 text-[12px] text-stone-500">Loading changes…</p>
+                        )}
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
+              ))}
+              {monitors.length === 0 && (
+                <tr>
+                  <td colSpan={canEdit ? 6 : 5} className="px-3 py-8 text-center text-stone-500">
+                    No monitors yet — watch a competitor pricing page, changelog, or docs.
                   </td>
                 </tr>
               )}

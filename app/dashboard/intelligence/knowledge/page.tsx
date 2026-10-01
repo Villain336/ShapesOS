@@ -6,6 +6,7 @@ import { requireUser, getOrCreateWorkspace } from "@/lib/session";
 import { requireWorkspaceRole } from "@/lib/authz";
 import { listSources } from "@/lib/knowledge/contextdev/sources";
 import { listCrawlJobs } from "@/lib/knowledge/contextdev/crawl";
+import { listMonitors } from "@/lib/knowledge/contextdev/monitor";
 import { KnowledgeClient } from "./KnowledgeClient";
 
 export const dynamic = "force-dynamic";
@@ -24,9 +25,10 @@ export default async function KnowledgePage() {
   if (!membership) redirect("/dashboard");
   const canEdit = membership.role !== "viewer";
 
-  const [sources, jobs] = await Promise.all([
+  const [sources, jobs, monitors] = await Promise.all([
     listSources(workspace.id),
     listCrawlJobs(workspace.id),
+    listMonitors(workspace.id),
   ]);
 
   return (
@@ -42,6 +44,7 @@ export default async function KnowledgePage() {
       <KnowledgeClient
         initialSources={JSON.parse(JSON.stringify(sources))}
         initialJobs={JSON.parse(JSON.stringify(jobs))}
+        initialMonitors={JSON.parse(JSON.stringify(monitors))}
         canEdit={canEdit}
       />
     </div>

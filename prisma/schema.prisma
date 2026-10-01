@@ -592,6 +592,9 @@ model Workspace {
   knowledgeChunks         KnowledgeChunk[]
   // Wave 2 context.dev slice 3: research back-relation.
   researchTasks           ResearchTask[]
+  // Wave 2 context.dev slice 4: monitor back-relations.
+  monitors                Monitor[]
+  monitorChanges          MonitorChange[]
   // Phase 15 slice 3: per-workspace toolkit enablement back-relation.
   workspaceToolkits       WorkspaceToolkit[]
   // Phase 15 slice 4: per-workspace Composio call budget back-relation.
@@ -9467,6 +9470,7 @@ model KnowledgeSource {
 
   jobs   CrawlJob[]
   chunks KnowledgeChunk[]
+  monitors Monitor[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -9545,8 +9549,68 @@ model ResearchTask {
   creditsUsed Int      @default(0) @map("credits_used")
   error       String?
 
+  monitorChanges MonitorChange[]
+
   createdAt DateTime @default(now()) @map("created_at")
 
   @@index([workspaceId, createdAt])
   @@map("research_tasks")
+}
+
+// ── Wave 2 context.dev: change monitors (slice 4) ──────────────────────────
+// Monitor: a scheduled watch on a page. Each run scrapes the URL, hashes the
+// markdown, and compares to lastSeenHash; a new hash writes a MonitorChange
+// with a diff digest. Identical hashes dedup silently (no change row).
+// Optionally spawns a ResearchTask per change (opt-in, budget-gated).
+model Monitor {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  name   String
+  url    String
+  // hourly | daily | weekly
+  cadence String @default("daily")
+  // active | paused | archived
+  status  String @default("active")
+
+  lastSeenHash String?   @map("last_seen_hash")
+  lastContent  String?   @map("last_content")
+  lastCheckedAt DateTime? @map("last_checked_at")
+  lastChangeAt  DateTime? @map("last_change_at")
+  consecutiveFailures Int @default(0) @map("consecutive_failures")
+  // Spawn a ResearchTask on each detected change (budget-gated).
+  autoResearch Boolean @default(false) @map("auto_research")
+
+  sourceId String?          @map("source_id")
+  source   KnowledgeSource? @relation(fields: [sourceId], references: [id], onDelete: SetNull)
+
+  changes MonitorChange[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([workspaceId, status])
+  @@map("monitors")
+}
+
+model MonitorChange {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  monitorId   String    @map("monitor_id")
+  monitor     Monitor   @relation(fields: [monitorId], references: [id], onDelete: Cascade)
+
+  detectedAt DateTime @default(now()) @map("detected_at")
+  prevHash   String?  @map("prev_hash")
+  newHash    String   @map("new_hash")
+  digest     String
+  excerpt    String?
+
+  researchTaskId String?       @map("research_task_id")
+  researchTask   ResearchTask? @relation(fields: [researchTaskId], references: [id], onDelete: SetNull)
+
+  @@index([monitorId, detectedAt])
+  @@index([workspaceId, detectedAt])
+  @@map("monitor_changes")
 }
