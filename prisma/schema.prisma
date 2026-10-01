@@ -590,6 +590,8 @@ model Workspace {
   knowledgeSources        KnowledgeSource[]
   crawlJobs               CrawlJob[]
   knowledgeChunks         KnowledgeChunk[]
+  // Wave 2 context.dev slice 3: research back-relation.
+  researchTasks           ResearchTask[]
   // Phase 15 slice 3: per-workspace toolkit enablement back-relation.
   workspaceToolkits       WorkspaceToolkit[]
   // Phase 15 slice 4: per-workspace Composio call budget back-relation.
@@ -9519,4 +9521,32 @@ model KnowledgeChunk {
   @@index([workspaceId, sourceId])
   @@index([jobId])
   @@map("knowledge_chunks")
+}
+
+// ── Wave 2 context.dev: research tasks (slice 3) ───────────────────────────
+// ResearchTask: one sourced Q&A execution. Stores the question, locale,
+// structured json_content, cited source URLs, and a heuristic confidence so
+// "what did the agent know and when" stays answerable. Zero-source answers
+// are stored as failed — the citation contract is never silently broken.
+model ResearchTask {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  question  String
+  locale    String @default("en")
+  // fast | ultra
+  mode      String @default("fast")
+  // complete | partial | failed
+  status    String @default("complete")
+  jsonContent Json   @map("json_content")
+  sources     String[]
+  confidence  Float    @default(0)
+  creditsUsed Int      @default(0) @map("credits_used")
+  error       String?
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([workspaceId, createdAt])
+  @@map("research_tasks")
 }

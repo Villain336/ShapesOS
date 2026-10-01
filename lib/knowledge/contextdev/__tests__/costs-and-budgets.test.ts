@@ -23,6 +23,9 @@ describe("contextDevCreditsFor", () => {
     assert.equal(contextDevCreditsFor("brand_retrieve"), 10);
     assert.equal(contextDevCreditsFor("brand_prefetch"), 0);
     assert.equal(contextDevCreditsFor("ai_products"), 10);
+    // Slice 3: Answers pricing verified 2026-10-01 at docs.context.dev/account/credits.
+    assert.equal(contextDevCreditsFor("answers_fast"), 10);
+    assert.equal(contextDevCreditsFor("answers_ultra"), 100);
   });
 
   it("fails closed on unknown operations", () => {

@@ -229,3 +229,79 @@ describe("error mapping", () => {
     }
   });
 });
+
+describe("researchAnswer", () => {
+  it("POSTs the verified /web/answers contract (task, json_format, mode)", async () => {
+    const { fetchImpl, calls } = ok({
+      json_content: { pricing_page_url: "https://example.com/pricing", plans: [{ name: "Pro" }] },
+      sources: ["https://example.com/pricing"],
+    });
+    const client = createContextDevClient({ apiKey: API_KEY }, fetchImpl);
+    const res = await client.researchAnswer({
+      task: "Find the pricing page URL and plan names.",
+      jsonFormat: { pricing_page_url: "", plans: [{ name: "" }] },
+      mode: "fast",
+      locale: "en",
+    });
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].url, "https://api.context.dev/v1/web/answers");
+    assert.equal(calls[0].method, "POST");
+    const body = JSON.parse(calls[0].body ?? "{}");
+    assert.equal(body.mode, "fast");
+    assert.equal(body.task, "Find the pricing page URL and plan names.");
+    assert.deepEqual(body.json_format, { pricing_page_url: "", plans: [{ name: "" }] });
+    assert.equal(body.locale, "en");
+    assert.deepEqual(res.jsonContent, {
+      pricing_page_url: "https://example.com/pricing",
+      plans: [{ name: "Pro" }],
+    });
+    assert.deepEqual(res.sources, ["https://example.com/pricing"]);
+    assert.equal(res.partial, false);
+  });
+
+  it("surfaces partial answers", async () => {
+    const { fetchImpl } = ok({ json_content: { a: 1 }, sources: ["https://x.com"], partial: true });
+    const client = createContextDevClient({ apiKey: API_KEY }, fetchImpl);
+    const res = await client.researchAnswer({ task: "q", jsonFormat: { a: "" } });
+    assert.equal(res.partial, true);
+  });
+
+  it("validates the question, shape, and mode", async () => {
+    const { fetchImpl, calls } = ok({});
+    const client = createContextDevClient({ apiKey: API_KEY }, fetchImpl);
+    await assert.rejects(() => client.researchAnswer({ task: "  ", jsonFormat: {} }), (e: unknown) => {
+      assert.ok(e instanceof ContextDevError && e.code === "BAD_REQUEST");
+      return true;
+    });
+    await assert.rejects(
+      () => client.researchAnswer({ task: "q", jsonFormat: { a: "" }, mode: "turbo" as never }),
+      (e: unknown) => {
+        assert.ok(e instanceof ContextDevError && e.code === "BAD_REQUEST");
+        return true;
+      },
+    );
+    assert.equal(calls.length, 0);
+  });
+
+  it("maps 401 USAGE_EXCEEDED to CREDITS_EXHAUSTED, not AUTH_FAILED", async () => {
+    const { fetchImpl } = mockFetch(() => ({
+      status: 401,
+      json: { error_code: "USAGE_EXCEEDED", message: "credits exhausted" },
+    }));
+    // The mock returns json(); the client reads the body text via res.clone().
+    // Emulate text() too.
+    const client = createContextDevClient({ apiKey: API_KEY }, (async (input: string, init: RequestInit = {}) => {
+      return {
+        status: 401,
+        clone: () => ({ text: async () => JSON.stringify({ error_code: "USAGE_EXCEEDED" }) }),
+        text: async () => JSON.stringify({ error_code: "USAGE_EXCEEDED" }),
+        json: async () => ({ error_code: "USAGE_EXCEEDED" }),
+      } as unknown as Response;
+    }) as FetchImpl);
+    await assert.rejects(() => client.researchAnswer({ task: "q", jsonFormat: {} }), (e: unknown) => {
+      assert.ok(e instanceof ContextDevError && e.code === "CREDITS_EXHAUSTED");
+      return true;
+    });
+    void fetchImpl;
+  });
+});

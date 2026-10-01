@@ -1,10 +1,10 @@
-// Marketr — Wave 2 context.dev slice 1: credit costs per operation.
+// Marketr — Wave 2 context.dev slice 1+3: credit costs per operation.
 //
-// Pure table. Costs verified 2026-10-01 from the n8n community node's README
-// (fredfrom/n8n-nodes-context-dev): Web 1 credit/call, Brand 10/call,
-// AI extraction 10+/call, Screenshot 1/call, Transaction 1/call,
-// brand prefetch 0 credits. Unknown operations fail closed — the caller must
-// name a known operation, never a guessed cost.
+// Pure table. Costs verified 2026-10-01 against docs.context.dev/account/credits
+// (official): Scrape 1, Map 1 (2 with search), Brand 10, Styleguide 10,
+// People 20, Answers fast 10 / ultra 100 (charged on success AND partial),
+// prefetch 0. AI products 10+. Unknown operations fail closed — the caller
+// must name a known operation, never a guessed cost.
 
 export type ContextDevOperation =
   | "scrape_markdown"
@@ -13,7 +13,9 @@ export type ContextDevOperation =
   | "crawl_sitemap"
   | "brand_retrieve"
   | "brand_prefetch"
-  | "ai_products";
+  | "ai_products"
+  | "answers_fast"
+  | "answers_ultra";
 
 export const CONTEXTDEV_CREDIT_COSTS: Record<ContextDevOperation, number> = {
   scrape_markdown: 1,
@@ -23,6 +25,8 @@ export const CONTEXTDEV_CREDIT_COSTS: Record<ContextDevOperation, number> = {
   brand_retrieve: 10,
   brand_prefetch: 0,
   ai_products: 10,
+  answers_fast: 10,
+  answers_ultra: 100,
 };
 
 /** Credits one call of the operation costs. Throws on unknown operations (fail closed). */

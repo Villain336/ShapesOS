@@ -21,6 +21,7 @@ export const CONTEXTDEV_API_VERSION = "v1";
 
 export type ContextDevErrorCode =
   | "AUTH_FAILED"
+  | "CREDITS_EXHAUSTED"
   | "RATE_LIMITED"
   | "BAD_REQUEST"
   | "NOT_FOUND"
@@ -95,6 +96,17 @@ async function request<T>(
     );
   }
   if (res.status === 401 || res.status === 403) {
+    // A spent credit balance is not a bad key — surface it distinctly so the
+    // caller routes to the budget/approval path instead of key rotation.
+    let bodyText = "";
+    try {
+      bodyText = await res.clone().text();
+    } catch {
+      /* non-standard fetch impl — fall through to AUTH_FAILED */
+    }
+    if (/USAGE_EXCEEDED/i.test(bodyText)) {
+      throw new ContextDevError("CREDITS_EXHAUSTED", "Context.dev credit balance exhausted", res.status);
+    }
     throw new ContextDevError("AUTH_FAILED", "Context.dev rejected the API key", res.status);
   }
   if (res.status === 429) {
@@ -320,7 +332,60 @@ export function createContextDevClient(auth: ContextDevAuth, fetchImpl: FetchImp
       const products = Array.isArray(json.products) ? json.products : [];
       return { products };
     },
+
+    /**
+     * Research a question → structured JSON + source URLs.
+     * Verified 2026-10-01 against docs.context.dev/answers: POST
+     * /v1/web/answers, body { mode, task, json_format, locale?, timeoutOpts }.
+     * Response: { json_content, sources, partial? }.
+     * 10 credits for fast, 100 for ultra — charged on success AND partial.
+     */
+    async researchAnswer(opts: ResearchAnswerOptions): Promise<ResearchAnswerResult> {
+      const task = opts.task.trim();
+      if (!task) throw new ContextDevError("BAD_REQUEST", "researchAnswer requires a question");
+      if (!opts.jsonFormat || typeof opts.jsonFormat !== "object" || Array.isArray(opts.jsonFormat)) {
+        throw new ContextDevError("BAD_REQUEST", "researchAnswer requires a jsonFormat object");
+      }
+      const mode = opts.mode ?? "fast";
+      if (mode !== "fast" && mode !== "ultra") {
+        throw new ContextDevError("BAD_REQUEST", `researchAnswer mode must be "fast" or "ultra"`);
+      }
+      const json = await request<Record<string, unknown>>(auth, fetchImpl, "POST", "/web/answers", {
+        body: {
+          mode,
+          task,
+          json_format: opts.jsonFormat,
+          ...(opts.locale ? { locale: opts.locale } : {}),
+          timeoutOpts: { milliseconds: opts.timeoutMs ?? 30000, behavior: "return-partial" },
+        },
+      });
+      return {
+        jsonContent: (json.json_content ?? {}) as Record<string, unknown>,
+        sources: asStringArray(json.sources) ?? [],
+        partial: json.partial === true,
+      };
+    },
   };
 }
 
 export type ContextDevClient = ReturnType<typeof createContextDevClient>;
+
+export type ResearchAnswerMode = "fast" | "ultra";
+
+export interface ResearchAnswerOptions {
+  /** The research question / task. */
+  task: string;
+  /** Example JSON object describing the answer shape. */
+  jsonFormat: Record<string, unknown>;
+  /** fast (10 credits, ≤30s) or ultra (100 credits, ≤50s). Default fast. */
+  mode?: ResearchAnswerMode;
+  /** BCP-47-ish locale hint, passed through to the vendor best-effort. */
+  locale?: string;
+  timeoutMs?: number;
+}
+
+export interface ResearchAnswerResult {
+  jsonContent: Record<string, unknown>;
+  sources: string[];
+  partial: boolean;
+}

@@ -34,6 +34,9 @@ import { auditStudio } from "@/lib/studio/service";
 // Phase 17 slice 7: Operations tools (read/draft/propose — money writes are
 // propose-only behind the Phase 14 gate).
 import { OPS_TOOLS } from "./ops-tools";
+// Wave 2 context.dev slice 3: agent-facing research tool (spend-kind,
+// confirmation-gated, budget-gated before the vendor is hit).
+import { research_question } from "@/lib/knowledge/contextdev/research-tool";
 
 export type ToolKind = "safe" | "destructive" | "publish" | "spend";
 
@@ -972,6 +975,8 @@ export const TOOLS: ToolDef[] = [
   design_qr_code,
   trigger_automation_flow,
   automation_flow_status,
+  // Wave 2 context.dev slice 3: research a question (spend-kind).
+  research_question,
   // Phase 17: business operations (invoices, inventory, POs, projects, HR,
   // workflows) — propose-only money writes.
   ...OPS_TOOLS,
