@@ -9,7 +9,7 @@ import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
 import type { ComponentType } from "react";
 import { useState } from "react";
-import { Mail, Paintbrush, Megaphone, RefreshCw, Brain, Target, BookOpen, Inbox, Share2, LayoutDashboard, Scissors, Briefcase, PenLine } from "lucide-react";
+import { Mail, Paintbrush, Megaphone, RefreshCw, Brain, Target, BookOpen, Inbox, Share2, LayoutDashboard, Scissors, Briefcase, PenLine, Home } from "lucide-react";
 import {
   ChartBar,
   Bell,
@@ -89,6 +89,8 @@ const NAV_SECTIONS: {
       { href: "/dashboard/office", label: "Office", icon: Briefcase },
       // Wave 2: E-sign — governed signature envelopes on the Documenso rail.
       { href: "/dashboard/esign", label: "E-sign", icon: PenLine },
+      // Wave 2: WFH mode — per-user remote-work mode switch.
+      { href: "/dashboard/wfh", label: "WFH mode", icon: Home },
     ],
   },
 ];

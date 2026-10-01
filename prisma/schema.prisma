@@ -597,6 +597,9 @@ model Workspace {
   monitorChanges          MonitorChange[]
   // Wave 2 context.dev slice 5: brand sync back-relations.
   brandSyncs              BrandSync[]
+  // Wave 2 WFH mode slice 1: per-user work mode back-relations.
+  wfhWorkModes            WfhWorkMode[]
+  wfhModeHistory          WfhModeHistory[]
   // Phase 15 slice 3: per-workspace toolkit enablement back-relation.
   workspaceToolkits       WorkspaceToolkit[]
   // Phase 15 slice 4: per-workspace Composio call budget back-relation.
@@ -9842,4 +9845,73 @@ model BrandSync {
 
   @@index([workspaceId, status])
   @@map("brand_syncs")
+}
+
+// ── Wave 2 WFH mode (slice 1): WorkMode object + toggle ──────────────────────
+// Per-user OS mode switch (wfh / office / hybrid). One active row per
+// (workspace, user); preference changes are recorded in WfhModeHistory for
+// the 13B learning loop.
+
+enum WfhMode {
+  wfh
+  office
+  hybrid
+}
+
+enum WfhStandupCadence {
+  daily
+  none
+}
+
+enum WfhNotificationProfile {
+  realtime
+  batched
+}
+
+model WfhWorkMode {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  // Auth.js user id (subject). The mode is per-user, not per-workspace.
+  userId String @map("user_id")
+  email  String?
+
+  mode                WfhMode                @default(office)
+  // Effective WFH days for hybrid mode (lowercase 3-letter codes: mon..sun).
+  wfhDays             String[]               @default([]) @map("wfh_days")
+  // Protected focus hours, minutes since midnight local (e.g. 540 = 09:00).
+  focusStartMin       Int                    @default(540) @map("focus_start_min")
+  focusEndMin         Int                    @default(1020) @map("focus_end_min")
+  focusBlockMinutes   Int                    @default(90) @map("focus_block_minutes")
+  standupCadence      WfhStandupCadence      @default(daily) @map("standup_cadence")
+  notificationProfile WfhNotificationProfile @default(batched) @map("notification_profile")
+  // Mandatory first-enable setup interstitial completed at (wfh days, focus
+  // hours, standup cadence). Enabling wfh/hybrid without this fails closed.
+  setupCompletedAt DateTime? @map("setup_completed_at")
+
+  history   WfhModeHistory[]
+  createdAt DateTime         @default(now()) @map("created_at")
+  updatedAt DateTime         @updatedAt @map("updated_at")
+
+  @@unique([workspaceId, userId])
+  @@index([workspaceId, mode])
+  @@map("wfh_work_modes")
+}
+
+model WfhModeHistory {
+  id          String      @id @default(cuid())
+  workspaceId String      @map("workspace_id")
+  workspace   Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  workModeId  String      @map("work_mode_id")
+  workMode    WfhWorkMode @relation(fields: [workModeId], references: [id], onDelete: Cascade)
+  userId      String      @map("user_id")
+
+  previousMode WfhMode @map("previous_mode")
+  newMode      WfhMode @map("new_mode")
+  reason       String  @default("user_toggle")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([workModeId, createdAt])
+  @@map("wfh_mode_history")
 }
