@@ -7,10 +7,12 @@
 // opaque tokenRef ("vault:oauth:<platform>:<connectionId>") lands on
 // AdAccount.tokenRef.
 //
-// Slice 1 covers: amazon-ads (fully registered). walmart-connect fails
-// closed until slice 4 pins the partner-program authorize URL. stackadapt
-// is API-key based (its key is stored via lib/vault/apikey.ts, same
-// tokenRef scheme). spotify is guided-only — there is no OAuth to start.
+// Slice 1 covers: amazon-ads (fully registered). walmart-connect is
+// guided-only by research verdict (Phase 18 slice 4, outcome B — see
+// docs/phases/PHASE18-SLICE4-WALMART.md): no public OAuth authorize URL
+// exists, so startAdsOAuth("walmart") fails closed with GUIDED_ONLY.
+// stackadapt is API-key based (its key is stored via lib/vault/apikey.ts,
+// same tokenRef scheme). spotify is guided-only — there is no OAuth to start.
 
 import { randomBytes } from "crypto";
 import { prisma } from "@/lib/prisma";

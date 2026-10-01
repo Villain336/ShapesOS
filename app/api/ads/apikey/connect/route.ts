@@ -1,7 +1,8 @@
 // Marketr — Phase 18 slice 3: connect an API-key ad platform.
 // POST /api/ads/apikey/connect { platformKey, apiKey, label? } → { ok, accountId }
 // Slice 3 covers stackadapt only; every other key is fail-closed: spotify is
-// guided-only (no credential to store) and walmart is OAuth (slice 4).
+// guided-only (no credential to store); walmart is guided-only too (slice 4,
+// outcome B — partner-level auth, no advertiser OAuth).
 
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser, getOrCreateWorkspace } from "@/lib/session";

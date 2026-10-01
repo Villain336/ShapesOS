@@ -7,9 +7,11 @@
 // directly.
 //
 // Platform executors register per platform in later slices
-// (amazon → slice 2, stackadapt → slice 3, walmart → slice 4, spotify is
-// guided-only and never executes). Until a platform's executor registers,
-// launch/pause fail closed with PLATFORM_NOT_CONNECTED.
+// (amazon → slice 2, stackadapt → slice 3). walmart and spotify are
+// guided-only (walmart by Phase 18 slice-4 research verdict — see
+// docs/phases/PHASE18-SLICE4-WALMART.md) and never execute. Until a
+// platform's executor registers, launch/pause fail closed with
+// PLATFORM_NOT_CONNECTED.
 
 import {
   approveSpendAction,

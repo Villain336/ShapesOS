@@ -104,10 +104,10 @@ describe("connect_account OAuth scaffolding", () => {
     );
   });
 
-  it("fails closed for Walmart until the partner authorize URL is pinned (slice 4)", () => {
+  it("fails closed for Walmart — guided-only by slice-4 research verdict (no public OAuth authorize URL)", () => {
     assert.throws(
       () => startAdsOAuth("walmart", "u", "w", "https://app.example.com"),
-      (e: unknown) => e instanceof AdsOAuthError && e.code === "NOT_CONFIGURED",
+      (e: unknown) => e instanceof AdsOAuthError && e.code === "GUIDED_ONLY",
     );
   });
 

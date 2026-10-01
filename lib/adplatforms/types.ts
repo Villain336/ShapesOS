@@ -57,14 +57,21 @@ export const ADS_PLATFORMS: Record<AdsPlatformKey, AdsPlatformDef> = {
   walmart: {
     key: "walmart",
     displayName: "Walmart Connect",
-    // Developer/partner program auth (consumer credentials + signed token).
-    // The exact partner-program authorize URL is pinned in slice 4 when the
-    // connector is built; slice 1 fails closed with "not configured".
-    authKind: "oauth",
-    supportsApiLaunch: true,
-    supportsReportingApi: true,
-    guidedOnly: false,
-    oauthConnectorKey: "walmart-connect",
+    // OUTCOME B (Phase 18 slice 4, research 2026-10-01 — see
+    // docs/phases/PHASE18-SLICE4-WALMART.md): Walmart Connect's Sponsored
+    // Search Ads API exists but is exclusive to Walmart Connect Partner
+    // Network (WCPN) partners. There is NO public OAuth authorize URL for an
+    // advertiser to connect their own ad account to a third-party SaaS —
+    // auth is a single partner-level credential (Consumer ID + RSA-SHA256
+    // request signing + bearer token) issued after a BUSINESS application
+    // at advertising.walmart.com, which Marketr cannot complete in code.
+    // So Walmart ships guided-only (same model as Spotify): the guided
+    // setup flow + CSV spend import land in this slice; the RSA-signing API
+    // client lands in a follow-up slice after Tico's WCPN partner approval.
+    authKind: "guided",
+    supportsApiLaunch: false,
+    supportsReportingApi: false,
+    guidedOnly: true,
   },
   spotify: {
     key: "spotify",

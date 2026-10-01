@@ -98,9 +98,13 @@ export const OAUTH_CONFIGS: Record<string, OAuthProviderConfig> = {
     clientIdEnv: "AMAZON_ADS_CLIENT_ID",
     clientSecretEnv: "AMAZON_ADS_CLIENT_SECRET",
   },
-  // NOTE (Phase 18 slice 1): Walmart Connect is NOT registered here yet.
-  // Its partner-program authorize URL is pinned in slice 4 when the
-  // connector is built. startAdsOAuth() fails closed for walmart until then.
+  // NOTE (Phase 18 slice 4, outcome B): Walmart Connect is NOT registered
+  // here and never will be as an OAuth connector. Research 2026-10-01
+  // (docs/phases/PHASE18-SLICE4-WALMART.md) established there is no public
+  // OAuth authorize URL: the Ads API is exclusive to WCPN partners and
+  // uses partner-level RSA-signed credentials issued after a business
+  // application. Walmart ships guided-only; startAdsOAuth() fails closed
+  // with GUIDED_ONLY.
 };
 
 export interface OAuthState {

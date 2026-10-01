@@ -195,7 +195,13 @@ describe("governed action catalog", () => {
   it("registers the four Phase 1 platforms with honest capability flags", () => {
     assert.equal(ADS_PLATFORMS.amazon.supportsApiLaunch, true);
     assert.equal(ADS_PLATFORMS.stackadapt.supportsApiLaunch, true);
-    assert.equal(ADS_PLATFORMS.walmart.supportsApiLaunch, true);
+    // Walmart: guided-only by slice-4 research verdict — no public OAuth
+    // authorize URL exists; auth is partner-level after a business
+    // application. No launch/reporting API is claimed.
+    assert.equal(ADS_PLATFORMS.walmart.guidedOnly, true);
+    assert.equal(ADS_PLATFORMS.walmart.supportsApiLaunch, false);
+    assert.equal(ADS_PLATFORMS.walmart.supportsReportingApi, false);
+    assert.equal(ADS_PLATFORMS.walmart.oauthConnectorKey, undefined);
     // Spotify: guided only — no launch API is ever claimed.
     assert.equal(ADS_PLATFORMS.spotify.guidedOnly, true);
     assert.equal(ADS_PLATFORMS.spotify.supportsApiLaunch, false);
