@@ -743,6 +743,10 @@ model Workspace {
   esignEnvelopes          EsignEnvelope[]
   esignTemplates          EsignTemplate[]
   esignVaultEntries       EsignVaultEntry[]
+  // Wave 2 Insurance module (SPEC-INSURANCE.md).
+  insuranceCarriers       InsuranceCarrier[]
+  insurancePolicies       InsurancePolicy[]
+  insuranceRenewals       InsuranceRenewal[]
   // Phase 12 (embeds): tenant-scoped GrowthBook flag overrides.
   flagOverrides           WorkspaceFlagOverride[]
   eddmOrders              EddmOrder[]
@@ -10206,4 +10210,132 @@ model WfhLearningSignal {
 
   @@index([workspaceId, userId, occurredAt])
   @@map("wfh_learning_signals")
+}
+
+// ── Wave 2 Insurance (slice 1): policy inventory ontology ───────────────────
+// Manage side of the insurance module: carriers, policies, renewals.
+// Quote/bind side (Submissions, Quotes, Certificates) arrives in slices 2–4.
+// Insurance is a money red-lane domain: premiums are consequential payments,
+// propose → explicit approval → licensed rail executes; the OS never holds
+// premium funds (zero custody). SPEC-INSURANCE.md §4.
+
+enum InsuranceLineOfBusiness {
+  gl
+  wc
+  bop
+  cyber
+  professional_liability
+  commercial_auto
+  umbrella
+}
+
+enum InsurancePolicyStatus {
+  active
+  pending_renewal
+  expired
+  cancelled
+}
+
+enum InsuranceAppointmentPath {
+  direct
+  dais_market_access
+  subappointment
+}
+
+enum InsuranceRemarketStatus {
+  detected
+  remarketing
+  quoted
+  bound
+  auto_renew_surfaced
+}
+
+// An insurance carrier or MGA reachable through the vendor rail.
+model InsuranceCarrier {
+  id          String   @id @default(cuid())
+  workspaceId String   @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  name            String
+  amBestRating    String?                 @map("am_best_rating")
+  naicCode        String?                 @map("naic_code")
+  appointmentPath InsuranceAppointmentPath @map("appointment_path")
+  // Lines supported: ["gl","bop","wc",...] — JSON so new lines need no schema change.
+  linesSupported  Json                    @default("[]") @map("lines_supported")
+
+  policies InsurancePolicy[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([workspaceId, name])
+  @@index([workspaceId])
+  @@map("insurance_carriers")
+}
+
+// An in-force (or historical) insurance contract. Coverage data renders ONLY
+// from vendor/carrier truth — the OS never invents limits or premiums.
+model InsurancePolicy {
+  id          String   @id @default(cuid())
+  workspaceId String   @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  carrierId   String   @map("carrier_id")
+  carrier     InsuranceCarrier @relation(fields: [carrierId], references: [id], onDelete: Restrict)
+
+  policyNumber String @map("policy_number")
+  line         InsuranceLineOfBusiness
+  namedInsured String @map("named_insured")
+  effectiveAt  DateTime @map("effective_at")
+  expiresAt    DateTime @map("expires_at")
+  // Limits in minor currency units (cents).
+  limitPerOccurrenceCents Int? @map("limit_per_occurrence_cents")
+  limitAggregateCents      Int? @map("limit_aggregate_cents")
+  deductibleCents          Int? @map("deductible_cents")
+  annualPremiumCents       Int? @map("annual_premium_cents")
+  paymentSchedule          String? @map("payment_schedule")
+  status                   InsurancePolicyStatus @default(active)
+  // "coverforce" | "manual" — where this record came from.
+  source     String @default("manual")
+  // Raw vendor payload snapshot for audit and re-parsing.
+  rawPayload Json   @default("{}") @map("raw_payload")
+
+  renewals InsuranceRenewal[]
+  // Prior-term lineage: a renewal creates a new Policy row linked back here.
+  priorPolicyId String?         @map("prior_policy_id")
+  priorPolicy   InsurancePolicy? @relation("PolicyLineage", fields: [priorPolicyId], references: [id], onDelete: SetNull)
+  nextTerms     InsurancePolicy[] @relation("PolicyLineage")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([workspaceId, policyNumber])
+  @@index([workspaceId, status])
+  @@index([workspaceId, expiresAt])
+  @@map("insurance_policies")
+}
+
+// A policy coming due. Auto-renewals are detected and surfaced — never
+// silently accepted; the agent flags premium/coverage deltas before approval.
+model InsuranceRenewal {
+  id          String   @id @default(cuid())
+  workspaceId String   @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  policyId    String   @map("policy_id")
+  policy      InsurancePolicy @relation(fields: [policyId], references: [id], onDelete: Cascade)
+
+  renewalDate     DateTime @map("renewal_date")
+  remarketStatus  InsuranceRemarketStatus @default(detected) @map("remarket_status")
+  priorPremiumCents Int?  @map("prior_premium_cents")
+  newPremiumCents   Int?  @map("new_premium_cents")
+  // (new - prior) / prior * 100, stored when a renewal quote is bound.
+  premiumDeltaPct   Float? @map("premium_delta_pct")
+  alertSentAt       DateTime? @map("alert_sent_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([workspaceId, policyId, renewalDate])
+  @@index([workspaceId, renewalDate])
+  @@index([workspaceId, remarketStatus])
+  @@map("insurance_renewals")
 }
