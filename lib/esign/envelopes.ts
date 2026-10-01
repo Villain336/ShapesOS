@@ -27,6 +27,7 @@ import {
   verifyDocumensoWebhookSignature,
 } from "./documenso-vendor";
 import { appendAuditEvent, sha256Hex, type AuditDb } from "./audit";
+import { firePipelineLinks } from "./pipeline";
 
 export type EsignDb = Pick<
   PrismaClient,
@@ -45,7 +46,23 @@ export class EsignGateError extends Error {
       | "missing_reason"
       | "unknown_envelope"
       | "bad_signature"
-      | "vendor_not_configured",
+      | "vendor_not_configured"
+      | "bad_json"
+      // Template codes (named mismatch reasons — never silent).
+      | "unknown_template"
+      | "missing_name"
+      | "empty_document"
+      | "no_roles"
+      | "blank_role"
+      | "duplicate_role"
+      | "field_role_mismatch"
+      | "bad_field_type"
+      | "blank_merge_name"
+      | "bad_merge_def"
+      | "missing_merge_value"
+      | "unmapped_merge_value"
+      | "unknown_signer_role"
+      | "unbound_signer_role",
     message: string,
   ) {
     super(message);
@@ -528,6 +545,7 @@ export async function ingestDocumensoWebhook(
   // Envelope-level transition. COMPLETED additionally pulls the sealed PDF —
   // the evidence that makes "completed" mean something.
   let sealedPdfFetched = false;
+  const wasCompleted = envelope.status === "completed";
   if (transition.envelopeStatus === "completed") {
     try {
       const sealed = await vendor.getSealedPdf(envelope.vendorRef!);
@@ -546,6 +564,20 @@ export async function ingestDocumensoWebhook(
       await db.esignEnvelope.update({
         where: { id: envelope.id },
         data: { status: "completed", vendorStatus: "COMPLETED" },
+      });
+    }
+    // Pipeline links fire ONLY on the first completion transition: the vendor
+    // sealed the document, so downstream objects (proposal→contract, SOW→
+    // invoice-draft, contract→executed) may react. Announced as subscribable
+    // internal events with a durable audit row the future legal/pipeline
+    // modules can replay — nothing here invents downstream records.
+    if (!wasCompleted) {
+      await firePipelineLinks(db, {
+        id: envelope.id,
+        workspaceId: envelope.workspaceId,
+        contractType: envelope.contractType,
+        contractRef: envelope.contractRef,
+        pipelineRef: envelope.pipelineRef,
       });
     }
   } else if (transition.envelopeStatus) {

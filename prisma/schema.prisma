@@ -4559,6 +4559,11 @@ model EsignTemplate {
   name String
   // Source document for the blueprint (stored asset ref / uploaded name).
   sourceDocumentName String? @map("source_document_name")
+  // Blueprint PDF bytes — instantiateTemplate mints drafts from these exact
+  // bytes so the template's document can never drift from what was approved.
+  sourceDocument     Bytes?  @map("source_document")
+  sourceDocumentHash String? @map("source_document_hash")
+  sourceDocumentSize Int?    @map("source_document_size")
   // Field layout: [{ fieldType, page, x, y, width, height, required, signerRole }]
   fieldLayout Json @default("[]") @map("field_layout")
   // Signer roles: [{ role, orderIndex, required }]

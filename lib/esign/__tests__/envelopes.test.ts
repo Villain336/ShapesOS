@@ -16,6 +16,7 @@ import {
   type CreateDraftInput,
 } from "../envelopes";
 import { sha256Hex } from "../audit";
+import { onPipelineLink, type PipelineLinkEvent } from "../pipeline";
 import type { EsignVendor } from "../vendor";
 
 const WEBHOOK_ENV = { DOCUMENSO_WEBHOOK_SECRET: "wh-secret" };
@@ -535,5 +536,45 @@ describe("ingestDocumensoWebhook", () => {
     const row = await db.esignEnvelope.findFirst({ where: { vendorRef: "doc_1" } });
     assert.equal(row.status, "declined");
     assert.equal(row.signers[0].status, "declined");
+  });
+});
+
+describe("completion fires pipeline links", () => {
+  it("a completed proposal-linked envelope announces proposal_to_contract", async () => {
+    const db = makeFakeDb();
+    const vendor = makeFakeVendor();
+    const env = await createEnvelopeDraft(
+      db,
+      draftInput({ contractType: "proposal", contractRef: "prop_1" }),
+    );
+    const token = buildSendToken({
+      id: env.id,
+      title: env.title,
+      signerEmails: env.signers.map((s: any) => s.email),
+      signingOrder: env.signingOrder,
+      expiresAt: env.expiresAt,
+      sourcePdfHash: env.sourcePdfHash,
+    });
+    await sendEnvelope(db, vendor, { envelopeId: env.id, token, actor: "user:u1" });
+
+    const seen: PipelineLinkEvent[] = [];
+    const unsub = onPipelineLink((e) => {
+      seen.push(e);
+    });
+    try {
+      const done = await ingestDocumensoWebhook(db, vendor, {
+        rawBody: webhookBody("DOCUMENT_COMPLETED", "doc_1"),
+        secretHeader: "wh-secret",
+        env: WEBHOOK_ENV,
+      });
+      assert.deepEqual(done, { ok: true, applied: "completed" });
+      assert.equal(seen.length, 1);
+      assert.equal(seen[0]!.kind, "proposal_to_contract");
+      assert.equal(seen[0]!.refId, "prop_1");
+      assert.equal(seen[0]!.envelopeId, env.id);
+      assert.ok(db.auditRows.some((r: any) => r.event === "pipeline_link_fired"));
+    } finally {
+      unsub();
+    }
   });
 });

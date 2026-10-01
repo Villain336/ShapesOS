@@ -11,7 +11,9 @@ import {
   CheckCircle2,
   FileText,
   FileUp,
+  LayoutTemplate,
   Loader2,
+  Pencil,
   PencilLine,
   Plus,
   RefreshCw,
@@ -778,9 +780,9 @@ function DetailView({ id, onBack, onChanged }: { id: string; onBack: () => void;
   );
 }
 
-// ── Envelope list + app shell ────────────────────────────────────────────────
+// ── Envelope list tab ────────────────────────────────────────────────────────
 
-export function EsignApp() {
+function EnvelopesTab() {
   const [envelopes, setEnvelopes] = useState<ApiEnvelope[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -885,6 +887,473 @@ export function EsignApp() {
           onCreated={(id) => { setComposerOpen(false); void load(); setSelectedId(id); }}
         />
       )}
+    </div>
+  );
+}
+
+// ── Template library ─────────────────────────────────────────────────────────
+
+interface ApiTemplate {
+  id: string;
+  name: string;
+  sourceDocumentName: string | null;
+  sourceDocumentHash: string | null;
+  signerRoles: Array<{ role: string; orderIndex: number; required: boolean }>;
+  fieldLayout: Array<{ signerRole: string; fieldType: string; page?: number; x?: number; y?: number; required?: boolean }>;
+  mergeFieldMapping: Record<string, { source: string; path: string; required: boolean }>;
+  updatedAt: string;
+}
+
+interface RoleRow { role: string; required: boolean }
+interface FieldRow { signerRole: string; fieldType: string; page: string; x: string; y: string }
+interface MergeRow { name: string; source: string; path: string; required: boolean }
+
+function TemplateModal({
+  template,
+  onClose,
+  onSaved,
+}: {
+  template: ApiTemplate | null;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [name, setName] = useState(template?.name ?? "");
+  const [file, setFile] = useState<File | null>(null);
+  const [roles, setRoles] = useState<RoleRow[]>(
+    template?.signerRoles.map((r) => ({ role: r.role, required: r.required })) ?? [{ role: "signer", required: true }],
+  );
+  const [fields, setFields] = useState<FieldRow[]>(
+    template?.fieldLayout.map((f) => ({
+      signerRole: f.signerRole,
+      fieldType: f.fieldType,
+      page: f.page != null ? String(f.page) : "1",
+      x: f.x != null ? String(f.x) : "",
+      y: f.y != null ? String(f.y) : "",
+    })) ?? [],
+  );
+  const [merges, setMerges] = useState<MergeRow[]>(
+    template ? Object.entries(template.mergeFieldMapping).map(([n, d]) => ({ name: n, source: d.source, path: d.path, required: d.required })) : [],
+  );
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const roleNames = roles.map((r) => r.role.trim()).filter(Boolean);
+
+  async function submit() {
+    setError(null);
+    if (!name.trim()) return setError("Give the template a name.");
+    if (!template && !file) return setError("Attach the blueprint PDF.");
+    setSaving(true);
+    try {
+      if (template) {
+        const res = await fetch(`/api/esign/templates/${template.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: name.trim(),
+            signerRoles: roles.map((r, i) => ({ role: r.role.trim(), orderIndex: i, required: r.required })),
+            fieldLayout: fields.map((f) => ({
+              signerRole: f.signerRole,
+              fieldType: f.fieldType,
+              page: f.page ? Number(f.page) : undefined,
+              x: f.x ? Number(f.x) : undefined,
+              y: f.y ? Number(f.y) : undefined,
+            })),
+            mergeFieldMapping: Object.fromEntries(
+              merges.filter((m) => m.name.trim()).map((m) => [m.name.trim(), { source: m.source.trim() || "manual", path: m.path.trim() || m.name.trim(), required: m.required }]),
+            ),
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error ?? "Could not save the template.");
+      } else {
+        const form = new FormData();
+        form.set("name", name.trim());
+        form.set("file", file!);
+        form.set("signerRoles", JSON.stringify(roles.map((r, i) => ({ role: r.role.trim(), orderIndex: i, required: r.required }))));
+        form.set("fieldLayout", JSON.stringify(fields.map((f) => ({
+          signerRole: f.signerRole,
+          fieldType: f.fieldType,
+          page: f.page ? Number(f.page) : undefined,
+          x: f.x ? Number(f.x) : undefined,
+          y: f.y ? Number(f.y) : undefined,
+        }))));
+        form.set("mergeFieldMapping", JSON.stringify(Object.fromEntries(
+          merges.filter((m) => m.name.trim()).map((m) => [m.name.trim(), { source: m.source.trim() || "manual", path: m.path.trim() || m.name.trim(), required: m.required }]),
+        )));
+        const res = await fetch("/api/esign/templates", { method: "POST", body: form });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error ?? "Could not create the template.");
+      }
+      onSaved();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not save the template.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Modal title={template ? "Edit template" : "New template"} onClose={onClose} wide>
+      <ErrorNote error={error} />
+
+      <label className="mb-1 block text-[12px] font-medium text-stone-600">Name</label>
+      <input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. MSA template" className={`${inputCls} mb-4 w-full`} maxLength={200} />
+
+      {!template && (
+        <>
+          <label className="mb-1 block text-[12px] font-medium text-stone-600">Blueprint PDF</label>
+          <label className="mb-4 flex cursor-pointer items-center gap-2 rounded-md border border-dashed border-stone-300 bg-stone-50 px-3 py-3 text-[13px] text-stone-600 hover:border-[var(--brand-600)]">
+            <FileUp size={16} className="shrink-0 text-stone-400" />
+            <span className="truncate">{file ? file.name : "Choose the blueprint PDF — drafts mint from these exact bytes"}</span>
+            <input type="file" accept="application/pdf" className="hidden" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+          </label>
+        </>
+      )}
+
+      <div className="mb-1 flex items-center justify-between">
+        <span className="text-[12px] font-medium text-stone-600">Signer roles <span className="font-normal text-stone-400">(in signing order)</span></span>
+        <button type="button" onClick={() => setRoles((rs) => [...rs, { role: "", required: true }])} className="flex items-center gap-1 text-[12px] font-medium text-[var(--brand-700)] hover:underline">
+          <Plus size={13} /> Add role
+        </button>
+      </div>
+      <div className="mb-4 space-y-2">
+        {roles.map((r, i) => (
+          <div key={i} className="grid grid-cols-[1fr_120px_28px] items-center gap-2">
+            <input value={r.role} onChange={(e) => setRoles((rs) => rs.map((x, j) => (j === i ? { ...x, role: e.target.value } : x)))} placeholder="e.g. client" className={inputCls} />
+            <label className="flex items-center gap-1.5 text-[12px] text-stone-600">
+              <input type="checkbox" checked={r.required} onChange={(e) => setRoles((rs) => rs.map((x, j) => (j === i ? { ...x, required: e.target.checked } : x)))} className="h-3.5 w-3.5 accent-[var(--brand-600)]" />
+              Required
+            </label>
+            <button type="button" disabled={roles.length <= 1} onClick={() => setRoles((rs) => rs.filter((_, j) => j !== i))} className="rounded-md p-1.5 text-stone-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-30" aria-label="Remove role">
+              <Trash2 size={14} />
+            </button>
+          </div>
+        ))}
+      </div>
+
+      <div className="mb-1 flex items-center justify-between">
+        <span className="text-[12px] font-medium text-stone-600">Field layout</span>
+        <button
+          type="button"
+          disabled={roleNames.length === 0}
+          onClick={() => setFields((fs) => [...fs, { signerRole: roleNames[0]!, fieldType: "signature", page: "1", x: "", y: "" }])}
+          className="flex items-center gap-1 text-[12px] font-medium text-[var(--brand-700)] hover:underline disabled:opacity-40"
+        >
+          <Plus size={13} /> Add field
+        </button>
+      </div>
+      {fields.length > 0 && (
+        <div className="mb-4 space-y-2">
+          {fields.map((f, i) => (
+            <div key={i} className="grid grid-cols-[1fr_110px_56px_64px_64px_28px] items-center gap-2">
+              <select value={f.signerRole} onChange={(e) => setFields((fs) => fs.map((x, j) => (j === i ? { ...x, signerRole: e.target.value } : x)))} className={inputCls}>
+                {roleNames.map((r) => (<option key={r} value={r}>{r}</option>))}
+              </select>
+              <select value={f.fieldType} onChange={(e) => setFields((fs) => fs.map((x, j) => (j === i ? { ...x, fieldType: e.target.value } : x)))} className={inputCls}>
+                <option value="signature">Signature</option>
+                <option value="initials">Initials</option>
+                <option value="date">Date</option>
+                <option value="text">Text</option>
+                <option value="checkbox">Checkbox</option>
+              </select>
+              <input value={f.page} onChange={(e) => setFields((fs) => fs.map((x, j) => (j === i ? { ...x, page: e.target.value } : x)))} placeholder="Pg" className={inputCls} inputMode="numeric" />
+              <input value={f.x} onChange={(e) => setFields((fs) => fs.map((x, j) => (j === i ? { ...x, x: e.target.value } : x)))} placeholder="x" className={inputCls} inputMode="decimal" />
+              <input value={f.y} onChange={(e) => setFields((fs) => fs.map((x, j) => (j === i ? { ...x, y: e.target.value } : x)))} placeholder="y" className={inputCls} inputMode="decimal" />
+              <button type="button" onClick={() => setFields((fs) => fs.filter((_, j) => j !== i))} className="rounded-md p-1.5 text-stone-400 hover:bg-red-50 hover:text-red-600" aria-label="Remove field">
+                <Trash2 size={14} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="mb-1 flex items-center justify-between">
+        <span className="text-[12px] font-medium text-stone-600">Merge fields <span className="font-normal text-stone-400">(declared values the caller must supply)</span></span>
+        <button type="button" onClick={() => setMerges((ms) => [...ms, { name: "", source: "manual", path: "", required: false }])} className="flex items-center gap-1 text-[12px] font-medium text-[var(--brand-700)] hover:underline">
+          <Plus size={13} /> Add merge field
+        </button>
+      </div>
+      {merges.length > 0 && (
+        <div className="mb-4 space-y-2">
+          {merges.map((m, i) => (
+            <div key={i} className="grid grid-cols-[1fr_110px_1fr_90px_28px] items-center gap-2">
+              <input value={m.name} onChange={(e) => setMerges((ms) => ms.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))} placeholder="placeholder" className={inputCls} />
+              <input value={m.source} onChange={(e) => setMerges((ms) => ms.map((x, j) => (j === i ? { ...x, source: e.target.value } : x)))} placeholder="source" className={inputCls} />
+              <input value={m.path} onChange={(e) => setMerges((ms) => ms.map((x, j) => (j === i ? { ...x, path: e.target.value } : x)))} placeholder="dotted.path" className={inputCls} />
+              <label className="flex items-center gap-1 text-[12px] text-stone-600">
+                <input type="checkbox" checked={m.required} onChange={(e) => setMerges((ms) => ms.map((x, j) => (j === i ? { ...x, required: e.target.checked } : x)))} className="h-3.5 w-3.5 accent-[var(--brand-600)]" />
+                Req.
+              </label>
+              <button type="button" onClick={() => setMerges((ms) => ms.filter((_, j) => j !== i))} className="rounded-md p-1.5 text-stone-400 hover:bg-red-50 hover:text-red-600" aria-label="Remove merge field">
+                <Trash2 size={14} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="mt-4 flex justify-end gap-2">
+        <button type="button" onClick={onClose} className={btnGhost}>Cancel</button>
+        <button type="button" onClick={submit} disabled={saving} className={btnPrimary}>
+          {saving ? <Loader2 size={14} className="animate-spin" /> : <LayoutTemplate size={14} />}
+          {template ? "Save template" : "Create template"}
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
+function InstantiateModal({
+  template,
+  onClose,
+  onCreated,
+}: {
+  template: ApiTemplate;
+  onClose: () => void;
+  onCreated: (envelopeId: string) => void;
+}) {
+  const mergeNames = Object.keys(template.mergeFieldMapping);
+  const [mergeValues, setMergeValues] = useState<Record<string, string>>({});
+  const [bindings, setBindings] = useState<Array<{ role: string; name: string; email: string }>>(
+    template.signerRoles.map((r) => ({ role: r.role, name: "", email: "" })),
+  );
+  const [title, setTitle] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  async function submit() {
+    setError(null);
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/esign/templates/${template.id}/instantiate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: title.trim() || undefined,
+          mergeValues,
+          signerBindings: bindings.map((b) => ({ role: b.role, name: b.name.trim(), email: b.email.trim() })),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Could not instantiate the template.");
+      onCreated(data.envelope.id);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not instantiate the template.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Modal title={`Use template — ${template.name}`} onClose={onClose}>
+      <ErrorNote error={error} />
+      <p className="mb-4 text-[13px] text-stone-600">
+        This mints a <span className="font-medium text-stone-900">draft</span> from the template's
+        blueprint. Missing required values block — nothing is silently left blank.
+      </p>
+
+      <label className="mb-1 block text-[12px] font-medium text-stone-600">Envelope title (optional)</label>
+      <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={`${template.name} — …`} className={`${inputCls} mb-4 w-full`} maxLength={200} />
+
+      {mergeNames.length > 0 && (
+        <>
+          <div className="mb-1 text-[12px] font-medium text-stone-600">Merge values</div>
+          <div className="mb-4 space-y-2">
+            {mergeNames.map((n) => {
+              const def = template.mergeFieldMapping[n]!;
+              return (
+                <div key={n} className="grid grid-cols-[160px_1fr] items-center gap-2">
+                  <span className="truncate text-[13px] text-stone-700" title={`${def.source} · ${def.path}`}>
+                    <code className="rounded bg-stone-100 px-1 py-0.5 font-mono text-[12px]">{n}</code>
+                    {def.required && <span className="ml-1 text-red-500">*</span>}
+                  </span>
+                  <input
+                    value={mergeValues[n] ?? ""}
+                    onChange={(e) => setMergeValues((m) => ({ ...m, [n]: e.target.value }))}
+                    placeholder={`${def.source} · ${def.path}`}
+                    className={inputCls}
+                  />
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
+
+      <div className="mb-1 text-[12px] font-medium text-stone-600">Bind signer roles</div>
+      <div className="mb-4 space-y-2">
+        {bindings.map((b, i) => (
+          <div key={b.role} className="grid grid-cols-[120px_1fr_1fr] items-center gap-2">
+            <span className="truncate text-[13px] font-medium text-stone-700">{b.role}</span>
+            <input value={b.name} onChange={(e) => setBindings((bs) => bs.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))} placeholder="Full name" className={inputCls} />
+            <input value={b.email} onChange={(e) => setBindings((bs) => bs.map((x, j) => (j === i ? { ...x, email: e.target.value } : x)))} placeholder="email@company.com" className={inputCls} />
+          </div>
+        ))}
+      </div>
+
+      <div className="flex justify-end gap-2">
+        <button type="button" onClick={onClose} className={btnGhost}>Cancel</button>
+        <button type="button" onClick={submit} disabled={saving} className={btnPrimary}>
+          {saving ? <Loader2 size={14} className="animate-spin" /> : <PencilLine size={14} />}
+          Create draft
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
+function TemplatesTab({ onOpenEnvelope }: { onOpenEnvelope: (id: string) => void }) {
+  const [templates, setTemplates] = useState<ApiTemplate[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [modal, setModal] = useState<"create" | ApiTemplate | null>(null);
+  const [instantiate, setInstantiate] = useState<ApiTemplate | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    try {
+      const res = await fetch("/api/esign/templates");
+      const data = await res.json();
+      if (res.ok) setTemplates(data.templates ?? []);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  async function remove(id: string) {
+    if (!window.confirm("Delete this template? Existing envelopes keep their copy.")) return;
+    setDeleting(id);
+    try {
+      await fetch(`/api/esign/templates/${id}`, { method: "DELETE" });
+      await load();
+    } finally {
+      setDeleting(null);
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-2">
+        <div className="flex-1" />
+        <button onClick={() => setModal("create")} className={btnPrimary}>
+          <Plus size={14} /> New template
+        </button>
+      </div>
+
+      <div className="overflow-hidden rounded-lg border border-stone-200 bg-white">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-[13px]">
+            <thead>
+              <tr className="border-b border-stone-100 bg-stone-50/60 text-[11px] uppercase tracking-wide text-stone-500">
+                <th className="px-3 py-2 font-medium">Name</th>
+                <th className="px-3 py-2 font-medium">Roles</th>
+                <th className="px-3 py-2 font-medium">Fields</th>
+                <th className="px-3 py-2 font-medium">Merge fields</th>
+                <th className="px-3 py-2 font-medium">Blueprint</th>
+                <th className="px-3 py-2 font-medium">Updated</th>
+                <th className="px-3 py-2 font-medium"><span className="sr-only">Actions</span></th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr><td colSpan={7} className="px-3 py-10 text-center text-stone-500"><Loader2 size={16} className="mr-2 inline animate-spin" />Loading…</td></tr>
+              ) : templates.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="px-3 py-10 text-center text-stone-500">
+                    <LayoutTemplate size={20} className="mx-auto mb-2 text-stone-300" />
+                    No templates yet. Save a reusable blueprint to stop rebuilding envelopes by hand.
+                  </td>
+                </tr>
+              ) : (
+                templates.map((t) => (
+                  <tr key={t.id} className="border-b border-stone-100 last:border-0 hover:bg-[var(--brand-50)]/40">
+                    <td className="px-3 py-2.5 font-medium text-stone-900">{t.name}</td>
+                    <td className="px-3 py-2.5">
+                      <span className="flex flex-wrap gap-1">
+                        {t.signerRoles.map((r) => (<Chip key={r.role}>{r.role}</Chip>))}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2.5 text-stone-600">{t.fieldLayout.length}</td>
+                    <td className="px-3 py-2.5 text-stone-600">{Object.keys(t.mergeFieldMapping).length}</td>
+                    <td className="px-3 py-2.5 font-mono text-[12px] text-stone-600" title={t.sourceDocumentHash ?? ""}>
+                      {t.sourceDocumentHash ? `${t.sourceDocumentHash.slice(0, 12)}…` : "—"}
+                    </td>
+                    <td className="px-3 py-2.5 text-stone-600">{fmtDate(t.updatedAt)}</td>
+                    <td className="px-3 py-2.5">
+                      <span className="flex items-center justify-end gap-1">
+                        <button onClick={() => setInstantiate(t)} className="rounded-md px-2 py-1 text-[12px] font-medium text-[var(--brand-700)] hover:bg-[var(--brand-50)]">Use</button>
+                        <button onClick={() => setModal(t)} className="rounded-md p-1.5 text-stone-400 hover:bg-stone-100 hover:text-stone-600" aria-label="Edit template">
+                          <Pencil size={14} />
+                        </button>
+                        <button onClick={() => remove(t.id)} disabled={deleting === t.id} className="rounded-md p-1.5 text-stone-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-40" aria-label="Delete template">
+                          {deleting === t.id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                        </button>
+                      </span>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {modal && (
+        <TemplateModal
+          template={modal === "create" ? null : modal}
+          onClose={() => setModal(null)}
+          onSaved={() => { setModal(null); void load(); }}
+        />
+      )}
+      {instantiate && (
+        <InstantiateModal
+          template={instantiate}
+          onClose={() => setInstantiate(null)}
+          onCreated={(id) => { setInstantiate(null); onOpenEnvelope(id); }}
+        />
+      )}
+    </div>
+  );
+}
+
+// ── App shell with sub-tabs ──────────────────────────────────────────────────
+
+const ESIGN_TABS = [
+  { id: "envelopes", label: "Envelopes", icon: FileText },
+  { id: "templates", label: "Templates", icon: LayoutTemplate },
+] as const;
+
+export function EsignApp() {
+  const [tab, setTab] = useState<(typeof ESIGN_TABS)[number]["id"]>("envelopes");
+  const [openEnvelopeId, setOpenEnvelopeId] = useState<string | null>(null);
+
+  if (openEnvelopeId) {
+    return <DetailView id={openEnvelopeId} onBack={() => setOpenEnvelopeId(null)} onChanged={() => {}} />;
+  }
+
+  return (
+    <div>
+      <div className="mb-4 flex gap-1 border-b border-stone-200">
+        {ESIGN_TABS.map(({ id, label, icon: Icon }) => (
+          <button
+            key={id}
+            onClick={() => setTab(id)}
+            className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-[13.5px] font-medium transition ${
+              tab === id
+                ? "border-[var(--brand-600)] text-[var(--brand-700)]"
+                : "border-transparent text-stone-500 hover:text-stone-800"
+            }`}
+          >
+            <Icon size={15} />
+            {label}
+          </button>
+        ))}
+      </div>
+      {tab === "envelopes" ? <EnvelopesTab /> : <TemplatesTab onOpenEnvelope={setOpenEnvelopeId} />}
     </div>
   );
 }
