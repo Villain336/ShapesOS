@@ -764,6 +764,9 @@ model Workspace {
   datasetVersionChunks   DatasetVersionChunk[]
   // Dataset Builder slice 4: Activate.
   datasetPublishes       DatasetPublish[]
+  // Legal/Compliance slice 1: Obligation map.
+  legalProfile           LegalProfile?
+  obligations            Obligation[]
   insurancePaymentHandoffs InsurancePaymentHandoff[]
   insuranceCertificates     InsuranceCertificate[]
   // Phase 12 (embeds): tenant-scoped GrowthBook flag overrides.
@@ -10897,4 +10900,93 @@ model DatasetPublish {
   @@unique([datasetId, target, version])
   @@index([workspaceId, datasetId, target])
   @@map("dataset_publishes")
+}
+
+// Legal/Compliance slice 1: Obligation map (BUSINESS-OS-FEATURE-SPECS.md §4).
+// LegalProfile captures industry + business model + jurisdictions per tenant;
+// ObligationTemplate is structured seed data (industry/jurisdiction filters);
+// Obligation is the per-tenant computed instance with tenant-controlled status.
+// Guardrails: every output carries the information-not-advice label; templates
+// carry a source reference and never invent form numbers, statutes, or deadlines.
+
+model LegalProfile {
+  id          String    @id @default(cuid())
+  workspaceId String    @unique @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  // food | drones | saas | services (see lib/legal/types.ts INDUSTRIES).
+  industry String
+  // sole_proprietor | llc | corporation | partnership.
+  businessModel String   @map("business_model")
+  // e.g. ["NC"]. "national" templates apply in every jurisdiction.
+  jurisdictions String[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("legal_profiles")
+}
+
+model ObligationTemplate {
+  id String @id @default(cuid())
+  // Stable slug, e.g. "nc-sos-registration". Joins tenant Obligation rows.
+  key String @unique
+
+  // Empty = applies to all industries.
+  industries String[]
+  // "national" = applies in every jurisdiction; otherwise codes like "NC".
+  jurisdictions String[]
+
+  category ObligationCategory
+  title       String
+  description String
+  // Where the claim comes from, e.g. "IRS — irs.gov (verify before acting)".
+  // Never empty: the no-invention guardrail requires a source on every template.
+  sourceRef String @map("source_ref")
+  // Renewal cadence in plain words; null when unknown rather than invented.
+  renewalCadence String? @map("renewal_cadence")
+  // True when specifics were deliberately left out for verification.
+  needsReview Boolean @default(false) @map("needs_review")
+
+  version Int @default(1)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([key])
+  @@map("obligation_templates")
+}
+
+enum ObligationCategory {
+  license
+  filing
+  tax
+  insurance
+  permit
+}
+
+model Obligation {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  templateKey String @map("template_key")
+
+  status       ObligationStatus @default(open)
+  snoozedUntil DateTime?        @map("snoozed_until")
+  note         String?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([workspaceId, templateKey])
+  @@index([workspaceId, status])
+  @@map("obligations")
+}
+
+enum ObligationStatus {
+  open
+  snoozed
+  dismissed
+  done
 }

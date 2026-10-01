@@ -44,6 +44,7 @@ import {
   List,
   Phone,
   Star,
+  Scale,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import GlideMenu from "@/components/vault/primitives/GlideMenu";
@@ -113,6 +114,9 @@ const NAV_SECTIONS: {
       // Business OS: Dataset Builder slice 1 — ingest business knowledge
       // into traceable datasets (Launch pillar on-ramp).
       { href: "/dashboard/datasets", label: "Datasets", icon: Database },
+      // Business OS: Legal/Compliance slice 1 — per-tenant obligation map
+      // (licenses, filings, tax registrations, insurance, permits).
+      { href: "/dashboard/legal", label: "Legal", icon: Scale },
     ],
   },
 ];
