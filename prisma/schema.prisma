@@ -750,6 +750,8 @@ model Workspace {
   insuranceSubmissions    InsuranceSubmission[]
   insuranceQuotes         InsuranceQuote[]
   insuranceLicensedPartners InsuranceLicensedPartner[]
+  insuranceAuditEvents    InsuranceAuditEvent[]
+  insuranceQuoteRules     InsuranceQuoteRule[]
   // Phase 12 (embeds): tenant-scoped GrowthBook flag overrides.
   flagOverrides           WorkspaceFlagOverride[]
   eddmOrders              EddmOrder[]
@@ -10453,4 +10455,54 @@ model InsuranceLicensedPartner {
 
   @@index([workspaceId, status])
   @@map("insurance_licensed_partners")
+}
+
+// Wave 2 Insurance slice 3a: governed-action audit trail (SPEC-INSURANCE.md §4.3–4.4).
+// One record per human decision on a governed action (approved or denied):
+// who approved, what was approved (payload snapshot), timestamp, and the
+// vendor transaction reference once the licensed rail executes.
+model InsuranceAuditEvent {
+  id          String   @id @default(cuid())
+  workspaceId String   @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  // "request_quote" | "bind_policy" | "issue_certificate".
+  action String
+  // "quote" | "policy" | "certificate".
+  subjectType String @map("subject_type")
+  subjectId   String @map("subject_id")
+  // "approved" | "denied".
+  result    String
+  decidedBy String?  @map("decided_by")
+  decidedAt DateTime @map("decided_at")
+  // Payload snapshot as approved: premium/limits/carrier/effective dates.
+  // Fields not present at approval read "not confirmed" at render; never invented.
+  payload Json
+  // Set when the licensed rail executes (post-approval). Nullable until then.
+  vendorTransactionRef String? @map("vendor_transaction_ref")
+  note                 String?
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([workspaceId, action, createdAt])
+  @@map("insurance_audit_events")
+}
+
+// Wave 2 Insurance slice 3a: request_quote standing rules.
+// A workspace may pre-approve quoting per line of business, so request_quote
+// needs one approval OR a standing rule. bind_policy NEVER has a standing
+// rule (hard refusal in governance.ts) — no auto-bind in v1.
+model InsuranceQuoteRule {
+  id          String   @id @default(cuid())
+  workspaceId String   @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  // InsuranceLineOfBusiness value, e.g. "general_liability".
+  lineOfBusiness String  @map("line_of_business")
+  approvedBy     String? @map("approved_by")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([workspaceId, lineOfBusiness])
+  @@map("insurance_quote_rules")
 }
