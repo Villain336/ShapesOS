@@ -7,6 +7,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireUser, getOrCreateWorkspace } from "@/lib/session";
 import { requireWorkspaceRole } from "@/lib/authz";
 import { prisma } from "@/lib/prisma";
+import { signalRitualJoined } from "@/lib/wfh/dayview";
+import { recordLearningSignalSafe } from "@/lib/wfh/signals";
 
 export async function POST(
   req: NextRequest,
@@ -42,6 +44,12 @@ export async function POST(
       update: {},
     }),
   ]);
+
+  await recordLearningSignalSafe(
+    workspace.id,
+    user.id,
+    signalRitualJoined({ ritualId: ritual.id, ritualType: ritual.type, withNote: !!note }),
+  );
 
   return NextResponse.json({ participation }, { status: 201 });
 }

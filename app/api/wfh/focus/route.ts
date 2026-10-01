@@ -8,6 +8,8 @@ import { requireUser, getOrCreateWorkspace } from "@/lib/session";
 import { requireWorkspaceRole } from "@/lib/authz";
 import { prisma } from "@/lib/prisma";
 import { validateFocusBlock, WfhFocusError } from "@/lib/wfh/focus";
+import { signalFocusCreated } from "@/lib/wfh/dayview";
+import { recordLearningSignalSafe } from "@/lib/wfh/signals";
 
 export async function GET() {
   const user = await requireUser();
@@ -57,6 +59,18 @@ export async function POST(req: NextRequest) {
         status: "scheduled",
       },
     });
+    // 13B learning-loop hook (best-effort).
+    await recordLearningSignalSafe(
+      workspace.id,
+      user.id,
+      signalFocusCreated({
+        id: block.id,
+        protection: block.protection,
+        recurrence: block.recurrence,
+        startAt: block.startAt,
+        endAt: block.endAt,
+      }),
+    );
     return NextResponse.json({ block }, { status: 201 });
   } catch (err) {
     if (err instanceof WfhFocusError) {

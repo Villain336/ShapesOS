@@ -29,7 +29,7 @@ export class WfhStandupError extends Error {
 }
 
 export interface StandupDraft {
-  date: Date;
+  date: Date | string;
   yesterday: string;
   today: string;
   blockers?: string | null;

@@ -6,6 +6,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireUser, getOrCreateWorkspace } from "@/lib/session";
 import { requireWorkspaceRole } from "@/lib/authz";
 import { prisma } from "@/lib/prisma";
+import { signalRitualRetired } from "@/lib/wfh/dayview";
+import { recordLearningSignalSafe } from "@/lib/wfh/signals";
 
 export async function PATCH(
   req: NextRequest,
@@ -18,7 +20,7 @@ export async function PATCH(
   if (!membership) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const { id } = await params;
-  let body: { active?: unknown };
+  let body: { active?: unknown; wasDead?: unknown };
   try {
     body = (await req.json()) as typeof body;
   } catch {
@@ -37,5 +39,18 @@ export async function PATCH(
     where: { id: ritual.id },
     data: { active: body.active },
   });
+  if (!body.active) {
+    // 13B learning-loop hook (best-effort). wasDead comes from the client's
+    // health verdict — the team saw the dead-ritual surfacing and acted.
+    await recordLearningSignalSafe(
+      workspace.id,
+      user.id,
+      signalRitualRetired({
+        ritualId: ritual.id,
+        ritualType: ritual.type,
+        wasDead: body.wasDead === true,
+      }),
+    );
+  }
   return NextResponse.json({ ritual: updated });
 }

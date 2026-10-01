@@ -612,6 +612,8 @@ model Workspace {
   // Wave 2 WFH mode slice 6: home-office expense pack.
   wfhExpenseCategories    WfhExpenseCategory[]
   wfhExpenses             WfhExpense[]
+  // Wave 2 WFH mode slice 7: 13B learning-loop signals.
+  wfhLearningSignals      WfhLearningSignal[]
   // Phase 15 slice 3: per-workspace toolkit enablement back-relation.
   workspaceToolkits       WorkspaceToolkit[]
   // Phase 15 slice 4: per-workspace Composio call budget back-relation.
@@ -10180,4 +10182,28 @@ model WfhExpense {
 
   @@index([workspaceId, userId, occurredOn])
   @@map("wfh_expenses")
+}
+
+// ── Wave 2 WFH mode (slice 7): 13B learning-loop signals ─────────────────────
+// Behavioral facts (focus overridden, standup submitted, ritual joined…)
+// for the preference-learning loop. Facts, never judgments.
+
+model WfhLearningSignal {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  userId String @map("user_id")
+
+  // focus_block_created | focus_block_overridden | focus_block_completed |
+  // standup_submitted | ritual_joined | ritual_retired | mode_enabled | mode_disabled
+  signalType String @map("signal_type")
+  // focus | standup | ritual | mode
+  source     String
+  payload    Json
+  occurredAt DateTime @map("occurred_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([workspaceId, userId, occurredAt])
+  @@map("wfh_learning_signals")
 }

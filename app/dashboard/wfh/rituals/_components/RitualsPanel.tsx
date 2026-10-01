@@ -136,7 +136,7 @@ export default function RitualsPanel() {
       const res = await fetch(`/api/wfh/rituals/${r.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ active: false }),
+        body: JSON.stringify({ active: false, wasDead: r.health.dead }),
       });
       if (!res.ok) {
         const data = await res.json();

@@ -7,6 +7,8 @@ import { requireUser, getOrCreateWorkspace } from "@/lib/session";
 import { requireWorkspaceRole } from "@/lib/authz";
 import { prisma } from "@/lib/prisma";
 import { transitionStatus, FOCUS_STATUSES, WfhFocusError, type FocusStatus } from "@/lib/wfh/focus";
+import { signalFocusOverridden } from "@/lib/wfh/dayview";
+import { recordLearningSignalSafe } from "@/lib/wfh/signals";
 
 export async function PATCH(
   req: NextRequest,
@@ -52,5 +54,16 @@ export async function PATCH(
     where: { id: block.id },
     data: { status: target },
   });
+  if (target === "overridden") {
+    await recordLearningSignalSafe(
+      workspace.id,
+      user.id,
+      signalFocusOverridden({
+        id: block.id,
+        protection: block.protection,
+        conflicts: block.defendedEventIds.length,
+      }),
+    );
+  }
   return NextResponse.json({ block: updated });
 }

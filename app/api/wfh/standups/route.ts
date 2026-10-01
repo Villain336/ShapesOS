@@ -8,7 +8,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireUser, getOrCreateWorkspace } from "@/lib/session";
 import { requireWorkspaceRole } from "@/lib/authz";
 import { prisma } from "@/lib/prisma";
-import { validateStandup, WfhStandupError } from "@/lib/wfh/standups";
+import { validateStandup, WfhStandupError, isStandupLate } from "@/lib/wfh/standups";
+import { signalStandupSubmitted } from "@/lib/wfh/dayview";
+import { recordLearningSignalSafe } from "@/lib/wfh/signals";
 
 export async function GET() {
   const user = await requireUser();
@@ -85,6 +87,17 @@ export async function POST(req: NextRequest) {
         visibility: n.visibility,
       },
     });
+    await recordLearningSignalSafe(
+      workspace.id,
+      user.id,
+      signalStandupSubmitted({
+        standupId: standup.id,
+        late: isStandupLate(new Date()),
+        visibility: standup.visibility,
+        hasBlockers: !!standup.blockers,
+        hasVideo: !!standup.videoUrl,
+      }),
+    );
     return NextResponse.json({ standup }, { status: 201 });
   } catch (err) {
     if (err instanceof WfhStandupError) {

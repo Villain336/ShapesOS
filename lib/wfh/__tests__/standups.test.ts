@@ -42,7 +42,7 @@ describe("validateStandup", () => {
       date: new Date(2026, 9, 1),
       yesterday: "   ",
       today: "",
-      visibility: "everyone",
+      visibility: "everyone" as "team",
       videoUrl: "ftp://x",
     });
     assert.equal(v.ok, false);
