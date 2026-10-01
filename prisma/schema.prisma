@@ -722,6 +722,9 @@ model Workspace {
   // Phase 12 (embeds): rrweb replay sessions + Documenso signing requests.
   designReplaySessions    DesignReplaySession[]
   signingRequests         SigningRequest[]
+  // Wave 2 E-sign module (SPEC-GAP-ESIGN.md).
+  esignEnvelopes          EsignEnvelope[]
+  esignTemplates          EsignTemplate[]
   // Phase 12 (embeds): tenant-scoped GrowthBook flag overrides.
   flagOverrides           WorkspaceFlagOverride[]
   eddmOrders              EddmOrder[]
@@ -4470,6 +4473,10 @@ model EsignEnvelope {
   // Source document metadata (bytes live transiently; the vendor holds them).
   documentName String? @map("document_name")
   documentSize Int?    @map("document_size")
+  // The exact bytes the approver reviews; the send confirmation token binds
+  // to their hash so a changed draft can never be sent on a stale approval.
+  sourcePdf     Bytes?  @map("source_pdf")
+  sourcePdfHash String? @map("source_pdf_hash")
 
   // Sealed PDF mirror, fetched ONLY on the vendor's completion event.
   sealedPdf       Bytes?   @map("sealed_pdf")
