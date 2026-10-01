@@ -26,11 +26,11 @@ export default async function DesignEditorPage({
   await getOrCreateWorkspace(user.id, user.email);
 
   return (
-    <div className="-mx-4 -my-6 flex h-[calc(100dvh-105px)] flex-col bg-[#FAFAF7] sm:-mx-6 sm:-my-8 md:h-[calc(100dvh-48px)] lg:-mx-10">
-      <div className="flex shrink-0 items-center border-b border-stone-200 bg-[#FAFAF7] px-4 py-2">
+    <div className="-mx-4 -my-6 flex h-[calc(100dvh-105px)] flex-col bg-canvas sm:-mx-6 sm:-my-8 md:h-[calc(100dvh-48px)] lg:-mx-10">
+      <div className="flex shrink-0 items-center border-b border-line bg-canvas px-4 py-2">
         <Link
           href="/dashboard/studio"
-          className="flex items-center gap-1.5 text-[13px] font-medium text-stone-600 hover:text-violet-700"
+          className="flex items-center gap-1.5 text-[13px] font-medium text-muted hover:text-ink"
         >
           <ArrowLeft className="h-4 w-4" />
           Back to Studio

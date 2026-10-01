@@ -59,25 +59,25 @@ export default function PoolControls({
             variant="outline"
             onClick={() => call(`/api/media/pools/${poolId}/freeze`, { reason: "manual freeze from pool page" })}
             disabled={busy}
-            className="flex items-center gap-1.5 rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-[13px] text-stone-700 hover:bg-stone-50 disabled:opacity-40"
+            className="flex items-center gap-1.5 rounded-full border border-line bg-paper px-2.5 py-1.5 text-[13px] font-medium text-ink shadow-outline hover:bg-hover-paper disabled:opacity-40"
           >
             Freeze pool
           </Button>
         )}
         {!hasCard && (
-          <Button onClick={() => setShowCard((v) => !v)} disabled={busy} className="flex items-center gap-1.5 rounded-md bg-violet-600 px-3 py-1.5 text-[13px] font-medium text-white hover:bg-violet-700 disabled:opacity-40">
+          <Button onClick={() => setShowCard((v) => !v)} disabled={busy} className="flex items-center gap-1.5 rounded-full bg-ink px-3 py-1.5 text-[13px] font-semibold text-white aos-press disabled:opacity-40">
             Attach virtual card
           </Button>
         )}
       </div>
       {showCard && (
-        <div className="w-72 rounded-xl border border-stone-200 bg-white p-3 shadow-lg">
-          <p className="text-xs font-semibold text-stone-900">Client&apos;s virtual card</p>
-          <p className="mt-0.5 text-[11px] text-stone-500">
+        <div className="w-72 rounded-lg border border-line bg-paper p-3 shadow-overlay">
+          <p className="text-xs font-semibold text-ink">Client&apos;s virtual card</p>
+          <p className="mt-0.5 text-[11px] text-muted">
             Issued on the client&apos;s own account — never the agency&apos;s. Limit = pool cap.
           </p>
           <Select value={provider} onValueChange={(v) => setProvider(v ?? "fake")}>
-            <SelectTrigger className="rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-[13px] text-stone-900 placeholder:text-stone-400 focus:border-violet-400 focus:outline-none mt-2 w-full">
+            <SelectTrigger className="rounded-md border border-line bg-paper px-2.5 py-1.5 text-[13px] text-ink placeholder:text-subtle focus:border-focus focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus:outline-none mt-2 w-full">
               <SelectValue placeholder="Provider" />
             </SelectTrigger>
             <SelectContent>
@@ -95,13 +95,13 @@ export default function PoolControls({
           <Button
             onClick={() => accountRef.trim() && call(`/api/media/pools/${poolId}/virtual-card`, { provider, providerAccountRef: accountRef })}
             disabled={busy || !accountRef.trim()}
-            className="flex items-center gap-1.5 rounded-md bg-violet-600 px-3 py-1.5 text-[13px] font-medium text-white hover:bg-violet-700 disabled:opacity-40 mt-2 w-full"
+            className="mt-2 flex w-full items-center gap-1.5 rounded-full bg-ink px-3 py-1.5 text-[13px] font-semibold text-white aos-press disabled:opacity-40"
           >
             Issue card
           </Button>
         </div>
       )}
-      {msg && <p className="max-w-xs text-right text-xs text-red-700">{msg}</p>}
+      {msg && <p className="max-w-xs text-right text-xs text-failed-text">{msg}</p>}
     </div>
   );
 }

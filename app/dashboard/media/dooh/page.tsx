@@ -20,8 +20,8 @@ export default async function DoohPage() {
   return (
     <div className="flex h-full flex-col gap-4 bg-[#FAFAF7] p-4 md:p-6">
       <div>
-        <h1 className="text-xl font-bold tracking-tight text-stone-900">DOOH Planner</h1>
-        <p className="mt-0.5 text-[13px] text-stone-500">
+        <h1 className="aos-heading text-ink">DOOH Planner</h1>
+        <p className="mt-0.5 text-[13px] text-muted">
           Plan digital billboards — Blip first, Blindspot second, Adomni optional. Estimates are
           planning ranges; execution happens in the client&apos;s own operator account from a
           launch packet. AdQuick API is parked — referral link to adquick.com self-serve only.

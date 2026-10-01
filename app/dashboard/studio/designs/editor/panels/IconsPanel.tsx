@@ -22,7 +22,7 @@ import {
 import { btnPrimary, inputCls, panelTitle } from "../ui";
 
 const PAGE_SIZE = 32;
-const FILL = "#7c3aed";
+const FILL = "#1c1917";
 
 const PREFIX_LABELS: Record<string, string> = {
   mdi: "Material Design Icons",
@@ -148,13 +148,13 @@ export function IconsPanel() {
           ))}
         </select>
         {error && (
-          <p className="rounded-md border border-red-200 bg-red-50 px-2.5 py-2 text-[12px] leading-snug text-red-700">
+          <p className="rounded-md border border-failed bg-failed-tint px-2.5 py-2 text-[12px] leading-snug text-failed-text">
             {error}
           </p>
         )}
         {results.length > 0 ? (
           <>
-            <p className="text-[11px] text-stone-400">
+            <p className="text-[11px] text-subtle">
               {total > results.length
                 ? `Showing ${results.length} of ~${total.toLocaleString()} matches`
                 : `${results.length} match${results.length === 1 ? "" : "es"}`}
@@ -166,7 +166,7 @@ export function IconsPanel() {
                   key={icon.ref}
                   onClick={() => place(icon)}
                   title={`${icon.ref} — click to place`}
-                  className="flex aspect-square items-center justify-center rounded-md border border-stone-200 bg-white p-2 hover:border-violet-400 hover:bg-violet-50/40"
+                  className="flex aspect-square items-center justify-center rounded-md border border-line bg-paper p-2 hover:border-line-strong hover:bg-hover-paper"
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
@@ -180,7 +180,7 @@ export function IconsPanel() {
             </div>
           </>
         ) : searched !== null && !busy ? (
-          <p className="flex items-start gap-1.5 text-[12px] text-stone-500">
+          <p className="flex items-start gap-1.5 text-[12px] text-muted">
             <ImageOff className="mt-0.5 h-3.5 w-3.5 shrink-0" />
             <span>
               No icons found for “{searched}”. Try another search or a different
@@ -188,15 +188,15 @@ export function IconsPanel() {
             </span>
           </p>
         ) : (
-          <p className="flex items-start gap-1.5 text-[12px] leading-snug text-stone-500">
-            <Shapes className="mt-0.5 h-3.5 w-3.5 shrink-0 text-stone-400" />
+          <p className="flex items-start gap-1.5 text-[12px] leading-snug text-muted">
+            <Shapes className="mt-0.5 h-3.5 w-3.5 shrink-0 text-subtle" />
             <span>
               Search 100k+ icons from open-source sets. Click an icon to place
-              it — it lands violet and recolors from the toolbar.
+              it — it lands in ink and recolors from the toolbar.
             </span>
           </p>
         )}
-        <p className="border-t border-stone-100 pt-2 text-[11px] leading-snug text-stone-400">
+        <p className="border-t border-line pt-2 text-[11px] leading-snug text-subtle">
           Only permissively-licensed sets (MIT, Apache-2.0, ISC, CC0) are
           searchable — no attribution required on your exports. Icons are
           stored in your design, so exports never phone home.

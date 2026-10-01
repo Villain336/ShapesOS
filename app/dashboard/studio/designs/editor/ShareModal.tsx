@@ -171,14 +171,14 @@ export function ShareModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/40 p-4">
-      <div className="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-xl border border-stone-200 bg-white shadow-2xl">
-        <div className="flex items-center gap-2 border-b border-stone-100 px-5 py-4">
-          <ShieldCheck className="h-4 w-4 text-violet-600" />
-          <h2 className="text-[15px] font-semibold text-stone-900">Share & approval</h2>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-night/40 p-4">
+      <div className="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-lg border border-line bg-paper shadow-overlay">
+        <div className="flex items-center gap-2 border-b border-line px-5 py-4">
+          <ShieldCheck className="h-4 w-4 text-ink" />
+          <h2 className="aos-subheading text-ink">Share & approval</h2>
           <button
             onClick={onClose}
-            className="ml-auto rounded p-1 text-stone-400 hover:bg-stone-100 hover:text-stone-700"
+            className="ml-auto rounded-full p-1 text-subtle hover:bg-hover-paper hover:text-ink"
             aria-label="Close"
           >
             <X className="h-4 w-4" />
@@ -187,18 +187,18 @@ export function ShareModal({
 
         <div className="space-y-6 px-5 py-4">
           {error && (
-            <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-700">
+            <p className="rounded-md border border-failed bg-failed-tint px-3 py-2 text-[13px] text-failed-text">
               {error}
             </p>
           )}
           {loading ? (
-            <p className="flex items-center gap-2 text-[13px] text-stone-500">
+            <p className="flex items-center gap-2 text-[13px] text-muted">
               <Loader2 className="h-4 w-4 animate-spin" /> Loading…
             </p>
           ) : (
             <>
               <section>
-                <h3 className="mb-2 text-[12px] font-semibold uppercase tracking-wide text-stone-400">
+                <h3 className="mb-2 text-[12px] font-semibold text-muted">
                   Approval status
                 </h3>
                 <div className="flex flex-wrap gap-1.5">
@@ -209,8 +209,8 @@ export function ShareModal({
                       onClick={() => void setStatus(s.key)}
                       className={`rounded-md px-3 py-1.5 text-[13px] font-medium ${
                         approval?.status === s.key
-                          ? "bg-violet-600 text-white"
-                          : "border border-stone-200 bg-white text-stone-700 hover:bg-stone-50"
+                          ? "bg-ink text-white"
+                          : "border border-line bg-paper text-ink hover:bg-hover-paper"
                       }`}
                     >
                       {s.label}
@@ -224,27 +224,27 @@ export function ShareModal({
                     onBlur={() => void setStatus("changes_requested")}
                     rows={3}
                     placeholder="What needs to change?"
-                    className="mt-2 w-full rounded-md border border-stone-200 px-2.5 py-1.5 text-[13px] focus:border-violet-400 focus:outline-none"
+                    className="mt-2 w-full rounded-md border-[1.5px] border-control bg-paper px-2.5 py-1.5 text-[13px] text-ink focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none"
                   />
                 )}
               </section>
 
               <section>
-                <h3 className="mb-2 text-[12px] font-semibold uppercase tracking-wide text-stone-400">
+                <h3 className="mb-2 text-[12px] font-semibold text-muted">
                   Public share links
                 </h3>
                 {newToken && (
-                  <div className="mb-3 rounded-md border border-amber-200 bg-amber-50 p-3">
-                    <p className="mb-1.5 text-[12px] font-semibold text-amber-900">
-                      Copy this link now — the token is shown once and never again.
+                  <div className="mb-3 rounded-md border border-line bg-needs-tint p-3">
+                    <p className="mb-1.5 flex items-center gap-1.5 text-[12px] font-semibold text-ink">
+                      <span className="aos-shape aos-shape--needs aos-shape--edged shrink-0" />Copy this link now — the token is shown once and never again.
                     </p>
                     <div className="flex items-center gap-2">
-                      <code className="min-w-0 flex-1 truncate rounded bg-white px-2 py-1.5 font-mono text-[12px] text-stone-800">
+                      <code className="min-w-0 flex-1 truncate rounded bg-paper px-2 py-1.5 font-mono text-[12px] text-ink shadow-hairline">
                         {newToken.url}
                       </code>
                       <button
                         onClick={() => void copy(newToken.url)}
-                        className="flex shrink-0 items-center gap-1 rounded-md bg-violet-600 px-2.5 py-1.5 text-[12px] font-semibold text-white hover:bg-violet-700"
+                        className="flex shrink-0 items-center gap-1 rounded-full bg-ink px-3 py-1.5 text-[12px] font-semibold text-white aos-press"
                       >
                         {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
                         {copied ? "Copied" : "Copy"}
@@ -258,30 +258,30 @@ export function ShareModal({
                     onChange={(e) => setExpiryDays(e.target.value.replace(/\D/g, ""))}
                     placeholder="Expires in days (optional)"
                     inputMode="numeric"
-                    className="w-48 rounded-md border border-stone-200 px-2.5 py-1.5 text-[13px] focus:border-violet-400 focus:outline-none"
+                    className="w-48 rounded-md border-[1.5px] border-control bg-paper px-2.5 py-1.5 text-[13px] text-ink focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none"
                   />
                   <label
-                    className="flex cursor-pointer items-center gap-1.5 rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-[13px] text-stone-700 hover:bg-stone-50"
+                    className="flex cursor-pointer items-center gap-1.5 rounded-full border border-line bg-paper px-3 py-1.5 text-[13px] text-ink shadow-outline hover:bg-hover-paper"
                     title="Record visitor sessions (rrweb). Inputs are masked; recordings are workspace-visible only."
                   >
                     <input
                       type="checkbox"
                       checked={replayOptIn}
                       onChange={(e) => setReplayOptIn(e.target.checked)}
-                      className="h-3.5 w-3.5 accent-violet-600"
+                      className="h-3.5 w-3.5 accent-ink"
                     />
                     Session replay
                   </label>
                   <button
                     onClick={() => void createShare()}
                     disabled={saving}
-                    className="flex items-center gap-1.5 rounded-md bg-violet-600 px-3 py-1.5 text-[13px] font-semibold text-white hover:bg-violet-700 disabled:opacity-50"
+                    className="flex h-control-sm items-center gap-1.5 rounded-full bg-ink px-4 text-[13px] font-semibold text-white aos-press disabled:bg-disabled disabled:text-disabled-fg"
                   >
                     <Plus className="h-4 w-4" /> New link
                   </button>
                 </div>
                 {shares.length === 0 ? (
-                  <p className="text-[13px] text-stone-500">
+                  <p className="text-[13px] text-muted">
                     No share links yet. Links open a read-only preview for anyone with the URL.
                   </p>
                 ) : (
@@ -289,32 +289,32 @@ export function ShareModal({
                     {shares.map((s) => (
                       <li
                         key={s.id}
-                        className="flex items-center gap-2 rounded-md border border-stone-200 px-3 py-2"
+                        className="flex items-center gap-2 rounded-md border border-line bg-paper px-3 py-2"
                       >
                         <Link2
-                          className={`h-4 w-4 shrink-0 ${s.active ? "text-violet-600" : "text-stone-300"}`}
+                          className={`h-4 w-4 shrink-0 ${s.active ? "text-ink" : "text-subtle"}`}
                         />
                         <div className="min-w-0 flex-1">
-                          <p className="text-[12px] font-medium text-stone-700">
+                          <p className="text-[12px] font-medium text-ink">
                             Created {new Date(s.createdAt).toLocaleDateString()}
                             {s.expiresAt &&
                               ` · expires ${new Date(s.expiresAt).toLocaleDateString()}`}
                           </p>
                           <p
-                            className={`text-[11px] ${s.active ? "text-emerald-600" : "text-stone-400"}`}
+                            className={`text-[11px] ${s.active ? "text-ink" : "text-subtle"}`}
                           >
                             {s.active ? "Active" : "Revoked"}
                             {s.replayOptIn && s.active && (
                               <Link
                                 href={`/dashboard/studio/designs/${encodeURIComponent(designId)}/replay/${encodeURIComponent(s.id)}`}
-                                className="ml-1.5 inline-flex items-center gap-0.5 rounded-full bg-violet-100 px-1.5 py-0.5 text-[10px] font-semibold text-violet-700 hover:bg-violet-200"
+                                className="ml-1.5 inline-flex items-center gap-0.5 rounded-full bg-canvas px-1.5 py-0.5 text-[10px] font-semibold text-ink hover:bg-hover-paper"
                                 title="Watch session recordings for this link"
                               >
                                 <MonitorPlay className="h-3 w-3" /> replay · watch
                               </Link>
                             )}
                             {s.replayOptIn && !s.active && (
-                              <span className="ml-1.5 rounded-full bg-violet-100 px-1.5 py-0.5 text-[10px] font-semibold text-violet-700">
+                              <span className="ml-1.5 rounded-full bg-canvas px-1.5 py-0.5 text-[10px] font-semibold text-subtle">
                                 replay on
                               </span>
                             )}
@@ -323,7 +323,7 @@ export function ShareModal({
                         {s.active && (
                           <button
                             onClick={() => void revokeShare(s.id)}
-                            className="flex items-center gap-1 rounded px-2 py-1 text-[12px] font-medium text-red-600 hover:bg-red-50"
+                            className="flex items-center gap-1 rounded-full bg-paper px-2 py-1 text-[12px] font-medium text-failed-text shadow-[inset_0_0_0_1.5px_var(--aos-failed)]"
                             title="Revoke this link"
                           >
                             <Trash2 className="h-3.5 w-3.5" /> Revoke
@@ -333,7 +333,7 @@ export function ShareModal({
                     ))}
                   </ul>
                 )}
-                <p className="mt-2 text-[11px] leading-snug text-stone-400">
+                <p className="mt-2 text-[11px] leading-snug text-subtle">
                   Public previews show the design, approval status, and comments only — never
                   workspace details. Revoked, expired, and unknown links all return the same
                   404.

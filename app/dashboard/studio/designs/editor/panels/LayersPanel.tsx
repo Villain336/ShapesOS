@@ -22,7 +22,7 @@ import type { DesignElement } from "@/lib/design/types";
 import { panelTitle } from "../ui";
 
 function TypeIcon({ type }: { type: DesignElement["type"] }) {
-  const cls = "h-3.5 w-3.5 shrink-0 text-stone-500";
+  const cls = "h-3.5 w-3.5 shrink-0 text-muted";
   switch (type) {
     case "text":
       return <Type className={cls} />;
@@ -63,7 +63,7 @@ export function LayersPanel() {
       <div className={panelTitle}>Layers · {page.name}</div>
       <div className="space-y-1 px-3 pb-4">
         {rows.length === 0 && (
-          <p className="text-[12px] text-stone-500">This page is empty — add something from the other panels.</p>
+          <p className="text-[12px] text-muted">This page is empty — add something from the other panels.</p>
         )}
         {rows.map((el) => {
           const selected = selectedIds.includes(el.id);
@@ -75,8 +75,8 @@ export function LayersPanel() {
               title="Click to select · double-click to rename"
               className={`flex cursor-pointer items-center gap-2 rounded-md border px-2 py-1.5 text-[12px] ${
                 selected
-                  ? "border-violet-400 bg-violet-50/60 text-stone-900"
-                  : "border-stone-200 bg-white text-stone-700 hover:border-stone-300"
+                  ? "border-ink bg-hover-paper text-ink"
+                  : "border-line bg-paper text-ink hover:border-line-strong"
               } ${el.visible ? "" : "opacity-50"}`}
             >
               <TypeIcon type={el.type} />
@@ -87,7 +87,7 @@ export function LayersPanel() {
                   moveElement(el.id, "forward");
                 }}
                 title="Bring forward"
-                className="rounded p-0.5 text-stone-400 hover:bg-stone-100 hover:text-stone-700"
+                className="rounded-full p-0.5 text-subtle hover:bg-hover-paper hover:text-ink"
               >
                 <ChevronUp className="h-3.5 w-3.5" />
               </button>
@@ -97,7 +97,7 @@ export function LayersPanel() {
                   moveElement(el.id, "backward");
                 }}
                 title="Send backward"
-                className="rounded p-0.5 text-stone-400 hover:bg-stone-100 hover:text-stone-700"
+                className="rounded-full p-0.5 text-subtle hover:bg-hover-paper hover:text-ink"
               >
                 <ChevronDown className="h-3.5 w-3.5" />
               </button>
@@ -107,7 +107,7 @@ export function LayersPanel() {
                   updateElement(el.id, { locked: !el.locked });
                 }}
                 title={el.locked ? "Unlock" : "Lock"}
-                className="rounded p-0.5 text-stone-400 hover:bg-stone-100 hover:text-stone-700"
+                className="rounded-full p-0.5 text-subtle hover:bg-hover-paper hover:text-ink"
               >
                 {el.locked ? <Lock className="h-3.5 w-3.5" /> : <Unlock className="h-3.5 w-3.5" />}
               </button>
@@ -117,7 +117,7 @@ export function LayersPanel() {
                   updateElement(el.id, { visible: !el.visible });
                 }}
                 title={el.visible ? "Hide" : "Show"}
-                className="rounded p-0.5 text-stone-400 hover:bg-stone-100 hover:text-stone-700"
+                className="rounded-full p-0.5 text-subtle hover:bg-hover-paper hover:text-ink"
               >
                 {el.visible ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
               </button>

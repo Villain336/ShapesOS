@@ -9,7 +9,7 @@
 "use client";
 
 import { useState } from "react";
-import { ImagePlus, Loader2, Sparkles } from "lucide-react";
+import { Check, ImagePlus, Loader2, Sparkles } from "lucide-react";
 import { useCanvasStore } from "@/lib/design/store";
 import { newAssetId, useSessionAssets } from "@/lib/design/assets";
 import { AI_DESIGN_SIZES } from "@/lib/design/ai";
@@ -96,20 +96,25 @@ export function AiPanel() {
     if (s.kind === "idle") return null;
     if (s.kind === "busy") {
       return (
-        <p className="flex items-center gap-1.5 text-[12px] text-violet-700">
-          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+        <p className="flex items-center gap-1.5 text-[12px] text-running">
+          <span className="aos-shape aos-shape--running aos-is-live" />
           {s.label} This can take ~30 seconds.
         </p>
       );
     }
     return (
       <p
-        className={`rounded-md border px-2.5 py-2 text-[12px] leading-snug ${
+        className={`flex items-start gap-1.5 rounded-md border px-2.5 py-2 text-[12px] leading-snug ${
           s.kind === "error"
-            ? "border-red-200 bg-red-50 text-red-700"
-            : "border-emerald-200 bg-emerald-50 text-emerald-700"
+            ? "border-failed bg-failed-tint text-failed-text"
+            : "border-line bg-paper text-ink"
         }`}
       >
+        {s.kind === "error" ? (
+          <span className="aos-shape aos-shape--failed mt-0.5 shrink-0" />
+        ) : (
+          <Check className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+        )}
         {s.message}
       </p>
     );
@@ -136,8 +141,8 @@ export function AiPanel() {
                 onClick={() => setDesignSize(s)}
                 className={`rounded-md border px-2 py-1.5 text-left text-[11px] font-medium ${
                   designSize.key === s.key
-                    ? "border-violet-600 bg-violet-50 text-violet-700"
-                    : "border-stone-200 bg-white text-stone-600 hover:border-stone-300"
+                    ? "border-ink bg-ink text-white"
+                    : "border-line bg-paper text-muted hover:border-line-strong"
                 }`}
               >
                 {s.label}
@@ -153,13 +158,13 @@ export function AiPanel() {
             {designStatus.kind === "busy" ? "Drafting…" : "Generate design"}
           </button>
           <div className="mt-2">{renderStatus(designStatus)}</div>
-          <p className="mt-1.5 text-[11px] leading-snug text-stone-400">
+          <p className="mt-1.5 text-[11px] leading-snug text-subtle">
             The AI drafts a starting page — you refine every detail. Nothing is published automatically.
           </p>
         </section>
 
         {/* ── Generate image ──────────────────────────────────── */}
-        <section className="border-t border-stone-100 pt-4">
+        <section className="border-t border-line pt-4">
           <div className={panelSectionLabel}>Generate image</div>
           <textarea
             value={imagePrompt}
@@ -175,8 +180,8 @@ export function AiPanel() {
                 onClick={() => setImageSize(s.key)}
                 className={`flex-1 rounded-md border px-2 py-1.5 text-[11px] font-medium ${
                   imageSize === s.key
-                    ? "border-violet-600 bg-violet-50 text-violet-700"
-                    : "border-stone-200 bg-white text-stone-600 hover:border-stone-300"
+                    ? "border-ink bg-ink text-white"
+                    : "border-line bg-paper text-muted hover:border-line-strong"
                 }`}
               >
                 {s.label}
@@ -192,7 +197,7 @@ export function AiPanel() {
             {imageStatus.kind === "busy" ? "Painting…" : "Generate image"}
           </button>
           <div className="mt-2">{renderStatus(imageStatus)}</div>
-          <p className="mt-1.5 text-[11px] leading-snug text-stone-400">
+          <p className="mt-1.5 text-[11px] leading-snug text-subtle">
             Uses your OpenAI image key (LLM_IMAGE_MODEL). Images land in Uploads — you place them.
           </p>
         </section>

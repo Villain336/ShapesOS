@@ -114,36 +114,36 @@ export function FontPicker({ value, onChange, brandFonts = [], className = "", a
         onClick={() => setOpen((o) => !o)}
         aria-label={ariaLabel}
         title={ariaLabel}
-        className="flex max-w-44 items-center gap-1.5 rounded-md border border-stone-200 bg-white px-2 py-1 text-[12px] text-stone-700 hover:border-violet-400"
+        className="flex max-w-44 items-center gap-1.5 rounded-full border border-line bg-paper px-2.5 py-1 text-[12px] text-ink shadow-outline hover:bg-hover-paper"
       >
-        <Type className="h-3.5 w-3.5 shrink-0 text-stone-400" />
+        <Type className="h-3.5 w-3.5 shrink-0 text-subtle" />
         <span className="truncate" style={{ fontFamily: `"${currentCss}", sans-serif` }}>
           {currentLabel}
         </span>
-        <ChevronDown className="h-3.5 w-3.5 shrink-0 text-stone-400" />
+        <ChevronDown className="h-3.5 w-3.5 shrink-0 text-subtle" />
       </button>
       {open && (
-        <div className="absolute left-0 z-30 mt-1 w-64 overflow-hidden rounded-md border border-stone-200 bg-white shadow-lg">
-          <div className="border-b border-stone-100 p-1.5">
-            <div className="flex items-center gap-1.5 rounded-md bg-stone-50 px-2 py-1">
-              <Search className="h-3.5 w-3.5 shrink-0 text-stone-400" />
+        <div className="absolute left-0 z-30 mt-1 w-64 overflow-hidden rounded-md border border-line bg-paper shadow-overlay">
+          <div className="border-b border-line p-1.5">
+            <div className="flex items-center gap-1.5 rounded-md bg-canvas px-2 py-1">
+              <Search className="h-3.5 w-3.5 shrink-0 text-subtle" />
               <input
                 autoFocus
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search fonts…"
                 aria-label="Search fonts"
-                className="w-full bg-transparent text-[12px] text-stone-700 outline-none placeholder:text-stone-400"
+                className="w-full bg-transparent text-[12px] text-ink outline-none placeholder:text-subtle"
               />
             </div>
           </div>
           <div className="max-h-80 overflow-y-auto py-1">
             {groups.length === 0 && (
-              <p className="px-3 py-4 text-[12px] text-stone-400">No fonts match “{query}”.</p>
+              <p className="px-3 py-4 text-[12px] text-subtle">No fonts match “{query}”.</p>
             )}
             {groups.map((g) => (
               <div key={g.title}>
-                <p className="px-3 pb-0.5 pt-2 text-[10px] font-semibold uppercase tracking-wide text-stone-400">
+                <p className="px-3 pb-0.5 pt-2 text-[10px] font-semibold text-subtle">
                   {g.title}
                 </p>
                 {g.options.map((opt) => {
@@ -153,26 +153,26 @@ export function FontPicker({ value, onChange, brandFonts = [], className = "", a
                       key={opt.key}
                       type="button"
                       onClick={() => pick(opt)}
-                      className={`flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-violet-50/40 ${
-                        active ? "bg-violet-50/60" : ""
+                      className={`flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-hover-paper ${
+                        active ? "bg-hover-paper" : ""
                       }`}
                       title={`${opt.label} — ${opt.sub}`}
                     >
                       <span
-                        className="flex-1 truncate text-[15px] leading-snug text-stone-800"
+                        className="flex-1 truncate text-[15px] leading-snug text-ink"
                         style={{ fontFamily: `"${opt.cssFamily}", sans-serif` }}
                       >
                         {opt.label}
                       </span>
-                      <span className="shrink-0 text-[10px] text-stone-400">{opt.sub}</span>
-                      {active && <Check className="h-3.5 w-3.5 shrink-0 text-violet-600" />}
+                      <span className="shrink-0 text-[10px] text-subtle">{opt.sub}</span>
+                      {active && <Check className="h-3.5 w-3.5 shrink-0 text-ink" />}
                     </button>
                   );
                 })}
               </div>
             ))}
           </div>
-          <p className="border-t border-stone-100 px-3 py-1.5 text-[10px] leading-snug text-stone-400">
+          <p className="border-t border-line px-3 py-1.5 text-[10px] leading-snug text-subtle">
             All families are OFL-licensed and self-hosted — safe for client exports.
           </p>
         </div>

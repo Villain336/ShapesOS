@@ -134,7 +134,7 @@ function BgRemovalControl({ el }: { el: ImageElement }) {
           {busy ? progress ?? "Working…" : "Remove background"}
         </button>
       )}
-      {error && <span className="max-w-64 text-[11px] leading-snug text-red-600">{error}</span>}
+      {error && <span className="max-w-64 text-[11px] leading-snug text-failed-text">{error}</span>}
     </div>
   );
 }
@@ -346,29 +346,29 @@ export function Toolbar({ stageRef, designId, designName, onNameChange, saveStat
     saveState === "saving" ? "Saving…" : saveState === "saved" ? "Saved" : saveState === "error" ? "Save error" : "";
 
   return (
-    <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b border-stone-200 bg-white px-3 py-2">
+    <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b border-line bg-paper px-3 py-2">
       <input
         value={designName}
         onChange={(e) => onNameChange(e.target.value)}
         aria-label="Design name"
-        className="w-44 rounded-md border border-transparent px-2 py-1 text-[13px] font-semibold text-stone-900 hover:border-stone-200 focus:border-violet-400 focus:outline-none"
+        className="w-44 rounded-md border border-transparent px-2 py-1 text-[13px] font-semibold text-ink hover:border-line focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)]"
       />
 
-      <div className="h-5 w-px bg-stone-200" />
+      <div className="h-5 w-px bg-line" />
 
       {selected.length === 0 && page && (
         <div className="flex items-center gap-2">
-          <label className="flex items-center gap-1.5 text-[12px] text-stone-600">
+          <label className="flex items-center gap-1.5 text-[12px] text-muted">
             <input
               type="color"
               value={page.background}
               onChange={(e) => setPageBackground(page.id, e.target.value)}
-              className="h-7 w-8 cursor-pointer rounded border border-stone-200 bg-white p-0.5"
+              className="h-7 w-8 cursor-pointer rounded border border-line bg-paper p-0.5"
               title="Page background"
             />
             Background
           </label>
-          <span className="rounded bg-stone-100 px-1.5 py-0.5 font-mono text-[11px] text-stone-600">
+          <span className="rounded bg-canvas px-1.5 py-0.5 font-mono text-[11px] text-muted">
             {page.width} × {page.height}
           </span>
           <div ref={resizeRef} className="relative">
@@ -377,13 +377,13 @@ export function Toolbar({ stageRef, designId, designName, onNameChange, saveStat
               className={`${btnGhost} !py-1 text-[12px]`}
               title="Magic resize — convert this page to another size"
             >
-              <Scaling className="h-3.5 w-3.5 text-violet-600" />
+              <Scaling className="h-3.5 w-3.5 text-ink" />
               Magic resize
               <ChevronDown className="h-3.5 w-3.5" />
             </button>
             {resizeOpen && (
-              <div className="absolute left-0 z-30 mt-1 w-56 overflow-hidden rounded-md border border-stone-200 bg-white shadow-lg">
-                <p className="px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-stone-400">
+              <div className="absolute left-0 z-30 mt-1 w-56 overflow-hidden rounded-md border border-line bg-paper shadow-overlay">
+                <p className="px-3 pb-1 pt-2 text-[11px] font-semibold text-subtle">
                   Resize page to…
                 </p>
                 {AI_DESIGN_SIZES.map((preset) => {
@@ -393,18 +393,18 @@ export function Toolbar({ stageRef, designId, designName, onNameChange, saveStat
                       key={preset.key}
                       disabled={current}
                       onClick={() => doMagicResize(preset)}
-                      className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-[13px] text-stone-700 hover:bg-violet-50/40 disabled:cursor-default disabled:hover:bg-transparent"
+                      className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-[13px] text-ink hover:bg-hover-paper disabled:cursor-default disabled:hover:bg-transparent"
                     >
-                      <span className={current ? "text-stone-400" : ""}>{preset.label}</span>
+                      <span className={current ? "text-subtle" : ""}>{preset.label}</span>
                       {current ? (
-                        <span className="text-[11px] font-medium text-stone-400">Current</span>
+                        <span className="text-[11px] font-medium text-subtle">Current</span>
                       ) : (
-                        <Scaling className="h-3.5 w-3.5 text-violet-400" />
+                        <Scaling className="h-3.5 w-3.5 text-subtle" />
                       )}
                     </button>
                   );
                 })}
-                <p className="border-t border-stone-100 px-3 py-2 text-[11px] leading-snug text-stone-400">
+                <p className="border-t border-line px-3 py-2 text-[11px] leading-snug text-subtle">
                   Layout scales proportionally. Locked elements resize too. Undo with Ctrl+Z.
                 </p>
               </div>
@@ -455,7 +455,7 @@ export function Toolbar({ stageRef, designId, designName, onNameChange, saveStat
             onChange={(e) => {
               for (const t of textEls) updateElement(t.id, { fill: e.target.value });
             }}
-            className="h-7 w-8 cursor-pointer rounded border border-stone-200 bg-white p-0.5"
+            className="h-7 w-8 cursor-pointer rounded border border-line bg-paper p-0.5"
             title="Text color"
           />
           {(["left", "center", "right"] as const).map((a) => (
@@ -502,7 +502,7 @@ export function Toolbar({ stageRef, designId, designName, onNameChange, saveStat
 
       {selected.length > 0 && (
         <div className="flex flex-wrap items-center gap-1.5">
-          <label className="flex items-center gap-1 text-[12px] text-stone-600" title="Opacity">
+          <label className="flex items-center gap-1 text-[12px] text-muted" title="Opacity">
             <input
               type="range"
               min={0}
@@ -512,7 +512,7 @@ export function Toolbar({ stageRef, designId, designName, onNameChange, saveStat
                 const v = parseInt(e.target.value, 10) / 100;
                 for (const el of selected) updateElement(el.id, { opacity: v });
               }}
-              className="h-1 w-20 accent-violet-600"
+              className="h-1 w-20 accent-ink"
             />
           </label>
           <input
@@ -531,7 +531,7 @@ export function Toolbar({ stageRef, designId, designName, onNameChange, saveStat
                 if (Object.keys(patch).length > 0) updateElement(el.id, patch);
               }
             }}
-            className="h-7 w-8 cursor-pointer rounded border border-stone-200 bg-white p-0.5"
+            className="h-7 w-8 cursor-pointer rounded border border-line bg-paper p-0.5"
             title="Fill color"
           />
           <button
@@ -577,7 +577,7 @@ export function Toolbar({ stageRef, designId, designName, onNameChange, saveStat
       <div className="ml-auto flex items-center gap-1.5">
         <button
           onClick={() => setBatchOpen(true)}
-          className="flex items-center gap-1.5 rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-[13px] text-stone-700 hover:bg-stone-50"
+          className={btnGhost}
           title="Batch generate variants from {{variables}} on this page"
         >
           <Wand2 className="h-4 w-4" />
@@ -585,7 +585,7 @@ export function Toolbar({ stageRef, designId, designName, onNameChange, saveStat
         </button>
         <button
           onClick={() => setShareOpen(true)}
-          className="flex items-center gap-1.5 rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-[13px] text-stone-700 hover:bg-stone-50"
+          className={btnGhost}
           title="Share links, comments, and approval"
         >
           <Share2 className="h-4 w-4" />
@@ -601,14 +601,14 @@ export function Toolbar({ stageRef, designId, designName, onNameChange, saveStat
           <button
             onClick={() => setExportOpen((o) => !o)}
             disabled={exporting}
-            className="flex items-center gap-1.5 rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-[13px] text-stone-700 hover:bg-stone-50 disabled:opacity-40"
+            className={btnGhost}
           >
             <Download className="h-4 w-4" />
-            {exporting ? "Exporting…" : "Export"}
+            {exporting ? <span className="aos-shape aos-shape--running aos-is-live" /> : null}{exporting ? "Exporting…" : "Export"}
             <ChevronDown className="h-3.5 w-3.5" />
           </button>
           {exportOpen && (
-            <div className="absolute right-0 z-30 mt-1 w-36 overflow-hidden rounded-md border border-stone-200 bg-white shadow-lg">
+            <div className="absolute right-0 z-30 mt-1 w-36 overflow-hidden rounded-md border border-line bg-paper shadow-overlay">
               {(
                 [
                   ["png", "PNG image"],
@@ -620,7 +620,7 @@ export function Toolbar({ stageRef, designId, designName, onNameChange, saveStat
                 <button
                   key={fmt}
                   onClick={() => void doExport(fmt)}
-                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-[13px] text-stone-700 hover:bg-violet-50/40"
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-[13px] text-ink hover:bg-hover-paper"
                 >
                   <Check className="h-3.5 w-3.5 invisible" />
                   {label}
@@ -632,32 +632,34 @@ export function Toolbar({ stageRef, designId, designName, onNameChange, saveStat
         {saveLabel && (
           <span
             className={`flex items-center gap-1 text-[12px] ${
-              saveState === "error" ? "text-red-600" : "text-stone-500"
+              saveState === "error" ? "text-failed-text" : "text-muted"
             }`}
           >
-            {saveState === "saved" && <Check className="h-3.5 w-3.5 text-emerald-600" />}
+            {saveState === "saving" && <span className="aos-shape aos-shape--running aos-is-live" />}
+            {saveState === "saved" && <Check className="h-3.5 w-3.5 text-ink" />}
+            {saveState === "error" && <span className="aos-shape aos-shape--failed" />}
             {saveLabel}
           </span>
         )}
       </div>
 
       {notice && (
-        <div className="fixed bottom-6 left-1/2 z-50 flex -translate-x-1/2 items-center gap-3 rounded-lg bg-stone-900 py-2.5 pl-4 pr-2.5 text-[13px] text-white shadow-xl">
-          <Check className="h-4 w-4 shrink-0 text-emerald-400" />
+        <div className="fixed bottom-6 left-1/2 z-50 flex -translate-x-1/2 animate-toast-in items-center gap-3 rounded-lg bg-night py-2.5 pl-4 pr-2.5 text-[13px] text-night-soft shadow-toast">
+          <Check className="h-4 w-4 shrink-0 text-white" />
           <span>{notice}</span>
           <button
             onClick={() => {
               undo();
               setNotice(null);
             }}
-            className="rounded-md bg-violet-600 px-2.5 py-1 text-[12px] font-semibold text-white hover:bg-violet-500"
+            className="rounded-full bg-white px-3 py-1 text-[12px] font-semibold text-ink aos-press hover:bg-hover-paper"
           >
             Undo
           </button>
           <button
             onClick={() => setNotice(null)}
             aria-label="Dismiss"
-            className="rounded p-1 text-stone-400 hover:bg-stone-700 hover:text-white"
+            className="rounded-full p-1 text-night-muted hover:bg-night-hover hover:text-white"
           >
             <X className="h-3.5 w-3.5" />
           </button>

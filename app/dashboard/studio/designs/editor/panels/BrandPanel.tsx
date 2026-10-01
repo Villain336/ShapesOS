@@ -6,9 +6,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Check } from "lucide-react";
 /* PROVIDER:brandfetch */
-import { Globe2, Loader2, Settings, TriangleAlert, Wand2 } from "lucide-react";
+import { Check, Globe2, Loader2, Settings, Wand2 } from "lucide-react";
 import { btnGhost, btnPrimary, inputCls } from "../ui";
 import type { BrandKitImport } from "@/lib/design/brandfetch";
 /* END */
@@ -69,19 +68,19 @@ function asPatch(el: { type: string }, color: string): Record<string, unknown> {
 function ColormindSection({ seedColor }: { seedColor: string | null }) {
   const status = colormindStatus();
   return (
-    <div className="rounded-md border border-stone-200 bg-white p-2.5">
+    <div className="rounded-md border border-line bg-paper p-2.5">
       <div className="flex items-center gap-1.5">
-        <Palette className="h-4 w-4 text-violet-600" />
-        <span className="text-[13px] font-semibold text-stone-900">AI palette</span>
+        <Palette className="h-4 w-4 text-ink" />
+        <span className="text-[13px] font-semibold text-ink">AI palette</span>
       </div>
-      <p className="pt-1 text-[11px] leading-snug text-stone-500">
+      <p className="pt-1 text-[11px] leading-snug text-muted">
         Generate five harmonious colors around your brand color
         {seedColor ? (
           <>
             {" "}
             (
             <span
-              className="inline-block h-3 w-3 rounded-sm border border-stone-200 align-[-1px]"
+              className="inline-block h-3 w-3 rounded-sm border border-line align-[-1px]"
               style={{ backgroundColor: seedColor }}
             />{" "}
             <span className="font-mono">{seedColor}</span>)
@@ -99,7 +98,7 @@ function ColormindSection({ seedColor }: { seedColor: string | null }) {
         <Palette className="h-4 w-4" />
         Generate palette around our brand color
       </button>
-      <p className="pt-1.5 text-[10px] leading-snug text-stone-400">{status.reason}</p>
+      <p className="pt-1.5 text-[10px] leading-snug text-subtle">{status.reason}</p>
     </div>
   );
 }
@@ -151,11 +150,11 @@ function TexturesSection() {
   };
 
   return (
-    <div className="rounded-md border border-stone-200 bg-white p-2.5">
+    <div className="rounded-md border border-line bg-paper p-2.5">
       <div className="flex items-center gap-1.5">
-        <LayoutGrid className="h-4 w-4 text-violet-600" />
-        <span className="text-[13px] font-semibold text-stone-900">Patterns</span>
-        <span className="text-[10px] text-stone-400">ambientCG · CC0</span>
+        <LayoutGrid className="h-4 w-4 text-ink" />
+        <span className="text-[13px] font-semibold text-ink">Patterns</span>
+        <span className="text-[10px] text-subtle">ambientCG · CC0</span>
       </div>
       <div className="flex gap-1 pt-2">
         {(["page", "shape"] as const).map((t) => (
@@ -164,8 +163,8 @@ function TexturesSection() {
             onClick={() => setTarget(t)}
             className={
               target === t
-                ? "rounded-md bg-violet-100 px-2 py-1 text-[11px] font-medium text-violet-700"
-                : "rounded-md border border-stone-200 bg-white px-2 py-1 text-[11px] text-stone-600 hover:bg-stone-50"
+                ? "rounded-md bg-ink px-2 py-1 text-[11px] font-medium text-white"
+                : "rounded-md border border-line bg-paper px-2 py-1 text-[11px] text-muted hover:bg-hover-paper hover:text-ink"
             }
           >
             {t === "page" ? "Page background" : "Selected shape"}
@@ -182,7 +181,7 @@ function TexturesSection() {
               disabled={target === "shape" && fillable.length === 0}
               title={`${t.name} — CC0 via ambientCG`}
               className={`relative overflow-hidden rounded-md border disabled:opacity-40 ${
-                isCurrent ? "border-violet-600 ring-1 ring-violet-600" : "border-stone-200"
+                isCurrent ? "border-ink ring-1 ring-ink" : "border-line"
               }`}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -196,12 +195,12 @@ function TexturesSection() {
       </div>
       {current ? (
         <div className="flex items-center justify-between pt-1.5">
-          <p className="text-[11px] text-stone-500">
-            Applied: <span className="font-medium text-stone-700">{current.name}</span>
+          <p className="text-[11px] text-muted">
+            Applied: <span className="font-medium text-ink">{current.name}</span>
           </p>
           <button
             onClick={() => applyTexture(null)}
-            className="text-[11px] font-medium text-violet-700 hover:underline"
+            className="text-[11px] font-medium text-ink hover:underline"
           >
             Remove
           </button>
@@ -209,12 +208,12 @@ function TexturesSection() {
       ) : (
         target === "shape" &&
         fillable.length === 0 && (
-          <p className="pt-1.5 text-[11px] text-stone-400">
+          <p className="pt-1.5 text-[11px] text-subtle">
             Select a shape (rectangle, ellipse, or a plain path icon) to fill with a pattern.
           </p>
         )
       )}
-      <p className="pt-1.5 text-[10px] leading-snug text-stone-400">
+      <p className="pt-1.5 text-[10px] leading-snug text-subtle">
         Patterns: ambientCG — CC0 1.0, free for commercial use, no attribution required.
       </p>
     </div>
@@ -409,24 +408,24 @@ export function BrandPanel({ onFontsLoaded }: { onFontsLoaded?: (fonts: string[]
       <div className={panelTitle}>Brand</div>
       <div className="space-y-4 px-3 pb-4">
         {/* PROVIDER:brandfetch */}
-        <div className="rounded-md border border-stone-200 bg-white p-2.5">
+        <div className="rounded-md border border-line bg-paper p-2.5">
           <div className="flex items-center gap-1.5">
-            <Globe2 className="h-4 w-4 text-violet-600" />
-            <span className="text-[13px] font-semibold text-stone-900">Import from domain</span>
+            <Globe2 className="h-4 w-4 text-ink" />
+            <span className="text-[13px] font-semibold text-ink">Import from domain</span>
           </div>
-          <p className="pt-1 text-[11px] leading-snug text-stone-500">
+          <p className="pt-1 text-[11px] leading-snug text-muted">
             Paste a client domain to pull their logo, palette, and fonts into a brand kit —
             the agency onboarding shortcut.
           </p>
           {bfConfigured === null ? (
-            <p className="flex items-center gap-1.5 pt-2 text-[12px] text-stone-500">
+            <p className="flex items-center gap-1.5 pt-2 text-[12px] text-muted">
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
               Checking brand lookup setup…
             </p>
           ) : bfConfigured === false ? (
-            <div className="mt-2 rounded-md border border-stone-200 bg-stone-50 px-2.5 py-2">
-              <p className="text-[12px] font-medium text-stone-800">Brand lookup needs a Brandfetch API key</p>
-              <p className="pt-0.5 text-[11px] leading-snug text-stone-500">
+            <div className="mt-2 rounded-md border border-line bg-canvas px-2.5 py-2">
+              <p className="text-[12px] font-medium text-ink">Brand lookup needs a Brandfetch API key</p>
+              <p className="pt-0.5 text-[11px] leading-snug text-muted">
                 Add BRANDFETCH_API_KEY in Settings → Providers to enable one-click brand-kit
                 autofill. No key, no fake data — this stays off until then.
               </p>
@@ -452,21 +451,21 @@ export function BrandPanel({ onFontsLoaded }: { onFontsLoaded?: (fonts: string[]
                   Fetch
                 </button>
               </div>
-              <div className="mt-2 flex gap-1.5 rounded-md border border-stone-200 bg-stone-50 px-2.5 py-2">
-                <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0 text-stone-500" />
-                <p className="text-[11px] leading-snug text-stone-500">
+              <div className="mt-2 flex gap-1.5 rounded-md border border-line bg-needs-tint px-2.5 py-2">
+                <span className="aos-shape aos-shape--needs aos-shape--edged mt-0.5 shrink-0" />
+                <p className="text-[11px] leading-snug text-ink">
                   Third-party logos are trademarked. Only import brands you have the right to
                   use, and check the brand owner's usage guidelines before publishing client
                   work.
                 </p>
               </div>
               {bfError && (
-                <p className="mt-2 rounded-md border border-stone-200 bg-stone-50 px-2.5 py-2 text-[12px] text-stone-600">
+                <p className="mt-2 rounded-md border border-failed bg-failed-tint px-2.5 py-2 text-[12px] text-failed-text">
                   {bfError}
                 </p>
               )}
               {bfResult && (
-                <div className="mt-2 rounded-md border border-stone-200 p-2.5">
+                <div className="mt-2 rounded-md border border-line bg-paper p-2.5">
                   <div className="flex items-center gap-2">
                     {bfResult.brand.logoUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
@@ -476,13 +475,13 @@ export function BrandPanel({ onFontsLoaded }: { onFontsLoaded?: (fonts: string[]
                         className="h-10 w-10 shrink-0 rounded object-contain"
                       />
                     ) : (
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded bg-stone-100 text-[10px] text-stone-400">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded bg-canvas text-[10px] text-subtle">
                         No logo
                       </div>
                     )}
                     <div className="min-w-0">
-                      <p className="truncate text-[13px] font-semibold text-stone-900">{bfResult.brand.name}</p>
-                      <p className="truncate font-mono text-[11px] text-stone-500">{bfResult.brand.domain}</p>
+                      <p className="truncate text-[13px] font-semibold text-ink">{bfResult.brand.name}</p>
+                      <p className="truncate font-mono text-[11px] text-subtle">{bfResult.brand.domain}</p>
                     </div>
                   </div>
                   {Object.keys(bfResult.kitColors).length > 0 && (
@@ -493,7 +492,7 @@ export function BrandPanel({ onFontsLoaded }: { onFontsLoaded?: (fonts: string[]
                           <span
                             key={key}
                             title={`${key}: ${color}`}
-                            className="h-8 w-8 rounded-md border border-stone-200"
+                            className="h-8 w-8 rounded-md border border-line"
                             style={{ backgroundColor: color }}
                           />
                         ))}
@@ -505,8 +504,8 @@ export function BrandPanel({ onFontsLoaded }: { onFontsLoaded?: (fonts: string[]
                       <div className={panelSectionLabel}>Fonts — from Brandfetch</div>
                       <ul className="space-y-0.5">
                         {Object.entries(bfResult.kitFonts).map(([key, font]) => (
-                          <li key={key} className="text-[12px] text-stone-600">
-                            <span className="capitalize text-stone-400">{key}:</span>{" "}
+                          <li key={key} className="text-[12px] text-muted">
+                            <span className="capitalize text-subtle">{key}:</span>{" "}
                             <span style={{ fontFamily: font }}>{font}</span>
                           </li>
                         ))}
@@ -533,7 +532,7 @@ export function BrandPanel({ onFontsLoaded }: { onFontsLoaded?: (fonts: string[]
                   </div>
                 </div>
               )}
-              {bfDone && <p className="pt-1.5 text-[11px] font-medium text-violet-700">{bfDone}</p>}
+              {bfDone && <p className="flex items-center gap-1 pt-1.5 text-[11px] font-medium text-ink"><Check className="h-3.5 w-3.5 shrink-0" />{bfDone}</p>}
             </>
           )}
         </div>
@@ -541,14 +540,14 @@ export function BrandPanel({ onFontsLoaded }: { onFontsLoaded?: (fonts: string[]
         {/* PROVIDER:penpot */}
         <PenpotSection kits={kits} onKitsChanged={bfRefreshKits} />
         {/* END */}
-        {loading && <p className="text-[12px] text-stone-500">Loading brand kits…</p>}
+        {loading && <p className="text-[12px] text-muted">Loading brand kits…</p>}
         {error && (
-          <p className="rounded-md border border-stone-200 bg-stone-50 px-2.5 py-2 text-[12px] text-stone-600">
+          <p className="rounded-md border border-failed bg-failed-tint px-2.5 py-2 text-[12px] text-failed-text">
             {error}
           </p>
         )}
         {!loading && !error && kits.length === 0 && (
-          <p className="text-[12px] leading-snug text-stone-500">
+          <p className="text-[12px] leading-snug text-muted">
             No brand kits yet. Create one under Brand kits to get one-click colors and fonts here.
           </p>
         )}
@@ -556,18 +555,18 @@ export function BrandPanel({ onFontsLoaded }: { onFontsLoaded?: (fonts: string[]
           const colors = Object.entries(kit.colors ?? {}).filter(([, v]) => typeof v === "string" && v);
           const fonts = Object.entries(kit.fonts ?? {}).filter(([, v]) => typeof v === "string" && v);
           return (
-            <div key={kit.id} className="rounded-md border border-stone-200 bg-white p-2.5">
+            <div key={kit.id} className="rounded-md border border-line bg-paper p-2.5">
               <div className="flex items-center gap-1.5">
-                <span className="truncate text-[13px] font-semibold text-stone-900">{kit.name}</span>
+                <span className="truncate text-[13px] font-semibold text-ink">{kit.name}</span>
                 {kit.isDefault && (
-                  <span className="rounded-full bg-violet-100 px-1.5 py-0.5 text-[10px] font-medium text-violet-700">
+                  <span className="rounded-full bg-canvas px-1.5 py-0.5 text-[10px] font-medium text-muted">
                     Default
                   </span>
                 )}
               </div>
               {/* PROVIDER:brandfetch */}
               {kit.metadata?.source === "brandfetch" && (
-                <p className="pt-0.5 text-[11px] text-stone-400">
+                <p className="pt-0.5 text-[11px] text-subtle">
                   Imported from{" "}
                   <span className="font-mono">{String(kit.metadata.domain ?? "")}</span>
                 </p>
@@ -575,7 +574,7 @@ export function BrandPanel({ onFontsLoaded }: { onFontsLoaded?: (fonts: string[]
               {/* END */}
               {/* PROVIDER:penpot */}
               {kit.metadata?.source === "penpot" && (
-                <p className="pt-0.5 text-[11px] text-stone-400">
+                <p className="pt-0.5 text-[11px] text-subtle">
                   Imported from Penpot
                   {kit.metadata.fileName ? (
                     <>
@@ -598,7 +597,7 @@ export function BrandPanel({ onFontsLoaded }: { onFontsLoaded?: (fonts: string[]
                           onClick={() => applyColor(kit.id, key, color)}
                           disabled={selected.length === 0}
                           title={`${COLOR_LABELS[key] ?? key}: ${color}`}
-                          className="relative h-8 w-8 rounded-md border border-stone-200 disabled:opacity-40"
+                          className="relative h-8 w-8 rounded-md border border-line disabled:opacity-40"
                           style={{ backgroundColor: color }}
                         >
                           {applied === id && (
@@ -609,7 +608,7 @@ export function BrandPanel({ onFontsLoaded }: { onFontsLoaded?: (fonts: string[]
                     })}
                   </div>
                   {selected.length === 0 && (
-                    <p className="pt-1 text-[11px] text-stone-400">Select an element to apply a color.</p>
+                    <p className="pt-1 text-[11px] text-subtle">Select an element to apply a color.</p>
                   )}
                 </div>
               )}
@@ -619,8 +618,8 @@ export function BrandPanel({ onFontsLoaded }: { onFontsLoaded?: (fonts: string[]
                   <div className={panelSectionLabel}>Fonts</div>
                   <ul className="space-y-0.5">
                     {fonts.map(([key, font]) => (
-                      <li key={key} className="text-[12px] text-stone-600">
-                        <span className="capitalize text-stone-400">{key}:</span>{" "}
+                      <li key={key} className="text-[12px] text-muted">
+                        <span className="capitalize text-subtle">{key}:</span>{" "}
                         <span style={{ fontFamily: font }}>{font}</span>
                       </li>
                     ))}
@@ -631,13 +630,13 @@ export function BrandPanel({ onFontsLoaded }: { onFontsLoaded?: (fonts: string[]
               <div className="pt-2">
                 <div className={panelSectionLabel}>Logo</div>
                 {kit.logoPath ? (
-                  <p className="text-[11px] leading-snug text-stone-500">
+                  <p className="text-[11px] leading-snug text-muted">
                     Logo is stored server-side (
                     <span className="font-mono">{kit.logoPath}</span>) with no public URL route, so
                     insert is disabled rather than rendering a broken image.
                   </p>
                 ) : (
-                  <p className="text-[11px] text-stone-400">No logo on this kit.</p>
+                  <p className="text-[11px] text-subtle">No logo on this kit.</p>
                 )}
               </div>
             </div>

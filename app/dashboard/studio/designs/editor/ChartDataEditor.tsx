@@ -58,23 +58,23 @@ export function ChartDataEditor({ el }: { el: ChartElement }) {
     <div className="relative">
       <button
         onClick={() => setOpen((o) => !o)}
-        className="flex items-center gap-1.5 rounded-md border border-stone-200 bg-white px-2.5 py-1 text-[12px] text-stone-700 hover:bg-stone-50"
+        className="flex items-center gap-1.5 rounded-full border border-line bg-paper px-3 py-1 text-[12px] text-ink shadow-outline hover:bg-hover-paper"
         title="Edit chart data and colors"
       >
-        <BarChart3 className="h-3.5 w-3.5 text-violet-600" />
+        <BarChart3 className="h-3.5 w-3.5 text-ink" />
         Chart data
       </button>
       {open && (
-        <div className="absolute left-0 z-30 mt-1 w-80 overflow-hidden rounded-md border border-stone-200 bg-white shadow-lg">
-          <div className="flex items-center gap-1 border-b border-stone-100 p-2">
+        <div className="absolute left-0 z-30 mt-1 w-80 overflow-hidden rounded-md border border-line bg-paper shadow-overlay">
+          <div className="flex items-center gap-1 border-b border-line p-2">
             {TYPE_TABS.map((t) => (
               <button
                 key={t.key}
                 onClick={() => set({ chartType: t.key })}
                 className={`flex flex-1 items-center justify-center gap-1 rounded px-2 py-1.5 text-[12px] font-medium ${
                   el.chartType === t.key
-                    ? "bg-violet-100 text-violet-700"
-                    : "text-stone-500 hover:bg-stone-100"
+                    ? "bg-ink text-white"
+                    : "text-muted hover:bg-hover-paper"
                 }`}
               >
                 {t.icon}
@@ -89,26 +89,26 @@ export function ChartDataEditor({ el }: { el: ChartElement }) {
                   type="color"
                   value={el.colors[i] ?? DEFAULT_FACTORY_COLORS[i % DEFAULT_FACTORY_COLORS.length]}
                   onChange={(e) => updateColor(i, e.target.value)}
-                  className="h-7 w-7 shrink-0 cursor-pointer rounded border border-stone-200 bg-white p-0.5"
+                  className="h-7 w-7 shrink-0 cursor-pointer rounded border border-line bg-paper p-0.5"
                   title={`Series ${i + 1} color`}
                 />
                 <input
                   value={label}
                   onChange={(e) => updateRow(i, e.target.value, el.values[i] ?? 0)}
-                  className="min-w-0 flex-1 rounded border border-stone-200 px-1.5 py-1 text-[12px] focus:border-violet-400 focus:outline-none"
+                  className="min-w-0 flex-1 rounded border border-control bg-paper px-1.5 py-1 text-[12px] text-ink focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none"
                   aria-label={`Label ${i + 1}`}
                 />
                 <input
                   type="number"
                   value={el.values[i] ?? 0}
                   onChange={(e) => updateRow(i, label, parseFloat(e.target.value) || 0)}
-                  className="w-16 shrink-0 rounded border border-stone-200 px-1.5 py-1 text-[12px] focus:border-violet-400 focus:outline-none"
+                  className="w-16 shrink-0 rounded border border-control bg-paper px-1.5 py-1 text-[12px] text-ink focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none"
                   aria-label={`Value ${i + 1}`}
                 />
                 <button
                   onClick={() => removeRow(i)}
                   disabled={el.labels.length <= 1}
-                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded text-stone-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-30"
+                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded text-subtle hover:bg-failed-tint hover:text-failed-text disabled:opacity-30"
                   title="Remove series"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
@@ -116,20 +116,20 @@ export function ChartDataEditor({ el }: { el: ChartElement }) {
               </div>
             ))}
           </div>
-          <div className="flex items-center justify-between border-t border-stone-100 p-2">
+          <div className="flex items-center justify-between border-t border-line p-2">
             <button
               onClick={addRow}
-              className="flex items-center gap-1 rounded px-2 py-1 text-[12px] font-medium text-violet-700 hover:bg-violet-50"
+              className="flex items-center gap-1 rounded-full px-2 py-1 text-[12px] font-medium text-ink hover:bg-hover-paper"
             >
               <Plus className="h-3.5 w-3.5" />
               Add series
             </button>
-            <label className="flex items-center gap-1.5 text-[12px] text-stone-600">
+            <label className="flex items-center gap-1.5 text-[12px] text-muted">
               <input
                 type="checkbox"
                 checked={el.showValues}
                 onChange={(e) => set({ showValues: e.target.checked })}
-                className="accent-violet-600"
+                className="accent-ink"
               />
               Show values
             </label>

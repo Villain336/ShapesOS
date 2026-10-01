@@ -10,7 +10,7 @@ import { poolUtilization } from "@/lib/media/pools";
 import PoolControls from "./_components/PoolControls";
 
 const chip =
-  "inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-1.5 py-0.5 text-[10px] font-medium leading-tight bg-stone-100 text-stone-600 border-stone-200";
+  "inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-1.5 py-0.5 text-[10px] font-medium leading-tight bg-canvas text-muted border-line";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Pool — Media — Marketr" };
@@ -28,7 +28,7 @@ export default async function PoolPage({ params }: { params: Promise<{ id: strin
   const mediaRole = mediaRoleForWorkspaceRole(membership.role);
 
   if (!(await safetyTablesReady().catch(() => false))) {
-    return <div className="p-6 text-sm text-stone-600">Media safety tables are not provisioned yet.</div>;
+    return <div className="p-6 text-sm text-muted">Media safety tables are not provisioned yet.</div>;
   }
   const { id } = await params;
   const { pools } = mediaStores();
@@ -41,11 +41,11 @@ export default async function PoolPage({ params }: { params: Promise<{ id: strin
     <div className="flex h-full flex-col gap-4 bg-[#FAFAF7] p-4 md:p-6">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <p className="text-xs font-medium uppercase tracking-wide text-stone-400">
+          <p className="text-xs font-medium uppercase tracking-wide text-subtle">
             Budget pool · {pool.period} · {pool.status}
           </p>
-          <h1 className="mt-1 text-xl font-bold tracking-tight text-stone-900">{pool.name}</h1>
-          <p className="mt-1 text-[13px] text-stone-500">
+          <h1 className="aos-heading mt-1 text-ink">{pool.name}</h1>
+          <p className="mt-1 text-[13px] text-muted">
             Cap {money(pool.capCents, pool.currency)} · allowlist: {pool.platformAllowlist.join(", ")}
           </p>
         </div>
@@ -53,37 +53,37 @@ export default async function PoolPage({ params }: { params: Promise<{ id: strin
       </div>
 
       <div className="grid gap-4 lg:grid-cols-3">
-        <section className="rounded-xl border border-stone-200 bg-white p-4">
-          <h2 className="mb-2 text-sm font-semibold text-stone-900">Utilization</h2>
-          <div className="h-2 overflow-hidden rounded-full bg-stone-100">
+        <section className="rounded-lg border border-line bg-paper p-4">
+          <h2 className="mb-2 text-sm font-semibold text-ink">Utilization</h2>
+          <div className="h-2 overflow-hidden rounded-full bg-canvas">
             <div
-              className={`h-full rounded-full ${util >= 90 ? "bg-red-500" : util >= 75 ? "bg-amber-500" : "bg-emerald-500"}`}
+              className={`h-full rounded-full ${util >= 90 ? "bg-ink" : util >= 75 ? "bg-ink" : "bg-ink"}`}
               style={{ width: `${Math.min(100, util).toFixed(1)}%` }}
             />
           </div>
           <dl className="mt-3 space-y-1.5 text-sm">
-            <div className="flex justify-between"><dt className="text-stone-500">Remaining</dt><dd className="font-semibold text-stone-900">{money(pool.remainingCents, pool.currency)}</dd></div>
-            <div className="flex justify-between"><dt className="text-stone-500">Encumbered</dt><dd className="text-stone-900">{money(pool.encumberedCents, pool.currency)}</dd></div>
-            <div className="flex justify-between"><dt className="text-stone-500">Alerts at</dt><dd className="text-stone-900">{pool.alertThresholds.join(" / ")}%</dd></div>
+            <div className="flex justify-between"><dt className="text-muted">Remaining</dt><dd className="font-semibold text-ink">{money(pool.remainingCents, pool.currency)}</dd></div>
+            <div className="flex justify-between"><dt className="text-muted">Encumbered</dt><dd className="text-ink">{money(pool.encumberedCents, pool.currency)}</dd></div>
+            <div className="flex justify-between"><dt className="text-muted">Alerts at</dt><dd className="text-ink">{pool.alertThresholds.join(" / ")}%</dd></div>
           </dl>
         </section>
 
-        <section className="rounded-xl border border-stone-200 bg-white p-4">
-          <h2 className="mb-2 text-sm font-semibold text-stone-900">Virtual card (money-layer backstop)</h2>
+        <section className="rounded-lg border border-line bg-paper p-4">
+          <h2 className="mb-2 text-sm font-semibold text-ink">Virtual card (money-layer backstop)</h2>
           <dl className="space-y-1.5 text-sm">
-            <div className="flex justify-between"><dt className="text-stone-500">Provider</dt><dd className="text-stone-900">{pool.cardProvider}</dd></div>
-            <div className="flex justify-between"><dt className="text-stone-500">Ref</dt><dd className="font-mono text-xs text-stone-900">{pool.virtualCardRef ?? "none attached"}</dd></div>
-            <div className="flex justify-between"><dt className="text-stone-500">Limit</dt><dd className="text-stone-900">= pool cap ({money(pool.capCents, pool.currency)})</dd></div>
+            <div className="flex justify-between"><dt className="text-muted">Provider</dt><dd className="text-ink">{pool.cardProvider}</dd></div>
+            <div className="flex justify-between"><dt className="text-muted">Ref</dt><dd className="font-mono text-xs text-ink">{pool.virtualCardRef ?? "none attached"}</dd></div>
+            <div className="flex justify-between"><dt className="text-muted">Limit</dt><dd className="text-ink">= pool cap ({money(pool.capCents, pool.currency)})</dd></div>
           </dl>
-          <p className="mt-2 text-xs text-stone-500">
+          <p className="mt-2 text-xs text-muted">
             Issued on the client&apos;s own account. Card declines survive Marketr software bugs —
             the layer that kills the €7,937/day class. Only the ref is stored; never a PAN.
           </p>
         </section>
 
-        <section className="rounded-xl border border-stone-200 bg-white p-4">
-          <h2 className="mb-2 text-sm font-semibold text-stone-900">Guardrails</h2>
-          <ul className="list-disc space-y-1.5 pl-5 text-sm text-stone-700">
+        <section className="rounded-lg border border-line bg-paper p-4">
+          <h2 className="mb-2 text-sm font-semibold text-ink">Guardrails</h2>
+          <ul className="list-disc space-y-1.5 pl-5 text-sm text-muted">
             <li>Over-encumbrance rejected at the service layer</li>
             <li>Expiry / revocation releases encumbrance</li>
             <li>One ad account per client (no cross-client contamination)</li>
@@ -92,15 +92,15 @@ export default async function PoolPage({ params }: { params: Promise<{ id: strin
         </section>
       </div>
 
-      <section className="rounded-xl border border-stone-200 bg-white p-4">
-        <h2 className="mb-3 text-sm font-semibold text-stone-900">Encumbrance ledger</h2>
+      <section className="rounded-lg border border-line bg-paper p-4">
+        <h2 className="mb-3 text-sm font-semibold text-ink">Encumbrance ledger</h2>
         {txs.length === 0 ? (
-          <p className="text-sm text-stone-500">No ledger entries yet.</p>
+          <p className="text-sm text-muted">No ledger entries yet.</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
               <thead>
-                <tr className="border-b border-stone-100 bg-stone-50/60 text-[11px] uppercase tracking-wide text-stone-500">
+                <tr className="border-b border-line bg-canvas text-[11px] uppercase tracking-wide text-muted">
                   <th className="px-3 py-2 font-medium">Time</th>
                   <th className="px-3 py-2 font-medium">Kind</th>
                   <th className="px-3 py-2 font-medium">Amount</th>
@@ -112,14 +112,14 @@ export default async function PoolPage({ params }: { params: Promise<{ id: strin
               </thead>
               <tbody>
                 {txs.map((t) => (
-                  <tr key={t.id} className="border-b border-stone-100 last:border-0 hover:bg-violet-50/40">
-                    <td className="px-3 py-2 font-mono text-xs text-stone-500">{t.ts.toISOString().slice(0, 19)}</td>
+                  <tr key={t.id} className="border-b border-line last:border-0 hover:bg-hover-paper">
+                    <td className="px-3 py-2 font-mono text-xs text-muted">{t.ts.toISOString().slice(0, 19)}</td>
                     <td className="px-3 py-2"><span className={chip}>{t.kind}</span></td>
                     <td className="px-3 py-2 font-medium">{money(t.amountCents, pool.currency)}</td>
                     <td className="px-3 py-2">{money(t.runningRemainingCents, pool.currency)}</td>
                     <td className="px-3 py-2">{money(t.runningEncumberedCents, pool.currency)}</td>
-                    <td className="px-3 py-2 font-mono text-xs text-stone-500">{t.actor.slice(0, 12)}</td>
-                    <td className="px-3 py-2 text-xs text-stone-500">{t.note ?? "—"}</td>
+                    <td className="px-3 py-2 font-mono text-xs text-muted">{t.actor.slice(0, 12)}</td>
+                    <td className="px-3 py-2 text-xs text-muted">{t.note ?? "—"}</td>
                   </tr>
                 ))}
               </tbody>

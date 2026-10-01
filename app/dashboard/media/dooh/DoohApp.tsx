@@ -216,7 +216,7 @@ export function DoohApp() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="mb-4 flex gap-1 border-b border-stone-200">
+      <div className="mb-4 flex gap-1 border-b border-line">
         {([
           { id: "planner" as const, label: "Planner", icon: Map },
           { id: "plans" as const, label: `Plans (${plans.length})`, icon: ClipboardList },
@@ -226,8 +226,8 @@ export function DoohApp() {
             onClick={() => setTab(id)}
             className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-[13.5px] font-medium transition ${
               tab === id
-                ? "border-violet-600 text-violet-700"
-                : "border-transparent text-stone-500 hover:text-stone-800"
+                ? "border-ink text-ink"
+                : "border-transparent text-muted hover:text-ink"
             }`}
           >
             <Icon size={15} />
@@ -237,13 +237,13 @@ export function DoohApp() {
       </div>
 
       {error && (
-        <div className="flex items-start gap-2 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+        <div className="flex items-start gap-2 rounded-md border border-failed bg-failed-tint p-3 text-sm text-failed-text">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
           <span>{error}</span>
         </div>
       )}
       {notice && (
-        <div className="flex items-start gap-2 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
+        <div className="flex items-start gap-2 rounded-md border border-line bg-paper p-3 text-sm text-ink">
           <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />
           <span>{notice}</span>
         </div>
@@ -251,77 +251,77 @@ export function DoohApp() {
 
       {tab === "planner" && (
         <div className="grid gap-4 lg:grid-cols-2">
-          <div className="rounded-lg border border-stone-200 bg-white p-4">
-            <h2 className="text-sm font-semibold text-stone-900">1 · Vendor & inventory</h2>
-            <label className="mt-3 block text-xs font-medium text-stone-600">Vendor (locked order)</label>
-            <select value={vendor} onChange={(e) => setVendor(e.target.value)} className="mt-1 w-full rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-[13px] text-stone-900 placeholder:text-stone-400 focus:border-violet-400 focus:outline-none">
+          <div className="rounded-lg border border-line bg-paper p-4">
+            <h2 className="text-sm font-semibold text-ink">1 · Vendor & inventory</h2>
+            <label className="mt-3 block text-xs font-medium text-muted">Vendor (locked order)</label>
+            <select value={vendor} onChange={(e) => setVendor(e.target.value)} className="mt-1 w-full rounded-md border border-line bg-paper px-2.5 py-1.5 text-[13px] text-ink placeholder:text-subtle focus:border-focus focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus:outline-none">
               {VENDORS.map((v) => (
                 <option key={v.id} value={v.id}>{v.label}</option>
               ))}
             </select>
-            <p className="mt-1 text-xs text-stone-500">{VENDORS.find((v) => v.id === vendor)?.hint}</p>
+            <p className="mt-1 text-xs text-muted">{VENDORS.find((v) => v.id === vendor)?.hint}</p>
             <div className="mt-3 flex gap-2">
-              <input value={city} onChange={(e) => setCity(e.target.value)} placeholder="City" className="w-full rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-[13px] text-stone-900 placeholder:text-stone-400 focus:border-violet-400 focus:outline-none" />
-              <input value={state} onChange={(e) => setState(e.target.value)} placeholder="ST" className="w-20 rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-[13px] text-stone-900 focus:border-violet-400 focus:outline-none" />
-              <button onClick={lookupInventory} disabled={loading} className="flex items-center gap-1.5 rounded-md bg-violet-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-violet-700 disabled:opacity-40">
+              <input value={city} onChange={(e) => setCity(e.target.value)} placeholder="City" className="w-full rounded-md border border-line bg-paper px-2.5 py-1.5 text-[13px] text-ink placeholder:text-subtle focus:border-focus focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus:outline-none" />
+              <input value={state} onChange={(e) => setState(e.target.value)} placeholder="ST" className="w-20 rounded-md border border-line bg-paper px-2.5 py-1.5 text-[13px] text-ink focus:border-focus focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus:outline-none" />
+              <button onClick={lookupInventory} disabled={loading} className="flex items-center gap-1.5 rounded-full bg-ink px-3 py-1.5 text-sm font-semibold text-white aos-press disabled:opacity-40">
                 {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />} Lookup
               </button>
             </div>
             <div className="mt-3 max-h-64 space-y-1 overflow-y-auto">
               {inventory.map((item) => (
-                <label key={item.boardId} className="flex items-start gap-2 rounded-md border border-stone-200 p-2 text-sm hover:border-violet-200 hover:bg-violet-50/40">
+                <label key={item.boardId} className="flex items-start gap-2 rounded-md border border-line p-2 text-sm hover:border-line-strong hover:bg-hover-paper">
                   <input type="checkbox" checked={selected.some((b) => b.boardId === item.boardId)} onChange={() => toggleBoard(item)} className="mt-1" />
                   <span>
-                    <span className="font-medium text-stone-900">{item.name}</span>
-                    <span className="block text-xs text-stone-500">{item.city}, {item.state} · {item.boardId}</span>
+                    <span className="font-medium text-ink">{item.name}</span>
+                    <span className="block text-xs text-muted">{item.city}, {item.state} · {item.boardId}</span>
                   </span>
                 </label>
               ))}
-              {inventory.length === 0 && <p className="text-xs text-stone-500">Look up inventory to pick boards. Planning data only — availability is confirmed in the client&apos;s account.</p>}
+              {inventory.length === 0 && <p className="text-xs text-muted">Look up inventory to pick boards. Planning data only — availability is confirmed in the client&apos;s account.</p>}
             </div>
           </div>
 
-          <div className="rounded-lg border border-stone-200 bg-white p-4">
-            <h2 className="text-sm font-semibold text-stone-900">2 · Flight, dayparts & budget</h2>
-            <label className="mt-3 block text-xs font-medium text-stone-600">Plan name</label>
-            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Q4 Greensboro flight" className="mt-1 w-full rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-[13px] text-stone-900 placeholder:text-stone-400 focus:border-violet-400 focus:outline-none" />
+          <div className="rounded-lg border border-line bg-paper p-4">
+            <h2 className="text-sm font-semibold text-ink">2 · Flight, dayparts & budget</h2>
+            <label className="mt-3 block text-xs font-medium text-muted">Plan name</label>
+            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Q4 Greensboro flight" className="mt-1 w-full rounded-md border border-line bg-paper px-2.5 py-1.5 text-[13px] text-ink placeholder:text-subtle focus:border-focus focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus:outline-none" />
             <div className="mt-3 grid grid-cols-2 gap-2">
               <div>
-                <label className="block text-xs font-medium text-stone-600">Flight start</label>
-                <input type="date" value={flightStart} onChange={(e) => setFlightStart(e.target.value)} className="mt-1 w-full rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-[13px] text-stone-900 placeholder:text-stone-400 focus:border-violet-400 focus:outline-none" />
+                <label className="block text-xs font-medium text-muted">Flight start</label>
+                <input type="date" value={flightStart} onChange={(e) => setFlightStart(e.target.value)} className="mt-1 w-full rounded-md border border-line bg-paper px-2.5 py-1.5 text-[13px] text-ink placeholder:text-subtle focus:border-focus focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus:outline-none" />
               </div>
               <div>
-                <label className="block text-xs font-medium text-stone-600">Flight end</label>
-                <input type="date" value={flightEnd} onChange={(e) => setFlightEnd(e.target.value)} className="mt-1 w-full rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-[13px] text-stone-900 placeholder:text-stone-400 focus:border-violet-400 focus:outline-none" />
+                <label className="block text-xs font-medium text-muted">Flight end</label>
+                <input type="date" value={flightEnd} onChange={(e) => setFlightEnd(e.target.value)} className="mt-1 w-full rounded-md border border-line bg-paper px-2.5 py-1.5 text-[13px] text-ink placeholder:text-subtle focus:border-focus focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus:outline-none" />
               </div>
             </div>
-            <label className="mt-3 block text-xs font-medium text-stone-600">Daypart mix</label>
+            <label className="mt-3 block text-xs font-medium text-muted">Daypart mix</label>
             <div className="mt-1 flex flex-wrap gap-1">
               {DAYPARTS.map((d) => (
-                <button key={d} onClick={() => toggleDaypart(d)} className={`rounded-full border px-2.5 py-1 text-xs ${dayparts.includes(d) ? "border-violet-600 bg-violet-600 text-white" : "border-stone-200 text-stone-600 hover:border-stone-300"}`}>
+                <button key={d} onClick={() => toggleDaypart(d)} className={`rounded-full border px-2.5 py-1 text-xs ${dayparts.includes(d) ? "border-ink bg-ink text-white" : "border-line text-muted hover:border-line-strong"}`}>
                   {d}
                 </button>
               ))}
             </div>
-            <label className="mt-3 block text-xs font-medium text-stone-600">Plays per board per day</label>
-            <input type="number" value={plays} onChange={(e) => setPlays(Number(e.target.value))} min={1} className="mt-1 w-32 rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-[13px] text-stone-900 focus:border-violet-400 focus:outline-none" />
-            <label className="mt-3 block text-xs font-medium text-stone-600">Creatives (Creative Studio — hash-bound)</label>
+            <label className="mt-3 block text-xs font-medium text-muted">Plays per board per day</label>
+            <input type="number" value={plays} onChange={(e) => setPlays(Number(e.target.value))} min={1} className="mt-1 w-32 rounded-md border border-line bg-paper px-2.5 py-1.5 text-[13px] text-ink focus:border-focus focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus:outline-none" />
+            <label className="mt-3 block text-xs font-medium text-muted">Creatives (Creative Studio — hash-bound)</label>
             <div className="mt-1 max-h-32 space-y-1 overflow-y-auto">
               {creatives.map((c) => (
                 <label key={c.id} className="flex items-center gap-2 text-sm">
                   <input type="checkbox" checked={creativeIds.includes(c.id)} onChange={() => setCreativeIds((s) => (s.includes(c.id) ? s.filter((x) => x !== c.id) : [...s, c.id]))} />
-                  <span className="text-stone-800">{c.name} <span className="text-xs text-stone-500">({c.size})</span></span>
+                  <span className="text-ink">{c.name} <span className="text-xs text-muted">({c.size})</span></span>
                 </label>
               ))}
-              {creatives.length === 0 && <p className="text-xs text-stone-500">No hashed creatives found — finalize one in Creative Studio first.</p>}
+              {creatives.length === 0 && <p className="text-xs text-muted">No hashed creatives found — finalize one in Creative Studio first.</p>}
             </div>
-            <button onClick={createPlan} disabled={loading || !name || selected.length === 0 || !flightStart || !flightEnd} className="mt-4 flex items-center gap-1.5 rounded-md bg-violet-600 px-4 py-2 text-sm font-medium text-white hover:bg-violet-700 disabled:opacity-40">
+            <button onClick={createPlan} disabled={loading || !name || selected.length === 0 || !flightStart || !flightEnd} className="mt-4 flex items-center gap-1.5 rounded-full bg-ink px-4 py-2 text-sm font-semibold text-white aos-press disabled:opacity-40">
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />} Create plan & estimate
             </button>
-            <p className="mt-2 text-xs text-stone-500">
+            <p className="mt-2 text-xs text-muted">
               Estimate only — the approved binding&apos;s max_total_spend is the controlling cap.
               Traditional OOH alongside this plan:{" "}
-              <a href="https://www.adquick.com" target="_blank" rel="noreferrer" className="inline-flex items-center gap-0.5 text-stone-700 underline">
+              <a href="https://www.adquick.com" target="_blank" rel="noreferrer" className="inline-flex items-center gap-0.5 text-muted underline">
                 adquick.com self-serve <ExternalLink className="h-3 w-3" />
               </a>{" "}
               (referral only — API parked).
@@ -332,12 +332,12 @@ export function DoohApp() {
 
       {tab === "plans" && (
         plans.length === 0 ? (
-          <p className="text-sm text-stone-500">No plans yet — build one in the Planner tab.</p>
+          <p className="text-sm text-muted">No plans yet — build one in the Planner tab.</p>
         ) : (
-          <div className="overflow-x-auto rounded-xl border border-stone-200 bg-white">
+          <div className="overflow-x-auto rounded-lg border border-line bg-paper">
             <table className="w-full text-left text-[13px]">
               <thead>
-                <tr className="border-b border-stone-100 bg-stone-50/60 text-[11px] uppercase tracking-wide text-stone-500">
+                <tr className="border-b border-line bg-canvas text-[11px] uppercase tracking-wide text-muted">
                   <th className="px-3 py-2 font-medium">Plan</th>
                   <th className="px-3 py-2 font-medium">Vendor</th>
                   <th className="px-3 py-2 font-medium">Boards</th>
@@ -350,26 +350,26 @@ export function DoohApp() {
               <tbody>
                 {plans.map((plan) => (
                   <>
-                    <tr key={plan.id} className="border-b border-stone-100 last:border-0 hover:bg-violet-50/40">
-                      <td className="px-3 py-2 font-medium text-stone-900">{plan.name}</td>
-                      <td className="px-3 py-2 text-stone-600">{plan.vendor}</td>
-                      <td className="px-3 py-2 text-stone-600">{(plan.placementsJson.placements ?? []).length}</td>
-                      <td className="px-3 py-2 text-[12px] text-stone-600">{plan.placementsJson.flightStart} → {plan.placementsJson.flightEnd}</td>
-                      <td className="px-3 py-2 font-medium text-stone-900">{money(plan.estimateCents)}</td>
+                    <tr key={plan.id} className="border-b border-line last:border-0 hover:bg-hover-paper">
+                      <td className="px-3 py-2 font-medium text-ink">{plan.name}</td>
+                      <td className="px-3 py-2 text-muted">{plan.vendor}</td>
+                      <td className="px-3 py-2 text-muted">{(plan.placementsJson.placements ?? []).length}</td>
+                      <td className="px-3 py-2 text-[12px] text-muted">{plan.placementsJson.flightStart} → {plan.placementsJson.flightEnd}</td>
+                      <td className="px-3 py-2 font-medium text-ink">{money(plan.estimateCents)}</td>
                       <td className="px-3 py-2">
-                        <span className="inline-flex items-center whitespace-nowrap rounded-full border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium leading-tight text-amber-700">{plan.status}</span>
+                        <span className="inline-flex items-center whitespace-nowrap rounded-full border border-line bg-canvas px-1.5 py-0.5 text-[10px] font-medium leading-tight text-muted">{plan.status}</span>
                       </td>
                       <td className="px-3 py-2">
-                        <button onClick={() => { const next = expandedPlan === plan.id ? null : plan.id; setExpandedPlan(next); if (next) loadPackets(plan.id); }} className="rounded-md border border-stone-200 bg-white px-2 py-1 text-xs text-stone-700 hover:bg-stone-50">
+                        <button onClick={() => { const next = expandedPlan === plan.id ? null : plan.id; setExpandedPlan(next); if (next) loadPackets(plan.id); }} className="rounded-full border border-line bg-paper px-2 py-1 text-xs font-medium text-ink shadow-outline hover:bg-hover-paper">
                           {expandedPlan === plan.id ? "Collapse" : "Packets"}
                         </button>
                       </td>
                     </tr>
                     {expandedPlan === plan.id && (
-                      <tr key={`${plan.id}-detail`} className="border-b border-stone-100 bg-stone-50/40">
+                      <tr key={`${plan.id}-detail`} className="border-b border-line bg-canvas">
                         <td colSpan={7} className="px-3 py-3">
-                          <h4 className="text-xs font-semibold text-stone-700">Estimate lines</h4>
-                          <ul className="mt-1 text-xs text-stone-600">
+                          <h4 className="text-xs font-semibold text-muted">Estimate lines</h4>
+                          <ul className="mt-1 text-xs text-muted">
                             {(plan.estimateJson.lines ?? []).map((l, i) => (
                               <li key={i} className="flex justify-between gap-2 py-0.5">
                                 <span>{l.label}{l.note ? ` — ${l.note}` : ""}</span>
@@ -377,22 +377,22 @@ export function DoohApp() {
                               </li>
                             ))}
                           </ul>
-                          <h4 className="mt-3 text-xs font-semibold text-stone-700">Launch packets</h4>
+                          <h4 className="mt-3 text-xs font-semibold text-muted">Launch packets</h4>
                           {(packets[plan.id] ?? []).map((pkt) => (
-                            <div key={pkt.id} className="mt-1 flex items-center justify-between rounded-md border border-stone-200 bg-white p-2 text-xs">
+                            <div key={pkt.id} className="mt-1 flex items-center justify-between rounded-md border border-line bg-paper p-2 text-xs">
                               <span>v{pkt.version} · approval {pkt.approvalId.slice(0, 8)}… · sha256 {pkt.packetSha256.slice(0, 16)}…</span>
-                              <a href={pkt.pdfUrl} className="flex items-center gap-1 text-stone-700 underline"><FileDown className="h-3 w-3" /> PDF</a>
+                              <a href={pkt.pdfUrl} className="flex items-center gap-1 text-muted underline"><FileDown className="h-3 w-3" /> PDF</a>
                             </div>
                           ))}
-                          <div className="mt-3 rounded-lg border border-stone-200 bg-white p-3">
-                            <h4 className="text-xs font-semibold text-stone-700">Compile launch packet (approved buy only)</h4>
-                            <input value={approvalId} onChange={(e) => setApprovalId(e.target.value)} placeholder="Approval ID (status: approved)" className="mt-2 w-full rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-[13px] text-stone-900 placeholder:text-stone-400 focus:border-violet-400 focus:outline-none" />
-                            <label className="mt-2 block text-xs text-stone-500">Per-placement tracking (JSON — from the attribution track)</label>
-                            <textarea value={trackingJson} onChange={(e) => setTrackingJson(e.target.value)} rows={2} placeholder='[{"placementRef":"board-47","boardName":"I-40 W","slug":"brand-board-47","destinationUrl":"https://brand.link/board-47"}]' className="mt-1 w-full rounded-md border border-stone-200 bg-white px-2.5 py-1.5 font-mono text-[12px] text-stone-900 placeholder:text-stone-400 focus:border-violet-400 focus:outline-none" />
-                            <button onClick={() => compilePacket(plan.id)} disabled={loading || !approvalId} className="mt-2 flex items-center gap-1.5 rounded-md bg-violet-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-violet-700 disabled:opacity-40">
+                          <div className="mt-3 rounded-lg border border-line bg-paper p-3">
+                            <h4 className="text-xs font-semibold text-muted">Compile launch packet (approved buy only)</h4>
+                            <input value={approvalId} onChange={(e) => setApprovalId(e.target.value)} placeholder="Approval ID (status: approved)" className="mt-2 w-full rounded-md border border-line bg-paper px-2.5 py-1.5 text-[13px] text-ink placeholder:text-subtle focus:border-focus focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus:outline-none" />
+                            <label className="mt-2 block text-xs text-muted">Per-placement tracking (JSON — from the attribution track)</label>
+                            <textarea value={trackingJson} onChange={(e) => setTrackingJson(e.target.value)} rows={2} placeholder='[{"placementRef":"board-47","boardName":"I-40 W","slug":"brand-board-47","destinationUrl":"https://brand.link/board-47"}]' className="mt-1 w-full rounded-md border border-line bg-paper px-2.5 py-1.5 font-mono text-[12px] text-ink placeholder:text-subtle focus:border-focus focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus:outline-none" />
+                            <button onClick={() => compilePacket(plan.id)} disabled={loading || !approvalId} className="mt-2 flex items-center gap-1.5 rounded-md bg-ink px-3 py-1.5 text-xs font-medium text-white aos-press disabled:opacity-40">
                               {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <ShieldCheck className="h-3 w-3" />} Compile packet
                             </button>
-                            <p className="mt-1 text-[11px] text-stone-500">Fail-closed: any drift between the plan and the approved binding blocks compilation.</p>
+                            <p className="mt-1 text-[11px] text-muted">Fail-closed: any drift between the plan and the approved binding blocks compilation.</p>
                           </div>
                         </td>
                       </tr>

@@ -59,25 +59,25 @@ export function ElementsPanel() {
           <div className={panelSectionLabel}>Shapes</div>
           <div className="grid grid-cols-3 gap-2">
             <button
-              onClick={() => addElement(makeRect({ width: 320, height: 200, fill: "#7c3aed", cornerRadius: 8, ...dims, name: "Rectangle" }))}
-              className="flex h-14 items-center justify-center rounded-md border border-stone-200 bg-white hover:border-violet-400"
+              onClick={() => addElement(makeRect({ width: 320, height: 200, fill: "#1c1917", cornerRadius: 8, ...dims, name: "Rectangle" }))}
+              className="flex h-14 items-center justify-center rounded-md border border-line bg-paper hover:border-line-strong"
               title="Rectangle"
             >
-              <span className="h-6 w-9 rounded-[3px] bg-violet-600" />
+              <span className="h-6 w-9 rounded-[3px] bg-ink" />
             </button>
             <button
-              onClick={() => addElement(makeEllipse({ radiusX: 120, radiusY: 90, fill: "#7c3aed", ...dims, name: "Ellipse" }))}
-              className="flex h-14 items-center justify-center rounded-md border border-stone-200 bg-white hover:border-violet-400"
+              onClick={() => addElement(makeEllipse({ radiusX: 120, radiusY: 90, fill: "#1c1917", ...dims, name: "Ellipse" }))}
+              className="flex h-14 items-center justify-center rounded-md border border-line bg-paper hover:border-line-strong"
               title="Ellipse"
             >
-              <span className="h-6 w-9 rounded-full bg-violet-600" />
+              <span className="h-6 w-9 rounded-full bg-ink" />
             </button>
             <button
               onClick={() => addElement(makeLine({ length: 320, ...dims, name: "Line" }))}
-              className="flex h-14 items-center justify-center rounded-md border border-stone-200 bg-white hover:border-violet-400"
+              className="flex h-14 items-center justify-center rounded-md border border-line bg-paper hover:border-line-strong"
               title="Line"
             >
-              <span className="h-[3px] w-9 bg-stone-800" />
+              <span className="h-[3px] w-9 bg-ink" />
             </button>
           </div>
         </div>
@@ -95,22 +95,22 @@ export function ElementsPanel() {
                 key={c.key}
                 onClick={() => addElement(makeChart({ chartType: c.key, ...dims, name: c.label }))}
                 title={`Insert ${c.label}`}
-                className="flex h-14 flex-col items-center justify-center gap-1 rounded-md border border-stone-200 bg-white text-violet-600 hover:border-violet-400 hover:bg-violet-50/40"
+                className="flex h-14 flex-col items-center justify-center gap-1 rounded-md border border-line bg-paper text-ink hover:border-line-strong hover:bg-hover-paper"
               >
                 {c.icon}
-                <span className="text-[10px] font-medium text-stone-600">{c.label}</span>
+                <span className="text-[10px] font-medium text-muted">{c.label}</span>
               </button>
             ))}
             <button
               onClick={() => addElement(makeQr({ ...dims, name: "QR code" }))}
               title="Insert QR code"
-              className="flex h-14 flex-col items-center justify-center gap-1 rounded-md border border-stone-200 bg-white text-violet-600 hover:border-violet-400 hover:bg-violet-50/40"
+              className="flex h-14 flex-col items-center justify-center gap-1 rounded-md border border-line bg-paper text-ink hover:border-line-strong hover:bg-hover-paper"
             >
               <QrCode className="h-6 w-6" />
-              <span className="text-[10px] font-medium text-stone-600">QR code</span>
+              <span className="text-[10px] font-medium text-muted">QR code</span>
             </button>
           </div>
-          <p className="pt-2 text-[11px] leading-snug text-stone-500">
+          <p className="pt-2 text-[11px] leading-snug text-subtle">
             Charts and QR codes drop in with starter content — edit data, colors, and links from the toolbar once selected.
           </p>
         </div>
@@ -122,7 +122,7 @@ export function ElementsPanel() {
                 key={icon.name}
                 onClick={() => addElement(makeSvg({ path: icon.path, ...dims, name: icon.name }))}
                 title={icon.name}
-                className="flex h-14 items-center justify-center rounded-md border border-stone-200 bg-white text-violet-600 hover:border-violet-400 hover:bg-violet-50/40"
+                className="flex h-14 items-center justify-center rounded-md border border-line bg-paper text-ink hover:border-line-strong hover:bg-hover-paper"
               >
                 <svg viewBox="0 0 24 24" className="h-6 w-6" fill="currentColor" aria-hidden>
                   <path d={icon.path} />
@@ -130,8 +130,8 @@ export function ElementsPanel() {
               </button>
             ))}
           </div>
-          <p className="pt-2 text-[11px] leading-snug text-stone-500">
-            Icons drop as violet SVG elements — recolor them from the toolbar.
+          <p className="pt-2 text-[11px] leading-snug text-subtle">
+            Icons drop in ink — recolor them from the toolbar.
           </p>
         </div>
       </div>

@@ -88,12 +88,12 @@ function RichTextControls({ el }: { el: TextElement }) {
         placeholder="No text"
       />
       {hasRange && range ? (
-        <p className="mt-1 text-[11px] leading-snug text-stone-500">
+        <p className="mt-1 text-[11px] leading-snug text-muted">
           Chars {range.start}–{range.end}:{" "}
-          <span className="font-medium text-stone-700">“{preview}”</span>
+          <span className="font-medium text-ink">“{preview}”</span>
         </p>
       ) : (
-        <p className="mt-1 text-[11px] leading-snug text-stone-400">
+        <p className="mt-1 text-[11px] leading-snug text-subtle">
           Drag across the text above to select a range, then style just that range.
         </p>
       )}
@@ -169,7 +169,7 @@ function RangeStyleForm({
       <select
         value={fontFamily}
         onChange={(e) => setFontFamily(e.target.value)}
-        className={`${inputCls} max-w-32 py-1 text-[12px]`}
+        className={`${inputCls} max-w-32 text-[12px]`}
         title="Range font"
         aria-label="Range font"
       >
@@ -187,7 +187,7 @@ function RangeStyleForm({
         onChange={(e) =>
           setFontSize(Math.min(400, Math.max(8, parseInt(e.target.value, 10) || 8)))
         }
-        className={`${inputCls} w-16 py-1 text-[12px]`}
+        className={`${inputCls} w-16 text-[12px]`}
         title="Range font size"
         aria-label="Range font size"
       />
@@ -195,13 +195,13 @@ function RangeStyleForm({
         type="color"
         value={fill}
         onChange={(e) => setFill(e.target.value)}
-        className="h-7 w-8 cursor-pointer rounded border border-stone-200 bg-white p-0.5"
+        className="h-7 w-8 cursor-pointer rounded border border-line bg-paper p-0.5"
         title="Range color"
         aria-label="Range color"
       />
       <button
         onClick={() => onApply({ fontFamily, fontSize, fill })}
-        className={`${btnGhost} !py-1 text-[12px]`}
+        className={btnGhost}
       >
         Apply to range
       </button>
@@ -227,7 +227,7 @@ function TextPathControls({ el }: { el: TextElement }) {
               setCustom(p.data);
             }}
             className={`${btnGhost} !py-1 text-[12px] ${
-              active === p.data ? "!border-violet-600 !bg-violet-50 !text-violet-700" : ""
+              active === p.data ? "!border-ink !bg-ink !text-white" : ""
             }`}
             title={`Path preset: ${p.label}`}
           >
@@ -242,14 +242,14 @@ function TextPathControls({ el }: { el: TextElement }) {
           onChange={(e) => setCustom(e.target.value)}
           placeholder="Custom SVG path data…"
           aria-label="Custom SVG path data"
-          className={`${inputCls} min-w-0 flex-1 py-1 font-mono text-[12px]`}
+          className={`${inputCls} min-w-0 flex-1 font-mono text-[12px]`}
         />
         <button
           onClick={() => {
             if (custom.trim()) setTextPath(el.id, custom.trim());
           }}
           disabled={!custom.trim()}
-          className={`${btnGhost} !py-1 text-[12px]`}
+          className={btnGhost}
         >
           Set
         </button>
@@ -266,7 +266,7 @@ function TextPathControls({ el }: { el: TextElement }) {
           Remove path
         </button>
       )}
-      <p className="mt-1 text-[11px] leading-snug text-stone-500">
+      <p className="mt-1 text-[11px] leading-snug text-muted">
         While a path is set, per-range styling is ignored and the text follows
         the path from the element's position.
       </p>
@@ -310,7 +310,7 @@ export function TextPanel() {
     const rect = makeRect({
       width: pillW,
       height: pillH,
-      fill: "#7c3aed",
+      fill: "#1c1917",
       cornerRadius: 999,
       pageW: page.width,
       pageH: page.height,
@@ -349,15 +349,15 @@ export function TextPanel() {
           <button
             key={p.label}
             onClick={() => addPreset(p)}
-            className="block w-full rounded-md border border-stone-200 bg-white px-3 py-2 text-left hover:border-violet-400 hover:bg-violet-50/40"
+            className="block w-full rounded-md border border-line bg-paper px-3 py-2 text-left hover:border-line-strong hover:bg-hover-paper"
           >
             <span
-              className="block truncate text-stone-900"
+              className="block truncate text-ink"
               style={{ fontSize: Math.min(p.fontSize, 28), fontWeight: p.fontStyle === "bold" ? 700 : 400, color: p.fill }}
             >
               {p.label}
             </span>
-            <span className="text-[11px] text-stone-500">
+            <span className="text-[11px] text-muted">
               {p.label} · {p.fontSize}px{p.fontStyle === "bold" ? " · bold" : ""}
             </span>
           </button>
@@ -365,12 +365,12 @@ export function TextPanel() {
         <div className={`${panelSectionLabel} pt-2`}>Call to action</div>
         <button
           onClick={addCta}
-          className="flex w-full items-center justify-center rounded-full bg-violet-600 px-3 py-2.5 text-[14px] font-semibold text-white hover:bg-violet-700"
+          className="flex h-control w-full items-center justify-center rounded-full bg-ink px-3 text-[14px] font-semibold text-white aos-press"
         >
           CTA button
         </button>
-        <p className="pt-1 text-[11px] leading-snug text-stone-500">
-          Adds a violet pill with a centered label as two elements. Select the label to edit its text in the toolbar.
+        <p className="pt-1 text-[11px] leading-snug text-subtle">
+          Adds a black pill with a centered label as two elements. Select the label to edit its text in the toolbar.
         </p>
       </div>
     </div>

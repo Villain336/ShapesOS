@@ -404,7 +404,7 @@ export function DesignCanvas({ stageRef }: { stageRef: StageRef }) {
 
   if (!page) {
     return (
-      <div className="flex h-full items-center justify-center text-[13px] text-stone-500">
+      <div className="flex h-full items-center justify-center text-[13px] text-muted">
         No page to show.
       </div>
     );

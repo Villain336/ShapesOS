@@ -68,16 +68,16 @@ export default function ApprovalActions({
     <div className="flex flex-col items-end gap-2">
       <div className="flex gap-2">
         {status === "draft" && (
-          <Button className="bg-violet-600 text-white hover:bg-violet-700" onClick={() => call(`/api/media/approvals/${approvalId}/submit`, "POST", {})} disabled={busy}>
+          <Button className="bg-ink text-white aos-press" onClick={() => call(`/api/media/approvals/${approvalId}/submit`, "POST", {})} disabled={busy}>
             Submit for approval
           </Button>
         )}
         {status === "pending" && canAct && (
           <>
-            <Button variant="outline" className="border border-stone-200 bg-white text-stone-700 hover:bg-stone-50" onClick={mintOtp} disabled={busy}>
+            <Button variant="outline" className="rounded-full border border-line bg-paper text-ink shadow-outline hover:bg-hover-paper" onClick={mintOtp} disabled={busy}>
               Mint OTP
             </Button>
-            <Button className="bg-violet-600 text-white hover:bg-violet-700" onClick={approve} disabled={busy || (showOtp && otpCode.trim().length === 0)}>
+            <Button className="bg-done text-white aos-press" onClick={approve} disabled={busy || (showOtp && otpCode.trim().length === 0)}>
               Approve{showOtp ? " with OTP" : ""}
             </Button>
             <Button variant="destructive" onClick={() => setShowRevoke((v) => !v)} disabled={busy}>
@@ -86,20 +86,20 @@ export default function ApprovalActions({
           </>
         )}
         {status === "approved" && canAct && (
-          <Button className="bg-violet-600 text-white hover:bg-violet-700" onClick={() => call(`/api/media/buys/${approvalId}/execute`, "POST", {})} disabled={busy}>
+          <Button className="bg-running text-white aos-press" onClick={() => call(`/api/media/buys/${approvalId}/execute`, "POST", {})} disabled={busy}>
             Run pre-flight + execute
           </Button>
         )}
       </div>
 
       {showOtp && otp && (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+        <div className="aos-shape aos-shape--needs aos-shape--edged rounded-lg border border-needs bg-needs-tint p-3 text-xs text-ink">
           <p className="font-semibold">Test-mode OTP: <span className="font-mono text-base">{otp}</span></p>
           <Input
             value={otpCode}
             onChange={(e) => setOtpCode(e.target.value)}
             placeholder="Enter OTP code"
-            className="mt-2 rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-[13px] text-stone-900 placeholder:text-stone-400 focus:border-violet-400 focus:outline-none"
+            className="mt-2 rounded-md border border-line bg-paper px-2.5 py-1.5 text-[13px] text-ink placeholder:text-subtle focus:border-focus focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus:outline-none"
           />
           <p className="mt-1">Production delivers the code out-of-band (authenticator/SMS).</p>
         </div>
@@ -111,7 +111,7 @@ export default function ApprovalActions({
             value={revokeReason}
             onChange={(e) => setRevokeReason(e.target.value)}
             placeholder="Revocation reason"
-            className="rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-[13px] text-stone-900 placeholder:text-stone-400 focus:border-violet-400 focus:outline-none"
+            className="rounded-md border border-line bg-paper px-2.5 py-1.5 text-[13px] text-ink placeholder:text-subtle focus:border-focus focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus:outline-none"
           />
           <Button
             variant="destructive"
@@ -124,9 +124,9 @@ export default function ApprovalActions({
       )}
 
       {status === "pending" && !canAct && (
-        <p className="text-xs text-stone-500">Buyers propose — an owner must approve.</p>
+        <p className="text-xs text-muted">Buyers propose — an owner must approve.</p>
       )}
-      {msg && <p className="max-w-xs text-right text-xs text-red-700">{msg}</p>}
+      {msg && <p className="max-w-xs text-right text-xs text-failed-text">{msg}</p>}
     </div>
   );
 }

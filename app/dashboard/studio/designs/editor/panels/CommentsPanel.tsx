@@ -110,18 +110,18 @@ export function CommentsPanel({ designId }: { designId: string }) {
       </div>
       <div className="space-y-3 px-3 pb-4">
         {error && (
-          <p className="rounded-md border border-red-200 bg-red-50 px-2.5 py-2 text-[12px] text-red-700">
+          <p className="rounded-md border border-failed bg-failed-tint px-2.5 py-2 text-[12px] text-failed-text">
             {error}
           </p>
         )}
         {loading ? (
-          <p className="flex items-center gap-2 text-[12px] text-stone-500">
+          <p className="flex items-center gap-2 text-[12px] text-muted">
             <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading comments…
           </p>
         ) : comments.length === 0 ? (
-          <div className="rounded-md border border-dashed border-stone-300 p-4 text-center">
-            <MessageSquare className="mx-auto mb-1 h-5 w-5 text-stone-300" />
-            <p className="text-[12px] text-stone-500">
+          <div className="rounded-md border border-dashed border-line bg-canvas p-4 text-center">
+            <MessageSquare className="mx-auto mb-1 h-5 w-5 text-subtle" />
+            <p className="text-[12px] text-muted">
               No comments yet. Feedback from reviewers lands here.
             </p>
           </div>
@@ -131,14 +131,14 @@ export function CommentsPanel({ designId }: { designId: string }) {
               <li
                 key={c.id}
                 className={`rounded-md border p-2.5 ${
-                  c.resolved ? "border-stone-100 bg-stone-50" : "border-stone-200 bg-white"
+                  c.resolved ? "border-line bg-canvas" : "border-line bg-paper"
                 }`}
               >
                 <div className="mb-1 flex items-center gap-1.5">
-                  <span className="text-[12px] font-semibold text-stone-800">
+                  <span className="text-[12px] font-semibold text-ink">
                     {c.authorName}
                   </span>
-                  <span className="text-[10px] text-stone-400">
+                  <span className="text-[10px] text-subtle">
                     {new Date(c.createdAt).toLocaleDateString()}
                   </span>
                   <span className="ml-auto flex items-center gap-0.5">
@@ -146,8 +146,8 @@ export function CommentsPanel({ designId }: { designId: string }) {
                       onClick={() => void toggleResolved(c)}
                       className={`rounded p-1 ${
                         c.resolved
-                          ? "text-emerald-600 hover:bg-emerald-50"
-                          : "text-stone-400 hover:bg-stone-100 hover:text-emerald-600"
+                          ? "text-ink hover:bg-hover-paper"
+                          : "text-subtle hover:bg-hover-paper hover:text-ink"
                       }`}
                       title={c.resolved ? "Reopen" : "Resolve"}
                     >
@@ -159,7 +159,7 @@ export function CommentsPanel({ designId }: { designId: string }) {
                     </button>
                     <button
                       onClick={() => void deleteComment(c)}
-                      className="rounded p-1 text-stone-400 hover:bg-red-50 hover:text-red-600"
+                      className="rounded-full p-1 text-subtle hover:bg-failed-tint hover:text-failed-text"
                       title="Delete comment"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
@@ -168,7 +168,7 @@ export function CommentsPanel({ designId }: { designId: string }) {
                 </div>
                 <p
                   className={`whitespace-pre-wrap text-[12px] ${
-                    c.resolved ? "text-stone-400 line-through" : "text-stone-700"
+                    c.resolved ? "text-subtle line-through" : "text-ink"
                   }`}
                 >
                   {c.body}
@@ -183,12 +183,12 @@ export function CommentsPanel({ designId }: { designId: string }) {
             onChange={(e) => setDraft(e.target.value)}
             rows={2}
             placeholder="Add a comment…"
-            className="min-w-0 flex-1 rounded-md border border-stone-200 px-2.5 py-1.5 text-[13px] focus:border-violet-400 focus:outline-none"
+            className="min-w-0 flex-1 rounded-md border-[1.5px] border-control bg-paper px-2.5 py-1.5 text-[13px] text-ink focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none"
           />
           <button
             onClick={() => void addComment()}
             disabled={sending || !draft.trim()}
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-violet-600 text-white hover:bg-violet-700 disabled:opacity-40"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-ink text-white aos-press disabled:opacity-40"
             title="Post comment"
           >
             {sending ? (
@@ -198,7 +198,7 @@ export function CommentsPanel({ designId }: { designId: string }) {
             )}
           </button>
         </div>
-        <p className="text-[11px] leading-snug text-stone-400">
+        <p className="text-[11px] leading-snug text-subtle">
           Comments are visible to the workspace and read-only on public share links.
         </p>
       </div>

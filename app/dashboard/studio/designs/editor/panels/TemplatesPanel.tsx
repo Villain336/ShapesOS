@@ -21,10 +21,10 @@ const BLANK_PRESETS = [
 ];
 
 const CATEGORY_TINT: Record<DesignTemplate["category"], string> = {
-  social: "bg-violet-100",
-  ads: "bg-amber-100",
-  web: "bg-sky-100",
-  print: "bg-emerald-100",
+  social: "bg-canvas",
+  ads: "bg-canvas",
+  web: "bg-canvas",
+  print: "bg-canvas",
 };
 
 interface TemplatesPanelProps {
@@ -87,10 +87,10 @@ export function TemplatesPanel({ onDocumentReplaced }: TemplatesPanelProps) {
               <button
                 key={p.name}
                 onClick={() => createBlankPage(p.w, p.h, p.name)}
-                className="rounded-md border border-stone-200 bg-white px-2 py-1.5 text-left hover:border-violet-400"
+                className="rounded-md border border-line bg-paper px-2 py-1.5 text-left hover:border-line-strong"
               >
-                <div className="text-[12px] font-medium text-stone-800">{p.name}</div>
-                <div className="text-[11px] text-stone-500">
+                <div className="text-[12px] font-medium text-ink">{p.name}</div>
+                <div className="text-[11px] text-muted">
                   {p.w} × {p.h}
                 </div>
               </button>
@@ -104,7 +104,7 @@ export function TemplatesPanel({ onDocumentReplaced }: TemplatesPanelProps) {
               aria-label="Custom width"
               className={`${inputCls} w-full px-2 py-1 text-[12px]`}
             />
-            <span className="text-stone-400">×</span>
+            <span className="text-subtle">×</span>
             <input
               value={customH}
               onChange={(e) => setCustomH(e.target.value)}
@@ -138,8 +138,8 @@ export function TemplatesPanel({ onDocumentReplaced }: TemplatesPanelProps) {
                 onClick={() => setCat(c)}
                 className={`rounded-full px-2 py-0.5 text-[11px] font-medium capitalize ${
                   cat === c
-                    ? "bg-violet-600 text-white"
-                    : "border border-stone-200 bg-white text-stone-600 hover:border-violet-300"
+                    ? "bg-ink text-white"
+                    : "border border-line bg-paper text-muted hover:border-line-strong hover:text-ink"
                 }`}
               >
                 {c}
@@ -150,21 +150,21 @@ export function TemplatesPanel({ onDocumentReplaced }: TemplatesPanelProps) {
             {visible.map((t) => (
               <div
                 key={t.key}
-                className="overflow-hidden rounded-md border border-stone-200 bg-white"
+                className="overflow-hidden rounded-md border border-line bg-paper"
               >
                 <div
                   className={`flex h-20 items-center justify-center ${CATEGORY_TINT[t.category]}`}
                 >
-                  <span className="rounded bg-white/80 px-1.5 py-0.5 text-[10px] font-medium text-stone-700">
+                  <span className="rounded bg-paper px-1.5 py-0.5 text-[10px] font-medium text-muted shadow-hairline">
                     {t.width} × {t.height}
                   </span>
                 </div>
                 <div className="px-2 py-1.5">
-                  <div className="truncate text-[12px] font-medium text-stone-800">{t.name}</div>
-                  <div className="truncate text-[11px] capitalize text-stone-500">{t.category}</div>
+                  <div className="truncate text-[12px] font-medium text-ink">{t.name}</div>
+                  <div className="truncate text-[11px] capitalize text-muted">{t.category}</div>
                   <button
                     onClick={() => applyTemplate(t)}
-                    className="mt-1 w-full rounded border border-violet-200 bg-violet-50 px-2 py-1 text-[11px] font-medium text-violet-700 hover:bg-violet-100"
+                    className="mt-1 w-full rounded-full border border-line bg-paper px-2 py-1 text-[11px] font-medium text-ink shadow-outline hover:bg-hover-paper"
                   >
                     Apply
                   </button>
@@ -172,7 +172,7 @@ export function TemplatesPanel({ onDocumentReplaced }: TemplatesPanelProps) {
               </div>
             ))}
           </div>
-          <p className="pt-2 text-[11px] leading-snug text-stone-500">
+          <p className="pt-2 text-[11px] leading-snug text-subtle">
             Applying a template replaces the whole document — confirm first.
           </p>
         </div>

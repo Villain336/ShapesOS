@@ -16,24 +16,24 @@ export function QrEditor({ el }: { el: QrElement }) {
         onChange={(e) => updateElement(el.id, { payload: e.target.value })}
         aria-label="QR payload"
         placeholder="https://… or text"
-        className="w-56 rounded-md border border-stone-200 bg-white px-2 py-1 text-[12px] focus:border-violet-400 focus:outline-none"
+        className="h-8 w-56 rounded-md border-[1.5px] border-control bg-paper px-2 text-[12px] text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none"
         title="QR payload (URL or text)"
       />
-      <label className="flex items-center gap-1 text-[12px] text-stone-600" title="QR foreground">
+      <label className="flex items-center gap-1 text-[12px] text-muted" title="QR foreground">
         <input
           type="color"
           value={el.foreground}
           onChange={(e) => updateElement(el.id, { foreground: e.target.value })}
-          className="h-7 w-8 cursor-pointer rounded border border-stone-200 bg-white p-0.5"
+          className="h-7 w-8 cursor-pointer rounded border border-line bg-paper p-0.5"
         />
         Code
       </label>
-      <label className="flex items-center gap-1 text-[12px] text-stone-600" title="QR background">
+      <label className="flex items-center gap-1 text-[12px] text-muted" title="QR background">
         <input
           type="color"
           value={el.background}
           onChange={(e) => updateElement(el.id, { background: e.target.value })}
-          className="h-7 w-8 cursor-pointer rounded border border-stone-200 bg-white p-0.5"
+          className="h-7 w-8 cursor-pointer rounded border border-line bg-paper p-0.5"
         />
         Background
       </label>

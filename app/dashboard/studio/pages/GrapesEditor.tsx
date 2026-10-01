@@ -41,11 +41,11 @@ interface BrandDefaults {
 }
 
 const btnPrimary =
-  "flex items-center gap-1.5 rounded-md bg-violet-600 px-3 py-1.5 text-[13px] font-medium text-white hover:bg-violet-700 disabled:opacity-40";
+  "flex items-center gap-1.5 rounded-full bg-ink px-4 py-1.5 text-[13px] font-semibold text-white aos-press disabled:opacity-40";
 const btnGhost =
-  "flex items-center gap-1.5 rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-[13px] text-stone-700 hover:bg-stone-50 disabled:opacity-40";
-const btnIconActive = "bg-violet-100 text-violet-700";
-const btnIconIdle = "text-stone-500 hover:bg-stone-100";
+  "flex items-center gap-1.5 rounded-full border border-line bg-paper px-3 py-1.5 text-[13px] font-medium text-ink shadow-outline hover:bg-hover-paper disabled:opacity-40";
+const btnIconActive = "bg-ink text-white";
+const btnIconIdle = "text-subtle hover:bg-hover-paper";
 
 function buildDocument(editor: Editor, isEmail: boolean): string {
   if (isEmail) {
@@ -231,27 +231,27 @@ export function GrapesEditor({ pageId }: { pageId: string }) {
   return (
     <div className="flex h-full flex-col">
       {/* Toolbar — Marketr house chrome over the GrapesJS surface */}
-      <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-stone-200 bg-white px-3 py-2">
+      <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-line bg-paper px-3 py-2">
         <Link
           href="/dashboard/studio"
-          className="flex items-center gap-1 text-[13px] font-medium text-stone-500 hover:text-violet-700"
+          className="flex items-center gap-1 text-[13px] font-medium text-muted hover:text-ink"
         >
           <ArrowLeft size={14} /> Pages
         </Link>
-        <span className="text-stone-300">/</span>
-        <span className="max-w-56 truncate text-[13px] font-semibold text-stone-900">{name}</span>
-        <span className="rounded-full border border-violet-200 bg-violet-50 px-2 py-0.5 text-[10px] font-medium text-violet-700">
+        <span className="text-subtle">/</span>
+        <span className="max-w-56 truncate text-[13px] font-semibold text-ink">{name}</span>
+        <span className="rounded-full border border-line bg-canvas px-2 py-0.5 text-[10px] font-medium text-muted">
           {kind === "email" ? "Email" : "Landing page"}
         </span>
-        {dirty && !saving && <span className="text-[12px] text-stone-400">Unsaved changes</span>}
+        {dirty && !saving && <span className="text-[12px] text-subtle">Unsaved changes</span>}
         {savedAt && !dirty && (
-          <span className="flex items-center gap-1 text-[12px] text-stone-400">
+          <span className="flex items-center gap-1 text-[12px] text-muted">
             <Check size={12} /> Saved {savedAt}
           </span>
         )}
 
         <div className="ml-auto flex items-center gap-1.5">
-          <div className="mr-1 flex items-center gap-0.5 rounded-md border border-stone-200 p-0.5">
+          <div className="mr-1 flex items-center gap-0.5 rounded-md border border-line bg-canvas p-0.5">
             {[
               { id: "Desktop", icon: Monitor, label: "Desktop" },
               { id: "Tablet", icon: Tablet, label: "Tablet" },
@@ -288,15 +288,15 @@ export function GrapesEditor({ pageId }: { pageId: string }) {
       </div>
 
       {error && (
-        <div className="flex shrink-0 items-start gap-2 border-b border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-700">
+        <div className="flex shrink-0 items-start gap-2 border-b border-failed bg-failed-tint px-3 py-2 text-[13px] text-failed-text">
           <TriangleAlert size={14} className="mt-0.5 shrink-0" />
           <span>{error}</span>
         </div>
       )}
 
-      <div className="relative min-h-0 flex-1 bg-stone-100">
+      <div className="relative min-h-0 flex-1 bg-canvas">
         {!ready && !error && (
-          <div className="absolute inset-0 z-10 flex items-center justify-center gap-2 bg-stone-100 text-[13px] text-stone-500">
+          <div className="absolute inset-0 z-10 flex items-center justify-center gap-2 bg-canvas text-[13px] text-muted">
             <Loader2 size={16} className="animate-spin" /> Loading page builder…
           </div>
         )}

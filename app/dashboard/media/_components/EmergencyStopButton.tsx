@@ -44,9 +44,9 @@ export default function EmergencyStopButton({ mediaRole }: { mediaRole: string }
         Emergency stop
       </Button>
       {open && (
-        <div className="absolute right-0 z-20 mt-2 w-80 rounded-xl border border-red-200 bg-white p-4 shadow-xl">
-          <p className="text-sm font-semibold text-red-900">Emergency stop</p>
-          <p className="mt-1 text-xs text-stone-500">
+        <div className="absolute right-0 z-20 mt-2 w-80 rounded-lg border border-failed bg-paper p-4 shadow-overlay">
+          <p className="text-sm font-semibold text-ink">Emergency stop</p>
+          <p className="mt-1 text-xs text-muted">
             Pauses every active entity for the client across all platforms, revokes pending
             approvals, freezes all pools, and exports the audit trail. Requires a written reason.
           </p>
@@ -73,7 +73,7 @@ export default function EmergencyStopButton({ mediaRole }: { mediaRole: string }
           </Button>
         </div>
       )}
-      {result && <p className="mt-2 max-w-xs text-xs text-stone-600">{result}</p>}
+      {result && <p className="mt-2 max-w-xs text-xs text-muted">{result}</p>}
     </div>
   );
 }

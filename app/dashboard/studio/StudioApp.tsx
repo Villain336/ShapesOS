@@ -42,12 +42,12 @@ import { TEMPLATES } from "@/lib/design/templates";
 
 function Chip({ children, tone = "slate" }: { children: React.ReactNode; tone?: "slate" | "violet" | "green" | "amber" | "red" | "blue" }) {
   const tones: Record<string, string> = {
-    slate: "bg-slate-100 text-slate-600 border-slate-200",
-    violet: "bg-violet-50 text-violet-700 border-violet-200",
-    green: "bg-emerald-50 text-emerald-700 border-emerald-200",
-    amber: "bg-amber-50 text-amber-700 border-amber-200",
-    red: "bg-red-50 text-red-700 border-red-200",
-    blue: "bg-blue-50 text-blue-700 border-blue-200",
+    slate: "bg-canvas text-muted border-line",
+    violet: "bg-canvas text-muted border-line",
+    green: "bg-canvas text-muted border-line",
+    amber: "bg-canvas text-muted border-line",
+    red: "bg-failed-tint text-failed-text border-failed",
+    blue: "bg-canvas text-muted border-line",
   };
   return (
     <span className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-1.5 py-0.5 text-[10px] font-medium leading-tight ${tones[tone]}`}>
@@ -66,12 +66,12 @@ function statusTone(status: string): "slate" | "violet" | "green" | "amber" | "r
 }
 
 const inputCls =
-  "rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-[13px] text-stone-900 placeholder:text-stone-400 focus:border-violet-400 focus:outline-none";
+  "rounded-md border-[1.5px] border-control bg-paper px-2.5 py-1.5 text-[13px] text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none";
 
 const btnPrimary =
-  "flex items-center gap-1.5 rounded-md bg-violet-600 px-3 py-1.5 text-[13px] font-medium text-white hover:bg-violet-700 disabled:opacity-40";
+  "flex items-center gap-1.5 rounded-full bg-ink px-4 py-1.5 text-[13px] font-semibold text-white aos-press disabled:opacity-40";
 const btnGhost =
-  "flex items-center gap-1.5 rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-[13px] text-stone-700 hover:bg-stone-50 disabled:opacity-40";
+  "flex items-center gap-1.5 rounded-full border border-line bg-paper px-3 py-1.5 text-[13px] font-medium text-ink shadow-outline hover:bg-hover-paper disabled:opacity-40";
 
 // ── Creatives tab ────────────────────────────────────────────────────────────
 
@@ -148,10 +148,10 @@ function CreativesTab() {
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-lg border border-stone-200 bg-white">
+      <div className="overflow-hidden rounded-lg border border-line bg-paper">
         <table className="w-full text-left text-[13px]">
           <thead>
-            <tr className="border-b border-stone-100 bg-stone-50/60 text-[11px] uppercase tracking-wide text-stone-500">
+            <tr className="border-b border-line bg-canvas text-[11px] font-semibold text-subtle">
               <th className="px-3 py-2 font-medium">Name</th>
               <th className="px-3 py-2 font-medium">Channel</th>
               <th className="px-3 py-2 font-medium">Track / size</th>
@@ -166,22 +166,22 @@ function CreativesTab() {
               <tr
                 key={c.id}
                 onClick={() => setSelectedId(c.id)}
-                className={`cursor-pointer border-b border-stone-100 last:border-0 hover:bg-violet-50/40 ${selectedId === c.id ? "bg-violet-50/60" : ""}`}
+                className={`cursor-pointer border-b border-line last:border-0 hover:bg-hover-paper ${selectedId === c.id ? "bg-hover-paper" : ""}`}
               >
-                <td className="px-3 py-2 font-medium text-stone-900">{c.name}</td>
+                <td className="px-3 py-2 font-medium text-ink">{c.name}</td>
                 <td className="px-3 py-2"><Chip tone="blue">{c.channelTemplate}</Chip></td>
-                <td className="px-3 py-2 text-stone-600">
-                  <Chip>{trackLabel(c.formatTrack)}</Chip> <span className="text-stone-500">{c.size}</span>
+                <td className="px-3 py-2 text-muted">
+                  <Chip>{trackLabel(c.formatTrack)}</Chip> <span className="text-muted">{c.size}</span>
                 </td>
-                <td className="px-3 py-2 text-stone-500">{c.source}</td>
+                <td className="px-3 py-2 text-muted">{c.source}</td>
                 <td className="px-3 py-2"><Chip tone="violet">v{c.version}</Chip></td>
-                <td className="px-3 py-2 font-mono text-[11px] text-stone-500">{hashShort(c.creativeHash)}</td>
+                <td className="px-3 py-2 font-mono text-[11px] text-subtle">{hashShort(c.creativeHash)}</td>
                 <td className="px-3 py-2"><Chip tone={statusTone(c.status)}>{c.status}</Chip></td>
               </tr>
             ))}
             {creatives.length === 0 && !loading && (
               <tr>
-                <td colSpan={7} className="px-3 py-8 text-center text-[13px] text-stone-400">
+                <td colSpan={7} className="px-3 py-8 text-center text-[13px] text-subtle">
                   No creatives yet — create the first one with “New creative”.
                 </td>
               </tr>
@@ -243,35 +243,35 @@ function CreativeDrawer({ creative, onClose, onChange }: { creative: Creative; o
 
   return (
     <div className="fixed inset-0 z-40">
-      <div className="absolute inset-0 bg-stone-900/30" onClick={onClose} />
+      <div className="absolute inset-0 bg-night/30" onClick={onClose} />
       <div className="absolute right-0 top-0 flex h-full w-full max-w-md flex-col bg-white shadow-xl">
-        <div className="flex items-start justify-between border-b border-stone-100 px-4 py-3.5">
+        <div className="flex items-start justify-between border-b border-line px-4 py-3.5">
           <div>
-            <h3 className="text-[15px] font-semibold text-stone-900">{c.name}</h3>
+            <h3 className="text-[15px] font-semibold text-ink">{c.name}</h3>
             <div className="mt-1 flex flex-wrap items-center gap-1.5">
               <Chip tone={statusTone(c.status)}>{c.status}</Chip>
               <Chip tone="violet">v{c.version}</Chip>
               <Chip tone="blue">{c.channelTemplate}</Chip>
               <Chip>{trackLabel(c.formatTrack)} · {c.size}</Chip>
             </div>
-            <div className="mt-1.5 font-mono text-[11px] text-stone-500">
+            <div className="mt-1.5 font-mono text-[11px] text-subtle">
               hash {c.creativeHash ?? "—"}
             </div>
           </div>
-          <button onClick={onClose} className="rounded-md p-1.5 text-stone-400 hover:bg-stone-100" aria-label="Close">
+          <button onClick={onClose} className="rounded-full p-1.5 text-subtle hover:bg-hover-paper hover:text-ink" aria-label="Close">
             <X size={16} />
           </button>
         </div>
 
         <div className="flex-1 space-y-4 overflow-y-auto px-4 py-4">
           {error && (
-            <div className="flex items-start gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-700">
+            <div className="flex items-start gap-2 rounded-md border border-failed bg-failed-tint px-3 py-2 text-[13px] text-failed-text">
               <AlertTriangle size={14} className="mt-0.5 shrink-0" />
               <span>{error}</span>
             </div>
           )}
 
-          {report ? <ValidationView report={report} /> : <p className="text-[13px] text-stone-500">No PDF attached yet.</p>}
+          {report ? <ValidationView report={report} /> : <p className="text-[13px] text-muted">No PDF attached yet.</p>}
 
           {c.pdfUrl && (
             <a href={c.pdfUrl} className={btnGhost} download>
@@ -280,8 +280,8 @@ function CreativeDrawer({ creative, onClose, onChange }: { creative: Creative; o
           )}
 
           {c.status === "draft" && (
-            <div className="space-y-2 border-t border-stone-100 pt-3">
-              <div className="text-[12px] font-medium uppercase tracking-wide text-stone-500">Actions</div>
+            <div className="space-y-2 border-t border-line pt-3">
+              <div className="text-[12px] font-semibold text-subtle">Actions</div>
               <div className="flex flex-wrap gap-2">
                 <label className={`${btnGhost} cursor-pointer`}>
                   <FileUp size={14} /> Upload PDF
@@ -318,9 +318,9 @@ function CreativeDrawer({ creative, onClose, onChange }: { creative: Creative; o
                 </button>
               </div>
 
-              <label className="flex cursor-pointer items-start gap-2.5 rounded-md border border-stone-200 bg-stone-50 px-3 py-2.5">
-                <input type="checkbox" checked={attested} onChange={(e) => setAttested(e.target.checked)} className="mt-0.5 accent-violet-600" />
-                <span className="text-[12.5px] leading-snug text-stone-700">
+              <label className="flex cursor-pointer items-start gap-2.5 rounded-md border border-line bg-canvas px-3 py-2.5">
+                <input type="checkbox" checked={attested} onChange={(e) => setAttested(e.target.checked)} className="mt-0.5 accent-ink" />
+                <span className="text-[12.5px] leading-snug text-ink">
                   I confirm this creative contains <strong>no USPS/government impersonation markings</strong> (spec §7).
                 </span>
               </label>
@@ -332,7 +332,7 @@ function CreativeDrawer({ creative, onClose, onChange }: { creative: Creative; o
                 }).then((r) => r.creative))}
                 disabled={!!busy || !attested || !report?.ok}
                 title={!report?.ok ? "Validation must pass before marking ready" : undefined}
-                className="flex items-center gap-1.5 rounded-md bg-[var(--brand-600)] px-3.5 py-1.5 text-[13px] font-medium text-white hover:bg-[var(--brand-700)] disabled:opacity-40"
+                className="flex items-center gap-1.5 rounded-full bg-done px-4 py-1.5 text-[13px] font-semibold text-white aos-press disabled:opacity-40"
               >
                 {busy === "ready" && <Loader2 size={14} className="animate-spin" />}
                 <CheckCircle2 size={14} /> Mark ready
@@ -341,7 +341,7 @@ function CreativeDrawer({ creative, onClose, onChange }: { creative: Creative; o
           )}
 
           {c.status === "ready" && (
-            <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-[12.5px] text-emerald-800">
+            <div className="flex items-start gap-1.5 rounded-md border border-line bg-paper px-3 py-2 text-[12.5px] text-ink">
               Ready for campaigns. The approval gate binds hash <span className="font-mono">{hashShort(c.creativeHash)}</span>.
               To change the PDF, create a new version.
             </div>
@@ -406,21 +406,21 @@ function AssetsTab() {
         <button onClick={() => void load()} className={btnGhost}>
           <RefreshCw size={14} /> Refresh
         </button>
-        <span className="text-[12px] text-stone-400">The asset library is per-project; creatives are workspace-wide.</span>
+        <span className="text-[12px] text-subtle">The asset library is per-project; creatives are workspace-wide.</span>
       </div>
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         {assets.map((a) => (
-          <div key={a.id} className="overflow-hidden rounded-lg border border-stone-200 bg-white">
-            <div className="flex h-28 items-center justify-center bg-stone-50">
+          <div key={a.id} className="overflow-hidden rounded-lg border border-line bg-paper">
+            <div className="flex h-28 items-center justify-center bg-canvas">
               {a.mimeType?.startsWith("image/") ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={a.url} alt={a.name} className="max-h-full max-w-full object-contain" />
               ) : (
-                <FolderOpen size={24} className="text-stone-300" />
+                <FolderOpen size={24} className="text-subtle" />
               )}
             </div>
             <div className="px-2.5 py-2">
-              <div className="truncate text-[12.5px] font-medium text-stone-900">{a.name}</div>
+              <div className="truncate text-[12.5px] font-medium text-ink">{a.name}</div>
               <div className="mt-1 flex items-center justify-between">
                 <Chip>{a.source}</Chip>
                 <button
@@ -431,7 +431,7 @@ function AssetsTab() {
                       body: JSON.stringify({ projectId }),
                     }).then(() => void load()).catch(() => {})
                   }
-                  className="rounded p-1 text-stone-400 hover:bg-red-50 hover:text-red-600"
+                  className="rounded-full p-1 text-subtle hover:bg-failed-tint hover:text-failed-text"
                   aria-label={`Delete ${a.name}`}
                 >
                   <Trash2 size={13} />
@@ -442,7 +442,7 @@ function AssetsTab() {
         ))}
       </div>
       {assets.length === 0 && !loading && (
-        <p className="py-8 text-center text-[13px] text-stone-400">No assets in this project yet.</p>
+        <p className="py-8 text-center text-[13px] text-subtle">No assets in this project yet.</p>
       )}
     </div>
   );
@@ -491,24 +491,24 @@ function NewDesignModal({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/40 p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-night/40 p-4">
       <div className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-xl bg-white shadow-xl">
-        <div className="flex items-center justify-between border-b border-stone-100 px-5 py-3.5">
-          <h2 className="text-[15px] font-semibold text-stone-900">New design</h2>
-          <button onClick={onClose} className="rounded-md p-1.5 text-stone-400 hover:bg-stone-100 hover:text-stone-600" aria-label="Close">
+        <div className="flex items-center justify-between border-b border-line px-5 py-3.5">
+          <h2 className="text-[15px] font-semibold text-ink">New design</h2>
+          <button onClick={onClose} className="rounded-full p-1.5 text-subtle hover:bg-hover-paper hover:text-ink" aria-label="Close">
             <X size={16} />
           </button>
         </div>
 
         <div className="flex-1 overflow-y-auto px-5 py-4">
           {error && (
-            <div className="mb-4 flex items-start gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-700">
+            <div className="mb-4 flex items-start gap-2 rounded-md border border-failed bg-failed-tint px-3 py-2 text-[13px] text-failed-text">
               <AlertTriangle size={14} className="mt-0.5 shrink-0" />
               <span>{error}</span>
             </div>
           )}
 
-          <label className="mb-1 block text-[12px] font-medium text-stone-600">Name</label>
+          <label className="mb-1 block text-[12px] font-medium text-muted">Name</label>
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
@@ -517,19 +517,19 @@ function NewDesignModal({ onClose }: { onClose: () => void }) {
             maxLength={120}
           />
 
-          <div className="mb-2 text-[12px] font-medium text-stone-600">Start from</div>
+          <div className="mb-2 text-[12px] font-medium text-muted">Start from</div>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
             <button
               type="button"
               onClick={() => setTemplateKey(null)}
               className={`rounded-lg border p-3 text-left transition ${
                 templateKey === null
-                  ? "border-violet-600 bg-violet-50/40"
-                  : "border-stone-200 hover:border-stone-300"
+                  ? "border-ink bg-hover-paper"
+                  : "border-line hover:border-line-strong"
               }`}
             >
-              <div className="text-[13px] font-medium text-stone-900">Blank canvas</div>
-              <div className="mt-0.5 text-[11px] text-stone-500">1080 × 1080</div>
+              <div className="text-[13px] font-medium text-ink">Blank canvas</div>
+              <div className="mt-0.5 text-[11px] text-subtle">1080 × 1080</div>
             </button>
             {TEMPLATES.map((t) => (
               <button
@@ -538,21 +538,21 @@ function NewDesignModal({ onClose }: { onClose: () => void }) {
                 onClick={() => setTemplateKey(t.key)}
                 className={`rounded-lg border p-3 text-left transition ${
                   templateKey === t.key
-                    ? "border-violet-600 bg-violet-50/40"
-                    : "border-stone-200 hover:border-stone-300"
+                    ? "border-ink bg-hover-paper"
+                    : "border-line hover:border-line-strong"
                 }`}
               >
                 <div className="flex items-center justify-between gap-1">
-                  <div className="truncate text-[13px] font-medium text-stone-900">{t.name}</div>
+                  <div className="truncate text-[13px] font-medium text-ink">{t.name}</div>
                 </div>
-                <div className="mt-0.5 text-[11px] text-stone-500">{t.width} × {t.height}</div>
+                <div className="mt-0.5 text-[11px] text-subtle">{t.width} × {t.height}</div>
                 <div className="mt-1"><Chip tone="violet">{t.category}</Chip></div>
               </button>
             ))}
           </div>
         </div>
 
-        <div className="flex items-center justify-end gap-2 border-t border-stone-100 px-5 py-3.5">
+        <div className="flex items-center justify-end gap-2 border-t border-line px-5 py-3.5">
           <button onClick={onClose} className={btnGhost} disabled={busy}>Cancel</button>
           <button onClick={create} className={btnPrimary} disabled={busy}>
             {busy ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
@@ -618,10 +618,10 @@ function DesignsTab() {
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-lg border border-stone-200 bg-white">
+      <div className="overflow-hidden rounded-lg border border-line bg-paper">
         <table className="w-full text-left text-[13px]">
           <thead>
-            <tr className="border-b border-stone-100 bg-stone-50/60 text-[11px] uppercase tracking-wide text-stone-500">
+            <tr className="border-b border-line bg-canvas text-[11px] font-semibold text-subtle">
               <th className="px-3 py-2 font-medium">Name</th>
               <th className="px-3 py-2 font-medium">Template</th>
               <th className="px-3 py-2 font-medium">Pages</th>
@@ -637,21 +637,21 @@ function DesignsTab() {
                 onClick={() => {
                   window.location.href = `/dashboard/studio/designs/${d.id}`;
                 }}
-                className="cursor-pointer border-b border-stone-100 last:border-0 hover:bg-violet-50/40"
+                className="cursor-pointer border-b border-line last:border-0 hover:bg-hover-paper"
               >
-                <td className="px-3 py-2 font-medium text-stone-900">{d.name}</td>
+                <td className="px-3 py-2 font-medium text-ink">{d.name}</td>
                 <td className="px-3 py-2">
                   <Chip tone={d.templateKey ? "blue" : "slate"}>{templateLabel(d.templateKey)}</Chip>
                 </td>
-                <td className="px-3 py-2 text-stone-600">{d.pageCount}</td>
-                <td className="px-3 py-2 text-stone-600">{d.elementCount}</td>
-                <td className="px-3 py-2 text-stone-500">
+                <td className="px-3 py-2 text-muted">{d.pageCount}</td>
+                <td className="px-3 py-2 text-muted">{d.elementCount}</td>
+                <td className="px-3 py-2 text-muted">
                   {new Date(d.updatedAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
                 </td>
                 <td className="px-3 py-2 text-right">
                   <button
                     onClick={(e) => remove(d, e)}
-                    className="rounded-md p-1.5 text-stone-400 hover:bg-red-50 hover:text-red-600"
+                    className="rounded-full p-1.5 text-subtle hover:bg-failed-tint hover:text-failed-text"
                     aria-label={`Delete ${d.name}`}
                   >
                     <Trash2 size={14} />
@@ -661,7 +661,7 @@ function DesignsTab() {
             ))}
             {filtered.length === 0 && !loading && (
               <tr>
-                <td colSpan={6} className="px-3 py-8 text-center text-[13px] text-stone-400">
+                <td colSpan={6} className="px-3 py-8 text-center text-[13px] text-subtle">
                   {q ? "No designs match your search." : "No designs yet — create the first one with “New design”."}
                 </td>
               </tr>
@@ -725,24 +725,24 @@ function NewPageModal({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/40 p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-night/40 p-4">
       <div className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-xl bg-white shadow-xl">
-        <div className="flex items-center justify-between border-b border-stone-100 px-5 py-3.5">
-          <h2 className="text-[15px] font-semibold text-stone-900">New page</h2>
-          <button onClick={onClose} className="rounded-md p-1.5 text-stone-400 hover:bg-stone-100 hover:text-stone-600" aria-label="Close">
+        <div className="flex items-center justify-between border-b border-line px-5 py-3.5">
+          <h2 className="text-[15px] font-semibold text-ink">New page</h2>
+          <button onClick={onClose} className="rounded-full p-1.5 text-subtle hover:bg-hover-paper hover:text-ink" aria-label="Close">
             <X size={16} />
           </button>
         </div>
 
         <div className="flex-1 overflow-y-auto px-5 py-4">
           {error && (
-            <div className="mb-4 flex items-start gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-700">
+            <div className="mb-4 flex items-start gap-2 rounded-md border border-failed bg-failed-tint px-3 py-2 text-[13px] text-failed-text">
               <AlertTriangle size={14} className="mt-0.5 shrink-0" />
               <span>{error}</span>
             </div>
           )}
 
-          <label className="mb-1 block text-[12px] font-medium text-stone-600">Name</label>
+          <label className="mb-1 block text-[12px] font-medium text-muted">Name</label>
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
@@ -751,8 +751,8 @@ function NewPageModal({ onClose }: { onClose: () => void }) {
             maxLength={120}
           />
 
-          <div className="mb-2 text-[12px] font-medium text-stone-600">Page type</div>
-          <div className="mb-4 flex gap-1 border-b border-stone-200">
+          <div className="mb-2 text-[12px] font-medium text-muted">Page type</div>
+          <div className="mb-4 flex gap-1 border-b border-line">
             {(
               [
                 { id: "landing", label: "Landing page", icon: Monitor },
@@ -765,8 +765,8 @@ function NewPageModal({ onClose }: { onClose: () => void }) {
                 onClick={() => setKind(id)}
                 className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-[13.5px] font-medium transition ${
                   kind === id
-                    ? "border-violet-600 text-violet-700"
-                    : "border-transparent text-stone-500 hover:text-stone-800"
+                    ? "border-ink text-ink"
+                    : "border-transparent text-muted hover:text-ink"
                 }`}
               >
                 <Icon size={15} />
@@ -775,19 +775,19 @@ function NewPageModal({ onClose }: { onClose: () => void }) {
             ))}
           </div>
 
-          <div className="mb-2 text-[12px] font-medium text-stone-600">Start from</div>
+          <div className="mb-2 text-[12px] font-medium text-muted">Start from</div>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
             <button
               type="button"
               onClick={() => setTemplateKey(null)}
               className={`rounded-lg border p-3 text-left transition ${
                 templateKey === null
-                  ? "border-violet-600 bg-violet-50/40"
-                  : "border-stone-200 hover:border-stone-300"
+                  ? "border-ink bg-hover-paper"
+                  : "border-line hover:border-line-strong"
               }`}
             >
-              <div className="text-[13px] font-medium text-stone-900">Blank page</div>
-              <div className="mt-0.5 text-[11px] text-stone-500">Empty canvas</div>
+              <div className="text-[13px] font-medium text-ink">Blank page</div>
+              <div className="mt-0.5 text-[11px] text-subtle">Empty canvas</div>
             </button>
             {templates.map((t) => (
               <button
@@ -796,19 +796,19 @@ function NewPageModal({ onClose }: { onClose: () => void }) {
                 onClick={() => setTemplateKey(t.key)}
                 className={`rounded-lg border p-3 text-left transition ${
                   templateKey === t.key
-                    ? "border-violet-600 bg-violet-50/40"
-                    : "border-stone-200 hover:border-stone-300"
+                    ? "border-ink bg-hover-paper"
+                    : "border-line hover:border-line-strong"
                 }`}
               >
-                <div className="truncate text-[13px] font-medium text-stone-900">{t.name}</div>
-                <div className="mt-0.5 line-clamp-2 text-[11px] text-stone-500">{t.description}</div>
+                <div className="truncate text-[13px] font-medium text-ink">{t.name}</div>
+                <div className="mt-0.5 line-clamp-2 text-[11px] text-subtle">{t.description}</div>
                 <div className="mt-1"><Chip tone="violet">{t.category}</Chip></div>
               </button>
             ))}
           </div>
         </div>
 
-        <div className="flex items-center justify-end gap-2 border-t border-stone-100 px-5 py-3.5">
+        <div className="flex items-center justify-end gap-2 border-t border-line px-5 py-3.5">
           <button onClick={onClose} className={btnGhost} disabled={busy}>Cancel</button>
           <button onClick={create} className={btnPrimary} disabled={busy}>
             {busy ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
@@ -867,8 +867,8 @@ function PagesTab() {
 
   return (
     <div>
-      <div className="mb-3 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2.5 text-[12.5px] text-stone-600">
-        <span className="font-medium text-stone-800">Canvas vs Pages. </span>
+      <div className="mb-3 rounded-lg border border-line bg-canvas px-3 py-2.5 text-[12.5px] text-muted">
+        <span className="font-medium text-ink">Canvas vs Pages. </span>
         Designs (Canvas) produce PNG/SVG assets; Pages produce responsive HTML —
         landing pages and email templates. Build the hero in Canvas, drop the asset into a Page.
       </div>
@@ -887,10 +887,10 @@ function PagesTab() {
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-lg border border-stone-200 bg-white">
+      <div className="overflow-hidden rounded-lg border border-line bg-paper">
         <table className="w-full text-left text-[13px]">
           <thead>
-            <tr className="border-b border-stone-100 bg-stone-50/60 text-[11px] uppercase tracking-wide text-stone-500">
+            <tr className="border-b border-line bg-canvas text-[11px] font-semibold text-subtle">
               <th className="px-3 py-2 font-medium">Name</th>
               <th className="px-3 py-2 font-medium">Type</th>
               <th className="px-3 py-2 font-medium">Template</th>
@@ -905,9 +905,9 @@ function PagesTab() {
                 onClick={() => {
                   window.location.href = `/dashboard/studio/pages/${p.id}`;
                 }}
-                className="cursor-pointer border-b border-stone-100 last:border-0 hover:bg-violet-50/40"
+                className="cursor-pointer border-b border-line last:border-0 hover:bg-hover-paper"
               >
-                <td className="px-3 py-2 font-medium text-stone-900">{p.name}</td>
+                <td className="px-3 py-2 font-medium text-ink">{p.name}</td>
                 <td className="px-3 py-2">
                   <Chip tone={p.kind === "email" ? "amber" : "blue"}>
                     {p.kind === "email" ? "Email" : "Landing page"}
@@ -916,13 +916,13 @@ function PagesTab() {
                 <td className="px-3 py-2">
                   <Chip tone={p.templateName ? "violet" : "slate"}>{p.templateName ?? "Blank"}</Chip>
                 </td>
-                <td className="px-3 py-2 text-stone-500">
+                <td className="px-3 py-2 text-muted">
                   {new Date(p.updatedAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
                 </td>
                 <td className="px-3 py-2 text-right">
                   <button
                     onClick={(e) => remove(p, e)}
-                    className="rounded-md p-1.5 text-stone-400 hover:bg-red-50 hover:text-red-600"
+                    className="rounded-full p-1.5 text-subtle hover:bg-failed-tint hover:text-failed-text"
                     aria-label={`Delete ${p.name}`}
                   >
                     <Trash2 size={14} />
@@ -932,7 +932,7 @@ function PagesTab() {
             ))}
             {filtered.length === 0 && !loading && (
               <tr>
-                <td colSpan={5} className="px-3 py-8 text-center text-[13px] text-stone-400">
+                <td colSpan={5} className="px-3 py-8 text-center text-[13px] text-subtle">
                   {q || fKind ? "No pages match your filters." : "No pages yet — create the first one with “New page”."}
                 </td>
               </tr>
@@ -960,15 +960,15 @@ export function StudioApp() {
   const [tab, setTab] = useState<(typeof TABS)[number]["id"]>("creatives");
   return (
     <div>
-      <div className="mb-4 flex gap-1 border-b border-stone-200">
+      <div className="mb-4 flex gap-1 border-b border-line">
         {TABS.map(({ id, label, icon: Icon }) => (
           <button
             key={id}
             onClick={() => setTab(id)}
             className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-[13.5px] font-medium transition ${
               tab === id
-                ? "border-violet-600 text-violet-700"
-                : "border-transparent text-stone-500 hover:text-stone-800"
+                ? "border-ink text-ink"
+                : "border-transparent text-muted hover:text-ink"
             }`}
           >
             <Icon size={15} />

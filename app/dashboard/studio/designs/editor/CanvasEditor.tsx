@@ -42,7 +42,7 @@ import { AiPanel } from "./panels/AiPanel";
 const DesignCanvas = dynamic(() => import("./DesignCanvas").then((m) => m.DesignCanvas), {
   ssr: false,
   loading: () => (
-    <div className="flex h-full items-center justify-center text-[13px] text-stone-500">
+    <div className="flex h-full items-center justify-center text-[13px] text-muted">
       Loading canvas…
     </div>
   ),
@@ -203,7 +203,7 @@ export function CanvasEditor({ designId }: { designId: string }) {
 
   if (loading) {
     return (
-      <div className="flex h-full items-center justify-center bg-[#FAFAF7] text-[13px] text-stone-500">
+      <div className="flex h-full items-center justify-center bg-canvas text-[13px] text-muted">
         Loading design…
       </div>
     );
@@ -212,8 +212,8 @@ export function CanvasEditor({ designId }: { designId: string }) {
   if (loadError || !document) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-2 bg-[#FAFAF7] px-6 text-center">
-        <p className="text-[14px] font-semibold text-stone-900">Could not load this design</p>
-        <p className="max-w-md text-[13px] text-stone-500">
+        <p className="text-[14px] font-semibold text-ink">Could not load this design</p>
+        <p className="max-w-md text-[13px] text-muted">
           {loadError ?? "The design came back empty."} The designs API may still be landing — try again in a moment.
         </p>
       </div>
@@ -223,7 +223,7 @@ export function CanvasEditor({ designId }: { designId: string }) {
   return (
     <div className="flex h-full bg-[#FAFAF7]">
       {/* Icon rail */}
-      <div className="flex w-12 shrink-0 flex-col items-center gap-1 border-r border-stone-200 bg-white py-2">
+      <div className="flex w-12 shrink-0 flex-col items-center gap-1 border-r border-line bg-paper py-2">
         {RAIL.map((r) => (
           <button
             key={r.key}
@@ -231,8 +231,8 @@ export function CanvasEditor({ designId }: { designId: string }) {
             title={r.label}
             className={`flex h-10 w-10 flex-col items-center justify-center gap-0.5 rounded-md text-[9px] font-medium ${
               panel === r.key
-                ? "bg-violet-50 text-violet-700"
-                : "text-stone-500 hover:bg-stone-100 hover:text-stone-800"
+                ? "bg-ink text-white"
+                : "text-subtle hover:bg-hover-paper hover:text-ink"
             }`}
           >
             {r.icon}
@@ -242,7 +242,7 @@ export function CanvasEditor({ designId }: { designId: string }) {
       </div>
 
       {/* Panel column */}
-      <div className="w-64 shrink-0 overflow-y-auto border-r border-stone-200 bg-white">
+      <div className="w-64 shrink-0 overflow-y-auto border-r border-line bg-paper">
         {panel === "templates" && <TemplatesPanel onDocumentReplaced={onDocumentReplaced} />}
         {panel === "text" && <TextPanel />}
         {panel === "uploads" && <UploadsPanel />}
@@ -269,35 +269,35 @@ export function CanvasEditor({ designId }: { designId: string }) {
           brandFonts={brandFonts}
         />
 
-        <div ref={workspaceRef} className="relative min-h-0 flex-1 overflow-auto bg-stone-100">
+        <div ref={workspaceRef} className="relative min-h-0 flex-1 overflow-auto bg-canvas">
           <DesignCanvas stageRef={stageRef} />
 
           {/* Zoom controls */}
-          <div className="absolute bottom-3 right-3 z-20 flex items-center gap-0.5 rounded-md border border-stone-200 bg-white px-1 py-1 shadow-sm">
+          <div className="absolute bottom-3 right-3 z-20 flex items-center gap-0.5 rounded-md border border-line bg-paper px-1 py-1 shadow-outline">
             <button
               onClick={() => setZoom(zoom - 0.1)}
-              className="flex h-6 w-6 items-center justify-center rounded text-stone-600 hover:bg-stone-100"
+              className="flex h-6 w-6 items-center justify-center rounded text-muted hover:bg-hover-paper hover:text-ink"
               title="Zoom out"
             >
               <Minus className="h-3.5 w-3.5" />
             </button>
             <button
               onClick={fitZoom}
-              className="min-w-12 rounded px-1 text-center text-[11px] font-medium text-stone-700 hover:bg-stone-100"
+              className="min-w-12 rounded px-1 text-center text-[11px] font-medium text-ink hover:bg-hover-paper"
               title="Fit to screen"
             >
               {Math.round(zoom * 100)}%
             </button>
             <button
               onClick={() => setZoom(zoom + 0.1)}
-              className="flex h-6 w-6 items-center justify-center rounded text-stone-600 hover:bg-stone-100"
+              className="flex h-6 w-6 items-center justify-center rounded text-muted hover:bg-hover-paper hover:text-ink"
               title="Zoom in"
             >
               <Plus className="h-3.5 w-3.5" />
             </button>
             <button
               onClick={fitZoom}
-              className="rounded px-1.5 py-0.5 text-[11px] font-medium text-violet-700 hover:bg-violet-50"
+              className="rounded px-1.5 py-0.5 text-[11px] font-medium text-ink hover:bg-hover-paper"
               title="Fit page to screen"
             >
               Fit

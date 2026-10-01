@@ -141,11 +141,11 @@ export function RadioPrintApp() {
     }
   }
 
-  const inputCls = "mt-1 w-full rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-[13px] text-stone-900 placeholder:text-stone-400 focus:border-violet-400 focus:outline-none";
+  const inputCls = "mt-1 w-full rounded-md border border-line bg-paper px-2.5 py-1.5 text-[13px] text-ink placeholder:text-subtle focus:border-focus focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus:outline-none";
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="mb-4 flex gap-1 border-b border-stone-200">
+      <div className="mb-4 flex gap-1 border-b border-line">
         {([
           { id: "briefs" as const, label: `Briefs (${briefs.length})`, icon: FileText },
           { id: "new" as const, label: "New IO brief", icon: Plus },
@@ -155,8 +155,8 @@ export function RadioPrintApp() {
             onClick={() => setTab(id)}
             className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-[13.5px] font-medium transition ${
               tab === id
-                ? "border-violet-600 text-violet-700"
-                : "border-transparent text-stone-500 hover:text-stone-800"
+                ? "border-ink text-ink"
+                : "border-transparent text-muted hover:text-ink"
             }`}
           >
             <Icon size={15} />
@@ -166,46 +166,46 @@ export function RadioPrintApp() {
       </div>
 
       {error && (
-        <div className="flex items-start gap-2 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+        <div className="flex items-start gap-2 rounded-md border border-failed bg-failed-tint p-3 text-sm text-failed-text">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" /><span>{error}</span>
         </div>
       )}
       {notice && (
-        <div className="flex items-start gap-2 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
+        <div className="flex items-start gap-2 rounded-md border border-line bg-paper p-3 text-sm text-ink">
           <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" /><span>{notice}</span>
         </div>
       )}
 
       {tab === "new" && (
         <div className="grid gap-4 lg:grid-cols-2">
-          <div className="rounded-lg border border-stone-200 bg-white p-4">
-            <h2 className="text-sm font-semibold text-stone-900">Buy & inventory</h2>
-            <label className="mt-3 block text-xs font-medium text-stone-600">Name</label>
+          <div className="rounded-lg border border-line bg-paper p-4">
+            <h2 className="text-sm font-semibold text-ink">Buy & inventory</h2>
+            <label className="mt-3 block text-xs font-medium text-muted">Name</label>
             <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Q4 WXYZ drive-time flight" className={inputCls} />
-            <label className="mt-3 block text-xs font-medium text-stone-600">Channel</label>
+            <label className="mt-3 block text-xs font-medium text-muted">Channel</label>
             <select value={channel} onChange={(e) => setChannel(e.target.value)} className={inputCls}>
               {CHANNELS.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
             </select>
             {channel === "magazine" && (
-              <p className="mt-1 text-xs text-amber-700">Magazines are planning-only in v1 — no signed IO, no spend.</p>
+              <p className="mt-1 flex items-start gap-1.5 text-xs text-needs"><AlertTriangle size={12} className="mt-0.5 shrink-0" />Magazines are planning-only in v1 — no signed IO, no spend.</p>
             )}
             <div className="mt-3 grid grid-cols-2 gap-2">
-              <div><label className="block text-xs font-medium text-stone-600">Flight start</label><input type="date" value={flightStart} onChange={(e) => setFlightStart(e.target.value)} className={inputCls} /></div>
-              <div><label className="block text-xs font-medium text-stone-600">Flight end</label><input type="date" value={flightEnd} onChange={(e) => setFlightEnd(e.target.value)} className={inputCls} /></div>
+              <div><label className="block text-xs font-medium text-muted">Flight start</label><input type="date" value={flightStart} onChange={(e) => setFlightStart(e.target.value)} className={inputCls} /></div>
+              <div><label className="block text-xs font-medium text-muted">Flight end</label><input type="date" value={flightEnd} onChange={(e) => setFlightEnd(e.target.value)} className={inputCls} /></div>
             </div>
-            <h3 className="mt-4 text-xs font-semibold text-stone-700">Inventory (stations / publications)</h3>
+            <h3 className="mt-4 text-xs font-semibold text-muted">Inventory (stations / publications)</h3>
             {inventory.map((r, i) => (
               <div key={i} className="mt-1 grid grid-cols-[1fr_1fr_auto_auto_auto] gap-1">
                 <input value={r.name} onChange={(e) => setInventory((x) => x.map((o, j) => (j === i ? { ...o, name: e.target.value } : o)))} placeholder="WXYZ-FM" className={inputCls} />
                 <input value={r.market} onChange={(e) => setInventory((x) => x.map((o, j) => (j === i ? { ...o, market: e.target.value } : o)))} placeholder="Market" className={inputCls} />
                 <input value={r.callSign} onChange={(e) => setInventory((x) => x.map((o, j) => (j === i ? { ...o, callSign: e.target.value } : o)))} placeholder="WXYZ" className={`${inputCls} w-20`} />
                 <input value={r.daypartMix} onChange={(e) => setInventory((x) => x.map((o, j) => (j === i ? { ...o, daypartMix: e.target.value } : o)))} placeholder="Dayparts" className={inputCls} />
-                <button onClick={() => setInventory((x) => x.filter((_, j) => j !== i))} className="mt-1 rounded-md border border-stone-200 bg-white px-2 py-1.5 text-stone-600 hover:bg-stone-50"><Trash2 className="h-3 w-3" /></button>
+                <button onClick={() => setInventory((x) => x.filter((_, j) => j !== i))} className="mt-1 rounded-md border border-line bg-paper px-2 py-1.5 text-muted hover:bg-failed-tint hover:text-failed-text"><Trash2 className="h-3 w-3" /></button>
               </div>
             ))}
-            <button onClick={() => setInventory((x) => [...x, { name: "", market: "", callSign: "", daypartMix: "", placement: "" }])} className="mt-1 text-xs text-stone-600 underline">+ inventory</button>
+            <button onClick={() => setInventory((x) => [...x, { name: "", market: "", callSign: "", daypartMix: "", placement: "" }])} className="mt-1 text-xs text-muted underline">+ inventory</button>
 
-            <h3 className="mt-4 text-xs font-semibold text-stone-700">Rep contact</h3>
+            <h3 className="mt-4 text-xs font-semibold text-muted">Rep contact</h3>
             <div className="mt-1 grid grid-cols-2 gap-2">
               <input value={repName} onChange={(e) => setRepName(e.target.value)} placeholder="Rep name" className={inputCls} />
               <input value={repCompany} onChange={(e) => setRepCompany(e.target.value)} placeholder="Company / group" className={inputCls} />
@@ -214,41 +214,41 @@ export function RadioPrintApp() {
             </div>
           </div>
 
-          <div className="rounded-lg border border-stone-200 bg-white p-4">
-            <h2 className="text-sm font-semibold text-stone-900">IO terms — maximum spend binds</h2>
-            <h3 className="mt-3 text-xs font-semibold text-stone-700">Deliverables</h3>
+          <div className="rounded-lg border border-line bg-paper p-4">
+            <h2 className="text-sm font-semibold text-ink">IO terms — maximum spend binds</h2>
+            <h3 className="mt-3 text-xs font-semibold text-muted">Deliverables</h3>
             {deliverables.map((d, i) => (
-              <div key={i} className="mt-1 rounded-md border border-stone-200 p-2">
+              <div key={i} className="mt-1 rounded-md border border-line p-2">
                 <div className="flex gap-1">
                   <input value={d.description} onChange={(e) => setDeliverables((x) => x.map((o, j) => (j === i ? { ...o, description: e.target.value } : o)))} placeholder="30s drive-time spots (400×)" className={inputCls} />
-                  <button onClick={() => setDeliverables((x) => x.filter((_, j) => j !== i))} className="mt-1 rounded-md border border-stone-200 bg-white px-2 py-1.5 text-stone-600 hover:bg-stone-50"><Trash2 className="h-3 w-3" /></button>
+                  <button onClick={() => setDeliverables((x) => x.filter((_, j) => j !== i))} className="mt-1 rounded-md border border-line bg-paper px-2 py-1.5 text-muted hover:bg-failed-tint hover:text-failed-text"><Trash2 className="h-3 w-3" /></button>
                 </div>
                 <div className="mt-1 grid grid-cols-3 gap-1">
-                  <div><label className="block text-[11px] text-stone-500">Qty</label><input type="number" value={d.quantity} onChange={(e) => setDeliverables((x) => x.map((o, j) => (j === i ? { ...o, quantity: Number(e.target.value) } : o)))} className={inputCls} /></div>
-                  <div><label className="block text-[11px] text-stone-500">Unit price ($)</label><input type="number" value={(d.unitPriceCents / 100).toFixed(2)} onChange={(e) => setDeliverables((x) => x.map((o, j) => (j === i ? { ...o, unitPriceCents: Math.round(Number(e.target.value) * 100) } : o)))} className={inputCls} /></div>
-                  <div><label className="block text-[11px] text-stone-500">Total ($)</label><input type="number" value={(d.totalCents / 100).toFixed(2)} onChange={(e) => setDeliverables((x) => x.map((o, j) => (j === i ? { ...o, totalCents: Math.round(Number(e.target.value) * 100) } : o)))} className={inputCls} /></div>
+                  <div><label className="block text-[11px] text-muted">Qty</label><input type="number" value={d.quantity} onChange={(e) => setDeliverables((x) => x.map((o, j) => (j === i ? { ...o, quantity: Number(e.target.value) } : o)))} className={inputCls} /></div>
+                  <div><label className="block text-[11px] text-muted">Unit price ($)</label><input type="number" value={(d.unitPriceCents / 100).toFixed(2)} onChange={(e) => setDeliverables((x) => x.map((o, j) => (j === i ? { ...o, unitPriceCents: Math.round(Number(e.target.value) * 100) } : o)))} className={inputCls} /></div>
+                  <div><label className="block text-[11px] text-muted">Total ($)</label><input type="number" value={(d.totalCents / 100).toFixed(2)} onChange={(e) => setDeliverables((x) => x.map((o, j) => (j === i ? { ...o, totalCents: Math.round(Number(e.target.value) * 100) } : o)))} className={inputCls} /></div>
                 </div>
               </div>
             ))}
-            <button onClick={() => setDeliverables((x) => [...x, { description: "", quantity: 1, unitPriceCents: 1000, totalCents: 1000, notes: "" }])} className="mt-1 text-xs text-stone-600 underline">+ deliverable</button>
-            <div className="mt-3 rounded-lg border border-stone-200 bg-white p-2.5 text-xs">
+            <button onClick={() => setDeliverables((x) => [...x, { description: "", quantity: 1, unitPriceCents: 1000, totalCents: 1000, notes: "" }])} className="mt-1 text-xs text-muted underline">+ deliverable</button>
+            <div className="mt-3 rounded-lg border border-line bg-paper p-2.5 text-xs">
               <div className="flex justify-between"><span>Scheduled total</span><span className="font-semibold">{money(deliverableSum())}</span></div>
               <div className="flex justify-between"><span>Maximum amount to be spent</span><span className="font-semibold">{money(Math.round(maxSpend * 100))}</span></div>
               {deliverableSum() > Math.round(maxSpend * 100) && (
-                <p className="mt-1 font-medium text-red-700">Scheduled total exceeds the maximum spend — reduce deliverables or raise the cap.</p>
+                <p className="mt-1 font-medium text-failed-text">Scheduled total exceeds the maximum spend — reduce deliverables or raise the cap.</p>
               )}
             </div>
-            <label className="mt-3 block text-xs font-medium text-stone-600">Maximum amount to be spent ($)</label>
+            <label className="mt-3 block text-xs font-medium text-muted">Maximum amount to be spent ($)</label>
             <input type="number" value={maxSpend} onChange={(e) => setMaxSpend(Number(e.target.value))} min={1} className={inputCls} />
-            <label className="mt-3 block text-xs font-medium text-stone-600">Third-party ad server</label>
+            <label className="mt-3 block text-xs font-medium text-muted">Third-party ad server</label>
             <input value={adServer} onChange={(e) => setAdServer(e.target.value)} placeholder="e.g. Dub pURL tracking / radio copy center" className={inputCls} />
-            <label className="mt-3 block text-xs font-medium text-stone-600">Cancellation terms</label>
+            <label className="mt-3 block text-xs font-medium text-muted">Cancellation terms</label>
             <textarea value={cancelTerms} onChange={(e) => setCancelTerms(e.target.value)} rows={2} className={inputCls} />
-            <label className="mt-3 block text-xs font-medium text-stone-600">Payment terms</label>
+            <label className="mt-3 block text-xs font-medium text-muted">Payment terms</label>
             <textarea value={paymentTerms} onChange={(e) => setPaymentTerms(e.target.value)} rows={2} className={inputCls} />
-            <label className="mt-3 block text-xs font-medium text-stone-600">Notes</label>
+            <label className="mt-3 block text-xs font-medium text-muted">Notes</label>
             <input value={notes} onChange={(e) => setNotes(e.target.value)} className={inputCls} />
-            <button onClick={createBrief} disabled={loading || !name || !flightStart || !flightEnd || !adServer || deliverableSum() > Math.round(maxSpend * 100)} className="mt-4 flex items-center gap-1.5 rounded-md bg-violet-600 px-4 py-2 text-sm font-medium text-white hover:bg-violet-700 disabled:opacity-40">
+            <button onClick={createBrief} disabled={loading || !name || !flightStart || !flightEnd || !adServer || deliverableSum() > Math.round(maxSpend * 100)} className="mt-4 flex items-center gap-1.5 rounded-full bg-ink px-4 py-2 text-sm font-semibold text-white aos-press disabled:opacity-40">
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />} Generate IO brief
             </button>
           </div>
@@ -257,12 +257,12 @@ export function RadioPrintApp() {
 
       {tab === "briefs" && (
         briefs.length === 0 ? (
-          <p className="text-sm text-stone-500">No IO briefs yet.</p>
+          <p className="text-sm text-muted">No IO briefs yet.</p>
         ) : (
-          <div className="overflow-x-auto rounded-xl border border-stone-200 bg-white">
+          <div className="overflow-x-auto rounded-lg border border-line bg-paper">
             <table className="w-full text-left text-[13px]">
               <thead>
-                <tr className="border-b border-stone-100 bg-stone-50/60 text-[11px] uppercase tracking-wide text-stone-500">
+                <tr className="border-b border-line bg-canvas text-[11px] uppercase tracking-wide text-muted">
                   <th className="px-3 py-2 font-medium">Brief</th>
                   <th className="px-3 py-2 font-medium">Channel</th>
                   <th className="px-3 py-2 font-medium">Max spend</th>
@@ -275,57 +275,57 @@ export function RadioPrintApp() {
               <tbody>
                 {briefs.map((b) => (
                   <>
-                    <tr key={b.id} className="border-b border-stone-100 last:border-0 hover:bg-violet-50/40">
-                      <td className="px-3 py-2 font-medium text-stone-900">{b.name}</td>
-                      <td className="px-3 py-2 text-stone-600">{b.channel}</td>
-                      <td className="px-3 py-2 font-medium text-stone-900">{money(b.maxSpendCents)}</td>
-                      <td className="px-3 py-2 text-[12px] text-stone-600">{b.ioTermsJson.flightStart} → {b.ioTermsJson.flightEnd}</td>
+                    <tr key={b.id} className="border-b border-line last:border-0 hover:bg-hover-paper">
+                      <td className="px-3 py-2 font-medium text-ink">{b.name}</td>
+                      <td className="px-3 py-2 text-muted">{b.channel}</td>
+                      <td className="px-3 py-2 font-medium text-ink">{money(b.maxSpendCents)}</td>
+                      <td className="px-3 py-2 text-[12px] text-muted">{b.ioTermsJson.flightStart} → {b.ioTermsJson.flightEnd}</td>
                       <td className="px-3 py-2">
                         <div className="flex items-center gap-1">
                           {FLOW.map((s, i) => {
                             const done = FLOW.indexOf(b.signatureStatus) >= i;
                             return (
                               <div key={s} className="flex items-center gap-1">
-                                <span className={`rounded-full px-2 py-0.5 text-[11px] ${done ? "bg-violet-600 text-white" : "border border-stone-200 bg-white text-stone-500"}`}>{s.replace(/_/g, " ")}</span>
-                                {i < FLOW.length - 1 && <span className="h-px w-4 bg-stone-300" />}
+                                <span className={`rounded-full px-2 py-0.5 text-[11px] ${done ? "bg-ink text-white" : "border border-line bg-paper text-muted"}`}>{s.replace(/_/g, " ")}</span>
+                                {i < FLOW.length - 1 && <span className="h-px w-4 bg-line" />}
                               </div>
                             );
                           })}
-                          {b.signatureStatus === "cancelled" && <span className="rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[11px] text-red-700">cancelled</span>}
+                          {b.signatureStatus === "cancelled" && <span className="rounded-full border border-failed bg-failed-tint px-2 py-0.5 text-[11px] text-failed-text">cancelled</span>}
                         </div>
                       </td>
                       <td className="px-3 py-2">
-                        {b.briefPdfUrl ? <a href={b.briefPdfUrl} className="flex items-center gap-1 text-xs text-stone-700 underline"><FileDown className="h-3 w-3" /> PDF</a> : <span className="text-stone-400">—</span>}
+                        {b.briefPdfUrl ? <a href={b.briefPdfUrl} className="flex items-center gap-1 text-xs text-muted underline"><FileDown className="h-3 w-3" /> PDF</a> : <span className="text-subtle">—</span>}
                       </td>
                       <td className="px-3 py-2">
-                        <button onClick={() => setExpanded(expanded === b.id ? null : b.id)} className="rounded-md border border-stone-200 bg-white px-2 py-1 text-xs text-stone-700 hover:bg-stone-50">
+                        <button onClick={() => setExpanded(expanded === b.id ? null : b.id)} className="rounded-full border border-line bg-paper px-2 py-1 text-xs font-medium text-ink shadow-outline hover:bg-hover-paper">
                           {expanded === b.id ? "Collapse" : "Signature"}
                         </button>
                       </td>
                     </tr>
                     {expanded === b.id && (
-                      <tr key={`${b.id}-detail`} className="border-b border-stone-100 bg-stone-50/40">
+                      <tr key={`${b.id}-detail`} className="border-b border-line bg-canvas">
                         <td colSpan={7} className="px-3 py-3">
-                          <h4 className="text-xs font-semibold text-stone-700">Signature flow — the rep keeps the signature</h4>
-                          {b.repContact && <p className="mt-1 text-xs text-stone-500">Rep: {b.repContact.name} ({b.repContact.company})</p>}
+                          <h4 className="text-xs font-semibold text-muted">Signature flow — the rep keeps the signature</h4>
+                          {b.repContact && <p className="mt-1 text-xs text-muted">Rep: {b.repContact.name} ({b.repContact.company})</p>}
                           <div className="mt-2 flex flex-wrap gap-2">
-                            <button onClick={() => setStatus(b.id, "sent_to_rep")} disabled={loading || b.signatureStatus !== "draft"} className="rounded-md border border-stone-200 bg-white px-3 py-1.5 text-xs text-stone-700 hover:bg-stone-50 disabled:opacity-40">Mark sent to rep</button>
-                            <button onClick={() => setStatus(b.id, "signed")} disabled={loading || b.signatureStatus !== "sent_to_rep" || !b.repContact} className="rounded-md border border-stone-200 bg-white px-3 py-1.5 text-xs text-stone-700 hover:bg-stone-50 disabled:opacity-40">Mark signed</button>
-                            <button onClick={() => setStatus(b.id, "cancelled")} disabled={loading || ["signed", "proof_received", "cancelled"].includes(b.signatureStatus)} className="rounded-md border border-red-300 px-3 py-1.5 text-xs text-red-700 disabled:opacity-50">Cancel brief</button>
+                            <button onClick={() => setStatus(b.id, "sent_to_rep")} disabled={loading || b.signatureStatus !== "draft"} className="rounded-full border border-line bg-paper px-3 py-1.5 text-xs font-medium text-ink shadow-outline hover:bg-hover-paper disabled:opacity-40">Mark sent to rep</button>
+                            <button onClick={() => setStatus(b.id, "signed")} disabled={loading || b.signatureStatus !== "sent_to_rep" || !b.repContact} className="rounded-full border border-line bg-paper px-3 py-1.5 text-xs font-medium text-ink shadow-outline hover:bg-hover-paper disabled:opacity-40">Mark signed</button>
+                            <button onClick={() => setStatus(b.id, "cancelled")} disabled={loading || ["signed", "proof_received", "cancelled"].includes(b.signatureStatus)} className="rounded-md border border-line bg-paper px-3 py-1.5 text-xs font-medium text-failed-text shadow-[inset_0_0_0_1.5px_var(--aos-failed)] disabled:opacity-50">Cancel brief</button>
                           </div>
                           <div className="mt-3">
-                            <label className="block text-xs font-medium text-stone-600">Proof-of-run URL (receipt of performance)</label>
+                            <label className="block text-xs font-medium text-muted">Proof-of-run URL (receipt of performance)</label>
                             <div className="mt-1 flex gap-1">
-                              <input value={proofUrl} onChange={(e) => setProofUrl(e.target.value)} placeholder="https://…affidavit or file link" className="w-full rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-[13px] text-stone-900 placeholder:text-stone-400 focus:border-violet-400 focus:outline-none" />
+                              <input value={proofUrl} onChange={(e) => setProofUrl(e.target.value)} placeholder="https://…affidavit or file link" className="w-full rounded-md border border-line bg-paper px-2.5 py-1.5 text-[13px] text-ink placeholder:text-subtle focus:border-focus focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus:outline-none" />
                               <button
                                 onClick={() => { if (proofUrl) { setStatus(b.id, "proof_received", { proofOfRunUrl: proofUrl }); setProofUrl(""); } }}
                                 disabled={loading || !proofUrl}
-                                className="rounded-md bg-violet-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-violet-700 disabled:opacity-40"
+                                className="rounded-full bg-ink px-3 py-1.5 text-xs font-semibold text-white aos-press disabled:opacity-40"
                               >
                                 Attach proof
                               </button>
                             </div>
-                            {b.proofOfRunUrl && <p className="mt-1 text-[11px] text-stone-500">Current: {b.proofOfRunUrl}</p>}
+                            {b.proofOfRunUrl && <p className="mt-1 text-[11px] text-muted">Current: {b.proofOfRunUrl}</p>}
                           </div>
                         </td>
                       </tr>

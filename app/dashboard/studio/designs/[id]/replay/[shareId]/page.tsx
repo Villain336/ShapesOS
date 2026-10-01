@@ -44,12 +44,12 @@ export default async function DashboardShareReplayPage({
   if (!active || !share) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center bg-[#FAFAF7] px-4">
-        <div className="rounded-xl border border-stone-200 bg-white p-8 text-center">
-          <MonitorPlay className="mx-auto h-8 w-8 text-stone-300" />
-          <h1 className="mt-3 text-xl font-bold tracking-tight text-stone-900">
+        <div className="rounded-lg border border-line bg-paper p-8 text-center">
+          <MonitorPlay className="mx-auto h-8 w-8 text-subtle" />
+          <h1 className="aos-heading mt-3 text-ink">
             No replay available
           </h1>
-          <p className="mt-1 text-[13px] text-stone-500">
+          <p className="mt-1 text-[13px] text-muted">
             This share link doesn&apos;t exist, has expired, or didn&apos;t opt in to
             session replay.
           </p>
@@ -65,13 +65,13 @@ export default async function DashboardShareReplayPage({
     <div className="flex h-full flex-col gap-4 bg-[#FAFAF7] p-4 md:p-6">
       <Link
         href={`/dashboard/studio/designs/${encodeURIComponent(designId)}`}
-        className="inline-flex w-fit items-center gap-1 text-[13px] text-stone-500 hover:text-stone-700"
+        className="inline-flex w-fit items-center gap-1 text-[13px] text-muted hover:text-ink"
       >
         <ArrowLeft className="h-3.5 w-3.5" /> Back to design
       </Link>
       <div>
-        <h1 className="text-xl font-bold tracking-tight text-stone-900">Session replay</h1>
-        <p className="mt-0.5 max-w-2xl text-[13px] text-stone-500">
+        <h1 className="aos-heading text-ink">Session replay</h1>
+        <p className="mt-0.5 max-w-2xl text-[13px] text-muted">
           {share.design.name} — recordings are opt-in per share link and only visible to
           your workspace. Inputs are masked in every recording.
         </p>
