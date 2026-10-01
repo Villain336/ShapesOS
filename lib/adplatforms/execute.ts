@@ -11,6 +11,7 @@ import { prisma } from "@/lib/prisma";
 import { runAdsAction, AdsActionError, type AdsActionContext } from "./actions";
 import { prismaApprovalStore, prismaProposalStore } from "./store";
 import { registerAmazonConnectors } from "./amazon";
+import { registerStackAdaptConnectors } from "./stackadapt";
 import { isAdsPlatformKey } from "./types";
 
 export async function executeSpendProposal(
@@ -26,6 +27,7 @@ export async function executeSpendProposal(
   }
 
   registerAmazonConnectors();
+  registerStackAdaptConnectors();
 
   const payload = (proposal.payload ?? {}) as Record<string, unknown>;
   const platformKey =
