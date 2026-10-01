@@ -24,9 +24,9 @@ export default async function WfhDayPage() {
   if (!membership) redirect("/dashboard");
 
   return (
-    <div className="bg-[#FAFAF7] p-4 md:p-6">
-      <h1 className="text-xl font-bold tracking-tight text-stone-900">WFH mode</h1>
-      <p className="mt-1 text-[13px] text-stone-500">
+    <div className="bg-canvas p-4 md:p-6">
+      <h1 className="aos-heading">WFH mode</h1>
+      <p className="mt-1 text-sm text-muted">
         Your WFH day at a glance — focus blocks, standup, rituals, and digests.
       </p>
       <div className="mt-3">

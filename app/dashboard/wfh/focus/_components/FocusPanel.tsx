@@ -40,14 +40,16 @@ interface EnforcementView {
 }
 
 const inputCls =
-  "rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-[13px] text-stone-900 placeholder:text-stone-400 focus:border-[var(--brand-600)] focus:outline-none";
+  "h-control-sm rounded-md border-[1.5px] border-control bg-paper px-3 text-sm text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none";
 const btnPrimary =
-  "flex items-center gap-1.5 rounded-md bg-[var(--brand-600)] px-3 py-1.5 text-[13px] font-medium text-white hover:bg-[var(--brand-700)] disabled:opacity-40";
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-night-hover disabled:opacity-40";
 const btnGhost =
-  "flex items-center gap-1.5 rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-[13px] text-stone-700 hover:bg-stone-50 disabled:opacity-40";
-const labelCls = "block text-[12px] font-medium text-stone-600";
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-paper px-4 text-sm font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper disabled:opacity-40";
+const labelCls = "block text-xs font-semibold text-muted";
+// All workflow states render neutral: block statuses and protection levels are
+// workflow states, not agent states, so they never take a status color.
 const chip =
-  "inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-1.5 py-0.5 text-[10px] font-medium leading-tight";
+  "inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-paper px-2 py-0.5 text-xs font-semibold text-muted shadow-control";
 
 function fmtDT(iso: string) {
   const d = new Date(iso);
@@ -209,26 +211,18 @@ export default function FocusPanel({
   }
 
   function statusChip(status: string) {
-    if (status === "protected")
-      return <span className={`${chip} border-emerald-200 bg-emerald-50 text-emerald-700`}>protected</span>;
-    if (status === "overridden")
-      return <span className={`${chip} border-amber-200 bg-amber-50 text-amber-700`}>overridden</span>;
-    if (status === "completed")
-      return <span className={`${chip} border-stone-200 bg-stone-100 text-stone-600`}>completed</span>;
-    if (status === "cancelled")
-      return <span className={`${chip} border-stone-200 bg-stone-100 text-stone-500`}>cancelled</span>;
-    return <span className={`${chip} border-[var(--brand-600)]/20 bg-[var(--brand-50)] text-[var(--brand-700)]`}>scheduled</span>;
+    return <span className={chip}>{status}</span>;
   }
 
   return (
     <div className="space-y-4">
       {/* Consent gate banner */}
-      <div className="flex items-center justify-between rounded-md border border-stone-200 bg-stone-50 px-3 py-2.5">
-        <p className="flex items-center gap-2 text-[13px] text-stone-600">
+      <div className="flex items-center justify-between gap-3 rounded-lg bg-paper px-3 py-2.5 shadow-hairline">
+        <p className="flex items-center gap-2 text-sm text-muted">
           {consented ? (
-            <ShieldCheck className="h-4 w-4 text-emerald-600" />
+            <ShieldCheck className="h-4 w-4 shrink-0 text-ink" />
           ) : (
-            <ShieldAlert className="h-4 w-4 text-amber-600" />
+            <ShieldAlert className="h-4 w-4 shrink-0 text-ink" />
           )}
           {consented
             ? "Auto-decline consent recorded. Hard-protected blocks may decline meetings on your behalf once a calendar is connected."
@@ -242,14 +236,18 @@ export default function FocusPanel({
       </div>
 
       {error && (
-        <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-700">
-          {error}
+        <div
+          className="flex items-start gap-2 rounded-md border border-failed bg-failed-tint px-3 py-2 text-sm text-failed-text"
+          role="alert"
+        >
+          <span className="mt-1 h-3 w-3 shrink-0 bg-failed" aria-hidden="true" />
+          <span>{error}</span>
         </div>
       )}
 
       {/* Create form */}
-      <div className="rounded-lg border border-stone-200 bg-white px-4 py-4">
-        <h2 className="flex items-center gap-2 text-[15px] font-semibold text-stone-900">
+      <div className="rounded-lg bg-paper px-4 py-4 shadow-hairline">
+        <h2 className="aos-subheading flex items-center gap-2">
           <Plus className="h-4 w-4" /> New focus block
         </h2>
         <div className="mt-3 grid gap-3 md:grid-cols-3">
@@ -292,11 +290,11 @@ export default function FocusPanel({
       </div>
 
       {/* Manual event list (calendar-lite conflict source) */}
-      <div className="rounded-lg border border-stone-200 bg-white px-4 py-4">
-        <h2 className="flex items-center gap-2 text-[15px] font-semibold text-stone-900">
+      <div className="rounded-lg bg-paper px-4 py-4 shadow-hairline">
+        <h2 className="aos-subheading flex items-center gap-2">
           <CalendarClock className="h-4 w-4" /> Calendar events (manual)
         </h2>
-        <p className="mt-0.5 text-[13px] text-stone-500">
+        <p className="mt-0.5 text-sm text-muted">
           Live calendar sync arrives with the calendar integration. Until then, add the events
           on your calendar to preview conflicts.
         </p>
@@ -309,9 +307,9 @@ export default function FocusPanel({
         {events.length > 0 && (
           <ul className="mt-2 space-y-1">
             {events.map((e) => (
-              <li key={e.id} className="flex items-center justify-between text-[13px] text-stone-700">
+              <li key={e.id} className="flex items-center justify-between text-sm text-ink">
                 <span>{e.title} · {fmtDT(new Date(e.startAt).toISOString())} → {fmtDT(new Date(e.endAt).toISOString())}</span>
-                <button type="button" onClick={() => setEvents((evs) => evs.filter((x) => x.id !== e.id))} className="text-stone-400 hover:text-stone-600">Remove</button>
+                <button type="button" onClick={() => setEvents((evs) => evs.filter((x) => x.id !== e.id))} className="rounded-full px-2 py-1 text-xs font-medium text-muted hover:bg-hover-paper hover:text-ink">Remove</button>
               </li>
             ))}
           </ul>
@@ -319,20 +317,20 @@ export default function FocusPanel({
       </div>
 
       {/* Blocks table */}
-      <div className="overflow-hidden rounded-lg border border-stone-200 bg-white">
-        <div className="border-b border-stone-200 px-4 py-2.5">
-          <h2 className="text-[13px] font-semibold text-stone-900">
-            Focus blocks <span className="font-normal text-stone-500">({blocks.length})</span>
+      <div className="overflow-hidden rounded-lg bg-paper shadow-hairline">
+        <div className="border-b border-line px-4 py-2.5">
+          <h2 className="text-sm font-semibold text-ink">
+            Focus blocks <span className="font-normal text-muted">({blocks.length})</span>
           </h2>
         </div>
         {blocks.length === 0 ? (
-          <p className="px-4 py-6 text-center text-[13px] text-stone-500">
+          <p className="px-4 py-6 text-center text-sm text-muted">
             No focus blocks yet. Create one above — the OS will defend it.
           </p>
         ) : (
-          <table className="w-full text-[13px]">
+          <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-stone-200 bg-stone-50 text-left text-[12px] text-stone-500">
+              <tr className="border-b border-line text-xs font-semibold text-muted">
                 <th className="px-4 py-2 font-medium">Block</th>
                 <th className="px-4 py-2 font-medium">When</th>
                 <th className="px-4 py-2 font-medium">Protection</th>
@@ -342,16 +340,14 @@ export default function FocusPanel({
             </thead>
             <tbody>
               {blocks.map((b) => (
-                <tr key={b.id} className="border-b border-stone-100 hover:bg-[var(--brand-50)]/40">
-                  <td className="px-4 py-2 font-medium text-stone-900">
+                <tr key={b.id} className="border-b border-line hover:bg-hover-paper">
+                  <td className="px-4 py-2 font-medium text-ink">
                     {b.title}
-                    {b.recurrence !== "none" && <span className="ml-2 text-[11px] font-normal text-stone-500">· {b.recurrence}</span>}
+                    {b.recurrence !== "none" && <span className="ml-2 text-xs font-normal text-muted">· {b.recurrence}</span>}
                   </td>
-                  <td className="px-4 py-2 text-stone-600">{fmtDT(b.startAt)} → {fmtDT(b.endAt)}</td>
+                  <td className="px-4 py-2 text-muted">{fmtDT(b.startAt)} → {fmtDT(b.endAt)}</td>
                   <td className="px-4 py-2">
-                    <span className={`${chip} ${b.protection === "hard" ? "border-amber-200 bg-amber-50 text-amber-700" : "border-stone-200 bg-stone-100 text-stone-600"}`}>
-                      {b.protection}
-                    </span>
+                    <span className={chip}>{b.protection}</span>
                   </td>
                   <td className="px-4 py-2">{statusChip(b.status)}</td>
                   <td className="px-4 py-2">
@@ -376,13 +372,13 @@ export default function FocusPanel({
 
       {/* Enforcement result */}
       {enforcement && (
-        <div className="rounded-lg border border-stone-200 bg-white px-4 py-4">
-          <h2 className="text-[15px] font-semibold text-stone-900">Enforcement result</h2>
-          <p className="mt-1 text-[13px] text-stone-600">{enforcement.result.note}</p>
+        <div className="rounded-lg bg-paper px-4 py-4 shadow-hairline">
+          <h2 className="aos-subheading">Enforcement result</h2>
+          <p className="mt-1 text-sm text-ink">{enforcement.result.note}</p>
           {enforcement.result.conflicts.length > 0 && (
             <div className="mt-2">
-              <p className="text-[12px] font-medium text-stone-600">Conflicts</p>
-              <ul className="mt-1 space-y-1 text-[13px] text-stone-700">
+              <p className="text-xs font-semibold text-muted">Conflicts</p>
+              <ul className="mt-1 space-y-1 text-sm text-ink">
                 {enforcement.result.conflicts.map((c) => (
                   <li key={c.eventId}>· {c.title} ({c.overlapMin} min overlap)</li>
                 ))}
@@ -391,8 +387,8 @@ export default function FocusPanel({
           )}
           {enforcement.result.suggestions.length > 0 && (
             <div className="mt-2">
-              <p className="text-[12px] font-medium text-stone-600">Suggested new times (soft protection)</p>
-              <ul className="mt-1 space-y-1 text-[13px] text-stone-700">
+              <p className="text-xs font-semibold text-muted">Suggested new times (soft protection)</p>
+              <ul className="mt-1 space-y-1 text-sm text-ink">
                 {enforcement.result.suggestions.map((s) => (
                   <li key={s.eventId}>· {s.title} → {fmtDT(s.suggestedStartAt)} – {fmtDT(s.suggestedEndAt)}</li>
                 ))}
@@ -400,7 +396,7 @@ export default function FocusPanel({
             </div>
           )}
           {enforcement.result.autoDeclined.length > 0 && (
-            <p className="mt-2 text-[13px] text-amber-700">
+            <p className="mt-2 text-sm text-muted">
               {enforcement.result.autoDeclined.length} event(s) marked pending auto-decline — the
               live decline sends when the calendar rail connects.
             </p>

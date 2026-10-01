@@ -57,9 +57,9 @@ export default async function WfhModePage() {
     : null;
 
   return (
-    <div className="bg-[#FAFAF7] p-4 md:p-6">
-      <h1 className="text-xl font-bold tracking-tight text-stone-900">WFH mode</h1>
-      <p className="mt-1 text-[13px] text-stone-500">
+    <div className="bg-canvas p-4 md:p-6">
+      <h1 className="aos-heading">WFH mode</h1>
+      <p className="mt-1 text-sm text-muted">
         One switch that reconfigures the OS for remote work — async-first notifications,
         protected focus time, home-office expenses, and rituals. Per-user: your teammates
         keep their own setting.

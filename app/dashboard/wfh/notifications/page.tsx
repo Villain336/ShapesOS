@@ -47,9 +47,9 @@ export default async function WfhNotificationsPage() {
   });
 
   return (
-    <div className="bg-[#FAFAF7] p-4 md:p-6">
-      <h1 className="text-xl font-bold tracking-tight text-stone-900">WFH mode</h1>
-      <p className="mt-1 text-[13px] text-stone-500">
+    <div className="bg-canvas p-4 md:p-6">
+      <h1 className="aos-heading">WFH mode</h1>
+      <p className="mt-1 text-sm text-muted">
         Async-first notifications: urgent breaks through immediately — approval gates, money
         movement, customer-facing — everything else batches into digest windows.
       </p>

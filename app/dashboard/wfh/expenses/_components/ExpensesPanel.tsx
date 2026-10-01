@@ -39,12 +39,12 @@ interface Summary {
 }
 
 const inputCls =
-  "rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-[13px] text-stone-900 placeholder:text-stone-400 focus:border-[var(--brand-600)] focus:outline-none";
+  "h-control-sm rounded-md border-[1.5px] border-control bg-paper px-3 text-sm text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none";
 const btnPrimary =
-  "flex items-center gap-1.5 rounded-md bg-[var(--brand-600)] px-3 py-1.5 text-[13px] font-medium text-white hover:bg-[var(--brand-700)] disabled:opacity-40";
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-night-hover disabled:opacity-40";
 const btnGhost =
-  "flex items-center gap-1.5 rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-[13px] text-stone-700 hover:bg-stone-50 disabled:opacity-40";
-const labelCls = "block text-[12px] font-medium text-stone-600";
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-paper px-4 text-sm font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper disabled:opacity-40";
+const labelCls = "block text-xs font-semibold text-muted";
 
 function money(cents: number) {
   return `$${(cents / 100).toFixed(2)}`;
@@ -135,7 +135,7 @@ export default function ExpensesPanel() {
 
   if (!loaded) {
     return (
-      <div className="flex items-center gap-2 text-[13px] text-stone-500">
+      <div className="flex items-center gap-2 text-sm text-muted">
         <Loader2 className="h-4 w-4 animate-spin" /> Loading expenses…
       </div>
     );
@@ -144,37 +144,41 @@ export default function ExpensesPanel() {
   return (
     <div className="space-y-4">
       {error && (
-        <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-700">
-          {error}
+        <div
+          className="flex items-start gap-2 rounded-md border border-failed bg-failed-tint px-3 py-2 text-sm text-failed-text"
+          role="alert"
+        >
+          <span className="mt-1 h-3 w-3 shrink-0 bg-failed" aria-hidden="true" />
+          <span>{error}</span>
         </div>
       )}
 
       {/* Monthly summary */}
-      <div className="rounded-lg border border-stone-200 bg-white px-4 py-4">
+      <div className="rounded-lg bg-paper px-4 py-4 shadow-hairline">
         <div className="flex items-center justify-between">
-          <h2 className="text-[15px] font-semibold text-stone-900">Monthly summary</h2>
+          <h2 className="aos-subheading">Monthly summary</h2>
           <input type="month" className={inputCls} value={month} onChange={(e) => setMonth(e.target.value)} />
         </div>
         {summary && (
           <div className="mt-3 grid gap-3 md:grid-cols-3">
-            <div className="rounded-md border border-stone-200 bg-stone-50 px-3 py-2">
-              <p className="text-[11px] font-medium uppercase tracking-wide text-stone-400">Total spent</p>
-              <p className="text-xl font-bold text-stone-900">{money(summary.totalCents)}</p>
+            <div className="rounded-md bg-canvas px-3 py-2">
+              <p className="text-xs font-semibold text-muted">Total spent</p>
+              <p className="text-lg font-bold text-ink">{money(summary.totalCents)}</p>
             </div>
-            <div className="rounded-md border border-stone-200 bg-stone-50 px-3 py-2">
-              <p className="text-[11px] font-medium uppercase tracking-wide text-stone-400">Deductible portion</p>
-              <p className="text-xl font-bold text-[var(--brand-700)]">{money(summary.totalDeductibleCents)}</p>
+            <div className="rounded-md bg-canvas px-3 py-2">
+              <p className="text-xs font-semibold text-muted">Deductible portion</p>
+              <p className="text-lg font-bold text-ink">{money(summary.totalDeductibleCents)}</p>
             </div>
-            <div className="rounded-md border border-stone-200 bg-stone-50 px-3 py-2">
-              <p className="text-[11px] font-medium uppercase tracking-wide text-stone-400">Expenses</p>
-              <p className="text-xl font-bold text-stone-900">{summary.expenseCount}</p>
+            <div className="rounded-md bg-canvas px-3 py-2">
+              <p className="text-xs font-semibold text-muted">Expenses</p>
+              <p className="text-lg font-bold text-ink">{summary.expenseCount}</p>
             </div>
           </div>
         )}
         {summary && summary.categories.length > 0 && (
-          <table className="mt-3 w-full text-[13px]">
+          <table className="mt-3 w-full text-sm">
             <thead>
-              <tr className="border-b border-stone-200 text-left text-[12px] text-stone-500">
+              <tr className="border-b border-line text-xs font-semibold text-muted">
                 <th className="py-1.5 font-medium">Category</th>
                 <th className="py-1.5 font-medium">Spent</th>
                 <th className="py-1.5 font-medium">Deductible</th>
@@ -182,23 +186,23 @@ export default function ExpensesPanel() {
             </thead>
             <tbody>
               {summary.categories.map((c) => (
-                <tr key={c.key} className="border-b border-stone-100">
-                  <td className="py-1.5 text-stone-900">{c.name} <span className="text-stone-400">({c.count})</span></td>
-                  <td className="py-1.5 text-stone-600">{money(c.totalCents)}</td>
-                  <td className="py-1.5 font-medium text-stone-900">{money(c.deductibleCents)}</td>
+                <tr key={c.key} className="border-b border-line">
+                  <td className="py-1.5 text-ink">{c.name} <span className="text-muted">({c.count})</span></td>
+                  <td className="py-1.5 text-muted">{money(c.totalCents)}</td>
+                  <td className="py-1.5 font-medium text-ink">{money(c.deductibleCents)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         )}
-        <p className="mt-2 text-[11px] text-stone-400">
+        <p className="mt-2 text-xs text-subtle">
           A starting point for your accountant — not tax advice.
         </p>
       </div>
 
       {/* Record expense */}
-      <div className="rounded-lg border border-stone-200 bg-white px-4 py-4">
-        <h2 className="flex items-center gap-2 text-[15px] font-semibold text-stone-900">
+      <div className="rounded-lg bg-paper px-4 py-4 shadow-hairline">
+        <h2 className="aos-subheading flex items-center gap-2">
           <Plus className="h-4 w-4" /> Record expense
         </h2>
         <div className="mt-3 grid gap-3 md:grid-cols-4">
@@ -219,7 +223,7 @@ export default function ExpensesPanel() {
             <input type="date" className={`${inputCls} mt-1 w-full`} value={date} onChange={(e) => setDate(e.target.value)} />
           </div>
           <div>
-            <label className={labelCls}>Note <span className="font-normal text-stone-400">(optional)</span></label>
+            <label className={labelCls}>Note <span className="font-normal text-subtle">(optional)</span></label>
             <input className={`${inputCls} mt-1 w-full`} value={note} onChange={(e) => setNote(e.target.value)} placeholder="September bill" />
           </div>
         </div>
@@ -229,16 +233,16 @@ export default function ExpensesPanel() {
       </div>
 
       {/* Allocation rules */}
-      <div className="overflow-hidden rounded-lg border border-stone-200 bg-white">
-        <div className="border-b border-stone-200 px-4 py-2.5">
-          <h2 className="text-[13px] font-semibold text-stone-900">Allocation rules</h2>
-          <p className="text-[12px] text-stone-500">
+      <div className="overflow-hidden rounded-lg bg-paper shadow-hairline">
+        <div className="border-b border-line px-4 py-2.5">
+          <h2 className="text-sm font-semibold text-ink">Allocation rules</h2>
+          <p className="text-xs text-muted">
             What % of each bill counts as business use. Applies to new expenses only.
           </p>
         </div>
-        <table className="w-full text-[13px]">
+        <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-stone-200 bg-stone-50 text-left text-[12px] text-stone-500">
+            <tr className="border-b border-line text-xs font-semibold text-muted">
               <th className="px-4 py-2 font-medium">Category</th>
               <th className="px-4 py-2 font-medium">Method</th>
               <th className="px-4 py-2 font-medium">Business %</th>
@@ -247,12 +251,12 @@ export default function ExpensesPanel() {
           </thead>
           <tbody>
             {categories.map((c) => (
-              <tr key={c.key} className="border-b border-stone-100 hover:bg-[var(--brand-50)]/40">
+              <tr key={c.key} className="border-b border-line hover:bg-hover-paper">
                 <td className="px-4 py-2">
-                  <p className="font-medium text-stone-900">{c.name}</p>
-                  <p className="text-[11px] text-stone-500">{c.description}</p>
+                  <p className="font-medium text-ink">{c.name}</p>
+                  <p className="text-xs text-muted">{c.description}</p>
                 </td>
-                <td className="px-4 py-2 text-stone-600">
+                <td className="px-4 py-2 text-muted">
                   {c.allocationMethod === "square_footage" ? `sqft (${c.officeSqft}/${c.totalSqft})` : "flat %"}
                 </td>
                 <td className="px-4 py-2">
@@ -275,20 +279,20 @@ export default function ExpensesPanel() {
       </div>
 
       {/* Recent expenses */}
-      <div className="overflow-hidden rounded-lg border border-stone-200 bg-white">
-        <div className="border-b border-stone-200 px-4 py-2.5">
-          <h2 className="text-[13px] font-semibold text-stone-900">
-            {month} <span className="font-normal text-stone-500">({expenses.length})</span>
+      <div className="overflow-hidden rounded-lg bg-paper shadow-hairline">
+        <div className="border-b border-line px-4 py-2.5">
+          <h2 className="text-sm font-semibold text-ink">
+            {month} <span className="font-normal text-muted">({expenses.length})</span>
           </h2>
         </div>
         {expenses.length === 0 ? (
-          <p className="px-4 py-6 text-center text-[13px] text-stone-500">
+          <p className="px-4 py-6 text-center text-sm text-muted">
             Nothing recorded this month yet.
           </p>
         ) : (
-          <table className="w-full text-[13px]">
+          <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-stone-200 bg-stone-50 text-left text-[12px] text-stone-500">
+              <tr className="border-b border-line text-xs font-semibold text-muted">
                 <th className="px-4 py-2 font-medium">Date</th>
                 <th className="px-4 py-2 font-medium">Category</th>
                 <th className="px-4 py-2 font-medium">Amount</th>
@@ -298,12 +302,12 @@ export default function ExpensesPanel() {
             </thead>
             <tbody>
               {expenses.map((e) => (
-                <tr key={e.id} className="border-b border-stone-100 hover:bg-[var(--brand-50)]/40">
-                  <td className="px-4 py-2 text-stone-600">{new Date(e.occurredOn).toLocaleDateString()}</td>
-                  <td className="px-4 py-2 text-stone-900">{e.category.name}{e.note && <span className="block text-[11px] text-stone-500">{e.note}</span>}</td>
-                  <td className="px-4 py-2 text-stone-600">{money(e.amountCents)}</td>
-                  <td className="px-4 py-2 text-stone-600">{e.allocationPct}%</td>
-                  <td className="px-4 py-2 font-medium text-stone-900">{money(e.deductibleCents)}</td>
+                <tr key={e.id} className="border-b border-line hover:bg-hover-paper">
+                  <td className="px-4 py-2 text-muted">{new Date(e.occurredOn).toLocaleDateString()}</td>
+                  <td className="px-4 py-2 text-ink">{e.category.name}{e.note && <span className="block text-xs text-muted">{e.note}</span>}</td>
+                  <td className="px-4 py-2 text-muted">{money(e.amountCents)}</td>
+                  <td className="px-4 py-2 text-muted">{e.allocationPct}%</td>
+                  <td className="px-4 py-2 font-medium text-ink">{money(e.deductibleCents)}</td>
                 </tr>
               ))}
             </tbody>

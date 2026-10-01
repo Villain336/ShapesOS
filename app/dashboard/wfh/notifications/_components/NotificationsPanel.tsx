@@ -5,7 +5,7 @@
 "use client";
 
 import { useState } from "react";
-import { Bell, BellOff, Loader2, Save, Zap } from "lucide-react";
+import { Bell, BellOff, Check, Loader2, Save, Zap } from "lucide-react";
 
 interface QueuedItem {
   id: string;
@@ -17,10 +17,15 @@ interface QueuedItem {
 }
 
 const inputCls =
-  "rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-[13px] text-stone-900 placeholder:text-stone-400 focus:border-[var(--brand-600)] focus:outline-none";
+  "h-control-sm rounded-md border-[1.5px] border-control bg-paper px-3 text-sm text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none";
 const btnPrimary =
-  "flex items-center gap-1.5 rounded-md bg-[var(--brand-600)] px-3 py-1.5 text-[13px] font-medium text-white hover:bg-[var(--brand-700)] disabled:opacity-40";
-const labelCls = "block text-[12px] font-medium text-stone-600";
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-night-hover disabled:opacity-40";
+const labelCls = "block text-xs font-semibold text-muted";
+// Notification routing states are workflow states, not agent states — neutrals.
+const chip =
+  "h-chip inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-paper px-4 text-sm font-semibold text-muted shadow-control";
+const chipPressed =
+  "h-chip inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-ink px-4 text-sm font-semibold text-white shadow-control";
 
 const PROBE_KINDS = [
   "approval_requested",
@@ -124,14 +129,16 @@ export default function NotificationsPanel({
   return (
     <div className="space-y-4">
       {!setupDone && (
-        <div className="rounded-md border border-stone-200 bg-stone-50 px-3 py-2 text-[13px] text-stone-600">
-          Finish the 60-second WFH setup on the Mode tab first — digest routing follows your
-          notification profile.
+        <div className="rounded-lg bg-paper px-3 py-2 shadow-hairline">
+          <p className="text-sm text-muted">
+            Finish the 60-second WFH setup on the Mode tab first — digest routing follows your
+            notification profile.
+          </p>
         </div>
       )}
 
-      <div className="rounded-lg border border-stone-200 bg-white px-4 py-4">
-        <h2 className="text-[15px] font-semibold text-stone-900">Digest preferences</h2>
+      <div className="rounded-lg bg-paper px-4 py-4 shadow-hairline">
+        <h2 className="aos-subheading">Digest preferences</h2>
         <div className="mt-3 grid gap-4 md:grid-cols-2">
           <div>
             <label className={labelCls}>Notification profile</label>
@@ -148,11 +155,8 @@ export default function NotificationsPanel({
                     key={o.v}
                     type="button"
                     onClick={() => setProfile(o.v)}
-                    className={`flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-[13px] font-medium ${
-                      profile === o.v
-                        ? "border-[var(--brand-600)] bg-[var(--brand-50)] text-[var(--brand-700)]"
-                        : "border-stone-200 bg-white text-stone-700 hover:bg-stone-50"
-                    }`}
+                    aria-pressed={profile === o.v}
+                    className={`${profile === o.v ? chipPressed : chip} aos-press`}
                   >
                     <Icon className="h-3.5 w-3.5" />
                     {o.label}
@@ -176,21 +180,25 @@ export default function NotificationsPanel({
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
             Save preferences
           </button>
-          {saved && <span className="text-[13px] text-emerald-700">Saved.</span>}
+          {saved && (
+            <span className="flex items-center gap-1.5 text-sm font-medium text-ink">
+              <Check className="h-4 w-4" /> Saved.
+            </span>
+          )}
         </div>
-        {error && <p className="mt-2 text-[13px] text-red-700">{error}</p>}
-        <p className="mt-2 text-[12px] text-stone-500">
+        {error && <p className="mt-2 text-sm text-failed-text">{error}</p>}
+        <p className="mt-2 text-xs text-muted">
           {modeActive
             ? "WFH mode is on: routine notifications batch into these windows."
             : "WFH mode is off: everything delivers in realtime until you turn it on."}
         </p>
       </div>
 
-      <div className="rounded-lg border border-stone-200 bg-white px-4 py-4">
-        <h2 className="flex items-center gap-2 text-[15px] font-semibold text-stone-900">
-          <Zap className="h-4 w-4 text-stone-400" /> Routing probe
+      <div className="rounded-lg bg-paper px-4 py-4 shadow-hairline">
+        <h2 className="aos-subheading flex items-center gap-2">
+          <Zap className="h-4 w-4" /> Routing probe
         </h2>
-        <p className="mt-0.5 text-[13px] text-stone-500">
+        <p className="mt-0.5 text-sm text-muted">
           See how a notification kind routes under your current mode — no queue side effects
           beyond the probe item itself.
         </p>
@@ -206,23 +214,23 @@ export default function NotificationsPanel({
             Probe routing
           </button>
         </div>
-        {probeResult && <p className="mt-2 text-[13px] text-stone-700">{probeResult}</p>}
+        {probeResult && <p className="mt-2 text-sm text-ink">{probeResult}</p>}
       </div>
 
-      <div className="overflow-hidden rounded-lg border border-stone-200 bg-white">
-        <div className="border-b border-stone-200 px-4 py-2.5">
-          <h2 className="text-[13px] font-semibold text-stone-900">
-            Queued for digest <span className="font-normal text-stone-500">({queued.length})</span>
+      <div className="overflow-hidden rounded-lg bg-paper shadow-hairline">
+        <div className="border-b border-line px-4 py-2.5">
+          <h2 className="text-sm font-semibold text-ink">
+            Queued for digest <span className="font-normal text-muted">({queued.length})</span>
           </h2>
         </div>
         {queued.length === 0 ? (
-          <p className="px-4 py-6 text-center text-[13px] text-stone-500">
+          <p className="px-4 py-6 text-center text-sm text-muted">
             Nothing waiting. Routine notifications will appear here while WFH mode batches them.
           </p>
         ) : (
-          <table className="w-full text-[13px]">
+          <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-stone-200 bg-stone-50 text-left text-[12px] text-stone-500">
+              <tr className="border-b border-line text-xs font-semibold text-muted">
                 <th className="px-4 py-2 font-medium">Title</th>
                 <th className="px-4 py-2 font-medium">Kind</th>
                 <th className="px-4 py-2 font-medium">Digest window</th>
@@ -231,15 +239,15 @@ export default function NotificationsPanel({
             </thead>
             <tbody>
               {queued.map((q) => (
-                <tr key={q.id} className="border-b border-stone-100 hover:bg-[var(--brand-50)]/40">
-                  <td className="px-4 py-2 text-stone-900">{q.title}</td>
+                <tr key={q.id} className="border-b border-line hover:bg-hover-paper">
+                  <td className="px-4 py-2 text-ink">{q.title}</td>
                   <td className="px-4 py-2">
-                    <span className="inline-flex rounded-full border border-stone-200 bg-stone-100 px-1.5 py-0.5 text-[11px] font-medium text-stone-600">
+                    <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-paper px-2 py-0.5 text-xs font-semibold text-muted shadow-control">
                       {q.kind}
                     </span>
                   </td>
-                  <td className="px-4 py-2 text-stone-600">{q.windowLabel}</td>
-                  <td className="px-4 py-2 text-stone-500">{new Date(q.queuedAt).toLocaleString()}</td>
+                  <td className="px-4 py-2 text-muted">{q.windowLabel}</td>
+                  <td className="px-4 py-2 text-muted">{new Date(q.queuedAt).toLocaleString()}</td>
                 </tr>
               ))}
             </tbody>

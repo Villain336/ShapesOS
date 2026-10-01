@@ -19,8 +19,8 @@ import {
 const UniverEmbed = dynamic(() => import("@/components/office/UniverEmbed"), {
   ssr: false,
   loading: () => (
-    <div className="flex h-[560px] items-center justify-center rounded-lg border border-stone-200 bg-white">
-      <Loader2 className="h-6 w-6 animate-spin text-stone-400" />
+    <div className="flex h-[560px] items-center justify-center rounded-lg bg-paper shadow-hairline">
+      <Loader2 className="h-6 w-6 animate-spin text-subtle" />
     </div>
   ),
 });
@@ -40,23 +40,20 @@ interface FullDoc extends DocSummary {
   snapshot: unknown;
 }
 
-const KIND_META: Record<string, { label: string; icon: typeof FileSpreadsheet; badge: string }> = {
-  sheet: {
-    label: "Sheet",
-    icon: FileSpreadsheet,
-    badge: "bg-emerald-50 text-emerald-700 border-emerald-200",
-  },
-  doc: {
-    label: "Doc",
-    icon: FileText,
-    badge: "bg-sky-50 text-sky-700 border-sky-200",
-  },
-  slide: {
-    label: "Deck",
-    icon: Presentation,
-    badge: "bg-amber-50 text-amber-700 border-amber-200",
-  },
+// Document kinds are categories, not agent states — neutrals only.
+const KIND_META: Record<string, { label: string; icon: typeof FileSpreadsheet }> = {
+  sheet: { label: "Sheet", icon: FileSpreadsheet },
+  doc: { label: "Doc", icon: FileText },
+  slide: { label: "Deck", icon: Presentation },
 };
+
+const kindBadge =
+  "inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-paper px-2 py-0.5 text-xs font-semibold text-muted shadow-control";
+
+const btnPrimary =
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-night-hover disabled:opacity-50";
+const btnSecondary =
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-paper px-4 text-sm font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper";
 
 function fmtDate(iso: string): string {
   try {
@@ -179,7 +176,7 @@ export function OfficeClient({ initialDocs, openId }: { initialDocs: DocSummary[
           <button
             type="button"
             onClick={() => setOpenDoc(null)}
-            className="inline-flex items-center gap-1.5 text-[13px] font-medium text-stone-600 hover:text-stone-900"
+            className="inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-sm font-medium text-muted hover:bg-hover-paper hover:text-ink"
           >
             <ArrowLeft className="h-4 w-4" /> All docs
           </button>
@@ -187,7 +184,7 @@ export function OfficeClient({ initialDocs, openId }: { initialDocs: DocSummary[
             {openDoc.kind === "sheet" ? (
               <a
                 href={`/api/office/docs/${openDoc.id}/export?format=csv`}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-[13px] font-medium text-stone-700 hover:bg-stone-50"
+                className={btnSecondary}
               >
                 <Download className="h-4 w-4" />
                 Export CSV
@@ -195,18 +192,18 @@ export function OfficeClient({ initialDocs, openId }: { initialDocs: DocSummary[
             ) : openDoc.kind === "doc" ? (
               <a
                 href={`/api/office/docs/${openDoc.id}/export?format=pdf`}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-[13px] font-medium text-stone-700 hover:bg-stone-50"
+                className={btnSecondary}
               >
                 <Download className="h-4 w-4" />
                 Export PDF
               </a>
             ) : null}
-            <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${meta.badge}`}>
+            <span className={kindBadge}>
               <meta.icon className="h-3 w-3" /> {meta.label} · v{openDoc.version}
             </span>
           </div>
         </div>
-        <h2 className="text-lg font-bold tracking-tight text-stone-900">{openDoc.title}</h2>
+        <h2 className="aos-subheading">{openDoc.title}</h2>
         {editable ? (
           <UniverEmbed
             key={openDoc.id}
@@ -224,7 +221,7 @@ export function OfficeClient({ initialDocs, openId }: { initialDocs: DocSummary[
           />
         )}
         {notice && (
-          <p className={`text-[13px] ${notice.kind === "ok" ? "text-emerald-700" : "text-red-700"}`}>
+          <p className={`text-sm ${notice.kind === "ok" ? "text-muted" : "text-failed-text"}`}>
             {notice.text}
           </p>
         )}
@@ -235,7 +232,7 @@ export function OfficeClient({ initialDocs, openId }: { initialDocs: DocSummary[
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-center justify-between">
-        <p className="text-[13px] text-stone-500">
+        <p className="text-sm text-muted">
           {docs.length} doc{docs.length === 1 ? "" : "s"} — snapshots stored by Marketr, never in a third-party cloud.
         </p>
         <div className="flex items-center gap-2">
@@ -245,7 +242,7 @@ export function OfficeClient({ initialDocs, openId }: { initialDocs: DocSummary[
               type="button"
               onClick={() => createDoc(kind)}
               disabled={creating !== null}
-              className="inline-flex items-center gap-1.5 rounded-md bg-[var(--brand-600)] px-3 py-1.5 text-[13px] font-medium text-white hover:bg-[var(--brand-700)] disabled:opacity-50"
+              className={btnPrimary}
             >
               {creating === kind ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -259,15 +256,15 @@ export function OfficeClient({ initialDocs, openId }: { initialDocs: DocSummary[
       </div>
 
       {notice && (
-        <p className={`text-[13px] ${notice.kind === "ok" ? "text-emerald-700" : "text-red-700"}`}>
+        <p className={`text-sm ${notice.kind === "ok" ? "text-muted" : "text-failed-text"}`}>
           {notice.text}
         </p>
       )}
 
-      <div className="overflow-hidden rounded-lg border border-stone-200 bg-white">
-        <table className="w-full text-left text-[13px]">
+      <div className="overflow-hidden rounded-lg bg-paper shadow-hairline">
+        <table className="w-full text-left text-sm">
           <thead>
-            <tr className="border-b border-stone-200 bg-stone-50 text-stone-500">
+            <tr className="border-b border-line text-xs font-semibold text-muted">
               <th className="px-3 py-2 font-medium">Title</th>
               <th className="px-3 py-2 font-medium">Kind</th>
               <th className="px-3 py-2 font-medium">Source</th>
@@ -278,7 +275,7 @@ export function OfficeClient({ initialDocs, openId }: { initialDocs: DocSummary[
           <tbody>
             {docs.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-3 py-8 text-center text-stone-400">
+                <td colSpan={5} className="px-3 py-8 text-center text-sm text-subtle">
                   No docs yet — create a sheet or doc to get started.
                 </td>
               </tr>
@@ -286,30 +283,30 @@ export function OfficeClient({ initialDocs, openId }: { initialDocs: DocSummary[
             {docs.map((d) => {
               const meta = KIND_META[d.kind] ?? KIND_META.sheet;
               return (
-                <tr key={d.id} className="border-b border-stone-100 last:border-0 hover:bg-[var(--brand-50)]/40">
+                <tr key={d.id} className="border-b border-line last:border-0 hover:bg-hover-paper">
                   <td className="px-3 py-2">
                     <button
                       type="button"
                       onClick={() => open(d.id)}
                       disabled={loading}
-                      className="font-medium text-stone-900 hover:text-[var(--brand-700)] hover:underline"
+                      className="font-medium text-ink hover:underline"
                     >
                       {d.title}
                     </button>
-                    <span className="ml-2 text-xs text-stone-400">v{d.version}</span>
+                    <span className="ml-2 text-xs text-subtle">v{d.version}</span>
                   </td>
                   <td className="px-3 py-2">
-                    <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${meta.badge}`}>
+                    <span className={kindBadge}>
                       <meta.icon className="h-3 w-3" /> {meta.label}
                     </span>
                   </td>
-                  <td className="px-3 py-2 text-stone-500">{d.sourceRef ?? "—"}</td>
-                  <td className="px-3 py-2 text-stone-500">{fmtDate(d.updatedAt)}</td>
+                  <td className="px-3 py-2 text-muted">{d.sourceRef ?? "—"}</td>
+                  <td className="px-3 py-2 text-muted">{fmtDate(d.updatedAt)}</td>
                   <td className="px-3 py-2 text-right">
                     <button
                       type="button"
                       onClick={() => remove(d.id, d.title)}
-                      className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-stone-500 hover:bg-red-50 hover:text-red-700"
+                      className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold text-failed-text hover:bg-failed-tint"
                     >
                       <Trash2 className="h-3.5 w-3.5" /> Delete
                     </button>

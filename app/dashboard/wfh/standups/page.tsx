@@ -39,9 +39,9 @@ export default async function WfhStandupsPage() {
   });
 
   return (
-    <div className="bg-[#FAFAF7] p-4 md:p-6">
-      <h1 className="text-xl font-bold tracking-tight text-stone-900">WFH mode</h1>
-      <p className="mt-1 text-[13px] text-stone-500">
+    <div className="bg-canvas p-4 md:p-6">
+      <h1 className="aos-heading">WFH mode</h1>
+      <p className="mt-1 text-sm text-muted">
         Async standups: yesterday, today, blockers — written, visible to the team,
         with a comment and reaction thread. No meeting required.
       </p>

@@ -1,5 +1,5 @@
 // Marketr — Wave 2 WFH mode: section tabs (server component).
-// House pattern: Lucide icon + label, active = brand border + brand text.
+// Agentic OS: Lucide icon + label, active = ink underline + ink text.
 
 import Link from "next/link";
 import { Home, Bell, Timer, MessagesSquare, PartyPopper, Receipt, Sun } from "lucide-react";
@@ -16,7 +16,7 @@ const TABS = [
 
 export default function WfhTabs({ active }: { active: string }) {
   return (
-    <nav className="flex gap-1 border-b border-stone-200" aria-label="WFH mode sections">
+    <nav className="flex gap-1 border-b border-line" aria-label="WFH mode sections">
       {TABS.map((t) => {
         const Icon = t.icon;
         const isActive = t.slug === active;
@@ -24,10 +24,10 @@ export default function WfhTabs({ active }: { active: string }) {
           <Link
             key={t.slug}
             href={t.href}
-            className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-[13px] font-medium ${
+            className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-sm font-medium ${
               isActive
-                ? "border-[var(--brand-600)] text-[var(--brand-700)]"
-                : "border-transparent text-stone-500 hover:text-stone-800"
+                ? "border-ink text-ink"
+                : "border-transparent text-muted hover:text-ink"
             }`}
           >
             <Icon className="h-3.5 w-3.5" />

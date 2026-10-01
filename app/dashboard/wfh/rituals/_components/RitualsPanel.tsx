@@ -30,14 +30,17 @@ interface Ritual {
 }
 
 const inputCls =
-  "rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-[13px] text-stone-900 placeholder:text-stone-400 focus:border-[var(--brand-600)] focus:outline-none";
+  "h-control-sm rounded-md border-[1.5px] border-control bg-paper px-3 text-sm text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none";
 const btnPrimary =
-  "flex items-center gap-1.5 rounded-md bg-[var(--brand-600)] px-3 py-1.5 text-[13px] font-medium text-white hover:bg-[var(--brand-700)] disabled:opacity-40";
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-night-hover disabled:opacity-40";
 const btnGhost =
-  "flex items-center gap-1.5 rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-[13px] text-stone-700 hover:bg-stone-50 disabled:opacity-40";
-const labelCls = "block text-[12px] font-medium text-stone-600";
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-paper px-4 text-sm font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper disabled:opacity-40";
+const btnDeny =
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-paper px-4 text-sm font-semibold text-failed-text aos-press shadow-[inset_0_0_0_1.5px_var(--aos-failed)] disabled:opacity-40";
+const labelCls = "block text-xs font-semibold text-muted";
+// Ritual states are workflow states, not agent states — neutrals only.
 const chip =
-  "inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-1.5 py-0.5 text-[10px] font-medium leading-tight";
+  "inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-paper px-2 py-0.5 text-xs font-semibold text-muted shadow-control";
 
 const PRESETS = [
   { type: "wins", label: "Wins" },
@@ -160,7 +163,7 @@ export default function RitualsPanel() {
 
   if (!loaded) {
     return (
-      <div className="flex items-center gap-2 text-[13px] text-stone-500">
+      <div className="flex items-center gap-2 text-sm text-muted">
         <Loader2 className="h-4 w-4 animate-spin" /> Loading rituals…
       </div>
     );
@@ -169,14 +172,18 @@ export default function RitualsPanel() {
   return (
     <div className="space-y-4">
       {error && (
-        <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-700">
-          {error}
+        <div
+          className="flex items-start gap-2 rounded-md border border-failed bg-failed-tint px-3 py-2 text-sm text-failed-text"
+          role="alert"
+        >
+          <span className="mt-1 h-3 w-3 shrink-0 bg-failed" aria-hidden="true" />
+          <span>{error}</span>
         </div>
       )}
 
       {/* Create */}
-      <div className="rounded-lg border border-stone-200 bg-white px-4 py-4">
-        <h2 className="flex items-center gap-2 text-[15px] font-semibold text-stone-900">
+      <div className="rounded-lg bg-paper px-4 py-4 shadow-hairline">
+        <h2 className="aos-subheading flex items-center gap-2">
           <Plus className="h-4 w-4" /> Start a ritual
         </h2>
         <div className="mt-3 flex flex-wrap gap-2">
@@ -205,40 +212,40 @@ export default function RitualsPanel() {
 
       {/* Rituals */}
       {rituals.length === 0 ? (
-        <p className="rounded-lg border border-stone-200 bg-white px-4 py-6 text-center text-[13px] text-stone-500">
+        <p className="rounded-lg bg-paper px-4 py-6 text-center text-sm text-muted shadow-hairline">
           No rituals yet. Start one above — wins and kudos are the cheapest culture wins there are.
         </p>
       ) : (
         <div className="grid gap-3 md:grid-cols-2">
           {rituals.map((r) => (
-            <div key={r.id} className={`rounded-lg border border-stone-200 bg-white px-4 py-4 ${r.active ? "" : "opacity-60"}`}>
+            <div key={r.id} className={`rounded-lg bg-paper px-4 py-4 shadow-hairline ${r.active ? "" : "opacity-60"}`}>
               <div className="flex items-start justify-between gap-2">
                 <div>
-                  <h3 className="text-[15px] font-semibold text-stone-900">{r.title}</h3>
-                  <p className="mt-0.5 text-[13px] text-stone-500">{r.description}</p>
+                  <h3 className="text-sm font-semibold text-ink">{r.title}</h3>
+                  <p className="mt-0.5 text-sm text-muted">{r.description}</p>
                 </div>
-                <span className={`${chip} ${r.active ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-stone-200 bg-stone-100 text-stone-500"}`}>
+                <span className={chip}>
                   {r.active ? r.cadence : "retired"}
                 </span>
               </div>
 
               {r.health.dead && r.active && (
-                <div className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-800">
-                  <p className="flex items-center gap-1.5 font-medium">
+                <div className="mt-2 rounded-md bg-canvas px-3 py-2 text-xs text-muted">
+                  <p className="flex items-center gap-1.5 font-semibold text-ink">
                     <AlertTriangle className="h-3.5 w-3.5" /> This ritual looks dead: {r.health.reason}
                   </p>
                   {r.health.suggestion && <p className="mt-0.5">{r.health.suggestion}</p>}
                 </div>
               )}
 
-              <div className="mt-2 flex items-center gap-3 text-[12px] text-stone-500">
+              <div className="mt-2 flex items-center gap-3 text-xs text-muted">
                 <span>{r.subscriberCount} subscribed</span>
                 <span>{r.participations.length} recent participations</span>
                 {r.active && <span>Next: {fmtDate(r.nextOccurrence)}</span>}
               </div>
 
               {r.meta?.prompt && (
-                <p className="mt-2 text-[13px] italic text-stone-600">“{r.meta.prompt}”</p>
+                <p className="mt-2 text-sm italic text-muted">“{r.meta.prompt}”</p>
               )}
 
               {r.active && (
@@ -258,7 +265,7 @@ export default function RitualsPanel() {
                     </button>
                   </div>
                   {r.health.dead && (
-                    <button type="button" onClick={() => retire(r)} disabled={busy} className={`${btnGhost} mt-2 text-red-700`}>
+                    <button type="button" onClick={() => retire(r)} disabled={busy} className={`${btnDeny} mt-2`}>
                       Retire this ritual
                     </button>
                   )}

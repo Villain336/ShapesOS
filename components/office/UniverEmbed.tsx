@@ -180,9 +180,9 @@ export default function UniverEmbed({ kind, snapshot, onSave, height = 560 }: Un
   };
 
   return (
-    <div className="overflow-hidden rounded-lg border border-stone-200 bg-white">
-      <div className="flex items-center justify-between border-b border-stone-200 bg-stone-50 px-3 py-2">
-        <span className="text-[13px] font-medium text-stone-600">
+    <div className="overflow-hidden rounded-lg bg-paper shadow-hairline">
+      <div className="flex items-center justify-between border-b border-line bg-canvas px-3 py-2">
+        <span className="text-sm font-medium text-muted">
           {kind === "sheet" ? "Spreadsheet" : kind === "doc" ? "Document" : "Slides"} — edits stay local until you save
         </span>
         {onSave && (
@@ -190,7 +190,7 @@ export default function UniverEmbed({ kind, snapshot, onSave, height = 560 }: Un
             type="button"
             onClick={handleSave}
             disabled={phase !== "ready" || saving}
-            className="inline-flex items-center gap-1.5 rounded-md bg-[var(--brand-600)] px-3 py-1.5 text-[13px] font-medium text-white hover:bg-[var(--brand-700)] disabled:opacity-50"
+            className="inline-flex h-control-sm items-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-night-hover disabled:opacity-50"
           >
             {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
             {saving ? "Saving…" : "Save to Marketr"}
@@ -200,13 +200,13 @@ export default function UniverEmbed({ kind, snapshot, onSave, height = 560 }: Un
       <div className="relative" style={{ height }}>
         <div ref={containerRef} className="h-full w-full" />
         {phase === "loading" && (
-          <div className="absolute inset-0 flex items-center justify-center bg-white/80">
-            <Loader2 className="h-6 w-6 animate-spin text-stone-400" />
+          <div className="absolute inset-0 flex items-center justify-center bg-paper/80">
+            <Loader2 className="h-6 w-6 animate-spin text-subtle" />
           </div>
         )}
         {phase === "error" && (
-          <div className="absolute inset-0 flex items-center justify-center bg-white">
-            <p className="text-[13px] text-stone-500">
+          <div className="absolute inset-0 flex items-center justify-center bg-paper">
+            <p className="text-sm text-muted">
               The editor failed to load. Check your connection and reload.
             </p>
           </div>

@@ -4,7 +4,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2, Send, ThumbsUp } from "lucide-react";
+import { Bell, Loader2, Send, ThumbsUp } from "lucide-react";
 
 interface StandupComment {
   id: string;
@@ -27,14 +27,18 @@ interface StandupEntry {
 }
 
 const inputCls =
-  "rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-[13px] text-stone-900 placeholder:text-stone-400 focus:border-[var(--brand-600)] focus:outline-none";
+  "h-control-sm rounded-md border-[1.5px] border-control bg-paper px-3 text-sm text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none";
 const btnPrimary =
-  "flex items-center gap-1.5 rounded-md bg-[var(--brand-600)] px-3 py-1.5 text-[13px] font-medium text-white hover:bg-[var(--brand-700)] disabled:opacity-40";
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-night-hover disabled:opacity-40";
 const btnGhost =
-  "flex items-center gap-1.5 rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-[13px] text-stone-700 hover:bg-stone-50 disabled:opacity-40";
-const labelCls = "block text-[12px] font-medium text-stone-600";
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-paper px-4 text-sm font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper disabled:opacity-40";
+const labelCls = "block text-xs font-semibold text-muted";
+// Textareas share the input treatment but size by rows, not the 36px control height.
+const textareaCls =
+  "min-h-[88px] rounded-md border-[1.5px] border-control bg-paper px-3 py-2 text-sm text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none";
+// Standup submission states are workflow states, not agent states — neutrals.
 const chip =
-  "inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-1.5 py-0.5 text-[10px] font-medium leading-tight";
+  "inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-paper px-2 py-0.5 text-xs font-semibold text-muted shadow-control";
 
 const QUICK_REACTIONS = ["🎉", "👍", "🚀", "🙏"];
 
@@ -160,35 +164,40 @@ export default function StandupsPanel({
   return (
     <div className="space-y-4">
       {nudge && (
-        <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2.5 text-[13px] text-amber-800">
-          {nudge}
+        <div className="flex items-start gap-2 rounded-lg bg-paper px-3 py-2.5 shadow-hairline">
+          <Bell className="mt-0.5 h-4 w-4 shrink-0 text-ink" aria-hidden="true" />
+          <p className="text-sm text-muted">{nudge}</p>
         </div>
       )}
       {error && (
-        <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-700">
-          {error}
+        <div
+          className="flex items-start gap-2 rounded-md border border-failed bg-failed-tint px-3 py-2 text-sm text-failed-text"
+          role="alert"
+        >
+          <span className="mt-1 h-3 w-3 shrink-0 bg-failed" aria-hidden="true" />
+          <span>{error}</span>
         </div>
       )}
 
       {/* Compose */}
-      <div className="rounded-lg border border-stone-200 bg-white px-4 py-4">
-        <h2 className="text-[15px] font-semibold text-stone-900">Today&apos;s standup</h2>
+      <div className="rounded-lg bg-paper px-4 py-4 shadow-hairline">
+        <h2 className="aos-subheading">Today&apos;s standup</h2>
         <div className="mt-3 space-y-3">
           <div>
             <label className={labelCls}>Yesterday</label>
-            <textarea className={`${inputCls} mt-1 w-full`} rows={2} value={yesterday} onChange={(e) => setYesterday(e.target.value)} placeholder="What did you finish?" />
+            <textarea className={`${textareaCls} mt-1 w-full`} rows={2} value={yesterday} onChange={(e) => setYesterday(e.target.value)} placeholder="What did you finish?" />
           </div>
           <div>
             <label className={labelCls}>Today</label>
-            <textarea className={`${inputCls} mt-1 w-full`} rows={2} value={today} onChange={(e) => setToday(e.target.value)} placeholder="What are you working on?" />
+            <textarea className={`${textareaCls} mt-1 w-full`} rows={2} value={today} onChange={(e) => setToday(e.target.value)} placeholder="What are you working on?" />
           </div>
           <div>
-            <label className={labelCls}>Blockers <span className="font-normal text-stone-400">(optional)</span></label>
-            <textarea className={`${inputCls} mt-1 w-full`} rows={2} value={blockers} onChange={(e) => setBlockers(e.target.value)} placeholder="Anything in your way?" />
+            <label className={labelCls}>Blockers <span className="font-normal text-subtle">(optional)</span></label>
+            <textarea className={`${textareaCls} mt-1 w-full`} rows={2} value={blockers} onChange={(e) => setBlockers(e.target.value)} placeholder="Anything in your way?" />
           </div>
           <div className="grid gap-3 md:grid-cols-2">
             <div>
-              <label className={labelCls}>Video URL <span className="font-normal text-stone-400">(optional)</span></label>
+              <label className={labelCls}>Video URL <span className="font-normal text-subtle">(optional)</span></label>
               <input className={`${inputCls} mt-1 w-full`} value={videoUrl} onChange={(e) => setVideoUrl(e.target.value)} placeholder="https://…" />
             </div>
             <div>
@@ -206,33 +215,33 @@ export default function StandupsPanel({
       </div>
 
       {/* Feed */}
-      <div className="rounded-lg border border-stone-200 bg-white px-4 py-4">
-        <h2 className="text-[15px] font-semibold text-stone-900">
-          Team feed <span className="font-normal text-stone-500">({standups.length})</span>
+      <div className="rounded-lg bg-paper px-4 py-4 shadow-hairline">
+        <h2 className="aos-subheading">
+          Team feed <span className="font-normal text-muted">({standups.length})</span>
         </h2>
         {standups.length === 0 ? (
-          <p className="py-6 text-center text-[13px] text-stone-500">
+          <p className="py-6 text-center text-sm text-muted">
             No standups yet. Post the first one above.
           </p>
         ) : (
           <div className="mt-3 space-y-3">
             {standups.map((s) => (
-              <div key={s.id} className="rounded-md border border-stone-200 px-3 py-3">
+              <div key={s.id} className="rounded-md border border-line px-3 py-3">
                 <div className="flex items-center justify-between">
-                  <p className="text-[13px] font-medium text-stone-900">
+                  <p className="text-sm font-medium text-ink">
                     {fmtDate(s.date)}
-                    {s.userId === me && <span className="ml-2 text-[11px] font-normal text-stone-400">you</span>}
+                    {s.userId === me && <span className="ml-2 text-xs font-normal text-muted">you</span>}
                   </p>
-                  <span className={`${chip} ${s.visibility === "team" ? "border-[var(--brand-600)]/20 bg-[var(--brand-50)] text-[var(--brand-700)]" : "border-stone-200 bg-stone-100 text-stone-500"}`}>
+                  <span className={chip}>
                     {s.visibility}
                   </span>
                 </div>
-                <dl className="mt-2 space-y-1.5 text-[13px]">
-                  <div><dt className="text-[11px] font-medium uppercase tracking-wide text-stone-400">Yesterday</dt><dd className="text-stone-700">{s.yesterday}</dd></div>
-                  <div><dt className="text-[11px] font-medium uppercase tracking-wide text-stone-400">Today</dt><dd className="text-stone-700">{s.today}</dd></div>
-                  {s.blockers && <div><dt className="text-[11px] font-medium uppercase tracking-wide text-stone-400">Blockers</dt><dd className="text-stone-700">{s.blockers}</dd></div>}
+                <dl className="mt-2 space-y-1.5 text-sm">
+                  <div><dt className="text-xs font-semibold text-muted">Yesterday</dt><dd className="text-ink">{s.yesterday}</dd></div>
+                  <div><dt className="text-xs font-semibold text-muted">Today</dt><dd className="text-ink">{s.today}</dd></div>
+                  {s.blockers && <div><dt className="text-xs font-semibold text-muted">Blockers</dt><dd className="text-ink">{s.blockers}</dd></div>}
                   {s.videoUrl && (
-                    <div><dt className="text-[11px] font-medium uppercase tracking-wide text-stone-400">Video</dt><dd><a href={s.videoUrl} target="_blank" rel="noreferrer" className="text-[var(--brand-600)] hover:underline">Watch update</a></dd></div>
+                    <div><dt className="text-xs font-semibold text-muted">Video</dt><dd><a href={s.videoUrl} target="_blank" rel="noreferrer" className="text-ink underline">Watch update</a></dd></div>
                   )}
                 </dl>
 
@@ -245,22 +254,22 @@ export default function StandupsPanel({
                         key={e}
                         type="button"
                         onClick={() => react(s.id, e)}
-                        className="flex items-center gap-1 rounded-full border border-stone-200 px-2 py-0.5 text-[13px] hover:bg-stone-50"
+                        className="inline-flex h-chip items-center gap-1 rounded-full bg-paper px-3 text-sm text-ink shadow-control aos-press hover:text-ink"
                         title={`React ${e}`}
                       >
-                        {e}{count > 0 && <span className="text-[11px] text-stone-500">{count}</span>}
+                        {e}{count > 0 && <span className="text-xs text-muted">{count}</span>}
                       </button>
                     );
                   })}
-                  <ThumbsUp className="h-3.5 w-3.5 text-stone-300" />
+                  <ThumbsUp className="h-3.5 w-3.5 text-subtle" />
                 </div>
 
                 {/* Comments */}
                 {s.comments.length > 0 && (
-                  <div className="mt-2 space-y-1 border-t border-stone-100 pt-2">
+                  <div className="mt-2 space-y-1 border-t border-line pt-2">
                     {s.comments.map((c) => (
-                      <p key={c.id} className="text-[13px] text-stone-600">
-                        <span className="font-medium text-stone-800">{c.userId === me ? "You" : "Teammate"}: </span>
+                      <p key={c.id} className="text-sm text-muted">
+                        <span className="font-medium text-ink">{c.userId === me ? "You" : "Teammate"}: </span>
                         {c.body}
                       </p>
                     ))}

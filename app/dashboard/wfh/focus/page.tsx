@@ -38,9 +38,9 @@ export default async function WfhFocusPage() {
   ]);
 
   return (
-    <div className="bg-[#FAFAF7] p-4 md:p-6">
-      <h1 className="text-xl font-bold tracking-tight text-stone-900">WFH mode</h1>
-      <p className="mt-1 text-[13px] text-stone-500">
+    <div className="bg-canvas p-4 md:p-6">
+      <h1 className="aos-heading">WFH mode</h1>
+      <p className="mt-1 text-sm text-muted">
         Sacred focus time: create protected deep-work blocks. Soft protection suggests new
         times for conflicts; hard protection auto-declines — with your one-time consent.
       </p>

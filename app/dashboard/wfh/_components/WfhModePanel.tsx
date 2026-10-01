@@ -36,12 +36,18 @@ const DAYS = [
 ];
 
 const inputCls =
-  "rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-[13px] text-stone-900 placeholder:text-stone-400 focus:border-[var(--brand-600)] focus:outline-none";
+  "h-control-sm rounded-md border-[1.5px] border-control bg-paper px-3 text-sm text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none";
 const btnPrimary =
-  "flex items-center gap-1.5 rounded-md bg-[var(--brand-600)] px-3 py-1.5 text-[13px] font-medium text-white hover:bg-[var(--brand-700)] disabled:opacity-40";
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-night-hover disabled:opacity-40";
 const btnGhost =
-  "flex items-center gap-1.5 rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-[13px] text-stone-700 hover:bg-stone-50 disabled:opacity-40";
-const labelCls = "block text-[12px] font-medium text-stone-600";
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-paper px-4 text-sm font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper disabled:opacity-40";
+const labelCls = "block text-xs font-semibold text-muted";
+// All workflow states render neutral: mode, day-selection and history states
+// are workflow states, not agent states, so they never take a status color.
+const chip =
+  "h-chip inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-paper px-4 text-sm font-semibold text-muted shadow-control";
+const chipPressed =
+  "h-chip inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-ink px-4 text-sm font-semibold text-white shadow-control";
 
 function fmtMin(min: number) {
   const h = Math.floor(min / 60);
@@ -181,58 +187,73 @@ export default function WfhModePanel({
   return (
     <div className="space-y-4">
       {/* Mode indicator + toggle */}
-      <div className="flex items-center justify-between rounded-lg border border-stone-200 bg-white px-4 py-3 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
+      <div className="flex items-center justify-between gap-4 rounded-lg bg-paper px-4 py-3 shadow-hairline">
         <div className="flex items-center gap-3">
-          <span
-            className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[12px] font-semibold ${
-              active
-                ? "border-[var(--brand-600)]/20 bg-[var(--brand-50)] text-[var(--brand-700)]"
-                : "border-stone-200 bg-stone-100 text-stone-600"
-            }`}
-            aria-live="polite"
-          >
-            {active ? <Home className="h-3.5 w-3.5" /> : <Building2 className="h-3.5 w-3.5" />}
+          <span className={chip} aria-live="polite">
+            {active ? <Home className="h-3.5 w-3.5 text-ink" /> : <Building2 className="h-3.5 w-3.5 text-muted" />}
             {mode?.indicator.label ?? "Office mode"}
           </span>
-          <p className="text-[13px] text-stone-500">
+          <p className="text-sm text-muted">
             {active
               ? "Async-first notifications, protected focus time, and rituals are on."
               : "Office defaults are on. Flip the switch to reconfigure the OS for remote work."}
           </p>
         </div>
-        <button type="button" onClick={doToggle} disabled={busy} className={btnPrimary}>
-          {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-          {active ? "Switch to office" : "Turn on WFH mode"}
-        </button>
+        <span className="flex shrink-0 items-center gap-2.5">
+          <label htmlFor="wfh-mode-switch" className="text-sm font-semibold text-ink">
+            WFH mode
+          </label>
+          <button
+            type="button"
+            role="switch"
+            id="wfh-mode-switch"
+            aria-checked={active}
+            onClick={doToggle}
+            disabled={busy}
+            className={`relative inline-flex h-[26px] w-11 shrink-0 items-center rounded-full px-[3px] transition-colors ${
+              active ? "bg-ink" : "bg-disabled-fg"
+            } disabled:opacity-40`}
+          >
+            <span
+              className={`block h-5 w-5 rounded-full bg-paper transition-transform ${
+                active ? "translate-x-[18px]" : "translate-x-0"
+              }`}
+            />
+          </button>
+        </span>
       </div>
 
       {error && (
-        <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-700">
-          {error}
+        <div
+          className="flex items-start gap-2 rounded-md border border-failed bg-failed-tint px-3 py-2 text-sm text-failed-text"
+          role="alert"
+        >
+          <span className="mt-1 h-3 w-3 shrink-0 bg-failed" aria-hidden="true" />
+          <span>{error}</span>
         </div>
       )}
 
       {/* Current preferences summary */}
       {mode && mode.setupCompletedAt && (
-        <div className="rounded-lg border border-stone-200 bg-stone-50 px-4 py-3">
-          <p className="text-[12px] font-medium text-stone-600">Your WFH setup</p>
-          <div className="mt-1 flex flex-wrap gap-x-5 gap-y-1 text-[13px] text-stone-700">
+        <div className="rounded-lg bg-paper px-4 py-3 shadow-hairline">
+          <p className="text-xs font-semibold text-muted">Your WFH setup</p>
+          <div className="mt-1 flex flex-wrap gap-x-5 gap-y-1 text-sm text-ink">
             <span>
-              <span className="text-stone-500">Days:</span>{" "}
+              <span className="text-muted">Days:</span>{" "}
               {mode.mode === "hybrid" ? mode.wfhDays.join(", ") || "—" : "every day"}
             </span>
             <span>
-              <span className="text-stone-500">Focus hours:</span> {fmtMin(mode.focusStartMin)}–
+              <span className="text-muted">Focus hours:</span> {fmtMin(mode.focusStartMin)}–
               {fmtMin(mode.focusEndMin)}
             </span>
             <span>
-              <span className="text-stone-500">Focus blocks:</span> {mode.focusBlockMinutes} min
+              <span className="text-muted">Focus blocks:</span> {mode.focusBlockMinutes} min
             </span>
             <span>
-              <span className="text-stone-500">Standups:</span> {mode.standupCadence}
+              <span className="text-muted">Standups:</span> {mode.standupCadence}
             </span>
             <span>
-              <span className="text-stone-500">Notifications:</span>{" "}
+              <span className="text-muted">Notifications:</span>{" "}
               {mode.notificationProfile === "batched" ? "batched digest" : "realtime"}
             </span>
           </div>
@@ -249,9 +270,9 @@ export default function WfhModePanel({
 
       {/* Setup interstitial */}
       {showSetup && (
-        <div className="rounded-lg border border-stone-200 bg-white px-4 py-4 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
-          <h2 className="text-[15px] font-semibold text-stone-900">60-second WFH setup</h2>
-          <p className="mt-0.5 text-[13px] text-stone-500">
+        <div className="rounded-lg bg-paper px-4 py-4 shadow-hairline">
+          <h2 className="aos-subheading">60-second WFH setup</h2>
+          <p className="mt-0.5 text-sm text-muted">
             Turning WFH mode on changes how the OS treats your time. Set your defaults once —
             everything below stays reversible in one tap.
           </p>
@@ -264,11 +285,8 @@ export default function WfhModePanel({
                     key={m}
                     type="button"
                     onClick={() => setSetupMode(m)}
-                    className={`rounded-md border px-3 py-1.5 text-[13px] font-medium ${
-                      setupMode === m
-                        ? "border-[var(--brand-600)] bg-[var(--brand-50)] text-[var(--brand-700)]"
-                        : "border-stone-200 bg-white text-stone-700 hover:bg-stone-50"
-                    }`}
+                    aria-pressed={setupMode === m}
+                    className={`${setupMode === m ? chipPressed : chip} aos-press`}
                   >
                     {m === "wfh" ? "Fully remote" : "Hybrid"}
                   </button>
@@ -284,11 +302,7 @@ export default function WfhModePanel({
                         type="button"
                         onClick={() => toggleDay(d.code)}
                         aria-pressed={days.includes(d.code)}
-                        className={`rounded-full border px-2.5 py-1 text-[12px] font-medium ${
-                          days.includes(d.code)
-                            ? "border-[var(--brand-600)] bg-[var(--brand-600)] text-white"
-                            : "border-stone-200 bg-white text-stone-600 hover:bg-stone-50"
-                        }`}
+                        className={`${days.includes(d.code) ? chipPressed : chip} aos-press`}
                       >
                         {d.label}
                       </button>
@@ -355,15 +369,15 @@ export default function WfhModePanel({
 
       {/* Mode history (dense table, preference-learning feed) */}
       {hist.length > 0 && (
-        <div className="overflow-hidden rounded-lg border border-stone-200 bg-white">
-          <div className="flex items-center gap-2 border-b border-stone-200 px-4 py-2.5">
-            <Clock className="h-4 w-4 text-stone-400" />
-            <h2 className="text-[13px] font-semibold text-stone-900">Mode history</h2>
-            <span className="text-[12px] text-stone-500">— the OS learns your preferences from this</span>
+        <div className="overflow-hidden rounded-lg bg-paper shadow-hairline">
+          <div className="flex items-center gap-2 border-b border-line px-4 py-2.5">
+            <Clock className="h-4 w-4 text-muted" />
+            <h2 className="text-sm font-semibold text-ink">Mode history</h2>
+            <span className="text-xs text-muted">— the OS learns your preferences from this</span>
           </div>
-          <table className="w-full text-[13px]">
+          <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-stone-200 bg-stone-50 text-left text-[12px] text-stone-500">
+              <tr className="border-b border-line text-xs font-semibold text-muted">
                 <th className="px-4 py-2 font-medium">When</th>
                 <th className="px-4 py-2 font-medium">From</th>
                 <th className="px-4 py-2 font-medium">To</th>
@@ -372,21 +386,17 @@ export default function WfhModePanel({
             </thead>
             <tbody>
               {hist.map((h) => (
-                <tr key={h.id} className="border-b border-stone-100 hover:bg-[var(--brand-50)]/40">
-                  <td className="px-4 py-2 text-stone-500">
+                <tr key={h.id} className="border-b border-line hover:bg-hover-paper">
+                  <td className="px-4 py-2 text-muted">
                     {new Date(h.createdAt).toLocaleString()}
                   </td>
                   <td className="px-4 py-2">
-                    <span className="inline-flex rounded-full border border-stone-200 bg-stone-100 px-1.5 py-0.5 text-[11px] font-medium text-stone-600">
-                      {h.previousMode}
-                    </span>
+                    <span className={chip}>{h.previousMode}</span>
                   </td>
                   <td className="px-4 py-2">
-                    <span className="inline-flex rounded-full border border-[var(--brand-600)]/20 bg-[var(--brand-50)] px-1.5 py-0.5 text-[11px] font-medium text-[var(--brand-700)]">
-                      {h.newMode}
-                    </span>
+                    <span className={chip}>{h.newMode}</span>
                   </td>
-                  <td className="px-4 py-2 text-stone-500">{h.reason.replace(/_/g, " ")}</td>
+                  <td className="px-4 py-2 text-muted">{h.reason.replace(/_/g, " ")}</td>
                 </tr>
               ))}
             </tbody>
