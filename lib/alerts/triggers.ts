@@ -249,6 +249,15 @@ export const TRIGGERS: TriggerDef[] = [
     dedupAvailable: true,
     live: true, // Legal slice 2: emitted by the legal deadline sweep cron.
   },
+  {
+    key: "legal_document_expiry",
+    label: "Legal document expiring",
+    description:
+      "A document in the legal vault is expiring or overdue (escalation tiers: date needed, 90, 30, 7 days out, overdue). Emitted by the legal document sweep.",
+    conditionKeys: ["severities"],
+    dedupAvailable: true,
+    live: true, // Legal slice 3: emitted by the legal document sweep cron.
+  },
 ];
 
 export function triggerDef(key: string): TriggerDef | undefined {

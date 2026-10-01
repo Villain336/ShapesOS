@@ -29,7 +29,9 @@ export default async function LegalPage() {
         <p className="mt-0.5 text-sm text-muted">
           Your obligation map — licenses, filings, tax registrations, insurance,
           and permits for your industry, business model, and jurisdictions.
-          Computed per business, never generic.
+          Computed per business, never generic. The vault keeps your formation
+          docs, contracts, licenses, and EIN letters versioned, with
+          expiry reminders.
         </p>
       </div>
       <LegalApp />

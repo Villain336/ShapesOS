@@ -16,6 +16,9 @@
 // invents dates.
 
 import type { PrismaClient } from "@prisma/client";
+import { writeFile, FsError } from "@/lib/filesystem/service";
+import { normalizeLogicalPath } from "@/lib/filesystem/paths";
+import { safeFilename } from "@/lib/security/upload-safety";
 import { computeObligations, validateSeedTemplates } from "./obligations";
 import { OBLIGATION_TEMPLATES } from "./seeds";
 import {
@@ -34,6 +37,18 @@ import {
   type DeadlineSource,
   type EscalationTier,
 } from "./deadlines";
+import {
+  carryForwardExpiry,
+  daysUntilDue as daysUntilExpiry,
+  isValidDocumentType,
+  isValidExpirySource,
+  planNewVersion,
+  tierForExpiry,
+  type ExpiryTier,
+  type LegalDocumentType,
+  type LegalExpirySource,
+  type PreviousVersion,
+} from "./documents";
 
 export class PrismaLegalStore {
   constructor(private prisma: PrismaClient) {}
@@ -457,6 +472,414 @@ export class PrismaLegalStore {
       data: { lastAlertedTier: tier, lastAlertedAt: now },
     });
   }
+
+  // ------------------------------------------------------------------
+  // Slice 3: document vault
+  // ------------------------------------------------------------------
+
+  /**
+   * Write one vault file through the EXISTING filesystem pipeline — the same
+   * writeFile the /api/files route uses, so upload safety, the 25 MB cap,
+   * and quota all apply unchanged. Files land under /files/legal/<docType>/.
+   */
+  private async writeVaultFile(opts: {
+    workspaceId: string;
+    userId: string;
+    docType: LegalDocumentType;
+    fileName: string;
+    fileBytes: Buffer;
+    mimeType?: string;
+  }) {
+    const logicalPath = `/files/legal/${opts.docType}/${safeFilename(opts.fileName || "file")}`;
+    const check = normalizeLogicalPath(logicalPath);
+    if (!check.ok) throw new LegalError("INVALID_PATH", check.reason);
+    if (!logicalPath.startsWith("/files/legal/")) {
+      throw new LegalError("INVALID_PATH", "Vault files must live under /files/legal/.");
+    }
+    return writeFile({
+      workspaceId: opts.workspaceId,
+      logicalPath,
+      kind: check.kind,
+      bytes: opts.fileBytes,
+      mimeType: opts.mimeType,
+      createdBy: opts.userId,
+    });
+  }
+
+  /**
+   * Create a document with its first version. The expiry is tenant-set or
+   * tenant-read only — never invented.
+   */
+  async createDocument(
+    workspaceId: string,
+    userId: string,
+    input: {
+      docType: LegalDocumentType;
+      title: string;
+      notes?: string | null;
+      expiryDate?: string | null;
+      expirySource?: LegalExpirySource | null;
+      issuer?: string | null;
+      fileName: string;
+      fileBytes: Buffer;
+      mimeType?: string;
+    },
+  ): Promise<ComputedDocumentDetail> {
+    if (!isValidDocumentType(input.docType)) {
+      throw new LegalError(
+        "INVALID_DOC_TYPE",
+        `docType must be one of: ${["formation", "contract", "license", "ein_letter", "policy", "other"].join(", ")}`,
+      );
+    }
+    const title = input.title.trim();
+    if (!title) {
+      throw new LegalError("INVALID_TITLE", "Title is required.");
+    }
+    assertNonEmptyFile(input.fileBytes);
+    // Guardrail: expiry is tenant-set or tenant-read only — never invented.
+    const expiry = carryForwardExpiry(
+      { expiryDate: input.expiryDate, expirySource: input.expirySource },
+      null,
+    );
+
+    const file = await this.writeVaultFile({
+      workspaceId,
+      userId,
+      docType: input.docType,
+      fileName: input.fileName,
+      fileBytes: input.fileBytes,
+      mimeType: input.mimeType,
+    });
+
+    const doc = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.legalDocument.create({
+        data: {
+          workspaceId,
+          docType: input.docType,
+          title,
+          notes: input.notes?.trim() || null,
+        },
+      });
+      const plan = planNewVersion(null);
+      const version = await tx.legalDocumentVersion.create({
+        data: {
+          documentId: created.id,
+          versionNumber: plan.versionNumber,
+          workspaceFileId: file.id,
+          uploadedBy: userId,
+          expiryDate: expiry.expiryDate ? new Date(expiry.expiryDate) : null,
+          expirySource: expiry.expirySource,
+          issuer: input.issuer?.trim() || null,
+          supersedesVersionId: plan.supersedesVersionId,
+        },
+      });
+      await tx.legalDocument.update({
+        where: { id: created.id },
+        data: { currentVersionId: version.id },
+      });
+      return created;
+    });
+    const detail = await this.getDocument(workspaceId, doc.id);
+    if (!detail) {
+      throw new LegalError("UNKNOWN_DOCUMENT", `No document: ${doc.id}`);
+    }
+    return detail;
+  }
+
+  /**
+   * Upload a new version of an existing document. History is preserved: the
+   * new row supersedes the previous current version, and
+   * currentVersionId moves to the new row. Expiry/issuer carry forward from
+   * the previous version unless the upload sets them explicitly.
+   */
+  async addVersion(
+    workspaceId: string,
+    userId: string,
+    documentId: string,
+    input: {
+      expiryDate?: string | null;
+      expirySource?: LegalExpirySource | null;
+      issuer?: string | null;
+      fileName: string;
+      fileBytes: Buffer;
+      mimeType?: string;
+    },
+  ): Promise<ComputedDocumentDetail> {
+    const doc = await this.prisma.legalDocument.findFirst({
+      where: { id: documentId, workspaceId },
+      include: { currentVersion: true },
+    });
+    if (!doc) {
+      throw new LegalError("UNKNOWN_DOCUMENT", `No document: ${documentId}`);
+    }
+    assertNonEmptyFile(input.fileBytes);
+    const rawPrev = doc.currentVersion;
+    const prev: PreviousVersion | null = rawPrev
+      ? {
+          id: rawPrev.id,
+          versionNumber: rawPrev.versionNumber,
+          expiryDate: rawPrev.expiryDate?.toISOString() ?? null,
+          expirySource: isValidExpirySource(rawPrev.expirySource)
+            ? rawPrev.expirySource
+            : null,
+          issuer: rawPrev.issuer,
+        }
+      : null;
+    // New upload = new version row; history preserved via supersedes chain.
+    const plan = planNewVersion(prev);
+    // Expiry carries forward from the previous version unless the upload
+    // sets or clears it — never invented.
+    const expiry = carryForwardExpiry(
+      { expiryDate: input.expiryDate, expirySource: input.expirySource },
+      prev,
+    );
+
+    const file = await this.writeVaultFile({
+      workspaceId,
+      userId,
+      docType: doc.docType as LegalDocumentType,
+      fileName: input.fileName,
+      fileBytes: input.fileBytes,
+      mimeType: input.mimeType,
+    });
+
+    await this.prisma.$transaction(async (tx) => {
+      const version = await tx.legalDocumentVersion.create({
+        data: {
+          documentId: doc.id,
+          versionNumber: plan.versionNumber,
+          workspaceFileId: file.id,
+          uploadedBy: userId,
+          expiryDate: expiry.expiryDate ? new Date(expiry.expiryDate) : null,
+          expirySource: expiry.expirySource,
+          issuer:
+            input.issuer !== undefined
+              ? input.issuer?.trim() || null
+              : (prev?.issuer ?? null),
+          supersedesVersionId: plan.supersedesVersionId,
+        },
+      });
+      await tx.legalDocument.update({
+        where: { id: doc.id },
+        data: { currentVersionId: version.id },
+      });
+    });
+
+    const detail = await this.getDocument(workspaceId, doc.id);
+    if (!detail) {
+      throw new LegalError("UNKNOWN_DOCUMENT", `No document: ${doc.id}`);
+    }
+    return detail;
+  }
+
+  /** The tenant's vault: documents with their current version and expiry tier. */
+  async listDocuments(
+    workspaceId: string,
+    now: Date = new Date(),
+  ): Promise<ComputedDocument[]> {
+    const rows = await this.prisma.legalDocument.findMany({
+      where: { workspaceId },
+      include: {
+        currentVersion: {
+          include: {
+            workspaceFile: true,
+            supersedes: { select: { versionNumber: true } },
+          },
+        },
+        _count: { select: { versions: true } },
+      },
+      orderBy: { updatedAt: "desc" },
+    });
+    const docs = rows.map((r) => toComputedDocument(r, now));
+    docs.sort((a, b) => {
+      const order = (t: ExpiryTier | null) =>
+        t === null
+          ? 99
+          : (["overdue", "date_needed", "due_7", "due_30", "due_90"] as const).indexOf(t);
+      if (a.tier !== b.tier) return order(a.tier) - order(b.tier);
+      const da = a.currentVersion?.expiryDate
+        ? new Date(a.currentVersion.expiryDate).getTime()
+        : Number.POSITIVE_INFINITY;
+      const db = b.currentVersion?.expiryDate
+        ? new Date(b.currentVersion.expiryDate).getTime()
+        : Number.POSITIVE_INFINITY;
+      return da - db;
+    });
+    return docs;
+  }
+
+  /** One document with its full version history (newest first). */
+  async getDocument(
+    workspaceId: string,
+    id: string,
+    now: Date = new Date(),
+  ): Promise<ComputedDocumentDetail | null> {
+    const row = await this.prisma.legalDocument.findFirst({
+      where: { id, workspaceId },
+      include: {
+        currentVersion: {
+          include: {
+            workspaceFile: true,
+            supersedes: { select: { versionNumber: true } },
+          },
+        },
+        versions: {
+          include: {
+            workspaceFile: true,
+            supersedes: { select: { versionNumber: true } },
+          },
+          orderBy: { versionNumber: "desc" },
+        },
+      },
+    });
+    if (!row) return null;
+    return {
+      ...toComputedDocument(row, now),
+      versions: row.versions.map(toComputedVersion),
+    };
+  }
+
+  /**
+   * Tenant edits document metadata. Title/notes/docType edit the document;
+   * expiryDate/issuer edit the CURRENT version (history rows are immutable).
+   * A changed expiry resets the escalation ladder — like deadline re-dates.
+   */
+  async updateDocument(
+    workspaceId: string,
+    id: string,
+    input: {
+      title?: string;
+      notes?: string | null;
+      docType?: LegalDocumentType;
+      expiryDate?: string | null;
+      expirySource?: LegalExpirySource | null;
+      issuer?: string | null;
+    },
+  ): Promise<ComputedDocumentDetail> {
+    const doc = await this.prisma.legalDocument.findFirst({
+      where: { id, workspaceId },
+      include: { currentVersion: true },
+    });
+    if (!doc) {
+      throw new LegalError("UNKNOWN_DOCUMENT", `No document: ${id}`);
+    }
+    const data: {
+      title?: string;
+      notes?: string | null;
+      docType?: LegalDocumentType;
+    } = {};
+    if (input.title !== undefined) {
+      const title = input.title.trim();
+      if (!title) throw new LegalError("INVALID_TITLE", "Title cannot be empty.");
+      data.title = title;
+    }
+    if (input.notes !== undefined) data.notes = input.notes?.trim() || null;
+    if (input.docType !== undefined) {
+      if (!isValidDocumentType(input.docType)) {
+        throw new LegalError("INVALID_DOC_TYPE", "docType must be a known document type.");
+      }
+      data.docType = input.docType;
+    }
+
+    const versionData: {
+      expiryDate?: Date | null;
+      expirySource?: LegalExpirySource | null;
+      issuer?: string | null;
+      lastAlertedTier?: null;
+      lastAlertedAt?: null;
+    } = {};
+    if (input.expiryDate !== undefined) {
+      const prevExpiry: PreviousVersion | null = doc.currentVersion
+        ? {
+            id: doc.currentVersion.id,
+            versionNumber: doc.currentVersion.versionNumber,
+            expiryDate: doc.currentVersion.expiryDate?.toISOString() ?? null,
+            expirySource: isValidExpirySource(doc.currentVersion.expirySource)
+              ? doc.currentVersion.expirySource
+              : null,
+            issuer: doc.currentVersion.issuer,
+          }
+        : null;
+      const expiry = carryForwardExpiry(
+        { expiryDate: input.expiryDate, expirySource: input.expirySource },
+        prevExpiry,
+      );
+      versionData.expiryDate = expiry.expiryDate ? new Date(expiry.expiryDate) : null;
+      versionData.expirySource = expiry.expirySource;
+      // A changed expiry resets the escalation ladder (see deadline re-dates).
+      versionData.lastAlertedTier = null;
+      versionData.lastAlertedAt = null;
+    }
+    if (input.issuer !== undefined) {
+      versionData.issuer = input.issuer?.trim() || null;
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      if (Object.keys(data).length > 0) {
+        await tx.legalDocument.update({ where: { id }, data });
+      }
+      if (doc.currentVersionId && Object.keys(versionData).length > 0) {
+        await tx.legalDocumentVersion.update({
+          where: { id: doc.currentVersionId },
+          data: versionData,
+        });
+      }
+    });
+
+    const detail = await this.getDocument(workspaceId, id);
+    if (!detail) {
+      throw new LegalError("UNKNOWN_DOCUMENT", `No document: ${id}`);
+    }
+    return detail;
+  }
+
+  /** Tenant removes a document and its version history (uploaded files stay
+   *  in /files/legal/ — the files trash flow owns their cleanup). */
+  async deleteDocument(workspaceId: string, id: string): Promise<void> {
+    const existing = await this.prisma.legalDocument.findFirst({
+      where: { id, workspaceId },
+    });
+    if (!existing) {
+      throw new LegalError("UNKNOWN_DOCUMENT", `No document: ${id}`);
+    }
+    await this.prisma.$transaction(async (tx) => {
+      await tx.legalDocumentVersion.deleteMany({ where: { documentId: id } });
+      await tx.legalDocument.delete({ where: { id } });
+    });
+  }
+
+  /** Sweep port: the current version of every document in the workspace.
+   *  Older versions are history and never alert. */
+  async listCurrentVersions(workspaceId: string) {
+    const rows = await this.prisma.legalDocument.findMany({
+      where: { workspaceId, currentVersionId: { not: null } },
+      include: { currentVersion: true },
+    });
+    return rows.map((r) => ({
+      id: r.currentVersion!.id,
+      documentId: r.id,
+      title: r.title,
+      docType: r.docType as LegalDocumentType,
+      versionNumber: r.currentVersion!.versionNumber,
+      expiryDate: r.currentVersion!.expiryDate,
+      lastAlertedTier: isEscalationTier(r.currentVersion!.lastAlertedTier)
+        ? (r.currentVersion!.lastAlertedTier as EscalationTier)
+        : null,
+    }));
+  }
+
+  /** Sweep port: record that a tier was emitted so it fires only once. */
+  async recordDocumentAlertedTier(
+    workspaceId: string,
+    versionId: string,
+    tier: EscalationTier,
+    now: Date,
+  ): Promise<void> {
+    await this.prisma.legalDocumentVersion.updateMany({
+      where: { id: versionId, document: { workspaceId } },
+      data: { lastAlertedTier: tier, lastAlertedAt: now },
+    });
+  }
 }
 
 export type DeadlineStatus = "open" | "done" | "dismissed";
@@ -536,4 +959,118 @@ function parseOptionalDate(
     throw new LegalError("INVALID_DATE", `${field} must be a valid date.`);
   }
   return d;
+}
+
+// ------------------------------------------------------------------
+// Slice 3: document vault helpers
+// ------------------------------------------------------------------
+
+export interface ComputedDocumentVersion {
+  id: string;
+  versionNumber: number;
+  filename: string;
+  logicalPath: string;
+  mimeType: string;
+  sizeBytes: number;
+  workspaceFileId: string;
+  uploadedBy: string;
+  uploadedAt: string;
+  expiryDate: string | null;
+  expirySource: LegalExpirySource | null;
+  issuer: string | null;
+  supersedesVersionNumber: number | null;
+}
+
+export interface ComputedDocument {
+  id: string;
+  docType: LegalDocumentType;
+  title: string;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+  versionCount: number;
+  currentVersion: ComputedDocumentVersion | null;
+  /** Escalation tier of the current version's expiry; null = >90 days out. */
+  tier: ExpiryTier | null;
+  daysUntilExpiry: number | null;
+}
+
+export interface ComputedDocumentDetail extends ComputedDocument {
+  /** Full version history, newest first. */
+  versions: ComputedDocumentVersion[];
+}
+
+function assertNonEmptyFile(bytes: unknown): asserts bytes is Buffer {
+  if (!bytes || !(bytes instanceof Buffer) || bytes.length === 0) {
+    throw new LegalError("EMPTY_FILE", "Attach a file — it cannot be empty.");
+  }
+}
+
+type VaultVersionRow = {
+  id: string;
+  versionNumber: number;
+  uploadedBy: string;
+  uploadedAt: Date;
+  expiryDate: Date | null;
+  expirySource: string | null;
+  issuer: string | null;
+  workspaceFileId: string;
+  supersedes: { versionNumber: number } | null;
+  workspaceFile: {
+    filename: string;
+    logicalPath: string;
+    mimeType: string;
+    sizeBytes: number;
+  };
+};
+
+function toComputedVersion(row: VaultVersionRow): ComputedDocumentVersion {
+  return {
+    id: row.id,
+    versionNumber: row.versionNumber,
+    filename: row.workspaceFile.filename,
+    logicalPath: row.workspaceFile.logicalPath,
+    mimeType: row.workspaceFile.mimeType,
+    sizeBytes: row.workspaceFile.sizeBytes,
+    workspaceFileId: row.workspaceFileId,
+    uploadedBy: row.uploadedBy,
+    uploadedAt: row.uploadedAt.toISOString(),
+    expiryDate: row.expiryDate ? row.expiryDate.toISOString() : null,
+    expirySource: isValidExpirySource(row.expirySource)
+      ? row.expirySource
+      : null,
+    issuer: row.issuer,
+    supersedesVersionNumber: row.supersedes?.versionNumber ?? null,
+  };
+}
+
+type VaultDocRow = {
+  id: string;
+  docType: string;
+  title: string;
+  notes: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+  currentVersion: VaultVersionRow | null;
+};
+
+function toComputedDocument(
+  row: VaultDocRow & { _count?: { versions: number }; versions?: VaultVersionRow[] },
+  now: Date = new Date(),
+): ComputedDocument {
+  const current = row.currentVersion ? toComputedVersion(row.currentVersion) : null;
+  const expiryDate = row.currentVersion?.expiryDate ?? null;
+  const tier = tierForExpiry(expiryDate, now);
+  return {
+    id: row.id,
+    docType: row.docType as LegalDocumentType,
+    title: row.title,
+    notes: row.notes,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+    versionCount: row._count?.versions ?? row.versions?.length ?? (current ? 1 : 0),
+    currentVersion: current,
+    tier,
+    daysUntilExpiry: expiryDate ? daysUntilExpiry(expiryDate, now) : null,
+  };
 }

@@ -768,6 +768,8 @@ model Workspace {
   legalProfile           LegalProfile?
   obligations            Obligation[]
   legalDeadlines         LegalDeadline[]
+  // Legal/Compliance slice 3: Document vault.
+  legalDocuments         LegalDocument[]
   insurancePaymentHandoffs InsurancePaymentHandoff[]
   insuranceCertificates     InsuranceCertificate[]
   // Phase 12 (embeds): tenant-scoped GrowthBook flag overrides.
@@ -3223,6 +3225,8 @@ model WorkspaceFile {
   createdAt   DateTime          @default(now()) @map("created_at")
   // Trash: set on soft-delete, 30-day retention, then purge.
   trashedAt   DateTime?         @map("trashed_at")
+  // Legal/Compliance slice 3: Document vault — versions referencing this file.
+  legalDocumentVersions LegalDocumentVersion[]
 
   @@index([workspaceId, trashedAt])
   @@index([workspaceId, kind])
@@ -11049,4 +11053,83 @@ model LegalDeadline {
   @@index([workspaceId, status])
   @@index([workspaceId, dueDate])
   @@map("legal_deadlines")
+}
+
+// Legal/Compliance slice 3: Document vault (BUSINESS-OS-FEATURE-SPECS.md §4).
+// LegalDocument is the logical document (formation doc, contract, license,
+// EIN letter, policy, other). LegalDocumentVersion holds one uploaded file
+// per version: a new upload of the same logical document adds a version row —
+// history is never overwritten. Expiry dates are tenant-set ("tenant_set")
+// or read from the document itself ("read_from_document") — the engine never
+// guesses one. Escalation tiers (90/30/7 days, overdue) are computed at read
+// time from the CURRENT version's expiryDate; lastAlertedTier records which
+// tier the sweep already emitted so each tier fires at most once per version.
+
+enum LegalDocumentType {
+  formation
+  contract
+  license
+  ein_letter
+  policy
+  other
+}
+
+enum LegalExpirySource {
+  tenant_set
+  read_from_document
+}
+
+model LegalDocument {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  docType LegalDocumentType @map("doc_type")
+  title   String
+  notes   String?
+
+  currentVersionId String?               @map("current_version_id")
+  currentVersion   LegalDocumentVersion? @relation("LegalDocumentCurrentVersion", fields: [currentVersionId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  versions LegalDocumentVersion[] @relation("LegalDocumentVersions")
+
+  @@index([workspaceId, docType])
+  @@map("legal_documents")
+}
+
+model LegalDocumentVersion {
+  id         String        @id @default(cuid())
+  documentId String        @map("document_id")
+  document   LegalDocument @relation("LegalDocumentVersions", fields: [documentId], references: [id], onDelete: Cascade)
+
+  versionNumber   Int           @map("version_number")
+  workspaceFileId String        @map("workspace_file_id")
+  workspaceFile   WorkspaceFile @relation(fields: [workspaceFileId], references: [id], onDelete: Cascade)
+
+  uploadedBy String   @map("uploaded_by")
+  uploadedAt DateTime @default(now()) @map("uploaded_at")
+
+  // Null = no expiry recorded yet ("date needed"). Never guessed.
+  expiryDate   DateTime?          @map("expiry_date")
+  expirySource LegalExpirySource? @map("expiry_source")
+  issuer       String?
+
+  // Version-chain bookkeeping: a new version supersedes the previous one.
+  supersedesVersionId String?               @map("supersedes_version_id")
+  supersedes          LegalDocumentVersion? @relation("LegalDocumentVersionSupersedes", fields: [supersedesVersionId], references: [id], onDelete: SetNull)
+  supersededBy        LegalDocumentVersion[] @relation("LegalDocumentVersionSupersedes")
+
+  // Documents that point at this version as their current one.
+  currentOf LegalDocument[] @relation("LegalDocumentCurrentVersion")
+
+  // Escalation bookkeeping: the tier the sweep last emitted for this version.
+  lastAlertedTier String?   @map("last_alerted_tier")
+  lastAlertedAt   DateTime? @map("last_alerted_at")
+
+  @@unique([documentId, versionNumber])
+  @@index([workspaceFileId])
+  @@map("legal_document_versions")
 }

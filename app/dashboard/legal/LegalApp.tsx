@@ -6,16 +6,17 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { CalendarClock, ListChecks, Loader2 } from "lucide-react";
+import { Archive, CalendarClock, ListChecks, Loader2 } from "lucide-react";
 import { ChecklistView, type ObligationView } from "./views/ChecklistView";
 import {
   DeadlinesView,
   type DeadlineView,
   type NeedsDateView,
 } from "./views/DeadlinesView";
+import { DocumentsView, type DocumentView } from "./views/DocumentsView";
 import { ProfileStep, type ProfileDraft } from "./views/ProfileStep";
 
-type Tab = "obligations" | "deadlines";
+type Tab = "obligations" | "deadlines" | "documents";
 
 export function LegalApp() {
   const [loading, setLoading] = useState(true);
@@ -25,12 +26,15 @@ export function LegalApp() {
   const [obligations, setObligations] = useState<ObligationView[]>([]);
   const [deadlines, setDeadlines] = useState<DeadlineView[]>([]);
   const [needsDate, setNeedsDate] = useState<NeedsDateView[]>([]);
+  const [documents, setDocuments] = useState<DocumentView[]>([]);
+  const [workspaceId, setWorkspaceId] = useState("");
   const [disclaimer, setDisclaimer] = useState("");
 
   const refresh = useCallback(async () => {
-    const [oblRes, dlRes] = await Promise.all([
+    const [oblRes, dlRes, docRes] = await Promise.all([
       fetch("/api/legal/obligations"),
       fetch("/api/legal/deadlines"),
+      fetch("/api/legal/documents"),
     ]);
     if (oblRes.ok) {
       const json = await oblRes.json();
@@ -43,6 +47,12 @@ export function LegalApp() {
       setDisclaimer((prev) => prev || (json.disclaimer ?? ""));
       setDeadlines(json.deadlines ?? []);
       setNeedsDate(json.needsDate ?? []);
+    }
+    if (docRes.ok) {
+      const json = await docRes.json();
+      setDisclaimer((prev) => prev || (json.disclaimer ?? ""));
+      setDocuments(json.documents ?? []);
+      setWorkspaceId(json.workspaceId ?? "");
     }
     setLoading(false);
   }, []);
@@ -76,6 +86,9 @@ export function LegalApp() {
   const attention = deadlines.filter(
     (d) => d.status === "open" && d.tier && d.tier !== "due_90" && d.tier !== null,
   ).length;
+  const docAttention = documents.filter(
+    (d) => d.tier && d.tier !== "due_90",
+  ).length;
 
   const tabs = [
     { id: "obligations" as const, label: "Obligations", icon: ListChecks, badge: null as number | null },
@@ -84,6 +97,12 @@ export function LegalApp() {
       label: "Deadlines",
       icon: CalendarClock,
       badge: attention > 0 ? attention : null,
+    },
+    {
+      id: "documents" as const,
+      label: "Documents",
+      icon: Archive,
+      badge: docAttention > 0 ? docAttention : null,
     },
   ];
 
@@ -127,10 +146,17 @@ export function LegalApp() {
           onChanged={() => void refresh()}
           onEditProfile={() => setEditing(true)}
         />
-      ) : (
+      ) : tab === "deadlines" ? (
         <DeadlinesView
           deadlines={deadlines}
           needsDate={needsDate}
+          disclaimer={disclaimer}
+          onChanged={() => void refresh()}
+        />
+      ) : (
+        <DocumentsView
+          documents={documents}
+          workspaceId={workspaceId}
           disclaimer={disclaimer}
           onChanged={() => void refresh()}
         />
