@@ -1512,7 +1512,7 @@ function TemplateModal({
               <input value={m.name} onChange={(e) => setMerges((ms) => ms.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))} placeholder="placeholder" className={inputCls} />
               <input value={m.source} onChange={(e) => setMerges((ms) => ms.map((x, j) => (j === i ? { ...x, source: e.target.value } : x)))} placeholder="source" className={inputCls} />
               <input value={m.path} onChange={(e) => setMerges((ms) => ms.map((x, j) => (j === i ? { ...x, path: e.target.value } : x)))} placeholder="dotted.path" className={inputCls} />
-              <label className="flex items-center gap-1 text-xs text-muted>
+              <label className="flex items-center gap-1 text-xs text-muted">
                 <input type="checkbox" checked={m.required} onChange={(e) => setMerges((ms) => ms.map((x, j) => (j === i ? { ...x, required: e.target.checked } : x)))} className="h-3.5 w-3.5 accent-ink" />
                 Req.
               </label>
