@@ -40,8 +40,36 @@ always return `[]`. Anything else is a data-integrity incident.
 | `engines.ts` | Extraction-engine interface: NeMo Data Designer stub, frontier stub, mock |
 | `ingest.ts` | The four pipelines: `ingestUpload`, `ingestDriveFile`, `ingestWeb`, `ingestPaste` |
 | `register.ts` | `getSourceRegister` (source → documents → chunk counts), `verifyNoOrphanedChunks` |
+| `classify.ts` | Dataset types, `ClassificationEngine` interface, `RulesClassificationEngine` (deterministic default), `FrontierClassificationEngine` stub (fail-closed) |
+| `structure.ts` | `structureChunk` / `structureDocument` / `structureWorkspace`, `decideReview`, `getTypeBreakdown`, `listReviewQueue` |
 | `store.ts` | In-memory store (tests, tooling) |
 | `__tests__/` | `npx tsx --test` per file — no DB, no network, no credentials |
+
+## Slice 2: Structure (built)
+
+Auto-classify chunks into the six dataset types (`faq`, `product_catalog`,
+`policy`, `process_sop`, `company_fact`, `pricing`). Every classification
+carries a confidence score + engine lineage (`engine`, `engineVersion`).
+
+The trust-ladder rule: confidence ≥ 0.6 auto-applies; below it the chunk is
+**never force-fit** — it gets `pending_review` status plus exactly one
+`ReviewItem`. A human then approves (suggested type applies), reassigns (the
+human's type applies), or rejects (the chunk stays unclassified — never
+mislabeled). Decisions are final (`REVIEW_ALREADY_DECIDED` on re-decide).
+
+- Upsert is per `(chunkId, engine)`: re-running an engine replaces its own
+  classification, never duplicates it.
+- `classificationId` is unique on review items: the queue can never lose or
+  double-count a pending decision.
+- The zero-orphaned-chunks invariant extends down: `chunk_id` is NOT NULL
+  with `ON DELETE CASCADE`, so classifying a missing chunk throws
+  `UNKNOWN_CHUNK`.
+- API: `POST /api/datasets/classify` (run), `GET /api/datasets/by-type`
+  (breakdown incl. the unclassified bucket), `GET /api/datasets/reviews`
+  (pending queue with chunk text + names), `POST /api/datasets/reviews/[id]`
+  (decide).
+- UI: `/dashboard/datasets` gains **By type** and **Review queue** tabs
+  (queue badge counts pending items).
 
 ## Extraction limits (documented, v1)
 
@@ -59,12 +87,10 @@ npx tsx --test lib/datasetbuilder/__tests__/extract.test.ts
 npx tsx --test lib/datasetbuilder/__tests__/ingest.test.ts
 npx tsx --test lib/datasetbuilder/__tests__/integrity.test.ts
 npx tsx --test lib/datasetbuilder/__tests__/adapters.test.ts
+npx tsx --test lib/datasetbuilder/__tests__/classify.test.ts
+npx tsx --test lib/datasetbuilder/__tests__/structure.test.ts
 ```
 
 (Directory args fail on this repo's tsx version — pass explicit file paths.)
 
-## Slice 2 preview (not built)
-
-Auto-classify documents into dataset types (FAQ, catalog, policy, SOP,
-facts, pricing); low-confidence classifications go to a human review queue
-(draft-for-approval, same as the OS trust ladder).
+## Slice 3 preview (not built)

@@ -8,6 +8,8 @@ import type { Prisma, PrismaClient } from "@prisma/client";
 import {
   DatasetBuilderError,
   type ChunkInput,
+  type ClassificationInput,
+  type ClassificationRecord,
   type DatasetBuilderStore,
   type DatasetChunkRecord,
   type DatasetDocumentInput,
@@ -15,7 +17,22 @@ import {
   type DatasetSourceInput,
   type DatasetSourceRecord,
   type DatasetSourceKind,
+  type DatasetType,
+  type ReviewDecision,
+  type ReviewItemInput,
+  type ReviewItemRecord,
+  type ReviewItemStatus,
 } from "./types";
+import type {
+  ClassificationStatus,
+  DatasetType as PrismaDatasetType,
+  ClassificationStatus as PrismaClassificationStatus,
+  ReviewItemStatus as PrismaReviewStatus,
+} from "./classify";
+
+function toDatasetType(t: string): DatasetType {
+  return t as DatasetType;
+}
 
 function toSourceKind(
   kind: "upload" | "drive" | "web" | "paste",
@@ -239,6 +256,318 @@ export class PrismaDatasetBuilderStore implements DatasetBuilderStore {
       status: d.status,
       error: d.error,
       createdAt: d.createdAt,
+    };
+  }
+
+  // ---- Slice 2: structure -------------------------------------------
+
+  private toClassification(c: {
+    id: string;
+    workspaceId: string;
+    chunkId: string;
+    datasetType: string;
+    confidence: number;
+    engine: string;
+    engineVersion: string;
+    status: string;
+    createdAt: Date;
+    updatedAt: Date;
+  }): ClassificationRecord {
+    return {
+      id: c.id,
+      workspaceId: c.workspaceId,
+      chunkId: c.chunkId,
+      datasetType: toDatasetType(c.datasetType),
+      confidence: c.confidence,
+      engine: c.engine,
+      engineVersion: c.engineVersion,
+      status: c.status as ClassificationRecord["status"],
+      createdAt: c.createdAt,
+      updatedAt: c.updatedAt,
+    };
+  }
+
+  private toReviewItem(r: {
+    id: string;
+    workspaceId: string;
+    classificationId: string;
+    status: string;
+    note: string | null;
+    decidedBy: string | null;
+    decidedAt: Date | null;
+    createdAt: Date;
+  }): ReviewItemRecord {
+    return {
+      id: r.id,
+      workspaceId: r.workspaceId,
+      classificationId: r.classificationId,
+      status: r.status as ReviewItemRecord["status"],
+      note: r.note,
+      decidedBy: r.decidedBy,
+      decidedAt: r.decidedAt,
+      createdAt: r.createdAt,
+    };
+  }
+
+  async getChunkById(id: string): Promise<DatasetChunkRecord | null> {
+    const c = await this.db.datasetChunk.findUnique({ where: { id } });
+    if (!c) return null;
+    return {
+      id: c.id,
+      workspaceId: c.workspaceId,
+      documentId: c.documentId,
+      position: c.position,
+      charStart: c.charStart,
+      charEnd: c.charEnd,
+      text: c.text,
+      createdAt: c.createdAt,
+    };
+  }
+
+  async upsertClassification(
+    input: ClassificationInput,
+  ): Promise<ClassificationRecord> {
+    if (
+      !Number.isFinite(input.confidence) ||
+      input.confidence < 0 ||
+      input.confidence > 1
+    ) {
+      throw new DatasetBuilderError(
+        "VALIDATION_FAILED",
+        "confidence must be between 0 and 1",
+      );
+    }
+    try {
+      const c = await this.db.datasetClassification.upsert({
+        where: {
+          chunkId_engine: { chunkId: input.chunkId, engine: input.engine },
+        },
+        create: {
+          workspaceId: input.workspaceId,
+          chunkId: input.chunkId,
+          datasetType: input.datasetType as PrismaDatasetType,
+          confidence: input.confidence,
+          engine: input.engine,
+          engineVersion: input.engineVersion,
+          status:
+            (input.status as PrismaClassificationStatus | undefined) ??
+            "applied",
+        },
+        update: {
+          datasetType: input.datasetType as PrismaDatasetType,
+          confidence: input.confidence,
+          engineVersion: input.engineVersion,
+          status: input.status as PrismaClassificationStatus | undefined,
+        },
+      });
+      return this.toClassification(c);
+    } catch {
+      // FK to a missing chunk — mirrors the in-memory UNKNOWN_CHUNK.
+      throw new DatasetBuilderError(
+        "UNKNOWN_CHUNK",
+        `cannot classify: chunk "${input.chunkId}" does not exist`,
+      );
+    }
+  }
+
+  async getClassificationByChunk(
+    chunkId: string,
+  ): Promise<ClassificationRecord | null> {
+    const c = await this.db.datasetClassification.findFirst({
+      where: { chunkId },
+      orderBy: { createdAt: "desc" },
+    });
+    return c ? this.toClassification(c) : null;
+  }
+
+  async getClassificationById(
+    id: string,
+  ): Promise<ClassificationRecord | null> {
+    const c = await this.db.datasetClassification.findUnique({ where: { id } });
+    return c ? this.toClassification(c) : null;
+  }
+
+  async listClassificationsByType(
+    workspaceId: string,
+    type: DatasetType,
+  ): Promise<ClassificationRecord[]> {
+    const rows = await this.db.datasetClassification.findMany({
+      where: { workspaceId, datasetType: type as PrismaDatasetType },
+    });
+    return rows.map((c) => this.toClassification(c));
+  }
+
+  async listPendingClassifications(
+    workspaceId: string,
+  ): Promise<ClassificationRecord[]> {
+    const rows = await this.db.datasetClassification.findMany({
+      where: { workspaceId, status: "pending_review" },
+    });
+    return rows.map((c) => this.toClassification(c));
+  }
+
+  async updateClassification(
+    id: string,
+    patch: Partial<
+      Pick<ClassificationRecord, "datasetType" | "confidence" | "status">
+    >,
+  ): Promise<ClassificationRecord> {
+    if (
+      patch.confidence !== undefined &&
+      (!Number.isFinite(patch.confidence) ||
+        patch.confidence < 0 ||
+        patch.confidence > 1)
+    ) {
+      throw new DatasetBuilderError(
+        "VALIDATION_FAILED",
+        "confidence must be between 0 and 1",
+      );
+    }
+    try {
+      const c = await this.db.datasetClassification.update({
+        where: { id },
+        data: {
+          datasetType: patch.datasetType as PrismaDatasetType | undefined,
+          confidence: patch.confidence,
+          status: patch.status as PrismaClassificationStatus | undefined,
+        },
+      });
+      return this.toClassification(c);
+    } catch {
+      throw new DatasetBuilderError(
+        "UNKNOWN_CLASSIFICATION",
+        `cannot update classification: "${id}" does not exist`,
+      );
+    }
+  }
+
+  async createReviewItem(
+    input: ReviewItemInput,
+  ): Promise<ReviewItemRecord> {
+    try {
+      const r = await this.db.datasetReviewItem.create({
+        data: {
+          workspaceId: input.workspaceId,
+          classificationId: input.classificationId,
+          note: input.note,
+        },
+      });
+      return this.toReviewItem(r);
+    } catch {
+      // Unique on classificationId → REVIEW_ALREADY_EXISTS; FK to a
+      // missing classification → UNKNOWN_CLASSIFICATION.
+      const existing = await this.db.datasetReviewItem.findUnique({
+        where: { classificationId: input.classificationId },
+      });
+      if (existing) {
+        throw new DatasetBuilderError(
+          "REVIEW_ALREADY_EXISTS",
+          `review item already exists for classification "${input.classificationId}"`,
+        );
+      }
+      throw new DatasetBuilderError(
+        "UNKNOWN_CLASSIFICATION",
+        `cannot create review item: classification "${input.classificationId}" does not exist`,
+      );
+    }
+  }
+
+  async getReviewItem(id: string): Promise<ReviewItemRecord | null> {
+    const r = await this.db.datasetReviewItem.findUnique({ where: { id } });
+    return r ? this.toReviewItem(r) : null;
+  }
+
+  async getReviewItemByClassification(
+    classificationId: string,
+  ): Promise<ReviewItemRecord | null> {
+    const r = await this.db.datasetReviewItem.findUnique({
+      where: { classificationId },
+    });
+    return r ? this.toReviewItem(r) : null;
+  }
+
+  async listReviewItems(
+    workspaceId: string,
+    status?: ReviewItemStatus,
+  ): Promise<ReviewItemRecord[]> {
+    const rows = await this.db.datasetReviewItem.findMany({
+      where: {
+        workspaceId,
+        status: status as PrismaReviewStatus | undefined,
+      },
+      orderBy: { createdAt: "asc" },
+    });
+    return rows.map((r) => this.toReviewItem(r));
+  }
+
+  async decideReviewItem(
+    id: string,
+    decision: ReviewDecision,
+  ): Promise<{ review: ReviewItemRecord; classification: ClassificationRecord }> {
+    const review = await this.db.datasetReviewItem.findUnique({
+      where: { id },
+    });
+    if (!review) {
+      throw new DatasetBuilderError(
+        "UNKNOWN_REVIEW_ITEM",
+        `cannot decide review: "${id}" does not exist`,
+      );
+    }
+    if (review.status !== "pending") {
+      throw new DatasetBuilderError(
+        "REVIEW_ALREADY_DECIDED",
+        `review "${id}" was already decided (${review.status})`,
+      );
+    }
+    const classification = await this.db.datasetClassification.findUnique({
+      where: { id: review.classificationId },
+    });
+    if (!classification) {
+      throw new DatasetBuilderError(
+        "UNKNOWN_CLASSIFICATION",
+        `review "${id}" points at a missing classification`,
+      );
+    }
+    let nextStatus: PrismaClassificationStatus;
+    let nextType: PrismaDatasetType = classification.datasetType;
+    let reviewStatus: PrismaReviewStatus;
+    if (decision.action === "approve") {
+      nextStatus = "applied";
+      reviewStatus = "approved";
+    } else if (decision.action === "reassign") {
+      if (!decision.datasetType) {
+        throw new DatasetBuilderError(
+          "VALIDATION_FAILED",
+          "reassign requires a datasetType",
+        );
+      }
+      nextStatus = "applied";
+      nextType = decision.datasetType as PrismaDatasetType;
+      reviewStatus = "approved";
+    } else {
+      nextStatus = "rejected";
+      reviewStatus = "rejected";
+    }
+
+    const decidedAt = new Date();
+    const [updatedReview, updatedClassification] = await this.db.$transaction([
+      this.db.datasetReviewItem.update({
+        where: { id },
+        data: {
+          status: reviewStatus,
+          note: decision.note ?? review.note,
+          decidedBy: decision.decidedBy ?? null,
+          decidedAt,
+        },
+      }),
+      this.db.datasetClassification.update({
+        where: { id: review.classificationId },
+        data: { status: nextStatus, datasetType: nextType },
+      }),
+    ]);
+    return {
+      review: this.toReviewItem(updatedReview),
+      classification: this.toClassification(updatedClassification),
     };
   }
 }

@@ -13,12 +13,16 @@ import {
   FileUp,
   Globe,
   HardDrive,
+  ListChecks,
   Loader2,
   Plus,
   ShieldCheck,
+  Tags,
   TriangleAlert,
   type LucideIcon,
 } from "lucide-react";
+
+type DatasetsTab = "sources" | "types" | "reviews";
 
 type SourceKind = "upload" | "drive" | "web" | "paste";
 
@@ -57,17 +61,20 @@ function formatCount(n: number): string {
 }
 
 export function DatasetsApp() {
+  const [tab, setTab] = useState<DatasetsTab>("sources");
   const [sources, setSources] = useState<RegisterSource[]>([]);
   const [totals, setTotals] = useState({ sources: 0, documents: 0, chunks: 0, chars: 0 });
   const [integrityOk, setIntegrityOk] = useState<boolean | null>(null);
+  const [pendingReviews, setPendingReviews] = useState(0);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
   const refresh = useCallback(async () => {
-    const [regRes, intRes] = await Promise.all([
+    const [regRes, intRes, revRes] = await Promise.all([
       fetch("/api/datasets/sources"),
       fetch("/api/datasets/integrity"),
+      fetch("/api/datasets/reviews"),
     ]);
     if (regRes.ok) {
       const json = await regRes.json();
@@ -77,6 +84,10 @@ export function DatasetsApp() {
     if (intRes.ok) {
       const json = await intRes.json();
       setIntegrityOk(json.ok === true);
+    }
+    if (revRes.ok) {
+      const json = await revRes.json();
+      setPendingReviews(json.pending?.length ?? 0);
     }
     setLoading(false);
   }, []);
@@ -111,51 +122,98 @@ export function DatasetsApp() {
             documents · {formatCount(totals.chunks)} chunks
           </span>
         </div>
-        <div className="ml-auto">
-          <button
-            type="button"
-            onClick={() => setShowAdd((v) => !v)}
-            className="aos-press flex h-11 items-center gap-2 rounded-full bg-black px-6 text-[15px] font-semibold text-white"
-          >
-            <Plus size={16} />
-            Add source
-          </button>
-        </div>
+        {tab === "sources" && (
+          <div className="ml-auto">
+            <button
+              type="button"
+              onClick={() => setShowAdd((v) => !v)}
+              className="aos-press flex h-11 items-center gap-2 rounded-full bg-black px-6 text-[15px] font-semibold text-white"
+            >
+              <Plus size={16} />
+              Add source
+            </button>
+          </div>
+        )}
       </div>
 
-      {showAdd && (
-        <AddSourcePanel
-          onAdded={() => {
-            setShowAdd(false);
-            void refresh();
-          }}
-          onCancel={() => setShowAdd(false)}
-        />
-      )}
+      {/* Tabs */}
+      <div className="flex items-center gap-2" role="tablist" aria-label="Dataset views">
+        {(
+          [
+            { id: "sources", label: "Sources", icon: Globe, badge: null },
+            { id: "types", label: "By type", icon: Tags, badge: null },
+            {
+              id: "reviews",
+              label: "Review queue",
+              icon: ListChecks,
+              badge: pendingReviews > 0 ? pendingReviews : null,
+            },
+          ] as const
+        ).map((t) => {
+          const Icon = t.icon;
+          const active = tab === t.id;
+          return (
+            <button
+              key={t.id}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => setTab(t.id)}
+              className={`aos-press flex h-10 items-center gap-2 rounded-full px-4 text-[14px] font-semibold ${
+                active ? "bg-black text-white" : "bg-paper text-muted shadow-hairline"
+              }`}
+            >
+              <Icon size={15} />
+              {t.label}
+              {t.badge !== null && (
+                <span
+                  className={`flex h-5 min-w-5 items-center justify-center rounded-full px-1 font-mono text-[11px] ${
+                    active ? "bg-white text-black" : "bg-black text-white"
+                  }`}
+                >
+                  {t.badge}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
 
-      {loading ? (
-        <div className="flex items-center gap-2 text-sm text-muted">
-          <Loader2 size={16} className="animate-spin" />
-          Loading sources
-        </div>
-      ) : sources.length === 0 ? (
-        <div className="rounded-lg bg-paper p-8 text-center shadow-hairline">
-          <p className="text-[15px] font-semibold">No sources yet</p>
-          <p className="mt-1 text-sm text-muted">
-            Add your first source — a file, a Drive document, a website, or
-            pasted text — and it becomes chunked, traceable knowledge.
-          </p>
-          <button
-            type="button"
-            onClick={() => setShowAdd(true)}
-            className="aos-press mt-4 h-11 rounded-full bg-black px-6 text-[15px] font-semibold text-white"
-          >
-            Add source
-          </button>
-        </div>
-      ) : (
-        <div className="flex flex-col gap-3">
-          {sources.map((source) => {
+      {tab === "sources" && (
+        <>
+          {showAdd && (
+            <AddSourcePanel
+              onAdded={() => {
+                setShowAdd(false);
+                void refresh();
+              }}
+              onCancel={() => setShowAdd(false)}
+            />
+          )}
+
+          {loading ? (
+            <div className="flex items-center gap-2 text-sm text-muted">
+              <Loader2 size={16} className="animate-spin" />
+              Loading sources
+            </div>
+          ) : sources.length === 0 ? (
+            <div className="rounded-lg bg-paper p-8 text-center shadow-hairline">
+              <p className="text-[15px] font-semibold">No sources yet</p>
+              <p className="mt-1 text-sm text-muted">
+                Add your first source — a file, a Drive document, a website, or
+                pasted text — and it becomes chunked, traceable knowledge.
+              </p>
+              <button
+                type="button"
+                onClick={() => setShowAdd(true)}
+                className="aos-press mt-4 h-11 rounded-full bg-black px-6 text-[15px] font-semibold text-white"
+              >
+                Add source
+              </button>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-3">
+              {sources.map((source) => {
             const meta = KIND_META[source.kind];
             const Icon = meta.icon;
             const isOpen = expanded[source.id] ?? false;
@@ -227,8 +285,295 @@ export function DatasetsApp() {
               </div>
             );
           })}
-        </div>
+            </div>
+          )}
+        </>
       )}
+
+      {tab === "types" && <ByTypeView onClassified={() => void refresh()} />}
+
+      {tab === "reviews" && (
+        <ReviewQueueView onDecided={() => void refresh()} />
+      )}
+    </div>
+  );
+}
+
+interface TypeEntry {
+  type: string;
+  label: string;
+  count: number;
+}
+
+function ByTypeView({ onClassified }: { onClassified: () => void }) {
+  const [types, setTypes] = useState<TypeEntry[]>([]);
+  const [unclassified, setUnclassified] = useState(0);
+  const [pendingReview, setPendingReview] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [running, setRunning] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    const res = await fetch("/api/datasets/by-type");
+    if (res.ok) {
+      const json = await res.json();
+      setTypes(json.types ?? []);
+      setUnclassified(json.unclassified ?? 0);
+      setPendingReview(json.pendingReview ?? 0);
+    }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  async function runClassification() {
+    setRunning(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/datasets/classify", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      if (!res.ok) throw new Error("Classification run failed");
+      await load();
+      onClassified();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Classification run failed");
+    } finally {
+      setRunning(false);
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center gap-2 text-sm text-muted">
+        <Loader2 size={16} className="animate-spin" />
+        Loading dataset types
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-wrap items-center gap-3">
+        <p className="text-[13px] text-muted">
+          Chunks auto-classified into dataset types. Low-confidence chunks go
+          to the review queue instead of being force-fit.
+        </p>
+        <div className="ml-auto">
+          <button
+            type="button"
+            onClick={() => void runClassification()}
+            disabled={running}
+            className="aos-press flex h-11 items-center gap-2 rounded-full bg-black px-6 text-[15px] font-semibold text-white disabled:opacity-60"
+          >
+            {running ? <Loader2 size={16} className="animate-spin" /> : <Tags size={16} />}
+            {running ? "Classifying" : "Run classification"}
+          </button>
+        </div>
+      </div>
+      {error && <p className="text-[13px] text-failed-text">{error}</p>}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {types.map((t) => (
+          <div key={t.type} className="rounded-lg bg-paper p-4 shadow-hairline">
+            <p className="text-[15px] font-semibold">{t.label}</p>
+            <p className="mt-1 font-mono text-[24px] font-semibold">
+              {formatCount(t.count)}
+            </p>
+            <p className="text-[13px] text-muted">
+              {t.count === 1 ? "chunk" : "chunks"} classified
+            </p>
+          </div>
+        ))}
+        <div className="rounded-lg bg-paper p-4 shadow-hairline">
+          <p className="text-[15px] font-semibold">Unclassified</p>
+          <p className="mt-1 font-mono text-[24px] font-semibold">
+            {formatCount(unclassified)}
+          </p>
+          <p className="text-[13px] text-muted">chunks awaiting classification</p>
+        </div>
+        <div className="rounded-lg bg-paper p-4 shadow-hairline">
+          <p className="text-[15px] font-semibold">In review</p>
+          <p className="mt-1 font-mono text-[24px] font-semibold">
+            {formatCount(pendingReview)}
+          </p>
+          <p className="text-[13px] text-muted">chunks awaiting your decision</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+interface ReviewEntry {
+  reviewId: string;
+  classificationId: string;
+  suggestedType: string;
+  suggestedTypeLabel: string;
+  confidence: number;
+  engine: string;
+  chunkText: string;
+  documentName: string;
+  sourceName: string;
+  createdAt: string;
+}
+
+const REASSIGN_TYPES = [
+  { value: "faq", label: "FAQs" },
+  { value: "product_catalog", label: "Products / catalog" },
+  { value: "policy", label: "Policies" },
+  { value: "process_sop", label: "Processes / SOPs" },
+  { value: "company_fact", label: "Company facts" },
+  { value: "pricing", label: "Pricing" },
+];
+
+function ReviewQueueView({ onDecided }: { onDecided: () => void }) {
+  const [items, setItems] = useState<ReviewEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [reassignFor, setReassignFor] = useState<string | null>(null);
+  const [reassignType, setReassignType] = useState("faq");
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    const res = await fetch("/api/datasets/reviews");
+    if (res.ok) {
+      const json = await res.json();
+      setItems(json.pending ?? []);
+    }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  async function decide(
+    reviewId: string,
+    action: "approve" | "reassign" | "reject",
+    datasetType?: string,
+  ) {
+    setBusy(reviewId);
+    try {
+      const res = await fetch(`/api/datasets/reviews/${reviewId}`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action, datasetType }),
+      });
+      if (res.ok) {
+        setItems((cur) => cur.filter((i) => i.reviewId !== reviewId));
+        setReassignFor(null);
+        onDecided();
+      }
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center gap-2 text-sm text-muted">
+        <Loader2 size={16} className="animate-spin" />
+        Loading review queue
+      </div>
+    );
+  }
+
+  if (items.length === 0) {
+    return (
+      <div className="rounded-lg bg-paper p-8 text-center shadow-hairline">
+        <p className="text-[15px] font-semibold">Review queue is clear</p>
+        <p className="mt-1 text-sm text-muted">
+          Low-confidence classifications will land here for your decision —
+          approve, reassign to the right type, or reject.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-3">
+      {items.map((item) => (
+        <div key={item.reviewId} className="rounded-lg bg-paper p-4 shadow-hairline">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="rounded-full bg-canvas px-3 py-1 text-[13px] font-semibold">
+              {item.suggestedTypeLabel}
+            </span>
+            <span className="font-mono text-[12px] text-subtle">
+              {Math.round(item.confidence * 100)}% confidence · {item.engine}
+            </span>
+            <span className="text-[13px] text-muted">
+              {item.documentName} · {item.sourceName}
+            </span>
+          </div>
+          <p className="mt-2 line-clamp-3 text-[14px] text-muted">
+            {item.chunkText}
+          </p>
+          {reassignFor === item.reviewId ? (
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <select
+                value={reassignType}
+                onChange={(e) => setReassignType(e.target.value)}
+                className="h-10 rounded-full border border-line bg-paper px-4 text-[14px]"
+                aria-label="Reassign to type"
+              >
+                {REASSIGN_TYPES.map((t) => (
+                  <option key={t.value} value={t.value}>
+                    {t.label}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                disabled={busy === item.reviewId}
+                onClick={() => void decide(item.reviewId, "reassign", reassignType)}
+                className="aos-press h-10 rounded-full bg-black px-5 text-[14px] font-semibold text-white disabled:opacity-60"
+              >
+                Confirm reassign
+              </button>
+              <button
+                type="button"
+                onClick={() => setReassignFor(null)}
+                className="aos-press h-10 rounded-full px-4 text-[14px] font-semibold text-muted"
+              >
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                disabled={busy === item.reviewId}
+                onClick={() => void decide(item.reviewId, "approve")}
+                className="aos-press h-10 rounded-full bg-black px-5 text-[14px] font-semibold text-white disabled:opacity-60"
+              >
+                Approve
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setReassignFor(item.reviewId);
+                  setReassignType(item.suggestedType);
+                }}
+                className="aos-press h-10 rounded-full bg-paper px-5 text-[14px] font-semibold shadow-hairline"
+              >
+                Reassign
+              </button>
+              <button
+                type="button"
+                disabled={busy === item.reviewId}
+                onClick={() => void decide(item.reviewId, "reject")}
+                className="aos-press h-10 rounded-full px-4 text-[14px] font-semibold text-failed-text"
+              >
+                Reject
+              </button>
+            </div>
+          )}
+        </div>
+      ))}
     </div>
   );
 }

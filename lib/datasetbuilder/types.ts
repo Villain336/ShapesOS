@@ -99,6 +99,26 @@ export interface DatasetChunkRecord {
   createdAt: Date;
 }
 
+import type {
+  ClassificationInput,
+  ClassificationRecord,
+  DatasetType,
+  ReviewDecision,
+  ReviewItemInput,
+  ReviewItemRecord,
+  ReviewItemStatus,
+} from "./classify";
+
+export type {
+  ClassificationInput,
+  ClassificationRecord,
+  DatasetType,
+  ReviewDecision,
+  ReviewItemInput,
+  ReviewItemRecord,
+  ReviewItemStatus,
+};
+
 /** Store contract every backend (in-memory for tests, Prisma in prod) implements. */
 export interface DatasetBuilderStore {
   createSource(input: DatasetSourceInput): Promise<DatasetSourceRecord>;
@@ -122,6 +142,58 @@ export interface DatasetBuilderStore {
   createChunk(input: ChunkInput): Promise<DatasetChunkRecord>;
   listChunksByDocument(documentId: string): Promise<DatasetChunkRecord[]>;
   listAllChunks(workspaceId: string): Promise<DatasetChunkRecord[]>;
+
+  // ---- Slice 2: structure -------------------------------------------
+  /**
+   * Upsert by (chunkId, engine): re-running an engine replaces its own
+   * classification, never duplicates it. chunkId must reference a live
+   * chunk (UNKNOWN_CHUNK otherwise) — classifications of orphaned chunks
+   * are as invalid as orphaned chunks themselves.
+   */
+  upsertClassification(
+    input: ClassificationInput,
+  ): Promise<ClassificationRecord>;
+  getClassificationByChunk(
+    chunkId: string,
+  ): Promise<ClassificationRecord | null>;
+  getClassificationById(id: string): Promise<ClassificationRecord | null>;
+  getChunkById(id: string): Promise<DatasetChunkRecord | null>;
+  listClassificationsByType(
+    workspaceId: string,
+    type: DatasetType,
+  ): Promise<ClassificationRecord[]>;
+  listPendingClassifications(
+    workspaceId: string,
+  ): Promise<ClassificationRecord[]>;
+  updateClassification(
+    id: string,
+    patch: Partial<
+      Pick<ClassificationRecord, "datasetType" | "confidence" | "status">
+    >,
+  ): Promise<ClassificationRecord>;
+
+  /**
+   * Exactly one review item per classification — REVIEW_ALREADY_EXISTS on
+   * duplicates, so the review queue can never lose or double-count an item.
+   */
+  createReviewItem(input: ReviewItemInput): Promise<ReviewItemRecord>;
+  getReviewItem(id: string): Promise<ReviewItemRecord | null>;
+  getReviewItemByClassification(
+    classificationId: string,
+  ): Promise<ReviewItemRecord | null>;
+  listReviewItems(
+    workspaceId: string,
+    status?: ReviewItemStatus,
+  ): Promise<ReviewItemRecord[]>;
+  /**
+   * Applies a human decision (approve / reassign / reject). Throws
+   * REVIEW_ALREADY_DECIDED when the item is not pending — decisions are
+   * final and auditable.
+   */
+  decideReviewItem(
+    id: string,
+    decision: ReviewDecision,
+  ): Promise<{ review: ReviewItemRecord; classification: ClassificationRecord }>;
 }
 
 export type DatasetBuilderErrorCode =
@@ -134,7 +206,12 @@ export type DatasetBuilderErrorCode =
   | "FETCH_FAILED"
   | "NANGO_NOT_CONFIGURED"
   | "ENGINE_NOT_CONFIGURED"
-  | "VALIDATION_FAILED";
+  | "VALIDATION_FAILED"
+  | "UNKNOWN_CHUNK"
+  | "UNKNOWN_CLASSIFICATION"
+  | "UNKNOWN_REVIEW_ITEM"
+  | "REVIEW_ALREADY_EXISTS"
+  | "REVIEW_ALREADY_DECIDED";
 
 export class DatasetBuilderError extends Error {
   readonly code: DatasetBuilderErrorCode;
