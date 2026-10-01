@@ -7,16 +7,21 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   AlertTriangle,
+  Archive,
   ArrowLeft,
   CheckCircle2,
+  FileDown,
   FileText,
   FileUp,
   LayoutTemplate,
+  Link2,
   Loader2,
+  Lock,
   Pencil,
   PencilLine,
   Plus,
   RefreshCw,
+  Scale,
   Send,
   ShieldCheck,
   Trash2,
@@ -131,6 +136,16 @@ interface ApiEnvelopeDetail extends ApiEnvelope {
     previousHash: string | null;
     createdAt: string;
   }>;
+  contractType: string | null;
+  contractRef: string | null;
+  vaultEntry: {
+    id: string;
+    storedAt: string;
+    retentionUntil: string | null;
+    legalHold: boolean;
+    legalHoldReason: string | null;
+    purgedAt: string | null;
+  } | null;
 }
 
 interface SendPreview {
@@ -686,6 +701,8 @@ function DetailView({ id, onBack, onChanged }: { id: string; onBack: () => void;
         </div>
       </div>
 
+      <EvidenceCard detail={detail} onChanged={() => { void load(); onChanged(); }} />
+
       {detail.fields.length > 0 && (
         <div className="rounded-lg border border-stone-200 bg-white">
           <div className="border-b border-stone-100 px-4 py-2.5 text-[12px] font-semibold text-stone-900">Fields</div>
@@ -776,6 +793,164 @@ function DetailView({ id, onBack, onChanged }: { id: string; onBack: () => void;
           onVoided={() => { setShowVoid(false); void load(); onChanged(); }}
         />
       )}
+    </div>
+  );
+}
+
+// ── Evidence & legal vault card ────────────────────────────────────────────
+
+function EvidenceCard({ detail, onChanged }: { detail: ApiEnvelopeDetail; onChanged: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const [linkType, setLinkType] = useState("");
+  const [linkRef, setLinkRef] = useState("");
+  const [retentionDays, setRetentionDays] = useState("2555");
+  const [holdReason, setHoldReason] = useState("");
+  const [showHold, setShowHold] = useState(false);
+
+  async function post(url: string, body?: unknown, method = "POST") {
+    setBusy(true);
+    try {
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: body !== undefined ? JSON.stringify(body) : undefined,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error ?? "Action failed.");
+      onChanged();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Action failed.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function downloadPack() {
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/esign/envelopes/${detail.id}/evidence`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Could not build the evidence pack.");
+      const blob = new Blob([JSON.stringify(data.evidence, null, 2)], { type: "application/json" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `${detail.title.replace(/[^a-z0-9-_]+/gi, "-").slice(0, 60)}-evidence-pack.json`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Could not build the evidence pack.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const canVault = detail.status === "completed" && detail.sealedPdfHash && !detail.vaultEntry;
+  const canFlip = detail.status === "completed" && detail.sealedPdfHash && detail.contractRef;
+
+  return (
+    <div className="rounded-lg border border-stone-200 bg-white">
+      <div className="border-b border-stone-100 px-4 py-2.5 text-[12px] font-semibold text-stone-900">
+        Evidence & legal vault <span className="ml-1 font-normal text-stone-500">— one package for counsel</span>
+      </div>
+      <div className="grid gap-4 px-4 py-3 md:grid-cols-3">
+        {/* Contract binding */}
+        <div>
+          <div className="mb-2 flex items-center gap-1.5 text-[12px] font-semibold text-stone-900">
+            <Scale size={13} /> Contract
+          </div>
+          {detail.contractRef ? (
+            <div className="space-y-1 text-[13px]">
+              <div className="flex justify-between gap-4"><span className="text-stone-500">Type</span><span className="text-stone-900">{detail.contractType ?? "—"}</span></div>
+              <div className="flex justify-between gap-4"><span className="text-stone-500">Ref</span><span className="font-mono text-[12px] text-stone-900">{detail.contractRef}</span></div>
+              {canFlip && (
+                <button disabled={busy} onClick={() => post(`/api/esign/envelopes/${detail.id}/flip-executed`)} className={btnGhost}>
+                  <CheckCircle2 size={14} /> Mark contract executed
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <input value={linkType} onChange={(e) => setLinkType(e.target.value)} placeholder="Contract type (e.g. msa)" className={inputCls} />
+              <input value={linkRef} onChange={(e) => setLinkRef(e.target.value)} placeholder="Contract reference" className={inputCls} />
+              <button
+                disabled={busy || !linkType.trim() || !linkRef.trim()}
+                onClick={() => post(`/api/esign/envelopes/${detail.id}/link-contract`, { contractType: linkType, contractRef: linkRef })}
+                className={btnGhost}
+              >
+                <Link2 size={14} /> Link contract
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Vault */}
+        <div>
+          <div className="mb-2 flex items-center gap-1.5 text-[12px] font-semibold text-stone-900">
+            <Archive size={13} /> Legal vault
+          </div>
+          {detail.vaultEntry ? (
+            <div className="space-y-1 text-[13px]">
+              <div className="flex justify-between gap-4"><span className="text-stone-500">Stored</span><span className="text-stone-900">{fmtDate(detail.vaultEntry.storedAt)}</span></div>
+              <div className="flex justify-between gap-4"><span className="text-stone-500">Retention until</span><span className="text-stone-900">{fmtDate(detail.vaultEntry.retentionUntil) ?? "indefinite"}</span></div>
+              {detail.vaultEntry.legalHold ? (
+                <div className="space-y-1">
+                  <div><Chip tone="red"><Lock size={11} className="mr-1" />Legal hold</Chip></div>
+                  {detail.vaultEntry.legalHoldReason && <div className="text-stone-600">{detail.vaultEntry.legalHoldReason}</div>}
+                  <button disabled={busy} onClick={() => post(`/api/esign/vault/${detail.vaultEntry!.id}/legal-hold`, undefined, "DELETE")} className={btnGhost}>
+                    Release hold
+                  </button>
+                </div>
+              ) : showHold ? (
+                <div className="space-y-2">
+                  <input value={holdReason} onChange={(e) => setHoldReason(e.target.value)} placeholder="Hold reason (required)" className={inputCls} />
+                  <div className="flex gap-2">
+                    <button disabled={busy || !holdReason.trim()} onClick={() => { void post(`/api/esign/vault/${detail.vaultEntry!.id}/legal-hold`, { reason: holdReason }).then(() => setShowHold(false)); }} className={btnPrimary}>
+                      Set hold
+                    </button>
+                    <button onClick={() => setShowHold(false)} className={btnGhost}>Cancel</button>
+                  </div>
+                </div>
+              ) : (
+                <button disabled={busy} onClick={() => setShowHold(true)} className={btnGhost}>
+                  <Lock size={14} /> Set legal hold
+                </button>
+              )}
+            </div>
+          ) : canVault ? (
+            <div className="space-y-2">
+              <p className="text-[13px] text-stone-500">Anchors the sealed PDF hash + audit chain head.</p>
+              <input value={retentionDays} onChange={(e) => setRetentionDays(e.target.value)} inputMode="numeric" placeholder="Retention days (default 2555)" className={inputCls} />
+              <button
+                disabled={busy}
+                onClick={() => post(`/api/esign/envelopes/${detail.id}/vault`, retentionDays.trim() ? { retentionDays: Number(retentionDays) } : {})}
+                className={btnGhost}
+              >
+                <Archive size={14} /> Store in vault
+              </button>
+            </div>
+          ) : (
+            <p className="text-[13px] text-stone-500">Available once the envelope is completed and sealed.</p>
+          )}
+        </div>
+
+        {/* Evidence pack */}
+        <div>
+          <div className="mb-2 flex items-center gap-1.5 text-[12px] font-semibold text-stone-900">
+            <ShieldCheck size={13} /> Evidence pack
+          </div>
+          <p className="mb-2 text-[13px] text-stone-500">Sealed PDF hash + hash-chained audit log + signer identity evidence.</p>
+          <div className="flex flex-wrap gap-2">
+            <button disabled={busy} onClick={downloadPack} className={btnGhost}>
+              <FileDown size={14} /> Download pack
+            </button>
+            {detail.sealedPdfHash && (
+              <a href={`/api/esign/envelopes/${detail.id}/evidence/pdf`} className={btnGhost}>
+                <FileText size={14} /> Sealed PDF
+              </a>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -901,6 +1076,7 @@ interface ApiTemplate {
   signerRoles: Array<{ role: string; orderIndex: number; required: boolean }>;
   fieldLayout: Array<{ signerRole: string; fieldType: string; page?: number; x?: number; y?: number; required?: boolean }>;
   mergeFieldMapping: Record<string, { source: string; path: string; required: boolean }>;
+  contractType: string | null;
   updatedAt: string;
 }
 
@@ -918,6 +1094,7 @@ function TemplateModal({
   onSaved: () => void;
 }) {
   const [name, setName] = useState(template?.name ?? "");
+  const [contractType, setContractType] = useState(template?.contractType ?? "");
   const [file, setFile] = useState<File | null>(null);
   const [roles, setRoles] = useState<RoleRow[]>(
     template?.signerRoles.map((r) => ({ role: r.role, required: r.required })) ?? [{ role: "signer", required: true }],
@@ -951,6 +1128,7 @@ function TemplateModal({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             name: name.trim(),
+            contractType: contractType.trim() || null,
             signerRoles: roles.map((r, i) => ({ role: r.role.trim(), orderIndex: i, required: r.required })),
             fieldLayout: fields.map((f) => ({
               signerRole: f.signerRole,
@@ -999,6 +1177,15 @@ function TemplateModal({
 
       <label className="mb-1 block text-[12px] font-medium text-stone-600">Name</label>
       <input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. MSA template" className={`${inputCls} mb-4 w-full`} maxLength={200} />
+
+      {template && (
+        <>
+          <label className="mb-1 block text-[12px] font-medium text-stone-600">
+            Contract type <span className="font-normal text-stone-400">(binds the template to a legal contract object, e.g. msa)</span>
+          </label>
+          <input value={contractType} onChange={(e) => setContractType(e.target.value)} placeholder="e.g. msa" className={`${inputCls} mb-4 w-full`} maxLength={80} />
+        </>
+      )}
 
       {!template && (
         <>
@@ -1250,6 +1437,7 @@ function TemplatesTab({ onOpenEnvelope }: { onOpenEnvelope: (id: string) => void
             <thead>
               <tr className="border-b border-stone-100 bg-stone-50/60 text-[11px] uppercase tracking-wide text-stone-500">
                 <th className="px-3 py-2 font-medium">Name</th>
+                <th className="px-3 py-2 font-medium">Contract</th>
                 <th className="px-3 py-2 font-medium">Roles</th>
                 <th className="px-3 py-2 font-medium">Fields</th>
                 <th className="px-3 py-2 font-medium">Merge fields</th>
@@ -1260,10 +1448,10 @@ function TemplatesTab({ onOpenEnvelope }: { onOpenEnvelope: (id: string) => void
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={7} className="px-3 py-10 text-center text-stone-500"><Loader2 size={16} className="mr-2 inline animate-spin" />Loading…</td></tr>
+                <tr><td colSpan={8} className="px-3 py-10 text-center text-stone-500"><Loader2 size={16} className="mr-2 inline animate-spin" />Loading…</td></tr>
               ) : templates.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-3 py-10 text-center text-stone-500">
+                  <td colSpan={8} className="px-3 py-10 text-center text-stone-500">
                     <LayoutTemplate size={20} className="mx-auto mb-2 text-stone-300" />
                     No templates yet. Save a reusable blueprint to stop rebuilding envelopes by hand.
                   </td>
@@ -1272,6 +1460,7 @@ function TemplatesTab({ onOpenEnvelope }: { onOpenEnvelope: (id: string) => void
                 templates.map((t) => (
                   <tr key={t.id} className="border-b border-stone-100 last:border-0 hover:bg-[var(--brand-50)]/40">
                     <td className="px-3 py-2.5 font-medium text-stone-900">{t.name}</td>
+                    <td className="px-3 py-2.5">{t.contractType ? <Chip tone="blue">{t.contractType}</Chip> : <span className="text-stone-400">—</span>}</td>
                     <td className="px-3 py-2.5">
                       <span className="flex flex-wrap gap-1">
                         {t.signerRoles.map((r) => (<Chip key={r.role}>{r.role}</Chip>))}

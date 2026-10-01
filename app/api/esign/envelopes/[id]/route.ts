@@ -16,6 +16,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
         signers: { orderBy: { orderIndex: "asc" } },
         fields: true,
         events: { orderBy: { createdAt: "asc" }, take: 200 },
+        vaultEntry: true,
       },
     });
     if (!envelope) return Response.json({ error: "Envelope not found." }, { status: 404 });
@@ -36,6 +37,16 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
         voidReason: envelope.voidReason,
         contractType: envelope.contractType,
         contractRef: envelope.contractRef,
+        vaultEntry: envelope.vaultEntry
+          ? {
+              id: envelope.vaultEntry.id,
+              storedAt: envelope.vaultEntry.storedAt.toISOString(),
+              retentionUntil: envelope.vaultEntry.retentionUntil?.toISOString() ?? null,
+              legalHold: envelope.vaultEntry.legalHold,
+              legalHoldReason: envelope.vaultEntry.legalHoldReason,
+              purgedAt: envelope.vaultEntry.purgedAt?.toISOString() ?? null,
+            }
+          : null,
         createdAt: envelope.createdAt.toISOString(),
         signers: envelope.signers.map((s) => ({
           id: s.id,

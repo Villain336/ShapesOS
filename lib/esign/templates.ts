@@ -146,6 +146,7 @@ export async function updateTemplate(
     signerRoles?: SignerRoleDef[];
     fieldLayout?: TemplateFieldDef[];
     mergeFieldMapping?: Record<string, MergeFieldDef>;
+    contractType?: string | null;
   },
 ) {
   const template = await db.esignTemplate.findFirst({
@@ -172,6 +173,7 @@ export async function updateTemplate(
     where: { id: template.id },
     data: {
       ...(input.name ? { name: input.name.trim() } : {}),
+      ...(input.contractType !== undefined ? { contractType: input.contractType?.trim() || null } : {}),
       signerRoles: signerRoles as unknown as Prisma.InputJsonValue,
       fieldLayout: fieldLayout as unknown as Prisma.InputJsonValue,
       mergeFieldMapping: mergeFieldMapping as unknown as Prisma.InputJsonValue,

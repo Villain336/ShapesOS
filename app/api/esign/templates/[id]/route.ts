@@ -12,6 +12,7 @@ export const dynamic = "force-dynamic";
 
 const PatchSchema = z.object({
   name: z.string().min(1).max(200).optional(),
+  contractType: z.string().max(80).nullable().optional(),
   signerRoles: z
     .array(z.object({ role: z.string().min(1).max(80), orderIndex: z.number().int().min(0).max(20).default(0), required: z.boolean().default(true) }))
     .min(1)
@@ -46,6 +47,7 @@ function serialize(t: {
   signerRoles: unknown;
   fieldLayout: unknown;
   mergeFieldMapping: unknown;
+  contractType: string | null;
   createdAt: Date;
   updatedAt: Date;
 }) {
@@ -60,6 +62,7 @@ function serialize(t: {
     mergeFieldMapping: t.mergeFieldMapping,
     createdAt: t.createdAt.toISOString(),
     updatedAt: t.updatedAt.toISOString(),
+    contractType: t.contractType ?? null,
   };
 }
 

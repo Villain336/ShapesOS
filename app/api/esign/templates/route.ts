@@ -69,6 +69,7 @@ export async function GET() {
         mergeFieldMapping: t.mergeFieldMapping,
         createdAt: t.createdAt.toISOString(),
         updatedAt: t.updatedAt.toISOString(),
+        contractType: t.contractType ?? null,
       })),
     });
   } catch (e) {

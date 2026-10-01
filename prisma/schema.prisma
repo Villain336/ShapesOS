@@ -725,6 +725,7 @@ model Workspace {
   // Wave 2 E-sign module (SPEC-GAP-ESIGN.md).
   esignEnvelopes          EsignEnvelope[]
   esignTemplates          EsignTemplate[]
+  esignVaultEntries       EsignVaultEntry[]
   // Phase 12 (embeds): tenant-scoped GrowthBook flag overrides.
   flagOverrides           WorkspaceFlagOverride[]
   eddmOrders              EddmOrder[]
@@ -4499,6 +4500,7 @@ model EsignEnvelope {
   signers EsignSigner[]
   fields  EsignField[]
   events  EsignAuditEvent[]
+  vaultEntry EsignVaultEntry?
 
   createdBy String?  @map("created_by")
   createdAt DateTime @default(now()) @map("created_at")
@@ -4570,6 +4572,9 @@ model EsignTemplate {
   signerRoles Json @default("[]") @map("signer_roles")
   // Merge-field mapping: { "{{client.name}}": "crm.contact.name", ... }
   mergeFieldMapping Json @default("{}") @map("merge_field_mapping")
+  // Template bound to a contract type (e.g. MSA template → MSA contract
+  // object in the legal/compliance module, which arrives next phase).
+  contractType String? @map("contract_type")
 
   envelopes EsignEnvelope[]
   ownerUserId String?  @map("owner_user_id")
@@ -4605,6 +4610,33 @@ model EsignAuditEvent {
 
   @@index([envelopeId, createdAt])
   @@map("esign_audit_events")
+}
+
+// Wave 2 E-sign module: the legal vault. A vault entry anchors a completed
+// envelope's sealed artifact: the sealed PDF hash + the audit chain's head
+// hash are captured at vault time, so any later tampering is detectable.
+// Retention policy lives here; a legal hold blocks purging.
+
+model EsignVaultEntry {
+  id          String        @id @default(cuid())
+  workspaceId String        @map("workspace_id")
+  workspace   Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  envelopeId  String        @unique @map("envelope_id")
+  envelope    EsignEnvelope @relation(fields: [envelopeId], references: [id], onDelete: Cascade)
+
+  sealedPdfHash String @map("sealed_pdf_hash")
+  auditHeadHash String @map("audit_head_hash")
+  eventCount    Int    @map("event_count")
+  signerCount   Int    @map("signer_count")
+  storedAt      DateTime @default(now()) @map("stored_at")
+
+  retentionUntil  DateTime? @map("retention_until")
+  legalHold       Boolean   @default(false) @map("legal_hold")
+  legalHoldReason String?   @map("legal_hold_reason")
+  purgedAt        DateTime? @map("purged_at")
+
+  @@index([workspaceId, storedAt])
+  @@map("esign_vault_entries")
 }
 
 // Phase 12 (Worker 1): GrapesJS page drafts — responsive landing pages and

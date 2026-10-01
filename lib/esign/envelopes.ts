@@ -48,6 +48,11 @@ export class EsignGateError extends Error {
       | "bad_signature"
       | "vendor_not_configured"
       | "bad_json"
+      | "not_completed"
+      | "no_sealed_pdf"
+      | "broken_chain"
+      | "unknown_vault_entry"
+      | "no_contract_link"
       // Template codes (named mismatch reasons — never silent).
       | "unknown_template"
       | "missing_name"
