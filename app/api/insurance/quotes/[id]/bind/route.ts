@@ -56,9 +56,19 @@ export async function POST(
       requestedBy: user.id,
     });
 
+    // The vendor's carrier confirmation lives in the policy rawPayload
+    // (not in the serialized policy); surface it so the UI can show the
+    // carrier's confirmation alongside the minted policy number.
+    const rawPayload = (result.policy.rawPayload ?? {}) as Record<string, unknown>;
+    const carrierConfirmation =
+      typeof rawPayload["carrierConfirmation"] === "string"
+        ? (rawPayload["carrierConfirmation"] as string)
+        : null;
+
     return Response.json(
       {
         policy: serializeBindPolicy(result.policy),
+        carrierConfirmation,
         paymentHandoff: serializePaymentHandoff(result.paymentHandoff),
         live: result.live,
         replayed: result.replayed,

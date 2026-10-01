@@ -14,6 +14,7 @@ import {
   partnerCoversState,
   requireAppointedPartner,
   validatePartnerInput,
+  validatePartnerStates,
   type LicensedPartnerInput,
   type LicensedPartnerRecord,
   type LicensedPartnerStore,
@@ -44,15 +45,39 @@ function record(overrides: Partial<LicensedPartnerRecord> = {}): LicensedPartner
 }
 
 function stubStore(partners: LicensedPartnerRecord[]): LicensedPartnerStore {
+  const byId = new Map(partners.map((p) => [p.id, { ...p }]));
   return {
     async getActivePartners() {
-      return partners.filter((p) => p.status === "active");
+      return [...byId.values()].filter((p) => p.status === "active");
+    },
+    async list() {
+      return [...byId.values()];
+    },
+    async get(_ws, partnerId) {
+      return byId.get(partnerId) ?? null;
     },
     async create(_ws, input) {
       validatePartnerInput(input);
-      return record({ name: input.name });
+      const p = record({ name: input.name });
+      byId.set(p.id, p);
+      return p;
     },
-    async setStatus() {},
+    async setStatus(_ws, partnerId, status) {
+      const p = byId.get(partnerId);
+      if (!p) {
+        throw new InsuranceError("UNKNOWN_PARTNER", "Licensed partner not found in this workspace.");
+      }
+      p.status = status;
+    },
+    async setLicensedStates(_ws, partnerId, states) {
+      const p = byId.get(partnerId);
+      if (!p) {
+        throw new InsuranceError("UNKNOWN_PARTNER", "Licensed partner not found in this workspace.");
+      }
+      // Mirror the fail-closed state validation the Prisma store applies.
+      p.statesLicensed = validatePartnerStates(states);
+      return p;
+    },
   };
 }
 
@@ -142,6 +167,70 @@ describe("requireAppointedPartner (store-backed gate)", () => {
           "ws-1",
           stubStore([record({ status: "suspended" })]),
         ),
+      (e: unknown) => e instanceof InsuranceError && e.code === "PARTNER_NOT_APPOINTED",
+    );
+  });
+});
+
+describe("validatePartnerStates (fail closed on state codes)", () => {
+  it("uppercases and trims codes", () => {
+    assert.deepEqual(validatePartnerStates(["nc", " Sc "]), ["NC", "SC"]);
+  });
+  it("rejects an empty list", () => {
+    assert.throws(
+      () => validatePartnerStates([]),
+      (e: unknown) => e instanceof InsuranceError && e.code === "PARTNER_STATES_REQUIRED",
+    );
+  });
+  it("rejects a malformed code", () => {
+    assert.throws(
+      () => validatePartnerStates(["NCA"]),
+      (e: unknown) => e instanceof InsuranceError && e.code === "BAD_PARTNER_STATE",
+    );
+  });
+});
+
+describe("partner management surface (slice 3c store methods)", () => {
+  it("list returns every partner, active or not", async () => {
+    const store = stubStore([
+      record(),
+      record({ id: "partner-2", status: "suspended", name: "Other" }),
+    ]);
+    const all = await store.list("ws-1");
+    assert.equal(all.length, 2);
+  });
+  it("get returns the partner by id, null when unknown", async () => {
+    const store = stubStore([record()]);
+    assert.equal((await store.get("ws-1", "partner-1"))?.name, "Amwins DAIS Partner LLC");
+    assert.equal(await store.get("ws-1", "nope"), null);
+  });
+  it("setLicensedStates replaces the state list, normalized", async () => {
+    const store = stubStore([record()]);
+    const updated = await store.setLicensedStates("ws-1", "partner-1", ["ga", "FL"]);
+    assert.deepEqual(updated.statesLicensed, ["GA", "FL"]);
+  });
+  it("setLicensedStates fails closed on malformed codes", async () => {
+    const store = stubStore([record()]);
+    await assert.rejects(
+      () => store.setLicensedStates("ws-1", "partner-1", ["North Carolina"]),
+      (e: unknown) => e instanceof InsuranceError && e.code === "BAD_PARTNER_STATE",
+    );
+  });
+  it("setStatus to an unknown partner fails closed", async () => {
+    const store = stubStore([record()]);
+    await assert.rejects(
+      () => store.setStatus("ws-1", "nope", "suspended"),
+      (e: unknown) => e instanceof InsuranceError && e.code === "UNKNOWN_PARTNER",
+    );
+  });
+  it("suspending the only partner re-blocks the bind gate", async () => {
+    const store = stubStore([record()]);
+    // Gate is satisfied before the suspension…
+    await requireAppointedPartner("ws-1", store);
+    // …and fails closed after.
+    await store.setStatus("ws-1", "partner-1", "suspended");
+    await assert.rejects(
+      () => requireAppointedPartner("ws-1", store),
       (e: unknown) => e instanceof InsuranceError && e.code === "PARTNER_NOT_APPOINTED",
     );
   });

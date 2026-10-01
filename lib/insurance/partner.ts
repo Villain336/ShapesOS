@@ -20,6 +20,12 @@ import { prisma } from "@/lib/prisma";
 
 export type LicensedPartnerStatus = "active" | "suspended" | "revoked";
 
+export const LICENSED_PARTNER_STATUSES: readonly LicensedPartnerStatus[] = [
+  "active",
+  "suspended",
+  "revoked",
+];
+
 export interface LicensedPartnerRecord {
   id: string;
   workspaceId: string;
@@ -42,6 +48,30 @@ export interface LicensedPartnerInput {
 }
 
 /**
+ * Validate + normalize licensed-state codes (2-letter, uppercased). Fail
+ * closed: a malformed state code throws BAD_PARTNER_STATE. Returns the
+ * normalized codes.
+ */
+export function validatePartnerStates(states: unknown): string[] {
+  if (!Array.isArray(states) || states.length === 0) {
+    throw new InsuranceError(
+      "PARTNER_STATES_REQUIRED",
+      "At least one licensed state is required (2-letter codes).",
+    );
+  }
+  return states.map((s) => {
+    const code = String(s).trim().toUpperCase();
+    if (!/^[A-Z]{2}$/.test(code)) {
+      throw new InsuranceError(
+        "BAD_PARTNER_STATE",
+        `Licensed states must be 2-letter codes; got "${s}".`,
+      );
+    }
+    return code;
+  });
+}
+
+/**
  * Fail closed on partner registration: an appointed partner is a legal
  * identity, so the record must carry one. A partner without a license number
  * or licensed states can be stored as suspended, never as active.
@@ -50,20 +80,7 @@ export function validatePartnerInput(input: LicensedPartnerInput): void {
   if (!input.name || input.name.trim().length === 0) {
     throw new InsuranceError("PARTNER_NAME_REQUIRED", "Partner name is required.");
   }
-  if (!Array.isArray(input.statesLicensed) || input.statesLicensed.length === 0) {
-    throw new InsuranceError(
-      "PARTNER_STATES_REQUIRED",
-      "At least one licensed state is required (2-letter codes).",
-    );
-  }
-  for (const s of input.statesLicensed) {
-    if (!/^[A-Z]{2}$/.test(s.trim().toUpperCase())) {
-      throw new InsuranceError(
-        "BAD_PARTNER_STATE",
-        `Licensed states must be 2-letter codes; got "${s}".`,
-      );
-    }
-  }
+  validatePartnerStates(input.statesLicensed);
   if (!input.licenseNumber || input.licenseNumber.trim().length === 0) {
     throw new InsuranceError(
       "PARTNER_LICENSE_REQUIRED",
@@ -110,6 +127,9 @@ export function partnerCoversState(
 
 export interface LicensedPartnerStore {
   getActivePartners(workspaceId: string): Promise<LicensedPartnerRecord[]>;
+  /** All partners in the workspace, newest first (management surface). */
+  list(workspaceId: string): Promise<LicensedPartnerRecord[]>;
+  get(workspaceId: string, partnerId: string): Promise<LicensedPartnerRecord | null>;
   create(
     workspaceId: string,
     input: LicensedPartnerInput,
@@ -119,6 +139,12 @@ export interface LicensedPartnerStore {
     partnerId: string,
     status: LicensedPartnerStatus,
   ): Promise<void>;
+  /** Replace the licensed-states list (validated 2-letter codes). */
+  setLicensedStates(
+    workspaceId: string,
+    partnerId: string,
+    states: string[],
+  ): Promise<LicensedPartnerRecord>;
 }
 
 function toRecord(row: {
@@ -162,6 +188,31 @@ export function prismaLicensedPartnerStore(): LicensedPartnerStore {
         }),
       );
     },
+    async list(workspaceId) {
+      const rows = await prisma.insuranceLicensedPartner.findMany({
+        where: { workspaceId },
+        orderBy: { createdAt: "desc" },
+      });
+      return rows.map((r) =>
+        toRecord({
+          ...r,
+          appointmentPath: r.appointmentPath as InsuranceAppointmentPath,
+          status: r.status as LicensedPartnerStatus,
+        }),
+      );
+    },
+    async get(workspaceId, partnerId) {
+      const r = await prisma.insuranceLicensedPartner.findFirst({
+        where: { id: partnerId, workspaceId },
+      });
+      return r
+        ? toRecord({
+            ...r,
+            appointmentPath: r.appointmentPath as InsuranceAppointmentPath,
+            status: r.status as LicensedPartnerStatus,
+          })
+        : null;
+    },
     async create(workspaceId, input) {
       validatePartnerInput(input);
       const row = await prisma.insuranceLicensedPartner.create({
@@ -195,6 +246,41 @@ export function prismaLicensedPartnerStore(): LicensedPartnerStore {
         throw new InsuranceError("UNKNOWN_PARTNER", "Licensed partner not found in this workspace.");
       }
     },
+    async setLicensedStates(workspaceId, partnerId, states) {
+      const normalized = validatePartnerStates(states);
+      const updated = await prisma.insuranceLicensedPartner.updateMany({
+        where: { id: partnerId, workspaceId },
+        data: { statesLicensed: normalized },
+      });
+      if (updated.count === 0) {
+        throw new InsuranceError("UNKNOWN_PARTNER", "Licensed partner not found in this workspace.");
+      }
+      const r = await prisma.insuranceLicensedPartner.findFirst({
+        where: { id: partnerId, workspaceId },
+      });
+      if (!r) {
+        throw new InsuranceError("UNKNOWN_PARTNER", "Licensed partner not found in this workspace.");
+      }
+      return toRecord({
+        ...r,
+        appointmentPath: r.appointmentPath as InsuranceAppointmentPath,
+        status: r.status as LicensedPartnerStatus,
+      });
+    },
+  };
+}
+
+/** JSON-safe serialization for API responses. */
+export function serializePartner(record: LicensedPartnerRecord): Record<string, unknown> {
+  return {
+    id: record.id,
+    name: record.name,
+    contactEmail: record.contactEmail,
+    licenseNumber: record.licenseNumber,
+    licensedStates: record.statesLicensed,
+    appointmentPath: record.appointmentPath,
+    status: record.status,
+    appointedAt: record.appointedAt ? record.appointedAt.toISOString() : null,
   };
 }
 

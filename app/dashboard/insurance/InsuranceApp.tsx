@@ -4,17 +4,26 @@
 
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
+  Ban,
   BellRing,
   CalendarClock,
+  CheckCircle2,
+  ChevronDown,
+  Eye,
   FileUp,
+  Handshake,
+  Info,
   Loader2,
   Plus,
   RefreshCw,
+  RotateCcw,
   ShieldCheck,
+  Stamp,
   X,
+  XCircle,
 } from "lucide-react";
 import {
   DECLARATIONS_REVIEW_THRESHOLD,
@@ -102,7 +111,7 @@ interface PolicyRow {
   alertLevel: RenewalAlertLevel;
 }
 
-type Tab = "policies" | "renewals" | "quoting" | "import";
+type Tab = "policies" | "renewals" | "quoting" | "import" | "partners" | "approvals";
 
 interface QuoteRow {
   id: string;
@@ -127,6 +136,95 @@ interface SubmissionRow {
   vendorRef: string | null;
   createdAt: string;
   quotes: QuoteRow[];
+}
+
+// ── Slice 3c: licensed partners + governed-action approvals ──────────────────
+
+interface PartnerRow {
+  id: string;
+  name: string;
+  contactEmail: string | null;
+  licenseNumber: string | null;
+  licensedStates: string[];
+  appointmentPath: string;
+  status: "active" | "suspended" | "revoked";
+  appointedAt: string | null;
+}
+
+interface PendingApprovalRow {
+  id: string;
+  kind: string;
+  payload: Record<string, unknown>;
+  status: string;
+  requestedBy: string | null;
+  createdAt: string | null;
+}
+
+interface AppointedPartnerInfo {
+  name: string;
+  licenseNumber: string | null;
+  licensedStates: string[];
+  appointmentPath: string;
+}
+
+interface ApprovedBind {
+  approvalId: string;
+  quoteId: string;
+  payload: Record<string, unknown>;
+}
+
+interface ExecutedBind {
+  policyNumber: string;
+  carrierName: string;
+  carrierConfirmation: string | null;
+  replayed: boolean;
+}
+
+const APPOINTMENT_PATH_LABELS: Record<string, string> = {
+  direct: "Direct appointment",
+  dais_market_access: "DAIS market access",
+  subappointment: "Subappointment",
+};
+
+function actionLabel(kind: string): string {
+  switch (kind) {
+    case "insurance_bind_policy": return "Bind policy";
+    case "insurance_request_quote": return "Request quote";
+    case "insurance_issue_certificate": return "Issue certificate";
+    default: return kind;
+  }
+}
+
+function actionTone(kind: string): "slate" | "violet" | "green" | "amber" | "red" | "blue" {
+  switch (kind) {
+    case "insurance_bind_policy": return "red";
+    case "insurance_request_quote": return "blue";
+    case "insurance_issue_certificate": return "amber";
+    default: return "slate";
+  }
+}
+
+function partnerTone(status: PartnerRow["status"]): "slate" | "violet" | "green" | "amber" | "red" | "blue" {
+  switch (status) {
+    case "active": return "green";
+    case "suspended": return "amber";
+    case "revoked": return "red";
+    default: return "slate";
+  }
+}
+
+function shortId(id: string): string {
+  return id.length > 12 ? `${id.slice(0, 8)}…` : id;
+}
+
+function approvalSummary(a: PendingApprovalRow): string {
+  const p = a.payload ?? {};
+  const action = String(p.action ?? a.kind.replace(/^insurance_/, ""));
+  const sid = String(p.subjectId ?? "");
+  if (action === "bind_policy") {
+    return `Quote ${shortId(sid)}${p.carrier ? ` · ${String(p.carrier)}` : ""}`;
+  }
+  return `${action.replace(/_/g, " ")} · ${shortId(sid)}`;
 }
 
 // ── Component ────────────────────────────────────────────────────────────────
@@ -286,6 +384,215 @@ export function InsuranceApp() {
     parsed.expiresAt != null &&
     !saving;
 
+  // ── Partners tab (slice 3c) ────────────────────────────────────────────────
+
+  const [partners, setPartners] = useState<PartnerRow[]>([]);
+  const [partnersLoading, setPartnersLoading] = useState(false);
+  const [partnersError, setPartnersError] = useState<string | null>(null);
+  const [showRegister, setShowRegister] = useState(false);
+  const [registering, setRegistering] = useState(false);
+  const [registerError, setRegisterError] = useState<string | null>(null);
+  const [reg, setReg] = useState({
+    name: "",
+    producerLicenseNumber: "",
+    contactEmail: "",
+    licensedStates: "",
+    appointmentPath: "dais_market_access",
+  });
+  const [statusChanging, setStatusChanging] = useState<string | null>(null);
+
+  const loadPartners = useCallback(async () => {
+    setPartnersLoading(true);
+    setPartnersError(null);
+    try {
+      const res = await fetch("/api/insurance/partners");
+      if (!res.ok) throw new Error(`Load failed (${res.status})`);
+      const data = await res.json();
+      setPartners(data.partners ?? []);
+    } catch (e) {
+      setPartnersError(e instanceof Error ? e.message : "Load failed");
+    } finally {
+      setPartnersLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (tab === "partners") void loadPartners();
+  }, [tab, loadPartners]);
+
+  const handleRegister = useCallback(async () => {
+    setRegistering(true);
+    setRegisterError(null);
+    try {
+      const res = await fetch("/api/insurance/partners", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: reg.name,
+          producerLicenseNumber: reg.producerLicenseNumber,
+          contactEmail: reg.contactEmail || undefined,
+          licensedStates: reg.licensedStates
+            .split(",")
+            .map((s) => s.trim())
+            .filter((s) => s.length > 0),
+          appointmentPath: reg.appointmentPath,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? `Registration failed (${res.status})`);
+      setReg({
+        name: "",
+        producerLicenseNumber: "",
+        contactEmail: "",
+        licensedStates: "",
+        appointmentPath: "dais_market_access",
+      });
+      setShowRegister(false);
+      await loadPartners();
+    } catch (e) {
+      setRegisterError(e instanceof Error ? e.message : "Registration failed");
+    } finally {
+      setRegistering(false);
+    }
+  }, [reg, loadPartners]);
+
+  const handleStatusChange = useCallback(
+    async (p: PartnerRow, status: PartnerRow["status"]) => {
+      const consequence =
+        status === "active"
+          ? "This partner will be able to satisfy the bind gate again."
+          : "Binding will be blocked (PARTNER_NOT_APPOINTED) until an active partner is on file.";
+      if (
+        !window.confirm(
+          `${status === "active" ? "Reactivate" : status === "suspended" ? "Suspend" : "Revoke"} "${p.name}"?\n\n${consequence}`,
+        )
+      ) {
+        return;
+      }
+      setStatusChanging(p.id);
+      setPartnersError(null);
+      try {
+        const res = await fetch(`/api/insurance/partners/${p.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error ?? `Update failed (${res.status})`);
+        await loadPartners();
+      } catch (e) {
+        setPartnersError(e instanceof Error ? e.message : "Update failed");
+      } finally {
+        setStatusChanging(null);
+      }
+    },
+    [loadPartners],
+  );
+
+  // ── Approvals tab (slice 3c) ───────────────────────────────────────────────
+
+  const [pending, setPending] = useState<PendingApprovalRow[]>([]);
+  const [appointedPartner, setAppointedPartner] = useState<AppointedPartnerInfo | null>(null);
+  const [pendingLoading, setPendingLoading] = useState(false);
+  const [pendingError, setPendingError] = useState<string | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [decidingId, setDecidingId] = useState<string | null>(null);
+  const [decisionError, setDecisionError] = useState<string | null>(null);
+  const [denyNote, setDenyNote] = useState("");
+  const [approvedBinds, setApprovedBinds] = useState<ApprovedBind[]>([]);
+  const [executingId, setExecutingId] = useState<string | null>(null);
+  const [executedBinds, setExecutedBinds] = useState<Record<string, ExecutedBind>>({});
+
+  const loadPending = useCallback(async () => {
+    setPendingLoading(true);
+    setPendingError(null);
+    try {
+      const res = await fetch("/api/insurance/governance/pending");
+      if (!res.ok) throw new Error(`Load failed (${res.status})`);
+      const data = await res.json();
+      setPending(data.approvals ?? []);
+      setAppointedPartner(data.appointedPartner ?? null);
+    } catch (e) {
+      setPendingError(e instanceof Error ? e.message : "Load failed");
+    } finally {
+      setPendingLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (tab === "approvals") void loadPending();
+  }, [tab, loadPending]);
+
+  const handleDecide = useCallback(
+    async (a: PendingApprovalRow, decision: "approve" | "reject") => {
+      setDecidingId(a.id);
+      setDecisionError(null);
+      try {
+        const res = await fetch(`/api/insurance/governance/${a.id}/decide`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            decision,
+            note: denyNote.trim() ? denyNote.trim() : undefined,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error ?? `Decision failed (${res.status})`);
+        if (decision === "approve" && a.kind === "insurance_bind_policy") {
+          const quoteId = String(a.payload.subjectId ?? "");
+          setApprovedBinds((prev) =>
+            prev.some((b) => b.approvalId === a.id)
+              ? prev
+              : [...prev, { approvalId: a.id, quoteId, payload: a.payload }],
+          );
+        }
+        setDenyNote("");
+        setExpandedId(null);
+        await loadPending();
+      } catch (e) {
+        setDecisionError(e instanceof Error ? e.message : "Decision failed");
+      } finally {
+        setDecidingId(null);
+      }
+    },
+    [denyNote, loadPending],
+  );
+
+  const handleExecuteBind = useCallback(async (bind: ApprovedBind) => {
+    if (!bind.quoteId) return;
+    setExecutingId(bind.approvalId);
+    setDecisionError(null);
+    try {
+      const res = await fetch(`/api/insurance/quotes/${bind.quoteId}/bind`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ approvalId: bind.approvalId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? `Bind failed (${res.status})`);
+      setExecutedBinds((prev) => ({
+        ...prev,
+        [bind.approvalId]: {
+          policyNumber: data.policy.policyNumber,
+          carrierName: data.policy.carrierName,
+          carrierConfirmation: data.carrierConfirmation ?? null,
+          replayed: data.replayed === true,
+        },
+      }));
+    } catch (e) {
+      setDecisionError(e instanceof Error ? e.message : "Bind failed");
+    } finally {
+      setExecutingId(null);
+    }
+  }, []);
+
+  const handleRefresh = useCallback(() => {
+    if (tab === "partners") void loadPartners();
+    else if (tab === "approvals") void loadPending();
+    else if (tab === "quoting") void loadSubmissions();
+    else void load();
+  }, [tab, load, loadPartners, loadPending, loadSubmissions]);
+
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4">
       {/* Stat strip */}
@@ -311,6 +618,8 @@ export function InsuranceApp() {
             { key: "renewals", label: "Renewals", icon: CalendarClock },
             { key: "quoting", label: "Quoting", icon: Plus },
             { key: "import", label: "Import declarations", icon: FileUp },
+            { key: "partners", label: "Partners", icon: Handshake },
+            { key: "approvals", label: "Approvals", icon: Stamp },
           ] as const
         ).map(({ key, label, icon: Icon }) => (
           <button
@@ -327,8 +636,8 @@ export function InsuranceApp() {
           </button>
         ))}
         <div className="ml-auto pb-1">
-          <button className={btnGhost} onClick={() => void load()} disabled={loading}>
-            <RefreshCw size={13} className={loading ? "animate-spin" : ""} />
+          <button className={btnGhost} onClick={handleRefresh} disabled={loading || partnersLoading || pendingLoading}>
+            <RefreshCw size={13} className={loading || partnersLoading || pendingLoading ? "animate-spin" : ""} />
             Refresh
           </button>
         </div>
@@ -608,7 +917,7 @@ export function InsuranceApp() {
             </p>
           )}
         </div>
-      ) : (
+      ) : tab === "import" ? (
         <div className="grid gap-4 md:grid-cols-2">
           <div className="rounded-lg border border-stone-200 bg-white p-4 shadow-sm">
             <h2 className="text-[14px] font-semibold text-stone-900">Paste a declarations page</h2>
@@ -691,6 +1000,410 @@ export function InsuranceApp() {
               </>
             )}
           </div>
+        </div>
+      ) : tab === "partners" ? (
+        <div className="flex flex-col gap-4">
+          <div className="flex items-start gap-2 rounded-md border border-stone-200 bg-stone-50 px-3 py-2 text-[12px] text-stone-600">
+            <Info size={14} className="mt-0.5 shrink-0" />
+            <span>
+              The licensed partner is the <strong className="text-stone-800">producer of record</strong> —
+              the partner holds the licenses, Marketr provides the software. Binding is blocked
+              (PARTNER_NOT_APPOINTED) until an <strong className="text-stone-800">active, appointed</strong> partner
+              with a producer license number and licensed states is on file. Status changes are admin-gated.
+            </span>
+          </div>
+          {partnersError && (
+            <div className="flex items-center gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-700">
+              <AlertTriangle size={14} />
+              {partnersError}
+            </div>
+          )}
+          <div>
+            <button className={btnPrimary} onClick={() => setShowRegister((v) => !v)}>
+              <Plus size={14} />
+              {showRegister ? "Hide registration" : "Register partner"}
+            </button>
+          </div>
+          {showRegister && (
+            <div className="rounded-lg border border-stone-200 bg-white p-4 shadow-sm">
+              <h2 className="text-[14px] font-semibold text-stone-900">Register licensed partner</h2>
+              <p className="mt-0.5 text-[12px] text-stone-500">
+                Registration is fail-closed: name, producer license number, and licensed states are all required.
+              </p>
+              <div className="mt-3 grid gap-3 md:grid-cols-2">
+                <label className="flex flex-col gap-1 text-[12px] font-medium text-stone-600">
+                  Partner name
+                  <input
+                    value={reg.name}
+                    onChange={(e) => setReg({ ...reg, name: e.target.value })}
+                    placeholder="Amwins DAIS Partner LLC"
+                    className={inputCls}
+                  />
+                </label>
+                <label className="flex flex-col gap-1 text-[12px] font-medium text-stone-600">
+                  Producer license number
+                  <input
+                    value={reg.producerLicenseNumber}
+                    onChange={(e) => setReg({ ...reg, producerLicenseNumber: e.target.value })}
+                    placeholder="NC-123456"
+                    className={inputCls}
+                  />
+                </label>
+                <label className="flex flex-col gap-1 text-[12px] font-medium text-stone-600">
+                  Contact email (optional)
+                  <input
+                    value={reg.contactEmail}
+                    onChange={(e) => setReg({ ...reg, contactEmail: e.target.value })}
+                    placeholder="partners@example.com"
+                    className={inputCls}
+                  />
+                </label>
+                <label className="flex flex-col gap-1 text-[12px] font-medium text-stone-600">
+                  Licensed states (comma-separated, 2-letter)
+                  <input
+                    value={reg.licensedStates}
+                    onChange={(e) => setReg({ ...reg, licensedStates: e.target.value })}
+                    placeholder="NC, SC"
+                    className={inputCls}
+                  />
+                </label>
+                <label className="flex flex-col gap-1 text-[12px] font-medium text-stone-600">
+                  Appointment path
+                  <select
+                    value={reg.appointmentPath}
+                    onChange={(e) => setReg({ ...reg, appointmentPath: e.target.value })}
+                    className={inputCls}
+                  >
+                    {Object.entries(APPOINTMENT_PATH_LABELS).map(([v, label]) => (
+                      <option key={v} value={v}>{label}</option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              {registerError && (
+                <div className="mt-3 flex items-center gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[12px] text-red-700">
+                  <AlertTriangle size={14} />
+                  {registerError}
+                </div>
+              )}
+              <button
+                className={`${btnPrimary} mt-3`}
+                onClick={() => void handleRegister()}
+                disabled={
+                  registering ||
+                  !reg.name.trim() ||
+                  !reg.producerLicenseNumber.trim() ||
+                  !reg.licensedStates.trim()
+                }
+              >
+                {registering ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+                {registering ? "Registering…" : "Register"}
+              </button>
+            </div>
+          )}
+          {partnersLoading ? (
+            <div className="flex items-center justify-center gap-2 py-10 text-stone-500">
+              <Loader2 size={16} className="animate-spin" />
+              <span className="text-[13px]">Loading partners…</span>
+            </div>
+          ) : (
+            <div className="overflow-x-auto rounded-lg border border-stone-200 bg-white shadow-sm">
+              <table className="w-full text-left text-[13px]">
+                <thead>
+                  <tr className="border-b border-stone-200 bg-stone-50 text-[11px] font-medium uppercase tracking-wide text-stone-500">
+                    <th className="px-3 py-2">Partner</th>
+                    <th className="px-3 py-2">License</th>
+                    <th className="px-3 py-2">Licensed states</th>
+                    <th className="px-3 py-2">Appointment path</th>
+                    <th className="px-3 py-2">Status</th>
+                    <th className="px-3 py-2">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {partners.length === 0 && (
+                    <tr>
+                      <td colSpan={6} className="px-3 py-10 text-center text-stone-500">
+                        No licensed partners yet — register one to unblock binding.
+                      </td>
+                    </tr>
+                  )}
+                  {partners.map((p) => (
+                    <tr key={p.id} className="border-b border-stone-100 last:border-0 hover:bg-[var(--brand-50)]/40">
+                      <td className="px-3 py-2">
+                        <div className="font-medium text-stone-900">{p.name}</div>
+                        {p.contactEmail && (
+                          <div className="text-[11px] text-stone-500">{p.contactEmail}</div>
+                        )}
+                      </td>
+                      <td className="px-3 py-2 font-mono text-[12px] text-stone-800">
+                        {p.licenseNumber ?? <span className="font-sans text-stone-400">none</span>}
+                      </td>
+                      <td className="px-3 py-2">
+                        <div className="flex flex-wrap gap-1">
+                          {p.licensedStates.map((s) => (
+                            <Chip key={s} tone="slate">{s}</Chip>
+                          ))}
+                          {p.licensedStates.length === 0 && (
+                            <span className="text-[11px] text-stone-400">none</span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-3 py-2 text-[12px] text-stone-700">
+                        {APPOINTMENT_PATH_LABELS[p.appointmentPath] ?? p.appointmentPath}
+                      </td>
+                      <td className="px-3 py-2">
+                        <Chip tone={partnerTone(p.status)}>{p.status}</Chip>
+                      </td>
+                      <td className="px-3 py-2">
+                        <div className="flex gap-1.5">
+                          {p.status === "active" ? (
+                            <>
+                              <button
+                                className={btnGhost}
+                                disabled={statusChanging === p.id}
+                                onClick={() => void handleStatusChange(p, "suspended")}
+                                title="Suspend — blocks the bind gate for the workspace"
+                              >
+                                <Ban size={13} />
+                                Suspend
+                              </button>
+                              <button
+                                className={btnGhost}
+                                disabled={statusChanging === p.id}
+                                onClick={() => void handleStatusChange(p, "revoked")}
+                                title="Revoke — permanently cuts this partner from the bind gate"
+                              >
+                                <XCircle size={13} />
+                                Revoke
+                              </button>
+                            </>
+                          ) : (
+                            <button
+                              className={btnGhost}
+                              disabled={statusChanging === p.id}
+                              onClick={() => void handleStatusChange(p, "active")}
+                              title="Reactivate — requires license identity on file"
+                            >
+                              <RotateCcw size={13} />
+                              Reactivate
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="flex flex-col gap-4">
+          <div className="flex items-start gap-2 rounded-md border border-stone-200 bg-stone-50 px-3 py-2 text-[12px] text-stone-600">
+            <Info size={14} className="mt-0.5 shrink-0" />
+            <span>
+              <strong className="text-stone-800">Agent prepares → you approve → licensed rail executes.</strong>{" "}
+              Premium moves carrier-direct; the OS never holds funds. Bind approvals show the full disclosure
+              (carrier, premium, limits, effective dates) before you decide — no auto-bind in v1.
+            </span>
+          </div>
+          {pendingError && (
+            <div className="flex items-center gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-700">
+              <AlertTriangle size={14} />
+              {pendingError}
+            </div>
+          )}
+          {decisionError && (
+            <div className="flex items-center gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-700">
+              <AlertTriangle size={14} />
+              {decisionError}
+            </div>
+          )}
+          {pendingLoading ? (
+            <div className="flex items-center justify-center gap-2 py-10 text-stone-500">
+              <Loader2 size={16} className="animate-spin" />
+              <span className="text-[13px]">Loading approvals…</span>
+            </div>
+          ) : pending.length === 0 && approvedBinds.length === 0 ? (
+            <p className="py-8 text-center text-[13px] text-stone-500">
+              No pending governed actions.
+            </p>
+          ) : (
+            pending.length > 0 && (
+              <div className="overflow-x-auto rounded-lg border border-stone-200 bg-white shadow-sm">
+                <table className="w-full text-left text-[13px]">
+                  <thead>
+                    <tr className="border-b border-stone-200 bg-stone-50 text-[11px] font-medium uppercase tracking-wide text-stone-500">
+                      <th className="px-3 py-2">Action</th>
+                      <th className="px-3 py-2">Subject</th>
+                      <th className="px-3 py-2">Requested by</th>
+                      <th className="px-3 py-2">Requested at</th>
+                      <th className="px-3 py-2">Review</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pending.map((a) => (
+                      <Fragment key={a.id}>
+                        <tr className="border-b border-stone-100 hover:bg-[var(--brand-50)]/40">
+                          <td className="px-3 py-2">
+                            <Chip tone={actionTone(a.kind)}>{actionLabel(a.kind)}</Chip>
+                          </td>
+                          <td className="px-3 py-2 text-stone-700">{approvalSummary(a)}</td>
+                          <td className="px-3 py-2 text-[12px] text-stone-500">{a.requestedBy ?? "—"}</td>
+                          <td className="px-3 py-2 text-[12px] text-stone-500">{fmtDate(a.createdAt)}</td>
+                          <td className="px-3 py-2">
+                            <button
+                              className={btnGhost}
+                              onClick={() => setExpandedId(expandedId === a.id ? null : a.id)}
+                            >
+                              <Eye size={13} />
+                              {expandedId === a.id ? "Hide" : "Review"}
+                              <ChevronDown size={13} className={expandedId === a.id ? "rotate-180" : ""} />
+                            </button>
+                          </td>
+                        </tr>
+                        {expandedId === a.id && (
+                          <tr className="border-b border-stone-100 bg-stone-50/60">
+                            <td colSpan={5} className="px-4 py-3">
+                              {a.kind === "insurance_bind_policy" ? (
+                                <>
+                                  <h3 className="text-[13px] font-semibold text-stone-900">
+                                    Full disclosure — review before approving
+                                  </h3>
+                                  <dl className="mt-2 grid grid-cols-2 gap-x-6 gap-y-1.5 text-[13px] md:grid-cols-3">
+                                    {(
+                                      [
+                                        ["Carrier", typeof a.payload.carrier === "string" ? a.payload.carrier : null],
+                                        ["Premium", typeof a.payload.premiumCents === "number" ? fmtMoney(a.payload.premiumCents) : null],
+                                        ["Per-occurrence limit", typeof a.payload.limitPerOccurrenceCents === "number" ? fmtMoney(a.payload.limitPerOccurrenceCents) : null],
+                                        ["Aggregate limit", typeof a.payload.limitAggregateCents === "number" ? fmtMoney(a.payload.limitAggregateCents) : null],
+                                        ["Effective date", typeof a.payload.effectiveDate === "string" ? fmtDate(a.payload.effectiveDate) : null],
+                                        ["Expiry date", typeof a.payload.expiryDate === "string" ? fmtDate(a.payload.expiryDate) : null],
+                                      ] as const
+                                    ).map(([k, v]) => (
+                                      <div key={k} className="flex justify-between gap-3 border-b border-stone-200/70 pb-1">
+                                        <dt className="text-stone-500">{k}</dt>
+                                        <dd className={`font-medium ${v == null ? "text-stone-400" : "text-stone-900"}`}>
+                                          {v ?? "not confirmed"}
+                                        </dd>
+                                      </div>
+                                    ))}
+                                  </dl>
+                                  <div className="mt-2 text-[12px] text-stone-600">
+                                    <span className="font-medium text-stone-800">Producer of record: </span>
+                                    {appointedPartner ? (
+                                      <>
+                                        {appointedPartner.name} · license{" "}
+                                        <span className="font-mono">{appointedPartner.licenseNumber ?? "not confirmed"}</span> ·{" "}
+                                        {appointedPartner.licensedStates.join(", ")}
+                                      </>
+                                    ) : (
+                                      <span className="text-amber-700">
+                                        No appointed partner — bind execution will be blocked until one is registered.
+                                      </span>
+                                    )}
+                                  </div>
+                                  <p className="mt-1.5 text-[11px] text-stone-500">
+                                    Fields the carrier has not confirmed read "not confirmed" — coverage is never invented.
+                                  </p>
+                                </>
+                              ) : (
+                                <div className="text-[12px] text-stone-600">
+                                  <span className="font-medium text-stone-800">Subject:</span>{" "}
+                                  {String(a.payload.subjectType ?? "")}{" "}
+                                  <span className="font-mono">{String(a.payload.subjectId ?? "")}</span>
+                                </div>
+                              )}
+                              <div className="mt-3 flex flex-wrap items-center gap-2">
+                                <button
+                                  className={btnPrimary}
+                                  disabled={decidingId === a.id}
+                                  onClick={() => void handleDecide(a, "approve")}
+                                >
+                                  {decidingId === a.id ? (
+                                    <Loader2 size={14} className="animate-spin" />
+                                  ) : (
+                                    <CheckCircle2 size={14} />
+                                  )}
+                                  Approve
+                                </button>
+                                <button
+                                  className={btnGhost}
+                                  disabled={decidingId === a.id}
+                                  onClick={() => void handleDecide(a, "reject")}
+                                >
+                                  <XCircle size={14} />
+                                  Deny
+                                </button>
+                                <input
+                                  value={denyNote}
+                                  onChange={(e) => setDenyNote(e.target.value)}
+                                  placeholder="Note (recorded on deny)"
+                                  className={`${inputCls} w-64`}
+                                />
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </Fragment>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )
+          )}
+          {approvedBinds.length > 0 && (
+            <div className="rounded-lg border border-stone-200 bg-white p-4 shadow-sm">
+              <h2 className="text-[14px] font-semibold text-stone-900">Approved — ready to execute</h2>
+              <p className="mt-0.5 text-[12px] text-stone-500">
+                Approval is recorded with the full disclosure. Executing a bind calls the licensed rail with the
+                approved terms — the producer of record binds at the carrier, premium moves carrier-direct.
+              </p>
+              <div className="mt-3 flex flex-col gap-2">
+                {approvedBinds.map((b) => {
+                  const exec = executedBinds[b.approvalId];
+                  return (
+                    <div
+                      key={b.approvalId}
+                      className="flex flex-wrap items-center gap-3 rounded-md border border-stone-200 bg-stone-50 px-3 py-2.5"
+                    >
+                      <div className="text-[13px] text-stone-800">
+                        <span className="font-medium">Quote {shortId(b.quoteId)}</span>
+                        {typeof b.payload.carrier === "string" && (
+                          <span className="text-stone-500"> · {b.payload.carrier}</span>
+                        )}
+                        {typeof b.payload.premiumCents === "number" && (
+                          <span className="text-stone-500"> · {fmtMoney(b.payload.premiumCents)}</span>
+                        )}
+                      </div>
+                      {exec ? (
+                        <div className="ml-auto flex items-center gap-2 text-[12px]">
+                          <Chip tone="green">{exec.replayed ? "Replayed" : "Bound"}</Chip>
+                          <span className="font-mono font-medium text-stone-900">{exec.policyNumber}</span>
+                          {exec.carrierConfirmation && (
+                            <span className="text-stone-500">confirmation {exec.carrierConfirmation}</span>
+                          )}
+                        </div>
+                      ) : (
+                        <button
+                          className={`${btnPrimary} ml-auto`}
+                          onClick={() => void handleExecuteBind(b)}
+                          disabled={executingId === b.approvalId}
+                        >
+                          {executingId === b.approvalId ? (
+                            <Loader2 size={14} className="animate-spin" />
+                          ) : (
+                            <CheckCircle2 size={14} />
+                          )}
+                          {executingId === b.approvalId ? "Binding…" : "Execute bind"}
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

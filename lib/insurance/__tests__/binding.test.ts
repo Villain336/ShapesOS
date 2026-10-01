@@ -210,10 +210,22 @@ function stubDeps(world: StubWorld): BindingDeps {
     async getActivePartners(workspaceId) {
       return world.partners.filter((p) => p.workspaceId === workspaceId);
     },
+    async list(workspaceId) {
+      return world.partners.filter((p) => p.workspaceId === workspaceId);
+    },
+    async get(workspaceId, partnerId) {
+      return (
+        world.partners.find((p) => p.workspaceId === workspaceId && p.id === partnerId) ??
+        null
+      );
+    },
     async create() {
       throw new Error("not implemented in stub");
     },
     async setStatus() {},
+    async setLicensedStates() {
+      throw new Error("not implemented in stub");
+    },
   };
   const approvals: GovernedApprovalStore = {
     async create() {

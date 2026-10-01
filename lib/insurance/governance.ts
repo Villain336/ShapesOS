@@ -107,6 +107,8 @@ export interface ApprovalRecord {
   decidedBy: string | null;
   decidedAt: Date | null;
   note: string | null;
+  /** Optional: populated by the Prisma port for the approval queue UI ("when"). */
+  createdAt?: Date | null;
 }
 
 export interface AuditEventRecord {
@@ -209,6 +211,7 @@ function toApprovalRecord(row: {
   decidedBy: string | null;
   decidedAt: Date | null;
   note: string | null;
+  createdAt?: Date | null;
 }): ApprovalRecord {
   return {
     id: row.id,
@@ -220,6 +223,7 @@ function toApprovalRecord(row: {
     decidedBy: row.decidedBy,
     decidedAt: row.decidedAt,
     note: row.note,
+    createdAt: row.createdAt ?? null,
   };
 }
 

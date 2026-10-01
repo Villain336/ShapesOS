@@ -412,6 +412,30 @@ describe("getPendingApprovals", () => {
     const after = await getPendingApprovals(WS, undefined, stores);
     assert.equal(after.length, 1);
   });
+  it("never returns another workspace's pending approvals", async () => {
+    const stores = stubStores();
+    await proposeGovernedAction(
+      WS,
+      "bind_policy",
+      { subjectType: "quote", subjectId: "q_1" },
+      BIND_DETAILS,
+      "agent_1",
+      stores,
+    );
+    await proposeGovernedAction(
+      "ws_other",
+      "bind_policy",
+      { subjectType: "quote", subjectId: "q_9" },
+      BIND_DETAILS,
+      "agent_1",
+      stores,
+    );
+    const mine = await getPendingApprovals(WS, undefined, stores);
+    assert.equal(mine.length, 1);
+    assert.ok(mine.every((a) => a.workspaceId === WS));
+    const theirs = await getPendingApprovals("ws_other", undefined, stores);
+    assert.equal(theirs.length, 1);
+  });
 });
 
 describe("validateBindDisclosure", () => {
