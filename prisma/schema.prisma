@@ -607,6 +607,8 @@ model Workspace {
   wfhCalendarConnections  WfhCalendarConnection[]
   // Wave 2 WFH mode slice 4: async standups.
   wfhStandups             WfhStandup[]
+  // Wave 2 WFH mode slice 5: team rituals.
+  wfhRituals              WfhRitual[]
   // Phase 15 slice 3: per-workspace toolkit enablement back-relation.
   workspaceToolkits       WorkspaceToolkit[]
   // Phase 15 slice 4: per-workspace Composio call budget back-relation.
@@ -10065,4 +10067,60 @@ model WfhStandupReaction {
 
   @@unique([standupId, userId])
   @@map("wfh_standup_reactions")
+}
+
+// ── Wave 2 WFH mode (slice 5): team rituals ─────────────────────────────────
+// Workspace-level opt-in rituals (wins, kudos, virtual coffee, demo Friday).
+// Subscriptions are opt-in; participation is logged; dead rituals are surfaced
+// for retirement, never auto-deleted.
+
+model WfhRitual {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdBy   String    @map("created_by")
+
+  // wins | kudos | virtual-coffee | demo-friday
+  type        String
+  title       String
+  description String
+  // daily | weekly | biweekly | monthly
+  cadence    String   @default("weekly")
+  anchorDate DateTime @map("anchor_date")
+  active     Boolean  @default(true)
+
+  subscriptions  WfhRitualSubscription[]
+  participations WfhRitualParticipation[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([workspaceId, active])
+  @@map("wfh_rituals")
+}
+
+model WfhRitualSubscription {
+  id        String    @id @default(cuid())
+  ritualId  String    @map("ritual_id")
+  ritual    WfhRitual @relation(fields: [ritualId], references: [id], onDelete: Cascade)
+  userId    String    @map("user_id")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([ritualId, userId])
+  @@map("wfh_ritual_subscriptions")
+}
+
+model WfhRitualParticipation {
+  id        String    @id @default(cuid())
+  ritualId  String    @map("ritual_id")
+  ritual    WfhRitual @relation(fields: [ritualId], references: [id], onDelete: Cascade)
+  userId    String    @map("user_id")
+  note      String?
+  occurredAt DateTime @map("occurred_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([ritualId, occurredAt])
+  @@map("wfh_ritual_participations")
 }
