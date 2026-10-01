@@ -11,6 +11,7 @@ import { requireWorkspaceRole } from "@/lib/authz";
 import { prisma } from "@/lib/prisma";
 import { modeIndicator } from "@/lib/wfh/mode";
 import WfhModePanel from "./_components/WfhModePanel";
+import WfhTabs from "./_components/WfhTabs";
 
 export const dynamic = "force-dynamic";
 
@@ -63,6 +64,9 @@ export default async function WfhModePage() {
         protected focus time, home-office expenses, and rituals. Per-user: your teammates
         keep their own setting.
       </p>
+      <div className="mt-3">
+        <WfhTabs active="mode" />
+      </div>
       <div className="mt-4">
         <WfhModePanel
           initial={initial}

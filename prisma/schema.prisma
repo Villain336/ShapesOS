@@ -600,6 +600,8 @@ model Workspace {
   // Wave 2 WFH mode slice 1: per-user work mode back-relations.
   wfhWorkModes            WfhWorkMode[]
   wfhModeHistory          WfhModeHistory[]
+  // Wave 2 WFH mode slice 2: digest queue back-relation.
+  wfhDigestItems          WfhDigestItem[]
   // Phase 15 slice 3: per-workspace toolkit enablement back-relation.
   workspaceToolkits       WorkspaceToolkit[]
   // Phase 15 slice 4: per-workspace Composio call budget back-relation.
@@ -9885,6 +9887,8 @@ model WfhWorkMode {
   focusBlockMinutes   Int                    @default(90) @map("focus_block_minutes")
   standupCadence      WfhStandupCadence      @default(daily) @map("standup_cadence")
   notificationProfile WfhNotificationProfile @default(batched) @map("notification_profile")
+  // Digest window times (minutes since midnight local). Empty = 09:00 + 16:00 defaults.
+  digestTimesMin      Int[]                  @default([]) @map("digest_times_min")
   // Mandatory first-enable setup interstitial completed at (wfh days, focus
   // hours, standup cadence). Enabling wfh/hybrid without this fails closed.
   setupCompletedAt DateTime? @map("setup_completed_at")
@@ -9914,4 +9918,32 @@ model WfhModeHistory {
 
   @@index([workModeId, createdAt])
   @@map("wfh_mode_history")
+}
+
+// ── Wave 2 WFH mode (slice 2): async-first notification digest queue ─────────
+// Routine notifications held for digest windows while WFH is effective.
+// Urgent items are never queued (fail-open-toward-quiet is for senders only).
+
+model WfhDigestItem {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  userId String @map("user_id")
+
+  kind    String
+  title   String
+  body    String? @db.Text
+  link    String?
+  urgency String @default("routine")
+
+  // Digest window this item waits for (minutes since midnight local).
+  windowMin Int @map("window_min")
+  // queued | sent
+  status  String    @default("queued")
+  sentAt  DateTime? @map("sent_at")
+
+  queuedAt DateTime @default(now()) @map("queued_at")
+
+  @@index([workspaceId, userId, status, windowMin])
+  @@map("wfh_digest_items")
 }

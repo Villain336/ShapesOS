@@ -133,3 +133,66 @@ export async function POST(req: NextRequest) {
     throw err;
   }
 }
+
+/**
+ * PATCH /api/wfh/mode — update WFH preferences without changing the mode.
+ * Body: { digestTimesMin?: number[], notificationProfile?: "realtime"|"batched" }.
+ */
+export async function PATCH(req: NextRequest) {
+  const user = await requireUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const workspace = await getOrCreateWorkspace(user.id, user.email);
+  const membership = await requireWorkspaceRole(user.id, workspace.id, "editor");
+  if (!membership) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
+  let body: { digestTimesMin?: unknown; notificationProfile?: unknown };
+  try {
+    body = (await req.json()) as typeof body;
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
+
+  const patch: { digestTimesMin?: number[]; notificationProfile?: "realtime" | "batched" } = {};
+  if (body.digestTimesMin !== undefined) {
+    const times = Array.isArray(body.digestTimesMin) ? body.digestTimesMin : [];
+    const clean = [
+      ...new Set(
+        times.filter(
+          (t): t is number => typeof t === "number" && Number.isInteger(t) && t >= 0 && t < 1440,
+        ),
+      ),
+    ].sort((a, b) => a - b);
+    if (clean.length === 0 || clean.length > 6) {
+      return NextResponse.json(
+        { error: "Provide 1–6 digest times as minutes since midnight." },
+        { status: 400 },
+      );
+    }
+    patch.digestTimesMin = clean;
+  }
+  if (body.notificationProfile !== undefined) {
+    if (body.notificationProfile !== "realtime" && body.notificationProfile !== "batched") {
+      return NextResponse.json(
+        { error: "notificationProfile must be 'realtime' or 'batched'." },
+        { status: 400 },
+      );
+    }
+    patch.notificationProfile = body.notificationProfile;
+  }
+  if (Object.keys(patch).length === 0) {
+    return NextResponse.json({ error: "Nothing to update." }, { status: 400 });
+  }
+
+  const updated = await prisma.wfhWorkMode.upsert({
+    where: { workspaceId_userId: { workspaceId: workspace.id, userId: user.id } },
+    create: {
+      workspaceId: workspace.id,
+      userId: user.id,
+      email: user.email ?? null,
+      mode: "office",
+      ...patch,
+    },
+    update: { ...patch, email: user.email ?? null },
+  });
+  return NextResponse.json({ mode: updated });
+}
