@@ -584,6 +584,8 @@ model Workspace {
   creativeVariants        CreativeVariant[]
   // Phase 15 slice 5: per-workspace catalog drift reports back-relation.
   composioCatalogDrift    ComposioCatalogDrift[]
+  // Wave 2 context.dev slice 1: daily credit-budget back-relation.
+  contextDevBudgets       ContextDevBudget[]
   // Phase 15 slice 3: per-workspace toolkit enablement back-relation.
   workspaceToolkits       WorkspaceToolkit[]
   // Phase 15 slice 4: per-workspace Composio call budget back-relation.
@@ -9412,4 +9414,25 @@ model CreativeVariant {
   @@index([workspaceId, campaignId])
   @@index([workspaceId, approvalStatus])
   @@map("creative_variants")
+}
+
+// ── Wave 2 context.dev: daily credit budget (slice 1) ────────────────────────
+// One row per workspace per UTC day (day = YYYY-MM-DD). recordSpend charges
+// atomically via upsert+increment; the gate (decideBudget) runs before any
+// Context.dev API call. Over-budget calls route to approval, never charge.
+model ContextDevBudget {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  day         String
+  creditsUsed Int       @default(0) @map("credits_used")
+  capCredits  Int       @default(100) @map("cap_credits")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([workspaceId, day])
+  @@index([workspaceId])
+  @@map("context_dev_budgets")
 }
