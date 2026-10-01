@@ -1,4 +1,4 @@
-// Marketr — Phase 12 "embeds": Documenso signing requests UI (API-only).
+// Marketr — signing settings: Documenso signing requests UI (API-only).
 // Create-from-template-PDF form + status table. Without a configured
 // Documenso instance it renders an honest empty state with the
 // docker-compose quick start — never fabricated documents.
@@ -25,17 +25,10 @@ type LoadState =
   | { kind: "error"; message: string }
   | { kind: "ready"; requests: SigningRequest[] };
 
+// Document statuses are workflow states, not agent states — neutral chip.
 function StatusBadge({ status }: { status: string }) {
-  const s = status.toLowerCase();
-  const cls = s.includes("complet")
-    ? "bg-emerald-100 text-emerald-700"
-    : s.includes("pend") || s.includes("sent")
-      ? "bg-amber-100 text-amber-700"
-      : s.includes("declin") || s.includes("reject") || s.includes("error")
-        ? "bg-red-100 text-red-700"
-        : "bg-stone-100 text-stone-600";
   return (
-    <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${cls}`}>
+    <span className="inline-flex whitespace-nowrap items-center gap-1 rounded-full bg-paper px-2 py-0.5 text-xs font-semibold text-muted shadow-control">
       {status}
     </span>
   );
@@ -146,22 +139,22 @@ export function SigningPanel({ configured }: { configured: boolean }) {
   return (
     <div className="flex flex-col gap-4">
       {!configured && (
-        <div className="rounded-xl border border-stone-200 bg-stone-50 p-5">
-          <div className="flex items-center gap-2 text-stone-900">
-            <PenLine className="h-5 w-5 text-violet-600" />
-            <h2 className="text-sm font-semibold">Documenso is not connected</h2>
+        <div className="rounded-lg bg-paper p-5 shadow-hairline">
+          <div className="flex items-center gap-2 text-ink">
+            <PenLine className="h-5 w-5 text-muted" />
+            <h2 className="aos-subheading">Documenso is not connected</h2>
           </div>
-          <p className="mt-2 text-[13px] text-stone-500">
+          <p className="mt-2 text-sm text-muted">
             Signing requests are API-only against an unmodified Documenso
             Community Edition instance (AGPL). Signers get Documenso&apos;s own
             emailed signing link — the white-labeled embedded signing UI is the
             paid Enterprise feature and is intentionally not offered here.
           </p>
-          <div className="mt-3 rounded-lg border border-stone-200 bg-white p-3">
-            <p className="flex items-center gap-1.5 text-xs font-medium text-stone-700">
+          <div className="mt-3 rounded-md border border-line bg-canvas p-3">
+            <p className="flex items-center gap-1.5 text-xs font-semibold text-ink">
               <TerminalSquare className="h-4 w-4" /> Quick start (self-host CE)
             </p>
-            <p className="mt-2 text-xs text-stone-500">
+            <p className="mt-2 text-xs text-muted">
               Run Documenso per its own docker guide, then set{" "}
               <code className="font-mono">DOCUMENSO_URL</code> and{" "}
               <code className="font-mono">DOCUMENSO_API_KEY</code> on the host
@@ -173,16 +166,16 @@ export function SigningPanel({ configured }: { configured: boolean }) {
 
       <form
         onSubmit={onSubmit}
-        className="rounded-xl border border-stone-200 bg-white p-5"
+        className="rounded-lg bg-paper p-5 shadow-hairline"
       >
-        <h2 className="text-sm font-semibold text-stone-900">New signing request</h2>
-        <p className="mt-0.5 text-[13px] text-stone-500">
+        <h2 className="aos-subheading">New signing request</h2>
+        <p className="mt-0.5 text-sm text-muted">
           Upload a template PDF, add signers, send. API-only — no embedded
           signing UI.
         </p>
         <div className="mt-4 grid gap-3 md:grid-cols-2">
           <div>
-            <label className="mb-1 block text-xs font-medium text-stone-600" htmlFor="sr-title">
+            <label className="mb-1 block text-xs font-semibold text-muted" htmlFor="sr-title">
               Document title
             </label>
             <input
@@ -190,11 +183,11 @@ export function SigningPanel({ configured }: { configured: boolean }) {
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="MSA — Acme Corp"
-              className="w-full rounded-md border border-stone-200 px-2.5 py-1.5 text-[13px] focus:border-violet-400 focus:outline-none"
+              className="h-control-sm w-full rounded-md border-[1.5px] border-control bg-paper px-3 text-sm text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none"
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-stone-600" htmlFor="sr-template">
+            <label className="mb-1 block text-xs font-semibold text-muted" htmlFor="sr-template">
               Template name (optional)
             </label>
             <input
@@ -202,11 +195,11 @@ export function SigningPanel({ configured }: { configured: boolean }) {
               value={templateName}
               onChange={(e) => setTemplateName(e.target.value)}
               placeholder="msa-v3"
-              className="w-full rounded-md border border-stone-200 px-2.5 py-1.5 text-[13px] focus:border-violet-400 focus:outline-none"
+              className="h-control-sm w-full rounded-md border-[1.5px] border-control bg-paper px-3 text-sm text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none"
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-stone-600" htmlFor="sr-file">
+            <label className="mb-1 block text-xs font-semibold text-muted" htmlFor="sr-file">
               Template PDF
             </label>
             <input
@@ -214,11 +207,11 @@ export function SigningPanel({ configured }: { configured: boolean }) {
               type="file"
               accept="application/pdf"
               onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-              className="w-full text-[13px] text-stone-600"
+              className="w-full text-sm text-muted file:h-control-sm file:rounded-md file:border-[1.5px] file:border-control file:bg-paper file:px-3 file:text-sm file:font-semibold file:text-ink"
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-stone-600" htmlFor="sr-signers">
+            <label className="mb-1 block text-xs font-semibold text-muted" htmlFor="sr-signers">
               Signers (one per line: Name &lt;email&gt;)
             </label>
             <textarea
@@ -227,75 +220,75 @@ export function SigningPanel({ configured }: { configured: boolean }) {
               onChange={(e) => setSignersText(e.target.value)}
               placeholder={"Jane Doe <jane@acme.com>\nbob@acme.com"}
               rows={3}
-              className="w-full rounded-md border border-stone-200 px-2.5 py-1.5 font-mono text-[12px] focus:border-violet-400 focus:outline-none"
+              className="h-auto w-full rounded-md border-[1.5px] border-control bg-paper px-3 py-2 font-mono text-xs text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none"
             />
           </div>
         </div>
-        {formError && <p className="mt-3 text-[13px] text-red-600">{formError}</p>}
-        {formOk && <p className="mt-3 text-[13px] text-emerald-700">{formOk}</p>}
+        {formError && <div className="mb-4 mt-3 flex items-start gap-2 rounded-md border border-failed bg-failed-tint px-3 py-2 text-sm text-failed-text"><span className="mt-1 h-3 w-3 shrink-0 bg-failed" aria-hidden="true" /><span>{formError}</span></div>}
+        {formOk && <p className="mt-3 text-sm text-muted">{formOk}</p>}
         <button
           type="submit"
           disabled={submitting || !configured}
-          className="mt-4 rounded-md bg-violet-600 px-4 py-2 text-sm font-medium text-white hover:bg-violet-700 disabled:opacity-50"
+          className="mt-4 inline-flex h-control-sm items-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-night-hover disabled:opacity-40"
         >
           {submitting ? "Sending…" : "Create & send signing request"}
         </button>
         {!configured && (
-          <p className="mt-2 text-xs text-stone-500">
+          <p className="mt-2 text-xs text-muted">
             Connect Documenso first — the form is disabled until then.
           </p>
         )}
       </form>
 
-      <div className="overflow-hidden rounded-xl border border-stone-200 bg-white">
-        <table className="w-full text-left text-[13px]">
+      <div className="overflow-hidden rounded-lg bg-paper shadow-hairline">
+        <table className="w-full text-left text-sm">
           <thead>
-            <tr className="border-b border-stone-200 bg-stone-50/60 text-xs uppercase tracking-wide text-stone-500">
-              <th className="px-4 py-2.5 font-medium">Title</th>
-              <th className="px-4 py-2.5 font-medium">Status</th>
-              <th className="px-4 py-2.5 font-medium">Signers</th>
-              <th className="px-4 py-2.5 font-medium">Created</th>
-              <th className="px-4 py-2.5 text-right font-medium">Actions</th>
+            <tr className="border-b border-line text-xs font-semibold text-muted">
+              <th className="px-4 py-2.5">Title</th>
+              <th className="px-4 py-2.5">Status</th>
+              <th className="px-4 py-2.5">Signers</th>
+              <th className="px-4 py-2.5">Created</th>
+              <th className="px-4 py-2.5 text-right">Actions</th>
             </tr>
           </thead>
           <tbody>
             {state.kind === "loading" && (
               <tr>
-                <td colSpan={5} className="px-4 py-8 text-center text-stone-500">
+                <td colSpan={5} className="px-4 py-8 text-center text-muted">
                   Loading…
                 </td>
               </tr>
             )}
             {state.kind === "error" && (
               <tr>
-                <td colSpan={5} className="px-4 py-8 text-center text-red-600">
+                <td colSpan={5} className="px-4 py-8 text-center text-failed-text">
                   {state.message}
                 </td>
               </tr>
             )}
             {state.kind === "ready" &&
               state.requests.map((r) => (
-                <tr key={r.id} className="border-b border-stone-100 last:border-0 hover:bg-violet-50/40">
+                <tr key={r.id} className="border-b border-line last:border-0 hover:bg-hover-paper">
                   <td className="px-4 py-2.5">
-                    <div className="font-medium text-stone-900">{r.title}</div>
+                    <div className="font-semibold text-ink">{r.title}</div>
                     {r.templateName && (
-                      <div className="font-mono text-[11px] text-stone-500">{r.templateName}</div>
+                      <div className="font-mono text-xs text-muted">{r.templateName}</div>
                     )}
                   </td>
                   <td className="px-4 py-2.5">
                     <StatusBadge status={r.status} />
                   </td>
-                  <td className="px-4 py-2.5 text-stone-600">
+                  <td className="px-4 py-2.5 text-muted">
                     {r.signers.map((s) => s.name).join(", ") || "—"}
                   </td>
-                  <td className="px-4 py-2.5 text-stone-500">
+                  <td className="px-4 py-2.5 text-muted">
                     {new Date(r.createdAt).toLocaleDateString()}
                   </td>
                   <td className="px-4 py-2.5 text-right">
                     <button
                       onClick={() => void onRefresh(r.id)}
                       disabled={refreshing === r.id || !r.documensoDocumentId}
-                      className="inline-flex items-center gap-1 rounded-md border border-stone-200 px-2.5 py-1 text-xs font-medium text-stone-700 hover:bg-stone-50 disabled:opacity-50"
+                      className="inline-flex items-center gap-1 rounded-full bg-paper px-3 py-1 text-xs font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper disabled:opacity-50"
                     >
                       <RefreshCw className={`h-3 w-3 ${refreshing === r.id ? "animate-spin" : ""}`} />
                       Refresh
@@ -305,7 +298,7 @@ export function SigningPanel({ configured }: { configured: boolean }) {
               ))}
             {state.kind === "ready" && state.requests.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-4 py-8 text-center text-stone-500">
+                <td colSpan={5} className="px-4 py-8 text-center text-muted">
                   No signing requests yet.
                 </td>
               </tr>

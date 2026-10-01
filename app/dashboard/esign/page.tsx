@@ -1,5 +1,5 @@
 // Marketr — Wave 2 E-sign module: page shell (server).
-// Follows the Studio/Office house pattern (AGENTS.md).
+// Agentic OS design system (docs/design/DESIGN.md).
 
 import { redirect } from "next/navigation";
 import { requireUser, getOrCreateWorkspace } from "@/lib/session";
@@ -21,10 +21,10 @@ export default async function EsignPage() {
   if (!membership) redirect("/dashboard");
 
   return (
-    <div className="flex h-full flex-col gap-4 bg-[#FAFAF7] p-4 md:p-6">
+    <div className="flex h-full flex-col gap-4 bg-canvas p-4 md:p-6">
       <div>
-        <h1 className="text-xl font-bold tracking-tight text-stone-900">E-sign</h1>
-        <p className="mt-0.5 text-[13px] text-stone-500">
+        <h1 className="aos-heading">E-sign</h1>
+        <p className="mt-0.5 text-sm text-muted">
           Prepare signature envelopes, review them, and send — the vendor seals the
           document, Marketr keeps the evidence.
         </p>

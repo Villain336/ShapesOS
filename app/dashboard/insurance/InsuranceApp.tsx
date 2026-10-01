@@ -1,12 +1,12 @@
-// Marketr — Wave 2 Insurance slice 1: policy inventory, renewal alerts,
-// declarations-page import. House pattern: StudioApp.tsx (AGENTS.md) — dense
-// tables, brand buttons, Lucide icons, --brand-* vars (never hardcoded).
+// Marketr — Wave 2 Insurance module: policy inventory, renewal alerts,
+// declarations-page import, quoting, certificates, licensed-partner bind gate.
+// Agentic OS design system (docs/design/DESIGN.md): canvas app bg, white
+// paper cards, black pill primary actions, Lucide icons, aos tokens only.
 
 "use client";
 
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import {
-  AlertTriangle,
   Ban,
   BellRing,
   CalendarClock,
@@ -38,37 +38,64 @@ import {
 // ── House atoms ──────────────────────────────────────────────────────────────
 
 const inputCls =
-  "rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-[13px] text-stone-900 placeholder:text-stone-400 focus:border-[var(--brand-600)] focus:outline-none";
+  "h-control-sm rounded-md border-[1.5px] border-control bg-paper px-3 text-sm text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none";
 
 const btnPrimary =
-  "flex items-center gap-1.5 rounded-md bg-[var(--brand-600)] px-3 py-1.5 text-[13px] font-medium text-white hover:bg-[var(--brand-700)] disabled:opacity-40";
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-night-hover disabled:opacity-40";
 
 const btnGhost =
-  "flex items-center gap-1.5 rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-[13px] text-stone-700 hover:bg-stone-50 disabled:opacity-40";
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-paper px-4 text-sm font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper disabled:opacity-40";
 
+const btnDeny =
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-paper px-4 text-sm font-semibold text-failed-text aos-press shadow-[inset_0_0_0_1.5px_var(--aos-failed)] disabled:opacity-40";
+
+const btnApprove =
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-done px-4 text-sm font-semibold text-white aos-press disabled:opacity-40";
+
+const btnReview =
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-needs px-4 text-sm font-semibold text-ink aos-press disabled:opacity-40";
+
+const btnExecute =
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-running px-4 text-sm font-semibold text-white aos-press disabled:opacity-40";
+
+// All workflow states (envelope/signer/policy/quote/remarket/partner/
+// certificate statuses) render neutral: they are document/workflow states,
+// not agent states, so they never take a status color. The tone prop stays
+// for call-site compatibility.
 function Chip({ children, tone = "slate" }: { children: React.ReactNode; tone?: "slate" | "violet" | "green" | "amber" | "red" | "blue" }) {
-  const tones: Record<string, string> = {
-    slate: "bg-slate-100 text-slate-600 border-slate-200",
-    violet: "bg-violet-50 text-violet-700 border-violet-200",
-    green: "bg-emerald-50 text-emerald-700 border-emerald-200",
-    amber: "bg-amber-50 text-amber-700 border-amber-200",
-    red: "bg-red-50 text-red-700 border-red-200",
-    blue: "bg-blue-50 text-blue-700 border-blue-200",
-  };
+  void tone;
   return (
-    <span className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-1.5 py-0.5 text-[10px] font-medium leading-tight ${tones[tone]}`}>
+    <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-paper px-2 py-0.5 text-xs font-semibold text-muted shadow-control">
       {children}
     </span>
   );
 }
 
-function alertTone(level: RenewalAlertLevel): "slate" | "violet" | "green" | "amber" | "red" | "blue" {
-  switch (level) {
-    case "critical": return "red";
-    case "warning": return "amber";
-    case "info": return "blue";
-    default: return "slate";
-  }
+// Approval-flow language: Review = needs yellow + black triangle + black text.
+function NeedsChip({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-needs px-2 py-0.5 text-xs font-semibold text-ink shadow-control">
+      <span className="aos-shape aos-shape--needs" style={{ color: "var(--aos-ink)" }} role="img" aria-label="Needs review" />
+      {children}
+    </span>
+  );
+}
+
+// Approval-flow language: Approve/Bound/Issued-approval = done green + quarter disc.
+function DoneChip({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-done px-2 py-0.5 text-xs font-semibold text-white shadow-control">
+      <span className="aos-shape aos-shape--done" style={{ color: "var(--aos-on-done)" }} role="img" aria-label="Done" />
+      {children}
+    </span>
+  );
+}
+
+// Neutral needs-you mark for paper/canvas: black-edged yellow triangle.
+function NeedsMark({ label = "Needs review" }: { label?: string }) {
+  return (
+    <span className="aos-shape aos-shape--needs aos-shape--edged" role="img" aria-label={label} />
+  );
 }
 
 function alertLabel(level: RenewalAlertLevel): string {
@@ -196,24 +223,6 @@ function actionLabel(kind: string): string {
   }
 }
 
-function actionTone(kind: string): "slate" | "violet" | "green" | "amber" | "red" | "blue" {
-  switch (kind) {
-    case "insurance_bind_policy": return "red";
-    case "insurance_request_quote": return "blue";
-    case "insurance_issue_certificate": return "amber";
-    default: return "slate";
-  }
-}
-
-function partnerTone(status: PartnerRow["status"]): "slate" | "violet" | "green" | "amber" | "red" | "blue" {
-  switch (status) {
-    case "active": return "green";
-    case "suspended": return "amber";
-    case "revoked": return "red";
-    default: return "slate";
-  }
-}
-
 function shortId(id: string): string {
   return id.length > 12 ? `${id.slice(0, 8)}…` : id;
 }
@@ -270,24 +279,13 @@ interface RenewalRow {
   submission: RenewalSubmissionRow | null;
 }
 
-function remarketTone(status: RemarketStatus): "slate" | "violet" | "green" | "amber" | "red" | "blue" {
-  switch (status) {
-    case "detected": return "slate";
-    case "remarketing": return "blue";
-    case "quoted": return "violet";
-    case "bound": return "green";
-    case "auto_renew_surfaced": return "red";
-    default: return "slate";
-  }
-}
-
 function DeltaBadge({ deltaPct, flagged }: { deltaPct: number | null; flagged: boolean }) {
-  if (deltaPct == null) return <span className="text-stone-400">—</span>;
+  if (deltaPct == null) return <span className="text-subtle">—</span>;
   const sign = deltaPct > 0 ? "+" : "";
-  return (
-    <Chip tone={flagged ? "red" : "slate"}>
-      {sign}{deltaPct.toFixed(1)}%
-    </Chip>
+  return flagged ? (
+    <NeedsChip>{sign}{deltaPct.toFixed(1)}%</NeedsChip>
+  ) : (
+    <Chip>{sign}{deltaPct.toFixed(1)}%</Chip>
   );
 }
 
@@ -361,14 +359,14 @@ function CertificateReview({ payload }: { payload: Record<string, unknown> }) {
   return (
     <div className="grid gap-4 md:grid-cols-2">
       <div>
-        <h3 className="text-[12px] font-semibold uppercase tracking-wide text-stone-500">
+        <h3 className="text-xs font-semibold text-muted">
           Policy truth — rendered from the in-force policy
         </h3>
-        <dl className="mt-2 space-y-1.5 text-[13px]">
+        <dl className="mt-2 space-y-1.5 text-sm">
           {truth.map(([k, v]) => (
-            <div key={k} className="flex justify-between gap-3 border-b border-stone-200/70 pb-1">
-              <dt className="text-stone-500">{k}</dt>
-              <dd className={`font-medium ${v == null ? "text-stone-400" : "text-stone-900"}`}>
+            <div key={k} className="flex justify-between gap-3 border-b border-line/70 pb-1">
+              <dt className="text-muted">{k}</dt>
+              <dd className={`font-medium ${v == null ? "text-subtle" : "text-ink"}`}>
                 {fmtTermsValue(v)}
               </dd>
             </div>
@@ -376,14 +374,14 @@ function CertificateReview({ payload }: { payload: Record<string, unknown> }) {
         </dl>
       </div>
       <div>
-        <h3 className="text-[12px] font-semibold uppercase tracking-wide text-stone-500">
+        <h3 className="text-xs font-semibold text-muted">
           Certificate — the reviewed input
         </h3>
-        <dl className="mt-2 space-y-1.5 text-[13px]">
+        <dl className="mt-2 space-y-1.5 text-sm">
           {cert.map(([k, v]) => (
-            <div key={k} className="flex justify-between gap-3 border-b border-stone-200/70 pb-1">
-              <dt className="text-stone-500">{k}</dt>
-              <dd className={`font-medium ${v == null ? "text-stone-400" : "text-stone-900"}`}>
+            <div key={k} className="flex justify-between gap-3 border-b border-line/70 pb-1">
+              <dt className="text-muted">{k}</dt>
+              <dd className={`font-medium ${v == null ? "text-subtle" : "text-ink"}`}>
                 {fmtTermsValue(v)}
               </dd>
             </div>
@@ -394,12 +392,10 @@ function CertificateReview({ payload }: { payload: Record<string, unknown> }) {
   );
 }
 
-function certStatusTone(c: CertificateRow): "slate" | "violet" | "green" | "amber" | "red" | "blue" {
-  if (c.status === "issued") return "green";
-  if (c.status === "revoked") return "red";
-  if (c.approvalStatus === "approved") return "blue";
-  if (c.approvalStatus === "pending") return "amber";
-  return "slate";
+function CertStatusChip({ c }: { c: CertificateRow }) {
+  if (c.approvalStatus === "pending") return <NeedsChip>{certStatusLabel(c)}</NeedsChip>;
+  if (c.approvalStatus === "approved") return <DoneChip>{certStatusLabel(c)}</DoneChip>;
+  return <Chip>{certStatusLabel(c)}</Chip>;
 }
 
 function certStatusLabel(c: CertificateRow): string {
@@ -1109,15 +1105,15 @@ export function InsuranceApp() {
           { label: "Renewing ≤ 30 days", value: String(stats.critical) },
           { label: "Annual premium", value: fmtMoney(stats.premium) },
         ].map((s) => (
-          <div key={s.label} className="rounded-lg border border-stone-200 bg-white px-3 py-2.5 shadow-sm">
-            <div className="text-[11px] font-medium text-stone-500">{s.label}</div>
-            <div className="mt-0.5 text-lg font-bold tracking-tight text-stone-900">{s.value}</div>
+          <div key={s.label} className="rounded-lg bg-paper px-3 py-2.5 shadow-hairline">
+            <div className="text-xs font-semibold text-muted">{s.label}</div>
+            <div className="mt-0.5 text-lg font-bold text-ink">{s.value}</div>
           </div>
         ))}
       </div>
 
       {/* Sub-tabs */}
-      <div className="flex items-center gap-1 border-b border-stone-200">
+      <div className="flex items-center gap-1 border-b border-line">
         {(
           [
             { key: "policies", label: "Policies", icon: ShieldCheck },
@@ -1132,10 +1128,10 @@ export function InsuranceApp() {
           <button
             key={key}
             onClick={() => setTab(key)}
-            className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-[13px] font-medium ${
+            className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-sm font-semibold ${
               tab === key
-                ? "border-[var(--brand-600)] text-[var(--brand-700)]"
-                : "border-transparent text-stone-500 hover:text-stone-800"
+                ? "border-ink text-ink"
+                : "border-transparent text-muted hover:text-ink"
             }`}
           >
             <Icon size={14} />
@@ -1151,22 +1147,22 @@ export function InsuranceApp() {
       </div>
 
       {error && (
-        <div className="flex items-center gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-700">
-          <AlertTriangle size={14} />
+        <div className="flex items-start gap-2 rounded-md border border-failed bg-failed-tint px-3 py-2 text-sm text-failed-text">
+          <span className="mt-1 h-3 w-3 shrink-0 bg-failed" aria-hidden="true" />
           {error}
         </div>
       )}
 
       {loading ? (
-        <div className="flex items-center justify-center gap-2 py-16 text-stone-500">
+        <div className="flex items-center justify-center gap-2 py-16 text-muted">
           <Loader2 size={16} className="animate-spin" />
-          <span className="text-[13px]">Loading policies…</span>
+          <span className="text-sm">Loading policies…</span>
         </div>
       ) : tab === "policies" ? (
-        <div className="overflow-x-auto rounded-lg border border-stone-200 bg-white shadow-sm">
-          <table className="w-full text-left text-[13px]">
+        <div className="overflow-x-auto rounded-lg bg-paper shadow-hairline">
+          <table className="w-full text-left text-sm">
             <thead>
-              <tr className="border-b border-stone-200 bg-stone-50 text-[11px] font-medium uppercase tracking-wide text-stone-500">
+              <tr className="border-b border-line text-xs font-semibold text-muted">
                 <th className="px-3 py-2">Policy</th>
                 <th className="px-3 py-2">Line</th>
                 <th className="px-3 py-2">Carrier</th>
@@ -1179,33 +1175,31 @@ export function InsuranceApp() {
             <tbody>
               {policies.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-3 py-10 text-center text-stone-500">
+                  <td colSpan={7} className="px-3 py-10 text-center text-muted">
                     No policies yet — import a declarations page to get started.
                   </td>
                 </tr>
               )}
               {policies.map((p) => (
-                <tr key={p.id} className="border-b border-stone-100 hover:bg-[var(--brand-50)]/40">
+                <tr key={p.id} className="border-b border-line hover:bg-hover-paper">
                   <td className="px-3 py-2">
-                    <div className="font-medium text-stone-900">{p.policyNumber}</div>
-                    <div className="text-[11px] text-stone-500">{p.namedInsured}</div>
+                    <div className="font-medium text-ink">{p.policyNumber}</div>
+                    <div className="text-xs text-muted">{p.namedInsured}</div>
                   </td>
                   <td className="px-3 py-2"><Chip tone="slate">{p.lineLabel}</Chip></td>
                   <td className="px-3 py-2">
-                    <div className="text-stone-800">{p.carrierName}</div>
+                    <div className="text-ink">{p.carrierName}</div>
                     {p.amBestRating && (
-                      <div className="text-[11px] text-stone-500">AM Best {p.amBestRating}</div>
+                      <div className="text-xs text-muted">AM Best {p.amBestRating}</div>
                     )}
                   </td>
-                  <td className="px-3 py-2 text-stone-700">
+                  <td className="px-3 py-2 text-ink">
                     {fmtMoney(p.limitPerOccurrenceCents)} / {fmtMoney(p.limitAggregateCents)}
                   </td>
-                  <td className="px-3 py-2 text-stone-700">{fmtMoney(p.annualPremiumCents)}</td>
-                  <td className="px-3 py-2 text-stone-700">{fmtDate(p.expiresAt)}</td>
+                  <td className="px-3 py-2 text-ink">{fmtMoney(p.annualPremiumCents)}</td>
+                  <td className="px-3 py-2 text-ink">{fmtDate(p.expiresAt)}</td>
                   <td className="px-3 py-2">
-                    <Chip tone={p.status === "active" ? "green" : p.status === "pending_renewal" ? "amber" : "slate"}>
-                      {p.status.replace(/_/g, " ")}
-                    </Chip>
+                    <Chip>{p.status.replace(/_/g, " ")}</Chip>
                   </td>
                 </tr>
               ))}
@@ -1214,31 +1208,31 @@ export function InsuranceApp() {
         </div>
       ) : tab === "renewals" ? (
         <div className="flex flex-col gap-3">
-          <div className="flex items-start gap-2 rounded-md border border-stone-200 bg-stone-50 px-3 py-2 text-[12px] text-stone-600">
-            <Info size={14} className="mt-0.5 shrink-0" />
+          <div className="flex items-start gap-2 rounded-md border border-line bg-canvas px-3 py-2 text-xs text-muted">
+            <Info size={14} className="mt-0.5 shrink-0 text-muted" />
             <span>
-              <strong className="text-stone-800">Renew: remarket → compare → approve → bind.</strong>{" "}
+              <strong className="text-ink">Renew: remarket → compare → approve → bind.</strong>{" "}
               Remarketed quotes show the premium delta against the prior term before any approval —
-              deltas above the flag threshold are marked red. Auto-renewals are surfaced for review,
+              deltas above the flag threshold are flagged for review. Auto-renewals are surfaced for review,
               never silently accepted.
             </span>
           </div>
           {renewalError && (
-            <div className="flex items-center gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-700">
-              <AlertTriangle size={14} />
+            <div className="flex items-start gap-2 rounded-md border border-failed bg-failed-tint px-3 py-2 text-sm text-failed-text">
+              <span className="mt-1 h-3 w-3 shrink-0 bg-failed" aria-hidden="true" />
               {renewalError}
             </div>
           )}
           {renewalsLoading ? (
-            <div className="flex items-center justify-center gap-2 py-16 text-stone-500">
+            <div className="flex items-center justify-center gap-2 py-16 text-muted">
               <Loader2 size={16} className="animate-spin" />
-              <span className="text-[13px]">Loading renewals…</span>
+              <span className="text-sm">Loading renewals…</span>
             </div>
           ) : (
-            <div className="overflow-x-auto rounded-lg border border-stone-200 bg-white shadow-sm">
-              <table className="w-full text-left text-[13px]">
+            <div className="overflow-x-auto rounded-lg bg-paper shadow-hairline">
+              <table className="w-full text-left text-sm">
                 <thead>
-                  <tr className="border-b border-stone-200 bg-stone-50 text-[11px] font-medium uppercase tracking-wide text-stone-500">
+                  <tr className="border-b border-line text-xs font-semibold text-muted">
                     <th className="px-3 py-2">Policy</th>
                     <th className="px-3 py-2">Expires</th>
                     <th className="px-3 py-2">Alert</th>
@@ -1251,34 +1245,34 @@ export function InsuranceApp() {
                 <tbody>
                   {renewalRows.length === 0 && (
                     <tr>
-                      <td colSpan={7} className="px-3 py-10 text-center text-stone-500">
-                        <BellRing size={16} className="mx-auto mb-2 text-stone-400" />
+                      <td colSpan={7} className="px-3 py-10 text-center text-muted">
+                        <BellRing size={16} className="mx-auto mb-2 text-subtle" />
                         No renewals yet — they are created automatically when a policy is ingested.
                       </td>
                     </tr>
                   )}
                   {renewalRows.map((r) => (
                     <Fragment key={r.id}>
-                      <tr className="border-b border-stone-100 hover:bg-[var(--brand-50)]/40">
+                      <tr className="border-b border-line hover:bg-hover-paper">
                         <td className="px-3 py-2">
-                          <div className="font-medium text-stone-900">{r.policyNumber ?? "—"}</div>
-                          <div className="text-[11px] text-stone-500">
+                          <div className="font-medium text-ink">{r.policyNumber ?? "—"}</div>
+                          <div className="text-xs text-muted">
                             {r.carrierName ?? "not confirmed"}{r.lineLabel ? ` · ${r.lineLabel}` : ""}
                           </div>
                         </td>
-                        <td className="px-3 py-2 text-stone-700">
+                        <td className="px-3 py-2 text-ink">
                           {fmtDate(r.expiresAt)}
-                          <div className="text-[11px] text-stone-500">
+                          <div className="text-xs text-muted">
                             {r.daysUntilRenewal >= 0 ? `${r.daysUntilRenewal}d left` : "expired"}
                           </div>
                         </td>
                         <td className="px-3 py-2">
-                          <Chip tone={alertTone(r.alertLevel)}>{alertLabel(r.alertLevel)}</Chip>
+                          <Chip>{alertLabel(r.alertLevel)}</Chip>
                         </td>
-                        <td className="px-3 py-2 text-stone-700">
+                        <td className="px-3 py-2 text-ink">
                           {fmtMoney(r.priorPremiumCents)}
                           {r.newPremiumCents != null && (
-                            <div className="text-[11px] text-stone-500">→ {fmtMoney(r.newPremiumCents)} new</div>
+                            <div className="text-xs text-muted">→ {fmtMoney(r.newPremiumCents)} new</div>
                           )}
                         </td>
                         <td className="px-3 py-2">
@@ -1286,8 +1280,8 @@ export function InsuranceApp() {
                         </td>
                         <td className="px-3 py-2">
                           <div className="flex flex-wrap items-center gap-1">
-                            <Chip tone={remarketTone(r.remarketStatus)}>{r.statusLabel}</Chip>
-                            {r.needsReview && <Chip tone="red">Review</Chip>}
+                            <Chip>{r.statusLabel}</Chip>
+                            {r.needsReview && <NeedsChip>Review</NeedsChip>}
                           </div>
                         </td>
                         <td className="px-3 py-2">
@@ -1359,10 +1353,7 @@ export function InsuranceApp() {
                             </div>
                           )}
                           {r.remarketStatus === "bound" && (
-                            <span className="flex items-center gap-1 text-[12px] text-stone-500">
-                              <CheckCircle2 size={13} className="text-emerald-600" />
-                              Renewed
-                            </span>
+                            <DoneChip>Renewed</DoneChip>
                           )}
                           {r.remarketStatus === "auto_renew_surfaced" && (
                             <button
@@ -1382,17 +1373,17 @@ export function InsuranceApp() {
                         </td>
                       </tr>
                       {renewalForm?.id === r.id && (
-                        <tr className="border-b border-stone-100 bg-stone-50/60">
+                        <tr className="border-b border-line bg-canvas/60">
                           <td colSpan={7} className="px-4 py-3">
                             {renewalForm.kind === "remarket" && (
                               <div>
-                                <h3 className="text-[13px] font-semibold text-stone-900">Start remarket</h3>
-                                <p className="mt-0.5 text-[12px] text-stone-500">
+                                <h3 className="text-sm font-semibold text-ink">Start remarket</h3>
+                                <p className="mt-0.5 text-xs text-muted">
                                   Creates a draft submission pre-filled from the expiring policy and proposes the
                                   request_quote governed action (or honors the standing quote rule for this line).
                                 </p>
                                 <div className="mt-2 flex flex-wrap items-center gap-2">
-                                  <label className="flex items-center gap-1.5 text-[12px] font-medium text-stone-600">
+                                  <label className="flex items-center gap-1.5 text-xs font-semibold text-muted">
                                     Risk state (2-letter)
                                     <input
                                       value={remarketState}
@@ -1422,13 +1413,13 @@ export function InsuranceApp() {
                             )}
                             {renewalForm.kind === "surface" && (
                               <div>
-                                <h3 className="text-[13px] font-semibold text-stone-900">Surface auto-renewal</h3>
-                                <p className="mt-0.5 text-[12px] text-stone-500">
+                                <h3 className="text-sm font-semibold text-ink">Surface auto-renewal</h3>
+                                <p className="mt-0.5 text-xs text-muted">
                                   Enter the carrier&apos;s renewal terms exactly as quoted. Surfacing never
                                   auto-accepts — the terms go to review, and acceptance still needs a bind approval.
                                 </p>
                                 <div className="mt-2 flex flex-wrap items-center gap-2">
-                                  <label className="flex items-center gap-1.5 text-[12px] font-medium text-stone-600">
+                                  <label className="flex items-center gap-1.5 text-xs font-semibold text-muted">
                                     Renewal premium ($)
                                     <input
                                       value={surfacePremium}
@@ -1438,7 +1429,7 @@ export function InsuranceApp() {
                                       className={`${inputCls} w-28`}
                                     />
                                   </label>
-                                  <label className="flex items-center gap-1.5 text-[12px] font-medium text-stone-600">
+                                  <label className="flex items-center gap-1.5 text-xs font-semibold text-muted">
                                     Carrier
                                     <input
                                       value={surfaceCarrier}
@@ -1448,7 +1439,7 @@ export function InsuranceApp() {
                                     />
                                   </label>
                                   <button
-                                    className={btnPrimary}
+                                    className={btnReview}
                                     disabled={renewalActingId === r.id}
                                     onClick={() => void handleSurfaceAutoRenew(r.id)}
                                   >
@@ -1468,20 +1459,21 @@ export function InsuranceApp() {
                             {renewalForm.kind === "quotes" && (
                               <div>
                                 <div className="flex items-center gap-2">
-                                  <h3 className="text-[13px] font-semibold text-stone-900">Renewal quotes</h3>
+                                  <h3 className="text-sm font-semibold text-ink">Renewal quotes</h3>
                                   <DeltaBadge deltaPct={r.premiumDeltaPct} flagged={r.deltaFlagged} />
                                   {r.deltaFlagged && (
-                                    <span className="text-[12px] text-red-700">
+                                    <span className="inline-flex items-center gap-1 text-xs font-semibold text-ink">
+                                      <NeedsMark label="Flagged" />
                                       Above the flag threshold — review before approving any bind.
                                     </span>
                                   )}
                                 </div>
                                 {!r.submission || r.submission.quotes.length === 0 ? (
-                                  <p className="mt-1 text-[12px] text-stone-500">No quotes recorded yet.</p>
+                                  <p className="mt-1 text-xs text-muted">No quotes recorded yet.</p>
                                 ) : (
-                                  <table className="mt-2 w-full text-left text-[12px]">
+                                  <table className="mt-2 w-full text-left text-xs">
                                     <thead>
-                                      <tr className="border-b border-stone-200 text-[10px] font-medium uppercase tracking-wide text-stone-500">
+                                      <tr className="border-b border-line text-xs font-semibold text-muted">
                                         <th className="px-2 py-1">Carrier</th>
                                         <th className="px-2 py-1">Premium</th>
                                         <th className="px-2 py-1">Limits (occ / agg)</th>
@@ -1490,24 +1482,22 @@ export function InsuranceApp() {
                                     </thead>
                                     <tbody>
                                       {r.submission.quotes.map((q) => (
-                                        <tr key={q.id} className="border-b border-stone-100">
-                                          <td className="px-2 py-1.5 font-medium text-stone-900">{q.carrierName}</td>
-                                          <td className="px-2 py-1.5 text-stone-700">{fmtMoney(q.quotedPremiumCents)}</td>
-                                          <td className="px-2 py-1.5 text-stone-700">
+                                        <tr key={q.id} className="border-b border-line">
+                                          <td className="px-2 py-1.5 font-medium text-ink">{q.carrierName}</td>
+                                          <td className="px-2 py-1.5 text-ink">{fmtMoney(q.quotedPremiumCents)}</td>
+                                          <td className="px-2 py-1.5 text-ink">
                                             {fmtMoney(q.limitPerOccurrenceCents)} / {fmtMoney(q.limitAggregateCents)}
                                           </td>
                                           <td className="px-2 py-1.5">
-                                            <Chip tone={q.status === "quoted" ? "green" : "slate"}>
-                                              {q.status}
-                                            </Chip>
+                                            <Chip>{q.status}</Chip>
                                           </td>
                                         </tr>
                                       ))}
                                     </tbody>
                                   </table>
                                 )}
-                                <p className="mt-2 text-[12px] text-stone-500">
-                                  To bind a renewal quote, use the <strong className="text-stone-700">Bind</strong> button
+                                <p className="mt-2 text-xs text-muted">
+                                  To bind a renewal quote, use the <strong className="text-ink">Bind</strong> button
                                   above — binding is proposed and approved in the Approvals tab, then executed on the
                                   licensed rail.
                                 </p>
@@ -1516,24 +1506,24 @@ export function InsuranceApp() {
                             {renewalForm.kind === "terms" && r.autoRenewTerms && (
                               <div>
                                 <div className="flex items-center gap-2">
-                                  <h3 className="text-[13px] font-semibold text-stone-900">
+                                  <h3 className="text-sm font-semibold text-ink">
                                     Carrier auto-renewal terms
                                   </h3>
                                   <DeltaBadge deltaPct={r.premiumDeltaPct} flagged={r.deltaFlagged} />
-                                  <Chip tone="red">Needs your decision</Chip>
+                                  <NeedsChip>Needs your decision</NeedsChip>
                                 </div>
-                                <dl className="mt-2 grid grid-cols-2 gap-x-6 gap-y-1.5 text-[13px] md:grid-cols-3">
+                                <dl className="mt-2 grid grid-cols-2 gap-x-6 gap-y-1.5 text-sm md:grid-cols-3">
                                   {Object.entries(r.autoRenewTerms).map(([k, v]) => (
                                     <div
                                       key={k}
-                                      className="flex justify-between gap-3 border-b border-stone-200/70 pb-1"
+                                      className="flex justify-between gap-3 border-b border-line/70 pb-1"
                                     >
-                                      <dt className="text-stone-500">{k}</dt>
-                                      <dd className="font-medium text-stone-900">{fmtTermsValue(v)}</dd>
+                                      <dt className="text-muted">{k}</dt>
+                                      <dd className="font-medium text-ink">{fmtTermsValue(v)}</dd>
                                     </div>
                                   ))}
                                 </dl>
-                                <p className="mt-2 text-[12px] text-stone-500">
+                                <p className="mt-2 text-xs text-muted">
                                   This auto-renewal was surfaced, not accepted. Accepting means remarketing and
                                   binding through the governed flow — start a fresh remarket from the policy if the
                                   terms are wrong.
@@ -1552,14 +1542,14 @@ export function InsuranceApp() {
         </div>
       ) : tab === "quoting" ? (
         <div className="flex flex-col gap-4">
-          <div className="rounded-lg border border-stone-200 bg-white p-4 shadow-sm">
-            <h2 className="text-[14px] font-semibold text-stone-900">New submission</h2>
-            <p className="mt-0.5 text-[12px] text-stone-500">
+          <div className="rounded-lg bg-paper p-4 shadow-hairline">
+            <h2 className="aos-subheading">New submission</h2>
+            <p className="mt-0.5 text-xs text-muted">
               Submitting a risk discloses business data to carriers — quotes are
               non-binding. Fixture carrier data until CoverForce credentials exist.
             </p>
             <div className="mt-3 grid gap-3 md:grid-cols-3">
-              <label className="flex flex-col gap-1 text-[12px] font-medium text-stone-600">
+              <label className="flex flex-col gap-1 text-xs font-semibold text-muted">
                 Line of business
                 <select
                   value={intake.line}
@@ -1571,7 +1561,7 @@ export function InsuranceApp() {
                   ))}
                 </select>
               </label>
-              <label className="flex flex-col gap-1 text-[12px] font-medium text-stone-600">
+              <label className="flex flex-col gap-1 text-xs font-semibold text-muted">
                 Applicant name
                 <input
                   value={intake.applicantName}
@@ -1580,7 +1570,7 @@ export function InsuranceApp() {
                   className={inputCls}
                 />
               </label>
-              <label className="flex flex-col gap-1 text-[12px] font-medium text-stone-600">
+              <label className="flex flex-col gap-1 text-xs font-semibold text-muted">
                 State (2-letter)
                 <input
                   value={intake.state}
@@ -1590,7 +1580,7 @@ export function InsuranceApp() {
                   className={inputCls}
                 />
               </label>
-              <label className="flex flex-col gap-1 text-[12px] font-medium text-stone-600">
+              <label className="flex flex-col gap-1 text-xs font-semibold text-muted">
                 Operations description
                 <input
                   value={intake.operationsDescription}
@@ -1599,7 +1589,7 @@ export function InsuranceApp() {
                   className={inputCls}
                 />
               </label>
-              <label className="flex flex-col gap-1 text-[12px] font-medium text-stone-600">
+              <label className="flex flex-col gap-1 text-xs font-semibold text-muted">
                 Class code
                 <input
                   value={intake.classCode}
@@ -1609,7 +1599,7 @@ export function InsuranceApp() {
                 />
               </label>
               <div className="grid grid-cols-2 gap-3">
-                <label className="flex flex-col gap-1 text-[12px] font-medium text-stone-600">
+                <label className="flex flex-col gap-1 text-xs font-semibold text-muted">
                   Payroll ($)
                   <input
                     value={intake.payrollCents}
@@ -1619,7 +1609,7 @@ export function InsuranceApp() {
                     className={inputCls}
                   />
                 </label>
-                <label className="flex flex-col gap-1 text-[12px] font-medium text-stone-600">
+                <label className="flex flex-col gap-1 text-xs font-semibold text-muted">
                   Revenue ($)
                   <input
                     value={intake.revenueCents}
@@ -1632,8 +1622,8 @@ export function InsuranceApp() {
               </div>
             </div>
             {quoteError && (
-              <div className="mt-3 flex items-center gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[12px] text-red-700">
-                <AlertTriangle size={14} />
+              <div className="mt-3 flex items-start gap-2 rounded-md border border-failed bg-failed-tint px-3 py-2 text-xs text-failed-text">
+                <span className="mt-0.5 h-3 w-3 shrink-0 bg-failed" aria-hidden="true" />
                 {quoteError}
               </div>
             )}
@@ -1648,27 +1638,25 @@ export function InsuranceApp() {
           </div>
 
           {subsLoading ? (
-            <div className="flex items-center justify-center gap-2 py-10 text-stone-500">
+            <div className="flex items-center justify-center gap-2 py-10 text-muted">
               <Loader2 size={16} className="animate-spin" />
-              <span className="text-[13px]">Loading submissions…</span>
+              <span className="text-sm">Loading submissions…</span>
             </div>
           ) : (
             submissions.map((s) => (
-              <div key={s.id} className="rounded-lg border border-stone-200 bg-white shadow-sm">
-                <div className="flex items-center gap-2 border-b border-stone-100 px-4 py-2.5">
-                  <span className="text-[13px] font-semibold text-stone-900">{s.applicantName}</span>
-                  <Chip tone="slate">{s.lineLabel}</Chip>
-                  <Chip tone={s.status === "quoted" ? "green" : s.status === "declined" ? "red" : "blue"}>
-                    {s.status}
-                  </Chip>
-                  <span className="ml-auto text-[11px] text-stone-500">
+              <div key={s.id} className="rounded-lg border border-line bg-paper shadow-sm">
+                <div className="flex items-center gap-2 border-b border-line px-4 py-2.5">
+                  <span className="text-sm font-semibold text-ink">{s.applicantName}</span>
+                  <Chip>{s.lineLabel}</Chip>
+                  <Chip>{s.status}</Chip>
+                  <span className="ml-auto text-xs text-muted">
                     {s.vendorRef} · {fmtDate(s.createdAt)}
                   </span>
                 </div>
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left text-[13px]">
+                  <table className="w-full text-left text-sm">
                     <thead>
-                      <tr className="border-b border-stone-100 bg-stone-50 text-[11px] font-medium uppercase tracking-wide text-stone-500">
+                      <tr className="border-b border-line text-xs font-semibold text-muted">
                         <th className="px-4 py-2">Carrier</th>
                         <th className="px-3 py-2">Premium</th>
                         <th className="px-3 py-2">Limits (occ / agg)</th>
@@ -1678,32 +1666,32 @@ export function InsuranceApp() {
                     </thead>
                     <tbody>
                       {s.quotes.map((q) => (
-                        <tr key={q.id} className="border-b border-stone-100 last:border-0 hover:bg-[var(--brand-50)]/40">
+                        <tr key={q.id} className="border-b border-line last:border-0 hover:bg-hover-paper">
                           <td className="px-4 py-2">
-                            <span className="font-medium text-stone-900">{q.carrierName}</span>
+                            <span className="font-medium text-ink">{q.carrierName}</span>
                             {q.rank === 1 && (
-                              <span className="ml-2"><Chip tone="green">Best premium</Chip></span>
+                              <span className="ml-2"><Chip>Best premium</Chip></span>
                             )}
                           </td>
-                          <td className="px-3 py-2 text-stone-700">{fmtMoney(q.quotedPremiumCents)}</td>
-                          <td className="px-3 py-2 text-stone-700">
+                          <td className="px-3 py-2 text-ink">{fmtMoney(q.quotedPremiumCents)}</td>
+                          <td className="px-3 py-2 text-ink">
                             {fmtMoney(q.limitPerOccurrenceCents)} / {fmtMoney(q.limitAggregateCents)}
                           </td>
-                          <td className="px-3 py-2 text-stone-700">
+                          <td className="px-3 py-2 text-ink">
                             {q.premiumPerMillionAggregateCents != null
                               ? fmtMoney(q.premiumPerMillionAggregateCents)
                               : "—"}
                           </td>
                           <td className="px-3 py-2">
                             {q.status === "quoted" ? (
-                              <Chip tone="green">Quoted</Chip>
+                              <Chip>Quoted</Chip>
                             ) : q.status === "referred" ? (
-                              <Chip tone="amber">Referred</Chip>
+                              <Chip>Referred</Chip>
                             ) : (
                               <span className="flex flex-col gap-0.5">
-                                <Chip tone="red">Declined</Chip>
+                                <Chip>Declined</Chip>
                                 {q.declineReason && (
-                                  <span className="text-[11px] text-stone-500">{q.declineReason}</span>
+                                  <span className="text-xs text-muted">{q.declineReason}</span>
                                 )}
                               </span>
                             )}
@@ -1717,16 +1705,16 @@ export function InsuranceApp() {
             ))
           )}
           {!subsLoading && submissions.length === 0 && (
-            <p className="py-8 text-center text-[13px] text-stone-500">
+            <p className="py-8 text-center text-sm text-muted">
               No submissions yet — submit a risk above to get carrier quotes.
             </p>
           )}
         </div>
       ) : tab === "import" ? (
         <div className="grid gap-4 md:grid-cols-2">
-          <div className="rounded-lg border border-stone-200 bg-white p-4 shadow-sm">
-            <h2 className="text-[14px] font-semibold text-stone-900">Paste a declarations page</h2>
-            <p className="mt-0.5 text-[12px] text-stone-500">
+          <div className="rounded-lg bg-paper p-4 shadow-hairline">
+            <h2 className="aos-subheading">Paste a declarations page</h2>
+            <p className="mt-0.5 text-xs text-muted">
               The parser extracts what it finds and leaves the rest blank — coverage is
               never invented. Low-confidence parses (&lt; {Math.round(DECLARATIONS_REVIEW_THRESHOLD * 100)}%) are flagged for review.
             </p>
@@ -1735,7 +1723,7 @@ export function InsuranceApp() {
               onChange={(e) => setDeclText(e.target.value)}
               rows={14}
               placeholder="Paste declarations-page text (or OCR output) here…"
-              className={`${inputCls} mt-3 w-full font-mono text-[12px]`}
+              className={`${inputCls} mt-3 h-auto w-full py-2 font-mono text-xs`}
             />
             <div className="mt-3 flex gap-2">
               <button className={btnPrimary} onClick={handleParse} disabled={!declText.trim()}>
@@ -1750,21 +1738,21 @@ export function InsuranceApp() {
               )}
             </div>
           </div>
-          <div className="rounded-lg border border-stone-200 bg-white p-4 shadow-sm">
-            <h2 className="text-[14px] font-semibold text-stone-900">Parse preview</h2>
+          <div className="rounded-lg bg-paper p-4 shadow-hairline">
+            <h2 className="aos-subheading">Parse preview</h2>
             {!parsed ? (
-              <p className="mt-2 text-[12px] text-stone-500">
+              <p className="mt-2 text-xs text-muted">
                 Nothing parsed yet. Paste declarations text and press Parse.
               </p>
             ) : (
               <>
                 {parsed.confidence < DECLARATIONS_REVIEW_THRESHOLD && (
-                  <div className="mt-2 flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-800">
-                    <AlertTriangle size={14} />
+                  <div className="mt-2 flex items-start gap-2 rounded-md border border-needs bg-needs-tint px-3 py-2 text-xs text-ink">
+                    <span className="aos-shape aos-shape--needs aos-shape--edged mt-0.5 shrink-0" role="img" aria-label="Warning" />
                     Low confidence ({Math.round(parsed.confidence * 100)}%) — review every field before saving.
                   </div>
                 )}
-                <dl className="mt-3 space-y-1.5 text-[13px]">
+                <dl className="mt-3 space-y-1.5 text-sm">
                   {(
                     [
                       ["Policy number", parsed.policyNumber],
@@ -1779,17 +1767,17 @@ export function InsuranceApp() {
                       ["Annual premium", parsed.annualPremiumCents != null ? fmtMoney(parsed.annualPremiumCents) : null],
                     ] as const
                   ).map(([k, v]) => (
-                    <div key={k} className="flex justify-between gap-3 border-b border-stone-100 pb-1">
-                      <dt className="text-stone-500">{k}</dt>
-                      <dd className={`font-medium ${v == null ? "text-stone-400" : "text-stone-900"}`}>
+                    <div key={k} className="flex justify-between gap-3 border-b border-line pb-1">
+                      <dt className="text-muted">{k}</dt>
+                      <dd className={`font-medium ${v == null ? "text-subtle" : "text-ink"}`}>
                         {v ?? "not confirmed"}
                       </dd>
                     </div>
                   ))}
                 </dl>
                 {saveError && (
-                  <div className="mt-2 flex items-center gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[12px] text-red-700">
-                    <AlertTriangle size={14} />
+                  <div className="mt-2 flex items-start gap-2 rounded-md border border-failed bg-failed-tint px-3 py-2 text-xs text-failed-text">
+                    <span className="mt-0.5 h-3 w-3 shrink-0 bg-failed" aria-hidden="true" />
                     {saveError}
                   </div>
                 )}
@@ -1798,7 +1786,7 @@ export function InsuranceApp() {
                   {saving ? "Saving…" : "Save to inventory"}
                 </button>
                 {!canSave && !saving && parsed && (
-                  <p className="mt-1.5 text-[11px] text-stone-500">
+                  <p className="mt-1.5 text-xs text-muted">
                     Policy number, carrier, line, named insured, and a valid term are required to save.
                   </p>
                 )}
@@ -1808,35 +1796,35 @@ export function InsuranceApp() {
         </div>
       ) : tab === "partners" ? (
         <div className="flex flex-col gap-4">
-          <div className="flex items-start gap-2 rounded-md border border-stone-200 bg-stone-50 px-3 py-2 text-[12px] text-stone-600">
-            <Info size={14} className="mt-0.5 shrink-0" />
+          <div className="flex items-start gap-2 rounded-md border border-line bg-canvas px-3 py-2 text-xs text-muted">
+            <Info size={14} className="mt-0.5 shrink-0 text-muted" />
             <span>
-              The licensed partner is the <strong className="text-stone-800">producer of record</strong> —
+              The licensed partner is the <strong className="text-ink">producer of record</strong> —
               the partner holds the licenses, Marketr provides the software. Binding is blocked
-              (PARTNER_NOT_APPOINTED) until an <strong className="text-stone-800">active, appointed</strong> partner
+              (PARTNER_NOT_APPOINTED) until an <strong className="text-ink">active, appointed</strong> partner
               with a producer license number and licensed states is on file. Status changes are admin-gated.
             </span>
           </div>
           {partnersError && (
-            <div className="flex items-center gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-700">
-              <AlertTriangle size={14} />
+            <div className="flex items-start gap-2 rounded-md border border-failed bg-failed-tint px-3 py-2 text-sm text-failed-text">
+              <span className="mt-1 h-3 w-3 shrink-0 bg-failed" aria-hidden="true" />
               {partnersError}
             </div>
           )}
           <div>
-            <button className={btnPrimary} onClick={() => setShowRegister((v) => !v)}>
-              <Plus size={14} />
+            <button className={btnReview} onClick={() => setShowRegister((v) => !v)}>
+              <span className="aos-shape aos-shape--needs" style={{ color: "var(--aos-ink)" }} role="img" aria-label="Needs review" />
               {showRegister ? "Hide registration" : "Register partner"}
             </button>
           </div>
           {showRegister && (
-            <div className="rounded-lg border border-stone-200 bg-white p-4 shadow-sm">
-              <h2 className="text-[14px] font-semibold text-stone-900">Register licensed partner</h2>
-              <p className="mt-0.5 text-[12px] text-stone-500">
+            <div className="rounded-lg bg-paper p-4 shadow-hairline">
+              <h2 className="aos-subheading">Register licensed partner</h2>
+              <p className="mt-0.5 text-xs text-muted">
                 Registration is fail-closed: name, producer license number, and licensed states are all required.
               </p>
               <div className="mt-3 grid gap-3 md:grid-cols-2">
-                <label className="flex flex-col gap-1 text-[12px] font-medium text-stone-600">
+                <label className="flex flex-col gap-1 text-xs font-semibold text-muted">
                   Partner name
                   <input
                     value={reg.name}
@@ -1845,7 +1833,7 @@ export function InsuranceApp() {
                     className={inputCls}
                   />
                 </label>
-                <label className="flex flex-col gap-1 text-[12px] font-medium text-stone-600">
+                <label className="flex flex-col gap-1 text-xs font-semibold text-muted">
                   Producer license number
                   <input
                     value={reg.producerLicenseNumber}
@@ -1854,7 +1842,7 @@ export function InsuranceApp() {
                     className={inputCls}
                   />
                 </label>
-                <label className="flex flex-col gap-1 text-[12px] font-medium text-stone-600">
+                <label className="flex flex-col gap-1 text-xs font-semibold text-muted">
                   Contact email (optional)
                   <input
                     value={reg.contactEmail}
@@ -1863,7 +1851,7 @@ export function InsuranceApp() {
                     className={inputCls}
                   />
                 </label>
-                <label className="flex flex-col gap-1 text-[12px] font-medium text-stone-600">
+                <label className="flex flex-col gap-1 text-xs font-semibold text-muted">
                   Licensed states (comma-separated, 2-letter)
                   <input
                     value={reg.licensedStates}
@@ -1872,7 +1860,7 @@ export function InsuranceApp() {
                     className={inputCls}
                   />
                 </label>
-                <label className="flex flex-col gap-1 text-[12px] font-medium text-stone-600">
+                <label className="flex flex-col gap-1 text-xs font-semibold text-muted">
                   Appointment path
                   <select
                     value={reg.appointmentPath}
@@ -1886,8 +1874,8 @@ export function InsuranceApp() {
                 </label>
               </div>
               {registerError && (
-                <div className="mt-3 flex items-center gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[12px] text-red-700">
-                  <AlertTriangle size={14} />
+                <div className="mt-3 flex items-start gap-2 rounded-md border border-failed bg-failed-tint px-3 py-2 text-xs text-failed-text">
+                  <span className="mt-0.5 h-3 w-3 shrink-0 bg-failed" aria-hidden="true" />
                   {registerError}
                 </div>
               )}
@@ -1907,15 +1895,15 @@ export function InsuranceApp() {
             </div>
           )}
           {partnersLoading ? (
-            <div className="flex items-center justify-center gap-2 py-10 text-stone-500">
+            <div className="flex items-center justify-center gap-2 py-10 text-muted">
               <Loader2 size={16} className="animate-spin" />
-              <span className="text-[13px]">Loading partners…</span>
+              <span className="text-sm">Loading partners…</span>
             </div>
           ) : (
-            <div className="overflow-x-auto rounded-lg border border-stone-200 bg-white shadow-sm">
-              <table className="w-full text-left text-[13px]">
+            <div className="overflow-x-auto rounded-lg bg-paper shadow-hairline">
+              <table className="w-full text-left text-sm">
                 <thead>
-                  <tr className="border-b border-stone-200 bg-stone-50 text-[11px] font-medium uppercase tracking-wide text-stone-500">
+                  <tr className="border-b border-line text-xs font-semibold text-muted">
                     <th className="px-3 py-2">Partner</th>
                     <th className="px-3 py-2">License</th>
                     <th className="px-3 py-2">Licensed states</th>
@@ -1927,37 +1915,37 @@ export function InsuranceApp() {
                 <tbody>
                   {partners.length === 0 && (
                     <tr>
-                      <td colSpan={6} className="px-3 py-10 text-center text-stone-500">
+                      <td colSpan={6} className="px-3 py-10 text-center text-muted">
                         No licensed partners yet — register one to unblock binding.
                       </td>
                     </tr>
                   )}
                   {partners.map((p) => (
-                    <tr key={p.id} className="border-b border-stone-100 last:border-0 hover:bg-[var(--brand-50)]/40">
+                    <tr key={p.id} className="border-b border-line last:border-0 hover:bg-hover-paper">
                       <td className="px-3 py-2">
-                        <div className="font-medium text-stone-900">{p.name}</div>
+                        <div className="font-medium text-ink">{p.name}</div>
                         {p.contactEmail && (
-                          <div className="text-[11px] text-stone-500">{p.contactEmail}</div>
+                          <div className="text-xs text-muted">{p.contactEmail}</div>
                         )}
                       </td>
-                      <td className="px-3 py-2 font-mono text-[12px] text-stone-800">
-                        {p.licenseNumber ?? <span className="font-sans text-stone-400">none</span>}
+                      <td className="px-3 py-2 font-mono text-xs text-ink">
+                        {p.licenseNumber ?? <span className="font-sans text-subtle">none</span>}
                       </td>
                       <td className="px-3 py-2">
                         <div className="flex flex-wrap gap-1">
                           {p.licensedStates.map((s) => (
-                            <Chip key={s} tone="slate">{s}</Chip>
+                            <Chip key={s}>{s}</Chip>
                           ))}
                           {p.licensedStates.length === 0 && (
-                            <span className="text-[11px] text-stone-400">none</span>
+                            <span className="text-xs text-subtle">none</span>
                           )}
                         </div>
                       </td>
-                      <td className="px-3 py-2 text-[12px] text-stone-700">
+                      <td className="px-3 py-2 text-xs text-ink">
                         {APPOINTMENT_PATH_LABELS[p.appointmentPath] ?? p.appointmentPath}
                       </td>
                       <td className="px-3 py-2">
-                        <Chip tone={partnerTone(p.status)}>{p.status}</Chip>
+                        <Chip>{p.status}</Chip>
                       </td>
                       <td className="px-3 py-2">
                         <div className="flex gap-1.5">
@@ -2004,42 +1992,42 @@ export function InsuranceApp() {
         </div>
       ) : tab === "certificates" ? (
         <div className="flex flex-col gap-4">
-          <div className="flex items-start gap-2 rounded-md border border-stone-200 bg-stone-50 px-3 py-2 text-[12px] text-stone-600">
-            <Info size={14} className="mt-0.5 shrink-0" />
+          <div className="flex items-start gap-2 rounded-md border border-line bg-canvas px-3 py-2 text-xs text-muted">
+            <Info size={14} className="mt-0.5 shrink-0 text-muted" />
             <span>
-              <strong className="text-stone-800">Agent prepares → you review → system issues.</strong>{" "}
-              Certificates render <strong className="text-stone-800">only from in-force policy truth</strong> — the
+              <strong className="text-ink">Agent prepares → you review → system issues.</strong>{" "}
+              Certificates render <strong className="text-ink">only from in-force policy truth</strong> — the
               policy picker lists in-force policies only, and unverified fields read "not confirmed". Issuance
               re-verifies the approval disclosure against the live policy before any PDF is generated.
             </span>
           </div>
           {certNotice && (
-            <div className="flex items-center gap-2 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-[13px] text-blue-800">
-              <Info size={14} />
+            <div className="flex items-center gap-2 rounded-md border border-line bg-canvas px-3 py-2 text-sm text-muted">
+              <Info size={14} className="text-ink" />
               {certNotice}
             </div>
           )}
           {certError && (
-            <div className="flex items-center gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-700">
-              <AlertTriangle size={14} />
+            <div className="flex items-start gap-2 rounded-md border border-failed bg-failed-tint px-3 py-2 text-sm text-failed-text">
+              <span className="mt-1 h-3 w-3 shrink-0 bg-failed" aria-hidden="true" />
               {certError}
             </div>
           )}
           <div>
-            <button className={btnPrimary} onClick={() => setShowPrepare((v) => !v)}>
-              <Plus size={14} />
+            <button className={btnReview} onClick={() => setShowPrepare((v) => !v)}>
+              <span className="aos-shape aos-shape--needs" style={{ color: "var(--aos-ink)" }} role="img" aria-label="Needs review" />
               {showPrepare ? "Hide prepare form" : "Prepare certificate"}
             </button>
           </div>
           {showPrepare && (
-            <div className="rounded-lg border border-stone-200 bg-white p-4 shadow-sm">
-              <h2 className="text-[14px] font-semibold text-stone-900">Prepare certificate of insurance</h2>
-              <p className="mt-0.5 text-[12px] text-stone-500">
+            <div className="rounded-lg bg-paper p-4 shadow-hairline">
+              <h2 className="aos-subheading">Prepare certificate of insurance</h2>
+              <p className="mt-0.5 text-xs text-muted">
                 Prepare creates a draft and proposes the issue_certificate governed action — nothing is issued until
                 you approve and press Issue. The validity window is clamped into the policy term.
               </p>
               <div className="mt-3 grid gap-3 md:grid-cols-2">
-                <label className="flex flex-col gap-1 text-[12px] font-medium text-stone-600">
+                <label className="flex flex-col gap-1 text-xs font-semibold text-muted">
                   Issuing policy (in-force only)
                   <select
                     value={prep.policyId}
@@ -2054,12 +2042,13 @@ export function InsuranceApp() {
                     ))}
                   </select>
                   {inForcePolicies.length === 0 && (
-                    <span className="text-[11px] text-amber-700">
+                    <span className="inline-flex items-center gap-1 text-xs font-semibold text-ink">
+                      <NeedsMark label="Warning" />
                       No in-force policies — certificates can only be issued from policies with status "active".
                     </span>
                   )}
                 </label>
-                <label className="flex flex-col gap-1 text-[12px] font-medium text-stone-600">
+                <label className="flex flex-col gap-1 text-xs font-semibold text-muted">
                   Certificate holder name
                   <input
                     value={prep.holderName}
@@ -2068,7 +2057,7 @@ export function InsuranceApp() {
                     className={inputCls}
                   />
                 </label>
-                <label className="flex flex-col gap-1 text-[12px] font-medium text-stone-600">
+                <label className="flex flex-col gap-1 text-xs font-semibold text-muted">
                   Holder address
                   <input
                     value={prep.holderAddress}
@@ -2077,7 +2066,7 @@ export function InsuranceApp() {
                     className={inputCls}
                   />
                 </label>
-                <label className="flex flex-col gap-1 text-[12px] font-medium text-stone-600">
+                <label className="flex flex-col gap-1 text-xs font-semibold text-muted">
                   Requested for (contract / client reference)
                   <input
                     value={prep.requestedFor}
@@ -2086,7 +2075,7 @@ export function InsuranceApp() {
                     className={inputCls}
                   />
                 </label>
-                <label className="flex flex-col gap-1 text-[12px] font-medium text-stone-600">
+                <label className="flex flex-col gap-1 text-xs font-semibold text-muted">
                   Description of operations
                   <input
                     value={prep.operationsDescription}
@@ -2096,29 +2085,29 @@ export function InsuranceApp() {
                   />
                 </label>
                 <div className="flex items-end gap-5 pb-1">
-                  <label className="flex items-center gap-2 text-[13px] text-stone-700">
+                  <label className="flex items-center gap-2 text-sm text-ink">
                     <input
                       type="checkbox"
                       checked={prep.additionalInsured}
                       onChange={(e) => setPrep({ ...prep, additionalInsured: e.target.checked })}
-                      className="h-4 w-4 accent-[var(--brand-600)]"
+                      className="h-4 w-4 accent-ink"
                     />
                     Additional insured
                   </label>
-                  <label className="flex items-center gap-2 text-[13px] text-stone-700">
+                  <label className="flex items-center gap-2 text-sm text-ink">
                     <input
                       type="checkbox"
                       checked={prep.waiverOfSubrogation}
                       onChange={(e) => setPrep({ ...prep, waiverOfSubrogation: e.target.checked })}
-                      className="h-4 w-4 accent-[var(--brand-600)]"
+                      className="h-4 w-4 accent-ink"
                     />
                     Waiver of subrogation
                   </label>
                 </div>
               </div>
               {prepareError && (
-                <div className="mt-3 flex items-center gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[12px] text-red-700">
-                  <AlertTriangle size={14} />
+                <div className="mt-3 flex items-start gap-2 rounded-md border border-failed bg-failed-tint px-3 py-2 text-xs text-failed-text">
+                  <span className="mt-0.5 h-3 w-3 shrink-0 bg-failed" aria-hidden="true" />
                   {prepareError}
                 </div>
               )}
@@ -2133,15 +2122,15 @@ export function InsuranceApp() {
             </div>
           )}
           {certsLoading ? (
-            <div className="flex items-center justify-center gap-2 py-10 text-stone-500">
+            <div className="flex items-center justify-center gap-2 py-10 text-muted">
               <Loader2 size={16} className="animate-spin" />
-              <span className="text-[13px]">Loading certificates…</span>
+              <span className="text-sm">Loading certificates…</span>
             </div>
           ) : (
-            <div className="overflow-x-auto rounded-lg border border-stone-200 bg-white shadow-sm">
-              <table className="w-full text-left text-[13px]">
+            <div className="overflow-x-auto rounded-lg bg-paper shadow-hairline">
+              <table className="w-full text-left text-sm">
                 <thead>
-                  <tr className="border-b border-stone-200 bg-stone-50 text-[11px] font-medium uppercase tracking-wide text-stone-500">
+                  <tr className="border-b border-line text-xs font-semibold text-muted">
                     <th className="px-3 py-2">Holder</th>
                     <th className="px-3 py-2">Policy</th>
                     <th className="px-3 py-2">Endorsements</th>
@@ -2153,57 +2142,57 @@ export function InsuranceApp() {
                 <tbody>
                   {certs.length === 0 && (
                     <tr>
-                      <td colSpan={6} className="px-3 py-10 text-center text-stone-500">
-                        <ScrollText size={16} className="mx-auto mb-2 text-stone-400" />
+                      <td colSpan={6} className="px-3 py-10 text-center text-muted">
+                        <ScrollText size={16} className="mx-auto mb-2 text-subtle" />
                         No certificates yet — prepare one from an in-force policy above.
                       </td>
                     </tr>
                   )}
                   {certs.map((c) => (
                     <Fragment key={c.id}>
-                      <tr className="border-b border-stone-100 hover:bg-[var(--brand-50)]/40">
+                      <tr className="border-b border-line hover:bg-hover-paper">
                         <td className="px-3 py-2">
-                          <div className="font-medium text-stone-900">{c.holderName}</div>
+                          <div className="font-medium text-ink">{c.holderName}</div>
                           {c.requestedFor && (
-                            <div className="text-[11px] text-stone-500">for {c.requestedFor}</div>
+                            <div className="text-xs text-muted">for {c.requestedFor}</div>
                           )}
                         </td>
                         <td className="px-3 py-2">
-                          <div className="text-stone-800">{c.policyNumber ?? "—"}</div>
-                          <div className="text-[11px] text-stone-500">
+                          <div className="text-ink">{c.policyNumber ?? "—"}</div>
+                          <div className="text-xs text-muted">
                             {c.carrierName ?? "not confirmed"}{c.lineLabel ? ` · ${c.lineLabel}` : ""}
                           </div>
                         </td>
                         <td className="px-3 py-2">
                           <div className="flex flex-wrap gap-1">
-                            {c.additionalInsured && <Chip tone="violet">AI</Chip>}
-                            {c.waiverOfSubrogation && <Chip tone="blue">WoS</Chip>}
+                            {c.additionalInsured && <Chip>AI</Chip>}
+                            {c.waiverOfSubrogation && <Chip>WoS</Chip>}
                             {!c.additionalInsured && !c.waiverOfSubrogation && (
-                              <span className="text-[11px] text-stone-400">none</span>
+                              <span className="text-xs text-subtle">none</span>
                             )}
                           </div>
                         </td>
-                        <td className="px-3 py-2 text-stone-700">
+                        <td className="px-3 py-2 text-ink">
                           {fmtDate(c.validFrom)} → {fmtDate(c.validTo)}
                         </td>
                         <td className="px-3 py-2">
-                          <Chip tone={certStatusTone(c)}>{certStatusLabel(c)}</Chip>
+                          <CertStatusChip c={c} />
                         </td>
                         <td className="px-3 py-2">
                           <div className="flex flex-wrap items-center gap-1.5">
                             {c.status === "draft" && c.approvalStatus === "pending" && c.approvalPayload && (
                               <button
-                                className={btnGhost}
+                                className={btnReview}
                                 onClick={() => setCertExpandedId(certExpandedId === c.id ? null : c.id)}
                               >
-                                <Eye size={13} />
+                                <span className="aos-shape aos-shape--needs" style={{ color: "var(--aos-ink)" }} role="img" aria-label="Needs review" />
                                 {certExpandedId === c.id ? "Hide" : "Review"}
                                 <ChevronDown size={13} className={certExpandedId === c.id ? "rotate-180" : ""} />
                               </button>
                             )}
                             {c.status === "draft" && c.approvalStatus === "approved" && (
                               <button
-                                className={btnPrimary}
+                                className={btnExecute}
                                 disabled={issuingId === c.id}
                                 onClick={() => void handleIssue(c)}
                               >
@@ -2237,7 +2226,7 @@ export function InsuranceApp() {
                               </>
                             )}
                             {c.status === "revoked" && c.revokedReason && (
-                              <span className="max-w-56 text-[11px] text-stone-500">
+                              <span className="max-w-56 text-xs text-muted">
                                 Revoked: {c.revokedReason}
                               </span>
                             )}
@@ -2245,16 +2234,16 @@ export function InsuranceApp() {
                         </td>
                       </tr>
                       {certExpandedId === c.id && c.approvalPayload && (
-                        <tr className="border-b border-stone-100 bg-stone-50/60">
+                        <tr className="border-b border-line bg-canvas/60">
                           <td colSpan={6} className="px-4 py-3">
                             <CertificateReview payload={c.approvalPayload} />
-                            <p className="mt-2 text-[11px] text-stone-500">
+                            <p className="mt-2 text-xs text-muted">
                               Fields the policy has not confirmed read "not confirmed" — coverage is never invented.
                               Issuance re-verifies this disclosure against the live policy row.
                             </p>
                             <div className="mt-3 flex flex-wrap items-center gap-2">
                               <button
-                                className={btnPrimary}
+                                className={btnApprove}
                                 disabled={certDecidingId === c.id}
                                 onClick={() => void handleCertDecide(c, "approve")}
                               >
@@ -2266,7 +2255,7 @@ export function InsuranceApp() {
                                 Approve
                               </button>
                               <button
-                                className={btnGhost}
+                                className={btnDeny}
                                 disabled={certDecidingId === c.id}
                                 onClick={() => void handleCertDecide(c, "reject")}
                               >
@@ -2284,12 +2273,12 @@ export function InsuranceApp() {
                         </tr>
                       )}
                       {revokeFormId === c.id && c.status === "issued" && (
-                        <tr className="border-b border-stone-100 bg-stone-50/60">
+                        <tr className="border-b border-line bg-canvas/60">
                           <td colSpan={6} className="px-4 py-3">
-                            <h3 className="text-[13px] font-semibold text-stone-900">
+                            <h3 className="text-sm font-semibold text-ink">
                               Revoke certificate for {c.holderName}
                             </h3>
-                            <p className="mt-0.5 text-[12px] text-stone-500">
+                            <p className="mt-0.5 text-xs text-muted">
                               A reason is required — the revocation is written to the audit trail and the download
                               link is disabled.
                             </p>
@@ -2301,7 +2290,7 @@ export function InsuranceApp() {
                                 className={`${inputCls} w-80`}
                               />
                               <button
-                                className={btnPrimary}
+                                className={btnDeny}
                                 disabled={issuingId === c.id || !revokeReason.trim()}
                                 onClick={() => void handleRevoke(c)}
                               >
@@ -2334,41 +2323,41 @@ export function InsuranceApp() {
         </div>
       ) : (
         <div className="flex flex-col gap-4">
-          <div className="flex items-start gap-2 rounded-md border border-stone-200 bg-stone-50 px-3 py-2 text-[12px] text-stone-600">
-            <Info size={14} className="mt-0.5 shrink-0" />
+          <div className="flex items-start gap-2 rounded-md border border-line bg-canvas px-3 py-2 text-xs text-muted">
+            <Info size={14} className="mt-0.5 shrink-0 text-muted" />
             <span>
-              <strong className="text-stone-800">Agent prepares → you approve → licensed rail executes.</strong>{" "}
+              <strong className="text-ink">Agent prepares → you approve → licensed rail executes.</strong>{" "}
               Premium moves carrier-direct; the OS never holds funds. Bind approvals show the full disclosure
               (carrier, premium, limits, effective dates) before you decide — no auto-bind in v1.
             </span>
           </div>
           {pendingError && (
-            <div className="flex items-center gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-700">
-              <AlertTriangle size={14} />
+            <div className="flex items-start gap-2 rounded-md border border-failed bg-failed-tint px-3 py-2 text-sm text-failed-text">
+              <span className="mt-1 h-3 w-3 shrink-0 bg-failed" aria-hidden="true" />
               {pendingError}
             </div>
           )}
           {decisionError && (
-            <div className="flex items-center gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-700">
-              <AlertTriangle size={14} />
+            <div className="flex items-start gap-2 rounded-md border border-failed bg-failed-tint px-3 py-2 text-sm text-failed-text">
+              <span className="mt-1 h-3 w-3 shrink-0 bg-failed" aria-hidden="true" />
               {decisionError}
             </div>
           )}
           {pendingLoading ? (
-            <div className="flex items-center justify-center gap-2 py-10 text-stone-500">
+            <div className="flex items-center justify-center gap-2 py-10 text-muted">
               <Loader2 size={16} className="animate-spin" />
-              <span className="text-[13px]">Loading approvals…</span>
+              <span className="text-sm">Loading approvals…</span>
             </div>
           ) : pending.length === 0 && approvedBinds.length === 0 ? (
-            <p className="py-8 text-center text-[13px] text-stone-500">
+            <p className="py-8 text-center text-sm text-muted">
               No pending governed actions.
             </p>
           ) : (
             pending.length > 0 && (
-              <div className="overflow-x-auto rounded-lg border border-stone-200 bg-white shadow-sm">
-                <table className="w-full text-left text-[13px]">
+              <div className="overflow-x-auto rounded-lg bg-paper shadow-hairline">
+                <table className="w-full text-left text-sm">
                   <thead>
-                    <tr className="border-b border-stone-200 bg-stone-50 text-[11px] font-medium uppercase tracking-wide text-stone-500">
+                    <tr className="border-b border-line text-xs font-semibold text-muted">
                       <th className="px-3 py-2">Action</th>
                       <th className="px-3 py-2">Subject</th>
                       <th className="px-3 py-2">Requested by</th>
@@ -2379,33 +2368,33 @@ export function InsuranceApp() {
                   <tbody>
                     {pending.map((a) => (
                       <Fragment key={a.id}>
-                        <tr className="border-b border-stone-100 hover:bg-[var(--brand-50)]/40">
+                        <tr className="border-b border-line hover:bg-hover-paper">
                           <td className="px-3 py-2">
-                            <Chip tone={actionTone(a.kind)}>{actionLabel(a.kind)}</Chip>
+                            <Chip>{actionLabel(a.kind)}</Chip>
                           </td>
-                          <td className="px-3 py-2 text-stone-700">{approvalSummary(a)}</td>
-                          <td className="px-3 py-2 text-[12px] text-stone-500">{a.requestedBy ?? "—"}</td>
-                          <td className="px-3 py-2 text-[12px] text-stone-500">{fmtDate(a.createdAt)}</td>
+                          <td className="px-3 py-2 text-ink">{approvalSummary(a)}</td>
+                          <td className="px-3 py-2 text-xs text-muted">{a.requestedBy ?? "—"}</td>
+                          <td className="px-3 py-2 text-xs text-muted">{fmtDate(a.createdAt)}</td>
                           <td className="px-3 py-2">
                             <button
-                              className={btnGhost}
+                              className={btnReview}
                               onClick={() => setExpandedId(expandedId === a.id ? null : a.id)}
                             >
-                              <Eye size={13} />
+                              <span className="aos-shape aos-shape--needs" style={{ color: "var(--aos-ink)" }} role="img" aria-label="Needs review" />
                               {expandedId === a.id ? "Hide" : "Review"}
                               <ChevronDown size={13} className={expandedId === a.id ? "rotate-180" : ""} />
                             </button>
                           </td>
                         </tr>
                         {expandedId === a.id && (
-                          <tr className="border-b border-stone-100 bg-stone-50/60">
+                          <tr className="border-b border-line bg-canvas/60">
                             <td colSpan={5} className="px-4 py-3">
                               {a.kind === "insurance_bind_policy" ? (
                                 <>
-                                  <h3 className="text-[13px] font-semibold text-stone-900">
+                                  <h3 className="text-sm font-semibold text-ink">
                                     Full disclosure — review before approving
                                   </h3>
-                                  <dl className="mt-2 grid grid-cols-2 gap-x-6 gap-y-1.5 text-[13px] md:grid-cols-3">
+                                  <dl className="mt-2 grid grid-cols-2 gap-x-6 gap-y-1.5 text-sm md:grid-cols-3">
                                     {(
                                       [
                                         ["Carrier", typeof a.payload.carrier === "string" ? a.payload.carrier : null],
@@ -2416,16 +2405,16 @@ export function InsuranceApp() {
                                         ["Expiry date", typeof a.payload.expiryDate === "string" ? fmtDate(a.payload.expiryDate) : null],
                                       ] as const
                                     ).map(([k, v]) => (
-                                      <div key={k} className="flex justify-between gap-3 border-b border-stone-200/70 pb-1">
-                                        <dt className="text-stone-500">{k}</dt>
-                                        <dd className={`font-medium ${v == null ? "text-stone-400" : "text-stone-900"}`}>
+                                      <div key={k} className="flex justify-between gap-3 border-b border-line/70 pb-1">
+                                        <dt className="text-muted">{k}</dt>
+                                        <dd className={`font-medium ${v == null ? "text-subtle" : "text-ink"}`}>
                                           {v ?? "not confirmed"}
                                         </dd>
                                       </div>
                                     ))}
                                   </dl>
-                                  <div className="mt-2 text-[12px] text-stone-600">
-                                    <span className="font-medium text-stone-800">Producer of record: </span>
+                                  <div className="mt-2 text-xs text-muted">
+                                    <span className="font-medium text-ink">Producer of record: </span>
                                     {appointedPartner ? (
                                       <>
                                         {appointedPartner.name} · license{" "}
@@ -2433,42 +2422,43 @@ export function InsuranceApp() {
                                         {appointedPartner.licensedStates.join(", ")}
                                       </>
                                     ) : (
-                                      <span className="text-amber-700">
+                                      <span className="inline-flex items-center gap-1 text-ink">
+                                        <NeedsMark label="Warning" />
                                         No appointed partner — bind execution will be blocked until one is registered.
                                       </span>
                                     )}
                                   </div>
-                                  <p className="mt-1.5 text-[11px] text-stone-500">
+                                  <p className="mt-1.5 text-xs text-muted">
                                     Fields the carrier has not confirmed read "not confirmed" — coverage is never invented.
                                   </p>
                                 </>
                               ) : a.kind === "insurance_issue_certificate" ? (
                                 <>
-                                  <h3 className="text-[13px] font-semibold text-stone-900">
+                                  <h3 className="text-sm font-semibold text-ink">
                                     Certificate disclosure — review before approving
                                   </h3>
                                   <div className="mt-2">
                                     <CertificateReview payload={a.payload} />
                                   </div>
-                                  <p className="mt-2 text-[12px] text-stone-600">
+                                  <p className="mt-2 text-xs text-muted">
                                     After approval, issue the certificate from the{" "}
-                                    <strong className="text-stone-800">Certificates</strong> tab — issuance re-verifies
+                                    <strong className="text-ink">Certificates</strong> tab — issuance re-verifies
                                     this disclosure against the live policy row before rendering the PDF.
                                   </p>
-                                  <p className="mt-1.5 text-[11px] text-stone-500">
+                                  <p className="mt-1.5 text-xs text-muted">
                                     Fields the policy has not confirmed read "not confirmed" — coverage is never invented.
                                   </p>
                                 </>
                               ) : (
-                                <div className="text-[12px] text-stone-600">
-                                  <span className="font-medium text-stone-800">Subject:</span>{" "}
+                                <div className="text-xs text-muted">
+                                  <span className="font-medium text-ink">Subject:</span>{" "}
                                   {String(a.payload.subjectType ?? "")}{" "}
                                   <span className="font-mono">{String(a.payload.subjectId ?? "")}</span>
                                 </div>
                               )}
                               <div className="mt-3 flex flex-wrap items-center gap-2">
                                 <button
-                                  className={btnPrimary}
+                                  className={btnApprove}
                                   disabled={decidingId === a.id}
                                   onClick={() => void handleDecide(a, "approve")}
                                 >
@@ -2480,7 +2470,7 @@ export function InsuranceApp() {
                                   Approve
                                 </button>
                                 <button
-                                  className={btnGhost}
+                                  className={btnDeny}
                                   disabled={decidingId === a.id}
                                   onClick={() => void handleDecide(a, "reject")}
                                 >
@@ -2505,9 +2495,9 @@ export function InsuranceApp() {
             )
           )}
           {approvedBinds.length > 0 && (
-            <div className="rounded-lg border border-stone-200 bg-white p-4 shadow-sm">
-              <h2 className="text-[14px] font-semibold text-stone-900">Approved — ready to execute</h2>
-              <p className="mt-0.5 text-[12px] text-stone-500">
+            <div className="rounded-lg bg-paper p-4 shadow-hairline">
+              <h2 className="aos-subheading">Approved — ready to execute</h2>
+              <p className="mt-0.5 text-xs text-muted">
                 Approval is recorded with the full disclosure. Executing a bind calls the licensed rail with the
                 approved terms — the producer of record binds at the carrier, premium moves carrier-direct.
               </p>
@@ -2517,28 +2507,28 @@ export function InsuranceApp() {
                   return (
                     <div
                       key={b.approvalId}
-                      className="flex flex-wrap items-center gap-3 rounded-md border border-stone-200 bg-stone-50 px-3 py-2.5"
+                      className="flex flex-wrap items-center gap-3 rounded-md border border-line bg-canvas px-3 py-2.5"
                     >
-                      <div className="text-[13px] text-stone-800">
+                      <div className="text-sm text-ink">
                         <span className="font-medium">Quote {shortId(b.quoteId)}</span>
                         {typeof b.payload.carrier === "string" && (
-                          <span className="text-stone-500"> · {b.payload.carrier}</span>
+                          <span className="text-muted"> · {b.payload.carrier}</span>
                         )}
                         {typeof b.payload.premiumCents === "number" && (
-                          <span className="text-stone-500"> · {fmtMoney(b.payload.premiumCents)}</span>
+                          <span className="text-muted"> · {fmtMoney(b.payload.premiumCents)}</span>
                         )}
                       </div>
                       {exec ? (
-                        <div className="ml-auto flex items-center gap-2 text-[12px]">
-                          <Chip tone="green">{exec.replayed ? "Replayed" : "Bound"}</Chip>
-                          <span className="font-mono font-medium text-stone-900">{exec.policyNumber}</span>
+                        <div className="ml-auto flex items-center gap-2 text-xs">
+                          <DoneChip>{exec.replayed ? "Replayed" : "Bound"}</DoneChip>
+                          <span className="font-mono font-medium text-ink">{exec.policyNumber}</span>
                           {exec.carrierConfirmation && (
-                            <span className="text-stone-500">confirmation {exec.carrierConfirmation}</span>
+                            <span className="text-muted">confirmation {exec.carrierConfirmation}</span>
                           )}
                         </div>
                       ) : (
                         <button
-                          className={`${btnPrimary} ml-auto`}
+                          className={`${btnExecute} ml-auto`}
                           onClick={() => void handleExecuteBind(b)}
                           disabled={executingId === b.approvalId}
                         >

@@ -1,12 +1,13 @@
 // Marketr — Wave 2 E-sign module: envelope list, composer, detail, send gate.
-// House pattern: StudioApp.tsx (AGENTS.md) — dense tables, brand buttons,
-// Lucide icons, --brand-* vars (never hardcoded primary colors).
+// Agentic OS design system (docs/design/DESIGN.md): canvas app bg, white
+// paper cards, black pill primary actions, Lucide icons, aos tokens only.
+// E-sign invariant: the agent prepares, NEVER sends — the send path stays
+// gated on explicit human review.
 
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
 import {
-  AlertTriangle,
   Archive,
   ArrowLeft,
   BarChart3,
@@ -18,6 +19,7 @@ import {
   FileDown,
   FileText,
   FileUp,
+  Info,
   LayoutTemplate,
   Link2,
   Loader2,
@@ -33,48 +35,36 @@ import {
   X,
 } from "lucide-react";
 
-// ── House atoms ──────────────────────────────────────────────────────────────
+// ── Agentic OS atoms ─────────────────────────────────────────────────────────
 
 const inputCls =
-  "rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-[13px] text-stone-900 placeholder:text-stone-400 focus:border-[var(--brand-600)] focus:outline-none";
+  "h-control-sm rounded-md border-[1.5px] border-control bg-paper px-3 text-sm text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none";
 
 const btnPrimary =
-  "flex items-center gap-1.5 rounded-md bg-[var(--brand-600)] px-3 py-1.5 text-[13px] font-medium text-white hover:bg-[var(--brand-700)] disabled:opacity-40";
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-night-hover disabled:opacity-40";
 
 const btnGhost =
-  "flex items-center gap-1.5 rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-[13px] text-stone-700 hover:bg-stone-50 disabled:opacity-40";
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-paper px-4 text-sm font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper disabled:opacity-40";
 
-const btnDanger =
-  "flex items-center gap-1.5 rounded-md bg-red-600 px-3 py-1.5 text-[13px] font-medium text-white hover:bg-red-700 disabled:opacity-40";
+const btnDeny =
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-paper px-4 text-sm font-semibold text-failed-text aos-press shadow-[inset_0_0_0_1.5px_var(--aos-failed)] disabled:opacity-40";
 
+const btnApprove =
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-done px-4 text-sm font-semibold text-white aos-press disabled:opacity-40";
+
+const btnReview =
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-needs px-4 text-sm font-semibold text-ink aos-press disabled:opacity-40";
+
+// All workflow states render neutral: envelope, signer, field and role
+// states are document/workflow states, not agent states, so they never take
+// a status color. The tone prop stays for call-site compatibility.
 function Chip({ children, tone = "slate" }: { children: React.ReactNode; tone?: "slate" | "violet" | "green" | "amber" | "red" | "blue" }) {
-  const tones: Record<string, string> = {
-    slate: "bg-slate-100 text-slate-600 border-slate-200",
-    violet: "bg-violet-50 text-violet-700 border-violet-200",
-    green: "bg-emerald-50 text-emerald-700 border-emerald-200",
-    amber: "bg-amber-50 text-amber-700 border-amber-200",
-    red: "bg-red-50 text-red-700 border-red-200",
-    blue: "bg-blue-50 text-blue-700 border-blue-200",
-  };
+  void tone;
   return (
-    <span className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-1.5 py-0.5 text-[10px] font-medium leading-tight ${tones[tone]}`}>
+    <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-paper px-2 py-0.5 text-xs font-semibold text-muted shadow-control">
       {children}
     </span>
   );
-}
-
-function statusTone(status: string): "slate" | "violet" | "green" | "amber" | "red" | "blue" {
-  switch (status) {
-    case "draft": return "violet";
-    case "sent": return "blue";
-    case "partially-signed": return "amber";
-    case "completed": return "green";
-    case "declined":
-    case "error": return "red";
-    case "expired": return "amber";
-    case "voided": return "slate";
-    default: return "slate";
-  }
 }
 
 function statusLabel(status: string): string {
@@ -167,11 +157,11 @@ interface SendPreview {
 
 function Modal({ title, onClose, children, wide }: { title: string; onClose: () => void; children: React.ReactNode; wide?: boolean }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/40 p-4">
-      <div className={`flex max-h-[90vh] w-full ${wide ? "max-w-3xl" : "max-w-2xl"} flex-col overflow-hidden rounded-xl bg-white shadow-xl`}>
-        <div className="flex items-center justify-between border-b border-stone-100 px-5 py-3.5">
-          <h2 className="text-[15px] font-semibold text-stone-900">{title}</h2>
-          <button onClick={onClose} className="rounded-md p-1.5 text-stone-400 hover:bg-stone-100 hover:text-stone-600" aria-label="Close">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/30 p-4">
+      <div className={`flex max-h-[90vh] w-full ${wide ? "max-w-3xl" : "max-w-2xl"} flex-col overflow-hidden rounded-lg bg-paper shadow-overlay`}>
+        <div className="flex items-center justify-between border-b border-line px-5 py-3.5">
+          <h2 className="aos-subheading">{title}</h2>
+          <button onClick={onClose} className="rounded-full p-1.5 text-muted hover:bg-hover-paper hover:text-ink" aria-label="Close">
             <X size={16} />
           </button>
         </div>
@@ -184,8 +174,8 @@ function Modal({ title, onClose, children, wide }: { title: string; onClose: () 
 function ErrorNote({ error }: { error: string | null }) {
   if (!error) return null;
   return (
-    <div className="mb-4 flex items-start gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-700">
-      <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+    <div className="mb-4 flex items-start gap-2 rounded-md border border-failed bg-failed-tint px-3 py-2 text-sm text-failed-text">
+      <span className="mt-1 h-3 w-3 shrink-0 bg-failed" aria-hidden="true" />
       <span>{error}</span>
     </div>
   );
@@ -270,12 +260,12 @@ function ComposerModal({ onClose, onCreated }: { onClose: () => void; onCreated:
     <Modal title="New envelope" onClose={onClose} wide>
       <ErrorNote error={error} />
 
-      <label className="mb-1 block text-[12px] font-medium text-stone-600">Title</label>
+      <label className="mb-1 block text-xs font-semibold text-muted">Title</label>
       <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. MSA — Acme Corp" className={`${inputCls} mb-4 w-full`} maxLength={200} />
 
-      <label className="mb-1 block text-[12px] font-medium text-stone-600">Document (PDF)</label>
-      <label className="mb-4 flex cursor-pointer items-center gap-2 rounded-md border border-dashed border-stone-300 bg-stone-50 px-3 py-3 text-[13px] text-stone-600 hover:border-[var(--brand-600)]">
-        <FileUp size={16} className="shrink-0 text-stone-400" />
+      <label className="mb-1 block text-xs font-semibold text-muted">Document (PDF)</label>
+      <label className="mb-4 flex cursor-pointer items-center gap-2 rounded-md border border-dashed border-control bg-canvas px-3 py-3 text-sm text-muted hover:border-ink">
+        <FileUp size={16} className="shrink-0 text-subtle" />
         <span className="truncate">{file ? file.name : "Choose a PDF — this is the exact file reviewers approve"}</span>
         <input
           type="file"
@@ -286,11 +276,11 @@ function ComposerModal({ onClose, onCreated }: { onClose: () => void; onCreated:
       </label>
 
       <div className="mb-1 flex items-center justify-between">
-        <span className="text-[12px] font-medium text-stone-600">Signers</span>
+        <span className="text-xs font-semibold text-muted">Signers</span>
         <button
           type="button"
           onClick={() => setSigners((ss) => [...ss, { name: "", email: "", role: "signer" }])}
-          className="flex items-center gap-1 text-[12px] font-medium text-[var(--brand-700)] hover:underline"
+          className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold text-ink hover:bg-hover-paper aos-press"
         >
           <Plus size={13} /> Add signer
         </button>
@@ -309,7 +299,7 @@ function ComposerModal({ onClose, onCreated }: { onClose: () => void; onCreated:
               type="button"
               disabled={signers.length <= 1}
               onClick={() => setSigners((ss) => ss.filter((_, j) => j !== i))}
-              className="rounded-md p-1.5 text-stone-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-30"
+              className="rounded-full p-1.5 text-subtle hover:bg-failed-tint hover:text-failed-text disabled:opacity-30"
               aria-label="Remove signer"
             >
               <Trash2 size={14} />
@@ -320,20 +310,20 @@ function ComposerModal({ onClose, onCreated }: { onClose: () => void; onCreated:
 
       <div className="mb-4 grid grid-cols-2 gap-3">
         <div>
-          <label className="mb-1 block text-[12px] font-medium text-stone-600">Signing order</label>
+          <label className="mb-1 block text-xs font-semibold text-muted">Signing order</label>
           <select value={signingOrder} onChange={(e) => setSigningOrder(e.target.value as "sequential" | "parallel")} className={`${inputCls} w-full`}>
             <option value="sequential">Sequential — in listed order</option>
             <option value="parallel">Parallel — all at once</option>
           </select>
         </div>
         <div>
-          <label className="mb-1 block text-[12px] font-medium text-stone-600">Expires (optional)</label>
+          <label className="mb-1 block text-xs font-semibold text-muted">Expires (optional)</label>
           <input type="date" value={expiresAt} onChange={(e) => setExpiresAt(e.target.value)} className={`${inputCls} w-full`} />
         </div>
       </div>
 
       <div className="mb-1 flex items-center justify-between">
-        <span className="text-[12px] font-medium text-stone-600">Signature fields (optional)</span>
+        <span className="text-xs font-semibold text-muted">Signature fields (optional)</span>
         <button
           type="button"
           disabled={signers.every((s) => !s.email.trim())}
@@ -343,7 +333,7 @@ function ComposerModal({ onClose, onCreated }: { onClose: () => void; onCreated:
               { signerEmail: signers.find((s) => s.email.trim())?.email.trim() ?? "", fieldType: "signature", page: "1", x: "", y: "" },
             ])
           }
-          className="flex items-center gap-1 text-[12px] font-medium text-[var(--brand-700)] hover:underline disabled:opacity-40"
+          className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold text-ink hover:bg-hover-paper aos-press disabled:opacity-40"
         >
           <Plus size={13} /> Add field
         </button>
@@ -370,7 +360,7 @@ function ComposerModal({ onClose, onCreated }: { onClose: () => void; onCreated:
               <button
                 type="button"
                 onClick={() => setFields((fs) => fs.filter((_, j) => j !== i))}
-                className="rounded-md p-1.5 text-stone-400 hover:bg-red-50 hover:text-red-600"
+                className="rounded-full p-1.5 text-subtle hover:bg-failed-tint hover:text-failed-text"
                 aria-label="Remove field"
               >
                 <Trash2 size={14} />
@@ -380,7 +370,7 @@ function ComposerModal({ onClose, onCreated }: { onClose: () => void; onCreated:
         </div>
       )}
 
-      <div className="rounded-md border border-stone-200 bg-stone-50 px-3 py-2.5 text-[12px] text-stone-500">
+      <div className="rounded-md border border-line bg-canvas px-3 py-2.5 text-xs text-muted">
         The draft is created locally and never sent automatically. Sending requires a
         separate review step where you confirm the exact document and signer list.
       </div>
@@ -443,67 +433,67 @@ function SendGateDialog({ envelopeId, onClose, onSent }: { envelopeId: string; o
     <Modal title="Review before sending" onClose={onClose} wide>
       <ErrorNote error={error} />
       {!preview ? (
-        <div className="flex items-center justify-center py-10 text-[13px] text-stone-500">
+        <div className="flex items-center justify-center py-10 text-sm text-muted">
           <Loader2 size={16} className="mr-2 animate-spin" /> Loading the exact send summary…
         </div>
       ) : (
         <>
           {!preview.vendorConfigured && (
-            <div className="mb-4 flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[13px] text-amber-800">
-              <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+            <div className="mb-4 flex items-start gap-2 rounded-md border border-line bg-canvas px-3 py-2 text-sm text-muted">
+              <Info size={14} className="mt-0.5 shrink-0" />
               <span>
                 The signing vendor is not connected (missing DOCUMENSO credentials). Sending will
                 fail until it is configured — the draft stays safe either way.
               </span>
             </div>
           )}
-          <div className="mb-4 rounded-md border border-stone-200">
-            <div className="border-b border-stone-100 bg-stone-50/60 px-3 py-2 text-[11px] font-medium uppercase tracking-wide text-stone-500">
+          <div className="mb-4 rounded-md border border-line">
+            <div className="border-b border-line px-3 py-2 text-xs font-semibold text-muted">
               What will be sent
             </div>
-            <dl className="grid grid-cols-2 gap-x-6 gap-y-2 px-3 py-3 text-[13px]">
-              <div><dt className="text-[11px] text-stone-500">Title</dt><dd className="font-medium text-stone-900">{preview.title}</dd></div>
-              <div><dt className="text-[11px] text-stone-500">Document</dt><dd className="text-stone-900">{preview.documentName ?? "—"}</dd></div>
-              <div><dt className="text-[11px] text-stone-500">Document hash</dt><dd className="font-mono text-[12px] text-stone-900">{hashShort(preview.sourcePdfHash)}</dd></div>
-              <div><dt className="text-[11px] text-stone-500">Signing order</dt><dd className="text-stone-900">{preview.signingOrder}</dd></div>
-              <div><dt className="text-[11px] text-stone-500">Expires</dt><dd className="text-stone-900">{fmtDate(preview.expiresAt)}</dd></div>
-              <div><dt className="text-[11px] text-stone-500">Fields</dt><dd className="text-stone-900">{preview.fieldCount}</dd></div>
+            <dl className="grid grid-cols-2 gap-x-6 gap-y-2 px-3 py-3 text-sm">
+              <div><dt className="text-xs text-muted">Title</dt><dd className="font-medium text-ink">{preview.title}</dd></div>
+              <div><dt className="text-xs text-muted">Document</dt><dd className="text-ink">{preview.documentName ?? "—"}</dd></div>
+              <div><dt className="text-xs text-muted">Document hash</dt><dd className="font-mono text-xs text-ink">{hashShort(preview.sourcePdfHash)}</dd></div>
+              <div><dt className="text-xs text-muted">Signing order</dt><dd className="text-ink">{preview.signingOrder}</dd></div>
+              <div><dt className="text-xs text-muted">Expires</dt><dd className="text-ink">{fmtDate(preview.expiresAt)}</dd></div>
+              <div><dt className="text-xs text-muted">Fields</dt><dd className="text-ink">{preview.fieldCount}</dd></div>
             </dl>
-            <div className="border-t border-stone-100 px-3 py-2">
-              <div className="mb-1 text-[11px] font-medium uppercase tracking-wide text-stone-500">Signers</div>
-              <ul className="space-y-1 text-[13px]">
+            <div className="border-t border-line px-3 py-2">
+              <div className="mb-1 text-xs font-semibold text-muted">Signers</div>
+              <ul className="space-y-1 text-sm">
                 {preview.signers.map((s) => (
                   <li key={s.email} className="flex items-center justify-between gap-2">
-                    <span className="text-stone-900">{s.name} <span className="text-stone-500">· {s.email}</span></span>
-                    <Chip tone={s.role === "signer" ? "blue" : "slate"}>{s.role}</Chip>
+                    <span className="text-ink">{s.name} <span className="text-muted">· {s.email}</span></span>
+                    <Chip>{s.role}</Chip>
                   </li>
                 ))}
               </ul>
             </div>
           </div>
 
-          <label className="flex cursor-pointer items-start gap-2.5 rounded-md border border-stone-200 bg-stone-50 px-3 py-2.5">
+          <label className="flex cursor-pointer items-start gap-2.5 rounded-md border border-line bg-canvas px-3 py-2.5">
             <input
               type="checkbox"
               checked={reviewed}
               onChange={(e) => setReviewed(e.target.checked)}
-              className="mt-0.5 h-4 w-4 accent-[var(--brand-600)]"
+              className="mt-0.5 h-4 w-4 accent-ink"
             />
-            <span className="text-[13px] text-stone-700">
+            <span className="text-sm text-ink">
               I have reviewed the document, the signer list, and the signing order above. This
               confirmation is bound to this exact version — if anything changes, I review again.
             </span>
           </label>
 
-          <div className="mt-3 flex items-center gap-2 text-[12px] text-stone-500">
-            <ShieldCheck size={14} className="shrink-0 text-stone-400" />
+          <div className="mt-3 flex items-center gap-2 text-xs text-muted">
+            <ShieldCheck size={14} className="shrink-0 text-subtle" />
             <span>Approval token (echoed to the server with your send):</span>
-            <code className="truncate rounded bg-stone-100 px-1.5 py-0.5 font-mono text-[11px] text-stone-700">{token ? `${token.slice(0, 24)}…` : "—"}</code>
+            <code className="truncate rounded bg-canvas px-1.5 py-0.5 font-mono text-xs text-muted">{token ? `${token.slice(0, 24)}…` : "—"}</code>
           </div>
 
           <div className="mt-4 flex justify-end gap-2">
             <button type="button" onClick={onClose} className={btnGhost}>Cancel</button>
-            <button type="button" onClick={send} disabled={!reviewed || sending} className={btnPrimary}>
+            <button type="button" onClick={send} disabled={!reviewed || sending} className={btnApprove}>
               {sending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
               Send envelope
             </button>
@@ -542,11 +532,11 @@ function VoidDialog({ envelopeId, onClose, onVoided }: { envelopeId: string; onC
   return (
     <Modal title="Void envelope" onClose={onClose}>
       <ErrorNote error={error} />
-      <p className="mb-3 text-[13px] text-stone-600">
+      <p className="mb-3 text-sm text-muted">
         The envelope is cancelled and signers can no longer sign. The sealed document,
         if any, is kept as evidence — voiding never deletes it.
       </p>
-      <label className="mb-1 block text-[12px] font-medium text-stone-600">Reason</label>
+      <label className="mb-1 block text-xs font-semibold text-muted">Reason</label>
       <textarea
         value={reason}
         onChange={(e) => setReason(e.target.value)}
@@ -557,7 +547,7 @@ function VoidDialog({ envelopeId, onClose, onVoided }: { envelopeId: string; onC
       />
       <div className="flex justify-end gap-2">
         <button type="button" onClick={onClose} className={btnGhost}>Cancel</button>
-        <button type="button" onClick={submit} disabled={saving} className={btnDanger}>
+        <button type="button" onClick={submit} disabled={saving} className={btnDeny}>
           {saving ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
           Void envelope
         </button>
@@ -567,16 +557,6 @@ function VoidDialog({ envelopeId, onClose, onVoided }: { envelopeId: string; onC
 }
 
 // ── Envelope detail ──────────────────────────────────────────────────────────
-
-function signerTone(status: string): "slate" | "violet" | "green" | "amber" | "red" | "blue" {
-  switch (status) {
-    case "signed": return "green";
-    case "sent":
-    case "viewed": return "blue";
-    case "declined": return "red";
-    default: return "slate";
-  }
-}
 
 function DetailView({ id, onBack, onChanged }: { id: string; onBack: () => void; onChanged: () => void }) {
   const [detail, setDetail] = useState<ApiEnvelopeDetail | null>(null);
@@ -613,7 +593,7 @@ function DetailView({ id, onBack, onChanged }: { id: string; onBack: () => void;
 
   if (error) {
     return (
-      <div className="rounded-lg border border-stone-200 bg-white p-6">
+      <div className="rounded-lg bg-paper p-6 shadow-hairline">
         <ErrorNote error={error} />
         <button onClick={onBack} className={btnGhost}><ArrowLeft size={14} /> Back</button>
       </div>
@@ -621,7 +601,7 @@ function DetailView({ id, onBack, onChanged }: { id: string; onBack: () => void;
   }
   if (!detail) {
     return (
-      <div className="flex items-center justify-center rounded-lg border border-stone-200 bg-white py-16 text-[13px] text-stone-500">
+      <div className="flex items-center justify-center rounded-lg bg-paper py-16 text-sm text-muted shadow-hairline">
         <Loader2 size={16} className="mr-2 animate-spin" /> Loading envelope…
       </div>
     );
@@ -655,8 +635,8 @@ function DetailView({ id, onBack, onChanged }: { id: string; onBack: () => void;
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <button onClick={onBack} className={btnGhost}><ArrowLeft size={14} /> Back</button>
-          <h2 className="text-lg font-bold tracking-tight text-stone-900">{detail.title}</h2>
-          <Chip tone={statusTone(detail.status)}>{statusLabel(detail.status)}</Chip>
+          <h2 className="aos-subheading">{detail.title}</h2>
+          <Chip>{statusLabel(detail.status)}</Chip>
         </div>
         <div className="flex items-center gap-2">
           {canRefresh && (
@@ -675,8 +655,9 @@ function DetailView({ id, onBack, onChanged }: { id: string; onBack: () => void;
             </button>
           )}
           {canSend && (
-            <button onClick={() => setShowSend(true)} className={btnPrimary}>
-              <Send size={14} /> Review & send
+            <button onClick={() => setShowSend(true)} className={btnReview}>
+              <span className="aos-shape aos-shape--needs" style={{ color: "var(--aos-ink)" }} role="img" aria-label="Needs review" />
+              Review & send
             </button>
           )}
         </div>
@@ -684,30 +665,30 @@ function DetailView({ id, onBack, onChanged }: { id: string; onBack: () => void;
       {cloneError && <ErrorNote error={cloneError} />}
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <div className="rounded-lg border border-stone-200 bg-white">
-          <div className="border-b border-stone-100 px-4 py-2.5 text-[12px] font-semibold text-stone-900">Document</div>
-          <dl className="space-y-2 px-4 py-3 text-[13px]">
-            <div className="flex justify-between gap-4"><dt className="text-stone-500">File</dt><dd className="text-right text-stone-900">{detail.documentName ?? "—"}</dd></div>
-            <div className="flex justify-between gap-4"><dt className="text-stone-500">Source hash</dt><dd className="font-mono text-[12px] text-stone-900">{hashShort(detail.sourcePdfHash)}</dd></div>
-            <div className="flex justify-between gap-4"><dt className="text-stone-500">Sealed PDF hash</dt><dd className="font-mono text-[12px] text-stone-900">{hashShort(detail.sealedPdfHash)}</dd></div>
-            <div className="flex justify-between gap-4"><dt className="text-stone-500">Sealed fetched</dt><dd className="text-stone-900">{fmtDate(detail.sealedPdfFetchedAt)}</dd></div>
-            <div className="flex justify-between gap-4"><dt className="text-stone-500">Signing order</dt><dd className="text-stone-900">{detail.signingOrder}</dd></div>
-            <div className="flex justify-between gap-4"><dt className="text-stone-500">Expires</dt><dd className="text-stone-900">{fmtDate(detail.expiresAt)}</dd></div>
+        <div className="rounded-lg bg-paper shadow-hairline">
+          <div className="border-b border-line px-4 py-2.5 text-xs font-semibold text-ink">Document</div>
+          <dl className="space-y-2 px-4 py-3 text-sm">
+            <div className="flex justify-between gap-4"><dt className="text-muted">File</dt><dd className="text-right text-ink">{detail.documentName ?? "—"}</dd></div>
+            <div className="flex justify-between gap-4"><dt className="text-muted">Source hash</dt><dd className="font-mono text-xs text-ink">{hashShort(detail.sourcePdfHash)}</dd></div>
+            <div className="flex justify-between gap-4"><dt className="text-muted">Sealed PDF hash</dt><dd className="font-mono text-xs text-ink">{hashShort(detail.sealedPdfHash)}</dd></div>
+            <div className="flex justify-between gap-4"><dt className="text-muted">Sealed fetched</dt><dd className="text-ink">{fmtDate(detail.sealedPdfFetchedAt)}</dd></div>
+            <div className="flex justify-between gap-4"><dt className="text-muted">Signing order</dt><dd className="text-ink">{detail.signingOrder}</dd></div>
+            <div className="flex justify-between gap-4"><dt className="text-muted">Expires</dt><dd className="text-ink">{fmtDate(detail.expiresAt)}</dd></div>
             {detail.vendorRef && (
-              <div className="flex justify-between gap-4"><dt className="text-stone-500">Vendor ref</dt><dd className="font-mono text-[12px] text-stone-900">{detail.vendorRef}</dd></div>
+              <div className="flex justify-between gap-4"><dt className="text-muted">Vendor ref</dt><dd className="font-mono text-xs text-ink">{detail.vendorRef}</dd></div>
             )}
             {detail.voidReason && (
-              <div className="flex justify-between gap-4"><dt className="text-stone-500">Void reason</dt><dd className="text-right text-stone-900">{detail.voidReason}</dd></div>
+              <div className="flex justify-between gap-4"><dt className="text-muted">Void reason</dt><dd className="text-right text-ink">{detail.voidReason}</dd></div>
             )}
           </dl>
         </div>
 
-        <div className="rounded-lg border border-stone-200 bg-white">
-          <div className="border-b border-stone-100 px-4 py-2.5 text-[12px] font-semibold text-stone-900">Signers</div>
+        <div className="rounded-lg bg-paper shadow-hairline">
+          <div className="border-b border-line px-4 py-2.5 text-xs font-semibold text-ink">Signers</div>
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-[13px]">
+            <table className="w-full text-left text-sm">
               <thead>
-                <tr className="border-b border-stone-100 bg-stone-50/60 text-[11px] uppercase tracking-wide text-stone-500">
+                <tr className="border-b border-line text-xs font-semibold text-muted">
                   <th className="px-4 py-2 font-medium">Name</th>
                   <th className="px-4 py-2 font-medium">Email</th>
                   <th className="px-4 py-2 font-medium">Role</th>
@@ -717,12 +698,12 @@ function DetailView({ id, onBack, onChanged }: { id: string; onBack: () => void;
               </thead>
               <tbody>
                 {detail.signers.map((s) => (
-                  <tr key={s.id} className="border-b border-stone-100 last:border-0 hover:bg-[var(--brand-50)]/40">
-                    <td className="px-4 py-2 font-medium text-stone-900">{s.name}</td>
-                    <td className="px-4 py-2 text-stone-600">{s.email}</td>
+                  <tr key={s.id} className="border-b border-line last:border-0 hover:bg-hover-paper">
+                    <td className="px-4 py-2 font-medium text-ink">{s.name}</td>
+                    <td className="px-4 py-2 text-muted">{s.email}</td>
                     <td className="px-4 py-2"><Chip>{s.role}</Chip></td>
-                    <td className="px-4 py-2"><Chip tone={signerTone(s.status)}>{s.status}</Chip></td>
-                    <td className="px-4 py-2 text-stone-600">{fmtDate(s.signedAt)}</td>
+                    <td className="px-4 py-2"><Chip>{s.status}</Chip></td>
+                    <td className="px-4 py-2 text-muted">{fmtDate(s.signedAt)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -734,12 +715,12 @@ function DetailView({ id, onBack, onChanged }: { id: string; onBack: () => void;
       <EvidenceCard detail={detail} onChanged={() => { void load(); onChanged(); }} />
 
       {detail.fields.length > 0 && (
-        <div className="rounded-lg border border-stone-200 bg-white">
-          <div className="border-b border-stone-100 px-4 py-2.5 text-[12px] font-semibold text-stone-900">Fields</div>
+        <div className="rounded-lg bg-paper shadow-hairline">
+          <div className="border-b border-line px-4 py-2.5 text-xs font-semibold text-ink">Fields</div>
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-[13px]">
+            <table className="w-full text-left text-sm">
               <thead>
-                <tr className="border-b border-stone-100 bg-stone-50/60 text-[11px] uppercase tracking-wide text-stone-500">
+                <tr className="border-b border-line text-xs font-semibold text-muted">
                   <th className="px-4 py-2 font-medium">Signer</th>
                   <th className="px-4 py-2 font-medium">Type</th>
                   <th className="px-4 py-2 font-medium">Page</th>
@@ -751,12 +732,12 @@ function DetailView({ id, onBack, onChanged }: { id: string; onBack: () => void;
                 {detail.fields.map((f) => {
                   const signer = detail.signers.find((s) => s.id === f.signerId);
                   return (
-                    <tr key={f.id} className="border-b border-stone-100 last:border-0 hover:bg-[var(--brand-50)]/40">
-                      <td className="px-4 py-2 text-stone-900">{signer?.name ?? "—"}</td>
-                      <td className="px-4 py-2"><Chip tone="blue">{f.fieldType}</Chip></td>
-                      <td className="px-4 py-2 text-stone-600">{f.page ?? "—"}</td>
-                      <td className="px-4 py-2 text-stone-600">{f.x != null && f.y != null ? `(${f.x}, ${f.y})` : "—"}</td>
-                      <td className="px-4 py-2 text-stone-600">{f.required ? "Yes" : "No"}</td>
+                    <tr key={f.id} className="border-b border-line last:border-0 hover:bg-hover-paper">
+                      <td className="px-4 py-2 text-ink">{signer?.name ?? "—"}</td>
+                      <td className="px-4 py-2"><Chip>{f.fieldType}</Chip></td>
+                      <td className="px-4 py-2 text-muted">{f.page ?? "—"}</td>
+                      <td className="px-4 py-2 text-muted">{f.x != null && f.y != null ? `(${f.x}, ${f.y})` : "—"}</td>
+                      <td className="px-4 py-2 text-muted">{f.required ? "Yes" : "No"}</td>
                     </tr>
                   );
                 })}
@@ -766,14 +747,14 @@ function DetailView({ id, onBack, onChanged }: { id: string; onBack: () => void;
         </div>
       )}
 
-      <div className="rounded-lg border border-stone-200 bg-white">
-        <div className="border-b border-stone-100 px-4 py-2.5 text-[12px] font-semibold text-stone-900">
-          Audit trail <span className="ml-1 font-normal text-stone-500">— hash-chained, tamper-evident</span>
+      <div className="rounded-lg bg-paper shadow-hairline">
+        <div className="border-b border-line px-4 py-2.5 text-xs font-semibold text-ink">
+          Audit trail <span className="ml-1 font-normal text-muted">— hash-chained, tamper-evident</span>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-[13px]">
+          <table className="w-full text-left text-sm">
             <thead>
-              <tr className="border-b border-stone-100 bg-stone-50/60 text-[11px] uppercase tracking-wide text-stone-500">
+              <tr className="border-b border-line text-xs font-semibold text-muted">
                 <th className="px-4 py-2 font-medium">Event</th>
                 <th className="px-4 py-2 font-medium">Actor</th>
                 <th className="px-4 py-2 font-medium">Hash</th>
@@ -782,17 +763,17 @@ function DetailView({ id, onBack, onChanged }: { id: string; onBack: () => void;
             </thead>
             <tbody>
               {detail.events.map((e) => (
-                <tr key={e.id} className="border-b border-stone-100 last:border-0 hover:bg-[var(--brand-50)]/40">
-                  <td className="px-4 py-2 font-medium text-stone-900">{e.event.replace(/_/g, " ")}</td>
-                  <td className="px-4 py-2 text-stone-600">{e.actor ?? "vendor"}</td>
-                  <td className="px-4 py-2 font-mono text-[12px] text-stone-600" title={e.previousHash ? `prev: ${e.previousHash}` : ""}>
+                <tr key={e.id} className="border-b border-line last:border-0 hover:bg-hover-paper">
+                  <td className="px-4 py-2 font-medium text-ink">{e.event.replace(/_/g, " ")}</td>
+                  <td className="px-4 py-2 text-muted">{e.actor ?? "vendor"}</td>
+                  <td className="px-4 py-2 font-mono text-xs text-muted" title={e.previousHash ? `prev: ${e.previousHash}` : ""}>
                     {hashShort(e.hash)}
                   </td>
-                  <td className="px-4 py-2 text-stone-600">{fmtDate(e.createdAt)}</td>
+                  <td className="px-4 py-2 text-muted">{fmtDate(e.createdAt)}</td>
                 </tr>
               ))}
               {detail.events.length === 0 && (
-                <tr><td colSpan={4} className="px-4 py-6 text-center text-stone-500">No events yet.</td></tr>
+                <tr><td colSpan={4} className="px-4 py-6 text-center text-muted">No events yet.</td></tr>
               )}
             </tbody>
           </table>
@@ -800,8 +781,8 @@ function DetailView({ id, onBack, onChanged }: { id: string; onBack: () => void;
       </div>
 
       {detail.status === "completed" && (
-        <div className="flex items-start gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-[13px] text-emerald-800">
-          <CheckCircle2 size={15} className="mt-0.5 shrink-0" />
+        <div className="flex items-start gap-2 rounded-md border border-line bg-canvas px-3 py-2.5 text-sm text-muted">
+          <CheckCircle2 size={15} className="mt-0.5 shrink-0 text-ink" />
           <span>
             Completed and sealed by the vendor. The sealed PDF and this audit trail are the
             evidence pack — use Refresh status to re-fetch the sealed document if needed.
@@ -878,20 +859,20 @@ function EvidenceCard({ detail, onChanged }: { detail: ApiEnvelopeDetail; onChan
   const canFlip = detail.status === "completed" && detail.sealedPdfHash && detail.contractRef;
 
   return (
-    <div className="rounded-lg border border-stone-200 bg-white">
-      <div className="border-b border-stone-100 px-4 py-2.5 text-[12px] font-semibold text-stone-900">
-        Evidence & legal vault <span className="ml-1 font-normal text-stone-500">— one package for counsel</span>
+    <div className="rounded-lg bg-paper shadow-hairline">
+      <div className="border-b border-line px-4 py-2.5 text-xs font-semibold text-ink">
+        Evidence & legal vault <span className="ml-1 font-normal text-muted">— one package for counsel</span>
       </div>
       <div className="grid gap-4 px-4 py-3 md:grid-cols-3">
         {/* Contract binding */}
         <div>
-          <div className="mb-2 flex items-center gap-1.5 text-[12px] font-semibold text-stone-900">
+          <div className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-ink">
             <Scale size={13} /> Contract
           </div>
           {detail.contractRef ? (
-            <div className="space-y-1 text-[13px]">
-              <div className="flex justify-between gap-4"><span className="text-stone-500">Type</span><span className="text-stone-900">{detail.contractType ?? "—"}</span></div>
-              <div className="flex justify-between gap-4"><span className="text-stone-500">Ref</span><span className="font-mono text-[12px] text-stone-900">{detail.contractRef}</span></div>
+            <div className="space-y-1 text-sm">
+              <div className="flex justify-between gap-4"><span className="text-muted">Type</span><span className="text-ink">{detail.contractType ?? "—"}</span></div>
+              <div className="flex justify-between gap-4"><span className="text-muted">Ref</span><span className="font-mono text-xs text-ink">{detail.contractRef}</span></div>
               {canFlip && (
                 <button disabled={busy} onClick={() => post(`/api/esign/envelopes/${detail.id}/flip-executed`)} className={btnGhost}>
                   <CheckCircle2 size={14} /> Mark contract executed
@@ -915,17 +896,17 @@ function EvidenceCard({ detail, onChanged }: { detail: ApiEnvelopeDetail; onChan
 
         {/* Vault */}
         <div>
-          <div className="mb-2 flex items-center gap-1.5 text-[12px] font-semibold text-stone-900">
+          <div className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-ink">
             <Archive size={13} /> Legal vault
           </div>
           {detail.vaultEntry ? (
-            <div className="space-y-1 text-[13px]">
-              <div className="flex justify-between gap-4"><span className="text-stone-500">Stored</span><span className="text-stone-900">{fmtDate(detail.vaultEntry.storedAt)}</span></div>
-              <div className="flex justify-between gap-4"><span className="text-stone-500">Retention until</span><span className="text-stone-900">{fmtDate(detail.vaultEntry.retentionUntil) ?? "indefinite"}</span></div>
+            <div className="space-y-1 text-sm">
+              <div className="flex justify-between gap-4"><span className="text-muted">Stored</span><span className="text-ink">{fmtDate(detail.vaultEntry.storedAt)}</span></div>
+              <div className="flex justify-between gap-4"><span className="text-muted">Retention until</span><span className="text-ink">{fmtDate(detail.vaultEntry.retentionUntil) ?? "indefinite"}</span></div>
               {detail.vaultEntry.legalHold ? (
                 <div className="space-y-1">
-                  <div><Chip tone="red"><Lock size={11} className="mr-1" />Legal hold</Chip></div>
-                  {detail.vaultEntry.legalHoldReason && <div className="text-stone-600">{detail.vaultEntry.legalHoldReason}</div>}
+                  <div><Chip><Lock size={11} className="mr-1" />Legal hold</Chip></div>
+                  {detail.vaultEntry.legalHoldReason && <div className="text-muted">{detail.vaultEntry.legalHoldReason}</div>}
                   <button disabled={busy} onClick={() => post(`/api/esign/vault/${detail.vaultEntry!.id}/legal-hold`, undefined, "DELETE")} className={btnGhost}>
                     Release hold
                   </button>
@@ -948,7 +929,7 @@ function EvidenceCard({ detail, onChanged }: { detail: ApiEnvelopeDetail; onChan
             </div>
           ) : canVault ? (
             <div className="space-y-2">
-              <p className="text-[13px] text-stone-500">Anchors the sealed PDF hash + audit chain head.</p>
+              <p className="text-sm text-muted">Anchors the sealed PDF hash + audit chain head.</p>
               <input value={retentionDays} onChange={(e) => setRetentionDays(e.target.value)} inputMode="numeric" placeholder="Retention days (default 2555)" className={inputCls} />
               <button
                 disabled={busy}
@@ -959,16 +940,16 @@ function EvidenceCard({ detail, onChanged }: { detail: ApiEnvelopeDetail; onChan
               </button>
             </div>
           ) : (
-            <p className="text-[13px] text-stone-500">Available once the envelope is completed and sealed.</p>
+            <p className="text-sm text-muted">Available once the envelope is completed and sealed.</p>
           )}
         </div>
 
         {/* Evidence pack */}
         <div>
-          <div className="mb-2 flex items-center gap-1.5 text-[12px] font-semibold text-stone-900">
+          <div className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-ink">
             <ShieldCheck size={13} /> Evidence pack
           </div>
-          <p className="mb-2 text-[13px] text-stone-500">Sealed PDF hash + hash-chained audit log + signer identity evidence.</p>
+          <p className="mb-2 text-sm text-muted">Sealed PDF hash + hash-chained audit log + signer identity evidence.</p>
           <div className="flex flex-wrap gap-2">
             <button disabled={busy} onClick={downloadPack} className={btnGhost}>
               <FileDown size={14} /> Download pack
@@ -1118,56 +1099,56 @@ function AutomationCard() {
     : [];
 
   return (
-    <div className="rounded-lg border border-stone-200 bg-white">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-stone-100 px-4 py-2.5">
-        <div className="flex items-center gap-2 text-[12px] font-semibold text-stone-900">
-          <Bot size={14} className="text-[var(--brand-600)]" />
+    <div className="rounded-lg bg-paper shadow-hairline">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-4 py-2.5">
+        <div className="flex items-center gap-2 text-xs font-semibold text-ink">
+          <Bot size={14} className="text-ink" />
           Signing automation
-          <span className="font-normal text-stone-500">— agent prepares, a human releases</span>
+          <span className="font-normal text-muted">— agent prepares, a human releases</span>
         </div>
         <button onClick={sweep} disabled={busy === "sweep"} className={btnGhost}>
           <Clock3 size={14} className={busy === "sweep" ? "animate-spin" : ""} /> Run expiry sweep
         </button>
       </div>
-      {note && <div className="border-b border-stone-100 px-4 py-2 text-[12px] text-emerald-700">{note}</div>}
-      {err && <div className="border-b border-stone-100 px-4 py-2 text-[12px] text-red-700">{err}</div>}
-      <div className="grid gap-px bg-stone-100 sm:grid-cols-4">
+      {note && <div className="border-b border-line px-4 py-2 text-xs text-muted">{note}</div>}
+      {err && <div className="border-b border-failed bg-failed-tint px-4 py-2 text-xs text-failed-text">{err}</div>}
+      <div className="grid gap-px bg-line sm:grid-cols-4">
         {stats.map((s) => (
-          <div key={s.label} className="bg-white px-4 py-3">
-            <div className="text-[11px] uppercase tracking-wide text-stone-500">{s.label}</div>
-            <div className="text-lg font-bold tracking-tight text-stone-900">{s.value}</div>
+          <div key={s.label} className="bg-paper px-4 py-3">
+            <div className="text-xs font-semibold text-muted">{s.label}</div>
+            <div className="text-lg font-bold text-ink">{s.value}</div>
           </div>
         ))}
       </div>
       {analytics && analytics.perTemplate.length > 0 && (
-        <div className="border-t border-stone-100 px-4 py-2.5">
-          <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-stone-500">
+        <div className="border-t border-line px-4 py-2.5">
+          <div className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-muted">
             <BarChart3 size={12} /> By template
           </div>
-          <table className="w-full text-left text-[12px]">
+          <table className="w-full text-left text-xs">
             <tbody>
               {analytics.perTemplate.slice(0, 5).map((t) => (
-                <tr key={t.templateId} className="border-t border-stone-100 first:border-0">
-                  <td className="py-1 pr-2 text-stone-900">{t.templateName}</td>
-                  <td className="py-1 text-right text-stone-500">{t.completed}/{t.sent} signed</td>
-                  <td className="py-1 text-right text-stone-500">{t.completionRate === null ? "—" : `${Math.round(t.completionRate * 100)}%`}</td>
-                  <td className="py-1 text-right text-stone-500">{fmtHours(t.avgHoursToSign)} avg</td>
+                <tr key={t.templateId} className="border-t border-line first:border-0">
+                  <td className="py-1 pr-2 text-ink">{t.templateName}</td>
+                  <td className="py-1 text-right text-muted">{t.completed}/{t.sent} signed</td>
+                  <td className="py-1 text-right text-muted">{t.completionRate === null ? "—" : `${Math.round(t.completionRate * 100)}%`}</td>
+                  <td className="py-1 text-right text-muted">{fmtHours(t.avgHoursToSign)} avg</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       )}
-      <div className="border-t border-stone-100 px-4 py-2.5">
-        <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-stone-500">
-          <BellRing size={12} /> Pending nudges {pending.length > 0 && <span className="text-stone-400">({pending.length})</span>}
+      <div className="border-t border-line px-4 py-2.5">
+        <div className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-muted">
+          <BellRing size={12} /> Pending nudges {pending.length > 0 && <span className="text-subtle">({pending.length})</span>}
         </div>
         {pending.length === 0 ? (
-          <p className="py-1 text-[12px] text-stone-500">No idle signers waiting on live envelopes.</p>
+          <p className="py-1 text-xs text-muted">No idle signers waiting on live envelopes.</p>
         ) : (
-          <table className="w-full text-left text-[13px]">
+          <table className="w-full text-left text-sm">
             <thead>
-              <tr className="text-[11px] uppercase tracking-wide text-stone-500">
+              <tr className="text-xs font-semibold text-muted">
                 <th className="py-1 font-medium">Signer</th>
                 <th className="py-1 font-medium">Envelope</th>
                 <th className="py-1 font-medium">Waiting</th>
@@ -1179,21 +1160,21 @@ function AutomationCard() {
               {pending.map((n) => {
                 const d = drafted[n.signerId];
                 return (
-                  <tr key={n.signerId} className="border-t border-stone-100 hover:bg-[var(--brand-50)]/40">
+                  <tr key={n.signerId} className="border-t border-line hover:bg-hover-paper">
                     <td className="py-1.5 pr-2">
-                      <div className="text-stone-900">{n.name}</div>
-                      <div className="text-[11px] text-stone-500">{n.email}</div>
+                      <div className="text-ink">{n.name}</div>
+                      <div className="text-xs text-muted">{n.email}</div>
                     </td>
-                    <td className="py-1.5 pr-2 text-stone-700">{n.envelopeTitle}</td>
-                    <td className="py-1.5 pr-2 text-stone-700">{n.daysWaiting}d</td>
-                    <td className="py-1.5 pr-2 text-[12px] text-stone-500">
+                    <td className="py-1.5 pr-2 text-ink">{n.envelopeTitle}</td>
+                    <td className="py-1.5 pr-2 text-ink">{n.daysWaiting}d</td>
+                    <td className="py-1.5 pr-2 text-xs text-muted">
                       {n.lastNudgeAt ? new Date(n.lastNudgeAt).toLocaleDateString() : "—"}
                     </td>
                     <td className="py-1.5 text-right">
                       {d ? (
                         <div className="flex items-center justify-end gap-2">
-                          <span className="max-w-56 truncate text-[11px] italic text-stone-500" title={d.message}>“{d.message}”</span>
-                          <button onClick={() => approve(n)} disabled={busy === n.signerId} className={btnPrimary}>
+                          <span className="max-w-56 truncate text-xs italic text-muted" title={d.message}>“{d.message}”</span>
+                          <button onClick={() => approve(n)} disabled={busy === n.signerId} className={btnApprove}>
                             <CheckCircle2 size={13} /> Approve & release
                           </button>
                         </div>
@@ -1209,7 +1190,7 @@ function AutomationCard() {
             </tbody>
           </table>
         )}
-        <p className="mt-2 text-[11px] text-stone-400">
+        <p className="mt-2 text-xs text-subtle">
           Nudges are drafted for your approval — the OS never sends them on its own. Record the delivery after your provider sends it.
         </p>
       </div>
@@ -1266,11 +1247,11 @@ function EnvelopesTab() {
         </button>
       </div>
 
-      <div className="overflow-hidden rounded-lg border border-stone-200 bg-white">
+      <div className="overflow-hidden rounded-lg bg-paper shadow-hairline">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-[13px]">
+          <table className="w-full text-left text-sm">
             <thead>
-              <tr className="border-b border-stone-100 bg-stone-50/60 text-[11px] uppercase tracking-wide text-stone-500">
+              <tr className="border-b border-line text-xs font-semibold text-muted">
                 <th className="px-3 py-2 font-medium">Title</th>
                 <th className="px-3 py-2 font-medium">Status</th>
                 <th className="px-3 py-2 font-medium">Signers</th>
@@ -1280,11 +1261,11 @@ function EnvelopesTab() {
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={5} className="px-3 py-10 text-center text-stone-500"><Loader2 size={16} className="mr-2 inline animate-spin" />Loading…</td></tr>
+                <tr><td colSpan={5} className="px-3 py-10 text-center text-muted"><Loader2 size={16} className="mr-2 inline animate-spin" />Loading…</td></tr>
               ) : filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-3 py-10 text-center text-stone-500">
-                    <FileText size={20} className="mx-auto mb-2 text-stone-300" />
+                  <td colSpan={5} className="px-3 py-10 text-center text-muted">
+                    <FileText size={20} className="mx-auto mb-2 text-subtle" />
                     No envelopes yet. Create a draft to get started.
                   </td>
                 </tr>
@@ -1295,15 +1276,15 @@ function EnvelopesTab() {
                     <tr
                       key={e.id}
                       onClick={() => setSelectedId(e.id)}
-                      className="cursor-pointer border-b border-stone-100 last:border-0 hover:bg-[var(--brand-50)]/40"
+                      className="cursor-pointer border-b border-line last:border-0 hover:bg-hover-paper"
                     >
-                      <td className="px-3 py-2.5 font-medium text-stone-900">{e.title}</td>
-                      <td className="px-3 py-2.5"><Chip tone={statusTone(e.status)}>{statusLabel(e.status)}</Chip></td>
-                      <td className="px-3 py-2.5 text-stone-600">
+                      <td className="px-3 py-2.5 font-medium text-ink">{e.title}</td>
+                      <td className="px-3 py-2.5"><Chip>{statusLabel(e.status)}</Chip></td>
+                      <td className="px-3 py-2.5 text-muted">
                         {e.signers.length === 0 ? "—" : `${signed}/${e.signers.length} signed`}
                       </td>
-                      <td className="px-3 py-2.5 text-stone-600">{e.documentName ?? "—"}</td>
-                      <td className="px-3 py-2.5 text-stone-600">{fmtDate(e.updatedAt)}</td>
+                      <td className="px-3 py-2.5 text-muted">{e.documentName ?? "—"}</td>
+                      <td className="px-3 py-2.5 text-muted">{fmtDate(e.updatedAt)}</td>
                     </tr>
                   );
                 })
@@ -1313,7 +1294,7 @@ function EnvelopesTab() {
         </div>
       </div>
 
-      <div className="rounded-md border border-stone-200 bg-stone-50 px-3 py-2.5 text-[12px] text-stone-500">
+      <div className="rounded-md border border-line bg-canvas px-3 py-2.5 text-xs text-muted">
         Signing itself happens with the connected vendor (Documenso). Marketr prepares the
         envelope, gates the send on your explicit review, and mirrors the sealed document
         plus a tamper-evident audit trail — it never invents a signature.
@@ -1438,13 +1419,13 @@ function TemplateModal({
     <Modal title={template ? "Edit template" : "New template"} onClose={onClose} wide>
       <ErrorNote error={error} />
 
-      <label className="mb-1 block text-[12px] font-medium text-stone-600">Name</label>
+      <label className="mb-1 block text-xs font-semibold text-muted">Name</label>
       <input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. MSA template" className={`${inputCls} mb-4 w-full`} maxLength={200} />
 
       {template && (
         <>
-          <label className="mb-1 block text-[12px] font-medium text-stone-600">
-            Contract type <span className="font-normal text-stone-400">(binds the template to a legal contract object, e.g. msa)</span>
+          <label className="mb-1 block text-xs font-semibold text-muted">
+            Contract type <span className="font-normal text-subtle">(binds the template to a legal contract object, e.g. msa)</span>
           </label>
           <input value={contractType} onChange={(e) => setContractType(e.target.value)} placeholder="e.g. msa" className={`${inputCls} mb-4 w-full`} maxLength={80} />
         </>
@@ -1452,9 +1433,9 @@ function TemplateModal({
 
       {!template && (
         <>
-          <label className="mb-1 block text-[12px] font-medium text-stone-600">Blueprint PDF</label>
-          <label className="mb-4 flex cursor-pointer items-center gap-2 rounded-md border border-dashed border-stone-300 bg-stone-50 px-3 py-3 text-[13px] text-stone-600 hover:border-[var(--brand-600)]">
-            <FileUp size={16} className="shrink-0 text-stone-400" />
+          <label className="mb-1 block text-xs font-semibold text-muted">Blueprint PDF</label>
+          <label className="mb-4 flex cursor-pointer items-center gap-2 rounded-md border border-dashed border-control bg-canvas px-3 py-3 text-sm text-muted hover:border-ink">
+            <FileUp size={16} className="shrink-0 text-subtle" />
             <span className="truncate">{file ? file.name : "Choose the blueprint PDF — drafts mint from these exact bytes"}</span>
             <input type="file" accept="application/pdf" className="hidden" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
           </label>
@@ -1462,8 +1443,8 @@ function TemplateModal({
       )}
 
       <div className="mb-1 flex items-center justify-between">
-        <span className="text-[12px] font-medium text-stone-600">Signer roles <span className="font-normal text-stone-400">(in signing order)</span></span>
-        <button type="button" onClick={() => setRoles((rs) => [...rs, { role: "", required: true }])} className="flex items-center gap-1 text-[12px] font-medium text-[var(--brand-700)] hover:underline">
+        <span className="text-xs font-semibold text-muted">Signer roles <span className="font-normal text-subtle">(in signing order)</span></span>
+        <button type="button" onClick={() => setRoles((rs) => [...rs, { role: "", required: true }])} className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold text-ink hover:bg-hover-paper aos-press">
           <Plus size={13} /> Add role
         </button>
       </div>
@@ -1471,11 +1452,11 @@ function TemplateModal({
         {roles.map((r, i) => (
           <div key={i} className="grid grid-cols-[1fr_120px_28px] items-center gap-2">
             <input value={r.role} onChange={(e) => setRoles((rs) => rs.map((x, j) => (j === i ? { ...x, role: e.target.value } : x)))} placeholder="e.g. client" className={inputCls} />
-            <label className="flex items-center gap-1.5 text-[12px] text-stone-600">
-              <input type="checkbox" checked={r.required} onChange={(e) => setRoles((rs) => rs.map((x, j) => (j === i ? { ...x, required: e.target.checked } : x)))} className="h-3.5 w-3.5 accent-[var(--brand-600)]" />
+            <label className="flex items-center gap-1.5 text-xs text-muted">
+              <input type="checkbox" checked={r.required} onChange={(e) => setRoles((rs) => rs.map((x, j) => (j === i ? { ...x, required: e.target.checked } : x)))} className="h-3.5 w-3.5 accent-ink" />
               Required
             </label>
-            <button type="button" disabled={roles.length <= 1} onClick={() => setRoles((rs) => rs.filter((_, j) => j !== i))} className="rounded-md p-1.5 text-stone-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-30" aria-label="Remove role">
+            <button type="button" disabled={roles.length <= 1} onClick={() => setRoles((rs) => rs.filter((_, j) => j !== i))} className="rounded-full p-1.5 text-subtle hover:bg-failed-tint hover:text-failed-text disabled:opacity-30" aria-label="Remove role">
               <Trash2 size={14} />
             </button>
           </div>
@@ -1483,12 +1464,12 @@ function TemplateModal({
       </div>
 
       <div className="mb-1 flex items-center justify-between">
-        <span className="text-[12px] font-medium text-stone-600">Field layout</span>
+        <span className="text-xs font-semibold text-muted">Field layout</span>
         <button
           type="button"
           disabled={roleNames.length === 0}
           onClick={() => setFields((fs) => [...fs, { signerRole: roleNames[0]!, fieldType: "signature", page: "1", x: "", y: "" }])}
-          className="flex items-center gap-1 text-[12px] font-medium text-[var(--brand-700)] hover:underline disabled:opacity-40"
+          className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold text-ink hover:bg-hover-paper aos-press disabled:opacity-40"
         >
           <Plus size={13} /> Add field
         </button>
@@ -1510,7 +1491,7 @@ function TemplateModal({
               <input value={f.page} onChange={(e) => setFields((fs) => fs.map((x, j) => (j === i ? { ...x, page: e.target.value } : x)))} placeholder="Pg" className={inputCls} inputMode="numeric" />
               <input value={f.x} onChange={(e) => setFields((fs) => fs.map((x, j) => (j === i ? { ...x, x: e.target.value } : x)))} placeholder="x" className={inputCls} inputMode="decimal" />
               <input value={f.y} onChange={(e) => setFields((fs) => fs.map((x, j) => (j === i ? { ...x, y: e.target.value } : x)))} placeholder="y" className={inputCls} inputMode="decimal" />
-              <button type="button" onClick={() => setFields((fs) => fs.filter((_, j) => j !== i))} className="rounded-md p-1.5 text-stone-400 hover:bg-red-50 hover:text-red-600" aria-label="Remove field">
+              <button type="button" onClick={() => setFields((fs) => fs.filter((_, j) => j !== i))} className="rounded-full p-1.5 text-subtle hover:bg-failed-tint hover:text-failed-text" aria-label="Remove field">
                 <Trash2 size={14} />
               </button>
             </div>
@@ -1519,8 +1500,8 @@ function TemplateModal({
       )}
 
       <div className="mb-1 flex items-center justify-between">
-        <span className="text-[12px] font-medium text-stone-600">Merge fields <span className="font-normal text-stone-400">(declared values the caller must supply)</span></span>
-        <button type="button" onClick={() => setMerges((ms) => [...ms, { name: "", source: "manual", path: "", required: false }])} className="flex items-center gap-1 text-[12px] font-medium text-[var(--brand-700)] hover:underline">
+        <span className="text-xs font-semibold text-muted">Merge fields <span className="font-normal text-subtle">(declared values the caller must supply)</span></span>
+        <button type="button" onClick={() => setMerges((ms) => [...ms, { name: "", source: "manual", path: "", required: false }])} className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold text-ink hover:bg-hover-paper aos-press">
           <Plus size={13} /> Add merge field
         </button>
       </div>
@@ -1531,11 +1512,11 @@ function TemplateModal({
               <input value={m.name} onChange={(e) => setMerges((ms) => ms.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))} placeholder="placeholder" className={inputCls} />
               <input value={m.source} onChange={(e) => setMerges((ms) => ms.map((x, j) => (j === i ? { ...x, source: e.target.value } : x)))} placeholder="source" className={inputCls} />
               <input value={m.path} onChange={(e) => setMerges((ms) => ms.map((x, j) => (j === i ? { ...x, path: e.target.value } : x)))} placeholder="dotted.path" className={inputCls} />
-              <label className="flex items-center gap-1 text-[12px] text-stone-600">
-                <input type="checkbox" checked={m.required} onChange={(e) => setMerges((ms) => ms.map((x, j) => (j === i ? { ...x, required: e.target.checked } : x)))} className="h-3.5 w-3.5 accent-[var(--brand-600)]" />
+              <label className="flex items-center gap-1 text-xs text-muted>
+                <input type="checkbox" checked={m.required} onChange={(e) => setMerges((ms) => ms.map((x, j) => (j === i ? { ...x, required: e.target.checked } : x)))} className="h-3.5 w-3.5 accent-ink" />
                 Req.
               </label>
-              <button type="button" onClick={() => setMerges((ms) => ms.filter((_, j) => j !== i))} className="rounded-md p-1.5 text-stone-400 hover:bg-red-50 hover:text-red-600" aria-label="Remove merge field">
+              <button type="button" onClick={() => setMerges((ms) => ms.filter((_, j) => j !== i))} className="rounded-full p-1.5 text-subtle hover:bg-failed-tint hover:text-failed-text" aria-label="Remove merge field">
                 <Trash2 size={14} />
               </button>
             </div>
@@ -1598,25 +1579,25 @@ function InstantiateModal({
   return (
     <Modal title={`Use template — ${template.name}`} onClose={onClose}>
       <ErrorNote error={error} />
-      <p className="mb-4 text-[13px] text-stone-600">
-        This mints a <span className="font-medium text-stone-900">draft</span> from the template's
+      <p className="mb-4 text-sm text-muted">
+        This mints a <span className="font-medium text-ink">draft</span> from the template's
         blueprint. Missing required values block — nothing is silently left blank.
       </p>
 
-      <label className="mb-1 block text-[12px] font-medium text-stone-600">Envelope title (optional)</label>
+      <label className="mb-1 block text-xs font-semibold text-muted">Envelope title (optional)</label>
       <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={`${template.name} — …`} className={`${inputCls} mb-4 w-full`} maxLength={200} />
 
       {mergeNames.length > 0 && (
         <>
-          <div className="mb-1 text-[12px] font-medium text-stone-600">Merge values</div>
+          <div className="mb-1 text-xs font-semibold text-muted">Merge values</div>
           <div className="mb-4 space-y-2">
             {mergeNames.map((n) => {
               const def = template.mergeFieldMapping[n]!;
               return (
                 <div key={n} className="grid grid-cols-[160px_1fr] items-center gap-2">
-                  <span className="truncate text-[13px] text-stone-700" title={`${def.source} · ${def.path}`}>
-                    <code className="rounded bg-stone-100 px-1 py-0.5 font-mono text-[12px]">{n}</code>
-                    {def.required && <span className="ml-1 text-red-500">*</span>}
+                  <span className="truncate text-sm text-ink" title={`${def.source} · ${def.path}`}>
+                    <code className="rounded bg-canvas px-1 py-0.5 font-mono text-xs">{n}</code>
+                    {def.required && <span className="ml-1 text-failed-text">*</span>}
                   </span>
                   <input
                     value={mergeValues[n] ?? ""}
@@ -1631,11 +1612,11 @@ function InstantiateModal({
         </>
       )}
 
-      <div className="mb-1 text-[12px] font-medium text-stone-600">Bind signer roles</div>
+      <div className="mb-1 text-xs font-semibold text-muted">Bind signer roles</div>
       <div className="mb-4 space-y-2">
         {bindings.map((b, i) => (
           <div key={b.role} className="grid grid-cols-[120px_1fr_1fr] items-center gap-2">
-            <span className="truncate text-[13px] font-medium text-stone-700">{b.role}</span>
+            <span className="truncate text-sm font-medium text-ink">{b.role}</span>
             <input value={b.name} onChange={(e) => setBindings((bs) => bs.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))} placeholder="Full name" className={inputCls} />
             <input value={b.email} onChange={(e) => setBindings((bs) => bs.map((x, j) => (j === i ? { ...x, email: e.target.value } : x)))} placeholder="email@company.com" className={inputCls} />
           </div>
@@ -1694,11 +1675,11 @@ function TemplatesTab({ onOpenEnvelope }: { onOpenEnvelope: (id: string) => void
         </button>
       </div>
 
-      <div className="overflow-hidden rounded-lg border border-stone-200 bg-white">
+      <div className="overflow-hidden rounded-lg bg-paper shadow-hairline">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-[13px]">
+          <table className="w-full text-left text-sm">
             <thead>
-              <tr className="border-b border-stone-100 bg-stone-50/60 text-[11px] uppercase tracking-wide text-stone-500">
+              <tr className="border-b border-line text-xs font-semibold text-muted">
                 <th className="px-3 py-2 font-medium">Name</th>
                 <th className="px-3 py-2 font-medium">Contract</th>
                 <th className="px-3 py-2 font-medium">Roles</th>
@@ -1711,37 +1692,37 @@ function TemplatesTab({ onOpenEnvelope }: { onOpenEnvelope: (id: string) => void
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={8} className="px-3 py-10 text-center text-stone-500"><Loader2 size={16} className="mr-2 inline animate-spin" />Loading…</td></tr>
+                <tr><td colSpan={8} className="px-3 py-10 text-center text-muted"><Loader2 size={16} className="mr-2 inline animate-spin" />Loading…</td></tr>
               ) : templates.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-3 py-10 text-center text-stone-500">
-                    <LayoutTemplate size={20} className="mx-auto mb-2 text-stone-300" />
+                  <td colSpan={8} className="px-3 py-10 text-center text-muted">
+                    <LayoutTemplate size={20} className="mx-auto mb-2 text-subtle" />
                     No templates yet. Save a reusable blueprint to stop rebuilding envelopes by hand.
                   </td>
                 </tr>
               ) : (
                 templates.map((t) => (
-                  <tr key={t.id} className="border-b border-stone-100 last:border-0 hover:bg-[var(--brand-50)]/40">
-                    <td className="px-3 py-2.5 font-medium text-stone-900">{t.name}</td>
-                    <td className="px-3 py-2.5">{t.contractType ? <Chip tone="blue">{t.contractType}</Chip> : <span className="text-stone-400">—</span>}</td>
+                  <tr key={t.id} className="border-b border-line last:border-0 hover:bg-hover-paper">
+                    <td className="px-3 py-2.5 font-medium text-ink">{t.name}</td>
+                    <td className="px-3 py-2.5">{t.contractType ? <Chip>{t.contractType}</Chip> : <span className="text-subtle">—</span>}</td>
                     <td className="px-3 py-2.5">
                       <span className="flex flex-wrap gap-1">
                         {t.signerRoles.map((r) => (<Chip key={r.role}>{r.role}</Chip>))}
                       </span>
                     </td>
-                    <td className="px-3 py-2.5 text-stone-600">{t.fieldLayout.length}</td>
-                    <td className="px-3 py-2.5 text-stone-600">{Object.keys(t.mergeFieldMapping).length}</td>
-                    <td className="px-3 py-2.5 font-mono text-[12px] text-stone-600" title={t.sourceDocumentHash ?? ""}>
+                    <td className="px-3 py-2.5 text-muted">{t.fieldLayout.length}</td>
+                    <td className="px-3 py-2.5 text-muted">{Object.keys(t.mergeFieldMapping).length}</td>
+                    <td className="px-3 py-2.5 font-mono text-xs text-muted" title={t.sourceDocumentHash ?? ""}>
                       {t.sourceDocumentHash ? `${t.sourceDocumentHash.slice(0, 12)}…` : "—"}
                     </td>
-                    <td className="px-3 py-2.5 text-stone-600">{fmtDate(t.updatedAt)}</td>
+                    <td className="px-3 py-2.5 text-muted">{fmtDate(t.updatedAt)}</td>
                     <td className="px-3 py-2.5">
                       <span className="flex items-center justify-end gap-1">
-                        <button onClick={() => setInstantiate(t)} className="rounded-md px-2 py-1 text-[12px] font-medium text-[var(--brand-700)] hover:bg-[var(--brand-50)]">Use</button>
-                        <button onClick={() => setModal(t)} className="rounded-md p-1.5 text-stone-400 hover:bg-stone-100 hover:text-stone-600" aria-label="Edit template">
+                        <button onClick={() => setInstantiate(t)} className="rounded-full px-2.5 py-1 text-xs font-semibold text-ink hover:bg-hover-paper">Use</button>
+                        <button onClick={() => setModal(t)} className="rounded-full p-1.5 text-subtle hover:bg-hover-paper hover:text-ink" aria-label="Edit template">
                           <Pencil size={14} />
                         </button>
-                        <button onClick={() => remove(t.id)} disabled={deleting === t.id} className="rounded-md p-1.5 text-stone-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-40" aria-label="Delete template">
+                        <button onClick={() => remove(t.id)} disabled={deleting === t.id} className="rounded-full p-1.5 text-subtle hover:bg-failed-tint hover:text-failed-text disabled:opacity-40" aria-label="Delete template">
                           {deleting === t.id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
                         </button>
                       </span>
@@ -1789,15 +1770,15 @@ export function EsignApp() {
 
   return (
     <div>
-      <div className="mb-4 flex gap-1 border-b border-stone-200">
+      <div className="mb-4 flex gap-1 border-b border-line">
         {ESIGN_TABS.map(({ id, label, icon: Icon }) => (
           <button
             key={id}
             onClick={() => setTab(id)}
-            className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-[13.5px] font-medium transition ${
+            className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-sm font-semibold ${
               tab === id
-                ? "border-[var(--brand-600)] text-[var(--brand-700)]"
-                : "border-transparent text-stone-500 hover:text-stone-800"
+                ? "border-ink text-ink"
+                : "border-transparent text-muted hover:text-ink"
             }`}
           >
             <Icon size={15} />
