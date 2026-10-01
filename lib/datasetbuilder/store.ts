@@ -13,9 +13,14 @@ import {
   type DatasetChunkRecord,
   type DatasetDocumentInput,
   type DatasetDocumentRecord,
+  type DatasetRecord,
   type DatasetSourceInput,
   type DatasetSourceRecord,
   type DatasetType,
+  type DatasetVersionChunkInput,
+  type DatasetVersionChunkRecord,
+  type DatasetVersionInput,
+  type DatasetVersionRecord,
   type ReviewDecision,
   type ReviewItemInput,
   type ReviewItemRecord,
@@ -24,6 +29,7 @@ import {
 import type {
   ClassificationStatus,
 } from "./classify";
+import { DATASET_TYPE_LABELS } from "./classify";
 
 let seq = 0;
 function newId(prefix: string): string {
@@ -37,6 +43,9 @@ export class InMemoryDatasetBuilderStore implements DatasetBuilderStore {
   private chunks = new Map<string, DatasetChunkRecord>();
   private classifications = new Map<string, ClassificationRecord>();
   private reviewItems = new Map<string, ReviewItemRecord>();
+  private datasets = new Map<string, DatasetRecord>();
+  private versions = new Map<string, DatasetVersionRecord>();
+  private versionChunks = new Map<string, DatasetVersionChunkRecord>();
 
   async createSource(input: DatasetSourceInput): Promise<DatasetSourceRecord> {
     const record: DatasetSourceRecord = {
@@ -383,5 +392,168 @@ export class InMemoryDatasetBuilderStore implements DatasetBuilderStore {
     this.classifications.set(classification.id, updatedClassification);
     this.reviewItems.set(id, updatedReview);
     return { review: updatedReview, classification: updatedClassification };
+  }
+
+  // ---- Slice 3: build -------------------------------------------------
+
+  async getOrCreateDataset(
+    workspaceId: string,
+    type: DatasetType,
+  ): Promise<DatasetRecord> {
+    const existing = [...this.datasets.values()].find(
+      (d) => d.workspaceId === workspaceId && d.type === type,
+    );
+    if (existing) return existing;
+    const record: DatasetRecord = {
+      id: newId("ds"),
+      workspaceId,
+      type,
+      name: DATASET_TYPE_LABELS[type],
+      createdAt: new Date(),
+    };
+    this.datasets.set(record.id, record);
+    return record;
+  }
+
+  async getDataset(id: string): Promise<DatasetRecord | null> {
+    return this.datasets.get(id) ?? null;
+  }
+
+  async getDatasetByType(
+    workspaceId: string,
+    type: DatasetType,
+  ): Promise<DatasetRecord | null> {
+    return (
+      [...this.datasets.values()].find(
+        (d) => d.workspaceId === workspaceId && d.type === type,
+      ) ?? null
+    );
+  }
+
+  async listDatasets(workspaceId: string): Promise<DatasetRecord[]> {
+    return [...this.datasets.values()].filter(
+      (d) => d.workspaceId === workspaceId,
+    );
+  }
+
+  async createDatasetVersion(
+    input: DatasetVersionInput,
+  ): Promise<DatasetVersionRecord> {
+    if (!this.datasets.has(input.datasetId)) {
+      throw new DatasetBuilderError(
+        "UNKNOWN_DATASET",
+        `cannot create version: dataset "${input.datasetId}" does not exist`,
+      );
+    }
+    const duplicate = [...this.versions.values()].find(
+      (v) => v.datasetId === input.datasetId && v.version === input.version,
+    );
+    if (duplicate) {
+      throw new DatasetBuilderError(
+        "DATASET_VERSION_EXISTS",
+        `dataset "${input.datasetId}" already has version ${input.version}`,
+      );
+    }
+    if (!Number.isInteger(input.version) || input.version < 1) {
+      throw new DatasetBuilderError(
+        "VALIDATION_FAILED",
+        "version must be a positive integer",
+      );
+    }
+    if (!Number.isInteger(input.chunkCount) || input.chunkCount < 0) {
+      throw new DatasetBuilderError(
+        "VALIDATION_FAILED",
+        "chunkCount must be a non-negative integer",
+      );
+    }
+    const record: DatasetVersionRecord = {
+      id: newId("dsv"),
+      workspaceId: input.workspaceId,
+      datasetId: input.datasetId,
+      version: input.version,
+      chunkCount: input.chunkCount,
+      settings: input.settings,
+      compiledAt: new Date(),
+    };
+    this.versions.set(record.id, record);
+    return record;
+  }
+
+  async getDatasetVersion(id: string): Promise<DatasetVersionRecord | null> {
+    return this.versions.get(id) ?? null;
+  }
+
+  async getLatestDatasetVersion(
+    datasetId: string,
+  ): Promise<DatasetVersionRecord | null> {
+    const rows = [...this.versions.values()].filter(
+      (v) => v.datasetId === datasetId,
+    );
+    if (rows.length === 0) return null;
+    return rows.reduce((a, b) => (b.version > a.version ? b : a));
+  }
+
+  async listDatasetVersions(
+    datasetId: string,
+  ): Promise<DatasetVersionRecord[]> {
+    return [...this.versions.values()]
+      .filter((v) => v.datasetId === datasetId)
+      .sort((a, b) => b.version - a.version);
+  }
+
+  async addDatasetVersionChunks(
+    rows: DatasetVersionChunkInput[],
+  ): Promise<DatasetVersionChunkRecord[]> {
+    const written: DatasetVersionChunkRecord[] = [];
+    for (const row of rows) {
+      if (!this.versions.has(row.versionId)) {
+        throw new DatasetBuilderError(
+          "UNKNOWN_DATASET_VERSION",
+          `cannot add lineage: version "${row.versionId}" does not exist`,
+        );
+      }
+      if (!this.chunks.has(row.chunkId)) {
+        throw new DatasetBuilderError(
+          "UNKNOWN_CHUNK",
+          `cannot add lineage: chunk "${row.chunkId}" does not exist`,
+        );
+      }
+      if (!this.classifications.has(row.classificationId)) {
+        throw new DatasetBuilderError(
+          "UNKNOWN_CLASSIFICATION",
+          `cannot add lineage: classification "${row.classificationId}" does not exist`,
+        );
+      }
+      // Retry-safe: an identical (versionId, chunkId) row is skipped,
+      // never duplicated.
+      const existing = [...this.versionChunks.values()].find(
+        (r) => r.versionId === row.versionId && r.chunkId === row.chunkId,
+      );
+      if (existing) {
+        written.push(existing);
+        continue;
+      }
+      const record: DatasetVersionChunkRecord = {
+        id: newId("dsvchunk"),
+        workspaceId: row.workspaceId,
+        versionId: row.versionId,
+        chunkId: row.chunkId,
+        classificationId: row.classificationId,
+        engine: row.engine,
+        engineVersion: row.engineVersion,
+        compiledAt: new Date(),
+      };
+      this.versionChunks.set(record.id, record);
+      written.push(record);
+    }
+    return written;
+  }
+
+  async listDatasetVersionChunks(
+    versionId: string,
+  ): Promise<DatasetVersionChunkRecord[]> {
+    return [...this.versionChunks.values()].filter(
+      (r) => r.versionId === versionId,
+    );
   }
 }

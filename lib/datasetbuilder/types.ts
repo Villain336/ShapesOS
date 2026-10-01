@@ -194,6 +194,50 @@ export interface DatasetBuilderStore {
     id: string,
     decision: ReviewDecision,
   ): Promise<{ review: ReviewItemRecord; classification: ClassificationRecord }>;
+
+  // ---- Slice 3: build ---------------------------------------------
+  /**
+   * One dataset per (workspaceId, type). Creates it on first use —
+   * compiling a type's first version also creates "the pricing dataset".
+   */
+  getOrCreateDataset(
+    workspaceId: string,
+    type: DatasetType,
+  ): Promise<DatasetRecord>;
+  getDataset(id: string): Promise<DatasetRecord | null>;
+  getDatasetByType(
+    workspaceId: string,
+    type: DatasetType,
+  ): Promise<DatasetRecord | null>;
+  listDatasets(workspaceId: string): Promise<DatasetRecord[]>;
+
+  /**
+   * Records an immutable version snapshot. Throws UNKNOWN_DATASET when
+   * the dataset does not exist, DATASET_VERSION_EXISTS when the version
+   * number is already taken for that dataset.
+   */
+  createDatasetVersion(
+    input: DatasetVersionInput,
+  ): Promise<DatasetVersionRecord>;
+  getDatasetVersion(id: string): Promise<DatasetVersionRecord | null>;
+  getLatestDatasetVersion(
+    datasetId: string,
+  ): Promise<DatasetVersionRecord | null>;
+  listDatasetVersions(datasetId: string): Promise<DatasetVersionRecord[]>;
+
+  /**
+   * Writes per-chunk lineage rows for a version. Throws
+   * UNKNOWN_DATASET_VERSION / UNKNOWN_CHUNK / UNKNOWN_CLASSIFICATION
+   * when any pointer is dangling — a version snapshot can never carry
+   * orphaned lineage. Retries are safe: an identical (versionId, chunkId)
+   * row is skipped, never duplicated.
+   */
+  addDatasetVersionChunks(
+    rows: DatasetVersionChunkInput[],
+  ): Promise<DatasetVersionChunkRecord[]>;
+  listDatasetVersionChunks(
+    versionId: string,
+  ): Promise<DatasetVersionChunkRecord[]>;
 }
 
 export type DatasetBuilderErrorCode =
@@ -211,7 +255,12 @@ export type DatasetBuilderErrorCode =
   | "UNKNOWN_CLASSIFICATION"
   | "UNKNOWN_REVIEW_ITEM"
   | "REVIEW_ALREADY_EXISTS"
-  | "REVIEW_ALREADY_DECIDED";
+  | "REVIEW_ALREADY_DECIDED"
+  | "UNKNOWN_DATASET"
+  | "UNKNOWN_DATASET_VERSION"
+  | "DATASET_VERSION_EXISTS"
+  | "COMPILE_EMPTY"
+  | "LINEAGE_BROKEN";
 
 export class DatasetBuilderError extends Error {
   readonly code: DatasetBuilderErrorCode;
@@ -237,4 +286,68 @@ export interface CrawlInput {
   /** Optional label shown in the register; defaults to the URL. */
   label?: string;
   chunking?: ChunkingConfig;
+}
+
+// ---- Slice 3: build ---------------------------------------------------
+
+/**
+ * Compile-time transform lineage. Stored on every DatasetVersion so a
+ * snapshot answers "which transform, when" without re-running anything.
+ */
+export interface CompileSettings {
+  compiler: string;
+  compilerVersion: string;
+  datasetType: DatasetType;
+}
+
+/** One dataset per (workspace, type) — "the pricing dataset". */
+export interface DatasetRecord {
+  id: string;
+  workspaceId: string;
+  type: DatasetType;
+  name: string;
+  createdAt: Date;
+}
+
+/** An immutable versioned snapshot of a dataset's applied chunk set. */
+export interface DatasetVersionRecord {
+  id: string;
+  workspaceId: string;
+  datasetId: string;
+  /** Monotonic per dataset: v1, v2, … */
+  version: number;
+  chunkCount: number;
+  settings: CompileSettings;
+  compiledAt: Date;
+}
+
+export interface DatasetVersionInput {
+  workspaceId: string;
+  datasetId: string;
+  version: number;
+  chunkCount: number;
+  settings: CompileSettings;
+}
+
+/**
+ * Per-chunk lineage row: version ← chunk ← classification, tracing back
+ * to Source/Document through the chunk's own FK chain. The model lineage
+ * (engine + engineVersion) is copied at compile time so it survives
+ * engine renames.
+ */
+export interface DatasetVersionChunkInput {
+  workspaceId: string;
+  versionId: string;
+  /** Must reference a live chunk — UNKNOWN_CHUNK otherwise. */
+  chunkId: string;
+  /** Must reference a live classification — UNKNOWN_CLASSIFICATION otherwise. */
+  classificationId: string;
+  engine: string;
+  engineVersion: string;
+}
+
+export interface DatasetVersionChunkRecord
+  extends DatasetVersionChunkInput {
+  id: string;
+  compiledAt: Date;
 }

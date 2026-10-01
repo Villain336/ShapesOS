@@ -42,6 +42,8 @@ always return `[]`. Anything else is a data-integrity incident.
 | `register.ts` | `getSourceRegister` (source → documents → chunk counts), `verifyNoOrphanedChunks` |
 | `classify.ts` | Dataset types, `ClassificationEngine` interface, `RulesClassificationEngine` (deterministic default), `FrontierClassificationEngine` stub (fail-closed) |
 | `structure.ts` | `structureChunk` / `structureDocument` / `structureWorkspace`, `decideReview`, `getTypeBreakdown`, `listReviewQueue` |
+| `build.ts` | Versioned compiler (`compileDataset` / `compileDatasets`), `getVersionLineage`, JSONL + Parquet exporters, `verifyNoOrphanedVersionChunks` |
+| `health.ts` | `getDatasetHealth`: coverage, freshness, staleness/drift/uncompiled alerts |
 | `store.ts` | In-memory store (tests, tooling) |
 | `__tests__/` | `npx tsx --test` per file — no DB, no network, no credentials |
 
@@ -93,4 +95,47 @@ npx tsx --test lib/datasetbuilder/__tests__/structure.test.ts
 
 (Directory args fail on this repo's tsx version — pass explicit file paths.)
 
-## Slice 3 preview (not built)
+Also:
+```bash
+npx tsx --test lib/datasetbuilder/__tests__/build.test.ts
+npx tsx --test lib/datasetbuilder/__tests__/health.test.ts
+```
+
+## Slice 3: Build (built)
+
+Compiles applied classifications into **immutable versioned datasets**,
+exportable as JSONL and Parquet, with per-chunk lineage and a dataset
+health panel.
+
+- **Compiler** (`build.ts`): `compileDataset(store, workspaceId, type)`
+  snapshots every chunk with an `applied` classification of that type into
+  a new `DatasetVersion` (monotonic v1, v2, …; `COMPILE_EMPTY` when nothing
+  is classified — compiling an empty dataset fails loudly). One chunk
+  appears at most once per version even when several engines classified it
+  (highest confidence wins). `compileDatasets` compiles every populated
+  type, skipping empty ones.
+- **Lineage**: every version records which source → which document → which
+  chunk (through the slice-1/2 FK chain), which model classified it
+  (`engine`/`engineVersion` copied at compile time), which transform
+  compiled it (`settings`: compiler name + version), and when
+  (`compiledAt`). `getVersionLineage` resolves it all; the zero-orphaned
+  data invariant extends down: version-chunk FKs are NOT NULL +
+  `ON DELETE CASCADE`, and `verifyNoOrphanedVersionChunks()` audits it.
+- **Exports**: `exportDatasetJsonl` (one JSON object per line) and
+  `exportDatasetParquet` (real Parquet via `@dsnp/parquetjs` 1.8.9 pinned —
+  the 1.9.3 publish ships without `dist/`). Both carry the lineage flat
+  (chunk, document, source, engine, compiled version).
+- **Health** (`health.ts`): `getDatasetHealth` returns coverage (% of
+  chunks classified into datasets), freshness (age of newest data per
+  dataset), and alerts: stale ("Your pricing dataset is 120 days old",
+  default threshold 90 days), drift ("1 new pricing chunk since v1 —
+  recompile to refresh"), and uncompiled ("Compile your first pricing
+  dataset from 2 classified chunks").
+- API: `POST /api/datasets/compile` (one type or all), `GET /api/datasets`
+  (types + latest versions), `GET /api/datasets/[id]/versions` (history +
+  lineage summaries), `GET /api/datasets/[id]/export?format=jsonl|parquet`,
+  `GET /api/datasets/health`.
+- UI: `/dashboard/datasets` gains a **Build** tab — health panel
+  (coverage, freshness, staleness alerts), per-type dataset cards with
+  Compile / JSONL / Parquet actions, and expandable version history with
+  lineage (sources + models).

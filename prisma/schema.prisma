@@ -758,6 +758,10 @@ model Workspace {
   datasetChunks    DatasetChunk[]
   datasetClassifications DatasetClassification[]
   datasetReviewItems     DatasetReviewItem[]
+  // Dataset Builder slice 3: Build.
+  datasets               Dataset[]
+  datasetVersions        DatasetVersion[]
+  datasetVersionChunks   DatasetVersionChunk[]
   insurancePaymentHandoffs InsurancePaymentHandoff[]
   insuranceCertificates     InsuranceCertificate[]
   // Phase 12 (embeds): tenant-scoped GrowthBook flag overrides.
@@ -10717,6 +10721,7 @@ model DatasetChunk {
   createdAt DateTime @default(now()) @map("created_at")
 
   classifications DatasetClassification[]
+  versionChunks DatasetVersionChunk[]
 
   @@unique([documentId, position])
   @@map("dataset_chunks")
@@ -10762,6 +10767,7 @@ model DatasetClassification {
   status ClassificationStatus @default(applied)
 
   reviewItem DatasetReviewItem?
+  versionChunks DatasetVersionChunk[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -10791,4 +10797,74 @@ model DatasetReviewItem {
 
   @@index([workspaceId, status])
   @@map("dataset_review_items")
+}
+
+// ---- Slice 3: versioned dataset compiler -------------------------------
+model Dataset {
+  id          String   @id @default(cuid())
+  workspaceId String   @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  // One dataset per type per workspace — "the pricing dataset".
+  type DatasetType @map("type")
+  // Human label, e.g. "Pricing".
+  name String
+
+  versions DatasetVersion[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([workspaceId, type])
+  @@map("datasets")
+}
+
+model DatasetVersion {
+  id          String   @id @default(cuid())
+  workspaceId String   @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  datasetId String  @map("dataset_id")
+  dataset   Dataset @relation(fields: [datasetId], references: [id], onDelete: Cascade)
+
+  // Monotonic per dataset: v1, v2, …
+  version Int
+  chunkCount Int @map("chunk_count")
+  // Compile-time transform lineage: which compiler, which settings, when.
+  settings Json @default("{}")
+
+  chunks DatasetVersionChunk[]
+
+  compiledAt DateTime @default(now()) @map("compiled_at")
+
+  @@unique([datasetId, version])
+  @@index([workspaceId, datasetId])
+  @@map("dataset_versions")
+}
+
+model DatasetVersionChunk {
+  id          String   @id @default(cuid())
+  workspaceId String   @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  versionId String        @map("version_id")
+  version   DatasetVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
+
+  // Per-chunk lineage: version ← chunk ← classification, tracing back to
+  // Source/Document through the chunk's own FK chain. A version chunk can
+  // never point at a missing version, chunk, or classification — the
+  // zero-orphaned-data invariant extends down to compiled snapshots.
+  chunkId String      @map("chunk_id")
+  chunk   DatasetChunk @relation(fields: [chunkId], references: [id], onDelete: Cascade)
+  classificationId String               @map("classification_id")
+  classification   DatasetClassification @relation(fields: [classificationId], references: [id], onDelete: Cascade)
+  // Model lineage copied at compile time so it survives engine renames.
+  engine        String
+  engineVersion String @map("engine_version")
+
+  compiledAt DateTime @default(now()) @map("compiled_at")
+
+  @@unique([versionId, chunkId])
+  @@index([workspaceId, versionId])
+  @@map("dataset_version_chunks")
 }

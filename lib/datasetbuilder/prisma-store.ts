@@ -14,10 +14,15 @@ import {
   type DatasetChunkRecord,
   type DatasetDocumentInput,
   type DatasetDocumentRecord,
+  type DatasetRecord,
   type DatasetSourceInput,
   type DatasetSourceRecord,
   type DatasetSourceKind,
   type DatasetType,
+  type DatasetVersionChunkInput,
+  type DatasetVersionChunkRecord,
+  type DatasetVersionInput,
+  type DatasetVersionRecord,
   type ReviewDecision,
   type ReviewItemInput,
   type ReviewItemRecord,
@@ -29,6 +34,7 @@ import type {
   ClassificationStatus as PrismaClassificationStatus,
   ReviewItemStatus as PrismaReviewStatus,
 } from "./classify";
+import { DATASET_TYPE_LABELS } from "./classify";
 
 function toDatasetType(t: string): DatasetType {
   return t as DatasetType;
@@ -569,5 +575,261 @@ export class PrismaDatasetBuilderStore implements DatasetBuilderStore {
       review: this.toReviewItem(updatedReview),
       classification: this.toClassification(updatedClassification),
     };
+  }
+
+  // ---- Slice 3: build -------------------------------------------------
+
+  private toDataset(d: {
+    id: string;
+    workspaceId: string;
+    type: string;
+    name: string;
+    createdAt: Date;
+  }): DatasetRecord {
+    return {
+      id: d.id,
+      workspaceId: d.workspaceId,
+      type: toDatasetType(d.type),
+      name: d.name,
+      createdAt: d.createdAt,
+    };
+  }
+
+  private toDatasetVersion(v: {
+    id: string;
+    workspaceId: string;
+    datasetId: string;
+    version: number;
+    chunkCount: number;
+    settings: unknown;
+    compiledAt: Date;
+  }): DatasetVersionRecord {
+    return {
+      id: v.id,
+      workspaceId: v.workspaceId,
+      datasetId: v.datasetId,
+      version: v.version,
+      chunkCount: v.chunkCount,
+      settings: v.settings as DatasetVersionRecord["settings"],
+      compiledAt: v.compiledAt,
+    };
+  }
+
+  private toVersionChunk(r: {
+    id: string;
+    workspaceId: string;
+    versionId: string;
+    chunkId: string;
+    classificationId: string;
+    engine: string;
+    engineVersion: string;
+    compiledAt: Date;
+  }): DatasetVersionChunkRecord {
+    return {
+      id: r.id,
+      workspaceId: r.workspaceId,
+      versionId: r.versionId,
+      chunkId: r.chunkId,
+      classificationId: r.classificationId,
+      engine: r.engine,
+      engineVersion: r.engineVersion,
+      compiledAt: r.compiledAt,
+    };
+  }
+
+  async getOrCreateDataset(
+    workspaceId: string,
+    type: DatasetType,
+  ): Promise<DatasetRecord> {
+    const existing = await this.db.dataset.findFirst({
+      where: { workspaceId, type: type as PrismaDatasetType },
+    });
+    if (existing) return this.toDataset(existing);
+    try {
+      const created = await this.db.dataset.create({
+        data: {
+          workspaceId,
+          type: type as PrismaDatasetType,
+          name: DATASET_TYPE_LABELS[type],
+        },
+      });
+      return this.toDataset(created);
+    } catch {
+      // Lost a race with a concurrent create — the unique (workspaceId,
+      // type) index means the row now exists.
+      const raced = await this.db.dataset.findFirst({
+        where: { workspaceId, type: type as PrismaDatasetType },
+      });
+      if (raced) return this.toDataset(raced);
+      throw new DatasetBuilderError(
+        "VALIDATION_FAILED",
+        `could not create dataset for type "${type}"`,
+      );
+    }
+  }
+
+  async getDataset(id: string): Promise<DatasetRecord | null> {
+    const d = await this.db.dataset.findUnique({ where: { id } });
+    return d ? this.toDataset(d) : null;
+  }
+
+  async getDatasetByType(
+    workspaceId: string,
+    type: DatasetType,
+  ): Promise<DatasetRecord | null> {
+    const d = await this.db.dataset.findFirst({
+      where: { workspaceId, type: type as PrismaDatasetType },
+    });
+    return d ? this.toDataset(d) : null;
+  }
+
+  async listDatasets(workspaceId: string): Promise<DatasetRecord[]> {
+    const rows = await this.db.dataset.findMany({
+      where: { workspaceId },
+      orderBy: { createdAt: "asc" },
+    });
+    return rows.map((d) => this.toDataset(d));
+  }
+
+  async createDatasetVersion(
+    input: DatasetVersionInput,
+  ): Promise<DatasetVersionRecord> {
+    if (!Number.isInteger(input.version) || input.version < 1) {
+      throw new DatasetBuilderError(
+        "VALIDATION_FAILED",
+        "version must be a positive integer",
+      );
+    }
+    if (!Number.isInteger(input.chunkCount) || input.chunkCount < 0) {
+      throw new DatasetBuilderError(
+        "VALIDATION_FAILED",
+        "chunkCount must be a non-negative integer",
+      );
+    }
+    try {
+      const v = await this.db.datasetVersion.create({
+        data: {
+          workspaceId: input.workspaceId,
+          datasetId: input.datasetId,
+          version: input.version,
+          chunkCount: input.chunkCount,
+          settings: input.settings as unknown as Prisma.InputJsonValue,
+        },
+      });
+      return this.toDatasetVersion(v);
+    } catch {
+      // FK to a missing dataset → UNKNOWN_DATASET; unique
+      // (datasetId, version) → DATASET_VERSION_EXISTS.
+      const dataset = await this.db.dataset.findUnique({
+        where: { id: input.datasetId },
+        select: { id: true },
+      });
+      if (!dataset) {
+        throw new DatasetBuilderError(
+          "UNKNOWN_DATASET",
+          `cannot create version: dataset "${input.datasetId}" does not exist`,
+        );
+      }
+      throw new DatasetBuilderError(
+        "DATASET_VERSION_EXISTS",
+        `dataset "${input.datasetId}" already has version ${input.version}`,
+      );
+    }
+  }
+
+  async getDatasetVersion(id: string): Promise<DatasetVersionRecord | null> {
+    const v = await this.db.datasetVersion.findUnique({ where: { id } });
+    return v ? this.toDatasetVersion(v) : null;
+  }
+
+  async getLatestDatasetVersion(
+    datasetId: string,
+  ): Promise<DatasetVersionRecord | null> {
+    const v = await this.db.datasetVersion.findFirst({
+      where: { datasetId },
+      orderBy: { version: "desc" },
+    });
+    return v ? this.toDatasetVersion(v) : null;
+  }
+
+  async listDatasetVersions(
+    datasetId: string,
+  ): Promise<DatasetVersionRecord[]> {
+    const rows = await this.db.datasetVersion.findMany({
+      where: { datasetId },
+      orderBy: { version: "desc" },
+    });
+    return rows.map((v) => this.toDatasetVersion(v));
+  }
+
+  async addDatasetVersionChunks(
+    rows: DatasetVersionChunkInput[],
+  ): Promise<DatasetVersionChunkRecord[]> {
+    const written: DatasetVersionChunkRecord[] = [];
+    for (const row of rows) {
+      // Retry-safe: an identical (versionId, chunkId) row is skipped,
+      // never duplicated.
+      const existing = await this.db.datasetVersionChunk.findUnique({
+        where: {
+          versionId_chunkId: {
+            versionId: row.versionId,
+            chunkId: row.chunkId,
+          },
+        },
+      });
+      if (existing) {
+        written.push(this.toVersionChunk(existing));
+        continue;
+      }
+      try {
+        const created = await this.db.datasetVersionChunk.create({
+          data: {
+            workspaceId: row.workspaceId,
+            versionId: row.versionId,
+            chunkId: row.chunkId,
+            classificationId: row.classificationId,
+            engine: row.engine,
+            engineVersion: row.engineVersion,
+          },
+        });
+        written.push(this.toVersionChunk(created));
+      } catch {
+        // FK failures → the same codes the in-memory store raises.
+        const version = await this.db.datasetVersion.findUnique({
+          where: { id: row.versionId },
+          select: { id: true },
+        });
+        if (!version) {
+          throw new DatasetBuilderError(
+            "UNKNOWN_DATASET_VERSION",
+            `cannot add lineage: version "${row.versionId}" does not exist`,
+          );
+        }
+        const chunk = await this.db.datasetChunk.findUnique({
+          where: { id: row.chunkId },
+          select: { id: true },
+        });
+        if (!chunk) {
+          throw new DatasetBuilderError(
+            "UNKNOWN_CHUNK",
+            `cannot add lineage: chunk "${row.chunkId}" does not exist`,
+          );
+        }
+        throw new DatasetBuilderError(
+          "UNKNOWN_CLASSIFICATION",
+          `cannot add lineage: classification "${row.classificationId}" does not exist`,
+        );
+      }
+    }
+    return written;
+  }
+
+  async listDatasetVersionChunks(
+    versionId: string,
+  ): Promise<DatasetVersionChunkRecord[]> {
+    const rows = await this.db.datasetVersionChunk.findMany({
+      where: { versionId },
+    });
+    return rows.map((r) => this.toVersionChunk(r));
   }
 }
