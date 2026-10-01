@@ -57,8 +57,13 @@ export interface AmazonAdsAuth {
   accessToken: string;
   /** LWA client id → Amazon-Ads-ClientId header. */
   clientId: string;
-  /** Advertiser profile id → Amazon-Advertising-API-Scope header. */
-  profileId: string;
+  /**
+   * Advertiser profile id → Amazon-Advertising-API-Scope header. Optional at
+   * construction: the profiles call (GET /v2/profiles) is unscoped, so the
+   * OAuth callback can list profiles BEFORE any profile id is known. Every
+   * profile-scoped call throws MISSING_AUTH when it is absent.
+   */
+  profileId?: string;
   /** Region base URL. Defaults to NA. */
   baseUrl?: string;
 }
@@ -309,12 +314,19 @@ export class AmazonAdsClient {
     if (!options.auth?.clientId) {
       throw new AmazonAdsError("MISSING_AUTH", "Amazon Ads LWA client id is required");
     }
-    if (!options.auth?.profileId) {
-      throw new AmazonAdsError("MISSING_AUTH", "Amazon Ads profile id is required");
-    }
     this.auth = options.auth;
     this.fetchImpl = options.fetchImpl ?? fetch;
     this.baseUrl = (options.auth.baseUrl ?? AMAZON_ADS_REGION_BASE_URLS.NA).replace(/\/+$/, "");
+  }
+
+  private requireProfileId(): string {
+    if (!this.auth.profileId) {
+      throw new AmazonAdsError(
+        "MISSING_AUTH",
+        "Amazon Ads profile id is required for profile-scoped calls — list profiles first",
+      );
+    }
+    return this.auth.profileId;
   }
 
   private baseHeaders(): Record<string, string> {
@@ -327,7 +339,7 @@ export class AmazonAdsClient {
   private scopedHeaders(contentType?: string): Record<string, string> {
     return {
       ...this.baseHeaders(),
-      "Amazon-Advertising-API-Scope": this.auth.profileId,
+      "Amazon-Advertising-API-Scope": this.requireProfileId(),
       Accept: "application/json",
       ...(contentType ? { "Content-Type": contentType } : {}),
     };

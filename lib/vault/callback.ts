@@ -12,13 +12,13 @@
 import { prisma } from "@/lib/prisma";
 import { secrets } from "@/lib/secrets";
 import type { ConnectorConnection } from "@prisma/client";
-import { parseOAuthState, getOAuthConfig } from "./oauth";
+import { parseOAuthState, getOAuthConfig, type OAuthProviderConfig } from "./oauth";
 
 export interface CallbackDeps {
   fetchImpl?: typeof fetch;
 }
 
-interface TokenResponse {
+export interface OAuthTokenResponse {
   access_token: string;
   refresh_token?: string;
   expires_in?: number;
@@ -27,29 +27,24 @@ interface TokenResponse {
 }
 
 /**
- * Handle an OAuth provider callback. Returns the upserted connection.
- * Throws on invalid state, token exchange failure, or missing env config.
+ * Exchange an authorization code for tokens at the provider's token
+ * endpoint. Shared by the M21 callback and the Phase 18 ads callbacks.
+ * Never logs the code or the tokens — only the status.
  */
-export async function handleOAuthCallback(
-  state: string,
+export async function exchangeCodeForTokens(
+  config: OAuthProviderConfig,
+  connectorKey: string,
   code: string,
   redirectUri: string,
-  deps: CallbackDeps = {},
-): Promise<ConnectorConnection> {
-  const parsed = parseOAuthState(state);
-  const config = getOAuthConfig(parsed.connectorKey);
-  if (!config) {
-    throw new Error(`Connector "${parsed.connectorKey}" does not support OAuth2`);
-  }
+  fetchImpl: typeof fetch = fetch,
+): Promise<OAuthTokenResponse> {
   const clientId = (process.env[config.clientIdEnv] ?? "").trim();
   const clientSecret = (process.env[config.clientSecretEnv] ?? "").trim();
   if (!clientId || !clientSecret) {
     throw new Error(
-      `OAuth is not configured for "${parsed.connectorKey}": ${config.clientIdEnv}/${config.clientSecretEnv}`,
+      `OAuth is not configured for "${connectorKey}": ${config.clientIdEnv}/${config.clientSecretEnv}`,
     );
   }
-
-  const fetchImpl = deps.fetchImpl ?? fetch;
   const body = new URLSearchParams({
     grant_type: "authorization_code",
     code,
@@ -63,13 +58,31 @@ export async function handleOAuthCallback(
     body,
   });
   if (!res.ok) {
-    // Never log the code or tokens — only the status.
-    throw new Error(`Token exchange failed for "${parsed.connectorKey}" (HTTP ${res.status})`);
+    throw new Error(`Token exchange failed for "${connectorKey}" (HTTP ${res.status})`);
   }
-  const token = (await res.json()) as TokenResponse;
+  const token = (await res.json()) as OAuthTokenResponse;
   if (!token.access_token) {
-    throw new Error(`Token exchange returned no access_token for "${parsed.connectorKey}"`);
+    throw new Error(`Token exchange returned no access_token for "${connectorKey}"`);
   }
+  return token;
+}
+
+/**
+ * Persist an OAuth token payload in the vault: upsert ConnectorConnection
+ * (status active) + ConnectorCredential with the AES-256-GCM encrypted blob.
+ * Shared by the M21 callback and the Phase 18 ads callbacks.
+ */
+export async function storeOAuthTokens(input: {
+  userId: string;
+  workspaceId: string;
+  connectorKey: string;
+  token: OAuthTokenResponse;
+  scopes: string[];
+}): Promise<ConnectorConnection> {
+  const { userId, workspaceId, connectorKey, token, scopes } = input;
+  const config = getOAuthConfig(connectorKey);
+  const clientId = (process.env[config?.clientIdEnv ?? ""] ?? "").trim();
+  const clientSecret = (process.env[config?.clientSecretEnv ?? ""] ?? "").trim();
 
   // Non-sensitive metadata the UI may display.
   const meta: { grantedScopes?: string } = {};
@@ -89,18 +102,14 @@ export async function handleOAuthCallback(
       : null;
 
   let connection = await prisma.connectorConnection.findFirst({
-    where: {
-      workspaceId: parsed.workspaceId,
-      userId: parsed.userId,
-      connectorKey: parsed.connectorKey,
-    },
+    where: { workspaceId, userId, connectorKey },
   });
   if (connection) {
     connection = await prisma.connectorConnection.update({
       where: { id: connection.id },
       data: {
         status: "active",
-        scopes: config.scopes,
+        scopes,
         meta,
         connectedAt: new Date(),
         lastRefreshAt: null,
@@ -109,11 +118,11 @@ export async function handleOAuthCallback(
   } else {
     connection = await prisma.connectorConnection.create({
       data: {
-        connectorKey: parsed.connectorKey,
-        workspaceId: parsed.workspaceId,
-        userId: parsed.userId,
+        connectorKey,
+        workspaceId,
+        userId,
         status: "active",
-        scopes: config.scopes,
+        scopes,
         meta,
       },
     });
@@ -126,4 +135,35 @@ export async function handleOAuthCallback(
   });
 
   return connection;
+}
+
+/**
+ * Handle an OAuth provider callback. Returns the upserted connection.
+ * Throws on invalid state, token exchange failure, or missing env config.
+ */
+export async function handleOAuthCallback(
+  state: string,
+  code: string,
+  redirectUri: string,
+  deps: CallbackDeps = {},
+): Promise<ConnectorConnection> {
+  const parsed = parseOAuthState(state);
+  const config = getOAuthConfig(parsed.connectorKey);
+  if (!config) {
+    throw new Error(`Connector "${parsed.connectorKey}" does not support OAuth2`);
+  }
+  const token = await exchangeCodeForTokens(
+    config,
+    parsed.connectorKey,
+    code,
+    redirectUri,
+    deps.fetchImpl ?? fetch,
+  );
+  return storeOAuthTokens({
+    userId: parsed.userId,
+    workspaceId: parsed.workspaceId,
+    connectorKey: parsed.connectorKey,
+    token,
+    scopes: config.scopes,
+  });
 }

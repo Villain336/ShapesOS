@@ -27,6 +27,49 @@ export class AdsOAuthError extends Error {
   }
 }
 
+/** The signed state envelope produced by startAdsOAuth(). */
+export interface AdsOAuthState {
+  userId: string;
+  workspaceId: string;
+  connectorKey: string;
+  adsPlatform: string;
+  exp: number;
+  nonce: string;
+}
+
+/**
+ * Verify a callback state envelope. Throws AdsOAuthError (INVALID_STATE /
+ * STATE_EXPIRED) on tamper, expiry, or wrong connector — the callback must
+ * reject the exchange before any network call.
+ */
+export function parseAdsOAuthState(state: string, expectedConnectorKey: string): AdsOAuthState {
+  let parsed: AdsOAuthState;
+  try {
+    parsed = JSON.parse(secrets().decrypt(state)) as AdsOAuthState;
+  } catch {
+    throw new AdsOAuthError("INVALID_STATE", "OAuth callback rejected: state signature mismatch or malformed");
+  }
+  if (
+    typeof parsed.userId !== "string" ||
+    typeof parsed.workspaceId !== "string" ||
+    typeof parsed.connectorKey !== "string" ||
+    typeof parsed.adsPlatform !== "string" ||
+    typeof parsed.exp !== "number"
+  ) {
+    throw new AdsOAuthError("INVALID_STATE", "OAuth callback rejected: state is missing fields");
+  }
+  if (parsed.connectorKey !== expectedConnectorKey) {
+    throw new AdsOAuthError(
+      "INVALID_STATE",
+      `OAuth callback rejected: state is for "${parsed.connectorKey}", not "${expectedConnectorKey}"`,
+    );
+  }
+  if (Date.now() > parsed.exp) {
+    throw new AdsOAuthError("STATE_EXPIRED", "OAuth callback rejected: state expired");
+  }
+  return parsed;
+}
+
 const STATE_TTL_MS = 10 * 60 * 1000;
 
 /**
