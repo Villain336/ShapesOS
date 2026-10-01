@@ -9,7 +9,12 @@ import {
   AlertTriangle,
   Archive,
   ArrowLeft,
+  BarChart3,
+  BellRing,
+  Bot,
   CheckCircle2,
+  Clock3,
+  Copy,
   FileDown,
   FileText,
   FileUp,
@@ -625,6 +630,25 @@ function DetailView({ id, onBack, onChanged }: { id: string; onBack: () => void;
   const canSend = detail.status === "draft";
   const canVoid = ["draft", "sent", "partially-signed"].includes(detail.status);
   const canRefresh = ["sent", "partially-signed", "completed"].includes(detail.status);
+  const canClone = ["expired", "declined"].includes(detail.status);
+  const [cloning, setCloning] = useState(false);
+  const [cloneError, setCloneError] = useState<string | null>(null);
+
+  const clone = async () => {
+    setCloning(true);
+    setCloneError(null);
+    try {
+      const res = await fetch(`/api/esign/envelopes/${id}/clone`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Clone failed.");
+      onChanged();
+      onBack();
+    } catch (e) {
+      setCloneError(e instanceof Error ? e.message : "Clone failed.");
+    } finally {
+      setCloning(false);
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -645,6 +669,11 @@ function DetailView({ id, onBack, onChanged }: { id: string; onBack: () => void;
               <Trash2 size={14} /> Void
             </button>
           )}
+          {canClone && (
+            <button onClick={clone} disabled={cloning} className={btnGhost} title="Re-send as a fresh draft — same document, signers and fields.">
+              <Copy size={14} className={cloning ? "animate-spin" : ""} /> Clone as draft
+            </button>
+          )}
           {canSend && (
             <button onClick={() => setShowSend(true)} className={btnPrimary}>
               <Send size={14} /> Review & send
@@ -652,6 +681,7 @@ function DetailView({ id, onBack, onChanged }: { id: string; onBack: () => void;
           )}
         </div>
       </div>
+      {cloneError && <ErrorNote error={cloneError} />}
 
       <div className="grid gap-4 lg:grid-cols-2">
         <div className="rounded-lg border border-stone-200 bg-white">
@@ -955,6 +985,238 @@ function EvidenceCard({ detail, onChanged }: { detail: ApiEnvelopeDetail; onChan
   );
 }
 
+// ── Signing automation (agent workflows) ─────────────────────────────────────
+
+type PendingNudgeRow = {
+  signerId: string;
+  name: string;
+  email: string;
+  role: string;
+  envelopeId: string;
+  envelopeTitle: string;
+  daysWaiting: number;
+  lastNudgeAt: string | null;
+};
+
+type SigningAnalytics = {
+  sent: number;
+  completed: number;
+  declined: number;
+  completionRate: number | null;
+  avgHoursToSign: number | null;
+  medianHoursToSign: number | null;
+  perTemplate: Array<{
+    templateId: string;
+    templateName: string;
+    sent: number;
+    completed: number;
+    completionRate: number | null;
+    avgHoursToSign: number | null;
+  }>;
+};
+
+function fmtHours(h: number | null): string {
+  if (h === null) return "—";
+  return h < 1 ? `${Math.round(h * 60)}m` : `${h.toFixed(1)}h`;
+}
+
+function AutomationCard() {
+  const [analytics, setAnalytics] = useState<SigningAnalytics | null>(null);
+  const [pending, setPending] = useState<PendingNudgeRow[]>([]);
+  const [drafted, setDrafted] = useState<Record<string, { nudgeEventId: string; message: string }>>({});
+  const [busy, setBusy] = useState<string | null>(null);
+  const [note, setNote] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    try {
+      const [a, p] = await Promise.all([
+        fetch("/api/esign/agent/analytics").then((r) => r.json()),
+        fetch("/api/esign/agent/pending-nudges").then((r) => r.json()),
+      ]);
+      if (a.analytics) setAnalytics(a.analytics);
+      setPending(p.pending ?? []);
+    } catch {
+      /* non-blocking */
+    }
+  }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const draft = async (n: PendingNudgeRow) => {
+    setBusy(n.signerId);
+    setErr(null);
+    try {
+      const res = await fetch("/api/esign/agent/nudges?action=draft", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ envelopeId: n.envelopeId, signerId: n.signerId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Draft failed.");
+      setDrafted((d) => ({ ...d, [n.signerId]: { nudgeEventId: data.nudgeEventId, message: data.message } }));
+      setNote(`Nudge drafted for ${n.name} — approve to release. Nothing has been sent.`);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Draft failed.");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const approve = async (n: PendingNudgeRow) => {
+    const d = drafted[n.signerId];
+    if (!d) return;
+    setBusy(n.signerId);
+    setErr(null);
+    try {
+      const res = await fetch("/api/esign/agent/nudges?action=approve", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nudgeEventId: d.nudgeEventId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Approval failed.");
+      setDrafted((dd) => {
+        const c = { ...dd };
+        delete c[n.signerId];
+        return c;
+      });
+      setNote(`Nudge released for ${n.name}. Deliver it through your signing provider, then record the delivery.`);
+      await load();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Approval failed.");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const sweep = async () => {
+    setBusy("sweep");
+    setErr(null);
+    try {
+      const res = await fetch("/api/esign/agent/sweep-expirations", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Sweep failed.");
+      setNote(`Sweep complete — expired ${data.expired} stale envelope${data.expired === 1 ? "" : "s"}.`);
+      await load();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Sweep failed.");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const stats = analytics
+    ? [
+        { label: "Completion rate", value: analytics.completionRate === null ? "—" : `${Math.round(analytics.completionRate * 100)}%` },
+        { label: "Avg time to sign", value: fmtHours(analytics.avgHoursToSign) },
+        { label: "Median time to sign", value: fmtHours(analytics.medianHoursToSign) },
+        { label: "Sent / completed", value: `${analytics.sent} / ${analytics.completed}` },
+      ]
+    : [];
+
+  return (
+    <div className="rounded-lg border border-stone-200 bg-white">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-stone-100 px-4 py-2.5">
+        <div className="flex items-center gap-2 text-[12px] font-semibold text-stone-900">
+          <Bot size={14} className="text-[var(--brand-600)]" />
+          Signing automation
+          <span className="font-normal text-stone-500">— agent prepares, a human releases</span>
+        </div>
+        <button onClick={sweep} disabled={busy === "sweep"} className={btnGhost}>
+          <Clock3 size={14} className={busy === "sweep" ? "animate-spin" : ""} /> Run expiry sweep
+        </button>
+      </div>
+      {note && <div className="border-b border-stone-100 px-4 py-2 text-[12px] text-emerald-700">{note}</div>}
+      {err && <div className="border-b border-stone-100 px-4 py-2 text-[12px] text-red-700">{err}</div>}
+      <div className="grid gap-px bg-stone-100 sm:grid-cols-4">
+        {stats.map((s) => (
+          <div key={s.label} className="bg-white px-4 py-3">
+            <div className="text-[11px] uppercase tracking-wide text-stone-500">{s.label}</div>
+            <div className="text-lg font-bold tracking-tight text-stone-900">{s.value}</div>
+          </div>
+        ))}
+      </div>
+      {analytics && analytics.perTemplate.length > 0 && (
+        <div className="border-t border-stone-100 px-4 py-2.5">
+          <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-stone-500">
+            <BarChart3 size={12} /> By template
+          </div>
+          <table className="w-full text-left text-[12px]">
+            <tbody>
+              {analytics.perTemplate.slice(0, 5).map((t) => (
+                <tr key={t.templateId} className="border-t border-stone-100 first:border-0">
+                  <td className="py-1 pr-2 text-stone-900">{t.templateName}</td>
+                  <td className="py-1 text-right text-stone-500">{t.completed}/{t.sent} signed</td>
+                  <td className="py-1 text-right text-stone-500">{t.completionRate === null ? "—" : `${Math.round(t.completionRate * 100)}%`}</td>
+                  <td className="py-1 text-right text-stone-500">{fmtHours(t.avgHoursToSign)} avg</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      <div className="border-t border-stone-100 px-4 py-2.5">
+        <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-stone-500">
+          <BellRing size={12} /> Pending nudges {pending.length > 0 && <span className="text-stone-400">({pending.length})</span>}
+        </div>
+        {pending.length === 0 ? (
+          <p className="py-1 text-[12px] text-stone-500">No idle signers waiting on live envelopes.</p>
+        ) : (
+          <table className="w-full text-left text-[13px]">
+            <thead>
+              <tr className="text-[11px] uppercase tracking-wide text-stone-500">
+                <th className="py-1 font-medium">Signer</th>
+                <th className="py-1 font-medium">Envelope</th>
+                <th className="py-1 font-medium">Waiting</th>
+                <th className="py-1 font-medium">Last nudge</th>
+                <th className="py-1 text-right font-medium">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {pending.map((n) => {
+                const d = drafted[n.signerId];
+                return (
+                  <tr key={n.signerId} className="border-t border-stone-100 hover:bg-[var(--brand-50)]/40">
+                    <td className="py-1.5 pr-2">
+                      <div className="text-stone-900">{n.name}</div>
+                      <div className="text-[11px] text-stone-500">{n.email}</div>
+                    </td>
+                    <td className="py-1.5 pr-2 text-stone-700">{n.envelopeTitle}</td>
+                    <td className="py-1.5 pr-2 text-stone-700">{n.daysWaiting}d</td>
+                    <td className="py-1.5 pr-2 text-[12px] text-stone-500">
+                      {n.lastNudgeAt ? new Date(n.lastNudgeAt).toLocaleDateString() : "—"}
+                    </td>
+                    <td className="py-1.5 text-right">
+                      {d ? (
+                        <div className="flex items-center justify-end gap-2">
+                          <span className="max-w-56 truncate text-[11px] italic text-stone-500" title={d.message}>“{d.message}”</span>
+                          <button onClick={() => approve(n)} disabled={busy === n.signerId} className={btnPrimary}>
+                            <CheckCircle2 size={13} /> Approve & release
+                          </button>
+                        </div>
+                      ) : (
+                        <button onClick={() => draft(n)} disabled={busy === n.signerId} className={btnGhost}>
+                          <BellRing size={13} /> Draft nudge
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+        <p className="mt-2 text-[11px] text-stone-400">
+          Nudges are drafted for your approval — the OS never sends them on its own. Record the delivery after your provider sends it.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 // ── Envelope list tab ────────────────────────────────────────────────────────
 
 function EnvelopesTab() {
@@ -990,6 +1252,7 @@ function EnvelopesTab() {
 
   return (
     <div className="space-y-4">
+      <AutomationCard />
       <div className="flex flex-wrap items-center gap-2">
         <input
           value={search}

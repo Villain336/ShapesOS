@@ -53,6 +53,12 @@ export class EsignGateError extends Error {
       | "broken_chain"
       | "unknown_vault_entry"
       | "no_contract_link"
+      | "unknown_signer"
+      | "already_signed"
+      | "duplicate_nudge"
+      | "unknown_nudge"
+      | "nudge_already_released"
+      | "not_reopenable"
       // Template codes (named mismatch reasons — never silent).
       | "unknown_template"
       | "missing_name"

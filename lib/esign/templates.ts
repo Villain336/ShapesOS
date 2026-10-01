@@ -67,6 +67,9 @@ export interface InstantiateTemplateInput {
   signerBindings: SignerBinding[];
   expiresAt?: Date | null;
   createdBy?: string;
+  /** Legal binding — defaults to the template's contractType when omitted. */
+  contractType?: string;
+  contractRef?: string;
 }
 
 const FIELD_TYPES = ["signature", "initials", "date", "text", "checkbox"] as const;
@@ -288,6 +291,9 @@ export async function instantiateTemplate(
     documentName: template.sourceDocumentName ?? "template.pdf",
     pdfBytes: new Uint8Array(template.sourceDocument),
     createdBy: input.createdBy,
+    // Legal binding: explicit input wins, otherwise the template's contract type.
+    contractType: input.contractType ?? template.contractType ?? undefined,
+    contractRef: input.contractRef ?? undefined,
   });
 
   // Durable record of the instantiation: which placeholders resolved (keys
