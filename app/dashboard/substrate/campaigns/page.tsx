@@ -1,6 +1,5 @@
-// Marketr — Phase 8 G2: campaign list (hierarchy-aware).
-// House pattern (Creative Studio): dense table, violet tabs (layout),
-// stone info notes, light mode, Lucide icons. Styling only — no data changes.
+// Marketr — Campaign list (hierarchy-aware).
+// Agentic OS: dense table, neutral status chips, page-shell chrome.
 
 import { redirect } from "next/navigation";
 import Link from "next/link";
@@ -22,14 +21,6 @@ export const dynamic = "force-dynamic";
 export const metadata = {
   title: "Campaigns — Marketr",
   description: "The cross-channel campaign object: one ID across mail, email, social, ads, CTV, and tests.",
-};
-
-const STATUS_TONE: Record<string, "violet" | "green" | "amber" | "slate"> = {
-  draft: "violet",
-  active: "green",
-  paused: "amber",
-  complete: "slate",
-  archived: "slate",
 };
 
 interface Row {
@@ -113,12 +104,12 @@ export default async function CampaignsPage() {
                 <td className="px-3 py-2" style={{ paddingLeft: 12 + depth * 24 }}>
                   <Link
                     href={`/dashboard/substrate/campaigns/${row.id}`}
-                    className="font-medium text-stone-900 hover:underline"
+                    className="font-medium text-ink hover:underline"
                   >
                     {row.name}
                   </Link>
                   {(row.childCount > 0 || row.parentCampaign) && (
-                    <div className="text-[11px] text-stone-500">
+                    <div className="text-[11px] text-muted">
                       {row.childCount > 0
                         ? `${row.childCount} sub-campaign${row.childCount === 1 ? "" : "s"}`
                         : ""}
@@ -128,18 +119,18 @@ export default async function CampaignsPage() {
                   )}
                 </td>
                 <td className="px-3 py-2">
-                  <Chip tone={STATUS_TONE[row.status] ?? "slate"}>{row.status}</Chip>
+                  <Chip>{row.status}</Chip>
                 </td>
-                <td className="px-3 py-2 tabular-nums text-stone-600">
+                <td className="px-3 py-2 tabular-nums text-muted">
                   {row.linkCount} fragment{row.linkCount === 1 ? "" : "s"}
                 </td>
-                <td className="px-3 py-2 tabular-nums text-stone-600">{fmtCents(row.budgetRollupCents)}</td>
-                <td className="px-3 py-2 text-stone-500">{row.objective.replace("_", " ")}</td>
+                <td className="px-3 py-2 tabular-nums text-muted">{fmtCents(row.budgetRollupCents)}</td>
+                <td className="px-3 py-2 text-muted">{row.objective.replace("_", " ")}</td>
               </tr>
             ))}
             {tree.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-3 py-8 text-center text-[13px] text-stone-400">
+                <td colSpan={5} className="px-3 py-8 text-center text-[13px] text-subtle">
                   No campaigns yet. Create one on the New campaign tab, then attach fragments —
                   or run the backfill proposer on the Link proposals tab to link historical fragments.
                 </td>
@@ -149,7 +140,7 @@ export default async function CampaignsPage() {
         </table>
       </div>
 
-      <p className="mt-3 text-[12px] text-stone-500">
+      <p className="mt-3 text-[12px] text-muted">
         Hierarchy-aware: parents indent above their sub-campaigns (≤3 levels).
       </p>
     </div>

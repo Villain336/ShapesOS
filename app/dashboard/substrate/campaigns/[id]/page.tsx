@@ -98,7 +98,7 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
     <div className="space-y-4">
       {/* Header */}
       <div>
-        <nav className="mb-2 flex items-center gap-1 text-xs text-stone-500" aria-label="Breadcrumb">
+        <nav className="mb-2 flex items-center gap-1 text-xs text-muted" aria-label="Breadcrumb">
           <Link href="/dashboard/substrate/campaigns" className="hover:underline">Campaigns</Link>
           {ancestors.map((a) => (
             <span key={a.id} className="flex items-center gap-1">
@@ -127,7 +127,7 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
           </div>
         </div>
         <div className={`${infoNoteCls} mt-3`}>
-          <span className="font-medium text-stone-800">Money note. </span>
+          <span className="font-medium text-ink">Money note. </span>
           The budget roll-up is a reporting convenience (per-fragment declared budgets/spend) —
           not a spending envelope. Nothing on this page can move money (§3.1).
         </div>
@@ -151,25 +151,25 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
             <tbody>
               {stages.map((s) => (
                 <tr key={s.key} className={rowCls}>
-                  <td className="px-3 py-2 font-medium text-stone-900">
+                  <td className="px-3 py-2 font-medium text-ink">
                     {CAMPAIGN_STAGE_LABELS[s.key as CampaignStageKey] ?? s.key}
                   </td>
                   <td className="px-3 py-2">
                     <Chip tone={STAGE_TONE[s.status] ?? "slate"}>{s.status.replace("_", " ")}</Chip>
                   </td>
-                  <td className="px-3 py-2 text-stone-500">
+                  <td className="px-3 py-2 text-muted">
                     {s.linkedRefs.length > 0 ? (
                       <ul className="space-y-0.5">
                         {s.linkedRefs.map((r) => (
                           <li key={`${r.linkedType}:${r.linkedId}`} className="text-xs">
-                            <span className="font-medium text-stone-700">{LINKED_TYPE_LABELS[r.linkedType]}</span>
+                            <span className="font-medium text-muted">{LINKED_TYPE_LABELS[r.linkedType]}</span>
                             {" · "}
                             {report.fragments.find((f) => f.linkedType === r.linkedType && f.linkedId === r.linkedId)?.displayName ?? r.linkedId.slice(0, 8)}
                           </li>
                         ))}
                       </ul>
                     ) : (
-                      <span className="text-xs text-stone-400">No linked fragments yet.</span>
+                      <span className="text-xs text-subtle">No linked fragments yet.</span>
                     )}
                   </td>
                   <td className="px-3 py-2">
@@ -188,27 +188,27 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
         description="Each link is a first-class row with provenance. Unlinking is surgical — fragment rows are never touched."
       >
         {report.fragments.length === 0 ? (
-          <p className="text-[13px] text-stone-500">
+          <p className="text-[13px] text-muted">
             No fragments linked yet. Attach one below, or run the backfill proposer on the Link proposals tab.
           </p>
         ) : (
           <ul>
             {report.fragments.map((f) => (
-              <li key={f.linkId} className="border-b border-stone-100 py-3 first:pt-0 last:border-0 last:pb-0">
+              <li key={f.linkId} className="border-b border-line py-3 first:pt-0 last:border-0 last:pb-0">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <div className="text-[13px] font-medium text-stone-900">{f.displayName}</div>
-                    <p className="mt-0.5 text-xs text-stone-500">
+                    <div className="text-[13px] font-medium text-ink">{f.displayName}</div>
+                    <p className="mt-0.5 text-xs text-muted">
                       {LINKED_TYPE_LABELS[f.linkedType]} · role {f.role} · source {f.linkSource.replace("_", " ")}
                       {f.stageKeys.length > 0 ? ` · stages: ${f.stageKeys.map((k) => CAMPAIGN_STAGE_LABELS[k as CampaignStageKey] ?? k).join(", ")}` : ""}
                     </p>
-                    <p className="mt-1 text-xs text-stone-500">
-                      <span className="font-medium text-stone-700">Provenance:</span> table <code>{f.provenance.table}</code>
+                    <p className="mt-1 text-xs text-muted">
+                      <span className="font-medium text-muted">Provenance:</span> table <code>{f.provenance.table}</code>
                       {" · "}{f.provenance.notes.join("; ")}
                     </p>
                     {f.platformRef ? (
-                      <p className="mt-1 text-xs text-stone-500">
-                        <span className="font-medium text-stone-700">Platform ref (opaque):</span>{" "}
+                      <p className="mt-1 text-xs text-muted">
+                        <span className="font-medium text-muted">Platform ref (opaque):</span>{" "}
                         <code className="break-all">{JSON.stringify(f.platformRef)}</code>
                       </p>
                     ) : null}
@@ -219,8 +219,8 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
                   <dl className="mt-2 flex flex-wrap gap-x-6 gap-y-1">
                     {f.metrics.map((m) => (
                       <div key={m.key} className="text-xs">
-                        <dt className="text-stone-500">{m.label}</dt>
-                        <dd className="font-medium text-stone-800">{m.key === "spend_cents" ? fmtCents(typeof m.value === "number" ? m.value : null) : fmtVal(m.value)}</dd>
+                        <dt className="text-muted">{m.label}</dt>
+                        <dd className="font-medium text-ink">{m.key === "spend_cents" ? fmtCents(typeof m.value === "number" ? m.value : null) : fmtVal(m.value)}</dd>
                       </div>
                     ))}
                   </dl>
@@ -229,10 +229,10 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
             ))}
           </ul>
         )}
-        <div className="mt-4 border-t border-stone-100 pt-4">
-          <h3 className="mb-2 text-[13px] font-medium text-stone-800">Attach a fragment</h3>
+        <div className="mt-4 border-t border-line pt-4">
+          <h3 className="mb-2 text-[13px] font-medium text-ink">Attach a fragment</h3>
           {attachOptions.length === 0 ? (
-            <p className="text-[13px] text-stone-500">Every fragment in this workspace is already linked.</p>
+            <p className="text-[13px] text-muted">Every fragment in this workspace is already linked.</p>
           ) : (
             <AttachLinkForm campaignId={campaign.id} fragments={attachOptions} />
           )}
@@ -245,7 +245,7 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
         description="Per-fragment metrics with provenance labels. Totals carry explicit semantics notes — semantically-different metrics are never silently summed."
       >
         {report.warnings.length > 0 ? (
-          <div className="mb-3 flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[13px] text-amber-800">
+          <div className="mb-3 flex items-start gap-2 rounded-md border border-needs bg-needs-tint px-3 py-2 text-[13px] text-ink">
             <AlertTriangle size={14} className="mt-0.5 shrink-0" />
             <ul className="space-y-1">
               {report.warnings.map((w, i) => (
@@ -255,7 +255,7 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
           </div>
         ) : null}
         {report.totals.length === 0 ? (
-          <p className="text-[13px] text-stone-500">No summable metrics on the linked fragments yet.</p>
+          <p className="text-[13px] text-muted">No summable metrics on the linked fragments yet.</p>
         ) : (
           <div className={tableShell}>
             <table className="w-full text-left text-[13px]">
@@ -270,17 +270,17 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
               <tbody>
                 {report.totals.map((t) => (
                   <tr key={t.key} className={rowCls}>
-                    <td className="px-3 py-2 font-medium text-stone-900">{t.key.replace(/_/g, " ")}</td>
-                    <td className="px-3 py-2 font-semibold tabular-nums text-stone-900">
+                    <td className="px-3 py-2 font-medium text-ink">{t.key.replace(/_/g, " ")}</td>
+                    <td className="px-3 py-2 font-semibold tabular-nums text-ink">
                       {t.key === "spend_cents" ? fmtCents(t.value) : t.value.toLocaleString("en-US")}
                     </td>
-                    <td className="px-3 py-2 text-xs text-stone-500">{t.semantics}</td>
+                    <td className="px-3 py-2 text-xs text-muted">{t.semantics}</td>
                     <td className="px-3 py-2">
                       <ul className="space-y-0.5">
                         {t.provenance.map((p, i) => (
-                          <li key={i} className="text-xs text-stone-500">
+                          <li key={i} className="text-xs text-muted">
                             {p.from}:{" "}
-                            <span className="font-medium text-stone-800">
+                            <span className="font-medium text-ink">
                               {t.key === "spend_cents" ? fmtCents(p.value) : p.value.toLocaleString("en-US")}
                             </span>
                           </li>
@@ -293,7 +293,7 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
             </table>
           </div>
         )}
-        <p className="mt-3 text-xs text-stone-500">
+        <p className="mt-3 text-xs text-muted">
           Generated {new Date(report.generatedAt).toLocaleString()} · metrics labeled at the fragment level;
           no "conversions" total is produced because platform conversions and CRM closed-won are different things.
         </p>
@@ -307,8 +307,8 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
         {children.length > 0 ? (
           <ul>
             {children.map((c) => (
-              <li key={c.id} className="flex items-center justify-between gap-3 border-b border-stone-100 py-2 last:border-0">
-                <Link href={`/dashboard/substrate/campaigns/${c.id}`} className="text-[13px] font-medium text-stone-900 hover:underline">
+              <li key={c.id} className="flex items-center justify-between gap-3 border-b border-line py-2 last:border-0">
+                <Link href={`/dashboard/substrate/campaigns/${c.id}`} className="text-[13px] font-medium text-ink hover:underline">
                   {c.name}
                 </Link>
                 <Chip tone={STATUS_TONE[c.status] ?? "slate"}>{c.status}</Chip>
@@ -316,11 +316,11 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
             ))}
           </ul>
         ) : (
-          <p className="text-[13px] text-stone-500">No sub-campaigns.</p>
+          <p className="text-[13px] text-muted">No sub-campaigns.</p>
         )}
         {canNest ? (
-          <div className="mt-4 border-t border-stone-100 pt-4">
-            <h3 className="mb-2 text-[13px] font-medium text-stone-800">Create sub-campaign</h3>
+          <div className="mt-4 border-t border-line pt-4">
+            <h3 className="mb-2 text-[13px] font-medium text-ink">Create sub-campaign</h3>
             <NewCampaignForm parentId={campaign.id} />
           </div>
         ) : null}

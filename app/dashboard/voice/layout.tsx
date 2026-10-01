@@ -9,7 +9,7 @@ import { VoiceNavTabs } from "./tabs";
 
 export default function VoiceLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex h-full flex-col gap-4 bg-[#FAFAF7] p-4 md:p-6">
+    <div className="flex h-full flex-col gap-4 bg-canvas p-4 md:p-6">
       <VoiceNavTabs />
       {children}
     </div>

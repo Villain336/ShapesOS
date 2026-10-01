@@ -1,6 +1,6 @@
 // Marketr — Phase 13D: voice section sub-tab nav.
 // Exact pattern from Creative Studio (StudioApp.tsx) + substrate tabs:
-// icon + label, ACTIVE = border-[var(--brand-600)] text-[var(--brand-700)].
+// icon + label, ACTIVE = border-ink text-ink.
 // Never hardcode primary colors — brand vars only (docs/audit/THEMING.md).
 //
 // Nav configs MUST live in this client module (server components cannot
@@ -47,7 +47,7 @@ export function VoiceNavTabs() {
   ];
   return (
     <div
-      className="flex flex-wrap gap-1 border-b border-stone-200"
+      className="flex flex-wrap gap-1 border-b border-line"
       role="navigation"
       aria-label="Voice sections"
     >
@@ -60,8 +60,8 @@ export function VoiceNavTabs() {
             aria-current={active ? "page" : undefined}
             className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-[13.5px] font-medium transition ${
               active
-                ? "border-[var(--brand-600)] text-[var(--brand-700)]"
-                : "border-transparent text-stone-500 hover:text-stone-800"
+                ? "border-ink text-ink"
+                : "border-transparent text-muted hover:text-ink"
             }`}
           >
             <Icon size={15} />

@@ -28,22 +28,23 @@ export const metadata = {
 };
 
 
+// Prospect pipeline statuses are workflow/provider states — neutral chips.
 const STATUS_CHIP: Record<string, string> = {
-  active: "border-emerald-200 bg-emerald-50 text-emerald-700",
-  draft: "border-stone-200 bg-stone-50 text-stone-600",
-  new: "border-stone-200 bg-stone-50 text-stone-600",
-  qualified: "border-violet-200 bg-violet-50 text-violet-700",
-  contacted: "border-violet-200 bg-violet-50 text-violet-700",
-  replied: "border-emerald-200 bg-emerald-50 text-emerald-700",
-  placed: "border-emerald-200 bg-emerald-50 text-emerald-700",
-  bounced: "border-red-200 bg-red-50 text-red-700",
-  suppressed: "border-red-200 bg-red-50 text-red-700",
-  declined: "border-stone-200 bg-stone-50 text-stone-600",
+  active: "border-line bg-paper text-muted shadow-control",
+  draft: "border-line bg-paper text-muted shadow-control",
+  new: "border-line bg-paper text-muted shadow-control",
+  qualified: "border-line bg-paper text-muted shadow-control",
+  contacted: "border-line bg-paper text-muted shadow-control",
+  replied: "border-line bg-paper text-muted shadow-control",
+  placed: "border-line bg-paper text-muted shadow-control",
+  bounced: "border-line bg-paper text-muted shadow-control",
+  suppressed: "border-line bg-paper text-muted shadow-control",
+  declined: "border-line bg-paper text-muted shadow-control",
 };
 
 function chip(text: string, key: string) {
   return (
-    <span className={`inline-flex items-center whitespace-nowrap rounded-full border px-1.5 py-0.5 text-[10px] font-medium leading-tight ${STATUS_CHIP[key] ?? "border-stone-200 bg-stone-50 text-stone-600"}`}>
+    <span className={`inline-flex items-center whitespace-nowrap rounded-full border px-1.5 py-0.5 text-[10px] font-medium leading-tight ${STATUS_CHIP[key] ?? "border-line bg-paper text-muted"}`}>
       {text}
     </span>
   );
@@ -63,10 +64,10 @@ const SEQ_STATUS_LABEL: Record<string, string> = {
 function ScoreCell({ value }: { value: number }) {
   return (
     <div className="flex items-center gap-1.5">
-      <span className="h-1.5 w-14 overflow-hidden rounded-full bg-stone-100">
-        <span className="block h-full rounded-full bg-violet-500" style={{ width: `${Math.min(100, Math.max(0, value))}%` }} />
+      <span className="h-1.5 w-14 overflow-hidden rounded-full bg-paper">
+        <span className="block h-full rounded-full bg-ink" style={{ width: `${Math.min(100, Math.max(0, value))}%` }} />
       </span>
-      <span className="font-medium text-stone-700">{value}</span>
+      <span className="font-medium text-muted">{value}</span>
     </div>
   );
 }
@@ -89,7 +90,7 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
   const campaign = ready ? await campaignStore.get(id, workspace.id).catch(() => null) : null;
   if (!campaign) {
     return (
-      <div className="p-6 text-sm text-stone-600">
+      <div className="p-6 text-sm text-muted">
         Campaign not found.{" "}
         <Link href="/dashboard/authority/outreach" className="underline">Back to outreach</Link>
       </div>
@@ -136,18 +137,18 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
   }
 
   return (
-    <div className="flex h-full flex-col gap-4 bg-[#FAFAF7] p-4 md:p-6">
+    <div className="flex h-full flex-col gap-4 bg-canvas p-4 md:p-6">
       <div>
         <Link
           href="/dashboard/authority/outreach"
-          className="mb-2 inline-flex items-center gap-1 text-xs text-stone-500 hover:text-stone-800"
+          className="mb-2 inline-flex items-center gap-1 text-xs text-muted hover:text-ink"
         >
           <ArrowLeft className="h-3.5 w-3.5" /> Outreach
         </Link>
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <h1 className="text-xl font-bold tracking-tight text-stone-900">{campaign.name}</h1>
-            <p className="mt-0.5 text-[13px] text-stone-500">
+            <h1 className="aos-heading">{campaign.name}</h1>
+            <p className="mt-0.5 text-[13px] text-muted">
               Depth {campaign.depth} · {domain ? `sending via ${domain.domain}` : "no sending domain"} ·
               cap ≤ {campaign.dailyCap}/day
             </p>
@@ -161,17 +162,17 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
 
       {/* Placement alerts */}
       {placementAlerts.length > 0 && (
-        <section className="rounded-xl border border-amber-200 bg-amber-50 p-4">
-          <h2 className="mb-2 flex items-center gap-2 text-sm font-semibold text-amber-900">
+        <section className="rounded-lg border border-needs bg-needs-tint p-4">
+          <h2 className="mb-2 flex items-center gap-2 aos-subheading">
             <TriangleAlert className="h-4 w-4" /> Placement verification alerts ({placementAlerts.length})
           </h2>
-          <ul className="space-y-1.5 text-xs text-amber-800">
+          <ul className="space-y-1.5 text-xs text-ink">
             {placementAlerts.map((a) => (
               <li key={`${a.sequenceId}-${a.ts.getTime()}`} className="flex items-start gap-2">
                 <Link2 className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                 <span>
                   <strong>{prospectById.get(a.prospectId)?.domain ?? "unknown site"}</strong> — {a.outcome.replace(/_/g, " ")}
-                  <span className="text-amber-600"> · {a.ts.toLocaleDateString()}</span>
+                  <span className="text-muted"> · {a.ts.toLocaleDateString()}</span>
                 </span>
               </li>
             ))}
@@ -181,18 +182,18 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
 
       {/* Reply inbox */}
       <section>
-        <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-stone-800">
+        <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-ink">
           <Inbox className="h-4 w-4" /> Reply inbox ({replies.length})
         </h2>
         {replies.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-stone-300 bg-white p-6 text-center text-xs text-stone-500">
+          <div className="rounded-lg border border-dashed border-line bg-paper p-6 text-center text-xs text-muted">
             No replies yet. Any reply stops its sequence and suppresses the sender in the same cycle.
           </div>
         ) : (
-          <div className="overflow-x-auto rounded-xl border border-stone-200 bg-white">
+          <div className="overflow-x-auto rounded-lg border border-line bg-paper">
             <table className="w-full text-left text-[13px]">
               <thead>
-                <tr className="border-b border-stone-100 bg-stone-50/60 text-[11px] uppercase tracking-wide text-stone-500">
+                <tr className="border-b border-line bg-paper/60 text-[11px] text-muted">
                   <th className="px-3 py-2 font-medium">Prospect</th>
                   <th className="px-3 py-2 font-medium">Reply</th>
                   <th className="px-3 py-2 font-medium">Received</th>
@@ -201,10 +202,10 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
               </thead>
               <tbody>
                 {replies.map((r) => (
-                  <tr key={`${r.sequenceId}-${r.ts.getTime()}`} className="border-b border-stone-100 last:border-0 hover:bg-violet-50/40">
-                    <td className="px-3 py-2 font-medium text-stone-900">{prospectById.get(r.prospectId)?.domain ?? "unknown"}</td>
-                    <td className="px-3 py-2 font-mono text-[11px] text-stone-500">{r.replyId.slice(0, 12)}…</td>
-                    <td className="px-3 py-2 text-[12px] text-stone-600">{r.ts.toLocaleString()}</td>
+                  <tr key={`${r.sequenceId}-${r.ts.getTime()}`} className="border-b border-line last:border-0 hover:bg-hover-paper">
+                    <td className="px-3 py-2 font-medium text-ink">{prospectById.get(r.prospectId)?.domain ?? "unknown"}</td>
+                    <td className="px-3 py-2 font-mono text-[11px] text-muted">{r.replyId.slice(0, 12)}…</td>
+                    <td className="px-3 py-2 text-[12px] text-muted">{r.ts.toLocaleString()}</td>
                     <td className="px-3 py-2">{chip("auto-suppressed", "draft")}</td>
                   </tr>
                 ))}
@@ -217,20 +218,20 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
       {/* Prospects */}
       <section>
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-          <h2 className="flex items-center gap-2 text-sm font-semibold text-stone-800">
+          <h2 className="flex items-center gap-2 text-sm font-semibold text-ink">
             <Users className="h-4 w-4" /> Prospects ({prospects.length})
           </h2>
           {canEdit && <DiscoverButton campaignId={campaign.id} />}
         </div>
         {prospects.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-stone-300 bg-white p-8 text-center text-sm text-stone-500">
+          <div className="rounded-lg border border-dashed border-line bg-paper p-8 text-center text-sm text-muted">
             No prospects yet. Run discovery to find guest-post opportunities and score them.
           </div>
         ) : (
-          <div className="overflow-x-auto rounded-xl border border-stone-200 bg-white">
+          <div className="overflow-x-auto rounded-lg border border-line bg-paper">
             <table className="w-full text-left text-[13px]">
               <thead>
-                <tr className="border-b border-stone-100 bg-stone-50/60 text-[11px] uppercase tracking-wide text-stone-500">
+                <tr className="border-b border-line bg-paper/60 text-[11px] text-muted">
                   <th className="px-3 py-2 font-medium">Site</th>
                   <th className="px-3 py-2 font-medium">Contact</th>
                   <th className="px-3 py-2 font-medium">Quality</th>
@@ -245,15 +246,15 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
                   const expired = seq ? isDraftExpired(seq.createdAt) && seq.status === "draft" : false;
                   return (
                     <>
-                      <tr key={p.id} className="border-b border-stone-100 last:border-0 hover:bg-violet-50/40">
+                      <tr key={p.id} className="border-b border-line last:border-0 hover:bg-hover-paper">
                         <td className="px-3 py-2">
-                          <span className="flex items-center gap-1.5 font-medium text-stone-900">
+                          <span className="flex items-center gap-1.5 font-medium text-ink">
                             {p.domain}
                             <a
                               href={p.url}
                               target="_blank"
                               rel="noreferrer"
-                              className="text-stone-400 hover:text-stone-700"
+                              className="text-subtle hover:text-ink"
                               aria-label="Open guidelines"
                             >
                               <ExternalLink className="h-3.5 w-3.5" />
@@ -261,9 +262,9 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
                           </span>
                         </td>
                         <td className="px-3 py-2">
-                          <span className="text-stone-600">{p.contactName ?? "—"}</span>
+                          <span className="text-muted">{p.contactName ?? "—"}</span>
                           {p.emailVerified && (
-                            <span className="ml-1.5 inline-flex items-center gap-0.5 text-[11px] text-emerald-700">
+                            <span className="ml-1.5 inline-flex items-center gap-0.5 text-[11px] text-ink">
                               <BadgeCheck className="h-3 w-3" /> verified
                             </span>
                           )}
@@ -273,10 +274,10 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
                         <td className="px-3 py-2">{chip(p.status, p.status)}</td>
                         <td className="px-3 py-2">
                           {seq ? (
-                            <span className="inline-flex items-center gap-1 text-[11px] text-stone-600">
+                            <span className="inline-flex items-center gap-1 text-[11px] text-muted">
                               {SEQ_STATUS_LABEL[seq.status] ?? seq.status}
                               {seq.status === "draft" && !expired && (
-                                <span className="inline-flex items-center gap-0.5 text-amber-700">
+                                <span className="inline-flex items-center gap-0.5 text-ink">
                                   <Hourglass className="h-3 w-3" />
                                   {Math.max(
                                     0,
@@ -287,11 +288,11 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
                               )}
                             </span>
                           ) : (
-                            <span className="text-stone-400">—</span>
+                            <span className="text-subtle">—</span>
                           )}
                         </td>
                       </tr>
-                      <tr key={`${p.id}-actions`} className="border-b border-stone-100 bg-stone-50/40">
+                      <tr key={`${p.id}-actions`} className="border-b border-line bg-paper/40">
                         <td colSpan={6} className="px-3 py-2">
                           <div className="flex flex-wrap items-center gap-2">
                             {canEdit && p.status === "new" && <QualifyButton prospectId={p.id} />}
@@ -306,7 +307,7 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
                               </>
                             ) : null}
                             {campaign.depth === 1 && !seq && (
-                              <span className="text-[11px] text-stone-400">Depth 1: prospecting only — no drafts or sends.</span>
+                              <span className="text-[11px] text-subtle">Depth 1: prospecting only — no drafts or sends.</span>
                             )}
                           </div>
                           {!seq && canEdit && p.status === "qualified" && campaign.depth !== 1 && (
@@ -324,8 +325,8 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
       </section>
 
       {canEdit && campaign.status === "draft" && (
-        <section className="rounded-xl border border-stone-200 bg-white p-4">
-          <h2 className="mb-2 text-sm font-semibold text-stone-800">Activation</h2>
+        <section className="rounded-lg border border-line bg-paper p-4">
+          <h2 className="mb-2 text-sm font-semibold text-ink">Activation</h2>
           {campaign.depth === 3 ? (
             <Depth3ActivationPanel
               campaignId={campaign.id}

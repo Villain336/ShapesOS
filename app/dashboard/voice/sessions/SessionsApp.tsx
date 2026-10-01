@@ -68,8 +68,8 @@ export function SessionsApp() {
   return (
     <div className="flex flex-col gap-4">
       <div>
-        <h1 className="text-xl font-bold tracking-tight text-stone-900">Call Sessions</h1>
-        <p className="mt-0.5 text-[13px] text-stone-500">
+        <h1 className="aos-heading">Call Sessions</h1>
+        <p className="mt-0.5 text-[13px] text-muted">
           Every session — live, rehearsal, or blocked — with its consent proof and audit trail.
         </p>
       </div>
@@ -93,7 +93,7 @@ export function SessionsApp() {
           ))}
         </select>
         <div className="relative">
-          <Search className="pointer-events-none absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-400" />
+          <Search className="pointer-events-none absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-subtle" />
           <input
             className={`${inputCls} pl-8`}
             placeholder="Search lead or agent…"
@@ -103,7 +103,7 @@ export function SessionsApp() {
         </div>
       </div>
 
-      <div className="overflow-x-auto rounded-md border border-stone-200 bg-white">
+      <div className="overflow-x-auto rounded-md border border-line bg-paper">
         <table className={tableCls}>
           <thead className={theadCls}>
             <tr>
@@ -137,7 +137,7 @@ export function SessionsApp() {
                 <td className={tdCls}>
                   <Link
                     href={`/dashboard/voice/sessions/${s.id}`}
-                    className="font-mono text-[12px] text-stone-900 hover:text-[var(--brand-700)]"
+                    className="font-mono text-[12px] text-ink hover:text-ink"
                   >
                     {s.id.slice(-8)}
                   </Link>

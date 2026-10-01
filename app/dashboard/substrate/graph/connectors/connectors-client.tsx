@@ -6,7 +6,6 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Button } from "@/components/vault/shadcn/button";
 import { Plug, RefreshCw, Unplug, AlertTriangle } from "lucide-react";
 
 interface SyncJob {
@@ -36,13 +35,18 @@ interface CatalogEntry {
   honestyNote: string;
 }
 
-function statusPill(s: string): string {
-  const base =
-    "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium";
-  if (s === "connected") return `${base} bg-emerald-50 text-emerald-700`;
-  if (s === "pending") return `${base} bg-amber-50 text-amber-700`;
-  return `${base} bg-red-50 text-red-700`;
+// Connector statuses are provider states, not agent states — neutral chip.
+const chipNeutral =
+  "inline-flex items-center rounded-full bg-paper px-2 py-0.5 text-xs font-medium text-muted shadow-control";
+
+function statusPill(_s: string): string {
+  return chipNeutral;
 }
+
+const btnPrimary =
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-night-hover disabled:opacity-40";
+const btnSecondary =
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-paper px-4 text-sm font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper disabled:opacity-40";
 
 export default function ConnectorsClient({ workspaceId }: { workspaceId: string }) {
   const [catalog, setCatalog] = useState<CatalogEntry[]>([]);
@@ -139,40 +143,41 @@ export default function ConnectorsClient({ workspaceId }: { workspaceId: string 
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-stone-900">Connectors</h1>
-          <p className="mt-0.5 text-[13px] text-stone-500">
+          <h1 className="aos-heading">Connectors</h1>
+          <p className="mt-0.5 text-[13px] text-muted">
             Webhook-first where real, scheduled pulls with per-platform rate budgets
             elsewhere. Credentials live in the vault — never in the graph. Fake mode
             is the default until credentials are connected.
           </p>
         </div>
         <div className="flex shrink-0 gap-2">
-          <span className="inline-flex items-center rounded-full bg-stone-100 px-2 py-0.5 text-xs font-medium text-stone-600">
+          <span className={chipNeutral}>
             {connectors.filter((c) => c.status === "connected").length} connected
           </span>
-          <span className="inline-flex items-center rounded-full bg-stone-100 px-2 py-0.5 text-xs font-medium text-stone-600">
+          <span className={chipNeutral}>
             {connectors.length} registered
           </span>
         </div>
       </div>
 
       {error && (
-        <div className="rounded-xl border border-destructive bg-card p-4 text-sm text-destructive">
-          {error}
+        <div role="alert" className="flex items-start gap-2 rounded-md border border-failed bg-failed-tint px-3 py-2 text-sm text-failed-text">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          <span>{error}</span>
         </div>
       )}
       {notice && (
-        <div className="rounded-xl border bg-card p-4 text-sm">
-          <AlertTriangle className="mr-2 inline h-4 w-4" />
-          {notice}
+        <div className="flex items-start gap-2 rounded-md border border-line bg-paper px-3 py-2 text-sm text-muted">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          <span>{notice}</span>
         </div>
       )}
-      {loading && <div className="text-sm text-muted-foreground">Loading connectors…</div>}
+      {loading && <div className="text-sm text-subtle">Loading connectors…</div>}
 
-      <div className="overflow-hidden rounded-lg border border-stone-200 bg-white">
+      <div className="overflow-hidden rounded-lg border border-line bg-paper">
         <table className="w-full text-[13px]">
           <thead>
-            <tr className="border-b border-stone-200 text-left text-[11px] uppercase tracking-wide text-stone-500">
+            <tr className="border-b border-line text-left text-[11px] text-muted">
               <th className="px-3 py-2 font-medium">Connector</th>
               <th className="px-3 py-2 font-medium">Tier</th>
               <th className="px-3 py-2 font-medium">Status</th>
@@ -186,20 +191,20 @@ export default function ConnectorsClient({ workspaceId }: { workspaceId: string 
               return (
                 <tr
                   key={entry.platform}
-                  className="border-b border-stone-100 transition hover:bg-violet-50/40"
+                  className="border-b border-line transition hover:bg-hover-paper"
                 >
                   <td className="px-3 py-2">
-                    <div className="font-medium text-stone-900">{entry.displayName}</div>
-                    <div className="text-xs text-stone-500">{entry.honestyNote}</div>
+                    <div className="font-medium text-ink">{entry.displayName}</div>
+                    <div className="text-xs text-muted">{entry.honestyNote}</div>
                     {c && (
-                      <div className="text-xs text-stone-500">
+                      <div className="text-xs text-muted">
                         Vault auth: {c.hasAuth ? "present" : "missing"} · webhook secret:{" "}
                         {c.hasWebhookSecret ? "present" : "missing"}
                       </div>
                     )}
                   </td>
                   <td className="px-3 py-2">
-                    <span className="inline-flex items-center rounded-full bg-stone-100 px-2 py-0.5 text-xs font-medium text-stone-600">
+                    <span className={chipNeutral}>
                       {entry.tier}
                     </span>
                   </td>
@@ -207,10 +212,10 @@ export default function ConnectorsClient({ workspaceId }: { workspaceId: string 
                     {c ? (
                       <span className={statusPill(c.status)}>{c.status}</span>
                     ) : (
-                      <span className="text-xs text-stone-400">not connected</span>
+                      <span className="text-xs text-subtle">not connected</span>
                     )}
                   </td>
-                  <td className="px-3 py-2 text-xs text-stone-500">
+                  <td className="px-3 py-2 text-xs text-muted">
                     {c && c.syncJobs.length > 0 ? (
                       <div className="space-y-0.5">
                         {c.syncJobs.map((j) => (
@@ -230,44 +235,40 @@ export default function ConnectorsClient({ workspaceId }: { workspaceId: string 
                   <td className="px-3 py-2">
                     <div className="flex justify-end gap-2">
                       {!c && (
-                        <Button
-                          size="sm"
-                          className="bg-violet-600 text-white hover:bg-violet-700"
+                        <button
+                          className={btnPrimary}
                           disabled={busy === `connect:${entry.platform}`}
                           onClick={() => connect(entry.platform)}
                         >
-                          <Plug className="mr-1 h-3.5 w-3.5" /> Connect
-                        </Button>
+                          <Plug className="h-3.5 w-3.5" /> Connect
+                        </button>
                       )}
                       {c && c.status !== "revoked" && (
                         <>
-                          <Button
-                            size="sm"
-                            variant="outline"
+                          <button
+                            className={btnSecondary}
                             disabled={busy === `sync:${c.id}`}
                             onClick={() => syncNow(c.id, entry.displayName)}
                           >
-                            <RefreshCw className="mr-1 h-3.5 w-3.5" /> Sync now
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
+                            <RefreshCw className="h-3.5 w-3.5" /> Sync now
+                          </button>
+                          <button
+                            className={btnSecondary}
                             disabled={busy === `revoke:${c.id}`}
                             onClick={() => revoke(c.id, entry.displayName)}
                           >
-                            <Unplug className="mr-1 h-3.5 w-3.5" /> Revoke
-                          </Button>
+                            <Unplug className="h-3.5 w-3.5" /> Revoke
+                          </button>
                         </>
                       )}
                       {c && c.status === "revoked" && (
-                        <Button
-                          size="sm"
-                          className="bg-violet-600 text-white hover:bg-violet-700"
+                        <button
+                          className={btnPrimary}
                           disabled={busy === `connect:${entry.platform}`}
                           onClick={() => connect(entry.platform)}
                         >
-                          <Plug className="mr-1 h-3.5 w-3.5" /> Re-connect
-                        </Button>
+                          <Plug className="h-3.5 w-3.5" /> Re-connect
+                        </button>
                       )}
                     </div>
                   </td>

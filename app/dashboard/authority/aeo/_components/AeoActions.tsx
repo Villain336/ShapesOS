@@ -7,11 +7,18 @@
 
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { Button } from "@/components/vault/shadcn/button";
 import { Input } from "@/components/vault/shadcn/input";
 import { Label } from "@/components/vault/shadcn/label";
 import { Textarea } from "@/components/vault/shadcn/textarea";
 import { CheckCircle2, Play, RefreshCw } from "lucide-react";
+
+// Agentic OS pressables: done = approve, running = run verbs.
+const btnP =
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-night-hover disabled:opacity-40";
+const btnD =
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-done px-4 text-sm font-semibold text-white aos-press hover:bg-done/90 disabled:opacity-40";
+const btnR =
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-running px-4 text-sm font-semibold text-white aos-press hover:bg-running/90 disabled:opacity-40";
 
 function usePost() {
   const router = useRouter();
@@ -57,12 +64,12 @@ export function ApproveActionButton({ id }: { id: string }) {
 
   return (
     <span className="inline-flex items-center gap-2">
-      <Button type="button" size="sm" variant="outline" onClick={act} disabled={busy}>
-        <CheckCircle2 className="mr-1 h-3.5 w-3.5" />
+      <button type="button" className={btnD} onClick={act} disabled={busy}>
+        <CheckCircle2 className="h-3.5 w-3.5" />
         {busy ? "Approving…" : "Approve"}
-      </Button>
-      {result && <span className="text-xs text-emerald-700">{result}</span>}
-      {error && <span className="text-xs text-red-700">Error: {error}</span>}
+      </button>
+      {result && <span className="text-xs text-muted">{result}</span>}
+      {error && <span className="text-xs text-failed-text">Error: {error}</span>}
     </span>
   );
 }
@@ -79,12 +86,12 @@ export function ActivatePromptSetButton({ id }: { id: string }) {
 
   return (
     <span className="inline-flex items-center gap-2">
-      <Button type="button" size="sm" variant="outline" onClick={act} disabled={busy}>
-        <Play className="mr-1 h-3.5 w-3.5" />
+      <button type="button" className={btnP} onClick={act} disabled={busy}>
+        <Play className="h-3.5 w-3.5" />
         {busy ? "Activating…" : "Activate"}
-      </Button>
-      {result && <span className="text-xs text-emerald-700">{result}</span>}
-      {error && <span className="text-xs text-red-700">Error: {error}</span>}
+      </button>
+      {result && <span className="text-xs text-muted">{result}</span>}
+      {error && <span className="text-xs text-failed-text">Error: {error}</span>}
     </span>
   );
 }
@@ -112,26 +119,26 @@ export function CreatePromptSetForm() {
   return (
     <form onSubmit={submit} className="space-y-3">
       <div>
-        <Label htmlFor="aeo-prompts" className="text-[13px] font-medium text-stone-700">Prompts (one per line, 20–50 money prompts)</Label>
+        <Label htmlFor="aeo-prompts" className="text-[13px] font-medium text-muted">Prompts (one per line, 20–50 money prompts)</Label>
         <Textarea
           id="aeo-prompts"
           value={text}
           onChange={(e) => setText(e.target.value)}
           rows={8}
           placeholder={"Best CRM for a 10-person agency\nAgency accounting software vs QuickBooks\n…"}
-          className="mt-1 font-mono text-xs border-stone-200 bg-white text-[13px] placeholder:text-stone-400 focus-visible:border-violet-400 focus-visible:ring-violet-200/60"
+          className="mt-1 font-mono text-xs border-line bg-paper text-[13px] placeholder:text-subtle focus-visible:border-focus focus-visible:ring-[var(--aos-focus-halo)]"
         />
       </div>
       <div className="flex items-center justify-between">
-        <p className={`text-xs ${countOk ? "text-stone-600" : "text-amber-700"}`}>
+        <p className={`text-xs ${countOk ? "text-muted" : "text-ink"}`}>
           {count} prompt{count === 1 ? "" : "s"} — {countOk ? "within the 20–50 range" : "needs 20–50 to save"}
         </p>
-        <Button type="submit" size="sm" disabled={busy || !countOk}>
+        <button type="submit" className={btnP} disabled={busy || !countOk}>
           {busy ? "Saving…" : "Create prompt set"}
-        </Button>
+        </button>
       </div>
-      {result && <p className="text-xs text-emerald-700">{result}</p>}
-      {error && <p className="text-xs text-red-700">Error: {error}</p>}
+      {result && <p className="text-xs text-muted">{result}</p>}
+      {error && <p className="text-xs text-failed-text">Error: {error}</p>}
     </form>
   );
 }
@@ -162,40 +169,40 @@ export function TriggerRunCard({ hasActiveSet, brand }: { hasActiveSet: boolean;
     <form onSubmit={submit} className="space-y-3">
       <div className="grid gap-3 md:grid-cols-2">
         <div>
-          <Label htmlFor="aeo-brand" className="text-[13px] font-medium text-stone-700">Brand (for entity matching)</Label>
+          <Label htmlFor="aeo-brand" className="text-[13px] font-medium text-muted">Brand (for entity matching)</Label>
           <Input
             id="aeo-brand"
             value={brandInput}
             onChange={(e) => setBrandInput(e.target.value)}
             placeholder="Acme Studio"
-            className="mt-1 border-stone-200 bg-white text-[13px] placeholder:text-stone-400 focus-visible:border-violet-400 focus-visible:ring-violet-200/60"
+            className="mt-1 border-line bg-paper text-[13px] placeholder:text-subtle focus-visible:border-focus focus-visible:ring-[var(--aos-focus-halo)]"
           />
         </div>
         <div>
-          <Label htmlFor="aeo-domain" className="text-[13px] font-medium text-stone-700">Owned domain (optional)</Label>
+          <Label htmlFor="aeo-domain" className="text-[13px] font-medium text-muted">Owned domain (optional)</Label>
           <Input
             id="aeo-domain"
             value={ownedDomain}
             onChange={(e) => setOwnedDomain(e.target.value)}
             placeholder="acme.com"
-            className="mt-1 border-stone-200 bg-white text-[13px] placeholder:text-stone-400 focus-visible:border-violet-400 focus-visible:ring-violet-200/60"
+            className="mt-1 border-line bg-paper text-[13px] placeholder:text-subtle focus-visible:border-focus focus-visible:ring-[var(--aos-focus-halo)]"
           />
         </div>
       </div>
       <div className="flex items-center justify-between">
-        <p className="text-xs text-stone-500">
+        <p className="text-xs text-muted">
           Weekly cadence is the default (daily available at ~4.3× cost). Cost envelope: ~$1–5/mo per brand.
         </p>
-        <Button type="submit" size="sm" disabled={busy || !hasActiveSet || !brandInput.trim()}>
-          <RefreshCw className={`mr-1 h-3.5 w-3.5 ${busy ? "animate-spin" : ""}`} />
+        <button type="submit" className={btnR} disabled={busy || !hasActiveSet || !brandInput.trim()}>
+          <RefreshCw className={`h-3.5 w-3.5 ${busy ? "animate-spin" : ""}`} />
           {busy ? "Starting…" : "Run now"}
-        </Button>
+        </button>
       </div>
       {!hasActiveSet && (
-        <p className="text-xs text-amber-700">No active prompt set — activate one above before running.</p>
+        <p className="text-xs text-ink">No active prompt set — activate one above before running.</p>
       )}
-      {result && <p className="text-xs text-emerald-700">{result}</p>}
-      {error && <p className="text-xs text-red-700">Error: {error}</p>}
+      {result && <p className="text-xs text-muted">{result}</p>}
+      {error && <p className="text-xs text-failed-text">Error: {error}</p>}
     </form>
   );
 }

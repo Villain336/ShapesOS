@@ -17,11 +17,11 @@ import {
 } from "lucide-react";
 
 const inputCls =
-  "rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-[13px] text-stone-900 placeholder:text-stone-400 focus:border-[var(--brand-600)] focus:outline-none";
+  "rounded-md border border-line bg-paper px-2.5 py-1.5 text-[13px] text-ink placeholder:text-subtle focus:border-ink focus:outline-none";
 const btnPrimary =
-  "flex items-center gap-1.5 rounded-md bg-[var(--brand-600)] px-3 py-1.5 text-[13px] font-medium text-white hover:bg-[var(--brand-700)] disabled:opacity-40";
+  "flex items-center gap-1.5 rounded-md bg-ink px-3 py-1.5 text-[13px] font-medium text-white hover:bg-night-hover disabled:opacity-40";
 const btnGhost =
-  "flex items-center gap-1.5 rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-[13px] text-stone-700 hover:bg-stone-50 disabled:opacity-40";
+  "flex items-center gap-1.5 rounded-md border border-line bg-paper px-2.5 py-1.5 text-[13px] text-muted hover:bg-hover-paper disabled:opacity-40";
 
 interface Entry {
   id: string;
@@ -37,8 +37,8 @@ function sourceChip(source: string) {
     <span
       className={`inline-flex items-center whitespace-nowrap rounded-full border px-1.5 py-0.5 text-[10px] font-medium leading-tight ${
         isKg
-          ? "border-[var(--brand-600)]/20 bg-[var(--brand-50)] text-[var(--brand-700)]"
-          : "border-stone-200 bg-stone-100 text-stone-600"
+          ? "border-ink/20 bg-canvas text-ink"
+          : "border-line bg-paper text-muted"
       }`}
     >
       {isKg ? "knowledge graph" : "manual"}
@@ -158,20 +158,20 @@ export function PronunciationApp() {
   return (
     <div className="flex flex-col gap-4">
       <div>
-        <h1 className="text-xl font-bold tracking-tight text-stone-900">Pronunciation</h1>
-        <p className="mt-0.5 text-[13px] text-stone-500">
+        <h1 className="aos-heading">Pronunciation</h1>
+        <p className="mt-0.5 text-[13px] text-muted">
           How brand terms are spoken in voiceovers — seeded from the company knowledge graph, editable by you.
         </p>
       </div>
 
       {error && (
-        <div className="flex items-start gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-800">
+        <div className="flex items-start gap-2 rounded-md border border-failed bg-failed-tint px-3 py-2 text-[13px] text-failed-text">
           <AlertTriangle size={15} className="mt-0.5 shrink-0" />
           <span>{error}</span>
         </div>
       )}
       {seedNote && (
-        <div className="rounded-md border border-stone-200 bg-stone-50 px-3 py-2 text-[13px] text-stone-700">
+        <div className="rounded-md border border-line bg-paper px-3 py-2 text-[13px] text-muted">
           {seedNote}
         </div>
       )}
@@ -199,23 +199,23 @@ export function PronunciationApp() {
         </button>
       </div>
 
-      <div className="overflow-hidden rounded-lg border border-stone-200 bg-white">
-        <div className="border-b border-stone-200 px-4 py-2.5">
-          <h2 className="flex items-center gap-1.5 text-[13px] font-semibold text-stone-900">
+      <div className="overflow-hidden rounded-lg border border-line bg-paper">
+        <div className="border-b border-line px-4 py-2.5">
+          <h2 className="flex items-center gap-1.5 text-[13px] font-semibold text-ink">
             <BookOpenText size={14} />
             Dictionary ({entries.length})
           </h2>
         </div>
         {loading ? (
-          <p className="px-4 py-6 text-center text-[13px] text-stone-400">Loading…</p>
+          <p className="px-4 py-6 text-center text-[13px] text-subtle">Loading…</p>
         ) : entries.length === 0 ? (
-          <p className="px-4 py-6 text-center text-[13px] text-stone-400">
+          <p className="px-4 py-6 text-center text-[13px] text-subtle">
             Empty dictionary — seed from company knowledge or add entries manually.
           </p>
         ) : (
           <table className="w-full text-[13px]">
             <thead>
-              <tr className="border-b border-stone-200 bg-stone-50 text-left text-[11px] uppercase tracking-wide text-stone-500">
+              <tr className="border-b border-line bg-paper text-left text-[11px] text-muted">
                 <th className="px-3 py-2 font-medium">Term</th>
                 <th className="px-3 py-2 font-medium">Phonetic</th>
                 <th className="px-3 py-2 font-medium">Source</th>
@@ -225,9 +225,9 @@ export function PronunciationApp() {
             </thead>
             <tbody>
               {entries.map((e) => (
-                <tr key={e.id} className="border-b border-stone-100 last:border-0 hover:bg-[var(--brand-50)]/40">
-                  <td className="px-3 py-2 font-medium text-stone-800">{e.term}</td>
-                  <td className="px-3 py-2 text-stone-600">
+                <tr key={e.id} className="border-b border-line last:border-0 hover:bg-hover-paper">
+                  <td className="px-3 py-2 font-medium text-ink">{e.term}</td>
+                  <td className="px-3 py-2 text-muted">
                     {editingId === e.id ? (
                       <input
                         value={editPhonetic}
@@ -240,7 +240,7 @@ export function PronunciationApp() {
                     )}
                   </td>
                   <td className="px-3 py-2">{sourceChip(e.source)}</td>
-                  <td className="px-3 py-2 text-[12px] text-stone-500">
+                  <td className="px-3 py-2 text-[12px] text-muted">
                     {new Date(e.updatedAt).toLocaleDateString()}
                   </td>
                   <td className="px-3 py-2">
@@ -280,7 +280,7 @@ export function PronunciationApp() {
         )}
       </div>
 
-      <div className="rounded-md border border-stone-200 bg-stone-50 px-3 py-2 text-[12px] text-stone-600">
+      <div className="rounded-md border border-line bg-paper px-3 py-2 text-[12px] text-muted">
         Substitutions are longest-term-first, case-insensitive, and word-boundary matched — respellings never
         corrupt surrounding text. Each rendered voiceover records the exact snapshot applied.
       </div>

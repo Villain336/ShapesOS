@@ -38,7 +38,7 @@ export default function ConnectChannelButton({ channel }: { channel: string }) {
         <Plug className="mr-1.5 h-3.5 w-3.5" />
         {busy ? "Connecting…" : "Connect"}
       </Button>
-      {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
+      {error && <p className="mt-1 text-xs text-failed-text">{error}</p>}
     </div>
   );
 }

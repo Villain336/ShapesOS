@@ -1,6 +1,5 @@
-// Marketr — Phase 8: violet sub-tab bars with Lucide icons.
-// Exact pattern copied from Creative Studio (StudioApp.tsx): icon + label,
-// active = border-violet-600 text-violet-700.
+// Marketr — Substrate sub-tab bars with Lucide icons: icon + label,
+// active = border-ink text-ink (Agentic OS tab idiom).
 //
 // The nav configs (icon component references, activeOn functions) MUST live
 // in this client module. Server components cannot pass component references
@@ -42,7 +41,7 @@ function SubstrateTabs({ items, label }: { items: SubTab[]; label: string }) {
   const pathname = usePathname();
   return (
     <div
-      className="mb-4 flex flex-wrap gap-1 border-b border-stone-200"
+      className="mb-4 flex flex-wrap gap-1 border-b border-line"
       role="navigation"
       aria-label={label}
     >
@@ -55,8 +54,8 @@ function SubstrateTabs({ items, label }: { items: SubTab[]; label: string }) {
             aria-current={active ? "page" : undefined}
             className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-[13.5px] font-medium transition ${
               active
-                ? "border-violet-600 text-violet-700"
-                : "border-transparent text-stone-500 hover:text-stone-800"
+                ? "border-ink text-ink"
+                : "border-transparent text-muted hover:text-ink"
             }`}
           >
             <Icon size={15} />

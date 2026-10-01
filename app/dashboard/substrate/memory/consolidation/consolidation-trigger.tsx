@@ -3,8 +3,11 @@
 "use client";
 
 import { useState } from "react";
-import { Button } from "@/components/vault/shadcn/button";
 import { RefreshCw } from "lucide-react";
+
+// Triggering a run -> running fill (run verb).
+const btnRun =
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-running px-4 text-sm font-semibold text-white aos-press hover:bg-running/90 disabled:opacity-40";
 
 export default function ConsolidationTrigger({ workspaceId }: { workspaceId: string }) {
   const [state, setState] = useState<"idle" | "starting" | "started" | "error">("idle");
@@ -30,11 +33,11 @@ export default function ConsolidationTrigger({ workspaceId }: { workspaceId: str
 
   return (
     <div className="flex items-center gap-2">
-      <Button onClick={trigger} disabled={state === "starting"}>
-        <RefreshCw className="mr-2 h-4 w-4" aria-hidden />
+      <button className={btnRun} onClick={trigger} disabled={state === "starting"}>
+        <RefreshCw className="h-4 w-4" aria-hidden />
         {state === "starting" ? "Starting…" : "Run consolidation pass"}
-      </Button>
-      {message && <span className="text-xs text-muted-foreground">{message}</span>}
+      </button>
+      {message && <span className="text-xs text-muted">{message}</span>}
     </div>
   );
 }

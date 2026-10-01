@@ -25,8 +25,8 @@ export default async function NewCampaignPage() {
   return (
     <div className="mx-auto max-w-xl space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">New campaign</h1>
-        <p className="text-sm text-muted-foreground">
+        <h1 className="aos-heading">New campaign</h1>
+        <p className="text-sm text-muted">
           Create the cross-channel object first — attach fragments (mail, email,
           social, ads, CTV, tests) afterward, or let the backfill proposer
           suggest historical links for review.

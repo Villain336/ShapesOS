@@ -29,11 +29,11 @@ export const metadata = {
 };
 
 const URGENCY_META = {
-  same_day: { icon: Flame, label: "Due today", cls: "border-red-200 bg-red-50 text-red-700" },
-  within_48h: { icon: Clock, label: "48h", cls: "border-violet-200 bg-violet-50 text-violet-700" },
-  this_week: { icon: CalendarDays, label: "This week", cls: "border-stone-200 bg-stone-50 text-stone-600" },
-  open: { icon: CircleDot, label: "Open", cls: "border-stone-200 bg-stone-50 text-stone-600" },
-  expired: { icon: XCircle, label: "Expired", cls: "border-stone-200 bg-stone-100 text-stone-500" },
+  same_day: { icon: Flame, label: "Due today", cls: "border-failed bg-failed-tint text-failed-text" },
+  within_48h: { icon: Clock, label: "48h", cls: "bg-needs text-ink" },
+  this_week: { icon: CalendarDays, label: "This week", cls: "border-line bg-paper text-muted" },
+  open: { icon: CircleDot, label: "Open", cls: "border-line bg-paper text-muted" },
+  expired: { icon: XCircle, label: "Expired", cls: "border-line bg-paper text-muted" },
 };
 
 function chip(text: React.ReactNode, cls: string) {
@@ -75,11 +75,11 @@ export default async function PrPage() {
   const aeoDomains = placementData?.aeoSourceDomains ?? [];
 
   return (
-    <div className="flex h-full flex-col gap-4 bg-[#FAFAF7] p-4 md:p-6">
+    <div className="flex h-full flex-col gap-4 bg-canvas p-4 md:p-6">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-stone-900">Digital PR</h1>
-          <p className="mt-0.5 max-w-2xl text-[13px] text-stone-500">
+          <h1 className="aos-heading">Digital PR</h1>
+          <p className="mt-0.5 max-w-2xl text-[13px] text-muted">
             Journalist queries aggregated and matched — then a draft workspace with research
             brief, pitch-the-gap, and a de-AI pass. <strong>Humans send everything.</strong>{" "}
             Marketr records sends against a pr_send approval; it never sends on your identity.
@@ -89,20 +89,20 @@ export default async function PrPage() {
       </div>
 
       {!ready && (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+        <div className="rounded-lg border border-needs bg-needs-tint p-4 text-sm text-ink">
           Authority tables are not provisioned yet — this page renders read-only until the Phase 6 migration runs.
         </div>
       )}
 
       {/* Opportunity feed */}
-      <section className="rounded-xl border border-stone-200 bg-white p-4">
+      <section className="rounded-lg border border-line bg-paper p-4">
         <div className="mb-3 flex items-center gap-2">
-          <Rss className="h-4 w-4 text-stone-500" />
-          <h2 className="text-sm font-semibold text-stone-900">Opportunity feed</h2>
-          <span className="text-xs text-stone-500">{feed.length} open</span>
+          <Rss className="h-4 w-4 text-muted" />
+          <h2 className="text-sm font-semibold text-ink">Opportunity feed</h2>
+          <span className="text-xs text-muted">{feed.length} open</span>
         </div>
         {feed.length === 0 ? (
-          <p className="text-sm text-stone-500">
+          <p className="text-sm text-muted">
             No open queries. Run an ingest to pull HARO / Connectively / Qwoted / SOS / HAB2BW / #JournoRequest digests.
           </p>
         ) : (
@@ -111,18 +111,18 @@ export default async function PrPage() {
               const um = URGENCY_META[o.urgency];
               const UIcon = um.icon;
               return (
-                <li key={o.id} className="rounded-lg border border-stone-100 p-3">
+                <li key={o.id} className="rounded-lg border border-line p-3">
                   <div className="flex flex-wrap items-center gap-2">
                     {chip(<><UIcon className="h-3 w-3" /> {o.urgency === "same_day" ? "Due today" : um.label} · {hoursLabel(o.hoursLeft)}</>, um.cls)}
-                    {chip(`match ${o.matchScore}`, "border-violet-200 bg-violet-50 text-violet-700")}
-                    {chip(o.source, "border-stone-200 bg-stone-50 text-stone-600")}
-                    <span className="text-sm font-medium text-stone-900">
+                    {chip(`match ${o.matchScore}`, "border-line bg-paper text-muted shadow-control")}
+                    {chip(o.source, "border-line bg-paper text-muted")}
+                    <span className="text-sm font-medium text-ink">
                       {o.journalist} · {o.outlet}
                     </span>
                   </div>
-                  <p className="mt-1.5 text-[13px] leading-snug text-stone-700">{o.queryText}</p>
+                  <p className="mt-1.5 text-[13px] leading-snug text-muted">{o.queryText}</p>
                   {o.expertiseTags.length > 0 && (
-                    <p className="mt-1 font-mono text-[11px] text-stone-400">{o.expertiseTags.join(" · ")}</p>
+                    <p className="mt-1 font-mono text-[11px] text-subtle">{o.expertiseTags.join(" · ")}</p>
                   )}
                   {(o.status === "new" || o.status === "matched") && <CreateDraftForm opportunityId={o.id} />}
                 </li>
@@ -133,14 +133,14 @@ export default async function PrPage() {
       </section>
 
       {/* Draft workspace */}
-      <section className="rounded-xl border border-stone-200 bg-white p-4">
+      <section className="rounded-lg border border-line bg-paper p-4">
         <div className="mb-3 flex items-center gap-2">
-          <PenLine className="h-4 w-4 text-stone-500" />
-          <h2 className="text-sm font-semibold text-stone-900">Draft workspace</h2>
-          <span className="text-xs text-stone-500">{drafts.length} drafts</span>
+          <PenLine className="h-4 w-4 text-muted" />
+          <h2 className="text-sm font-semibold text-ink">Draft workspace</h2>
+          <span className="text-xs text-muted">{drafts.length} drafts</span>
         </div>
         {drafts.length === 0 ? (
-          <p className="text-sm text-stone-500">No drafts yet. Build one from an opportunity above.</p>
+          <p className="text-sm text-muted">No drafts yet. Build one from an opportunity above.</p>
         ) : (
           <ul className="space-y-3">
             {drafts.map((d) => {
@@ -150,23 +150,23 @@ export default async function PrPage() {
               const deAi = brief.deAi ?? { passed: d.deAiPassed, flags: [], suggestions: [] };
               const checklist = ((d.checklist as { items?: { id: string; label: string; passed: boolean; detail: string }[]; subject?: string } | null)?.items ?? []);
               return (
-                <li key={d.id} className="rounded-lg border border-stone-200 p-4">
+                <li key={d.id} className="rounded-lg border border-line p-4">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-sm font-semibold text-stone-900">
+                    <span className="text-sm font-semibold text-ink">
                       {d.opportunity.journalist} · {d.opportunity.outlet}
                     </span>
                     {chip(d.status.replace("_", " "),
-                      d.status === "sent" ? "border-violet-200 bg-violet-50 text-violet-700"
-                        : d.status === "human_approved" ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                        : "border-stone-200 bg-stone-50 text-stone-600")}
+                      d.status === "sent" ? "bg-done text-white"
+                        : d.status === "human_approved" ? "bg-done text-white"
+                        : "border-line bg-paper text-muted shadow-control")}
                     {chip(<>{d.deAiPassed ? <CheckCircle2 className="h-3 w-3" /> : <XCircle className="h-3 w-3" />} de-AI {d.deAiPassed ? "passed" : "failed"}</>,
-                      d.deAiPassed ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-red-200 bg-red-50 text-red-700")}
+                      d.deAiPassed ? "bg-done text-white" : "bg-failed text-white")}
                   </div>
 
                   {/* Research brief */}
                   <details className="mt-2 text-sm">
-                    <summary className="cursor-pointer font-medium text-stone-800">Research brief</summary>
-                    <div className="mt-1 space-y-1 text-[13px] text-stone-600">
+                    <summary className="cursor-pointer font-medium text-ink">Research brief</summary>
+                    <div className="mt-1 space-y-1 text-[13px] text-muted">
                       {(b.recentBeats?.length ?? 0) > 0 && <p><strong>Beats:</strong> {b.recentBeats!.join(", ")}</p>}
                       {(b.recentArticles?.length ?? 0) > 0 && (
                         <p><strong>Recent:</strong> {b.recentArticles!.map((a) => a.title).join(" · ")}</p>
@@ -184,18 +184,18 @@ export default async function PrPage() {
 
                   {/* Quote skeleton */}
                   <details className="mt-1 text-sm">
-                    <summary className="cursor-pointer font-medium text-stone-800">Quote skeleton (working scaffold — never send-ready)</summary>
-                    <pre className="mt-1 whitespace-pre-wrap rounded bg-stone-50 p-2 font-mono text-[12px] text-stone-700">{d.quoteSkeleton}</pre>
+                    <summary className="cursor-pointer font-medium text-ink">Quote skeleton (working scaffold — never send-ready)</summary>
+                    <pre className="mt-1 whitespace-pre-wrap rounded bg-paper p-2 font-mono text-[12px] text-muted">{d.quoteSkeleton}</pre>
                   </details>
 
                   {/* Pre-send checklist */}
                   <div className="mt-2">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-stone-500">Pre-send checklist</p>
+                    <p className="text-xs font-semibold text-muted">Pre-send checklist</p>
                     <ul className="mt-1 space-y-0.5">
                       {checklist.map((c) => (
                         <li key={c.id} className="flex items-start gap-1.5 text-[13px]">
-                          {c.passed ? <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-600" /> : <XCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-red-500" />}
-                          <span className={c.passed ? "text-stone-700" : "text-stone-900 font-medium"}>{c.label}</span>
+                          {c.passed ? <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-ink" /> : <XCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-failed-text" />}
+                          <span className={c.passed ? "text-muted" : "text-ink font-medium"}>{c.label}</span>
                         </li>
                       ))}
                     </ul>
@@ -203,11 +203,11 @@ export default async function PrPage() {
 
                   {/* de-AI flags */}
                   {!d.deAiPassed && deAi.flags.length > 0 && (
-                    <div className="mt-2 rounded-lg border border-red-200 bg-red-50 p-2 text-[12px] text-red-900">
+                    <div className="mt-2 rounded-lg border border-failed bg-failed-tint p-2 text-[12px] text-failed-text">
                       <p className="font-semibold">De-AI pass flagged AI signals — rework before approval:</p>
                       <ul className="mt-1 list-disc pl-4">
                         {deAi.flags.map((f, i) => <li key={i}>{f}</li>)}
-                        {deAi.suggestions.map((s, i) => <li key={`s${i}`} className="text-red-700">→ {s}</li>)}
+                        {deAi.suggestions.map((s, i) => <li key={`s${i}`} className="text-failed-text">→ {s}</li>)}
                       </ul>
                     </div>
                   )}
@@ -224,9 +224,9 @@ export default async function PrPage() {
                       <MarkSentButton draftId={d.id} journalist={d.opportunity.journalist} outlet={d.opportunity.outlet} />
                     )}
                     {d.status === "sent" && (
-                      <span className="inline-flex items-center gap-1 text-xs text-stone-500">
+                      <span className="inline-flex items-center gap-1 text-xs text-muted">
                         <ShieldAlert className="h-3.5 w-3.5" />
-                        Recorded against pr_send approval {d.approvalId ? d.approvalId.slice(0, 8) : "—"}…
+                        Recorded against pr_send approval <span className="font-mono">{d.approvalId ? d.approvalId.slice(0, 8) : "—"}</span>…
                       </span>
                     )}
                   </div>
@@ -238,34 +238,34 @@ export default async function PrPage() {
       </section>
 
       {/* Relationship CRM-lite */}
-      <section className="rounded-xl border border-stone-200 bg-white p-4">
+      <section className="rounded-lg border border-line bg-paper p-4">
         <div className="mb-3 flex items-center gap-2">
-          <Users className="h-4 w-4 text-stone-500" />
-          <h2 className="text-sm font-semibold text-stone-900">Journalist relationships</h2>
-          <span className="text-xs text-stone-500">{relationships.length} journalists</span>
+          <Users className="h-4 w-4 text-muted" />
+          <h2 className="text-sm font-semibold text-ink">Journalist relationships</h2>
+          <span className="text-xs text-muted">{relationships.length} journalists</span>
         </div>
         {relationships.length === 0 ? (
-          <p className="text-sm text-stone-500">No journalists yet — relationships are created when a draft is built.</p>
+          <p className="text-sm text-muted">No journalists yet — relationships are created when a draft is built.</p>
         ) : (
           <ul className="space-y-2">
             {relationships.map((r) => {
               const eligible = !r.reengagementEligibleAt || r.reengagementEligibleAt.getTime() <= Date.now();
               return (
-                <li key={r.id} className="rounded-lg border border-stone-100 p-3">
+                <li key={r.id} className="rounded-lg border border-line p-3">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-sm font-medium text-stone-900">{r.journalist} · {r.outlet}</span>
+                    <span className="text-sm font-medium text-ink">{r.journalist} · {r.outlet}</span>
                     {chip(`${r.followUpCount}/2 follow-ups`,
-                      r.followUpCount >= 2 ? "border-red-200 bg-red-50 text-red-700" : "border-stone-200 bg-stone-50 text-stone-600")}
+                      r.followUpCount >= 2 ? "border-failed bg-failed-tint text-failed-text" : "border-line bg-paper text-muted")}
                     {chip(eligible ? "re-engageable" : `cooling until ${r.reengagementEligibleAt!.toISOString().slice(0, 10)}`,
-                      eligible ? "border-violet-200 bg-violet-50 text-violet-700" : "border-stone-200 bg-stone-50 text-stone-600")}
+                      eligible ? "border-line bg-paper text-muted shadow-control" : "border-line bg-paper text-muted shadow-control")}
                   </div>
                   {r.declinationReasons.length > 0 && (
-                    <p className="mt-1 text-[12px] text-stone-500">
+                    <p className="mt-1 text-[12px] text-muted">
                       Declinations: {r.declinationReasons.join(" · ")}
                     </p>
                   )}
                   {r.history.length > 0 && (
-                    <ul className="mt-1 space-y-0.5 text-[12px] text-stone-500">
+                    <ul className="mt-1 space-y-0.5 text-[12px] text-muted">
                       {r.history.slice(-4).reverse().map((h, i) => (
                         <li key={i}>
                           <span className="font-mono text-[11px]">{h.ts.toISOString().slice(0, 10)}</span>{" "}
@@ -283,43 +283,43 @@ export default async function PrPage() {
       </section>
 
       {/* Placements + attribution */}
-      <section className="rounded-xl border border-stone-200 bg-white p-4">
+      <section className="rounded-lg border border-line bg-paper p-4">
         <div className="mb-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Newspaper className="h-4 w-4 text-stone-500" />
-            <h2 className="text-sm font-semibold text-stone-900">Coverage &amp; attribution</h2>
-            <span className="text-xs text-stone-500">{placements.length} placements</span>
+            <Newspaper className="h-4 w-4 text-muted" />
+            <h2 className="text-sm font-semibold text-ink">Coverage &amp; attribution</h2>
+            <span className="text-xs text-muted">{placements.length} placements</span>
           </div>
           <PlacementForm />
         </div>
         {placements.length === 0 ? (
-          <p className="text-sm text-stone-500">No placements yet. Record one when a pitch lands.</p>
+          <p className="text-sm text-muted">No placements yet. Record one when a pitch lands.</p>
         ) : (
           <ul className="space-y-2">
             {placements.map((p) => {
               const impact = (p.impact as { impact?: { score?: number; notes?: string[] } } | null)?.impact;
               return (
-                <li key={p.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-stone-100 px-3 py-2">
+                <li key={p.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-line px-3 py-2">
                   <div className="min-w-0">
-                    <Link href={p.url} target="_blank" className="truncate text-sm font-medium text-stone-900 hover:underline">
+                    <Link href={p.url} target="_blank" className="truncate text-sm font-medium text-ink hover:underline">
                       {p.outlet}
                     </Link>
-                    <p className="truncate font-mono text-[11px] text-stone-400">{p.url}</p>
+                    <p className="truncate font-mono text-[11px] text-subtle">{p.url}</p>
                   </div>
-                  {chip(`impact ${impact?.score ?? "—"}/100`, "border-stone-200 bg-stone-50 text-stone-600")}
+                  {chip(`impact ${impact?.score ?? "—"}/100`, "border-line bg-paper text-muted")}
                 </li>
               );
             })}
           </ul>
         )}
         {aeoDomains.length > 0 && (
-          <div className="mt-3 rounded-lg bg-stone-50 p-3">
-            <p className="text-xs font-semibold uppercase tracking-wide text-stone-500">
+          <div className="mt-3 rounded-lg bg-paper p-3">
+            <p className="text-xs font-semibold text-muted">
               AEO source list (placed domains — consumable by the AEO source-impact scorer)
             </p>
             <div className="mt-1 flex flex-wrap gap-1.5">
               {aeoDomains.map((d) => (
-                <span key={d.domain} className="inline-flex items-center gap-0.5 whitespace-nowrap rounded-full border border-stone-200 bg-stone-50 px-1.5 py-0.5 font-mono text-[10px] font-medium leading-tight text-stone-600">
+                <span key={d.domain} className="inline-flex items-center gap-0.5 whitespace-nowrap rounded-full border border-line bg-paper px-1.5 py-0.5 font-mono text-[10px] font-medium leading-tight text-muted">
                   {d.domain} ×{d.placements}
                 </span>
               ))}

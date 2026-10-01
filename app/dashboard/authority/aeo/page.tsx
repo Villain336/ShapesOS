@@ -67,9 +67,9 @@ function liftFmt(n: number) {
 }
 
 function Delta({ value }: { value: number | null }) {
-  if (value === null || !Number.isFinite(value)) return <Minus className="h-3.5 w-3.5 text-stone-300" />;
+  if (value === null || !Number.isFinite(value)) return <Minus className="h-3.5 w-3.5 text-subtle" />;
   const Icon = value > 0.05 ? TrendingUp : value < -0.05 ? TrendingDown : Minus;
-  const cls = value > 0.05 ? "text-emerald-600" : value < -0.05 ? "text-red-600" : "text-stone-400";
+  const cls = value === null || !Number.isFinite(value) ? "text-subtle" : "text-ink";
   const sign = value > 0.05 ? "+" : value < -0.05 ? "−" : "";
   return (
     <span className={`inline-flex items-center gap-1 text-xs font-medium ${cls}`}>
@@ -82,7 +82,7 @@ function Delta({ value }: { value: number | null }) {
 
 function SentimentBar({ sentiment }: { sentiment: PerEngineScore["sentiment"] }) {
   const total = sentiment.positive + sentiment.neutral + sentiment.negative + sentiment.unmentioned;
-  if (total === 0) return <p className="text-xs text-stone-400">No responses yet</p>;
+  if (total === 0) return <p className="text-xs text-subtle">No responses yet</p>;
   const seg = (n: number, cls: string, label: string) =>
     n > 0 ? (
       <div
@@ -93,28 +93,29 @@ function SentimentBar({ sentiment }: { sentiment: PerEngineScore["sentiment"] })
     ) : null;
   return (
     <div>
-      <div className="flex h-2.5 w-full overflow-hidden rounded-full bg-stone-100">
-        {seg(sentiment.positive, "bg-emerald-500", "Positive")}
-        {seg(sentiment.neutral, "bg-stone-300", "Neutral")}
-        {seg(sentiment.negative, "bg-red-500", "Negative")}
-        {seg(sentiment.unmentioned, "bg-stone-200", "Unmentioned")}
+      <div className="flex h-2.5 w-full overflow-hidden rounded-full bg-paper">
+        {seg(sentiment.positive, "bg-ink", "Positive")}
+        {seg(sentiment.neutral, "bg-disabled-fg", "Neutral")}
+        {seg(sentiment.negative, "bg-failed", "Negative")}
+        {seg(sentiment.unmentioned, "bg-line", "Unmentioned")}
       </div>
-      <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-stone-500">
-        <span><span className="font-semibold text-emerald-700">{sentiment.positive}</span> positive</span>
-        <span><span className="font-semibold text-stone-600">{sentiment.neutral}</span> neutral</span>
-        <span><span className="font-semibold text-red-700">{sentiment.negative}</span> negative</span>
-        <span><span className="font-semibold text-stone-500">{sentiment.unmentioned}</span> unmentioned</span>
+      <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-muted">
+        <span><span className="font-semibold text-ink">{sentiment.positive}</span> positive</span>
+        <span><span className="font-semibold text-muted">{sentiment.neutral}</span> neutral</span>
+        <span><span className="font-semibold text-failed-text">{sentiment.negative}</span> negative</span>
+        <span><span className="font-semibold text-muted">{sentiment.unmentioned}</span> unmentioned</span>
       </div>
     </div>
   );
 }
 
+// Action-plan workflow: proposed needs review, approved/applied/done are done.
 const ACTION_STATUS_CHIP: Record<string, string> = {
-  proposed: "border-stone-200 bg-stone-50 text-stone-600",
-  approved: "border-violet-200 bg-violet-50 text-violet-700",
-  applied: "border-emerald-200 bg-emerald-50 text-emerald-700",
-  done: "border-emerald-200 bg-emerald-50 text-emerald-700",
-  dismissed: "border-red-200 bg-red-50 text-red-700",
+  proposed: "bg-needs text-ink",
+  approved: "bg-done text-white",
+  applied: "bg-done text-white",
+  done: "bg-done text-white",
+  dismissed: "bg-failed text-white",
 };
 
 function chip(text: React.ReactNode, cls: string) {
@@ -287,13 +288,13 @@ export default async function AeoPage({
   const hasActiveSet = promptSets.some((s) => s.active);
 
   return (
-    <div className="flex h-full flex-col gap-4 bg-[#FAFAF7] p-4 md:p-6">
+    <div className="flex h-full flex-col gap-4 bg-canvas p-4 md:p-6">
       {/* Header + honest labeling */}
       <div>
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h1 className="text-xl font-bold tracking-tight text-stone-900">AEO — answer-engine visibility</h1>
-            <p className="mt-0.5 max-w-3xl text-[13px] text-stone-500">
+            <h1 className="aos-heading">AEO — answer-engine visibility</h1>
+            <p className="mt-0.5 max-w-3xl text-[13px] text-muted">
               Versioned money-prompt sets run weekly against official LLM APIs (N=3 reps), parsed by a
               nano-class judge. The act leg turns source-impact findings into owned-domain GEO16 fixes
               (supervised ladder) and third-party user action plans.
@@ -304,17 +305,17 @@ export default async function AeoPage({
               name="brand"
               defaultValue={brand}
               placeholder="Brand for matching…"
-              className="w-44 border-stone-200 bg-white text-[13px] placeholder:text-stone-400 focus-visible:border-violet-400 focus-visible:ring-violet-200/60"
+              className="w-44 border-line bg-paper text-[13px] placeholder:text-subtle focus-visible:border-focus focus-visible:ring-[var(--aos-focus-halo)]"
             />
             <button
               type="submit"
-              className="rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-violet-700"
+              className="inline-flex h-control-sm items-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-night-hover"
             >
               Set
             </button>
           </form>
         </div>
-        <div className="mt-3 flex gap-2 rounded-xl border border-stone-200 bg-stone-50 p-3 text-xs text-stone-700">
+        <div className="mt-3 flex gap-2 rounded-lg border border-line bg-paper p-3 text-xs text-muted">
           <Info className="mt-0.5 h-4 w-4 shrink-0" />
           <p>
             <strong>{AEO_PROXY_DISCLAIMER}</strong> Metrics below are reported <strong>per engine only</strong> —
@@ -325,7 +326,7 @@ export default async function AeoPage({
       </div>
 
       {!ready && (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+        <div className="rounded-lg border border-needs bg-needs-tint p-4 text-sm text-ink">
           Authority tables are not provisioned yet — merge{" "}
           <code className="font-mono">prisma/fragments/phase6-authority.prisma</code> and migrate.
           This page renders in read-only preview until then.
@@ -335,14 +336,14 @@ export default async function AeoPage({
       {/* Per-engine metrics — never a composite */}
       <section>
         <div className="mb-3 flex items-center gap-2">
-          <Sparkles className="h-4 w-4 text-stone-500" />
-          <h2 className="text-sm font-semibold text-stone-900">Per-engine visibility</h2>
-          {chip("No composite score", "border-stone-200 bg-stone-50 text-stone-600")}
+          <Sparkles className="h-4 w-4 text-muted" />
+          <h2 className="text-sm font-semibold text-ink">Per-engine visibility</h2>
+          {chip("No composite score", "border-line bg-paper text-muted")}
         </div>
-        <div className="overflow-x-auto rounded-xl border border-stone-200 bg-white">
+        <div className="overflow-x-auto rounded-lg border border-line bg-paper">
           <table className="w-full text-left text-[13px]">
             <thead>
-              <tr className="border-b border-stone-100 bg-stone-50/60 text-[11px] uppercase tracking-wide text-stone-500">
+              <tr className="border-b border-line bg-paper/60 text-[11px] text-muted">
                 <th className="px-3 py-2 font-medium">Engine</th>
                 <th className="px-3 py-2 font-medium">Mention rate</th>
                 <th className="px-3 py-2 font-medium">Answer SoV</th>
@@ -358,27 +359,27 @@ export default async function AeoPage({
                 const d = deltas[engine];
                 const latest = latestRunByEngine[engine];
                 return (
-                  <tr key={engine} className="border-b border-stone-100 last:border-0 hover:bg-violet-50/40">
+                  <tr key={engine} className="border-b border-line last:border-0 hover:bg-hover-paper">
                     <td className="px-3 py-2">
-                      <span className="font-medium text-stone-900">{ENGINE_LABELS[engine]}</span>
-                      <span className="block font-mono text-[10px] text-stone-400">{ENGINE_MODELS[engine]}</span>
+                      <span className="font-medium text-ink">{ENGINE_LABELS[engine]}</span>
+                      <span className="block font-mono text-[10px] text-subtle">{ENGINE_MODELS[engine]}</span>
                     </td>
                     {!score ? (
-                      <td colSpan={6} className="px-3 py-2 text-xs text-stone-400">No completed run yet for this engine.</td>
+                      <td colSpan={6} className="px-3 py-2 text-xs text-subtle">No completed run yet for this engine.</td>
                     ) : (
                       <>
                         <td className="px-3 py-2">
-                          <span className="flex items-center gap-1.5 font-semibold text-stone-900">
+                          <span className="flex items-center gap-1.5 font-semibold text-ink">
                             {pct1(score.mentionRate)}
                             <Delta value={d.mentionRate} />
                           </span>
-                          <span className="mt-1 block h-1.5 w-24 overflow-hidden rounded-full bg-stone-100">
-                            <span className="block h-full rounded-full bg-violet-500" style={{ width: `${score.mentionRate}%` }} />
+                          <span className="mt-1 block h-1.5 w-24 overflow-hidden rounded-full bg-paper">
+                            <span className="block h-full rounded-full bg-ink" style={{ width: `${score.mentionRate}%` }} />
                           </span>
                         </td>
-                        <td className="px-3 py-2 font-semibold text-stone-900">{pct1(score.answerShareOfVoice)}</td>
+                        <td className="px-3 py-2 font-semibold text-ink">{pct1(score.answerShareOfVoice)}</td>
                         <td className="px-3 py-2">
-                          <span className="flex items-center gap-1.5 font-semibold text-stone-900">
+                          <span className="flex items-center gap-1.5 font-semibold text-ink">
                             {pct1(score.recommendationRate)}
                             <Delta value={d.recommendationRate} />
                           </span>
@@ -386,8 +387,8 @@ export default async function AeoPage({
                         <td className="px-3 py-2">
                           <SentimentBar sentiment={score.sentiment} />
                         </td>
-                        <td className="px-3 py-2 text-[12px] text-stone-600">{score.responses} resp · {score.prompts} prompts</td>
-                        <td className="px-3 py-2 text-[12px] text-stone-600">
+                        <td className="px-3 py-2 text-[12px] text-muted">{score.responses} resp · {score.prompts} prompts</td>
+                        <td className="px-3 py-2 text-[12px] text-muted">
                           {latest ? `v${latest.version} · ${latest.startedAt.toLocaleDateString()}` : "—"}
                         </td>
                       </>
@@ -398,7 +399,7 @@ export default async function AeoPage({
             </tbody>
           </table>
         </div>
-        <p className="mt-2 text-[11px] text-stone-400">
+        <p className="mt-2 text-[11px] text-subtle">
           Mention rate = mean % of reps per prompt where the brand was mentioned (2/3 = 67%), not a binary flag.
           Answer share of voice = brand appearances ÷ total responses × 100.
         </p>
@@ -409,14 +410,14 @@ export default async function AeoPage({
       {/* Source-impact ranking */}
       <section>
         <div className="mb-3 flex items-center gap-2">
-          <FileSearch className="h-4 w-4 text-stone-500" />
-          <h2 className="text-sm font-semibold text-stone-900">Source-impact ranking</h2>
-          {chip("per engine", "border-stone-200 bg-stone-50 text-stone-600")}
+          <FileSearch className="h-4 w-4 text-muted" />
+          <h2 className="text-sm font-semibold text-ink">Source-impact ranking</h2>
+          {chip("per engine", "border-line bg-paper text-muted")}
         </div>
-        <div className="overflow-x-auto rounded-xl border border-stone-200 bg-white">
+        <div className="overflow-x-auto rounded-lg border border-line bg-paper">
           <table className="w-full min-w-[640px] text-left text-[13px]">
             <thead>
-              <tr className="border-b border-stone-100 bg-stone-50/60 text-[11px] uppercase tracking-wide text-stone-500">
+              <tr className="border-b border-line bg-paper/60 text-[11px] text-muted">
                 <th className="px-3 py-2 font-medium">Domain</th>
                 <th className="px-3 py-2 font-medium">Engine</th>
                 <th className="px-4 py-2.5 font-medium" title="Times the domain was cited across the prompt set">
@@ -434,30 +435,30 @@ export default async function AeoPage({
             <tbody>
               {impacts.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-6 text-center text-stone-400">
+                  <td colSpan={6} className="px-4 py-6 text-center text-subtle">
                     No source-impact data yet — run the weekly cadence, then impacts are computed from run history.
                   </td>
                 </tr>
               ) : (
                 impacts.map((i) => (
-                  <tr key={i.id} className="border-b border-stone-100 last:border-0 hover:bg-violet-50/40">
-                    <td className="px-3 py-2 font-medium text-stone-900">{i.domain}</td>
-                    <td className="px-3 py-2">{chip(i.engine, "border-stone-200 bg-stone-50 text-stone-600")}</td>
-                    <td className="px-3 py-2 font-semibold text-stone-900">{i.citationFrequency}</td>
-                    <td className="px-3 py-2 text-stone-600">{i.citationEfficiency.toFixed(2)}</td>
+                  <tr key={i.id} className="border-b border-line last:border-0 hover:bg-hover-paper">
+                    <td className="px-3 py-2 font-medium text-ink">{i.domain}</td>
+                    <td className="px-3 py-2">{chip(i.engine, "border-line bg-paper text-muted")}</td>
+                    <td className="px-3 py-2 font-semibold text-ink">{i.citationFrequency}</td>
+                    <td className="px-3 py-2 text-muted">{i.citationEfficiency.toFixed(2)}</td>
                     <td className="px-3 py-2">
-                      <span className={`font-semibold ${i.cooccurrenceLift > 0 ? "text-emerald-700" : i.cooccurrenceLift < 0 ? "text-red-700" : "text-stone-500"}`}>
+                      <span className="font-semibold text-ink">
                         {liftFmt(i.cooccurrenceLift)}
                       </span>
                     </td>
-                    <td className="px-3 py-2 text-stone-400">{i.computedAt.toLocaleDateString()}</td>
+                    <td className="px-3 py-2 text-subtle">{i.computedAt.toLocaleDateString()}</td>
                   </tr>
                 ))
               )}
             </tbody>
           </table>
         </div>
-        <p className="mt-2 text-[11px] text-stone-400">
+        <p className="mt-2 text-[11px] text-subtle">
           Co-occurrence lift is the defensible impact metric: high-lift domains are where effort pays.
           Benchmarks — listicles 1.89, YouTube 1.83, review platforms 1.23, Reddit 0.73 (citations per URL).
         </p>
@@ -468,23 +469,23 @@ export default async function AeoPage({
       {/* Act leg: owned fixes + third-party plans */}
       <section>
         <div className="mb-3 flex items-center gap-2">
-          <Wrench className="h-4 w-4 text-stone-500" />
-          <h2 className="text-sm font-semibold text-stone-900">Act — fixes & action plans</h2>
-          {chip("approval-gated", "border-stone-200 bg-stone-50 text-stone-600")}
+          <Wrench className="h-4 w-4 text-muted" />
+          <h2 className="text-sm font-semibold text-ink">Act — fixes & action plans</h2>
+          {chip("approval-gated", "border-line bg-paper text-muted")}
         </div>
         <div className="grid gap-4 lg:grid-cols-2">
-          <div className="rounded-xl border border-stone-200 bg-white p-4">
-            <h3 className="mb-1 text-sm font-semibold text-stone-900">Owned-domain GEO16 fixes</h3>
-            <p className="mb-3 text-[11px] text-stone-500">
+          <div className="rounded-lg border border-line bg-paper p-4">
+            <h3 className="mb-1 text-sm font-semibold text-ink">Owned-domain GEO16 fixes</h3>
+            <p className="mb-3 text-[11px] text-muted">
               Approval flows into the supervised fix-agent ladder: proposed → approved → applied. Never autonomous.
             </p>
             {ownedFixes.length === 0 ? (
-              <p className="text-xs text-stone-400">No owned-domain fix proposals yet.</p>
+              <p className="text-xs text-subtle">No owned-domain fix proposals yet.</p>
             ) : (
-              <div className="overflow-x-auto rounded-xl border border-stone-200">
+              <div className="overflow-x-auto rounded-lg border border-line">
                 <table className="w-full text-left text-[13px]">
                   <thead>
-                    <tr className="border-b border-stone-100 bg-stone-50/60 text-[11px] uppercase tracking-wide text-stone-500">
+                    <tr className="border-b border-line bg-paper/60 text-[11px] text-muted">
                       <th className="px-3 py-2 font-medium">Page</th>
                       <th className="px-3 py-2 font-medium">Pillars</th>
                       <th className="px-3 py-2 font-medium">Benchmark impact</th>
@@ -497,21 +498,21 @@ export default async function AeoPage({
                       const fix = a.fixProposalJson as FixProposal | null;
                       return (
                         <>
-                          <tr key={a.id} className="border-b border-stone-100 last:border-0 hover:bg-violet-50/40">
+                          <tr key={a.id} className="border-b border-line last:border-0 hover:bg-hover-paper">
                             <td className="px-3 py-2">
-                              <span className="flex items-center gap-1.5 font-medium text-stone-900">
-                                <ExternalLink className="h-3 w-3 shrink-0 text-stone-400" />
+                              <span className="flex items-center gap-1.5 font-medium text-ink">
+                                <ExternalLink className="h-3 w-3 shrink-0 text-subtle" />
                                 {fix?.pageUrl ?? a.sourceRef}
                               </span>
                             </td>
                             <td className="px-3 py-2">
                               <span className="flex flex-wrap gap-1">
                                 {(a.geo16Pillars.length > 0 ? a.geo16Pillars : [fix?.pillar].filter(Boolean) as string[]).map((p) => (
-                                  chip(PILLAR_LABELS[p] ?? p, "border-stone-200 bg-stone-50 text-stone-600")
+                                  chip(PILLAR_LABELS[p] ?? p, "border-line bg-paper text-muted")
                                 ))}
                               </span>
                             </td>
-                            <td className="px-3 py-2 text-[12px] text-stone-600">
+                            <td className="px-3 py-2 text-[12px] text-muted">
                               {fix?.benchmarkImpactPct != null ? `+${fix.benchmarkImpactPct}% citations` : "—"}
                             </td>
                             <td className="px-3 py-2">{chip(a.status, ACTION_STATUS_CHIP[a.status] ?? ACTION_STATUS_CHIP.proposed)}</td>
@@ -520,10 +521,10 @@ export default async function AeoPage({
                             </td>
                           </tr>
                           {(fix?.proposedChange || fix?.rationale) && (
-                            <tr key={`${a.id}-detail`} className="border-b border-stone-100 bg-stone-50/40">
+                            <tr key={`${a.id}-detail`} className="border-b border-line bg-paper/40">
                               <td colSpan={5} className="px-3 py-2">
-                                {fix?.proposedChange && <p className="text-xs text-stone-600">{fix.proposedChange}</p>}
-                                {fix?.rationale && <p className="mt-1 text-[11px] text-stone-400">{fix.rationale}</p>}
+                                {fix?.proposedChange && <p className="text-xs text-muted">{fix.proposedChange}</p>}
+                                {fix?.rationale && <p className="mt-1 text-[11px] text-subtle">{fix.rationale}</p>}
                               </td>
                             </tr>
                           )}
@@ -536,19 +537,19 @@ export default async function AeoPage({
             )}
           </div>
 
-          <div className="rounded-xl border border-stone-200 bg-white p-4">
-            <h3 className="mb-1 text-sm font-semibold text-stone-900">Third-party user action plans</h3>
-            <p className="mb-3 text-[11px] text-stone-500">
+          <div className="rounded-lg border border-line bg-paper p-4">
+            <h3 className="mb-1 text-sm font-semibold text-ink">Third-party user action plans</h3>
+            <p className="mb-3 text-[11px] text-muted">
               Marketr cannot edit third-party pages — these are concrete plans for you to execute. Approving
               marks a commitment; it never publishes on your behalf.
             </p>
             {thirdParty.length === 0 ? (
-              <p className="text-xs text-stone-400">No third-party action plans yet.</p>
+              <p className="text-xs text-subtle">No third-party action plans yet.</p>
             ) : (
-              <div className="overflow-x-auto rounded-xl border border-stone-200">
+              <div className="overflow-x-auto rounded-lg border border-line">
                 <table className="w-full text-left text-[13px]">
                   <thead>
-                    <tr className="border-b border-stone-100 bg-stone-50/60 text-[11px] uppercase tracking-wide text-stone-500">
+                    <tr className="border-b border-line bg-paper/60 text-[11px] text-muted">
                       <th className="px-3 py-2 font-medium">Target</th>
                       <th className="px-3 py-2 font-medium">Expected lift</th>
                       <th className="px-3 py-2 font-medium">Deadline</th>
@@ -561,17 +562,17 @@ export default async function AeoPage({
                       const plan = a.actionPlanJson as ThirdPartyPlan | null;
                       return (
                         <>
-                          <tr key={a.id} className="border-b border-stone-100 last:border-0 hover:bg-violet-50/40">
+                          <tr key={a.id} className="border-b border-line last:border-0 hover:bg-hover-paper">
                             <td className="px-3 py-2">
-                              <span className="flex items-center gap-1.5 font-medium text-stone-900">
-                                <ExternalLink className="h-3 w-3 shrink-0 text-stone-400" />
+                              <span className="flex items-center gap-1.5 font-medium text-ink">
+                                <ExternalLink className="h-3 w-3 shrink-0 text-subtle" />
                                 {plan?.exactTarget ?? a.sourceRef}
                               </span>
                             </td>
-                            <td className="px-3 py-2 text-[12px] text-stone-600">
+                            <td className="px-3 py-2 text-[12px] text-muted">
                               {(plan?.expectedLift ?? a.expectedLift) != null ? `+${Number(plan?.expectedLift ?? a.expectedLift).toFixed(1)} pts` : "—"}
                             </td>
-                            <td className="px-3 py-2 text-[12px] text-stone-600">
+                            <td className="px-3 py-2 text-[12px] text-muted">
                               {plan?.deadline ? (
                                 <span className="flex items-center gap-1">
                                   <CalendarClock className="h-3 w-3" /> {plan.deadline}
@@ -584,9 +585,9 @@ export default async function AeoPage({
                             </td>
                           </tr>
                           {plan?.contributionAngle && (
-                            <tr key={`${a.id}-detail`} className="border-b border-stone-100 bg-stone-50/40">
+                            <tr key={`${a.id}-detail`} className="border-b border-line bg-paper/40">
                               <td colSpan={5} className="px-3 py-2">
-                                <p className="text-xs text-stone-600">{plan.contributionAngle}</p>
+                                <p className="text-xs text-muted">{plan.contributionAngle}</p>
                               </td>
                             </tr>
                           )}
@@ -606,19 +607,19 @@ export default async function AeoPage({
       {/* Prompt-set manager + run trigger */}
       <section>
         <div className="mb-3 flex items-center gap-2">
-          <ListOrdered className="h-4 w-4 text-stone-500" />
-          <h2 className="text-sm font-semibold text-stone-900">Prompt sets & runs</h2>
+          <ListOrdered className="h-4 w-4 text-muted" />
+          <h2 className="text-sm font-semibold text-ink">Prompt sets & runs</h2>
         </div>
         <div className="grid gap-4 lg:grid-cols-2">
-          <div className="rounded-xl border border-stone-200 bg-white p-4">
-            <h3 className="mb-3 text-sm font-semibold text-stone-900">Versions</h3>
+          <div className="rounded-lg border border-line bg-paper p-4">
+            <h3 className="mb-3 text-sm font-semibold text-ink">Versions</h3>
             {promptSets.length === 0 ? (
-              <p className="text-xs text-stone-400">No prompt sets yet — create one below.</p>
+              <p className="text-xs text-subtle">No prompt sets yet — create one below.</p>
             ) : (
-              <div className="overflow-x-auto rounded-xl border border-stone-200">
+              <div className="overflow-x-auto rounded-lg border border-line">
                 <table className="w-full text-left text-[13px]">
                   <thead>
-                    <tr className="border-b border-stone-100 bg-stone-50/60 text-[11px] uppercase tracking-wide text-stone-500">
+                    <tr className="border-b border-line bg-paper/60 text-[11px] text-muted">
                       <th className="px-3 py-2 font-medium">Version</th>
                       <th className="px-3 py-2 font-medium">Prompts</th>
                       <th className="px-3 py-2 font-medium">Created</th>
@@ -628,12 +629,12 @@ export default async function AeoPage({
                   </thead>
                   <tbody>
                     {promptSets.map((s) => (
-                      <tr key={s.id} className="border-b border-stone-100 last:border-0 hover:bg-violet-50/40">
-                        <td className="px-3 py-2 font-semibold text-stone-900">v{s.version}</td>
-                        <td className="px-3 py-2 text-stone-600">{s.promptCount}</td>
-                        <td className="px-3 py-2 text-[12px] text-stone-600">{s.createdAt.toLocaleDateString()}</td>
+                      <tr key={s.id} className="border-b border-line last:border-0 hover:bg-hover-paper">
+                        <td className="px-3 py-2 font-semibold text-ink">v{s.version}</td>
+                        <td className="px-3 py-2 text-muted">{s.promptCount}</td>
+                        <td className="px-3 py-2 text-[12px] text-muted">{s.createdAt.toLocaleDateString()}</td>
                         <td className="px-3 py-2">
-                          {s.active ? chip("Active", "border-emerald-200 bg-emerald-50 text-emerald-700") : <span className="text-stone-400">—</span>}
+                          {s.active ? chip("Active", "border-line bg-paper text-muted shadow-control") : <span className="text-subtle">—</span>}
                         </td>
                         <td className="px-3 py-2">
                           {canEdit && !s.active && <ActivatePromptSetButton id={s.id} />}
@@ -645,16 +646,16 @@ export default async function AeoPage({
               </div>
             )}
             {canEdit && (
-              <div className="mt-4 border-t border-stone-100 pt-4">
-                <h4 className="mb-2 text-xs font-semibold text-stone-900">Create new version</h4>
+              <div className="mt-4 border-t border-line pt-4">
+                <h4 className="mb-2 text-xs font-semibold text-ink">Create new version</h4>
                 <CreatePromptSetForm />
               </div>
             )}
           </div>
 
-          <div className="rounded-xl border border-stone-200 bg-white p-4">
-            <h3 className="mb-1 text-sm font-semibold text-stone-900">Weekly run trigger</h3>
-            <p className="mb-3 text-[11px] text-stone-500">
+          <div className="rounded-lg border border-line bg-paper p-4">
+            <h3 className="mb-1 text-sm font-semibold text-ink">Weekly run trigger</h3>
+            <p className="mb-3 text-[11px] text-muted">
               Runs the active prompt set against all four engines (N=3 reps each), then the nano-judge parses
               mention, position, sentiment, competitors, and cited sources. Official APIs only — no consumer
               chat-UI scraping. Weekly default; daily available at ~4.3× cost. Envelope ~$1–5/mo per brand
@@ -663,10 +664,10 @@ export default async function AeoPage({
             {canEdit ? (
               <TriggerRunCard hasActiveSet={hasActiveSet} brand={brand} />
             ) : (
-              <p className="text-xs text-stone-400">Editor role required to start a run.</p>
+              <p className="text-xs text-subtle">Editor role required to start a run.</p>
             )}
-            <div className="mt-4 border-t border-stone-100 pt-3 text-[11px] text-stone-500">
-              <Link href="/dashboard/authority" className="font-medium text-stone-700 hover:text-stone-900">
+            <div className="mt-4 border-t border-line pt-3 text-[11px] text-muted">
+              <Link href="/dashboard/authority" className="font-medium text-muted hover:text-ink">
                 ← Back to Authority overview
               </Link>
             </div>

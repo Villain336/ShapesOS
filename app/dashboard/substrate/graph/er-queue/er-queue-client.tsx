@@ -5,9 +5,16 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Badge } from "@/components/vault/shadcn/badge";
-import { Button } from "@/components/vault/shadcn/button";
 import { Check, X, UserCheck, Scale } from "lucide-react";
+
+// Agentic OS idioms: merge = approve (done), not-the-same = deny idiom,
+// matcher signals and match scores are analytic -> neutral chips.
+const chipNeutral =
+  "inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-paper px-1.5 py-0.5 text-[10px] font-medium leading-tight text-muted shadow-control";
+const btnApprove =
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-done px-4 text-sm font-semibold text-white aos-press hover:bg-done/90 disabled:opacity-40";
+const btnDeny =
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-paper px-4 text-sm font-semibold text-failed-text shadow-[inset_0_0_0_1.5px_var(--aos-failed)] aos-press hover:bg-failed-tint disabled:opacity-40";
 
 interface QueueItem {
   id: string;
@@ -67,29 +74,35 @@ export default function ErQueueClient({ workspaceId }: { workspaceId: string }) 
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">ER review queue</h1>
-          <p className="text-sm text-muted-foreground">
+          <h1 className="aos-heading">ER review queue</h1>
+          <p className="text-sm text-muted">
             Ambiguous entity matches awaiting a human decision. Approvals merge reversibly
             (SAME_AS provenance); rejections record a NOT_SAME negative signal. Nothing
             auto-merges in v1.
           </p>
         </div>
         <div className="flex shrink-0 gap-2">
-          <Badge variant={items.length > 0 ? "destructive" : "secondary"}>
+          <span
+            className={
+              items.length > 0
+                ? "inline-flex items-center rounded-full bg-needs px-2 py-0.5 text-xs font-medium text-ink"
+                : chipNeutral
+            }
+          >
             {items.length} pending
-          </Badge>
+          </span>
         </div>
       </div>
 
       {error && (
-        <div className="rounded-xl border border-destructive bg-card p-4 text-sm text-destructive">
+        <div role="alert" className="rounded-md border border-failed bg-failed-tint px-3 py-2 text-sm text-failed-text">
           {error}
         </div>
       )}
-      {loading && <div className="text-sm text-muted-foreground">Loading queue…</div>}
+      {loading && <div className="text-sm text-subtle">Loading queue…</div>}
 
       {!loading && items.length === 0 && !error && (
-        <div className="rounded-xl border bg-card p-5 text-sm text-muted-foreground">
+        <div className="rounded-lg border border-line bg-paper p-5 text-sm text-muted">
           <UserCheck className="mb-2 h-5 w-5" />
           Queue is empty — no ambiguous duplicates waiting for review.
         </div>
@@ -97,56 +110,51 @@ export default function ErQueueClient({ workspaceId }: { workspaceId: string }) 
 
       <div className="space-y-3">
         {items.map((item) => (
-          <div key={item.id} className="rounded-xl border bg-card p-5 shadow-sm">
+          <div key={item.id} className="rounded-lg border border-line bg-paper p-5 shadow-hairline">
             <div className="flex items-start justify-between gap-2">
               <div className="flex items-center gap-3">
-                <div className="rounded-md bg-muted px-3 py-2 text-sm font-medium">
+                <div className="rounded-md bg-hover-paper px-3 py-2 text-sm font-medium">
                   {item.nodeA.displayName}
-                  <div className="text-xs font-normal text-muted-foreground">
+                  <div className="text-xs font-normal text-muted">
                     {item.nodeA.entityType} · {item.nodeA.asOfSource}
                   </div>
                 </div>
-                <Scale className="h-4 w-4 shrink-0 text-muted-foreground" />
-                <div className="rounded-md bg-muted px-3 py-2 text-sm font-medium">
+                <Scale className="h-4 w-4 shrink-0 text-muted" />
+                <div className="rounded-md bg-hover-paper px-3 py-2 text-sm font-medium">
                   {item.nodeB.displayName}
-                  <div className="text-xs font-normal text-muted-foreground">
+                  <div className="text-xs font-normal text-muted">
                     {item.nodeB.entityType} · {item.nodeB.asOfSource}
                   </div>
                 </div>
               </div>
-              <Badge variant="outline" className="shrink-0">
+              <span className={`${chipNeutral} shrink-0`}>
                 {(item.confidence * 100).toFixed(0)}% match
-              </Badge>
+              </span>
             </div>
 
             <div className="mt-3 flex flex-wrap gap-1.5">
               {item.matcherSignals.map((s, i) => (
-                <Badge
-                  key={i}
-                  variant={s.weight > 0 ? "secondary" : "destructive"}
-                  title={s.detail ?? s.matcher}
-                >
+                <span key={i} className={chipNeutral} title={s.detail ?? s.matcher}>
                   {s.matcher}: {s.field}
-                </Badge>
+                </span>
               ))}
             </div>
 
             <div className="mt-4 flex gap-2">
-              <Button
-                size="sm"
+              <button
+                className={btnApprove}
                 disabled={acting === item.id}
                 onClick={() => decide(item.id, "approved")}
               >
-                <Check className="mr-1 h-3.5 w-3.5" /> Merge (reversible)
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
+                <Check className="h-3.5 w-3.5" /> Merge (reversible)
+              </button>
+              <button
+                className={btnDeny}
                 disabled={acting === item.id}
                 onClick={() => decide(item.id, "rejected")}
               >
-                <X className="mr-1 h-3.5 w-3.5" /> Not the same
-              </Button>
+                <X className="h-3.5 w-3.5" /> Not the same
+              </button>
             </div>
           </div>
         ))}

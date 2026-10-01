@@ -10,7 +10,6 @@ import { listProposals } from "@/lib/substrate/campaigns/store";
 import { LINKED_TYPE_LABELS } from "@/lib/substrate/campaigns/types";
 import { Card, CardBody, CardHeader } from "@/components/vault/Card";
 import { EmptyState } from "@/components/vault/EmptyState";
-import { Badge } from "@/components/vault/shadcn/badge";
 import { campaignTablesReady } from "@/app/api/substrate/_lib";
 import { ProposalActions, RunScanButton } from "../client-actions";
 
@@ -39,17 +38,23 @@ export default async function ProposalsPage() {
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Link proposals</h1>
-          <p className="text-sm text-muted-foreground">
+          <h1 className="aos-heading">Link proposals</h1>
+          <p className="text-sm text-muted">
             The backfill proposer scans fragment tables and suggests links by naming convention,
             utm_campaign, date proximity, and shared creative. Every proposal needs a human decision —
             nothing auto-links, ever.
           </p>
         </div>
         <div className="flex shrink-0 gap-2">
-          <Badge variant={pending.length > 0 ? "destructive" : "secondary"}>
+          <span
+            className={
+              pending.length > 0
+                ? "inline-flex items-center rounded-full bg-needs px-2 py-0.5 text-xs font-medium text-ink"
+                : "inline-flex items-center rounded-full bg-paper px-2 py-0.5 text-xs font-medium text-muted shadow-control"
+            }
+          >
             {pending.length} pending
-          </Badge>
+          </span>
         </div>
       </div>
 
@@ -84,20 +89,20 @@ export default async function ProposalsPage() {
                               {p.campaign.name}
                             </Link>
                           ) : (
-                            <span className="text-muted-foreground">(campaign removed)</span>
+                            <span className="text-muted">(campaign removed)</span>
                           )}
                         </div>
                         <ul className="mt-1 space-y-0.5">
                           {signals.map((s, i) => (
-                            <li key={i} className="text-xs text-muted-foreground">
-                              <span className="font-medium text-foreground">{s.signal.replace("_", " ")}</span>
+                            <li key={i} className="text-xs text-muted">
+                              <span className="font-medium text-ink">{s.signal.replace("_", " ")}</span>
                               {" · "}{s.detail}
                             </li>
                           ))}
                         </ul>
                       </div>
                       <div className="flex shrink-0 items-center gap-3">
-                        <Badge variant="outline">{Math.round(p.confidence * 100)}% confidence</Badge>
+                        <span className="inline-flex items-center whitespace-nowrap rounded-full bg-paper px-1.5 py-0.5 text-[10px] font-medium leading-tight text-muted shadow-control">{Math.round(p.confidence * 100)}% confidence</span>
                         <ProposalActions proposalId={p.id} />
                       </div>
                     </div>
@@ -117,14 +122,22 @@ export default async function ProposalsPage() {
               {resolved.map((p) => (
                 <li key={p.id} className="flex items-center justify-between gap-3 py-2">
                   <div className="min-w-0 text-sm">
-                    <span className="text-muted-foreground">[{LINKED_TYPE_LABELS[p.linkedType]}]</span>{" "}
+                    <span className="text-muted">[{LINKED_TYPE_LABELS[p.linkedType]}]</span>{" "}
                     {p.campaign?.name ?? "(campaign removed)"}
-                    <span className="text-xs text-muted-foreground">
+                    <span className="text-xs text-muted">
                       {" · "}{p.decidedBy ?? "unknown"}{" · "}
                       {p.decidedAt ? new Date(p.decidedAt).toLocaleString() : ""}
                     </span>
                   </div>
-                  <Badge variant={p.status === "approved" ? "default" : "outline"}>{p.status}</Badge>
+                  <span
+              className={
+                p.status === "approved"
+                  ? "inline-flex items-center whitespace-nowrap rounded-full bg-done px-1.5 py-0.5 text-[10px] font-medium leading-tight text-white"
+                  : "inline-flex items-center whitespace-nowrap rounded-full bg-paper px-1.5 py-0.5 text-[10px] font-medium leading-tight text-muted shadow-control"
+              }
+            >
+              {p.status}
+            </span>
                 </li>
               ))}
             </ul>

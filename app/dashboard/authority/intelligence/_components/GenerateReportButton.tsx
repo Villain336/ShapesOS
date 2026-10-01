@@ -6,7 +6,6 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { FileSearch, Loader2 } from "lucide-react";
-import { Button } from "@/components/vault/shadcn/button";
 
 export function GenerateReportButton() {
   const router = useRouter();
@@ -37,11 +36,16 @@ export function GenerateReportButton() {
 
   return (
     <span className="inline-flex flex-col items-end gap-1">
-      <Button type="button" className="bg-violet-600 text-white hover:bg-violet-700" onClick={generate} disabled={busy}>
-        {busy ? <Loader2 className="animate-spin" /> : <FileSearch />}
+      <button
+        type="button"
+        onClick={generate}
+        disabled={busy}
+        className="inline-flex h-control-sm items-center gap-1.5 rounded-full bg-running px-4 text-sm font-semibold text-white aos-press hover:bg-running/90 disabled:opacity-40"
+      >
+        {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSearch className="h-4 w-4" />}
         {busy ? "Compiling twelve audits…" : "Generate report"}
-      </Button>
-      {error && <span className="text-xs text-red-600">{error}</span>}
+      </button>
+      {error && <span className="text-xs text-failed-text">{error}</span>}
     </span>
   );
 }

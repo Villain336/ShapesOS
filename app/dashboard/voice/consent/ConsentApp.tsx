@@ -78,8 +78,8 @@ export function ConsentApp() {
   return (
     <div className="flex flex-col gap-4">
       <div>
-        <h1 className="text-xl font-bold tracking-tight text-stone-900">Consent</h1>
-        <p className="mt-0.5 text-[13px] text-stone-500">
+        <h1 className="aos-heading">Consent</h1>
+        <p className="mt-0.5 text-[13px] text-muted">
           Prior express consent per lead per channel. Outbound AI calls only to opted-in leads.
         </p>
       </div>
@@ -105,7 +105,7 @@ export function ConsentApp() {
         </select>
       </div>
 
-      <div className="overflow-x-auto rounded-md border border-stone-200 bg-white">
+      <div className="overflow-x-auto rounded-md border border-line bg-paper">
         <table className={tableCls}>
           <thead className={theadCls}>
             <tr>
@@ -136,7 +136,7 @@ export function ConsentApp() {
             )}
             {rows.map((r) => (
               <tr key={r.id} className={rowCls}>
-                <td className={`${tdCls} font-medium text-stone-900`}>{r.lead.name}</td>
+                <td className={`${tdCls} font-medium text-ink`}>{r.lead.name}</td>
                 <td className={tdCls}>{r.lead.phone ?? r.lead.email ?? "—"}</td>
                 <td className={tdCls}><Chip tone="slate">{r.channel}</Chip></td>
                 <td className={tdCls}><Chip tone={statusTone(r.status)}>{r.status}</Chip></td>

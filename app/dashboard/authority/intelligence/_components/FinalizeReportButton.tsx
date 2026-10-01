@@ -7,7 +7,6 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { CheckCheck, Loader2 } from "lucide-react";
-import { Button } from "@/components/vault/shadcn/button";
 
 export function FinalizeReportButton({ reportId }: { reportId: string }) {
   const router = useRouter();
@@ -35,11 +34,16 @@ export function FinalizeReportButton({ reportId }: { reportId: string }) {
 
   return (
     <span className="inline-flex flex-col items-end gap-1">
-      <Button type="button" variant="secondary" onClick={finalize} disabled={busy}>
-        {busy ? <Loader2 className="animate-spin" /> : <CheckCheck />}
+      <button
+        type="button"
+        onClick={finalize}
+        disabled={busy}
+        className="inline-flex h-control-sm items-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-night-hover disabled:opacity-40"
+      >
+        {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCheck className="h-4 w-4" />}
         {busy ? "Finalizing…" : "Mark ready"}
-      </Button>
-      {error && <span className="text-xs text-red-600">{error}</span>}
+      </button>
+      {error && <span className="text-xs text-failed-text">{error}</span>}
     </span>
   );
 }

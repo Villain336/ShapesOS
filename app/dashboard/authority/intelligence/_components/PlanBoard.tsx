@@ -24,10 +24,11 @@ const SPRINTS = [
   { sprint: 90 as const, label: "Days 61–90", sub: "Scale: invest in what the data proved." },
 ];
 
+// Effort is an analytic estimate, not an agent state — neutral chips.
 const EFFORT_CHIP: Record<string, string> = {
-  low: "border-emerald-200 bg-emerald-50 text-emerald-700",
-  medium: "border-amber-200 bg-amber-50 text-amber-700",
-  high: "border-rose-200 bg-rose-50 text-rose-700",
+  low: "border-line bg-paper text-muted shadow-control",
+  medium: "border-line bg-paper text-muted shadow-control",
+  high: "border-line bg-paper text-muted shadow-control",
 };
 
 export function PlanBoard({ reportId, initial }: { reportId: string; initial: PlanInitiative[] }) {
@@ -70,10 +71,10 @@ export function PlanBoard({ reportId, initial }: { reportId: string; initial: Pl
   return (
     <div className="space-y-4">
       {(error || saving) && (
-        <div className="flex items-center gap-2 text-xs text-stone-500">
+        <div className="flex items-center gap-2 text-xs text-muted">
           {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
           {saving ? "Saving priority…" : null}
-          {error && <span className="text-red-600">{error}</span>}
+          {error && <span className="text-failed-text">{error}</span>}
         </div>
       )}
       {SPRINTS.map((s) => {
@@ -82,29 +83,29 @@ export function PlanBoard({ reportId, initial }: { reportId: string; initial: Pl
         return (
           <section key={s.sprint} aria-label={s.label}>
             <div className="mb-3 flex items-baseline justify-between">
-              <h3 className="text-sm font-semibold tracking-tight text-stone-900">{s.label}</h3>
-              <p className="text-xs text-stone-500">{s.sub}</p>
+              <h3 className="text-sm font-semibold tracking-tight text-ink">{s.label}</h3>
+              <p className="text-xs text-muted">{s.sub}</p>
             </div>
             <ol className="space-y-2">
               {items.map((i) => (
                 <li
                   key={i.id}
-                  className="rounded-xl border border-stone-200 bg-white p-4"
+                  className="rounded-lg border border-line bg-paper p-4"
                 >
                   <div className="flex items-start gap-3">
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-violet-50 text-sm font-bold text-violet-700">
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-line bg-paper text-sm font-bold text-ink">
                       {i.priority}
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
-                        <p className="text-sm font-semibold text-stone-900">{i.title}</p>
-                        {i.adjustedByHuman && chip(<><Hand className="h-3 w-3" /> human-adjusted</>, "border-violet-200 bg-violet-50 text-violet-700")}
+                        <p className="text-sm font-semibold text-ink">{i.title}</p>
+                        {i.adjustedByHuman && chip(<><Hand className="h-3 w-3" /> human-adjusted</>, "border-line bg-paper text-muted shadow-control")}
                       </div>
-                      <p className="mt-1 text-sm text-stone-600">{i.description}</p>
+                      <p className="mt-1 text-sm text-muted">{i.description}</p>
                       <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
-                        {chip(`Executes in: ${i.module}`, "border-stone-200 bg-stone-100 text-stone-700")}
-                        {chip(`${i.effort} effort`, EFFORT_CHIP[i.effort] ?? "border-stone-200 bg-stone-100 text-stone-500")}
-                        <span className="text-stone-500">Expected: {i.expectedOutcome}</span>
+                        {chip(`Executes in: ${i.module}`, "border-line bg-paper text-muted")}
+                        {chip(`${i.effort} effort`, EFFORT_CHIP[i.effort] ?? "border-line bg-paper text-muted")}
+                        <span className="text-muted">Expected: {i.expectedOutcome}</span>
                       </div>
                     </div>
                     <div className="flex shrink-0 flex-col gap-1">
@@ -113,7 +114,7 @@ export function PlanBoard({ reportId, initial }: { reportId: string; initial: Pl
                         aria-label={`Raise priority of ${i.title}`}
                         onClick={() => move(i.id, -1)}
                         disabled={saving || i.priority === 1}
-                        className="rounded-md border border-stone-200 p-1.5 text-stone-500 hover:border-stone-400 hover:text-stone-800 disabled:opacity-30"
+                        className="rounded-md border border-line p-1.5 text-muted hover:border-ink hover:text-ink disabled:opacity-30"
                       >
                         <ArrowUp className="h-3.5 w-3.5" />
                       </button>
@@ -122,7 +123,7 @@ export function PlanBoard({ reportId, initial }: { reportId: string; initial: Pl
                         aria-label={`Lower priority of ${i.title}`}
                         onClick={() => move(i.id, 1)}
                         disabled={saving || i.priority === order.length}
-                        className="rounded-md border border-stone-200 p-1.5 text-stone-500 hover:border-stone-400 hover:text-stone-800 disabled:opacity-30"
+                        className="rounded-md border border-line p-1.5 text-muted hover:border-ink hover:text-ink disabled:opacity-30"
                       >
                         <ArrowDown className="h-3.5 w-3.5" />
                       </button>

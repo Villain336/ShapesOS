@@ -5,9 +5,6 @@
 "use client";
 
 import { useState } from "react";
-import { Badge } from "@/components/vault/shadcn/badge";
-import { Input } from "@/components/vault/shadcn/input";
-import { Button } from "@/components/vault/shadcn/button";
 import { Search, Zap, Database, FileText, Layers } from "lucide-react";
 
 interface Hit {
@@ -28,11 +25,14 @@ interface Hit {
 
 const STORE_ICON = { episode: FileText, fact: Database, learning: Layers } as const;
 
-function bucketVariant(bucket: string): "secondary" | "outline" | "destructive" {
-  if (bucket === "fresh") return "secondary";
-  if (bucket === "aging") return "outline";
-  return "destructive";
-}
+// Freshness buckets are provider states, not agent states — neutral chips.
+const chipNeutral =
+  "inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-paper px-1.5 py-0.5 text-[10px] font-medium leading-tight text-muted shadow-control";
+
+const inputCls =
+  "h-control-sm rounded-md border-[1.5px] border-control bg-paper px-3 text-sm text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none";
+const btnPrimary =
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-night-hover disabled:opacity-40";
 
 export default function RecallClient({ workspaceId }: { workspaceId: string }) {
   const [query, setQuery] = useState("");
@@ -70,38 +70,38 @@ export default function RecallClient({ workspaceId }: { workspaceId: string }) {
     <div className="space-y-4">
       <form onSubmit={run} className="flex flex-wrap items-center gap-2">
         <div className="relative w-96">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
-          <Input
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-subtle" aria-hidden />
+          <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="What did we learn about cart recovery?"
-            className="pl-9"
+            className={`${inputCls} w-full pl-9`}
             aria-label="Recall query"
           />
         </div>
-        <Input
+        <input
           type="datetime-local"
           value={asOf}
           onChange={(e) => setAsOf(e.target.value)}
-          className="w-56"
+          className={`${inputCls} w-56`}
           aria-label="as of (temporal query)"
           title="Temporal query: recall what was true at this time"
         />
-        <Button
+        <button
           type="submit"
-          className="bg-violet-600 text-white hover:bg-violet-700"
+          className={btnPrimary}
           disabled={loading || !query.trim()}
         >
           {loading ? "Recalling…" : "Recall"}
-        </Button>
+        </button>
       </form>
 
       {error && (
-        <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm">{error}</div>
+        <div role="alert" className="rounded-md border border-failed bg-failed-tint px-3 py-2 text-sm text-failed-text">{error}</div>
       )}
 
       {hits.length === 0 && !loading && !error && (
-        <div className="rounded-lg border bg-card p-8 text-center text-sm text-muted-foreground">
+        <div className="rounded-lg border border-line bg-paper p-8 text-center text-sm text-muted">
           Ask the memory anything. Exact IDs and error codes bypass the vector search — try an experiment ID.
         </div>
       )}
@@ -110,29 +110,29 @@ export default function RecallClient({ workspaceId }: { workspaceId: string }) {
         {hits.map((h, i) => {
           const Icon = STORE_ICON[h.store as keyof typeof STORE_ICON] ?? FileText;
           return (
-            <article key={`${h.store}:${h.refId}`} className="relative rounded-lg border bg-card p-4">
+            <article key={`${h.store}:${h.refId}`} className="relative rounded-lg border border-line bg-paper p-4">
               <div className="absolute right-3 top-3 flex gap-1.5">
                 {h.exactMatch && (
-                  <Badge variant="secondary">
-                    <Zap className="mr-1 h-3 w-3" aria-hidden /> exact match
-                  </Badge>
+                  <span className={chipNeutral} title="Exact ID match — bypassed vector search">
+                    <Zap className="h-3 w-3" aria-hidden /> exact match
+                  </span>
                 )}
-                <Badge variant="outline">{h.store}</Badge>
-                <Badge variant={bucketVariant(h.freshness.bucket)} title={h.freshness.label}>
+                <span className={chipNeutral}>{h.store}</span>
+                <span className={chipNeutral} title={h.freshness.label}>
                   {h.freshness.bucket}
-                </Badge>
+                </span>
               </div>
               <div className="flex items-start gap-3 pr-48">
-                <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium text-muted-foreground">
+                <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-line bg-paper text-xs font-medium text-ink">
                   {i + 1}
                 </span>
                 <div className="min-w-0">
                   <h3 className="flex items-center gap-2 font-medium leading-snug">
-                    <Icon className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+                    <Icon className="h-4 w-4 shrink-0 text-muted" aria-hidden />
                     <span className="truncate">{h.title}</span>
                   </h3>
-                  <p className="mt-1 text-sm text-muted-foreground">{h.body}</p>
-                  <p className="mt-2 text-xs text-muted-foreground">
+                  <p className="mt-1 text-sm text-muted">{h.body}</p>
+                  <p className="mt-2 text-xs text-muted">
                     score {h.score.toFixed(3)}
                     {h.rerankScore != null ? ` · rerank ${h.rerankScore.toFixed(2)}` : null}
                     {" · "}{h.freshness.label}

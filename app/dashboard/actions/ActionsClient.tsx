@@ -116,49 +116,58 @@ const TABS: Array<{ id: Tab; label: string; icon: typeof Plug }> = [
 
 const TOOLKIT_CATEGORIES = ["comms", "crm", "files", "payments", "productivity", "support"];
 
+const badgeBase =
+  "inline-flex h-badge items-center gap-1.5 rounded-full px-3 text-sm font-semibold";
+
+// Neutral chip for categories and provider states (12a ClipsApp idiom).
+const chipNeutral =
+  "inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-paper px-1.5 py-0.5 text-[10px] font-medium leading-tight text-muted shadow-control";
+
+// Action button idioms (Agentic OS): primary black pill, secondary white
+// with shadow-outline, approve = done fill, deny = white + failed-text with
+// 1.5px failed inset ring, review = needs fill with black text, execute =
+// failed fill.
+const BTN_PRIMARY =
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-night-hover disabled:opacity-40";
+const BTN_SECONDARY =
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-paper px-4 text-sm font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper disabled:opacity-40";
+const BTN_APPROVE =
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-done px-4 text-sm font-semibold text-white aos-press hover:opacity-90 disabled:opacity-40";
+const BTN_DENY =
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-paper px-4 text-sm font-semibold text-failed-text shadow-[inset_0_0_0_1.5px_var(--aos-failed)] aos-press hover:bg-failed-tint disabled:opacity-40";
+const BTN_REVIEW =
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-needs px-4 text-sm font-semibold text-ink aos-press hover:opacity-90 disabled:opacity-40";
+const BTN_EXEC =
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-failed px-4 text-sm font-semibold text-white aos-press hover:bg-failed/90 disabled:opacity-40";
+const INPUT_CLS =
+  "h-control-sm rounded-md border-[1.5px] border-control bg-paper px-3 text-sm text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none";
+
+// Risk tiers are categories, not agent states — always a neutral chip.
 function tierBadge(tier: string) {
-  const cls =
-    tier === "high"
-      ? "bg-red-50 text-red-700 border-red-200"
-      : tier === "medium"
-        ? "bg-amber-50 text-amber-700 border-amber-200"
-        : "bg-stone-100 text-stone-600 border-stone-200";
-  return (
-    <span className={`inline-block rounded-full border px-2 py-0.5 text-[11px] font-medium ${cls}`}>
-      {tier}
-    </span>
-  );
+  return <span className={chipNeutral}>{tier}</span>;
 }
 
+// Approval/execution states ARE agent states — status-color badges.
 function statusBadge(status: string) {
   const cls =
-    status === "connected" || status === "approved" || status === "success"
-      ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+    status === "connected" || status === "approved" || status === "success" || status === "executed"
+      ? "bg-done text-white"
       : status === "pending"
-        ? "bg-amber-50 text-amber-700 border-amber-200"
+        ? "bg-needs text-ink"
         : status === "denied" || status === "failed"
-          ? "bg-red-50 text-red-700 border-red-200"
-          : status === "executed"
-            ? "bg-blue-50 text-blue-700 border-blue-200"
-            : "bg-stone-100 text-stone-500 border-stone-200";
-  return (
-    <span className={`inline-block rounded-full border px-2 py-0.5 text-[11px] font-medium ${cls}`}>
-      {status}
-    </span>
-  );
+          ? "bg-failed text-white"
+          : "";
+  if (!cls) return <span className={chipNeutral}>{status}</span>;
+  return <span className={`${badgeBase} ${cls}`}>{status}</span>;
 }
 
-/** Category badge for the toolkit directory (stone; neutral, never a primary). */
+/** Category badge for the toolkit directory — neutral, never a primary. */
 function categoryBadge(category: string) {
-  return (
-    <span className="inline-block rounded-full border border-stone-200 bg-stone-100 px-2 py-0.5 text-[11px] font-medium text-stone-600">
-      {category}
-    </span>
-  );
+  return <span className={chipNeutral}>{category}</span>;
 }
 
-/** Tier breakdown cells for the toolkit directory — low/medium/high reuse
- *  the tier palette; unclassified is its own marker (high-gated by default). */
+/** Tier breakdown cells for the toolkit directory — tiers are categories,
+ *  so every cell is a neutral chip; unclassified keeps its dashed marker. */
 function tierBreakdownBadges(bd: ToolkitEntry["tierBreakdown"]) {
   const items: Array<{ label: string; n: number }> = [
     { label: "low", n: bd.low },
@@ -172,15 +181,11 @@ function tierBreakdownBadges(bd: ToolkitEntry["tierBreakdown"]) {
         <span
           key={it.label}
           title={`${it.n} ${it.label} tools`}
-          className={`inline-block rounded-full border px-1.5 py-0.5 text-[11px] font-medium ${
-            it.label === "high"
-              ? "bg-red-50 text-red-700 border-red-200"
-              : it.label === "medium"
-                ? "bg-amber-50 text-amber-700 border-amber-200"
-                : it.label === "unclassified"
-                  ? "border-dashed bg-white text-stone-500 border-stone-300"
-                  : "bg-stone-100 text-stone-600 border-stone-200"
-          }`}
+          className={
+            it.label === "unclassified"
+              ? "inline-block rounded-full border border-dashed border-line bg-paper px-1.5 py-0.5 text-[11px] font-medium text-muted"
+              : chipNeutral
+          }
         >
           {it.label} {it.n}
         </span>
@@ -209,30 +214,26 @@ function BudgetPanel({
   const entries = Object.entries(attribution.byToolkit).sort((a, b) => b[1] - a[1]);
   const top = entries.slice(0, 8);
   return (
-    <div className="mb-3 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2.5">
+    <div className="mb-3 rounded-lg border border-line bg-paper px-3 py-2.5">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-        <span className="text-[12px] font-semibold text-stone-700">Call budget</span>
+        <span className="text-[12px] font-semibold text-muted">Call budget</span>
         {budget.budget == null ? (
-          <span className="text-[12px] text-stone-500">
+          <span className="text-[12px] text-muted">
             No monthly budget set — usage is metered through the credit ledger.
           </span>
         ) : (
           <>
-            <span className="text-[12px] text-stone-600">
+            <span className="text-[12px] text-muted">
               {budget.usage.toLocaleString()} / {budget.budget.toLocaleString()} calls this month (
               {budget.pct}%)
             </span>
             <span
-              className={`inline-block rounded-full border px-2 py-0.5 text-[11px] font-medium ${
-                budget.hardCap
-                  ? "bg-red-50 text-red-700 border-red-200"
-                  : "bg-stone-100 text-stone-600 border-stone-200"
-              }`}
+              className={budget.hardCap ? "inline-flex items-center rounded-full bg-failed-tint px-2 py-0.5 text-[11px] font-medium text-failed-text" : chipNeutral}
             >
               {budget.hardCap ? "Hard cap" : "Soft cap"}
             </span>
             {budget.blocked && (
-              <span className="flex items-center gap-1 text-[12px] font-medium text-red-700">
+              <span className="flex items-center gap-1 text-[12px] font-medium text-failed-text">
                 <AlertTriangle className="h-3.5 w-3.5" /> Budget exhausted — new executions are
                 refused.
               </span>
@@ -241,17 +242,22 @@ function BudgetPanel({
         )}
       </div>
       {budget.budget != null && (
-        <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-stone-200">
+        <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-line">
           <div
-            className="h-full rounded-full bg-[var(--brand-600)]"
+            className="h-full rounded-full bg-ink"
             style={{ width: `${Math.min(100, budget.pct)}%` }}
           />
         </div>
       )}
-      {budget.warning && <div className="mt-2 text-[12px] text-amber-700">{budget.warning}</div>}
+      {budget.warning && (
+        <div className="mt-2 flex items-start gap-2 rounded-md border border-line bg-needs-tint px-3 py-2 text-[12px] text-ink">
+          <span className="aos-shape aos-shape--needs aos-shape--edged mt-0.5 shrink-0" role="img" aria-label="Warning" />
+          <span>{budget.warning}</span>
+        </div>
+      )}
       {top.length > 0 && (
-        <div className="mt-3 border-t border-stone-200 pt-2">
-          <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-stone-500">
+        <div className="mt-3 border-t border-line pt-2">
+          <div className="mb-1.5 text-[11px] font-semibold text-muted">
             Cost attribution — this month
           </div>
           <div className="grid gap-1.5 sm:grid-cols-2">
@@ -260,16 +266,16 @@ function BudgetPanel({
                 attribution.total > 0 ? Math.round((count / attribution.total) * 100) : 0;
               return (
                 <div key={slug} className="flex items-center gap-2">
-                  <span className="w-28 shrink-0 truncate text-[12px] font-medium text-stone-700">
+                  <span className="w-28 shrink-0 truncate text-[12px] font-medium text-muted">
                     {slug === "unknown" ? "Unattributed" : slug}
                   </span>
-                  <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-stone-200">
+                  <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-line">
                     <div
-                      className="h-full rounded-full bg-[var(--brand-600)]/70"
+                      className="h-full rounded-full bg-ink/70"
                       style={{ width: `${pct}%` }}
                     />
                   </div>
-                  <span className="w-24 shrink-0 text-right text-[11px] text-stone-500">
+                  <span className="w-24 shrink-0 text-right text-[11px] text-muted">
                     {pct}% · {count.toLocaleString()}
                   </span>
                 </div>
@@ -277,7 +283,7 @@ function BudgetPanel({
             })}
           </div>
           {entries.length > top.length && (
-            <div className="mt-1 text-[11px] text-stone-400">
+            <div className="mt-1 text-[11px] text-subtle">
               + {entries.length - top.length} more toolkits
             </div>
           )}
@@ -298,18 +304,17 @@ function BudgetPanel({
 // House pattern: info-note container, dense table with badge columns,
 // brand-var buttons.
 // ─────────────────────────────────────────────────────────────────────
+// Catalog drift changes are document states — removed reads as failed,
+// renamed as needs review, added as informational neutral.
 function driftBadge(changeType: DriftReportRow["changeType"]) {
   const cls =
     changeType === "removed"
-      ? "bg-red-50 text-red-700 border-red-200"
+      ? "bg-failed text-white"
       : changeType === "renamed"
-        ? "bg-amber-50 text-amber-700 border-amber-200"
-        : "bg-blue-50 text-blue-700 border-blue-200";
-  return (
-    <span className={`inline-block rounded-full border px-2 py-0.5 text-[11px] font-medium ${cls}`}>
-      {changeType}
-    </span>
-  );
+        ? "bg-needs text-ink"
+        : "";
+  if (!cls) return <span className={chipNeutral}>{changeType}</span>;
+  return <span className={`${badgeBase} ${cls}`}>{changeType}</span>;
 }
 
 function driftDetail(r: DriftReportRow): string {
@@ -330,25 +335,25 @@ function DriftPanel({
   if (data === null) return null;
   const unack = data.reports.filter((r) => r.acknowledgedAt === null);
   return (
-    <div className="mb-3 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2.5">
+    <div className="mb-3 rounded-lg border border-line bg-paper px-3 py-2.5">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-        <span className="text-[12px] font-semibold text-stone-700">Catalog drift</span>
+        <span className="text-[12px] font-semibold text-muted">Catalog drift</span>
         {unack.length === 0 ? (
-          <span className="text-[12px] text-stone-500">
+          <span className="text-[12px] text-muted">
             Live catalog matches the cached tool list — no drift detected.
           </span>
         ) : (
-          <span className="flex items-center gap-1 text-[12px] font-medium text-amber-700">
-            <AlertTriangle className="h-3.5 w-3.5" />
+          <span className="flex items-center gap-1.5 rounded-md border border-line bg-needs-tint px-2 py-1 text-[12px] font-medium text-ink">
+            <span className="aos-shape aos-shape--needs aos-shape--edged shrink-0" role="img" aria-label="Warning" />
             {unack.length} unacknowledged change{unack.length === 1 ? "" : "s"}
           </span>
         )}
       </div>
       {unack.length > 0 && (
-        <div className="mt-2 overflow-hidden rounded-lg border border-stone-200 bg-white">
+        <div className="mt-2 overflow-hidden rounded-lg border border-line bg-paper">
           <table className="w-full text-[12px]">
             <thead>
-              <tr className="border-b border-stone-200 bg-stone-50 text-left text-[11px] uppercase tracking-wide text-stone-500">
+              <tr className="border-b border-line bg-paper text-left text-[11px] text-muted">
                 <th className="px-3 py-2 font-medium">Detected</th>
                 <th className="px-3 py-2 font-medium">Change</th>
                 <th className="px-3 py-2 font-medium">Tool</th>
@@ -358,17 +363,17 @@ function DriftPanel({
             </thead>
             <tbody>
               {unack.map((r) => (
-                <tr key={r.id} className="border-b border-stone-100 hover:bg-[var(--brand-50)]/40">
-                  <td className="whitespace-nowrap px-3 py-2 text-stone-500">
+                <tr key={r.id} className="border-b border-line hover:bg-hover-paper">
+                  <td className="whitespace-nowrap px-3 py-2 text-muted">
                     {new Date(r.detectedAt).toLocaleString()}
                   </td>
                   <td className="px-3 py-2">{driftBadge(r.changeType)}</td>
-                  <td className="px-3 py-2 font-mono text-[11px] text-stone-700">{r.toolSlug}</td>
-                  <td className="max-w-[320px] px-3 py-2 text-stone-600">{driftDetail(r)}</td>
+                  <td className="px-3 py-2 font-mono text-[11px] text-muted">{r.toolSlug}</td>
+                  <td className="max-w-[320px] px-3 py-2 text-muted">{driftDetail(r)}</td>
                   <td className="px-3 py-2">
                     <button
                       onClick={() => onAcknowledge(r.id)}
-                      className="rounded-md bg-[var(--brand-600)] px-2 py-1 text-[12px] font-medium text-white hover:bg-[var(--brand-700)]"
+                      className={BTN_REVIEW}
                     >
                       Re-approve
                     </button>
@@ -380,9 +385,9 @@ function DriftPanel({
         </div>
       )}
       {data.staleOverrides.length > 0 && (
-        <div className="mt-2 border-t border-stone-200 pt-2">
-          <div className="mb-1.5 flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-amber-700">
-            <AlertTriangle className="h-3 w-3" />
+        <div className="mt-2 border-t border-line pt-2">
+          <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold text-ink">
+            <span className="aos-shape aos-shape--needs aos-shape--edged shrink-0" role="img" aria-label="Needs re-approval" />
             Stale tier overrides — needs re-approval
           </div>
           <div className="grid gap-1.5">
@@ -394,14 +399,14 @@ function DriftPanel({
               );
               return (
                 <div key={s.toolSlug} className="flex flex-wrap items-center gap-2">
-                  <span className="font-mono text-[11px] font-medium text-stone-700">
+                  <span className="font-mono text-[11px] font-medium text-muted">
                     {s.toolSlug}
                   </span>
-                  <span className="flex-1 text-[12px] text-stone-600">{s.reason}</span>
+                  <span className="flex-1 text-[12px] text-muted">{s.reason}</span>
                   {row && (
                     <button
                       onClick={() => onAcknowledge(row.id)}
-                      className="rounded-md bg-[var(--brand-600)] px-2 py-1 text-[12px] font-medium text-white hover:bg-[var(--brand-700)]"
+                      className={BTN_REVIEW}
                     >
                       Re-approve
                     </button>
@@ -634,7 +639,7 @@ export function ActionsClient({
   return (
     <div className="flex flex-col gap-4">
       {/* Sub-tabs */}
-      <div className="flex gap-1 border-b border-stone-200">
+      <div className="flex gap-1 border-b border-line">
         {TABS.map((t) => {
           const Icon = t.icon;
           const active = tab === t.id;
@@ -644,14 +649,14 @@ export function ActionsClient({
               onClick={() => setTab(t.id)}
               className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-[13px] font-medium ${
                 active
-                  ? "border-[var(--brand-600)] text-[var(--brand-700)]"
-                  : "border-transparent text-stone-500 hover:text-stone-800"
+                  ? "border-ink text-ink"
+                  : "border-transparent text-muted hover:text-ink"
               }`}
             >
               <Icon className="h-4 w-4" />
               {t.label}
               {t.id === "approvals" && pendingCount > 0 && (
-                <span className="rounded-full bg-[var(--brand-600)] px-1.5 text-[11px] font-semibold text-white">
+                <span className="rounded-full bg-ink px-1.5 text-[11px] font-semibold text-white">
                   {pendingCount}
                 </span>
               )}
@@ -661,17 +666,18 @@ export function ActionsClient({
       </div>
 
       {error && (
-        <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-700">
-          {error}
+        <div role="alert" className="flex items-start gap-2 rounded-md border border-failed bg-failed-tint px-3 py-2 text-[13px] text-failed-text">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          <span>{error}</span>
         </div>
       )}
 
       {/* ── Connections ─────────────────────────────────────────── */}
       {tab === "connections" && (
-        <div className="overflow-hidden rounded-lg border border-stone-200 bg-white">
+        <div className="overflow-hidden rounded-lg border border-line bg-paper">
           <table className="w-full text-[13px]">
             <thead>
-              <tr className="border-b border-stone-200 bg-stone-50 text-left text-[11px] uppercase tracking-wide text-stone-500">
+              <tr className="border-b border-line bg-paper text-left text-[11px] text-muted">
                 <th className="px-3 py-2 font-medium">App</th>
                 <th className="px-3 py-2 font-medium">What agents can do</th>
                 <th className="px-3 py-2 font-medium">Status</th>
@@ -683,9 +689,9 @@ export function ActionsClient({
                 const conn = connByApp.get(app.appKey);
                 const connected = conn?.status === "connected";
                 return (
-                  <tr key={app.appKey} className="border-b border-stone-100 hover:bg-[var(--brand-50)]/40">
-                    <td className="px-3 py-2.5 font-medium text-stone-900">{app.label}</td>
-                    <td className="px-3 py-2.5 text-stone-500">{app.description}</td>
+                  <tr key={app.appKey} className="border-b border-line hover:bg-hover-paper">
+                    <td className="px-3 py-2.5 font-medium text-ink">{app.label}</td>
+                    <td className="px-3 py-2.5 text-muted">{app.description}</td>
                     <td className="px-3 py-2.5">{statusBadge(conn?.status ?? "not connected")}</td>
                     <td className="px-3 py-2.5 text-right">
                       {connected ? (
@@ -696,7 +702,7 @@ export function ActionsClient({
                               await api(`/api/integrations/actions/connections/${conn!.id}`, { method: "DELETE" });
                             })
                           }
-                          className="rounded-md border border-stone-200 px-2.5 py-1 text-[12px] text-stone-600 hover:bg-stone-50 disabled:opacity-50"
+                          className={BTN_SECONDARY}
                         >
                           {busy === `revoke-${conn.id}` ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Revoke"}
                         </button>
@@ -704,7 +710,7 @@ export function ActionsClient({
                         <button
                           disabled={busy === `connect-${app.appKey}`}
                           onClick={() => connect(app.appKey)}
-                          className="inline-flex items-center gap-1 rounded-md bg-[var(--brand-600)] px-2.5 py-1 text-[12px] font-medium text-white hover:bg-[var(--brand-700)] disabled:opacity-50"
+                          className={BTN_PRIMARY}
                         >
                           {busy === `connect-${app.appKey}` ? (
                             <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -720,7 +726,7 @@ export function ActionsClient({
               })}
             </tbody>
           </table>
-          <div className="border-t border-stone-200 bg-stone-50 px-3 py-2 text-[12px] text-stone-500">
+          <div className="border-t border-line bg-paper px-3 py-2 text-[12px] text-muted">
             OAuth runs on Composio&apos;s hosted flow — Marketr stores only the connection
             reference, never your app tokens.
           </div>
@@ -733,20 +739,20 @@ export function ActionsClient({
           {/* Filter toolbar: search + category dropdown (house pattern) */}
           <div className="flex flex-wrap items-center gap-2">
             <div className="relative">
-              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-400" />
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-subtle" />
               <input
                 value={toolkitSearch}
                 onChange={(e) => setToolkitSearch(e.target.value)}
                 placeholder="Search toolkits…"
                 aria-label="Search toolkits"
-                className="rounded-md border border-stone-200 bg-white py-1.5 pl-8 pr-2 text-[13px] placeholder:text-stone-400 focus:border-[var(--brand-600)] focus:outline-none"
+                className={`${INPUT_CLS} pl-8 pr-2`}
               />
             </div>
             <select
               value={toolkitCategory}
               onChange={(e) => setToolkitCategory(e.target.value)}
               aria-label="Filter by category"
-              className="rounded-md border border-stone-200 bg-white px-2 py-1.5 text-[13px]"
+              className={INPUT_CLS}
             >
               <option value="all">All categories</option>
               {TOOLKIT_CATEGORIES.map((c) => (
@@ -755,17 +761,17 @@ export function ActionsClient({
                 </option>
               ))}
             </select>
-            <span className="text-[12px] text-stone-500">
+            <span className="text-[12px] text-muted">
               {enabledToolkitCount} of {toolkits.length} enabled — agents can only
               propose tools from enabled toolkits; anything else is refused by
               the gate.
             </span>
           </div>
 
-          <div className="overflow-hidden rounded-lg border border-stone-200 bg-white">
+          <div className="overflow-hidden rounded-lg border border-line bg-paper">
             <table className="w-full text-[13px]">
               <thead>
-                <tr className="border-b border-stone-200 bg-stone-50 text-left text-[11px] uppercase tracking-wide text-stone-500">
+                <tr className="border-b border-line bg-paper text-left text-[11px] text-muted">
                   <th className="px-3 py-2 font-medium">Toolkit</th>
                   <th className="px-3 py-2 font-medium">Category</th>
                   <th className="px-3 py-2 font-medium">Tools</th>
@@ -777,13 +783,13 @@ export function ActionsClient({
               </thead>
               <tbody>
                 {visibleToolkits.map((t) => (
-                  <tr key={t.toolkitSlug} className="border-b border-stone-100 hover:bg-[var(--brand-50)]/40">
+                  <tr key={t.toolkitSlug} className="border-b border-line hover:bg-hover-paper">
                     <td className="max-w-xs px-3 py-2.5">
-                      <div className="font-medium text-stone-900">{t.label}</div>
-                      <div className="text-[12px] text-stone-500">{t.description}</div>
+                      <div className="font-medium text-ink">{t.label}</div>
+                      <div className="text-[12px] text-muted">{t.description}</div>
                     </td>
                     <td className="px-3 py-2.5">{categoryBadge(t.category)}</td>
-                    <td className="px-3 py-2.5 text-stone-700">{t.toolCount}</td>
+                    <td className="px-3 py-2.5 text-muted">{t.toolCount}</td>
                     <td className="px-3 py-2.5">{tierBreakdownBadges(t.tierBreakdown)}</td>
                     <td className="px-3 py-2.5">
                       {statusBadge(t.connected ? "connected" : "not connected")}
@@ -796,11 +802,11 @@ export function ActionsClient({
                         disabled={busy === `toggle-${t.toolkitSlug}`}
                         onClick={() => toggleToolkit(t.toolkitSlug, !t.enabled)}
                         className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors disabled:opacity-50 ${
-                          t.enabled ? "bg-[var(--brand-600)]" : "bg-stone-300"
+                          t.enabled ? "bg-ink" : "bg-disabled-fg"
                         }`}
                       >
                         <span
-                          className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                          className={`inline-block h-4 w-4 transform rounded-full bg-paper shadow transition-transform ${
                             t.enabled ? "translate-x-4" : "translate-x-0.5"
                           }`}
                         />
@@ -811,7 +817,7 @@ export function ActionsClient({
                         <button
                           disabled={busy === `connect-${t.appKey}`}
                           onClick={() => connect(t.appKey)}
-                          className="inline-flex items-center gap-1 rounded-md bg-[var(--brand-600)] px-2.5 py-1 text-[12px] font-medium text-white hover:bg-[var(--brand-700)] disabled:opacity-50"
+                          className={BTN_PRIMARY}
                         >
                           {busy === `connect-${t.appKey}` ? (
                             <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -821,21 +827,21 @@ export function ActionsClient({
                           Connect
                         </button>
                       ) : (
-                        <span className="text-[12px] text-stone-400">—</span>
+                        <span className="text-[12px] text-subtle">—</span>
                       )}
                     </td>
                   </tr>
                 ))}
                 {visibleToolkits.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="px-3 py-8 text-center text-[13px] text-stone-400">
+                    <td colSpan={7} className="px-3 py-8 text-center text-[13px] text-subtle">
                       No toolkits match — try a different search or category.
                     </td>
                   </tr>
                 )}
               </tbody>
             </table>
-            <div className="border-t border-stone-200 bg-stone-50 px-3 py-2 text-[12px] text-stone-500">
+            <div className="border-t border-line bg-paper px-3 py-2 text-[12px] text-muted">
               Every toolkit is browsable from day one (full firehose, no packs).
               Enablement is à la carte; unclassified tools always land
               high-gated and need your approval plus second confirmation.
@@ -851,7 +857,7 @@ export function ActionsClient({
             <select
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
-              className="rounded-md border border-stone-200 bg-white px-2 py-1.5 text-[13px]"
+              className={INPUT_CLS}
             >
               <option value="pending">Pending</option>
               <option value="approved">Approved</option>
@@ -864,21 +870,21 @@ export function ActionsClient({
               <button
                 disabled={busy === "batch"}
                 onClick={batchApprove}
-                className="inline-flex items-center gap-1 rounded-md bg-[var(--brand-600)] px-2.5 py-1.5 text-[12px] font-medium text-white hover:bg-[var(--brand-700)] disabled:opacity-50"
+                className={BTN_APPROVE}
               >
                 {busy === "batch" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
                 Approve {selected.size} selected
               </button>
             )}
-            <span className="text-[12px] text-stone-500">
+            <span className="text-[12px] text-muted">
               Approvals expire automatically — stale proposals can never execute.
             </span>
           </div>
 
-          <div className="overflow-hidden rounded-lg border border-stone-200 bg-white">
+          <div className="overflow-hidden rounded-lg border border-line bg-paper">
             <table className="w-full text-[13px]">
               <thead>
-                <tr className="border-b border-stone-200 bg-stone-50 text-left text-[11px] uppercase tracking-wide text-stone-500">
+                <tr className="border-b border-line bg-paper text-left text-[11px] text-muted">
                   <th className="w-8 px-3 py-2" />
                   <th className="px-3 py-2 font-medium">What will happen</th>
                   <th className="px-3 py-2 font-medium">Tool</th>
@@ -890,7 +896,7 @@ export function ActionsClient({
               <tbody>
                 {visibleApprovals.map((a) => (
                   <Fragment key={a.id}>
-                    <tr className="border-b border-stone-100 hover:bg-[var(--brand-50)]/40">
+                    <tr className="border-b border-line hover:bg-hover-paper">
                       <td className="px-3 py-2.5">
                         {a.status === "pending" && (
                           <input
@@ -902,19 +908,19 @@ export function ActionsClient({
                               else next.delete(a.id);
                               setSelected(next);
                             }}
-                            className="h-3.5 w-3.5 accent-[var(--brand-600)]"
+                            className="h-3.5 w-3.5 accent-ink"
                           />
                         )}
                       </td>
-                      <td className="max-w-md px-3 py-2.5 text-stone-800">{a.plainSummary}</td>
-                      <td className="px-3 py-2.5 font-mono text-[11px] text-stone-500">{a.toolName}</td>
+                      <td className="max-w-md px-3 py-2.5 text-ink">{a.plainSummary}</td>
+                      <td className="px-3 py-2.5 font-mono text-[11px] text-muted">{a.toolName}</td>
                       <td className="px-3 py-2.5">{tierBadge(a.riskTier)}</td>
                       <td className="px-3 py-2.5">{statusBadge(a.status)}</td>
                       <td className="px-3 py-2.5">
                         <div className="flex justify-end gap-1.5">
                           <button
                             onClick={() => openDetail(a.id)}
-                            className="rounded-md border border-stone-200 px-2 py-1 text-[12px] text-stone-600 hover:bg-stone-50"
+                            className={BTN_SECONDARY}
                           >
                             {expanded === a.id ? "Hide" : "Details"}
                           </button>
@@ -924,7 +930,7 @@ export function ActionsClient({
                                 disabled={busy === `decide-${a.id}`}
                                 onClick={() => decide(a.id, "approved")}
                                 aria-label={`Approve ${a.toolName}`}
-                                className="inline-flex items-center gap-1 rounded-md bg-[var(--brand-600)] px-2 py-1 text-[12px] font-medium text-white hover:bg-[var(--brand-700)] disabled:opacity-50"
+                                className={BTN_APPROVE}
                               >
                                 <Check className="h-3.5 w-3.5" /> Approve
                               </button>
@@ -932,7 +938,7 @@ export function ActionsClient({
                                 disabled={busy === `decide-${a.id}`}
                                 onClick={() => setDenyFor(a.id)}
                                 aria-label={`Deny ${a.toolName}`}
-                                className="inline-flex items-center gap-1 rounded-md border border-red-200 px-2 py-1 text-[12px] text-red-700 hover:bg-red-50 disabled:opacity-50"
+                                className={BTN_DENY}
                               >
                                 <X className="h-3.5 w-3.5" /> Deny
                               </button>
@@ -942,7 +948,7 @@ export function ActionsClient({
                             <button
                               disabled={busy === `exec-${a.id}`}
                               onClick={() => executeApproval(a)}
-                              className="inline-flex items-center gap-1 rounded-md border border-stone-200 px-2 py-1 text-[12px] text-stone-700 hover:bg-stone-50 disabled:opacity-50"
+                              className={BTN_SECONDARY}
                             >
                               {busy === `exec-${a.id}` ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
                               Execute
@@ -955,7 +961,7 @@ export function ActionsClient({
                                 setConfirmExec(a.id);
                                 if (expanded !== a.id) await openDetail(a.id);
                               }}
-                              className="inline-flex items-center gap-1 rounded-md border border-red-200 px-2 py-1 text-[12px] font-medium text-red-700 hover:bg-red-50 disabled:opacity-50"
+                              className={BTN_DENY}
                             >
                               <AlertTriangle className="h-3.5 w-3.5" />
                               Execute
@@ -965,24 +971,24 @@ export function ActionsClient({
                       </td>
                     </tr>
                     {confirmExec === a.id && a.status === "approved" && a.riskTier === "high" && (
-                      <tr key={`${a.id}-confirm`} className="border-b border-red-100 bg-red-50/60">
+                      <tr key={`${a.id}-confirm`} className="border-b border-failed bg-failed-tint">
                         <td />
                         <td colSpan={5} className="px-3 py-3">
                           {(() => {
                             const bulk = bulkFor(a);
                             return (
-                              <div className="rounded-md border border-red-200 bg-white p-3">
-                                <div className="flex items-center gap-1.5 text-[13px] font-semibold text-red-800">
+                              <div className="rounded-md border border-failed bg-paper p-3">
+                                <div className="flex items-center gap-1.5 text-[13px] font-semibold text-failed-text">
                                   <AlertTriangle className="h-4 w-4" />
                                   Destructive action — explicit confirmation required
                                 </div>
-                                <div className="mt-1 text-[12px] text-stone-600">{a.plainSummary}</div>
+                                <div className="mt-1 text-[12px] text-muted">{a.plainSummary}</div>
                                 {bulk ? (
-                                  <div className="mt-1 text-[12px] font-medium text-red-700">
+                                  <div className="mt-1 text-[12px] font-medium text-failed-text">
                                     Bulk review: {describeBulk(bulk)}
                                   </div>
                                 ) : (
-                                  <div className="mt-1 text-[12px] text-stone-500">
+                                  <div className="mt-1 text-[12px] text-muted">
                                     {expanded === a.id ? "Single target." : "Loading target details…"}
                                   </div>
                                 )}
@@ -995,7 +1001,7 @@ export function ActionsClient({
                                         ...(bulk ? { confirmedBulkCount: bulk.count } : {}),
                                       })
                                     }
-                                    className="inline-flex items-center gap-1 rounded-md bg-red-600 px-2.5 py-1 text-[12px] font-medium text-white hover:bg-red-700 disabled:opacity-50"
+                                    className={BTN_EXEC}
                                   >
                                     {busy === `exec-${a.id}` ? (
                                       <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -1006,7 +1012,7 @@ export function ActionsClient({
                                   </button>
                                   <button
                                     onClick={() => setConfirmExec(null)}
-                                    className="rounded-md border border-stone-200 px-2.5 py-1 text-[12px] text-stone-600 hover:bg-stone-50"
+                                    className={BTN_SECONDARY}
                                   >
                                     Cancel
                                   </button>
@@ -1018,15 +1024,15 @@ export function ActionsClient({
                       </tr>
                     )}
                     {expanded === a.id && detail && (
-                      <tr key={`${a.id}-detail`} className="border-b border-stone-100 bg-stone-50/60">
+                      <tr key={`${a.id}-detail`} className="border-b border-line bg-paper/60">
                         <td />
                         <td colSpan={5} className="px-3 py-3">
                           <div className="grid gap-3 md:grid-cols-2">
                             <div>
-                              <div className="mb-1 text-[11px] font-medium uppercase tracking-wide text-stone-500">
+                              <div className="mb-1 text-[11px] font-medium text-muted">
                                 Proposed arguments (redacted)
                               </div>
-                              <pre className="max-h-48 overflow-auto rounded-md border border-stone-200 bg-white p-2 font-mono text-[11px] text-stone-700">
+                              <pre className="max-h-48 overflow-auto rounded-md border border-line bg-paper p-2 font-mono text-[11px] text-muted">
                                 {JSON.stringify((detail as { proposedArgs?: unknown }).proposedArgs ?? {}, null, 2)}
                               </pre>
                               {editing === a.id ? (
@@ -1035,7 +1041,7 @@ export function ActionsClient({
                                     value={editText}
                                     onChange={(e) => setEditText(e.target.value)}
                                     rows={6}
-                                    className="w-full rounded-md border border-stone-200 p-2 font-mono text-[11px]"
+                                    className={`${INPUT_CLS} h-auto py-2 font-mono text-[11px]`}
                                   />
                                   <div className="mt-1 flex gap-1.5">
                                     <button
@@ -1047,13 +1053,13 @@ export function ActionsClient({
                                           setError("Edited args are not valid JSON.");
                                         }
                                       }}
-                                      className="rounded-md bg-[var(--brand-600)] px-2 py-1 text-[12px] font-medium text-white hover:bg-[var(--brand-700)]"
+                                      className={BTN_APPROVE}
                                     >
                                       Approve with edits
                                     </button>
                                     <button
                                       onClick={() => setEditing(null)}
-                                      className="rounded-md border border-stone-200 px-2 py-1 text-[12px] text-stone-600"
+                                      className={BTN_SECONDARY}
                                     >
                                       Cancel
                                     </button>
@@ -1068,7 +1074,7 @@ export function ActionsClient({
                                       );
                                       setEditing(a.id);
                                     }}
-                                    className="mt-2 inline-flex items-center gap-1 rounded-md border border-stone-200 px-2 py-1 text-[12px] text-stone-600 hover:bg-white"
+                                    className="mt-2 inline-flex items-center gap-1 rounded-md border border-line px-2 py-1 text-[12px] text-muted hover:bg-paper"
                                   >
                                     <Pencil className="h-3.5 w-3.5" /> Edit args before approving
                                   </button>
@@ -1076,30 +1082,30 @@ export function ActionsClient({
                               )}
                             </div>
                             <div>
-                              <div className="mb-1 text-[11px] font-medium uppercase tracking-wide text-stone-500">
+                              <div className="mb-1 text-[11px] font-medium text-muted">
                                 Audit trail
                               </div>
-                              <ul className="space-y-1 text-[12px] text-stone-600">
+                              <ul className="space-y-1 text-[12px] text-muted">
                                 {((detail as { auditTrail?: Array<{ at: string; actor: string; event: string; detail?: string }> }).auditTrail ?? []).map(
                                   (ev, i) => (
-                                    <li key={i} className="rounded border border-stone-200 bg-white px-2 py-1">
-                                      <span className="font-medium text-stone-800">{ev.event}</span>
-                                      <span className="text-stone-400"> · {ev.actor}</span>
-                                      {ev.detail && <div className="text-stone-500">{ev.detail}</div>}
+                                    <li key={i} className="rounded border border-line bg-paper px-2 py-1">
+                                      <span className="font-medium text-ink">{ev.event}</span>
+                                      <span className="text-subtle"> · {ev.actor}</span>
+                                      {ev.detail && <div className="text-muted">{ev.detail}</div>}
                                     </li>
                                   ),
                                 )}
                               </ul>
                               {a.decisionReason && (
-                                <div className="mt-2 text-[12px] text-stone-600">
+                                <div className="mt-2 text-[12px] text-muted">
                                   <span className="font-medium">Decision reason:</span> {a.decisionReason}
                                 </div>
                               )}
                             </div>
                           </div>
                           {denyFor === a.id && (
-                            <div className="mt-3 rounded-md border border-red-200 bg-red-50/50 p-2">
-                              <div className="mb-1 text-[12px] font-medium text-red-800">
+                            <div className="mt-3 rounded-md border border-failed bg-failed-tint/50 p-2">
+                              <div className="mb-1 text-[12px] font-medium text-failed-text">
                                 Deny with reason (the action is killed):
                               </div>
                               <div className="flex gap-1.5">
@@ -1107,17 +1113,17 @@ export function ActionsClient({
                                   value={denyReason}
                                   onChange={(e) => setDenyReason(e.target.value)}
                                   placeholder="Why is this denied?"
-                                  className="flex-1 rounded-md border border-stone-200 px-2 py-1 text-[12px]"
+                                  className={`${INPUT_CLS} flex-1 text-[12px]`}
                                 />
                                 <button
                                   onClick={() => decide(a.id, "denied", denyReason || "Denied without reason")}
-                                  className="rounded-md bg-red-600 px-2 py-1 text-[12px] font-medium text-white hover:bg-red-700"
+                                  className={BTN_EXEC}
                                 >
                                   Confirm deny
                                 </button>
                                 <button
                                   onClick={() => setDenyFor(null)}
-                                  className="rounded-md border border-stone-200 px-2 py-1 text-[12px] text-stone-600"
+                                  className={BTN_SECONDARY}
                                 >
                                   Cancel
                                 </button>
@@ -1131,7 +1137,7 @@ export function ActionsClient({
                 ))}
                 {visibleApprovals.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="px-3 py-8 text-center text-[13px] text-stone-400">
+                    <td colSpan={6} className="px-3 py-8 text-center text-[13px] text-subtle">
                       No approvals here yet — proposed agent actions will appear for review.
                     </td>
                   </tr>
@@ -1147,10 +1153,10 @@ export function ActionsClient({
         <>
           <DriftPanel data={drift} onAcknowledge={acknowledgeDrift} />
           <BudgetPanel budget={initialBudget} attribution={initialAttribution} />
-          <div className="overflow-hidden rounded-lg border border-stone-200 bg-white">
+          <div className="overflow-hidden rounded-lg border border-line bg-paper">
           <table className="w-full text-[13px]">
             <thead>
-              <tr className="border-b border-stone-200 bg-stone-50 text-left text-[11px] uppercase tracking-wide text-stone-500">
+              <tr className="border-b border-line bg-paper text-left text-[11px] text-muted">
                 <th className="px-3 py-2 font-medium">When</th>
                 <th className="px-3 py-2 font-medium">Tool</th>
                 <th className="px-3 py-2 font-medium">App</th>
@@ -1161,27 +1167,27 @@ export function ActionsClient({
             </thead>
             <tbody>
               {logs.map((l) => (
-                <tr key={l.id} className="border-b border-stone-100 hover:bg-[var(--brand-50)]/40">
-                  <td className="whitespace-nowrap px-3 py-2.5 text-stone-500">
+                <tr key={l.id} className="border-b border-line hover:bg-hover-paper">
+                  <td className="whitespace-nowrap px-3 py-2.5 text-muted">
                     {new Date(l.createdAt).toLocaleString()}
                   </td>
-                  <td className="px-3 py-2.5 font-mono text-[11px] text-stone-700">{l.toolName}</td>
-                  <td className="px-3 py-2.5 text-stone-600">{l.appKey}</td>
+                  <td className="px-3 py-2.5 font-mono text-[11px] text-muted">{l.toolName}</td>
+                  <td className="px-3 py-2.5 text-muted">{l.appKey}</td>
                   <td className="px-3 py-2.5">{tierBadge(l.riskTier)}</td>
                   <td className="px-3 py-2.5">{statusBadge(l.status)}</td>
-                  <td className="max-w-[180px] truncate px-3 py-2.5 text-stone-500">{l.executedBy}</td>
+                  <td className="max-w-[180px] truncate px-3 py-2.5 text-muted">{l.executedBy}</td>
                 </tr>
               ))}
               {logs.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-3 py-8 text-center text-[13px] text-stone-400">
+                  <td colSpan={6} className="px-3 py-8 text-center text-[13px] text-subtle">
                     No actions executed yet — every execution is logged here.
                   </td>
                 </tr>
               )}
             </tbody>
           </table>
-          <div className="border-t border-stone-200 bg-stone-50 px-3 py-2 text-[12px] text-stone-500">
+          <div className="border-t border-line bg-paper px-3 py-2 text-[12px] text-muted">
             Reads and draft-creators execute automatically and appear here; writes and
             destructive actions only after your approval.
           </div>

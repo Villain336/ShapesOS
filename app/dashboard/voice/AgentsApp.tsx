@@ -72,7 +72,7 @@ export function AgentsApp() {
   };
 
   const toggleKill = async (a: Agent) => {
-    const verb = a.killSwitch ? "RELEASE the kill switch for" : "ENGAGE the kill switch for";
+    const verb = a.killSwitch ? "Release the kill switch for" : "Engage the kill switch for";
     if (!confirm(`${verb} "${a.name}"?`)) return;
     await api(`/api/voice/agents/${a.id}/kill-switch`, {
       method: "POST",
@@ -94,8 +94,8 @@ export function AgentsApp() {
   return (
     <div className="flex flex-col gap-4">
       <div>
-        <h1 className="text-xl font-bold tracking-tight text-stone-900">Voice Agents</h1>
-        <p className="mt-0.5 text-[13px] text-stone-500">
+        <h1 className="aos-heading">Voice Agents</h1>
+        <p className="mt-0.5 text-[13px] text-muted">
           LiveKit follow-up agents that qualify leads and book meetings — consent-gated, disclosure-first.
         </p>
       </div>
@@ -106,7 +106,7 @@ export function AgentsApp() {
         The kill switch refuses all new sessions for an agent, immediately.
       </Note>
 
-      <div className="flex flex-wrap items-end gap-2 rounded-md border border-stone-200 bg-white p-3">
+      <div className="flex flex-wrap items-end gap-2 rounded-md border border-line bg-paper p-3">
         <input className={inputCls} placeholder="Agent name" value={name} onChange={(e) => setName(e.target.value)} />
         <input className={inputCls} placeholder="VoiceStudio voice id" value={voiceId} onChange={(e) => setVoiceId(e.target.value)} />
         <select className={inputCls} value={purpose} onChange={(e) => setPurpose(e.target.value)}>
@@ -119,7 +119,7 @@ export function AgentsApp() {
         </button>
       </div>
 
-      <div className="overflow-x-auto rounded-md border border-stone-200 bg-white">
+      <div className="overflow-x-auto rounded-md border border-line bg-paper">
         <table className={tableCls}>
           <thead className={theadCls}>
             <tr>
@@ -147,7 +147,7 @@ export function AgentsApp() {
             {agents.map((a) => (
               <tr key={a.id} className={rowCls}>
                 <td className={tdCls}>
-                  <Link href={`/dashboard/voice/sessions?agentId=${a.id}`} className="font-medium text-stone-900 hover:text-[var(--brand-700)]">
+                  <Link href={`/dashboard/voice/sessions?agentId=${a.id}`} className="font-medium text-ink hover:text-ink">
                     {a.name}
                   </Link>
                 </td>
@@ -158,12 +158,12 @@ export function AgentsApp() {
                 <td className={tdCls}>{a._count.scripts}</td>
                 <td className={tdCls}>
                   <button
-                    className={a.killSwitch ? "inline-flex items-center gap-1.5 rounded-md bg-red-600 px-2.5 py-1 text-[12px] font-medium text-white hover:bg-red-700" : btnGhost}
+                    className={a.killSwitch ? "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-night-hover" : btnGhost}
                     onClick={() => toggleKill(a)}
                     title={a.killSwitch ? "Kill switch engaged — release" : "Engage kill switch"}
                   >
                     <ShieldAlert className="h-3.5 w-3.5" />
-                    {a.killSwitch ? "ENGAGED" : "Off"}
+                    {a.killSwitch ? "Engaged" : "Off"}
                   </button>
                 </td>
                 <td className={`${tdCls} text-right`}>
@@ -176,7 +176,7 @@ export function AgentsApp() {
           </tbody>
         </table>
       </div>
-      <div className="flex items-center gap-2 text-[12px] text-stone-500">
+      <div className="flex items-center gap-2 text-[12px] text-muted">
         <Pause className="h-3.5 w-3.5" />
         <Play className="h-3.5 w-3.5" />
         Pausing/archiving an agent also refuses new sessions (gate a). Delete is blocked while session history exists.

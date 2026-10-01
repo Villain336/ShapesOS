@@ -237,7 +237,7 @@ function easeOutCubic(t: number): number {
 function ZoomControls() {
   const { zoomIn, zoomOut, fitView } = useReactFlow();
   const btn =
-    "flex h-8 w-8 items-center justify-center rounded-md border border-stone-200 bg-white text-stone-600 shadow-sm transition hover:text-stone-900 active:scale-[0.97]";
+    "flex h-8 w-8 items-center justify-center rounded-full border border-line bg-paper text-muted shadow-control transition hover:text-ink active:scale-[0.97]";
   return (
     <div className="absolute bottom-3 right-3 z-10 flex gap-1.5">
       <button type="button" className={btn} onClick={() => zoomIn({ duration: 200 })} aria-label="Zoom in">
@@ -459,7 +459,7 @@ function GraphCanvas({
   const nodeCount = nodes.length;
 
   return (
-    <div ref={wrapRef} className="relative h-[560px] overflow-hidden rounded-lg border border-stone-200 bg-white">
+    <div ref={wrapRef} className="relative h-[560px] overflow-hidden rounded-lg border border-line bg-paper">
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -472,34 +472,34 @@ function GraphCanvas({
         minZoom={0.25}
         maxZoom={2}
         proOptions={{ hideAttribution: true }}
-        className="bg-[#FAFAF7]"
+        className="bg-canvas"
       >
         <Background color="#e7e5e4" gap={26} size={1} />
         <ZoomControls />
       </ReactFlow>
 
       {loading && (
-        <div className="absolute inset-0 z-20 flex items-center justify-center bg-white/70">
-          <span className="flex items-center gap-2 text-[13px] text-stone-500">
+        <div className="absolute inset-0 z-20 flex items-center justify-center bg-paper/70">
+          <span className="flex items-center gap-2 text-[13px] text-muted">
             <Loader2 size={15} className="animate-spin" /> Laying out the graph…
           </span>
         </div>
       )}
       {error && (
-        <div className="absolute inset-x-0 top-3 z-20 mx-auto w-fit rounded-md border border-red-200 bg-red-50 px-3 py-1.5 text-[12.5px] text-red-700">
+        <div role="alert" className="absolute inset-x-0 top-3 z-20 mx-auto w-fit rounded-md border border-failed bg-failed-tint px-3 py-1.5 text-[12.5px] text-failed-text">
           Couldn&apos;t load the graph: {error}
         </div>
       )}
       {!loading && !error && nodeCount === 0 && (
         <div className="absolute inset-0 z-20 flex items-center justify-center">
-          <p className="max-w-sm text-center text-[13px] text-stone-400">
+          <p className="max-w-sm text-center text-[13px] text-subtle">
             No entities yet. Seed the graph from the onboarding bootstrap or connect a source —
             every fact lands here with provenance.
           </p>
         </div>
       )}
       {!loading && !error && nodeCount > 0 && (
-        <div className="absolute left-3 top-3 z-10 rounded-full border border-stone-200 bg-white/90 px-2.5 py-1 text-[11.5px] font-medium text-stone-600">
+        <div className="absolute left-3 top-3 z-10 rounded-full border border-line bg-paper/90 px-2.5 py-1 text-[11.5px] font-medium text-muted">
           {nodeCount} nodes · {edges.length} edges · drag to move, scroll to zoom
         </div>
       )}

@@ -38,11 +38,11 @@ export function ApproveButton({ id, draftReply }: { id: string; draftReply: stri
         type="button"
         onClick={act}
         disabled={busy}
-        className="rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs font-medium text-stone-800 hover:border-stone-400 disabled:opacity-50"
+        className="inline-flex h-control-sm items-center gap-1.5 rounded-full bg-done px-4 text-sm font-semibold text-white aos-press hover:bg-done/90 disabled:opacity-40"
       >
         {busy ? "Signing…" : "Approve / sign"}
       </button>
-      {result && <span className="text-xs text-stone-500">{result}</span>}
+      {result && <span className="text-xs text-muted">{result}</span>}
     </span>
   );
 }
@@ -73,11 +73,11 @@ export function PostButton({ id }: { id: string }) {
         type="button"
         onClick={act}
         disabled={busy}
-        className="rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-violet-700 disabled:opacity-40"
+        className="inline-flex h-control-sm items-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-night-hover disabled:opacity-40"
       >
         {busy ? "Posting…" : "Post to GBP"}
       </button>
-      {result && <span className="text-xs text-stone-500">{result}</span>}
+      {result && <span className="text-xs text-muted">{result}</span>}
     </span>
   );
 }

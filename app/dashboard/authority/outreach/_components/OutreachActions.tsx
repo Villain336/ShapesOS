@@ -6,7 +6,6 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button } from "@/components/vault/shadcn/button";
 import { Input } from "@/components/vault/shadcn/input";
 import { Textarea } from "@/components/vault/shadcn/textarea";
 import { Label } from "@/components/vault/shadcn/label";
@@ -40,8 +39,23 @@ async function patchJson(url: string, body: unknown) {
 
 function ActionNote({ note }: { note: string | null }) {
   if (!note) return null;
-  return <span className="text-xs text-stone-500">{note}</span>;
+  return <span className="text-xs text-muted">{note}</span>;
 }
+
+// Agentic OS pressables. Black = primary, white = secondary, done = approve/complete,
+// running = agent-run verbs. Compact xs variants for table-density rows.
+const btnP =
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-night-hover disabled:opacity-40";
+const btnS =
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-paper px-4 text-sm font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper disabled:opacity-40";
+const btnD =
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-done px-4 text-sm font-semibold text-white aos-press hover:bg-done/90 disabled:opacity-40";
+const btnR =
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-running px-4 text-sm font-semibold text-white aos-press hover:bg-running/90 disabled:opacity-40";
+const btnPXs =
+  "inline-flex h-7 items-center gap-1 rounded-full bg-ink px-2.5 text-xs font-semibold text-white aos-press hover:bg-night-hover disabled:opacity-40";
+const btnSXs =
+  "inline-flex h-7 items-center gap-1 rounded-full bg-paper px-2.5 text-xs font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper disabled:opacity-40";
 
 function useAction() {
   const router = useRouter();
@@ -76,14 +90,14 @@ export function CreateCampaignForm({ domains }: { domains: { id: string; domain:
   const [open, setOpen] = useState(false);
   if (!open) {
     return (
-      <Button size="sm" onClick={() => setOpen(true)}>
+      <button className={btnP} onClick={() => setOpen(true)}>
         New campaign
-      </Button>
+      </button>
     );
   }
   return (
     <form
-      className="space-y-3 rounded-lg border border-stone-200 bg-white p-4"
+      className="space-y-3 rounded-lg border border-line bg-paper p-4"
       onSubmit={(e) => {
         e.preventDefault();
         void run("Create campaign", async () => {
@@ -99,13 +113,13 @@ export function CreateCampaignForm({ domains }: { domains: { id: string; domain:
     >
       <div className="grid gap-3 md:grid-cols-2">
         <div className="space-y-1.5">
-          <Label className="text-[13px] font-medium text-stone-700">Campaign name</Label>
-          <Input className="border-stone-200 bg-white text-[13px] placeholder:text-stone-400 focus-visible:border-violet-400 focus-visible:ring-violet-200/60" value={name} onChange={(e) => setName(e.target.value)} placeholder="Q4 guest-post push" required />
+          <Label className="text-[13px] font-medium text-muted">Campaign name</Label>
+          <Input className="border-line bg-paper text-[13px] placeholder:text-subtle focus-visible:border-focus focus-visible:ring-[var(--aos-focus-halo)]" value={name} onChange={(e) => setName(e.target.value)} placeholder="Q4 guest-post push" required />
         </div>
         <div className="space-y-1.5">
-          <Label className="text-[13px] font-medium text-stone-700">Ladder depth</Label>
+          <Label className="text-[13px] font-medium text-muted">Ladder depth</Label>
           <Select value={depth} onValueChange={(v) => setDepth(v ?? "1")}>
-            <SelectTrigger className="border-stone-200 bg-white text-[13px] placeholder:text-stone-400 focus-visible:border-violet-400 focus-visible:ring-violet-200/60"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="border-line bg-paper text-[13px] placeholder:text-subtle focus-visible:border-focus focus-visible:ring-[var(--aos-focus-halo)]"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="1">1 — Prospecting only (no sending)</SelectItem>
               <SelectItem value="2">2 — Drafts for human send</SelectItem>
@@ -114,28 +128,28 @@ export function CreateCampaignForm({ domains }: { domains: { id: string; domain:
           </Select>
         </div>
         <div className="space-y-1.5">
-          <Label className="text-[13px] font-medium text-stone-700">Sending domain</Label>
+          <Label className="text-[13px] font-medium text-muted">Sending domain</Label>
           <Select value={sendingDomainId} onValueChange={(v) => setSendingDomainId(v ?? "")}>
-            <SelectTrigger className="border-stone-200 bg-white text-[13px] placeholder:text-stone-400 focus-visible:border-violet-400 focus-visible:ring-violet-200/60"><SelectValue placeholder="Choose a domain…" /></SelectTrigger>
+            <SelectTrigger className="border-line bg-paper text-[13px] placeholder:text-subtle focus-visible:border-focus focus-visible:ring-[var(--aos-focus-halo)]"><SelectValue placeholder="Choose a domain…" /></SelectTrigger>
             <SelectContent>
               {domains.map((d) => (
                 <SelectItem key={d.id} value={d.id}>{d.domain}</SelectItem>
               ))}
             </SelectContent>
           </Select>
-          <p className="text-[11px] text-stone-500">Depth 3 requires a secondary domain. Primary domains never cold-send.</p>
+          <p className="text-[11px] text-muted">Depth 3 requires a secondary domain. Primary domains never cold-send.</p>
         </div>
         <div className="space-y-1.5">
-          <Label className="text-[13px] font-medium text-stone-700">Daily cap (1–50)</Label>
-          <Input className="border-stone-200 bg-white text-[13px] placeholder:text-stone-400 focus-visible:border-violet-400 focus-visible:ring-violet-200/60" type="number" min={1} max={50} value={dailyCap} onChange={(e) => setDailyCap(e.target.value)} />
+          <Label className="text-[13px] font-medium text-muted">Daily cap (1–50)</Label>
+          <Input className="border-line bg-paper text-[13px] placeholder:text-subtle focus-visible:border-focus focus-visible:ring-[var(--aos-focus-halo)]" type="number" min={1} max={50} value={dailyCap} onChange={(e) => setDailyCap(e.target.value)} />
         </div>
       </div>
       <div className="flex items-center gap-3">
-        <Button size="sm" type="submit" disabled={busy || !name.trim()}>
-          {busy && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
+        <button className={btnP} type="submit" disabled={busy || !name.trim()}>
+          {busy && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
           Create campaign
-        </Button>
-        <Button size="sm" type="button" variant="ghost" onClick={() => setOpen(false)}>Cancel</Button>
+        </button>
+        <button className={btnS} type="button" onClick={() => setOpen(false)}>Cancel</button>
         <ActionNote note={note} />
       </div>
     </form>
@@ -146,8 +160,8 @@ export function ActivateShallowButton({ campaignId }: { campaignId: string }) {
   const { busy, note, run } = useAction();
   return (
     <div className="flex items-center gap-3">
-      <Button
-        size="sm"
+      <button
+        className={btnP}
         disabled={busy}
         onClick={() =>
           run("Activate", async () => {
@@ -156,9 +170,9 @@ export function ActivateShallowButton({ campaignId }: { campaignId: string }) {
           })
         }
       >
-        {busy && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
+        {busy && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
         Activate
-      </Button>
+      </button>
       <ActionNote note={note} />
     </div>
   );
@@ -179,19 +193,18 @@ export function Depth3ActivationPanel({
 
   if (pendingApproval) {
     return (
-      <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
-        <p className="text-xs font-semibold text-amber-900">
+      <div className="rounded-lg border border-needs bg-needs-tint p-3">
+        <p className="text-xs font-semibold text-ink">
           Depth-3 activation pending — {pendingApproval.approvers.length}/2 approvers
         </p>
-        <p className="mt-1 text-[11px] text-amber-700">
+        <p className="mt-1 text-[11px] text-ink">
           Two distinct humans must approve before activation completes. Each approver signs from
           their own session.
         </p>
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <ApproveApprovalButton approvalId={pendingApproval.id} />
-          <Button
-            size="sm"
-            variant="outline"
+          <button
+            className={btnD}
             disabled={busy}
             onClick={() =>
               run("Finalize", async () => {
@@ -202,9 +215,9 @@ export function Depth3ActivationPanel({
               })
             }
           >
-            {busy && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
+            {busy && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
             Finalize activation
-          </Button>
+          </button>
           <ActionNote note={note} />
         </div>
       </div>
@@ -213,9 +226,8 @@ export function Depth3ActivationPanel({
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <Button
-        size="sm"
-        variant="outline"
+      <button
+        className={btnS}
         disabled={busy}
         onClick={() =>
           run("Checklist", async () => {
@@ -228,11 +240,11 @@ export function Depth3ActivationPanel({
           })
         }
       >
-        {busy && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
+        {busy && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
         Check readiness
-      </Button>
-      <Button
-        size="sm"
+      </button>
+      <button
+        className={btnP}
         disabled={busy || !sendingDomainId}
         onClick={() =>
           run("Request activation", async () => {
@@ -242,10 +254,10 @@ export function Depth3ActivationPanel({
         }
       >
         Request depth-3 activation
-      </Button>
+      </button>
       <ActionNote note={note} />
       {checklist && !checklist.passed && (
-        <ul className="w-full list-disc space-y-1 pl-5 text-xs text-red-700">
+        <ul className="w-full list-disc space-y-1 pl-5 text-xs text-failed-text">
           {checklist.failures.map((f) => (
             <li key={f.code}>{f.message}</li>
           ))}
@@ -259,9 +271,8 @@ export function ApproveApprovalButton({ approvalId }: { approvalId: string }) {
   const { busy, note, run } = useAction();
   return (
     <span className="inline-flex items-center gap-2">
-      <Button
-        size="sm"
-        variant="outline"
+      <button
+        className={btnD}
         disabled={busy}
         onClick={() =>
           run("Approve", async () => {
@@ -273,9 +284,9 @@ export function ApproveApprovalButton({ approvalId }: { approvalId: string }) {
           })
         }
       >
-        {busy && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
+        {busy && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
         Approve as me
-      </Button>
+      </button>
       <ActionNote note={note} />
     </span>
   );
@@ -297,14 +308,14 @@ export function CreateDomainForm() {
   const [warmupStartedAt, setWarmupStartedAt] = useState("");
   if (!open) {
     return (
-      <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
+      <button className={btnS} onClick={() => setOpen(true)}>
         Register sending domain
-      </Button>
+      </button>
     );
   }
   return (
     <form
-      className="space-y-3 rounded-lg border border-stone-200 bg-white p-4"
+      className="space-y-3 rounded-lg border border-line bg-paper p-4"
       onSubmit={(e) => {
         e.preventDefault();
         void run("Register domain", async () => {
@@ -323,13 +334,13 @@ export function CreateDomainForm() {
     >
       <div className="grid gap-3 md:grid-cols-2">
         <div className="space-y-1.5">
-          <Label className="text-[13px] font-medium text-stone-700">Domain</Label>
-          <Input className="border-stone-200 bg-white text-[13px] placeholder:text-stone-400 focus-visible:border-violet-400 focus-visible:ring-violet-200/60" value={domain} onChange={(e) => setDomain(e.target.value)} placeholder="outreach.example.com" required />
+          <Label className="text-[13px] font-medium text-muted">Domain</Label>
+          <Input className="border-line bg-paper text-[13px] placeholder:text-subtle focus-visible:border-focus focus-visible:ring-[var(--aos-focus-halo)]" value={domain} onChange={(e) => setDomain(e.target.value)} placeholder="outreach.example.com" required />
         </div>
         <div className="space-y-1.5">
-          <Label className="text-[13px] font-medium text-stone-700">DMARC policy</Label>
+          <Label className="text-[13px] font-medium text-muted">DMARC policy</Label>
           <Select value={dmarcPolicy} onValueChange={(v) => setDmarcPolicy(v ?? "")}>
-            <SelectTrigger className="border-stone-200 bg-white text-[13px] placeholder:text-stone-400 focus-visible:border-violet-400 focus-visible:ring-violet-200/60"><SelectValue placeholder="None yet" /></SelectTrigger>
+            <SelectTrigger className="border-line bg-paper text-[13px] placeholder:text-subtle focus-visible:border-focus focus-visible:ring-[var(--aos-focus-halo)]"><SelectValue placeholder="None yet" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="none">p=none</SelectItem>
               <SelectItem value="quarantine">p=quarantine</SelectItem>
@@ -338,35 +349,35 @@ export function CreateDomainForm() {
           </Select>
         </div>
         <div className="space-y-1.5">
-          <Label className="text-[13px] font-medium text-stone-700">Warmup started</Label>
-          <Input className="border-stone-200 bg-white text-[13px] placeholder:text-stone-400 focus-visible:border-violet-400 focus-visible:ring-violet-200/60" type="date" value={warmupStartedAt} onChange={(e) => setWarmupStartedAt(e.target.value)} />
-          <p className="text-[11px] text-stone-500">Depth 3 needs 30+ days of warmup with ramp history.</p>
+          <Label className="text-[13px] font-medium text-muted">Warmup started</Label>
+          <Input className="border-line bg-paper text-[13px] placeholder:text-subtle focus-visible:border-focus focus-visible:ring-[var(--aos-focus-halo)]" type="date" value={warmupStartedAt} onChange={(e) => setWarmupStartedAt(e.target.value)} />
+          <p className="text-[11px] text-muted">Depth 3 needs 30+ days of warmup with ramp history.</p>
         </div>
         <div className="space-y-2 pt-1">
-          <label className="flex items-center gap-2 text-xs text-stone-700">
+          <label className="flex items-center gap-2 text-xs text-muted">
             <Checkbox checked={isPrimary} onCheckedChange={(v) => setIsPrimary(v === true)} />
             Primary domain (never cold-sends)
           </label>
-          <label className="flex items-center gap-2 text-xs text-stone-700">
+          <label className="flex items-center gap-2 text-xs text-muted">
             <Checkbox checked={spfOk} onCheckedChange={(v) => setSpfOk(v === true)} />
             SPF verified
           </label>
-          <label className="flex items-center gap-2 text-xs text-stone-700">
+          <label className="flex items-center gap-2 text-xs text-muted">
             <Checkbox checked={dkimOk} onCheckedChange={(v) => setDkimOk(v === true)} />
             DKIM verified
           </label>
-          <label className="flex items-center gap-2 text-xs text-stone-700">
+          <label className="flex items-center gap-2 text-xs text-muted">
             <Checkbox checked={trackingCnameOk} onCheckedChange={(v) => setTrackingCnameOk(v === true)} />
             Custom tracking CNAME set
           </label>
         </div>
       </div>
       <div className="flex items-center gap-3">
-        <Button size="sm" type="submit" disabled={busy || !domain.trim()}>
-          {busy && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
+        <button className={btnP} type="submit" disabled={busy || !domain.trim()}>
+          {busy && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
           Register
-        </Button>
-        <Button size="sm" type="button" variant="ghost" onClick={() => setOpen(false)}>Cancel</Button>
+        </button>
+        <button className={btnS} type="button" onClick={() => setOpen(false)}>Cancel</button>
         <ActionNote note={note} />
       </div>
     </form>
@@ -381,25 +392,24 @@ export function UpdateDomainChecks({ domainId }: { domainId: string }) {
   const [open, setOpen] = useState(false);
   if (!open) {
     return (
-      <Button size="xs" variant="ghost" className="h-7 px-2 text-xs" onClick={() => setOpen(true)}>
+      <button className={btnSXs} onClick={() => setOpen(true)}>
         Update DNS checks
-      </Button>
+      </button>
     );
   }
   return (
-    <div className="mt-2 flex flex-wrap items-center gap-2 rounded-md bg-stone-50 p-2">
-      <label className="flex items-center gap-1.5 text-[11px] text-stone-700">
+    <div className="mt-2 flex flex-wrap items-center gap-2 rounded-md bg-paper p-2">
+      <label className="flex items-center gap-1.5 text-[11px] text-muted">
         <Checkbox checked={spfOk} onCheckedChange={(v) => setSpfOk(v === true)} /> SPF
       </label>
-      <label className="flex items-center gap-1.5 text-[11px] text-stone-700">
+      <label className="flex items-center gap-1.5 text-[11px] text-muted">
         <Checkbox checked={dkimOk} onCheckedChange={(v) => setDkimOk(v === true)} /> DKIM
       </label>
-      <label className="flex items-center gap-1.5 text-[11px] text-stone-700">
+      <label className="flex items-center gap-1.5 text-[11px] text-muted">
         <Checkbox checked={trackingCnameOk} onCheckedChange={(v) => setTrackingCnameOk(v === true)} /> CNAME
       </label>
-      <Button
-        size="xs"
-        className="h-7 text-xs"
+      <button
+        className={btnPXs}
         disabled={busy}
         onClick={() =>
           run("Update", async () => {
@@ -409,9 +419,9 @@ export function UpdateDomainChecks({ domainId }: { domainId: string }) {
           })
         }
       >
-        {busy && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
+        {busy && <Loader2 className="h-3 w-3 animate-spin" />}
         Save
-      </Button>
+      </button>
       <ActionNote note={note} />
     </div>
   );
@@ -427,10 +437,10 @@ export function DiscoverButton({ campaignId }: { campaignId: string }) {
   const [niche, setNiche] = useState("");
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <Input className="h-8 w-56 border-stone-200 bg-white text-[13px] placeholder:text-stone-400 focus-visible:border-violet-400 focus-visible:ring-violet-200/60" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="SERP query" />
-      <Input className="h-8 w-40 border-stone-200 bg-white text-[13px] placeholder:text-stone-400 focus-visible:border-violet-400 focus-visible:ring-violet-200/60" value={niche} onChange={(e) => setNiche(e.target.value)} placeholder="Client niche" />
-      <Button
-        size="sm"
+      <Input className="h-8 w-56 border-line bg-paper text-[13px] placeholder:text-subtle focus-visible:border-focus focus-visible:ring-[var(--aos-focus-halo)]" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="SERP query" />
+      <Input className="h-8 w-40 border-line bg-paper text-[13px] placeholder:text-subtle focus-visible:border-focus focus-visible:ring-[var(--aos-focus-halo)]" value={niche} onChange={(e) => setNiche(e.target.value)} placeholder="Client niche" />
+      <button
+        className={btnR}
         disabled={busy || !query.trim() || !niche.trim()}
         onClick={() =>
           run("Discover", async () => {
@@ -442,9 +452,9 @@ export function DiscoverButton({ campaignId }: { campaignId: string }) {
           })
         }
       >
-        {busy && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
+        {busy && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
         Discover prospects
-      </Button>
+      </button>
       <ActionNote note={note} />
     </div>
   );
@@ -454,10 +464,8 @@ export function QualifyButton({ prospectId }: { prospectId: string }) {
   const { busy, note, run } = useAction();
   return (
     <span className="inline-flex items-center gap-2">
-      <Button
-        size="xs"
-        variant="outline"
-        className="h-7 text-xs"
+      <button
+        className={btnSXs}
         disabled={busy}
         onClick={() =>
           run("Qualify", async () => {
@@ -466,9 +474,9 @@ export function QualifyButton({ prospectId }: { prospectId: string }) {
           })
         }
       >
-        {busy && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
+        {busy && <Loader2 className="h-3 w-3 animate-spin" />}
         Qualify
-      </Button>
+      </button>
       <ActionNote note={note} />
     </span>
   );
@@ -483,14 +491,14 @@ export function DraftSequenceForm({ campaignId, prospectId, depth }: { campaignI
   const [physicalAddress, setPhysicalAddress] = useState("");
   if (!open) {
     return (
-      <Button size="xs" variant="outline" className="h-7 text-xs" onClick={() => setOpen(true)}>
+      <button className={btnSXs} onClick={() => setOpen(true)}>
         Draft pitch
-      </Button>
+      </button>
     );
   }
   return (
     <form
-      className="mt-2 space-y-2 rounded-lg border border-stone-200 bg-stone-50 p-3"
+      className="mt-2 space-y-2 rounded-lg border border-line bg-paper p-3"
       onSubmit={(e) => {
         e.preventDefault();
         void run("Draft", async () => {
@@ -509,29 +517,29 @@ export function DraftSequenceForm({ campaignId, prospectId, depth }: { campaignI
       }}
     >
       <div className="space-y-1.5">
-        <Label className="text-[13px] font-medium text-stone-700">Subject</Label>
-        <Input className="h-8 border-stone-200 bg-white text-[13px] placeholder:text-stone-400 focus-visible:border-violet-400 focus-visible:ring-violet-200/60" value={subject} onChange={(e) => setSubject(e.target.value)} required />
+        <Label className="text-[13px] font-medium text-muted">Subject</Label>
+        <Input className="h-8 border-line bg-paper text-[13px] placeholder:text-subtle focus-visible:border-focus focus-visible:ring-[var(--aos-focus-halo)]" value={subject} onChange={(e) => setSubject(e.target.value)} required />
       </div>
       <div className="space-y-1.5">
-        <Label className="text-[13px] font-medium text-stone-700">Pitch body (first-line + angle personalization)</Label>
-        <Textarea className="border-stone-200 bg-white text-[13px] placeholder:text-stone-400 focus-visible:border-violet-400 focus-visible:ring-violet-200/60" rows={4} value={body} onChange={(e) => setBody(e.target.value)} required />
+        <Label className="text-[13px] font-medium text-muted">Pitch body (first-line + angle personalization)</Label>
+        <Textarea className="border-line bg-paper text-[13px] placeholder:text-subtle focus-visible:border-focus focus-visible:ring-[var(--aos-focus-halo)]" rows={4} value={body} onChange={(e) => setBody(e.target.value)} required />
       </div>
       <div className="grid gap-2 md:grid-cols-2">
         <div className="space-y-1.5">
-          <Label className="text-[13px] font-medium text-stone-700">One-click unsubscribe URL (CAN-SPAM)</Label>
-          <Input className="h-8 border-stone-200 bg-white text-[13px] placeholder:text-stone-400 focus-visible:border-violet-400 focus-visible:ring-violet-200/60" type="url" value={unsubscribeUrl} onChange={(e) => setUnsubscribeUrl(e.target.value)} required />
+          <Label className="text-[13px] font-medium text-muted">One-click unsubscribe URL (CAN-SPAM)</Label>
+          <Input className="h-8 border-line bg-paper text-[13px] placeholder:text-subtle focus-visible:border-focus focus-visible:ring-[var(--aos-focus-halo)]" type="url" value={unsubscribeUrl} onChange={(e) => setUnsubscribeUrl(e.target.value)} required />
         </div>
         <div className="space-y-1.5">
-          <Label className="text-[13px] font-medium text-stone-700">Physical mailing address (CAN-SPAM)</Label>
-          <Input className="h-8 border-stone-200 bg-white text-[13px] placeholder:text-stone-400 focus-visible:border-violet-400 focus-visible:ring-violet-200/60" value={physicalAddress} onChange={(e) => setPhysicalAddress(e.target.value)} required />
+          <Label className="text-[13px] font-medium text-muted">Physical mailing address (CAN-SPAM)</Label>
+          <Input className="h-8 border-line bg-paper text-[13px] placeholder:text-subtle focus-visible:border-focus focus-visible:ring-[var(--aos-focus-halo)]" value={physicalAddress} onChange={(e) => setPhysicalAddress(e.target.value)} required />
         </div>
       </div>
       <div className="flex items-center gap-3">
-        <Button size="sm" type="submit" disabled={busy}>
-          {busy && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
+        <button className={btnP} type="submit" disabled={busy}>
+          {busy && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
           Create draft
-        </Button>
-        <Button size="sm" type="button" variant="ghost" onClick={() => setOpen(false)}>Cancel</Button>
+        </button>
+        <button className={btnS} type="button" onClick={() => setOpen(false)}>Cancel</button>
         <ActionNote note={note} />
       </div>
     </form>
@@ -542,9 +550,8 @@ export function SendSequenceButton({ sequenceId, depth }: { sequenceId: string; 
   const { busy, note, run } = useAction();
   return (
     <span className="inline-flex items-center gap-2">
-      <Button
-        size="xs"
-        className="h-7 text-xs"
+      <button
+        className={btnPXs}
         disabled={busy}
         onClick={() =>
           run("Send", async () => {
@@ -555,9 +562,9 @@ export function SendSequenceButton({ sequenceId, depth }: { sequenceId: string; 
           })
         }
       >
-        {busy && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
+        {busy && <Loader2 className="h-3 w-3 animate-spin" />}
         {depth === 2 ? "Send (human click)" : "Dispatch next step"}
-      </Button>
+      </button>
       <ActionNote note={note} />
     </span>
   );
@@ -567,10 +574,8 @@ export function VerifyPlacementButton({ sequenceId }: { sequenceId: string }) {
   const { busy, note, run } = useAction();
   return (
     <span className="inline-flex items-center gap-2">
-      <Button
-        size="xs"
-        variant="outline"
-        className="h-7 text-xs"
+      <button
+        className="inline-flex h-7 items-center gap-1 rounded-full bg-running px-2.5 text-xs font-semibold text-white aos-press hover:bg-running/90 disabled:opacity-40"
         disabled={busy}
         onClick={() =>
           run("Verify", async () => {
@@ -579,9 +584,9 @@ export function VerifyPlacementButton({ sequenceId }: { sequenceId: string }) {
           })
         }
       >
-        {busy && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
+        {busy && <Loader2 className="h-3 w-3 animate-spin" />}
         Verify placement
-      </Button>
+      </button>
       <ActionNote note={note} />
     </span>
   );

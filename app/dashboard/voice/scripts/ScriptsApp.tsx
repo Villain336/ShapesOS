@@ -8,8 +8,10 @@ import {
   Chip,
   statusTone,
   inputCls,
-  btnPrimary,
   btnGhost,
+  btnDanger,
+  btnApprove,
+  btnReview,
   tableCls,
   theadCls,
   thCls,
@@ -79,8 +81,8 @@ export function ScriptsApp() {
   return (
     <div className="flex flex-col gap-4">
       <div>
-        <h1 className="text-xl font-bold tracking-tight text-stone-900">Call Scripts</h1>
-        <p className="mt-0.5 text-[13px] text-stone-500">
+        <h1 className="aos-heading">Call Scripts</h1>
+        <p className="mt-0.5 text-[13px] text-muted">
           Draft-first: only human-approved scripts can attach to a live session. This is the legal-review surface.
         </p>
       </div>
@@ -100,7 +102,7 @@ export function ScriptsApp() {
         </select>
       </div>
 
-      <div className="overflow-x-auto rounded-md border border-stone-200 bg-white">
+      <div className="overflow-x-auto rounded-md border border-line bg-paper">
         <table className={tableCls}>
           <thead className={theadCls}>
             <tr>
@@ -135,18 +137,18 @@ export function ScriptsApp() {
             )}
             {rows.map((s) => (
               <tr key={s.id} className={rowCls}>
-                <td className={`${tdCls} font-medium text-stone-900`}>{s.name}</td>
+                <td className={`${tdCls} font-medium text-ink`}>{s.name}</td>
                 <td className={tdCls}>{s.agentName}</td>
                 <td className={tdCls}>v{s.version}</td>
                 <td className={tdCls}><Chip tone={statusTone(s.status)}>{s.status}</Chip></td>
                 <td className={tdCls}>
                   {s.hasDisclosure ? (
-                    <span className="inline-flex items-center gap-1 text-emerald-700">
+                    <span className="inline-flex items-center gap-1 text-ink">
                       <ShieldCheck className="h-4 w-4" />
                       <span className="text-[12px] font-medium">Present</span>
                     </span>
                   ) : (
-                    <span className="inline-flex items-center gap-1 text-red-700">
+                    <span className="inline-flex items-center gap-1 text-failed-text">
                       <ShieldAlert className="h-4 w-4" />
                       <span className="text-[12px] font-medium">Missing — will be refused</span>
                     </span>
@@ -166,16 +168,16 @@ export function ScriptsApp() {
                 <td className={tdCls}>
                   <div className="flex gap-1.5">
                     {(s.status === "draft" || s.status === "rejected") && (
-                      <button className={btnGhost} disabled={busyId === s.id} onClick={() => act(s, "submit")}>
+                      <button className={btnReview} disabled={busyId === s.id} onClick={() => act(s, "submit")}>
                         Submit
                       </button>
                     )}
                     {s.status === "in_review" && (
                       <>
-                        <button className={btnPrimary} disabled={busyId === s.id} onClick={() => act(s, "approve")}>
+                        <button className={btnApprove} disabled={busyId === s.id} onClick={() => act(s, "approve")}>
                           Approve
                         </button>
-                        <button className={btnGhost} disabled={busyId === s.id} onClick={() => act(s, "reject")}>
+                        <button className={btnDanger} disabled={busyId === s.id} onClick={() => act(s, "reject")}>
                           Reject
                         </button>
                       </>

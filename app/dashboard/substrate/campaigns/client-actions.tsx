@@ -1,13 +1,22 @@
-// Marketr — Phase 8 G2: client-side campaign actions.
+// Marketr — Campaign client-side actions.
 // Plain fetch calls against /api/substrate/campaigns/*, then router.refresh().
-// House pattern (Creative Studio): violet primary buttons, stone inputs,
-// light mode. Styling only — no behavior changes.
+// Agentic OS pressables: approve = done fill, reject = deny idiom, run = running fill.
+// Styling only — no behavior changes.
 
 "use client";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { btnGhost, btnPrimary, inputCls, labelCls } from "../ui";
+
+// Local decision idioms (not in ../ui): approve → done, reject → deny,
+// backfill scan → running.
+const btnApprove =
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-done px-4 text-sm font-semibold text-white aos-press hover:bg-done/90 disabled:opacity-40";
+const btnDeny =
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-paper px-4 text-sm font-semibold text-failed-text shadow-[inset_0_0_0_1.5px_var(--aos-failed)] aos-press hover:bg-failed-tint disabled:opacity-40";
+const btnRun =
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-running px-4 text-sm font-semibold text-white aos-press hover:bg-running/90 disabled:opacity-40";
 import {
   CAMPAIGN_STAGES,
   CAMPAIGN_STAGE_LABELS,
@@ -73,7 +82,7 @@ export function NewCampaignForm({ parentId }: { parentId?: string }) {
           <option value="launch">Launch</option>
         </select>
       </div>
-      {error ? <p className="text-[13px] text-red-700">{error}</p> : null}
+      {error ? <p className="text-[13px] text-failed-text">{error}</p> : null}
       <button type="submit" className={btnPrimary} disabled={busy || !name.trim()}>
         {busy ? "Creating…" : parentId ? "Create sub-campaign" : "Create campaign"}
       </button>
@@ -155,7 +164,7 @@ export function AttachLinkForm({ campaignId, fragments }: { campaignId: string; 
           </select>
         </div>
       </div>
-      {error ? <p className="text-[13px] text-red-700">{error}</p> : null}
+      {error ? <p className="text-[13px] text-failed-text">{error}</p> : null}
       <button type="submit" className={btnPrimary} disabled={busy || !value}>
         {busy ? "Attaching…" : "Attach to campaign"}
       </button>
@@ -186,7 +195,7 @@ export function UnlinkButton({ campaignId, linkId, label }: { campaignId: string
       <button onClick={unlink} disabled={busy} className={btnGhost}>
         {busy ? "Unlinking…" : "Unlink"}
       </button>
-      {error ? <span className="text-xs text-red-700">{error}</span> : null}
+      {error ? <span className="text-xs text-failed-text">{error}</span> : null}
     </span>
   );
 }
@@ -210,13 +219,13 @@ export function ProposalActions({ proposalId }: { proposalId: string }) {
 
   return (
     <span className="inline-flex items-center gap-2">
-      <button onClick={() => resolve("approved")} disabled={busy !== null} className={btnPrimary}>
+      <button onClick={() => resolve("approved")} disabled={busy !== null} className={btnApprove}>
         {busy === "approved" ? "Approving…" : "Approve"}
       </button>
-      <button onClick={() => resolve("rejected")} disabled={busy !== null} className={btnGhost}>
+      <button onClick={() => resolve("rejected")} disabled={busy !== null} className={btnDeny}>
         {busy === "rejected" ? "Rejecting…" : "Reject"}
       </button>
-      {error ? <span className="text-xs text-red-700">{error}</span> : null}
+      {error ? <span className="text-xs text-failed-text">{error}</span> : null}
     </span>
   );
 }
@@ -247,11 +256,11 @@ export function RunScanButton() {
 
   return (
     <span className="inline-flex flex-wrap items-center gap-3">
-      <button onClick={scan} disabled={busy} className={btnPrimary}>
+      <button onClick={scan} disabled={busy} className={btnRun}>
         {busy ? "Scanning fragments…" : "Run backfill scan"}
       </button>
-      {result ? <span className="text-[13px] text-stone-500">{result}</span> : null}
-      {error ? <span className="text-[13px] text-red-700">{error}</span> : null}
+      {result ? <span className="text-[13px] text-muted">{result}</span> : null}
+      {error ? <span className="text-[13px] text-failed-text">{error}</span> : null}
     </span>
   );
 }
@@ -296,7 +305,7 @@ export function CampaignStatusSelect({
         <option value="complete">Complete</option>
         <option value="archived">Archived</option>
       </select>
-      {error ? <span className="text-xs text-red-700">{error}</span> : null}
+      {error ? <span className="text-xs text-failed-text">{error}</span> : null}
     </span>
   );
 }
@@ -351,7 +360,7 @@ export function StageStatusSelect({
         <option value="blocked">Blocked</option>
         <option value="skipped">Skipped</option>
       </select>
-      {error ? <span className="text-xs text-red-700">{error}</span> : null}
+      {error ? <span className="text-xs text-failed-text">{error}</span> : null}
     </span>
   );
 }

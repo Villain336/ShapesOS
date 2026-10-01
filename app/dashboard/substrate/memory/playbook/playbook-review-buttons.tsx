@@ -3,8 +3,13 @@
 "use client";
 
 import { useState } from "react";
-import { Button } from "@/components/vault/shadcn/button";
 import { Check, X } from "lucide-react";
+
+// Approve -> done fill, reject -> deny idiom (human approval workflow).
+const btnApprove =
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-done px-4 text-sm font-semibold text-white aos-press hover:bg-done/90 disabled:opacity-40";
+const btnDeny =
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-paper px-4 text-sm font-semibold text-failed-text shadow-[inset_0_0_0_1.5px_var(--aos-failed)] aos-press hover:bg-failed-tint disabled:opacity-40";
 
 export default function PlaybookReviewButtons({
   workspaceId,
@@ -36,17 +41,17 @@ export default function PlaybookReviewButtons({
     }
   }
 
-  if (state === "done") return <p className="text-sm text-muted-foreground">Reviewed.</p>;
+  if (state === "done") return <p className="text-sm text-muted">Reviewed.</p>;
 
   return (
     <div className="flex gap-2">
-      <Button size="sm" onClick={() => decide("approved")} disabled={state === "working"}>
-        <Check className="mr-1 h-3.5 w-3.5" aria-hidden /> Approve
-      </Button>
-      <Button size="sm" variant="outline" onClick={() => decide("rejected")} disabled={state === "working"}>
-        <X className="mr-1 h-3.5 w-3.5" aria-hidden /> Reject
-      </Button>
-      {state === "error" && <span className="text-xs text-destructive">Review failed — try again.</span>}
+      <button className={btnApprove} onClick={() => decide("approved")} disabled={state === "working"}>
+        <Check className="h-3.5 w-3.5" aria-hidden /> Approve
+      </button>
+      <button className={btnDeny} onClick={() => decide("rejected")} disabled={state === "working"}>
+        <X className="h-3.5 w-3.5" aria-hidden /> Reject
+      </button>
+      {state === "error" && <span className="text-xs text-failed-text">Review failed — try again.</span>}
     </div>
   );
 }

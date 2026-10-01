@@ -36,10 +36,11 @@ const AUDIT_ICONS = {
   crm: Users, content: FileText, technology: Cpu,
 } as const;
 
+// Data completeness is analytic, never status-colored — neutral chips.
 const COMPLETENESS_CHIP: Record<Completeness, string> = {
-  full: "border-emerald-200 bg-emerald-50 text-emerald-700",
-  partial: "border-amber-200 bg-amber-50 text-amber-700",
-  unavailable: "border-stone-200 bg-stone-100 text-stone-500",
+  full: "border-line bg-paper text-muted shadow-control",
+  partial: "border-line bg-paper text-muted shadow-control",
+  unavailable: "border-line bg-paper text-muted shadow-control",
 };
 
 const COMPLETENESS_LABEL: Record<Completeness, string> = {
@@ -49,9 +50,9 @@ const COMPLETENESS_LABEL: Record<Completeness, string> = {
 };
 
 const STATUS_CHIP: Record<string, string> = {
-  draft: "border-violet-200 bg-violet-50 text-violet-700",
-  ready: "border-emerald-200 bg-emerald-50 text-emerald-700",
-  archived: "border-stone-200 bg-stone-100 text-stone-500",
+  draft: "bg-needs text-ink",
+  ready: "bg-done text-white",
+  archived: "border-line bg-paper text-muted shadow-control",
 };
 
 function chip(text: React.ReactNode, cls: string) {
@@ -62,25 +63,22 @@ function chip(text: React.ReactNode, cls: string) {
   );
 }
 
+// Audit scores are analytic, never status-colored.
 function scoreStyle(score: number | null) {
-  if (score == null) return "text-stone-400";
-  if (score >= 70) return "text-emerald-600";
-  if (score >= 45) return "text-amber-600";
-  return "text-rose-600";
+  if (score == null) return "text-subtle";
+  return "text-ink";
 }
 
 function scoreBar(score: number | null) {
-  if (score == null) return "bg-stone-200";
-  if (score >= 70) return "bg-emerald-500";
-  if (score >= 45) return "bg-amber-500";
-  return "bg-rose-500";
+  if (score == null) return "bg-line";
+  return "bg-ink";
 }
 
 const SEVERITY_ICON = { critical: TriangleAlert, warn: CircleAlert, info: Info } as const;
 const SEVERITY_COLOR = {
-  critical: "text-rose-600",
-  warn: "text-amber-600",
-  info: "text-stone-400",
+  critical: "text-failed-text",
+  warn: "text-ink",
+  info: "text-subtle",
 } as const;
 
 function fmtMoney(usd: number) {
@@ -100,10 +98,10 @@ function AuditRows({ audits }: { audits: AuditResult[] }) {
         const top = audit.findings.slice(0, 3);
         return (
           <>
-            <tr key={audit.id} className="border-b border-stone-100 last:border-0 hover:bg-violet-50/40">
+            <tr key={audit.id} className="border-b border-line last:border-0 hover:bg-hover-paper">
               <td className="px-3 py-2">
-                <span className="flex items-center gap-2 font-medium text-stone-900">
-                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-violet-50 text-violet-600">
+                <span className="flex items-center gap-2 font-medium text-ink">
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-line bg-paper text-ink">
                     <Icon className="h-3.5 w-3.5" />
                   </span>
                   {audit.name}
@@ -113,18 +111,18 @@ function AuditRows({ audits }: { audits: AuditResult[] }) {
               <td className="px-3 py-2">
                 <span className={`font-bold ${scoreStyle(audit.score)}`}>
                   {audit.score == null ? "—" : audit.score}
-                  <span className="font-normal text-stone-400"> / 100</span>
+                  <span className="font-normal text-subtle"> / 100</span>
                 </span>
-                <span className="mt-1 block h-1.5 w-24 overflow-hidden rounded-full bg-stone-100">
+                <span className="mt-1 block h-1.5 w-24 overflow-hidden rounded-full bg-paper">
                   <span className={`block h-full rounded-full ${scoreBar(audit.score)}`} style={{ width: audit.score == null ? "0%" : `${audit.score}%` }} />
                 </span>
               </td>
-              <td className="px-3 py-2 text-[12px] text-stone-600">{audit.dataSource}</td>
+              <td className="px-3 py-2 text-[12px] text-muted">{audit.dataSource}</td>
             </tr>
-            <tr key={`${audit.id}-findings`} className="border-b border-stone-100 bg-stone-50/40">
+            <tr key={`${audit.id}-findings`} className="border-b border-line bg-paper/40">
               <td colSpan={4} className="px-3 py-2">
                 {top.length === 0 ? (
-                  <p className="text-[12px] text-stone-400">
+                  <p className="text-[12px] text-subtle">
                     {audit.completeness === "unavailable"
                       ? "No data available — connect the contributing data sources to unlock this audit."
                       : "No findings recorded."}
@@ -137,8 +135,8 @@ function AuditRows({ audits }: { audits: AuditResult[] }) {
                         <li key={i} className="flex gap-2">
                           <SIcon className={`mt-0.5 h-3.5 w-3.5 shrink-0 ${SEVERITY_COLOR[f.severity]}`} />
                           <div className="min-w-0">
-                            <p className="text-[12px] font-medium text-stone-800">{f.title}</p>
-                            <p className="line-clamp-1 text-[12px] text-stone-500">{f.detail}</p>
+                            <p className="text-[12px] font-medium text-ink">{f.title}</p>
+                            <p className="line-clamp-1 text-[12px] text-muted">{f.detail}</p>
                           </div>
                         </li>
                       );
@@ -146,7 +144,7 @@ function AuditRows({ audits }: { audits: AuditResult[] }) {
                   </ul>
                 )}
                 {audit.findings.length > 3 && (
-                  <p className="mt-1 text-[11px] text-stone-400">+ {audit.findings.length - 3} more findings in the PDF.</p>
+                  <p className="mt-1 text-[11px] text-subtle">+ {audit.findings.length - 3} more findings in the PDF.</p>
                 )}
               </td>
             </tr>
@@ -209,25 +207,25 @@ export default async function IntelligencePage({
   };
 
   return (
-    <div className="flex h-full flex-col gap-4 bg-[#FAFAF7] p-4 md:p-6">
+    <div className="flex h-full flex-col gap-4 bg-canvas p-4 md:p-6">
       {/* Breadcrumb */}
-      <nav className="flex items-center gap-1.5 text-xs text-stone-500">
-        <Link href="/dashboard/authority" className="hover:text-stone-800">Authority</Link>
+      <nav className="flex items-center gap-1.5 text-xs text-muted">
+        <Link href="/dashboard/authority" className="hover:text-ink">Authority</Link>
         <ChevronRight className="h-3 w-3" />
-        <span className="font-medium text-stone-800">Intelligence Report</span>
+        <span className="font-medium text-ink">Intelligence Report</span>
       </nav>
 
       {/* Header */}
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <p className="text-[11px] font-bold tracking-[0.2em] text-violet-600">MARKETR · INTELLIGENCE REPORT</p>
-          <h1 className="mt-1 text-xl font-bold tracking-tight text-stone-900">{brandName}</h1>
-          {domain && <p className="mt-0.5 text-[13px] text-stone-500">{domain}</p>}
+          <p className="text-[13px] text-muted">Intelligence report</p>
+          <h1 className="mt-1 aos-heading">{brandName}</h1>
+          {domain && <p className="mt-0.5 text-[13px] text-muted">{domain}</p>}
           {row && (
             <div className="mt-2.5 flex flex-wrap items-center gap-2 text-xs">
-              {chip(`v${row.version}`, "border-stone-200 bg-stone-50 text-stone-600")}
+              {chip(`v${row.version}`, "border-line bg-paper text-muted")}
               {chip(row.status, STATUS_CHIP[row.status] ?? STATUS_CHIP.archived)}
-              <span className="text-stone-500">Generated {fmtDate(row.generatedAt ?? row.createdAt)}</span>
+              <span className="text-muted">Generated {fmtDate(row.generatedAt ?? row.createdAt)}</span>
             </div>
           )}
         </div>
@@ -235,7 +233,7 @@ export default async function IntelligencePage({
           {row && (
             <a
               href={`/api/authority/intelligence/reports/${row.id}/pdf`}
-              className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-stone-200 bg-white px-2.5 text-sm font-medium text-stone-800 transition hover:bg-stone-50"
+              className="inline-flex h-control-sm items-center gap-1.5 rounded-full bg-paper px-4 text-sm font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper"
             >
               <Download className="h-4 w-4" /> Export PDF
             </a>
@@ -246,7 +244,7 @@ export default async function IntelligencePage({
       </header>
 
       {reports.length > 1 && (
-        <div className="flex flex-wrap items-center gap-2 text-xs text-stone-500">
+        <div className="flex flex-wrap items-center gap-2 text-xs text-muted">
           <span className="font-medium">History:</span>
           {reports.slice(0, 8).map((r) => (
             <Link
@@ -254,8 +252,8 @@ export default async function IntelligencePage({
               href={`/dashboard/authority/intelligence?id=${r.id}`}
               className={`rounded-full border px-3 py-1 transition ${
                 r.id === row?.id
-                  ? "border-violet-300 bg-violet-50 font-medium text-violet-700"
-                  : "border-stone-200 bg-white text-stone-600 hover:border-stone-400"
+                  ? "border-ink bg-paper font-medium text-ink"
+                  : "border-line bg-paper text-muted hover:border-ink"
               }`}
             >
               {fmtDate(r.generatedAt ?? r.createdAt)} · {r.status}
@@ -266,12 +264,12 @@ export default async function IntelligencePage({
 
       {!bundle || !row ? (
         /* Empty state — no report yet */
-        <div className="mx-auto flex max-w-xl flex-col items-center rounded-2xl border border-dashed border-stone-300 bg-white px-8 py-16 text-center">
-          <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-violet-50 text-violet-600">
+        <div className="mx-auto flex max-w-xl flex-col items-center rounded-2xl border border-dashed border-line bg-paper px-8 py-16 text-center">
+          <span className="flex h-14 w-14 items-center justify-center rounded-2xl border border-line bg-paper text-ink">
             <Sparkles className="h-6 w-6" />
           </span>
-          <h2 className="mt-4 text-lg font-semibold text-stone-900">No intelligence report yet</h2>
-          <p className="mt-2 text-sm text-stone-500">
+          <h2 className="mt-4 text-lg font-semibold text-ink">No intelligence report yet</h2>
+          <p className="mt-2 text-sm text-muted">
             Connect your stack, then compile: twelve audits run against the data Marketr already
             holds — from onboarding intake to paid media — plus ranked revenue opportunities and a
             90-day Growth Plan. Missing connections degrade to labeled partial, never fabricated.
@@ -280,33 +278,33 @@ export default async function IntelligencePage({
             {canEdit ? (
               <GenerateReportButton />
             ) : (
-              <p className="text-xs text-stone-400">Ask an editor or admin to generate the first report.</p>
+              <p className="text-xs text-subtle">Ask an editor or admin to generate the first report.</p>
             )}
           </div>
         </div>
       ) : (
         <>
           {/* Readiness hero */}
-          <section className="rounded-2xl border border-stone-200 bg-white p-6">
+          <section className="rounded-2xl border border-line bg-paper p-6">
             <div className="flex flex-wrap items-center gap-8">
               <div className="flex items-center gap-5">
                 <span className={`text-6xl font-bold tracking-tight ${scoreStyle(readiness)}`}>
                   {readiness == null ? "—" : readiness}
                 </span>
                 <div>
-                  <p className="text-sm font-semibold text-stone-900">Overall readiness</p>
-                  <p className="text-xs text-stone-500">
+                  <p className="text-sm font-semibold text-ink">Overall readiness</p>
+                  <p className="text-xs text-muted">
                     {scored.length} of 12 audits scored · average of scored audits
                   </p>
                 </div>
               </div>
               <Separator orientation="vertical" className="hidden h-16 md:block" />
               <div className="flex flex-wrap gap-2.5">
-                {chip(`${counts.full} full-data`, "border-emerald-200 bg-emerald-50 text-emerald-700")}
-                {chip(`${counts.partial} partial`, "border-amber-200 bg-amber-50 text-amber-700")}
-                {chip(`${counts.unavailable} unavailable`, "border-stone-200 bg-stone-100 text-stone-500")}
+                {chip(`${counts.full} full-data`, "border-line bg-paper text-muted shadow-control")}
+                {chip(`${counts.partial} partial`, "border-line bg-paper text-muted shadow-control")}
+                {chip(`${counts.unavailable} unavailable`, "border-line bg-paper text-muted")}
               </div>
-              <p className="w-full text-xs text-stone-400">
+              <p className="w-full text-xs text-subtle">
                 Sections labeled partial or unavailable reflect missing connections or data — never fabricated numbers.
               </p>
             </div>
@@ -315,13 +313,13 @@ export default async function IntelligencePage({
           {/* Twelve audits */}
           <section>
             <div className="mb-3 flex items-baseline justify-between">
-              <h2 className="text-sm font-semibold tracking-tight text-stone-900">The twelve audits</h2>
-              <p className="text-xs text-stone-500">Each audit cites the Marketr module that produced it.</p>
+              <h2 className="text-sm font-semibold tracking-tight text-ink">The twelve audits</h2>
+              <p className="text-xs text-muted">Each audit cites the Marketr module that produced it.</p>
             </div>
-            <div className="overflow-x-auto rounded-xl border border-stone-200 bg-white">
+            <div className="overflow-x-auto rounded-lg border border-line bg-paper">
               <table className="w-full text-left text-[13px]">
                 <thead>
-                  <tr className="border-b border-stone-100 bg-stone-50/60 text-[11px] uppercase tracking-wide text-stone-500">
+                  <tr className="border-b border-line bg-paper/60 text-[11px] text-muted">
                     <th className="px-3 py-2 font-medium">Audit</th>
                     <th className="px-3 py-2 font-medium">Completeness</th>
                     <th className="px-3 py-2 font-medium">Score</th>
@@ -338,20 +336,20 @@ export default async function IntelligencePage({
           {/* Revenue opportunities */}
           <section>
             <div className="mb-4 flex items-baseline justify-between">
-              <h2 className="text-sm font-semibold tracking-tight text-stone-900">
+              <h2 className="text-sm font-semibold tracking-tight text-ink">
                 Revenue opportunities, ranked
               </h2>
-              <p className="text-xs text-stone-500">Impact × effort · impact figures are estimates, not forecasts.</p>
+              <p className="text-xs text-muted">Impact × effort · impact figures are estimates, not forecasts.</p>
             </div>
             {bundle.opportunities.length === 0 ? (
-              <p className="rounded-xl border border-dashed border-stone-300 bg-white p-6 text-center text-sm text-stone-400">
+              <p className="rounded-lg border border-dashed border-line bg-paper p-6 text-center text-sm text-subtle">
                 No opportunities derived — most likely too few audits have data to work from.
               </p>
             ) : (
-              <div className="overflow-x-auto rounded-xl border border-stone-200 bg-white">
+              <div className="overflow-x-auto rounded-lg border border-line bg-paper">
                 <table className="w-full text-left text-[13px]">
                   <thead>
-                    <tr className="border-b border-stone-100 bg-stone-50/60 text-[11px] uppercase tracking-wide text-stone-500">
+                    <tr className="border-b border-line bg-paper/60 text-[11px] text-muted">
                       <th className="px-3 py-2 font-medium">#</th>
                       <th className="px-3 py-2 font-medium">Opportunity</th>
                       <th className="px-3 py-2 font-medium">Impact</th>
@@ -363,18 +361,18 @@ export default async function IntelligencePage({
                   </thead>
                   <tbody>
                     {bundle.opportunities.map((o, i) => (
-                      <tr key={o.id} className="border-b border-stone-100 last:border-0 hover:bg-violet-50/40">
+                      <tr key={o.id} className="border-b border-line last:border-0 hover:bg-hover-paper">
                         <td className="px-3 py-2">
-                          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-violet-600 text-[11px] font-bold text-white">
+                          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-ink text-[11px] font-bold text-white">
                             {i + 1}
                           </span>
                         </td>
                         <td className="max-w-xs px-3 py-2">
-                          <span className="font-medium text-stone-900">{o.title}</span>
-                          <span className="block text-[12px] text-stone-500 line-clamp-2">{o.description}</span>
+                          <span className="font-medium text-ink">{o.title}</span>
+                          <span className="block text-[12px] text-muted line-clamp-2">{o.description}</span>
                         </td>
                         <td className="px-3 py-2">
-                          <span className="flex items-center gap-1 font-bold text-violet-700">
+                          <span className="flex items-center gap-1 font-bold text-ink">
                             <CircleDollarSign className="h-4 w-4" />
                             {fmtMoney(o.impactUsd)}
                           </span>
@@ -384,21 +382,17 @@ export default async function IntelligencePage({
                             {Array.from({ length: 5 }).map((_, d) => (
                               <span
                                 key={d}
-                                className={`h-1.5 w-4 rounded-full ${d < o.effort ? "bg-violet-500" : "bg-stone-200"}`}
+                                className={`h-1.5 w-4 rounded-full ${d < o.effort ? "bg-ink" : "bg-line"}`}
                               />
                             ))}
                           </span>
                         </td>
                         <td className="px-3 py-2">
                           {chip(`${o.confidence} confidence`,
-                            o.confidence === "high"
-                              ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                              : o.confidence === "medium"
-                                ? "border-amber-200 bg-amber-50 text-amber-700"
-                                : "border-stone-200 bg-stone-100 text-stone-500")}
+                            "border-line bg-paper text-muted shadow-control")}
                         </td>
-                        <td className="px-3 py-2 text-[12px] text-stone-600">{o.executesIn}</td>
-                        <td className="px-3 py-2 text-[12px] text-stone-600">{AUDIT_NAMES[o.auditId]}</td>
+                        <td className="px-3 py-2 text-[12px] text-muted">{o.executesIn}</td>
+                        <td className="px-3 py-2 text-[12px] text-muted">{AUDIT_NAMES[o.auditId]}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -411,8 +405,8 @@ export default async function IntelligencePage({
           <section>
             <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
               <div>
-                <h2 className="text-sm font-semibold tracking-tight text-stone-900">90-day Growth Plan</h2>
-                <p className="mt-0.5 text-xs text-stone-500">
+                <h2 className="text-sm font-semibold tracking-tight text-ink">90-day Growth Plan</h2>
+                <p className="mt-0.5 text-xs text-muted">
                   Each initiative is mapped to the Marketr module that executes it.
                   {canEdit && row.status === "draft"
                     ? " Adjust priority with the arrows — a human reviews before the plan becomes the baseline."
@@ -422,7 +416,7 @@ export default async function IntelligencePage({
               {row.status === "draft" && canEdit && <FinalizeReportButton reportId={row.id} />}
             </div>
             {bundle.plan.initiatives.length === 0 ? (
-              <p className="rounded-xl border border-dashed border-stone-300 bg-white p-6 text-center text-sm text-stone-400">
+              <p className="rounded-lg border border-dashed border-line bg-paper p-6 text-center text-sm text-subtle">
                 No initiatives compiled for this report.
               </p>
             ) : canEdit && row.status === "draft" ? (
@@ -451,11 +445,11 @@ function PlanBoardReadOnly({ initiatives }: { initiatives: PlanInitiative[] }) {
         if (items.length === 0) return null;
         return (
           <section key={s.sprint} aria-label={s.label}>
-            <h3 className="mb-2 text-sm font-semibold tracking-tight text-stone-900">{s.label}</h3>
-            <div className="overflow-x-auto rounded-xl border border-stone-200 bg-white">
+            <h3 className="mb-2 text-sm font-semibold tracking-tight text-ink">{s.label}</h3>
+            <div className="overflow-x-auto rounded-lg border border-line bg-paper">
               <table className="w-full text-left text-[13px]">
                 <thead>
-                  <tr className="border-b border-stone-100 bg-stone-50/60 text-[11px] uppercase tracking-wide text-stone-500">
+                  <tr className="border-b border-line bg-paper/60 text-[11px] text-muted">
                     <th className="px-3 py-2 font-medium">#</th>
                     <th className="px-3 py-2 font-medium">Initiative</th>
                     <th className="px-3 py-2 font-medium">Module</th>
@@ -465,22 +459,22 @@ function PlanBoardReadOnly({ initiatives }: { initiatives: PlanInitiative[] }) {
                 </thead>
                 <tbody>
                   {items.map((i) => (
-                    <tr key={i.id} className="border-b border-stone-100 last:border-0 hover:bg-violet-50/40">
+                    <tr key={i.id} className="border-b border-line last:border-0 hover:bg-hover-paper">
                       <td className="px-3 py-2">
-                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-violet-600 text-[11px] font-bold text-white">
+                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-ink text-[11px] font-bold text-white">
                           {i.priority}
                         </span>
                       </td>
                       <td className="max-w-xs px-3 py-2">
-                        <span className="flex flex-wrap items-center gap-1.5 font-medium text-stone-900">
+                        <span className="flex flex-wrap items-center gap-1.5 font-medium text-ink">
                           {i.title}
-                          {i.adjustedByHuman && chip("human-adjusted", "border-violet-200 bg-violet-50 text-violet-700")}
+                          {i.adjustedByHuman && chip("human-adjusted", "border-line bg-paper text-muted shadow-control")}
                         </span>
-                        <span className="block text-[12px] text-stone-500 line-clamp-2">{i.description}</span>
+                        <span className="block text-[12px] text-muted line-clamp-2">{i.description}</span>
                       </td>
-                      <td className="px-3 py-2 text-[12px] text-stone-600">{i.module}</td>
-                      <td className="px-3 py-2 text-[12px] text-stone-600">{i.effort}</td>
-                      <td className="px-3 py-2 text-[12px] text-stone-600">{i.expectedOutcome}</td>
+                      <td className="px-3 py-2 text-[12px] text-muted">{i.module}</td>
+                      <td className="px-3 py-2 text-[12px] text-muted">{i.effort}</td>
+                      <td className="px-3 py-2 text-[12px] text-muted">{i.expectedOutcome}</td>
                     </tr>
                   ))}
                 </tbody>

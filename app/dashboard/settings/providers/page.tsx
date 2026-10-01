@@ -25,13 +25,10 @@ import { documensoStatus } from "@/lib/integrations/documenso";
 
 export const dynamic = "force-dynamic";
 
+// Provider health states are provider states, not agent states — neutral chips.
 function StatusBadge({ ok, label }: { ok: boolean; label: string }) {
   return (
-    <span
-      className={`rounded-full px-2 py-0.5 text-xs ${
-        ok ? "bg-emerald-50 text-emerald-700" : "bg-zinc-100 text-zinc-500"
-      }`}
-    >
+    <span className="inline-flex items-center rounded-full bg-paper px-2 py-0.5 text-xs font-medium text-muted shadow-control">
       {label}
     </span>
   );
@@ -66,8 +63,8 @@ export default async function ProvidersSettingsPage() {
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h1 className="text-xl font-bold tracking-tight text-stone-900">Providers</h1>
-        <p className="mt-0.5 text-[13px] text-stone-500">
+        <h1 className="aos-heading">Providers</h1>
+        <p className="mt-0.5 text-[13px] text-muted">
           {workspace.name} — which external providers Marketr is using. These
           are configured via environment variables on the host; change them
           there and restart to apply. Key material is never displayed here.
@@ -75,7 +72,7 @@ export default async function ProvidersSettingsPage() {
       </div>
       <SettingsNav />
 
-      <div className="rounded-xl border border-zinc-200 bg-white/60 p-5">
+      <div className="rounded-lg border border-line bg-paper/60 p-5">
         <div className="flex items-center justify-between gap-2">
           <h2 className="font-medium">SEO data provider</h2>
           <StatusBadge
@@ -85,27 +82,27 @@ export default async function ProvidersSettingsPage() {
         </div>
         <dl className="mt-3 grid gap-2 text-sm md:grid-cols-2">
           <div>
-            <dt className="text-xs text-zinc-500">Provider</dt>
+            <dt className="text-xs text-subtle">Provider</dt>
             <dd className="font-mono text-xs">{seo.name}</dd>
           </div>
           <div>
-            <dt className="text-xs text-zinc-500">Live data</dt>
+            <dt className="text-xs text-subtle">Live data</dt>
             <dd>{seo.isLive ? "Yes" : "No — using the built-in mock"}</dd>
           </div>
           <div className="md:col-span-2">
-            <dt className="text-xs text-zinc-500">Environment variables</dt>
+            <dt className="text-xs text-subtle">Environment variables</dt>
             <dd className="font-mono text-xs">DATAFORSEO_LOGIN, DATAFORSEO_PASSWORD</dd>
           </div>
         </dl>
         {!seo.configured && (
-          <p className="mt-3 text-xs text-zinc-500">
+          <p className="mt-3 text-xs text-subtle">
             Set DATAFORSEO_LOGIN and DATAFORSEO_PASSWORD on the host to switch
             from mock data to live DataForSEO results.
           </p>
         )}
       </div>
 
-      <div className="rounded-xl border border-zinc-200 bg-white/60 p-5">
+      <div className="rounded-lg border border-line bg-paper/60 p-5">
         <div className="flex items-center justify-between gap-2">
           <h2 className="font-medium">LLM provider</h2>
           <StatusBadge
@@ -115,33 +112,33 @@ export default async function ProvidersSettingsPage() {
         </div>
         <dl className="mt-3 grid gap-2 text-sm md:grid-cols-2">
           <div>
-            <dt className="text-xs text-zinc-500">Provider</dt>
+            <dt className="text-xs text-subtle">Provider</dt>
             <dd className="font-mono text-xs">{llm.name}</dd>
           </div>
           <div>
-            <dt className="text-xs text-zinc-500">Live model</dt>
+            <dt className="text-xs text-subtle">Live model</dt>
             <dd>{llm.isLive ? "Yes" : "No — using the built-in mock"}</dd>
           </div>
           <div>
-            <dt className="text-xs text-zinc-500">Model</dt>
+            <dt className="text-xs text-subtle">Model</dt>
             <dd className="font-mono text-xs">{llm.model ?? "—"}</dd>
           </div>
           <div className="md:col-span-2">
-            <dt className="text-xs text-zinc-500">Environment variables</dt>
+            <dt className="text-xs text-subtle">Environment variables</dt>
             <dd className="font-mono text-xs">
               LLM_API_KEY (falls back to OPENAI_API_KEY), LLM_MODEL, LLM_BASE_URL
             </dd>
           </div>
         </dl>
         {!llm.configured && (
-          <p className="mt-3 text-xs text-zinc-500">
+          <p className="mt-3 text-xs text-subtle">
             Set LLM_API_KEY (or OPENAI_API_KEY) on the host to use a live
             OpenAI-compatible endpoint instead of the mock.
           </p>
         )}
       </div>
 
-      <div className="rounded-xl border border-zinc-200 bg-white/60 p-5">
+      <div className="rounded-lg border border-line bg-paper/60 p-5">
         <div className="flex items-center justify-between gap-2">
           <h2 className="font-medium">Stock photos (Unsplash)</h2>
           <StatusBadge
@@ -151,11 +148,11 @@ export default async function ProvidersSettingsPage() {
         </div>
         <dl className="mt-3 grid gap-2 text-sm md:grid-cols-2">
           <div>
-            <dt className="text-xs text-zinc-500">Provider</dt>
+            <dt className="text-xs text-subtle">Provider</dt>
             <dd className="font-mono text-xs">{unsplash.name}</dd>
           </div>
           <div>
-            <dt className="text-xs text-zinc-500">Live data</dt>
+            <dt className="text-xs text-subtle">Live data</dt>
             <dd>
               {unsplash.isLive
                 ? "Yes"
@@ -163,12 +160,12 @@ export default async function ProvidersSettingsPage() {
             </dd>
           </div>
           <div className="md:col-span-2">
-            <dt className="text-xs text-zinc-500">Environment variable</dt>
+            <dt className="text-xs text-subtle">Environment variable</dt>
             <dd className="font-mono text-xs">UNSPLASH_ACCESS_KEY</dd>
           </div>
         </dl>
         {!unsplash.configured && (
-          <p className="mt-3 text-xs text-zinc-500">
+          <p className="mt-3 text-xs text-subtle">
             Get a free key at unsplash.com/developers and set
             UNSPLASH_ACCESS_KEY on the host to enable stock photo search in
             the design editor. Key material is never displayed here.
@@ -177,7 +174,7 @@ export default async function ProvidersSettingsPage() {
       </div>
 
       {/* PROVIDER:brandfetch */}
-      <div className="rounded-xl border border-zinc-200 bg-white/60 p-5">
+      <div className="rounded-lg border border-line bg-paper/60 p-5">
         <div className="flex items-center justify-between gap-2">
           <h2 className="font-medium">Brand lookup (Brandfetch)</h2>
           <StatusBadge
@@ -187,11 +184,11 @@ export default async function ProvidersSettingsPage() {
         </div>
         <dl className="mt-3 grid gap-2 text-sm md:grid-cols-2">
           <div>
-            <dt className="text-xs text-zinc-500">Provider</dt>
+            <dt className="text-xs text-subtle">Provider</dt>
             <dd className="font-mono text-xs">{brandfetch.name}</dd>
           </div>
           <div>
-            <dt className="text-xs text-zinc-500">Live data</dt>
+            <dt className="text-xs text-subtle">Live data</dt>
             <dd>
               {brandfetch.isLive
                 ? "Yes"
@@ -199,12 +196,12 @@ export default async function ProvidersSettingsPage() {
             </dd>
           </div>
           <div className="md:col-span-2">
-            <dt className="text-xs text-zinc-500">Environment variable</dt>
+            <dt className="text-xs text-subtle">Environment variable</dt>
             <dd className="font-mono text-xs">BRANDFETCH_API_KEY</dd>
           </div>
         </dl>
         {!brandfetch.configured && (
-          <p className="mt-3 text-xs text-zinc-500">
+          <p className="mt-3 text-xs text-subtle">
             Get a key at brandfetch.com and set BRANDFETCH_API_KEY on the
             host to enable one-click brand-kit autofill (logo, palette,
             fonts) from a domain in the design editor. Key material is never
@@ -215,7 +212,7 @@ export default async function ProvidersSettingsPage() {
       {/* END */}
 
       {/* PROVIDER:pexels */}
-      <div className="rounded-xl border border-zinc-200 bg-white/60 p-5">
+      <div className="rounded-lg border border-line bg-paper/60 p-5">
         <div className="flex items-center justify-between gap-2">
           <h2 className="font-medium">Stock photos & video (Pexels)</h2>
           <StatusBadge
@@ -225,11 +222,11 @@ export default async function ProvidersSettingsPage() {
         </div>
         <dl className="mt-3 grid gap-2 text-sm md:grid-cols-2">
           <div>
-            <dt className="text-xs text-zinc-500">Provider</dt>
+            <dt className="text-xs text-subtle">Provider</dt>
             <dd className="font-mono text-xs">{pexels.name}</dd>
           </div>
           <div>
-            <dt className="text-xs text-zinc-500">Live data</dt>
+            <dt className="text-xs text-subtle">Live data</dt>
             <dd>
               {pexels.isLive
                 ? "Yes"
@@ -237,12 +234,12 @@ export default async function ProvidersSettingsPage() {
             </dd>
           </div>
           <div className="md:col-span-2">
-            <dt className="text-xs text-zinc-500">Environment variable</dt>
+            <dt className="text-xs text-subtle">Environment variable</dt>
             <dd className="font-mono text-xs">PEXELS_API_KEY</dd>
           </div>
         </dl>
         {!pexels.configured && (
-          <p className="mt-3 text-xs text-zinc-500">
+          <p className="mt-3 text-xs text-subtle">
             Get a free key at pexels.com/api and set PEXELS_API_KEY on the
             host to enable Pexels photo + video search in the design editor.
             Key material is never displayed here.
@@ -252,7 +249,7 @@ export default async function ProvidersSettingsPage() {
       {/* END */}
 
       {/* PROVIDER:pixabay */}
-      <div className="rounded-xl border border-zinc-200 bg-white/60 p-5">
+      <div className="rounded-lg border border-line bg-paper/60 p-5">
         <div className="flex items-center justify-between gap-2">
           <h2 className="font-medium">Stock images & video (Pixabay)</h2>
           <StatusBadge
@@ -262,11 +259,11 @@ export default async function ProvidersSettingsPage() {
         </div>
         <dl className="mt-3 grid gap-2 text-sm md:grid-cols-2">
           <div>
-            <dt className="text-xs text-zinc-500">Provider</dt>
+            <dt className="text-xs text-subtle">Provider</dt>
             <dd className="font-mono text-xs">{pixabay.name}</dd>
           </div>
           <div>
-            <dt className="text-xs text-zinc-500">Live data</dt>
+            <dt className="text-xs text-subtle">Live data</dt>
             <dd>
               {pixabay.isLive
                 ? "Yes"
@@ -274,18 +271,18 @@ export default async function ProvidersSettingsPage() {
             </dd>
           </div>
           <div className="md:col-span-2">
-            <dt className="text-xs text-zinc-500">Environment variable</dt>
+            <dt className="text-xs text-subtle">Environment variable</dt>
             <dd className="font-mono text-xs">PIXABAY_API_KEY</dd>
           </div>
         </dl>
-        <p className="mt-3 text-xs text-zinc-500">
+        <p className="mt-3 text-xs text-subtle">
           Placed Pixabay assets are downloaded server-side and served from
           Marketr’s own storage (cached 24h per the Pixabay API terms) — no
           permanent Pixabay hotlinking. Pixabay does not guarantee model or
           property releases exist for people/logos/trademarks in images.
         </p>
         {!pixabay.configured && (
-          <p className="mt-2 text-xs text-zinc-500">
+          <p className="mt-2 text-xs text-subtle">
             Sign up free at pixabay.com for an API key and set PIXABAY_API_KEY
             on the host. Key material is never displayed here.
           </p>
@@ -294,7 +291,7 @@ export default async function ProvidersSettingsPage() {
       {/* END */}
 
       {/* PROVIDER:cloudinary */}
-      <div className="rounded-xl border border-zinc-200 bg-white/60 p-5">
+      <div className="rounded-lg border border-line bg-paper/60 p-5">
         <div className="flex items-center justify-between gap-2">
           <h2 className="font-medium">Media uploads (Cloudinary)</h2>
           <StatusBadge
@@ -304,11 +301,11 @@ export default async function ProvidersSettingsPage() {
         </div>
         <dl className="mt-3 grid gap-2 text-sm md:grid-cols-2">
           <div>
-            <dt className="text-xs text-zinc-500">Provider</dt>
+            <dt className="text-xs text-subtle">Provider</dt>
             <dd className="font-mono text-xs">{cloudinary.name}</dd>
           </div>
           <div>
-            <dt className="text-xs text-zinc-500">Upload pipeline</dt>
+            <dt className="text-xs text-subtle">Upload pipeline</dt>
             <dd>
               {cloudinary.isLive
                 ? "Yes — signed direct-to-Cloudinary uploads with auto format/quality"
@@ -316,13 +313,13 @@ export default async function ProvidersSettingsPage() {
             </dd>
           </div>
           <div className="md:col-span-2">
-            <dt className="text-xs text-zinc-500">Environment variables</dt>
+            <dt className="text-xs text-subtle">Environment variables</dt>
             <dd className="font-mono text-xs">
               CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET
             </dd>
           </div>
         </dl>
-        <p className="mt-3 text-xs text-zinc-500">
+        <p className="mt-3 text-xs text-subtle">
           Uploads go to your own Cloudinary account (free tier: 25
           credits/month, metered by Cloudinary on your dashboard). The API
           secret stays on the server; the browser only ever receives
@@ -330,7 +327,7 @@ export default async function ProvidersSettingsPage() {
           here.
         </p>
         {!cloudinary.configured && (
-          <p className="mt-2 text-xs text-zinc-500">
+          <p className="mt-2 text-xs text-subtle">
             Create a free account at cloudinary.com and set the three
             CLOUDINARY_* variables on the host to replace data-URL uploads
             with the Cloudinary pipeline in the design editor.
@@ -340,7 +337,7 @@ export default async function ProvidersSettingsPage() {
       {/* END */}
 
       {/* PROVIDER:listmonk */}
-      <div className="rounded-xl border border-zinc-200 bg-white/60 p-5">
+      <div className="rounded-lg border border-line bg-paper/60 p-5">
         <div className="flex items-center justify-between gap-2">
           <h2 className="font-medium">Newsletter engine (Listmonk)</h2>
           <StatusBadge
@@ -350,11 +347,11 @@ export default async function ProvidersSettingsPage() {
         </div>
         <dl className="mt-3 grid gap-2 text-sm md:grid-cols-2">
           <div>
-            <dt className="text-xs text-zinc-500">Provider</dt>
+            <dt className="text-xs text-subtle">Provider</dt>
             <dd className="font-mono text-xs">{listmonk.name}</dd>
           </div>
           <div>
-            <dt className="text-xs text-zinc-500">Live data</dt>
+            <dt className="text-xs text-subtle">Live data</dt>
             <dd>
               {listmonk.isLive
                 ? "Yes — broadcasts run on your Listmonk sidecar"
@@ -362,19 +359,19 @@ export default async function ProvidersSettingsPage() {
             </dd>
           </div>
           <div className="md:col-span-2">
-            <dt className="text-xs text-zinc-500">Environment variables</dt>
+            <dt className="text-xs text-subtle">Environment variables</dt>
             <dd className="font-mono text-xs">
               LISTMONK_URL, LISTMONK_USER, LISTMONK_TOKEN
             </dd>
           </div>
         </dl>
-        <p className="mt-3 text-xs text-zinc-500">
+        <p className="mt-3 text-xs text-subtle">
           Listmonk is a self-hosted AGPL-3.0 email engine sidecar (separate
           process, own Postgres — see docker/integrations/listmonk.yml). Marketr
           talks to it over its REST API only, with Basic auth (user + token).
         </p>
         {!listmonk.configured && (
-          <p className="mt-2 text-xs text-zinc-500">
+          <p className="mt-2 text-xs text-subtle">
             Bring up the sidecar and set LISTMONK_URL, LISTMONK_USER, and
             LISTMONK_TOKEN on the host. Key material is never displayed here.
           </p>
@@ -383,7 +380,7 @@ export default async function ProvidersSettingsPage() {
       {/* END */}
 
       {/* PROVIDER:postiz */}
-      <div className="rounded-xl border border-zinc-200 bg-white/60 p-5">
+      <div className="rounded-lg border border-line bg-paper/60 p-5">
         <div className="flex items-center justify-between gap-2">
           <h2 className="font-medium">Social publishing (Postiz)</h2>
           <StatusBadge
@@ -393,11 +390,11 @@ export default async function ProvidersSettingsPage() {
         </div>
         <dl className="mt-3 grid gap-2 text-sm md:grid-cols-2">
           <div>
-            <dt className="text-xs text-zinc-500">Provider</dt>
+            <dt className="text-xs text-subtle">Provider</dt>
             <dd className="font-mono text-xs">{postiz.name}</dd>
           </div>
           <div>
-            <dt className="text-xs text-zinc-500">Live data</dt>
+            <dt className="text-xs text-subtle">Live data</dt>
             <dd>
               {postiz.isLive
                 ? "Yes — scheduling runs on your Postiz sidecar"
@@ -405,11 +402,11 @@ export default async function ProvidersSettingsPage() {
             </dd>
           </div>
           <div className="md:col-span-2">
-            <dt className="text-xs text-zinc-500">Environment variables</dt>
+            <dt className="text-xs text-subtle">Environment variables</dt>
             <dd className="font-mono text-xs">POSTIZ_URL, POSTIZ_API_KEY</dd>
           </div>
         </dl>
-        <p className="mt-3 text-xs text-zinc-500">
+        <p className="mt-3 text-xs text-subtle">
           Postiz is a self-hosted AGPL-3.0 social-publishing sidecar (~30
           channels behind one OAuth surface — see
           docker/integrations/postiz.yml). Marketr uses its public REST API
@@ -417,7 +414,7 @@ export default async function ProvidersSettingsPage() {
           Channel OAuth tokens stay inside Postiz.
         </p>
         {!postiz.configured && (
-          <p className="mt-2 text-xs text-zinc-500">
+          <p className="mt-2 text-xs text-subtle">
             Bring up the sidecar, create an API key in its Settings → Public
             API, and set POSTIZ_URL and POSTIZ_API_KEY on the host. Key
             material is never displayed here.
@@ -427,7 +424,7 @@ export default async function ProvidersSettingsPage() {
       {/* END */}
 
       {/* INTEGRATION:activepieces */}
-      <div className="rounded-xl border border-zinc-200 bg-white/60 p-5">
+      <div className="rounded-lg border border-line bg-paper/60 p-5">
         <div className="flex items-center justify-between gap-2">
           <h2 className="font-medium">Automation engine (Activepieces)</h2>
           <StatusBadge
@@ -437,13 +434,13 @@ export default async function ProvidersSettingsPage() {
         </div>
         <dl className="mt-3 grid gap-2 text-sm md:grid-cols-2">
           <div>
-            <dt className="text-xs text-zinc-500">Engine</dt>
+            <dt className="text-xs text-subtle">Engine</dt>
             <dd className="font-mono text-xs">
               {activepieces.configured ? activepieces.url : "—"}
             </dd>
           </div>
           <div>
-            <dt className="text-xs text-zinc-500">Flows</dt>
+            <dt className="text-xs text-subtle">Flows</dt>
             <dd>
               {activepieces.configured
                 ? "Yes — Missions, Playbooks, and the Strategy Agent can trigger published webhook flows"
@@ -451,11 +448,11 @@ export default async function ProvidersSettingsPage() {
             </dd>
           </div>
           <div className="md:col-span-2">
-            <dt className="text-xs text-zinc-500">Environment variables</dt>
+            <dt className="text-xs text-subtle">Environment variables</dt>
             <dd className="font-mono text-xs">ACTIVEPIECES_URL, ACTIVEPIECES_API_KEY, ACTIVEPIECES_API_PREFIX (optional)</dd>
           </div>
         </dl>
-        <p className="mt-3 text-xs text-zinc-500">
+        <p className="mt-3 text-xs text-subtle">
           Activepieces Community Edition (MIT) is the optional automation
           backbone: self-host with{" "}
           <code className="font-mono">
@@ -467,7 +464,7 @@ export default async function ProvidersSettingsPage() {
           fired externally — schedule and piece triggers run inside the engine.
         </p>
         {!activepieces.configured && (
-          <p className="mt-2 text-xs text-zinc-500">
+          <p className="mt-2 text-xs text-subtle">
             Unconnected: the Run automation action, automation playbook steps,
             and automation tools report an honest “not connected” state and
             nothing is fabricated.
@@ -477,7 +474,7 @@ export default async function ProvidersSettingsPage() {
       {/* END */}
 
       {/* PHASE12:umami */}
-      <div className="rounded-xl border border-zinc-200 bg-white/60 p-5">
+      <div className="rounded-lg border border-line bg-paper/60 p-5">
         <div className="flex items-center justify-between gap-2">
           <h2 className="font-medium">Analytics (Umami)</h2>
           <StatusBadge
@@ -487,11 +484,11 @@ export default async function ProvidersSettingsPage() {
         </div>
         <dl className="mt-3 grid gap-2 text-sm md:grid-cols-2">
           <div>
-            <dt className="text-xs text-zinc-500">Provider</dt>
+            <dt className="text-xs text-subtle">Provider</dt>
             <dd className="font-mono text-xs">{umami.name}</dd>
           </div>
           <div>
-            <dt className="text-xs text-zinc-500">Stats API</dt>
+            <dt className="text-xs text-subtle">Stats API</dt>
             <dd>
               {umami.statsConfigured
                 ? "Yes — the Analytics dashboard reads this sidecar"
@@ -499,7 +496,7 @@ export default async function ProvidersSettingsPage() {
             </dd>
           </div>
           <div>
-            <dt className="text-xs text-zinc-500">Tracking snippet</dt>
+            <dt className="text-xs text-subtle">Tracking snippet</dt>
             <dd>
               {umami.snippetConfigured
                 ? "Yes — cookieless tracking on public pages"
@@ -507,13 +504,13 @@ export default async function ProvidersSettingsPage() {
             </dd>
           </div>
           <div className="md:col-span-2">
-            <dt className="text-xs text-zinc-500">Environment variables</dt>
+            <dt className="text-xs text-subtle">Environment variables</dt>
             <dd className="font-mono text-xs">
               UMAMI_URL, UMAMI_API_KEY, UMAMI_WEBSITE_ID, UMAMI_SCRIPT_URL
             </dd>
           </div>
         </dl>
-        <p className="mt-3 text-xs text-zinc-500">
+        <p className="mt-3 text-xs text-subtle">
           Self-host with{" "}
           <code className="font-mono">
             docker compose -f docker-compose.yml -f docker/profiles/umami.yml --profile umami up -d
@@ -524,7 +521,7 @@ export default async function ProvidersSettingsPage() {
       {/* END */}
 
       {/* PHASE12:chatwoot */}
-      <div className="rounded-xl border border-zinc-200 bg-white/60 p-5">
+      <div className="rounded-lg border border-line bg-paper/60 p-5">
         <div className="flex items-center justify-between gap-2">
           <h2 className="font-medium">Live chat (Chatwoot)</h2>
           <StatusBadge
@@ -540,11 +537,11 @@ export default async function ProvidersSettingsPage() {
         </div>
         <dl className="mt-3 grid gap-2 text-sm md:grid-cols-2">
           <div>
-            <dt className="text-xs text-zinc-500">Provider</dt>
+            <dt className="text-xs text-subtle">Provider</dt>
             <dd className="font-mono text-xs">{chatwoot.name}</dd>
           </div>
           <div>
-            <dt className="text-xs text-zinc-500">Widget</dt>
+            <dt className="text-xs text-subtle">Widget</dt>
             <dd>
               {chatwoot.active
                 ? "Live in the dashboard"
@@ -552,13 +549,13 @@ export default async function ProvidersSettingsPage() {
             </dd>
           </div>
           <div className="md:col-span-2">
-            <dt className="text-xs text-zinc-500">Environment variables</dt>
+            <dt className="text-xs text-subtle">Environment variables</dt>
             <dd className="font-mono text-xs">
               CHATWOOT_BASE_URL, CHATWOOT_WEBSITE_TOKEN, CHATWOOT_WIDGET_ENABLED=true
             </dd>
           </div>
         </dl>
-        <p className="mt-3 text-xs text-zinc-500">
+        <p className="mt-3 text-xs text-subtle">
           MIT core. Off by default even with credentials set — the widget
           mounts only when CHATWOOT_WIDGET_ENABLED=true. Key material is never
           displayed here.
@@ -567,7 +564,7 @@ export default async function ProvidersSettingsPage() {
       {/* END */}
 
       {/* PHASE12:ghost */}
-      <div className="rounded-xl border border-zinc-200 bg-white/60 p-5">
+      <div className="rounded-lg border border-line bg-paper/60 p-5">
         <div className="flex items-center justify-between gap-2">
           <h2 className="font-medium">Blog publishing (Ghost)</h2>
           <StatusBadge
@@ -577,11 +574,11 @@ export default async function ProvidersSettingsPage() {
         </div>
         <dl className="mt-3 grid gap-2 text-sm md:grid-cols-2">
           <div>
-            <dt className="text-xs text-zinc-500">Provider</dt>
+            <dt className="text-xs text-subtle">Provider</dt>
             <dd className="font-mono text-xs">{ghost.name}</dd>
           </div>
           <div>
-            <dt className="text-xs text-zinc-500">Content engine</dt>
+            <dt className="text-xs text-subtle">Content engine</dt>
             <dd>
               {ghost.configured
                 ? "Yes — “Publish to Ghost” is live on content items"
@@ -589,11 +586,11 @@ export default async function ProvidersSettingsPage() {
             </dd>
           </div>
           <div className="md:col-span-2">
-            <dt className="text-xs text-zinc-500">Environment variables</dt>
+            <dt className="text-xs text-subtle">Environment variables</dt>
             <dd className="font-mono text-xs">GHOST_URL, GHOST_ADMIN_API_KEY</dd>
           </div>
         </dl>
-        <p className="mt-3 text-xs text-zinc-500">
+        <p className="mt-3 text-xs text-subtle">
           MIT. Posts go out as Ghost drafts by default. Key material is never
           displayed here.
         </p>
@@ -601,7 +598,7 @@ export default async function ProvidersSettingsPage() {
       {/* END */}
 
       {/* PHASE12:growthbook */}
-      <div className="rounded-xl border border-zinc-200 bg-white/60 p-5">
+      <div className="rounded-lg border border-line bg-paper/60 p-5">
         <div className="flex items-center justify-between gap-2">
           <h2 className="font-medium">Feature flags (GrowthBook)</h2>
           <StatusBadge
@@ -611,11 +608,11 @@ export default async function ProvidersSettingsPage() {
         </div>
         <dl className="mt-3 grid gap-2 text-sm md:grid-cols-2">
           <div>
-            <dt className="text-xs text-zinc-500">Provider</dt>
+            <dt className="text-xs text-subtle">Provider</dt>
             <dd className="font-mono text-xs">{growthbook.name}</dd>
           </div>
           <div>
-            <dt className="text-xs text-zinc-500">SDK (live flag values)</dt>
+            <dt className="text-xs text-subtle">SDK (live flag values)</dt>
             <dd>
               {growthbook.sdkConfigured
                 ? "Yes — flags resolve from the sidecar"
@@ -623,13 +620,13 @@ export default async function ProvidersSettingsPage() {
             </dd>
           </div>
           <div className="md:col-span-2">
-            <dt className="text-xs text-zinc-500">Environment variables</dt>
+            <dt className="text-xs text-subtle">Environment variables</dt>
             <dd className="font-mono text-xs">
               GROWTHBOOK_API_HOST, GROWTHBOOK_API_KEY, GROWTHBOOK_CLIENT_KEY
             </dd>
           </div>
         </dl>
-        <p className="mt-3 text-xs text-zinc-500">
+        <p className="mt-3 text-xs text-subtle">
           Open core, MIT bulk. Self-host with{" "}
           <code className="font-mono">
             docker compose -f docker-compose.yml -f docker/profiles/growthbook.yml --profile growthbook up -d
@@ -641,7 +638,7 @@ export default async function ProvidersSettingsPage() {
       {/* END */}
 
       {/* PHASE12:documenso */}
-      <div className="rounded-xl border border-zinc-200 bg-white/60 p-5">
+      <div className="rounded-lg border border-line bg-paper/60 p-5">
         <div className="flex items-center justify-between gap-2">
           <h2 className="font-medium">E-signatures (Documenso)</h2>
           <StatusBadge
@@ -651,11 +648,11 @@ export default async function ProvidersSettingsPage() {
         </div>
         <dl className="mt-3 grid gap-2 text-sm md:grid-cols-2">
           <div>
-            <dt className="text-xs text-zinc-500">Provider</dt>
+            <dt className="text-xs text-subtle">Provider</dt>
             <dd className="font-mono text-xs">{documenso.name}</dd>
           </div>
           <div>
-            <dt className="text-xs text-zinc-500">Signing requests</dt>
+            <dt className="text-xs text-subtle">Signing requests</dt>
             <dd>
               {documenso.configured
                 ? "Yes — API-only, at Settings → Signing"
@@ -663,11 +660,11 @@ export default async function ProvidersSettingsPage() {
             </dd>
           </div>
           <div className="md:col-span-2">
-            <dt className="text-xs text-zinc-500">Environment variables</dt>
+            <dt className="text-xs text-subtle">Environment variables</dt>
             <dd className="font-mono text-xs">DOCUMENSO_URL, DOCUMENSO_API_KEY</dd>
           </div>
         </dl>
-        <p className="mt-3 text-xs text-zinc-500">
+        <p className="mt-3 text-xs text-subtle">
           AGPL Community Edition, API-only against an unmodified instance —
           signers use Documenso&apos;s own emailed link. The white-labeled
           embedded signing UI is the paid Enterprise feature and is not

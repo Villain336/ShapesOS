@@ -110,7 +110,7 @@ export default async function LearningsPage({
         <button type="submit" className={btnPrimary}>
           <Filter size={14} /> Filter
         </button>
-        <span className="ml-auto text-[13px] text-stone-500">{learnings.length} learnings</span>
+        <span className="ml-auto text-[13px] text-muted">{learnings.length} learnings</span>
       </form>
 
       <div className={tableShell}>
@@ -132,10 +132,10 @@ export default async function LearningsPage({
                 <tr key={l.id} className={rowCls}>
                   <td className="px-3 py-2">
                     <div className="flex items-start gap-2">
-                      <Icon size={15} className="mt-0.5 shrink-0 text-stone-400" aria-hidden />
+                      <Icon size={15} className="mt-0.5 shrink-0 text-subtle" aria-hidden />
                       <div className="min-w-0">
-                        <div className="font-medium leading-snug text-stone-900">{l.hypothesis}</div>
-                        <div className="mt-0.5 text-[12px] text-stone-500">{l.action}</div>
+                        <div className="font-medium leading-snug text-ink">{l.hypothesis}</div>
+                        <div className="mt-0.5 text-[12px] text-muted">{l.action}</div>
                       </div>
                     </div>
                   </td>
@@ -144,13 +144,13 @@ export default async function LearningsPage({
                       {l.result}
                     </Chip>
                   </td>
-                  <td className="px-3 py-2 tabular-nums text-stone-600">
+                  <td className="px-3 py-2 tabular-nums text-muted">
                     {/* Procedural learnings carry no stored confidence; human-asserted
                         ones are 1.0 by house rule (they never decay). */}
                     {l.source === "human" ? "1.00" : "—"}
                   </td>
                   <td className="px-3 py-2">
-                    <div className="text-[12px] text-stone-500">{fresh.label}</div>
+                    <div className="text-[12px] text-muted">{fresh.label}</div>
                     <div className="mt-1">
                       <Chip tone={bucketTone(fresh.bucket)}>{fresh.bucket}</Chip>
                     </div>
@@ -158,13 +158,13 @@ export default async function LearningsPage({
                   <td className="px-3 py-2">
                     {l.sourceEpisodeId ? (
                       <Link
-                        className="text-[12px] text-violet-700 underline hover:text-violet-800"
+                        className="text-[12px] text-ink underline hover:text-ink"
                         href={`/dashboard/substrate/memory/episodes#${l.sourceEpisodeId}`}
                       >
                         source episode
                       </Link>
                     ) : (
-                      <span className="text-[12px] text-stone-400">—</span>
+                      <span className="text-[12px] text-subtle">—</span>
                     )}
                   </td>
                 </tr>
@@ -172,7 +172,7 @@ export default async function LearningsPage({
             })}
             {learnings.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-3 py-8 text-center text-[13px] text-stone-400">
+                <td colSpan={5} className="px-3 py-8 text-center text-[13px] text-subtle">
                   No learnings yet. Close a Test Lab experiment and archive it — the learning lands here.
                 </td>
               </tr>
@@ -182,7 +182,7 @@ export default async function LearningsPage({
       </div>
 
       <div className={`${infoNoteCls} mt-3 flex items-start gap-2`}>
-        <FlaskConical size={14} className="mt-0.5 shrink-0 text-stone-500" aria-hidden />
+        <FlaskConical size={14} className="mt-0.5 shrink-0 text-muted" aria-hidden />
         <p>Human-asserted learnings carry confidence 1.0 and origin user_told — they never decay.</p>
       </div>
     </div>

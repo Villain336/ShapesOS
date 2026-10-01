@@ -11,8 +11,8 @@ import { authorityTablesReady } from "@/lib/authority/db";
 
 const chip =
   "inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-2 py-0.5 text-[11px] font-medium leading-tight";
-const chipSlate = `${chip} bg-stone-100 text-stone-600 border-stone-200`;
-const chipRed = `${chip} bg-red-50 text-red-700 border-red-200`;
+const chipSlate = `${chip} bg-paper text-muted border-line`;
+const chipRed = `${chip} bg-failed-tint text-failed-text border-failed`;
 
 export const dynamic = "force-dynamic";
 
@@ -48,11 +48,11 @@ export default async function AuthorityPage() {
   }
 
   return (
-    <div className="flex h-full flex-col gap-4 bg-[#FAFAF7] p-4 md:p-6">
+    <div className="flex h-full flex-col gap-4 bg-canvas p-4 md:p-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-stone-900">Authority &amp; relevance</h1>
-          <p className="mt-0.5 max-w-2xl text-[13px] text-stone-500">
+          <h1 className="aos-heading">Authority &amp; relevance</h1>
+          <p className="mt-0.5 max-w-2xl text-[13px] text-muted">
             Outreach, PR, listings, AEO, and reviews — every external action is approval-bound.
           </p>
         </div>
@@ -66,7 +66,7 @@ export default async function AuthorityPage() {
         </div>
       </div>
       {!ready && (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm">
+        <div className="rounded-lg border border-needs bg-needs-tint p-4 text-sm">
           Authority tables are not provisioned yet (migration pending).
         </div>
       )}
@@ -75,10 +75,10 @@ export default async function AuthorityPage() {
           <Link
             key={c.href}
             href={c.href}
-            className="rounded-xl border border-stone-200 bg-white p-5 transition hover:border-stone-300"
+            className="rounded-lg border border-line bg-paper p-5 transition hover:border-line"
           >
-            <h2 className="text-base font-semibold text-stone-900">{c.title}</h2>
-            <p className="mt-1 text-sm text-stone-500">{c.desc}</p>
+            <h2 className="text-base font-semibold text-ink">{c.title}</h2>
+            <p className="mt-1 text-sm text-muted">{c.desc}</p>
           </Link>
         ))}
       </div>
