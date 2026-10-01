@@ -14,6 +14,7 @@ import {
   approveSpendAction,
   rejectSpendAction,
 } from "@/lib/adplatforms/gate";
+import { executeSpendProposal } from "@/lib/adplatforms/execute";
 import { prismaApprovalStore, prismaProposalStore } from "@/lib/adplatforms/store";
 import AdsTabs from "../_components/AdsTabs";
 
@@ -94,6 +95,17 @@ async function decide(proposalId: string, decision: "approve" | "reject") {
   revalidatePath("/dashboard/media/advertising/proposals");
 }
 
+async function execute(proposalId: string) {
+  "use server";
+  const user = await requireUser();
+  if (!user) redirect("/login");
+  const workspace = await getOrCreateWorkspace(user.id, user.email);
+  const membership = await requireWorkspaceRole(user.id, workspace.id, "editor");
+  if (!membership) redirect("/dashboard");
+  await executeSpendProposal(workspace.id, user.id, proposalId);
+  revalidatePath("/dashboard/media/advertising/proposals");
+}
+
 export default async function ProposalsPage() {
   const user = await requireUser();
   if (!user) redirect("/login");
@@ -167,7 +179,17 @@ export default async function ProposalsPage() {
                     )}
                   </td>
                   <td className="px-3 py-2.5 text-right">
-                    {p.status === "pending" && canDecide ? (
+                    {p.status === "approved" && canDecide ? (
+                      <form action={execute.bind(null, p.id)}>
+                        <button
+                          type="submit"
+                          className="inline-flex min-h-[36px] items-center gap-1 rounded-md bg-[var(--brand-600)] px-3 text-[12px] font-medium text-white hover:bg-[var(--brand-700)]"
+                        >
+                          <ShieldCheck className="h-3.5 w-3.5" />
+                          Execute
+                        </button>
+                      </form>
+                    ) : p.status === "pending" && canDecide ? (
                       <div className="inline-flex gap-1.5">
                         <form action={decide.bind(null, p.id, "approve")}>
                           <button
