@@ -6,7 +6,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Archive, CalendarClock, ListChecks, Loader2, Radar } from "lucide-react";
+import { Archive, CalendarClock, ListChecks, Loader2, Radar, ShieldCheck } from "lucide-react";
 import { ChecklistView, type ObligationView } from "./views/ChecklistView";
 import {
   DeadlinesView,
@@ -15,9 +15,10 @@ import {
 } from "./views/DeadlinesView";
 import { DocumentsView, type DocumentView } from "./views/DocumentsView";
 import { RadarView, type RadarItemView } from "./views/RadarView";
+import { DigitalView, type DigitalPropertyView } from "./views/DigitalView";
 import { ProfileStep, type ProfileDraft } from "./views/ProfileStep";
 
-type Tab = "obligations" | "deadlines" | "documents" | "radar";
+type Tab = "obligations" | "deadlines" | "documents" | "radar" | "digital";
 
 export function LegalApp() {
   const [loading, setLoading] = useState(true);
@@ -29,16 +30,18 @@ export function LegalApp() {
   const [needsDate, setNeedsDate] = useState<NeedsDateView[]>([]);
   const [documents, setDocuments] = useState<DocumentView[]>([]);
   const [radar, setRadar] = useState<RadarItemView[]>([]);
+  const [digital, setDigital] = useState<DigitalPropertyView[]>([]);
   const [seedFeedNotice, setSeedFeedNotice] = useState("");
   const [workspaceId, setWorkspaceId] = useState("");
   const [disclaimer, setDisclaimer] = useState("");
 
   const refresh = useCallback(async () => {
-    const [oblRes, dlRes, docRes, radarRes] = await Promise.all([
+    const [oblRes, dlRes, docRes, radarRes, digRes] = await Promise.all([
       fetch("/api/legal/obligations"),
       fetch("/api/legal/deadlines"),
       fetch("/api/legal/documents"),
       fetch("/api/legal/radar"),
+      fetch("/api/legal/digital-properties"),
     ]);
     if (oblRes.ok) {
       const json = await oblRes.json();
@@ -63,6 +66,11 @@ export function LegalApp() {
       setDisclaimer((prev) => prev || (json.disclaimer ?? ""));
       setRadar(json.items ?? []);
       setSeedFeedNotice(json.seedFeedNotice ?? "");
+    }
+    if (digRes.ok) {
+      const json = await digRes.json();
+      setDisclaimer((prev) => prev || (json.disclaimer ?? ""));
+      setDigital(json.properties ?? []);
     }
     setLoading(false);
   }, []);
@@ -102,6 +110,10 @@ export function LegalApp() {
   const radarAttention = radar.filter(
     (r) => r.relevance === "relevant" && r.triage === "new",
   ).length;
+  const digitalAttention = digital.reduce(
+    (n, p) => n + p.openFindingCount,
+    0,
+  );
 
   const tabs = [
     { id: "obligations" as const, label: "Obligations", icon: ListChecks, badge: null as number | null },
@@ -122,6 +134,12 @@ export function LegalApp() {
       label: "Radar",
       icon: Radar,
       badge: radarAttention > 0 ? radarAttention : null,
+    },
+    {
+      id: "digital" as const,
+      label: "Digital",
+      icon: ShieldCheck,
+      badge: digitalAttention > 0 ? digitalAttention : null,
     },
   ];
 
@@ -179,12 +197,19 @@ export function LegalApp() {
           disclaimer={disclaimer}
           onChanged={() => void refresh()}
         />
-      ) : (
+      ) : tab === "radar" ? (
         <RadarView
           items={radar}
           seedFeedNotice={seedFeedNotice}
           disclaimer={disclaimer}
           onChanged={() => void refresh()}
+        />
+      ) : (
+        <DigitalView
+          properties={digital}
+          disclaimer={disclaimer}
+          onChanged={() => void refresh()}
+          onShowObligations={() => setTab("obligations")}
         />
       )}
     </div>

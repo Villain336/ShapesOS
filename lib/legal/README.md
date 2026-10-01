@@ -5,7 +5,71 @@ business model + jurisdictions → the engine computes the tenant's obligation
 checklist (licenses, filings, tax registrations, insurance, permits). Slice 2
 adds computed deadlines with escalation tiers that feed the alert hub.
 
-## Slice 2 layout
+## Slice 5: digital properties (Hullcheck synergy)
+
+Hullcheck's "don't get sued" engine — legal, compliance, and security
+scanning for apps and websites — is the **digital side** of the Legal
+surface (slices 1–4 are the physical/regulatory side). Critical context:
+Hullcheck is a spec, not an implementation — there is no scan engine to
+wire to. So slice 5 implements Hullcheck's **layer taxonomy** (detect / fix
+/ prove / harden / document / comply — the six layers of the
+legal/compliance/security surface; operate/certify arrive with the engine)
+and **result model** inside Legal, structured so the future engine plugs
+in. **No scanner is built here.**
+
+- `digital.ts` — pure engine: layer taxonomy, 16-item self-assessment
+  checklist (the v1 "scanner": the tenant's own yes/no/not-sure answers),
+  `answersToFindings` ("no" = gap at full severity; "not sure" = flagged one
+  notch lower, marked Unverified — never silently dropped), finding status
+  transitions (open → fixed/dismissed; closed findings reopen), and the
+  `DigitalScan` ingestion shape with validation (`hullcheck_engine` scans
+  require `engineVersion`).
+- `prisma-store.ts` — slice 5 section: property CRUD (`LegalDigitalProperty`:
+  name, url, kind website|app, notes), finding CRUD (`LegalDigitalFinding`:
+  itemKey, hullcheckLayer, title, plain-English summary, severity, status,
+  source, obligationKey), `recordSelfAssessment` (replaces open
+  self-assessment findings; fixed/dismissed untouched),
+  `importDigitalScan` (**rejects** `hullcheck_engine` until the real engine
+  is connected — guardrail: never invent scan results), obligation titles
+  joined by key for the UI link-out.
+- `__tests__/digital.test.ts` — 34 tests: taxonomy validity, checklist seed
+  validity, self-assessment → findings (no/yes/unsure semantics, kind
+  filtering, unknown-key rejection), obligation-key linking against the
+  slice-1 seed templates, status transitions, source labeling, scan
+  validation, severity stepping, URL validation.
+
+## Routes
+
+- `GET/POST /api/legal/digital-properties` — property list / register (editor).
+- `GET/PATCH/DELETE /api/legal/digital-properties/[id]` — detail + findings / edit / remove (editor).
+- `GET/POST /api/legal/digital-properties/[id]/findings` — findings list / record-by-hand or scan import (editor).
+- `PATCH /api/legal/digital-properties/[id]/findings/[findingId]` — status transition (editor).
+- `GET/POST /api/legal/digital-properties/[id]/assess` — kind-scoped checklist / submit answers → findings (editor).
+
+## UI
+
+- `app/dashboard/legal/views/DigitalView.tsx` — "Digital" tab in
+  `LegalApp.tsx`: property list (dense table), per-property findings grouped
+  by Hullcheck layer, self-assessment walk-through (source banner: "your
+  answers, not a scan"), manual finding form, plain-English summaries on
+  every finding, "have an attorney confirm" nudge on legal items, and a
+  link-out to the related slice-1 obligation. "Don't get sued" framing.
+  Severity pills are monochrome (severity is not a genuine agent state).
+
+## Hard guardrails (never bend)
+
+1. **Information, never legal advice** — `LEGAL_DISCLAIMER` on every page
+   and API response; legal findings carry the confirm-with-professional nudge.
+2. **No invented scan results** — v1 findings come from the tenant's
+   self-assessment or manual import; the source label is on every finding;
+   `hullcheck_engine` imports are rejected until the engine exists.
+3. **Licensed partner invariant** — insurance obligations name the licensed
+   partner ("they hold the licenses, we provide the software") and never
+   present a binding path. Enforced by tests.
+
+---
+
+# Slice 2 layout
 
 - `deadlines.ts` — pure engine: escalation tiers (`date_needed`, `due_90`,
   `due_30`, `due_7`, `overdue`), whole-day `daysUntilDue`, month-clamped

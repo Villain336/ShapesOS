@@ -772,6 +772,8 @@ model Workspace {
   legalDocuments         LegalDocument[]
   // Legal/Compliance slice 4: Change radar.
   legalRadarTriage       LegalRadarTriage[]
+  // Legal/Compliance slice 5: Digital properties (Hullcheck synergy).
+  legalDigitalProperties LegalDigitalProperty[]
   insurancePaymentHandoffs InsurancePaymentHandoff[]
   insuranceCertificates     InsuranceCertificate[]
   // Phase 12 (embeds): tenant-scoped GrowthBook flag overrides.
@@ -11206,4 +11208,90 @@ model LegalDocumentVersion {
   @@unique([documentId, versionNumber])
   @@index([workspaceFileId])
   @@map("legal_document_versions")
+}
+
+// Legal/Compliance slice 5: Digital-properties module — Hullcheck synergy
+// (BUSINESS-OS-FEATURE-SPECS.md §4). The digital side of the Legal surface:
+// a tenant's websites/apps (DigitalProperty) and the plain-English findings
+// against them (DigitalFinding), organized by Hullcheck's layer taxonomy
+// (detect / fix / prove / harden / document / comply). v1 findings come from
+// the tenant's self-assessment or manual import — source is always labeled,
+// and "hullcheck_engine" is reserved for the future scan engine (the import
+// path rejects it until the engine exists; see lib/legal/digital.ts).
+
+enum DigitalPropertyKind {
+  website
+  app
+}
+
+enum HullcheckLayer {
+  detect
+  fix
+  prove
+  harden
+  document
+  comply
+}
+
+enum DigitalFindingSeverity {
+  critical
+  high
+  medium
+  low
+}
+
+enum DigitalFindingStatus {
+  open
+  fixed
+  dismissed
+}
+
+enum DigitalFindingSource {
+  self_assessment
+  manual_import
+  hullcheck_engine
+}
+
+model LegalDigitalProperty {
+  id          String             @id @default(cuid())
+  workspaceId String             @map("workspace_id")
+  workspace   Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  name  String
+  url   String?
+  kind  DigitalPropertyKind
+  notes String?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  findings LegalDigitalFinding[]
+
+  @@index([workspaceId])
+  @@map("legal_digital_properties")
+}
+
+model LegalDigitalFinding {
+  id         String               @id @default(cuid())
+  propertyId String               @map("property_id")
+  property   LegalDigitalProperty @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  // Stable self-assessment checklist item key; null for freeform manual findings.
+  itemKey String? @map("item_key")
+
+  hullcheckLayer      HullcheckLayer       @map("hullcheck_layer")
+  title               String
+  // "What this means for your business" (Hullcheck SPEC §3) — plain English, always present.
+  plainEnglishSummary String               @map("plain_english_summary")
+  severity            DigitalFindingSeverity
+  status              DigitalFindingStatus @default(open)
+  source              DigitalFindingSource
+  // Optional link into slice 1's obligation templates (by key).
+  obligationKey String? @map("obligation_key")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([propertyId, status])
+  @@map("legal_digital_findings")
 }

@@ -64,6 +64,25 @@ import {
   type LegalExpirySource,
   type PreviousVersion,
 } from "./documents";
+import {
+  answersToFindings,
+  findingSourceLabel,
+  isValidDigitalPropertyKind,
+  isValidFindingSeverity,
+  isValidFindingStatus,
+  isValidFindingStatusTransition,
+  isValidHullcheckLayer,
+  SELF_ASSESSMENT_CHECKLIST,
+  validateDigitalScan,
+  validatePropertyUrl,
+  type DigitalFindingSeverity,
+  type DigitalFindingSource,
+  type DigitalFindingStatus,
+  type DigitalPropertyKind,
+  type DigitalScan,
+  type HullcheckLayer,
+  type SelfAssessmentAnswer,
+} from "./digital";
 
 export class PrismaLegalStore {
   constructor(private prisma: PrismaClient) {}
@@ -1071,6 +1090,373 @@ export class PrismaLegalStore {
     }
     return created;
   }
+
+  // ------------------------------------------------------------------
+  // Slice 5: digital properties (Hullcheck synergy)
+  // ------------------------------------------------------------------
+  //
+  // The tenant's digital-property registry (websites/apps) plus
+  // plain-English findings organized by Hullcheck's layer taxonomy
+  // (detect / fix / prove / harden / document / comply). v1 findings come
+  // from the tenant's self-assessment or manual import only — the store
+  // REJECTS source "hullcheck_engine" until the real scan engine exists
+  // (guardrail: never invent scan results).
+
+  /** The tenant's registered digital properties with open-finding counts. */
+  async listDigitalProperties(workspaceId: string): Promise<ComputedDigitalProperty[]> {
+    const rows = await this.prisma.legalDigitalProperty.findMany({
+      where: { workspaceId },
+      include: { findings: { where: { status: "open" }, select: { severity: true } } },
+      orderBy: { createdAt: "asc" },
+    });
+    return rows.map(toComputedDigitalProperty);
+  }
+
+  async createDigitalProperty(
+    workspaceId: string,
+    input: { name: string; url?: string | null; kind: DigitalPropertyKind; notes?: string | null },
+  ): Promise<ComputedDigitalProperty> {
+    const name = input.name?.trim();
+    if (!name) {
+      throw new LegalError("INVALID_NAME", "Name the property (e.g. your store's website).");
+    }
+    if (!isValidDigitalPropertyKind(input.kind)) {
+      throw new LegalError("INVALID_KIND", "Kind must be website or app.");
+    }
+    const url = validatePropertyUrl(input.url ?? null);
+    const row = await this.prisma.legalDigitalProperty.create({
+      data: {
+        workspaceId,
+        name,
+        url,
+        kind: input.kind,
+        notes: input.notes?.trim() || null,
+      },
+      include: { findings: { where: { status: "open" }, select: { severity: true } } },
+    });
+    return toComputedDigitalProperty(row);
+  }
+
+  /** One property with its findings (open first, then by severity). */
+  async getDigitalProperty(
+    workspaceId: string,
+    id: string,
+  ): Promise<ComputedDigitalPropertyDetail | null> {
+    const row = await this.prisma.legalDigitalProperty.findFirst({
+      where: { id, workspaceId },
+      include: {
+        findings: {
+          where: { status: "open" },
+          select: { severity: true },
+        },
+      },
+    });
+    if (!row) return null;
+    const findings = await this.listDigitalFindings(workspaceId, id);
+    return { ...toComputedDigitalProperty(row), findings };
+  }
+
+  /** Tenant edits name/url/notes. Kind is set at creation (the checklist is kind-scoped). */
+  async updateDigitalProperty(
+    workspaceId: string,
+    id: string,
+    input: { name?: string; url?: string | null; notes?: string | null },
+  ): Promise<ComputedDigitalProperty> {
+    const existing = await this.prisma.legalDigitalProperty.findFirst({
+      where: { id, workspaceId },
+    });
+    if (!existing) {
+      throw new LegalError("UNKNOWN_PROPERTY", `No digital property: ${id}`);
+    }
+    const data: { name?: string; url?: string | null; notes?: string | null } = {};
+    if (input.name !== undefined) {
+      const name = input.name.trim();
+      if (!name) throw new LegalError("INVALID_NAME", "Name cannot be empty.");
+      data.name = name;
+    }
+    if (input.url !== undefined) data.url = validatePropertyUrl(input.url);
+    if (input.notes !== undefined) data.notes = input.notes?.trim() || null;
+    const row = await this.prisma.legalDigitalProperty.update({
+      where: { id },
+      data,
+      include: { findings: { where: { status: "open" }, select: { severity: true } } },
+    });
+    return toComputedDigitalProperty(row);
+  }
+
+  /** Tenant removes a property and its findings. */
+  async deleteDigitalProperty(workspaceId: string, id: string): Promise<void> {
+    const existing = await this.prisma.legalDigitalProperty.findFirst({
+      where: { id, workspaceId },
+    });
+    if (!existing) {
+      throw new LegalError("UNKNOWN_PROPERTY", `No digital property: ${id}`);
+    }
+    await this.prisma.$transaction(async (tx) => {
+      await tx.legalDigitalFinding.deleteMany({ where: { propertyId: id } });
+      await tx.legalDigitalProperty.delete({ where: { id } });
+    });
+  }
+
+  /**
+   * Findings for one property, open first then fixed/dismissed, severities
+   * ordered critical → low. Each finding carries its source label (the UI
+   * must show it) and, when linked, the slice-1 obligation's title.
+   */
+  async listDigitalFindings(
+    workspaceId: string,
+    propertyId: string,
+  ): Promise<ComputedDigitalFinding[]> {
+    await this.assertDigitalProperty(workspaceId, propertyId);
+    const rows = await this.prisma.legalDigitalFinding.findMany({
+      where: { propertyId },
+    });
+    const templateTitles = await this.obligationTitlesByKey(
+      rows.map((r) => r.obligationKey).filter((k): k is string => !!k),
+    );
+    const computed = rows.map((r) => toComputedDigitalFinding(r, templateTitles));
+    const severityRank = (s: DigitalFindingSeverity) =>
+      (["critical", "high", "medium", "low"] as const).indexOf(s);
+    const statusRank = (s: DigitalFindingStatus) =>
+      (["open", "fixed", "dismissed"] as const).indexOf(s);
+    computed.sort(
+      (a, b) =>
+        statusRank(a.status) - statusRank(b.status) ||
+        severityRank(a.severity) - severityRank(b.severity),
+    );
+    return computed;
+  }
+
+  /**
+   * Record one finding by hand (source: manual_import). obligationKey must
+   * match a real slice-1 obligation template — the store never links to
+   * something that does not exist.
+   */
+  async createDigitalFinding(
+    workspaceId: string,
+    propertyId: string,
+    input: {
+      itemKey?: string | null;
+      hullcheckLayer: HullcheckLayer;
+      title: string;
+      plainEnglishSummary: string;
+      severity: DigitalFindingSeverity;
+      obligationKey?: string | null;
+    },
+  ): Promise<ComputedDigitalFinding> {
+    await this.assertDigitalProperty(workspaceId, propertyId);
+    if (!isValidHullcheckLayer(input.hullcheckLayer)) {
+      throw new LegalError(
+        "INVALID_LAYER",
+        "hullcheckLayer must be one of detect, fix, prove, harden, document, comply.",
+      );
+    }
+    if (!isValidFindingSeverity(input.severity)) {
+      throw new LegalError(
+        "INVALID_SEVERITY",
+        "severity must be one of critical, high, medium, low.",
+      );
+    }
+    const title = input.title?.trim();
+    if (!title) throw new LegalError("INVALID_TITLE", "Title is required.");
+    const summary = input.plainEnglishSummary?.trim();
+    if (!summary) {
+      throw new LegalError(
+        "INVALID_SUMMARY",
+        "plainEnglishSummary is required — findings must explain what this means for the business.",
+      );
+    }
+    const obligationKey = await this.assertObligationKey(input.obligationKey ?? null);
+    const row = await this.prisma.legalDigitalFinding.create({
+      data: {
+        propertyId,
+        itemKey: input.itemKey?.trim() || null,
+        hullcheckLayer: input.hullcheckLayer,
+        title,
+        plainEnglishSummary: summary,
+        severity: input.severity,
+        status: "open",
+        source: "manual_import",
+        obligationKey,
+      },
+    });
+    const templateTitles = await this.obligationTitlesByKey(
+      obligationKey ? [obligationKey] : [],
+    );
+    return toComputedDigitalFinding(row, templateTitles);
+  }
+
+  /**
+   * Tenant walks the self-assessment for a property: answers come in, open
+   * findings from the previous self-assessment are replaced (the gaps were
+   * re-answered), and the new gaps are written. Fixed/dismissed findings are
+   * never touched by a re-run.
+   */
+  async recordSelfAssessment(
+    workspaceId: string,
+    propertyId: string,
+    answers: Record<string, SelfAssessmentAnswer>,
+  ): Promise<{ created: ComputedDigitalFinding[]; gapCount: number }> {
+    const property = await this.assertDigitalProperty(workspaceId, propertyId);
+    const inputs = answersToFindings(property.kind as DigitalPropertyKind, answers);
+    // obligationKeys from the checklist are seed-validated, but the tenant's
+    // template rows only exist after seeding — resolve titles best-effort.
+    const created = await this.prisma.$transaction(async (tx) => {
+      await tx.legalDigitalFinding.deleteMany({
+        where: { propertyId, source: "self_assessment", status: "open" },
+      });
+      const rows = [];
+      for (const input of inputs) {
+        rows.push(
+          await tx.legalDigitalFinding.create({
+            data: {
+              propertyId,
+              itemKey: input.itemKey,
+              hullcheckLayer: input.hullcheckLayer,
+              title: input.title,
+              plainEnglishSummary: input.plainEnglishSummary,
+              severity: input.severity,
+              status: "open",
+              source: "self_assessment",
+              obligationKey: input.obligationKey,
+            },
+          }),
+        );
+      }
+      return rows;
+    });
+    const templateTitles = await this.obligationTitlesByKey(
+      inputs.map((i) => i.obligationKey).filter((k): k is string => !!k),
+    );
+    return {
+      created: created.map((r) => toComputedDigitalFinding(r, templateTitles)),
+      gapCount: inputs.length,
+    };
+  }
+
+  /**
+   * Import a DigitalScan — the shape the future Hullcheck engine will
+   * produce. v1: self_assessment and manual_import only. "hullcheck_engine"
+   * is REJECTED until the real engine is connected (guardrail: never invent
+   * scan results). For self_assessment scans, open self-assessment findings
+   * are replaced like recordSelfAssessment.
+   */
+  async importDigitalScan(
+    workspaceId: string,
+    scan: DigitalScan,
+  ): Promise<{ imported: ComputedDigitalFinding[] }> {
+    validateDigitalScan(scan);
+    if (scan.source === "hullcheck_engine") {
+      throw new LegalError(
+        "ENGINE_NOT_CONNECTED",
+        "The Hullcheck scan engine is not connected yet. Record findings from the self-assessment or add them manually instead.",
+      );
+    }
+    const property = await this.assertDigitalProperty(workspaceId, scan.propertyId);
+    for (const f of scan.findings) {
+      await this.assertObligationKey(f.obligationKey ?? null);
+    }
+    const rows = await this.prisma.$transaction(async (tx) => {
+      if (scan.source === "self_assessment") {
+        await tx.legalDigitalFinding.deleteMany({
+          where: { propertyId: property.id, source: "self_assessment", status: "open" },
+        });
+      }
+      const created = [];
+      for (const f of scan.findings) {
+        created.push(
+          await tx.legalDigitalFinding.create({
+            data: {
+              propertyId: property.id,
+              itemKey: f.itemKey?.trim() || null,
+              hullcheckLayer: f.hullcheckLayer,
+              title: f.title.trim(),
+              plainEnglishSummary: f.plainEnglishSummary.trim(),
+              severity: f.severity,
+              status: "open",
+              source: scan.source,
+              obligationKey: f.obligationKey?.trim() || null,
+            },
+          }),
+        );
+      }
+      return created;
+    });
+    const templateTitles = await this.obligationTitlesByKey(
+      scan.findings.map((f) => f.obligationKey).filter((k): k is string => !!k),
+    );
+    return { imported: rows.map((r) => toComputedDigitalFinding(r, templateTitles)) };
+  }
+
+  /** Tenant moves one finding through the allowed transitions. */
+  async setDigitalFindingStatus(
+    workspaceId: string,
+    findingId: string,
+    status: DigitalFindingStatus,
+  ): Promise<ComputedDigitalFinding> {
+    if (!isValidFindingStatus(status)) {
+      throw new LegalError(
+        "INVALID_STATUS",
+        "Status must be one of: open, fixed, dismissed.",
+      );
+    }
+    const existing = await this.prisma.legalDigitalFinding.findFirst({
+      where: { id: findingId, property: { workspaceId } },
+    });
+    if (!existing) {
+      throw new LegalError("UNKNOWN_FINDING", `No digital finding: ${findingId}`);
+    }
+    const from = existing.status as DigitalFindingStatus;
+    if (!isValidFindingStatusTransition(from, status)) {
+      throw new LegalError(
+        "INVALID_TRANSITION",
+        `A ${from} finding cannot move to ${status}.`,
+      );
+    }
+    const row = await this.prisma.legalDigitalFinding.update({
+      where: { id: findingId },
+      data: { status },
+    });
+    const templateTitles = await this.obligationTitlesByKey(
+      row.obligationKey ? [row.obligationKey] : [],
+    );
+    return toComputedDigitalFinding(row, templateTitles);
+  }
+
+  private async assertDigitalProperty(workspaceId: string, id: string) {
+    const property = await this.prisma.legalDigitalProperty.findFirst({
+      where: { id, workspaceId },
+    });
+    if (!property) {
+      throw new LegalError("UNKNOWN_PROPERTY", `No digital property: ${id}`);
+    }
+    return property;
+  }
+
+  /** obligationKey must name a real slice-1 template (or be null). */
+  private async assertObligationKey(key: string | null): Promise<string | null> {
+    if (!key) return null;
+    const template = await this.prisma.obligationTemplate.findUnique({
+      where: { key },
+    });
+    if (!template) {
+      throw new LegalError(
+        "UNKNOWN_OBLIGATION",
+        `No obligation template: ${key}. Link findings to a real obligation.`,
+      );
+    }
+    return key;
+  }
+
+  private async obligationTitlesByKey(keys: string[]): Promise<Map<string, string>> {
+    const unique = [...new Set(keys)];
+    if (unique.length === 0) return new Map();
+    const rows = await this.prisma.obligationTemplate.findMany({
+      where: { key: { in: unique } },
+      select: { key: true, title: true },
+    });
+    return new Map(rows.map((r) => [r.key, r.title]));
+  }
 }
 
 export type DeadlineStatus = "open" | "done" | "dismissed";
@@ -1292,5 +1678,116 @@ function toComputedDocument(
     currentVersion: current,
     tier,
     daysUntilExpiry: expiryDate ? daysUntilExpiry(expiryDate, now) : null,
+  };
+}
+
+// ------------------------------------------------------------------
+// Slice 5: digital properties (Hullcheck synergy) helpers
+// ------------------------------------------------------------------
+
+export interface ComputedDigitalProperty {
+  id: string;
+  name: string;
+  url: string | null;
+  kind: DigitalPropertyKind;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+  openFindingCount: number;
+  criticalOpenCount: number;
+}
+
+export interface ComputedDigitalPropertyDetail extends ComputedDigitalProperty {
+  findings: ComputedDigitalFinding[];
+}
+
+export interface ComputedDigitalFinding {
+  id: string;
+  propertyId: string;
+  itemKey: string | null;
+  hullcheckLayer: HullcheckLayer;
+  title: string;
+  plainEnglishSummary: string;
+  severity: DigitalFindingSeverity;
+  status: DigitalFindingStatus;
+  source: DigitalFindingSource;
+  /** Always shown in the UI — the guardrail against invented scans. */
+  sourceLabel: string;
+  obligationKey: string | null;
+  /** Slice-1 obligation title, when the key resolves to a template. */
+  obligationTitle: string | null;
+  /** True when the tenant should have an attorney confirm the fix. */
+  confirmWithProfessional: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+type DigitalPropertyRow = {
+  id: string;
+  name: string;
+  url: string | null;
+  kind: string;
+  notes: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+  findings: { severity: string }[];
+};
+
+function toComputedDigitalProperty(row: DigitalPropertyRow): ComputedDigitalProperty {
+  return {
+    id: row.id,
+    name: row.name,
+    url: row.url,
+    kind: row.kind as DigitalPropertyKind,
+    notes: row.notes,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+    openFindingCount: row.findings.length,
+    criticalOpenCount: row.findings.filter((f) => f.severity === "critical").length,
+  };
+}
+
+type DigitalFindingRow = {
+  id: string;
+  propertyId: string;
+  itemKey: string | null;
+  hullcheckLayer: string;
+  title: string;
+  plainEnglishSummary: string;
+  severity: string;
+  status: string;
+  source: string;
+  obligationKey: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+/** Checklist lookup for the "talk to a professional" nudge. */
+const CHECKLIST_BY_KEY = new Map(SELF_ASSESSMENT_CHECKLIST.map((i) => [i.key, i]));
+
+function toComputedDigitalFinding(
+  row: DigitalFindingRow,
+  obligationTitles: Map<string, string>,
+): ComputedDigitalFinding {
+  const source = row.source as DigitalFindingSource;
+  const checklistItem = row.itemKey ? CHECKLIST_BY_KEY.get(row.itemKey) : undefined;
+  return {
+    id: row.id,
+    propertyId: row.propertyId,
+    itemKey: row.itemKey,
+    hullcheckLayer: row.hullcheckLayer as HullcheckLayer,
+    title: row.title,
+    plainEnglishSummary: row.plainEnglishSummary,
+    severity: row.severity as DigitalFindingSeverity,
+    status: row.status as DigitalFindingStatus,
+    source,
+    sourceLabel: findingSourceLabel(source),
+    obligationKey: row.obligationKey,
+    obligationTitle: row.obligationKey
+      ? (obligationTitles.get(row.obligationKey) ?? null)
+      : null,
+    confirmWithProfessional: checklistItem?.confirmWithProfessional ?? false,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
   };
 }
