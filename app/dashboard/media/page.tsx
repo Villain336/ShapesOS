@@ -79,6 +79,18 @@ export default async function MediaPage() {
       )}
 
       <div className="grid gap-4 lg:grid-cols-2">
+        {/* Phase 18: Advertising — one home for paid platforms */}
+        <section className="rounded-xl border border-stone-200 bg-white p-4 lg:col-span-2">
+          <div className="mb-1 flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-stone-900">Advertising <span className="ml-1 rounded-full border border-[var(--brand-600)]/20 bg-[var(--brand-50)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--brand-700)]">Phase 18</span></h2>
+            <Link href="/dashboard/media/advertising" className="text-xs font-medium text-stone-500 hover:text-stone-900">
+              Open →
+            </Link>
+          </div>
+          <p className="text-sm text-stone-500">
+            Buy everywhere, approve everything — Amazon Ads, StackAdapt, Walmart Connect, and Spotify behind one propose → approve spend gate.
+          </p>
+        </section>
         {/* Pools */}
         <section className="rounded-xl border border-stone-200 bg-white p-4">
           <div className="mb-3 flex items-center justify-between">

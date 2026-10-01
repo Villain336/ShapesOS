@@ -1,0 +1,203 @@
+// Marketr — Phase 18 slice 1: spend proposal inbox (Grow pillar → Advertising).
+//
+// Every launch, pause, budget change, and new flight waits here. Approving
+// mints the immutable SpendApproval; execution is impossible without it.
+// Server-gated: editor+ only (deciding spend is a money mutation).
+
+import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
+import { Check, Inbox as InboxIcon, ShieldCheck, X } from "lucide-react";
+import { requireUser, getOrCreateWorkspace } from "@/lib/session";
+import { requireWorkspaceRole } from "@/lib/authz";
+import { prisma } from "@/lib/prisma";
+import {
+  approveSpendAction,
+  rejectSpendAction,
+} from "@/lib/adplatforms/gate";
+import { prismaApprovalStore, prismaProposalStore } from "@/lib/adplatforms/store";
+import AdsTabs from "../_components/AdsTabs";
+
+export const dynamic = "force-dynamic";
+
+export const metadata = {
+  title: "Spend proposals — Marketr",
+  description: "Approve or reject every ad-spend action before it executes.",
+};
+
+const chip =
+  "inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-1.5 py-0.5 text-[10px] font-medium leading-tight";
+const chipSlate = `${chip} bg-stone-100 text-stone-600 border-stone-200`;
+const chipAmber = `${chip} bg-amber-50 text-amber-700 border-amber-200`;
+const chipGreen = `${chip} bg-emerald-50 text-emerald-700 border-emerald-200`;
+const chipRed = `${chip} bg-red-50 text-red-700 border-red-200`;
+const chipBrand = `${chip} bg-[var(--brand-50)] text-[var(--brand-700)] border-[var(--brand-600)]/20`;
+
+function statusChip(status: string) {
+  switch (status) {
+    case "pending":
+      return <span className={chipAmber}>Pending</span>;
+    case "approved":
+      return <span className={chipBrand}>Approved</span>;
+    case "executed":
+      return <span className={chipGreen}>Executed</span>;
+    case "rejected":
+      return <span className={chipRed}>Rejected</span>;
+    case "expired":
+      return <span className={chipSlate}>Expired</span>;
+    default:
+      return <span className={chipSlate}>{status}</span>;
+  }
+}
+
+function kindLabel(kind: string) {
+  switch (kind) {
+    case "launch":
+      return "Launch";
+    case "pause":
+      return "Pause";
+    case "budget_change":
+      return "Budget change";
+    case "new_flight":
+      return "New flight";
+    default:
+      return kind;
+  }
+}
+
+function money(cents: unknown) {
+  if (typeof cents !== "number") return "—";
+  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(cents / 100);
+}
+
+function payloadSummary(payload: unknown): string {
+  if (!payload || typeof payload !== "object") return "—";
+  const p = payload as Record<string, unknown>;
+  const bits: string[] = [];
+  if (p.budgetCents !== undefined) bits.push(`budget ${money(p.budgetCents)}`);
+  if (p.flightStart || p.flightEnd) bits.push(`${p.flightStart ?? "?"} → ${p.flightEnd ?? "?"}`);
+  if (p.campaignName) bits.push(String(p.campaignName));
+  return bits.length ? bits.join(" · ") : "—";
+}
+
+async function decide(proposalId: string, decision: "approve" | "reject") {
+  "use server";
+  const user = await requireUser();
+  if (!user) redirect("/login");
+  const workspace = await getOrCreateWorkspace(user.id, user.email);
+  const membership = await requireWorkspaceRole(user.id, workspace.id, "editor");
+  if (!membership) redirect("/dashboard");
+  if (decision === "approve") {
+    await approveSpendAction(prismaProposalStore(), prismaApprovalStore(), proposalId, user.id);
+  } else {
+    await rejectSpendAction(prismaProposalStore(), proposalId, user.id);
+  }
+  revalidatePath("/dashboard/media/advertising/proposals");
+}
+
+export default async function ProposalsPage() {
+  const user = await requireUser();
+  if (!user) redirect("/login");
+  const workspace = await getOrCreateWorkspace(user.id, user.email);
+  const membership = await requireWorkspaceRole(user.id, workspace.id, "viewer");
+  if (!membership) redirect("/dashboard");
+  const canDecide = ["owner", "admin", "editor"].includes(membership.role);
+
+  const proposals = await prisma.spendProposal.findMany({
+    where: { workspaceId: workspace.id },
+    orderBy: [{ status: "asc" }, { proposedAt: "desc" }],
+    include: { approval: { select: { approver: true, decidedAt: true, scopeHash: true } } },
+    take: 100,
+  });
+
+  return (
+    <div className="flex h-full flex-col gap-4 bg-[#FAFAF7] p-4 md:p-6">
+      <div>
+        <h1 className="text-xl font-bold tracking-tight text-stone-900">Spend proposals</h1>
+        <p className="mt-0.5 text-[13px] text-stone-500">
+          {workspace.name} — nothing spends until you approve it here. Approvals are immutable and bound to the exact proposed scope.
+        </p>
+      </div>
+
+      <AdsTabs active="proposals" />
+
+      {proposals.length === 0 ? (
+        <div className="flex flex-col items-center gap-2 rounded-lg border border-stone-200 bg-white px-6 py-12 text-center">
+          <InboxIcon className="h-8 w-8 text-stone-300" />
+          <p className="text-[14px] font-medium text-stone-700">No spend proposals yet</p>
+          <p className="max-w-sm text-[13px] text-stone-500">
+            When you or the agent propose a campaign launch, pause, budget change, or new flight, it waits here for approval.
+          </p>
+        </div>
+      ) : (
+        <div className="overflow-x-auto rounded-lg border border-stone-200 bg-white">
+          <table className="w-full min-w-[760px] text-left text-[13px]">
+            <thead>
+              <tr className="border-b border-stone-200 bg-stone-50 text-[11px] uppercase tracking-wide text-stone-500">
+                <th className="px-3 py-2 font-medium">Action</th>
+                <th className="px-3 py-2 font-medium">Target</th>
+                <th className="px-3 py-2 font-medium">Scope</th>
+                <th className="px-3 py-2 font-medium">Proposed by</th>
+                <th className="px-3 py-2 font-medium">Status</th>
+                <th className="px-3 py-2 font-medium">Approval lineage</th>
+                <th className="px-3 py-2 font-medium text-right">Decide</th>
+              </tr>
+            </thead>
+            <tbody>
+              {proposals.map((p) => (
+                <tr key={p.id} className="border-b border-stone-100 last:border-0 hover:bg-[var(--brand-50)]/40">
+                  <td className="px-3 py-2.5">
+                    <span className="font-medium text-stone-900">{kindLabel(p.kind)}</span>
+                    <div className="text-[11px] text-stone-400">{p.targetType} · {p.targetId.slice(0, 12)}</div>
+                  </td>
+                  <td className="px-3 py-2.5 text-stone-600">{p.targetId}</td>
+                  <td className="px-3 py-2.5 text-stone-600">{payloadSummary(p.payload)}</td>
+                  <td className="px-3 py-2.5 text-stone-600">{p.proposedBy}</td>
+                  <td className="px-3 py-2.5">{statusChip(p.status)}</td>
+                  <td className="px-3 py-2.5">
+                    {p.approval ? (
+                      <div className="flex flex-col gap-0.5 text-[11px] text-stone-500">
+                        <span className="inline-flex items-center gap-1 text-stone-700">
+                          <ShieldCheck className="h-3 w-3 text-emerald-600" />
+                          {p.approval.approver}
+                        </span>
+                        <span>scope {p.approval.scopeHash.slice(0, 12)}…</span>
+                      </div>
+                    ) : (
+                      <span className="text-[11px] text-stone-400">No approval yet</span>
+                    )}
+                  </td>
+                  <td className="px-3 py-2.5 text-right">
+                    {p.status === "pending" && canDecide ? (
+                      <div className="inline-flex gap-1.5">
+                        <form action={decide.bind(null, p.id, "approve")}>
+                          <button
+                            type="submit"
+                            className="inline-flex min-h-[36px] items-center gap-1 rounded-md bg-[var(--brand-600)] px-3 text-[12px] font-medium text-white hover:bg-[var(--brand-700)]"
+                          >
+                            <Check className="h-3.5 w-3.5" />
+                            Approve
+                          </button>
+                        </form>
+                        <form action={decide.bind(null, p.id, "reject")}>
+                          <button
+                            type="submit"
+                            className="inline-flex min-h-[36px] items-center gap-1 rounded-md border border-stone-300 px-3 text-[12px] font-medium text-stone-700 hover:bg-stone-50"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                            Reject
+                          </button>
+                        </form>
+                      </div>
+                    ) : (
+                      <span className="text-[11px] text-stone-400">—</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
