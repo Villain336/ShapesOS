@@ -13,6 +13,8 @@ import { ensureAdPlatforms } from "@/lib/adplatforms/oauth";
 import { adsManagerDeepLink } from "@/lib/adplatforms/chatgpt/types";
 import AdsTabs from "../_components/AdsTabs";
 import ProposeCampaignForm from "./_components/ProposeCampaignForm";
+import LaunchChecklistPanel from "./_components/LaunchChecklistPanel";
+import PauseControls from "./_components/PauseControls";
 
 export const dynamic = "force-dynamic";
 
@@ -60,12 +62,30 @@ export default async function ChatGPTAdsPage() {
     prisma.chatGPTCampaign.findMany({
       where: { workspaceId: workspace.id },
       include: {
-        campaign: { select: { name: true, externalId: true } },
+        campaign: { select: { id: true, name: true, externalId: true } },
         creatives: { select: { id: true } },
       },
       orderBy: { createdAt: "desc" },
     }),
   ]);
+
+  // Latest launch proposal per paid campaign — the launch checklist needs it.
+  const launchProposals = await prisma.spendProposal.findMany({
+    where: {
+      workspaceId: workspace.id,
+      kind: "launch",
+      targetType: "campaign",
+      targetId: { in: campaigns.map((c) => c.campaign.id) },
+    },
+    select: { id: true, targetId: true, status: true, createdAt: true },
+    orderBy: { createdAt: "desc" },
+  });
+  const approvedProposalByTarget = new Map<string, string>();
+  for (const p of launchProposals) {
+    if (p.status === "approved" && !approvedProposalByTarget.has(p.targetId)) {
+      approvedProposalByTarget.set(p.targetId, p.id);
+    }
+  }
 
   return (
     <div className="flex h-full flex-col gap-4 bg-[#FAFAF7] p-4 md:p-6">
@@ -140,6 +160,28 @@ export default async function ChatGPTAdsPage() {
           <ProposeCampaignForm accounts={accounts} />
         </div>
       </div>
+
+      {campaigns
+        .filter((c) => c.status === "approved" || c.status === "live")
+        .map((c) => (
+          <div key={c.id} className="overflow-hidden rounded-lg border border-stone-200 bg-white">
+            <div className="border-b border-stone-200 bg-stone-50 px-3 py-2 text-[12px] font-medium text-stone-600">
+              {c.status === "approved" ? "Launch" : "Live controls"} — {c.campaign.name}
+            </div>
+            <div className="p-3">
+              {c.status === "approved" ? (
+                <LaunchChecklistPanel
+                  campaignId={c.id}
+                  proposalId={approvedProposalByTarget.get(c.campaign.id) ?? null}
+                  targetTiers={c.targetTiers}
+                  dailyCapCents={c.budgetDailyCents}
+                />
+              ) : (
+                <PauseControls campaignId={c.id} />
+              )}
+            </div>
+          </div>
+        ))}
 
       <div className="rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-[13px] text-stone-500">
         There is no public OpenAI ads API — buying runs through StackAdapt and the{" "}

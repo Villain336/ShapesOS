@@ -18,6 +18,7 @@ import {
   approveSpendAction,
   rejectSpendAction,
 } from "@/lib/adplatforms/gate";
+import { onChatGPTProposalApproved } from "@/lib/adplatforms/chatgpt/launch";
 import { executeSpendProposal } from "@/lib/adplatforms/execute";
 import { prismaApprovalStore, prismaProposalStore } from "@/lib/adplatforms/store";
 import AdsTabs from "../_components/AdsTabs";
@@ -106,7 +107,10 @@ async function decide(proposalId: string, decision: "approve" | "reject") {
   const membership = await requireWorkspaceRole(user.id, workspace.id, "editor");
   if (!membership) redirect("/dashboard");
   if (decision === "approve") {
-    await approveSpendAction(prismaProposalStore(), prismaApprovalStore(), proposalId, user.id);
+    const { proposal } = await approveSpendAction(prismaProposalStore(), prismaApprovalStore(), proposalId, user.id);
+    // Wave 2 ChatGPT Ads: approving a ChatGPT launch proposal moves the
+    // campaign proposed → approved so the launch checklist unlocks.
+    await onChatGPTProposalApproved({}, proposal);
   } else {
     await rejectSpendAction(prismaProposalStore(), proposalId, user.id);
   }
