@@ -41,11 +41,11 @@ export default async function CorpusPage() {
   const manifest = readManifest();
 
   return (
-    <div className="flex h-full flex-col gap-4 bg-[#FAFAF7] p-4 md:p-6">
+    <div className="flex h-full flex-col gap-4 bg-canvas p-4 md:p-6">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-stone-900">Expert corpus</h1>
-          <p className="mt-0.5 max-w-2xl text-[13px] text-stone-500">
+          <h1 className="aos-heading">Expert corpus</h1>
+          <p className="mt-0.5 max-w-2xl text-sm text-muted">
             The marketing knowledge the Chief Strategy Agent reasons with: licensed
             sources ingested verbatim, learn-only sources shipped as Marketr-original
             Tier 1S syntheses, and the precision gate every corpus build must pass.
@@ -53,7 +53,7 @@ export default async function CorpusPage() {
         </div>
         <Link
           href="/dashboard/intelligence/corpus/brain"
-          className="flex shrink-0 items-center gap-1.5 rounded-md bg-violet-600 px-3 py-1.5 text-[13px] font-medium text-white hover:bg-violet-700"
+          className="aos-press flex shrink-0 items-center gap-1.5 rounded-full bg-ink px-4 py-2 text-sm font-semibold text-white hover:bg-night-hover"
         >
           <Brain className="h-3.5 w-3.5" /> Knowledge Brain
         </Link>

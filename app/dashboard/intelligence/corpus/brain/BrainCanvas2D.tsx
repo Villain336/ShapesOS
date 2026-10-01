@@ -9,7 +9,7 @@ import { useEffect, useRef } from "react";
 import { Brain } from "lucide-react";
 import { createLayout, type ForceLayout } from "@/lib/intelligence/corpus/graph-layout";
 import type { BrainGraph, BrainNode, BrainPillar } from "@/lib/intelligence/corpus/graph";
-import { PILLAR_COLORS } from "./brain-ui";
+import { pillarColorHex, resolveToken } from "./brain-ui";
 
 export interface FocusRequest {
   id: string;
@@ -107,6 +107,12 @@ export function BrainCanvas2D({
     const edgePhase = new Map<string, number>();
     graph.edges.forEach((e, i) => edgePhase.set(`${e.from}→${e.to}`, (i * 0.37) % 1));
 
+    // Token colors resolved once (canvas cannot parse var()).
+    const INK = resolveToken("--aos-ink");
+    const MUTED = resolveToken("--aos-text-muted");
+    const SUBTLE = resolveToken("--aos-text-subtle");
+    const FAILED = resolveToken("--aos-failed");
+
     const toScreen = (x: number, y: number) => {
       const v = viewRef.current;
       return { x: (x + v.x) * v.k, y: (y + v.y) * v.k };
@@ -150,20 +156,21 @@ export function BrainCanvas2D({
         if (!a || !b || !na || !nb || !visibleRef.current(na) || !visibleRef.current(nb)) continue;
         const pa = toScreen(a.x, a.y);
         const pb = toScreen(b.x, b.y);
-        ctx.strokeStyle = "rgba(124, 58, 237, 0.16)";
+        // Edges: ink at low alpha (neutral — categories never take status color).
+        ctx.strokeStyle = "rgba(0, 0, 0, 0.14)";
         ctx.lineWidth = 1;
         ctx.beginPath();
         ctx.moveTo(pa.x, pa.y);
         ctx.lineTo(pb.x, pb.y);
         ctx.stroke();
-        // Traveling pulse — the "thinking" signal.
+        // Traveling pulse — the "thinking" signal (neutral ink glow).
         const phase = (t * 0.25 + (edgePhase.get(`${e.from}→${e.to}`) ?? 0)) % 1;
         const px = pa.x + (pb.x - pa.x) * phase;
         const py = pa.y + (pb.y - pa.y) * phase;
         ctx.save();
-        ctx.shadowColor = "rgba(124, 58, 237, 0.8)";
+        ctx.shadowColor = "rgba(0, 0, 0, 0.45)";
         ctx.shadowBlur = 8;
-        ctx.fillStyle = "rgba(124, 58, 237, 0.85)";
+        ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
         ctx.beginPath();
         ctx.arc(px, py, 2.2, 0, Math.PI * 2);
         ctx.fill();
@@ -176,7 +183,7 @@ export function BrainCanvas2D({
         if (!n || !visibleRef.current(n)) continue;
         const s = toScreen(p.x, p.y);
         if (s.x < -60 || s.x > w + 60 || s.y < -60 || s.y > h + 60) continue;
-        const color = PILLAR_COLORS[n.pillar];
+        const color = pillarColorHex(n.pillar);
         const isHover = hoverRef.current === id;
         const isSel = selectedRef.current === id;
         const r = p.radius + (isHover || isSel ? 3 : 0);
@@ -198,24 +205,24 @@ export function BrainCanvas2D({
         ctx.arc(s.x, s.y, Math.max(2.5, r * 0.38), 0, Math.PI * 2);
         ctx.fill();
 
-        // Tier ring treatment.
+        // Tier ring treatment (neutral; only the removal flag carries a status color).
         ctx.lineWidth = 1.6;
         if (n.kind === "proposed" || n.kind === "catalog") {
-          ctx.strokeStyle = "#a8a29e";
+          ctx.strokeStyle = SUBTLE;
           ctx.setLineDash([3, 4]);
           ctx.beginPath();
           ctx.arc(s.x, s.y, r + 5, 0, Math.PI * 2);
           ctx.stroke();
           ctx.setLineDash([]);
         } else if (n.kind === "removal-flagged") {
-          ctx.strokeStyle = "#ef4444";
+          ctx.strokeStyle = FAILED;
           ctx.setLineDash([5, 4]);
           ctx.beginPath();
           ctx.arc(s.x, s.y, r + 5, 0, Math.PI * 2);
           ctx.stroke();
           ctx.setLineDash([]);
         } else if (n.tier === "1") {
-          ctx.strokeStyle = "#f59e0b";
+          ctx.strokeStyle = INK;
           ctx.beginPath();
           ctx.arc(s.x, s.y, r + 4, 0, Math.PI * 2);
           ctx.stroke();
@@ -223,7 +230,7 @@ export function BrainCanvas2D({
           ctx.arc(s.x, s.y, r + 7.5, 0, Math.PI * 2);
           ctx.stroke();
         } else if (n.tier === "1S") {
-          ctx.strokeStyle = color;
+          ctx.strokeStyle = INK;
           ctx.setLineDash([5, 4]);
           ctx.beginPath();
           ctx.arc(s.x, s.y, r + 5, 0, Math.PI * 2);
@@ -231,7 +238,7 @@ export function BrainCanvas2D({
           ctx.setLineDash([]);
         }
         if (isSel) {
-          ctx.strokeStyle = "#4c1d95";
+          ctx.strokeStyle = INK;
           ctx.lineWidth = 2;
           ctx.beginPath();
           ctx.arc(s.x, s.y, r + 9, 0, Math.PI * 2);
@@ -240,15 +247,15 @@ export function BrainCanvas2D({
         ctx.restore();
 
         // Labels: only the largest neurons plus hovered/selected, with a
-        // halo so text stays readable over the graph.
+        // paper halo so text stays readable over the graph.
         if (r >= 20 || isHover || isSel) {
-          ctx.font = `${isSel ? "600 " : ""}11px Inter, system-ui, sans-serif`;
+          ctx.font = `${isSel ? "600 " : ""}11px Archivo, system-ui, sans-serif`;
           ctx.textAlign = "center";
           const label = n.title.length > 26 ? `${n.title.slice(0, 25)}…` : n.title;
           ctx.lineWidth = 3;
-          ctx.strokeStyle = "rgba(250,250,247,0.9)";
+          ctx.strokeStyle = "rgba(255, 255, 255, 0.92)";
           ctx.strokeText(label, s.x, s.y + r + 14);
-          ctx.fillStyle = "#44403c";
+          ctx.fillStyle = MUTED;
           ctx.fillText(label, s.x, s.y + r + 14);
         }
       }
@@ -338,36 +345,36 @@ export function BrainCanvas2D({
   return (
     <div
       ref={wrapRef}
-      className="relative min-h-[420px] flex-1 overflow-hidden rounded-lg border border-stone-200 bg-[#FAFAF7]"
+      className="relative min-h-[420px] flex-1 overflow-hidden rounded-lg border border-line bg-canvas"
       style={{
-        backgroundImage: "radial-gradient(circle, #e7e5e4 1px, transparent 1px)",
+        backgroundImage: "radial-gradient(circle, var(--aos-line-strong) 1px, transparent 1px)",
         backgroundSize: "28px 28px",
         cursor: "grab",
       }}
     >
       <canvas ref={canvasRef} className="absolute inset-0" />
       {/* Legend */}
-      <div className="pointer-events-none absolute left-3 top-3 flex flex-col gap-1.5 rounded-md border border-stone-200 bg-white/90 px-2.5 py-2 backdrop-blur">
-        <div className="flex items-center gap-1.5 text-[11px] font-semibold text-stone-700">
-          <Brain className="h-3.5 w-3.5 text-violet-600" /> Legend
+      <div className="pointer-events-none absolute left-3 top-3 flex flex-col gap-1.5 rounded-md bg-paper px-2.5 py-2 shadow-raised">
+        <div className="flex items-center gap-1.5 text-xs font-semibold text-ink">
+          <Brain className="h-3.5 w-3.5" /> Legend
         </div>
-        <div className="flex items-center gap-1.5 text-[11px] text-stone-500">
-          <span className="inline-block h-2.5 w-2.5 rounded-full border-2 border-[#f59e0b]" /> Tier 1 · official
+        <div className="flex items-center gap-1.5 text-[11px] text-muted">
+          <span className="inline-block h-2.5 w-2.5 rounded-full border-2 border-ink" /> Tier 1 · official
         </div>
-        <div className="flex items-center gap-1.5 text-[11px] text-stone-500">
-          <span className="inline-block h-2.5 w-2.5 rounded-full border-2 border-dashed border-[#7c3aed]" /> Tier 1S · Marketr synthesis
+        <div className="flex items-center gap-1.5 text-[11px] text-muted">
+          <span className="inline-block h-2.5 w-2.5 rounded-full border-2 border-dashed border-ink" /> Tier 1S · Marketr synthesis
         </div>
-        <div className="flex items-center gap-1.5 text-[11px] text-stone-500">
-          <span className="inline-block h-2.5 w-2.5 rounded-full border-2 border-dotted border-stone-400" /> Proposed
+        <div className="flex items-center gap-1.5 text-[11px] text-muted">
+          <span className="inline-block h-2.5 w-2.5 rounded-full border-2 border-dotted border-subtle" /> Proposed
         </div>
-        <div className="flex items-center gap-1.5 text-[11px] text-stone-500">
-          <span className="inline-block h-2.5 w-2.5 rounded-full bg-[#7c3aed]" /> Node size ∝ chunks
+        <div className="flex items-center gap-1.5 text-[11px] text-muted">
+          <span className="inline-block h-2.5 w-2.5 rounded-full bg-ink" /> Node size ∝ chunks
         </div>
       </div>
       {hoverNode && (
-        <div className="pointer-events-none absolute bottom-3 left-3 max-w-[280px] rounded-md border border-stone-200 bg-white/95 px-2.5 py-2 shadow-sm backdrop-blur">
-          <div className="text-[12px] font-semibold text-stone-900">{hoverNode.title}</div>
-          <div className="mt-0.5 line-clamp-2 text-[11px] leading-snug text-stone-500">{hoverNode.teaches}</div>
+        <div className="pointer-events-none absolute bottom-3 left-3 max-w-[280px] rounded-md bg-paper px-2.5 py-2 shadow-raised">
+          <div className="text-[12px] font-semibold text-ink">{hoverNode.title}</div>
+          <div className="mt-0.5 line-clamp-2 text-[11px] leading-snug text-muted">{hoverNode.teaches}</div>
         </div>
       )}
     </div>

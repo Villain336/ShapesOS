@@ -40,10 +40,10 @@ export default async function KnowledgePage() {
   ]);
 
   return (
-    <div className="flex h-full flex-col gap-4 bg-[#FAFAF7] p-4 md:p-6">
+    <div className="flex h-full flex-col gap-4 bg-canvas p-4 md:p-6">
       <div>
-        <h1 className="text-xl font-bold tracking-tight text-stone-900">Knowledge sources</h1>
-        <p className="mt-0.5 max-w-2xl text-[13px] text-stone-500">
+        <h1 className="aos-heading">Knowledge sources</h1>
+        <p className="mt-0.5 max-w-2xl text-sm text-muted">
           Crawl the web into Marketr&apos;s knowledge base with Context.dev. Your
           own domains activate instantly; third-party domains need one approval,
           then crawl freely. Every chunk keeps its source URL and fetch time.

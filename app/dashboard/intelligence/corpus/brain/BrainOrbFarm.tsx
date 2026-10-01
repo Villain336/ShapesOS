@@ -59,10 +59,16 @@ const orb14ParamsBaked = d.struct({
 // OrbVariant assembled from the registry's meta.ts values (defaults, colors,
 // thinking preset) with the baked WGSL in place of the runtime-resolved
 // tgpu.resolve() string.
+//
+// Agentic OS re-anchor: the orb is the shared nucleus of every source core —
+// it must not read as a status color or a fifth accent. The thinking state
+// is therefore monochrome, taken from neutral tokens: ink = --aos-night-hover
+// (#1c1c1b), paper = --aos-hover (#e6e6e3). Pillar identity is carried by the
+// halo sprites (per-pillar neutral tints), not the orb.
 const orb14BakedVariant: OrbVariant = {
   colors: [
-    { default: "#101426", key: "ink", label: "Ink" },
-    { default: "#cfe6ff", key: "paper", label: "Paper" },
+    { default: "#1c1c1b", key: "ink", label: "Ink" },
+    { default: "#e6e6e3", key: "paper", label: "Paper" },
   ],
   key: "orb-14",
   label: "ORB-14",
@@ -82,9 +88,9 @@ const orb14BakedVariant: OrbVariant = {
   ],
   shader: orb14ShaderBaked,
   stateColors: {
-    idle: { ink: "#101426", paper: "#cfe6ff" },
+    idle: { ink: "#1c1c1b", paper: "#e6e6e3" },
     speaking: { ink: "#2a1410", paper: "#ffd9a4" },
-    thinking: { ink: "#140f38", paper: "#a9b9ff" },
+    thinking: { ink: "#1c1c1b", paper: "#e6e6e3" },
   },
   // Thinking churns the plasma in place while the light freezes.
   statePresets: {
@@ -151,8 +157,8 @@ export function BrainOrbFarm({
             for (let i = 0; i < data.length; i += 4) {
               if (data[i] + data[i + 1] + data[i + 2] > 24) lit++;
             }
-            // The thinking orb is bright (paper #a9b9ff on ink #140f38);
-            // a blank/failed canvas stays near-black.
+            // The thinking orb is bright (paper --aos-hover on ink
+            // --aos-night-hover); a blank/failed canvas stays near-black.
             onSupport(lit > 8);
           }
         } catch {

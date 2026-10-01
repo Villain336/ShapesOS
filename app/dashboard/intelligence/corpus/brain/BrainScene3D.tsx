@@ -36,7 +36,7 @@ import {
   MORPH_SHAPE_LABELS,
 } from "@/lib/intelligence/corpus/brain-morph-forms";
 import type { BrainGraph, BrainNode, BrainPillar } from "@/lib/intelligence/corpus/graph";
-import { PILLAR_COLORS } from "./brain-ui";
+import { pillarColorHex, resolveToken } from "./brain-ui";
 import { BrainOrbFarm } from "./BrainOrbFarm";
 import type { FocusRequest } from "./BrainCanvas2D";
 
@@ -110,12 +110,14 @@ function DashedRing({
 }
 
 function TierRings({ node, radius }: { node: BrainNode; radius: number }) {
-  const color = PILLAR_COLORS[node.pillar];
+  const color = pillarColorHex(node.pillar);
+  const subtle = resolveToken("--aos-text-subtle");
+  const failed = resolveToken("--aos-failed");
   if (node.kind === "proposed" || node.kind === "catalog") {
-    return <DashedRing radius={radius + 0.22} color="#a8a29e" dashSize={0.05} gapSize={0.08} opacity={0.9} />;
+    return <DashedRing radius={radius + 0.22} color={subtle} dashSize={0.05} gapSize={0.08} opacity={0.9} />;
   }
   if (node.kind === "removal-flagged") {
-    return <DashedRing radius={radius + 0.22} color="#dc2626" dashSize={0.12} gapSize={0.08} opacity={0.95} />;
+    return <DashedRing radius={radius + 0.22} color={failed} dashSize={0.12} gapSize={0.08} opacity={0.95} />;
   }
   if (node.tier === "1") {
     return (
@@ -126,7 +128,7 @@ function TierRings({ node, radius }: { node: BrainNode; radius: number }) {
     );
   }
   if (node.tier === "1S") {
-    return <DashedRing radius={radius + 0.18} color="#a8a29e" dashSize={0.12} gapSize={0.08} opacity={0.85} />;
+    return <DashedRing radius={radius + 0.18} color={subtle} dashSize={0.12} gapSize={0.08} opacity={0.85} />;
   }
   return null;
 }
@@ -169,7 +171,7 @@ function SourceCore({
   const orbMat = useRef<THREE.SpriteMaterial>(null);
   const haloIn = useRef<THREE.SpriteMaterial>(null);
   const haloOut = useRef<THREE.SpriteMaterial>(null);
-  const color = PILLAR_COLORS[node.pillar];
+  const color = pillarColorHex(node.pillar);
   const r = core.radius;
   const targetScale = hovered || selected ? 1.22 : 1;
   // orb-14's luminous dome fills ~90% of the canvas width (r2 < 1 with
@@ -381,7 +383,7 @@ function SparklePoints({
       pos[i * 3] = s.x;
       pos[i * 3 + 1] = s.y;
       pos[i * 3 + 2] = s.z;
-      c.set(PILLAR_COLORS[s.pillar]);
+      c.set(pillarColorHex(s.pillar));
       // Slight value jitter so the cloud shimmers instead of banding.
       const jitter = 0.92 + ((i * 7919) % 100) / 100 * 0.16;
       col[i * 3] = Math.min(1, c.r * jitter + 0.04);
@@ -496,7 +498,7 @@ function ThreadLines({
       pos[w * 6 + 3] = s.x;
       pos[w * 6 + 4] = s.y;
       pos[w * 6 + 5] = s.z;
-      c.set(PILLAR_COLORS[s.pillar]);
+      c.set(pillarColorHex(s.pillar));
       for (let k = 0; k < 2; k++) {
         col[w * 6 + k * 3] = c.r;
         col[w * 6 + k * 3 + 1] = c.g;
@@ -541,7 +543,11 @@ function EdgeLines({
   dimSet: Set<string>;
 }) {
   const items = useMemo(() => {
-    const mat = new THREE.LineBasicMaterial({ color: "#a8a29e", transparent: true, opacity: 0.4 });
+    const mat = new THREE.LineBasicMaterial({
+      color: resolveToken("--aos-text-subtle"),
+      transparent: true,
+      opacity: 0.4,
+    });
     return graph.edges.flatMap((e) => {
       const a = byId.get(e.from);
       const b = byId.get(e.to);
@@ -1049,15 +1055,10 @@ export function BrainScene3D(props: BrainScene3DProps) {
   }, []);
 
   return (
-    <div
-      className="relative min-h-[420px] flex-1 overflow-hidden rounded-lg border border-stone-200"
-      style={{
-        background: "radial-gradient(120% 90% at 50% 30%, #ffffff 0%, #FAFAF7 55%, #f1efeb 100%)",
-      }}
-    >
+    <div className="relative min-h-[420px] flex-1 overflow-hidden rounded-lg border border-line bg-canvas">
       <Suspense
         fallback={
-          <div className="absolute inset-0 flex items-center justify-center gap-2 text-[13px] text-stone-500">
+          <div className="absolute inset-0 flex items-center justify-center gap-2 text-sm text-muted">
             <Loader2 className="h-4 w-4 animate-spin" /> Growing the brain…
           </div>
         }
@@ -1068,7 +1069,7 @@ export function BrainScene3D(props: BrainScene3DProps) {
           gl={{ antialias: true, alpha: true, powerPreference: "high-performance" }}
           onPointerMissed={() => onSelect(null)}
         >
-          <fog attach="fog" args={["#f1efeb", 18, 42]} />
+          <fog attach="fog" args={[resolveToken("--aos-canvas"), 18, 42]} />
           <Scene
             {...props}
             tourCtl={tourCtl}
@@ -1084,18 +1085,18 @@ export function BrainScene3D(props: BrainScene3DProps) {
       <BrainOrbFarm onCanvas={setOrbCanvas} onSupport={setOrbSupported} />
 
       {/* Light legend */}
-      <div className="pointer-events-none absolute left-3 top-3 flex flex-col gap-1.5 rounded-md border border-stone-200 bg-white/80 px-2.5 py-2 shadow-sm backdrop-blur">
-        <div className="flex items-center gap-1.5 text-[11px] font-semibold text-stone-700">
-          <span className="inline-block h-2 w-2 rounded-full bg-violet-500 shadow-[0_0_6px_2px_rgba(124,58,237,0.45)]" /> Galaxy model
+      <div className="pointer-events-none absolute left-3 top-3 flex flex-col gap-1.5 rounded-md bg-paper px-2.5 py-2 shadow-raised">
+        <div className="flex items-center gap-1.5 text-xs font-semibold text-ink">
+          <span className="inline-block h-2 w-2 rounded-full bg-ink" /> Galaxy model
         </div>
-        <div className="flex items-center gap-1.5 text-[11px] text-stone-500">
-          <span className="inline-block h-2.5 w-2.5 rounded-full bg-violet-500" /> Core = source · size ∝ chunks
+        <div className="flex items-center gap-1.5 text-[11px] text-muted">
+          <span className="inline-block h-2.5 w-2.5 rounded-full bg-ink" /> Core = source · size ∝ chunks
         </div>
-        <div className="flex items-center gap-1.5 text-[11px] text-stone-500">
-          <span className="inline-block h-1.5 w-1.5 rounded-full bg-sky-500 shadow-[0_0_4px_1px_rgba(2,132,199,0.5)]" /> Sparkle = chunk
+        <div className="flex items-center gap-1.5 text-[11px] text-muted">
+          <span className="inline-block h-1.5 w-1.5 rounded-full bg-muted" /> Sparkle = chunk
         </div>
-        <div className="flex items-center gap-1.5 text-[11px] text-stone-500">
-          <span className="inline-block h-2.5 w-2.5 rounded-full border-2 border-dotted border-stone-400" /> Dotted ring = hero orbit
+        <div className="flex items-center gap-1.5 text-[11px] text-muted">
+          <span className="inline-block h-2.5 w-2.5 rounded-full border-2 border-dotted border-subtle" /> Dotted ring = hero orbit
         </div>
       </div>
 
@@ -1104,7 +1105,7 @@ export function BrainScene3D(props: BrainScene3DProps) {
         <button
           type="button"
           onClick={() => (touring ? tourCtl.current?.cancel() : tourCtl.current?.start())}
-          className="flex items-center gap-1.5 rounded-full bg-[var(--brand-600)] px-4 py-2 text-[12px] font-medium text-white shadow-md hover:bg-[var(--brand-700)]"
+          className="aos-press inline-flex h-control-sm items-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-white hover:bg-night-hover"
         >
           {touring ? <X className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
           {touring ? "Skip tour" : "Cinematic tour"}
@@ -1113,7 +1114,7 @@ export function BrainScene3D(props: BrainScene3DProps) {
           type="button"
           onClick={() => morphTriggerRef.current?.()}
           title="Morph the particle field through geometric forms"
-          className="flex items-center gap-1.5 rounded-full border border-stone-200 bg-white/85 px-4 py-2 text-[12px] font-medium text-stone-700 shadow-sm backdrop-blur hover:bg-white"
+          className="aos-press inline-flex h-control-sm items-center gap-1.5 rounded-full bg-white px-4 text-sm font-semibold text-ink shadow-outline hover:bg-hover-paper"
         >
           <Shapes className="h-3.5 w-3.5" />
           {morphLabel ? `Morphing · ${morphLabel}` : "Morph field"}
@@ -1122,14 +1123,14 @@ export function BrainScene3D(props: BrainScene3DProps) {
 
       {/* Hover card */}
       {hoverNode && (
-        <div className="pointer-events-none absolute bottom-3 left-3 max-w-[280px] rounded-md border border-stone-200 bg-white/85 px-2.5 py-2 shadow-sm backdrop-blur">
-          <div className="text-[12px] font-semibold text-stone-900">{hoverNode.title}</div>
-          <div className="mt-0.5 line-clamp-2 text-[11px] leading-snug text-stone-500">{hoverNode.teaches}</div>
+        <div className="pointer-events-none absolute bottom-3 left-3 max-w-[280px] rounded-md bg-paper px-2.5 py-2 shadow-raised">
+          <div className="text-[12px] font-semibold text-ink">{hoverNode.title}</div>
+          <div className="mt-0.5 line-clamp-2 text-[11px] leading-snug text-muted">{hoverNode.teaches}</div>
         </div>
       )}
 
       {/* Controls hint */}
-      <div className="pointer-events-none absolute bottom-3 right-3 rounded-md border border-stone-200 bg-white/80 px-2 py-1 text-[10px] tracking-wide text-stone-500 shadow-sm backdrop-blur">
+      <div className="pointer-events-none absolute bottom-3 right-3 rounded-md bg-paper px-2 py-1 text-[10px] tracking-wide text-subtle shadow-raised">
         {!introDone ? "opening flight — click anywhere to take over" : "drag to rotate · scroll to zoom · click a core"}
       </div>
     </div>

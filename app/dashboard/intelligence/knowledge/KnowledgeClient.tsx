@@ -1,11 +1,24 @@
-// Marketr — Wave 2 context.dev slice 2: knowledge client (tabs + tables).
+// Marketr — Wave 2 context.dev slice 2: knowledge client (tabs + tables) (Agentic OS).
 // Sources tab: register form + source table with approve/reject/crawl.
 // Crawl jobs tab: job history with pages/chunks/credits.
+// Statuses follow the status color+shape law: crawl jobs are genuine agent
+// runs (queued/running/complete/failed); monitors are subscriptions
+// (active/paused chips).
 
 "use client";
 
 import { useState, Fragment } from "react";
 import { Plus, Globe, Check, X, Play, Loader2, Pause, Radar } from "lucide-react";
+import {
+  Chip,
+  inputCls,
+  btnPrimary,
+  btnGhost,
+  btnRun,
+  btnApprove,
+  btnDeny,
+  type ChipTone,
+} from "../corpus/brain/brain-ui";
 
 type Source = {
   id: string;
@@ -68,26 +81,32 @@ type BrandSync = {
 
 type BrandKitOption = { id: string; name: string; isDefault: boolean };
 
-const STATUS_BADGE: Record<string, string> = {
-  active: "bg-emerald-50 text-emerald-700 ring-emerald-200",
-  pending_approval: "bg-amber-50 text-amber-700 ring-amber-200",
-  archived: "bg-stone-100 text-stone-500 ring-stone-200",
-};
+/** Status chip with the shape for its tone, per the status color+shape law
+ *  (Chip already renders the shape for its tone). */
+function StatusChip({ tone, children }: { tone: ChipTone; children: React.ReactNode }) {
+  return <Chip tone={tone}>{children}</Chip>;
+}
 
-const JOB_BADGE: Record<string, string> = {
-  queued: "bg-stone-100 text-stone-600 ring-stone-200",
-  running: "bg-sky-50 text-sky-700 ring-sky-200",
-  complete: "bg-emerald-50 text-emerald-700 ring-emerald-200",
-  failed: "bg-red-50 text-red-700 ring-red-200",
-};
+function sourceStatusTone(status: string): ChipTone {
+  if (status === "pending_approval") return "needs";
+  if (status === "archived") return "neutral";
+  return "done";
+}
 
-const SYNC_BADGE: Record<string, string> = {
-  pending_approval: "bg-amber-50 text-amber-700 ring-amber-200",
-  applied: "bg-emerald-50 text-emerald-700 ring-emerald-200",
-  unchanged: "bg-stone-100 text-stone-600 ring-stone-200",
-  rejected: "bg-stone-100 text-stone-600 ring-stone-200",
-  failed: "bg-red-50 text-red-700 ring-red-200",
-};
+function jobStatusTone(status: string): ChipTone {
+  if (status === "running") return "running";
+  if (status === "failed") return "failed";
+  if (status === "queued") return "queued";
+  return "done";
+}
+
+function syncStatusTone(status: string): ChipTone {
+  if (status === "pending_approval") return "needs";
+  if (status === "applied") return "done";
+  if (status === "rejected") return "deny";
+  if (status === "failed") return "failed";
+  return "neutral";
+}
 
 export function KnowledgeClient({
   initialSources,
@@ -307,18 +326,23 @@ export function KnowledgeClient({
   return (
     <div className="flex flex-col gap-4">
       {error && (
-        <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-700">
+        <div
+          role="alert"
+          className="flex items-start gap-2 rounded-lg border-[1.5px] border-failed bg-failed-tint px-3 py-2 text-sm text-failed-text"
+        >
+          <span className="aos-shape aos-shape--failed mt-1 shrink-0" style={{ "--aos-shape-size": "10px" } as React.CSSProperties} />
           {error}
         </div>
       )}
       {notice && (
-        <div className="rounded-md border border-stone-200 bg-stone-50 px-3 py-2 text-[13px] text-stone-700">
+        <div className="flex items-start gap-2 rounded-lg bg-paper px-3 py-2 text-sm text-ink shadow-hairline">
+          <Check className="mt-0.5 h-4 w-4 shrink-0" />
           {notice}
         </div>
       )}
 
       <div className="flex items-center justify-between">
-        <div className="flex gap-1 border-b border-stone-200">
+        <div className="flex gap-1 border-b border-line">
           {(
             [
               ["sources", "Sources"],
@@ -330,10 +354,10 @@ export function KnowledgeClient({
             <button
               key={key}
               onClick={() => setTab(key)}
-              className={`-mb-px border-b-2 px-3 pb-2 text-[13px] font-medium ${
+              className={`-mb-px border-b-2 px-3 pb-2 text-sm font-medium ${
                 tab === key
-                  ? "border-[var(--brand-600)] text-[var(--brand-700)]"
-                  : "border-transparent text-stone-500 hover:text-stone-800"
+                  ? "border-ink text-ink"
+                  : "border-transparent text-muted hover:text-ink"
               }`}
             >
               {label}
@@ -343,7 +367,7 @@ export function KnowledgeClient({
         {canEdit && tab === "sources" && (
           <button
             onClick={() => setShowForm((v) => !v)}
-            className="flex items-center gap-1.5 rounded-md bg-[var(--brand-600)] px-3 py-1.5 text-[13px] font-medium text-white hover:bg-[var(--brand-700)]"
+            className={btnPrimary}
           >
             <Plus className="h-3.5 w-3.5" /> Add source
           </button>
@@ -351,7 +375,7 @@ export function KnowledgeClient({
         {canEdit && tab === "monitors" && (
           <button
             onClick={() => setShowMonitorForm((v) => !v)}
-            className="flex items-center gap-1.5 rounded-md bg-[var(--brand-600)] px-3 py-1.5 text-[13px] font-medium text-white hover:bg-[var(--brand-700)]"
+            className={btnPrimary}
           >
             <Radar className="h-3.5 w-3.5" /> Watch a page
           </button>
@@ -359,7 +383,7 @@ export function KnowledgeClient({
         {canEdit && tab === "brand" && (
           <button
             onClick={() => setShowSyncForm((v) => !v)}
-            className="flex items-center gap-1.5 rounded-md bg-[var(--brand-600)] px-3 py-1.5 text-[13px] font-medium text-white hover:bg-[var(--brand-700)]"
+            className={btnPrimary}
           >
             <Plus className="h-3.5 w-3.5" /> Sync brand
           </button>
@@ -367,22 +391,22 @@ export function KnowledgeClient({
       </div>
 
       {showForm && (
-        <div className="flex flex-wrap items-end gap-2 rounded-lg border border-stone-200 bg-white p-3">
-          <label className="flex min-w-64 flex-1 flex-col gap-1 text-[12px] font-medium text-stone-600">
+        <div className="flex flex-wrap items-end gap-2 rounded-lg bg-paper p-3 shadow-hairline">
+          <label className="flex min-w-64 flex-1 flex-col gap-1 text-xs font-semibold text-muted">
             URL
             <input
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               placeholder="https://example.com/docs or sitemap.xml"
-              className="rounded-md border border-stone-200 px-2.5 py-1.5 text-[13px] text-stone-900 outline-none focus:border-[var(--brand-600)]"
+              className={`${inputCls} h-control`}
             />
           </label>
-          <label className="flex flex-col gap-1 text-[12px] font-medium text-stone-600">
+          <label className="flex flex-col gap-1 text-xs font-semibold text-muted">
             Type
             <select
               value={sourceType}
               onChange={(e) => setSourceType(e.target.value)}
-              className="rounded-md border border-stone-200 px-2.5 py-1.5 text-[13px] text-stone-900 outline-none focus:border-[var(--brand-600)]"
+              className={`${inputCls} h-control`}
             >
               <option value="page">Single page</option>
               <option value="sitemap">Sitemap (crawl)</option>
@@ -392,7 +416,7 @@ export function KnowledgeClient({
           <button
             onClick={addSource}
             disabled={busy === "add" || !url.trim()}
-            className="flex items-center gap-1.5 rounded-md bg-[var(--brand-600)] px-3 py-1.5 text-[13px] font-medium text-white hover:bg-[var(--brand-700)] disabled:opacity-50"
+            className={btnPrimary}
           >
             {busy === "add" && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
             Register
@@ -401,31 +425,31 @@ export function KnowledgeClient({
       )}
 
       {showMonitorForm && (
-        <div className="flex flex-wrap items-end gap-2 rounded-lg border border-stone-200 bg-white p-3">
-          <label className="flex min-w-40 flex-col gap-1 text-[12px] font-medium text-stone-600">
+        <div className="flex flex-wrap items-end gap-2 rounded-lg bg-paper p-3 shadow-hairline">
+          <label className="flex min-w-40 flex-col gap-1 text-xs font-semibold text-muted">
             Name
             <input
               value={monitorName}
               onChange={(e) => setMonitorName(e.target.value)}
               placeholder="Competitor pricing page"
-              className="rounded-md border border-stone-200 px-2.5 py-1.5 text-[13px] text-stone-900 outline-none focus:border-[var(--brand-600)]"
+              className={`${inputCls} h-control`}
             />
           </label>
-          <label className="flex min-w-64 flex-1 flex-col gap-1 text-[12px] font-medium text-stone-600">
+          <label className="flex min-w-64 flex-1 flex-col gap-1 text-xs font-semibold text-muted">
             URL to watch
             <input
               value={monitorUrl}
               onChange={(e) => setMonitorUrl(e.target.value)}
               placeholder="https://competitor.com/pricing"
-              className="rounded-md border border-stone-200 px-2.5 py-1.5 text-[13px] text-stone-900 outline-none focus:border-[var(--brand-600)]"
+              className={`${inputCls} h-control`}
             />
           </label>
-          <label className="flex flex-col gap-1 text-[12px] font-medium text-stone-600">
+          <label className="flex flex-col gap-1 text-xs font-semibold text-muted">
             Cadence
             <select
               value={monitorCadence}
               onChange={(e) => setMonitorCadence(e.target.value)}
-              className="rounded-md border border-stone-200 px-2.5 py-1.5 text-[13px] text-stone-900 outline-none focus:border-[var(--brand-600)]"
+              className={`${inputCls} h-control`}
             >
               <option value="hourly">Hourly</option>
               <option value="daily">Daily</option>
@@ -435,7 +459,7 @@ export function KnowledgeClient({
           <button
             onClick={addMonitor}
             disabled={busy === "add-monitor" || !monitorName.trim() || !monitorUrl.trim()}
-            className="flex items-center gap-1.5 rounded-md bg-[var(--brand-600)] px-3 py-1.5 text-[13px] font-medium text-white hover:bg-[var(--brand-700)] disabled:opacity-50"
+            className={btnPrimary}
           >
             {busy === "add-monitor" && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
             Watch
@@ -444,22 +468,22 @@ export function KnowledgeClient({
       )}
 
       {showSyncForm && (
-        <div className="flex flex-wrap items-end gap-2 rounded-lg border border-stone-200 bg-white p-3">
-          <label className="flex min-w-64 flex-1 flex-col gap-1 text-[12px] font-medium text-stone-600">
+        <div className="flex flex-wrap items-end gap-2 rounded-lg bg-paper p-3 shadow-hairline">
+          <label className="flex min-w-64 flex-1 flex-col gap-1 text-xs font-semibold text-muted">
             Domain
             <input
               value={syncDomain}
               onChange={(e) => setSyncDomain(e.target.value)}
               placeholder="acme.com"
-              className="rounded-md border border-stone-200 px-2.5 py-1.5 text-[13px] text-stone-900 outline-none focus:border-[var(--brand-600)]"
+              className={`${inputCls} h-control`}
             />
           </label>
-          <label className="flex flex-col gap-1 text-[12px] font-medium text-stone-600">
+          <label className="flex flex-col gap-1 text-xs font-semibold text-muted">
             Target kit
             <select
               value={syncKitId}
               onChange={(e) => setSyncKitId(e.target.value)}
-              className="rounded-md border border-stone-200 px-2.5 py-1.5 text-[13px] text-stone-900 outline-none focus:border-[var(--brand-600)]"
+              className={`${inputCls} h-control`}
             >
               <option value="">Default kit (or create new)</option>
               {kits.map((k) => (
@@ -473,7 +497,7 @@ export function KnowledgeClient({
           <button
             onClick={proposeSync}
             disabled={busy === "propose-sync" || !syncDomain.trim()}
-            className="flex items-center gap-1.5 rounded-md bg-[var(--brand-600)] px-3 py-1.5 text-[13px] font-medium text-white hover:bg-[var(--brand-700)] disabled:opacity-50"
+            className={btnPrimary}
           >
             {busy === "propose-sync" && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
             Fetch & diff
@@ -482,10 +506,10 @@ export function KnowledgeClient({
       )}
 
       {tab === "sources" ? (
-        <div className="overflow-hidden rounded-lg border border-stone-200 bg-white">
-          <table className="w-full text-[13px]">
+        <div className="overflow-hidden rounded-lg bg-paper shadow-hairline">
+          <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-stone-200 bg-stone-50 text-left text-[12px] font-medium text-stone-500">
+              <tr className="border-b border-line text-left text-xs font-semibold text-muted">
                 <th className="px-3 py-2">Source</th>
                 <th className="px-3 py-2">Type</th>
                 <th className="px-3 py-2">Status</th>
@@ -496,26 +520,22 @@ export function KnowledgeClient({
             </thead>
             <tbody>
               {sources.map((s) => (
-                <tr key={s.id} className="border-b border-stone-100 hover:bg-[var(--brand-50)]/40">
+                <tr key={s.id} className="border-b border-line last:border-0 hover:bg-hover-paper">
                   <td className="px-3 py-2">
-                    <div className="flex items-center gap-1.5 font-medium text-stone-900">
-                      <Globe className="h-3.5 w-3.5 text-stone-400" />
+                    <div className="flex items-center gap-1.5 font-medium text-ink">
+                      <Globe className="h-3.5 w-3.5 text-subtle" />
                       <span className="max-w-72 truncate">{s.url}</span>
                     </div>
-                    <div className="pl-5 text-[12px] text-stone-500">{s.domain}</div>
+                    <div className="pl-5 text-xs text-subtle">{s.domain}</div>
                   </td>
-                  <td className="px-3 py-2 text-stone-600">{s.sourceType}</td>
+                  <td className="px-3 py-2 text-muted">{s.sourceType}</td>
                   <td className="px-3 py-2">
-                    <span
-                      className={`inline-flex rounded-full px-2 py-0.5 text-[12px] font-medium ring-1 ring-inset ${
-                        STATUS_BADGE[s.status] ?? "bg-stone-100 text-stone-600 ring-stone-200"
-                      }`}
-                    >
+                    <StatusChip tone={sourceStatusTone(s.status)}>
                       {s.status.replace("_", " ")}
-                    </span>
+                    </StatusChip>
                   </td>
-                  <td className="px-3 py-2 text-right tabular-nums text-stone-700">{s._count.chunks}</td>
-                  <td className="px-3 py-2 text-right tabular-nums text-stone-700">{s._count.jobs}</td>
+                  <td className="px-3 py-2 text-right tabular-nums text-ink">{s._count.chunks}</td>
+                  <td className="px-3 py-2 text-right tabular-nums text-ink">{s._count.jobs}</td>
                   {canEdit && (
                     <td className="px-3 py-2">
                       <div className="flex justify-end gap-1.5">
@@ -525,7 +545,7 @@ export function KnowledgeClient({
                               title="Approve"
                               onClick={() => act(s.id, "approve")}
                               disabled={busy !== null}
-                              className="rounded-md border border-stone-200 p-1.5 text-emerald-600 hover:bg-emerald-50 disabled:opacity-40"
+                              className={btnApprove}
                             >
                               <Check className="h-3.5 w-3.5" />
                             </button>
@@ -533,7 +553,7 @@ export function KnowledgeClient({
                               title="Reject"
                               onClick={() => act(s.id, "reject")}
                               disabled={busy !== null}
-                              className="rounded-md border border-stone-200 p-1.5 text-red-600 hover:bg-red-50 disabled:opacity-40"
+                              className={btnDeny}
                             >
                               <X className="h-3.5 w-3.5" />
                             </button>
@@ -544,7 +564,7 @@ export function KnowledgeClient({
                             title="Crawl now"
                             onClick={() => act(s.id, "crawl")}
                             disabled={busy !== null}
-                            className="flex items-center gap-1 rounded-md border border-stone-200 px-2 py-1 text-[12px] font-medium text-stone-700 hover:bg-stone-50 disabled:opacity-40"
+                            className={btnRun}
                           >
                             {busy === `crawl:${s.id}` ? (
                               <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -561,7 +581,7 @@ export function KnowledgeClient({
               ))}
               {sources.length === 0 && (
                 <tr>
-                  <td colSpan={canEdit ? 6 : 5} className="px-3 py-8 text-center text-stone-500">
+                  <td colSpan={canEdit ? 6 : 5} className="px-3 py-8 text-center text-subtle">
                     No sources yet — add your first page, sitemap, or brand profile.
                   </td>
                 </tr>
@@ -570,10 +590,10 @@ export function KnowledgeClient({
           </table>
         </div>
       ) : tab === "jobs" ? (
-        <div className="overflow-hidden rounded-lg border border-stone-200 bg-white">
-          <table className="w-full text-[13px]">
+        <div className="overflow-hidden rounded-lg bg-paper shadow-hairline">
+          <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-stone-200 bg-stone-50 text-left text-[12px] font-medium text-stone-500">
+              <tr className="border-b border-line text-left text-xs font-semibold text-muted">
                 <th className="px-3 py-2">Job</th>
                 <th className="px-3 py-2">Status</th>
                 <th className="px-3 py-2 text-right">Pages</th>
@@ -582,32 +602,26 @@ export function KnowledgeClient({
             </thead>
             <tbody>
               {jobs.map((j) => (
-                <tr key={j.id} className="border-b border-stone-100 hover:bg-[var(--brand-50)]/40">
+                <tr key={j.id} className="border-b border-line last:border-0 hover:bg-hover-paper">
                   <td className="px-3 py-2">
-                    <div className="max-w-80 truncate font-medium text-stone-900">
+                    <div className="max-w-80 truncate font-medium text-ink">
                       {j.source?.url ?? "—"}
                     </div>
-                    <div className="text-[12px] text-stone-500">
+                    <div className="text-xs text-subtle">
                       {new Date(j.createdAt).toLocaleString()}
-                      {j.error && <span className="text-red-600"> · {j.error}</span>}
+                      {j.error && <span className="text-failed-text"> · {j.error}</span>}
                     </div>
                   </td>
                   <td className="px-3 py-2">
-                    <span
-                      className={`inline-flex rounded-full px-2 py-0.5 text-[12px] font-medium ring-1 ring-inset ${
-                        JOB_BADGE[j.status] ?? "bg-stone-100 text-stone-600 ring-stone-200"
-                      }`}
-                    >
-                      {j.status}
-                    </span>
+                    <StatusChip tone={jobStatusTone(j.status)}>{j.status}</StatusChip>
                   </td>
-                  <td className="px-3 py-2 text-right tabular-nums text-stone-700">{j.pagesFetched}</td>
-                  <td className="px-3 py-2 text-right tabular-nums text-stone-700">{j.creditsUsed}</td>
+                  <td className="px-3 py-2 text-right tabular-nums text-ink">{j.pagesFetched}</td>
+                  <td className="px-3 py-2 text-right tabular-nums text-ink">{j.creditsUsed}</td>
                 </tr>
               ))}
               {jobs.length === 0 && (
                 <tr>
-                  <td colSpan={4} className="px-3 py-8 text-center text-stone-500">
+                  <td colSpan={4} className="px-3 py-8 text-center text-subtle">
                     No crawl jobs yet.
                   </td>
                 </tr>
@@ -616,10 +630,10 @@ export function KnowledgeClient({
           </table>
         </div>
       ) : tab === "monitors" ? (
-        <div className="overflow-hidden rounded-lg border border-stone-200 bg-white">
-          <table className="w-full text-[13px]">
+        <div className="overflow-hidden rounded-lg bg-paper shadow-hairline">
+          <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-stone-200 bg-stone-50 text-left text-[12px] font-medium text-stone-500">
+              <tr className="border-b border-line text-left text-xs font-semibold text-muted">
                 <th className="px-3 py-2">Monitor</th>
                 <th className="px-3 py-2">Cadence</th>
                 <th className="px-3 py-2">Status</th>
@@ -631,41 +645,31 @@ export function KnowledgeClient({
             <tbody>
               {monitors.map((m) => (
                 <Fragment key={m.id}>
-                  <tr className="border-b border-stone-100 hover:bg-[var(--brand-50)]/40">
+                  <tr className="border-b border-line hover:bg-hover-paper">
                     <td className="px-3 py-2">
                       <button
                         onClick={() => toggleChanges(m.id)}
-                        className="max-w-80 truncate text-left font-medium text-stone-900 hover:text-[var(--brand-700)]"
+                        className="max-w-80 truncate text-left font-medium text-ink hover:underline"
                         title="Show detected changes"
                       >
                         {m.name}
                       </button>
-                      <div className="max-w-80 truncate text-[12px] text-stone-500">{m.url}</div>
+                      <div className="max-w-80 truncate text-xs text-subtle">{m.url}</div>
                       {m.consecutiveFailures > 0 && (
-                        <div className="text-[12px] text-red-600">
+                        <div className="text-xs text-failed-text">
                           {m.consecutiveFailures} consecutive failures
                           {m.status === "paused" && " — auto-paused"}
                         </div>
                       )}
                     </td>
-                    <td className="px-3 py-2 text-stone-600">{m.cadence}</td>
+                    <td className="px-3 py-2 text-muted">{m.cadence}</td>
                     <td className="px-3 py-2">
-                      <span
-                        className={`inline-flex rounded-full px-2 py-0.5 text-[12px] font-medium ring-1 ring-inset ${
-                          m.status === "active"
-                            ? "bg-green-50 text-green-700 ring-green-200"
-                            : m.status === "paused"
-                              ? "bg-amber-50 text-amber-700 ring-amber-200"
-                              : "bg-stone-100 text-stone-600 ring-stone-200"
-                        }`}
-                      >
-                        {m.status}
-                      </span>
+                      <Chip tone={m.status === "active" ? "neutral" : "paused"}>{m.status}</Chip>
                     </td>
-                    <td className="px-3 py-2 text-right tabular-nums text-stone-700">
+                    <td className="px-3 py-2 text-right tabular-nums text-ink">
                       {m._count.changes}
                     </td>
-                    <td className="px-3 py-2 text-[12px] text-stone-500">
+                    <td className="px-3 py-2 text-xs text-subtle">
                       {m.lastCheckedAt ? new Date(m.lastCheckedAt).toLocaleString() : "never"}
                     </td>
                     {canEdit && (
@@ -674,7 +678,7 @@ export function KnowledgeClient({
                           <button
                             onClick={() => monitorAct(m.id, "run")}
                             disabled={busy === `monitor:run:${m.id}` || m.status !== "active"}
-                            className="flex items-center gap-1 rounded-md border border-stone-200 px-2 py-1 text-[12px] font-medium text-stone-600 hover:bg-stone-50 disabled:opacity-50"
+                            className={btnRun}
                             title="Check now"
                           >
                             {busy === `monitor:run:${m.id}` ? (
@@ -687,7 +691,7 @@ export function KnowledgeClient({
                           <button
                             onClick={() => monitorAct(m.id, m.status === "active" ? "pause" : "resume")}
                             disabled={busy?.startsWith(`monitor:pause:${m.id}`) || busy?.startsWith(`monitor:resume:${m.id}`)}
-                            className="flex items-center gap-1 rounded-md border border-stone-200 px-2 py-1 text-[12px] font-medium text-stone-600 hover:bg-stone-50 disabled:opacity-50"
+                            className={btnGhost}
                           >
                             <Pause className="h-3 w-3" />
                             {m.status === "active" ? "Pause" : "Resume"}
@@ -698,29 +702,27 @@ export function KnowledgeClient({
                   </tr>
                   {expandedMonitor === m.id && (
                     <tr key={`${m.id}-changes`}>
-                      <td colSpan={canEdit ? 6 : 5} className="border-b border-stone-200 bg-stone-50 px-4 py-2">
+                      <td colSpan={canEdit ? 6 : 5} className="border-b border-line bg-canvas px-4 py-2">
                         {changes[m.id] ? (
                           changes[m.id].length === 0 ? (
-                            <p className="py-2 text-[12px] text-stone-500">
+                            <p className="py-2 text-xs text-subtle">
                               No changes detected since baselining.
                             </p>
                           ) : (
-                            <ul className="divide-y divide-stone-200">
+                            <ul className="divide-y divide-line">
                               {changes[m.id].map((c) => (
                                 <li key={c.id} className="py-2">
-                                  <div className="flex items-center gap-2 text-[12px]">
-                                    <span className="font-medium text-stone-700">{c.digest}</span>
-                                    <span className="text-stone-400">
+                                  <div className="flex items-center gap-2 text-xs">
+                                    <span className="font-medium text-ink">{c.digest}</span>
+                                    <span className="text-subtle">
                                       {new Date(c.detectedAt).toLocaleString()}
                                     </span>
                                     {c.researchTaskId && (
-                                      <span className="rounded-full bg-[var(--brand-50)] px-2 py-0.5 text-[11px] font-medium text-[var(--brand-700)] ring-1 ring-inset ring-[var(--brand-200)]">
-                                        research spawned
-                                      </span>
+                                      <Chip tone="neutral">research spawned</Chip>
                                     )}
                                   </div>
                                   {c.excerpt && (
-                                    <pre className="mt-1 max-h-32 overflow-auto whitespace-pre-wrap rounded bg-white p-2 text-[11px] text-stone-600 ring-1 ring-inset ring-stone-200">
+                                    <pre className="mt-1 max-h-32 overflow-auto whitespace-pre-wrap rounded-md bg-night p-2 font-mono text-xs text-night-text">
                                       {c.excerpt}
                                     </pre>
                                   )}
@@ -729,7 +731,7 @@ export function KnowledgeClient({
                             </ul>
                           )
                         ) : (
-                          <p className="py-2 text-[12px] text-stone-500">Loading changes…</p>
+                          <p className="py-2 text-xs text-subtle">Loading changes…</p>
                         )}
                       </td>
                     </tr>
@@ -738,7 +740,7 @@ export function KnowledgeClient({
               ))}
               {monitors.length === 0 && (
                 <tr>
-                  <td colSpan={canEdit ? 6 : 5} className="px-3 py-8 text-center text-stone-500">
+                  <td colSpan={canEdit ? 6 : 5} className="px-3 py-8 text-center text-subtle">
                     No monitors yet — watch a competitor pricing page, changelog, or docs.
                   </td>
                 </tr>
@@ -747,10 +749,10 @@ export function KnowledgeClient({
           </table>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-lg border border-stone-200 bg-white">
-          <table className="w-full text-[13px]">
+        <div className="overflow-hidden rounded-lg bg-paper shadow-hairline">
+          <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-stone-200 bg-stone-50 text-left text-[12px] font-medium text-stone-500">
+              <tr className="border-b border-line text-left text-xs font-semibold text-muted">
                 <th className="px-3 py-2">Domain</th>
                 <th className="px-3 py-2">Target kit</th>
                 <th className="px-3 py-2">Status</th>
@@ -763,45 +765,41 @@ export function KnowledgeClient({
             <tbody>
               {syncs.map((s) => (
                 <Fragment key={s.id}>
-                  <tr className="border-b border-stone-100 hover:bg-[var(--brand-50)]/40">
+                  <tr className="border-b border-line hover:bg-hover-paper">
                     <td className="px-3 py-2">
                       <button
                         onClick={() => setExpandedSync(expandedSync === s.id ? null : s.id)}
-                        className="font-medium text-stone-900 hover:text-[var(--brand-700)]"
+                        className="font-medium text-ink hover:underline"
                         title="Show diff"
                       >
                         {s.domain}
                       </button>
-                      {s.error && <div className="text-[12px] text-red-600">{s.error}</div>}
+                      {s.error && <div className="text-xs text-failed-text">{s.error}</div>}
                     </td>
-                    <td className="px-3 py-2 text-stone-600">
+                    <td className="px-3 py-2 text-muted">
                       {s.brandKit ? (
                         <>
                           {s.brandKit.name}
                           {s.brandKit.isDefault && (
-                            <span className="ml-1 text-[11px] text-stone-400">(default)</span>
+                            <span className="ml-1 text-[11px] text-subtle">(default)</span>
                           )}
                         </>
                       ) : (
-                        <span className="text-stone-400">new kit on approve</span>
+                        <span className="text-subtle">new kit on approve</span>
                       )}
                     </td>
                     <td className="px-3 py-2">
-                      <span
-                        className={`inline-flex rounded-full px-2 py-0.5 text-[12px] font-medium ring-1 ring-inset ${
-                          SYNC_BADGE[s.status] ?? "bg-stone-100 text-stone-600 ring-stone-200"
-                        }`}
-                      >
+                      <StatusChip tone={syncStatusTone(s.status)}>
                         {s.status.replace("_", " ")}
-                      </span>
+                      </StatusChip>
                     </td>
-                    <td className="px-3 py-2 text-right tabular-nums text-stone-700">
+                    <td className="px-3 py-2 text-right tabular-nums text-ink">
                       {s.diffJson.length}
                     </td>
-                    <td className="px-3 py-2 text-right tabular-nums text-stone-700">
+                    <td className="px-3 py-2 text-right tabular-nums text-ink">
                       {s.creditsUsed}
                     </td>
-                    <td className="px-3 py-2 text-[12px] text-stone-500">
+                    <td className="px-3 py-2 text-xs text-subtle">
                       {new Date(s.createdAt).toLocaleString()}
                     </td>
                     {canEdit && (
@@ -811,7 +809,7 @@ export function KnowledgeClient({
                             <button
                               onClick={() => syncAct(s.id, "approve")}
                               disabled={busy === `sync:approve:${s.id}`}
-                              className="flex items-center gap-1 rounded-md bg-[var(--brand-600)] px-2 py-1 text-[12px] font-medium text-white hover:bg-[var(--brand-700)] disabled:opacity-50"
+                              className={btnApprove}
                             >
                               {busy === `sync:approve:${s.id}` ? (
                                 <Loader2 className="h-3 w-3 animate-spin" />
@@ -823,14 +821,14 @@ export function KnowledgeClient({
                             <button
                               onClick={() => syncAct(s.id, "reject")}
                               disabled={busy === `sync:reject:${s.id}`}
-                              className="flex items-center gap-1 rounded-md border border-stone-200 px-2 py-1 text-[12px] font-medium text-stone-600 hover:bg-stone-50 disabled:opacity-50"
+                              className={btnDeny}
                             >
                               <X className="h-3 w-3" />
                               Reject
                             </button>
                           </div>
                         ) : (
-                          <div className="text-right text-[12px] text-stone-400">
+                          <div className="text-right text-xs text-subtle">
                             {s.decidedAt ? new Date(s.decidedAt).toLocaleString() : "—"}
                           </div>
                         )}
@@ -839,10 +837,10 @@ export function KnowledgeClient({
                   </tr>
                   {expandedSync === s.id && s.diffJson.length > 0 && (
                     <tr key={`${s.id}-diff`}>
-                      <td colSpan={canEdit ? 7 : 6} className="border-b border-stone-200 bg-stone-50 px-4 py-2">
-                        <table className="w-full text-[12px]">
+                      <td colSpan={canEdit ? 7 : 6} className="border-b border-line bg-canvas px-4 py-2">
+                        <table className="w-full text-xs">
                           <thead>
-                            <tr className="text-left text-[11px] font-medium uppercase tracking-wide text-stone-400">
+                            <tr className="text-left text-xs font-semibold text-muted">
                               <th className="py-1 pr-3">Field</th>
                               <th className="py-1 pr-3">Current</th>
                               <th className="py-1">Proposed</th>
@@ -850,39 +848,39 @@ export function KnowledgeClient({
                           </thead>
                           <tbody>
                             {s.diffJson.map((d) => (
-                              <tr key={d.field} className="border-t border-stone-200">
-                                <td className="py-1 pr-3 font-mono text-stone-600">{d.field}</td>
-                                <td className="py-1 pr-3 text-stone-500">
+                              <tr key={d.field} className="border-t border-line">
+                                <td className="py-1 pr-3 font-mono text-muted">{d.field}</td>
+                                <td className="py-1 pr-3 text-subtle">
                                   {d.field.startsWith("colors.") && d.current ? (
                                     <span className="inline-flex items-center gap-1.5">
                                       <span
-                                        className="inline-block h-3 w-3 rounded-sm ring-1 ring-inset ring-stone-300"
+                                        className="inline-block h-3 w-3 rounded-sm ring-1 ring-inset ring-control"
                                         style={{ backgroundColor: d.current }}
                                       />
                                       {d.current}
                                     </span>
                                   ) : (
-                                    (d.current ?? <span className="text-stone-300">—</span>)
+                                    (d.current ?? <span className="text-subtle">—</span>)
                                   )}
                                 </td>
-                                <td className="py-1 font-medium text-stone-800">
+                                <td className="py-1 font-medium text-ink">
                                   {d.field.startsWith("colors.") && d.proposed ? (
                                     <span className="inline-flex items-center gap-1.5">
                                       <span
-                                        className="inline-block h-3 w-3 rounded-sm ring-1 ring-inset ring-stone-300"
+                                        className="inline-block h-3 w-3 rounded-sm ring-1 ring-inset ring-control"
                                         style={{ backgroundColor: d.proposed }}
                                       />
                                       {d.proposed}
                                     </span>
                                   ) : (
-                                    (d.proposed ?? <span className="text-stone-300">—</span>)
+                                    (d.proposed ?? <span className="text-subtle">—</span>)
                                   )}
                                 </td>
                               </tr>
                             ))}
                           </tbody>
                         </table>
-                        <p className="mt-1 text-[11px] text-stone-400">
+                        <p className="mt-1 text-[11px] text-subtle">
                           Approving applies name, colors, and fonts to the kit and downloads the
                           logo; the dashboard theme refreshes on the next render.
                         </p>
@@ -893,7 +891,7 @@ export function KnowledgeClient({
               ))}
               {syncs.length === 0 && (
                 <tr>
-                  <td colSpan={canEdit ? 7 : 6} className="px-3 py-8 text-center text-stone-500">
+                  <td colSpan={canEdit ? 7 : 6} className="px-3 py-8 text-center text-subtle">
                     No brand syncs yet — fetch a brand profile to diff it against a kit.
                   </td>
                 </tr>

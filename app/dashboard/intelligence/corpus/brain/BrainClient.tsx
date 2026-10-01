@@ -15,7 +15,6 @@ import {
   X,
   Loader2,
   CheckCircle2,
-  AlertTriangle,
   Orbit,
   Network,
   Crosshair,
@@ -32,7 +31,7 @@ import { inputCls, btnPrimary, btnGhost, PILLAR_COLORS, PILLAR_LABEL } from "./b
 const BrainScene3D = dynamic(() => import("./BrainScene3D").then((m) => m.BrainScene3D), {
   ssr: false,
   loading: () => (
-    <div className="flex min-h-[420px] flex-1 items-center justify-center gap-2 rounded-lg border border-stone-200 bg-[#FAFAF7] text-[13px] text-stone-500">
+    <div className="flex min-h-[420px] flex-1 items-center justify-center gap-2 rounded-lg border border-line bg-canvas text-sm text-muted">
       <Loader2 className="h-4 w-4 animate-spin" /> Growing the brain…
     </div>
   ),
@@ -161,14 +160,14 @@ export function BrainClient({ canManage }: { canManage: boolean }) {
 
   if (loadError) {
     return (
-      <div className="rounded-md border border-stone-200 bg-stone-50 p-6 text-[13px] text-stone-600">
+      <div className="rounded-lg bg-paper p-6 text-sm text-muted shadow-hairline">
         Could not load the corpus graph: {loadError}
       </div>
     );
   }
   if (!graph) {
     return (
-      <div className="flex h-96 items-center justify-center gap-2 text-[13px] text-stone-500">
+      <div className="flex h-96 items-center justify-center gap-2 text-sm text-muted">
         <Loader2 className="h-4 w-4 animate-spin" /> Growing the brain…
       </div>
     );
@@ -182,7 +181,7 @@ export function BrainClient({ canManage }: { canManage: boolean }) {
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative">
-          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-stone-400" />
+          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-subtle" />
           <input
             value={query}
             onChange={(e) => {
@@ -192,28 +191,28 @@ export function BrainClient({ canManage }: { canManage: boolean }) {
             onFocus={() => setShowResults(true)}
             onBlur={() => setTimeout(() => setShowResults(false), 150)}
             placeholder="Search sources…"
-            className={`${inputCls} w-52 pl-8`}
+            className={`${inputCls} h-control-sm w-52 pl-8`}
           />
           {showResults && matches.length > 0 && (
-            <div className="absolute left-0 top-full z-30 mt-1 w-72 overflow-hidden rounded-md border border-stone-200 bg-white shadow-lg">
+            <div className="absolute left-0 top-full z-30 mt-1 w-72 overflow-hidden rounded-lg bg-paper shadow-raised">
               {matches.map((n) => (
                 <button
                   key={n.id}
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => flyTo(n.id)}
-                  className="flex w-full items-center gap-2 px-2.5 py-2 text-left hover:bg-violet-50/60"
+                  className="flex w-full items-center gap-2 px-2.5 py-2 text-left hover:bg-hover-paper"
                 >
                   <span
                     className="h-2.5 w-2.5 shrink-0 rounded-full"
                     style={{ backgroundColor: PILLAR_COLORS[n.pillar] }}
                   />
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[12px] font-medium text-stone-900">{n.title}</span>
-                    <span className="block truncate text-[11px] text-stone-400">
+                    <span className="block truncate text-[12px] font-medium text-ink">{n.title}</span>
+                    <span className="block truncate text-[11px] text-subtle">
                       {PILLAR_LABEL[n.pillar]} · Tier {n.tier}
                     </span>
                   </span>
-                  <Crosshair className="h-3.5 w-3.5 shrink-0 text-violet-400" />
+                  <Crosshair className="h-3.5 w-3.5 shrink-0 text-muted" />
                 </button>
               ))}
             </div>
@@ -222,36 +221,39 @@ export function BrainClient({ canManage }: { canManage: boolean }) {
         {(["marketing", "growth", "design"] as BrainPillar[]).map((p) => (
           <button
             key={p}
+            aria-pressed={pillarFilter.has(p)}
             onClick={() => toggleSet(pillarFilter, p, (s) => setPillarFilter(s as Set<BrainPillar>))}
-            className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[12px] font-medium transition ${
+            className={`aos-press inline-flex h-chip items-center gap-1.5 rounded-full px-3 text-sm font-semibold ${
               pillarFilter.has(p)
-                ? "border-transparent text-white"
-                : "border-stone-200 bg-white text-stone-500 hover:bg-stone-50"
+                ? "bg-ink text-white"
+                : "bg-white text-muted shadow-control hover:shadow-outline"
             }`}
-            style={pillarFilter.has(p) ? { backgroundColor: PILLAR_COLORS[p] } : undefined}
           >
-            <span
-              className="inline-block h-2 w-2 rounded-full"
-              style={{ backgroundColor: pillarFilter.has(p) ? "#fff" : PILLAR_COLORS[p] }}
-            />
+            {!pillarFilter.has(p) && (
+              <span
+                className="inline-block h-2 w-2 rounded-full"
+                style={{ backgroundColor: PILLAR_COLORS[p] }}
+              />
+            )}
             {PILLAR_LABEL[p]}
           </button>
         ))}
         {(["1", "2", "1S"] as const).map((t) => (
           <button
             key={t}
+            aria-pressed={tierFilter.has(t)}
             onClick={() => toggleSet(tierFilter, t, setTierFilter)}
-            className={`rounded-full border px-2.5 py-1 text-[12px] font-medium ${
+            className={`aos-press inline-flex h-chip items-center rounded-full px-3 text-sm font-semibold ${
               tierFilter.has(t)
-                ? "border-violet-600 bg-violet-600 text-white"
-                : "border-stone-200 bg-white text-stone-500 hover:bg-stone-50"
+                ? "bg-ink text-white"
+                : "bg-white text-muted shadow-control hover:shadow-outline"
             }`}
           >
             Tier {t}
           </button>
         ))}
         {/* 2D / 3D toggle */}
-        <div className="flex rounded-md border border-stone-200 bg-white p-0.5">
+        <div className="flex items-center rounded-full bg-canvas p-1" role="group" aria-label="View">
           {(
             [
               ["3d", "3D", Orbit],
@@ -260,9 +262,10 @@ export function BrainClient({ canManage }: { canManage: boolean }) {
           ).map(([v, label, Icon]) => (
             <button
               key={v}
+              aria-pressed={view === v}
               onClick={() => setView(v)}
-              className={`flex items-center gap-1.5 rounded px-2.5 py-1 text-[12px] font-medium ${
-                view === v ? "bg-violet-600 text-white shadow-sm" : "text-stone-500 hover:text-stone-700"
+              className={`inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-sm font-semibold ${
+                view === v ? "bg-ink text-white" : "text-muted hover:text-ink"
               }`}
             >
               <Icon className="h-3.5 w-3.5" /> {label}
@@ -285,19 +288,24 @@ export function BrainClient({ canManage }: { canManage: boolean }) {
 
       {actionMsg && (
         <div
-          className={`flex items-center gap-2 rounded-md border px-3 py-2 text-[13px] ${
+          role="status"
+          className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm ${
             actionMsg.tone === "green"
-              ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-              : "border-red-200 bg-red-50 text-red-800"
+              ? "bg-paper text-ink shadow-hairline"
+              : "border-[1.5px] border-failed bg-failed-tint text-failed-text"
           }`}
         >
           {actionMsg.tone === "green" ? (
-            <CheckCircle2 className="h-4 w-4" />
+            <CheckCircle2 className="h-4 w-4 shrink-0" />
           ) : (
-            <AlertTriangle className="h-4 w-4" />
+            <span className="aos-shape aos-shape--failed shrink-0" style={{ "--aos-shape-size": "10px" } as React.CSSProperties} />
           )}
           {actionMsg.text}
-          <button className="ml-auto" onClick={() => setActionMsg(null)}>
+          <button
+            className="ml-auto rounded-full p-1.5 text-muted hover:bg-hover-paper"
+            onClick={() => setActionMsg(null)}
+            aria-label="Dismiss"
+          >
             <X className="h-3.5 w-3.5" />
           </button>
         </div>
@@ -348,9 +356,9 @@ export function BrainClient({ canManage }: { canManage: boolean }) {
               evalQuestions={graph.stats.eval?.questions ?? null}
             />
           ) : (
-            <div className="flex min-h-[200px] flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-stone-300 bg-white/60 p-6 text-center">
-              <Orbit className="h-6 w-6 text-violet-300" />
-              <p className="max-w-[220px] text-[13px] text-stone-500">
+            <div className="flex min-h-[200px] flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-line bg-paper p-6 text-center">
+              <Orbit className="h-6 w-6 text-subtle" />
+              <p className="max-w-[220px] text-sm text-muted">
                 Click any neuron to inspect the source — what it taught Marketr, its license basis,
                 and its provenance.
               </p>
@@ -360,7 +368,7 @@ export function BrainClient({ canManage }: { canManage: boolean }) {
         </div>
       </div>
 
-      <p className="text-[11px] text-stone-400">
+      <p className="text-2xs text-subtle">
         Every metric on this page is real: it reads the corpus manifest, the eval results file, the
         retrieval-usage log, and the proposal/removal/rebuild records. Nothing is fabricated —
         counters read 0 until the event actually happens.

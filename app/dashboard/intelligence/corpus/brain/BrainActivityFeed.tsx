@@ -1,7 +1,9 @@
-// Marketr — Knowledge Brain: corpus activity feed.
+// Marketr — Knowledge Brain: corpus activity feed (Agentic OS).
 //
 // Real events only — proposals, removal flags, rebuild job history, manifest
 // version bumps — fetched from /api/corpus/activity. No fabricated activity.
+// Event categories are not agent states, so icons get a single neutral
+// treatment.
 
 "use client";
 
@@ -18,23 +20,11 @@ export interface ActivityEvent {
   actor?: string;
 }
 
-const TYPE_STYLE: Record<ActivityEvent["type"], { icon: React.ReactNode; tone: string }> = {
-  proposal: {
-    icon: <Inbox className="h-3.5 w-3.5" />,
-    tone: "text-violet-600 bg-violet-50 border-violet-200",
-  },
-  "removal-flag": {
-    icon: <Flag className="h-3.5 w-3.5" />,
-    tone: "text-red-600 bg-red-50 border-red-200",
-  },
-  rebuild: {
-    icon: <RefreshCw className="h-3.5 w-3.5" />,
-    tone: "text-sky-700 bg-sky-50 border-sky-200",
-  },
-  manifest: {
-    icon: <Tag className="h-3.5 w-3.5" />,
-    tone: "text-stone-500 bg-stone-50 border-stone-200",
-  },
+const TYPE_ICON: Record<ActivityEvent["type"], React.ReactNode> = {
+  proposal: <Inbox className="h-3.5 w-3.5" />,
+  "removal-flag": <Flag className="h-3.5 w-3.5" />,
+  rebuild: <RefreshCw className="h-3.5 w-3.5" />,
+  manifest: <Tag className="h-3.5 w-3.5" />,
 };
 
 function timeAgo(iso: string): string {
@@ -78,57 +68,55 @@ export function BrainActivityFeed({ refreshKey }: { refreshKey: number }) {
   }, [refreshKey]);
 
   return (
-    <div className="overflow-hidden rounded-lg border border-stone-200 bg-white">
-      <div className="flex items-center gap-2 border-b border-stone-100 px-3 py-2">
-        <History className="h-4 w-4 text-stone-400" />
-        <div className="text-[13px] font-semibold text-stone-900">Activity</div>
-        <div className="text-[11px] text-stone-400">what actually happened</div>
+    <div className="overflow-hidden rounded-lg bg-paper shadow-hairline">
+      <div className="flex items-center gap-2 border-b border-line px-3 py-2">
+        <History className="h-4 w-4 text-subtle" />
+        <div className="text-sm font-semibold text-ink">Activity</div>
+        <div className="text-[11px] text-subtle">what actually happened</div>
       </div>
       <div className="max-h-[420px] overflow-y-auto">
         {loading && (
-          <div className="flex items-center gap-2 p-4 text-[13px] text-stone-400">
+          <div className="flex items-center gap-2 p-4 text-sm text-subtle">
             <Loader2 className="h-4 w-4 animate-spin" /> Loading activity…
           </div>
         )}
         {error && (
           <div className="p-4">
-            <p className="text-[13px] text-red-600">Could not load activity ({error}).</p>
-            <button onClick={() => location.reload()} className={btnGhost}>
+            <p className="flex items-start gap-1.5 text-sm text-failed-text">
+              <span className="aos-shape aos-shape--failed mt-1 shrink-0" style={{ "--aos-shape-size": "10px" } as React.CSSProperties} />
+              Could not load activity ({error}).
+            </p>
+            <button onClick={() => location.reload()} className={`${btnGhost} mt-2`}>
               Retry
             </button>
           </div>
         )}
         {!loading && !error && events.length === 0 && (
-          <p className="p-4 text-[13px] text-stone-400">
+          <p className="p-4 text-sm text-subtle">
             No corpus events yet — proposals, removal flags, and rebuilds will appear here.
           </p>
         )}
         {!loading && !error && events.length > 0 && (
-          <ul className="divide-y divide-stone-100">
-            {events.map((e) => {
-              const st = TYPE_STYLE[e.type];
-              return (
-                <li key={e.id} className="flex gap-2.5 px-3 py-2">
-                  <span
-                    className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md border ${st.tone}`}
-                  >
-                    {st.icon}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-[13px] font-medium text-stone-900">{e.title}</div>
-                    {e.detail && (
-                      <div className="truncate text-[12px] text-stone-500" title={e.detail}>
-                        {e.detail}
-                      </div>
-                    )}
-                    <div className="mt-0.5 text-[11px] text-stone-400">
-                      {timeAgo(e.at)}
-                      {e.actor ? ` · ${e.actor}` : ""}
+          <ul className="divide-y divide-line">
+            {events.map((e) => (
+              <li key={e.id} className="flex gap-2.5 px-3 py-2">
+                <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-canvas text-muted">
+                  {TYPE_ICON[e.type]}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm font-medium text-ink">{e.title}</div>
+                  {e.detail && (
+                    <div className="truncate text-xs text-muted" title={e.detail}>
+                      {e.detail}
                     </div>
+                  )}
+                  <div className="mt-0.5 text-[11px] text-subtle">
+                    {timeAgo(e.at)}
+                    {e.actor ? ` · ${e.actor}` : ""}
                   </div>
-                </li>
-              );
-            })}
+                </div>
+              </li>
+            ))}
           </ul>
         )}
       </div>
