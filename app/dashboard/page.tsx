@@ -23,7 +23,6 @@ import ProjectCreateForm from "@/components/ProjectCreateForm";
 import { Card, CardBody, CardHeader } from "@/components/vault/Card";
 import { EmptyState } from "@/components/vault/EmptyState";
 import { ValuePill } from "@/components/vault/atoms/ValuePill";
-import { cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -217,23 +216,20 @@ export default async function DashboardPage() {
       {/* Page headline */}
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-stone-400">
-            Overview
-          </p>
-          <h1 className="mt-1 text-xl font-bold tracking-tight text-ink">
+          <h1 className="aos-heading">
             {workspace.name}
           </h1>
-          <p className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[13px] text-ink-2">
+          <p className="mt-2 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-muted">
             <span>Plan</span>
             <ValuePill>{workspace.plan}</ValuePill>
-            <span aria-hidden className="text-ink-3">·</span>
+            <span aria-hidden className="text-subtle">·</span>
             <span>Data</span>
-            <ValuePill tone={provider.isLive ? "green" : "orange"}>
+            <ValuePill>
               {provider.isLive ? "DataForSEO (live)" : "Mock"}
             </ValuePill>
             {lastRun ? (
               <>
-                <span aria-hidden className="text-ink-3">·</span>
+                <span aria-hidden className="text-subtle">·</span>
                 <span className="inline-flex items-center gap-1">
                   <Clock className="size-3.5" />
                   Last automation “{lastRun.workflow.name}” ran {timeAgo(lastRun.startedAt)}
@@ -245,7 +241,7 @@ export default async function DashboardPage() {
         {projects.length > 0 ? (
           <Link
             href={`/dashboard/assistant?project=${projects[0]!.id}`}
-            className="pressable inline-flex items-center gap-2 rounded-full bg-accent px-4 py-2 text-[13.5px] font-medium text-white transition-colors hover:bg-accent-hover"
+            className="aos-press inline-flex h-control items-center gap-2 rounded-full bg-ink px-5.5 text-base font-semibold text-white hover:bg-night-hover"
           >
             <TrendingUp className="size-4" />
             Ask Marketr
@@ -259,20 +255,20 @@ export default async function DashboardPage() {
           {/* Attention queue */}
           <section aria-labelledby="attention-h">
             <div className="mb-2 flex items-baseline justify-between">
-              <h2 id="attention-h" className="text-[15px] font-semibold text-ink">
+              <h2 id="attention-h" className="aos-subheading">
                 Needs your attention
               </h2>
               {attention.length > 0 ? (
-                <span className="text-[12.5px] text-ink-3">
+                <span className="text-xs text-subtle">
                   {attention.length} item{attention.length === 1 ? "" : "s"}
                 </span>
               ) : null}
             </div>
             {attention.length === 0 ? (
-              <div className="rounded-card border border-line bg-surface px-4 py-6 text-center">
-                <CheckCircle className="mx-auto size-6 text-green" />
-                <p className="text-lg font-semibold text-ink mt-2">All quiet</p>
-                <p className="mx-auto mt-1 max-w-[38ch] text-[13px] text-ink-2">
+              <div className="rounded-lg bg-paper px-4 py-6 text-center shadow-hairline">
+                <CheckCircle className="mx-auto size-6 text-ink" />
+                <p className="aos-subheading mt-2">All quiet</p>
+                <p className="mx-auto mt-1 max-w-[38ch] text-sm text-muted">
                   Nothing needs you right now. New drafts, decay alerts, and competitor moves
                   will show up here.
                 </p>
@@ -282,26 +278,26 @@ export default async function DashboardPage() {
                 {attention.slice(0, 6).map((row, i) => (
                   <li
                     key={row.key}
-                    className="widget-enter rounded-card border border-line bg-surface"
+                    className="widget-enter rounded-lg bg-paper shadow-hairline"
                     style={{ animationDelay: `${i * 45}ms` }}
                   >
                     <Link
                       href={row.href}
-                      className="group flex items-center gap-3 px-4 py-3 transition-[background-color] duration-150 hover:bg-hover"
+                      className="group flex items-center gap-3 px-4 py-3 transition-[background-color] duration-150 hover:bg-hover-paper"
                     >
-                      <span className="flex size-9 shrink-0 items-center justify-center rounded-control bg-inset text-ink-2">
+                      <span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-canvas text-muted">
                         {row.icon}
                       </span>
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate text-[14px] font-medium text-ink">
+                        <span className="block truncate text-base font-medium text-ink">
                           {row.title}
                         </span>
-                        <span className="block truncate text-[12.5px] text-ink-2">{row.meta}</span>
+                        <span className="block truncate text-sm text-muted">{row.meta}</span>
                       </span>
-                      <span className="shrink-0 text-[13px] font-medium text-accent-ink">
+                      <span className="shrink-0 text-sm font-semibold text-ink">
                         {row.cta}
                       </span>
-                      <ChevronRight className="size-4 shrink-0 text-ink-3 transition-transform duration-150 group-hover:translate-x-0.5" />
+                      <ChevronRight className="size-4 shrink-0 text-subtle transition-transform duration-150 group-hover:translate-x-0.5" />
                     </Link>
                   </li>
                 ))}
@@ -312,10 +308,10 @@ export default async function DashboardPage() {
           {/* Projects */}
           <section aria-labelledby="projects-h" id="new-project">
             <div className="mb-2 flex items-baseline justify-between">
-              <h2 id="projects-h" className="text-[15px] font-semibold text-ink">
+              <h2 id="projects-h" className="aos-subheading">
                 Projects
               </h2>
-              <span className="text-[12.5px] text-ink-3">
+              <span className="text-xs text-subtle">
                 {projects.length} project{projects.length === 1 ? "" : "s"} ·{" "}
                 {totalKeywords} keywords · {totalContent} content pieces
               </span>
@@ -336,13 +332,13 @@ export default async function DashboardPage() {
                         <li key={p.id} className="border-b border-line last:border-b-0">
                           <Link
                             href={`/dashboard/projects/${p.id}`}
-                            className="group flex items-center justify-between gap-3 px-4 py-3.5 transition-[background-color] duration-150 hover:bg-hover"
+                            className="group flex items-center justify-between gap-3 px-4 py-3.5 transition-[background-color] duration-150 hover:bg-hover-paper"
                           >
                             <span className="min-w-0 flex-1">
-                              <span className="block truncate text-[14px] font-medium text-ink">
+                              <span className="block truncate text-base font-medium text-ink">
                                 {p.domain}
                               </span>
-                              <span className="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[12.5px] text-ink-2">
+                              <span className="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-sm text-muted">
                                 <ValuePill>
                                   {p._count.keywords} keyword{p._count.keywords === 1 ? "" : "s"}
                                 </ValuePill>
@@ -352,23 +348,21 @@ export default async function DashboardPage() {
                                 <ValuePill>
                                   {p._count.workflows} automation{p._count.workflows === 1 ? "" : "s"}
                                 </ValuePill>
-                                <span className="text-ink-3">{p.locale}</span>
+                                <span className="text-subtle">{p.locale}</span>
                               </span>
                             </span>
                             {score !== undefined ? (
                               <span
-                                className={cn(
-                                  "flex size-11 shrink-0 flex-col items-center justify-center rounded-card border border-line bg-inset",
-                                )}
+                                className="flex size-11 shrink-0 flex-col items-center justify-center rounded-md bg-canvas shadow-hairline"
                                 title={`Visibility score ${score}/100`}
                               >
-                                <span className="text-[14px] font-semibold tabular-nums text-ink">
+                                <span className="text-base font-semibold tabular-nums text-ink">
                                   {score}
                                 </span>
-                                <span className="text-[9.5px] leading-none text-ink-3">score</span>
+                                <span className="text-2xs leading-none text-subtle">score</span>
                               </span>
                             ) : null}
-                            <ChevronRight className="size-4 shrink-0 text-ink-3 transition-transform duration-150 group-hover:translate-x-0.5" />
+                            <ChevronRight className="size-4 shrink-0 text-subtle transition-transform duration-150 group-hover:translate-x-0.5" />
                           </Link>
                         </li>
                       );
@@ -388,7 +382,7 @@ export default async function DashboardPage() {
             <CardHeader title="Win this week" description="The shortest path to more traffic" />
             <CardBody className="flex flex-col gap-1 p-2">
               {suggestions.length === 0 ? (
-                <p className="px-2 py-1 text-[13px] text-ink-2">
+                <p className="px-2 py-1 text-sm text-muted">
                   You’re on top of everything. Check back after the next scheduled run.
                 </p>
               ) : (
@@ -396,14 +390,14 @@ export default async function DashboardPage() {
                   <Link
                     key={i}
                     href={s.href}
-                    className="group flex items-start gap-2.5 rounded-control px-2 py-2 transition-[background-color] duration-150 hover:bg-hover"
+                    className="group flex items-start gap-2.5 rounded-md px-2 py-2 transition-[background-color] duration-150 hover:bg-hover-paper"
                   >
-                    <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-control bg-inset text-ink-2">
+                    <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-md bg-canvas text-muted">
                       {s.icon}
                     </span>
                     <span className="min-w-0">
-                      <span className="block text-[13px] leading-snug text-ink-2">{s.text}</span>
-                      <span className="mt-0.5 inline-block text-[13px] font-medium text-accent-ink">
+                      <span className="block text-sm leading-snug text-muted">{s.text}</span>
+                      <span className="mt-0.5 inline-block text-sm font-semibold text-ink">
                         {s.cta}
                       </span>
                     </span>

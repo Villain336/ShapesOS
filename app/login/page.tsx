@@ -7,9 +7,11 @@
 import { signIn } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState, type FormEvent } from "react";
+import { Loader2 } from "lucide-react";
+import { safeNext } from "@/lib/auth/redirect";
 
 const inputCls =
-  "w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-accent focus:outline-none";
+  "h-control w-full rounded-md border-[1.5px] bg-paper px-3 text-base text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-3 focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none";
 
 interface ProviderInfo {
   id: string;
@@ -17,7 +19,7 @@ interface ProviderInfo {
 }
 
 // Day-1: honor a same-origin `next` redirect (e.g. /invite?token=…) so invite
-import { safeNext } from "@/lib/auth/redirect";
+// links land back where they started.
 
 function LoginBody() {
   const params = useSearchParams();
@@ -69,17 +71,20 @@ function LoginBody() {
     }
   }
 
+  const invalid = error !== null;
+  const fieldCls = `${inputCls} ${invalid ? "border-failed" : "border-control"}`;
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 px-6 font-sans text-zinc-900">
-      <div className="w-full max-w-sm rounded-xl border border-zinc-200 bg-white/60 p-8">
-        <h1 className="text-2xl font-bold tracking-tight">Marketr</h1>
-        <p className="mt-1 text-sm text-zinc-500">
+    <div className="flex min-h-screen items-center justify-center bg-canvas px-6">
+      <div className="w-full max-w-sm rounded-lg bg-paper p-8 shadow-hairline">
+        <h1 className="aos-heading">Marketr</h1>
+        <p className="mt-1 text-sm text-muted">
           Sign in to your marketing workspace
         </p>
 
         <button
           onClick={() => signIn("google", { callbackUrl: next })}
-          className="mt-6 w-full rounded-md border border-zinc-200 bg-zinc-100 px-3 py-2 text-sm font-medium hover:bg-zinc-200"
+          className="aos-press mt-6 inline-flex h-control w-full items-center justify-center gap-2 rounded-full bg-paper text-base font-semibold text-ink shadow-outline"
         >
           Continue with Google
         </button>
@@ -88,17 +93,17 @@ function LoginBody() {
           <button
             key={p.id}
             onClick={() => signIn(p.id, { callbackUrl: next })}
-            className="mt-3 w-full rounded-md border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-100"
+            className="aos-press mt-3 inline-flex h-control w-full items-center justify-center gap-2 rounded-full bg-paper text-base font-semibold text-ink shadow-outline"
           >
             Continue with {p.name}
             {p.id === "boxyhq-saml" ? " (SAML SSO)" : ""}
           </button>
         ))}
 
-        <div className="my-5 flex items-center gap-3 text-xs text-zinc-500">
-          <span className="h-px flex-1 bg-zinc-200" />
+        <div className="my-5 flex items-center gap-3 text-xs text-muted">
+          <span className="h-px flex-1 bg-line" />
           or self-host admin login
-          <span className="h-px flex-1 bg-zinc-200" />
+          <span className="h-px flex-1 bg-line" />
         </div>
 
         <form onSubmit={onCredentials} className="flex flex-col gap-3">
@@ -108,7 +113,9 @@ function LoginBody() {
             placeholder="Email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className={inputCls}
+            aria-invalid={invalid}
+            aria-describedby={invalid ? "login-error" : undefined}
+            className={fieldCls}
           />
           <input
             type="password"
@@ -116,15 +123,36 @@ function LoginBody() {
             placeholder="Password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className={inputCls}
+            aria-invalid={invalid}
+            aria-describedby={invalid ? "login-error" : undefined}
+            className={fieldCls}
           />
-          {error && <p className="text-sm text-red-600">{error}</p>}
+          {error && (
+            <p
+              id="login-error"
+              role="alert"
+              className="flex items-center gap-2 text-sm text-failed-text"
+            >
+              <span
+                aria-hidden="true"
+                className="inline-block size-2 shrink-0 bg-failed"
+              />
+              {error}
+            </p>
+          )}
           <button
             type="submit"
             disabled={busy}
-            className="rounded-md bg-accent px-3 py-2 text-sm font-medium text-white hover:bg-accent-hover disabled:opacity-50 active:scale-[0.96] transition-[background-color,transform] duration-150 ease-[cubic-bezier(0.2,0,0,1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2"
+            className="aos-press inline-flex h-control w-full items-center justify-center gap-2 rounded-full bg-ink text-base font-semibold text-white hover:bg-night-hover disabled:bg-disabled disabled:text-disabled-fg"
           >
-            {busy ? "Signing in…" : "Sign in"}
+            {busy ? (
+              <>
+                <Loader2 className="size-4 aos-spin" aria-hidden="true" />
+                Signing in
+              </>
+            ) : (
+              "Sign in"
+            )}
           </button>
         </form>
       </div>
@@ -136,7 +164,7 @@ function LoginBody() {
 // suspense boundary for static prerendering (per the local Next.js docs).
 export default function LoginPage() {
   return (
-    <Suspense fallback={<div className="p-8 text-center text-sm text-zinc-500">Loading…</div>}>
+    <Suspense fallback={<div className="p-8 text-center text-sm text-muted">Loading…</div>}>
       <LoginBody />
     </Suspense>
   );

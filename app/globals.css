@@ -230,12 +230,6 @@ a {
 .thin-scroll::-webkit-scrollbar-thumb { background: var(--aos-line-strong); border-radius: 8px; }
 .thin-scroll::-webkit-scrollbar-track { background: transparent; }
 
-/* Press feedback — every pressable element */
-.pressable { transition: transform 100ms ease-out; }
-.pressable:active { transform: scale(0.97); }
-@media (hover: hover) and (pointer: fine) {
-  .pressable:hover { transform: none; }
-}
 
 .animated-underline { position: relative; display: inline-block; }
 .animated-underline::after {

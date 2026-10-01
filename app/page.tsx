@@ -17,9 +17,11 @@ export const metadata = {
 };
 
 const primaryCta =
-  "inline-flex items-center gap-2 rounded-md bg-violet-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-violet-700";
+  "aos-press inline-flex h-control items-center gap-2 rounded-full bg-ink px-5.5 text-base font-semibold text-white hover:bg-night-hover";
 const secondaryCta =
-  "inline-flex items-center gap-2 rounded-md border border-stone-300 bg-white px-5 py-2.5 text-sm font-medium text-stone-700 hover:bg-stone-50";
+  "aos-press inline-flex h-control items-center gap-2 rounded-full bg-paper px-5.5 text-base font-semibold text-ink shadow-outline";
+const quietNav =
+  "inline-flex h-control-sm items-center rounded-full px-4 text-base font-semibold text-muted transition-colors hover:bg-hover hover:text-ink";
 
 const highlights = [
   {
@@ -56,23 +58,20 @@ const highlights = [
 
 export default function Home() {
   return (
-    <div className="min-h-screen bg-[#FAFAF7] text-stone-900">
+    <div className="min-h-screen bg-canvas">
       {/* Top bar */}
-      <header className="border-b border-stone-200">
+      <header className="border-b border-line">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-          <span className="text-xl font-bold tracking-tight text-stone-900">
+          <span className="text-xl font-heading stretch-heading text-ink">
             Marketr
           </span>
-          <div className="flex items-center gap-3">
-            <Link
-              href="/login"
-              className="text-sm font-medium text-stone-600 hover:text-stone-900"
-            >
+          <div className="flex items-center gap-2">
+            <Link href="/login" className={quietNav}>
               Sign in
             </Link>
             <Link href="/login" className={primaryCta}>
               Get started
-              <ArrowRight className="h-4 w-4" />
+              <ArrowRight className="size-4" />
             </Link>
           </div>
         </div>
@@ -81,22 +80,22 @@ export default function Home() {
       <main>
         {/* Hero */}
         <section className="mx-auto max-w-6xl px-6 pb-16 pt-20 text-center md:pt-24">
-          <p className="inline-flex items-center gap-2 rounded-full border border-stone-200 bg-white px-4 py-1.5 text-xs uppercase tracking-widest text-stone-500">
-            <Code2 className="h-3.5 w-3.5" />
+          <p className="inline-flex h-chip items-center gap-2 rounded-full bg-paper px-4 text-sm font-semibold text-muted shadow-control">
+            <Code2 className="size-3.5" />
             Open source &middot; AGPLv3
           </p>
-          <h1 className="mx-auto mt-6 max-w-3xl text-4xl font-bold tracking-tight text-stone-900 md:text-5xl">
+          <h1 className="aos-display mx-auto mt-6 max-w-3xl">
             The open-source marketing &amp; SEO workspace
           </h1>
-          <p className="mx-auto mt-5 max-w-2xl text-lg leading-8 text-stone-500">
+          <p className="mx-auto mt-5 max-w-2xl text-lg text-muted">
             Keyword research, competitor gap analysis, an AI content engine,
             rank tracking, site audits, and white-label client reporting in
             one self-serve OS.
           </p>
-          <div className="mt-8 flex items-center justify-center gap-3">
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
             <Link href="/login" className={primaryCta}>
               Get started
-              <ArrowRight className="h-4 w-4" />
+              <ArrowRight className="size-4" />
             </Link>
             <Link href="/dashboard" className={secondaryCta}>
               Explore the dashboard
@@ -111,57 +110,57 @@ export default function Home() {
               <Link
                 key={h.title}
                 href={h.href}
-                className="group rounded-lg border border-stone-200 bg-white p-5 hover:border-violet-300 hover:bg-violet-50/40"
+                className="group rounded-lg bg-paper p-5 shadow-hairline transition-colors hover:bg-hover-paper"
               >
-                <h.icon className="h-5 w-5 text-violet-600" />
-                <h2 className="mt-3 text-base font-semibold tracking-tight text-stone-900">
+                <h.icon className="size-5 text-ink" />
+                <h2 className="mt-3 text-base font-semibold text-ink">
                   {h.title}
                 </h2>
-                <p className="mt-1.5 text-[13px] leading-6 text-stone-500">
+                <p className="mt-1.5 text-sm leading-relaxed text-muted">
                   {h.body}
                 </p>
-                <span className="mt-3 inline-flex items-center gap-1 text-[13px] font-medium text-violet-700">
+                <span className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-ink">
                   Open in Marketr
-                  <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+                  <ArrowRight className="size-3.5 transition-transform group-hover:translate-x-0.5" />
                 </span>
               </Link>
             ))}
             {/* Self-host card completes the grid */}
             <Link
               href="/login"
-              className="group rounded-lg border border-stone-200 bg-white p-5 hover:border-violet-300 hover:bg-violet-50/40"
+              className="group rounded-lg bg-paper p-5 shadow-hairline transition-colors hover:bg-hover-paper"
             >
-              <Code2 className="h-5 w-5 text-violet-600" />
-              <h2 className="mt-3 text-base font-semibold tracking-tight text-stone-900">
+              <Code2 className="size-5 text-ink" />
+              <h2 className="mt-3 text-base font-semibold text-ink">
                 Self-hosted or hosted
               </h2>
-              <p className="mt-1.5 text-[13px] leading-6 text-stone-500">
+              <p className="mt-1.5 text-sm leading-relaxed text-muted">
                 Self-host it free with your own API keys, or pay for hosted
                 with data included. Your data stays yours either way.
               </p>
-              <span className="mt-3 inline-flex items-center gap-1 text-[13px] font-medium text-violet-700">
+              <span className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-ink">
                 Sign in
-                <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+                <ArrowRight className="size-3.5 transition-transform group-hover:translate-x-0.5" />
               </span>
             </Link>
           </div>
         </section>
 
         {/* Bottom CTA */}
-        <section className="border-t border-stone-200">
+        <section className="border-t border-line">
           <div className="mx-auto max-w-6xl px-6 py-16 text-center">
-            <h2 className="text-2xl font-bold tracking-tight text-stone-900">
+            <h2 className="aos-heading">
               Ready to run your marketing from one place?
             </h2>
-            <p className="mx-auto mt-3 max-w-xl text-[13px] leading-6 text-stone-500">
+            <p className="mx-auto mt-3 max-w-xl text-sm leading-relaxed text-muted">
               Bring your own DataForSEO and LLM keys — or start on hosted and
               switch later.
             </p>
-            <ul className="mt-6 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-[13px] text-stone-600">
+            <ul className="mt-6 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm text-muted">
               {["AGPLv3 open source", "BYO API keys", "White-label reporting"].map(
                 (t) => (
                   <li key={t} className="inline-flex items-center gap-1.5">
-                    <Check className="h-4 w-4 text-violet-600" />
+                    <Check className="size-4 text-ink" />
                     {t}
                   </li>
                 )
@@ -170,17 +169,17 @@ export default function Home() {
             <div className="mt-8">
               <Link href="/login" className={primaryCta}>
                 Sign in to Marketr
-                <ArrowRight className="h-4 w-4" />
+                <ArrowRight className="size-4" />
               </Link>
             </div>
           </div>
         </section>
       </main>
 
-      <footer className="border-t border-stone-200">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-5 text-xs text-stone-500">
+      <footer className="border-t border-line">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-5 text-xs text-muted">
           <span>Marketr — open-source marketing &amp; SEO workspace</span>
-          <Link href="/login" className="hover:text-stone-900">
+          <Link href="/login" className="hover:text-ink">
             Sign in
           </Link>
         </div>
