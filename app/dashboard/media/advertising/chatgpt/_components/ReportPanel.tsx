@@ -7,11 +7,11 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { AlertTriangle, Download, Loader2 } from "lucide-react";
+import { Download, Loader2 } from "lucide-react";
 import type { ReportSummary } from "@/lib/adplatforms/chatgpt/reporting";
 
-const btnGhost =
-  "flex items-center gap-1.5 rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-[13px] text-stone-700 hover:bg-stone-50 disabled:opacity-40";
+const btnSecondarySm =
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-paper px-4 text-sm font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper disabled:opacity-40";
 
 function fmtMoney(cents: number | null | undefined) {
   if (cents == null) return "—";
@@ -20,9 +20,9 @@ function fmtMoney(cents: number | null | undefined) {
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-stone-200 bg-stone-50 px-3 py-2">
-      <p className="text-[11px] uppercase tracking-wide text-stone-500">{label}</p>
-      <p className="text-lg font-semibold text-stone-900">{value}</p>
+    <div className="rounded-lg bg-paper px-3 py-2 shadow-hairline">
+      <p className="text-xs font-semibold text-muted">{label}</p>
+      <p className="text-lg font-bold text-ink">{value}</p>
     </div>
   );
 }
@@ -62,23 +62,30 @@ export default function ReportPanel({
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-center justify-between">
-        <p className="text-[13px] font-medium text-stone-800">Performance — last 14 days</p>
-        <button type="button" className={btnGhost} disabled={busy} onClick={pull}>
+        <p className="text-sm font-semibold text-ink">Performance — last 14 days</p>
+        <button type="button" className={btnSecondarySm} disabled={busy} onClick={pull}>
           {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
           Pull latest report
         </button>
       </div>
 
       {variance.flagged && (
-        <p className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[13px] text-amber-800">
-          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-          CPA drifted {variance.driftRatio != null ? `${Math.abs(variance.driftRatio * 100).toFixed(0)}%` : ""} —
-          7-day CPA {fmtMoney(variance.recentCpaCents)} vs prior {fmtMoney(variance.priorCpaCents)}.
-          A review task was raised in the alerts hub.
+        <p className="flex items-start gap-2 rounded-lg bg-needs px-3 py-2 text-sm font-medium text-ink">
+          <span
+            className="aos-shape aos-shape--needs mt-1 shrink-0"
+            style={{ color: "var(--aos-ink)" }}
+            role="img"
+            aria-label="Needs review"
+          />
+          <span>
+            CPA drifted {variance.driftRatio != null ? `${Math.abs(variance.driftRatio * 100).toFixed(0)}%` : ""} —
+            7-day CPA {fmtMoney(variance.recentCpaCents)} vs prior {fmtMoney(variance.priorCpaCents)}.
+            A review task was raised in the alerts hub.
+          </span>
         </p>
       )}
       {!variance.flagged && variance.reason && (
-        <p className="text-[12px] text-stone-500">{variance.reason}.</p>
+        <p className="text-xs text-subtle">{variance.reason}.</p>
       )}
 
       <div className="grid grid-cols-2 gap-2 md:grid-cols-6">
@@ -91,40 +98,40 @@ export default function ReportPanel({
       </div>
 
       {summary.days.length > 0 ? (
-        <div className="overflow-x-auto rounded-lg border border-stone-200">
-          <table className="w-full text-left text-[13px]">
+        <div className="overflow-x-auto rounded-lg bg-paper shadow-hairline">
+          <table className="w-full text-left text-sm">
             <thead>
-              <tr className="border-b border-stone-200 bg-stone-50 text-[11px] uppercase tracking-wide text-stone-500">
-                <th className="px-3 py-2 font-medium">Day</th>
-                <th className="px-3 py-2 font-medium">Spend</th>
-                <th className="px-3 py-2 font-medium">Impr.</th>
-                <th className="px-3 py-2 font-medium">Clicks</th>
-                <th className="px-3 py-2 font-medium">CTR</th>
-                <th className="px-3 py-2 font-medium">Conv.</th>
-                <th className="px-3 py-2 font-medium">CPA</th>
+              <tr className="border-b border-line bg-canvas">
+                <th className="px-3 py-2 text-xs font-semibold text-muted">Day</th>
+                <th className="px-3 py-2 text-xs font-semibold text-muted">Spend</th>
+                <th className="px-3 py-2 text-xs font-semibold text-muted">Impr.</th>
+                <th className="px-3 py-2 text-xs font-semibold text-muted">Clicks</th>
+                <th className="px-3 py-2 text-xs font-semibold text-muted">CTR</th>
+                <th className="px-3 py-2 text-xs font-semibold text-muted">Conv.</th>
+                <th className="px-3 py-2 text-xs font-semibold text-muted">CPA</th>
               </tr>
             </thead>
             <tbody>
               {summary.days.map((d) => (
-                <tr key={d.date} className="border-b border-stone-100 last:border-0 hover:bg-[var(--brand-50)]/40">
-                  <td className="px-3 py-2 text-stone-600">{d.date}</td>
-                  <td className="px-3 py-2 text-stone-900">{fmtMoney(d.spendCents)}</td>
-                  <td className="px-3 py-2 text-stone-600">{d.impressions.toLocaleString()}</td>
-                  <td className="px-3 py-2 text-stone-600">{d.clicks.toLocaleString()}</td>
-                  <td className="px-3 py-2 text-stone-600">{d.ctr != null ? `${(d.ctr * 100).toFixed(2)}%` : "—"}</td>
-                  <td className="px-3 py-2 text-stone-600">{d.conversions.toLocaleString()}</td>
-                  <td className="px-3 py-2 text-stone-900">{fmtMoney(d.cpaCents)}</td>
+                <tr key={d.date} className="border-b border-line last:border-0 hover:bg-hover-paper">
+                  <td className="px-3 py-2 text-muted">{d.date}</td>
+                  <td className="px-3 py-2 font-semibold text-ink">{fmtMoney(d.spendCents)}</td>
+                  <td className="px-3 py-2 text-muted">{d.impressions.toLocaleString()}</td>
+                  <td className="px-3 py-2 text-muted">{d.clicks.toLocaleString()}</td>
+                  <td className="px-3 py-2 text-muted">{d.ctr != null ? `${(d.ctr * 100).toFixed(2)}%` : "—"}</td>
+                  <td className="px-3 py-2 text-muted">{d.conversions.toLocaleString()}</td>
+                  <td className="px-3 py-2 font-semibold text-ink">{fmtMoney(d.cpaCents)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       ) : (
-        <p className="text-[13px] text-stone-500">No report rows yet — pull the latest report to fetch delivery from StackAdapt.</p>
+        <p className="text-sm text-muted">No report rows yet — pull the latest report to fetch delivery from StackAdapt.</p>
       )}
 
       {error && (
-        <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-700">{error}</p>
+        <p className="rounded-lg border border-failed bg-failed-tint px-3 py-2 text-sm text-failed-text">{error}</p>
       )}
     </div>
   );

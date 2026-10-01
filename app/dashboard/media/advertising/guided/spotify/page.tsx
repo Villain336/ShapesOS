@@ -17,6 +17,7 @@ import {
   Megaphone,
   Upload,
   TriangleAlert,
+  ExternalLink,
 } from "lucide-react";
 import { requireUser, getOrCreateWorkspace } from "@/lib/session";
 import { requireWorkspaceRole } from "@/lib/authz";
@@ -42,6 +43,10 @@ export const metadata = {
   description: "Guided Spotify setup: Ads Manager checklist, budget planner, creative specs, and CSV spend import.",
 };
 
+const sectionTitle = "aos-subheading flex items-center gap-2";
+const sectionIcon = "h-4 w-4 shrink-0 text-ink";
+const sectionNote = "mt-0.5 text-sm text-muted";
+
 export default async function SpotifyGuidedPage() {
   const user = await requireUser();
   if (!user) redirect("/login");
@@ -57,28 +62,28 @@ export default async function SpotifyGuidedPage() {
   });
 
   return (
-    <div className="flex h-full flex-col gap-4 bg-[#FAFAF7] p-4 md:p-6">
+    <div className="flex h-full flex-col gap-4 bg-canvas p-4 md:p-6">
       <div>
         <Link
           href="/dashboard/media/advertising"
-          className="mb-3 inline-flex items-center gap-1.5 text-[12px] font-medium text-stone-500 hover:text-stone-800"
+          className="mb-3 inline-flex items-center gap-1.5 text-sm font-medium text-muted hover:text-ink"
         >
           <ArrowLeft className="h-3.5 w-3.5" />
           Back to Advertising
         </Link>
 
-        <h1 className="text-xl font-bold tracking-tight text-stone-900">Spotify — guided setup</h1>
-        <p className="mt-0.5 text-[13px] text-stone-500">
+        <h1 className="aos-heading">Spotify — guided setup</h1>
+        <p className="mt-0.5 text-sm text-muted">
           Self-serve setup for Spotify Ads Manager: account checklist, budget planner, creative specs, and spend
           tracking — without an API connection.
         </p>
       </div>
 
       {/* Guided framing: honest about what Marketr can and cannot do here. */}
-      <div className="mt-4 flex gap-2.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5">
-        <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
-        <div className="text-[12px] leading-relaxed text-amber-900">
-          <p className="font-medium">Guided, not connected.</p>
+      <div className="mt-4 flex gap-2.5 rounded-lg bg-paper px-4 py-3 shadow-hairline">
+        <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-ink" />
+        <div className="text-sm leading-relaxed text-muted">
+          <p className="font-semibold text-ink">Guided, not connected.</p>
           <p className="mt-0.5">
             Spotify advertising is managed entirely in Spotify Ads Manager. Marketr has no API connection here:
             it cannot create accounts, launch campaigns, or read performance data. You set up and launch in Ads
@@ -91,11 +96,11 @@ export default async function SpotifyGuidedPage() {
 
       {/* 1 — Account checklist */}
       <section>
-        <h2 className="flex items-center gap-2 text-[14px] font-semibold text-stone-900">
-          <ListChecks className="h-4 w-4" />
+        <h2 className={sectionTitle}>
+          <ListChecks className={sectionIcon} />
           1. Ads Manager account checklist
         </h2>
-        <p className="mt-0.5 text-[12px] text-stone-500">
+        <p className={sectionNote}>
           The self-serve account path from Spotify's help center. Steps happen in Ad Studio — check them off as you
           go.
         </p>
@@ -106,11 +111,11 @@ export default async function SpotifyGuidedPage() {
 
       {/* 2 — Budget planner */}
       <section>
-        <h2 className="flex items-center gap-2 text-[14px] font-semibold text-stone-900">
-          <Calculator className="h-4 w-4" />
+        <h2 className={sectionTitle}>
+          <Calculator className={sectionIcon} />
           2. Audience &amp; budget planner
         </h2>
-        <p className="mt-0.5 text-[12px] text-stone-500">
+        <p className={sectionNote}>
           Plan the audience worksheet and sanity-check the budget against the $250 Ad Studio minimum before you
           build the campaign.
         </p>
@@ -121,28 +126,28 @@ export default async function SpotifyGuidedPage() {
 
       {/* 3 — Creative specs */}
       <section>
-        <h2 className="flex items-center gap-2 text-[14px] font-semibold text-stone-900">
-          <FileAudio className="h-4 w-4" />
+        <h2 className={sectionTitle}>
+          <FileAudio className={sectionIcon} />
           3. Audio creative specs
         </h2>
-        <p className="mt-0.5 text-[12px] text-stone-500">
+        <p className={sectionNote}>
           The official Ad Studio specs, from Spotify's help center. Upload your files below to check them against
           these rules before launch.
         </p>
-        <div className="mt-2 overflow-x-auto rounded-lg border border-stone-200 bg-white">
-          <table className="w-full text-left text-[12px]">
+        <div className="mt-2 overflow-x-auto rounded-lg bg-paper shadow-hairline">
+          <table className="w-full text-left text-sm">
             <thead>
-              <tr className="border-b border-stone-200 bg-stone-50">
-                <th className="px-3 py-2 font-medium text-stone-600">Asset</th>
-                <th className="px-3 py-2 font-medium text-stone-600">Spec</th>
-                <th className="px-3 py-2 font-medium text-stone-600">Source</th>
+              <tr className="border-b border-line bg-canvas">
+                <th className="px-3 py-2 text-xs font-semibold text-muted">Asset</th>
+                <th className="px-3 py-2 text-xs font-semibold text-muted">Spec</th>
+                <th className="px-3 py-2 text-xs font-semibold text-muted">Source</th>
               </tr>
             </thead>
             <tbody>
               {SPOTIFY_AUDIO_SPECS.map((g) => (
-                <tr key={g.asset} className="border-b border-stone-100 last:border-0 hover:bg-[var(--brand-50)]/40">
-                  <td className="px-3 py-2 font-medium text-stone-900">{g.asset}</td>
-                  <td className="px-3 py-2 text-stone-500">
+                <tr key={g.asset} className="border-b border-line last:border-0 hover:bg-hover-paper">
+                  <td className="px-3 py-2 font-semibold text-ink">{g.asset}</td>
+                  <td className="px-3 py-2 text-muted">
                     <ul className="flex list-disc flex-col gap-0.5 pl-4">
                       {g.specs.map((s) => (
                         <li key={s}>{s}</li>
@@ -154,9 +159,9 @@ export default async function SpotifyGuidedPage() {
                       href={g.source}
                       target="_blank"
                       rel="noreferrer"
-                      className="font-medium text-[var(--brand-700)] underline"
+                      className="inline-flex items-center gap-1 text-sm font-semibold text-ink underline underline-offset-2"
                     >
-                      Spotify help center ↗
+                      Spotify help center <ExternalLink className="h-3 w-3" />
                     </a>
                   </td>
                 </tr>
@@ -171,11 +176,11 @@ export default async function SpotifyGuidedPage() {
 
       {/* 4 — UTM + pixel */}
       <section>
-        <h2 className="flex items-center gap-2 text-[14px] font-semibold text-stone-900">
-          <Link2 className="h-4 w-4" />
+        <h2 className={sectionTitle}>
+          <Link2 className={sectionIcon} />
           4. UTM builder &amp; Spotify Pixel
         </h2>
-        <p className="mt-0.5 text-[12px] text-stone-500">
+        <p className={sectionNote}>
           Tag landing URLs with utm_source=spotify and grab the pixel base code for conversion tracking.
         </p>
         <div className="mt-2">
@@ -185,11 +190,11 @@ export default async function SpotifyGuidedPage() {
 
       {/* 5 — Link ad account */}
       <section>
-        <h2 className="flex items-center gap-2 text-[14px] font-semibold text-stone-900">
-          <Link2 className="h-4 w-4" />
+        <h2 className={sectionTitle}>
+          <Link2 className={sectionIcon} />
           5. Link an ad account
         </h2>
-        <p className="mt-0.5 text-[12px] text-stone-500">
+        <p className={sectionNote}>
           Copy the ad account ID from Ad Studio (Manage ad accounts) and link it here. No credentials are stored —
           this is manual linkage only.
         </p>
@@ -200,11 +205,11 @@ export default async function SpotifyGuidedPage() {
 
       {/* 6 — Register campaign */}
       <section>
-        <h2 className="flex items-center gap-2 text-[14px] font-semibold text-stone-900">
-          <Megaphone className="h-4 w-4" />
+        <h2 className={sectionTitle}>
+          <Megaphone className={sectionIcon} />
           6. Register a launched campaign
         </h2>
-        <p className="mt-0.5 text-[12px] text-stone-500">
+        <p className={sectionNote}>
           After launching in Spotify Ads Manager, register the campaign here with its Spotify campaign ID so
           imported spend can attach to it.
         </p>
@@ -215,11 +220,11 @@ export default async function SpotifyGuidedPage() {
 
       {/* 7 — Import spend */}
       <section>
-        <h2 className="flex items-center gap-2 text-[14px] font-semibold text-stone-900">
-          <Upload className="h-4 w-4" />
+        <h2 className={sectionTitle}>
+          <Upload className={sectionIcon} />
           7. Import spend (CSV)
         </h2>
-        <p className="mt-0.5 text-[12px] text-stone-500">
+        <p className={sectionNote}>
           Pull the daily report from Spotify Ads Manager, paste or upload it as CSV. Strict format — the import is
           rejected if any row is malformed.
         </p>

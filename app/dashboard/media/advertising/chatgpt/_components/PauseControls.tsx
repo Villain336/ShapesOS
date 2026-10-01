@@ -5,8 +5,8 @@
 import { useState } from "react";
 import { Loader2, Pause, ShieldAlert } from "lucide-react";
 
-const btnGhost =
-  "flex items-center gap-1.5 rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-[13px] text-stone-700 hover:bg-stone-50 disabled:opacity-40";
+const btnSecondarySm =
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-paper px-4 text-sm font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper disabled:opacity-40";
 
 export default function PauseControls({ campaignId }: { campaignId: string }) {
   const [busy, setBusy] = useState<"pause" | "check" | null>(null);
@@ -44,28 +44,28 @@ export default function PauseControls({ campaignId }: { campaignId: string }) {
   }
 
   if (paused) {
-    return <p className="text-[13px] text-stone-500">Paused. {message}</p>;
+    return <p className="text-sm text-muted">Paused. {message}</p>;
   }
 
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center gap-2">
-        <button type="button" className={btnGhost} disabled={busy !== null} onClick={() => call("pause", "pause")}>
+        <button type="button" className={btnSecondarySm} disabled={busy !== null} onClick={() => call("pause", "pause")}>
           {busy === "pause" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Pause className="h-3.5 w-3.5" />}
           Pause now
         </button>
-        <button type="button" className={btnGhost} disabled={busy !== null} onClick={() => call("auto-pause-check", "check")}>
+        <button type="button" className={btnSecondarySm} disabled={busy !== null} onClick={() => call("auto-pause-check", "check")}>
           {busy === "check" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ShieldAlert className="h-3.5 w-3.5" />}
           Run spend check
         </button>
       </div>
       {message && (
-        <p className="rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-[13px] text-stone-600">{message}</p>
+        <p className="rounded-lg bg-paper px-3 py-2 text-sm text-muted shadow-hairline">{message}</p>
       )}
       {error && (
-        <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-700">{error}</p>
+        <p className="rounded-lg border border-failed bg-failed-tint px-3 py-2 text-sm text-failed-text">{error}</p>
       )}
-      <p className="text-[12px] text-stone-500">
+      <p className="text-xs text-subtle">
         The spend check auto-pauses when today&apos;s spend exceeds the daily cap by more than 10%.
       </p>
     </div>

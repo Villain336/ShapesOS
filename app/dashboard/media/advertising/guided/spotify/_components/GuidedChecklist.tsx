@@ -43,7 +43,7 @@ export default function GuidedChecklist({ steps }: { steps: SpotifyGuidedStep[] 
         return (
           <li
             key={s.id}
-            className={`rounded-lg border bg-white px-3 py-2.5 ${checked ? "border-stone-200 opacity-70" : "border-stone-200"}`}
+            className={`rounded-lg bg-paper px-3 py-2.5 shadow-hairline ${checked ? "opacity-70" : ""}`}
           >
             <div className="flex items-start gap-2.5">
               <button
@@ -51,26 +51,26 @@ export default function GuidedChecklist({ steps }: { steps: SpotifyGuidedStep[] 
                 onClick={() => toggle(s.id)}
                 aria-pressed={checked}
                 title={checked ? "Mark as not done" : "Mark as done"}
-                className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border ${
+                className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-[1.5px] ${
                   checked
-                    ? "border-[var(--brand-600)] bg-[var(--brand-600)] text-white"
-                    : "border-stone-300 bg-white text-transparent hover:border-[var(--brand-600)]"
+                    ? "border-ink bg-ink text-white"
+                    : "border-control bg-paper text-transparent hover:border-ink"
                 }`}
               >
                 <Check className="h-3.5 w-3.5" />
               </button>
               <div className="min-w-0 flex-1">
-                <p className={`text-[13px] font-medium ${checked ? "text-stone-500 line-through" : "text-stone-900"}`}>
-                  <span className="mr-1.5 text-stone-400">{i + 1}.</span>
+                <p className={`text-sm font-semibold ${checked ? "text-muted line-through" : "text-ink"}`}>
+                  <span className="mr-1.5 text-subtle">{i + 1}.</span>
                   {s.title}
                 </p>
-                <p className="mt-0.5 text-[12px] leading-relaxed text-stone-500">{s.detail}</p>
+                <p className="mt-0.5 text-sm leading-relaxed text-muted">{s.detail}</p>
                 {s.link && (
                   <a
                     href={s.link.href}
                     target="_blank"
                     rel="noreferrer"
-                    className="mt-1 inline-block text-[12px] font-medium text-[var(--brand-700)] underline"
+                    className="mt-1 inline-block text-sm font-semibold text-ink underline underline-offset-2"
                   >
                     {s.link.label} ↗
                   </a>

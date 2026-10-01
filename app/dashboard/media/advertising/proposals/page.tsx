@@ -30,13 +30,8 @@ export const metadata = {
   description: "Approve or reject every ad-spend action before it executes.",
 };
 
-const chip =
-  "inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-1.5 py-0.5 text-[10px] font-medium leading-tight";
-const chipSlate = `${chip} bg-stone-100 text-stone-600 border-stone-200`;
-const chipAmber = `${chip} bg-amber-50 text-amber-700 border-amber-200`;
-const chipGreen = `${chip} bg-emerald-50 text-emerald-700 border-emerald-200`;
-const chipRed = `${chip} bg-red-50 text-red-700 border-red-200`;
-const chipBrand = `${chip} bg-[var(--brand-50)] text-[var(--brand-700)] border-[var(--brand-600)]/20`;
+const chipBase =
+  "inline-flex h-badge items-center gap-1.5 rounded-full px-2.5 text-sm font-semibold";
 
 const STATUSES = ["pending", "approved", "executed", "rejected", "expired"] as const;
 type ProposalStatus = (typeof STATUSES)[number];
@@ -44,17 +39,50 @@ type ProposalStatus = (typeof STATUSES)[number];
 function statusChip(status: string) {
   switch (status) {
     case "pending":
-      return <span className={chipAmber}>Pending</span>;
+      return (
+        <span className={`${chipBase} bg-needs text-ink`}>
+          <span
+            className="aos-shape aos-shape--needs"
+            style={{ color: "var(--aos-ink)" }}
+            role="img"
+            aria-label="Needs review"
+          />
+          Pending
+        </span>
+      );
     case "approved":
-      return <span className={chipBrand}>Approved</span>;
+      return (
+        <span className={`${chipBase} bg-done text-white`}>
+          <span
+            className="aos-shape aos-shape--done"
+            style={{ color: "var(--aos-on-done)" }}
+            role="img"
+            aria-label="Approved"
+          />
+          Approved
+        </span>
+      );
     case "executed":
-      return <span className={chipGreen}>Executed</span>;
+      return (
+        <span className={`${chipBase} bg-done text-white`}>
+          <span
+            className="aos-shape aos-shape--done"
+            style={{ color: "var(--aos-on-done)" }}
+            role="img"
+            aria-label="Executed"
+          />
+          Executed
+        </span>
+      );
     case "rejected":
-      return <span className={chipRed}>Rejected</span>;
-    case "expired":
-      return <span className={chipSlate}>Expired</span>;
+      return (
+        <span className={`${chipBase} bg-paper text-failed-text shadow-[inset_0_0_0_1.5px_var(--aos-failed)]`}>
+          <span className="aos-shape aos-shape--failed" role="img" aria-label="Rejected" />
+          Rejected
+        </span>
+      );
     default:
-      return <span className={chipSlate}>{status}</span>;
+      return <span className={`${chipBase} border border-line bg-paper text-muted`}>{status}</span>;
   }
 }
 
@@ -155,6 +183,17 @@ const EMPTY_COPY: Record<string, { title: string; body: string }> = {
   },
 };
 
+const btnPrimarySm =
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-night-hover";
+const btnExecute =
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-running px-4 text-sm font-semibold text-white aos-press hover:bg-running-pressed";
+const btnApprove =
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-done px-4 text-sm font-semibold text-white aos-press";
+const btnDeny =
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-paper px-4 text-sm font-semibold text-failed-text aos-press shadow-[inset_0_0_0_1.5px_var(--aos-failed)]";
+const selectCls =
+  "h-control-sm rounded-md border-[1.5px] border-control bg-paper px-2.5 text-sm text-ink focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none";
+
 export default async function ProposalsPage({
   searchParams,
 }: {
@@ -204,10 +243,10 @@ export default async function ProposalsPage({
   const empty = EMPTY_COPY[statusFilter];
 
   return (
-    <div className="flex h-full flex-col gap-4 bg-[#FAFAF7] p-4 md:p-6">
+    <div className="flex h-full flex-col gap-4 bg-canvas p-4 md:p-6">
       <div>
-        <h1 className="text-xl font-bold tracking-tight text-stone-900">Spend proposals</h1>
-        <p className="mt-0.5 text-[13px] text-stone-500">
+        <h1 className="aos-heading">Spend proposals</h1>
+        <p className="mt-0.5 text-sm text-muted">
           {workspace.name} — nothing spends until you approve it here. Approvals are immutable and bound to the exact proposed scope.
         </p>
       </div>
@@ -215,11 +254,7 @@ export default async function ProposalsPage({
       <AdsTabs active="proposals" />
 
       <form method="get" className="flex flex-wrap items-center gap-2">
-        <select
-          name="status"
-          defaultValue={statusFilter}
-          className="rounded-md border border-stone-300 bg-white px-2 py-1.5 text-[12px] text-stone-800"
-        >
+        <select name="status" defaultValue={statusFilter} className={selectCls}>
           <option value="all">All statuses</option>
           {STATUSES.map((s) => (
             <option key={s} value={s}>
@@ -227,60 +262,57 @@ export default async function ProposalsPage({
             </option>
           ))}
         </select>
-        <button
-          type="submit"
-          className="inline-flex items-center gap-1 rounded-md bg-[var(--brand-600)] px-3 py-1.5 text-[12px] font-medium text-white hover:bg-[var(--brand-700)]"
-        >
+        <button type="submit" className={btnPrimarySm}>
           <Filter className="h-3.5 w-3.5" />
           Filter
         </button>
       </form>
 
       {proposals.length === 0 ? (
-        <div className="flex flex-col items-center gap-2 rounded-lg border border-stone-200 bg-white px-6 py-12 text-center">
-          <InboxIcon className="h-8 w-8 text-stone-300" />
-          <p className="text-[14px] font-medium text-stone-700">{empty.title}</p>
-          <p className="max-w-sm text-[13px] text-stone-500">{empty.body}</p>
+        <div className="flex flex-col items-center gap-2 rounded-lg bg-paper px-6 py-12 text-center shadow-hairline">
+          <InboxIcon className="h-8 w-8 text-subtle" />
+          <p className="text-md font-semibold text-ink">{empty.title}</p>
+          <p className="max-w-sm text-sm text-muted">{empty.body}</p>
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-stone-200 bg-white">
-          <table className="w-full min-w-[860px] text-left text-[13px]">
+        <div className="overflow-x-auto rounded-lg bg-paper shadow-hairline">
+          <table className="w-full min-w-[860px] text-left text-sm">
             <thead>
-              <tr className="border-b border-stone-200 bg-stone-50 text-[11px] uppercase tracking-wide text-stone-500">
-                <th className="px-3 py-2 font-medium">Action</th>
-                <th className="px-3 py-2 font-medium">Target</th>
-                <th className="px-3 py-2 font-medium">Scope</th>
-                <th className="px-3 py-2 font-medium">Proposed by</th>
-                <th className="px-3 py-2 font-medium">Status</th>
-                <th className="px-3 py-2 font-medium">Approval lineage</th>
-                <th className="px-3 py-2 font-medium text-right">Decide</th>
+              <tr className="border-b border-line bg-canvas">
+                <th className="px-3 py-2 text-xs font-semibold text-muted">Action</th>
+                <th className="px-3 py-2 text-xs font-semibold text-muted">Target</th>
+                <th className="px-3 py-2 text-xs font-semibold text-muted">Scope</th>
+                <th className="px-3 py-2 text-xs font-semibold text-muted">Proposed by</th>
+                <th className="px-3 py-2 text-xs font-semibold text-muted">Status</th>
+                <th className="px-3 py-2 text-xs font-semibold text-muted">Approval lineage</th>
+                <th className="px-3 py-2 text-right text-xs font-semibold text-muted">Decide</th>
               </tr>
             </thead>
             <tbody>
               {proposals.map((p) => {
                 const rowReceipts = p.approval ? receiptsByApproval.get(p.approval.id) ?? [] : [];
                 return (
-                  <tr key={p.id} className="border-b border-stone-100 last:border-0 hover:bg-[var(--brand-50)]/40">
+                  <tr key={p.id} className="border-b border-line last:border-0 hover:bg-hover-paper">
                     <td className="px-3 py-2.5">
-                      <span className="font-medium text-stone-900">{kindLabel(p.kind)}</span>
-                      <div className="text-[11px] text-stone-400">{p.targetType} · {p.targetId.slice(0, 12)}</div>
+                      <span className="font-semibold text-ink">{kindLabel(p.kind)}</span>
+                      <div className="font-mono text-2xs text-subtle">{p.targetType} · {p.targetId.slice(0, 12)}</div>
                     </td>
-                    <td className="px-3 py-2.5 text-stone-600">{p.targetId}</td>
-                    <td className="px-3 py-2.5 text-stone-600">{payloadSummary(p.payload)}</td>
-                    <td className="px-3 py-2.5 text-stone-600">{p.proposedBy}</td>
+                    <td className="px-3 py-2.5 font-mono text-sm text-muted">{p.targetId}</td>
+                    <td className="px-3 py-2.5 text-muted">{payloadSummary(p.payload)}</td>
+                    <td className="px-3 py-2.5 text-muted">{p.proposedBy}</td>
                     <td className="px-3 py-2.5">{statusChip(p.status)}</td>
                     <td className="px-3 py-2.5">
                       {p.approval ? (
-                        <div className="flex flex-col gap-0.5 text-[11px] text-stone-500">
-                          <span className="inline-flex items-center gap-1 text-stone-700">
-                            <ShieldCheck className="h-3 w-3 text-emerald-600" />
+                        <div className="flex flex-col gap-0.5 text-xs text-muted">
+                          <span className="inline-flex items-center gap-1 font-semibold text-ink">
+                            <ShieldCheck className="h-3 w-3" />
                             {p.approval.approver}
                           </span>
                           <span>
                             scope{" "}
                             <code
                               title={`Full scope hash: ${p.approval.scopeHash}`}
-                              className="rounded bg-stone-100 px-1 font-mono text-[10px] text-stone-600"
+                              className="rounded bg-canvas px-1 font-mono text-2xs text-muted"
                             >
                               {p.approval.scopeHash.slice(0, 16)}…
                             </code>
@@ -290,24 +322,24 @@ export default async function ProposalsPage({
                               receipts{" "}
                               <code
                                 title={rowReceipts.join(", ")}
-                                className="rounded bg-stone-100 px-1 font-mono text-[10px] text-stone-600"
+                                className="rounded bg-canvas px-1 font-mono text-2xs text-muted"
                               >
                                 {rowReceipts[0].slice(0, 18)}
                                 {rowReceipts.length > 1 ? ` +${rowReceipts.length - 1}` : ""}
                               </code>
                             </span>
                           ) : (
-                            <span className="text-stone-400">no platform receipts yet</span>
+                            <span className="text-subtle">no platform receipts yet</span>
                           )}
                         </div>
                       ) : (
-                        <div className="flex flex-col gap-0.5 text-[11px] text-stone-400">
+                        <div className="flex flex-col gap-0.5 text-xs text-subtle">
                           <span>No approval yet</span>
                           <span>
                             scope{" "}
                             <code
                               title={`Full scope hash: ${p.scopeHash}`}
-                              className="rounded bg-stone-100 px-1 font-mono text-[10px] text-stone-500"
+                              className="rounded bg-canvas px-1 font-mono text-2xs text-muted"
                             >
                               {p.scopeHash.slice(0, 16)}…
                             </code>
@@ -318,10 +350,7 @@ export default async function ProposalsPage({
                     <td className="px-3 py-2.5 text-right">
                       {p.status === "approved" && canDecide ? (
                         <form action={execute.bind(null, p.id)}>
-                          <button
-                            type="submit"
-                            className="inline-flex min-h-[36px] items-center gap-1 rounded-md bg-[var(--brand-600)] px-3 text-[12px] font-medium text-white hover:bg-[var(--brand-700)]"
-                          >
+                          <button type="submit" className={btnExecute}>
                             <ShieldCheck className="h-3.5 w-3.5" />
                             Execute
                           </button>
@@ -329,26 +358,20 @@ export default async function ProposalsPage({
                       ) : p.status === "pending" && canDecide ? (
                         <div className="inline-flex gap-1.5">
                           <form action={decide.bind(null, p.id, "approve")}>
-                            <button
-                              type="submit"
-                              className="inline-flex min-h-[36px] items-center gap-1 rounded-md bg-[var(--brand-600)] px-3 text-[12px] font-medium text-white hover:bg-[var(--brand-700)]"
-                            >
+                            <button type="submit" className={btnApprove}>
                               <Check className="h-3.5 w-3.5" />
                               Approve
                             </button>
                           </form>
                           <form action={decide.bind(null, p.id, "reject")}>
-                            <button
-                              type="submit"
-                              className="inline-flex min-h-[36px] items-center gap-1 rounded-md border border-stone-300 px-3 text-[12px] font-medium text-stone-700 hover:bg-stone-50"
-                            >
+                            <button type="submit" className={btnDeny}>
                               <X className="h-3.5 w-3.5" />
                               Reject
                             </button>
                           </form>
                         </div>
                       ) : (
-                        <span className="text-[11px] text-stone-400">—</span>
+                        <span className="text-xs text-subtle">—</span>
                       )}
                     </td>
                   </tr>

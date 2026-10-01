@@ -3,7 +3,7 @@
 "use client";
 
 import { useRef, useState, type ChangeEvent } from "react";
-import { Upload, Loader2, FileUp } from "lucide-react";
+import { CircleCheck, Upload, Loader2, FileUp } from "lucide-react";
 import type { GuidedAccountOption } from "./RegisterCampaignForm";
 
 interface ImportResult {
@@ -14,6 +14,13 @@ interface ImportResult {
   upserted?: number;
   skippedNoCampaign?: number;
 }
+
+const inputCls =
+  "h-control-sm rounded-md border-[1.5px] border-control bg-paper px-3 text-sm text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none";
+const btnPrimarySm =
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-night-hover disabled:opacity-40";
+const btnSecondarySm =
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-paper px-4 text-sm font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper";
 
 export default function CsvImportForm({
   accounts,
@@ -56,21 +63,21 @@ export default function CsvImportForm({
 
   if (accounts.length === 0) {
     return (
-      <p className="rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-[13px] text-stone-500">
+      <p className="rounded-lg bg-paper px-3 py-2 text-sm text-muted shadow-hairline">
         Link an advertiser account above first — imports need an account to attach to.
       </p>
     );
   }
 
   return (
-    <div className="flex flex-col gap-2 rounded-lg border border-stone-200 bg-white px-3 py-3">
+    <div className="flex flex-col gap-2 rounded-lg bg-paper px-3 py-3 shadow-hairline">
       <div className="flex flex-wrap items-center gap-2">
-        <label className="flex items-center gap-2 text-[12px] text-stone-600">
+        <label className="flex items-center gap-2 text-xs font-semibold text-muted">
           Advertiser account
           <select
             value={accountId}
             onChange={(e) => setAccountId(e.target.value)}
-            className="rounded-md border border-stone-300 px-2.5 py-1.5 text-[13px] text-stone-900 focus:border-[var(--brand-600)] focus:outline-none"
+            className={inputCls}
           >
             {accounts.map((a) => (
               <option key={a.id} value={a.id}>
@@ -82,7 +89,7 @@ export default function CsvImportForm({
         <button
           type="button"
           onClick={() => fileRef.current?.click()}
-          className="inline-flex items-center gap-1.5 rounded-md border border-stone-300 px-3 py-1.5 text-[12px] font-medium text-stone-700 hover:bg-stone-50"
+          className={btnSecondarySm}
         >
           <FileUp className="h-3.5 w-3.5" />
           Upload CSV
@@ -94,9 +101,9 @@ export default function CsvImportForm({
         onChange={(e) => setCsv(e.target.value)}
         rows={6}
         spellCheck={false}
-        className="w-full rounded-md border border-stone-300 px-2.5 py-2 font-mono text-[12px] text-stone-900 focus:border-[var(--brand-600)] focus:outline-none"
+        className="w-full rounded-md border-[1.5px] border-control bg-paper px-3 py-2 font-mono text-xs text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none"
       />
-      <p className="text-[11px] text-stone-400">
+      <p className="text-xs text-subtle">
         Columns: campaign_external_id, date (YYYY-MM-DD), spend_cents, impressions, clicks, conversions,
         revenue_cents. Money in cents, no negatives.
       </p>
@@ -105,23 +112,26 @@ export default function CsvImportForm({
           type="button"
           onClick={submit}
           disabled={busy || !accountId || !csv.trim()}
-          className="inline-flex items-center gap-1.5 rounded-md bg-[var(--brand-600)] px-3 py-1.5 text-[12px] font-medium text-white hover:bg-[var(--brand-700)] disabled:opacity-50"
+          className={btnPrimarySm}
         >
           {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
           {busy ? "Importing…" : "Import spend"}
         </button>
       </div>
       {result && result.ok && (
-        <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-[13px] text-emerald-800">
-          Imported {result.upserted} row{result.upserted === 1 ? "" : "s"} (batch{" "}
-          <span className="font-mono text-[11px]">{result.batchId?.slice(0, 8)}…</span>
-          {result.skippedNoCampaign ? `, ${result.skippedNoCampaign} skipped — no registered campaign matched` : ""}).
+        <p className="flex items-start gap-2 rounded-lg bg-paper px-3 py-2 text-sm text-ink shadow-hairline">
+          <CircleCheck className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>
+            Imported {result.upserted} row{result.upserted === 1 ? "" : "s"} (batch{" "}
+            <span className="font-mono text-2xs">{result.batchId?.slice(0, 8)}…</span>
+            {result.skippedNoCampaign ? `, ${result.skippedNoCampaign} skipped — no registered campaign matched` : ""}).
+          </span>
         </p>
       )}
       {result && !result.ok && (
-        <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-700">
+        <p className="rounded-lg border border-failed bg-failed-tint px-3 py-2 text-sm text-failed-text">
           {result.error ?? "Import failed"}
-          {result.code ? <span className="ml-1 font-mono text-[11px]">({result.code})</span> : null}
+          {result.code ? <span className="ml-1 font-mono text-2xs">({result.code})</span> : null}
         </p>
       )}
     </div>

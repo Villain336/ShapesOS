@@ -3,7 +3,7 @@
 "use client";
 
 import { useState } from "react";
-import { Loader2, Plus, Send, Trash2, ExternalLink } from "lucide-react";
+import { CircleCheck, Loader2, Plus, Send, Trash2, ExternalLink } from "lucide-react";
 
 export interface StackAdaptAccountOption {
   id: string;
@@ -22,12 +22,12 @@ interface CreativeDraft {
 }
 
 const inputCls =
-  "rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-[13px] text-stone-900 placeholder:text-stone-400 focus:border-[var(--brand-600)] focus:outline-none";
+  "h-control rounded-md border-[1.5px] border-control bg-paper px-3 text-sm text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none";
 const btnPrimary =
-  "flex items-center gap-1.5 rounded-md bg-[var(--brand-600)] px-3 py-1.5 text-[13px] font-medium text-white hover:bg-[var(--brand-700)] disabled:opacity-40";
-const btnGhost =
-  "flex items-center gap-1.5 rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-[13px] text-stone-700 hover:bg-stone-50 disabled:opacity-40";
-const labelCls = "block text-[12px] font-medium text-stone-600";
+  "inline-flex h-control items-center gap-1.5 rounded-full bg-ink px-[22px] text-base font-semibold text-white aos-press hover:bg-night-hover disabled:opacity-40";
+const btnSecondarySm =
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-paper px-4 text-sm font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper disabled:opacity-40";
+const labelCls = "block text-xs font-semibold text-muted";
 
 function emptyCreative(): CreativeDraft {
   return { headline: "", body: "", ctaLabel: "", locale: "en-US", source: "human", aiProviderUsed: "", aiModelUsed: "" };
@@ -95,7 +95,7 @@ export default function ProposeCampaignForm({ accounts }: { accounts: StackAdapt
 
   if (accounts.length === 0) {
     return (
-      <p className="rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-[13px] text-stone-500">
+      <p className="rounded-lg bg-paper px-3 py-2 text-sm text-muted shadow-hairline">
         Connect a StackAdapt ad account first — ChatGPT campaigns buy through the StackAdapt rail.
       </p>
     );
@@ -103,19 +103,22 @@ export default function ProposeCampaignForm({ accounts }: { accounts: StackAdapt
 
   if (done) {
     return (
-      <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-3 text-[13px] text-emerald-800">
-        <p className="font-medium">Campaign proposed — nothing spends until you approve it.</p>
-        <p className="mt-1">
-          Review it in the{" "}
-          <a href="/dashboard/media/advertising/proposals" className="underline">
-            proposal inbox
-          </a>
-          . You can also open it in{" "}
-          <a href={done.adsManagerLink} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 underline">
-            Ads Manager <ExternalLink className="h-3 w-3" />
-          </a>
-          .
-        </p>
+      <div className="flex items-start gap-2 rounded-lg bg-paper px-3 py-3 text-sm text-ink shadow-hairline">
+        <CircleCheck className="mt-0.5 h-4 w-4 shrink-0" />
+        <div>
+          <p className="font-semibold">Campaign proposed — nothing spends until you approve it.</p>
+          <p className="mt-1 text-muted">
+            Review it in the{" "}
+            <a href="/dashboard/media/advertising/proposals" className="font-semibold text-ink underline underline-offset-2">
+              proposal inbox
+            </a>
+            . You can also open it in{" "}
+            <a href={done.adsManagerLink} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-semibold text-ink underline underline-offset-2">
+              Ads Manager <ExternalLink className="h-3 w-3" />
+            </a>
+            .
+          </p>
+        </div>
       </div>
     );
   }
@@ -141,7 +144,7 @@ export default function ProposeCampaignForm({ accounts }: { accounts: StackAdapt
         </div>
         <div>
           <label className={labelCls}>Target tiers</label>
-          <div className="mt-1 flex gap-3 text-[13px] text-stone-700">
+          <div className="mt-1 flex h-control items-center gap-3 text-sm text-ink">
             <label className="flex items-center gap-1.5">
               <input type="checkbox" checked={tierFree} onChange={(e) => setTierFree(e.target.checked)} /> Free
             </label>
@@ -176,17 +179,17 @@ export default function ProposeCampaignForm({ accounts }: { accounts: StackAdapt
       <div className="mt-1">
         <div className="flex items-center justify-between">
           <span className={labelCls}>Creative variants</span>
-          <button type="button" className={btnGhost} onClick={() => setCreatives((cs) => [...cs, emptyCreative()])}>
+          <button type="button" className={btnSecondarySm} onClick={() => setCreatives((cs) => [...cs, emptyCreative()])}>
             <Plus className="h-3.5 w-3.5" /> Add variant
           </button>
         </div>
         <div className="mt-2 flex flex-col gap-2">
           {creatives.map((c, i) => (
-            <div key={i} className="rounded-lg border border-stone-200 bg-stone-50 p-3">
+            <div key={i} className="rounded-lg bg-canvas p-3 shadow-hairline">
               <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
                 <input className={inputCls} value={c.headline} onChange={(e) => updateCreative(i, { headline: e.target.value })} placeholder="Headline" />
                 <input className={inputCls} value={c.ctaLabel} onChange={(e) => updateCreative(i, { ctaLabel: e.target.value })} placeholder="CTA label (optional)" />
-                <textarea className={`${inputCls} md:col-span-2`} rows={2} value={c.body} onChange={(e) => updateCreative(i, { body: e.target.value })} placeholder="Body copy" />
+                <textarea className={`${inputCls} h-auto py-2 md:col-span-2`} rows={2} value={c.body} onChange={(e) => updateCreative(i, { body: e.target.value })} placeholder="Body copy" />
                 <select className={inputCls} value={c.source} onChange={(e) => updateCreative(i, { source: e.target.value as CreativeDraft["source"] })}>
                   <option value="human">Human-written</option>
                   <option value="ai_generated">AI-generated</option>
@@ -200,7 +203,7 @@ export default function ProposeCampaignForm({ accounts }: { accounts: StackAdapt
                 )}
               </div>
               <div className="mt-2 flex justify-end">
-                <button type="button" className={btnGhost} disabled={creatives.length === 1} onClick={() => setCreatives((cs) => cs.filter((_, j) => j !== i))}>
+                <button type="button" className={btnSecondarySm} disabled={creatives.length === 1} onClick={() => setCreatives((cs) => cs.filter((_, j) => j !== i))}>
                   <Trash2 className="h-3.5 w-3.5" /> Remove
                 </button>
               </div>
@@ -210,7 +213,7 @@ export default function ProposeCampaignForm({ accounts }: { accounts: StackAdapt
       </div>
 
       {error && (
-        <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-700">{error}</p>
+        <p className="rounded-lg border border-failed bg-failed-tint px-3 py-2 text-sm text-failed-text">{error}</p>
       )}
 
       <div className="flex items-center gap-2">
@@ -218,7 +221,7 @@ export default function ProposeCampaignForm({ accounts }: { accounts: StackAdapt
           {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
           Propose campaign
         </button>
-        <p className="text-[12px] text-stone-500">Proposing never spends — a human approves every dollar in the proposal inbox.</p>
+        <p className="text-xs text-subtle">Proposing never spends — a human approves every dollar in the proposal inbox.</p>
       </div>
     </div>
   );

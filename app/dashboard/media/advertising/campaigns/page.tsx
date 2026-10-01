@@ -35,10 +35,11 @@ const PLATFORM_LABELS: Record<string, string> = {
   spotify: "Spotify",
 };
 
-const STATUS_STYLES: Record<string, string> = {
-  live: "bg-emerald-50 text-emerald-700 ring-emerald-200",
-  paused: "bg-amber-50 text-amber-700 ring-amber-200",
-  draft: "bg-stone-100 text-stone-600 ring-stone-200",
+// Campaign statuses are not agent states — neutrals with text labels only.
+const STATUS_BADGES: Record<string, string> = {
+  live: "bg-ink text-white",
+  paused: "border border-line bg-paper text-muted",
+  draft: "border border-line bg-paper text-muted",
 };
 
 export default async function CampaignsPage() {
@@ -56,60 +57,60 @@ export default async function CampaignsPage() {
   });
 
   return (
-    <div className="flex h-full flex-col gap-4 bg-[#FAFAF7] p-4 md:p-6">
+    <div className="flex h-full flex-col gap-4 bg-canvas p-4 md:p-6">
       <div>
-        <h1 className="text-xl font-bold tracking-tight text-stone-900">Campaigns</h1>
-        <p className="mt-0.5 text-[13px] text-stone-500">
+        <h1 className="aos-heading">Campaigns</h1>
+        <p className="mt-0.5 text-sm text-muted">
           {workspace.name} — every campaign launched through an approved proposal, across all platforms.
         </p>
       </div>
       <AdsTabs active="campaigns" />
       {campaigns.length === 0 ? (
-        <div className="flex flex-col items-center gap-2 rounded-lg border border-stone-200 bg-white px-6 py-12 text-center">
-          <Megaphone className="h-8 w-8 text-stone-300" />
-          <p className="text-[14px] font-medium text-stone-700">No campaigns yet</p>
-          <p className="max-w-sm text-[13px] text-stone-500">
+        <div className="flex flex-col items-center gap-2 rounded-lg bg-paper px-6 py-12 text-center shadow-hairline">
+          <Megaphone className="h-8 w-8 text-subtle" />
+          <p className="text-md font-semibold text-ink">No campaigns yet</p>
+          <p className="max-w-sm text-sm text-muted">
             Campaigns appear here after their launch proposal is approved and executed. Nothing spends without that step.
           </p>
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-stone-200 bg-white">
-          <table className="w-full min-w-[860px] text-left text-[13px]">
+        <div className="overflow-x-auto rounded-lg bg-paper shadow-hairline">
+          <table className="w-full min-w-[860px] text-left text-sm">
             <thead>
-              <tr className="border-b border-stone-200 bg-stone-50 text-[11px] uppercase tracking-wide text-stone-500">
-                <th className="px-3 py-2 font-medium">Campaign</th>
-                <th className="px-3 py-2 font-medium">Platform</th>
-                <th className="px-3 py-2 font-medium">Account</th>
-                <th className="px-3 py-2 font-medium">External ID</th>
-                <th className="px-3 py-2 font-medium">Status</th>
-                <th className="px-3 py-2 font-medium text-right">Budget</th>
-                <th className="px-3 py-2 font-medium">Flight</th>
+              <tr className="border-b border-line bg-canvas">
+                <th className="px-3 py-2 text-xs font-semibold text-muted">Campaign</th>
+                <th className="px-3 py-2 text-xs font-semibold text-muted">Platform</th>
+                <th className="px-3 py-2 text-xs font-semibold text-muted">Account</th>
+                <th className="px-3 py-2 text-xs font-semibold text-muted">External ID</th>
+                <th className="px-3 py-2 text-xs font-semibold text-muted">Status</th>
+                <th className="px-3 py-2 text-right text-xs font-semibold text-muted">Budget</th>
+                <th className="px-3 py-2 text-xs font-semibold text-muted">Flight</th>
               </tr>
             </thead>
             <tbody>
               {campaigns.map((c) => {
-                const badge = STATUS_STYLES[c.status] ?? STATUS_STYLES.draft;
+                const badge = STATUS_BADGES[c.status] ?? STATUS_BADGES.draft;
                 return (
-                  <tr key={c.id} className="border-b border-stone-100 last:border-0 hover:bg-stone-50/60">
-                    <td className="px-3 py-2.5 font-medium text-stone-900">{c.name}</td>
-                    <td className="px-3 py-2.5 text-stone-600">
+                  <tr key={c.id} className="border-b border-line last:border-0 hover:bg-hover-paper">
+                    <td className="px-3 py-2.5 font-semibold text-ink">{c.name}</td>
+                    <td className="px-3 py-2.5 text-muted">
                       {PLATFORM_LABELS[c.platformKey] ?? c.platformKey}
                     </td>
-                    <td className="px-3 py-2.5 text-stone-600">
+                    <td className="px-3 py-2.5 text-muted">
                       {c.account.name ?? c.account.externalAccountId}
                     </td>
-                    <td className="px-3 py-2.5 font-mono text-[12px] text-stone-500">
+                    <td className="px-3 py-2.5 font-mono text-sm text-muted">
                       {c.externalId ?? "—"}
                     </td>
                     <td className="px-3 py-2.5">
-                      <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ${badge}`}>
+                      <span className={`inline-flex h-badge items-center rounded-full px-2.5 text-sm font-semibold ${badge}`}>
                         {c.status}
                       </span>
                     </td>
-                    <td className="px-3 py-2.5 text-right tabular-nums text-stone-700">
+                    <td className="px-3 py-2.5 text-right tabular-nums font-semibold text-ink">
                       {money(c.budgetCents)}
                     </td>
-                    <td className="px-3 py-2.5 text-stone-500">
+                    <td className="px-3 py-2.5 text-muted">
                       {c.flightStart || c.flightEnd ? `${fmtDate(c.flightStart)} → ${fmtDate(c.flightEnd)}` : "—"}
                     </td>
                   </tr>

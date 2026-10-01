@@ -76,10 +76,17 @@ function loadImageDimensions(file: File): Promise<{ width: number; height: numbe
 }
 
 function CheckIcon({ pass }: { pass: boolean | null }) {
-  if (pass === true) return <CircleCheck className="h-4 w-4 shrink-0 text-emerald-600" />;
-  if (pass === false) return <CircleX className="h-4 w-4 shrink-0 text-red-600" />;
-  return <CircleHelp className="h-4 w-4 shrink-0 text-stone-400" />;
+  if (pass === true) return <CircleCheck className="h-4 w-4 shrink-0 text-ink" />;
+  if (pass === false) return <CircleX className="h-4 w-4 shrink-0 text-failed-text" />;
+  return <CircleHelp className="h-4 w-4 shrink-0 text-subtle" />;
 }
+
+const inputCls =
+  "rounded-md border-[1.5px] border-control bg-paper px-3 py-1.5 text-sm text-ink file:mr-2 file:h-chip file:rounded-full file:border-0 file:bg-ink file:px-3 file:text-sm file:font-semibold file:text-white";
+const textInputCls =
+  "h-control-sm w-60 rounded-md border-[1.5px] border-control bg-paper px-3 text-sm text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none";
+const btnPrimarySm =
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-night-hover disabled:opacity-40";
 
 export default function CreativeSpecChecker() {
   const [audio, setAudio] = useState<AudioMeta | null>(null);
@@ -134,41 +141,38 @@ export default function CreativeSpecChecker() {
     );
   }
 
-  const inputCls =
-    "rounded-md border border-stone-300 px-2.5 py-1.5 text-[13px] text-stone-900 file:mr-2 file:rounded-md file:border-0 file:bg-stone-100 file:px-2 file:py-1 file:text-[12px] file:font-medium file:text-stone-700 hover:file:bg-stone-200";
-
   return (
-    <div className="flex flex-col gap-2 rounded-lg border border-stone-200 bg-white px-3 py-3">
+    <div className="flex flex-col gap-2 rounded-lg bg-paper px-3 py-3 shadow-hairline">
       <div className="grid gap-2 sm:grid-cols-2">
-        <label className="flex flex-col gap-1 text-[12px] text-stone-600">
+        <label className="flex flex-col gap-1 text-xs font-semibold text-muted">
           Audio ad file (WAV / MP3 / OGG)
           <input type="file" accept=".wav,.mp3,.ogg,audio/*" onChange={onAudio} className={inputCls} />
           {audio && (
-            <span className="text-[11px] text-stone-400">
+            <span className="text-xs text-subtle">
               {audio.fileName} · {(audio.fileSizeBytes / 1024).toFixed(0)} KB
               {audio.durationSeconds !== null ? ` · ${audio.durationSeconds.toFixed(1)}s` : " · duration unreadable"}
             </span>
           )}
         </label>
-        <label className="flex flex-col gap-1 text-[12px] text-stone-600">
+        <label className="flex flex-col gap-1 text-xs font-semibold text-muted">
           Companion image (JPEG / PNG)
           <input type="file" accept=".jpg,.jpeg,.png,image/*" onChange={onImage} className={inputCls} />
           {image && (
-            <span className="text-[11px] text-stone-400">
+            <span className="text-xs text-subtle">
               {image.width !== null ? `${image.width}×${image.height}` : "dimensions unreadable"} ·{" "}
               {image.sizeBytes !== null ? `${(image.sizeBytes / 1024).toFixed(0)} KB` : "size unreadable"}
             </span>
           )}
         </label>
       </div>
-      <label className="flex max-w-60 flex-col gap-1 text-[12px] text-stone-600">
+      <label className="flex max-w-60 flex-col gap-1 text-xs font-semibold text-muted">
         Script word count (optional)
         <input
           value={scriptWords}
           onChange={(e) => setScriptWords(e.target.value)}
           inputMode="numeric"
           placeholder="e.g. 60"
-          className="rounded-md border border-stone-300 px-2.5 py-1.5 text-[13px] text-stone-900 placeholder:text-stone-400 focus:border-[var(--brand-600)] focus:outline-none"
+          className={textInputCls}
         />
       </label>
       <div>
@@ -176,7 +180,7 @@ export default function CreativeSpecChecker() {
           type="button"
           onClick={run}
           disabled={!audio || reading}
-          className="inline-flex items-center gap-1.5 rounded-md bg-[var(--brand-600)] px-3 py-1.5 text-[12px] font-medium text-white hover:bg-[var(--brand-700)] disabled:opacity-50"
+          className={btnPrimarySm}
         >
           {reading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileAudio className="h-3.5 w-3.5" />}
           {reading ? "Reading files…" : "Check creative"}
@@ -189,24 +193,24 @@ export default function CreativeSpecChecker() {
               key={c.rule}
               className={`flex items-start gap-2 rounded-lg border px-3 py-2 ${
                 c.pass === true
-                  ? "border-emerald-200 bg-emerald-50/50"
+                  ? "border-line bg-paper"
                   : c.pass === false
-                    ? "border-red-200 bg-red-50/50"
-                    : "border-stone-200 bg-stone-50"
+                    ? "border-failed bg-failed-tint"
+                    : "border-line bg-canvas"
               }`}
             >
               <span className="mt-0.5">
                 <CheckIcon pass={c.pass} />
               </span>
               <div className="min-w-0">
-                <p className="text-[12px] font-medium text-stone-900">{c.rule}</p>
-                <p className="text-[12px] text-stone-500">{c.detail}</p>
+                <p className="text-sm font-semibold text-ink">{c.rule}</p>
+                <p className={`text-sm ${c.pass === false ? "text-failed-text" : "text-muted"}`}>{c.detail}</p>
               </div>
             </li>
           ))}
         </ul>
       )}
-      <p className="text-[11px] text-stone-400">
+      <p className="text-xs text-subtle">
         Checks run against the official Ad Studio specs above. Rules that couldn't be verified from your files are
         marked as such — confirm them in Ads Manager before launch.
       </p>

@@ -7,12 +7,14 @@
 "use client";
 
 import { useState } from "react";
-import { Loader2, Rocket } from "lucide-react";
+import { CircleCheck, Loader2, Rocket } from "lucide-react";
 
 const inputCls =
-  "rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-[13px] text-stone-900 placeholder:text-stone-400 focus:border-[var(--brand-600)] focus:outline-none";
+  "h-control-sm rounded-md border-[1.5px] border-control bg-paper px-3 text-sm text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none";
 const btnPrimary =
-  "flex items-center gap-1.5 rounded-md bg-[var(--brand-600)] px-3 py-1.5 text-[13px] font-medium text-white hover:bg-[var(--brand-700)] disabled:opacity-40";
+  "inline-flex h-control items-center gap-1.5 rounded-full bg-ink px-[22px] text-base font-semibold text-white aos-press hover:bg-night-hover disabled:opacity-40";
+const noteCls =
+  "flex items-start gap-2 rounded-lg bg-paper px-3 py-2 text-sm shadow-hairline";
 
 export default function LaunchChecklistPanel({
   campaignId,
@@ -61,7 +63,8 @@ export default function LaunchChecklistPanel({
 
   if (launched) {
     return (
-      <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-[13px] text-emerald-800">
+      <p className={`${noteCls} text-ink`}>
+        <CircleCheck className="mt-0.5 h-4 w-4 shrink-0" />
         Campaign launched on StackAdapt — conversational inventory is live.
       </p>
     );
@@ -69,7 +72,7 @@ export default function LaunchChecklistPanel({
 
   if (!proposalId) {
     return (
-      <p className="rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-[13px] text-stone-500">
+      <p className={`${noteCls} text-muted`}>
         No approved launch proposal found — approve the campaign in the proposal inbox first.
       </p>
     );
@@ -79,17 +82,17 @@ export default function LaunchChecklistPanel({
 
   return (
     <div className="flex flex-col gap-2">
-      <p className="text-[13px] font-medium text-stone-800">Launch checklist — confirm before going live</p>
-      <label className="flex items-center gap-2 text-[13px] text-stone-700">
+      <p className="text-sm font-semibold text-ink">Launch checklist — confirm before going live</p>
+      <label className="flex items-center gap-2 text-sm text-ink">
         <input type="checkbox" checked={tiersConfirmed} onChange={(e) => setTiersConfirmed(e.target.checked)} />
         Tier targeting confirmed: {targetTiers.length ? targetTiers.join(", ") : "—"}
       </label>
-      <label className="flex items-center gap-2 text-[13px] text-stone-700">
+      <label className="flex items-center gap-2 text-sm text-ink">
         <input type="checkbox" checked={geoConfirmed} onChange={(e) => setGeoConfirmed(e.target.checked)} />
         Geo confirmed: United States only (ChatGPT ads beta inventory)
       </label>
       <div className="flex items-center gap-2">
-        <label className="text-[13px] text-stone-700">
+        <label className="text-sm text-ink">
           Re-enter the daily cap ${capDollars ?? "—"} to confirm:
         </label>
         <input
@@ -101,7 +104,7 @@ export default function LaunchChecklistPanel({
         />
       </div>
       {error && (
-        <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-700">{error}</p>
+        <p className="rounded-lg border border-failed bg-failed-tint px-3 py-2 text-sm text-failed-text">{error}</p>
       )}
       <div>
         <button type="button" className={btnPrimary} disabled={busy} onClick={launch}>
@@ -109,7 +112,7 @@ export default function LaunchChecklistPanel({
           Launch campaign
         </button>
       </div>
-      <p className="text-[12px] text-stone-500">
+      <p className="text-xs text-subtle">
         Launch spends real money through your StackAdapt account. It needs the approval from the last 24
         hours — older approvals must be re-approved.
       </p>

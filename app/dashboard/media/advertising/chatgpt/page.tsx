@@ -30,22 +30,48 @@ export const metadata = {
 };
 
 const chip =
-  "inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-1.5 py-0.5 text-[10px] font-medium leading-tight";
-const chipSlate = `${chip} bg-stone-100 text-stone-600 border-stone-200`;
-const chipBrand = `${chip} bg-[var(--brand-50)] text-[var(--brand-700)] border-[var(--brand-600)]/20`;
-const chipGreen = `${chip} bg-emerald-50 text-emerald-700 border-emerald-200`;
-const chipAmber = `${chip} bg-amber-50 text-amber-700 border-amber-200`;
+  "inline-flex h-badge items-center whitespace-nowrap rounded-full border border-line bg-paper px-2.5 text-sm font-semibold text-muted";
+const chipBase =
+  "inline-flex h-badge items-center gap-1.5 rounded-full px-2.5 text-sm font-semibold";
 
 function statusChip(status: string) {
-  if (status === "live") return <span className={chipGreen}>live</span>;
-  if (status === "proposed" || status === "approved") return <span className={chipAmber}>{status}</span>;
-  return <span className={chipSlate}>{status}</span>;
+  // Approval states follow the approval-flow mapping; campaign statuses
+  // (live, paused, ended) are not agent states — neutrals only.
+  if (status === "live") return <span className={`${chipBase} bg-ink text-white`}>live</span>;
+  if (status === "proposed")
+    return (
+      <span className={`${chipBase} bg-needs text-ink`}>
+        <span
+          className="aos-shape aos-shape--needs"
+          style={{ color: "var(--aos-ink)" }}
+          role="img"
+          aria-label="Needs review"
+        />
+        proposed
+      </span>
+    );
+  if (status === "approved")
+    return (
+      <span className={`${chipBase} bg-done text-white`}>
+        <span
+          className="aos-shape aos-shape--done"
+          style={{ color: "var(--aos-on-done)" }}
+          role="img"
+          aria-label="Approved"
+        />
+        approved
+      </span>
+    );
+  return <span className={chip}>{status}</span>;
 }
 
 function fmtCents(cents: number | null | undefined) {
   if (cents == null) return "—";
   return `$${(cents / 100).toLocaleString("en-US", { maximumFractionDigits: 2 })}`;
 }
+
+const cardCls = "overflow-hidden rounded-lg bg-paper shadow-hairline";
+const cardBand = "border-b border-line px-3 py-2 text-xs font-semibold text-muted";
 
 export default async function ChatGPTAdsPage() {
   const user = await requireUser();
@@ -110,10 +136,10 @@ export default async function ChatGPTAdsPage() {
   );
 
   return (
-    <div className="flex h-full flex-col gap-4 bg-[#FAFAF7] p-4 md:p-6">
+    <div className="flex h-full flex-col gap-4 bg-canvas p-4 md:p-6">
       <div>
-        <h1 className="text-xl font-bold tracking-tight text-stone-900">ChatGPT Ads</h1>
-        <p className="mt-0.5 text-[13px] text-stone-500">
+        <h1 className="aos-heading">ChatGPT Ads</h1>
+        <p className="mt-0.5 text-sm text-muted">
           {workspace.name} — conversational-intent campaigns, bought through your StackAdapt account.
           Propose here, approve in the inbox, spend executes only after your approval.
         </p>
@@ -121,48 +147,46 @@ export default async function ChatGPTAdsPage() {
 
       <AdsTabs active="campaigns" />
 
-      <div className="overflow-hidden rounded-lg border border-stone-200 bg-white">
-        <div className="border-b border-stone-200 bg-stone-50 px-3 py-2 text-[12px] font-medium text-stone-600">
-          Campaigns
-        </div>
+      <div className={cardCls}>
+        <div className={cardBand}>Campaigns</div>
         {campaigns.length === 0 ? (
-          <p className="px-3 py-4 text-[13px] text-stone-500">
+          <p className="px-3 py-4 text-sm text-muted">
             No ChatGPT campaigns yet — propose the first one below.
           </p>
         ) : (
-          <table className="w-full text-left text-[13px]">
+          <table className="w-full text-left text-sm">
             <thead>
-              <tr className="border-b border-stone-200 bg-stone-50 text-[11px] uppercase tracking-wide text-stone-500">
-                <th className="px-3 py-2 font-medium">Campaign</th>
-                <th className="px-3 py-2 font-medium">Tiers</th>
-                <th className="px-3 py-2 font-medium">Daily</th>
-                <th className="px-3 py-2 font-medium">Total</th>
-                <th className="px-3 py-2 font-medium">Creatives</th>
-                <th className="px-3 py-2 font-medium">Status</th>
-                <th className="px-3 py-2 font-medium text-right">Action</th>
+              <tr className="border-b border-line bg-canvas">
+                <th className="px-3 py-2 text-xs font-semibold text-muted">Campaign</th>
+                <th className="px-3 py-2 text-xs font-semibold text-muted">Tiers</th>
+                <th className="px-3 py-2 text-xs font-semibold text-muted">Daily</th>
+                <th className="px-3 py-2 text-xs font-semibold text-muted">Total</th>
+                <th className="px-3 py-2 text-xs font-semibold text-muted">Creatives</th>
+                <th className="px-3 py-2 text-xs font-semibold text-muted">Status</th>
+                <th className="px-3 py-2 text-right text-xs font-semibold text-muted">Action</th>
               </tr>
             </thead>
             <tbody>
               {campaigns.map((c) => (
-                <tr key={c.id} className="border-b border-stone-100 last:border-0 hover:bg-[var(--brand-50)]/40">
-                  <td className="px-3 py-2.5 font-medium text-stone-900">{c.campaign.name}</td>
+                <tr key={c.id} className="border-b border-line last:border-0 hover:bg-hover-paper">
+                  <td className="px-3 py-2.5 font-semibold text-ink">{c.campaign.name}</td>
                   <td className="px-3 py-2.5">
-                    <span className="flex gap-1">
+                    <span className="flex gap-1.5">
                       {c.targetTiers.map((t) => (
-                        <span key={t} className={chipBrand}>{t}</span>
+                        <span key={t} className={chip}>{t}</span>
                       ))}
                     </span>
                   </td>
-                  <td className="px-3 py-2.5 text-stone-600">{fmtCents(c.budgetDailyCents)}</td>
-                  <td className="px-3 py-2.5 text-stone-600">{fmtCents(c.budgetTotalCents)}</td>
-                  <td className="px-3 py-2.5 text-stone-600">{c.creatives.length}</td>
+                  <td className="px-3 py-2.5 text-muted">{fmtCents(c.budgetDailyCents)}</td>
+                  <td className="px-3 py-2.5 text-muted">{fmtCents(c.budgetTotalCents)}</td>
+                  <td className="px-3 py-2.5 text-muted">{c.creatives.length}</td>
                   <td className="px-3 py-2.5">{statusChip(c.status)}</td>
                   <td className="px-3 py-2.5 text-right">
                     <a
                       href={adsManagerDeepLink({ campaignName: c.campaign.name })}
                       target="_blank"
                       rel="noreferrer"
-                      className="text-[12px] font-medium text-[var(--brand-700)] underline"
+                      className="text-sm font-semibold text-ink underline underline-offset-2"
                     >
                       Ads Manager
                     </a>
@@ -174,10 +198,8 @@ export default async function ChatGPTAdsPage() {
         )}
       </div>
 
-      <div className="overflow-hidden rounded-lg border border-stone-200 bg-white">
-        <div className="border-b border-stone-200 bg-stone-50 px-3 py-2 text-[12px] font-medium text-stone-600">
-          Propose a campaign
-        </div>
+      <div className={cardCls}>
+        <div className={cardBand}>Propose a campaign</div>
         <div className="p-3">
           <ProposeCampaignForm accounts={accounts} />
         </div>
@@ -186,8 +208,8 @@ export default async function ChatGPTAdsPage() {
       {campaigns
         .filter((c) => c.status === "approved" || c.status === "live")
         .map((c) => (
-          <div key={c.id} className="overflow-hidden rounded-lg border border-stone-200 bg-white">
-            <div className="border-b border-stone-200 bg-stone-50 px-3 py-2 text-[12px] font-medium text-stone-600">
+          <div key={c.id} className={cardCls}>
+            <div className={cardBand}>
               {c.status === "approved" ? "Launch" : "Live controls"} — {c.campaign.name}
             </div>
             <div className="p-3">
@@ -206,10 +228,8 @@ export default async function ChatGPTAdsPage() {
         ))}
 
       {reportData.map((r) => (
-        <div key={r.id} className="overflow-hidden rounded-lg border border-stone-200 bg-white">
-          <div className="border-b border-stone-200 bg-stone-50 px-3 py-2 text-[12px] font-medium text-stone-600">
-            Report — {r.name}
-          </div>
+        <div key={r.id} className={cardCls}>
+          <div className={cardBand}>Report — {r.name}</div>
           <div className="p-3">
             <ReportPanel
               campaignId={r.id}
@@ -226,13 +246,13 @@ export default async function ChatGPTAdsPage() {
         </div>
       ))}
 
-      <div className="rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-[13px] text-stone-500">
+      <div className="rounded-lg bg-paper px-3 py-2 text-sm text-muted shadow-hairline">
         There is no public OpenAI ads API — buying runs through StackAdapt and the{" "}
-        <a href="https://ads.openai.com/" target="_blank" rel="noreferrer" className="underline">
+        <a href="https://ads.openai.com/" target="_blank" rel="noreferrer" className="font-semibold text-ink underline underline-offset-2">
           Ads Manager console
         </a>
         . Marketr never holds ad spend; your StackAdapt account bills you directly.{" "}
-        <Link href="/dashboard/media/advertising/proposals" className="underline">
+        <Link href="/dashboard/media/advertising/proposals" className="font-semibold text-ink underline underline-offset-2">
           Open the proposal inbox
         </Link>
         . Server-side conversion events (Conversions API) are built with hashed identifiers only —

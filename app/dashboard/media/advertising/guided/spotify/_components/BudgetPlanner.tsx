@@ -24,6 +24,11 @@ const WORKSHEET_FIELDS = [
   { id: "context", label: "Listening context", placeholder: "e.g. morning commute, workout, work-from-home focus" },
 ] as const;
 
+const inputCls =
+  "h-control-sm rounded-md border-[1.5px] border-control bg-paper px-3 text-sm text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none";
+const btnPrimarySm =
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-night-hover disabled:opacity-40";
+
 export default function BudgetPlanner() {
   const [budget, setBudget] = useState("250");
   const [start, setStart] = useState("");
@@ -76,13 +81,10 @@ export default function BudgetPlanner() {
     }
   }
 
-  const inputCls =
-    "rounded-md border border-stone-300 px-2.5 py-1.5 text-[13px] text-stone-900 placeholder:text-stone-400 focus:border-[var(--brand-600)] focus:outline-none";
-
   return (
-    <div className="flex flex-col gap-2 rounded-lg border border-stone-200 bg-white px-3 py-3">
+    <div className="flex flex-col gap-2 rounded-lg bg-paper px-3 py-3 shadow-hairline">
       <div className="grid gap-2 sm:grid-cols-3">
-        <label className="flex flex-col gap-1 text-[12px] text-stone-600">
+        <label className="flex flex-col gap-1 text-xs font-semibold text-muted">
           Lifetime budget (USD)
           <input
             value={budget}
@@ -92,18 +94,18 @@ export default function BudgetPlanner() {
             className={inputCls}
           />
         </label>
-        <label className="flex flex-col gap-1 text-[12px] text-stone-600">
+        <label className="flex flex-col gap-1 text-xs font-semibold text-muted">
           Flight start (optional)
           <input type="date" value={start} onChange={(e) => setStart(e.target.value)} className={inputCls} />
         </label>
-        <label className="flex flex-col gap-1 text-[12px] text-stone-600">
+        <label className="flex flex-col gap-1 text-xs font-semibold text-muted">
           Flight end (optional)
           <input type="date" value={end} onChange={(e) => setEnd(e.target.value)} className={inputCls} />
         </label>
       </div>
       <div className="grid gap-2 sm:grid-cols-2">
         {WORKSHEET_FIELDS.map((f) => (
-          <label key={f.id} className="flex flex-col gap-1 text-[12px] text-stone-600">
+          <label key={f.id} className="flex flex-col gap-1 text-xs font-semibold text-muted">
             {f.label}
             <input
               value={worksheet[f.id] ?? ""}
@@ -119,35 +121,27 @@ export default function BudgetPlanner() {
           type="button"
           onClick={check}
           disabled={busy}
-          className="inline-flex items-center gap-1.5 rounded-md bg-[var(--brand-600)] px-3 py-1.5 text-[12px] font-medium text-white hover:bg-[var(--brand-700)] disabled:opacity-50"
+          className={btnPrimarySm}
         >
           {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Calculator className="h-3.5 w-3.5" />}
           {busy ? "Checking…" : "Check plan"}
         </button>
-        <span className="text-[11px] text-stone-400">
+        <span className="text-xs text-subtle">
           Ad Studio minimum: ${SPOTIFY_MIN_BUDGET_USD} lifetime budget
         </span>
       </div>
       {error && (
-        <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-700">{error}</p>
+        <p className="rounded-lg border border-failed bg-failed-tint px-3 py-2 text-sm text-failed-text">{error}</p>
       )}
       {plan && (
-        <div
-          className={`rounded-lg border px-3 py-2 ${
-            plan.ok ? "border-emerald-200 bg-emerald-50" : "border-amber-200 bg-amber-50"
-          }`}
-        >
-          <p
-            className={`flex items-center gap-1.5 text-[13px] font-medium ${
-              plan.ok ? "text-emerald-800" : "text-amber-800"
-            }`}
-          >
-            {plan.ok ? <CircleCheck className="h-4 w-4" /> : <TriangleAlert className="h-4 w-4" />}
+        <div className="rounded-lg border border-line bg-paper px-3 py-2">
+          <p className="flex items-center gap-1.5 text-sm font-semibold text-ink">
+            {plan.ok ? <CircleCheck className="h-4 w-4 shrink-0" /> : <TriangleAlert className="h-4 w-4 shrink-0" />}
             {plan.ok
               ? "Plan meets the Ad Studio minimum"
               : `Below the $${SPOTIFY_MIN_BUDGET_USD} minimum — this plan cannot launch as-is`}
           </p>
-          <ul className="mt-1.5 flex list-disc flex-col gap-1 pl-5 text-[12px] text-stone-600">
+          <ul className="mt-1.5 flex list-disc flex-col gap-1 pl-5 text-sm text-muted">
             {plan.notes.map((n, i) => (
               <li key={i}>{n}</li>
             ))}

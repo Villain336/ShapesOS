@@ -49,16 +49,19 @@ function roasText(roas: number | null): string {
 }
 
 const chip =
-  "inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-1.5 py-0.5 text-[10px] font-medium leading-tight";
-const chipSlate = `${chip} bg-stone-100 text-stone-600 border-stone-200`;
-const chipBrand = `${chip} bg-[var(--brand-50)] text-[var(--brand-700)] border-[var(--brand-600)]/20`;
+  "inline-flex h-badge items-center whitespace-nowrap rounded-full border border-line bg-paper px-2.5 text-sm font-semibold text-muted";
+
+const inputCls =
+  "h-control-sm rounded-md border-[1.5px] border-control bg-paper px-2.5 text-sm text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none";
+const btnPrimarySm =
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-night-hover";
 
 function Kpi({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
-    <div className="rounded-lg border border-stone-200 bg-white px-4 py-3">
-      <div className="text-[11px] uppercase tracking-wide text-stone-500">{label}</div>
-      <div className="mt-0.5 text-xl font-bold tracking-tight text-stone-900">{value}</div>
-      {sub && <div className="mt-0.5 text-[11px] text-stone-500">{sub}</div>}
+    <div className="rounded-lg bg-paper px-4 py-3 shadow-hairline">
+      <div className="text-xs font-semibold text-muted">{label}</div>
+      <div className="mt-0.5 text-xl font-bold tracking-tight text-ink">{value}</div>
+      {sub && <div className="mt-0.5 text-xs text-muted">{sub}</div>}
     </div>
   );
 }
@@ -95,10 +98,10 @@ export default async function AdReportsPage({
   const platformOptions = Object.values(ADS_PLATFORMS).map((p) => ({ key: p.key, label: p.displayName }));
 
   return (
-    <div className="flex h-full flex-col gap-4 bg-[#FAFAF7] p-4 md:p-6">
+    <div className="flex h-full flex-col gap-4 bg-canvas p-4 md:p-6">
       <div>
-        <h1 className="text-xl font-bold tracking-tight text-stone-900">Reports</h1>
-        <p className="mt-0.5 text-[13px] text-stone-500">
+        <h1 className="aos-heading">Reports</h1>
+        <p className="mt-0.5 text-sm text-muted">
           {workspace.name} — normalized spend, impressions, clicks, and ROAS across every platform. Every figure traces to the campaign, the approval, and the platform receipt.
         </p>
       </div>
@@ -106,24 +109,10 @@ export default async function AdReportsPage({
       <AdsTabs active="reports" />
 
       <form method="get" className="flex flex-wrap items-center gap-2">
-        <input
-          type="date"
-          name="from"
-          defaultValue={fromStr}
-          className="rounded-md border border-stone-300 bg-white px-2 py-1.5 text-[12px] text-stone-800"
-        />
-        <span className="text-[12px] text-stone-400">→</span>
-        <input
-          type="date"
-          name="to"
-          defaultValue={toStr}
-          className="rounded-md border border-stone-300 bg-white px-2 py-1.5 text-[12px] text-stone-800"
-        />
-        <select
-          name="platform"
-          defaultValue={rawPlatform ?? "all"}
-          className="rounded-md border border-stone-300 bg-white px-2 py-1.5 text-[12px] text-stone-800"
-        >
+        <input type="date" name="from" defaultValue={fromStr} className={inputCls} />
+        <span className="text-xs text-subtle">→</span>
+        <input type="date" name="to" defaultValue={toStr} className={inputCls} />
+        <select name="platform" defaultValue={rawPlatform ?? "all"} className={inputCls}>
           <option value="all">All platforms</option>
           {platformOptions.map((p) => (
             <option key={p.key} value={p.key}>
@@ -131,20 +120,17 @@ export default async function AdReportsPage({
             </option>
           ))}
         </select>
-        <button
-          type="submit"
-          className="inline-flex items-center gap-1 rounded-md bg-[var(--brand-600)] px-3 py-1.5 text-[12px] font-medium text-white hover:bg-[var(--brand-700)]"
-        >
+        <button type="submit" className={btnPrimarySm}>
           <BarChart3 className="h-3.5 w-3.5" />
           Apply
         </button>
       </form>
 
       {rows.length === 0 ? (
-        <div className="flex flex-col items-center gap-2 rounded-lg border border-stone-200 bg-white px-6 py-12 text-center">
-          <BarChart3 className="h-8 w-8 text-stone-300" />
-          <p className="text-[14px] font-medium text-stone-700">No ad data in this window</p>
-          <p className="max-w-sm text-[13px] text-stone-500">
+        <div className="flex flex-col items-center gap-2 rounded-lg bg-paper px-6 py-12 text-center shadow-hairline">
+          <BarChart3 className="h-8 w-8 text-subtle" />
+          <p className="text-md font-semibold text-ink">No ad data in this window</p>
+          <p className="max-w-sm text-sm text-muted">
             Connect a platform and pull reporting (Amazon Ads, StackAdapt), or import spend via the guided Walmart Connect / Spotify flows. Rows appear here once ingested.
           </p>
         </div>
@@ -157,70 +143,70 @@ export default async function AdReportsPage({
             <Kpi label="Clicks" value={num(totals.clicks)} sub={`${num(totals.impressions)} impressions · CTR ${pct(totals.ctr)}`} />
           </div>
 
-          <div className="overflow-hidden rounded-lg border border-stone-200 bg-white">
-            <div className="border-b border-stone-200 bg-stone-50 px-3 py-2 text-[12px] font-medium text-stone-700">
+          <div className="overflow-hidden rounded-lg bg-paper shadow-hairline">
+            <div className="border-b border-line px-3 py-2 text-xs font-semibold text-muted">
               By platform
             </div>
-            <table className="w-full text-left text-[13px]">
+            <table className="w-full text-left text-sm">
               <thead>
-                <tr className="border-b border-stone-200 bg-stone-50 text-[11px] uppercase tracking-wide text-stone-500">
-                  <th className="px-3 py-2 font-medium">Platform</th>
-                  <th className="px-3 py-2 font-medium text-right">Spend</th>
-                  <th className="px-3 py-2 font-medium text-right">Impr.</th>
-                  <th className="px-3 py-2 font-medium text-right">Clicks</th>
-                  <th className="px-3 py-2 font-medium text-right">CTR</th>
-                  <th className="px-3 py-2 font-medium text-right">Conv.</th>
-                  <th className="px-3 py-2 font-medium text-right">Revenue</th>
-                  <th className="px-3 py-2 font-medium text-right">ROAS</th>
+                <tr className="border-b border-line bg-canvas">
+                  <th className="px-3 py-2 text-xs font-semibold text-muted">Platform</th>
+                  <th className="px-3 py-2 text-right text-xs font-semibold text-muted">Spend</th>
+                  <th className="px-3 py-2 text-right text-xs font-semibold text-muted">Impr.</th>
+                  <th className="px-3 py-2 text-right text-xs font-semibold text-muted">Clicks</th>
+                  <th className="px-3 py-2 text-right text-xs font-semibold text-muted">CTR</th>
+                  <th className="px-3 py-2 text-right text-xs font-semibold text-muted">Conv.</th>
+                  <th className="px-3 py-2 text-right text-xs font-semibold text-muted">Revenue</th>
+                  <th className="px-3 py-2 text-right text-xs font-semibold text-muted">ROAS</th>
                 </tr>
               </thead>
               <tbody>
                 {byPlatform.map((p) => (
-                  <tr key={p.platformKey} className="border-b border-stone-100 last:border-0 hover:bg-[var(--brand-50)]/40">
+                  <tr key={p.platformKey} className="border-b border-line last:border-0 hover:bg-hover-paper">
                     <td className="px-3 py-2.5">
-                      <span className={chipBrand}>{p.platformLabel}</span>
+                      <span className={chip}>{p.platformLabel}</span>
                     </td>
-                    <td className="px-3 py-2.5 text-right font-medium text-stone-900">{money(p.totals.spendCents)}</td>
-                    <td className="px-3 py-2.5 text-right text-stone-600">{num(p.totals.impressions)}</td>
-                    <td className="px-3 py-2.5 text-right text-stone-600">{num(p.totals.clicks)}</td>
-                    <td className="px-3 py-2.5 text-right text-stone-600">{pct(p.totals.ctr)}</td>
-                    <td className="px-3 py-2.5 text-right text-stone-600">{num(p.totals.conversions)}</td>
-                    <td className="px-3 py-2.5 text-right text-stone-600">{money(p.totals.revenueCents)}</td>
-                    <td className="px-3 py-2.5 text-right font-medium text-stone-900">{roasText(p.totals.roas)}</td>
+                    <td className="px-3 py-2.5 text-right font-semibold text-ink">{money(p.totals.spendCents)}</td>
+                    <td className="px-3 py-2.5 text-right text-muted">{num(p.totals.impressions)}</td>
+                    <td className="px-3 py-2.5 text-right text-muted">{num(p.totals.clicks)}</td>
+                    <td className="px-3 py-2.5 text-right text-muted">{pct(p.totals.ctr)}</td>
+                    <td className="px-3 py-2.5 text-right text-muted">{num(p.totals.conversions)}</td>
+                    <td className="px-3 py-2.5 text-right text-muted">{money(p.totals.revenueCents)}</td>
+                    <td className="px-3 py-2.5 text-right font-semibold text-ink">{roasText(p.totals.roas)}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
 
-          <div className="overflow-hidden rounded-lg border border-stone-200 bg-white">
-            <div className="border-b border-stone-200 bg-stone-50 px-3 py-2 text-[12px] font-medium text-stone-700">
+          <div className="overflow-hidden rounded-lg bg-paper shadow-hairline">
+            <div className="border-b border-line px-3 py-2 text-xs font-semibold text-muted">
               By campaign
             </div>
-            <table className="w-full text-left text-[13px]">
+            <table className="w-full text-left text-sm">
               <thead>
-                <tr className="border-b border-stone-200 bg-stone-50 text-[11px] uppercase tracking-wide text-stone-500">
-                  <th className="px-3 py-2 font-medium">Campaign</th>
-                  <th className="px-3 py-2 font-medium">Platform</th>
-                  <th className="px-3 py-2 font-medium text-right">Spend</th>
-                  <th className="px-3 py-2 font-medium text-right">Clicks</th>
-                  <th className="px-3 py-2 font-medium text-right">Conv.</th>
-                  <th className="px-3 py-2 font-medium text-right">Revenue</th>
-                  <th className="px-3 py-2 font-medium text-right">ROAS</th>
+                <tr className="border-b border-line bg-canvas">
+                  <th className="px-3 py-2 text-xs font-semibold text-muted">Campaign</th>
+                  <th className="px-3 py-2 text-xs font-semibold text-muted">Platform</th>
+                  <th className="px-3 py-2 text-right text-xs font-semibold text-muted">Spend</th>
+                  <th className="px-3 py-2 text-right text-xs font-semibold text-muted">Clicks</th>
+                  <th className="px-3 py-2 text-right text-xs font-semibold text-muted">Conv.</th>
+                  <th className="px-3 py-2 text-right text-xs font-semibold text-muted">Revenue</th>
+                  <th className="px-3 py-2 text-right text-xs font-semibold text-muted">ROAS</th>
                 </tr>
               </thead>
               <tbody>
                 {byCampaign.map((c) => (
-                  <tr key={c.campaignId} className="border-b border-stone-100 last:border-0 hover:bg-[var(--brand-50)]/40">
-                    <td className="px-3 py-2.5 font-medium text-stone-900">{c.campaignName}</td>
+                  <tr key={c.campaignId} className="border-b border-line last:border-0 hover:bg-hover-paper">
+                    <td className="px-3 py-2.5 font-semibold text-ink">{c.campaignName}</td>
                     <td className="px-3 py-2.5">
-                      <span className={chipSlate}>{c.platformLabel}</span>
+                      <span className={chip}>{c.platformLabel}</span>
                     </td>
-                    <td className="px-3 py-2.5 text-right font-medium text-stone-900">{money(c.totals.spendCents)}</td>
-                    <td className="px-3 py-2.5 text-right text-stone-600">{num(c.totals.clicks)}</td>
-                    <td className="px-3 py-2.5 text-right text-stone-600">{num(c.totals.conversions)}</td>
-                    <td className="px-3 py-2.5 text-right text-stone-600">{money(c.totals.revenueCents)}</td>
-                    <td className="px-3 py-2.5 text-right font-medium text-stone-900">{roasText(c.totals.roas)}</td>
+                    <td className="px-3 py-2.5 text-right font-semibold text-ink">{money(c.totals.spendCents)}</td>
+                    <td className="px-3 py-2.5 text-right text-muted">{num(c.totals.clicks)}</td>
+                    <td className="px-3 py-2.5 text-right text-muted">{num(c.totals.conversions)}</td>
+                    <td className="px-3 py-2.5 text-right text-muted">{money(c.totals.revenueCents)}</td>
+                    <td className="px-3 py-2.5 text-right font-semibold text-ink">{roasText(c.totals.roas)}</td>
                   </tr>
                 ))}
               </tbody>
