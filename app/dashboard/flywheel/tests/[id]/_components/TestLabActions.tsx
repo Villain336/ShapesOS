@@ -64,30 +64,30 @@ export function TestLabActions({ experiment }: { experiment: Experiment }) {
   }
 
   return (
-    <section className="rounded-xl border border-stone-200 bg-white p-4">
-      <h2 className="text-sm font-semibold tracking-tight text-stone-900">Lifecycle actions</h2>
+    <section className="rounded-xl border border-line bg-white p-4">
+      <h2 className="text-sm font-semibold tracking-tight text-ink">Lifecycle actions</h2>
       <div className="mt-3 flex flex-wrap gap-2">
         {experiment.status === "draft" && (
-          <Button className="bg-violet-600 text-white hover:bg-violet-700" disabled={!!busy} onClick={() => call(`/api/flywheel/tests/${id}/qa`, { method: "POST", body: "{}" })}>
+          <Button className="bg-running text-white hover:brightness-110" disabled={!!busy} onClick={() => call(`/api/flywheel/tests/${id}/qa`, { method: "POST", body: "{}" })}>
             {busy ? "Running…" : "Run QA"}
           </Button>
         )}
         {experiment.status === "qa" && (
-          <Button className="bg-violet-600 text-white hover:bg-violet-700" disabled={!!busy} onClick={() => call(`/api/flywheel/tests/${id}/launch`, { method: "POST" })}>
+          <Button className="inline-flex h-control-sm cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-night-hover focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--aos-focus-halo)] disabled:opacity-40" disabled={!!busy} onClick={() => call(`/api/flywheel/tests/${id}/launch`, { method: "POST" })}>
             {busy ? "Launching…" : "Launch"}
           </Button>
         )}
         {(experiment.status === "running" || experiment.status === "paused") && (
-          <Button variant="outline" disabled={!!busy}
+          <Button className="bg-paper text-ink shadow-outline hover:bg-hover-paper" disabled={!!busy}
             onClick={() => call(`/api/flywheel/tests/${id}/pause`, { method: "POST", body: JSON.stringify({ action: paused ? "resume" : "pause" }) })}>
             {paused ? "Resume" : "Pause"}
           </Button>
         )}
         {(experiment.status === "running" || experiment.status === "paused") && (
-          <Button variant="outline" disabled={!!busy} onClick={readResults}>Read results</Button>
+          <Button className="bg-paper text-ink shadow-outline hover:bg-hover-paper" disabled={!!busy} onClick={readResults}>Read results</Button>
         )}
         {experiment.status === "complete" && (
-          <Button className="bg-violet-600 text-white hover:bg-violet-700" disabled={!!busy} onClick={() => call(`/api/flywheel/tests/${id}/archive`, { method: "POST" })}>
+          <Button className="bg-paper text-ink shadow-outline hover:bg-hover-paper" disabled={!!busy} onClick={() => call(`/api/flywheel/tests/${id}/archive`, { method: "POST" })}>
             {busy ? "Archiving…" : "Archive to Growth Memory"}
           </Button>
         )}
@@ -95,20 +95,23 @@ export function TestLabActions({ experiment }: { experiment: Experiment }) {
 
       {(experiment.status === "running" || experiment.status === "paused") && (
         <div className="mt-4 grid max-w-2xl grid-cols-2 gap-3 md:grid-cols-5">
-          <div><Label htmlFor="aConv" className="text-[13px] font-medium text-stone-700">Control conv.</Label><Input id="aConv" className="border-stone-200 bg-white text-[13px] placeholder:text-stone-400 focus-visible:border-violet-400 focus-visible:ring-violet-200/60" value={aConv} onChange={(e) => setAConv(e.target.value)} /></div>
-          <div><Label htmlFor="aN" className="text-[13px] font-medium text-stone-700">Control n</Label><Input id="aN" className="border-stone-200 bg-white text-[13px] placeholder:text-stone-400 focus-visible:border-violet-400 focus-visible:ring-violet-200/60" value={aN} onChange={(e) => setAN(e.target.value)} /></div>
-          <div><Label htmlFor="bConv" className="text-[13px] font-medium text-stone-700">Treatment conv.</Label><Input id="bConv" className="border-stone-200 bg-white text-[13px] placeholder:text-stone-400 focus-visible:border-violet-400 focus-visible:ring-violet-200/60" value={bConv} onChange={(e) => setBConv(e.target.value)} /></div>
-          <div><Label htmlFor="bN" className="text-[13px] font-medium text-stone-700">Treatment n</Label><Input id="bN" className="border-stone-200 bg-white text-[13px] placeholder:text-stone-400 focus-visible:border-violet-400 focus-visible:ring-violet-200/60" value={bN} onChange={(e) => setBN(e.target.value)} /></div>
-          <div><Label htmlFor="days" className="text-[13px] font-medium text-stone-700">Days running</Label><Input id="days" className="border-stone-200 bg-white text-[13px] placeholder:text-stone-400 focus-visible:border-violet-400 focus-visible:ring-violet-200/60" value={days} onChange={(e) => setDays(e.target.value)} /></div>
+          <div><Label htmlFor="aConv" className="text-[13px] font-medium text-muted">Control conv.</Label><Input id="aConv" className="border-line bg-white text-[13px] placeholder:text-subtle focus-visible:border-ink focus-visible:ring-[var(--aos-focus-halo)]" value={aConv} onChange={(e) => setAConv(e.target.value)} /></div>
+          <div><Label htmlFor="aN" className="text-[13px] font-medium text-muted">Control n</Label><Input id="aN" className="border-line bg-white text-[13px] placeholder:text-subtle focus-visible:border-ink focus-visible:ring-[var(--aos-focus-halo)]" value={aN} onChange={(e) => setAN(e.target.value)} /></div>
+          <div><Label htmlFor="bConv" className="text-[13px] font-medium text-muted">Treatment conv.</Label><Input id="bConv" className="border-line bg-white text-[13px] placeholder:text-subtle focus-visible:border-ink focus-visible:ring-[var(--aos-focus-halo)]" value={bConv} onChange={(e) => setBConv(e.target.value)} /></div>
+          <div><Label htmlFor="bN" className="text-[13px] font-medium text-muted">Treatment n</Label><Input id="bN" className="border-line bg-white text-[13px] placeholder:text-subtle focus-visible:border-ink focus-visible:ring-[var(--aos-focus-halo)]" value={bN} onChange={(e) => setBN(e.target.value)} /></div>
+          <div><Label htmlFor="days" className="text-[13px] font-medium text-muted">Days running</Label><Input id="days" className="border-line bg-white text-[13px] placeholder:text-subtle focus-visible:border-ink focus-visible:ring-[var(--aos-focus-halo)]" value={days} onChange={(e) => setDays(e.target.value)} /></div>
         </div>
       )}
 
       {error && (
-        <div className="mt-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-900">
-          <p className="font-medium">{error}</p>
-          {blockers.length > 0 && (
-            <ul className="mt-1 list-disc pl-5">{blockers.map((b, i) => <li key={i}>{b}</li>)}</ul>
-          )}
+        <div role="alert" className="mt-3 flex items-start gap-2 rounded-lg border border-failed bg-failed-tint p-3 text-sm text-failed-text">
+          <span className="mt-1 size-2.5 shrink-0 rounded-[2px] bg-failed" aria-hidden />
+          <div>
+            <p className="font-medium">{error}</p>
+            {blockers.length > 0 && (
+              <ul className="mt-1 list-disc pl-5">{blockers.map((b, i) => <li key={i}>{b}</li>)}</ul>
+            )}
+          </div>
         </div>
       )}
     </section>

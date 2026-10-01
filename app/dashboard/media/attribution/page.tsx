@@ -102,30 +102,31 @@ export default async function MediaAttributionPage({
         })
       : null;
 
-  const inputCls = "rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-[13px] text-stone-900 placeholder:text-stone-400 focus:border-violet-400 focus:outline-none";
+  const inputCls =
+  "h-control-sm rounded-md border-[1.5px] border-control bg-paper px-3 text-sm text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none";
   const thCls = "px-3 py-2 font-medium";
   const tdCls = "px-3 py-2";
 
   return (
-    <div className="flex h-full flex-col gap-4 bg-[#FAFAF7] p-4 md:p-6">
-      <h1 className="text-xl font-bold tracking-tight text-stone-900">Offline attribution</h1>
-      <p className="mt-0.5 max-w-2xl text-[13px] text-stone-500">
+    <div className="flex h-full flex-col gap-4 bg-canvas p-4 md:p-6">
+      <h1 className="aos-heading">Offline attribution</h1>
+      <p className="mt-0.5 max-w-2xl text-[13px] text-muted">
         Per-placement QR/pURL scans, promo redemptions, tracked calls, and branded-search lift.
         Directional indicators — never causal claims.
       </p>
 
       <form method="GET" className="mt-4 flex flex-wrap items-end gap-2">
-        <label className="text-[13px] text-stone-600">
+        <label className="text-[13px] text-muted">
           Buy ID{" "}
           <input name="buyId" defaultValue={buyId ?? ""} placeholder="buy_…" className={inputCls} />
         </label>
-        <button className="flex items-center gap-1.5 rounded-md bg-violet-600 px-3 py-1.5 text-[13px] font-medium text-white hover:bg-violet-700 disabled:opacity-40" type="submit">
+        <button className="inline-flex h-control-sm cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-night-hover focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--aos-focus-halo)] disabled:opacity-40" type="submit">
           Load
         </button>
       </form>
 
       {!buyId && (
-        <p className="mt-6 text-sm text-stone-500">
+        <p className="mt-6 text-sm text-muted">
           Enter a buy ID to load its attribution. Links, promo codes and call numbers are created
           at buy time (API: <code>/api/media/links</code>, <code>/api/media/promo-codes</code>).
         </p>
@@ -133,14 +134,14 @@ export default async function MediaAttributionPage({
 
       {buyId && rollup && (
         <section className="mt-6">
-          <h2 className="text-sm font-semibold text-stone-900">Placements — {rollup.totalScans} scans</h2>
-          <div className="mt-2 overflow-x-auto rounded-xl border border-stone-200 bg-white"><table className="w-full text-left text-[13px]">
+          <h2 className="text-sm font-semibold text-ink">Placements — {rollup.totalScans} scans</h2>
+          <div className="mt-2 overflow-x-auto rounded-xl border border-line bg-white"><table className="w-full text-left text-[13px]">
             <thead>
-              <tr className="border-b border-stone-100 bg-stone-50/60 text-[11px] uppercase tracking-wide text-stone-500"><th className={thCls}>Placement</th><th className={thCls}>Slug</th><th className={thCls}>Scans</th></tr>
+              <tr className="border-b border-line text-xs font-semibold text-muted"><th className={thCls}>Placement</th><th className={thCls}>Slug</th><th className={thCls}>Scans</th></tr>
             </thead>
             <tbody>
               {rollup.byPlacement.map((p) => (
-                <tr key={p.slug} className="border-b border-stone-100 last:border-0 hover:bg-violet-50/40">
+                <tr key={p.slug} className="border-b border-line last:border-0 hover:bg-hover-paper">
                   <td className={tdCls}>{p.placementRef}</td>
                   <td className={tdCls}><code>/{p.slug}</code></td>
                   <td className={tdCls}>{p.scans}</td>
@@ -157,14 +158,14 @@ export default async function MediaAttributionPage({
 
       {buyId && (
         <section className="mt-6">
-          <h2 className="text-sm font-semibold text-stone-900">Promo codes — {promoSum.totalRedemptions} redemptions</h2>
-          <div className="mt-2 overflow-x-auto rounded-xl border border-stone-200 bg-white"><table className="w-full text-left text-[13px]">
+          <h2 className="text-sm font-semibold text-ink">Promo codes — {promoSum.totalRedemptions} redemptions</h2>
+          <div className="mt-2 overflow-x-auto rounded-xl border border-line bg-white"><table className="w-full text-left text-[13px]">
             <thead>
-              <tr className="border-b border-stone-100 bg-stone-50/60 text-[11px] uppercase tracking-wide text-stone-500"><th className={thCls}>Channel</th><th className={thCls}>Code</th><th className={thCls}>Redemptions</th></tr>
+              <tr className="border-b border-line text-xs font-semibold text-muted"><th className={thCls}>Channel</th><th className={thCls}>Code</th><th className={thCls}>Redemptions</th></tr>
             </thead>
             <tbody>
               {promoSum.byChannel.map((c) => (
-                <tr key={c.code} className="border-b border-stone-100 last:border-0 hover:bg-violet-50/40">
+                <tr key={c.code} className="border-b border-line last:border-0 hover:bg-hover-paper">
                   <td className={tdCls}>{c.channelRef}</td>
                   <td className={tdCls}><code>{c.code}</code></td>
                   <td className={tdCls}>{c.redemptions}</td>
@@ -181,18 +182,18 @@ export default async function MediaAttributionPage({
 
       {buyId && (
         <section className="mt-6">
-          <h2 className="text-sm font-semibold text-stone-900">
+          <h2 className="text-sm font-semibold text-ink">
             Tracked calls — {callStats.calls} calls
             {callStats.costPerCallCents !== null &&
               ` · ${"$" + (callStats.costPerCallCents / 100).toFixed(2)}/call (${callStats.basis})`}
           </h2>
-          <div className="mt-2 overflow-x-auto rounded-xl border border-stone-200 bg-white"><table className="w-full text-left text-[13px]">
+          <div className="mt-2 overflow-x-auto rounded-xl border border-line bg-white"><table className="w-full text-left text-[13px]">
             <thead>
-              <tr className="border-b border-stone-100 bg-stone-50/60 text-[11px] uppercase tracking-wide text-stone-500"><th className={thCls}>Station</th><th className={thCls}>Number</th><th className={thCls}>Calls</th><th className={thCls}>Talk time</th></tr>
+              <tr className="border-b border-line text-xs font-semibold text-muted"><th className={thCls}>Station</th><th className={thCls}>Number</th><th className={thCls}>Calls</th><th className={thCls}>Talk time</th></tr>
             </thead>
             <tbody>
               {numbers.map((n) => (
-                <tr key={n.id} className="border-b border-stone-100 last:border-0 hover:bg-violet-50/40">
+                <tr key={n.id} className="border-b border-line last:border-0 hover:bg-hover-paper">
                   <td className={tdCls}>{n.stationRef}</td>
                   <td className={tdCls}><code>{n.numberE164}</code></td>
                   <td className={tdCls}>{n.callsCount}</td>
@@ -210,7 +211,7 @@ export default async function MediaAttributionPage({
 
       {buyId && (
         <section className="mt-6">
-          <h2 className="text-sm font-semibold text-stone-900">Branded-search lift</h2>
+          <h2 className="text-sm font-semibold text-ink">Branded-search lift</h2>
           <form method="GET" className="mt-2 flex flex-wrap items-end gap-2">
             <input type="hidden" name="buyId" value={buyId} />
             {(
@@ -229,21 +230,21 @@ export default async function MediaAttributionPage({
                 <input name={name} defaultValue={val ?? ""} placeholder={name === "brandQuery" ? "acme plumbing" : name.includes("Start") || name.includes("End") ? "2026-09-01" : "raleigh"} className={inputCls} />
               </label>
             ))}
-            <button className="flex items-center gap-1.5 rounded-md bg-violet-600 px-3 py-1.5 text-[13px] font-medium text-white hover:bg-violet-700 disabled:opacity-40" type="submit">
+            <button className="inline-flex h-control-sm cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-night-hover focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--aos-focus-halo)] disabled:opacity-40" type="submit">
               Compute lift
             </button>
           </form>
 
           {lift && (
-            <div className="mt-4 rounded-xl border border-stone-200 bg-white p-4">
+            <div className="mt-4 rounded-xl border border-line bg-white p-4">
               <p className="text-sm font-medium">{lift.verdict}</p>
-              <div className="mt-2 overflow-x-auto rounded-xl border border-stone-200 bg-white"><table className="w-full text-left text-[13px]">
+              <div className="mt-2 overflow-x-auto rounded-xl border border-line bg-white"><table className="w-full text-left text-[13px]">
                 <thead>
                   <tr><th className={thCls}>Metro</th><th className={thCls}>Kind</th><th className={thCls}>Baseline/day</th><th className={thCls}>Flight/day</th><th className={thCls}>Lift</th></tr>
                 </thead>
                 <tbody>
                   {lift.metros.map((m) => (
-                    <tr key={m.metro} className="border-b border-stone-100 last:border-0 hover:bg-violet-50/40">
+                    <tr key={m.metro} className="border-b border-line last:border-0 hover:bg-hover-paper">
                       <td className={tdCls}>{m.metro}</td>
                       <td className={tdCls}>{m.kind}</td>
                       <td className={tdCls}>{m.baselineDaily}</td>
@@ -254,7 +255,7 @@ export default async function MediaAttributionPage({
                 </tbody>
               </table>
               </div>
-              <p className="mt-2 text-sm text-stone-500">
+              <p className="mt-2 text-sm text-muted">
                 Device split (board metros): mobile{" "}
                 {lift.devices.find((d) => d.device === "mobile")?.liftPct}% · desktop{" "}
                 {lift.devices.find((d) => d.device === "desktop")?.liftPct}%.
@@ -268,10 +269,10 @@ export default async function MediaAttributionPage({
 
       {card && (
         <section className="mt-8">
-          <h2 className="text-sm font-semibold text-stone-900">Report card</h2>
+          <h2 className="text-sm font-semibold text-ink">Report card</h2>
           {card.sections.map((s) => (
-            <div key={s.title} className="mt-3 rounded-xl border border-stone-200 bg-white p-4">
-              <h3 className="text-sm font-semibold text-stone-900">{s.title}</h3>
+            <div key={s.title} className="mt-3 rounded-xl border border-line bg-white p-4">
+              <h3 className="text-sm font-semibold text-ink">{s.title}</h3>
               <ul className="list-disc pl-5 text-sm">
                 {s.lines.map((l, i) => (
                   <li key={i}>{l}</li>
@@ -279,14 +280,23 @@ export default async function MediaAttributionPage({
               </ul>
             </div>
           ))}
-          <div className="mt-4 rounded border border-amber-200 bg-amber-50 p-4">
-            <h3 className="font-semibold">Honest caveats — read before acting on this card</h3>
-            <ol className="list-decimal pl-5 text-sm">
-              {ATTRIBUTION_CAVEATS.map((c, i) => (
-                <li key={i} className="mt-1">{c}</li>
-              ))}
-            </ol>
-            <p className="mt-2 text-sm italic">Directional indicators, never causal claims.</p>
+          <div className="mt-4 rounded-lg bg-needs p-4 text-ink">
+            <div className="flex items-start gap-2.5">
+              <span
+                className="aos-shape aos-shape--needs aos-shape--edged mt-0.5 shrink-0 [--aos-shape-size:16px]"
+                style={{ color: "inherit" }}
+                aria-hidden
+              />
+              <div>
+                <h3 className="font-semibold">Honest caveats — read before acting on this card</h3>
+                <ol className="list-decimal pl-5 text-sm">
+                  {ATTRIBUTION_CAVEATS.map((c, i) => (
+                    <li key={i} className="mt-1">{c}</li>
+                  ))}
+                </ol>
+                <p className="mt-2 text-sm italic">Directional indicators, never causal claims.</p>
+              </div>
+            </div>
           </div>
         </section>
       )}

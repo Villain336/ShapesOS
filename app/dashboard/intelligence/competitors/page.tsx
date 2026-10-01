@@ -2,10 +2,10 @@
 // Dense change table (competitor, change-type badge, semantic summary,
 // recommended response, status) + watchlist management + weekly digest view
 // + licensed review-velocity pulls. House style per StudioApp.tsx
-// (diffed class-by-class): bg-[#FAFAF7] shell, text-xl bold title, Lucide
-// sub-tabs (ACTIVE = border-violet-600 text-violet-700), dense tables with
-// badge columns and rows hover:bg-violet-50/40, filter toolbar = dropdowns +
-// search + violet button, info notes border-stone-200 bg-stone-50.
+// (diffed class-by-class): bg-canvas shell, text-xl bold title, Lucide
+// sub-tabs (ACTIVE = border-ink text-ink), dense tables with
+// badge columns and rows hover:bg-hover-paper, filter toolbar = dropdowns +
+// search + violet button, info notes border-line bg-canvas.
 
 import { redirect } from "next/navigation";
 import { requireUser, getOrCreateWorkspace } from "@/lib/session";
@@ -35,12 +35,12 @@ export default async function CompetitorsPage() {
   });
 
   return (
-    <div className="flex h-full flex-col gap-4 bg-[#FAFAF7] p-4 md:p-6">
+    <div className="flex h-full flex-col gap-4 bg-canvas p-4 md:p-6">
       <div>
-        <h1 className="text-xl font-bold tracking-tight text-stone-900">
+        <h1 className="aos-heading">
           Competitor change fleet
         </h1>
-        <p className="mt-0.5 max-w-2xl text-[13px] text-stone-500">
+        <p className="mt-0.5 max-w-2xl text-[13px] text-muted">
           Semantic competitor intelligence — what changed, why it matters for
           your tracked keywords, and the proposed response. Polite, robots-
           respecting self-fetch only; reviews via licensed APIs only.

@@ -6,9 +6,11 @@
 import { redirect } from "next/navigation";
 import { requireUser, getOrCreateWorkspace } from "@/lib/session";
 import { requireWorkspaceRole } from "@/lib/authz";
-function chip(text: React.ReactNode, cls: string) {
+// Category chips are neutral by default (tone accepted for call-site compat).
+function chip(text: React.ReactNode, cls?: string) {
+  void cls;
   return (
-    <span className={`inline-flex items-center gap-0.5 whitespace-nowrap rounded-full border px-1.5 py-0.5 text-[10px] font-medium leading-tight ${cls}`}>
+    <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-paper px-2 py-0.5 text-[10px] font-semibold leading-tight text-muted shadow-control">
       {text}
     </span>
   );
@@ -30,11 +32,31 @@ export const metadata = {
   description: "Public-launch readiness checklist: security, legal, community, build. Readiness only — no public flip.",
 };
 
-const STATUS_CHIP: Record<string, string> = {
-  complete: "border-emerald-200 bg-emerald-50 text-emerald-700",
-  in_progress: "border-violet-200 bg-violet-50 text-violet-700",
-  pending: "border-stone-200 bg-stone-100 text-stone-600",
-};
+// Checklist statuses carry the AOS status shape language:
+// complete = done, in_progress = running, pending = neutral.
+const STATUS_SHAPE = (tone: string) => (
+  <span className={`aos-shape ${tone} [--aos-shape-size:9px]`} style={{ color: "inherit" }} aria-hidden />
+);
+function statusBadge(status: string) {
+  const base =
+    "inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-semibold leading-tight";
+  switch (status) {
+    case "complete":
+      return (
+        <span className={`${base} bg-done text-white`}>
+          {STATUS_SHAPE("aos-shape--done")} complete
+        </span>
+      );
+    case "in_progress":
+      return (
+        <span className={`${base} bg-running text-white`}>
+          {STATUS_SHAPE("aos-shape--running aos-is-live")} in progress
+        </span>
+      );
+    default:
+      return <span className={`${base} bg-paper text-muted shadow-control`}>pending</span>;
+  }
+}
 
 export default async function LaunchReadinessPage() {
   const user = await requireUser();
@@ -58,34 +80,29 @@ export default async function LaunchReadinessPage() {
   const pct = progress.total === 0 ? 0 : Math.round((progress.complete / progress.total) * 100);
 
   return (
-    <div className="flex h-full flex-col gap-4 bg-[#FAFAF7] p-4 md:p-6">
+    <div className="flex h-full flex-col gap-4 bg-canvas p-4 md:p-6">
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-stone-900">Public-launch readiness</h1>
-          <p className="mt-0.5 text-[13px] text-stone-500">
+          <h1 className="aos-heading">Public-launch readiness</h1>
+          <p className="mt-0.5 text-[13px] text-muted">
             Repo hygiene, license, and community bar for going public — tracked with evidence, not vibes.
           </p>
         </div>
-        <span className="text-[13px] font-semibold text-stone-700">{progress.complete}/{progress.total} complete</span>
+        <span className="text-[13px] font-semibold text-muted">{progress.complete}/{progress.total} complete</span>
       </header>
 
-      <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-        <strong>Readiness only.</strong> The open-core split is deferred by standing decision (SPEC-PHASE7 §12.5).
-        Nothing here flips the repo public — this page tracks the bar, not the launch.
-      </div>
+      <div className="flex items-start gap-2.5 rounded-lg bg-needs p-4 text-sm text-ink"><span className="aos-shape aos-shape--needs aos-shape--edged mt-0.5 shrink-0 [--aos-shape-size:14px]" style={{ color: "inherit" }} aria-hidden /><span><strong>Readiness only.</strong> The open-core split is deferred by standing decision (SPEC-PHASE7 §12.5). Nothing here flips the repo public — this page tracks the bar, not the launch.</span></div>
 
       {!ready && (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm">
-          Launch tables are not provisioned yet (migration pending).
-        </div>
+        <div className="flex items-start gap-2.5 rounded-lg bg-needs p-4 text-sm text-ink"><span className="aos-shape aos-shape--needs aos-shape--edged mt-0.5 shrink-0 [--aos-shape-size:14px]" style={{ color: "inherit" }} aria-hidden /><span>Launch tables are not provisioned yet (migration pending).</span></div>
       )}
 
       {ready && (
         <>
-          <div className="rounded-xl border border-stone-200 bg-white p-4">
+          <div className="rounded-xl border border-line bg-white p-4">
             <div className="flex items-center justify-between text-[13px]">
-              <span className="font-medium text-stone-900">Overall readiness</span>
-              <span className="text-stone-500">{pct}%</span>
+              <span className="font-medium text-ink">Overall readiness</span>
+              <span className="text-muted">{pct}%</span>
             </div>
             <Progress value={pct} className="mt-2" />
             <div className="mt-3 grid gap-2 sm:grid-cols-4">
@@ -95,8 +112,8 @@ export default async function LaunchReadinessPage() {
                 return (
                   <div key={c.key} className="text-xs">
                     <div className="flex justify-between">
-                      <span className="font-medium text-stone-800">{c.title}</span>
-                      <span className="text-stone-500">
+                      <span className="font-medium text-ink">{c.title}</span>
+                      <span className="text-muted">
                         {p.complete}/{p.total}
                       </span>
                     </div>
@@ -112,13 +129,13 @@ export default async function LaunchReadinessPage() {
             return (
               <section key={c.key} className="space-y-2">
                 <div>
-                  <h2 className="text-sm font-semibold tracking-tight text-stone-900">{c.title}</h2>
-                  <p className="text-[13px] text-stone-500">{c.blurb}</p>
+                  <h2 className="text-sm font-semibold tracking-tight text-ink">{c.title}</h2>
+                  <p className="text-[13px] text-muted">{c.blurb}</p>
                 </div>
-                <div className="overflow-x-auto rounded-xl border border-stone-200 bg-white">
+                <div className="overflow-x-auto rounded-xl border border-line bg-white">
                   <table className="w-full text-left text-[13px]">
                     <thead>
-                      <tr className="border-b border-stone-100 bg-stone-50/60 text-[11px] uppercase tracking-wide text-stone-500">
+                      <tr className="border-b border-line text-xs font-semibold text-muted">
                         <th className="px-3 py-2 font-medium">Checklist item</th>
                         <th className="px-3 py-2 font-medium">Status</th>
                         <th className="px-3 py-2 font-medium">Evidence</th>
@@ -129,28 +146,28 @@ export default async function LaunchReadinessPage() {
                       {catRows.map((r) => {
                         const cat = catalog.get(r.key);
                         return (
-                          <tr key={r.id} className="border-b border-stone-100 last:border-0 hover:bg-violet-50/40">
+                          <tr key={r.id} className="border-b border-line last:border-0 hover:bg-hover-paper">
                             <td className="max-w-sm px-3 py-2">
-                              <span className="font-medium text-stone-900">{r.item}</span>
-                              {cat && <span className="block text-[12px] text-stone-500">{cat.doneWhen}</span>}
-                              {r.note && <span className="block text-[12px] italic text-stone-500">Note: {r.note}</span>}
+                              <span className="font-medium text-ink">{r.item}</span>
+                              {cat && <span className="block text-[12px] text-muted">{cat.doneWhen}</span>}
+                              {r.note && <span className="block text-[12px] italic text-muted">Note: {r.note}</span>}
                               {cat && (
-                                <span className="block text-[11px] text-stone-400">
+                                <span className="block text-[11px] text-subtle">
                                   {cat.specRef} · hint: {cat.evidenceHint}
                                 </span>
                               )}
                             </td>
                             <td className="px-3 py-2">
-                              {chip(r.status.replace("_", " "), STATUS_CHIP[r.status] ?? STATUS_CHIP.pending)}
+                              {statusBadge(r.status)}
                             </td>
-                            <td className="px-3 py-2 text-[12px] text-stone-500">
+                            <td className="px-3 py-2 text-[12px] text-muted">
                               {r.evidenceUrl ? (
                                 /^https?:\/\//.test(r.evidenceUrl) ? (
                                   <a
                                     href={r.evidenceUrl}
                                     target="_blank"
                                     rel="noreferrer"
-                                    className="text-violet-700 underline hover:text-violet-800"
+                                    className="text-ink underline"
                                   >
                                     Evidence ↗
                                   </a>
@@ -158,10 +175,10 @@ export default async function LaunchReadinessPage() {
                                   <span className="font-mono">{r.evidenceUrl}</span>
                                 )
                               ) : (
-                                <span className="text-stone-400">No evidence yet</span>
+                                <span className="text-subtle">No evidence yet</span>
                               )}
                               {r.completedAt && (
-                                <span className="block text-stone-400">
+                                <span className="block text-subtle">
                                   completed {new Date(r.completedAt).toLocaleDateString()}
                                 </span>
                               )}
@@ -179,30 +196,30 @@ export default async function LaunchReadinessPage() {
             );
           })}
 
-          <section className="rounded-xl border border-stone-200 bg-white p-4">
-            <h2 className="text-sm font-semibold tracking-tight text-stone-900">Decision brief: the open-core split (deferred)</h2>
-            <p className="mt-0.5 text-[13px] text-stone-500">
+          <section className="rounded-xl border border-line bg-white p-4">
+            <h2 className="text-sm font-semibold tracking-tight text-ink">Decision brief: the open-core split (deferred)</h2>
+            <p className="mt-0.5 text-[13px] text-muted">
               Four options mapped in <span className="font-mono">docs/open-core-options.md</span> — presented
               with tradeoffs, no recommendation. The split is genuinely undecided; this phase builds readiness
               and the brief, not the decision.
             </p>
-            <div className="mt-2 overflow-x-auto rounded-xl border border-stone-200">
+            <div className="mt-2 overflow-x-auto rounded-xl border border-line">
               <table className="w-full text-left text-[13px]">
                 <thead>
-                  <tr className="border-b border-stone-100 bg-stone-50/60 text-[11px] uppercase tracking-wide text-stone-500">
+                  <tr className="border-b border-line text-xs font-semibold text-muted">
                     <th className="px-3 py-2 font-medium">Option</th>
                     <th className="px-3 py-2 font-medium">Model</th>
                   </tr>
                 </thead>
                 <tbody>
-                  <tr className="border-b border-stone-100 hover:bg-violet-50/40"><td className="px-3 py-2 font-medium text-stone-900">A — Open everything</td><td className="px-3 py-2 text-stone-600">All code AGPL; commercial = white-label license + hosted + support.</td></tr>
-                  <tr className="border-b border-stone-100 hover:bg-violet-50/40"><td className="px-3 py-2 font-medium text-stone-900">B — AGPL core + closed enterprise pack</td><td className="px-3 py-2 text-stone-600">SSO/RBAC/audit, white-label sub-accounts, premium integrations.</td></tr>
-                  <tr className="border-b border-stone-100 hover:bg-violet-50/40"><td className="px-3 py-2 font-medium text-stone-900">C — Three-layer GPL/AGPL/closed</td><td className="px-3 py-2 text-stone-600">GrowthOS orchestrator closed. Finest IP protection, highest complexity.</td></tr>
-                  <tr className="hover:bg-violet-50/40"><td className="px-3 py-2 font-medium text-stone-900">D — AGPL everything + cloud premium</td><td className="px-3 py-2 text-stone-600">No closed code; Cloud wins on cadence + managed keys.</td></tr>
+                  <tr className="border-b border-line hover:bg-hover-paper"><td className="px-3 py-2 font-medium text-ink">A — Open everything</td><td className="px-3 py-2 text-muted">All code AGPL; commercial = white-label license + hosted + support.</td></tr>
+                  <tr className="border-b border-line hover:bg-hover-paper"><td className="px-3 py-2 font-medium text-ink">B — AGPL core + closed enterprise pack</td><td className="px-3 py-2 text-muted">SSO/RBAC/audit, white-label sub-accounts, premium integrations.</td></tr>
+                  <tr className="border-b border-line hover:bg-hover-paper"><td className="px-3 py-2 font-medium text-ink">C — Three-layer GPL/AGPL/closed</td><td className="px-3 py-2 text-muted">GrowthOS orchestrator closed. Finest IP protection, highest complexity.</td></tr>
+                  <tr className="hover:bg-hover-paper"><td className="px-3 py-2 font-medium text-ink">D — AGPL everything + cloud premium</td><td className="px-3 py-2 text-muted">No closed code; Cloud wins on cadence + managed keys.</td></tr>
                 </tbody>
               </table>
             </div>
-            <p className="mt-3 text-xs text-stone-500">
+            <p className="mt-3 text-xs text-muted">
               Staged alongside: CLA-vs-DCO (must-decide-before-public), the AGPLv3 §7 trademark note (OnlyOffice 2026
               precedent), and the Product Hunt playbook.
             </p>

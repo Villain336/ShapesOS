@@ -10,10 +10,11 @@ import Link from "next/link";
 import { requireUser, getOrCreateWorkspace } from "@/lib/session";
 import { requireWorkspaceRole } from "@/lib/authz";
 
+// Neutral category chip. Pending approvals awaiting attention use the needs tone.
 const chip =
-  "inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-2 py-0.5 text-[11px] font-medium leading-tight";
-const chipSlate = `${chip} bg-stone-100 text-stone-600 border-stone-200`;
-const chipRed = `${chip} bg-red-50 text-red-700 border-red-200`;
+  "inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-paper px-2 py-0.5 text-[11px] font-semibold leading-tight text-muted shadow-control";
+const chipNeeds =
+  "inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-needs px-2 py-0.5 text-[11px] font-semibold leading-tight text-ink";
 
 export const dynamic = "force-dynamic";
 
@@ -84,20 +85,23 @@ export default async function FlywheelPage() {
   const { pendingApprovals, activeSras } = await trackStats(workspace.id);
 
   return (
-    <div className="flex h-full flex-col gap-4 bg-[#FAFAF7] p-4 md:p-6">
+    <div className="flex h-full flex-col gap-4 bg-canvas p-4 md:p-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-stone-900">Flywheel</h1>
-          <p className="mt-0.5 max-w-2xl text-[13px] text-stone-500">
+          <h1 className="aos-heading">Flywheel</h1>
+          <p className="mt-0.5 max-w-2xl text-[13px] text-muted">
             Reallocate budget to what works, recycle winning creative, test honestly, and expand
             channels — on rails that keep every dollar human-signed. Autopilot never buys media.
           </p>
         </div>
         <div className="flex shrink-0 gap-2">
-          <span className={pendingApprovals > 0 ? chipRed : chipSlate}>
+          <span className={pendingApprovals > 0 ? chipNeeds : chip}>
+              {pendingApprovals > 0 && (
+                <span className="aos-shape aos-shape--needs aos-shape--edged [--aos-shape-size:10px]" style={{ color: "inherit" }} aria-hidden />
+              )}
             {pendingApprovals} pending approvals
           </span>
-          <span className={chipSlate}>
+          <span className={chip}>
             {activeSras} active SRAs
           </span>
         </div>
@@ -107,10 +111,10 @@ export default async function FlywheelPage() {
           <Link
             key={c.href}
             href={c.href}
-            className="rounded-xl border border-stone-200 bg-white p-5 transition hover:border-stone-300"
+            className="rounded-xl border border-line bg-white p-5 transition hover:bg-hover-paper"
           >
-            <h2 className="text-base font-semibold text-stone-900">{c.title}</h2>
-            <p className="mt-1 text-sm text-stone-500">{c.desc}</p>
+            <h2 className="text-base font-semibold text-ink">{c.title}</h2>
+            <p className="mt-1 text-sm text-muted">{c.desc}</p>
           </Link>
         ))}
       </div>

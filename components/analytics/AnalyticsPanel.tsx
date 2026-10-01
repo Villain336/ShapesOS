@@ -77,7 +77,7 @@ function Sparkline({ series }: { series: Bucket[] }) {
       <polyline
         points={pts}
         fill="none"
-        stroke="#7c3aed"
+        stroke="#000000"
         strokeWidth="2"
         strokeLinejoin="round"
       />
@@ -87,7 +87,7 @@ function Sparkline({ series }: { series: Bucket[] }) {
           cx={i * step}
           cy={H - (b.y / max) * (H - 16) - 8}
           r="2.5"
-          fill="#7c3aed"
+          fill="#000000"
         />
       ))}
     </svg>
@@ -128,7 +128,7 @@ export function AnalyticsPanel() {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center gap-2">
-        <div className="flex rounded-lg border border-stone-200 bg-white p-0.5">
+        <div className="flex rounded-lg border border-line bg-white p-0.5">
           {PERIODS.map((p) => (
             <button
               key={p}
@@ -136,8 +136,8 @@ export function AnalyticsPanel() {
               onClick={() => setDays(p)}
               className={`rounded-md px-3 py-1.5 text-[13px] font-medium ${
                 days === p
-                  ? "bg-violet-600 text-white"
-                  : "text-stone-600 hover:bg-stone-100"
+                  ? "bg-ink text-white"
+                  : "text-muted hover:bg-hover"
               }`}
             >
               {p}d
@@ -156,32 +156,32 @@ export function AnalyticsPanel() {
       </div>
 
       {state.kind === "loading" && (
-        <div className="rounded-xl border border-stone-200 bg-white p-8 text-center text-sm text-stone-500">
+        <div className="rounded-xl border border-line bg-white p-8 text-center text-sm text-muted">
           Loading analytics…
         </div>
       )}
 
       {state.kind === "unconfigured" && (
-          <div className="rounded-xl border border-stone-200 bg-stone-50 p-6">
-            <div className="flex items-center gap-2 text-stone-900">
-              <BarChart3 className="h-5 w-5 text-violet-600" />
+          <div className="rounded-xl border border-line bg-canvas p-6">
+            <div className="flex items-center gap-2 text-ink">
+              <BarChart3 className="h-5 w-5 text-ink" />
               <h2 className="text-sm font-semibold">Umami is not connected</h2>
             </div>
-            <p className="mt-2 text-[13px] text-stone-500">
+            <p className="mt-2 text-[13px] text-muted">
               {state.message}{" "}
               Analytics for public pages (share links, campaign pages) come from a
               self-hosted Umami sidecar — MIT, cookieless, ~100MB idle.
             </p>
-            <div className="mt-3 rounded-lg border border-stone-200 bg-white p-3">
-              <p className="flex items-center gap-1.5 text-xs font-medium text-stone-700">
+            <div className="mt-3 rounded-lg border border-line bg-white p-3">
+              <p className="flex items-center gap-1.5 text-xs font-medium text-muted">
                 <TerminalSquare className="h-4 w-4" /> Quick start
               </p>
-              <pre className="mt-2 overflow-x-auto rounded bg-stone-900 p-3 font-mono text-[11px] leading-relaxed text-stone-100">
+              <pre className="mt-2 overflow-x-auto rounded bg-ink p-3 font-mono text-[11px] leading-relaxed text-white">
 {`docker compose -f docker-compose.yml \\
   -f docker/profiles/umami.yml \\
   --profile umami up -d`}
               </pre>
-              <p className="mt-2 text-xs text-stone-500">
+              <p className="mt-2 text-xs text-muted">
                 Then set <code className="font-mono">UMAMI_URL</code>,{" "}
                 <code className="font-mono">UMAMI_API_KEY</code>,{" "}
                 <code className="font-mono">UMAMI_WEBSITE_ID</code> and{" "}
@@ -193,7 +193,7 @@ export function AnalyticsPanel() {
         )}
 
       {state.kind === "error" && (
-        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-[13px] text-red-700">
+        <div className="rounded-xl border border-failed bg-failed-tint p-4 text-[13px] text-failed-text" role="alert">
           Couldn&apos;t load analytics: {state.message}
         </div>
       )}
@@ -208,25 +208,25 @@ export function AnalyticsPanel() {
               { icon: Activity, label: "Bounces", value: fmt(state.stats.bounces) },
               { icon: BarChart3, label: "Time on site", value: fmtDuration(state.stats.totaltime) },
             ].map((c) => (
-              <div key={c.label} className="rounded-xl border border-stone-200 bg-white p-4">
-                <div className="flex items-center gap-1.5 text-xs text-stone-500">
+              <div key={c.label} className="rounded-xl border border-line bg-white p-4">
+                <div className="flex items-center gap-1.5 text-xs text-muted">
                   <c.icon className="h-3.5 w-3.5" />
                   {c.label}
                 </div>
-                <div className="mt-1 text-2xl font-bold tracking-tight text-stone-900">
+                <div className="mt-1 text-2xl font-bold tracking-tight text-ink">
                   {c.value}
                 </div>
               </div>
             ))}
           </div>
-          <div className="rounded-xl border border-stone-200 bg-white p-4">
-            <h2 className="text-sm font-semibold text-stone-900">Pageviews</h2>
-            <p className="text-xs text-stone-500">Last {days} days · via Umami</p>
+          <div className="rounded-xl border border-line bg-white p-4">
+            <h2 className="text-sm font-semibold text-ink">Pageviews</h2>
+            <p className="text-xs text-muted">Last {days} days · via Umami</p>
             <div className="mt-2">
               {state.series.length > 0 ? (
                 <Sparkline series={state.series} />
               ) : (
-                <p className="py-8 text-center text-[13px] text-stone-500">
+                <p className="py-8 text-center text-[13px] text-muted">
                   No pageviews recorded in this period yet.
                 </p>
               )}

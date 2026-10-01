@@ -31,10 +31,10 @@ export default async function RankPage() {
   });
 
   return (
-    <div className="flex h-full flex-col gap-4 bg-[#FAFAF7] p-4 md:p-6">
+    <div className="flex h-full flex-col gap-4 bg-canvas p-4 md:p-6">
       <div>
-        <h1 className="text-xl font-bold tracking-tight text-stone-900">Rank intelligence</h1>
-        <p className="mt-0.5 max-w-2xl text-[13px] text-stone-500">
+        <h1 className="aos-heading">Rank intelligence</h1>
+        <p className="mt-0.5 max-w-2xl text-[13px] text-muted">
           GSC is the rank truth for owned sites — deltas, winners/losers, and the
           visibility score recomputed from Search Analytics. Paid SERP only covers
           what GSC cannot see.

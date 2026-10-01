@@ -59,34 +59,46 @@ async function api(path: string, init?: RequestInit) {
   return data;
 }
 
-function chip(text: React.ReactNode, cls: string) {
+// Category chips are neutral by default (tone accepted for call-site compat).
+function chip(text: React.ReactNode, cls?: string) {
+  void cls;
   return (
-    <span className={`inline-flex items-center gap-0.5 whitespace-nowrap rounded-full border px-1.5 py-0.5 text-[10px] font-medium leading-tight ${cls}`}>
+    <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-paper px-2 py-0.5 text-[10px] font-semibold leading-tight text-muted shadow-control">
       {text}
     </span>
   );
 }
 
+// Campaign statuses carry the AOS status shape language:
+// live/human_placed = done, pending/reconciling = needs, cancelled = failed.
 function statusChip(s: string) {
-  if (s === "live" || s === "human_placed") return chip(s, "border-emerald-200 bg-emerald-50 text-emerald-700");
-  if (s === "pending_vendor_approval" || s === "reconciling") return chip(s, "border-amber-200 bg-amber-50 text-amber-700");
-  if (s === "cancelled") return chip(s, "border-red-200 bg-red-50 text-red-700");
-  return chip(s, "border-stone-200 bg-stone-100 text-stone-600");
+  const base =
+    "inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-semibold leading-tight";
+  const shape = (extra: string) => (
+    <span className={`aos-shape ${extra} [--aos-shape-size:9px]`} style={{ color: "inherit" }} aria-hidden />
+  );
+  if (s === "live" || s === "human_placed")
+    return <span className={`${base} bg-done text-white`}>{shape("aos-shape--done")} {s}</span>;
+  if (s === "pending_vendor_approval" || s === "reconciling")
+    return <span className={`${base} bg-needs text-ink`}>{shape("aos-shape--needs aos-shape--edged")} {s}</span>;
+  if (s === "cancelled")
+    return <span className={`${base} bg-failed text-white`}>{shape("aos-shape--failed")} {s}</span>;
+  return <span className={`${base} bg-paper text-muted shadow-control`}>{s}</span>;
 }
 
-const HI = "border-stone-200 bg-white text-[13px] placeholder:text-stone-400 focus-visible:border-violet-400 focus-visible:ring-violet-200/60";
-const HSELECT = "rounded-md border border-stone-200 bg-white px-3 py-2 text-[13px] text-stone-800 focus-visible:border-violet-400 focus-visible:outline-none";
-const HLABEL = "text-[13px] font-medium text-stone-700";
+const HI = "border-line bg-white text-[13px] placeholder:text-subtle focus-visible:border-ink focus-visible:ring-[var(--aos-focus-halo)]";
+const HSELECT = "rounded-md border border-line bg-white px-3 py-2 text-[13px] text-ink focus-visible:border-ink focus-visible:outline-none";
+const HLABEL = "text-[13px] font-medium text-muted";
 
 function Panel({ title, description, action, children }: {
   title: string; description?: string; action?: React.ReactNode; children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-xl border border-stone-200 bg-white p-4">
+    <section className="rounded-xl border border-line bg-white p-4">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h2 className="text-sm font-semibold tracking-tight text-stone-900">{title}</h2>
-          {description && <p className="mt-0.5 text-xs text-stone-500">{description}</p>}
+          <h2 className="text-sm font-semibold tracking-tight text-ink">{title}</h2>
+          {description && <p className="mt-0.5 text-xs text-muted">{description}</p>}
         </div>
         {action}
       </div>
@@ -100,7 +112,7 @@ export function CtvApp() {
 
   return (
     <div className="flex h-full flex-col gap-4">
-      <div className="flex gap-1 overflow-x-auto border-b border-stone-200">
+      <div className="flex gap-1 overflow-x-auto border-b border-line">
         {TABS.map(({ id, label, icon: Icon }) => (
           <button
             key={id}
@@ -108,8 +120,8 @@ export function CtvApp() {
             onClick={() => setTab(id)}
             className={`-mb-px flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2 text-[13px] font-medium transition ${
               tab === id
-                ? "border-violet-600 text-violet-700"
-                : "border-transparent text-stone-500 hover:border-stone-300 hover:text-stone-800"
+                ? "border-ink text-ink"
+                : "border-transparent text-muted hover:text-ink"
             }`}
           >
             <Icon className="h-4 w-4" />
@@ -199,8 +211,8 @@ function CampaignsTab() {
   return (
     <div className="flex flex-col gap-4">
       {error && (
-        <div className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-[13px] text-red-900">
-          <XCircle className="mt-0.5 h-4 w-4 shrink-0" />
+        <div role="alert" className="flex items-start gap-2 rounded-xl border border-failed bg-failed-tint p-3 text-[13px] text-failed-text">
+          <span className="mt-1 size-2.5 shrink-0 rounded-[2px] bg-failed" aria-hidden />
           <span>{error}</span>
         </div>
       )}
@@ -224,29 +236,26 @@ function CampaignsTab() {
           <div className="grid gap-1.5"><Label htmlFor="ctv-approval" className={HLABEL}>Approval object id (required for API buys)</Label><Input id="ctv-approval" className={HI} value={form.approvalObjectId} onChange={(e) => setForm({ ...form, approvalObjectId: e.target.value })} placeholder="appr_…" /></div>
           <div className="grid gap-1.5"><Label htmlFor="ctv-advertiser" className={HLABEL}>Vibe advertiser id (API mode)</Label><Input id="ctv-advertiser" className={HI} value={form.vibeAdvertiserId} onChange={(e) => setForm({ ...form, vibeAdvertiserId: e.target.value })} placeholder="adv_…" /></div>
           <div className="flex items-end">
-            <Button className="bg-violet-600 text-white hover:bg-violet-700" onClick={create} disabled={!form.name}>Create (draft)</Button>
+            <Button className="inline-flex h-control-sm cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-night-hover focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--aos-focus-halo)] disabled:opacity-40" onClick={create} disabled={!form.name}>Create (draft)</Button>
           </div>
         </div>
       </Panel>
 
       <Panel
         title="Campaigns"
-        action={<Button size="sm" variant="outline" onClick={refresh} disabled={loading}>Refresh</Button>}
+        action={<Button size="sm" className="bg-paper text-ink shadow-outline hover:bg-hover-paper" onClick={refresh} disabled={loading}>Refresh</Button>}
       >
         {pauseNote && (
-          <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-[13px] text-amber-900">
-            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-            <span>{pauseNote}</span>
-          </div>
+          <div className="flex items-start gap-2.5 rounded-lg bg-needs px-4 py-3 text-[13px] text-ink"><span className="aos-shape aos-shape--needs aos-shape--edged mt-0.5 shrink-0 [--aos-shape-size:14px]" style={{ color: "inherit" }} aria-hidden /><span>{pauseNote}</span></div>
         )}
         {!loading && campaigns.length === 0 && (
-          <p className="py-2 text-[13px] text-stone-500">No campaigns yet — create one above.</p>
+          <p className="py-2 text-[13px] text-muted">No campaigns yet — create one above.</p>
         )}
         {campaigns.length > 0 && (
-          <div className="overflow-x-auto rounded-xl border border-stone-200">
+          <div className="overflow-x-auto rounded-xl border border-line">
             <table className="w-full text-left text-[13px]">
               <thead>
-                <tr className="border-b border-stone-100 bg-stone-50/60 text-[11px] uppercase tracking-wide text-stone-500">
+                <tr className="border-b border-line text-xs font-semibold text-muted">
                   <th className="px-3 py-2 font-medium">Campaign</th>
                   <th className="px-3 py-2 font-medium">Status</th>
                   <th className="px-3 py-2 font-medium">Platform</th>
@@ -256,19 +265,19 @@ function CampaignsTab() {
               </thead>
               <tbody>
                 {campaigns.map((c) => (
-                  <tr key={c.id} className="border-b border-stone-100 last:border-0 hover:bg-violet-50/40">
-                    <td className="px-3 py-2 font-medium text-stone-900">{c.name}</td>
+                  <tr key={c.id} className="border-b border-line last:border-0 hover:bg-hover-paper">
+                    <td className="px-3 py-2 font-medium text-ink">{c.name}</td>
                     <td className="px-3 py-2">{statusChip(c.status)}</td>
-                    <td className="px-3 py-2 text-[12px] text-stone-600">{PLATFORM_LABELS[c.platform] ?? c.platform}</td>
-                    <td className="px-3 py-2 text-[12px] text-stone-600">
+                    <td className="px-3 py-2 text-[12px] text-muted">{PLATFORM_LABELS[c.platform] ?? c.platform}</td>
+                    <td className="px-3 py-2 text-[12px] text-muted">
                       {c.mode}
                       {c.vibeTestMode && c.mode === "api" && (
-                        <> {chip("test mode", "border-stone-200 bg-stone-100 text-stone-500")}</>
+                        <> {chip("test mode", "border-line bg-hover text-muted")}</>
                       )}
                     </td>
                     <td className="px-3 py-2">
                       <Button size="sm" variant="outline" onClick={() => pause(c.id)} disabled={pausing === c.id || c.status === "paused"}>
-                        {pausing === c.id ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <PauseCircle className="mr-1 h-3.5 w-3.5" />}
+                        {pausing === c.id ? <Loader2 className="mr-1 h-3.5 w-3.5 aos-spin" /> : <PauseCircle className="mr-1 h-3.5 w-3.5" />}
                         Pause
                       </Button>
                     </td>
@@ -317,7 +326,7 @@ function ValidatorTab() {
           </div>
         </div>
         <div>
-          <Button className="bg-violet-600 text-white hover:bg-violet-700" disabled={busy} onClick={async () => {
+          <Button className="bg-ink text-white hover:bg-night-hover" disabled={busy} onClick={async () => {
             setBusy(true); setError(""); setResult(null);
             try {
               const fileId = (document.getElementById("ctv-file-id") as HTMLInputElement | null)?.value?.trim();
@@ -330,20 +339,20 @@ function ValidatorTab() {
             } catch (e) { setError(e instanceof Error ? e.message : String(e)); }
             finally { setBusy(false); }
           }}>
-            {busy ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <ShieldCheck className="mr-1 h-4 w-4" />} Validate
+            {busy ? <Loader2 className="mr-1 h-4 w-4 aos-spin" /> : <ShieldCheck className="mr-1 h-4 w-4" />} Validate
           </Button>
         </div>
-        {error && <p className="text-[13px] text-red-600">{error}</p>}
+        {error && <p className="text-[13px] text-failed-text">{error}</p>}
         {result && (
           <div>
-            <div className={`mb-2 flex items-center gap-2 text-[13px] font-semibold ${result.pass ? "text-emerald-700" : "text-red-700"}`}>
+            <div className={`mb-2 flex items-center gap-2 text-[13px] font-semibold ${result.pass ? "text-ink" : "text-failed-text"}`}>
               {result.pass ? <CheckCircle2 className="h-4 w-4" /> : <XCircle className="h-4 w-4" />}
               {result.pass ? "COMPLIANT — may be attached to a buy" : "BLOCKED — fix the failing checks before submission"}
             </div>
-            <div className="overflow-x-auto rounded-xl border border-stone-200">
+            <div className="overflow-x-auto rounded-xl border border-line">
               <table className="w-full text-left text-[13px]">
                 <thead>
-                  <tr className="border-b border-stone-100 bg-stone-50/60 text-[11px] uppercase tracking-wide text-stone-500">
+                  <tr className="border-b border-line text-xs font-semibold text-muted">
                     <th className="px-3 py-2 font-medium">Check</th>
                     <th className="px-3 py-2 font-medium">Result</th>
                     <th className="px-3 py-2 font-medium">Detail</th>
@@ -351,16 +360,16 @@ function ValidatorTab() {
                 </thead>
                 <tbody>
                   {result.checks.map((c) => (
-                    <tr key={c.name} className="border-b border-stone-100 last:border-0 hover:bg-violet-50/40">
-                      <td className="px-3 py-2 font-mono text-[12px] text-stone-800">{c.name}</td>
+                    <tr key={c.name} className="border-b border-line last:border-0 hover:bg-hover-paper">
+                      <td className="px-3 py-2 font-mono text-[12px] text-ink">{c.name}</td>
                       <td className="px-3 py-2">
                         <span className="flex items-center gap-1.5 text-[12px]">
-                          {c.passed ? <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-emerald-600" /> : <XCircle className="h-3.5 w-3.5 shrink-0 text-red-600" />}
+                          {c.passed ? <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-ink" /> : <XCircle className="h-3.5 w-3.5 shrink-0 text-failed-text" />}
                           {c.passed ? "Pass" : "Fail"}
-                          {c.heuristic && chip("heuristic", "border-stone-200 bg-stone-100 text-stone-500")}
+                          {c.heuristic && chip("heuristic", "border-line bg-hover text-muted")}
                         </span>
                       </td>
-                      <td className="px-3 py-2 text-[12px] text-stone-600">{c.detail}</td>
+                      <td className="px-3 py-2 text-[12px] text-muted">{c.detail}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -418,10 +427,10 @@ function SpotsTab() {
             <div className="grid gap-1.5"><Label htmlFor="spot-campaign" className={HLABEL}>Campaign id</Label><Input id="spot-campaign" className={HI} value={campaignId} onChange={(e) => setCampaignId(e.target.value)} placeholder="ctv_…" /></div>
             <div className="grid gap-1.5"><Label htmlFor="spot-dest" className={HLABEL}>Destination URL</Label><Input id="spot-dest" className={HI} value={destinationUrl} onChange={(e) => setDestinationUrl(e.target.value)} placeholder="https://shop.example.com/tv" /></div>
           </div>
-          <div className="overflow-x-auto rounded-xl border border-stone-200">
+          <div className="overflow-x-auto rounded-xl border border-line">
             <table className="w-full text-left text-[13px]">
               <thead>
-                <tr className="border-b border-stone-100 bg-stone-50/60 text-[11px] uppercase tracking-wide text-stone-500">
+                <tr className="border-b border-line text-xs font-semibold text-muted">
                   <th className="px-3 py-2 font-medium">Placement label</th>
                   <th className="px-3 py-2 font-medium">Show genre</th>
                   <th className="px-3 py-2 font-medium">Daypart</th>
@@ -430,7 +439,7 @@ function SpotsTab() {
               </thead>
               <tbody>
                 {rows.map((r, i) => (
-                  <tr key={i} className="border-b border-stone-100 last:border-0">
+                  <tr key={i} className="border-b border-line last:border-0">
                     <td className="px-3 py-2"><Input placeholder="Placement label" className={HI} value={r.placementLabel} onChange={(e) => setRows(rows.map((x, j) => (j === i ? { ...x, placementLabel: e.target.value } : x)))} /></td>
                     <td className="px-3 py-2"><Input placeholder="Show genre" className={HI} value={r.showGenre} onChange={(e) => setRows(rows.map((x, j) => (j === i ? { ...x, showGenre: e.target.value } : x)))} /></td>
                     <td className="px-3 py-2"><Input placeholder="Daypart" className={HI} value={r.daypart} onChange={(e) => setRows(rows.map((x, j) => (j === i ? { ...x, daypart: e.target.value } : x)))} /></td>
@@ -442,19 +451,19 @@ function SpotsTab() {
           </div>
           <div className="flex gap-2">
             <Button variant="outline" onClick={() => setRows([...rows, { placementLabel: "", showGenre: "", daypart: "", demo: "" }])}>+ placement</Button>
-            <Button className="bg-violet-600 text-white hover:bg-violet-700" onClick={mint} disabled={busy || !campaignId || !destinationUrl}>
-              {busy ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <QrCode className="mr-1 h-4 w-4" />} Mint kit
+            <Button className="bg-ink text-white hover:bg-night-hover" onClick={mint} disabled={busy || !campaignId || !destinationUrl}>
+              {busy ? <Loader2 className="mr-1 h-4 w-4 aos-spin" /> : <QrCode className="mr-1 h-4 w-4" />} Mint kit
             </Button>
           </div>
-          {error && <p className="text-[13px] text-red-600">{error}</p>}
-          {landing && <p className="text-[13px] text-stone-600">{landing}</p>}
+          {error && <p className="text-[13px] text-failed-text">{error}</p>}
+          {landing && <p className="text-[13px] text-muted">{landing}</p>}
         </div>
       </Panel>
       {result && (
-        <div className="overflow-x-auto rounded-xl border border-stone-200 bg-white">
+        <div className="overflow-x-auto rounded-xl border border-line bg-white">
           <table className="w-full text-left text-[13px]">
             <thead>
-              <tr className="border-b border-stone-100 bg-stone-50/60 text-[11px] uppercase tracking-wide text-stone-500">
+              <tr className="border-b border-line text-xs font-semibold text-muted">
                 <th className="px-3 py-2 font-medium">QR code</th>
                 <th className="px-3 py-2 font-medium">Placement</th>
                 <th className="px-3 py-2 font-medium">Public URL</th>
@@ -463,11 +472,11 @@ function SpotsTab() {
             </thead>
             <tbody>
               {result.map((s) => (
-                <tr key={s.publicUrl} className="border-b border-stone-100 last:border-0 hover:bg-violet-50/40">
+                <tr key={s.publicUrl} className="border-b border-line last:border-0 hover:bg-hover-paper">
                   <td className="px-3 py-2"><div className="max-w-[120px]" dangerouslySetInnerHTML={{ __html: s.qrSvg }} /></td>
-                  <td className="px-3 py-2 font-medium text-stone-900">{s.placementLabel}</td>
-                  <td className="px-3 py-2 font-mono text-[11px] text-stone-500">{s.publicUrl}</td>
-                  <td className="px-3 py-2 text-[12px] text-stone-600">Print ≥ {s.qrWidthCm} cm wide (couch distance ~3 m)</td>
+                  <td className="px-3 py-2 font-medium text-ink">{s.placementLabel}</td>
+                  <td className="px-3 py-2 font-mono text-[11px] text-muted">{s.publicUrl}</td>
+                  <td className="px-3 py-2 text-[12px] text-muted">Print ≥ {s.qrWidthCm} cm wide (couch distance ~3 m)</td>
                 </tr>
               ))}
             </tbody>
@@ -536,10 +545,7 @@ function IoTab() {
     <div className="flex flex-col gap-4">
       <Panel title="Concierge IO generator">
         <div className="flex flex-col gap-3">
-          <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-[13px] text-amber-900">
-            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-            <span>{ALERT_ONLY_COPY} Marketr generates the IO + creative brief; you place the buy in the vendor UI.</span>
-          </div>
+          <div className="flex items-start gap-2.5 rounded-lg bg-needs px-4 py-3 text-[13px] text-ink"><span className="aos-shape aos-shape--needs aos-shape--edged mt-0.5 shrink-0 [--aos-shape-size:14px]" style={{ color: "inherit" }} aria-hidden /><span>{ALERT_ONLY_COPY} Marketr generates the IO + creative brief; you place the buy in the vendor UI.</span></div>
           <div className="grid gap-3 md:grid-cols-3">
             <div className="grid gap-1.5"><Label className={HLABEL}>Campaign id</Label><Input className={HI} value={form.campaignId} onChange={set("campaignId")} /></div>
             <div className="grid gap-1.5"><Label className={HLABEL}>Vendor</Label>
@@ -557,18 +563,18 @@ function IoTab() {
             <div className="grid gap-1.5"><Label className={HLABEL}>Approval object id</Label><Input className={HI} value={form.approvalObjectId} onChange={set("approvalObjectId")} /></div>
           </div>
           <div>
-            <Button className="bg-violet-600 text-white hover:bg-violet-700" onClick={createIo} disabled={busy}>
-              {busy ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <FileText className="mr-1 h-4 w-4" />} Generate IO + brief
+            <Button className="bg-ink text-white hover:bg-night-hover" onClick={createIo} disabled={busy}>
+              {busy ? <Loader2 className="mr-1 h-4 w-4 aos-spin" /> : <FileText className="mr-1 h-4 w-4" />} Generate IO + brief
             </Button>
           </div>
-          {error && <p className="text-[13px] text-red-600">{error}</p>}
+          {error && <p className="text-[13px] text-failed-text">{error}</p>}
         </div>
       </Panel>
 
       {honesty.length > 0 && (
-        <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-4">
-          <h3 className="mb-2 text-[13px] font-semibold text-amber-900">Vendor honesty notes (surfaced in-product)</h3>
-          <ul className="list-disc space-y-1 pl-5 text-[13px] text-amber-900">
+        <div className="rounded-xl bg-needs p-4">
+          <h3 className="mb-2 text-[13px] font-semibold text-ink">Vendor honesty notes (surfaced in-product)</h3>
+          <ul className="list-disc space-y-1 pl-5 text-[13px] text-ink">
             {honesty.map((h, i) => <li key={i}>{h}</li>)}
           </ul>
         </div>
@@ -577,7 +583,7 @@ function IoTab() {
       {io && (
         <Panel
           title={`IO ${io.id}`}
-          action={chip(io.state, "border-stone-200 bg-stone-100 text-stone-600")}
+          action={chip(io.state, "border-line bg-hover text-muted")}
         >
           <div className="flex flex-col gap-3">
             <div className="flex flex-wrap gap-2">
@@ -585,10 +591,10 @@ function IoTab() {
                 <Button key={s} variant="outline" size="sm" onClick={() => transition(s)}>{s.replace(/_/g, " ")}</Button>
               ))}
             </div>
-            <pre className="max-h-96 overflow-auto rounded-md bg-stone-50 p-3 font-mono text-xs text-stone-700">
+            <pre className="max-h-96 overflow-auto rounded-md bg-canvas p-3 font-mono text-xs text-muted">
               {JSON.stringify(io.ioPayload.ioDocument, null, 2)}
             </pre>
-            <p className="text-xs text-amber-800">{ALERT_ONLY_COPY}</p>
+            <p className="text-xs text-ink">{ALERT_ONLY_COPY}</p>
           </div>
         </Panel>
       )}
@@ -633,17 +639,17 @@ function AttributionTab() {
       <div className="flex flex-col gap-3">
         <div className="flex gap-2">
           <Input className={HI} value={campaignId} onChange={(e) => setCampaignId(e.target.value)} placeholder="Campaign id" />
-          <Button className="bg-violet-600 text-white hover:bg-violet-700" onClick={load} disabled={busy || !campaignId}>
-            {busy ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <BarChart3 className="mr-1 h-4 w-4" />} Load
+          <Button className="bg-ink text-white hover:bg-night-hover" onClick={load} disabled={busy || !campaignId}>
+            {busy ? <Loader2 className="mr-1 h-4 w-4 aos-spin" /> : <BarChart3 className="mr-1 h-4 w-4" />} Load
           </Button>
         </div>
-        {error && <p className="text-[13px] text-red-600">{error}</p>}
+        {error && <p className="text-[13px] text-failed-text">{error}</p>}
         {view && layers && (
           <div className="flex flex-col gap-3">
-            <div className="overflow-x-auto rounded-xl border border-stone-200">
+            <div className="overflow-x-auto rounded-xl border border-line">
               <table className="w-full text-left text-[13px]">
                 <thead>
-                  <tr className="border-b border-stone-100 bg-stone-50/60 text-[11px] uppercase tracking-wide text-stone-500">
+                  <tr className="border-b border-line text-xs font-semibold text-muted">
                     <th className="px-3 py-2 font-medium">Layer</th>
                     <th className="px-3 py-2 font-medium">Value</th>
                     <th className="px-3 py-2 font-medium">Note</th>
@@ -651,16 +657,16 @@ function AttributionTab() {
                 </thead>
                 <tbody>
                   {layerRows.map((l) => (
-                    <tr key={l.title} className={`border-b border-stone-100 last:border-0 ${l.deterministic ? "bg-emerald-50/40 hover:bg-emerald-50/60" : "hover:bg-violet-50/40"}`}>
-                      <td className="px-3 py-2 font-medium text-stone-900">{l.title}</td>
-                      <td className="px-3 py-2 font-semibold text-stone-900">{l.value}</td>
-                      <td className="px-3 py-2 text-[12px] text-stone-500">{l.note}</td>
+                    <tr key={l.title} className={`border-b border-line last:border-0 ${l.deterministic ? "bg-hover-paper" : "hover:bg-hover-paper"}`}>
+                      <td className="px-3 py-2 font-medium text-ink">{l.title}</td>
+                      <td className="px-3 py-2 font-semibold text-ink">{l.value}</td>
+                      <td className="px-3 py-2 text-[12px] text-muted">{l.note}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-            <div className="rounded-lg border border-stone-200 bg-stone-50 p-3 text-xs text-stone-600">
+            <div className="rounded-lg border border-line bg-canvas p-3 text-xs text-muted">
               {(view.probabilisticDisclaimer as string) ?? ""}
             </div>
           </div>

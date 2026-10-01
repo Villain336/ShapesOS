@@ -41,11 +41,11 @@ export function CompleteButton({ id }: { id: string }) {
         type="button"
         onClick={act}
         disabled={busy}
-        className="rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs font-medium text-stone-800 hover:border-stone-400 disabled:opacity-50"
+        className="inline-flex h-control-sm cursor-pointer items-center justify-center whitespace-nowrap rounded-full bg-done px-4 text-xs font-semibold text-white aos-press hover:brightness-110 disabled:opacity-50"
       >
         {busy ? "Saving…" : "Mark complete"}
       </button>
-      {error && <span className="text-xs text-red-600">{error}</span>}
+      {error && <span className="text-xs text-failed-text">{error}</span>}
     </span>
   );
 }
@@ -74,7 +74,7 @@ export function ReopenButton({ id }: { id: string }) {
       type="button"
       onClick={act}
       disabled={busy}
-      className="rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs font-medium text-stone-500 hover:border-stone-400 hover:text-stone-800 disabled:opacity-50"
+      className="inline-flex h-control-sm cursor-pointer items-center justify-center whitespace-nowrap rounded-full bg-paper px-4 text-xs font-semibold text-muted shadow-outline aos-press hover:bg-hover-paper hover:text-ink disabled:opacity-50"
     >
       {busy ? "Saving…" : "Re-open"}
     </button>

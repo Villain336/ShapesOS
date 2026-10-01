@@ -4,14 +4,13 @@
 // plus the eval-bar tab showing the gate state that decides whether the
 // model may replace the vendor call. House style diffed against
 // app/dashboard/studio/StudioApp.tsx: dense tables (rows
-// hover:bg-violet-50/40), violet primaries, Lucide icons, sub-tabs with icon
-// + label (active = border-violet-600 text-violet-700), info notes
-// border-stone-200 bg-stone-50.
+// hover:bg-hover-paper), violet primaries, Lucide icons, sub-tabs with icon
+// + label (active = border-ink text-ink), info notes
+// border-line bg-canvas.
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  CircleAlert,
   CircleCheck,
   CircleX,
   FlaskConical,
@@ -24,29 +23,22 @@ import {
 // ── Small atoms (StudioApp parity) ───────────────────────────────────────────
 
 function Chip({ children, tone = "slate" }: { children: React.ReactNode; tone?: "slate" | "violet" | "green" | "amber" | "red" | "blue" }) {
-  const tones: Record<string, string> = {
-    slate: "bg-slate-100 text-slate-600 border-slate-200",
-    violet: "bg-violet-50 text-violet-700 border-violet-200",
-    green: "bg-emerald-50 text-emerald-700 border-emerald-200",
-    amber: "bg-amber-50 text-amber-700 border-amber-200",
-    red: "bg-red-50 text-red-700 border-red-200",
-    blue: "bg-blue-50 text-blue-700 border-blue-200",
-  };
+  void tone;
   return (
-    <span className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-1.5 py-0.5 text-[10px] font-medium leading-tight ${tones[tone]}`}>
+    <span className={"inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-paper px-2 py-0.5 text-[10px] font-semibold leading-tight text-muted shadow-control"}>
       {children}
     </span>
   );
 }
 
 const inputCls =
-  "rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-[13px] text-stone-900 placeholder:text-stone-400 focus:border-violet-400 focus:outline-none";
+  "h-control-sm rounded-md border-[1.5px] border-control bg-paper px-3 text-sm text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none";
 const btnPrimary =
-  "flex items-center gap-1.5 rounded-md bg-violet-600 px-3 py-1.5 text-[13px] font-medium text-white hover:bg-violet-700 disabled:opacity-40";
-const thCls = "px-2.5 py-1.5 text-left text-[11px] font-semibold uppercase tracking-wide text-stone-500";
-const tdCls = "px-2.5 py-1.5 text-[13px] text-stone-800";
-const rowCls = "border-t border-stone-100 hover:bg-violet-50/40";
-const noteCls = "rounded-md border border-stone-200 bg-stone-50 px-3 py-2 text-[12px] text-stone-600";
+  "inline-flex h-control-sm cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-night-hover focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--aos-focus-halo)] disabled:opacity-40";
+const thCls = "px-2.5 py-1.5 text-left text-[11px] font-semibold uppercase tracking-wide text-muted";
+const tdCls = "px-2.5 py-1.5 text-[13px] text-ink";
+const rowCls = "border-t border-line hover:bg-hover-paper";
+const noteCls = "rounded-md border border-line bg-canvas px-3 py-2 text-[12px] text-muted";
 
 // ── Types (mirror lib/intelligence/difficulty wire shapes) ──────────────────
 
@@ -123,7 +115,7 @@ function halfWidth(estimate: number, band: [number, number]): number {
 
 function ProvenanceCell({ p }: { p: InputsProvenance }) {
   const fed = p.authoritySources.filter((s) => s.domainsCovered > 0);
-  if (fed.length === 0) return <span className="text-stone-400">no authority</span>;
+  if (fed.length === 0) return <span className="text-subtle">no authority</span>;
   return (
     <div className="flex flex-wrap gap-1">
       {fed.map((s) => (
@@ -244,11 +236,11 @@ function EstimatesTab({
           aria-label="Own domain"
         />
         <button className={btnPrimary} onClick={runEstimate} disabled={running}>
-          {running ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
+          {running ? <Loader2 className="h-3.5 w-3.5 aos-spin" /> : <Play className="h-3.5 w-3.5" />}
           Estimate
         </button>
         <div className="relative ml-auto">
-          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-stone-400" />
+          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-subtle" />
           <input
             className={`${inputCls} w-48 pl-8`}
             placeholder="filter keywords…"
@@ -259,16 +251,16 @@ function EstimatesTab({
       </div>
 
       {error && (
-        <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-800">
-          <CircleAlert className="mt-0.5 h-4 w-4 shrink-0" />
+        <div role="alert" className="flex items-start gap-2 rounded-lg border border-failed bg-failed-tint px-3 py-2 text-[12px] text-failed-text">
+          <span className="mt-1 size-2.5 shrink-0 rounded-[2px] bg-failed" aria-hidden />
           <span>{error}</span>
         </div>
       )}
 
-      <div className="overflow-hidden rounded-md border border-stone-200 bg-white">
+      <div className="overflow-hidden rounded-md border border-line bg-white">
         <table className="w-full border-collapse">
           <thead>
-            <tr className="bg-stone-50/60">
+            <tr className="bg-canvas">
               <th className={thCls}>Keyword</th>
               <th className={`${thCls} text-right`}>KD</th>
               <th className={thCls}>± Band</th>
@@ -282,7 +274,7 @@ function EstimatesTab({
           <tbody>
             {filtered.length === 0 && (
               <tr className={rowCls}>
-                <td className={`${tdCls} text-stone-500`} colSpan={8}>
+                <td className={`${tdCls} text-muted`} colSpan={8}>
                   No estimates yet — run one above. Every estimate is versioned; model bumps never rewrite history.
                 </td>
               </tr>
@@ -294,14 +286,14 @@ function EstimatesTab({
                 <tr key={e.id} className={rowCls}>
                   <td className={`${tdCls} font-medium`}>{e.keyword}</td>
                   <td className={`${tdCls} text-right tabular-nums font-semibold`}>{e.estimate}</td>
-                  <td className={`${tdCls} tabular-nums text-stone-600`}>
-                    ±{hw} <span className="text-stone-400">[{e.uncertaintyBand[0]}–{e.uncertaintyBand[1]}]</span>
+                  <td className={`${tdCls} tabular-nums text-muted`}>
+                    ±{hw} <span className="text-subtle">[{e.uncertaintyBand[0]}–{e.uncertaintyBand[1]}]</span>
                   </td>
                   <td className={tdCls}>
                     {e.inputsProvenance.volumeBand ? (
                       <span className="tabular-nums">{e.inputsProvenance.volumeBand}</span>
                     ) : (
-                      <span className="text-stone-400">unknown</span>
+                      <span className="text-subtle">unknown</span>
                     )}
                   </td>
                   <td className={tdCls}>
@@ -317,7 +309,7 @@ function EstimatesTab({
                       <Chip tone="violet">model live</Chip>
                     )}
                   </td>
-                  <td className={`${tdCls} whitespace-nowrap text-stone-500`}>
+                  <td className={`${tdCls} whitespace-nowrap text-muted`}>
                     {new Date(e.evaluatedAt).toLocaleString()}
                   </td>
                 </tr>
@@ -373,47 +365,47 @@ function EvalTab({ gate, modelVersion }: { gate: GateStatus | null; modelVersion
   return (
     <div className="flex flex-col gap-4">
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <div className="rounded-md border border-stone-200 bg-white px-3 py-2.5">
-          <div className="text-[11px] font-medium uppercase tracking-wide text-stone-500">Gate</div>
+        <div className="rounded-md border border-line bg-white px-3 py-2.5">
+          <div className="text-[11px] font-medium uppercase tracking-wide text-muted">Gate</div>
           <div className="mt-1 flex items-center gap-1.5">
             {gate == null ? (
-              <span className="text-[13px] text-stone-400">loading…</span>
+              <span className="text-[13px] text-subtle">loading…</span>
             ) : gate.replaceVendor ? (
-              <span className="inline-flex items-center gap-1 text-[13px] font-semibold text-violet-700">
+              <span className="inline-flex items-center gap-1 text-[13px] font-semibold text-ink">
                 <CircleCheck className="h-4 w-4" /> open — model replaces vendor
               </span>
             ) : (
-              <span className="inline-flex items-center gap-1 text-[13px] font-semibold text-amber-700">
+              <span className="inline-flex items-center gap-1 text-[13px] font-semibold text-muted">
                 <CircleX className="h-4 w-4" /> closed — vendor stays
               </span>
             )}
           </div>
         </div>
-        <div className="rounded-md border border-stone-200 bg-white px-3 py-2.5">
-          <div className="text-[11px] font-medium uppercase tracking-wide text-stone-500">Model version</div>
-          <div className="mt-1 font-mono text-[15px] font-bold text-stone-900">{modelVersion}</div>
-          <div className="mt-0.5 text-[11px] text-stone-500">a bump closes the gate until re-evaluated</div>
+        <div className="rounded-md border border-line bg-white px-3 py-2.5">
+          <div className="text-[11px] font-medium uppercase tracking-wide text-muted">Model version</div>
+          <div className="mt-1 font-mono text-[15px] font-bold text-ink">{modelVersion}</div>
+          <div className="mt-0.5 text-[11px] text-muted">a bump closes the gate until re-evaluated</div>
         </div>
-        <div className="rounded-md border border-stone-200 bg-white px-3 py-2.5">
-          <div className="text-[11px] font-medium uppercase tracking-wide text-stone-500">Last live eval</div>
-          <div className="mt-1 text-[13px] font-semibold text-stone-900">
+        <div className="rounded-md border border-line bg-white px-3 py-2.5">
+          <div className="text-[11px] font-medium uppercase tracking-wide text-muted">Last live eval</div>
+          <div className="mt-1 text-[13px] font-semibold text-ink">
             {state?.evaluatedAt ? new Date(state.evaluatedAt).toLocaleString() : "never"}
           </div>
-          <div className="mt-0.5 text-[11px] text-stone-500">paid reference: DataForSEO bulk difficulty</div>
+          <div className="mt-0.5 text-[11px] text-muted">paid reference: DataForSEO bulk difficulty</div>
         </div>
-        <div className="rounded-md border border-stone-200 bg-white px-3 py-2.5">
-          <div className="text-[11px] font-medium uppercase tracking-wide text-stone-500">Verdict</div>
-          <div className="mt-1 text-[13px] font-semibold text-stone-900">
+        <div className="rounded-md border border-line bg-white px-3 py-2.5">
+          <div className="text-[11px] font-medium uppercase tracking-wide text-muted">Verdict</div>
+          <div className="mt-1 text-[13px] font-semibold text-ink">
             {state == null ? "—" : state.passed ? "PASS" : "not passed"}
           </div>
-          <div className="mt-0.5 text-[11px] text-stone-500">all four criteria must hold</div>
+          <div className="mt-0.5 text-[11px] text-muted">all four criteria must hold</div>
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-md border border-stone-200 bg-white">
+      <div className="overflow-hidden rounded-md border border-line bg-white">
         <table className="w-full border-collapse">
           <thead>
-            <tr className="bg-stone-50/60">
+            <tr className="bg-canvas">
               <th className={thCls}>Criterion</th>
               <th className={thCls}>Bar</th>
               <th className={thCls}>Current</th>
@@ -427,16 +419,16 @@ function EvalTab({ gate, modelVersion }: { gate: GateStatus | null; modelVersion
                 <tr key={r.name} className={rowCls}>
                   <td className={tdCls}>{r.name}</td>
                   <td className={`${tdCls} tabular-nums`}>{r.bar}</td>
-                  <td className={`${tdCls} tabular-nums`}>{cur ? cur.text : <span className="text-stone-400">—</span>}</td>
+                  <td className={`${tdCls} tabular-nums`}>{cur ? cur.text : <span className="text-subtle">—</span>}</td>
                   <td className={tdCls}>
                     {cur == null ? (
-                      <span className="text-stone-400">unevaluated</span>
+                      <span className="text-subtle">unevaluated</span>
                     ) : cur.ok ? (
-                      <span className="inline-flex items-center gap-1 text-emerald-700">
+                      <span className="inline-flex items-center gap-1 text-ink">
                         <CircleCheck className="h-3.5 w-3.5" /> pass
                       </span>
                     ) : (
-                      <span className="inline-flex items-center gap-1 text-red-700">
+                      <span className="inline-flex items-center gap-1 text-failed-text">
                         <CircleX className="h-3.5 w-3.5" /> fail
                       </span>
                     )}
@@ -449,7 +441,7 @@ function EvalTab({ gate, modelVersion }: { gate: GateStatus | null; modelVersion
       </div>
 
       <div className={noteCls}>
-        <span className="font-medium text-stone-700">How to evaluate.</span> The bar is checked on a held-out
+        <span className="font-medium text-muted">How to evaluate.</span> The bar is checked on a held-out
         set of ≥ 50 keywords spanning the difficulty deciles, against DataForSEO{" "}
         <span className="font-mono text-[12px]">labs/bulk_keyword_difficulty</span> ($0.132/1K — ~$0.01 for the
         60-keyword set) as the paid reference. Ordering matters most: keyword research shows rankings, and a
@@ -457,7 +449,7 @@ function EvalTab({ gate, modelVersion }: { gate: GateStatus | null; modelVersion
       </div>
 
       <div className={noteCls}>
-        <span className="font-medium text-stone-700">Run it.</span>{" "}
+        <span className="font-medium text-muted">Run it.</span>{" "}
         <span className="font-mono text-[12px]">npx tsx scripts/eval-difficulty.mts</span> runs the CI-safe
         fixture eval (no keys, no network — guards model math, not the gate).{" "}
         <span className="font-mono text-[12px]">npx tsx scripts/eval-difficulty.mts --live --workspace &lt;id&gt; --write-state</span>{" "}
@@ -505,7 +497,7 @@ export function DifficultyClient() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex gap-1 border-b border-stone-200">
+      <div className="flex gap-1 border-b border-line">
         {TABS.map((t) => {
           const Icon = t.icon;
           const active = tab === t.id;
@@ -514,7 +506,7 @@ export function DifficultyClient() {
               key={t.id}
               onClick={() => setTab(t.id)}
               className={`-mb-px flex items-center gap-1.5 border-b-2 px-3 py-2 text-[13px] font-medium ${
-                active ? "border-violet-600 text-violet-700" : "border-transparent text-stone-500 hover:text-stone-800"
+                active ? "border-ink text-ink" : "border-transparent text-muted hover:text-ink"
               }`}
             >
               <Icon className="h-4 w-4" />
@@ -524,8 +516,8 @@ export function DifficultyClient() {
         })}
       </div>
       {loading ? (
-        <div className="flex items-center gap-2 text-[13px] text-stone-500">
-          <Loader2 className="h-4 w-4 animate-spin" /> Loading estimates…
+        <div className="flex items-center gap-2 text-[13px] text-muted">
+          <Loader2 className="h-4 w-4 aos-spin" /> Loading estimates…
         </div>
       ) : (
         <>

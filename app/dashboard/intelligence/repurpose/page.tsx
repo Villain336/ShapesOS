@@ -26,18 +26,18 @@ export default async function RepurposePage() {
   if (!membership) redirect("/dashboard");
 
   return (
-    <div className="flex h-full flex-col gap-4 bg-[#FAFAF7] p-4 md:p-6">
+    <div className="flex h-full flex-col gap-4 bg-canvas p-4 md:p-6">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-stone-900">Repurpose</h1>
-          <p className="mt-0.5 max-w-2xl text-[13px] text-stone-500">
+          <h1 className="aos-heading">Repurpose</h1>
+          <p className="mt-0.5 max-w-2xl text-[13px] text-muted">
             Turn expert-corpus knowledge into derivative assets. Retrieval grounds every
             asset in cited sources; the copy is always synthesized fresh — never verbatim.
           </p>
         </div>
         <Link
           href="/dashboard/intelligence/corpus"
-          className="flex shrink-0 items-center gap-1.5 rounded-md border border-stone-200 bg-white px-3 py-1.5 text-[13px] font-medium text-stone-700 hover:bg-stone-50"
+          className="flex shrink-0 items-center gap-1.5 rounded-md border border-line bg-white px-3 py-1.5 text-[13px] font-medium text-muted hover:bg-hover-paper"
         >
           <Database className="h-3.5 w-3.5" /> Expert corpus
         </Link>

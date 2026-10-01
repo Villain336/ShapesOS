@@ -6,7 +6,6 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  AlertTriangle,
   ArrowUpRight,
   BarChart3,
   CheckCircle2,
@@ -22,35 +21,28 @@ import {
 
 // ── Small atoms (StudioApp.tsx pattern) ──────────────────────────────────────
 
+// Source badges are category chips — neutral by default.
 function SourceBadge({ source }: { source: string }) {
-  const tones: Record<string, string> = {
-    hacker_news: "bg-amber-50 text-amber-700 border-amber-200",
-    reddit: "bg-orange-50 text-orange-700 border-orange-200",
-    rss: "bg-slate-100 text-slate-600 border-slate-200",
-  };
   const labels: Record<string, string> = {
     hacker_news: "HN",
     reddit: "Reddit",
     rss: "RSS",
   };
-  const tone = tones[source] ?? tones.rss;
   return (
-    <span
-      className={`inline-flex items-center whitespace-nowrap rounded-full border px-1.5 py-0.5 text-[10px] font-medium leading-tight ${tone}`}
-    >
+    <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-paper px-2 py-0.5 text-[10px] font-semibold leading-tight text-muted shadow-control">
       {labels[source] ?? source}
     </span>
   );
 }
 
 const inputCls =
-  "rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-[13px] text-stone-900 placeholder:text-stone-400 focus:border-violet-400 focus:outline-none";
+  "h-control-sm rounded-md border-[1.5px] border-control bg-paper px-3 text-sm text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none";
 
 const btnPrimary =
-  "flex items-center gap-1.5 rounded-md bg-violet-600 px-3 py-1.5 text-[13px] font-medium text-white hover:bg-violet-700 disabled:opacity-40";
+  "inline-flex h-control-sm cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-night-hover focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--aos-focus-halo)] disabled:opacity-40";
 
 const btnGhost =
-  "flex items-center gap-1.5 rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-[13px] text-stone-700 hover:bg-stone-50 disabled:opacity-40";
+  "inline-flex h-control-sm cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-paper px-4 text-sm font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--aos-focus-halo)] disabled:opacity-40";
 
 function ageOf(iso: string): string {
   const ms = Date.now() - new Date(iso).getTime();
@@ -232,11 +224,11 @@ function QueueTab() {
           ))}
         </select>
         <button onClick={() => runScan(true)} disabled={scanning} className={btnGhost}>
-          {scanning ? <Loader2 size={14} className="animate-spin" /> : <ExternalLink size={14} />}
+          {scanning ? <Loader2 size={14} className="aos-spin" /> : <ExternalLink size={14} />}
           Preview opportunities
         </button>
         <button onClick={() => runScan(false)} disabled={scanning} className={btnPrimary}>
-          {scanning ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+          {scanning ? <Loader2 size={14} className="aos-spin" /> : <Plus size={14} />}
           Scan & draft
         </button>
         <button onClick={load} className={btnGhost} aria-label="Refresh queue">
@@ -248,14 +240,14 @@ function QueueTab() {
         </a>
       </div>
 
-      <div className="rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-[12px] text-stone-500">
+      <div className="rounded-lg border border-line bg-canvas px-3 py-2 text-[12px] text-muted">
         Draft-first, always: scanning drafts replies and queues them in the approvals inbox.
         A human edits and posts natively — Marketr never posts, votes, or messages on your
         behalf. Drafts failing the taste check never reach the inbox.
       </div>
 
-      <details className="rounded-lg border border-stone-200 bg-white px-3 py-2">
-        <summary className="cursor-pointer text-[13px] font-medium text-stone-700">
+      <details className="rounded-lg border border-line bg-white px-3 py-2">
+        <summary className="cursor-pointer text-[13px] font-medium text-muted">
           RSS feeds for this scan (optional)
         </summary>
         <textarea
@@ -268,8 +260,8 @@ function QueueTab() {
       </details>
 
       {error && (
-        <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-700">
-          <AlertTriangle size={15} className="shrink-0" />
+        <div role="alert" className="flex items-center gap-2 rounded-lg border border-failed bg-failed-tint px-3 py-2 text-[13px] text-failed-text">
+          <span className="size-2.5 shrink-0 rounded-[2px] bg-failed" aria-hidden />
           {error}
           <button onClick={() => setError(null)} className="ml-auto" aria-label="Dismiss error">
             <X size={14} />
@@ -278,8 +270,8 @@ function QueueTab() {
       )}
 
       {report && (
-        <div className="rounded-lg border border-violet-200 bg-violet-50/50 px-3 py-2.5 text-[13px]">
-          <div className="font-medium text-stone-900">
+        <div className="rounded-lg border border-line bg-canvas px-3 py-2.5 text-[13px]">
+          <div className="font-medium text-ink">
             Scan {report.dryRun ? "preview" : "complete"} — {report.opportunities.length}{" "}
             opportunit{report.opportunities.length === 1 ? "y" : "ies"} found
             {!report.dryRun && (
@@ -288,7 +280,7 @@ function QueueTab() {
               </>
             )}
           </div>
-          <div className="mt-1 flex flex-wrap gap-2 text-[12px] text-stone-500">
+          <div className="mt-1 flex flex-wrap gap-2 text-[12px] text-muted">
             {report.sources.map((s) => (
               <span key={s.source}>
                 <SourceBadge source={s.source} /> {s.status}: {s.detail}
@@ -296,19 +288,19 @@ function QueueTab() {
             ))}
           </div>
           {report.dryRun && report.opportunities.length > 0 && (
-            <ul className="mt-2 list-disc space-y-1 pl-5 text-stone-700">
+            <ul className="mt-2 list-disc space-y-1 pl-5 text-muted">
               {report.opportunities.slice(0, 8).map((o) => (
                 <li key={o.url}>
-                  <a href={o.url} target="_blank" rel="noreferrer" className="text-violet-700 hover:underline">
+                  <a href={o.url} target="_blank" rel="noreferrer" className="text-ink hover:underline">
                     {o.title}
                   </a>{" "}
-                  <span className="text-stone-500">— {o.relevanceReason}</span>
+                  <span className="text-muted">— {o.relevanceReason}</span>
                 </li>
               ))}
             </ul>
           )}
           {report.tasteRejected.length > 0 && (
-            <div className="mt-2 text-[12px] text-amber-700">
+            <div className="mt-2 text-[12px] text-muted">
               {report.tasteRejected.length} draft(s) failed the taste check and were logged, not
               queued: {report.tasteRejected.map((t) => t.failures[0]).join(" · ")}
             </div>
@@ -317,24 +309,24 @@ function QueueTab() {
       )}
 
       {items === null ? (
-        <div className="flex items-center gap-2 text-[13px] text-stone-500">
-          <Loader2 size={16} className="animate-spin" />
+        <div className="flex items-center gap-2 text-[13px] text-muted">
+          <Loader2 size={16} className="aos-spin" />
           Loading opportunity queue…
         </div>
       ) : filtered.length === 0 ? (
-        <div className="flex flex-col items-center gap-2 rounded-lg border border-stone-200 bg-white px-6 py-12 text-center">
-          <MessagesSquare size={28} className="text-stone-300" />
-          <div className="text-[14px] font-semibold text-stone-900">Queue is empty</div>
-          <div className="max-w-[360px] text-[13px] text-stone-500">
+        <div className="flex flex-col items-center gap-2 rounded-lg border border-line bg-white px-6 py-12 text-center">
+          <MessagesSquare size={28} className="text-subtle" />
+          <div className="text-[14px] font-semibold text-ink">Queue is empty</div>
+          <div className="max-w-[360px] text-[13px] text-muted">
             Run “Scan & draft” to find live threads and draft replies. Passing drafts land in the
             approvals inbox for your sign-off.
           </div>
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-stone-200 bg-white">
+        <div className="overflow-x-auto rounded-lg border border-line bg-white">
           <table className="w-full min-w-[860px] text-left text-[13px]">
             <thead>
-              <tr className="border-b border-stone-100 bg-stone-50/60 text-[11px] uppercase tracking-wide text-stone-500">
+              <tr className="border-b border-line text-xs font-semibold text-muted">
                 <th className="px-3 py-2 font-medium">Source</th>
                 <th className="px-3 py-2 font-medium">Thread</th>
                 <th className="px-3 py-2 font-medium">Why relevant</th>
@@ -344,51 +336,51 @@ function QueueTab() {
             </thead>
             <tbody>
               {filtered.map((i) => (
-                <tr key={i.id} className="border-b border-stone-100 last:border-0 hover:bg-violet-50/40">
+                <tr key={i.id} className="border-b border-line last:border-0 hover:bg-hover-paper">
                   <td className="px-3 py-2.5 align-top">
                     <SourceBadge source={i.source} />
-                    {i.feedName && <div className="mt-1 text-[11px] text-stone-400">{i.feedName}</div>}
+                    {i.feedName && <div className="mt-1 text-[11px] text-subtle">{i.feedName}</div>}
                   </td>
                   <td className="max-w-[220px] px-3 py-2.5 align-top">
                     <a
                       href={i.threadUrl}
                       target="_blank"
                       rel="noreferrer"
-                      className="font-medium text-stone-900 hover:text-violet-700 hover:underline"
+                      className="font-medium text-ink hover:text-ink hover:underline"
                       title={i.thread}
                     >
                       <span className="line-clamp-2">{i.thread}</span>
                     </a>
-                    <div className="mt-0.5 flex items-center gap-1 text-[11px] text-stone-400">
+                    <div className="mt-0.5 flex items-center gap-1 text-[11px] text-subtle">
                       {i.author && <span>by {i.author}</span>}
                       <ArrowUpRight size={11} />
                     </div>
                   </td>
-                  <td className="max-w-[220px] px-3 py-2.5 align-top text-[12px] text-stone-600">
+                  <td className="max-w-[220px] px-3 py-2.5 align-top text-[12px] text-muted">
                     <span className="line-clamp-3" title={i.reason}>
                       {i.reason}
                     </span>
                     {i.matchedKeywords.length > 0 && (
-                      <div className="mt-1 text-[11px] text-stone-400">
+                      <div className="mt-1 text-[11px] text-subtle">
                         {i.matchedKeywords.slice(0, 3).join(", ")}
                       </div>
                     )}
                   </td>
                   <td className="max-w-[260px] px-3 py-2.5 align-top">
                     <p
-                      className={`text-[12px] text-stone-600 ${expanded === i.id ? "" : "line-clamp-3"}`}
+                      className={`text-[12px] text-muted ${expanded === i.id ? "" : "line-clamp-3"}`}
                       title={i.draft}
                     >
                       {i.draft}
                     </p>
                     <button
                       onClick={() => setExpanded(expanded === i.id ? null : i.id)}
-                      className="mt-1 text-[11px] font-medium text-violet-700 hover:underline"
+                      className="mt-1 text-[11px] font-medium text-ink hover:underline"
                     >
                       {expanded === i.id ? "Show less" : "Show full draft"}
                     </button>
                   </td>
-                  <td className="whitespace-nowrap px-3 py-2.5 align-top text-stone-500">
+                  <td className="whitespace-nowrap px-3 py-2.5 align-top text-muted">
                     {ageOf(i.createdAt)}
                   </td>
                 </tr>
@@ -398,9 +390,9 @@ function QueueTab() {
         </div>
       )}
 
-      <p className="text-[12px] text-stone-500">
+      <p className="text-[12px] text-muted">
         Drafts are decided in the{" "}
-        <a href="/dashboard/approvals" className="font-medium text-violet-700 hover:underline">
+        <a href="/dashboard/approvals" className="font-medium text-ink hover:underline">
           approvals inbox
         </a>
         . Approving means “ok to post natively” — you still post it yourself, in your own voice.
@@ -479,12 +471,12 @@ function OutcomesTab() {
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="rounded-lg border border-stone-200 bg-white p-3">
-        <div className="mb-2 text-[13px] font-semibold text-stone-900">
+      <div className="rounded-lg border border-line bg-white p-3">
+        <div className="mb-2 text-[13px] font-semibold text-ink">
           Record a posted outcome
         </div>
         <div className="flex flex-wrap items-end gap-2">
-          <label className="flex flex-col gap-1 text-[12px] text-stone-500">
+          <label className="flex flex-col gap-1 text-[12px] text-muted">
             Queued draft
             <select
               value={form.approvalId}
@@ -504,7 +496,7 @@ function OutcomesTab() {
             ["replies", "Replies"],
             ["traffic", "Visits"],
           ].map(([key, label]) => (
-            <label key={key} className="flex flex-col gap-1 text-[12px] text-stone-500">
+            <label key={key} className="flex flex-col gap-1 text-[12px] text-muted">
               {label}
               <input
                 value={form[key as "upvotes" | "replies" | "traffic"]}
@@ -515,7 +507,7 @@ function OutcomesTab() {
               />
             </label>
           ))}
-          <label className="flex flex-col gap-1 text-[12px] text-stone-500">
+          <label className="flex flex-col gap-1 text-[12px] text-muted">
             Note
             <input
               value={form.note}
@@ -525,19 +517,19 @@ function OutcomesTab() {
             />
           </label>
           <button onClick={recordOutcome} disabled={saving} className={btnPrimary}>
-            {saving ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
+            {saving ? <Loader2 size={14} className="aos-spin" /> : <CheckCircle2 size={14} />}
             Record posted
           </button>
         </div>
-        <p className="mt-2 text-[12px] text-stone-500">
+        <p className="mt-2 text-[12px] text-muted">
           After you post a draft natively, record what happened. Outcomes feed M3’s
           branded-mention tracking.
         </p>
       </div>
 
       {error && (
-        <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-700">
-          <AlertTriangle size={15} className="shrink-0" />
+        <div role="alert" className="flex items-center gap-2 rounded-lg border border-failed bg-failed-tint px-3 py-2 text-[13px] text-failed-text">
+          <span className="size-2.5 shrink-0 rounded-[2px] bg-failed" aria-hidden />
           {error}
           <button onClick={() => setError(null)} className="ml-auto" aria-label="Dismiss error">
             <X size={14} />
@@ -546,23 +538,23 @@ function OutcomesTab() {
       )}
 
       {outcomes === null ? (
-        <div className="flex items-center gap-2 text-[13px] text-stone-500">
-          <Loader2 size={16} className="animate-spin" />
+        <div className="flex items-center gap-2 text-[13px] text-muted">
+          <Loader2 size={16} className="aos-spin" />
           Loading outcomes…
         </div>
       ) : outcomes.length === 0 ? (
-        <div className="flex flex-col items-center gap-2 rounded-lg border border-stone-200 bg-white px-6 py-12 text-center">
-          <BarChart3 size={28} className="text-stone-300" />
-          <div className="text-[14px] font-semibold text-stone-900">No posted outcomes yet</div>
-          <div className="max-w-[360px] text-[13px] text-stone-500">
+        <div className="flex flex-col items-center gap-2 rounded-lg border border-line bg-white px-6 py-12 text-center">
+          <BarChart3 size={28} className="text-subtle" />
+          <div className="text-[14px] font-semibold text-ink">No posted outcomes yet</div>
+          <div className="max-w-[360px] text-[13px] text-muted">
             Post a queued draft natively, then record the outcome above to close the loop.
           </div>
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-stone-200 bg-white">
+        <div className="overflow-x-auto rounded-lg border border-line bg-white">
           <table className="w-full min-w-[760px] text-left text-[13px]">
             <thead>
-              <tr className="border-b border-stone-100 bg-stone-50/60 text-[11px] uppercase tracking-wide text-stone-500">
+              <tr className="border-b border-line text-xs font-semibold text-muted">
                 <th className="px-3 py-2 font-medium">Source</th>
                 <th className="px-3 py-2 font-medium">Thread</th>
                 <th className="px-3 py-2 font-medium">Posted</th>
@@ -576,7 +568,7 @@ function OutcomesTab() {
               {outcomes.map((o) => (
                 <tr
                   key={o.approvalId}
-                  className="border-b border-stone-100 last:border-0 hover:bg-violet-50/40"
+                  className="border-b border-line last:border-0 hover:bg-hover-paper"
                 >
                   <td className="px-3 py-2.5 align-top">
                     <SourceBadge source={o.source} />
@@ -586,25 +578,25 @@ function OutcomesTab() {
                       href={o.threadUrl}
                       target="_blank"
                       rel="noreferrer"
-                      className="font-medium text-stone-900 hover:text-violet-700 hover:underline"
+                      className="font-medium text-ink hover:text-ink hover:underline"
                       title={o.threadTitle}
                     >
                       <span className="line-clamp-2">{o.threadTitle || "—"}</span>
                     </a>
                   </td>
-                  <td className="whitespace-nowrap px-3 py-2.5 align-top text-stone-500">
+                  <td className="whitespace-nowrap px-3 py-2.5 align-top text-muted">
                     {o.postedAt ? new Date(o.postedAt).toLocaleDateString() : "—"}
                   </td>
-                  <td className="px-3 py-2.5 align-top font-medium text-stone-800">
+                  <td className="px-3 py-2.5 align-top font-medium text-ink">
                     {o.upvotes ?? "—"}
                   </td>
-                  <td className="px-3 py-2.5 align-top font-medium text-stone-800">
+                  <td className="px-3 py-2.5 align-top font-medium text-ink">
                     {o.replies ?? "—"}
                   </td>
-                  <td className="px-3 py-2.5 align-top font-medium text-stone-800">
+                  <td className="px-3 py-2.5 align-top font-medium text-ink">
                     {o.traffic ?? "—"}
                   </td>
-                  <td className="max-w-[200px] px-3 py-2.5 align-top text-[12px] text-stone-500">
+                  <td className="max-w-[200px] px-3 py-2.5 align-top text-[12px] text-muted">
                     <span className="line-clamp-2" title={o.note ?? ""}>
                       {o.note ?? "—"}
                     </span>
@@ -627,29 +619,29 @@ function SourcesTab() {
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="rounded-lg border border-stone-200 bg-white p-4">
+      <div className="rounded-lg border border-line bg-white p-4">
         <div className="flex items-center gap-2">
           <SourceBadge source="hacker_news" />
-          <span className="text-[14px] font-semibold text-stone-900">Hacker News</span>
-          <span className="ml-auto inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700">
+          <span className="text-[14px] font-semibold text-ink">Hacker News</span>
+          <span className="ml-auto inline-flex items-center gap-1 rounded-full bg-paper px-2 py-0.5 text-[10px] font-semibold text-muted shadow-control">
             <CheckCircle2 size={11} /> Live — no key needed
           </span>
         </div>
-        <p className="mt-2 text-[13px] text-stone-500">
+        <p className="mt-2 text-[13px] text-muted">
           Searched via the free Algolia HN Search API (stories + comments). Queries default to
           your tracked keywords plus competitor domains.
         </p>
       </div>
 
-      <div className="rounded-lg border border-stone-200 bg-white p-4">
+      <div className="rounded-lg border border-line bg-white p-4">
         <div className="flex items-center gap-2">
           <SourceBadge source="reddit" />
-          <span className="text-[14px] font-semibold text-stone-900">Reddit</span>
-          <span className="ml-auto inline-flex items-center rounded-full border border-slate-200 bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-600">
+          <span className="text-[14px] font-semibold text-ink">Reddit</span>
+          <span className="ml-auto inline-flex items-center rounded-full bg-paper px-2 py-0.5 text-[10px] font-semibold text-muted shadow-control">
             Official API only — your own OAuth
           </span>
         </div>
-        <div className="mt-2 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-[12px] text-stone-500">
+        <div className="mt-2 rounded-lg border border-line bg-canvas px-3 py-2 text-[12px] text-muted">
           Marketr never scrapes Reddit and never proxies it at platform scale. To enable Reddit
           opportunities, create a script app at reddit.com/prefs/apps (your own account), then
           supply the client ID, secret, refresh token, and username when running a scan. Read-only
@@ -659,14 +651,14 @@ function SourcesTab() {
         </div>
       </div>
 
-      <div className="rounded-lg border border-stone-200 bg-white p-4">
+      <div className="rounded-lg border border-line bg-white p-4">
         <div className="flex items-center gap-2">
           <SourceBadge source="rss" />
-          <span className="text-[14px] font-semibold text-stone-900">Niche forums (RSS)</span>
+          <span className="text-[14px] font-semibold text-ink">Niche forums (RSS)</span>
         </div>
-        <p className="mt-2 text-[13px] text-stone-500">
+        <p className="mt-2 text-[13px] text-muted">
           Paste forum/community feed URLs below — one per line, optionally as{" "}
-          <code className="rounded bg-stone-100 px-1 text-[12px]">Name | https://…/rss</code>.
+          <code className="rounded bg-hover px-1 text-[12px]">Name | https://…/rss</code>.
           They’re sent with each scan (Discourse, NodeBB, Flarum, Substack feeds all work).
         </p>
         <textarea
@@ -690,15 +682,15 @@ function SourcesTab() {
         </div>
       </div>
 
-      <div className="rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-[12px] text-stone-500">
-        <span className="font-medium text-stone-700">Google Alerts baseline:</span> there is no
+      <div className="rounded-lg border border-line bg-canvas px-3 py-2 text-[12px] text-muted">
+        <span className="font-medium text-muted">Google Alerts baseline:</span> there is no
         Alerts API — use the free consumer product (google.com/alerts) for competitor mentions,
         then paste promising thread URLs into a scan’s context or post about them directly. M8
         never scrapes Alerts.
       </div>
 
-      <div className="rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-[12px] text-stone-500">
-        <span className="font-medium text-stone-700">House rules:</span> one account, honest
+      <div className="rounded-lg border border-line bg-canvas px-3 py-2 text-[12px] text-muted">
+        <span className="font-medium text-muted">House rules:</span> one account, honest
         identity. No astroturfing, no fake engagement, no automation of votes or posts.
         Over-polished AI replies get punished by communities — every draft passes a taste check
         before it reaches your inbox.
@@ -713,15 +705,15 @@ export default function CommunityClient() {
   const [tab, setTab] = useState<(typeof TABS)[number]["id"]>("queue");
   return (
     <div>
-      <div className="mb-4 flex gap-1 border-b border-stone-200">
+      <div className="mb-4 flex gap-1 border-b border-line">
         {TABS.map(({ id, label, icon: Icon }) => (
           <button
             key={id}
             onClick={() => setTab(id)}
             className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-[13.5px] font-medium transition ${
               tab === id
-                ? "border-violet-600 text-violet-700"
-                : "border-transparent text-stone-500 hover:text-stone-800"
+                ? "border-ink text-ink"
+                : "border-transparent text-muted hover:text-ink"
             }`}
           >
             <Icon size={15} />

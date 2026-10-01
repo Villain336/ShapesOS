@@ -1,8 +1,8 @@
 // Marketr — Phase 10 M6: data-costs client UI.
 // House style diffed against app/dashboard/studio/StudioApp.tsx:
-// dense tables (rows hover:bg-violet-50/40), violet primaries, Lucide icons,
-// sub-tabs with icon + label (active = border-violet-600 text-violet-700),
-// info notes border-stone-200 bg-stone-50.
+// dense tables (rows hover:bg-hover-paper), violet primaries, Lucide icons,
+// sub-tabs with icon + label (active = border-ink text-ink),
+// info notes border-line bg-canvas.
 "use client";
 
 import { useMemo, useState } from "react";
@@ -13,7 +13,6 @@ import {
   Coins,
   Database,
   Loader2,
-  ShieldAlert,
   XCircle,
 } from "lucide-react";
 import type { DataCostSummary } from "@/lib/intelligence/providers/meter";
@@ -23,29 +22,22 @@ import type { SerpVendorId } from "@/lib/intelligence/providers/types";
 // ── Small atoms (StudioApp parity) ───────────────────────────────────────────
 
 function Chip({ children, tone = "slate" }: { children: React.ReactNode; tone?: "slate" | "violet" | "green" | "amber" | "red" | "blue" }) {
-  const tones: Record<string, string> = {
-    slate: "bg-slate-100 text-slate-600 border-slate-200",
-    violet: "bg-violet-50 text-violet-700 border-violet-200",
-    green: "bg-emerald-50 text-emerald-700 border-emerald-200",
-    amber: "bg-amber-50 text-amber-700 border-amber-200",
-    red: "bg-red-50 text-red-700 border-red-200",
-    blue: "bg-blue-50 text-blue-700 border-blue-200",
-  };
+  void tone;
   return (
-    <span className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-1.5 py-0.5 text-[10px] font-medium leading-tight ${tones[tone]}`}>
+    <span className={"inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-paper px-2 py-0.5 text-[10px] font-semibold leading-tight text-muted shadow-control"}>
       {children}
     </span>
   );
 }
 
 const inputCls =
-  "rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-[13px] text-stone-900 placeholder:text-stone-400 focus:border-violet-400 focus:outline-none";
+  "h-control-sm rounded-md border-[1.5px] border-control bg-paper px-3 text-sm text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none";
 const btnPrimary =
-  "flex items-center gap-1.5 rounded-md bg-violet-600 px-3 py-1.5 text-[13px] font-medium text-white hover:bg-violet-700 disabled:opacity-40";
-const thCls = "px-2.5 py-1.5 text-left text-[11px] font-semibold uppercase tracking-wide text-stone-500";
-const tdCls = "px-2.5 py-1.5 text-[13px] text-stone-800";
-const rowCls = "border-t border-stone-100 hover:bg-violet-50/40";
-const noteCls = "rounded-md border border-stone-200 bg-stone-50 px-3 py-2 text-[12px] text-stone-600";
+  "inline-flex h-control-sm cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-night-hover focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--aos-focus-halo)] disabled:opacity-40";
+const thCls = "px-2.5 py-1.5 text-left text-[11px] font-semibold uppercase tracking-wide text-muted";
+const tdCls = "px-2.5 py-1.5 text-[13px] text-ink";
+const rowCls = "border-t border-line hover:bg-hover-paper";
+const noteCls = "rounded-md border border-line bg-canvas px-3 py-2 text-[12px] text-muted";
 
 function fmtUsd(n: number): string {
   return `$${n.toFixed(4)}`;
@@ -108,40 +100,40 @@ function SpendTab({ summary, period }: { summary: DataCostSummary; period: strin
       </div>
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <div className="rounded-md border border-stone-200 bg-white px-3 py-2.5">
-          <div className="text-[11px] font-medium uppercase tracking-wide text-stone-500">Spend · {summary.period}</div>
-          <div className="mt-1 text-xl font-bold tracking-tight text-stone-900">{fmtUsd(spendUsd)}</div>
+        <div className="rounded-md border border-line bg-white px-3 py-2.5">
+          <div className="text-[11px] font-medium uppercase tracking-wide text-muted">Spend · {summary.period}</div>
+          <div className="mt-1 text-xl font-bold tracking-tight text-ink">{fmtUsd(spendUsd)}</div>
         </div>
-        <div className="rounded-md border border-stone-200 bg-white px-3 py-2.5">
-          <div className="text-[11px] font-medium uppercase tracking-wide text-stone-500">Budget cap</div>
-          <div className="mt-1 text-xl font-bold tracking-tight text-stone-900">
+        <div className="rounded-md border border-line bg-white px-3 py-2.5">
+          <div className="text-[11px] font-medium uppercase tracking-wide text-muted">Budget cap</div>
+          <div className="mt-1 text-xl font-bold tracking-tight text-ink">
             {capUsd != null ? `$${capUsd.toFixed(2)}` : "—"}
           </div>
           {pct != null && (
-            <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-stone-100">
+            <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-hover">
               <div
-                className={`h-full rounded-full ${pct >= 90 ? "bg-red-500" : pct >= 70 ? "bg-amber-500" : "bg-violet-500"}`}
+                className={`h-full rounded-full ${pct >= 90 ? "bg-failed" : pct >= 70 ? "bg-needs" : "bg-ink"}`}
                 style={{ width: `${pct}%` }}
               />
             </div>
           )}
         </div>
-        <div className="rounded-md border border-stone-200 bg-white px-3 py-2.5">
-          <div className="text-[11px] font-medium uppercase tracking-wide text-stone-500">API calls</div>
-          <div className="mt-1 text-xl font-bold tracking-tight text-stone-900">{summary.totalCalls.toLocaleString()}</div>
+        <div className="rounded-md border border-line bg-white px-3 py-2.5">
+          <div className="text-[11px] font-medium uppercase tracking-wide text-muted">API calls</div>
+          <div className="mt-1 text-xl font-bold tracking-tight text-ink">{summary.totalCalls.toLocaleString()}</div>
         </div>
-        <div className="rounded-md border border-stone-200 bg-white px-3 py-2.5">
-          <div className="text-[11px] font-medium uppercase tracking-wide text-stone-500">Cache hit rate</div>
-          <div className="mt-1 text-xl font-bold tracking-tight text-stone-900">
+        <div className="rounded-md border border-line bg-white px-3 py-2.5">
+          <div className="text-[11px] font-medium uppercase tracking-wide text-muted">Cache hit rate</div>
+          <div className="mt-1 text-xl font-bold tracking-tight text-ink">
             {hitRate != null ? `${(hitRate * 100).toFixed(1)}%` : "—"}
           </div>
-          <div className="mt-0.5 text-[11px] text-stone-500">volume lookups served free</div>
+          <div className="mt-0.5 text-[11px] text-muted">volume lookups served free</div>
         </div>
       </div>
 
       {capUsd != null && pct != null && pct >= 80 && (
-        <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-800">
-          <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
+        <div className="flex items-start gap-2.5 rounded-lg bg-needs px-4 py-3 text-[12px] text-ink">
+          <span className="aos-shape aos-shape--needs aos-shape--edged mt-0.5 shrink-0 [--aos-shape-size:14px]" style={{ color: "inherit" }} aria-hidden />
           <span>
             {pct >= 100
               ? "Budget cap reached — new data calls are blocked by the circuit breaker until the cap is raised."
@@ -150,10 +142,10 @@ function SpendTab({ summary, period }: { summary: DataCostSummary; period: strin
         </div>
       )}
 
-      <div className="overflow-hidden rounded-md border border-stone-200 bg-white">
+      <div className="overflow-hidden rounded-md border border-line bg-white">
         <table className="w-full border-collapse">
           <thead>
-            <tr className="bg-stone-50/60">
+            <tr className="bg-canvas">
               <th className={thCls}>Vendor</th>
               <th className={thCls}>Meter</th>
               <th className={`${thCls} text-right`}>Calls</th>
@@ -164,7 +156,7 @@ function SpendTab({ summary, period }: { summary: DataCostSummary; period: strin
           <tbody>
             {summary.rows.length === 0 && (
               <tr className={rowCls}>
-                <td className={`${tdCls} text-stone-500`} colSpan={5}>
+                <td className={`${tdCls} text-muted`} colSpan={5}>
                   No metered calls in {summary.period} yet.
                 </td>
               </tr>
@@ -200,27 +192,27 @@ function CacheTab({ props }: { props: Props }) {
   return (
     <div className="flex flex-col gap-4">
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <div className="rounded-md border border-stone-200 bg-white px-3 py-2.5">
-          <div className="text-[11px] font-medium uppercase tracking-wide text-stone-500">Cached keywords</div>
-          <div className="mt-1 text-xl font-bold tracking-tight text-stone-900">{s.rows.toLocaleString()}</div>
-          <div className="mt-0.5 text-[11px] text-stone-500">shared dedup cache</div>
+        <div className="rounded-md border border-line bg-white px-3 py-2.5">
+          <div className="text-[11px] font-medium uppercase tracking-wide text-muted">Cached keywords</div>
+          <div className="mt-1 text-xl font-bold tracking-tight text-ink">{s.rows.toLocaleString()}</div>
+          <div className="mt-0.5 text-[11px] text-muted">shared dedup cache</div>
         </div>
-        <div className="rounded-md border border-stone-200 bg-white px-3 py-2.5">
-          <div className="text-[11px] font-medium uppercase tracking-wide text-stone-500">Aggregate hits</div>
-          <div className="mt-1 text-xl font-bold tracking-tight text-stone-900">{s.totalHits.toLocaleString()}</div>
-          <div className="mt-0.5 text-[11px] text-stone-500">never per-tenant</div>
+        <div className="rounded-md border border-line bg-white px-3 py-2.5">
+          <div className="text-[11px] font-medium uppercase tracking-wide text-muted">Aggregate hits</div>
+          <div className="mt-1 text-xl font-bold tracking-tight text-ink">{s.totalHits.toLocaleString()}</div>
+          <div className="mt-0.5 text-[11px] text-muted">never per-tenant</div>
         </div>
-        <div className="rounded-md border border-stone-200 bg-white px-3 py-2.5">
-          <div className="text-[11px] font-medium uppercase tracking-wide text-stone-500">Hit rate (period)</div>
-          <div className="mt-1 text-xl font-bold tracking-tight text-stone-900">
+        <div className="rounded-md border border-line bg-white px-3 py-2.5">
+          <div className="text-[11px] font-medium uppercase tracking-wide text-muted">Hit rate (period)</div>
+          <div className="mt-1 text-xl font-bold tracking-tight text-ink">
             {hitRate != null ? `${(hitRate * 100).toFixed(1)}%` : "—"}
           </div>
-          <div className="mt-0.5 text-[11px] text-stone-500">target ~90% at scale</div>
+          <div className="mt-0.5 text-[11px] text-muted">target ~90% at scale</div>
         </div>
-        <div className="rounded-md border border-stone-200 bg-white px-3 py-2.5">
-          <div className="text-[11px] font-medium uppercase tracking-wide text-stone-500">TTL policy</div>
-          <div className="mt-1 text-xl font-bold tracking-tight text-stone-900">{props.cacheTtlDays}d</div>
-          <div className="mt-0.5 text-[11px] text-stone-500">max {props.cacheMaxTtlDays}d from fetch</div>
+        <div className="rounded-md border border-line bg-white px-3 py-2.5">
+          <div className="text-[11px] font-medium uppercase tracking-wide text-muted">TTL policy</div>
+          <div className="mt-1 text-xl font-bold tracking-tight text-ink">{props.cacheTtlDays}d</div>
+          <div className="mt-0.5 text-[11px] text-muted">max {props.cacheMaxTtlDays}d from fetch</div>
         </div>
       </div>
 
@@ -232,7 +224,7 @@ function CacheTab({ props }: { props: Props }) {
       </div>
 
       <div className={noteCls}>
-        <span className="font-medium text-stone-700">Keyword Planner (free volume path) — not connected.</span>{" "}
+        <span className="font-medium text-muted">Keyword Planner (free volume path) — not connected.</span>{" "}
         Planner is free via the Google Ads API but requires a manager account and a ~5-business-day manual
         Basic-access review; Explorer access blocks KeywordPlanIdeaService. Until it&apos;s set up, volume misses
         fall through to vendor clickstream bulk (~$132/1M).
@@ -286,10 +278,10 @@ function RoutingTab({ props }: { props: Props }) {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="overflow-hidden rounded-md border border-stone-200 bg-white">
+      <div className="overflow-hidden rounded-md border border-line bg-white">
         <table className="w-full border-collapse">
           <thead>
-            <tr className="bg-stone-50/60">
+            <tr className="bg-canvas">
               <th className={thCls}>Vendor</th>
               <th className={thCls}>Status</th>
               <th className={thCls}>Configured</th>
@@ -310,11 +302,11 @@ function RoutingTab({ props }: { props: Props }) {
                   </td>
                   <td className={tdCls}>
                     {h.configured ? (
-                      <span className="inline-flex items-center gap-1 text-emerald-700">
+                      <span className="inline-flex items-center gap-1 text-ink">
                         <CheckCircle2 className="h-3.5 w-3.5" /> yes
                       </span>
                     ) : (
-                      <span className="inline-flex items-center gap-1 text-stone-400">
+                      <span className="inline-flex items-center gap-1 text-subtle">
                         <XCircle className="h-3.5 w-3.5" /> no key
                       </span>
                     )}
@@ -341,22 +333,22 @@ function RoutingTab({ props }: { props: Props }) {
       </div>
 
       {props.isAdmin ? (
-        <div className="flex items-center gap-2 rounded-md border border-stone-200 bg-white px-3 py-2.5">
-          <span className="text-[13px] font-medium text-stone-700">Default vendor</span>
+        <div className="flex items-center gap-2 rounded-md border border-line bg-white px-3 py-2.5">
+          <span className="text-[13px] font-medium text-muted">Default vendor</span>
           <select className={inputCls} value={vendor} onChange={(e) => setVendor(e.target.value as SerpVendorId)}>
             <option value="serper">serper</option>
             <option value="dataforseo">dataforseo</option>
             <option value="talordata">talordata</option>
           </select>
           <button className={btnPrimary} onClick={switchVendor} disabled={switching}>
-            {switching ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ArrowLeftRight className="h-3.5 w-3.5" />}
+            {switching ? <Loader2 className="h-3.5 w-3.5 aos-spin" /> : <ArrowLeftRight className="h-3.5 w-3.5" />}
             Switch default vendor
           </button>
-          {error && <span className="text-[12px] text-red-700">{error}</span>}
+          {error && <span className="text-[12px] text-failed-text">{error}</span>}
         </div>
       ) : (
         <div className={noteCls}>
-          <span className="font-medium text-stone-700">Admin role required</span> to switch the default vendor —
+          <span className="font-medium text-muted">Admin role required</span> to switch the default vendor —
           no self-serve vendor switching without approval.
         </div>
       )}
@@ -370,7 +362,7 @@ export function DataCostsClient(props: Props) {
   const [tab, setTab] = useState<TabId>("spend");
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex gap-1 border-b border-stone-200">
+      <div className="flex gap-1 border-b border-line">
         {TABS.map((t) => {
           const Icon = t.icon;
           const active = tab === t.id;
@@ -379,7 +371,7 @@ export function DataCostsClient(props: Props) {
               key={t.id}
               onClick={() => setTab(t.id)}
               className={`-mb-px flex items-center gap-1.5 border-b-2 px-3 py-2 text-[13px] font-medium ${
-                active ? "border-violet-600 text-violet-700" : "border-transparent text-stone-500 hover:text-stone-800"
+                active ? "border-ink text-ink" : "border-transparent text-muted hover:text-ink"
               }`}
             >
               <Icon className="h-4 w-4" />

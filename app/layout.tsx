@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Archivo, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
-import "@/components/crm/crm.css"; // CRM visual system, scoped under .crm
 import "@xyflow/react/dist/style.css"; // React Flow base styles (Business Graph mind-map view)
 
 /* Agentic OS type (Tico 2026-10-01): Archivo for everything, JetBrains Mono

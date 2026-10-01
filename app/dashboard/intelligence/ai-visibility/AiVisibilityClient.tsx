@@ -89,14 +89,14 @@ interface Props {
 }
 
 const inputCls =
-  "rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-[13px] text-stone-900 placeholder:text-stone-400 focus:border-violet-400 focus:outline-none";
+  "h-control-sm rounded-md border-[1.5px] border-control bg-paper px-3 text-sm text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none";
 const btnPrimary =
-  "flex items-center gap-1.5 rounded-md bg-violet-600 px-3 py-1.5 text-[13px] font-medium text-white hover:bg-violet-700 disabled:opacity-40";
+  "inline-flex h-control-sm cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-night-hover focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--aos-focus-halo)] disabled:opacity-40";
 const btnGhost =
-  "flex items-center gap-1.5 rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-[13px] text-stone-700 hover:bg-stone-50 disabled:opacity-40";
+  "inline-flex h-control-sm cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-paper px-4 text-sm font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--aos-focus-halo)] disabled:opacity-40";
 const thCls =
-  "px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-stone-500";
-const tdCls = "px-3 py-2 text-[13px] text-stone-800";
+  "px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-muted";
+const tdCls = "px-3 py-2 text-[13px] text-ink";
 const tabBase =
   "flex items-center gap-1.5 border-b-2 px-3 py-2 text-[13px] font-medium";
 
@@ -111,33 +111,27 @@ function CiBar({ s }: { s: HonestShareJson }) {
   const [lo, hi] = s.confidenceInterval;
   return (
     <div className="flex items-center gap-2">
-      <div className="relative h-2 w-28 overflow-hidden rounded-full bg-stone-100">
+      <div className="relative h-2 w-28 overflow-hidden rounded-full bg-hover">
         <div
-          className="absolute top-0 h-full rounded-full bg-violet-400"
+          className="absolute top-0 h-full rounded-full bg-ink"
           style={{ left: `${lo * 100}%`, width: `${Math.max(2, (hi - lo) * 100)}%` }}
         />
         <div
-          className="absolute top-[-2px] h-[12px] w-[2px] bg-violet-700"
+          className="absolute top-[-2px] h-[12px] w-[2px] bg-ink"
           style={{ left: `calc(${s.share * 100}% - 1px)` }}
         />
       </div>
-      <span className="text-xs text-stone-600">
-        {range(s)} <span className="text-stone-400">(n={s.n})</span>
+      <span className="text-xs text-muted">
+        {range(s)} <span className="text-subtle">(n={s.n})</span>
       </span>
     </div>
   );
 }
 
-function Chip({ tone, children }: { tone: "violet" | "amber" | "green" | "slate" | "red"; children: React.ReactNode }) {
-  const tones: Record<string, string> = {
-    violet: "bg-violet-50 text-violet-700 border-violet-200",
-    amber: "bg-amber-50 text-amber-800 border-amber-200",
-    green: "bg-emerald-50 text-emerald-700 border-emerald-200",
-    slate: "bg-stone-100 text-stone-600 border-stone-200",
-    red: "bg-red-50 text-red-700 border-red-200",
-  };
+function Chip({ tone, children }: { tone?: "violet" | "amber" | "green" | "slate" | "red"; children: React.ReactNode }) {
+  void tone;
   return (
-    <span className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-1.5 py-0.5 text-[10px] font-medium leading-tight ${tones[tone]}`}>
+    <span className={"inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-paper px-2 py-0.5 text-[10px] font-semibold leading-tight text-muted shadow-control"}>
       {children}
     </span>
   );
@@ -225,15 +219,15 @@ export function AiVisibilityClient({ panels, activePanel, summary, ownedDomain, 
   }
 
   return (
-    <div className="flex h-full flex-col gap-4 bg-[#FAFAF7] p-4 md:p-6">
+    <div className="flex h-full flex-col gap-4 bg-canvas p-4 md:p-6">
       {/* Header */}
       <div>
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <h1 className="text-xl font-bold tracking-tight text-stone-900">
+            <h1 className="text-xl font-bold tracking-tight text-ink">
               AI visibility — honest intelligence
             </h1>
-            <p className="mt-0.5 max-w-3xl text-[13px] text-stone-500">
+            <p className="mt-0.5 max-w-3xl text-[13px] text-muted">
               Versioned buyer-prompt panels run against official LLM APIs (N reps), reported as
               per-engine estimated ranges with confidence intervals. No single AI-visibility
               score exists here by design.
@@ -259,12 +253,12 @@ export function AiVisibilityClient({ panels, activePanel, summary, ownedDomain, 
               title="Project that citation-gap briefs belong to"
               className={`${inputCls} w-40`}
             />
-            <button type="submit" className="rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-violet-700">
+            <button type="submit" className="rounded-lg bg-ink px-3 py-1.5 text-xs font-medium text-white hover:bg-night-hover">
               Set
             </button>
           </form>
         </div>
-        <div className="mt-3 flex gap-2 rounded-xl border border-stone-200 bg-stone-50 p-3 text-xs text-stone-700">
+        <div className="mt-3 flex gap-2 rounded-xl border border-line bg-canvas p-3 text-xs text-muted">
           <Info className="mt-0.5 h-4 w-4 shrink-0" />
           <p>
             <strong>API proxy of consumer surfaces</strong> — per-engine spread is the metric.
@@ -276,15 +270,15 @@ export function AiVisibilityClient({ panels, activePanel, summary, ownedDomain, 
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 border-b border-stone-200">
+      <div className="flex gap-1 border-b border-line">
         {TABS.map((t) => (
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
             className={`${tabBase} ${
               tab === t.id
-                ? "border-violet-600 text-violet-700"
-                : "border-transparent text-stone-500 hover:text-stone-700"
+                ? "border-ink text-ink"
+                : "border-transparent text-muted hover:text-ink"
             }`}
           >
             <t.icon className="h-4 w-4" />
@@ -297,22 +291,23 @@ export function AiVisibilityClient({ panels, activePanel, summary, ownedDomain, 
       {tab === "ranges" && (
         <div className="flex flex-col gap-4">
           {!ownedDomain && (
-            <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-              Set your brand domain above to compute citation coverage and ranges.
+            <div className="flex items-start gap-2.5 rounded-xl bg-needs p-4 text-sm text-ink">
+              <span className="aos-shape aos-shape--needs aos-shape--edged mt-0.5 shrink-0 [--aos-shape-size:14px]" style={{ color: "inherit" }} aria-hidden />
+              <span>Set your brand domain above to compute citation coverage and ranges.</span>
             </div>
           )}
           {!summary ? (
-            <div className="rounded-xl border border-stone-200 bg-white p-6 text-sm text-stone-500">
+            <div className="rounded-xl border border-line bg-white p-6 text-sm text-muted">
               {panels.length === 0
                 ? "No prompt panels yet — create one in the Prompt panels tab."
                 : "No observations yet — trigger a run in the Prompt panels tab."}
             </div>
           ) : (
             <>
-              <div className="overflow-hidden rounded-xl border border-stone-200 bg-white">
+              <div className="overflow-hidden rounded-xl border border-line bg-white">
                 <table className="w-full border-collapse">
                   <thead>
-                    <tr className="border-b border-stone-200 bg-stone-50/60">
+                    <tr className="border-b border-line bg-canvas">
                       <th className={thCls}>Engine</th>
                       <th className={thCls}>Obs.</th>
                       <th className={thCls}>Mention estimated range</th>
@@ -323,7 +318,7 @@ export function AiVisibilityClient({ panels, activePanel, summary, ownedDomain, 
                   </thead>
                   <tbody>
                     {summary.perEngine.map((e) => (
-                      <tr key={e.engine} className="border-b border-stone-100 last:border-0 hover:bg-violet-50/40">
+                      <tr key={e.engine} className="border-b border-line last:border-0 hover:bg-hover-paper">
                         <td className={`${tdCls} font-medium capitalize`}>{e.engine}</td>
                         <td className={tdCls}>{e.observations}</td>
                         <td className={tdCls}>
@@ -331,19 +326,20 @@ export function AiVisibilityClient({ panels, activePanel, summary, ownedDomain, 
                         </td>
                         <td className={tdCls}>
                           <span className="font-medium">{pct(e.stability.stability)}</span>{" "}
-                          <span className="text-xs text-stone-400">(n={e.stability.n} reps)</span>
+                          <span className="text-xs text-subtle">(n={e.stability.n} reps)</span>
                         </td>
                         <td className={tdCls}>
                           <div className="flex items-center gap-2">
                             <span>{pct(e.unmentioned.unmentionedShare)}</span>
                             {e.unmentioned.unstable ? (
-                              <Chip tone="amber">
-                                <AlertTriangle className="h-3 w-3" /> unstable &gt;30%
-                              </Chip>
+                              <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-needs px-2 py-0.5 text-[10px] font-semibold leading-tight text-ink">
+                                <span className="aos-shape aos-shape--needs aos-shape--edged [--aos-shape-size:9px]" style={{ color: "inherit" }} aria-hidden />
+                                unstable &gt;30%
+                              </span>
                             ) : (
-                              <Chip tone="green">
+                              <span className="inline-flex items-center gap-1 text-[12px] font-semibold text-ink">
                                 <CheckCircle2 className="h-3 w-3" /> stable
-                              </Chip>
+                              </span>
                             )}
                           </div>
                         </td>
@@ -355,29 +351,29 @@ export function AiVisibilityClient({ panels, activePanel, summary, ownedDomain, 
                   </tbody>
                 </table>
               </div>
-              <div className="flex flex-wrap gap-2 text-xs text-stone-600">
-                <span className="rounded-xl border border-stone-200 bg-stone-50 px-3 py-2">
+              <div className="flex flex-wrap gap-2 text-xs text-muted">
+                <span className="rounded-xl border border-line bg-canvas px-3 py-2">
                   Runs: <strong>{summary.runCount}</strong>
                   {summary.latestRunAt && <> · latest {new Date(summary.latestRunAt).toLocaleString()}</>}
                 </span>
-                <span className="rounded-xl border border-stone-200 bg-stone-50 px-3 py-2">
+                <span className="rounded-xl border border-line bg-canvas px-3 py-2">
                   Leader-flip rate:{" "}
                   <strong>
                     {summary.leaderFlips ? pct(summary.leaderFlips.flipRate) : "—"}
                   </strong>
                   {summary.leaderFlips && (
-                    <span className="text-stone-400">
+                    <span className="text-subtle">
                       {" "}({summary.leaderFlips.flips}/{summary.leaderFlips.pairs} run-pairs · CI{" "}
                       {range({ share: 0, confidenceInterval: summary.leaderFlips.confidenceInterval, n: summary.leaderFlips.pairs })})
                     </span>
                   )}
-                  {!summary.leaderFlips && <span className="text-stone-400"> (needs ≥2 runs)</span>}
+                  {!summary.leaderFlips && <span className="text-subtle"> (needs ≥2 runs)</span>}
                 </span>
-                <span className="rounded-xl border border-stone-200 bg-stone-50 px-3 py-2">
+                <span className="rounded-xl border border-line bg-canvas px-3 py-2">
                   Panel v{summary.promptSetVersion} · {summary.promptCount} frozen prompts
                 </span>
               </div>
-              <p className="text-xs text-stone-400">{summary.proxyDisclaimer}</p>
+              <p className="text-xs text-subtle">{summary.proxyDisclaimer}</p>
             </>
           )}
         </div>
@@ -386,10 +382,10 @@ export function AiVisibilityClient({ panels, activePanel, summary, ownedDomain, 
       {/* ── Prompt panels ─────────────────────────────────────────────── */}
       {tab === "panels" && (
         <div className="flex flex-col gap-4">
-          <div className="overflow-hidden rounded-xl border border-stone-200 bg-white">
+          <div className="overflow-hidden rounded-xl border border-line bg-white">
             <table className="w-full border-collapse">
               <thead>
-                <tr className="border-b border-stone-200 bg-stone-50/60">
+                <tr className="border-b border-line bg-canvas">
                   <th className={thCls}>Engine</th>
                   <th className={thCls}>Version</th>
                   <th className={thCls}>Prompts</th>
@@ -401,19 +397,19 @@ export function AiVisibilityClient({ panels, activePanel, summary, ownedDomain, 
               <tbody>
                 {panels.length === 0 && (
                   <tr>
-                    <td colSpan={6} className={`${tdCls} text-stone-400`}>
+                    <td colSpan={6} className={`${tdCls} text-subtle`}>
                       No panels yet. Panels are frozen at creation — to change prompts, create a new version.
                     </td>
                   </tr>
                 )}
                 {panels.map((p) => (
-                  <tr key={p.id} className="border-b border-stone-100 last:border-0 hover:bg-violet-50/40">
+                  <tr key={p.id} className="border-b border-line last:border-0 hover:bg-hover-paper">
                     <td className={`${tdCls} font-medium capitalize`}>{p.engine}</td>
                     <td className={tdCls}>v{p.promptSetVersion}</td>
                     <td className={tdCls}>{p.promptCount}</td>
                     <td className={tdCls}>{p.cadence}</td>
                     <td className={tdCls}>{p.nReps}</td>
-                    <td className={`${tdCls} text-stone-500`}>{new Date(p.createdAt).toLocaleDateString()}</td>
+                    <td className={`${tdCls} text-muted`}>{new Date(p.createdAt).toLocaleDateString()}</td>
                   </tr>
                 ))}
               </tbody>
@@ -423,7 +419,7 @@ export function AiVisibilityClient({ panels, activePanel, summary, ownedDomain, 
           {canEdit && (
             <div className="grid gap-4 md:grid-cols-2">
               <form
-                className="flex flex-col gap-3 rounded-xl border border-stone-200 bg-white p-4"
+                className="flex flex-col gap-3 rounded-xl border border-line bg-white p-4"
                 onSubmit={async (e) => {
                   e.preventDefault();
                   const fd = new FormData(e.currentTarget);
@@ -442,7 +438,7 @@ export function AiVisibilityClient({ panels, activePanel, summary, ownedDomain, 
                   if (res.ok) window.location.reload();
                 }}
               >
-                <h3 className="flex items-center gap-2 text-sm font-semibold text-stone-900">
+                <h3 className="flex items-center gap-2 text-sm font-semibold text-ink">
                   <Plus className="h-4 w-4" /> New frozen panel (12–25 buyer prompts)
                 </h3>
                 <select name="engine" className={inputCls} defaultValue="openai">
@@ -458,20 +454,20 @@ export function AiVisibilityClient({ panels, activePanel, summary, ownedDomain, 
                   className={inputCls}
                 />
                 <div className="flex items-center gap-2">
-                  <label className="text-xs text-stone-500">Reps per prompt</label>
+                  <label className="text-xs text-muted">Reps per prompt</label>
                   <input name="nReps" type="number" min={1} max={10} defaultValue={3} className={`${inputCls} w-20`} />
                   <button type="submit" className={btnPrimary}>Freeze panel</button>
                 </div>
               </form>
 
               <form
-                className="flex flex-col gap-3 rounded-xl border border-stone-200 bg-white p-4"
+                className="flex flex-col gap-3 rounded-xl border border-line bg-white p-4"
                 onSubmit={(e) => {
                   e.preventDefault();
                   triggerRun(e.currentTarget);
                 }}
               >
-                <h3 className="flex items-center gap-2 text-sm font-semibold text-stone-900">
+                <h3 className="flex items-center gap-2 text-sm font-semibold text-ink">
                   <Play className="h-4 w-4" /> Trigger panel run
                 </h3>
                 <select name="panelId" className={inputCls} defaultValue={panels[0]?.id ?? ""}>
@@ -482,10 +478,10 @@ export function AiVisibilityClient({ panels, activePanel, summary, ownedDomain, 
                   ))}
                 </select>
                 <input name="brand" defaultValue={brand} placeholder="Brand name for matching" className={inputCls} />
-                <div className="flex flex-wrap gap-3 text-[13px] text-stone-700">
+                <div className="flex flex-wrap gap-3 text-[13px] text-muted">
                   {["openai", "anthropic", "gemini", "perplexity"].map((eng) => (
                     <label key={eng} className="flex items-center gap-1.5 capitalize">
-                      <input type="checkbox" name="engines" value={eng} defaultChecked className="accent-violet-600" />
+                      <input type="checkbox" name="engines" value={eng} defaultChecked className="accent-ink" />
                       {eng}
                     </label>
                   ))}
@@ -493,8 +489,8 @@ export function AiVisibilityClient({ panels, activePanel, summary, ownedDomain, 
                 <div>
                   <button type="submit" className={btnPrimary}>Run panel</button>
                 </div>
-                {runMsg && <p className="text-xs text-stone-600">{runMsg}</p>}
-                <p className="text-[11px] text-stone-400">
+                {runMsg && <p className="text-xs text-muted">{runMsg}</p>}
+                <p className="text-[11px] text-subtle">
                   Official APIs only (BYO keys). Engines without a key are skipped, never faked. Every
                   call is metered (ai_prompt).
                 </p>
@@ -503,11 +499,11 @@ export function AiVisibilityClient({ panels, activePanel, summary, ownedDomain, 
           )}
 
           {activePanel && (
-            <div className="rounded-xl border border-stone-200 bg-stone-50 p-4">
-              <h3 className="text-sm font-semibold text-stone-900">
+            <div className="rounded-xl border border-line bg-canvas p-4">
+              <h3 className="text-sm font-semibold text-ink">
                 Active panel — {activePanel.engine} · v{activePanel.promptSetVersion} (frozen)
               </h3>
-              <ol className="mt-2 list-decimal space-y-1 pl-5 text-[13px] text-stone-700">
+              <ol className="mt-2 list-decimal space-y-1 pl-5 text-[13px] text-muted">
                 {activePanel.prompts.map((p, i) => (
                   <li key={i}>{p}</li>
                 ))}
@@ -530,22 +526,22 @@ export function AiVisibilityClient({ panels, activePanel, summary, ownedDomain, 
             <button onClick={loadGaps} disabled={gapsLoading || !activePanel || !ownedDomain} className={btnGhost}>
               Reload gaps
             </button>
-            <span className="text-[11px] text-stone-400">
+            <span className="text-[11px] text-subtle">
               “Build brief” opens the project&apos;s content engine with the gap prefilled.
             </span>
           </div>
-          {gapsLoading && <p className="text-sm text-stone-500">Analyzing citations…</p>}
+          {gapsLoading && <p className="text-sm text-muted">Analyzing citations…</p>}
           {gaps !== null && !gapsLoading && gaps.length === 0 && (
-            <div className="rounded-xl border border-stone-200 bg-white p-6 text-sm text-stone-500">
+            <div className="rounded-xl border border-line bg-white p-6 text-sm text-muted">
               No citation gaps detected — or no observations yet. Gaps appear where engines cite
               competitor domains but never your domain.
             </div>
           )}
           {gaps !== null && gaps.length > 0 && (
-            <div className="overflow-hidden rounded-xl border border-stone-200 bg-white">
+            <div className="overflow-hidden rounded-xl border border-line bg-white">
               <table className="w-full border-collapse">
                 <thead>
-                  <tr className="border-b border-stone-200 bg-stone-50/60">
+                  <tr className="border-b border-line bg-canvas">
                     <th className={thCls}>Buyer prompt</th>
                     <th className={thCls}>Engines</th>
                     <th className={thCls}>Cited instead of you</th>
@@ -555,7 +551,7 @@ export function AiVisibilityClient({ panels, activePanel, summary, ownedDomain, 
                 </thead>
                 <tbody>
                   {gaps.map((g) => (
-                    <tr key={g.promptIdx} className="border-b border-stone-100 align-top last:border-0 hover:bg-violet-50/40">
+                    <tr key={g.promptIdx} className="border-b border-line align-top last:border-0 hover:bg-hover-paper">
                       <td className={`${tdCls} max-w-xs`}>{g.handoff.prompt}</td>
                       <td className={tdCls}>
                         <div className="flex flex-wrap gap-1">
@@ -567,7 +563,7 @@ export function AiVisibilityClient({ panels, activePanel, summary, ownedDomain, 
                       <td className={tdCls}>
                         <div className="flex flex-col gap-0.5 text-xs">
                           {g.competitorDomains.slice(0, 4).map((d) => (
-                            <span key={d} className="font-mono text-stone-600">{d}</span>
+                            <span key={d} className="font-mono text-muted">{d}</span>
                           ))}
                         </div>
                       </td>
@@ -577,11 +573,11 @@ export function AiVisibilityClient({ panels, activePanel, summary, ownedDomain, 
                       <td className={tdCls}>
                         <a
                           href={g.handoff.briefBuilderUrl}
-                          className="inline-flex items-center gap-1 text-[13px] font-medium text-violet-700 hover:text-violet-800"
+                          className="inline-flex items-center gap-1 text-[13px] font-medium text-ink"
                         >
                           Build brief <ExternalLink className="h-3.5 w-3.5" />
                         </a>
-                        <p className="mt-1 max-w-[220px] text-[11px] text-stone-400">
+                        <p className="mt-1 max-w-[220px] text-[11px] text-subtle">
                           Missing: {g.handoff.suggestedBrief.structuredFactsMissing.slice(0, 2).join("; ")}
                         </p>
                       </td>
@@ -607,33 +603,33 @@ export function AiVisibilityClient({ panels, activePanel, summary, ownedDomain, 
             <button onClick={loadFirstParty} disabled={fpLoading || !brand} className={btnPrimary}>
               Load first-party signals
             </button>
-            <label className="flex items-center gap-1.5 text-[13px] text-stone-600">
+            <label className="flex items-center gap-1.5 text-[13px] text-muted">
               <input
                 type="checkbox"
                 checked={licensedNews}
                 onChange={(e) => setLicensedNews(e.target.checked)}
-                className="accent-violet-600"
+                className="accent-ink"
               />
               Include licensed news (metered)
             </label>
-            {!brand && <span className="text-xs text-stone-400">Set a brand name above first.</span>}
+            {!brand && <span className="text-xs text-subtle">Set a brand name above first.</span>}
           </div>
-          <p className="text-[11px] text-stone-400">
+          <p className="text-[11px] text-subtle">
             Licensed news is off by default — it requires M3_LICENSED_NEWS_PROVIDER=newsapi and
             M3_NEWSAPI_KEY on the server. When enabled, every query is metered via M6.
           </p>
           {fp && !fp.error && (
             <>
-              <div className="overflow-hidden rounded-xl border border-stone-200 bg-white">
-                <div className="border-b border-stone-200 bg-stone-50/60 px-4 py-2 text-[13px] font-semibold text-stone-900">
+              <div className="overflow-hidden rounded-xl border border-line bg-white">
+                <div className="border-b border-line bg-canvas px-4 py-2 text-[13px] font-semibold text-ink">
                   GSC — AI Overview impressions
                 </div>
                 {fp.gsc.noAioRowsFlagged ? (
-                  <p className="p-4 text-[13px] text-stone-500">{fp.gsc.note}</p>
+                  <p className="p-4 text-[13px] text-muted">{fp.gsc.note}</p>
                 ) : (
                   <table className="w-full border-collapse">
                     <thead>
-                      <tr className="border-b border-stone-200 bg-stone-50/60">
+                      <tr className="border-b border-line bg-canvas">
                         <th className={thCls}>Window</th>
                         <th className={thCls}>Impressions</th>
                         <th className={thCls}>Clicks</th>
@@ -642,8 +638,8 @@ export function AiVisibilityClient({ panels, activePanel, summary, ownedDomain, 
                     </thead>
                     <tbody>
                       {fp.gsc.windows.map((w: any) => (
-                        <tr key={w.windowStart} className="border-b border-stone-100 last:border-0 hover:bg-violet-50/40">
-                          <td className={`${tdCls} text-stone-500`}>
+                        <tr key={w.windowStart} className="border-b border-line last:border-0 hover:bg-hover-paper">
+                          <td className={`${tdCls} text-muted`}>
                             {new Date(w.windowStart).toLocaleDateString()} → {new Date(w.windowEnd).toLocaleDateString()}
                           </td>
                           <td className={tdCls}>{w.impressions.toLocaleString()}</td>
@@ -656,9 +652,9 @@ export function AiVisibilityClient({ panels, activePanel, summary, ownedDomain, 
                 )}
               </div>
 
-              <div className="rounded-xl border border-stone-200 bg-stone-50 p-4">
-                <h3 className="text-sm font-semibold text-stone-900">GA4 — AI-referrer traffic</h3>
-                <p className="mt-1 text-[13px] text-stone-600">{fp.ga4.note}</p>
+              <div className="rounded-xl border border-line bg-canvas p-4">
+                <h3 className="text-sm font-semibold text-ink">GA4 — AI-referrer traffic</h3>
+                <p className="mt-1 text-[13px] text-muted">{fp.ga4.note}</p>
                 {fp.ga4.perHost.length > 0 && (
                   <div className="mt-2 flex flex-wrap gap-2">
                     {fp.ga4.perHost.map((h: any) => (
@@ -668,46 +664,53 @@ export function AiVisibilityClient({ panels, activePanel, summary, ownedDomain, 
                 )}
               </div>
 
-              <div className="rounded-xl border border-stone-200 bg-stone-50 p-4">
-                <h3 className="text-sm font-semibold text-stone-900">AI-crawler activity in your server logs</h3>
-                <p className="mt-1 text-[13px] text-stone-600">{fp.crawlerLogs.note}</p>
-                <a href={fp.crawlerLogs.docs} className="mt-1 inline-flex items-center gap-1 text-[13px] font-medium text-violet-700 hover:text-violet-800">
+              <div className="rounded-xl border border-line bg-canvas p-4">
+                <h3 className="text-sm font-semibold text-ink">AI-crawler activity in your server logs</h3>
+                <p className="mt-1 text-[13px] text-muted">{fp.crawlerLogs.note}</p>
+                <a href={fp.crawlerLogs.docs} className="mt-1 inline-flex items-center gap-1 text-[13px] font-medium text-ink">
                   Log-shipping guide <ExternalLink className="h-3.5 w-3.5" />
                 </a>
               </div>
 
               {fp.brandedMentions?.length > 0 && (
-                <div className="overflow-hidden rounded-xl border border-stone-200 bg-white">
-                  <div className="border-b border-stone-200 bg-stone-50/60 px-4 py-2 text-[13px] font-semibold text-stone-900">
+                <div className="overflow-hidden rounded-xl border border-line bg-white">
+                  <div className="border-b border-line bg-canvas px-4 py-2 text-[13px] font-semibold text-ink">
                     Branded mentions — GDELT + CC-NEWS
                     {fp.brandedMentions.some((s: any) => s.source === "licensed-news") && " + licensed news"}
                   </div>
                   {fp.brandedMentions.map((src: any, i: number) => (
-                    <div key={i} className="border-b border-stone-100 p-4 last:border-0">
-                      <div className="flex items-center gap-2 text-[13px] font-medium text-stone-800">
-                        <Chip tone={src.ok ? "green" : "red"}>{src.source}</Chip>
+                    <div key={i} className="border-b border-line p-4 last:border-0">
+                      <div className="flex items-center gap-2 text-[13px] font-medium text-ink">
+                        {src.ok ? (
+                          <Chip>{src.source}</Chip>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-failed-tint px-2 py-0.5 text-[10px] font-semibold leading-tight text-failed-text">
+                            <span className="size-2 rounded-[2px] bg-failed" aria-hidden />
+                            {src.source}
+                          </span>
+                        )}
                         {src.ok ? `${src.hits.length} hits` : `failed: ${src.error}`}
                       </div>
                       {src.ok && src.hits.length > 0 && (
                         <ul className="mt-2 space-y-1 text-[13px]">
                           {src.hits.slice(0, 10).map((h: any, j: number) => (
                             <li key={j}>
-                              <a href={h.url} target="_blank" rel="noreferrer" className="text-violet-700 hover:text-violet-800">
+                              <a href={h.url} target="_blank" rel="noreferrer" className="text-ink">
                                 {h.title}
                               </a>{" "}
-                              <span className="text-xs text-stone-400">{h.domain}{h.publishedAt ? ` · ${h.publishedAt}` : ""}</span>
+                              <span className="text-xs text-subtle">{h.domain}{h.publishedAt ? ` · ${h.publishedAt}` : ""}</span>
                             </li>
                           ))}
                         </ul>
                       )}
-                      <p className="mt-1 text-[11px] text-stone-400">{src.note}</p>
+                      <p className="mt-1 text-[11px] text-subtle">{src.note}</p>
                     </div>
                   ))}
                 </div>
               )}
             </>
           )}
-          {fp?.error && <p className="text-sm text-red-600">{fp.error}</p>}
+          {fp?.error && <p className="text-sm text-failed-text">{fp.error}</p>}
         </div>
       )}
     </div>

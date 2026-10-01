@@ -39,12 +39,12 @@ export default async function ReportsPage() {
   ]);
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-4 bg-canvas p-4 md:p-6">
       <div>
-        <h1 className="text-xl font-bold tracking-tight text-ink">Reports</h1>
-        <p className="mt-1 text-sm text-zinc-500">
+        <h1 className="aos-heading">Reports</h1>
+        <p className="mt-1 text-sm text-muted">
           Editable templates, branded PDF generation, and schedules. A paragraph containing only{" "}
-          <span className="font-mono text-zinc-500">{"{{rankings_table}}"}</span> becomes the keyword
+          <span className="font-mono text-muted">{"{{rankings_table}}"}</span> becomes the keyword
           rankings table at generation time.
         </p>
       </div>

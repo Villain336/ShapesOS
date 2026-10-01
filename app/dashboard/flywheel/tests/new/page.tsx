@@ -74,54 +74,54 @@ export default function NewExperimentPage() {
   }
 
   return (
-    <div className="flex h-full flex-col gap-4 bg-[#FAFAF7] p-4 md:p-6">
-      <nav className="flex items-center gap-1.5 text-xs text-stone-500">
-        <Link href="/dashboard/flywheel/tests" className="inline-flex items-center gap-1 hover:text-stone-800">
+    <div className="flex h-full flex-col gap-4 bg-canvas p-4 md:p-6">
+      <nav className="flex items-center gap-1.5 text-xs text-muted">
+        <Link href="/dashboard/flywheel/tests" className="inline-flex items-center gap-1 hover:text-ink">
           <ArrowLeft className="h-3 w-3" /> Test Lab
         </Link>
         <span>/</span>
-        <span className="font-medium text-stone-800">New experiment</span>
+        <span className="font-medium text-ink">New experiment</span>
       </nav>
       <header>
-        <h1 className="text-xl font-bold tracking-tight text-stone-900">New experiment</h1>
-        <p className="mt-0.5 text-[13px] text-stone-500">
+        <h1 className="aos-heading">New experiment</h1>
+        <p className="mt-0.5 text-[13px] text-muted">
           The traffic floor runs at creation — the lab refuses tests it cannot resolve.
         </p>
       </header>
-      <form onSubmit={submit} className="mx-auto w-full max-w-2xl rounded-xl border border-stone-200 bg-white p-5">
+      <form onSubmit={submit} className="mx-auto w-full max-w-2xl rounded-xl border border-line bg-white p-5">
         <div className="space-y-4">
-        <div className={F}><Label htmlFor="name" className="text-[13px] font-medium text-stone-700">Name</Label><Input id="name" className="border-stone-200 bg-white text-[13px] placeholder:text-stone-400 focus-visible:border-violet-400 focus-visible:ring-violet-200/60" value={form.name} onChange={set("name")} required /></div>
-        <div className={F}><Label htmlFor="hypothesis" className="text-[13px] font-medium text-stone-700">Hypothesis</Label><Input id="hypothesis" className="border-stone-200 bg-white text-[13px] placeholder:text-stone-400 focus-visible:border-violet-400 focus-visible:ring-violet-200/60" value={form.hypothesis} onChange={set("hypothesis")} required minLength={10} placeholder="We believe X will cause Y because Z" /></div>
+        <div className={F}><Label htmlFor="name" className="text-[13px] font-medium text-muted">Name</Label><Input id="name" className="border-line bg-white text-[13px] placeholder:text-subtle focus-visible:border-ink focus-visible:ring-[var(--aos-focus-halo)]" value={form.name} onChange={set("name")} required /></div>
+        <div className={F}><Label htmlFor="hypothesis" className="text-[13px] font-medium text-muted">Hypothesis</Label><Input id="hypothesis" className="border-line bg-white text-[13px] placeholder:text-subtle focus-visible:border-ink focus-visible:ring-[var(--aos-focus-halo)]" value={form.hypothesis} onChange={set("hypothesis")} required minLength={10} placeholder="We believe X will cause Y because Z" /></div>
         <div className="grid grid-cols-3 gap-3">
-          <div className={F}><Label htmlFor="potential" className="text-[13px] font-medium text-stone-700">Potential (0–10)</Label><Input id="potential" className="border-stone-200 bg-white text-[13px] placeholder:text-stone-400 focus-visible:border-violet-400 focus-visible:ring-violet-200/60" type="number" min={0} max={10} value={form.potential} onChange={set("potential")} /></div>
-          <div className={F}><Label htmlFor="importance" className="text-[13px] font-medium text-stone-700">Importance (0–10)</Label><Input id="importance" className="border-stone-200 bg-white text-[13px] placeholder:text-stone-400 focus-visible:border-violet-400 focus-visible:ring-violet-200/60" type="number" min={0} max={10} value={form.importance} onChange={set("importance")} /></div>
-          <div className={F}><Label htmlFor="ease" className="text-[13px] font-medium text-stone-700">Ease (0–10)</Label><Input id="ease" className="border-stone-200 bg-white text-[13px] placeholder:text-stone-400 focus-visible:border-violet-400 focus-visible:ring-violet-200/60" type="number" min={0} max={10} value={form.ease} onChange={set("ease")} /></div>
+          <div className={F}><Label htmlFor="potential" className="text-[13px] font-medium text-muted">Potential (0–10)</Label><Input id="potential" className="border-line bg-white text-[13px] placeholder:text-subtle focus-visible:border-ink focus-visible:ring-[var(--aos-focus-halo)]" type="number" min={0} max={10} value={form.potential} onChange={set("potential")} /></div>
+          <div className={F}><Label htmlFor="importance" className="text-[13px] font-medium text-muted">Importance (0–10)</Label><Input id="importance" className="border-line bg-white text-[13px] placeholder:text-subtle focus-visible:border-ink focus-visible:ring-[var(--aos-focus-halo)]" type="number" min={0} max={10} value={form.importance} onChange={set("importance")} /></div>
+          <div className={F}><Label htmlFor="ease" className="text-[13px] font-medium text-muted">Ease (0–10)</Label><Input id="ease" className="border-line bg-white text-[13px] placeholder:text-subtle focus-visible:border-ink focus-visible:ring-[var(--aos-focus-halo)]" type="number" min={0} max={10} value={form.ease} onChange={set("ease")} /></div>
         </div>
         <div className="grid grid-cols-2 gap-3">
-          <div className={F}><Label htmlFor="channel" className="text-[13px] font-medium text-stone-700">Channel</Label>
-            <select id="channel" value={form.channel} onChange={set("channel")} className="rounded-md border border-stone-200 bg-white px-3 py-2 text-[13px] text-stone-800 focus-visible:border-violet-400 focus-visible:outline-none">
+          <div className={F}><Label htmlFor="channel" className="text-[13px] font-medium text-muted">Channel</Label>
+            <select id="channel" value={form.channel} onChange={set("channel")} className="rounded-md border border-line bg-white px-3 py-2 text-[13px] text-ink focus-visible:border-ink focus-visible:outline-none">
               <option value="web">Web</option><option value="email">Email</option>
               <option value="ads">Ads (platform-native import)</option><option value="mail">Direct mail</option>
             </select>
           </div>
-          <div className={F}><Label htmlFor="audience" className="text-[13px] font-medium text-stone-700">Audience</Label><Input id="audience" className="border-stone-200 bg-white text-[13px] placeholder:text-stone-400 focus-visible:border-violet-400 focus-visible:ring-violet-200/60" value={form.audience} onChange={set("audience")} /></div>
+          <div className={F}><Label htmlFor="audience" className="text-[13px] font-medium text-muted">Audience</Label><Input id="audience" className="border-line bg-white text-[13px] placeholder:text-subtle focus-visible:border-ink focus-visible:ring-[var(--aos-focus-halo)]" value={form.audience} onChange={set("audience")} /></div>
         </div>
         <div className="grid grid-cols-2 gap-3">
-          <div className={F}><Label htmlFor="primaryMetric" className="text-[13px] font-medium text-stone-700">Primary metric</Label><Input id="primaryMetric" className="border-stone-200 bg-white text-[13px] placeholder:text-stone-400 focus-visible:border-violet-400 focus-visible:ring-violet-200/60" value={form.primaryMetric} onChange={set("primaryMetric")} /></div>
-          <div className={F}><Label htmlFor="treatmentName" className="text-[13px] font-medium text-stone-700">Treatment name</Label><Input id="treatmentName" className="border-stone-200 bg-white text-[13px] placeholder:text-stone-400 focus-visible:border-violet-400 focus-visible:ring-violet-200/60" value={form.treatmentName} onChange={set("treatmentName")} /></div>
+          <div className={F}><Label htmlFor="primaryMetric" className="text-[13px] font-medium text-muted">Primary metric</Label><Input id="primaryMetric" className="border-line bg-white text-[13px] placeholder:text-subtle focus-visible:border-ink focus-visible:ring-[var(--aos-focus-halo)]" value={form.primaryMetric} onChange={set("primaryMetric")} /></div>
+          <div className={F}><Label htmlFor="treatmentName" className="text-[13px] font-medium text-muted">Treatment name</Label><Input id="treatmentName" className="border-line bg-white text-[13px] placeholder:text-subtle focus-visible:border-ink focus-visible:ring-[var(--aos-focus-halo)]" value={form.treatmentName} onChange={set("treatmentName")} /></div>
         </div>
         <div className="grid grid-cols-3 gap-3">
-          <div className={F}><Label htmlFor="statedMde" className="text-[13px] font-medium text-stone-700">Stated MDE (e.g. 0.2)</Label><Input id="statedMde" className="border-stone-200 bg-white text-[13px] placeholder:text-stone-400 focus-visible:border-violet-400 focus-visible:ring-violet-200/60" type="number" step="0.01" min={0.001} max={1} value={form.statedMde} onChange={set("statedMde")} /></div>
-          <div className={F}><Label htmlFor="baselineRate" className="text-[13px] font-medium text-stone-700">Baseline rate (e.g. 0.02)</Label><Input id="baselineRate" className="border-stone-200 bg-white text-[13px] placeholder:text-stone-400 focus-visible:border-violet-400 focus-visible:ring-violet-200/60" type="number" step="0.001" min={0} max={1} value={form.baselineRate} onChange={set("baselineRate")} /></div>
-          <div className={F}><Label htmlFor="monthlyTraffic" className="text-[13px] font-medium text-stone-700">Monthly traffic</Label><Input id="monthlyTraffic" className="border-stone-200 bg-white text-[13px] placeholder:text-stone-400 focus-visible:border-violet-400 focus-visible:ring-violet-200/60" type="number" min={0} value={form.monthlyTraffic} onChange={set("monthlyTraffic")} /></div>
+          <div className={F}><Label htmlFor="statedMde" className="text-[13px] font-medium text-muted">Stated MDE (e.g. 0.2)</Label><Input id="statedMde" className="border-line bg-white text-[13px] placeholder:text-subtle focus-visible:border-ink focus-visible:ring-[var(--aos-focus-halo)]" type="number" step="0.01" min={0.001} max={1} value={form.statedMde} onChange={set("statedMde")} /></div>
+          <div className={F}><Label htmlFor="baselineRate" className="text-[13px] font-medium text-muted">Baseline rate (e.g. 0.02)</Label><Input id="baselineRate" className="border-line bg-white text-[13px] placeholder:text-subtle focus-visible:border-ink focus-visible:ring-[var(--aos-focus-halo)]" type="number" step="0.001" min={0} max={1} value={form.baselineRate} onChange={set("baselineRate")} /></div>
+          <div className={F}><Label htmlFor="monthlyTraffic" className="text-[13px] font-medium text-muted">Monthly traffic</Label><Input id="monthlyTraffic" className="border-line bg-white text-[13px] placeholder:text-subtle focus-visible:border-ink focus-visible:ring-[var(--aos-focus-halo)]" type="number" min={0} value={form.monthlyTraffic} onChange={set("monthlyTraffic")} /></div>
         </div>
         <div className="grid grid-cols-3 gap-3">
-          <div className={F}><Label htmlFor="minRuntimeDays" className="text-[13px] font-medium text-stone-700">Min runtime (days, ≥7)</Label><Input id="minRuntimeDays" className="border-stone-200 bg-white text-[13px] placeholder:text-stone-400 focus-visible:border-violet-400 focus-visible:ring-violet-200/60" type="number" min={7} value={form.minRuntimeDays} onChange={set("minRuntimeDays")} /></div>
-          <div className={F}><Label htmlFor="margin" className="text-[13px] font-medium text-stone-700">Margin/conv. $ (profit guardrail)</Label><Input id="margin" className="border-stone-200 bg-white text-[13px] placeholder:text-stone-400 focus-visible:border-violet-400 focus-visible:ring-violet-200/60" type="number" step="0.01" min={0} value={form.margin} onChange={set("margin")} placeholder="required for conversion tests" /></div>
-          <div className={F}><Label htmlFor="discount" className="text-[13px] font-medium text-stone-700">Discount cost/conv. $</Label><Input id="discount" className="border-stone-200 bg-white text-[13px] placeholder:text-stone-400 focus-visible:border-violet-400 focus-visible:ring-violet-200/60" type="number" step="0.01" min={0} value={form.discount} onChange={set("discount")} /></div>
+          <div className={F}><Label htmlFor="minRuntimeDays" className="text-[13px] font-medium text-muted">Min runtime (days, ≥7)</Label><Input id="minRuntimeDays" className="border-line bg-white text-[13px] placeholder:text-subtle focus-visible:border-ink focus-visible:ring-[var(--aos-focus-halo)]" type="number" min={7} value={form.minRuntimeDays} onChange={set("minRuntimeDays")} /></div>
+          <div className={F}><Label htmlFor="margin" className="text-[13px] font-medium text-muted">Margin/conv. $ (profit guardrail)</Label><Input id="margin" className="border-line bg-white text-[13px] placeholder:text-subtle focus-visible:border-ink focus-visible:ring-[var(--aos-focus-halo)]" type="number" step="0.01" min={0} value={form.margin} onChange={set("margin")} placeholder="required for conversion tests" /></div>
+          <div className={F}><Label htmlFor="discount" className="text-[13px] font-medium text-muted">Discount cost/conv. $</Label><Input id="discount" className="border-line bg-white text-[13px] placeholder:text-subtle focus-visible:border-ink focus-visible:ring-[var(--aos-focus-halo)]" type="number" step="0.01" min={0} value={form.discount} onChange={set("discount")} /></div>
         </div>
-        {error && <p className="rounded-lg border border-red-200 bg-red-50 p-3 text-[13px] text-red-900">{error}</p>}
-        <Button type="submit" disabled={busy} className="bg-violet-600 text-white hover:bg-violet-700">{busy ? "Creating…" : "Create experiment"}</Button>
+        {error && <p role="alert" className="flex items-center gap-2 rounded-lg border border-failed bg-failed-tint p-3 text-[13px] text-failed-text"><span className="size-2.5 shrink-0 rounded-[2px] bg-failed" aria-hidden />{error}</p>}
+        <Button type="submit" disabled={busy} className="bg-ink text-white hover:bg-night-hover">{busy ? "Creating…" : "Create experiment"}</Button>
         </div>
       </form>
     </div>

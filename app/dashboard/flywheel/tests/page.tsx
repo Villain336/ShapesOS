@@ -7,12 +7,34 @@ import Link from "next/link";
 import { requireUser, getOrCreateWorkspace } from "@/lib/session";
 import { requireWorkspaceRole } from "@/lib/authz";
 import { resolveExperimentStore } from "@/lib/flywheel/testlab/store";
-function chip(text: React.ReactNode, cls: string) {
+// Category chips are neutral by default (tone accepted for call-site compat).
+function chip(text: React.ReactNode, cls?: string) {
+  void cls;
   return (
-    <span className={`inline-flex items-center gap-0.5 whitespace-nowrap rounded-full border px-1.5 py-0.5 text-[10px] font-medium leading-tight ${cls}`}>
+    <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-paper px-2 py-0.5 text-[10px] font-semibold leading-tight text-muted shadow-control">
       {text}
     </span>
   );
+}
+
+// Status badges carry the AOS status shape language:
+// running = agent run in progress, qa = awaiting attention, complete/archived = neutral.
+function statusBadge(status: string) {
+  const base =
+    "inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-semibold leading-tight";
+  if (status === "running")
+    return (
+      <span className={`${base} bg-running text-white`}>
+        <span className="aos-shape aos-shape--running aos-is-live [--aos-shape-size:9px]" style={{ color: "inherit" }} aria-hidden /> running
+      </span>
+    );
+  if (status === "qa")
+    return (
+      <span className={`${base} bg-needs text-ink`}>
+        <span className="aos-shape aos-shape--needs aos-shape--edged [--aos-shape-size:9px]" style={{ color: "inherit" }} aria-hidden /> qa
+      </span>
+    );
+  return <span className={`${base} bg-paper text-muted shadow-control`}>{status}</span>;
 }
 import { Button } from "@/components/vault/shadcn/button";
 import { Plus } from "lucide-react";
@@ -24,18 +46,8 @@ export const metadata = {
   description: "CRO/A-B experimentation: ideas, experiments, honesty dashboard.",
 };
 
-const STATUS_CHIP: Record<string, string> = {
-  running: "border-violet-200 bg-violet-50 text-violet-700",
-  complete: "border-stone-200 bg-stone-100 text-stone-600",
-  archived: "border-stone-200 bg-stone-50 text-stone-500",
-  qa: "border-amber-200 bg-amber-50 text-amber-700",
-};
+// Verdicts are analytic outcomes, not agent states — the neutral chip() renders them.
 
-const VERDICT_CHIP: Record<string, string> = {
-  winner: "border-emerald-200 bg-emerald-50 text-emerald-700",
-  loser: "border-red-200 bg-red-50 text-red-700",
-  compromised: "border-red-200 bg-red-50 text-red-700",
-};
 
 export default async function TestLabPage() {
   const user = await requireUser();
@@ -51,40 +63,43 @@ export default async function TestLabPage() {
   ]);
 
   return (
-    <div className="flex h-full flex-col gap-4 bg-[#FAFAF7] p-4 md:p-6">
+    <div className="flex h-full flex-col gap-4 bg-canvas p-4 md:p-6">
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-stone-900">Test Lab</h1>
-          <p className="mt-0.5 text-[13px] text-stone-500">
+          <h1 className="aos-heading">Test Lab</h1>
+          <p className="mt-0.5 text-[13px] text-muted">
             Peek-safe A/B testing with an honesty dashboard — the lab refuses to
             declare a winner it can&apos;t defend.
           </p>
         </div>
         <Link href="/dashboard/flywheel/tests/new">
-          <Button className="bg-violet-600 text-white hover:bg-violet-700"><Plus className="mr-1 h-4 w-4" /> New experiment</Button>
+          <Button className="inline-flex h-control cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-ink px-5 text-sm font-semibold text-white aos-press hover:bg-night-hover focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--aos-focus-halo)] disabled:opacity-40"><Plus className="mr-1 h-4 w-4" /> New experiment</Button>
         </Link>
       </header>
 
       {!persistent && (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm">
-          Test Lab tables are not provisioned yet (migration pending) — showing
-          in-memory workspace data only.
+        <div className="flex items-start gap-2.5 rounded-lg bg-needs p-4 text-sm text-ink">
+          <span className="aos-shape aos-shape--needs aos-shape--edged mt-0.5 shrink-0 [--aos-shape-size:14px]" style={{ color: "inherit" }} aria-hidden />
+          <span>
+            Test Lab tables are not provisioned yet (migration pending) — showing
+            in-memory workspace data only.
+          </span>
         </div>
       )}
 
       <section className="space-y-2">
-        <h2 className="text-sm font-semibold tracking-tight text-stone-900">Idea queue
-          <span className="ml-1.5 text-xs font-normal text-stone-500">ranked by PIE/ICE</span>
+        <h2 className="text-sm font-semibold tracking-tight text-ink">Idea queue
+          <span className="ml-1.5 text-xs font-normal text-muted">ranked by PIE/ICE</span>
         </h2>
         {ideas.length === 0 ? (
-          <p className="text-[13px] text-stone-500">
+          <p className="text-[13px] text-muted">
             No ideas yet. Ideas arrive from Phases 2–6 signals — or add one via the API.
           </p>
         ) : (
-          <div className="overflow-x-auto rounded-xl border border-stone-200 bg-white">
+          <div className="overflow-x-auto rounded-xl border border-line bg-white">
             <table className="w-full text-left text-[13px]">
               <thead>
-                <tr className="border-b border-stone-100 bg-stone-50/60 text-[11px] uppercase tracking-wide text-stone-500">
+                <tr className="border-b border-line text-xs font-semibold text-muted">
                   <th className="px-3 py-2 font-medium">Idea</th>
                   <th className="px-3 py-2 font-medium">PIE/ICE</th>
                   <th className="px-3 py-2 font-medium">Signal</th>
@@ -93,11 +108,11 @@ export default async function TestLabPage() {
               </thead>
               <tbody>
                 {ideas.map((idea) => (
-                  <tr key={idea.id} className="border-b border-stone-100 last:border-0 hover:bg-violet-50/40">
-                    <td className="px-3 py-2 font-medium text-stone-900">{idea.title}</td>
-                    <td className="px-3 py-2 font-mono text-[12px] text-stone-700">{idea.pieIceScore.toFixed(1)}</td>
-                    <td className="px-3 py-2 text-[12px] text-stone-500">{idea.sourceSignal ?? "—"}</td>
-                    <td className="px-3 py-2">{chip(idea.status, "border-stone-200 bg-stone-100 text-stone-600")}</td>
+                  <tr key={idea.id} className="border-b border-line last:border-0 hover:bg-hover-paper">
+                    <td className="px-3 py-2 font-medium text-ink">{idea.title}</td>
+                    <td className="px-3 py-2 font-mono text-[12px] text-muted">{idea.pieIceScore.toFixed(1)}</td>
+                    <td className="px-3 py-2 text-[12px] text-muted">{idea.sourceSignal ?? "—"}</td>
+                    <td className="px-3 py-2">{chip(idea.status, "border-line bg-hover text-muted")}</td>
                   </tr>
                 ))}
               </tbody>
@@ -107,17 +122,17 @@ export default async function TestLabPage() {
       </section>
 
       <section className="space-y-2">
-        <h2 className="text-sm font-semibold tracking-tight text-stone-900">Experiments</h2>
+        <h2 className="text-sm font-semibold tracking-tight text-ink">Experiments</h2>
         {experiments.length === 0 ? (
-          <p className="text-[13px] text-stone-500">
+          <p className="text-[13px] text-muted">
             No experiments yet. Create one to walk the full lifecycle:
             draft → QA → launch → verdict → archive.
           </p>
         ) : (
-          <div className="overflow-x-auto rounded-xl border border-stone-200 bg-white">
+          <div className="overflow-x-auto rounded-xl border border-line bg-white">
             <table className="w-full text-left text-[13px]">
               <thead>
-                <tr className="border-b border-stone-100 bg-stone-50/60 text-[11px] uppercase tracking-wide text-stone-500">
+                <tr className="border-b border-line text-xs font-semibold text-muted">
                   <th className="px-3 py-2 font-medium">Experiment</th>
                   <th className="px-3 py-2 font-medium">Status</th>
                   <th className="px-3 py-2 font-medium">Channel</th>
@@ -127,18 +142,18 @@ export default async function TestLabPage() {
               </thead>
               <tbody>
                 {experiments.map((e) => (
-                  <tr key={e.id} className="border-b border-stone-100 last:border-0 hover:bg-violet-50/40">
+                  <tr key={e.id} className="border-b border-line last:border-0 hover:bg-hover-paper">
                     <td className="px-3 py-2">
-                      <Link href={`/dashboard/flywheel/tests/${e.id}`} className="font-medium text-stone-900 hover:text-violet-700">
+                      <Link href={`/dashboard/flywheel/tests/${e.id}`} className="font-medium text-ink hover:text-ink">
                         {e.name}
                       </Link>
-                      <span className="block max-w-xs truncate text-[12px] text-stone-500">{e.hypothesis}</span>
+                      <span className="block max-w-xs truncate text-[12px] text-muted">{e.hypothesis}</span>
                     </td>
-                    <td className="px-3 py-2">{chip(e.status, STATUS_CHIP[e.status] ?? STATUS_CHIP.qa)}</td>
-                    <td className="px-3 py-2 text-[12px] text-stone-600">{e.channel}</td>
-                    <td className="px-3 py-2 text-[12px] text-stone-600">{e.primaryMetric}</td>
+                    <td className="px-3 py-2">{statusBadge(e.status)}</td>
+                    <td className="px-3 py-2 text-[12px] text-muted">{e.channel}</td>
+                    <td className="px-3 py-2 text-[12px] text-muted">{e.primaryMetric}</td>
                     <td className="px-3 py-2">
-                      {e.verdict ? chip(e.verdict, VERDICT_CHIP[e.verdict] ?? "border-stone-200 bg-stone-100 text-stone-600") : <span className="text-stone-400">—</span>}
+                      {e.verdict ? chip(e.verdict) : <span className="text-subtle">—</span>}
                     </td>
                   </tr>
                 ))}

@@ -45,11 +45,11 @@ export default async function DataCostsPage({
   const isAdmin = membership.role === "owner" || membership.role === "admin";
 
   return (
-    <div className="flex h-full flex-col gap-4 bg-[#FAFAF7] p-4 md:p-6">
+    <div className="flex h-full flex-col gap-4 bg-canvas p-4 md:p-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-stone-900">Data costs</h1>
-          <p className="mt-0.5 max-w-2xl text-[13px] text-stone-500">
+          <h1 className="aos-heading">Data costs</h1>
+          <p className="mt-0.5 max-w-2xl text-[13px] text-muted">
             Every external data call, metered per workspace. Rent goes down when this table does.
           </p>
         </div>

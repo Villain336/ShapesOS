@@ -78,11 +78,17 @@ function rangeToDates(range: string): { from?: string; to?: string } {
   return { from: from.toISOString(), to: to.toISOString() };
 }
 
-const cardCls = "rounded-[10px] border border-stone-200 bg-white p-4";
-const thCls = "px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-stone-500";
-const tdCls = "px-3 py-2.5 text-[13px] text-stone-700 tabular-nums";
-const tdNum = "px-3 py-2.5 text-[13px] text-stone-700 tabular-nums text-right";
-const thNum = "px-3 py-2 text-right text-[11px] font-semibold uppercase tracking-wide text-stone-500";
+const cardCls = "rounded-[10px] border border-line bg-white p-4";
+const thCls = "px-3 py-2 text-left text-xs font-semibold text-muted";
+const tdCls = "px-3 py-2.5 text-[13px] text-muted tabular-nums";
+const tdNum = "px-3 py-2.5 text-[13px] text-muted tabular-nums text-right";
+const thNum = "px-3 py-2 text-right text-xs font-semibold text-muted";
+const inputCls =
+  "h-control-sm rounded-md border-[1.5px] border-control bg-paper px-3 text-sm text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none";
+const btnPrimary =
+  "inline-flex h-control-sm cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-night-hover focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--aos-focus-halo)] disabled:opacity-40";
+const btnDeny =
+  "inline-flex items-center justify-center rounded-full bg-white p-2 text-failed-text shadow-[inset_0_0_0_1.5px_var(--aos-failed)] aos-press hover:bg-failed-tint focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--aos-focus-halo)] disabled:opacity-40";
 
 export function AttributionApp() {
   const [model, setModel] = useState<Model>("linear");
@@ -186,17 +192,16 @@ export function AttributionApp() {
   ] : [];
 
   return (
-    <div className="flex h-full flex-col overflow-hidden">
+    <div className="flex h-full flex-col overflow-hidden bg-canvas">
       {/* Header */}
-      <div className="border-b border-stone-200 bg-white px-5 pb-0 pt-4">
+      <div className="border-b border-line bg-white px-5 pb-0 pt-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <div className="text-[12px] font-medium text-stone-500">Marketr · Analytics</div>
-            <h1 className="text-xl font-bold tracking-tight text-stone-900">Revenue Attribution</h1>
+            <h1 className="aos-heading">Revenue Attribution</h1>
           </div>
           <div className="flex items-center gap-2 pb-3">
             <select
-              className="crm-select !py-[6px] !text-[12.5px]"
+              className={inputCls}
               value={range}
               onChange={(e) => setRange(e.target.value)}
               aria-label="Date range"
@@ -204,7 +209,7 @@ export function AttributionApp() {
               {RANGES.map((r) => <option key={r.id} value={r.id}>{r.label}</option>)}
             </select>
             <select
-              className="crm-select !py-[6px] !text-[12.5px] max-w-[180px]"
+              className={`${inputCls} max-w-[180px]`}
               value={pipelineId}
               onChange={(e) => setPipelineId(e.target.value)}
               aria-label="Pipeline"
@@ -223,8 +228,8 @@ export function AttributionApp() {
               title={m.hint}
               className={`flex items-center gap-1.5 rounded-t-[8px] border-b-2 px-3.5 py-2 text-[13px] font-medium transition-colors ${
                 model === m.id
-                  ? "border-violet-600 text-violet-700"
-                  : "border-transparent text-stone-500 hover:text-stone-800"
+                  ? "border-ink text-ink"
+                  : "border-transparent text-muted hover:text-ink"
               }`}
             >
               <m.icon size={15} />
@@ -236,24 +241,31 @@ export function AttributionApp() {
 
       <div className="flex-1 overflow-y-auto px-5 py-5">
         {loading && !summary ? (
-          <p className="py-12 text-center text-sm text-stone-500">Loading attribution…</p>
+          <p className="py-12 text-center text-sm text-muted">Loading attribution…</p>
         ) : (
           <div className="mx-auto flex max-w-[1200px] flex-col gap-5">
             {/* KPI cards */}
             <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
               {kpis.map((k) => (
                 <div key={k.label} className={cardCls}>
-                  <div className="text-[11px] font-semibold uppercase tracking-wide text-stone-500">{k.label}</div>
-                  <div className="mt-1 text-[22px] font-semibold tabular-nums tracking-tight text-stone-900">{k.value}</div>
-                  <div className="mt-0.5 text-[11.5px] text-stone-400">{k.hint}</div>
+                  <div className="text-[11px] font-semibold text-muted">{k.label}</div>
+                  <div className="mt-1 text-[22px] font-semibold tabular-nums tracking-tight text-ink">{k.value}</div>
+                  <div className="mt-0.5 text-[11.5px] text-subtle">{k.hint}</div>
                 </div>
               ))}
             </div>
 
             {summary && summary.unattributedRevenueCents > 0 && (
-              <div className="rounded-[10px] border border-amber-200 bg-amber-50 px-4 py-3 text-[13px] text-amber-900">
-                <span className="font-semibold">{formatMoney(summary.unattributedRevenueCents)}</span> of won revenue
-                has no marketing touches — those leads were created without UTM data. Add UTMs to capture forms to close the gap.
+              <div className="flex items-start gap-2.5 rounded-lg bg-needs px-4 py-3 text-ink">
+                <span
+                  className="aos-shape aos-shape--needs aos-shape--edged mt-0.5 shrink-0 [--aos-shape-size:14px]"
+                  style={{ color: "inherit" }}
+                  aria-hidden
+                />
+                <p className="text-[13px]">
+                  <span className="font-semibold">{formatMoney(summary.unattributedRevenueCents)}</span> of won revenue
+                  has no marketing touches — those leads were created without UTM data. Add UTMs to capture forms to close the gap.
+                </p>
               </div>
             )}
 
@@ -263,17 +275,17 @@ export function AttributionApp() {
             {/* Channel performance */}
             <section className={cardCls}>
               <div className="mb-3 flex items-center justify-between">
-                <h2 className="flex items-center gap-2 text-[14px] font-semibold text-stone-900">
-                  <ChartLine size={16} className="text-violet-600" /> Channel performance
+                <h2 className="flex items-center gap-2 text-[14px] font-semibold text-ink">
+                  <ChartLine size={16} className="text-ink" /> Channel performance
                 </h2>
-                <span className="text-[11.5px] text-stone-400">Revenue columns follow the {MODELS.find((m) => m.id === model)!.label.toLowerCase()} model</span>
+                <span className="text-[11.5px] text-subtle">Revenue columns follow the {MODELS.find((m) => m.id === model)!.label.toLowerCase()} model</span>
               </div>
               {channels.length === 0 ? (
                 <EmptyState icon={ChartLine} title="No touches yet" hint="Capture leads with UTMs (or import a CSV with utm_* columns) and move them to Won to see channel ROAS." />
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="crm-table w-full">
-                    <thead><tr className="border-b border-stone-200">
+                  <table className="w-full text-left text-[13px]">
+                    <thead><tr className="border-b border-line">
                       <th className={thCls}>Channel</th>
                       <th className={thNum}>Spend</th>
                       <th className={thNum}>Leads</th>
@@ -287,14 +299,14 @@ export function AttributionApp() {
                       {channels.map((c) => {
                         const m = c.perModel[model];
                         return (
-                          <tr key={c.channel} className="border-b border-stone-100 last:border-0">
-                            <td className="px-3 py-2.5 text-[13px] font-medium text-stone-900">{channelLabel(c.channel)}</td>
+                          <tr key={c.channel} className="border-b border-line last:border-0">
+                            <td className="px-3 py-2.5 text-[13px] font-medium text-ink">{channelLabel(c.channel)}</td>
                             <td className={tdNum}>{formatMoney(c.spendCents)}</td>
                             <td className={tdNum}>{c.leads}</td>
                             <td className={tdNum}>{c.cplCents == null ? "—" : formatMoney(c.cplCents)}</td>
                             <td className={tdNum}>{fmtNum(m.customers, m.customers % 1 ? 2 : 0)}</td>
                             <td className={tdNum}>{m.cacCents == null ? "—" : formatMoney(m.cacCents)}</td>
-                            <td className={`${tdNum} font-semibold text-stone-900`}>{formatMoney(m.revenueCents)}</td>
+                            <td className={`${tdNum} font-semibold text-ink`}>{formatMoney(m.revenueCents)}</td>
                             <td className={tdNum}>{fmtRoas(m.roas)}</td>
                           </tr>
                         );
@@ -307,15 +319,15 @@ export function AttributionApp() {
 
             {/* Campaigns */}
             <section className={cardCls}>
-              <h2 className="mb-3 flex items-center gap-2 text-[14px] font-semibold text-stone-900">
-                <Megaphone size={16} className="text-violet-600" /> Campaigns
+              <h2 className="mb-3 flex items-center gap-2 text-[14px] font-semibold text-ink">
+                <Megaphone size={16} className="text-ink" /> Campaigns
               </h2>
               {campaigns.length === 0 ? (
                 <EmptyState icon={Megaphone} title="No campaigns yet" hint="utm_campaign values (or capture-form names) appear here once leads carry them." />
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="crm-table w-full">
-                    <thead><tr className="border-b border-stone-200">
+                  <table className="w-full text-left text-[13px]">
+                    <thead><tr className="border-b border-line">
                       <th className={thCls}>Campaign</th>
                       <th className={thCls}>Channel</th>
                       <th className={thNum}>Spend</th>
@@ -328,13 +340,13 @@ export function AttributionApp() {
                       {campaigns.slice(0, 25).map((c) => {
                         const m = c.perModel[model];
                         return (
-                          <tr key={`${c.channel}::${c.campaign}`} className="border-b border-stone-100 last:border-0">
-                            <td className="px-3 py-2.5 text-[13px] font-medium text-stone-900">{c.campaign ?? "—"}</td>
-                            <td className="px-3 py-2.5 text-[13px] text-stone-500">{channelLabel(c.channel)}</td>
+                          <tr key={`${c.channel}::${c.campaign}`} className="border-b border-line last:border-0">
+                            <td className="px-3 py-2.5 text-[13px] font-medium text-ink">{c.campaign ?? "—"}</td>
+                            <td className="px-3 py-2.5 text-[13px] text-muted">{channelLabel(c.channel)}</td>
                             <td className={tdNum}>{formatMoney(c.spendCents)}</td>
                             <td className={tdNum}>{c.leads}</td>
                             <td className={tdNum}>{fmtNum(m.customers, m.customers % 1 ? 2 : 0)}</td>
-                            <td className={`${tdNum} font-semibold text-stone-900`}>{formatMoney(m.revenueCents)}</td>
+                            <td className={`${tdNum} font-semibold text-ink`}>{formatMoney(m.revenueCents)}</td>
                             <td className={tdNum}>{fmtRoas(m.roas)}</td>
                           </tr>
                         );
@@ -347,26 +359,26 @@ export function AttributionApp() {
 
             {/* Revenue-influenced content */}
             <section className={cardCls}>
-              <h2 className="mb-3 flex items-center gap-2 text-[14px] font-semibold text-stone-900">
-                <LinkIcon size={16} className="text-violet-600" /> Revenue-influenced content
+              <h2 className="mb-3 flex items-center gap-2 text-[14px] font-semibold text-ink">
+                <LinkIcon size={16} className="text-ink" /> Revenue-influenced content
               </h2>
               {content.length === 0 ? (
                 <EmptyState icon={LinkIcon} title="No content touches yet" hint="Pass a contentId (a Marketr page) with a touch to see which pages influence revenue." />
               ) : (
-                <div className="flex flex-col divide-y divide-stone-100">
+                <div className="flex flex-col divide-y divide-line">
                   {content.slice(0, 20).map((c) => (
                     <div key={c.contentId} className="flex items-center justify-between gap-4 py-2.5">
                       <div className="min-w-0">
-                        <div className="truncate text-[13px] font-medium text-stone-900">
+                        <div className="truncate text-[13px] font-medium text-ink">
                           {c.keywordPhrase ?? c.publishedUrl ?? c.contentId}
                         </div>
-                        <div className="truncate text-[11.5px] text-stone-400">
+                        <div className="truncate text-[11.5px] text-subtle">
                           {c.publishedUrl ?? c.contentId} · {c.touches} touches · {c.leads} leads
                         </div>
                       </div>
                       <div className="shrink-0 text-right">
-                        <div className="text-[14px] font-semibold tabular-nums text-stone-900">{formatMoney(c.revenueCents)}</div>
-                        <div className="text-[11.5px] tabular-nums text-stone-400">{fmtNum(c.customers, c.customers % 1 ? 2 : 0)} customers</div>
+                        <div className="text-[14px] font-semibold tabular-nums text-ink">{formatMoney(c.revenueCents)}</div>
+                        <div className="text-[11.5px] tabular-nums text-subtle">{fmtNum(c.customers, c.customers % 1 ? 2 : 0)} customers</div>
                       </div>
                     </div>
                   ))}
@@ -377,47 +389,47 @@ export function AttributionApp() {
             {/* Spend manager */}
             <section className={cardCls}>
               <div className="mb-3 flex items-center justify-between">
-                <h2 className="flex items-center gap-2 text-[14px] font-semibold text-stone-900">
-                  <DollarSign size={16} className="text-violet-600" /> Spend entries
+                <h2 className="flex items-center gap-2 text-[14px] font-semibold text-ink">
+                  <DollarSign size={16} className="text-ink" /> Spend entries
                 </h2>
-                <button className="crm-btn-primary !py-[6px] !text-[12.5px]" onClick={() => setShowSpendForm((v) => !v)}>
+                <button className={btnPrimary} onClick={() => setShowSpendForm((v) => !v)}>
                   {showSpendForm ? <X size={14} /> : <Plus size={14} />} {showSpendForm ? "Cancel" : "Add spend"}
                 </button>
               </div>
-              <p className="mb-3 text-[12px] text-stone-500">
+              <p className="mb-3 text-[12px] text-muted">
                 Ad platform APIs aren&apos;t connected yet, so spend is entered manually. Organic and physical channels work with $0 spend — CPL/CAC/ROAS simply report as “—”.
               </p>
               {showSpendForm && (
-                <div className="mb-4 grid grid-cols-2 gap-3 rounded-[8px] border border-stone-200 bg-stone-50 p-4 md:grid-cols-3">
-                  <label className="flex flex-col gap-1 text-[12px] font-medium text-stone-600">
+                <div className="mb-4 grid grid-cols-2 gap-3 rounded-[8px] border border-line bg-canvas p-4 md:grid-cols-3">
+                  <label className="flex flex-col gap-1 text-[12px] font-medium text-muted">
                     Channel
-                    <input className="crm-input" value={spendDraft.channel} onChange={(e) => setSpendDraft({ ...spendDraft, channel: e.target.value })} placeholder="paid_search" />
+                    <input className={inputCls} value={spendDraft.channel} onChange={(e) => setSpendDraft({ ...spendDraft, channel: e.target.value })} placeholder="paid_search" />
                   </label>
-                  <label className="flex flex-col gap-1 text-[12px] font-medium text-stone-600">
-                    Campaign <span className="font-normal text-stone-400">(optional)</span>
-                    <input className="crm-input" value={spendDraft.campaign} onChange={(e) => setSpendDraft({ ...spendDraft, campaign: e.target.value })} placeholder="Q3 brand push" />
+                  <label className="flex flex-col gap-1 text-[12px] font-medium text-muted">
+                    Campaign <span className="font-normal text-subtle">(optional)</span>
+                    <input className={inputCls} value={spendDraft.campaign} onChange={(e) => setSpendDraft({ ...spendDraft, campaign: e.target.value })} placeholder="Q3 brand push" />
                   </label>
-                  <label className="flex flex-col gap-1 text-[12px] font-medium text-stone-600">
+                  <label className="flex flex-col gap-1 text-[12px] font-medium text-muted">
                     Amount (USD)
-                    <input className="crm-input" inputMode="decimal" value={spendDraft.amount} onChange={(e) => setSpendDraft({ ...spendDraft, amount: e.target.value })} placeholder="1250.00" />
+                    <input className={inputCls} inputMode="decimal" value={spendDraft.amount} onChange={(e) => setSpendDraft({ ...spendDraft, amount: e.target.value })} placeholder="1250.00" />
                   </label>
-                  <label className="flex flex-col gap-1 text-[12px] font-medium text-stone-600">
+                  <label className="flex flex-col gap-1 text-[12px] font-medium text-muted">
                     Period start
-                    <input className="crm-input" type="date" value={spendDraft.periodStart} onChange={(e) => setSpendDraft({ ...spendDraft, periodStart: e.target.value })} />
+                    <input className={inputCls} type="date" value={spendDraft.periodStart} onChange={(e) => setSpendDraft({ ...spendDraft, periodStart: e.target.value })} />
                   </label>
-                  <label className="flex flex-col gap-1 text-[12px] font-medium text-stone-600">
+                  <label className="flex flex-col gap-1 text-[12px] font-medium text-muted">
                     Period end
-                    <input className="crm-input" type="date" value={spendDraft.periodEnd} onChange={(e) => setSpendDraft({ ...spendDraft, periodEnd: e.target.value })} />
+                    <input className={inputCls} type="date" value={spendDraft.periodEnd} onChange={(e) => setSpendDraft({ ...spendDraft, periodEnd: e.target.value })} />
                   </label>
-                  <label className="flex flex-col gap-1 text-[12px] font-medium text-stone-600">
-                    Notes <span className="font-normal text-stone-400">(optional)</span>
-                    <input className="crm-input" value={spendDraft.notes} onChange={(e) => setSpendDraft({ ...spendDraft, notes: e.target.value })} placeholder="Google Ads invoice #…" />
+                  <label className="flex flex-col gap-1 text-[12px] font-medium text-muted">
+                    Notes <span className="font-normal text-subtle">(optional)</span>
+                    <input className={inputCls} value={spendDraft.notes} onChange={(e) => setSpendDraft({ ...spendDraft, notes: e.target.value })} placeholder="Google Ads invoice #…" />
                   </label>
                   <div className="col-span-2 flex items-center gap-3 md:col-span-3">
-                    <button className="crm-btn-primary" onClick={saveSpend} disabled={spendSaving}>
+                    <button className={btnPrimary} onClick={saveSpend} disabled={spendSaving}>
                       {spendSaving ? "Saving…" : "Save spend entry"}
                     </button>
-                    {spendError && <span className="text-[12.5px] text-red-600">{spendError}</span>}
+                    {spendError && <span className="text-[12.5px] text-failed-text">{spendError}</span>}
                   </div>
                 </div>
               )}
@@ -425,8 +437,8 @@ export function AttributionApp() {
                 <EmptyState icon={Calendar} title="No spend entries" hint="Add spend per channel and period to unlock CPL, CAC, and ROAS." />
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="crm-table w-full">
-                    <thead><tr className="border-b border-stone-200">
+                  <table className="w-full text-left text-[13px]">
+                    <thead><tr className="border-b border-line">
                       <th className={thCls}>Channel</th>
                       <th className={thCls}>Campaign</th>
                       <th className={thNum}>Amount</th>
@@ -436,17 +448,17 @@ export function AttributionApp() {
                     </tr></thead>
                     <tbody>
                       {spend.map((s) => (
-                        <tr key={s.id} className="border-b border-stone-100 last:border-0">
-                          <td className="px-3 py-2.5 text-[13px] font-medium text-stone-900">{channelLabel(s.channel)}</td>
-                          <td className="px-3 py-2.5 text-[13px] text-stone-500">{s.campaign ?? "—"}</td>
-                          <td className={`${tdNum} font-semibold text-stone-900`}>{formatMoney(s.amountCents)}</td>
-                          <td className="px-3 py-2.5 text-[12.5px] text-stone-500">
+                        <tr key={s.id} className="border-b border-line last:border-0">
+                          <td className="px-3 py-2.5 text-[13px] font-medium text-ink">{channelLabel(s.channel)}</td>
+                          <td className="px-3 py-2.5 text-[13px] text-muted">{s.campaign ?? "—"}</td>
+                          <td className={`${tdNum} font-semibold text-ink`}>{formatMoney(s.amountCents)}</td>
+                          <td className="px-3 py-2.5 text-[12.5px] text-muted">
                             {new Date(s.periodStart).toLocaleDateString()} → {new Date(s.periodEnd).toLocaleDateString()}
                           </td>
-                          <td className="max-w-[220px] truncate px-3 py-2.5 text-[12.5px] text-stone-500">{s.notes ?? "—"}</td>
+                          <td className="max-w-[220px] truncate px-3 py-2.5 text-[12.5px] text-muted">{s.notes ?? "—"}</td>
                           <td className="px-3 py-2.5 text-right">
                             <button
-                              className="crm-btn-ghost !px-2 !py-1 text-stone-400 hover:text-red-600"
+                              className={btnDeny}
                               onClick={() => deleteSpend(s.id)}
                               aria-label="Delete spend entry"
                             >

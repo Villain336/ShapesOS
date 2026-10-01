@@ -1,12 +1,12 @@
 // Marketr — Phase 10 M4: Competitor change fleet UI client.
 //
 // House pattern per app/dashboard/studio/StudioApp.tsx (AGENTS.md): page
-// shell bg-[#FAFAF7] p-4 md:p-6 (in page.tsx), title text-xl bold,
-// subtitle text-[13px] text-stone-500, sub-tabs with Lucide icon + label and
-// ACTIVE = border-violet-600 text-violet-700, primary buttons
-// bg-violet-600 hover:bg-violet-700, data lists as DENSE TABLES with badge
-// columns and rows hover:bg-violet-50/40, filter toolbar = dropdowns +
-// search + violet button, info notes border-stone-200 bg-stone-50.
+// shell bg-canvas p-4 md:p-6 (in page.tsx), title text-xl bold,
+// subtitle text-[13px] text-muted, sub-tabs with Lucide icon + label and
+// ACTIVE = border-ink text-ink, primary buttons
+// bg-ink hover:bg-night-hover, data lists as DENSE TABLES with badge
+// columns and rows hover:bg-hover-paper, filter toolbar = dropdowns +
+// search + violet button, info notes border-line bg-canvas.
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -38,17 +38,10 @@ function Chip({
   children: React.ReactNode;
   tone?: "slate" | "violet" | "green" | "amber" | "red" | "blue";
 }) {
-  const tones: Record<string, string> = {
-    slate: "bg-slate-100 text-slate-600 border-slate-200",
-    violet: "bg-violet-50 text-violet-700 border-violet-200",
-    green: "bg-emerald-50 text-emerald-700 border-emerald-200",
-    amber: "bg-amber-50 text-amber-700 border-amber-200",
-    red: "bg-red-50 text-red-700 border-red-200",
-    blue: "bg-blue-50 text-blue-700 border-blue-200",
-  };
+  void tone;
   return (
     <span
-      className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-1.5 py-0.5 text-[10px] font-medium leading-tight ${tones[tone]}`}
+      className={"inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-paper px-2 py-0.5 text-[10px] font-semibold leading-tight text-muted shadow-control"}
     >
       {children}
     </span>
@@ -56,11 +49,11 @@ function Chip({
 }
 
 const inputCls =
-  "rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-[13px] text-stone-900 placeholder:text-stone-400 focus:border-violet-400 focus:outline-none";
+  "h-control-sm rounded-md border-[1.5px] border-control bg-paper px-3 text-sm text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none";
 const btnPrimary =
-  "flex items-center gap-1.5 rounded-md bg-violet-600 px-3 py-1.5 text-[13px] font-medium text-white hover:bg-violet-700 disabled:opacity-40";
+  "inline-flex h-control-sm cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-night-hover focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--aos-focus-halo)] disabled:opacity-40";
 const btnGhost =
-  "flex items-center gap-1.5 rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-[13px] text-stone-700 hover:bg-stone-50 disabled:opacity-40";
+  "inline-flex h-control-sm cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-paper px-4 text-sm font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--aos-focus-halo)] disabled:opacity-40";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -146,13 +139,7 @@ const CHANGE_LABELS: Record<string, string> = {
   structure_changed: "Structure changed",
 };
 
-function changeTone(t: string): "blue" | "red" | "amber" | "slate" | "violet" {
-  if (t === "page_added") return "blue";
-  if (t === "page_removed") return "red";
-  if (t === "content_updated") return "amber";
-  if (t === "structure_changed") return "violet";
-  return "slate";
-}
+
 
 const STATUS_LABELS: Record<string, string> = {
   new: "New",
@@ -161,11 +148,30 @@ const STATUS_LABELS: Record<string, string> = {
   dismissed: "Dismissed",
 };
 
-function statusTone(s: string): "amber" | "blue" | "green" | "slate" {
-  if (s === "new") return "amber";
-  if (s === "reviewed") return "blue";
-  if (s === "actioned") return "green";
-  return "slate";
+// Watch status carries the AOS status shape language:
+// new = needs attention, actioned = done, reviewed/dismissed = neutral.
+function statusBadge(s: string) {
+  const base =
+    "inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-semibold leading-tight";
+  if (s === "new")
+    return (
+      <span className={`${base} bg-needs text-ink`}>
+        <span className="aos-shape aos-shape--needs aos-shape--edged [--aos-shape-size:9px]" style={{ color: "inherit" }} aria-hidden />
+        {STATUS_LABELS[s] ?? s}
+      </span>
+    );
+  if (s === "actioned")
+    return (
+      <span className={`${base} bg-done text-white`}>
+        <span className="aos-shape aos-shape--done [--aos-shape-size:9px]" style={{ color: "inherit" }} aria-hidden />
+        {STATUS_LABELS[s] ?? s}
+      </span>
+    );
+  return (
+    <span className={`${base} bg-paper text-muted shadow-control`}>
+      {STATUS_LABELS[s] ?? s}
+    </span>
+  );
 }
 
 function fmtDate(iso: string | null): string {
@@ -195,8 +201,8 @@ function truncate(s: string | null, n: number): string {
 function DetailRow({ label, value }: { label: string; value: string | null }) {
   return (
     <div className="grid grid-cols-[160px_1fr] gap-3 py-1.5">
-      <dt className="text-[12px] font-medium text-stone-500">{label}</dt>
-      <dd className="text-[13px] text-stone-800">{value || "—"}</dd>
+      <dt className="text-[12px] font-medium text-muted">{label}</dt>
+      <dd className="text-[13px] text-ink">{value || "—"}</dd>
     </div>
   );
 }
@@ -296,8 +302,8 @@ function ChangesTab({ projects }: { projects: Project[] }) {
 
   return (
     <div>
-      <div className="mb-3 rounded-lg border border-stone-200 bg-stone-50 p-3 text-[12.5px] text-stone-600">
-        <span className="font-medium text-stone-800">Propose-only. </span>
+      <div className="mb-3 rounded-lg border border-line bg-canvas p-3 text-[12.5px] text-muted">
+        <span className="font-medium text-ink">Propose-only. </span>
         The fleet reports — semantic summaries and recommended responses are
         proposals. Anything that acts goes through the Phase 9 approval
         executor; nothing here runs automatically.
@@ -337,7 +343,7 @@ function ChangesTab({ projects }: { projects: Project[] }) {
           ))}
         </select>
         <div className="relative">
-          <Search size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-stone-400" />
+          <Search size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-subtle" />
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
@@ -346,16 +352,16 @@ function ChangesTab({ projects }: { projects: Project[] }) {
           />
         </div>
         <button onClick={runFleet} disabled={running} className={btnPrimary}>
-          {running ? <Loader2 size={15} className="animate-spin" /> : <Play size={15} />}
+          {running ? <Loader2 size={15} className="aos-spin" /> : <Play size={15} />}
           Run fleet now
         </button>
       </div>
 
       {/* Dense change table */}
-      <div className="overflow-hidden rounded-lg border border-stone-200 bg-white">
+      <div className="overflow-hidden rounded-lg border border-line bg-white">
         <table className="w-full text-left text-[13px]">
           <thead>
-            <tr className="border-b border-stone-100 bg-stone-50/60 text-[11px] uppercase tracking-wide text-stone-500">
+            <tr className="border-b border-line text-xs font-semibold text-muted">
               <th className="px-3 py-2 font-medium">Detected</th>
               <th className="px-3 py-2 font-medium">Competitor</th>
               <th className="px-3 py-2 font-medium">Change</th>
@@ -370,42 +376,42 @@ function ChangesTab({ projects }: { projects: Project[] }) {
               <tr
                 key={c.id}
                 onClick={() => setExpandedId(expandedId === c.id ? null : c.id)}
-                className={`cursor-pointer border-b border-stone-100 last:border-0 hover:bg-violet-50/40 ${
-                  expandedId === c.id ? "bg-violet-50/60" : ""
+                className={`cursor-pointer border-b border-line last:border-0 hover:bg-hover-paper ${
+                  expandedId === c.id ? "bg-hover-paper" : ""
                 }`}
               >
-                <td className="whitespace-nowrap px-3 py-2 text-stone-500">{fmtDate(c.detectedAt)}</td>
-                <td className="whitespace-nowrap px-3 py-2 font-medium text-stone-900">
+                <td className="whitespace-nowrap px-3 py-2 text-muted">{fmtDate(c.detectedAt)}</td>
+                <td className="whitespace-nowrap px-3 py-2 font-medium text-ink">
                   {c.competitorDomain}
                 </td>
                 <td className="px-3 py-2">
-                  <Chip tone={changeTone(c.changeType)}>{CHANGE_LABELS[c.changeType] ?? c.changeType}</Chip>
+                  <Chip>{CHANGE_LABELS[c.changeType] ?? c.changeType}</Chip>
                 </td>
-                <td className="max-w-[220px] truncate px-3 py-2 text-stone-600" title={c.url}>
+                <td className="max-w-[220px] truncate px-3 py-2 text-muted" title={c.url}>
                   {shortUrl(c.url)}
                 </td>
-                <td className="max-w-[280px] truncate px-3 py-2 text-stone-700" title={c.semanticSummary ?? ""}>
+                <td className="max-w-[280px] truncate px-3 py-2 text-muted" title={c.semanticSummary ?? ""}>
                   {truncate(c.semanticSummary, 90)}
                 </td>
-                <td className="max-w-[280px] truncate px-3 py-2 text-stone-700" title={c.recommendedResponse ?? ""}>
+                <td className="max-w-[280px] truncate px-3 py-2 text-muted" title={c.recommendedResponse ?? ""}>
                   {truncate(c.recommendedResponse, 90)}
                 </td>
                 <td className="px-3 py-2">
-                  <Chip tone={statusTone(c.status)}>{STATUS_LABELS[c.status] ?? c.status}</Chip>
+                  {statusBadge(c.status)}
                 </td>
               </tr>
             ))}
             {changes.length === 0 && !loading && (
               <tr>
-                <td colSpan={7} className="px-3 py-8 text-center text-[13px] text-stone-400">
+                <td colSpan={7} className="px-3 py-8 text-center text-[13px] text-subtle">
                   No changes yet — add competitors in the Watchlist tab, then run the fleet.
                 </td>
               </tr>
             )}
             {loading && (
               <tr>
-                <td colSpan={7} className="px-3 py-8 text-center text-[13px] text-stone-400">
-                  <Loader2 size={16} className="mx-auto animate-spin" />
+                <td colSpan={7} className="px-3 py-8 text-center text-[13px] text-subtle">
+                  <Loader2 size={16} className="mx-auto aos-spin" />
                 </td>
               </tr>
             )}
@@ -415,16 +421,16 @@ function ChangesTab({ projects }: { projects: Project[] }) {
 
       {/* Expanded change detail */}
       {expanded && (
-        <div className="mt-3 rounded-lg border border-stone-200 bg-white p-4">
+        <div className="mt-3 rounded-lg border border-line bg-white p-4">
           <div className="mb-2 flex flex-wrap items-center gap-2">
-            <span className="text-[14px] font-semibold text-stone-900">{expanded.competitorDomain}</span>
-            <Chip tone={changeTone(expanded.changeType)}>
+            <span className="text-[14px] font-semibold text-ink">{expanded.competitorDomain}</span>
+            <Chip>
               {CHANGE_LABELS[expanded.changeType] ?? expanded.changeType}
             </Chip>
-            <Chip tone={statusTone(expanded.status)}>{STATUS_LABELS[expanded.status] ?? expanded.status}</Chip>
-            <span className="text-[12px] text-stone-500">{fmtDate(expanded.detectedAt)}</span>
+            {statusBadge(expanded.status)}
+            <span className="text-[12px] text-muted">{fmtDate(expanded.detectedAt)}</span>
           </div>
-          <dl className="divide-y divide-stone-100">
+          <dl className="divide-y divide-line">
             <DetailRow label="Page" value={expanded.url} />
             <DetailRow label="Semantic summary" value={expanded.semanticSummary} />
             <DetailRow label="Why it matters" value={expanded.whyItMatters} />
@@ -440,7 +446,7 @@ function ChangesTab({ projects }: { projects: Project[] }) {
             <button onClick={() => setStatus(expanded.id, "dismissed")} disabled={actingId === expanded.id} className={btnGhost}>
               <XCircle size={14} /> Dismiss
             </button>
-            <span className="text-[12px] text-stone-400">
+            <span className="text-[12px] text-subtle">
               “Actioned” means you handled it outside Marketr (e.g. via the Phase 9 approval
               executor) — the fleet never acted on its own.
             </span>
@@ -526,8 +532,8 @@ function WatchlistTab({ projects }: { projects: Project[] }) {
 
   return (
     <div>
-      <div className="mb-3 rounded-lg border border-stone-200 bg-stone-50 p-3 text-[12.5px] text-stone-600">
-        <span className="font-medium text-stone-800">Polite by design. </span>
+      <div className="mb-3 rounded-lg border border-line bg-canvas p-3 text-[12.5px] text-muted">
+        <span className="font-medium text-ink">Polite by design. </span>
         The fleet fetches sitemaps and tracked pages with ≥2s between hits per
         domain, a 15s timeout, an identifiable user agent, and a real
         robots.txt check before every page fetch — crawl-delay honored when
@@ -557,16 +563,16 @@ function WatchlistTab({ projects }: { projects: Project[] }) {
           className={`${inputCls} w-72`}
         />
         <button onClick={addWatch} disabled={saving || !domain.trim()} className={btnPrimary}>
-          {saving ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} />}
+          {saving ? <Loader2 size={15} className="aos-spin" /> : <Plus size={15} />}
           Add competitor
         </button>
       </div>
-      {error && <p className="mb-3 text-[13px] text-red-600">{error}</p>}
+      {error && <p className="mb-3 text-[13px] text-failed-text">{error}</p>}
 
-      <div className="overflow-hidden rounded-lg border border-stone-200 bg-white">
+      <div className="overflow-hidden rounded-lg border border-line bg-white">
         <table className="w-full text-left text-[13px]">
           <thead>
-            <tr className="border-b border-stone-100 bg-stone-50/60 text-[11px] uppercase tracking-wide text-stone-500">
+            <tr className="border-b border-line text-xs font-semibold text-muted">
               <th className="px-3 py-2 font-medium">Competitor</th>
               <th className="px-3 py-2 font-medium">Sitemap</th>
               <th className="px-3 py-2 font-medium">Last diff</th>
@@ -576,24 +582,24 @@ function WatchlistTab({ projects }: { projects: Project[] }) {
           </thead>
           <tbody>
             {watches.map((w) => (
-              <tr key={w.id} className="border-b border-stone-100 last:border-0 hover:bg-violet-50/40">
-                <td className="px-3 py-2 font-medium text-stone-900">
+              <tr key={w.id} className="border-b border-line last:border-0 hover:bg-hover-paper">
+                <td className="px-3 py-2 font-medium text-ink">
                   <span className="inline-flex items-center gap-1.5">
-                    <Globe size={13} className="text-stone-400" />
+                    <Globe size={13} className="text-subtle" />
                     {w.competitorDomain}
                   </span>
                 </td>
-                <td className="max-w-[320px] truncate px-3 py-2 text-stone-600" title={w.sitemapUrl ?? ""}>
-                  {w.sitemapUrl ? shortUrl(w.sitemapUrl) : <span className="text-stone-400">auto-detect</span>}
+                <td className="max-w-[320px] truncate px-3 py-2 text-muted" title={w.sitemapUrl ?? ""}>
+                  {w.sitemapUrl ? shortUrl(w.sitemapUrl) : <span className="text-subtle">auto-detect</span>}
                 </td>
-                <td className="whitespace-nowrap px-3 py-2 text-stone-500">{fmtDate(w.lastDiffAt)}</td>
+                <td className="whitespace-nowrap px-3 py-2 text-muted">{fmtDate(w.lastDiffAt)}</td>
                 <td className="px-3 py-2">
-                  {w.changeCount > 0 ? <Chip tone="violet">{w.changeCount}</Chip> : <span className="text-stone-400">—</span>}
+                  {w.changeCount > 0 ? <Chip tone="violet">{w.changeCount}</Chip> : <span className="text-subtle">—</span>}
                 </td>
                 <td className="px-3 py-2 text-right">
                   <button
                     onClick={() => deleteWatch(w.id)}
-                    className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[12px] text-stone-500 hover:bg-red-50 hover:text-red-600"
+                    className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[12px] text-muted hover:bg-failed-tint hover:text-failed-text"
                     title="Remove watch"
                   >
                     <Trash2 size={13} />
@@ -603,15 +609,15 @@ function WatchlistTab({ projects }: { projects: Project[] }) {
             ))}
             {watches.length === 0 && !loading && (
               <tr>
-                <td colSpan={5} className="px-3 py-8 text-center text-[13px] text-stone-400">
+                <td colSpan={5} className="px-3 py-8 text-center text-[13px] text-subtle">
                   No competitors watched yet — add one above.
                 </td>
               </tr>
             )}
             {loading && (
               <tr>
-                <td colSpan={5} className="px-3 py-8 text-center text-[13px] text-stone-400">
-                  <Loader2 size={16} className="mx-auto animate-spin" />
+                <td colSpan={5} className="px-3 py-8 text-center text-[13px] text-subtle">
+                  <Loader2 size={16} className="mx-auto aos-spin" />
                 </td>
               </tr>
             )}
@@ -668,11 +674,11 @@ function DigestTab({ projects }: { projects: Project[] }) {
           ))}
         </select>
         <button onClick={load} disabled={loading} className={btnPrimary}>
-          {loading ? <Loader2 size={15} className="animate-spin" /> : <RefreshCw size={15} />}
+          {loading ? <Loader2 size={15} className="aos-spin" /> : <RefreshCw size={15} />}
           Rebuild digest
         </button>
         {digest && (
-          <span className="text-[12px] text-stone-400">
+          <span className="text-[12px] text-subtle">
             Week {fmtDate(digest.weekStart)} – {fmtDate(digest.weekEnd)} · generated{" "}
             {fmtDate(digest.generatedAt)}
           </span>
@@ -680,7 +686,7 @@ function DigestTab({ projects }: { projects: Project[] }) {
       </div>
 
       {!digest && !loading && (
-        <div className="rounded-lg border border-stone-200 bg-stone-50 p-8 text-center text-[13px] text-stone-400">
+        <div className="rounded-lg border border-line bg-canvas p-8 text-center text-[13px] text-subtle">
           No digest yet — the weekly cron builds it automatically.
         </div>
       )}
@@ -697,10 +703,10 @@ function DigestTab({ projects }: { projects: Project[] }) {
           </div>
 
           {/* Per-competitor velocity */}
-          <div className="overflow-hidden rounded-lg border border-stone-200 bg-white">
+          <div className="overflow-hidden rounded-lg border border-line bg-white">
             <table className="w-full text-left text-[13px]">
               <thead>
-                <tr className="border-b border-stone-100 bg-stone-50/60 text-[11px] uppercase tracking-wide text-stone-500">
+                <tr className="border-b border-line text-xs font-semibold text-muted">
                   <th className="px-3 py-2 font-medium">Competitor</th>
                   <th className="px-3 py-2 font-medium">+ Pages</th>
                   <th className="px-3 py-2 font-medium">Updated</th>
@@ -711,8 +717,8 @@ function DigestTab({ projects }: { projects: Project[] }) {
               </thead>
               <tbody>
                 {digest.competitors.map((c) => (
-                  <tr key={c.domain} className="border-b border-stone-100 last:border-0 hover:bg-violet-50/40">
-                    <td className="whitespace-nowrap px-3 py-2 font-medium text-stone-900">{c.domain}</td>
+                  <tr key={c.domain} className="border-b border-line last:border-0 hover:bg-hover-paper">
+                    <td className="whitespace-nowrap px-3 py-2 font-medium text-ink">{c.domain}</td>
                     <td className="px-3 py-2"><Chip tone="blue">+{c.pagesAdded}</Chip></td>
                     <td className="px-3 py-2"><Chip tone="slate">{c.pagesUpdated}</Chip></td>
                     <td className="px-3 py-2"><Chip tone="red">−{c.pagesRemoved}</Chip></td>
@@ -720,14 +726,14 @@ function DigestTab({ projects }: { projects: Project[] }) {
                       {c.pricingOfferChanges > 0 ? (
                         <Chip tone="amber">{c.pricingOfferChanges}</Chip>
                       ) : (
-                        <span className="text-stone-400">—</span>
+                        <span className="text-subtle">—</span>
                       )}
                     </td>
                     <td className="px-3 py-2">
                       <ul className="space-y-1">
                         {c.topChanges.map((tc, i) => (
-                          <li key={i} className="flex items-center gap-1.5 text-[12.5px] text-stone-600">
-                            <Chip tone={changeTone(tc.changeType)}>{CHANGE_LABELS[tc.changeType] ?? tc.changeType}</Chip>
+                          <li key={i} className="flex items-center gap-1.5 text-[12.5px] text-muted">
+                            <Chip>{CHANGE_LABELS[tc.changeType] ?? tc.changeType}</Chip>
                             <span className="truncate" title={tc.summary ?? tc.url}>
                               {tc.summary ? truncate(tc.summary, 70) : shortUrl(tc.url)}
                             </span>
@@ -743,24 +749,24 @@ function DigestTab({ projects }: { projects: Project[] }) {
 
           {/* SERP presence */}
           <div>
-            <h3 className="mb-2 text-[13px] font-semibold text-stone-800">
+            <h3 className="mb-2 text-[13px] font-semibold text-ink">
               Keyword presence — watched competitors in the top 10
             </h3>
             {!digest.serpAvailable ? (
-              <div className="rounded-lg border border-stone-200 bg-stone-50 p-3 text-[12.5px] text-stone-600">
+              <div className="rounded-lg border border-line bg-canvas p-3 text-[12.5px] text-muted">
                 SERP vendor unavailable this week — keyword presence skipped (no
                 SERP vendor is configured; the digest degrades gracefully
                 instead of failing).
               </div>
             ) : digest.serpPresence.length === 0 ? (
-              <div className="rounded-lg border border-stone-200 bg-stone-50 p-3 text-[12.5px] text-stone-500">
+              <div className="rounded-lg border border-line bg-canvas p-3 text-[12.5px] text-muted">
                 No watched competitor in the top 10 for tracked keywords this week.
               </div>
             ) : (
-              <div className="overflow-hidden rounded-lg border border-stone-200 bg-white">
+              <div className="overflow-hidden rounded-lg border border-line bg-white">
                 <table className="w-full text-left text-[13px]">
                   <thead>
-                    <tr className="border-b border-stone-100 bg-stone-50/60 text-[11px] uppercase tracking-wide text-stone-500">
+                    <tr className="border-b border-line text-xs font-semibold text-muted">
                       <th className="px-3 py-2 font-medium">Keyword</th>
                       <th className="px-3 py-2 font-medium">Competitor</th>
                       <th className="px-3 py-2 font-medium">Position</th>
@@ -769,15 +775,15 @@ function DigestTab({ projects }: { projects: Project[] }) {
                   </thead>
                   <tbody>
                     {digest.serpPresence.map((s, i) => (
-                      <tr key={i} className="border-b border-stone-100 last:border-0 hover:bg-violet-50/40">
-                        <td className="px-3 py-2 font-medium text-stone-900">{s.keyword}</td>
-                        <td className="px-3 py-2 text-stone-600">{s.competitorDomain}</td>
-                        <td className="px-3 py-2 text-stone-600">#{s.position}</td>
+                      <tr key={i} className="border-b border-line last:border-0 hover:bg-hover-paper">
+                        <td className="px-3 py-2 font-medium text-ink">{s.keyword}</td>
+                        <td className="px-3 py-2 text-muted">{s.competitorDomain}</td>
+                        <td className="px-3 py-2 text-muted">#{s.position}</td>
                         <td className="px-3 py-2">
                           {s.backedByPageChange ? (
                             <Chip tone="violet">page change this week</Chip>
                           ) : (
-                            <span className="text-stone-400">—</span>
+                            <span className="text-subtle">—</span>
                           )}
                         </td>
                       </tr>
@@ -790,13 +796,13 @@ function DigestTab({ projects }: { projects: Project[] }) {
 
           {/* Review velocity status */}
           <div>
-            <h3 className="mb-2 text-[13px] font-semibold text-stone-800">
+            <h3 className="mb-2 text-[13px] font-semibold text-ink">
               Review velocity — licensed adapters
             </h3>
-            <div className="overflow-hidden rounded-lg border border-stone-200 bg-white">
+            <div className="overflow-hidden rounded-lg border border-line bg-white">
               <table className="w-full text-left text-[13px]">
                 <thead>
-                  <tr className="border-b border-stone-100 bg-stone-50/60 text-[11px] uppercase tracking-wide text-stone-500">
+                  <tr className="border-b border-line text-xs font-semibold text-muted">
                     <th className="px-3 py-2 font-medium">Source</th>
                     <th className="px-3 py-2 font-medium">Status</th>
                     <th className="px-3 py-2 font-medium">This week</th>
@@ -806,16 +812,16 @@ function DigestTab({ projects }: { projects: Project[] }) {
                 </thead>
                 <tbody>
                   {digest.reviewVelocity.map((rv, i) => (
-                    <tr key={i} className="border-b border-stone-100 last:border-0 hover:bg-violet-50/40">
-                      <td className="px-3 py-2 font-medium capitalize text-stone-900">{rv.source}</td>
+                    <tr key={i} className="border-b border-line last:border-0 hover:bg-hover-paper">
+                      <td className="px-3 py-2 font-medium capitalize text-ink">{rv.source}</td>
                       <td className="px-3 py-2">
                         <Chip tone={rv.status === "ok" ? "green" : "slate"}>{rv.status}</Chip>
                       </td>
-                      <td className="px-3 py-2 text-stone-600">{rv.reviewsThisWeek}</td>
-                      <td className="px-3 py-2 text-stone-600">
+                      <td className="px-3 py-2 text-muted">{rv.reviewsThisWeek}</td>
+                      <td className="px-3 py-2 text-muted">
                         {rv.avgRating !== null ? rv.avgRating.toFixed(1) : "—"}
                       </td>
-                      <td className="max-w-[380px] px-3 py-2 text-[12.5px] text-stone-500">
+                      <td className="max-w-[380px] px-3 py-2 text-[12.5px] text-muted">
                         {rv.detail ?? "—"}
                       </td>
                     </tr>
@@ -823,17 +829,17 @@ function DigestTab({ projects }: { projects: Project[] }) {
                 </tbody>
               </table>
             </div>
-            <p className="mt-1.5 text-[12px] text-stone-400">
+            <p className="mt-1.5 text-[12px] text-subtle">
               Run per-business pulls from the Reviews tab — the digest only
               reports adapter availability, never scraped data.
             </p>
           </div>
 
           {/* Google Alerts baseline (docs only — never scraped) */}
-          <div className="rounded-lg border border-stone-200 bg-stone-50 p-4">
+          <div className="rounded-lg border border-line bg-canvas p-4">
             <div className="mb-2 flex items-center gap-2">
-              <Bell size={14} className="text-stone-500" />
-              <span className="text-[13px] font-semibold text-stone-800">Google Alerts baseline</span>
+              <Bell size={14} className="text-muted" />
+              <span className="text-[13px] font-semibold text-ink">Google Alerts baseline</span>
               <select
                 value={alertDomain}
                 onChange={(e) => setAlertDomainPick(e.target.value)}
@@ -846,7 +852,7 @@ function DigestTab({ projects }: { projects: Project[] }) {
                 ))}
               </select>
             </div>
-            <div className="whitespace-pre-line text-[12.5px] leading-relaxed text-stone-600">
+            <div className="whitespace-pre-line text-[12.5px] leading-relaxed text-muted">
               {googleAlertsGuidance(alertDomain || "competitor.com")}
             </div>
           </div>
@@ -910,8 +916,8 @@ function ReviewsTab() {
 
   return (
     <div>
-      <div className="mb-3 rounded-lg border border-stone-200 bg-stone-50 p-3 text-[12.5px] text-stone-600">
-        <span className="font-medium text-stone-800">Licensed paths only. </span>
+      <div className="mb-3 rounded-lg border border-line bg-canvas p-3 text-[12.5px] text-muted">
+        <span className="font-medium text-ink">Licensed paths only. </span>
         Yelp Fusion (free tier), DataForSEO Business Data (metered through M6),
         and the GBP API for owned listings. No G2/Capterra/Trustpilot scraping —
         ever. Sentiment mining runs only on your own licensed data.
@@ -941,31 +947,31 @@ function ReviewsTab() {
           </>
         )}
         <button onClick={runPull} disabled={pulling} className={btnPrimary}>
-          {pulling ? <Loader2 size={15} className="animate-spin" /> : <RefreshCw size={15} />}
+          {pulling ? <Loader2 size={15} className="aos-spin" /> : <RefreshCw size={15} />}
           Pull reviews
         </button>
       </div>
-      {error && <p className="mb-3 text-[13px] text-red-600">{error}</p>}
+      {error && <p className="mb-3 text-[13px] text-failed-text">{error}</p>}
 
       {pull && (
         <div className="space-y-4">
           <div className="flex flex-wrap items-center gap-2">
             <Chip tone={pull.result.status === "ok" ? "green" : "slate"}>{pull.result.status}</Chip>
-            <span className="text-[13px] text-stone-600">
+            <span className="text-[13px] text-muted">
               {pull.velocity.reviewsThisWeek} reviews this week
               {pull.velocity.avgRating !== null && ` · avg ${pull.velocity.avgRating.toFixed(1)}★`}
             </span>
           </div>
           {pull.result.detail && (
-            <div className="rounded-lg border border-stone-200 bg-stone-50 p-3 text-[12.5px] text-stone-600">
+            <div className="rounded-lg border border-line bg-canvas p-3 text-[12.5px] text-muted">
               {pull.result.detail}
             </div>
           )}
           {pull.themes.length > 0 && (
-            <div className="overflow-hidden rounded-lg border border-stone-200 bg-white">
+            <div className="overflow-hidden rounded-lg border border-line bg-white">
               <table className="w-full text-left text-[13px]">
                 <thead>
-                  <tr className="border-b border-stone-100 bg-stone-50/60 text-[11px] uppercase tracking-wide text-stone-500">
+                  <tr className="border-b border-line text-xs font-semibold text-muted">
                     <th className="px-3 py-2 font-medium">Complaint theme (heuristic, your data only)</th>
                     <th className="px-3 py-2 font-medium">Mentions</th>
                     <th className="px-3 py-2 font-medium">Example</th>
@@ -973,12 +979,12 @@ function ReviewsTab() {
                 </thead>
                 <tbody>
                   {pull.themes.map((th) => (
-                    <tr key={th.theme} className="border-b border-stone-100 last:border-0 hover:bg-violet-50/40">
-                      <td className="px-3 py-2 font-medium capitalize text-stone-900">{th.theme.replace(/_/g, " ")}</td>
+                    <tr key={th.theme} className="border-b border-line last:border-0 hover:bg-hover-paper">
+                      <td className="px-3 py-2 font-medium capitalize text-ink">{th.theme.replace(/_/g, " ")}</td>
                       <td className="px-3 py-2">
                         <Chip tone="amber">{th.mentions}</Chip>
                       </td>
-                      <td className="max-w-[420px] truncate px-3 py-2 text-stone-600" title={th.example}>
+                      <td className="max-w-[420px] truncate px-3 py-2 text-muted" title={th.example}>
                         “{truncate(th.example, 90)}”
                       </td>
                     </tr>
@@ -1006,15 +1012,15 @@ export function CompetitorsClient({ projects }: { projects: Project[] }) {
   const [tab, setTab] = useState<(typeof TABS)[number]["id"]>("changes");
   return (
     <div>
-      <div className="mb-4 flex gap-1 border-b border-stone-200">
+      <div className="mb-4 flex gap-1 border-b border-line">
         {TABS.map(({ id, label, icon: Icon }) => (
           <button
             key={id}
             onClick={() => setTab(id)}
             className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-[13.5px] font-medium transition ${
               tab === id
-                ? "border-violet-600 text-violet-700"
-                : "border-transparent text-stone-500 hover:text-stone-800"
+                ? "border-ink text-ink"
+                : "border-transparent text-muted hover:text-ink"
             }`}
           >
             <Icon size={15} />
