@@ -132,6 +132,22 @@ export default async function AdvertisingPage() {
         Campaign connectors (launch, reporting) land in the following Phase 18 slices; the proposal inbox
         below is live now.
       </p>
+
+      <div className="overflow-hidden rounded-lg border border-stone-200 bg-white">
+        <div className="flex items-center justify-between border-b border-stone-200 bg-stone-50 px-3 py-2">
+          <span className="text-[12px] font-medium text-stone-600">Conversational-intent campaigns</span>
+          <a
+            href="/dashboard/media/advertising/chatgpt"
+            className="text-[12px] font-medium text-[var(--brand-700)] underline"
+          >
+            Open ChatGPT Ads
+          </a>
+        </div>
+        <p className="px-3 py-3 text-[13px] text-stone-500">
+          Target users inside ChatGPT — Free and Go tiers, by topic intent — bought through your StackAdapt
+          account. Propose a campaign and it lands in the proposal inbox; nothing spends until you approve.
+        </p>
+      </div>
     </div>
   );
 }
