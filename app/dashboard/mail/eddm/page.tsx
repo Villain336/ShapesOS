@@ -16,10 +16,10 @@ export default async function EddmPage() {
   if (!user) redirect("/login");
   await getOrCreateWorkspace(user.id, user.email);
   return (
-    <div className="flex h-full flex-col gap-4 bg-[#FAFAF7] p-4 md:p-6">
+    <div className="flex h-full flex-col gap-4 bg-canvas p-4 md:p-6">
       <div>
-        <h1 className="text-xl font-bold tracking-tight text-stone-900">EDDM Concierge</h1>
-        <p className="mt-0.5 text-[13px] text-stone-500">
+        <h1 className="aos-heading">EDDM Concierge</h1>
+        <p className="mt-1 text-sm text-muted">
           Every Door Direct Mail, planned end-to-end: carrier routes → creative → cost estimate →
           drop scheduling → mailhouse handoff brief → status tracking. There is no USPS EDDM API —
           your mailhouse executes the drop; Marketr prepares everything they need.

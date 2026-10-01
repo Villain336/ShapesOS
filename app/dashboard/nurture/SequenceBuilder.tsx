@@ -121,12 +121,12 @@ export function SequenceBuilder({
     <div className="space-y-4">
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
         <div>
-          <label className="mb-1 block text-[12px] font-medium text-stone-600">Name</label>
+          <label className="mb-1 block text-xs font-semibold text-muted">Name</label>
           <input className={inputCls} value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. New lead 7-day drip" />
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="mb-1 block text-[12px] font-medium text-stone-600">Status</label>
+            <label className="mb-1 block text-xs font-semibold text-muted">Status</label>
             <select className={inputCls} value={status} onChange={(e) => setStatus(e.target.value as NurtureSequence["status"])}>
               <option value="draft">Draft</option>
               <option value="active">Active</option>
@@ -135,7 +135,7 @@ export function SequenceBuilder({
             </select>
           </div>
           <div>
-            <label className="mb-1 block text-[12px] font-medium text-stone-600">Daily cap <span className="text-stone-400">(optional)</span></label>
+            <label className="mb-1 block text-xs font-semibold text-muted">Daily cap <span className="text-subtle">(optional)</span></label>
             <input
               className={inputCls}
               type="number"
@@ -148,32 +148,32 @@ export function SequenceBuilder({
         </div>
       </div>
       <div>
-        <label className="mb-1 block text-[12px] font-medium text-stone-600">Description</label>
+        <label className="mb-1 block text-xs font-semibold text-muted">Description</label>
         <input className={inputCls} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="What this sequence is for…" />
       </div>
 
       <div>
         <div className="mb-2 flex items-center justify-between">
-          <label className="text-[12px] font-medium text-stone-600">Steps ({steps.length})</label>
+          <label className="text-xs font-semibold text-muted">Steps ({steps.length})</label>
           <button className={btnSecondary} onClick={() => setSteps((p) => [...p, blankStep()])}>
             <Plus size={14} /> Add step
           </button>
         </div>
         <div className="space-y-2">
           {steps.map((step, i) => (
-            <div key={i} className="rounded-[10px] border border-stone-200 bg-stone-50/60 p-3">
+            <div key={i} className="rounded-lg border border-line bg-canvas p-3">
               <div className="mb-2 flex flex-wrap items-center gap-2">
-                <span className="flex items-center gap-1 text-[12px] font-semibold text-stone-500">
-                  <GripVertical size={13} className="text-stone-300" />
+                <span className="flex items-center gap-1 text-xs font-semibold text-muted">
+                  <GripVertical size={13} className="text-subtle" />
                   Step {i + 1}
                 </span>
-                <div className="flex flex-wrap rounded-md border border-stone-300 bg-white p-px">
+                <div className="flex flex-wrap rounded-full border border-line bg-paper p-1 shadow-control">
                   {CHANNELS.map(({ value, label, Icon }) => (
                     <button
                       key={value}
                       onClick={() => updateStep(i, { channel: value })}
-                      className={`flex items-center gap-1 rounded px-2 py-1 text-[12px] font-medium ${
-                        step.channel === value ? "bg-violet-600 text-white" : "text-stone-600 hover:bg-stone-100"
+                      className={`flex items-center gap-1 rounded-full px-2 py-1 text-[12px] font-medium ${
+                        step.channel === value ? "bg-ink text-white" : "text-muted hover:bg-hover-paper"
                       }`}
                     >
                       <Icon size={12} /> {label}
@@ -181,33 +181,33 @@ export function SequenceBuilder({
                   ))}
                 </div>
                 {isMailChannelValue(step.channel) ? (
-                  <label className="flex items-center gap-1.5 text-[12px] text-stone-600">
+                  <label className="flex items-center gap-1.5 text-[12px] text-muted">
                     Delay
                     <input
                       type="number"
                       min={0}
                       value={step.delayDays ?? 1}
                       onChange={(e) => updateStep(i, { delayDays: Math.max(0, Math.floor(Number(e.target.value) || 0)) })}
-                      className="w-20 rounded-md border border-stone-300 bg-white px-2 py-1 text-[12px] focus:border-violet-500 focus:outline-none"
+                      className="h-control-sm w-20 rounded-md border-[1.5px] border-control bg-paper px-2 text-[12px] text-ink focus:border-focus focus:outline-none"
                     />
                     days
                   </label>
                 ) : (
-                  <label className="flex items-center gap-1.5 text-[12px] text-stone-600">
+                  <label className="flex items-center gap-1.5 text-[12px] text-muted">
                     Delay
                     <input
                       type="number"
                       min={0}
                       value={step.delayMinutes}
                       onChange={(e) => updateStep(i, { delayMinutes: Math.max(0, Math.floor(Number(e.target.value) || 0)) })}
-                      className="w-20 rounded-md border border-stone-300 bg-white px-2 py-1 text-[12px] focus:border-violet-500 focus:outline-none"
+                      className="h-control-sm w-20 rounded-md border-[1.5px] border-control bg-paper px-2 text-[12px] text-ink focus:border-focus focus:outline-none"
                     />
                     min
                   </label>
                 )}
                 <div className="ml-auto flex items-center gap-1">
                   <button
-                    className="rounded p-1 text-stone-400 hover:bg-stone-200 hover:text-stone-700 disabled:opacity-30"
+                    className="rounded-full p-1 text-muted hover:bg-hover-paper hover:text-ink disabled:opacity-40"
                     disabled={i === 0}
                     onClick={() => moveStep(i, -1)}
                     title="Move up"
@@ -215,7 +215,7 @@ export function SequenceBuilder({
                     <ArrowUp size={14} />
                   </button>
                   <button
-                    className="rounded p-1 text-stone-400 hover:bg-stone-200 hover:text-stone-700 disabled:opacity-30"
+                    className="rounded-full p-1 text-muted hover:bg-hover-paper hover:text-ink disabled:opacity-40"
                     disabled={i === steps.length - 1}
                     onClick={() => moveStep(i, 1)}
                     title="Move down"
@@ -223,7 +223,7 @@ export function SequenceBuilder({
                     <ArrowDown size={14} />
                   </button>
                   <button
-                    className="rounded p-1 text-stone-400 hover:bg-red-100 hover:text-red-700 disabled:opacity-30"
+                    className="rounded-full p-1 text-muted hover:bg-failed-tint hover:text-failed-text disabled:opacity-40"
                     disabled={steps.length === 1}
                     onClick={() => setSteps((p) => p.filter((_, j) => j !== i))}
                     title="Remove step"
@@ -248,13 +248,13 @@ export function SequenceBuilder({
                         </option>
                       ))}
                     </select>
-                    <span className="text-[12px] text-stone-500">
+                    <span className="text-[12px] text-muted">
                       {inHomePreview(step.delayDays ?? 1)}
-                      <span className="text-stone-400"> · USPS transit 2–7 days · approval binds creative + spend</span>
+                      <span className="text-subtle"> · USPS transit 2–7 days · approval binds creative + spend</span>
                     </span>
                   </div>
-                  <p className="text-[11px] text-stone-400">
-                    Recipient needs a physical address on file (CRM custom field <span className="font-mono">address</span>) and mail opt-in. Unverifiable addresses are quarantined, never mailed.
+                  <p className="text-xs text-subtle">
+                    Recipient needs a physical address on file (CRM custom field <span className="aos-mono">address</span>) and mail opt-in. Unverifiable addresses are quarantined, never mailed.
                   </p>
                 </div>
               ) : null}
@@ -267,7 +267,7 @@ export function SequenceBuilder({
                 />
               ) : null}
               <textarea
-                className={`${inputCls} min-h-[76px] font-mono text-[12px]`}
+                className={`${inputCls} aos-mono min-h-[76px] text-[12px]`}
                 value={step.template}
                 onChange={(e) => updateStep(i, { template: e.target.value })}
                 placeholder={
@@ -279,10 +279,10 @@ export function SequenceBuilder({
                 }
               />
               <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                <span className="text-[11px] text-stone-400">Insert:</span>
+                <span className="text-xs text-subtle">Insert:</span>
                 {(isMailChannelValue(step.channel) ? MAIL_PLACEHOLDERS : PLACEHOLDERS).map((ph) => (
                   <button key={ph} onClick={() => insertPlaceholder(i, ph)} title={`Insert {{${ph}}}`}>
-                    <Chip tone="violet">{`{{${ph}}}`}</Chip>
+                    <Chip>{`{{${ph}}}`}</Chip>
                   </button>
                 ))}
               </div>
@@ -291,8 +291,8 @@ export function SequenceBuilder({
         </div>
       </div>
 
-      {error ? <p className="text-[13px] text-red-600">{error}</p> : null}
-      <div className="flex items-center justify-end gap-2 border-t border-stone-200 pt-3">
+      {error ? <p className="text-[13px] text-failed-text">{error}</p> : null}
+      <div className="flex items-center justify-end gap-2 border-t border-line pt-3">
         <button className={btnSecondary} onClick={onCancel}>Cancel</button>
         <button
           className={btnPrimary}

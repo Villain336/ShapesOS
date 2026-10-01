@@ -1,11 +1,10 @@
 // Marketr — EDDM concierge client app: order list + 6-step concierge wizard.
-// Light mode, dense, violet accents. Copy rule: no API send path exists for
+// Agentic OS design system. Copy rule: no API send path exists for
 // EDDM — the mailhouse executes; Marketr prepares the handoff.
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  AlertTriangle,
   ArrowLeft,
   Calculator,
   CalendarDays,
@@ -103,63 +102,50 @@ const fmtDate = (iso: string | null) =>
 const dateInput = (iso: string | null) => (iso ? iso.slice(0, 10) : "");
 
 // ---------------------------------------------------------------------------
-// Local UI primitives (mirror nurture/ui tokens)
+// Agentic OS atoms
 // ---------------------------------------------------------------------------
+// Visual migration only: same layout, same behavior. Order, route, and
+// creative statuses are workflow states, so every chip renders neutral —
+// never a status color. The `tone` prop stays for call-site compatibility.
 
 type Tone = "violet" | "green" | "amber" | "red" | "blue" | "stone" | "zinc";
 
-const TONE: Record<Tone, string> = {
-  violet: "bg-violet-50 text-violet-700 border-violet-200",
-  green: "bg-emerald-50 text-emerald-700 border-emerald-200",
-  amber: "bg-amber-50 text-amber-700 border-amber-200",
-  red: "bg-red-50 text-red-700 border-red-200",
-  blue: "bg-sky-50 text-sky-700 border-sky-200",
-  stone: "bg-stone-100 text-stone-600 border-stone-200",
-  zinc: "bg-zinc-100 text-zinc-500 border-zinc-200",
-};
-
-function Chip({ tone, children, title }: { tone: Tone; children: React.ReactNode; title?: string }) {
+function Chip({ tone, children, title }: { tone?: Tone; children: React.ReactNode; title?: string }) {
+  void tone;
   return (
     <span
       title={title}
-      className={`inline-flex shrink-0 items-center gap-1 rounded-full border px-1.5 py-px text-[11px] font-medium leading-4 ${TONE[tone]}`}
+      className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full bg-paper px-1.5 py-px text-[11px] font-medium leading-4 text-muted shadow-control"
     >
       {children}
     </span>
   );
 }
 
-const STATUS_TONE: Record<string, Tone> = {
-  draft: "stone",
-  briefed: "blue",
-  at_mailhouse: "amber",
-  dropped: "violet",
-  complete: "green",
-  cancelled: "zinc",
-};
-
 const inputCls =
-  "w-full rounded-md border border-stone-300 bg-white px-2 py-1.5 text-[13px] text-stone-900 placeholder:text-stone-400 focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500";
+  "w-full h-control-sm rounded-md border-[1.5px] border-control bg-paper px-3 text-sm text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none disabled:opacity-50";
 const btnPrimary =
-  "inline-flex items-center gap-1.5 rounded-md bg-violet-600 px-2.5 py-1.5 text-[13px] font-medium text-white hover:bg-violet-700 disabled:opacity-50";
+  "inline-flex h-control-sm cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-night-hover focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--aos-focus-halo)] disabled:opacity-40";
 const btnSecondary =
-  "inline-flex items-center gap-1.5 rounded-md border border-stone-300 bg-white px-2.5 py-1.5 text-[13px] font-medium text-stone-700 hover:bg-stone-50 disabled:opacity-50";
+  "inline-flex h-control-sm cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-paper px-4 text-sm font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--aos-focus-halo)] disabled:opacity-40";
+const btnDanger =
+  "inline-flex h-control-sm cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-paper px-4 text-sm font-semibold text-failed-text aos-press shadow-[inset_0_0_0_1.5px_var(--aos-failed)] focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--aos-focus-halo)] disabled:opacity-40";
 
 function Field({ label, children, hint }: { label: string; children: React.ReactNode; hint?: string }) {
   return (
     <label className="block">
-      <span className="mb-1 block text-[12px] font-medium text-stone-600">{label}</span>
+      <span className="mb-1 block text-xs font-semibold text-muted">{label}</span>
       {children}
-      {hint ? <span className="mt-0.5 block text-[11px] text-stone-400">{hint}</span> : null}
+      {hint ? <span className="mt-0.5 block text-[11px] text-subtle">{hint}</span> : null}
     </label>
   );
 }
 
 function Card({ title, icon, children, action }: { title: string; icon?: React.ReactNode; children: React.ReactNode; action?: React.ReactNode }) {
   return (
-    <div className="rounded-[10px] border border-stone-200 bg-white">
-      <div className="flex items-center justify-between border-b border-stone-100 px-4 py-2.5">
-        <h3 className="flex items-center gap-1.5 text-[13px] font-semibold text-stone-900">
+    <div className="rounded-lg bg-paper shadow-hairline">
+      <div className="flex items-center justify-between border-b border-line px-4 py-2.5">
+        <h3 className="flex items-center gap-1.5 text-[13px] font-semibold text-ink">
           {icon}
           {title}
         </h3>
@@ -173,8 +159,8 @@ function Card({ title, icon, children, action }: { title: string; icon?: React.R
 function Err({ message }: { message: string | null }) {
   if (!message) return null;
   return (
-    <div className="mb-3 flex items-start gap-2 rounded-md border border-red-200 bg-red-50 px-2.5 py-2 text-[12px] text-red-700">
-      <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+    <div className="mb-3 flex items-start gap-2 rounded-md bg-failed-tint px-2.5 py-2 text-[12px] text-failed-text">
+      <span className="aos-shape aos-shape--failed mt-0.5 shrink-0" role="img" aria-label="Error" />
       <span>{message}</span>
     </div>
   );
@@ -182,8 +168,8 @@ function Err({ message }: { message: string | null }) {
 
 function Note({ children }: { children: React.ReactNode }) {
   return (
-    <div className="mb-3 flex items-start gap-2 rounded-md border border-sky-200 bg-sky-50 px-2.5 py-2 text-[12px] text-sky-800">
-      <Info size={14} className="mt-0.5 shrink-0" />
+    <div className="mb-3 flex items-start gap-2 rounded-md bg-canvas px-2.5 py-2 text-[12px] text-muted">
+      <Info size={14} className="mt-0.5 shrink-0 text-ink" />
       <span>{children}</span>
     </div>
   );
@@ -266,7 +252,7 @@ export function EddmApp() {
     if (selectedId) await loadDetail(selectedId);
   }, [loadOrders, loadDetail, selectedId]);
 
-  if (loading) return <p className="text-[13px] text-stone-500">Loading EDDM orders…</p>;
+  if (loading) return <p className="text-[13px] text-muted">Loading EDDM orders…</p>;
 
   if (!selectedId || !detail) {
     return (
@@ -278,43 +264,43 @@ export function EddmApp() {
           </button>
         </div>
         {orders.length === 0 ? (
-          <div className="rounded-[10px] border border-dashed border-stone-300 bg-white px-4 py-10 text-center">
-            <p className="text-[13px] font-medium text-stone-600">No EDDM orders yet</p>
-            <p className="mt-1 text-[12px] text-stone-400">
+          <div className="rounded-lg border border-dashed border-line bg-paper px-4 py-10 text-center">
+            <p className="text-[13px] font-medium text-ink">No EDDM orders yet</p>
+            <p className="mt-1 text-[12px] text-subtle">
               Plan a saturation drop: pick carrier routes, bind an EDDM flat creative, estimate
               costs, and generate the mailhouse handoff brief.
             </p>
           </div>
         ) : (
-          <div className="overflow-hidden rounded-[10px] border border-stone-200 bg-white">
+          <div className="overflow-hidden rounded-lg bg-paper shadow-hairline">
             <table className="w-full text-[13px]">
               <thead>
-                <tr className="border-b border-stone-200 bg-stone-50 text-left text-[11px] uppercase tracking-wide text-stone-500">
-                  <th className="px-3 py-2 font-medium">Order</th>
-                  <th className="px-3 py-2 font-medium">Status</th>
-                  <th className="px-3 py-2 text-right font-medium">Pieces</th>
-                  <th className="px-3 py-2 text-right font-medium">Est. cost</th>
-                  <th className="px-3 py-2 font-medium">Drop date</th>
-                  <th className="px-3 py-2 font-medium">Updated</th>
+                <tr className="border-b border-line text-left text-xs font-semibold text-muted">
+                  <th className="px-3 py-2">Order</th>
+                  <th className="px-3 py-2">Status</th>
+                  <th className="px-3 py-2 text-right">Pieces</th>
+                  <th className="px-3 py-2 text-right">Est. cost</th>
+                  <th className="px-3 py-2">Drop date</th>
+                  <th className="px-3 py-2">Updated</th>
                 </tr>
               </thead>
               <tbody>
                 {orders.map((o) => (
                   <tr
                     key={o.id}
-                    className="cursor-pointer border-b border-stone-100 last:border-0 hover:bg-violet-50/40"
+                    className="cursor-pointer border-b border-line last:border-0 hover:bg-hover-paper"
                     onClick={() => openOrder(o.id)}
                   >
-                    <td className="px-3 py-2 font-medium text-stone-900">{o.name}</td>
+                    <td className="px-3 py-2 font-medium text-ink">{o.name}</td>
                     <td className="px-3 py-2">
-                      <Chip tone={STATUS_TONE[o.status] ?? "stone"}>{o.status.replace(/_/g, " ")}</Chip>
+                      <Chip>{o.status.replace(/_/g, " ")}</Chip>
                     </td>
-                    <td className="px-3 py-2 text-right tabular-nums text-stone-700">
+                    <td className="px-3 py-2 text-right tabular-nums text-muted">
                       {o.pieceCount.toLocaleString()}
                     </td>
-                    <td className="px-3 py-2 text-right tabular-nums text-stone-700">{money(o.costCents)}</td>
-                    <td className="px-3 py-2 text-stone-600">{fmtDate(o.dropDate)}</td>
-                    <td className="px-3 py-2 text-stone-500">{fmtDate(o.updatedAt)}</td>
+                    <td className="px-3 py-2 text-right tabular-nums text-muted">{money(o.costCents)}</td>
+                    <td className="px-3 py-2 text-muted">{fmtDate(o.dropDate)}</td>
+                    <td className="px-3 py-2 text-muted">{fmtDate(o.updatedAt)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -353,15 +339,15 @@ export function EddmApp() {
           <button
             key={s.key}
             onClick={() => setStep(s.key)}
-            className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[13px] font-medium ${
+            className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-[13px] font-medium ${
               step === s.key
-                ? "bg-violet-600 text-white"
-                : "border border-stone-300 bg-white text-stone-600 hover:bg-stone-50"
+                ? "border-ink bg-ink text-white"
+                : "border-line bg-paper text-muted hover:bg-hover-paper"
             }`}
           >
             {s.icon}
             {s.label}
-            {stepDone(detail, s.key) && step !== s.key ? <Check size={12} className="text-emerald-500" /> : null}
+            {stepDone(detail, s.key) && step !== s.key ? <Check size={12} className="text-ink" /> : null}
           </button>
         ))}
       </div>
@@ -432,8 +418,8 @@ function OrderHeader({
   const editable = order.status === "draft" || order.status === "briefed";
 
   return (
-    <div className="flex flex-wrap items-center gap-2 rounded-[10px] border border-stone-200 bg-white px-4 py-3">
-      <button onClick={onBack} className="rounded p-1 text-stone-500 hover:bg-stone-100" aria-label="Back to orders">
+    <div className="flex flex-wrap items-center gap-2 rounded-lg bg-paper px-4 py-3 shadow-hairline">
+      <button onClick={onBack} className="rounded-full p-1 text-muted hover:bg-hover-paper hover:text-ink" aria-label="Back to orders">
         <ArrowLeft size={16} />
       </button>
       {editing ? (
@@ -455,12 +441,12 @@ function OrderHeader({
         </div>
       ) : (
         <>
-          <h2 className="text-[15px] font-bold text-stone-900">{order.name}</h2>
-          <Chip tone={STATUS_TONE[order.status] ?? "stone"}>{order.status.replace(/_/g, " ")}</Chip>
-          {order.mailhouse ? <Chip tone="blue">{order.mailhouse}</Chip> : null}
+          <h2 className="text-[15px] font-semibold text-ink">{order.name}</h2>
+          <Chip>{order.status.replace(/_/g, " ")}</Chip>
+          {order.mailhouse ? <Chip>{order.mailhouse}</Chip> : null}
           {editable ? (
             <button
-              className="rounded p-1 text-stone-400 hover:bg-stone-100 hover:text-stone-700"
+              className="rounded-full p-1 text-subtle hover:bg-hover-paper hover:text-ink"
               onClick={() => {
                 setName(order.name);
                 setMailhouse(order.mailhouse ?? "");
@@ -473,12 +459,12 @@ function OrderHeader({
           ) : null}
         </>
       )}
-      <div className="ml-auto flex items-center gap-3 text-[12px] text-stone-500">
+      <div className="ml-auto flex items-center gap-3 text-[12px] text-muted">
         <span>
-          <strong className="text-stone-900">{order.pieceCount.toLocaleString()}</strong> pieces
+          <strong className="text-ink">{order.pieceCount.toLocaleString()}</strong> pieces
         </span>
         <span>
-          <strong className="text-stone-900">{money(order.costCents)}</strong> est.
+          <strong className="text-ink">{money(order.costCents)}</strong> est.
         </span>
       </div>
     </div>
@@ -508,11 +494,11 @@ function NewOrderModal({ onClose, onCreated }: { onClose: () => void; onCreated:
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/30 p-4 pt-[8vh]" onClick={onClose}>
-      <div className="w-full max-w-xl rounded-xl border border-stone-200 bg-white shadow-xl" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between border-b border-stone-200 px-4 py-2.5">
-          <h3 className="text-[14px] font-semibold text-stone-900">New EDDM order</h3>
-          <button onClick={onClose} className="rounded p-1 text-stone-400 hover:bg-stone-100" aria-label="Close">
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-ink/30 p-4 pt-[8vh]" onClick={onClose}>
+      <div className="w-full max-w-xl rounded-lg border border-line bg-paper shadow-overlay" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between border-b border-line px-4 py-2.5">
+          <h3 className="text-[14px] font-semibold text-ink">New EDDM order</h3>
+          <button onClick={onClose} className="rounded-full p-1 text-subtle hover:bg-hover-paper hover:text-ink" aria-label="Close">
             <X size={16} />
           </button>
         </div>
@@ -584,14 +570,14 @@ function RoutesStep({ order, onSaved, onError }: { order: Order; onSaved: () => 
   return (
     <Card
       title="Carrier routes"
-      icon={<MapPin size={14} className="text-violet-600" />}
+      icon={<MapPin size={14} className="text-ink" />}
       action={
         editable ? (
           <button className={btnPrimary} disabled={saving} onClick={save}>
             <Check size={14} /> Save routes
           </button>
         ) : (
-          <Chip tone="stone">Locked — order is {order.status.replace(/_/g, " ")}</Chip>
+          <Chip>Locked — order is {order.status.replace(/_/g, " ")}</Chip>
         )
       }
     >
@@ -602,28 +588,28 @@ function RoutesStep({ order, onSaved, onError }: { order: Order; onSaved: () => 
         of 200 pieces per selected route.
       </Note>
       <div className="mb-3 flex items-center gap-3">
-        <span className="text-[12px] font-medium text-stone-600">Postage entry:</span>
+        <span className="text-xs font-semibold text-muted">Postage entry:</span>
         {(["retail", "bmeu"] as const).map((t) => (
-          <label key={t} className="flex items-center gap-1.5 text-[13px] text-stone-700">
+          <label key={t} className="flex items-center gap-1.5 text-[13px] text-ink">
             <input type="radio" checked={tier === t} onChange={() => setTier(t)} disabled={!editable} />
             {t === "retail" ? "Retail — 26.0¢/pc" : "BMEU — 25.9¢/pc"}
           </label>
         ))}
       </div>
-      <div className="overflow-hidden rounded-md border border-stone-200">
+      <div className="overflow-hidden rounded-md border border-line">
         <table className="w-full text-[13px]">
           <thead>
-            <tr className="border-b border-stone-200 bg-stone-50 text-left text-[11px] uppercase tracking-wide text-stone-500">
-              <th className="px-2 py-1.5 font-medium">ZIP</th>
-              <th className="px-2 py-1.5 font-medium">Route</th>
-              <th className="px-2 py-1.5 text-right font-medium">Households</th>
-              <th className="px-2 py-1.5 text-center font-medium">Selected</th>
+            <tr className="border-b border-line text-left text-xs font-semibold text-muted">
+              <th className="px-2 py-1.5">ZIP</th>
+              <th className="px-2 py-1.5">Route</th>
+              <th className="px-2 py-1.5 text-right">Households</th>
+              <th className="px-2 py-1.5 text-center">Selected</th>
               <th className="px-2 py-1.5" />
             </tr>
           </thead>
           <tbody>
             {rows.map((r, i) => (
-              <tr key={i} className="border-b border-stone-100 last:border-0">
+              <tr key={i} className="border-b border-line last:border-0">
                 <td className="px-2 py-1.5">
                   <input
                     className={inputCls}
@@ -662,12 +648,12 @@ function RoutesStep({ order, onSaved, onError }: { order: Order; onSaved: () => 
                     checked={r.selected}
                     disabled={!editable}
                     onChange={(e) => setRow(i, { selected: e.target.checked })}
-                    className="h-4 w-4 accent-violet-600"
+                    className="h-4 w-4 accent-ink"
                   />
                 </td>
                 <td className="px-2 py-1.5 text-right">
                   {editable && rows.length > 1 ? (
-                    <button className="rounded p-1 text-stone-400 hover:bg-red-50 hover:text-red-600" onClick={() => removeRow(i)} aria-label="Remove route">
+                    <button className="rounded-full p-1 text-subtle hover:bg-hover-paper hover:text-failed-text" onClick={() => removeRow(i)} aria-label="Remove route">
                       <Trash2 size={14} />
                     </button>
                   ) : null}
@@ -685,9 +671,9 @@ function RoutesStep({ order, onSaved, onError }: { order: Order; onSaved: () => 
         ) : (
           <span />
         )}
-        <p className="text-[13px] text-stone-600">
-          <strong className="text-stone-900">{selectedPieces.toLocaleString()}</strong> pieces across{" "}
-          <strong className="text-stone-900">{rows.filter((r) => r.selected).length}</strong> selected routes
+        <p className="text-[13px] text-muted">
+          <strong className="text-ink">{selectedPieces.toLocaleString()}</strong> pieces across{" "}
+          <strong className="text-ink">{rows.filter((r) => r.selected).length}</strong> selected routes
         </p>
       </div>
     </Card>
@@ -732,7 +718,7 @@ function CreativeStep({ order, onSaved, onError }: { order: Order; onSaved: () =
   return (
     <Card
       title="Creative — EDDM flat"
-      icon={<Palette size={14} className="text-violet-600" />}
+      icon={<Palette size={14} className="text-ink" />}
       action={
         <a href="/dashboard/studio?formatTrack=eddm" className={btnSecondary}>
           Open Studio <ChevronRight size={14} />
@@ -746,11 +732,11 @@ function CreativeStep({ order, onSaved, onError }: { order: Order; onSaved: () =
         Studio, then bind it below.
       </Note>
       {loading ? (
-        <p className="text-[13px] text-stone-500">Loading EDDM-track creative…</p>
+        <p className="text-[13px] text-muted">Loading EDDM-track creative…</p>
       ) : creatives.length === 0 ? (
-        <div className="rounded-md border border-dashed border-stone-300 px-4 py-8 text-center">
-          <p className="text-[13px] font-medium text-stone-600">No EDDM-track creative yet</p>
-          <p className="mt-1 text-[12px] text-stone-400">
+        <div className="rounded-md border border-dashed border-line px-4 py-8 text-center">
+          <p className="text-[13px] font-medium text-ink">No EDDM-track creative yet</p>
+          <p className="mt-1 text-[12px] text-subtle">
             Create one in the Studio on the EDDM flat format track, then return to bind it.
           </p>
         </div>
@@ -762,18 +748,18 @@ function CreativeStep({ order, onSaved, onError }: { order: Order; onSaved: () =
               <div
                 key={c.id}
                 className={`flex items-center justify-between gap-2 rounded-md border px-3 py-2.5 ${
-                  bound ? "border-violet-400 bg-violet-50/60" : "border-stone-200 bg-white"
+                  bound ? "border-ink bg-canvas" : "border-line bg-paper"
                 }`}
               >
                 <div className="min-w-0">
-                  <p className="truncate text-[13px] font-medium text-stone-900">{c.name}</p>
-                  <p className="text-[11px] text-stone-500">
+                  <p className="truncate text-[13px] font-medium text-ink">{c.name}</p>
+                  <p className="text-[11px] text-muted">
                     {c.size} · v{c.version} · {c.status}
                     {c.creativeHash ? ` · ${c.creativeHash.slice(0, 10)}…` : ""}
                   </p>
                 </div>
                 {bound ? (
-                  <Chip tone="violet">
+                  <Chip>
                     <Check size={11} /> Bound
                   </Chip>
                 ) : editable ? (
@@ -838,7 +824,7 @@ function EstimateStep({ order, onSaved, onError }: { order: Order; onSaved: () =
   return (
     <Card
       title="Cost estimate"
-      icon={<Calculator size={14} className="text-violet-600" />}
+      icon={<Calculator size={14} className="text-ink" />}
       action={
         editable ? (
           <button className={btnPrimary} disabled={saving || !est || est.pieceCount === 0} onClick={save}>
@@ -856,7 +842,7 @@ function EstimateStep({ order, onSaved, onError }: { order: Order; onSaved: () =
         <Field label="Postage entry">
           <div className="flex gap-3 pt-1.5">
             {(["retail", "bmeu"] as const).map((t) => (
-              <label key={t} className="flex items-center gap-1.5 text-[13px] text-stone-700">
+              <label key={t} className="flex items-center gap-1.5 text-[13px] text-ink">
                 <input type="radio" checked={tier === t} onChange={() => setTier(t)} disabled={!editable} />
                 {t === "retail" ? "Retail — 26.0¢/pc (2026)" : "BMEU — 25.9¢/pc (2026)"}
               </label>
@@ -876,41 +862,41 @@ function EstimateStep({ order, onSaved, onError }: { order: Order; onSaved: () =
         </Field>
       </div>
       {est && est.pieceCount > 0 ? (
-        <div className="overflow-hidden rounded-md border border-stone-200">
+        <div className="overflow-hidden rounded-md border border-line">
           <table className="w-full text-[13px]">
             <thead>
-              <tr className="border-b border-stone-200 bg-stone-50 text-left text-[11px] uppercase tracking-wide text-stone-500">
-                <th className="px-3 py-2 font-medium">Line</th>
-                <th className="px-3 py-2 text-right font-medium">Per piece</th>
-                <th className="px-3 py-2 text-right font-medium">Total</th>
+              <tr className="border-b border-line text-left text-xs font-semibold text-muted">
+                <th className="px-3 py-2">Line</th>
+                <th className="px-3 py-2 text-right">Per piece</th>
+                <th className="px-3 py-2 text-right">Total</th>
               </tr>
             </thead>
             <tbody className="tabular-nums">
-              <tr className="border-b border-stone-100">
-                <td className="px-3 py-2 text-stone-700">Postage — {tier === "retail" ? "EDDM Retail" : "BMEU"}</td>
+              <tr className="border-b border-line">
+                <td className="px-3 py-2 text-muted">Postage — {tier === "retail" ? "EDDM Retail" : "BMEU"}</td>
                 <td className="px-3 py-2 text-right">{money(est.postageCentsPerPiece)}</td>
                 <td className="px-3 py-2 text-right">{money(est.postageCents)}</td>
               </tr>
-              <tr className="border-b border-stone-100">
-                <td className="px-3 py-2 text-stone-700">Print + prep</td>
+              <tr className="border-b border-line">
+                <td className="px-3 py-2 text-muted">Print + prep</td>
                 <td className="px-3 py-2 text-right">{money(est.printCentsPerPiece)}</td>
                 <td className="px-3 py-2 text-right">{money(est.printCents)}</td>
               </tr>
-              <tr className="bg-violet-50/50 font-semibold">
-                <td className="px-3 py-2 text-stone-900">
+              <tr className="bg-canvas font-semibold">
+                <td className="px-3 py-2 text-ink">
                   Estimated total · {est.pieceCount.toLocaleString()} pieces
                 </td>
-                <td className="px-3 py-2 text-right text-stone-900">{money(est.perPieceCents)}</td>
-                <td className="px-3 py-2 text-right text-stone-900">{money(est.totalCents)}</td>
+                <td className="px-3 py-2 text-right text-ink">{money(est.perPieceCents)}</td>
+                <td className="px-3 py-2 text-right text-ink">{money(est.totalCents)}</td>
               </tr>
             </tbody>
           </table>
         </div>
       ) : (
-        <p className="text-[13px] text-stone-500">Add carrier routes first — the estimate is piece count × postage + print.</p>
+        <p className="text-[13px] text-muted">Add carrier routes first — the estimate is piece count × postage + print.</p>
       )}
       {est?.usedDefaults ? (
-        <p className="mt-2 text-[11px] text-amber-600">Using the default print assumption until you enter a quote.</p>
+        <p className="mt-2 text-[11px] text-muted">Using the default print assumption until you enter a quote.</p>
       ) : null}
     </Card>
   );
@@ -958,7 +944,7 @@ function ScheduleStep({ order, onSaved, onError }: { order: Order; onSaved: () =
   return (
     <Card
       title="Drop scheduling"
-      icon={<CalendarDays size={14} className="text-violet-600" />}
+      icon={<CalendarDays size={14} className="text-ink" />}
       action={
         editable ? (
           <button className={btnPrimary} disabled={saving} onClick={save}>
@@ -977,12 +963,12 @@ function ScheduleStep({ order, onSaved, onError }: { order: Order; onSaved: () =
           <input type="date" className={inputCls} value={dropDate} disabled={!editable} onChange={(e) => setDropDate(e.target.value)} />
         </Field>
         <Field label="In-home target window">
-          <div className="rounded-md border border-stone-200 bg-stone-50 px-2 py-1.5 text-[13px] font-medium text-stone-900">
+          <div className="rounded-md border border-line bg-canvas px-2 py-1.5 text-[13px] font-medium text-ink">
             {dropDate ? inHomePreview(dropDate) : order.inHomeStart ? `${fmtDate(order.inHomeStart)} – ${fmtDate(order.inHomeEnd)}` : "—"}
           </div>
         </Field>
         <Field label="Pieces">
-          <div className="rounded-md border border-stone-200 bg-stone-50 px-2 py-1.5 text-[13px] font-medium text-stone-900">
+          <div className="rounded-md border border-line bg-canvas px-2 py-1.5 text-[13px] font-medium text-ink">
             {order.pieceCount.toLocaleString()}
           </div>
         </Field>
@@ -1029,7 +1015,7 @@ function BriefStep({ order, onSaved, onError }: { order: Order; onSaved: () => P
   return (
     <Card
       title="Mailhouse handoff brief"
-      icon={<FileText size={14} className="text-violet-600" />}
+      icon={<FileText size={14} className="text-ink" />}
       action={
         order.briefPdfUrl ? (
           <a href={order.briefPdfUrl} className={btnSecondary} download>
@@ -1045,7 +1031,7 @@ function BriefStep({ order, onSaved, onError }: { order: Order; onSaved: () => P
         summary. Generating it advances the order to <strong>briefed</strong>.
       </Note>
       {!ready ? (
-        <p className="text-[13px] text-stone-500">
+        <p className="text-[13px] text-muted">
           Bind an EDDM creative and add carrier routes first — the brief needs both.
         </p>
       ) : (
@@ -1054,7 +1040,7 @@ function BriefStep({ order, onSaved, onError }: { order: Order; onSaved: () => P
             <Field label="Postage entry (for the brief's cost summary)">
               <div className="flex gap-3 pt-1.5">
                 {(["retail", "bmeu"] as const).map((t) => (
-                  <label key={t} className="flex items-center gap-1.5 text-[13px] text-stone-700">
+                  <label key={t} className="flex items-center gap-1.5 text-[13px] text-ink">
                     <input type="radio" checked={tier === t} onChange={() => setTier(t)} disabled={!canGenerate} />
                     {t === "retail" ? "Retail — 26.0¢/pc" : "BMEU — 25.9¢/pc"}
                   </label>
@@ -1078,24 +1064,24 @@ function BriefStep({ order, onSaved, onError }: { order: Order; onSaved: () => P
               <FileText size={14} /> {generating ? "Generating…" : order.briefPdfUrl ? "Regenerate brief PDF" : "Generate handoff brief PDF"}
             </button>
           ) : (
-            <Chip tone="stone">Order is {order.status.replace(/_/g, " ")} — brief is locked</Chip>
+            <Chip>Order is {order.status.replace(/_/g, " ")} — brief is locked</Chip>
           )}
         </>
       )}
       {order.briefPdfUrl ? (
-        <div className="mt-4 rounded-md border border-stone-200 bg-stone-50 p-3 text-[12px] text-stone-600">
-          <p className="font-medium text-stone-900">Brief ready</p>
+        <div className="mt-4 rounded-md border border-line bg-canvas p-3 text-[12px] text-muted">
+          <p className="font-medium text-ink">Brief ready</p>
           <p className="mt-1 flex items-center gap-1.5">
-            <QrCode size={13} className="text-violet-600" /> Drop QR slug:{" "}
-            <code className="rounded bg-white px-1 py-px font-mono text-[11px]">{order.qrSlug ?? "—"}</code>
+            <QrCode size={13} className="text-ink" /> Drop QR slug:{" "}
+            <code className="rounded bg-paper px-1 py-px aos-mono text-[11px]">{order.qrSlug ?? "—"}</code>
           </p>
           {dropUrl ? (
             <p className="mt-1 flex items-center gap-1.5">
-              <Link2 size={13} className="text-violet-600" /> pURL:{" "}
-              <code className="break-all rounded bg-white px-1 py-px font-mono text-[11px]">{dropUrl}</code>
+              <Link2 size={13} className="text-ink" /> pURL:{" "}
+              <code className="break-all rounded bg-paper px-1 py-px aos-mono text-[11px]">{dropUrl}</code>
             </p>
           ) : null}
-          <p className="mt-1 text-[11px] text-stone-400">
+          <p className="mt-1 text-[11px] text-subtle">
             Confirm the scan target resolves before print — the drop pURL is reserved for this drop&apos;s attribution.
           </p>
         </div>
@@ -1137,11 +1123,11 @@ function TimelineStep({ order, onSaved, onError }: { order: Order; onSaved: () =
   const currentIdx = order.status === "cancelled" ? -1 : TIMELINE.indexOf(order.status);
 
   return (
-    <Card title="Status tracking" icon={<Truck size={14} className="text-violet-600" />}>
+    <Card title="Status tracking" icon={<Truck size={14} className="text-ink" />}>
       <Err message={localError} />
       {order.status === "cancelled" ? (
-        <div className="flex items-center gap-2 text-[13px] text-stone-500">
-          <Chip tone="zinc">cancelled</Chip> This order was cancelled. No spend occurred — estimates only.
+        <div className="flex items-center gap-2 text-[13px] text-muted">
+          <Chip>cancelled</Chip> This order was cancelled. No spend occurred — estimates only.
         </div>
       ) : (
         <>
@@ -1153,24 +1139,24 @@ function TimelineStep({ order, onSaved, onError }: { order: Order; onSaved: () =
                 <li key={s} className="flex gap-3">
                   <div className="flex flex-col items-center">
                     <span
-                      className={`flex h-6 w-6 items-center justify-center rounded-full border text-[11px] ${
+                      className={`flex h-6 w-6 items-center justify-center rounded-full border-[1.5px] text-[11px] font-semibold ${
                         done
-                          ? "border-emerald-500 bg-emerald-500 text-white"
+                          ? "border-ink bg-ink text-white"
                           : current
-                            ? "border-violet-600 bg-violet-600 text-white"
-                            : "border-stone-300 bg-white text-stone-400"
+                            ? "border-ink bg-paper text-ink"
+                            : "border-line bg-paper text-subtle"
                       }`}
                     >
                       {done ? <Check size={12} /> : i + 1}
                     </span>
-                    {i < TIMELINE.length - 1 ? <span className="h-5 w-px bg-stone-200" /> : null}
+                    {i < TIMELINE.length - 1 ? <span className="h-5 w-px bg-line" /> : null}
                   </div>
                   <div className="pb-4">
-                    <p className={`text-[13px] font-medium ${current ? "text-stone-900" : done ? "text-stone-700" : "text-stone-400"}`}>
+                    <p className={`text-[13px] font-medium ${current ? "text-ink" : done ? "text-muted" : "text-subtle"}`}>
                       {s.replace(/_/g, " ")}
-                      {current ? <Chip tone="violet">current</Chip> : null}
+                      {current ? <Chip>current</Chip> : null}
                     </p>
-                    <p className="text-[11px] text-stone-400">
+                    <p className="text-[11px] text-subtle">
                       {s === "dropped" && order.inHomeStart
                         ? `In-home target ${fmtDate(order.inHomeStart)} – ${fmtDate(order.inHomeEnd)}`
                         : s === "dropped" && order.dropDate
@@ -1184,13 +1170,13 @@ function TimelineStep({ order, onSaved, onError }: { order: Order; onSaved: () =
           </ol>
           {next.length > 0 ? (
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-[12px] font-medium text-stone-600">Advance:</span>
+              <span className="text-[12px] font-semibold text-muted">Advance:</span>
               {next.map((to) =>
                 to === "cancelled" ? (
                   confirmCancel ? (
                     <span key={to} className="inline-flex items-center gap-2">
-                      <span className="text-[12px] text-stone-500">Cancel this order? No spend occurred.</span>
-                      <button className="rounded-md bg-red-600 px-2.5 py-1.5 text-[13px] font-medium text-white hover:bg-red-700" disabled={busy != null} onClick={() => transition("cancelled")}>
+                      <span className="text-[12px] text-muted">Cancel this order? No spend occurred.</span>
+                      <button className={btnDanger} disabled={busy != null} onClick={() => transition("cancelled")}>
                         Confirm cancel
                       </button>
                       <button className={btnSecondary} onClick={() => setConfirmCancel(false)}>
@@ -1210,11 +1196,11 @@ function TimelineStep({ order, onSaved, onError }: { order: Order; onSaved: () =
               )}
             </div>
           ) : (
-            <p className="text-[12px] text-stone-500">Terminal state — nothing left to do.</p>
+            <p className="text-[12px] text-muted">Terminal state — nothing left to do.</p>
           )}
           {next.includes("dropped") && !order.dropDate ? (
-            <p className="mt-2 flex items-center gap-1.5 text-[12px] text-amber-700">
-              <AlertTriangle size={13} /> Set a drop date (Schedule step) before marking the order dropped.
+            <p className="mt-2 flex items-center gap-1.5 rounded-md bg-needs-tint p-2 text-[12px] text-ink">
+              <span className="aos-shape aos-shape--needs aos-shape--edged shrink-0" role="img" aria-label="Warning" /> Set a drop date (Schedule step) before marking the order dropped.
             </p>
           ) : null}
         </>

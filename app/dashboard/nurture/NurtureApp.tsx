@@ -1,5 +1,5 @@
 // Marketr — nurture workspace app: sequences, enrollments, approval queue,
-// message log, consent matrix. Dense, light mode, violet accents.
+// message log, consent matrix. Agentic OS design system.
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -32,15 +32,13 @@ import type {
 import { SequenceBuilder } from "./SequenceBuilder";
 import { BroadcastsTab } from "./BroadcastsTab";
 import {
-  APPROVAL_STATUS_TONE,
-  CONSENT_STATUS_TONE,
   ChannelChip,
   Chip,
-  ENROLL_STATUS_TONE,
+  DoneBadge,
   EmptyState,
-  MESSAGE_STATUS_TONE,
   Modal,
-  SEQUENCE_STATUS_TONE,
+  NeedsBadge,
+  btnApprove,
   btnDanger,
   btnPrimary,
   btnSecondary,
@@ -169,24 +167,24 @@ export function NurtureApp() {
     { id: "consent", label: "Consent", Icon: ShieldCheck },
   ];
 
-  if (loading) return <div className="p-8 text-[13px] text-stone-500">Loading nurture workspace…</div>;
+  if (loading) return <div className="p-8 text-sm text-muted">Loading nurture workspace…</div>;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-stone-200">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line">
         <div className="flex gap-1">
           {tabs.map(({ id, label, Icon, badge }) => (
             <button
               key={id}
               onClick={() => setTab(id)}
               className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-[13.5px] font-medium transition-colors ${
-                tab === id ? "border-violet-600 text-violet-700" : "border-transparent text-stone-500 hover:text-stone-800"
+                tab === id ? "border-ink text-ink" : "border-transparent text-muted hover:text-ink"
               }`}
             >
               <Icon size={15} />
               {label}
               {badge ? (
-                <span className={`rounded-full px-1.5 text-[11px] font-semibold ${tab === id ? "bg-violet-100 text-violet-700" : "bg-amber-100 text-amber-800"}`}>
+                <span className="rounded-full bg-needs px-1.5 text-[11px] font-semibold text-ink">
                   {badge}
                 </span>
               ) : null}
@@ -194,7 +192,7 @@ export function NurtureApp() {
           ))}
         </div>
         <div className="flex items-center gap-2">
-          {engineResult ? <span className="text-[12px] text-stone-500">{engineResult}</span> : null}
+          {engineResult ? <span className="text-xs text-muted">{engineResult}</span> : null}
           <button className={btnSecondary} onClick={runEngine} disabled={engineRunning} title="Advance due enrollments now (session-scoped)">
             <Zap size={14} /> {engineRunning ? "Running…" : "Run engine now"}
           </button>
@@ -275,28 +273,28 @@ function SequencesTab({
   const [enrollOpen, setEnrollOpen] = useState(false);
   return (
     <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 lg:grid-cols-[300px_1fr]">
-      <div className="rounded-[10px] border border-stone-200 bg-white">
-        <div className="flex items-center justify-between border-b border-stone-200 px-3 py-2">
-          <span className="text-[13px] font-semibold text-stone-800">Sequences ({sequences.length})</span>
+      <div className="rounded-lg bg-paper shadow-hairline">
+        <div className="flex items-center justify-between border-b border-line px-3 py-2">
+          <span className="text-[13px] font-semibold text-ink">Sequences ({sequences.length})</span>
           <button className={btnPrimary} onClick={onCreate}>
             <Plus size={14} /> New
           </button>
         </div>
-        <div className="max-h-[70vh] divide-y divide-stone-100 overflow-y-auto">
+        <div className="max-h-[70vh] divide-y divide-line overflow-y-auto">
           {sequences.length === 0 ? (
             <div className="p-4"><EmptyState title="No sequences yet" hint="Create your first nurture sequence." /></div>
           ) : sequences.map((s) => (
             <button
               key={s.id}
               onClick={() => onSelect(s.id)}
-              className={`flex w-full items-center gap-2 px-3 py-2.5 text-left hover:bg-stone-50 ${selected?.id === s.id ? "bg-violet-50" : ""}`}
+              className={`flex w-full items-center gap-2 px-3 py-2.5 text-left hover:bg-hover-paper ${selected?.id === s.id ? "bg-canvas" : ""}`}
             >
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-1.5">
-                  <span className="truncate text-[13px] font-semibold text-stone-900">{s.name}</span>
-                  <Chip tone={SEQUENCE_STATUS_TONE[s.status]}>{s.status}</Chip>
+                  <span className="truncate text-[13px] font-semibold text-ink">{s.name}</span>
+                  <Chip>{s.status}</Chip>
                 </div>
-                <div className="mt-0.5 flex items-center gap-2 text-[11px] text-stone-500">
+                <div className="mt-0.5 flex items-center gap-2 text-[11px] text-muted">
                   <span>{s.steps.length} steps</span>
                   <span>·</span>
                   <span>{s.stats?.enrolledActive ?? 0} enrolled</span>
@@ -304,7 +302,7 @@ function SequencesTab({
                   <span>{s.stats?.sent ?? 0} sent</span>
                 </div>
               </div>
-              <ChevronRight size={14} className="shrink-0 text-stone-300" />
+              <ChevronRight size={14} className="shrink-0 text-subtle" />
             </button>
           ))}
         </div>
@@ -346,19 +344,19 @@ function SequenceDetail({
 }) {
   return (
     <div className="space-y-3">
-      <div className="rounded-[10px] border border-stone-200 bg-white p-4">
+      <div className="rounded-lg bg-paper p-4 shadow-hairline">
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div>
             <div className="flex items-center gap-2">
-              <h2 className="text-[16px] font-bold text-stone-900">{sequence.name}</h2>
-              <Chip tone={SEQUENCE_STATUS_TONE[sequence.status]}>{sequence.status}</Chip>
-              {sequence.dailyCap ? <Chip tone="stone" title="Max sequence sends per day">cap {sequence.dailyCap}/day</Chip> : null}
+              <h2 className="text-[16px] font-bold text-ink">{sequence.name}</h2>
+              <Chip>{sequence.status}</Chip>
+              {sequence.dailyCap ? <Chip title="Max sequence sends per day">cap {sequence.dailyCap}/day</Chip> : null}
             </div>
-            {sequence.description ? <p className="mt-1 text-[13px] text-stone-500">{sequence.description}</p> : null}
-            <div className="mt-2 flex gap-3 text-[12px] text-stone-500">
-              <span><strong className="text-stone-800">{sequence.stats?.enrolledActive ?? 0}</strong> enrolled</span>
-              <span><strong className="text-stone-800">{sequence.stats?.sent ?? 0}</strong> sent</span>
-              <span><strong className="text-stone-800">{sequence.stats?.suppressed ?? 0}</strong> suppressed</span>
+            {sequence.description ? <p className="mt-1 text-[13px] text-muted">{sequence.description}</p> : null}
+            <div className="mt-2 flex gap-3 text-[12px] text-muted">
+              <span><strong className="text-ink">{sequence.stats?.enrolledActive ?? 0}</strong> enrolled</span>
+              <span><strong className="text-ink">{sequence.stats?.sent ?? 0}</strong> sent</span>
+              <span><strong className="text-ink">{sequence.stats?.suppressed ?? 0}</strong> suppressed</span>
               <span>updated {timeAgo(sequence.updatedAt)}</span>
             </div>
           </div>
@@ -378,25 +376,25 @@ function SequenceDetail({
         </div>
       </div>
 
-      <div className="rounded-[10px] border border-stone-200 bg-white">
-        <div className="border-b border-stone-200 px-4 py-2">
-          <span className="text-[13px] font-semibold text-stone-800">Steps</span>
+      <div className="rounded-lg bg-paper shadow-hairline">
+        <div className="border-b border-line px-4 py-2">
+          <span className="text-[13px] font-semibold text-ink">Steps</span>
         </div>
-        <div className="divide-y divide-stone-100">
+        <div className="divide-y divide-line">
           {sequence.steps.length === 0 ? (
-            <div className="p-4 text-[13px] text-stone-400">No steps yet — edit the sequence to add some.</div>
+            <div className="p-4 text-[13px] text-subtle">No steps yet — edit the sequence to add some.</div>
           ) : sequence.steps.map((step, i) => (
             <div key={i} className="flex gap-3 px-4 py-2.5">
               <div className="flex w-16 shrink-0 flex-col items-center gap-1">
-                <span className="text-[11px] font-semibold uppercase tracking-wide text-stone-400">Step {i + 1}</span>
-                {i > 0 ? <Chip tone="zinc">+{delayLabel(step.delayMinutes)}</Chip> : <Chip tone="zinc">now</Chip>}
+                <span className="text-xs font-semibold text-muted">Step {i + 1}</span>
+                {i > 0 ? <Chip>+{delayLabel(step.delayMinutes)}</Chip> : <Chip>now</Chip>}
               </div>
               <div className="min-w-0 flex-1">
                 <div className="mb-1 flex items-center gap-2">
                   <ChannelChip channel={step.channel} />
-                  {step.subject ? <span className="truncate text-[12px] font-medium text-stone-700">“{step.subject}”</span> : null}
+                  {step.subject ? <span className="truncate text-[12px] font-medium text-muted">“{step.subject}”</span> : null}
                 </div>
-                <p className="whitespace-pre-wrap break-words font-mono text-[12px] leading-5 text-stone-700">{step.template}</p>
+                <p className="aos-mono whitespace-pre-wrap break-words text-[12px] leading-5 text-muted">{step.template}</p>
               </div>
             </div>
           ))}
@@ -452,7 +450,7 @@ function EnrollModal({ sequence, onClose, onDone }: { sequence: NurtureSequence;
     <Modal title={`Enroll leads — ${sequence.name}`} onClose={onClose}>
       <div className="mb-2 flex gap-2">
         <div className="relative flex-1">
-          <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-stone-400" />
+          <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-subtle" />
           <input
             className={`${inputCls} pl-8`}
             value={q}
@@ -463,22 +461,22 @@ function EnrollModal({ sequence, onClose, onDone }: { sequence: NurtureSequence;
         </div>
         <button className={btnSecondary} onClick={() => search(q)} disabled={searching}>Search</button>
       </div>
-      <div className="max-h-64 divide-y divide-stone-100 overflow-y-auto rounded-md border border-stone-200">
+      <div className="max-h-64 divide-y divide-line overflow-y-auto rounded-md border border-line">
         {leads.length === 0 ? (
-          <div className="p-4 text-[13px] text-stone-400">{searching ? "Searching…" : "No leads found."}</div>
+          <div className="p-4 text-[13px] text-subtle">{searching ? "Searching…" : "No leads found."}</div>
         ) : leads.map((l) => (
-          <label key={l.id} className="flex cursor-pointer items-center gap-2.5 px-3 py-2 hover:bg-stone-50">
-            <input type="checkbox" checked={picked.has(l.id)} onChange={() => toggle(l.id)} className="accent-violet-600" />
+          <label key={l.id} className="flex cursor-pointer items-center gap-2.5 px-3 py-2 hover:bg-hover-paper">
+            <input type="checkbox" checked={picked.has(l.id)} onChange={() => toggle(l.id)} className="accent-ink" />
             <div className="min-w-0">
-              <div className="truncate text-[13px] font-medium text-stone-900">{l.name}</div>
-              <div className="truncate text-[12px] text-stone-500">{[l.company, l.email].filter(Boolean).join(" · ") || "—"}</div>
+              <div className="truncate text-[13px] font-medium text-ink">{l.name}</div>
+              <div className="truncate text-[12px] text-muted">{[l.company, l.email].filter(Boolean).join(" · ") || "—"}</div>
             </div>
           </label>
         ))}
       </div>
-      {result ? <p className="mt-2 text-[13px] text-stone-600">{result}</p> : null}
-      <div className="mt-3 flex items-center justify-between border-t border-stone-200 pt-3">
-        <span className="text-[12px] text-stone-500">{picked.size} selected</span>
+      {result ? <p className="mt-2 text-[13px] text-muted">{result}</p> : null}
+      <div className="mt-3 flex items-center justify-between border-t border-line pt-3">
+        <span className="text-[12px] text-muted">{picked.size} selected</span>
         <div className="flex gap-2">
           <button className={btnSecondary} onClick={onClose}>Close</button>
           <button className={btnPrimary} disabled={picked.size === 0 || enrolling} onClick={enroll}>
@@ -514,8 +512,8 @@ function EnrollmentsTab() {
   useEffect(() => { load(); }, [load]);
 
   return (
-    <div className="rounded-[10px] border border-stone-200 bg-white">
-      <div className="flex flex-wrap items-center gap-2 border-b border-stone-200 px-3 py-2">
+    <div className="rounded-lg bg-paper shadow-hairline">
+      <div className="flex flex-wrap items-center gap-2 border-b border-line px-3 py-2">
         <select className={`${inputCls} w-40`} value={status} onChange={(e) => setStatus(e.target.value)}>
           <option value="">All statuses</option>
           {["active", "paused", "completed", "unenrolled", "bounced"].map((s) => (
@@ -523,38 +521,38 @@ function EnrollmentsTab() {
           ))}
         </select>
         <div className="relative">
-          <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-stone-400" />
+          <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-subtle" />
           <input className={`${inputCls} pl-8`} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search lead…" />
         </div>
-        <span className="ml-auto text-[12px] text-stone-500">{rows.length} enrollments</span>
+        <span className="ml-auto text-[12px] text-muted">{rows.length} enrollments</span>
       </div>
       {loading ? (
-        <div className="p-6 text-[13px] text-stone-500">Loading…</div>
+        <div className="p-6 text-[13px] text-muted">Loading…</div>
       ) : rows.length === 0 ? (
         <div className="p-4"><EmptyState title="No enrollments" hint="Enroll leads from a sequence to get started." /></div>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full min-w-[760px] text-left text-[13px]">
             <thead>
-              <tr className="border-b border-stone-200 text-[11px] uppercase tracking-wide text-stone-400">
-                <th className="px-3 py-2 font-medium">Lead</th>
-                <th className="px-3 py-2 font-medium">Sequence</th>
-                <th className="px-3 py-2 font-medium">Status</th>
-                <th className="px-3 py-2 font-medium">Step</th>
-                <th className="px-3 py-2 font-medium">Next run</th>
+              <tr className="border-b border-line text-xs font-semibold text-muted">
+                <th className="px-3 py-2">Lead</th>
+                <th className="px-3 py-2">Sequence</th>
+                <th className="px-3 py-2">Status</th>
+                <th className="px-3 py-2">Step</th>
+                <th className="px-3 py-2">Next run</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-stone-100">
+            <tbody className="divide-y divide-line">
               {rows.map((e) => (
-                <tr key={e.id} className="hover:bg-stone-50">
+                <tr key={e.id} className="hover:bg-hover-paper">
                   <td className="px-3 py-2">
-                    <div className="font-medium text-stone-900">{e.lead.name}</div>
-                    <div className="text-[12px] text-stone-500">{[e.lead.company, e.lead.email].filter(Boolean).join(" · ") || "—"}</div>
+                    <div className="font-medium text-ink">{e.lead.name}</div>
+                    <div className="text-[12px] text-muted">{[e.lead.company, e.lead.email].filter(Boolean).join(" · ") || "—"}</div>
                   </td>
-                  <td className="px-3 py-2 text-stone-700">{e.sequence.name}</td>
-                  <td className="px-3 py-2"><Chip tone={ENROLL_STATUS_TONE[e.status]}>{e.status}</Chip></td>
-                  <td className="px-3 py-2 text-stone-700">{e.status === "completed" ? "done" : `${e.currentStep + 1}`}</td>
-                  <td className="px-3 py-2 text-stone-500">{e.nextRunAt ? timeAgo(e.nextRunAt) : "—"}</td>
+                  <td className="px-3 py-2 text-muted">{e.sequence.name}</td>
+                  <td className="px-3 py-2"><Chip>{e.status}</Chip></td>
+                  <td className="px-3 py-2 text-muted">{e.status === "completed" ? "done" : `${e.currentStep + 1}`}</td>
+                  <td className="px-3 py-2 text-muted">{e.nextRunAt ? timeAgo(e.nextRunAt) : "—"}</td>
                 </tr>
               ))}
             </tbody>
@@ -600,32 +598,38 @@ function ApprovalsTab() {
 
   return (
     <div className="space-y-2">
-      <p className="text-[12px] text-stone-500">
+      <p className="text-[12px] text-muted">
         Every sequence and speed-to-lead send waits here. Approving releases the message to the dispatcher
         (consent, quiet hours, caps, and dedup are enforced at dispatch).
       </p>
       {loading ? (
-        <div className="rounded-[10px] border border-stone-200 bg-white p-6 text-[13px] text-stone-500">Loading…</div>
+        <div className="rounded-lg bg-paper p-6 text-[13px] text-muted shadow-hairline">Loading…</div>
       ) : items.length === 0 ? (
         <EmptyState title="Approval queue is clear" hint="New sequence sends will appear here as the engine advances." />
       ) : items.map((item) => {
         const p = item.payload ?? {};
         return (
-          <div key={item.id} className="rounded-[10px] border border-stone-200 bg-white p-3">
+          <div key={item.id} className="rounded-lg bg-paper p-3 shadow-hairline">
             <div className="flex flex-wrap items-center gap-2">
               <ChannelChip channel={String(p.channel ?? "sms")} />
-              <Chip tone={APPROVAL_STATUS_TONE[item.status]}>{item.status}</Chip>
-              <Chip tone="stone">{String(item.kind).replace(/_/g, " ")}</Chip>
-              <span className="text-[13px] font-medium text-stone-900">
+              {item.status === "pending" ? (
+                <NeedsBadge>{item.status}</NeedsBadge>
+              ) : item.status === "approved" ? (
+                <DoneBadge>{item.status}</DoneBadge>
+              ) : (
+                <Chip>{item.status}</Chip>
+              )}
+              <Chip>{String(item.kind).replace(/_/g, " ")}</Chip>
+              <span className="text-[13px] font-medium text-ink">
                 {item.lead ? `${item.lead.name}${item.lead.company ? ` — ${item.lead.company}` : ""}` : "—"}
               </span>
-              <span className="ml-auto text-[12px] text-stone-400">
+              <span className="ml-auto text-[12px] text-subtle">
                 step {(Number(p.stepIndex ?? 0)) + 1} · requested {timeAgo(item.createdAt)}
                 {item.requestedBy ? ` by ${item.requestedBy}` : ""}
               </span>
             </div>
-            {p.subject ? <p className="mt-2 text-[13px] font-medium text-stone-800">Subject: {String(p.subject)}</p> : null}
-            <p className="mt-1 whitespace-pre-wrap break-words rounded-md bg-stone-50 p-2 font-mono text-[12px] leading-5 text-stone-700">
+            {p.subject ? <p className="mt-2 text-[13px] font-medium text-ink">Subject: {String(p.subject)}</p> : null}
+            <p className="aos-mono mt-1 whitespace-pre-wrap break-words rounded-md bg-canvas p-2 text-[12px] leading-5 text-muted">
               {String(p.body ?? "")}
             </p>
             <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -635,7 +639,7 @@ function ApprovalsTab() {
                 onChange={(e) => setNote((n) => ({ ...n, [item.id]: e.target.value }))}
                 placeholder="Decision note (optional)…"
               />
-              <button className={btnSecondary} disabled={busy === item.id} onClick={() => decide(item.id, "approve")}>
+              <button className={btnApprove} disabled={busy === item.id} onClick={() => decide(item.id, "approve")}>
                 <Check size={14} /> {busy === item.id ? "…" : "Approve"}
               </button>
               <button className={btnDanger} disabled={busy === item.id} onClick={() => decide(item.id, "reject")}>
@@ -676,8 +680,8 @@ function MessageLogTab() {
   useEffect(() => { load(); }, [load]);
 
   return (
-    <div className="rounded-[10px] border border-stone-200 bg-white">
-      <div className="flex flex-wrap items-center gap-2 border-b border-stone-200 px-3 py-2">
+    <div className="rounded-lg bg-paper shadow-hairline">
+      <div className="flex flex-wrap items-center gap-2 border-b border-line px-3 py-2">
         <select className={`${inputCls} w-32`} value={channel} onChange={(e) => setChannel(e.target.value)}>
           <option value="">All channels</option>
           <option value="sms">SMS</option>
@@ -693,56 +697,56 @@ function MessageLogTab() {
           ))}
         </select>
         <div className="relative">
-          <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-stone-400" />
+          <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-subtle" />
           <input className={`${inputCls} pl-8`} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search body or lead…" />
         </div>
-        <span className="ml-auto text-[12px] text-stone-500">{rows.length} messages</span>
+        <span className="ml-auto text-[12px] text-muted">{rows.length} messages</span>
       </div>
       {loading ? (
-        <div className="p-6 text-[13px] text-stone-500">Loading…</div>
+        <div className="p-6 text-[13px] text-muted">Loading…</div>
       ) : rows.length === 0 ? (
         <div className="p-4"><EmptyState title="No messages yet" hint="Run the engine or approve a queued send to populate the ledger." /></div>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full min-w-[860px] text-left text-[13px]">
             <thead>
-              <tr className="border-b border-stone-200 text-[11px] uppercase tracking-wide text-stone-400">
-                <th className="px-3 py-2 font-medium">When</th>
-                <th className="px-3 py-2 font-medium">Lead</th>
-                <th className="px-3 py-2 font-medium">Channel</th>
-                <th className="px-3 py-2 font-medium">Kind</th>
-                <th className="px-3 py-2 font-medium">Preview</th>
-                <th className="px-3 py-2 font-medium">Status</th>
+              <tr className="border-b border-line text-xs font-semibold text-muted">
+                <th className="px-3 py-2">When</th>
+                <th className="px-3 py-2">Lead</th>
+                <th className="px-3 py-2">Channel</th>
+                <th className="px-3 py-2">Kind</th>
+                <th className="px-3 py-2">Preview</th>
+                <th className="px-3 py-2">Status</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-stone-100">
+            <tbody className="divide-y divide-line">
               {rows.map((m) => (
-                <tr key={m.id} className="hover:bg-stone-50">
-                  <td className="whitespace-nowrap px-3 py-2 text-[12px] text-stone-500">{timeAgo(m.createdAt)}</td>
+                <tr key={m.id} className="hover:bg-hover-paper">
+                  <td className="whitespace-nowrap px-3 py-2 text-[12px] text-muted">{timeAgo(m.createdAt)}</td>
                   <td className="px-3 py-2">
-                    <div className="font-medium text-stone-900">{m.lead?.name ?? "—"}</div>
-                    <div className="text-[12px] text-stone-500">{m.lead?.company ?? ""}</div>
+                    <div className="font-medium text-ink">{m.lead?.name ?? "—"}</div>
+                    <div className="text-[12px] text-muted">{m.lead?.company ?? ""}</div>
                   </td>
                   <td className="px-3 py-2"><ChannelChip channel={m.channel} /></td>
-                  <td className="px-3 py-2 text-[12px] text-stone-600">{m.kind.replace(/_/g, " ")}</td>
+                  <td className="px-3 py-2 text-[12px] text-muted">{m.kind.replace(/_/g, " ")}</td>
                   <td className="max-w-[280px] px-3 py-2">
                     <button
-                      className="block w-full truncate text-left text-[12px] text-stone-600 hover:text-violet-700"
+                      className="block w-full truncate text-left text-[12px] text-muted hover:text-ink"
                       onClick={() => setExpanded(expanded === m.id ? null : m.id)}
                       title="Click to expand"
                     >
-                      {m.subject ? <span className="font-medium text-stone-700">“{m.subject}” — </span> : null}
+                      {m.subject ? <span className="font-medium text-muted">“{m.subject}” — </span> : null}
                       {m.body}
                     </button>
                     {expanded === m.id ? (
-                      <div className="mt-1 whitespace-pre-wrap break-words rounded-md bg-stone-50 p-2 font-mono text-[12px] text-stone-700">
+                      <div className="aos-mono mt-1 whitespace-pre-wrap break-words rounded-md bg-canvas p-2 text-[12px] text-muted">
                         {m.body}
-                        {m.error ? <p className="mt-1 text-red-600">Error: {m.error}</p> : null}
+                        {m.error ? <p className="mt-1 text-failed-text">Error: {m.error}</p> : null}
                       </div>
                     ) : null}
                   </td>
                   <td className="px-3 py-2">
-                    <Chip tone={MESSAGE_STATUS_TONE[m.status]} title={m.status === "suppressed" ? `Reason: ${m.suppressionReason ?? "unknown"}` : undefined}>
+                    <Chip title={m.status === "suppressed" ? `Reason: ${m.suppressionReason ?? "unknown"}` : undefined}>
                       {m.status === "suppressed" ? `suppressed: ${m.suppressionReason ?? "?"}` : m.status}
                     </Chip>
                   </td>
@@ -788,51 +792,43 @@ function ConsentTab() {
   };
 
   return (
-    <div className="rounded-[10px] border border-stone-200 bg-white">
-      <div className="flex flex-wrap items-center gap-2 border-b border-stone-200 px-3 py-2">
+    <div className="rounded-lg bg-paper shadow-hairline">
+      <div className="flex flex-wrap items-center gap-2 border-b border-line px-3 py-2">
         <div className="relative">
-          <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-stone-400" />
+          <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-subtle" />
           <input className={`${inputCls} pl-8`} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search leads…" />
         </div>
-        <span className="ml-auto text-[12px] text-stone-500">
+        <span className="ml-auto text-[12px] text-muted">
           Click a channel status to change it. The dispatcher suppresses sends without consent.
         </span>
       </div>
       {loading ? (
-        <div className="p-6 text-[13px] text-stone-500">Loading…</div>
+        <div className="p-6 text-[13px] text-muted">Loading…</div>
       ) : rows.length === 0 ? (
         <div className="p-4"><EmptyState title="No leads" hint="Leads appear here once added to the CRM." /></div>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full min-w-[640px] text-left text-[13px]">
             <thead>
-              <tr className="border-b border-stone-200 text-[11px] uppercase tracking-wide text-stone-400">
-                <th className="px-3 py-2 font-medium">Lead</th>
-                <th className="px-3 py-2 font-medium">SMS</th>
-                <th className="px-3 py-2 font-medium">Email</th>
-                <th className="px-3 py-2 font-medium">Voice</th>
-                <th className="px-3 py-2 font-medium">Mail</th>
+              <tr className="border-b border-line text-xs font-semibold text-muted">
+                <th className="px-3 py-2">Lead</th>
+                <th className="px-3 py-2">SMS</th>
+                <th className="px-3 py-2">Email</th>
+                <th className="px-3 py-2">Voice</th>
+                <th className="px-3 py-2">Mail</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-stone-100">
+            <tbody className="divide-y divide-line">
               {rows.map((r) => (
-                <tr key={r.id} className="hover:bg-stone-50">
+                <tr key={r.id} className="hover:bg-hover-paper">
                   <td className="px-3 py-2">
-                    <div className="font-medium text-stone-900">{r.name}</div>
-                    <div className="text-[12px] text-stone-500">{[r.company, r.email].filter(Boolean).join(" · ") || "—"}</div>
+                    <div className="font-medium text-ink">{r.name}</div>
+                    <div className="text-[12px] text-muted">{[r.company, r.email].filter(Boolean).join(" · ") || "—"}</div>
                   </td>
                   {(["sms", "email", "voice", "mail"] as const).map((ch) => (
                     <td key={ch} className="px-3 py-2">
                       <select
-                        className={`rounded-full border px-2 py-0.5 text-[12px] font-medium focus:outline-none ${
-                          CONSENT_STATUS_TONE[r.consent[ch] ?? "unknown"] === "green"
-                            ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                            : CONSENT_STATUS_TONE[r.consent[ch] ?? "unknown"] === "red"
-                              ? "border-red-200 bg-red-50 text-red-700"
-                              : CONSENT_STATUS_TONE[r.consent[ch] ?? "unknown"] === "amber"
-                                ? "border-amber-200 bg-amber-50 text-amber-700"
-                                : "border-zinc-200 bg-zinc-100 text-zinc-500"
-                        }`}
+                        className="rounded-full border border-line bg-paper px-2 py-0.5 text-[12px] font-medium text-ink focus:outline-none"
                         value={r.consent[ch] ?? "unknown"}
                         onChange={(e) => setConsent(r.id, ch, e.target.value)}
                       >

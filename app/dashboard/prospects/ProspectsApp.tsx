@@ -1,10 +1,10 @@
 "use client";
 
 // Marketr — R6 prospecting & enrichment UI.
-// Light mode, dense data-first: white/paper surfaces, violet accents,
-// compact type, chips, Lucide icons. Research only — nothing here sends
-// anything; "Send to sequence" queues an ApprovalItem for human review
-// (CAN-SPAM warning shown before export).
+// Agentic OS design system: canvas/paper surfaces, black primary actions,
+// neutral chips. Research only — nothing here sends anything; "Send to
+// sequence" queues an ApprovalItem for human review (CAN-SPAM warning shown
+// before export).
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { OpenInSheetsButton } from "@/components/office/OpenInSheetsButton";
@@ -87,33 +87,50 @@ interface Estimate {
   requiresAck: boolean;
 }
 
-// ── Small atoms ──────────────────────────────────────────────────────────────
+// ── Agentic OS atoms ─────────────────────────────────────────────────────────
+// Visual migration only: same layout, same behavior. All workflow states
+// (list status, lookup hit/miss/error, prospect status) render as neutral
+// chips — these are workflow states, not agent states. The `tone` prop stays
+// for call-site compatibility. The one genuine agent state — a prospect with
+// an enrichment agent mid-run — gets the running badge.
+
+const inputCls =
+  "w-full h-control-sm rounded-md border-[1.5px] border-control bg-paper px-3 text-sm text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none disabled:opacity-50";
+
+const btnPrimary =
+  "inline-flex h-control-sm cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-night-hover focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--aos-focus-halo)] disabled:opacity-40";
+
+const btnGhost =
+  "inline-flex h-control-sm cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-paper px-4 text-sm font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--aos-focus-halo)] disabled:opacity-40";
+
+const btnSmall =
+  "inline-flex cursor-pointer items-center gap-1 whitespace-nowrap rounded-full bg-paper px-2 py-1 text-[11px] font-semibold text-ink shadow-control aos-press hover:bg-hover-paper focus-visible:outline-none disabled:opacity-40";
+
+const btnSmallPrimary =
+  "inline-flex cursor-pointer items-center gap-1 whitespace-nowrap rounded-full bg-ink px-2 py-1 text-[11px] font-semibold text-white aos-press hover:bg-night-hover focus-visible:outline-none disabled:opacity-40";
 
 function Chip({ children, tone = "slate" }: { children: React.ReactNode; tone?: "slate" | "violet" | "green" | "amber" | "red" | "blue" }) {
-  const tones: Record<string, string> = {
-    slate: "bg-slate-100 text-slate-600 border-slate-200",
-    violet: "bg-violet-50 text-violet-700 border-violet-200",
-    green: "bg-emerald-50 text-emerald-700 border-emerald-200",
-    amber: "bg-amber-50 text-amber-700 border-amber-200",
-    red: "bg-red-50 text-red-700 border-red-200",
-    blue: "bg-blue-50 text-blue-700 border-blue-200",
-  };
+  void tone;
   return (
-    <span className={`inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-medium leading-tight ${tones[tone]}`}>
+    <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-paper px-1.5 py-0.5 text-[10px] font-medium leading-tight text-muted shadow-control">
       {children}
     </span>
   );
 }
 
-function statusTone(status: string): "slate" | "violet" | "green" | "amber" | "red" | "blue" {
-  switch (status) {
-    case "enriched": return "green";
-    case "enriching": return "blue";
-    case "converted": return "violet";
-    case "in_sequence": return "violet";
-    case "failed": return "red";
-    default: return "slate";
-  }
+/** Genuine agent state: an enrichment agent is mid-run on this prospect. */
+function RunningBadge({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-running px-2 py-0.5 text-[10px] font-semibold leading-tight text-white">
+      <span
+        className="aos-shape aos-shape--running aos-is-live"
+        style={{ color: "#fff" }}
+        role="img"
+        aria-label="Running"
+      />
+      {children}
+    </span>
+  );
 }
 
 async function api(path: string, init?: RequestInit) {
@@ -340,22 +357,19 @@ export function ProspectsApp() {
 
   if (loading) {
     return (
-      <div className="flex h-64 items-center justify-center text-sm text-slate-500">
-        <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading prospecting workspace…
+      <div className="flex h-64 items-center justify-center text-sm text-muted">
+        <Loader2 className="aos-spin mr-2 h-4 w-4" /> Loading prospecting workspace…
       </div>
     );
   }
 
   return (
-    <div className="flex h-full min-h-[600px] text-slate-900">
+    <div className="flex h-full min-h-[600px] text-ink">
       {/* ── List sidebar ── */}
-      <aside className="w-72 shrink-0 border-r border-slate-200 bg-white p-3">
+      <aside className="w-72 shrink-0 border-r border-line bg-paper p-3">
         <div className="mb-2 flex items-center justify-between">
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Lists</h2>
-          <button
-            onClick={() => setShowNewList(true)}
-            className="inline-flex items-center gap-1 rounded-md bg-violet-600 px-2 py-1 text-[11px] font-medium text-white hover:bg-violet-700"
-          >
+          <h2 className="text-xs font-semibold text-muted">Lists</h2>
+          <button onClick={() => setShowNewList(true)} className={btnPrimary}>
             <Plus className="h-3 w-3" /> New
           </button>
         </div>
@@ -365,30 +379,30 @@ export function ProspectsApp() {
               key={l.id}
               onClick={() => selectList(l.id)}
               className={`w-full rounded-lg border p-2.5 text-left transition ${
-                l.id === selectedId ? "border-violet-300 bg-violet-50" : "border-slate-200 bg-white hover:border-slate-300"
+                l.id === selectedId ? "border-ink bg-canvas" : "border-line bg-paper hover:border-control"
               }`}
             >
               <div className="flex items-center justify-between gap-2">
-                <span className="truncate text-[13px] font-semibold">{l.name}</span>
-                <Chip tone={l.status === "ready" ? "green" : "slate"}>{l.status}</Chip>
+                <span className="truncate text-[13px] font-semibold text-ink">{l.name}</span>
+                <Chip>{l.status}</Chip>
               </div>
               <div className="mt-1 flex flex-wrap gap-1">
                 {(l.icp.industries ?? []).slice(0, 2).map((i) => (
-                  <Chip key={i} tone="violet">{i}</Chip>
+                  <Chip key={i}>{i}</Chip>
                 ))}
                 {l.icp.geo && <Chip>{l.icp.geo}</Chip>}
                 {l.icp.titles?.slice(0, 1).map((t) => (
                   <Chip key={t}>{t}</Chip>
                 ))}
               </div>
-              <div className="mt-1.5 flex items-center gap-2 text-[11px] text-slate-500">
+              <div className="mt-1.5 flex items-center gap-2 text-[11px] text-muted">
                 <span className="inline-flex items-center gap-1"><Users className="h-3 w-3" />{l.prospectCount}</span>
-                <span className="inline-flex items-center gap-1 text-emerald-600"><BadgeCheck className="h-3 w-3" />{l.enrichedCount} enriched</span>
+                <span className="inline-flex items-center gap-1 text-muted"><BadgeCheck className="h-3 w-3" />{l.enrichedCount} enriched</span>
               </div>
             </button>
           ))}
           {lists.length === 0 && (
-            <p className="rounded-lg border border-dashed border-slate-300 p-4 text-center text-xs text-slate-500">
+            <p className="rounded-lg border border-dashed border-line bg-paper p-4 text-center text-xs text-muted">
               No lists yet. Create one to start building a prospect pipeline.
             </p>
           )}
@@ -398,16 +412,16 @@ export function ProspectsApp() {
       {/* ── Main ── */}
       <main className="min-w-0 flex-1 overflow-y-auto p-4">
         {error && (
-          <div className="mb-3 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-2.5 text-xs text-red-700">
-            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          <div className="mb-3 flex items-start gap-2 rounded-lg border border-failed bg-failed-tint p-2.5 text-xs text-failed-text">
+            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-failed-text" />
             <span className="flex-1">{error}</span>
-            <button onClick={() => setError(null)}><X className="h-3.5 w-3.5" /></button>
+            <button onClick={() => setError(null)} aria-label="Dismiss"><X className="h-3.5 w-3.5" /></button>
           </div>
         )}
 
         {!selected ? (
-          <div className="flex h-64 flex-col items-center justify-center gap-2 text-sm text-slate-500">
-            <ListPlus className="h-8 w-8 text-slate-300" />
+          <div className="flex h-64 flex-col items-center justify-center gap-2 text-sm text-muted">
+            <ListPlus className="h-8 w-8 text-subtle" />
             Select or create a prospect list to begin.
           </div>
         ) : (
@@ -415,24 +429,24 @@ export function ProspectsApp() {
             {/* List header + actions */}
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <div>
-                <h1 className="text-lg font-bold tracking-tight">{selected.name}</h1>
-                <p className="text-xs text-slate-500">
+                <h1 className="aos-subheading">{selected.name}</h1>
+                <p className="text-xs text-muted">
                   ICP: {(selected.icp.industries ?? []).join(", ") || "—"}
                   {selected.icp.geo ? ` · ${selected.icp.geo}` : ""}
                   {selected.icp.titles?.length ? ` · ${selected.icp.titles.join(", ")}` : ""}
                 </p>
               </div>
               <div className="flex flex-wrap gap-1.5">
-                <button onClick={() => setShowAdd(true)} className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium hover:bg-slate-50">
+                <button onClick={() => setShowAdd(true)} className={btnGhost}>
                   <Plus className="h-3.5 w-3.5" /> Add prospect
                 </button>
-                <button onClick={() => setShowCsv(true)} className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium hover:bg-slate-50">
+                <button onClick={() => setShowCsv(true)} className={btnGhost}>
                   <Upload className="h-3.5 w-3.5" /> CSV import
                 </button>
-                <button onClick={fetchEstimate} className="inline-flex items-center gap-1 rounded-md border border-violet-300 bg-violet-50 px-2.5 py-1.5 text-xs font-medium text-violet-700 hover:bg-violet-100">
+                <button onClick={fetchEstimate} className={btnPrimary}>
                   <Zap className="h-3.5 w-3.5" /> Estimate & enrich
                 </button>
-                <button onClick={openExport} className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium hover:bg-slate-50">
+                <button onClick={openExport} className={btnGhost}>
                   <Send className="h-3.5 w-3.5" /> Send to sequence
                 </button>
               </div>
@@ -440,10 +454,10 @@ export function ProspectsApp() {
 
             {/* Cost-estimate banner */}
             {estimate && (
-              <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 p-3">
+              <div className="mb-3 rounded-lg bg-needs-tint p-3">
                 <div className="flex items-start gap-2">
-                  <FlaskConical className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
-                  <div className="flex-1 text-xs text-amber-900">
+                  <span className="aos-shape aos-shape--needs aos-shape--edged mt-0.5 shrink-0" role="img" aria-label="Needs review" />
+                  <div className="flex-1 text-xs text-ink">
                     <p className="font-semibold">Cost estimate — review before running</p>
                     <p className="mt-1">
                       {estimate.prospectCount} unenriched prospect(s) · chain: {estimate.providerChain.join(" → ")} ·
@@ -452,19 +466,19 @@ export function ProspectsApp() {
                     </p>
                     {estimate.requiresAck && (
                       <label className="mt-2 flex cursor-pointer items-center gap-2 font-medium">
-                        <input type="checkbox" checked={estimateAck} onChange={(e) => setEstimateAck(e.target.checked)} className="h-3.5 w-3.5 accent-violet-600" />
+                        <input type="checkbox" checked={estimateAck} onChange={(e) => setEstimateAck(e.target.checked)} className="h-3.5 w-3.5 accent-ink" />
                         I acknowledge this run covers {estimate.prospectCount} prospects (est. ${estimate.estimatedTotalUsd.toFixed(2)} worst case).
                       </label>
                     )}
                   </div>
                   <div className="flex gap-1.5">
-                    <button onClick={() => setEstimate(null)} className="rounded-md border border-amber-300 bg-white px-2 py-1 text-xs font-medium text-amber-800">Cancel</button>
+                    <button onClick={() => setEstimate(null)} className={btnGhost}>Cancel</button>
                     <button
                       onClick={runEnrichment}
                       disabled={running || (estimate.requiresAck && !estimateAck)}
-                      className="inline-flex items-center gap-1 rounded-md bg-violet-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-violet-700 disabled:opacity-50"
+                      className={btnPrimary}
                     >
-                      {running ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                      {running ? <Loader2 className="aos-spin h-3.5 w-3.5" /> : <Sparkles className="h-3.5 w-3.5" />}
                       Run waterfall
                     </button>
                   </div>
@@ -473,14 +487,14 @@ export function ProspectsApp() {
             )}
 
             {runSummary && (
-              <div className="mb-3 flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 p-2.5 text-xs text-emerald-800">
+              <div className="mb-3 flex items-center gap-2 rounded-lg bg-paper p-2.5 text-xs text-ink shadow-hairline">
                 <CheckCircle2 className="h-3.5 w-3.5 shrink-0" /> {runSummary}
               </div>
             )}
 
             {/* Prospect table */}
             <div className="mb-2 flex items-center justify-between">
-              <p className="text-[12px] text-slate-500">{prospects.length} prospects</p>
+              <p className="text-[12px] text-muted">{prospects.length} prospects</p>
               {prospects.length > 0 && (
                 <OpenInSheetsButton
                   title={`Prospect list — ${selected?.name ?? "all"}`}
@@ -497,58 +511,58 @@ export function ProspectsApp() {
                   ])}
                   sourceRef="prospects:list"
                   sheetName="Prospects"
-                  className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-[12px] font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                  className="inline-flex items-center gap-1.5 rounded-full bg-paper px-3 py-1.5 text-[12px] font-semibold text-ink shadow-outline hover:bg-hover-paper disabled:opacity-40"
                 />
               )}
             </div>
-            <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+            <div className="overflow-hidden rounded-lg bg-paper shadow-hairline">
               <table className="w-full text-left text-xs">
                 <thead>
-                  <tr className="border-b border-slate-200 bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500">
-                    <th className="px-3 py-2 font-medium">Company / Contact</th>
-                    <th className="px-3 py-2 font-medium">Title</th>
-                    <th className="px-3 py-2 font-medium">Email / Phone</th>
-                    <th className="px-3 py-2 font-medium">Enrichment</th>
-                    <th className="px-3 py-2 font-medium">Score</th>
-                    <th className="px-3 py-2 font-medium">Status</th>
-                    <th className="px-3 py-2 font-medium">Actions</th>
+                  <tr className="border-b border-line text-xs font-semibold text-muted">
+                    <th className="px-3 py-2">Company / Contact</th>
+                    <th className="px-3 py-2">Title</th>
+                    <th className="px-3 py-2">Email / Phone</th>
+                    <th className="px-3 py-2">Enrichment</th>
+                    <th className="px-3 py-2">Score</th>
+                    <th className="px-3 py-2">Status</th>
+                    <th className="px-3 py-2">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {prospects.map((p) => (
-                    <tr key={p.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50/60">
+                    <tr key={p.id} className="border-b border-line last:border-0 hover:bg-hover-paper">
                       <td className="px-3 py-2">
-                        <div className="font-semibold text-slate-900">{p.company ?? "—"}</div>
-                        <div className="text-slate-500">{p.name ?? ""}{p.website ? ` · ${p.website.replace(/^https?:\/\//, "").split("/")[0]}` : ""}</div>
+                        <div className="font-semibold text-ink">{p.company ?? "—"}</div>
+                        <div className="text-muted">{p.name ?? ""}{p.website ? ` · ${p.website.replace(/^https?:\/\//, "").split("/")[0]}` : ""}</div>
                       </td>
-                      <td className="px-3 py-2 text-slate-600">{p.title ?? "—"}</td>
-                      <td className="px-3 py-2 text-slate-600">
+                      <td className="px-3 py-2 text-muted">{p.title ?? "—"}</td>
+                      <td className="px-3 py-2 text-muted">
                         <div className="truncate">{p.email ?? "—"}</div>
-                        <div className="text-slate-400">{p.phone ?? ""}</div>
+                        <div className="text-subtle">{p.phone ?? ""}</div>
                       </td>
                       <td className="px-3 py-2">
                         <div className="flex flex-wrap gap-1">
-                          {p.lookups.length === 0 && <span className="inline-flex items-center gap-1 text-slate-400"><CircleDashed className="h-3 w-3" /> none</span>}
+                          {p.lookups.length === 0 && <span className="inline-flex items-center gap-1 text-subtle"><CircleDashed className="h-3 w-3" /> none</span>}
                           {p.lookups.map((l) => (
-                            <Chip key={l.id} tone={l.status === "hit" ? "green" : l.status === "error" ? "red" : "slate"}>
+                            <Chip key={l.id}>
                               {l.provider}:{l.status}
                             </Chip>
                           ))}
                         </div>
                       </td>
                       <td className="px-3 py-2">
-                        <span className={`font-semibold ${p.score >= 60 ? "text-emerald-600" : p.score >= 30 ? "text-amber-600" : "text-slate-500"}`}>{p.score}</span>
+                        <span className={`font-semibold ${p.score >= 60 ? "text-ink" : p.score >= 30 ? "text-muted" : "text-subtle"}`}>{p.score}</span>
                       </td>
-                      <td className="px-3 py-2"><Chip tone={statusTone(p.status)}>{p.status.replace("_", " ")}</Chip></td>
+                      <td className="px-3 py-2">{p.status === "enriching" ? <RunningBadge>enriching</RunningBadge> : <Chip>{p.status.replace("_", " ")}</Chip>}</td>
                       <td className="px-3 py-2">
                         <div className="flex flex-wrap gap-1">
                           <button
                             onClick={() => (p.research ? setResearchTarget(p) : runResearch(p))}
                             disabled={researching === p.id}
                             title="AI research (icebreakers, first lines)"
-                            className="inline-flex items-center gap-1 rounded border border-slate-200 px-1.5 py-1 text-[11px] font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-50"
+                            className={btnSmall}
                           >
-                            {researching === p.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <FlaskConical className="h-3 w-3" />}
+                            {researching === p.id ? <Loader2 className="aos-spin h-3 w-3" /> : <FlaskConical className="h-3 w-3" />}
                             {p.research ? "Research" : "Research"}
                           </button>
                           {p.status !== "converted" && (
@@ -556,9 +570,9 @@ export function ProspectsApp() {
                               onClick={() => convertProspect(p)}
                               disabled={converting === p.id}
                               title="Convert to CRM lead"
-                              className="inline-flex items-center gap-1 rounded border border-violet-200 bg-violet-50 px-1.5 py-1 text-[11px] font-medium text-violet-700 hover:bg-violet-100 disabled:opacity-50"
+                              className={btnSmallPrimary}
                             >
-                              {converting === p.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <ArrowRightLeft className="h-3 w-3" />}
+                              {converting === p.id ? <Loader2 className="aos-spin h-3 w-3" /> : <ArrowRightLeft className="h-3 w-3" />}
                               Convert
                             </button>
                           )}
@@ -567,7 +581,7 @@ export function ProspectsApp() {
                     </tr>
                   ))}
                   {prospects.length === 0 && (
-                    <tr><td colSpan={7} className="px-3 py-8 text-center text-slate-400">No prospects in this list yet — add one or import a CSV.</td></tr>
+                    <tr><td colSpan={7} className="px-3 py-8 text-center text-subtle">No prospects in this list yet — add one or import a CSV.</td></tr>
                   )}
                 </tbody>
               </table>
@@ -579,13 +593,13 @@ export function ProspectsApp() {
       {/* ── Modals & drawer ── */}
       {showNewList && (
         <Modal title="New prospect list" onClose={() => setShowNewList(false)}>
-          <label className="mb-2 block text-xs font-medium text-slate-600">Name</label>
-          <input value={newListName} onChange={(e) => setNewListName(e.target.value)} placeholder="Q4 SaaS outreach" className="mb-3 w-full rounded-md border border-slate-300 px-2.5 py-1.5 text-sm" />
-          <label className="mb-2 block text-xs font-medium text-slate-600">ICP (JSON)</label>
-          <textarea value={newListIcp} onChange={(e) => setNewListIcp(e.target.value)} rows={5} placeholder='{"industries":["SaaS"],"geo":"North Carolina","titles":["VP Marketing"]}' className="mb-3 w-full rounded-md border border-slate-300 px-2.5 py-1.5 font-mono text-xs" />
+          <label className="mb-2 block text-xs font-semibold text-muted">Name</label>
+          <input value={newListName} onChange={(e) => setNewListName(e.target.value)} placeholder="Q4 SaaS outreach" className={`${inputCls} mb-3`} />
+          <label className="mb-2 block text-xs font-semibold text-muted">ICP (JSON)</label>
+          <textarea value={newListIcp} onChange={(e) => setNewListIcp(e.target.value)} rows={5} placeholder='{"industries":["SaaS"],"geo":"North Carolina","titles":["VP Marketing"]}' className={`${inputCls} aos-mono mb-3 text-xs`} />
           <div className="flex justify-end gap-2">
-            <button onClick={() => setShowNewList(false)} className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium">Cancel</button>
-            <button onClick={createList} className="rounded-md bg-violet-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-violet-700">Create list</button>
+            <button onClick={() => setShowNewList(false)} className={btnGhost}>Cancel</button>
+            <button onClick={createList} className={btnPrimary}>Create list</button>
           </div>
         </Modal>
       )}
@@ -595,25 +609,25 @@ export function ProspectsApp() {
           <div className="grid grid-cols-2 gap-2">
             {(["company", "name", "email", "phone", "title", "website"] as const).map((f) => (
               <div key={f}>
-                <label className="mb-1 block text-xs font-medium capitalize text-slate-600">{f}</label>
-                <input value={addForm[f]} onChange={(e) => setAddForm({ ...addForm, [f]: e.target.value })} className="w-full rounded-md border border-slate-300 px-2.5 py-1.5 text-sm" />
+                <label className="mb-1 block text-xs font-semibold capitalize text-muted">{f}</label>
+                <input value={addForm[f]} onChange={(e) => setAddForm({ ...addForm, [f]: e.target.value })} className={inputCls} />
               </div>
             ))}
           </div>
           <div className="mt-3 flex justify-end gap-2">
-            <button onClick={() => setShowAdd(false)} className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium">Cancel</button>
-            <button onClick={addProspect} className="rounded-md bg-violet-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-violet-700">Add</button>
+            <button onClick={() => setShowAdd(false)} className={btnGhost}>Cancel</button>
+            <button onClick={addProspect} className={btnPrimary}>Add</button>
           </div>
         </Modal>
       )}
 
       {showCsv && (
         <Modal title="CSV import" onClose={() => setShowCsv(false)}>
-          <p className="mb-2 text-xs text-slate-500">Headers: company, name, email, phone, title, website. Duplicates (by email/phone) are skipped.</p>
-          <textarea value={csvText} onChange={(e) => setCsvText(e.target.value)} rows={8} placeholder="company,name,email,phone,title,website&#10;Acme Inc,Jane Doe,jane@acme.com,,VP Marketing,acme.com" className="mb-3 w-full rounded-md border border-slate-300 px-2.5 py-1.5 font-mono text-xs" />
+          <p className="mb-2 text-xs text-muted">Headers: company, name, email, phone, title, website. Duplicates (by email/phone) are skipped.</p>
+          <textarea value={csvText} onChange={(e) => setCsvText(e.target.value)} rows={8} placeholder="company,name,email,phone,title,website&#10;Acme Inc,Jane Doe,jane@acme.com,,VP Marketing,acme.com" className={`${inputCls} aos-mono mb-3 text-xs`} />
           <div className="flex justify-end gap-2">
-            <button onClick={() => setShowCsv(false)} className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium">Cancel</button>
-            <button onClick={importCsv} className="inline-flex items-center gap-1 rounded-md bg-violet-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-violet-700"><FileText className="h-3.5 w-3.5" /> Import</button>
+            <button onClick={() => setShowCsv(false)} className={btnGhost}>Cancel</button>
+            <button onClick={importCsv} className={`${btnPrimary} inline-flex items-center gap-1`}><FileText className="h-3.5 w-3.5" /> Import</button>
           </div>
         </Modal>
       )}
@@ -622,25 +636,25 @@ export function ProspectsApp() {
         <Modal title="Send to sequence — approval required" onClose={() => setShowExport(false)}>
           {!exportDone ? (
             <>
-              <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 p-2.5 text-xs text-amber-900">
-                <p className="flex items-start gap-1.5 font-semibold"><AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" /> Cold-email compliance (CAN-SPAM)</p>
+              <div className="mb-3 rounded-lg bg-needs-tint p-2.5 text-xs text-ink">
+                <p className="flex items-start gap-1.5 font-semibold"><span className="aos-shape aos-shape--needs aos-shape--edged mt-0.5 shrink-0" role="img" aria-label="Warning" /> Cold-email compliance (CAN-SPAM)</p>
                 <p className="mt-1">Outreach requires opt-in or legitimate-interest review for every recipient. Every message must include a working unsubscribe mechanism and the sender's physical postal address. This only queues an approval — nothing is sent until a human approves it, and R3's consent layer enforces compliance before any send.</p>
               </div>
-              <label className="mb-1 block text-xs font-medium text-slate-600">Sequence ({exportIds.length} enriched prospect(s))</label>
-              <select value={exportSeq} onChange={(e) => setExportSeq(e.target.value)} className="mb-3 w-full rounded-md border border-slate-300 px-2.5 py-1.5 text-sm">
+              <label className="mb-1 block text-xs font-semibold text-muted">Sequence ({exportIds.length} enriched prospect(s))</label>
+              <select value={exportSeq} onChange={(e) => setExportSeq(e.target.value)} className={`${inputCls} mb-3`}>
                 {sequences.map((s) => <option key={s.id} value={s.id}>{s.name} ({s.status})</option>)}
                 {sequences.length === 0 && <option value="">No sequences found</option>}
               </select>
               <div className="flex justify-end gap-2">
-                <button onClick={() => setShowExport(false)} className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium">Cancel</button>
-                <button onClick={submitExport} className="inline-flex items-center gap-1 rounded-md bg-violet-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-violet-700"><Send className="h-3.5 w-3.5" /> Queue approval</button>
+                <button onClick={() => setShowExport(false)} className={btnGhost}>Cancel</button>
+                <button onClick={submitExport} className={btnPrimary}><Send className="h-3.5 w-3.5" /> Queue approval</button>
               </div>
             </>
           ) : (
             <>
-              <p className="flex items-start gap-2 text-sm text-emerald-700"><CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />{exportDone}</p>
+              <p className="flex items-start gap-2 text-sm text-ink"><CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />{exportDone}</p>
               <div className="mt-3 flex justify-end">
-                <button onClick={() => setShowExport(false)} className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium">Close</button>
+                <button onClick={() => setShowExport(false)} className={btnGhost}>Close</button>
               </div>
             </>
           )}
@@ -648,41 +662,41 @@ export function ProspectsApp() {
       )}
 
       {researchTarget && (
-        <div className="fixed inset-0 z-40 flex justify-end bg-black/20" onClick={() => setResearchTarget(null)}>
-          <div className="h-full w-full max-w-md overflow-y-auto border-l border-slate-200 bg-white p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-40 flex justify-end bg-ink/30" onClick={() => setResearchTarget(null)}>
+          <div className="h-full w-full max-w-md overflow-y-auto border-l border-line bg-paper p-5 shadow-overlay" onClick={(e) => e.stopPropagation()}>
             <div className="mb-3 flex items-start justify-between">
               <div>
-                <h3 className="text-sm font-bold">AI research</h3>
-                <p className="text-xs text-slate-500">{researchTarget.company ?? researchTarget.name}</p>
+                <h3 className="text-sm font-semibold text-ink">AI research</h3>
+                <p className="text-xs text-muted">{researchTarget.company ?? researchTarget.name}</p>
               </div>
-              <button onClick={() => setResearchTarget(null)}><X className="h-4 w-4 text-slate-400" /></button>
+              <button onClick={() => setResearchTarget(null)} aria-label="Close" className="rounded-full p-1 text-muted hover:bg-hover-paper hover:text-ink"><X className="h-4 w-4" /></button>
             </div>
             {researchTarget.research?.mock && (
-              <div className="mb-3"><Chip tone="amber">Mock research — connect an LLM for real output</Chip></div>
+              <div className="mb-3"><Chip>Mock research — connect an LLM for real output</Chip></div>
             )}
             <section className="mb-4">
-              <h4 className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Summary</h4>
-              <p className="text-[13px] leading-relaxed text-slate-700">{researchTarget.research?.summary}</p>
+              <h4 className="mb-1 text-xs font-semibold text-muted">Summary</h4>
+              <p className="text-[13px] leading-relaxed text-muted">{researchTarget.research?.summary}</p>
             </section>
             <section className="mb-4">
-              <h4 className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Icebreakers</h4>
+              <h4 className="mb-1 text-xs font-semibold text-muted">Icebreakers</h4>
               <ul className="space-y-1.5">
                 {(researchTarget.research?.icebreakers ?? []).map((s, i) => (
-                  <li key={i} className="flex gap-1.5 rounded-md bg-violet-50 p-2 text-[13px] text-slate-700"><ChevronRight className="mt-0.5 h-3.5 w-3.5 shrink-0 text-violet-500" />{s}</li>
+                  <li key={i} className="flex gap-1.5 rounded-md bg-canvas p-2 text-[13px] text-muted"><ChevronRight className="mt-0.5 h-3.5 w-3.5 shrink-0 text-ink" />{s}</li>
                 ))}
               </ul>
             </section>
             <section className="mb-4">
-              <h4 className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">First lines</h4>
+              <h4 className="mb-1 text-xs font-semibold text-muted">First lines</h4>
               <ul className="space-y-1.5">
                 {(researchTarget.research?.firstLines ?? []).map((s, i) => (
-                  <li key={i} className="flex gap-1.5 rounded-md bg-slate-50 p-2 text-[13px] text-slate-700"><ChevronRight className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400" />{s}</li>
+                  <li key={i} className="flex gap-1.5 rounded-md bg-canvas p-2 text-[13px] text-muted"><ChevronRight className="mt-0.5 h-3.5 w-3.5 shrink-0 text-subtle" />{s}</li>
                 ))}
               </ul>
             </section>
             <section>
-              <h4 className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Talking points</h4>
-              <ul className="list-disc space-y-1 pl-5 text-[13px] text-slate-700">
+              <h4 className="mb-1 text-xs font-semibold text-muted">Talking points</h4>
+              <ul className="list-disc space-y-1 pl-5 text-[13px] text-muted">
                 {(researchTarget.research?.talkingPoints ?? []).map((s, i) => <li key={i}>{s}</li>)}
               </ul>
             </section>
@@ -695,11 +709,11 @@ export function ProspectsApp() {
 
 function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/20 p-4" onClick={onClose}>
-      <div className="w-full max-w-lg rounded-xl border border-slate-200 bg-white p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-ink/30 p-4" onClick={onClose}>
+      <div className="w-full max-w-lg rounded-lg border border-line bg-paper p-5 shadow-overlay" onClick={(e) => e.stopPropagation()}>
         <div className="mb-3 flex items-center justify-between">
-          <h3 className="text-sm font-bold">{title}</h3>
-          <button onClick={onClose}><X className="h-4 w-4 text-slate-400" /></button>
+          <h3 className="text-sm font-semibold text-ink">{title}</h3>
+          <button onClick={onClose} aria-label="Close" className="rounded-full p-1 text-muted hover:bg-hover-paper hover:text-ink"><X className="h-4 w-4" /></button>
         </div>
         {children}
       </div>

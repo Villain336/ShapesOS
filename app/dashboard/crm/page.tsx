@@ -15,7 +15,7 @@ export default async function CrmPage() {
   if (!user) redirect("/login");
   await getOrCreateWorkspace(user.id, user.email);
   return (
-    <div className="h-full bg-[#FAFAF7]">
+    <div className="h-full bg-canvas">
       <CrmApp />
     </div>
   );

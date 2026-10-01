@@ -6,7 +6,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { CalendarClock, ExternalLink, MailOpen, Plus, Search, Send } from "lucide-react";
-import { Chip, EmptyState, Modal, btnPrimary, btnSecondary, inputCls } from "./ui";
+import { Chip, EmptyState, Modal, btnExecute, btnPrimary, btnSecondary, inputCls } from "./ui";
 
 export interface Broadcast {
   id: number;
@@ -36,16 +36,6 @@ interface BroadcastStats {
   clicked: number;
   bounced: number;
 }
-
-const STATUS_TONE: Record<string, "green" | "amber" | "red" | "blue" | "stone" | "zinc" | "violet"> = {
-  running: "green",
-  sent: "green",
-  scheduled: "amber",
-  draft: "stone",
-  paused: "amber",
-  cancelled: "red",
-  finished: "blue",
-};
 
 function timeAgo(iso: string | null): string {
   if (!iso) return "—";
@@ -141,13 +131,13 @@ export function BroadcastsTab() {
 
   if (connected === false) {
     return (
-      <div className="rounded-[10px] border border-stone-200 bg-white p-8 text-center">
-        <MailOpen size={28} className="mx-auto text-stone-300" />
-        <h3 className="mt-2 text-[15px] font-bold text-stone-900">Connect Listmonk to run newsletter broadcasts</h3>
-        <p className="mx-auto mt-1 max-w-md text-[13px] text-stone-500">
+      <div className="rounded-lg bg-paper p-8 text-center shadow-hairline">
+        <MailOpen size={28} className="mx-auto text-subtle" />
+        <h3 className="mt-2 text-sm font-semibold text-ink">Connect Listmonk to run newsletter broadcasts</h3>
+        <p className="mx-auto mt-1 max-w-md text-sm text-muted">
           Listmonk is a self-hosted email engine sidecar (AGPL-3.0, own Postgres). Set{" "}
-          <span className="font-mono">LISTMONK_URL</span>, <span className="font-mono">LISTMONK_USER</span>, and{" "}
-          <span className="font-mono">LISTMONK_TOKEN</span> in Settings → Providers, then come back here.
+          <span className="aos-mono">LISTMONK_URL</span>, <span className="aos-mono">LISTMONK_USER</span>, and{" "}
+          <span className="aos-mono">LISTMONK_TOKEN</span> in Settings → Providers, then come back here.
         </p>
         <a href="/dashboard/settings/providers" className={`${btnSecondary} mt-3 inline-flex items-center`}>
           <ExternalLink size={14} /> Open Settings → Providers
@@ -157,8 +147,8 @@ export function BroadcastsTab() {
   }
 
   return (
-    <div className="rounded-[10px] border border-stone-200 bg-white">
-      <div className="flex flex-wrap items-center gap-2 border-b border-stone-200 px-3 py-2">
+    <div className="rounded-lg bg-paper shadow-hairline">
+      <div className="flex flex-wrap items-center gap-2 border-b border-line px-3 py-2">
         <select className={`${inputCls} w-36`} value={status} onChange={(e) => setStatus(e.target.value)}>
           <option value="">All statuses</option>
           {["draft", "scheduled", "running", "sent", "paused", "cancelled"].map((s) => (
@@ -166,7 +156,7 @@ export function BroadcastsTab() {
           ))}
         </select>
         <div className="relative">
-          <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-stone-400" />
+          <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-subtle" />
           <input
             className={`${inputCls} pl-8`}
             value={q}
@@ -174,53 +164,53 @@ export function BroadcastsTab() {
             placeholder="Search campaigns…"
           />
         </div>
-        <span className="ml-auto text-[12px] text-stone-500">{rows.length} broadcasts</span>
+        <span className="ml-auto text-[12px] text-muted">{rows.length} broadcasts</span>
         <button className={btnPrimary} onClick={() => setCreateOpen(true)}>
           <Plus size={14} /> New broadcast
         </button>
       </div>
 
       {error ? (
-        <p className="border-b border-stone-200 bg-red-50 px-3 py-2 text-[12px] text-red-700">{error}</p>
+        <p className="border-b border-line bg-failed-tint px-3 py-2 text-[12px] text-failed-text">{error}</p>
       ) : null}
 
       {loading ? (
-        <div className="p-6 text-[13px] text-stone-500">Loading broadcasts…</div>
+        <div className="p-6 text-[13px] text-muted">Loading broadcasts…</div>
       ) : rows.length === 0 ? (
         <div className="p-4"><EmptyState title="No broadcasts yet" hint="Create one to send a newsletter via the Listmonk sidecar." /></div>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full min-w-[820px] text-left text-[13px]">
             <thead>
-              <tr className="border-b border-stone-200 text-[11px] uppercase tracking-wide text-stone-400">
-                <th className="px-3 py-2 font-medium">Campaign</th>
-                <th className="px-3 py-2 font-medium">Lists</th>
-                <th className="px-3 py-2 font-medium">Status</th>
-                <th className="px-3 py-2 font-medium">Sent</th>
-                <th className="px-3 py-2 font-medium">Updated</th>
-                <th className="px-3 py-2 font-medium text-right">Actions</th>
+              <tr className="border-b border-line text-xs font-semibold text-muted">
+                <th className="px-3 py-2">Campaign</th>
+                <th className="px-3 py-2">Lists</th>
+                <th className="px-3 py-2">Status</th>
+                <th className="px-3 py-2">Sent</th>
+                <th className="px-3 py-2">Updated</th>
+                <th className="px-3 py-2 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-stone-100">
+            <tbody className="divide-y divide-line">
               {rows.map((b) => (
-                <tr key={b.id} className="hover:bg-violet-50/40">
+                <tr key={b.id} className="hover:bg-hover-paper">
                   <td className="px-3 py-2">
-                    <button className="text-left hover:text-violet-700" onClick={() => openDetail(b)}>
-                      <div className="font-medium text-stone-900">{b.name}</div>
-                      <div className="max-w-[320px] truncate text-[12px] text-stone-500">{b.subject}</div>
+                    <button className="text-left hover:text-ink" onClick={() => openDetail(b)}>
+                      <div className="font-medium text-ink">{b.name}</div>
+                      <div className="max-w-[320px] truncate text-[12px] text-muted">{b.subject}</div>
                     </button>
                   </td>
                   <td className="px-3 py-2">
                     <div className="flex flex-wrap gap-1">
                       {b.lists.map((l) => (
-                        <Chip key={l.id} tone="blue">{l.name}</Chip>
+                        <Chip key={l.id}>{l.name}</Chip>
                       ))}
-                      {b.lists.length === 0 ? <span className="text-[12px] text-stone-400">—</span> : null}
+                      {b.lists.length === 0 ? <span className="text-[12px] text-subtle">—</span> : null}
                     </div>
                   </td>
-                  <td className="px-3 py-2"><Chip tone={STATUS_TONE[b.status] ?? "zinc"}>{b.status}</Chip></td>
-                  <td className="px-3 py-2 text-stone-700">{b.sentCount ?? "—"}</td>
-                  <td className="whitespace-nowrap px-3 py-2 text-[12px] text-stone-500">{timeAgo(b.updatedAt)}</td>
+                  <td className="px-3 py-2"><Chip>{b.status}</Chip></td>
+                  <td className="px-3 py-2 text-muted">{b.sentCount ?? "—"}</td>
+                  <td className="whitespace-nowrap px-3 py-2 text-[12px] text-muted">{timeAgo(b.updatedAt)}</td>
                   <td className="px-3 py-2">
                     <div className="flex justify-end gap-1.5">
                       {b.status === "draft" ? (
@@ -243,7 +233,7 @@ export function BroadcastsTab() {
                             <CalendarClock size={13} />
                           </button>
                           <button
-                            className={btnPrimary}
+                            className={btnExecute}
                             disabled={sending === b.id}
                             onClick={() => send(b, "now")}
                             title="Send now (irreversible)"
@@ -273,22 +263,22 @@ export function BroadcastsTab() {
         <Modal title={`Broadcast — ${detail.campaign.name}`} onClose={() => setDetail(null)} wide>
           <div className="space-y-3">
             <div className="flex items-center gap-2">
-              <Chip tone={STATUS_TONE[detail.campaign.status] ?? "zinc"}>{detail.campaign.status}</Chip>
-              <span className="text-[13px] text-stone-600">{detail.campaign.subject}</span>
+              <Chip>{detail.campaign.status}</Chip>
+              <span className="text-[13px] text-muted">{detail.campaign.subject}</span>
             </div>
             {detail.stats ? (
               <div className="grid grid-cols-4 gap-2">
                 {([["sent", detail.stats.sent], ["viewed", detail.stats.viewed], ["clicked", detail.stats.clicked], ["bounced", detail.stats.bounced]] as const).map(([k, v]) => (
-                  <div key={k} className="rounded-lg border border-stone-200 bg-stone-50 p-2 text-center">
-                    <div className="text-[16px] font-bold text-stone-900">{v}</div>
-                    <div className="text-[11px] uppercase tracking-wide text-stone-400">{k}</div>
+                  <div key={k} className="rounded-lg bg-canvas p-2 text-center">
+                    <div className="text-[16px] font-bold text-ink">{v}</div>
+                    <div className="text-xs font-semibold text-muted">{k}</div>
                   </div>
                 ))}
               </div>
             ) : (
-              <p className="text-[12px] text-stone-500">No send stats yet — stats appear after the first send.</p>
+              <p className="text-[12px] text-muted">No send stats yet — stats appear after the first send.</p>
             )}
-            <p className="text-[12px] text-stone-500">
+            <p className="text-[12px] text-muted">
               New drafts send through the Listmonk sidecar only. Sends are irreversible — confirm in the row actions.
             </p>
           </div>
@@ -341,28 +331,28 @@ function CreateBroadcastModal({
           <input className={inputCls} value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="Subject line" />
         </div>
         <div>
-          <p className="mb-1 text-[12px] font-medium text-stone-600">Lists ({picked.size} selected)</p>
-          <div className="max-h-32 space-y-1 overflow-y-auto rounded-md border border-stone-200 p-2">
+          <p className="mb-1 text-xs font-semibold text-muted">Lists ({picked.size} selected)</p>
+          <div className="max-h-32 space-y-1 overflow-y-auto rounded-md border border-line p-2">
             {lists.length === 0 ? (
-              <p className="text-[12px] text-stone-400">No lists yet — create one in the Listmonk admin UI first.</p>
+              <p className="text-[12px] text-subtle">No lists yet — create one in the Listmonk admin UI first.</p>
             ) : lists.map((l) => (
-              <label key={l.id} className="flex cursor-pointer items-center gap-2 px-1 py-0.5 hover:bg-stone-50">
-                <input type="checkbox" checked={picked.has(l.id)} onChange={() => toggle(l.id)} className="accent-violet-600" />
-                <span className="text-[13px] text-stone-800">{l.name}</span>
-                <span className="ml-auto text-[11px] text-stone-400">{l.subscriberCount ?? "—"} subscribers</span>
+              <label key={l.id} className="flex cursor-pointer items-center gap-2 px-1 py-0.5 hover:bg-hover-paper">
+                <input type="checkbox" checked={picked.has(l.id)} onChange={() => toggle(l.id)} className="accent-ink" />
+                <span className="text-[13px] text-ink">{l.name}</span>
+                <span className="ml-auto text-[11px] text-subtle">{l.subscriberCount ?? "—"} subscribers</span>
               </label>
             ))}
           </div>
         </div>
         <textarea
-          className={`${inputCls} min-h-[140px] font-mono`}
+          className={`${inputCls} aos-mono min-h-[140px]`}
           value={body}
           onChange={(e) => setBody(e.target.value)}
           placeholder="<h1>Hello</h1><p>Your newsletter HTML…</p>"
         />
-        {error ? <p className="text-[13px] text-red-600">{error}</p> : null}
-        <div className="flex items-center justify-between border-t border-stone-200 pt-3">
-          <p className="text-[12px] text-stone-500">Saved as a draft in Listmonk. Sends happen from the row actions.</p>
+        {error ? <p className="text-[13px] text-failed-text">{error}</p> : null}
+        <div className="flex items-center justify-between border-t border-line pt-3">
+          <p className="text-[12px] text-muted">Saved as a draft in Listmonk. Sends happen from the row actions.</p>
           <div className="flex gap-2">
             <button className={btnSecondary} onClick={onClose}>Cancel</button>
             <button

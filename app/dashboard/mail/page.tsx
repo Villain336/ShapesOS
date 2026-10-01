@@ -15,10 +15,10 @@ export default async function MailPage() {
   if (!user) redirect("/login");
   await getOrCreateWorkspace(user.id, user.email);
   return (
-    <div className="flex h-full flex-col gap-4 bg-[#FAFAF7] p-4 md:p-6">
+    <div className="flex h-full flex-col gap-4 bg-canvas p-4 md:p-6">
       <div>
-        <h1 className="text-xl font-bold tracking-tight text-stone-900">Direct Mail</h1>
-        <p className="mt-0.5 text-[13px] text-stone-500">
+        <h1 className="aos-heading">Direct Mail</h1>
+        <p className="mt-1 text-sm text-muted">
           Postcard and letter campaigns — a first-class nurture channel. Test mode by default; every
           piece needs a human approval binding creative, count, and max spend.
         </p>

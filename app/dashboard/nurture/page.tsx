@@ -15,10 +15,10 @@ export default async function NurturePage() {
   if (!user) redirect("/login");
   await getOrCreateWorkspace(user.id, user.email);
   return (
-    <div className="flex h-full flex-col gap-4 bg-[#FAFAF7] p-4 md:p-6">
+    <div className="flex h-full flex-col gap-4 bg-canvas p-4 md:p-6">
       <div>
-        <h1 className="text-xl font-bold tracking-tight text-stone-900">Nurture Sequences</h1>
-        <p className="mt-0.5 text-[13px] text-stone-500">
+        <h1 className="aos-heading">Nurture Sequences</h1>
+        <p className="mt-1 text-sm text-muted">
           Approval-gated drip sequences across SMS, email, voice, and direct mail. Every send requires a human approval —
           nothing auto-sends. The Broadcasts tab runs newsletter campaigns through the Listmonk email sidecar.
         </p>

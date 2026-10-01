@@ -1,103 +1,153 @@
-// Marketr — nurture UI primitives (light mode, dense, violet accents).
 "use client";
 
-import type { ReactNode } from "react";
-import { FileText, Mail, Mailbox, MessageCircle, Phone, X } from "lucide-react";
+import { useEffect, type ReactNode } from "react";
+import { X, Mail, MessageSquare, PhoneCall, Send } from "lucide-react";
 
-export type Tone = "violet" | "green" | "amber" | "red" | "blue" | "stone" | "zinc";
+// ── Agentic OS atoms ─────────────────────────────────────────────────────────
+// Visual migration only: same layout, same behavior. All workflow states
+// (sequence, enrollment, message, consent, broadcast states) render as neutral
+// chips — these are workflow states, not agent states, so they never take a
+// status color. The `tone` prop stays for call-site compatibility.
+// Genuine agent/approval states use the dedicated badges below
+// (RunningBadge / NeedsBadge / DoneBadge).
 
-const TONE_CLASSES: Record<Tone, string> = {
-  // "violet" is the legacy tone name — it resolves to the runtime brand vars
-  // (Phase 13 Wave A theming), NOT a hardcoded violet.
-  violet: "bg-brand-50 text-brand-700 border-violet-200",
-  green: "bg-emerald-50 text-emerald-700 border-emerald-200",
-  amber: "bg-amber-50 text-amber-700 border-amber-200",
-  red: "bg-red-50 text-red-700 border-red-200",
-  blue: "bg-sky-50 text-sky-700 border-sky-200",
-  stone: "bg-stone-100 text-stone-600 border-stone-200",
-  zinc: "bg-zinc-100 text-zinc-500 border-zinc-200",
+export const inputCls =
+  "w-full h-control-sm rounded-md border-[1.5px] border-control bg-paper px-3 text-sm text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none disabled:opacity-50";
+
+export const btnPrimary =
+  "inline-flex h-control-sm cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-night-hover focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--aos-focus-halo)] disabled:opacity-40";
+
+export const btnSecondary =
+  "inline-flex h-control-sm cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-paper px-4 text-sm font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--aos-focus-halo)] disabled:opacity-40";
+
+export const btnDanger =
+  "inline-flex h-control-sm cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-paper px-4 text-sm font-semibold text-failed-text aos-press shadow-[inset_0_0_0_1.5px_var(--aos-failed)] focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--aos-focus-halo)] disabled:opacity-40";
+
+export const btnApprove =
+  "inline-flex h-control-sm cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-done px-4 text-sm font-semibold text-white aos-press focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--aos-focus-halo)] disabled:opacity-40";
+
+/** Executes an approved action (irreversible send): running blue. */
+export const btnExecute =
+  "inline-flex h-control-sm cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-running px-4 text-sm font-semibold text-white aos-press hover:brightness-110 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--aos-focus-halo)] disabled:opacity-40";
+
+export type Tone = "stone" | "violet" | "green" | "amber" | "red" | "blue" | "zinc";
+
+// Workflow status → chip tone. Every workflow state maps to "stone": these
+// are workflow states, not agent states, so they always render neutral.
+export const SEQUENCE_STATUS_TONE: Record<string, Tone> = {
+  draft: "stone",
+  active: "stone",
+  paused: "stone",
+  archived: "stone",
 };
 
-export function Chip({ tone, children, title }: { tone: Tone; children: ReactNode; title?: string }) {
+export const ENROLL_STATUS_TONE: Record<string, Tone> = {
+  active: "stone",
+  paused: "stone",
+  completed: "stone",
+  unenrolled: "stone",
+  bounced: "stone",
+};
+
+export const MESSAGE_STATUS_TONE: Record<string, Tone> = {
+  queued: "stone",
+  sent: "stone",
+  delivered: "stone",
+  failed: "stone",
+  suppressed: "stone",
+};
+
+export const CONSENT_STATUS_TONE: Record<string, Tone> = {
+  unknown: "stone",
+  pending: "stone",
+  opted_in: "stone",
+  opted_out: "stone",
+};
+
+export const APPROVAL_STATUS_TONE: Record<string, Tone> = {
+  pending: "stone",
+  approved: "stone",
+  rejected: "stone",
+};
+
+export function Chip({
+  children,
+  tone = "stone",
+  title,
+}: {
+  children: ReactNode;
+  tone?: Tone;
+  title?: string;
+}) {
+  void tone;
   return (
     <span
       title={title}
-      className={`inline-flex shrink-0 items-center gap-1 rounded-full border px-1.5 py-px text-[11px] font-medium leading-4 ${TONE_CLASSES[tone]}`}
+      className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full bg-paper px-2 py-0.5 text-xs font-semibold text-muted shadow-control"
     >
       {children}
     </span>
   );
 }
 
-export function ChannelChip({ channel }: { channel: string }) {
-  const tone: Tone =
-    channel === "sms"
-      ? "green"
-      : channel === "email"
-        ? "blue"
-        : channel === "postcard" || channel === "letter"
-          ? "amber"
-          : "violet";
-  const Icon =
-    channel === "sms"
-      ? MessageCircle
-      : channel === "email"
-        ? Mail
-        : channel === "postcard"
-          ? Mailbox
-          : channel === "letter"
-            ? FileText
-            : Phone;
+/** Genuine agent state: an AI engine or enrichment run in progress. */
+export function RunningBadge({ children }: { children: ReactNode }) {
   return (
-    <Chip tone={tone}>
-      <Icon size={11} />
-      {channel}
-    </Chip>
+    <span className="inline-flex h-7 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full bg-running px-3 text-xs font-semibold text-white">
+      <span
+        className="aos-shape aos-shape--running aos-is-live"
+        style={{ color: "#fff" }}
+        role="img"
+        aria-label="Running"
+      />
+      {children}
+    </span>
   );
 }
 
-export const SEQUENCE_STATUS_TONE: Record<string, Tone> = {
-  draft: "stone",
-  active: "green",
-  paused: "amber",
-  archived: "zinc",
-};
+/** Genuine review state: a human must look at this (pending approval, cost estimate). */
+export function NeedsBadge({ children }: { children: ReactNode }) {
+  return (
+    <span className="inline-flex h-7 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full bg-needs px-3 text-xs font-semibold text-ink">
+      <span className="aos-shape aos-shape--needs aos-shape--edged" role="img" aria-label="Needs review" />
+      {children}
+    </span>
+  );
+}
 
-export const ENROLL_STATUS_TONE: Record<string, Tone> = {
-  active: "violet",
-  paused: "amber",
-  completed: "green",
-  unenrolled: "stone",
-  bounced: "red",
-};
+/** Genuine done state: a human approved this. */
+export function DoneBadge({ children }: { children: ReactNode }) {
+  return (
+    <span className="inline-flex h-7 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full bg-done px-3 text-xs font-semibold text-white">
+      <span className="aos-shape aos-shape--done" style={{ color: "#fff" }} role="img" aria-label="Done" />
+      {children}
+    </span>
+  );
+}
 
-export const MESSAGE_STATUS_TONE: Record<string, Tone> = {
-  queued: "amber",
-  sent: "blue",
-  delivered: "green",
-  failed: "red",
-  suppressed: "stone",
-};
-
-export const CONSENT_STATUS_TONE: Record<string, Tone> = {
-  opted_in: "green",
-  opted_out: "red",
-  pending: "amber",
-  unknown: "zinc",
-};
-
-export const APPROVAL_STATUS_TONE: Record<string, Tone> = {
-  pending: "amber",
-  approved: "green",
-  rejected: "red",
-  expired: "zinc",
-};
+export function ChannelChip({ channel }: { channel: string }) {
+  const Icon =
+    channel === "sms"
+      ? MessageSquare
+      : channel === "voice"
+        ? PhoneCall
+        : channel === "direct_mail"
+          ? Send
+          : Mail;
+  const label = channel === "direct_mail" ? "Mail" : channel;
+  return (
+    <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full bg-paper px-2 py-0.5 text-xs font-semibold text-muted shadow-control">
+      <Icon className="h-3 w-3" aria-hidden />
+      {label}
+    </span>
+  );
+}
 
 export function EmptyState({ title, hint }: { title: string; hint?: string }) {
   return (
-    <div className="rounded-[10px] border border-dashed border-stone-300 bg-white px-4 py-10 text-center">
-      <p className="text-[13px] font-medium text-stone-600">{title}</p>
-      {hint ? <p className="mt-1 text-[12px] text-stone-400">{hint}</p> : null}
+    <div className="rounded-lg border border-dashed border-line bg-paper px-4 py-10 text-center">
+      <p className="text-sm font-semibold text-ink">{title}</p>
+      {hint ? <p className="mt-1 text-xs text-muted">{hint}</p> : null}
     </div>
   );
 }
@@ -113,16 +163,32 @@ export function Modal({
   children: ReactNode;
   wide?: boolean;
 }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/30 p-4 pt-[8vh]" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-ink/30 p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-label={title}
+    >
       <div
-        className={`w-full rounded-xl border border-stone-200 bg-white shadow-xl ${wide ? "max-w-3xl" : "max-w-xl"}`}
-        onClick={(e) => e.stopPropagation()}
+        className={`max-h-[90vh] w-full ${wide ? "max-w-4xl" : "max-w-md"} overflow-y-auto rounded-lg border border-line bg-paper shadow-overlay`}
       >
-        <div className="flex items-center justify-between border-b border-stone-200 px-4 py-2.5">
-          <h3 className="text-[14px] font-semibold text-stone-900">{title}</h3>
-          <button onClick={onClose} className="rounded p-1 text-stone-400 hover:bg-stone-100 hover:text-stone-700" aria-label="Close">
-            <X size={16} />
+        <div className="flex items-center justify-between border-b border-line px-4 py-3">
+          <h2 className="aos-subheading">{title}</h2>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="rounded-full p-1.5 text-muted transition-colors hover:bg-hover-paper hover:text-ink"
+          >
+            <X className="h-4 w-4" aria-hidden />
           </button>
         </div>
         <div className="p-4">{children}</div>
@@ -130,15 +196,3 @@ export function Modal({
     </div>
   );
 }
-
-export const inputCls =
-  "w-full rounded-md border border-stone-300 bg-white px-2 py-1.5 text-[13px] text-stone-900 placeholder:text-stone-400 focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500";
-
-export const btnPrimary =
-  "inline-flex items-center gap-1.5 rounded-md bg-brand-600 px-2.5 py-1.5 text-[13px] font-medium text-white hover:bg-brand-700 disabled:opacity-50";
-
-export const btnSecondary =
-  "inline-flex items-center gap-1.5 rounded-md border border-stone-300 bg-white px-2.5 py-1.5 text-[13px] font-medium text-stone-700 hover:bg-stone-50 disabled:opacity-50";
-
-export const btnDanger =
-  "inline-flex items-center gap-1.5 rounded-md border border-red-200 bg-white px-2.5 py-1.5 text-[13px] font-medium text-red-700 hover:bg-red-50 disabled:opacity-50";

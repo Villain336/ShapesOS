@@ -7,7 +7,6 @@
 // app/api/mail/approvals/[id]) and the R3 nurture ledger
 // (/api/mail-nurture/pieces, backed by T1's tables). Studio creative picker
 // uses Track T2's /api/studio/creatives.
-"use client";
 
 import { useCallback, useEffect, useState } from "react";
 import {
@@ -45,50 +44,48 @@ async function api<T>(url: string, opts?: RequestInit): Promise<T> {
 }
 
 // ---------------------------------------------------------------------------
-// Shared bits
+// Agentic OS atoms
 // ---------------------------------------------------------------------------
+// Visual migration only: same layout, same behavior. Campaign, piece,
+// verification, and approval statuses are workflow states, so every chip
+// renders neutral — these are never agent states. Approval decisions and
+// sends keep their dedicated actions: approve (done), reject (deny),
+// request approval (needs review), send (execute — irreversible).
 
 function StatusChip({ status }: { status: string }) {
-  const tone =
-    status === "delivered" || status === "complete" || status === "approved" || status === "valid"
-      ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-      : status === "sent" || status === "sending" || status === "corrected"
-        ? "bg-sky-50 text-sky-700 border-sky-200"
-        : status === "failed" || status === "rejected" || status === "cancelled" || status === "quarantined"
-          ? "bg-red-50 text-red-700 border-red-200"
-          : status === "queued" || status === "pending_approval" || status === "pending" || status === "draft"
-            ? "bg-amber-50 text-amber-700 border-amber-200"
-            : status === "suppressed"
-              ? "bg-stone-100 text-stone-500 border-stone-200"
-              : "bg-zinc-100 text-zinc-500 border-zinc-200";
   return (
-    <span className={`inline-flex items-center rounded-full border px-1.5 py-px text-[11px] font-medium ${tone}`}>
+    <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-paper px-1.5 py-0.5 text-[11px] font-medium leading-tight text-muted shadow-control">
       {status}
     </span>
   );
 }
 
 function VerifyChip({ status }: { status: string | null }) {
-  if (!status) return <span className="text-[12px] text-stone-400">—</span>;
+  if (!status) return <span className="text-[12px] text-subtle">—</span>;
   const ok = status === "valid" || status === "corrected";
   return (
-    <span
-      className={`inline-flex items-center gap-1 rounded-full border px-1.5 py-px text-[11px] font-medium ${
-        ok ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-red-50 text-red-700 border-red-200"
-      }`}
-    >
-      {ok ? <BadgeCheck size={11} /> : <AlertTriangle size={11} />}
+    <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-paper px-1.5 py-0.5 text-[11px] font-medium leading-tight text-muted shadow-control">
+      {ok ? <BadgeCheck size={11} className="text-ink" /> : <AlertTriangle size={11} className="text-ink" />}
       {status}
     </span>
   );
 }
 
 const inputCls =
-  "w-full rounded-md border border-stone-300 bg-white px-2.5 py-1.5 text-[13px] text-stone-900 placeholder:text-stone-400 focus:border-violet-500 focus:outline-none";
+  "w-full h-control-sm rounded-md border-[1.5px] border-control bg-paper px-3 text-sm text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none disabled:opacity-50";
 const btnPrimary =
-  "inline-flex items-center gap-1.5 rounded-md bg-violet-600 px-3 py-1.5 text-[13px] font-medium text-white hover:bg-violet-700 disabled:opacity-50";
+  "inline-flex h-control-sm cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-night-hover focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--aos-focus-halo)] disabled:opacity-40";
 const btnSecondary =
-  "inline-flex items-center gap-1.5 rounded-md border border-stone-300 bg-white px-3 py-1.5 text-[13px] font-medium text-stone-700 hover:bg-stone-50 disabled:opacity-50";
+  "inline-flex h-control-sm cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-paper px-4 text-sm font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--aos-focus-halo)] disabled:opacity-40";
+const btnDanger =
+  "inline-flex h-control-sm cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-paper px-4 text-sm font-semibold text-failed-text aos-press shadow-[inset_0_0_0_1.5px_var(--aos-failed)] focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--aos-focus-halo)] disabled:opacity-40";
+const btnApprove =
+  "inline-flex h-control-sm cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-done px-4 text-sm font-semibold text-white aos-press focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--aos-focus-halo)] disabled:opacity-40";
+const btnReview =
+  "inline-flex h-control-sm cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-needs px-4 text-sm font-semibold text-ink aos-press hover:brightness-95 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--aos-focus-halo)] disabled:opacity-40";
+/** Executes an approved action (irreversible send): running blue. */
+const btnExecute =
+  "inline-flex h-control-sm cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-running px-4 text-sm font-semibold text-white aos-press hover:brightness-110 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--aos-focus-halo)] disabled:opacity-40";
 
 function fmtDate(iso: string | null): string {
   if (!iso) return "—";
@@ -102,7 +99,12 @@ function money(cents: number | null | undefined): string {
 
 function ErrorBox({ message }: { message: string | null }) {
   if (!message) return null;
-  return <div className="rounded-md border border-red-200 bg-red-50 p-2.5 text-[13px] text-red-700">{message}</div>;
+  return (
+    <div className="flex items-start gap-2 rounded-md bg-failed-tint p-2.5 text-[13px] text-failed-text">
+      <span className="aos-shape aos-shape--failed mt-0.5 shrink-0" role="img" aria-label="Error" />
+      <span>{message}</span>
+    </div>
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -211,50 +213,50 @@ function CampaignsTab({ onNew }: { onNew: () => void }) {
       <div className="space-y-3">
         <button className={btnSecondary} onClick={() => setDetail(null)}><ArrowLeft size={14} /> All campaigns</button>
         <ErrorBox message={error} />
-        <div className="rounded-[10px] border border-stone-200 bg-white p-4">
+        <div className="rounded-lg bg-paper p-4 shadow-hairline">
           <div className="flex flex-wrap items-center gap-2">
-            <h2 className="text-[15px] font-semibold text-stone-900">{campaign.name}</h2>
+            <h2 className="text-[15px] font-semibold text-ink">{campaign.name}</h2>
             <StatusChip status={campaign.status} />
-            <span className="ml-auto text-[12px] text-stone-500">
+            <span className="ml-auto text-[12px] text-muted">
               {campaign.pieceCount ?? 0} pieces · est {money(campaign.estCostCents)}
               {campaign.actualCostCents != null ? ` · actual ${money(campaign.actualCostCents)}` : ""}
             </span>
           </div>
-          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[12px] text-stone-500">
+          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[12px] text-muted">
             <span>Creative: {campaign.creative ? `${campaign.creative.name} (${campaign.creative.size}, ${campaign.creative.status})` : "—"}</span>
             <span>Provider: {campaign.provider ? `${campaign.provider.provider} (${campaign.provider.mode})` : "fake (test)"}</span>
             {campaign.inHomeStart ? <span>In-home: {fmtDate(campaign.inHomeStart)} – {fmtDate(campaign.inHomeEnd ?? null)}</span> : null}
           </div>
           <div className="mt-2 flex flex-wrap gap-2 text-[12px]">
-            <span className="text-stone-500">Pieces:</span>
+            <span className="text-muted">Pieces:</span>
             {Object.entries(pieces).map(([s, n]) => (
               <span key={s} className="inline-flex items-center gap-1"><StatusChip status={s} />{n}</span>
             ))}
-            <span className="ml-3 text-stone-500">Verification:</span>
+            <span className="ml-3 text-muted">Verification:</span>
             {Object.entries(verification).map(([s, n]) => (
               <span key={s} className="inline-flex items-center gap-1"><VerifyChip status={s} />{n}</span>
             ))}
           </div>
         </div>
 
-        <div className="rounded-[10px] border border-stone-200 bg-white p-4">
-          <h3 className="mb-2 text-[13px] font-semibold text-stone-900">Approvals</h3>
+        <div className="rounded-lg bg-paper p-4 shadow-hairline">
+          <h3 className="mb-2 text-[13px] font-semibold text-ink">Approvals</h3>
           {!latestApproval ? (
-            <div className="text-[13px] text-stone-500">No approval requested yet — use the builder or request one from the campaign.</div>
+            <div className="text-[13px] text-muted">No approval requested yet — use the builder or request one from the campaign.</div>
           ) : (
             <div className="space-y-2">
               {campaign.approvals.map((a) => (
-                <div key={a.id} className="flex flex-wrap items-center gap-2 rounded-md border border-stone-100 bg-stone-50 p-2.5 text-[13px]">
+                <div key={a.id} className="flex flex-wrap items-center gap-2 rounded-md border border-line bg-canvas p-2.5 text-[13px]">
                   <StatusChip status={a.status} />
-                  <span className="text-stone-600">{a.pieceCount} pieces · max {money(a.maxSpendCents)}</span>
-                  <span className="font-mono text-[11px] text-stone-400">hash {a.creativeHash?.slice(0, 12) ?? "—"}</span>
-                  {a.decidedAt ? <span className="text-[12px] text-stone-400">decided {fmtDate(a.decidedAt)}</span> : null}
+                  <span className="text-muted">{a.pieceCount} pieces · max {money(a.maxSpendCents)}</span>
+                  <span className="aos-mono text-[11px] text-subtle">hash {a.creativeHash?.slice(0, 12) ?? "—"}</span>
+                  {a.decidedAt ? <span className="text-[12px] text-subtle">decided {fmtDate(a.decidedAt)}</span> : null}
                   {a.status === "pending" ? (
                     <span className="ml-auto flex gap-2">
-                      <button className={btnPrimary} disabled={busy} onClick={() => decide(a.id, "approve")}>
+                      <button className={btnApprove} disabled={busy} onClick={() => decide(a.id, "approve")}>
                         <Check size={14} /> Approve
                       </button>
-                      <button className={btnSecondary} disabled={busy} onClick={() => decide(a.id, "reject")}>
+                      <button className={btnDanger} disabled={busy} onClick={() => decide(a.id, "reject")}>
                         <X size={14} /> Reject
                       </button>
                     </span>
@@ -262,7 +264,7 @@ function CampaignsTab({ onNew }: { onNew: () => void }) {
                 </div>
               ))}
               {campaign.status === "approved" ? (
-                <button className={btnPrimary} disabled={busy} onClick={() => send(campaign.id)}>
+                <button className={btnExecute} disabled={busy} onClick={() => send(campaign.id)}>
                   <Truck size={14} /> Send now
                 </button>
               ) : null}
@@ -276,40 +278,40 @@ function CampaignsTab({ onNew }: { onNew: () => void }) {
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <div className="text-[13px] text-stone-500">
+        <div className="text-[13px] text-muted">
           Standalone mail campaigns — bulk sends with C3 approval binding creative hash, piece count, and max spend.
         </div>
         <button className={btnPrimary} onClick={onNew}><Plus size={14} /> New campaign</button>
       </div>
       <ErrorBox message={error} />
       {campaigns === null && !error ? (
-        <div className="flex items-center gap-2 p-6 text-[13px] text-stone-500"><Loader2 size={14} className="animate-spin" /> Loading…</div>
+        <div className="flex items-center gap-2 p-6 text-[13px] text-muted"><Loader2 size={14} className="aos-spin" /> Loading…</div>
       ) : (campaigns ?? []).length === 0 ? (
-        <div className="rounded-[10px] border border-dashed border-stone-300 bg-white p-8 text-center">
-          <Mailbox size={22} className="mx-auto text-stone-300" />
-          <div className="mt-2 text-[14px] font-medium text-stone-700">No campaigns yet</div>
-          <div className="mt-1 text-[13px] text-stone-500">Run the builder wizard to verify an audience, pick creative, and get an estimate.</div>
+        <div className="rounded-lg border border-dashed border-line bg-paper p-8 text-center">
+          <Mailbox size={22} className="mx-auto text-subtle" />
+          <div className="mt-2 text-[14px] font-medium text-ink">No campaigns yet</div>
+          <div className="mt-1 text-[13px] text-muted">Run the builder wizard to verify an audience, pick creative, and get an estimate.</div>
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-[10px] border border-stone-200 bg-white">
+        <div className="overflow-x-auto rounded-lg bg-paper shadow-hairline">
           <table className="w-full min-w-[680px] text-left text-[13px]">
             <thead>
-              <tr className="border-b border-stone-100 bg-stone-50/60 text-[11px] uppercase tracking-wide text-stone-500">
-                <th className="px-3 py-2 font-medium">Campaign</th>
-                <th className="px-3 py-2 font-medium">Status</th>
-                <th className="px-3 py-2 font-medium">Pieces</th>
-                <th className="px-3 py-2 font-medium">Est. cost</th>
-                <th className="px-3 py-2 font-medium">Created</th>
+              <tr className="border-b border-line text-xs font-semibold text-muted">
+                <th className="px-3 py-2">Campaign</th>
+                <th className="px-3 py-2">Status</th>
+                <th className="px-3 py-2">Pieces</th>
+                <th className="px-3 py-2">Est. cost</th>
+                <th className="px-3 py-2">Created</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-stone-100">
+            <tbody>
               {(campaigns ?? []).map((c) => (
-                <tr key={c.id} className="cursor-pointer border-b border-stone-100 last:border-0 hover:bg-violet-50/40" onClick={() => openDetail(c.id)}>
-                  <td className="px-3 py-2 font-medium text-stone-900">{c.name}</td>
+                <tr key={c.id} className="cursor-pointer border-b border-line last:border-0 hover:bg-hover-paper" onClick={() => openDetail(c.id)}>
+                  <td className="px-3 py-2 font-medium text-ink">{c.name}</td>
                   <td className="px-3 py-2"><StatusChip status={c.status} /></td>
-                  <td className="px-3 py-2 text-stone-600">{c.pieceCount ?? "—"}</td>
-                  <td className="px-3 py-2 text-stone-600">{money(c.estCostCents)}</td>
-                  <td className="px-3 py-2 text-[12px] text-stone-500">{fmtDate(c.createdAt ?? null)}</td>
+                  <td className="px-3 py-2 text-muted">{c.pieceCount ?? "—"}</td>
+                  <td className="px-3 py-2 text-muted">{money(c.estCostCents)}</td>
+                  <td className="px-3 py-2 text-[12px] text-muted">{fmtDate(c.createdAt ?? null)}</td>
                 </tr>
               ))}
             </tbody>
@@ -368,7 +370,7 @@ function PiecesTab() {
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <div className="text-[13px] text-stone-500">
+        <div className="text-[13px] text-muted">
           Mail pieces queued by nurture sequences — consent, caps, verification, C3 approval, and metering,
           with date-based in-home windows instead of quiet hours. Each piece is one T1 campaign.
         </div>
@@ -376,56 +378,56 @@ function PiecesTab() {
       </div>
       <ErrorBox message={error} />
       {pieces === null && !error ? (
-        <div className="flex items-center gap-2 p-6 text-[13px] text-stone-500"><Loader2 size={14} className="animate-spin" /> Loading…</div>
+        <div className="flex items-center gap-2 p-6 text-[13px] text-muted"><Loader2 size={14} className="aos-spin" /> Loading…</div>
       ) : (
-        <div className="overflow-x-auto rounded-[10px] border border-stone-200 bg-white">
+        <div className="overflow-x-auto rounded-lg bg-paper shadow-hairline">
           <table className="w-full min-w-[980px] text-left text-[13px]">
             <thead>
-              <tr className="border-b border-stone-100 bg-stone-50/60 text-[11px] uppercase tracking-wide text-stone-500">
-                <th className="px-3 py-2 font-medium">Lead</th>
-                <th className="px-3 py-2 font-medium">Channel</th>
-                <th className="px-3 py-2 font-medium">Status</th>
-                <th className="px-3 py-2 font-medium">Verification</th>
-                <th className="px-3 py-2 font-medium">QR slug</th>
-                <th className="px-3 py-2 font-medium">Mail date</th>
-                <th className="px-3 py-2 font-medium">In-home</th>
-                <th className="px-3 py-2 font-medium">Provider piece</th>
-                <th className="px-3 py-2 font-medium">Cost</th>
+              <tr className="border-b border-line text-xs font-semibold text-muted">
+                <th className="px-3 py-2">Lead</th>
+                <th className="px-3 py-2">Channel</th>
+                <th className="px-3 py-2">Status</th>
+                <th className="px-3 py-2">Verification</th>
+                <th className="px-3 py-2">QR slug</th>
+                <th className="px-3 py-2">Mail date</th>
+                <th className="px-3 py-2">In-home</th>
+                <th className="px-3 py-2">Provider piece</th>
+                <th className="px-3 py-2">Cost</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-stone-100">
+            <tbody>
               {(pieces ?? []).map((p) => (
-                <tr key={p.pieceId} className="border-b border-stone-100 last:border-0 hover:bg-violet-50/40">
+                <tr key={p.pieceId} className="border-b border-line last:border-0 hover:bg-hover-paper">
                   <td className="px-3 py-2">
-                    <div className="font-medium text-stone-900">{p.leadName ?? "—"}</div>
-                    <div className="text-[12px] text-stone-500">{p.stepIndex != null ? `step ${p.stepIndex + 1}` : p.campaignName}</div>
+                    <div className="font-medium text-ink">{p.leadName ?? "—"}</div>
+                    <div className="text-[12px] text-muted">{p.stepIndex != null ? `step ${p.stepIndex + 1}` : p.campaignName}</div>
                   </td>
                   <td className="px-3 py-2">
-                    <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-1.5 py-px text-[11px] font-medium text-amber-700">
+                    <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-paper px-1.5 py-px text-[11px] font-medium text-muted shadow-control">
                       {p.channel === "postcard" ? <Mailbox size={11} /> : <FileText size={11} />}{p.channel ?? "—"}
                     </span>
                   </td>
                   <td className="px-3 py-2">
                     <StatusChip status={p.pieceStatus} />
-                    {p.suppressionReason ? <div className="mt-0.5 text-[11px] text-stone-400">{p.suppressionReason}</div> : null}
-                    {p.approvalStatus ? <div className="mt-0.5 text-[11px] text-stone-400">approval: {p.approvalStatus}</div> : null}
+                    {p.suppressionReason ? <div className="mt-0.5 text-[11px] text-subtle">{p.suppressionReason}</div> : null}
+                    {p.approvalStatus ? <div className="mt-0.5 text-[11px] text-subtle">approval: {p.approvalStatus}</div> : null}
                   </td>
                   <td className="px-3 py-2"><VerifyChip status={p.verificationStatus} /></td>
-                  <td className="px-3 py-2 font-mono text-[12px] text-stone-600">{p.qrSlug ?? "—"}</td>
-                  <td className="px-3 py-2 text-[12px] text-stone-600">{fmtDate(p.mailDate)}</td>
-                  <td className="px-3 py-2 text-[12px] text-stone-600">
+                  <td className="px-3 py-2 aos-mono text-[12px] text-muted">{p.qrSlug ?? "—"}</td>
+                  <td className="px-3 py-2 text-[12px] text-muted">{fmtDate(p.mailDate)}</td>
+                  <td className="px-3 py-2 text-[12px] text-muted">
                     {p.inHomeStart && p.inHomeEnd ? `${fmtDate(p.inHomeStart)} – ${fmtDate(p.inHomeEnd)}` : "—"}
                   </td>
-                  <td className="px-3 py-2 font-mono text-[12px] text-stone-600">{p.providerPieceId ?? "—"}</td>
-                  <td className="px-3 py-2 text-stone-600">{money(p.costCents)}</td>
+                  <td className="px-3 py-2 aos-mono text-[12px] text-muted">{p.providerPieceId ?? "—"}</td>
+                  <td className="px-3 py-2 text-muted">{money(p.costCents)}</td>
                 </tr>
               ))}
               {(pieces ?? []).length === 0 ? (
                 <tr>
                   <td colSpan={9} className="px-3 py-8 text-center">
-                    <Truck size={22} className="mx-auto text-stone-300" />
-                    <div className="mt-2 text-[14px] font-medium text-stone-700">No mail pieces yet</div>
-                    <div className="mt-1 text-[13px] text-stone-500">Add a postcard or letter step to a nurture sequence — pieces appear here after the approval gate.</div>
+                    <Truck size={22} className="mx-auto text-subtle" />
+                    <div className="mt-2 text-[14px] font-medium text-ink">No mail pieces yet</div>
+                    <div className="mt-1 text-[13px] text-muted">Add a postcard or letter step to a nurture sequence — pieces appear here after the approval gate.</div>
                   </td>
                 </tr>
               ) : null}
@@ -601,32 +603,32 @@ function BuilderWizard() {
               onClick={() => (campaignId && i <= step ? setStep(i) : null)}
               className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[12px] font-medium ${
                 i === step
-                  ? "border-violet-300 bg-violet-50 text-violet-700"
+                  ? "border-ink bg-ink text-white"
                   : i < step
-                    ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                    : "border-stone-200 bg-white text-stone-400"
+                    ? "border-line bg-paper text-ink"
+                    : "border-line bg-paper text-subtle"
               }`}
             >
-              {i < step ? <Check size={12} /> : <span className="text-[11px]">{i + 1}</span>}
+              {i < step ? <Check size={12} className="text-ink" /> : <span className="text-[11px]">{i + 1}</span>}
               {s}
             </button>
-            {i < WIZARD_STEPS.length - 1 ? <ChevronRight size={13} className="mx-0.5 text-stone-300" /> : null}
+            {i < WIZARD_STEPS.length - 1 ? <ChevronRight size={13} className="mx-0.5 text-subtle" /> : null}
           </div>
         ))}
       </div>
 
-      <div className="rounded-[10px] border border-stone-200 bg-white p-4">
+      <div className="rounded-lg bg-paper p-4 shadow-hairline">
         <ErrorBox message={error} />
 
         {step === 0 ? (
           <div className="max-w-[560px] space-y-3">
-            <h2 className="text-[15px] font-semibold text-stone-900">Audience</h2>
+            <h2 className="text-[15px] font-semibold text-ink">Audience</h2>
             <div>
-              <label className="mb-1 block text-[12px] font-medium text-stone-600">Campaign name</label>
+              <label className="mb-1 block text-xs font-semibold text-muted">Campaign name</label>
               <input className={inputCls} value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Q4 win-back postcard" />
             </div>
             <div>
-              <label className="mb-1 block text-[12px] font-medium text-stone-600">Audience source</label>
+              <label className="mb-1 block text-xs font-semibold text-muted">Audience source</label>
               <select className={inputCls} value={audKind} onChange={(e) => setAudKind(e.target.value as typeof audKind)}>
                 <option value="csv">Paste addresses (CSV)</option>
                 <option value="crm_segment">CRM segment</option>
@@ -635,30 +637,30 @@ function BuilderWizard() {
             </div>
             {audKind === "csv" ? (
               <div>
-                <label className="mb-1 block text-[12px] font-medium text-stone-600">
+                <label className="mb-1 block text-xs font-semibold text-muted">
                   Addresses — one per line: Name | Street | City | ST | ZIP
                 </label>
                 <textarea
-                  className={`${inputCls} min-h-[120px] font-mono text-[12px]`}
+                  className={`${inputCls} min-h-[120px] aos-mono text-[12px]`}
                   value={csvText}
                   onChange={(e) => setCsvText(e.target.value)}
                   placeholder={"Jane Doe | 123 Main St | Greensboro | NC | 27401"}
                 />
-                <div className="mt-1 text-[12px] text-stone-500">{parseCsvRows(csvText).length} usable rows</div>
+                <div className="mt-1 text-[12px] text-muted">{parseCsvRows(csvText).length} usable rows</div>
               </div>
             ) : (
               <div>
-                <label className="mb-1 block text-[12px] font-medium text-stone-600">
+                <label className="mb-1 block text-xs font-semibold text-muted">
                   {audKind === "crm_segment" ? "Segment filters (JSON)" : "Prospect list ID"}
                 </label>
                 <input className={inputCls} value={audRef} onChange={(e) => setAudRef(e.target.value)} placeholder={audKind === "crm_segment" ? '{"minScore": 50, "limit": 500}' : "list id"} />
               </div>
             )}
             <button className={btnPrimary} disabled={!name.trim() || !audienceValid || busy} onClick={createCampaign}>
-              {busy ? <Loader2 size={14} className="animate-spin" /> : <ArrowRight size={14} />} Create draft + build pieces
+              {busy ? <Loader2 size={14} className="aos-spin" /> : <ArrowRight size={14} />} Create draft + build pieces
             </button>
             {audienceRes ? (
-              <div className="text-[13px] text-stone-600">
+              <div className="text-[13px] text-muted">
                 Built {audienceRes.created} pieces ({audienceRes.skippedNoAddress} skipped — no address).
               </div>
             ) : null}
@@ -667,20 +669,20 @@ function BuilderWizard() {
 
         {step === 1 ? (
           <div className="max-w-[520px] space-y-3">
-            <h2 className="text-[15px] font-semibold text-stone-900">Verify addresses</h2>
-            <p className="text-[13px] text-stone-500">
+            <h2 className="text-[15px] font-semibold text-ink">Verify addresses</h2>
+            <p className="text-[13px] text-muted">
               Runs pieces through provider address verification (CASS). Unverifiable addresses are
               quarantined — never silently mailed. NCOA-changed addresses come back corrected.
             </p>
             {verifyRes ? (
               <div className="flex flex-wrap gap-2 text-[13px]">
-                <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 font-medium text-emerald-700"><BadgeCheck size={12} /> {verifyRes.valid} valid</span>
-                <span className="inline-flex items-center gap-1 rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 font-medium text-sky-700"><BadgeCheck size={12} /> {verifyRes.corrected} corrected</span>
-                <span className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-2 py-0.5 font-medium text-red-700"><AlertTriangle size={12} /> {verifyRes.quarantined} quarantined</span>
+                <span className="inline-flex items-center gap-1 rounded-full bg-paper px-2 py-0.5 font-medium text-muted shadow-control"><BadgeCheck size={12} className="text-ink" /> {verifyRes.valid} valid</span>
+                <span className="inline-flex items-center gap-1 rounded-full bg-paper px-2 py-0.5 font-medium text-muted shadow-control"><BadgeCheck size={12} className="text-ink" /> {verifyRes.corrected} corrected</span>
+                <span className="inline-flex items-center gap-1 rounded-full bg-paper px-2 py-0.5 font-medium text-muted shadow-control"><AlertTriangle size={12} className="text-ink" /> {verifyRes.quarantined} quarantined</span>
               </div>
             ) : (
               <button className={btnPrimary} disabled={busy} onClick={verifyAudience}>
-                {busy ? <Loader2 size={14} className="animate-spin" /> : null} Run verification
+                {busy ? <Loader2 size={14} className="aos-spin" /> : null} Run verification
               </button>
             )}
             {verifyRes ? <button className={btnPrimary} onClick={() => setStep(2)}>Continue <ArrowRight size={14} /></button> : null}
@@ -689,13 +691,13 @@ function BuilderWizard() {
 
         {step === 2 ? (
           <div className="max-w-[520px] space-y-3">
-            <h2 className="text-[15px] font-semibold text-stone-900">Creative</h2>
-            <p className="text-[13px] text-stone-500">
+            <h2 className="text-[15px] font-semibold text-ink">Creative</h2>
+            <p className="text-[13px] text-muted">
               Pick print-ready creative from the Studio (Track T2). The creative hash is bound to the
               approval — the piece cannot send if the creative changes afterwards.
             </p>
             <div>
-              <label className="mb-1 block text-[12px] font-medium text-stone-600">Studio creative</label>
+              <label className="mb-1 block text-xs font-semibold text-muted">Studio creative</label>
               <select className={inputCls} value={creativeId} onChange={(e) => setCreativeId(e.target.value)}>
                 <option value="">Select a creative…</option>
                 {(creatives ?? []).map((c) => (
@@ -705,44 +707,44 @@ function BuilderWizard() {
                 ))}
               </select>
               {creatives !== null && creatives.length === 0 ? (
-                <div className="mt-1 text-[12px] text-stone-400">No addressed-format creatives in the Studio yet.</div>
+                <div className="mt-1 text-[12px] text-subtle">No addressed-format creatives in the Studio yet.</div>
               ) : null}
             </div>
             <button className={btnPrimary} disabled={busy || !creativeId} onClick={saveCreative}>
-              {busy ? <Loader2 size={14} className="animate-spin" /> : null} Save creative <ArrowRight size={14} />
+              {busy ? <Loader2 size={14} className="aos-spin" /> : null} Save creative <ArrowRight size={14} />
             </button>
           </div>
         ) : null}
 
         {step === 3 ? (
           <div className="max-w-[520px] space-y-3">
-            <h2 className="text-[15px] font-semibold text-stone-900">Cost estimate</h2>
-            <p className="text-[13px] text-stone-500">
+            <h2 className="text-[15px] font-semibold text-ink">Cost estimate</h2>
+            <p className="text-[13px] text-muted">
               Provider cost for {estimate?.sendablePieces ?? "…"} sendable pieces
               {estimate && estimate.pendingVerifications > 0 ? ` (${estimate.pendingVerifications} still unverified)` : ""}.
             </p>
             {estimate ? (
               <table className="w-full text-left text-[13px]">
-                <tbody className="divide-y divide-stone-100">
+                <tbody>
                   {estimate.lineItems.map((l) => (
                     <tr key={l.label}>
-                      <td className="py-1.5 text-stone-700">{l.label}{l.quantity ? <span className="text-stone-400"> × {l.quantity}</span> : null}</td>
-                      <td className="py-1.5 text-right font-medium text-stone-900">{money(l.cents)}</td>
+                      <td className="py-1.5 text-ink">{l.label}{l.quantity ? <span className="text-subtle"> × {l.quantity}</span> : null}</td>
+                      <td className="py-1.5 text-right font-medium text-ink">{money(l.cents)}</td>
                     </tr>
                   ))}
                   <tr>
-                    <td className="py-1.5 text-stone-600">Hosted margin preview</td>
-                    <td className="py-1.5 text-right text-stone-600">{money(estimate.marginPreviewCents)}</td>
+                    <td className="py-1.5 text-muted">Hosted margin preview</td>
+                    <td className="py-1.5 text-right text-muted">{money(estimate.marginPreviewCents)}</td>
                   </tr>
                   <tr>
-                    <td className="py-1.5 font-semibold text-stone-900">Max spend (approval binds this)</td>
-                    <td className="py-1.5 text-right font-semibold text-stone-900">{money(estimate.totalWithMarginCents)}</td>
+                    <td className="py-1.5 font-semibold text-ink">Max spend (approval binds this)</td>
+                    <td className="py-1.5 text-right font-semibold text-ink">{money(estimate.totalWithMarginCents)}</td>
                   </tr>
                 </tbody>
               </table>
             ) : (
               <button className={btnPrimary} disabled={busy} onClick={getEstimate}>
-                {busy ? <Loader2 size={14} className="animate-spin" /> : null} Get estimate
+                {busy ? <Loader2 size={14} className="aos-spin" /> : null} Get estimate
               </button>
             )}
             {estimate ? <button className={btnPrimary} onClick={() => setStep(4)}>Continue <ArrowRight size={14} /></button> : null}
@@ -751,8 +753,8 @@ function BuilderWizard() {
 
         {step === 4 ? (
           <div className="max-w-[520px] space-y-3">
-            <h2 className="text-[15px] font-semibold text-stone-900">C3 approval</h2>
-            <p className="text-[13px] text-stone-500">
+            <h2 className="text-[15px] font-semibold text-ink">C3 approval</h2>
+            <p className="text-[13px] text-muted">
               A human approves the audience, creative hash, exact piece count, and max spend. No live send
               without this — test mode until then.
             </p>
@@ -760,23 +762,23 @@ function BuilderWizard() {
               <div className="space-y-2">
                 <div className="flex items-center gap-2 text-[13px]">
                   <StatusChip status={approval.status} />
-                  <span className="text-stone-600">max {money(approval.maxSpendCents)}</span>
-                  <span className="font-mono text-[12px] text-stone-500">{approval.id.slice(-8)}</span>
+                  <span className="text-muted">max {money(approval.maxSpendCents)}</span>
+                  <span className="aos-mono text-[12px] text-muted">{approval.id.slice(-8)}</span>
                 </div>
                 {approval.status === "pending" ? (
                   <div className="flex gap-2">
-                    <button className={btnPrimary} disabled={busy} onClick={() => decide("approve")}>
+                    <button className={btnApprove} disabled={busy} onClick={() => decide("approve")}>
                       <Check size={14} /> Approve
                     </button>
-                    <button className={btnSecondary} disabled={busy} onClick={() => decide("reject")}>
+                    <button className={btnDanger} disabled={busy} onClick={() => decide("reject")}>
                       <X size={14} /> Reject
                     </button>
                   </div>
                 ) : null}
               </div>
             ) : (
-              <button className={btnPrimary} disabled={busy} onClick={requestApproval}>
-                {busy ? <Loader2 size={14} className="animate-spin" /> : <ShieldCheck size={14} />} Request approval
+              <button className={btnReview} disabled={busy} onClick={requestApproval}>
+                {busy ? <Loader2 size={14} className="aos-spin" /> : <ShieldCheck size={14} />} Request approval
               </button>
             )}
             {approval?.status === "approved" ? <button className={btnPrimary} onClick={() => setStep(5)}>Continue <ArrowRight size={14} /></button> : null}
@@ -785,19 +787,19 @@ function BuilderWizard() {
 
         {step === 5 ? (
           <div className="max-w-[520px] space-y-3">
-            <h2 className="text-[15px] font-semibold text-stone-900">Send</h2>
-            <div className="rounded-md border border-violet-200 bg-violet-50 p-2.5 text-[13px] text-violet-800">
+            <h2 className="text-[15px] font-semibold text-ink">Send</h2>
+            <div className="rounded-md bg-canvas p-2.5 text-[13px] text-muted">
               Test mode — pieces are rendered, never physically mailed. Live sends need a provider row in
               live mode plus an approved campaign.
             </div>
             {sendRes ? (
-              <div className="text-[13px] text-stone-700">
+              <div className="text-[13px] text-ink">
                 Sent {sendRes.sent} · suppressed {sendRes.suppressed} · failed {sendRes.failed} · spend {money(sendRes.spendCents)}
                 {sendRes.renderedOnly ? " (rendered only)" : null}
               </div>
             ) : (
-              <button className={btnPrimary} disabled={busy || approval?.status !== "approved"} onClick={send}>
-                {busy ? <Loader2 size={14} className="animate-spin" /> : null} Send campaign
+              <button className={btnExecute} disabled={busy || approval?.status !== "approved"} onClick={send}>
+                {busy ? <Loader2 size={14} className="aos-spin" /> : null} Send campaign
               </button>
             )}
           </div>
@@ -818,15 +820,15 @@ export function MailApp() {
   ];
   return (
     <div className="flex h-full flex-col gap-3">
-      <div className="mb-4 flex gap-1 border-b border-stone-200">
+      <div className="mb-4 flex gap-1 border-b border-line">
         {TABS.map(({ id, label, icon: Icon }) => (
           <button
             key={id}
             onClick={() => setTab(id)}
             className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-[13.5px] font-medium transition ${
               tab === id
-                ? "border-violet-600 text-violet-700"
-                : "border-transparent text-stone-500 hover:text-stone-800"
+                ? "border-ink text-ink"
+                : "border-transparent text-muted hover:text-ink"
             }`}
           >
             <Icon size={15} />

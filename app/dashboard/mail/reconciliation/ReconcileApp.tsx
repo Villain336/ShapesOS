@@ -1,10 +1,9 @@
 // Marketr — reconciliation report client: scope picker, estimate-vs-actual
-// table, variance flags, manual invoice entry. Light mode, dense, violet.
+// table, variance flags, manual invoice entry. Agentic OS design system.
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
 import {
-  AlertTriangle,
   FilePlus2,
   Info,
   Plus,
@@ -74,35 +73,24 @@ const money = (cents: number) => `$${(cents / 100).toFixed(2)}`;
 const signed = (cents: number) => `${cents >= 0 ? "+" : "−"}${money(Math.abs(cents))}`;
 
 const inputCls =
-  "w-full rounded-md border border-stone-300 bg-white px-2 py-1.5 text-[13px] text-stone-900 placeholder:text-stone-400 focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500";
+  "w-full h-control-sm rounded-md border-[1.5px] border-control bg-paper px-3 text-sm text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none disabled:opacity-50";
 const btnPrimary =
-  "inline-flex items-center gap-1.5 rounded-md bg-violet-600 px-2.5 py-1.5 text-[13px] font-medium text-white hover:bg-violet-700 disabled:opacity-50";
+  "inline-flex h-control-sm cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-night-hover focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--aos-focus-halo)] disabled:opacity-40";
 const btnSecondary =
-  "inline-flex items-center gap-1.5 rounded-md border border-stone-300 bg-white px-2.5 py-1.5 text-[13px] font-medium text-stone-700 hover:bg-stone-50 disabled:opacity-50";
+  "inline-flex h-control-sm cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-paper px-4 text-sm font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--aos-focus-halo)] disabled:opacity-40";
 
 type Tone = "violet" | "green" | "amber" | "red" | "blue" | "stone";
-const TONE: Record<Tone, string> = {
-  violet: "bg-violet-50 text-violet-700 border-violet-200",
-  green: "bg-emerald-50 text-emerald-700 border-emerald-200",
-  amber: "bg-amber-50 text-amber-700 border-amber-200",
-  red: "bg-red-50 text-red-700 border-red-200",
-  blue: "bg-sky-50 text-sky-700 border-sky-200",
-  stone: "bg-stone-100 text-stone-600 border-stone-200",
-};
 
-function Chip({ tone, children }: { tone: Tone; children: React.ReactNode }) {
+// Source tags are workflow states, not agent states: always neutral chips.
+// The `tone` prop stays for call-site compatibility.
+function Chip({ tone, children }: { tone?: Tone; children: React.ReactNode }) {
+  void tone;
   return (
-    <span className={`inline-flex shrink-0 items-center gap-1 rounded-full border px-1.5 py-px text-[11px] font-medium leading-4 ${TONE[tone]}`}>
+    <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full bg-paper px-1.5 py-px text-[11px] font-medium leading-4 text-muted shadow-control">
       {children}
     </span>
   );
 }
-
-const SOURCE_TONE: Record<LineItem["source"], Tone> = {
-  ledger: "stone",
-  webhook: "blue",
-  invoice: "violet",
-};
 
 function currentMonth(): string {
   const d = new Date();
@@ -176,16 +164,16 @@ export function ReconcileApp() {
   return (
     <div className="flex flex-col gap-3">
       {error ? (
-        <div className="flex items-start gap-2 rounded-md border border-red-200 bg-red-50 px-2.5 py-2 text-[12px] text-red-700">
-          <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+        <div className="flex items-start gap-2 rounded-md bg-failed-tint px-2.5 py-2 text-[12px] text-failed-text">
+          <span className="aos-shape aos-shape--failed mt-0.5 shrink-0" role="img" aria-label="Error" />
           <span>{error}</span>
         </div>
       ) : null}
 
-      <div className="flex flex-wrap items-end gap-3 rounded-[10px] border border-stone-200 bg-white px-4 py-3">
+      <div className="flex flex-wrap items-end gap-3 rounded-lg bg-paper px-4 py-3 shadow-hairline">
         <div className="flex gap-3 pt-1.5">
           {(["campaign", "month"] as const).map((m) => (
-            <label key={m} className="flex items-center gap-1.5 text-[13px] text-stone-700">
+            <label key={m} className="flex items-center gap-1.5 text-[13px] text-ink">
               <input type="radio" checked={mode === m} onChange={() => setMode(m)} />
               {m === "campaign" ? "Campaign" : "Month"}
             </label>
@@ -193,7 +181,7 @@ export function ReconcileApp() {
         </div>
         {mode === "campaign" ? (
           <label className="block min-w-[240px]">
-            <span className="mb-1 block text-[12px] font-medium text-stone-600">Mail campaign</span>
+            <span className="mb-1 block text-xs font-semibold text-muted">Mail campaign</span>
             <select className={inputCls} value={campaignId} onChange={(e) => setCampaignId(e.target.value)}>
               {campaigns.map((c) => (
                 <option key={c.id} value={c.id}>
@@ -204,7 +192,7 @@ export function ReconcileApp() {
           </label>
         ) : (
           <label className="block">
-            <span className="mb-1 block text-[12px] font-medium text-stone-600">Month</span>
+            <span className="mb-1 block text-xs font-semibold text-muted">Month</span>
             <input type="month" className={inputCls} value={month} onChange={(e) => setMonth(e.target.value)} />
           </label>
         )}
@@ -219,17 +207,17 @@ export function ReconcileApp() {
       {report ? (
         <>
           <div className="grid gap-3 md:grid-cols-4">
-            <SummaryCard label="Estimated (ledger)" value={money(report.estimated.totalCents)} tone="text-stone-900" />
-            <SummaryCard label="Actual (provider)" value={money(report.actual.totalCents)} tone="text-stone-900" />
+            <SummaryCard label="Estimated (ledger)" value={money(report.estimated.totalCents)} tone="text-ink" />
+            <SummaryCard label="Actual (provider)" value={money(report.actual.totalCents)} tone="text-ink" />
             <SummaryCard
               label="Variance"
               value={signed(report.varianceCents)}
-              tone={Math.abs(report.varianceCents) > 100 ? "text-amber-700" : "text-emerald-700"}
+              tone={Math.abs(report.varianceCents) > 100 ? "text-ink" : "text-muted"}
             />
             <SummaryCard
               label="Flags"
               value={String(report.flags.length)}
-              tone={report.flags.some((f) => f.severity === "warn") ? "text-amber-700" : "text-stone-900"}
+              tone={report.flags.some((f) => f.severity === "warn") ? "text-ink" : "text-muted"}
             />
           </div>
 
@@ -238,68 +226,68 @@ export function ReconcileApp() {
               {report.flags.map((f, i) => (
                 <div
                   key={i}
-                  className={`flex items-start gap-2 rounded-md border px-2.5 py-2 text-[12px] ${
-                    f.severity === "warn" ? "border-amber-200 bg-amber-50 text-amber-800" : "border-sky-200 bg-sky-50 text-sky-800"
+                  className={`flex items-start gap-2 rounded-md px-2.5 py-2 text-[12px] ${
+                    f.severity === "warn" ? "bg-needs-tint text-ink" : "bg-canvas text-muted"
                   }`}
                 >
-                  {f.severity === "warn" ? <AlertTriangle size={14} className="mt-0.5 shrink-0" /> : <Info size={14} className="mt-0.5 shrink-0" />}
+                  {f.severity === "warn" ? <span className="aos-shape aos-shape--needs aos-shape--edged mt-0.5 shrink-0" role="img" aria-label="Warning" /> : <Info size={14} className="mt-0.5 shrink-0 text-ink" />}
                   <span>{f.message}</span>
                 </div>
               ))}
             </div>
           ) : null}
 
-          <div className="overflow-hidden rounded-[10px] border border-stone-200 bg-white">
-            <div className="border-b border-stone-100 px-4 py-2.5">
-              <h3 className="text-[13px] font-semibold text-stone-900">Line items</h3>
+          <div className="overflow-hidden rounded-lg bg-paper shadow-hairline">
+            <div className="border-b border-line px-4 py-2.5">
+              <h3 className="text-[13px] font-semibold text-ink">Line items</h3>
             </div>
             <table className="w-full text-[13px]">
               <thead>
-                <tr className="border-b border-stone-200 bg-stone-50 text-left text-[11px] uppercase tracking-wide text-stone-500">
-                  <th className="px-3 py-2 font-medium">Line</th>
-                  <th className="px-3 py-2 font-medium">Source</th>
-                  <th className="px-3 py-2 text-right font-medium">Estimated</th>
-                  <th className="px-3 py-2 text-right font-medium">Actual</th>
-                  <th className="px-3 py-2 text-right font-medium">Variance</th>
+                <tr className="border-b border-line text-left text-xs font-semibold text-muted">
+                  <th className="px-3 py-2">Line</th>
+                  <th className="px-3 py-2">Source</th>
+                  <th className="px-3 py-2 text-right">Estimated</th>
+                  <th className="px-3 py-2 text-right">Actual</th>
+                  <th className="px-3 py-2 text-right">Variance</th>
                 </tr>
               </thead>
               <tbody className="tabular-nums">
                 {report.lineItems.map((l, i) => (
-                  <tr key={i} className="border-b border-stone-100 last:border-0">
-                    <td className="px-3 py-2 text-stone-800">{l.label}</td>
+                  <tr key={i} className="border-b border-line last:border-0">
+                    <td className="px-3 py-2 text-ink">{l.label}</td>
                     <td className="px-3 py-2">
-                      <Chip tone={SOURCE_TONE[l.source]}>{l.source}</Chip>
+                      <Chip>{l.source}</Chip>
                     </td>
-                    <td className="px-3 py-2 text-right text-stone-600">{money(l.estimatedCents)}</td>
-                    <td className="px-3 py-2 text-right text-stone-600">{money(l.actualCents)}</td>
-                    <td className={`px-3 py-2 text-right font-medium ${Math.abs(l.varianceCents) > 100 ? "text-amber-700" : "text-stone-700"}`}>
+                    <td className="px-3 py-2 text-right text-muted">{money(l.estimatedCents)}</td>
+                    <td className="px-3 py-2 text-right text-muted">{money(l.actualCents)}</td>
+                    <td className={`px-3 py-2 text-right font-medium ${Math.abs(l.varianceCents) > 100 ? "text-ink" : "text-muted"}`}>
                       {signed(l.varianceCents)}
                     </td>
                   </tr>
                 ))}
-                <tr className="bg-violet-50/50 font-semibold">
-                  <td className="px-3 py-2 text-stone-900">Total</td>
+                <tr className="bg-canvas font-semibold">
+                  <td className="px-3 py-2 text-ink">Total</td>
                   <td className="px-3 py-2" />
-                  <td className="px-3 py-2 text-right text-stone-900">{money(report.estimated.totalCents)}</td>
-                  <td className="px-3 py-2 text-right text-stone-900">{money(report.actual.totalCents)}</td>
-                  <td className="px-3 py-2 text-right text-stone-900">{signed(report.varianceCents)}</td>
+                  <td className="px-3 py-2 text-right text-ink">{money(report.estimated.totalCents)}</td>
+                  <td className="px-3 py-2 text-right text-ink">{money(report.actual.totalCents)}</td>
+                  <td className="px-3 py-2 text-right text-ink">{signed(report.varianceCents)}</td>
                 </tr>
               </tbody>
             </table>
           </div>
 
-          <div className="rounded-[10px] border border-stone-200 bg-white">
-            <div className="flex items-center gap-1.5 border-b border-stone-100 px-4 py-2.5">
-              <Receipt size={14} className="text-violet-600" />
-              <h3 className="text-[13px] font-semibold text-stone-900">Imported invoices ({invoices.length})</h3>
+          <div className="rounded-lg bg-paper shadow-hairline">
+            <div className="flex items-center gap-1.5 border-b border-line px-4 py-2.5">
+              <Receipt size={14} className="text-ink" />
+              <h3 className="text-[13px] font-semibold text-ink">Imported invoices ({invoices.length})</h3>
             </div>
             {invoices.length === 0 ? (
-              <p className="px-4 py-3 text-[12px] text-stone-400">No invoices imported for this scope yet.</p>
+              <p className="px-4 py-3 text-[12px] text-subtle">No invoices imported for this scope yet.</p>
             ) : (
               <table className="w-full text-[13px]">
                 <thead>
-                  <tr className="border-b border-stone-200 bg-stone-50 text-left text-[11px] uppercase tracking-wide text-stone-500">
-                    <th className="px-3 py-2 font-medium">Vendor</th>
+                  <tr className="border-b border-line text-left text-xs font-semibold text-muted">
+                    <th className="px-3 py-2">Vendor</th>
                     <th className="px-3 py-2 font-medium">Invoice #</th>
                     <th className="px-3 py-2 font-medium">Date</th>
                     <th className="px-3 py-2 text-right font-medium">Total</th>
@@ -307,11 +295,11 @@ export function ReconcileApp() {
                 </thead>
                 <tbody className="tabular-nums">
                   {invoices.map((inv) => (
-                    <tr key={inv.id} className="border-b border-stone-100 last:border-0">
-                      <td className="px-3 py-2 text-stone-800">{inv.vendor}</td>
-                      <td className="px-3 py-2 text-stone-600">{inv.invoiceNo ?? "—"}</td>
-                      <td className="px-3 py-2 text-stone-600">{inv.date ?? "—"}</td>
-                      <td className="px-3 py-2 text-right font-medium text-stone-900">{money(inv.totalCents)}</td>
+                    <tr key={inv.id} className="border-b border-line last:border-0">
+                      <td className="px-3 py-2 text-ink">{inv.vendor}</td>
+                      <td className="px-3 py-2 text-muted">{inv.invoiceNo ?? "—"}</td>
+                      <td className="px-3 py-2 text-muted">{inv.date ?? "—"}</td>
+                      <td className="px-3 py-2 text-right font-medium text-ink">{money(inv.totalCents)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -320,9 +308,9 @@ export function ReconcileApp() {
           </div>
         </>
       ) : (
-        <div className="rounded-[10px] border border-dashed border-stone-300 bg-white px-4 py-10 text-center">
-          <p className="text-[13px] font-medium text-stone-600">Pick a scope and run reconciliation</p>
-          <p className="mt-1 text-[12px] text-stone-400">
+        <div className="rounded-lg border border-dashed border-line bg-paper px-4 py-10 text-center">
+          <p className="text-[13px] font-medium text-ink">Pick a scope and run reconciliation</p>
+          <p className="mt-1 text-[12px] text-subtle">
             Ledger estimates are compared against webhook-derived provider actuals and imported invoices.
           </p>
         </div>
@@ -347,9 +335,9 @@ export function ReconcileApp() {
 
 function SummaryCard({ label, value, tone }: { label: string; value: string; tone: string }) {
   return (
-    <div className="rounded-[10px] border border-stone-200 bg-white px-4 py-3">
-      <p className="text-[11px] font-medium uppercase tracking-wide text-stone-500">{label}</p>
-      <p className={`mt-1 text-[20px] font-bold tabular-nums ${tone}`}>{value}</p>
+    <div className="rounded-lg bg-paper px-4 py-3 shadow-hairline">
+      <p className="text-xs font-semibold text-muted">{label}</p>
+      <p className={`mt-1 text-[20px] font-semibold tabular-nums ${tone}`}>{value}</p>
     </div>
   );
 }
@@ -408,42 +396,42 @@ function InvoiceModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/30 p-4 pt-[8vh]" onClick={onClose}>
-      <div className="w-full max-w-xl rounded-xl border border-stone-200 bg-white shadow-xl" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between border-b border-stone-200 px-4 py-2.5">
-          <h3 className="text-[14px] font-semibold text-stone-900">Import provider invoice</h3>
-          <button onClick={onClose} className="rounded p-1 text-stone-400 hover:bg-stone-100" aria-label="Close">
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-ink/30 p-4 pt-[8vh]" onClick={onClose}>
+      <div className="w-full max-w-xl rounded-lg border border-line bg-paper shadow-overlay" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between border-b border-line px-4 py-2.5">
+          <h3 className="text-[14px] font-semibold text-ink">Import provider invoice</h3>
+          <button onClick={onClose} className="rounded-full p-1 text-subtle hover:bg-hover-paper hover:text-ink" aria-label="Close">
             <X size={16} />
           </button>
         </div>
         <div className="flex flex-col gap-3 p-4">
           {error ? (
-            <div className="flex items-start gap-2 rounded-md border border-red-200 bg-red-50 px-2.5 py-2 text-[12px] text-red-700">
-              <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+            <div className="flex items-start gap-2 rounded-md bg-failed-tint px-2.5 py-2 text-[12px] text-failed-text">
+              <span className="aos-shape aos-shape--failed mt-0.5 shrink-0" role="img" aria-label="Error" />
               <span>{error}</span>
             </div>
           ) : null}
           <div className="grid gap-3 md:grid-cols-2">
             <label className="block">
-              <span className="mb-1 block text-[12px] font-medium text-stone-600">Vendor</span>
+              <span className="mb-1 block text-xs font-semibold text-muted">Vendor</span>
               <input className={inputCls} placeholder="e.g. Lob, PostGrid, Print shop" value={vendor} onChange={(e) => setVendor(e.target.value)} />
             </label>
             <label className="block">
-              <span className="mb-1 block text-[12px] font-medium text-stone-600">Invoice #</span>
+              <span className="mb-1 block text-xs font-semibold text-muted">Invoice #</span>
               <input className={inputCls} value={invoiceNo} onChange={(e) => setInvoiceNo(e.target.value)} />
             </label>
             <label className="block">
-              <span className="mb-1 block text-[12px] font-medium text-stone-600">Invoice total ($)</span>
+              <span className="mb-1 block text-xs font-semibold text-muted">Invoice total ($)</span>
               <input className={inputCls} type="number" min={0} step={0.01} placeholder="0.00" value={total} onChange={(e) => setTotal(e.target.value)} />
             </label>
             <label className="block">
-              <span className="mb-1 block text-[12px] font-medium text-stone-600">Date</span>
+              <span className="mb-1 block text-xs font-semibold text-muted">Date</span>
               <input className={inputCls} type="date" value={date} onChange={(e) => setDate(e.target.value)} />
             </label>
           </div>
           {mode === "campaign" ? (
             <label className="block">
-              <span className="mb-1 block text-[12px] font-medium text-stone-600">Applies to campaign</span>
+              <span className="mb-1 block text-xs font-semibold text-muted">Applies to campaign</span>
               <select className={inputCls} value={scopeCampaignId} onChange={(e) => setScopeCampaignId(e.target.value)}>
                 {campaigns.map((c) => (
                   <option key={c.id} value={c.id}>
@@ -454,12 +442,12 @@ function InvoiceModal({
             </label>
           ) : (
             <label className="block">
-              <span className="mb-1 block text-[12px] font-medium text-stone-600">Applies to month</span>
+              <span className="mb-1 block text-xs font-semibold text-muted">Applies to month</span>
               <input type="month" className={inputCls} value={scopeMonth} onChange={(e) => setScopeMonth(e.target.value)} />
             </label>
           )}
           <label className="block">
-            <span className="mb-1 block text-[12px] font-medium text-stone-600">Notes (optional)</span>
+            <span className="mb-1 block text-xs font-semibold text-muted">Notes (optional)</span>
             <input className={inputCls} value={notes} onChange={(e) => setNotes(e.target.value)} />
           </label>
           <div className="flex justify-end gap-2">
