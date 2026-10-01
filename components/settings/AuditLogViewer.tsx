@@ -6,15 +6,44 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import {
-  Notice,
-  btnCls,
-  cardCls,
-  inputCls,
-  labelCls,
-  primaryBtnVioletCls,
-  type NoticeState,
-} from "./ui";
+import { Check } from "lucide-react";
+
+// AOS atoms (local — components/settings/ui.tsx is owned by another slice).
+const cardCls = "rounded-xl border border-line bg-paper p-5";
+const labelCls = "mb-1 block text-xs font-medium text-muted";
+const inputCls =
+  "h-control-sm rounded-md border-[1.5px] border-control bg-paper px-3 text-sm text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none";
+const btnPrimary =
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-night-hover disabled:opacity-40";
+const btnGhost =
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-paper px-4 text-sm font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper disabled:opacity-40";
+
+type NoticeKind = "ok" | "error" | "info";
+interface NoticeState {
+  kind: NoticeKind;
+  message: string;
+}
+
+function Notice({ notice }: { notice: NoticeState | null }) {
+  if (!notice) return null;
+  if (notice.kind === "error") {
+    return (
+      <div
+        role="alert"
+        className="flex items-start gap-2 rounded-md border border-failed bg-failed-tint px-3 py-2 text-sm text-failed-text"
+      >
+        <span className="mt-1 h-3 w-3 shrink-0 bg-failed" aria-hidden="true" />
+        <span>{notice.message}</span>
+      </div>
+    );
+  }
+  return (
+    <div className="flex items-start gap-2 rounded-md border border-line bg-paper px-3 py-2 text-sm text-muted">
+      <Check size={14} className="mt-0.5 shrink-0 text-ink" aria-hidden="true" />
+      <span>{notice.message}</span>
+    </div>
+  );
+}
 
 interface AuditEvent {
   id: string;
@@ -101,7 +130,7 @@ export default function AuditLogViewer({ workspaceId }: { workspaceId: string })
   return (
     <div className="flex flex-col gap-4">
       <div className={cardCls}>
-        <h2 className="font-medium">Filters</h2>
+        <h2 className="font-medium text-ink">Filters</h2>
         <div className="mt-3 grid gap-2 md:grid-cols-3">
           <label className={labelCls}>
             Action
@@ -155,13 +184,13 @@ export default function AuditLogViewer({ workspaceId }: { workspaceId: string })
             />
           </label>
           <div className="flex items-end gap-2">
-            <button onClick={load} disabled={loading} className={primaryBtnVioletCls}>
+            <button onClick={load} disabled={loading} className={btnPrimary}>
               {loading ? "Loading…" : "Apply filters"}
             </button>
-            <button onClick={clearFilters} disabled={loading} className={btnCls}>
+            <button onClick={clearFilters} disabled={loading} className={btnGhost}>
               Clear
             </button>
-            <a href={exportCsvUrl()} download className={btnCls}>
+            <a href={exportCsvUrl()} download className={btnGhost}>
               Export CSV
             </a>
           </div>
@@ -170,41 +199,41 @@ export default function AuditLogViewer({ workspaceId }: { workspaceId: string })
 
       <Notice notice={notice} />
 
-      <div className="overflow-hidden rounded-xl border border-zinc-200">
+      <div className="overflow-hidden rounded-lg border border-line bg-paper">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-zinc-200 bg-white/60 text-left text-xs uppercase tracking-widest text-zinc-500">
-              <th className="px-4 py-3">Time</th>
-              <th className="px-4 py-3">Actor</th>
-              <th className="px-4 py-3">Action</th>
-              <th className="px-4 py-3">Project</th>
-              <th className="px-4 py-3">Summary</th>
+            <tr className="border-b border-line bg-paper text-left text-xs text-muted">
+              <th className="px-4 py-2.5 font-medium">Time</th>
+              <th className="px-4 py-2.5 font-medium">Actor</th>
+              <th className="px-4 py-2.5 font-medium">Action</th>
+              <th className="px-4 py-2.5 font-medium">Project</th>
+              <th className="px-4 py-2.5 font-medium">Summary</th>
             </tr>
           </thead>
           <tbody>
             {events.map((e) => (
-              <tr key={e.id} className="border-b border-zinc-200/60 last:border-0">
-                <td className="whitespace-nowrap px-4 py-3 text-xs text-zinc-500">
+              <tr key={e.id} className="border-b border-line last:border-0 hover:bg-hover-paper">
+                <td className="whitespace-nowrap px-4 py-2.5 text-xs text-muted">
                   {new Date(e.createdAt).toLocaleString()}
                 </td>
-                <td className="px-4 py-3 text-xs">{e.actor ?? "—"}</td>
-                <td className="px-4 py-3 font-mono text-xs">{e.action}</td>
-                <td className="px-4 py-3 font-mono text-xs text-zinc-500">
+                <td className="px-4 py-2.5 text-xs text-ink">{e.actor ?? "—"}</td>
+                <td className="px-4 py-2.5 font-mono text-xs text-ink">{e.action}</td>
+                <td className="px-4 py-2.5 font-mono text-xs text-muted">
                   {e.projectId ? e.projectId.slice(0, 12) : "—"}
                 </td>
-                <td className="px-4 py-3 text-xs text-zinc-600">{e.summary ?? "—"}</td>
+                <td className="px-4 py-2.5 text-xs text-muted">{e.summary ?? "—"}</td>
               </tr>
             ))}
             {events.length === 0 && !loading && (
               <tr>
-                <td colSpan={5} className="px-4 py-8 text-center text-zinc-500">
+                <td colSpan={5} className="px-4 py-8 text-center text-sm text-muted">
                   No audit events match these filters.
                 </td>
               </tr>
             )}
             {loading && (
               <tr>
-                <td colSpan={5} className="px-4 py-8 text-center text-zinc-500">
+                <td colSpan={5} className="px-4 py-8 text-center text-sm text-muted">
                   Loading…
                 </td>
               </tr>

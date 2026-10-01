@@ -7,13 +7,43 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import {
-  Notice,
-  btnCls,
-  cardCls,
-  primaryBtnVioletCls,
-  type NoticeState,
-} from "./ui";
+import { Check } from "lucide-react";
+
+// AOS atoms (local — components/settings/ui.tsx is owned by another slice).
+const cardCls = "rounded-xl border border-line bg-paper p-5";
+const btnPrimary =
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-night-hover disabled:opacity-40";
+const btnGhost =
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-paper px-4 text-sm font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper disabled:opacity-40";
+const chipCls =
+  "inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-paper px-2.5 py-1 text-sm text-muted shadow-control";
+
+type NoticeKind = "ok" | "error" | "info";
+interface NoticeState {
+  kind: NoticeKind;
+  message: string;
+}
+
+function Notice({ notice }: { notice: NoticeState | null }) {
+  if (!notice) return null;
+  if (notice.kind === "error") {
+    return (
+      <div
+        role="alert"
+        className="flex items-start gap-2 rounded-md border border-failed bg-failed-tint px-3 py-2 text-sm text-failed-text"
+      >
+        <span className="mt-1 h-3 w-3 shrink-0 bg-failed" aria-hidden="true" />
+        <span>{notice.message}</span>
+      </div>
+    );
+  }
+  return (
+    <div className="flex items-start gap-2 rounded-md border border-line bg-paper px-3 py-2 text-sm text-muted">
+      <Check size={14} className="mt-0.5 shrink-0 text-ink" aria-hidden="true" />
+      <span>{notice.message}</span>
+    </div>
+  );
+}
 
 export interface HealthItem {
   connectionId: string;
@@ -40,14 +70,7 @@ interface Summary {
   degraded: number;
 }
 
-const STATUS_BADGE: Record<HealthItem["status"], string> = {
-  healthy: "bg-emerald-50 text-emerald-700 border-emerald-200",
-  degraded: "bg-amber-50 text-amber-700 border-amber-200",
-  needs_reauth: "bg-amber-50 text-amber-700 border-amber-200",
-  error: "bg-red-50 text-red-700 border-red-200",
-  unknown: "bg-zinc-100 text-zinc-500 border-zinc-200",
-};
-
+// Connector health is a provider state, not an agent state — neutral chips.
 const STATUS_LABEL: Record<HealthItem["status"], string> = {
   healthy: "Healthy",
   degraded: "Degraded",
@@ -55,6 +78,10 @@ const STATUS_LABEL: Record<HealthItem["status"], string> = {
   error: "Error",
   unknown: "Unknown",
 };
+
+function StatusChip({ status }: { status: HealthItem["status"] }) {
+  return <span className={chipCls}>{STATUS_LABEL[status]}</span>;
+}
 
 function fmtDate(iso: string | null): string {
   if (!iso) return "—";
@@ -134,30 +161,26 @@ export default function ConnectorHealthTab({
 
       {summary && (
         <div className="flex flex-wrap items-center gap-2 text-sm">
-          <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-emerald-700">
-            {summary.healthy} healthy
-          </span>
+          <span className={chipCls}>{summary.healthy} healthy</span>
           {summary.needsAttention > 0 && (
-            <span className="rounded-full border border-red-200 bg-red-50 px-3 py-1 text-red-700">
+            <span className={chipCls}>
               {summary.needsAttention} need{summary.needsAttention === 1 ? "s" : ""} attention
             </span>
           )}
           {summary.unknown > 0 && (
-            <span className="rounded-full border border-zinc-200 bg-zinc-100 px-3 py-1 text-zinc-600">
-              {summary.unknown} unknown
-            </span>
+            <span className={chipCls}>{summary.unknown} unknown</span>
           )}
-          <button onClick={load} disabled={loading} className={btnCls}>
+          <button onClick={load} disabled={loading} className={btnGhost}>
             {loading ? "Loading…" : "Refresh"}
           </button>
         </div>
       )}
 
       {loading && items.length === 0 ? (
-        <p className="text-sm text-zinc-500">Loading connector health…</p>
+        <p className="text-sm text-muted">Loading connector health…</p>
       ) : items.length === 0 ? (
         <div className={cardCls}>
-          <p className="text-sm text-zinc-500">
+          <p className="text-sm text-muted">
             No connections yet. Connect a data source on the Connections tab to
             start tracking its health.
           </p>
@@ -173,29 +196,25 @@ export default function ConnectorHealthTab({
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
-                    <h3 className="font-medium">{h.displayName}</h3>
-                    <span
-                      className={`shrink-0 rounded-full border px-2 py-0.5 text-xs ${STATUS_BADGE[h.status]}`}
-                    >
-                      {STATUS_LABEL[h.status]}
-                    </span>
+                    <h3 className="font-medium text-ink">{h.displayName}</h3>
+                    <StatusChip status={h.status} />
                   </div>
                   {h.connectionLabel && (
-                    <p className="mt-0.5 truncate text-sm text-zinc-500">{h.connectionLabel}</p>
+                    <p className="mt-0.5 truncate text-sm text-muted">{h.connectionLabel}</p>
                   )}
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
                   <button
                     onClick={() => checkNow(h.connectionId)}
                     disabled={checking === h.connectionId}
-                    className={btnCls}
+                    className={btnGhost}
                   >
                     {checking === h.connectionId ? "Checking…" : "Check now"}
                   </button>
                   {(h.status === "needs_reauth" || h.status === "error") && (
                     <button
                       onClick={() => onReconnect(h.connectorKey, h.authType)}
-                      className={primaryBtnVioletCls}
+                      className={btnPrimary}
                     >
                       Reconnect
                     </button>
@@ -205,22 +224,22 @@ export default function ConnectorHealthTab({
 
               <dl className="mt-3 grid gap-x-6 gap-y-2 text-sm sm:grid-cols-3">
                 <div>
-                  <dt className="text-xs text-zinc-400">Last successful sync</dt>
-                  <dd className="mt-0.5 text-zinc-700">{fmtDate(h.lastSuccessAt)}</dd>
+                  <dt className="text-xs text-subtle">Last successful sync</dt>
+                  <dd className="mt-0.5 text-ink">{fmtDate(h.lastSuccessAt)}</dd>
                 </div>
                 <div>
-                  <dt className="text-xs text-zinc-400">Last checked</dt>
-                  <dd className="mt-0.5 text-zinc-700">{fmtDate(h.lastCheckAt)}</dd>
+                  <dt className="text-xs text-subtle">Last checked</dt>
+                  <dd className="mt-0.5 text-ink">{fmtDate(h.lastCheckAt)}</dd>
                 </div>
                 <div>
-                  <dt className="text-xs text-zinc-400">Provider quota</dt>
-                  <dd className="mt-0.5 text-zinc-700">
+                  <dt className="text-xs text-subtle">Provider quota</dt>
+                  <dd className="mt-0.5 text-ink">
                     {h.quota && h.quota.limit != null ? (
                       <>
                         {h.quota.used ?? 0} / {h.quota.limit}
-                        <span className="ml-2 inline-block h-1.5 w-24 overflow-hidden rounded-full bg-zinc-200 align-middle">
+                        <span className="ml-2 inline-block h-1.5 w-24 overflow-hidden rounded-full bg-canvas align-middle">
                           <span
-                            className="block h-full rounded-full bg-[#0E7C66]"
+                            className="block h-full rounded-full bg-ink"
                             style={{
                               width: `${Math.min(100, ((h.quota.used ?? 0) / h.quota.limit) * 100)}%`,
                             }}
@@ -235,9 +254,9 @@ export default function ConnectorHealthTab({
               </dl>
 
               {(h.fixHint || h.label) && (
-                <div className="mt-3 rounded-md border border-zinc-200 bg-[#FAFAF7] px-3 py-2">
+                <div className="mt-3 rounded-md border border-line bg-canvas px-3 py-2">
                   {h.errorCode && (
-                    <p className="text-xs font-medium text-zinc-600">
+                    <p className="text-xs font-medium text-ink">
                       {h.status === "needs_reauth"
                         ? "Needs re-authentication"
                         : h.status === "error"
@@ -245,8 +264,8 @@ export default function ConnectorHealthTab({
                           : "Note"}
                     </p>
                   )}
-                  {h.fixHint && <p className="mt-0.5 text-sm text-zinc-700">{h.fixHint}</p>}
-                  {h.label && <p className="mt-0.5 text-xs text-zinc-500">{h.label}</p>}
+                  {h.fixHint && <p className="mt-0.5 text-sm text-muted">{h.fixHint}</p>}
+                  {h.label && <p className="mt-0.5 text-xs text-subtle">{h.label}</p>}
                 </div>
               )}
             </div>

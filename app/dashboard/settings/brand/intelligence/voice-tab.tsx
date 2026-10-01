@@ -15,13 +15,27 @@ import {
   RefreshCw,
   X,
 } from "lucide-react";
-import {
-  Chip,
-  btnPrimary,
-  btnGhost,
-  infoNoteCls,
-  inputCls,
-} from "../../../substrate/ui";
+// ── AOS atoms (local — app/dashboard/substrate/ui.tsx is owned by another slice) ──
+const inputCls =
+  "rounded-md border-[1.5px] border-control bg-paper px-2.5 py-1.5 text-[13px] text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none";
+const btnPrimary =
+  "inline-flex items-center gap-1.5 rounded-full bg-ink px-3 py-1.5 text-[13px] font-medium text-white aos-press hover:bg-night-hover disabled:opacity-40";
+const btnGhost =
+  "inline-flex items-center gap-1.5 rounded-full bg-paper px-2.5 py-1.5 text-[13px] font-medium text-ink shadow-outline aos-press hover:bg-hover-paper disabled:opacity-40";
+const tableShell = "overflow-hidden rounded-lg border border-line bg-paper";
+const theadCls = "border-b border-line text-left text-[12px] text-muted";
+const thCls = "px-3 py-2 text-left font-medium";
+const rowCls = "border-b border-line last:border-0 hover:bg-hover-paper";
+const infoNoteCls = "rounded-lg border border-line bg-canvas p-4 text-[12.5px] text-muted";
+
+// Statuses here are agent/provider states, not agent states — neutral chips.
+function Chip({ children, tone: _tone }: { children: React.ReactNode; tone?: string }) {
+  return (
+    <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-paper px-1.5 py-0.5 text-[10px] font-medium leading-tight text-muted shadow-control">
+      {children}
+    </span>
+  );
+}
 
 export interface VoiceProfileView {
   dimensions: Record<string, unknown>;
@@ -52,11 +66,11 @@ function list(v: unknown): string[] {
 function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-stone-900/30" onClick={onClose} aria-hidden />
-      <div className="relative max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-lg border border-stone-200 bg-white p-5 shadow-xl">
+      <div className="absolute inset-0 bg-ink/30" onClick={onClose} aria-hidden />
+      <div className="relative max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-lg border border-line bg-paper p-5 shadow-overlay">
         <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-[15px] font-semibold text-stone-900">{title}</h3>
-          <button type="button" onClick={onClose} aria-label="Close" className="rounded-md p-1 text-stone-400 hover:bg-stone-100 hover:text-stone-600">
+          <h3 className="text-[15px] font-semibold text-ink">{title}</h3>
+          <button type="button" onClick={onClose} aria-label="Close" className="rounded-md p-1 text-subtle hover:bg-hover-paper hover:text-muted">
             <X size={16} />
           </button>
         </div>
@@ -158,9 +172,9 @@ export default function VoiceTab({
       {notice && (
         <div className={infoNoteCls} role="status">
           <span className="flex items-center gap-2">
-            <Check size={14} className="shrink-0 text-emerald-600" />
+            <Check size={14} className="shrink-0 text-muted" />
             {notice}
-            <button type="button" onClick={() => setNotice(null)} className="ml-auto text-stone-400 hover:text-stone-600" aria-label="Dismiss">
+            <button type="button" onClick={() => setNotice(null)} className="ml-auto text-subtle hover:text-muted" aria-label="Dismiss">
               <X size={14} />
             </button>
           </span>
@@ -169,11 +183,11 @@ export default function VoiceTab({
 
       {/* Pending learner update — reviewable diff */}
       {pending && Object.keys(pendingDims).length > 0 && (
-        <section className="rounded-lg border border-brand-600/30 bg-brand-50/40 p-4">
+        <section className="rounded-lg border border-line bg-needs-tint aos-shape aos-shape--needs aos-shape--edged p-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-[14px] font-semibold text-stone-900">
+            <h2 className="text-[14px] font-semibold text-ink">
               Review pending update
-              <span className="ml-2 font-normal text-stone-500">
+              <span className="ml-2 font-normal text-muted">
                 proposed {pending.proposedAt ? new Date(pending.proposedAt).toLocaleDateString() : "recently"}
               </span>
             </h2>
@@ -188,22 +202,22 @@ export default function VoiceTab({
               </div>
             )}
           </div>
-          {pending.rationale && <p className="mt-1 text-[12.5px] text-stone-600">{pending.rationale}</p>}
+          {pending.rationale && <p className="mt-1 text-[12.5px] text-muted">{pending.rationale}</p>}
           <div className="mt-3 space-y-2">
             {DIM_META.filter((m) => {
               const v = pendingDims[m.key];
               return m.list ? list(v).length > 0 : str(v) !== "";
             }).map((m) => (
-              <div key={m.key} className="grid gap-2 rounded-md border border-stone-200 bg-white p-2.5 md:grid-cols-2">
+              <div key={m.key} className="grid gap-2 rounded-md border border-line bg-paper p-2.5 md:grid-cols-2">
                 <div>
-                  <p className="text-[11px] font-medium uppercase tracking-wide text-stone-400">Current — {m.label}</p>
-                  <p className="mt-0.5 text-[12.5px] text-stone-600">
+                  <p className="text-[11px] font-medium tracking-wide text-subtle">Current — {m.label}</p>
+                  <p className="mt-0.5 text-[12.5px] text-muted">
                     {m.list ? list(dims[m.key]).join(", ") || "—" : str(dims[m.key]) || "—"}
                   </p>
                 </div>
                 <div>
-                  <p className="text-[11px] font-medium uppercase tracking-wide text-brand-700">Proposed — {m.label}</p>
-                  <p className="mt-0.5 text-[12.5px] font-medium text-stone-900">
+                  <p className="text-[11px] font-medium tracking-wide text-ink">Proposed — {m.label}</p>
+                  <p className="mt-0.5 text-[12.5px] font-medium text-ink">
                     {m.list ? list(pendingDims[m.key]).join(", ") : str(pendingDims[m.key])}
                   </p>
                 </div>
@@ -214,15 +228,15 @@ export default function VoiceTab({
       )}
 
       {/* Profile */}
-      <section className="rounded-lg border border-stone-200 bg-white p-4">
+      <section className="rounded-lg border border-line bg-paper p-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2.5">
-            <span className="flex size-9 items-center justify-center rounded-full bg-brand-50 text-brand-700">
+            <span className="flex size-9 items-center justify-center rounded-full bg-canvas text-muted">
               <Megaphone size={16} />
             </span>
             <div>
-              <h2 className="text-[14px] font-semibold text-stone-900">Brand voice</h2>
-              <p className="text-[12px] text-stone-500">
+              <h2 className="text-[14px] font-semibold text-ink">Brand voice</h2>
+              <p className="text-[12px] text-muted">
                 {profile
                   ? `Derived from ${samples} sample${samples === 1 ? "" : "s"} · ${Math.round(profile.confidence * 100)}% confidence`
                   : "No voice profile yet — re-derive from your content or describe it below."}
@@ -262,15 +276,15 @@ export default function VoiceTab({
             const v = m.list ? list(dims[m.key]) : str(dims[m.key]);
             const empty = m.list ? v.length === 0 : !v;
             return (
-              <div key={m.key} className="rounded-md border border-stone-100 bg-stone-50/50 p-3">
-                <dt className="text-[11px] font-medium uppercase tracking-wide text-stone-400">{m.label}</dt>
-                <dd className="mt-1 text-[13px] text-stone-800">
+              <div key={m.key} className="rounded-md border border-line bg-canvas p-3">
+                <dt className="text-[11px] font-medium tracking-wide text-subtle">{m.label}</dt>
+                <dd className="mt-1 text-[13px] text-ink">
                   {empty ? (
-                    <span className="italic text-stone-400">Not set</span>
+                    <span className="italic text-subtle">Not set</span>
                   ) : m.list ? (
                     <span className="flex flex-wrap gap-1">
                       {(v as string[]).map((w) => (
-                        <Chip key={w} tone="violet">{w}</Chip>
+                        <Chip key={w}>{w}</Chip>
                       ))}
                     </span>
                   ) : (
@@ -282,7 +296,7 @@ export default function VoiceTab({
           })}
         </dl>
         {profile?.pinnedByUser && (
-          <p className="mt-3 flex items-center gap-1.5 text-[12px] text-stone-500">
+          <p className="mt-3 flex items-center gap-1.5 text-[12px] text-muted">
             <Lock size={12} /> Locked by you — consolidation proposals arrive as reviewable diffs instead of applying directly.
           </p>
         )}
@@ -292,8 +306,8 @@ export default function VoiceTab({
         <Modal title="Edit brand voice" onClose={() => setEditing(false)}>
           {DIM_META.map((m) => (
             <div key={m.key} className="mb-3">
-              <label className="mb-1 block text-[12.5px] font-medium text-stone-700">
-                {m.label}{m.list && <span className="font-normal text-stone-400"> — comma separated</span>}
+              <label className="mb-1 block text-[12.5px] font-medium text-muted">
+                {m.label}{m.list && <span className="font-normal text-subtle"> — comma separated</span>}
               </label>
               {m.list || m.key === "rhythm" ? (
                 <input value={form[m.key] ?? ""} onChange={(e) => setForm({ ...form, [m.key]: e.target.value })} className={`${inputCls} w-full`} />

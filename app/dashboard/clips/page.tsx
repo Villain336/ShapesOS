@@ -17,10 +17,10 @@ export default async function ClipsPage() {
   if (!user) redirect("/login");
   await getOrCreateWorkspace(user.id, user.email);
   return (
-    <div className="flex h-full flex-col gap-4 bg-[#FAFAF7] p-4 md:p-6">
+    <div className="flex h-full flex-col gap-4 bg-canvas p-4 md:p-6">
       <div>
-        <h1 className="text-xl font-bold tracking-tight text-stone-900">Clips</h1>
-        <p className="mt-0.5 text-[13px] text-stone-500">
+        <h1 className="aos-heading">Clips</h1>
+        <p className="mt-0.5 text-[13px] text-muted">
           Turn long videos into viral shorts — scored, captioned in your brand, approved by you.
         </p>
       </div>

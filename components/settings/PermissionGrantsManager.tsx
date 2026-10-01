@@ -5,16 +5,44 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { UserPlus, Users } from "lucide-react";
-import {
-  Notice,
-  cardCls,
-  dangerBtnCls,
-  inputCls,
-  labelCls,
-  primaryBtnVioletCls,
-  type NoticeState,
-} from "./ui";
+import { Check, UserPlus, Users } from "lucide-react";
+
+// AOS atoms (local — components/settings/ui.tsx is owned by another slice).
+const cardCls = "rounded-xl border border-line bg-paper p-5";
+const labelCls = "mb-1 block text-xs font-medium text-muted";
+const inputCls =
+  "h-control-sm rounded-md border-[1.5px] border-control bg-paper px-3 text-sm text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none";
+const btnPrimary =
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-night-hover disabled:opacity-40";
+const btnDeny =
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-paper px-4 text-sm font-semibold text-failed-text shadow-[inset_0_0_0_1.5px_var(--aos-failed)] aos-press hover:bg-failed-tint disabled:opacity-40";
+
+type NoticeKind = "ok" | "error" | "info";
+interface NoticeState {
+  kind: NoticeKind;
+  message: string;
+}
+
+function Notice({ notice }: { notice: NoticeState | null }) {
+  if (!notice) return null;
+  if (notice.kind === "error") {
+    return (
+      <div
+        role="alert"
+        className="flex items-start gap-2 rounded-md border border-failed bg-failed-tint px-3 py-2 text-sm text-failed-text"
+      >
+        <span className="mt-1 h-3 w-3 shrink-0 bg-failed" aria-hidden="true" />
+        <span>{notice.message}</span>
+      </div>
+    );
+  }
+  return (
+    <div className="flex items-start gap-2 rounded-md border border-line bg-paper px-3 py-2 text-sm text-muted">
+      <Check size={14} className="mt-0.5 shrink-0 text-ink" aria-hidden="true" />
+      <span>{notice.message}</span>
+    </div>
+  );
+}
 
 interface Grant {
   id: string;
@@ -150,13 +178,13 @@ export default function PermissionGrantsManager({
   return (
     <div className="flex flex-col gap-4">
       <div className={cardCls}>
-        <h2 className="font-medium">Permission grants</h2>
-        <p className="mt-1 text-sm text-zinc-500">
+        <h2 className="font-medium text-ink">Permission grants</h2>
+        <p className="mt-1 text-sm text-muted">
           Owners and admins hold every permission by default. Grant
           fine-grained permissions below to individual members or whole roles.
         </p>
 
-        <div className="mb-4 mt-3 flex gap-1 border-b border-stone-200">
+        <div className="mb-4 mt-3 flex gap-1 border-b border-line">
           {(
             [
               { id: "member", label: "Grant to a member", icon: UserPlus },
@@ -170,8 +198,8 @@ export default function PermissionGrantsManager({
                 onClick={() => setMode(m.id)}
                 className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-[13.5px] font-medium transition ${
                   mode === m.id
-                    ? "border-violet-600 text-violet-700"
-                    : "border-transparent text-stone-500 hover:text-stone-800"
+                    ? "border-ink text-ink"
+                    : "border-transparent text-muted hover:text-ink"
                 }`}
               >
                 <Icon size={15} />
@@ -234,13 +262,13 @@ export default function PermissionGrantsManager({
             <button
               onClick={grant}
               disabled={busy || (mode === "member" && !userId)}
-              className={primaryBtnVioletCls}
+              className={btnPrimary}
             >
               {busy ? "Granting…" : "Grant"}
             </button>
           </div>
         </div>
-        <p className="mt-2 text-xs text-zinc-500">
+        <p className="mt-2 text-xs text-muted">
           {PERMISSIONS.find((p) => p.key === permission)?.hint}
           {mode === "member" &&
             " Only members who have already joined (not pending invites) can hold individual grants."}
@@ -249,26 +277,26 @@ export default function PermissionGrantsManager({
 
       <Notice notice={notice} />
 
-      <div className="overflow-hidden rounded-xl border border-zinc-200">
+      <div className="overflow-hidden rounded-lg border border-line bg-paper">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-zinc-200 bg-white/60 text-left text-xs uppercase tracking-widest text-zinc-500">
-              <th className="px-4 py-3">Permission</th>
-              <th className="px-4 py-3">Granted to</th>
-              <th className="px-4 py-3">Granted</th>
-              <th className="px-4 py-3 text-right">Actions</th>
+            <tr className="border-b border-line bg-paper text-left text-xs text-muted">
+              <th className="px-4 py-2.5 font-medium">Permission</th>
+              <th className="px-4 py-2.5 font-medium">Granted to</th>
+              <th className="px-4 py-2.5 font-medium">Granted</th>
+              <th className="px-4 py-2.5 font-medium text-right">Actions</th>
             </tr>
           </thead>
           <tbody>
             {grants.map((g) => (
-              <tr key={g.id} className="border-b border-zinc-200/60 last:border-0">
-                <td className="px-4 py-3 font-mono text-xs">{g.permission}</td>
-                <td className="px-4 py-3">{grantTarget(g)}</td>
-                <td className="px-4 py-3 text-xs text-zinc-500">
+              <tr key={g.id} className="border-b border-line last:border-0 hover:bg-hover-paper">
+                <td className="px-4 py-2.5 font-mono text-xs text-ink">{g.permission}</td>
+                <td className="px-4 py-2.5 text-sm text-ink">{grantTarget(g)}</td>
+                <td className="px-4 py-2.5 text-xs text-muted">
                   {new Date(g.createdAt).toLocaleString()}
                 </td>
-                <td className="px-4 py-3 text-right">
-                  <button onClick={() => removeGrant(g.id)} className={dangerBtnCls}>
+                <td className="px-4 py-2.5 text-right">
+                  <button onClick={() => removeGrant(g.id)} className={btnDeny}>
                     Remove
                   </button>
                 </td>
@@ -276,7 +304,7 @@ export default function PermissionGrantsManager({
             ))}
             {grants.length === 0 && (
               <tr>
-                <td colSpan={4} className="px-4 py-8 text-center text-zinc-500">
+                <td colSpan={4} className="px-4 py-8 text-center text-sm text-muted">
                   No grants yet — owners and admins hold all permissions by default.
                 </td>
               </tr>

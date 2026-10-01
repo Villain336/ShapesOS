@@ -15,7 +15,7 @@ function StatusBadge({ ok, label }: { ok: boolean; label: string }) {
   return (
     <span
       className={`rounded-full px-2 py-0.5 text-xs ${
-        ok ? "bg-emerald-50 text-emerald-700" : "bg-zinc-100 text-zinc-500"
+        ok ? "bg-canvas text-muted border border-line" : "bg-canvas text-muted"
       }`}
     >
       {label}
@@ -43,15 +43,15 @@ export default async function SecuritySettingsPage() {
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h1 className="text-xl font-bold tracking-tight text-stone-900">Security</h1>
-        <p className="mt-0.5 text-[13px] text-stone-500">
+        <h1 className="aos-heading">Security</h1>
+        <p className="mt-0.5 text-[13px] text-muted">
           {workspace.name} — authentication, SSO, and secret-storage posture.
           Read-only; changes happen on the host via environment.
         </p>
       </div>
       <SettingsNav />
 
-      <div className="rounded-xl border border-zinc-200 bg-white/60 p-5">
+      <div className="rounded-xl border border-line bg-paper p-5">
         <div className="flex items-center justify-between gap-2">
           <h2 className="font-medium">Single sign-on (SSO)</h2>
           <StatusBadge
@@ -61,27 +61,27 @@ export default async function SecuritySettingsPage() {
         </div>
         <dl className="mt-3 grid gap-2 text-sm md:grid-cols-2">
           <div>
-            <dt className="text-xs text-zinc-500">Domain</dt>
+            <dt className="text-xs text-muted">Domain</dt>
             <dd className="font-mono text-xs">{ssoDomain || "—"}</dd>
           </div>
           <div>
-            <dt className="text-xs text-zinc-500">Default role for provisioned users</dt>
+            <dt className="text-xs text-muted">Default role for provisioned users</dt>
             <dd className="font-mono text-xs">{ssoOn ? ssoDefaultRole : "—"}</dd>
           </div>
         </dl>
-        <p className="mt-3 text-xs text-zinc-500">
+        <p className="mt-3 text-xs text-muted">
           {ssoOn
             ? "Users signing in via the OIDC/SAML provider with a verified email on this domain are added to the SSO workspace automatically. SSO can never mint owners, and invites are claimed via single-use token links."
             : "Set SSO_WORKSPACE_ID and SSO_DOMAIN on the host to enable domain-based auto-provisioning (env values only — never shown here)."}
         </p>
       </div>
 
-      <div className="rounded-xl border border-zinc-200 bg-white/60 p-5">
+      <div className="rounded-xl border border-line bg-paper p-5">
         <div className="flex items-center justify-between gap-2">
           <h2 className="font-medium">Secrets provider</h2>
           <StatusBadge ok={secretsProviderId === "env"} label={secretsProviderId} />
         </div>
-        <p className="mt-3 text-xs text-zinc-500">
+        <p className="mt-3 text-xs text-muted">
           Connector credentials and provider keys are encrypted with AES-256-GCM
           through this provider (env key by default, KMS-ready). Encrypt/decrypt
           happen server-side only — secrets are never sent to the browser.
@@ -89,19 +89,19 @@ export default async function SecuritySettingsPage() {
         </p>
       </div>
 
-      <div className="rounded-xl border border-zinc-200 bg-white/60 p-5">
+      <div className="rounded-xl border border-line bg-paper p-5">
         <h2 className="font-medium">Sessions & sign-in</h2>
         <dl className="mt-3 grid gap-2 text-sm md:grid-cols-2">
           <div>
-            <dt className="text-xs text-zinc-500">Session strategy</dt>
+            <dt className="text-xs text-muted">Session strategy</dt>
             <dd>JWT, 12-hour absolute lifetime — re-authentication required after that.</dd>
           </div>
           <div>
-            <dt className="text-xs text-zinc-500">Sign-in methods</dt>
+            <dt className="text-xs text-muted">Sign-in methods</dt>
             <dd>Google, credentials, and SAML/OIDC where configured.</dd>
           </div>
         </dl>
-        <p className="mt-3 text-xs text-zinc-500">
+        <p className="mt-3 text-xs text-muted">
           Pending member invites are single-use token links valid 7 days; bare
           email matching never grants access.
         </p>

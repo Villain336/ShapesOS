@@ -7,7 +7,52 @@
 // key is shown ONCE after creation and never again.
 
 import { useEffect, useState } from "react";
+import { Check } from "lucide-react";
 import { MCP_TOOL_NAMES, SCOPE_LABELS, scopeForTool, type McpToolName } from "@/lib/mcp/scopes";
+
+// AOS atoms (local — components/settings/ui.tsx is owned by another slice).
+const cardCls = "rounded-xl border border-line bg-paper p-5";
+const labelCls = "mb-1 block text-xs font-medium text-muted";
+const inputCls =
+  "h-control-sm rounded-md border-[1.5px] border-control bg-paper px-3 text-sm text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none";
+const btnPrimary =
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-night-hover disabled:opacity-40";
+const btnGhost =
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-paper px-4 text-sm font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper disabled:opacity-40";
+const btnDeny =
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-paper px-4 text-sm font-semibold text-failed-text shadow-[inset_0_0_0_1.5px_var(--aos-failed)] aos-press hover:bg-failed-tint disabled:opacity-40";
+const chipCls =
+  "inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-paper px-2 py-0.5 text-xs font-medium text-muted shadow-control";
+
+function Switch({
+  checked,
+  onChange,
+  label,
+}: {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  label: string;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      onClick={() => onChange(!checked)}
+      className={`relative h-[26px] w-[44px] shrink-0 rounded-full transition-colors ${
+        checked ? "bg-ink" : "bg-disabled-fg"
+      }`}
+    >
+      <span
+        aria-hidden="true"
+        className={`absolute top-[3px] h-5 w-5 rounded-full bg-white shadow transition-all ${
+          checked ? "left-[21px]" : "left-[3px]"
+        }`}
+      />
+    </button>
+  );
+}
 
 interface ApiKey {
   id: string;
@@ -138,71 +183,78 @@ export default function McpManager() {
     await refresh();
   }
 
-  if (loading) return <p className="text-sm text-zinc-500">Loading…</p>;
+  if (loading) return <p className="text-sm text-muted">Loading…</p>;
 
   return (
     <div className="flex flex-col gap-8">
-      {error && <p className="rounded-md bg-red-50 p-3 text-sm text-red-700">{error}</p>}
+      {error && (
+        <p role="alert" className="flex items-start gap-2 rounded-md border border-failed bg-failed-tint px-3 py-2 text-sm text-failed-text">
+          <span className="mt-1 h-3 w-3 shrink-0 bg-failed" aria-hidden="true" />
+          <span>{error}</span>
+        </p>
+      )}
 
-      <section className="rounded-xl border border-zinc-200 bg-white p-5">
-        <h2 className="text-base font-semibold">MCP server</h2>
-        <p className="mt-1 text-sm text-zinc-500">
+      <section className={cardCls}>
+        <h2 className="text-base font-semibold text-ink">MCP server</h2>
+        <p className="mt-1 text-sm text-muted">
           Expose this workspace to MCP clients (Claude Code, Claude, ChatGPT) over streamable HTTP
-          at <code className="rounded bg-zinc-100 px-1">/mcp</code>. Disabled by default — enabling
+          at <code className="rounded bg-canvas px-1 font-mono">/mcp</code>. Disabled by default — enabling
           opens a new authenticated API surface for this workspace.
         </p>
-        <label className="mt-4 flex items-center gap-3 text-sm">
-          <input
-            type="checkbox"
+        <div className="mt-4 flex items-center gap-3">
+          <Switch
             checked={enabled === true}
-            onChange={(e) => toggleEnabled(e.target.checked)}
-            className="h-4 w-4"
+            onChange={toggleEnabled}
+            label="Enable MCP server for this workspace"
           />
-          <span className="font-medium">Enable MCP server for this workspace</span>
-        </label>
+          <span className="text-sm font-medium text-ink">Enable MCP server for this workspace</span>
+        </div>
       </section>
 
       {newKey && (
-        <section className="rounded-xl border border-amber-300 bg-amber-50 p-5">
-          <h2 className="text-base font-semibold">Key created — copy it now</h2>
-          <p className="mt-1 text-sm text-zinc-600">
+        <section className="rounded-xl border border-line bg-needs-tint p-5">
+          <div className="flex items-center gap-2">
+            <span className="aos-shape aos-shape--needs aos-shape--edged" role="img" aria-label="Warning" />
+            <h2 className="text-base font-semibold text-ink">Key created — copy it now</h2>
+          </div>
+          <p className="mt-1 text-sm text-ink">
             This is the only time the raw key is shown. Store it somewhere safe.
           </p>
-          <code className="mt-3 block break-all rounded bg-white p-3 text-sm">{newKey.key}</code>
-          <p className="mt-2 text-xs text-zinc-500">
-            Use as <code>Authorization: Bearer {newKey.keyPrefix}…</code> against <code>/mcp</code>.
+          <code className="mt-3 block break-all rounded-md bg-paper p-3 font-mono text-sm text-ink">{newKey.key}</code>
+          <p className="mt-2 text-xs text-muted">
+            Use as <code className="font-mono">Authorization: Bearer {newKey.keyPrefix}…</code> against <code className="font-mono">/mcp</code>.
           </p>
           <button
             type="button"
             onClick={() => setNewKey(null)}
-            className="mt-3 rounded-md border border-zinc-300 px-3 py-1.5 text-sm"
+            className={`${btnGhost} mt-3`}
           >
             I&apos;ve copied it
           </button>
         </section>
       )}
 
-      <section className="rounded-xl border border-zinc-200 bg-white p-5">
-        <h2 className="text-base font-semibold">API keys</h2>
-        <p className="mt-1 text-xs text-zinc-500">
+      <section className={cardCls}>
+        <h2 className="text-base font-semibold text-ink">API keys</h2>
+        <p className="mt-1 text-xs text-muted">
           Credit usage per key for the current billing period. Attribution follows the key even
           after it is revoked.
         </p>
         {keys.length === 0 ? (
-          <p className="mt-2 text-sm text-zinc-500">No API keys yet.</p>
+          <p className="mt-2 text-sm text-muted">No API keys yet.</p>
         ) : (
-          <ul className="mt-3 divide-y divide-zinc-100">
+          <ul className="mt-3 divide-y divide-line">
             {keys.map((k) => (
               <li key={k.id} className="flex items-center justify-between py-3">
                 <div>
-                  <div className="text-sm font-medium">
+                  <div className="text-sm font-medium text-ink">
                     {k.name}{" "}
-                    <code className="rounded bg-zinc-100 px-1 text-xs text-zinc-500">{k.keyPrefix}…</code>
+                    <code className="rounded bg-canvas px-1 font-mono text-xs text-muted">{k.keyPrefix}…</code>
                     {k.revokedAt && (
-                      <span className="ml-2 rounded bg-zinc-200 px-1.5 py-0.5 text-xs">revoked</span>
+                      <span className={`${chipCls} ml-2`}>revoked</span>
                     )}
                   </div>
-                  <div className="mt-0.5 text-xs text-zinc-500">
+                  <div className="mt-0.5 text-xs text-muted">
                     {k.scopes.length} scope{k.scopes.length === 1 ? "" : "s"}
                     {` · ${k.usageCredits ?? 0} credit${(k.usageCredits ?? 0) === 1 ? "" : "s"} used`}
                     {k.lastUsedAt ? ` · last used ${new Date(k.lastUsedAt).toLocaleString()}` : " · never used"}
@@ -213,7 +265,7 @@ export default function McpManager() {
                   <button
                     type="button"
                     onClick={() => revoke(k.id)}
-                    className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm text-red-700"
+                    className={btnDeny}
                   >
                     Revoke
                   </button>
@@ -224,82 +276,97 @@ export default function McpManager() {
         )}
       </section>
 
-      <section className="rounded-xl border border-zinc-200 bg-white p-5">
-        <h2 className="text-base font-semibold">Create API key</h2>
+      <section className={cardCls}>
+        <h2 className="text-base font-semibold text-ink">Create API key</h2>
         <div className="mt-3 flex flex-col gap-4">
           <label className="flex flex-col gap-1 text-sm">
-            <span className="font-medium">Name</span>
+            <span className="text-xs font-medium text-muted">Name</span>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g. Claude Code on my laptop"
-              className="rounded-md border border-zinc-300 px-3 py-2"
+              className={inputCls}
             />
           </label>
           <fieldset>
-            <legend className="text-sm font-medium">Scopes (per-tool permissions)</legend>
+            <legend className="text-sm font-medium text-ink">Scopes (per-tool permissions)</legend>
             <div className="mt-2 grid gap-2 sm:grid-cols-2">
-              {MCP_TOOL_NAMES.map((tool) => (
-                <label key={tool} className="flex items-start gap-2 rounded-md border border-zinc-200 p-3 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={scopes.includes(scopeForTool(tool))}
-                    onChange={() => toggleScope(tool)}
-                    className="mt-0.5 h-4 w-4"
-                  />
-                  <span>
-                    <span className="font-medium">{SCOPE_LABELS[tool].title}</span>
-                    <span className="block text-xs text-zinc-500">{SCOPE_LABELS[tool].description}</span>
-                  </span>
-                </label>
-              ))}
+              {MCP_TOOL_NAMES.map((tool) => {
+                const selected = scopes.includes(scopeForTool(tool));
+                return (
+                  <button
+                    key={tool}
+                    type="button"
+                    aria-pressed={selected}
+                    onClick={() => toggleScope(tool)}
+                    className={`flex items-start gap-2 rounded-md border p-3 text-left text-sm transition ${
+                      selected
+                        ? "border-ink bg-paper shadow-[inset_0_0_0_1px_var(--aos-ink)]"
+                        : "border-line bg-paper hover:border-control"
+                    }`}
+                  >
+                    <span
+                      className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border-[1.5px] ${
+                        selected ? "border-ink bg-ink text-white" : "border-control"
+                      }`}
+                      aria-hidden="true"
+                    >
+                      {selected && <Check size={12} strokeWidth={3} />}
+                    </span>
+                    <span>
+                      <span className="font-medium text-ink">{SCOPE_LABELS[tool].title}</span>
+                      <span className="block text-xs text-muted">{SCOPE_LABELS[tool].description}</span>
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           </fieldset>
           <label className="flex flex-col gap-1 text-sm">
-            <span className="font-medium">Expires (optional)</span>
+            <span className="text-xs font-medium text-muted">Expires (optional)</span>
             <input
               type="datetime-local"
               value={expiresAt}
               onChange={(e) => setExpiresAt(e.target.value)}
-              className="rounded-md border border-zinc-300 px-3 py-2"
+              className={inputCls}
             />
           </label>
           <button
             type="button"
             onClick={createKey}
             disabled={creating || enabled !== true}
-            className="flex items-center gap-1.5 self-start rounded-md bg-violet-600 px-3 py-1.5 text-[13px] font-medium text-white hover:bg-violet-700 disabled:opacity-40"
+            className={`${btnPrimary} self-start`}
           >
             {creating ? "Creating…" : "Create key"}
           </button>
           {enabled !== true && (
-            <p className="text-xs text-zinc-500">Enable the MCP server above before creating keys.</p>
+            <p className="text-xs text-muted">Enable the MCP server above before creating keys.</p>
           )}
         </div>
       </section>
-      <section className="rounded-xl border border-zinc-200 bg-white p-5">
-        <h2 className="text-base font-semibold">Connected OAuth clients</h2>
-        <p className="mt-1 text-xs text-zinc-500">
+      <section className={cardCls}>
+        <h2 className="text-base font-semibold text-ink">Connected OAuth clients</h2>
+        <p className="mt-1 text-xs text-muted">
           MCP apps you approved on the OAuth consent screen. Deleting a client revokes all of its tokens immediately.
         </p>
         {clients.length === 0 ? (
-          <p className="mt-2 text-sm text-zinc-500">No OAuth clients connected.</p>
+          <p className="mt-2 text-sm text-muted">No OAuth clients connected.</p>
         ) : (
-          <ul className="mt-3 divide-y divide-zinc-100">
+          <ul className="mt-3 divide-y divide-line">
             {clients.map((c) => (
               <li key={c.clientId} className="flex items-center justify-between py-3">
                 <div>
-                  <div className="text-sm font-medium">{c.clientName ?? "Unnamed client"}</div>
-                  <div className="mt-0.5 text-xs text-zinc-500">
-                    <code className="rounded bg-zinc-100 px-1">{c.clientId.slice(0, 12)}…</code>
+                  <div className="text-sm font-medium text-ink">{c.clientName ?? "Unnamed client"}</div>
+                  <div className="mt-0.5 text-xs text-muted">
+                    <code className="rounded bg-canvas px-1 font-mono">{c.clientId.slice(0, 12)}…</code>
                     {` · connected ${new Date(c.createdAt).toLocaleDateString()}`}
                   </div>
                 </div>
                 <button
                   type="button"
                   onClick={() => revokeClient(c.clientId)}
-                  className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm text-red-700"
+                  className={btnDeny}
                 >
                   Disconnect
                 </button>

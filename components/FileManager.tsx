@@ -181,7 +181,7 @@ export function FileManager({
   return (
     <div className="flex flex-col gap-4">
       {/* Root tabs */}
-      <div className="flex flex-wrap gap-1 border-b border-stone-200">
+      <div className="flex flex-wrap gap-1 border-b border-line">
         {ROOTS.map((r) => (
           <button
             key={r.path}
@@ -193,13 +193,13 @@ export function FileManager({
             className={cn(
               "flex items-center gap-1.5 border-b-2 px-3 py-2 text-[13.5px] font-medium transition-colors",
               !trashOpen && (prefix === r.path || prefix.startsWith(`${r.path}/`))
-                ? "border-violet-600 text-violet-700"
-                : "border-transparent text-stone-500 hover:text-stone-800",
+                ? "border-ink text-ink"
+                : "border-transparent text-muted hover:text-ink",
             )}
           >
             <Folder size={15} />
             <span>{r.label}</span>
-            <span className="hidden text-xs text-stone-400 sm:inline">{r.hint}</span>
+            <span className="hidden text-xs text-subtle sm:inline">{r.hint}</span>
           </button>
         ))}
         {canEdit && (
@@ -209,8 +209,8 @@ export function FileManager({
             className={cn(
               "ml-auto flex items-center gap-1.5 border-b-2 px-3 py-2 text-[13.5px] font-medium transition-colors",
               trashOpen
-                ? "border-violet-600 text-violet-700"
-                : "border-transparent text-stone-500 hover:text-stone-800",
+                ? "border-ink text-ink"
+                : "border-transparent text-muted hover:text-ink",
             )}
           >
             <Trash size={15} />
@@ -220,27 +220,28 @@ export function FileManager({
       </div>
 
       {error && (
-        <div className="rounded-lg border border-red/30 bg-red-tint px-3 py-2 text-sm text-red">
-          {error}
+        <div role="alert" className="flex items-start gap-2 rounded-lg border border-failed bg-failed-tint px-3 py-2 text-sm text-failed-text">
+          <span className="mt-1 h-3 w-3 shrink-0 bg-failed" aria-hidden="true" />
+          <span>{error}</span>
         </div>
       )}
 
       {trashOpen ? (
-        <div className="rounded-xl border border-line bg-surface">
+        <div className="rounded-xl border border-line bg-paper">
           <div className="border-b border-line px-4 py-3">
             <h2 className="text-sm font-semibold">Trash</h2>
-            <p className="text-xs text-ink-3">Files are kept for 30 days, then permanently deleted.</p>
+            <p className="text-xs text-muted">Files are kept for 30 days, then permanently deleted.</p>
           </div>
           {trash.length === 0 ? (
-            <p className="px-4 py-8 text-center text-sm text-ink-3">Trash is empty.</p>
+            <p className="px-4 py-8 text-center text-sm text-muted">Trash is empty.</p>
           ) : (
             <ul className="divide-y divide-line">
               {trash.map((f) => (
                 <li key={f.id} className="flex items-center gap-3 px-4 py-2.5">
-                  <Trash size={16} className="shrink-0 text-ink-3" />
+                  <Trash size={16} className="shrink-0 text-muted" />
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium">{f.filename}</p>
-                    <p className="truncate text-xs text-ink-3">
+                    <p className="truncate text-xs text-muted">
                       {f.logicalPath} · {fmtBytes(f.sizeBytes)}
                     </p>
                   </div>
@@ -248,7 +249,7 @@ export function FileManager({
                     type="button"
                     onClick={() => void mutate(f.id, "restore")}
                     disabled={busy}
-                    className="flex items-center gap-1 rounded-md border border-line px-2 py-1 text-xs text-ink-2 hover:bg-hover"
+                    className="flex items-center gap-1 rounded-md border border-line px-2 py-1 text-xs text-muted hover:bg-hover-paper"
                   >
                     <RotateCcw size={14} /> Restore
                   </button>
@@ -257,7 +258,7 @@ export function FileManager({
                       type="button"
                       onClick={() => void remove(f.id, true)}
                       disabled={busy}
-                      className="rounded-md border border-line px-2 py-1 text-xs text-red hover:bg-red-tint"
+                      className="rounded-md px-2 py-1 text-xs text-failed-text shadow-[inset_0_0_0_1px_var(--aos-failed)] hover:bg-failed-tint"
                     >
                       Delete forever
                     </button>
@@ -270,8 +271,8 @@ export function FileManager({
       ) : (
         <div
           className={cn(
-            "rounded-xl border bg-surface",
-            dragOver ? "border-accent" : "border-line",
+            "rounded-xl border bg-paper",
+            dragOver ? "border-ink" : "border-line",
           )}
           onDragOver={(e) => {
             if (canEdit) {
@@ -292,20 +293,20 @@ export function FileManager({
             <button
               type="button"
               onClick={() => setPrefix("/files")}
-              className="text-sm text-ink-3 hover:text-ink"
+              className="text-sm text-muted hover:text-ink"
             >
               Files
             </button>
             {crumbs.map((c, i) => (
               <span key={i} className="flex items-center gap-2 text-sm">
-                <span className="text-ink-3">/</span>
+                <span className="text-muted">/</span>
                 {i === crumbs.length - 1 ? (
                   <span className="font-medium text-ink">{c}</span>
                 ) : (
                   <button
                     type="button"
                     onClick={() => setPrefix(`/${crumbs.slice(0, i + 1).join("/")}`)}
-                    className="text-ink-3 hover:text-ink"
+                    className="text-muted hover:text-ink"
                   >
                     {c}
                   </button>
@@ -328,7 +329,7 @@ export function FileManager({
                   type="button"
                   onClick={() => fileInput.current?.click()}
                   disabled={busy}
-                  className="flex items-center gap-2 rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-white hover:bg-accent-hover disabled:opacity-50"
+                  className="inline-flex items-center gap-2 rounded-full bg-ink px-4 py-1.5 text-sm font-medium text-white aos-press hover:bg-night-hover disabled:opacity-50"
                 >
                   <Upload size={16} />
                   {busy ? "Uploading…" : "Upload"}
@@ -339,9 +340,9 @@ export function FileManager({
 
           {/* Listing */}
           {!listing ? (
-            <p className="px-4 py-8 text-center text-sm text-ink-3">Loading…</p>
+            <p className="px-4 py-8 text-center text-sm text-muted">Loading…</p>
           ) : listing.dirs.length === 0 && listing.files.length === 0 ? (
-            <p className="px-4 py-8 text-center text-sm text-ink-3">
+            <p className="px-4 py-8 text-center text-sm text-muted">
               {canEdit
                 ? "This folder is empty. Drag files here or use Upload."
                 : "This folder is empty."}
@@ -353,9 +354,9 @@ export function FileManager({
                   <button
                     type="button"
                     onClick={() => setPrefix(d)}
-                    className="flex w-full items-center gap-3 px-4 py-2.5 text-left hover:bg-hover"
+                    className="flex w-full items-center gap-3 px-4 py-2.5 text-left hover:bg-hover-paper"
                   >
-                    <Folder size={18} className="shrink-0 text-accent-ink" />
+                    <Folder size={18} className="shrink-0 text-muted" />
                     <span className="text-sm font-medium">{d.split("/").pop()}</span>
                   </button>
                 </li>
@@ -364,16 +365,16 @@ export function FileManager({
                 const Icon = kindIcon(f.mimeType);
                 return (
                   <li key={f.id} className="flex items-center gap-3 px-4 py-2.5">
-                    <Icon size={18} className="shrink-0 text-ink-3" />
+                    <Icon size={18} className="shrink-0 text-muted" />
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-medium">{f.filename}</p>
-                      <p className="truncate text-xs text-ink-3">
+                      <p className="truncate text-xs text-muted">
                         {fmtBytes(f.sizeBytes)} · {f.mimeType}
                       </p>
                     </div>
                     <a
                       href={`/api/files/${f.id}?workspaceId=${encodeURIComponent(workspaceId)}&download=1`}
-                      className="flex items-center gap-1 rounded-md border border-line px-2 py-1 text-xs text-ink-2 hover:bg-hover"
+                      className="flex items-center gap-1 rounded-md border border-line px-2 py-1 text-xs text-muted hover:bg-hover-paper"
                     >
                       <Download size={14} /> Download
                     </a>
@@ -382,14 +383,14 @@ export function FileManager({
                         <button
                           type="button"
                           onClick={() => setDialog({ type: "rename", file: f, value: f.filename })}
-                          className="flex items-center gap-1 rounded-md border border-line px-2 py-1 text-xs text-ink-2 hover:bg-hover"
+                          className="flex items-center gap-1 rounded-md border border-line px-2 py-1 text-xs text-muted hover:bg-hover-paper"
                         >
                           <Pencil size={14} /> Rename
                         </button>
                         <button
                           type="button"
                           onClick={() => setDialog({ type: "move", file: f, value: f.logicalPath })}
-                          className="rounded-md border border-line px-2 py-1 text-xs text-ink-2 hover:bg-hover"
+                          className="rounded-md border border-line px-2 py-1 text-xs text-muted hover:bg-hover-paper"
                         >
                           Move
                         </button>
@@ -397,7 +398,7 @@ export function FileManager({
                           type="button"
                           onClick={() => void remove(f.id, false)}
                           disabled={busy}
-                          className="rounded-md border border-line px-2 py-1 text-xs text-red hover:bg-red-tint"
+                          className="rounded-md px-2 py-1 text-xs text-failed-text shadow-[inset_0_0_0_1px_var(--aos-failed)] hover:bg-failed-tint"
                         >
                           Trash
                         </button>
@@ -413,16 +414,16 @@ export function FileManager({
 
       {/* Quota meter */}
       {quota && (
-        <div className="rounded-xl border border-line bg-surface px-4 py-3">
+        <div className="rounded-xl border border-line bg-paper px-4 py-3">
           <div className="flex items-baseline justify-between">
             <h2 className="text-sm font-semibold">Storage</h2>
-            <p className="text-xs text-ink-3">
+            <p className="text-xs text-muted">
               {fmtBytes(quota.usedBytes)} of {fmtBytes(quota.limitBytes)} used
             </p>
           </div>
-          <div className="mt-2 h-2 overflow-hidden rounded-full bg-hover">
+          <div className="mt-2 h-2 overflow-hidden rounded-full bg-canvas">
             <div
-              className={cn("h-full rounded-full", quotaPct > 90 ? "bg-red" : "bg-accent")}
+              className={cn("h-full rounded-full", quotaPct > 90 ? "bg-failed" : "bg-ink")}
               style={{ width: `${quotaPct}%` }}
             />
           </div>
@@ -431,26 +432,26 @@ export function FileManager({
 
       {/* Rename / move dialog */}
       {dialog && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/20 p-4">
-          <div className="w-full max-w-sm rounded-xl border border-line bg-surface p-4 shadow-lg">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/30 p-4">
+          <div className="w-full max-w-sm rounded-xl border border-line bg-paper p-4 shadow-lg">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-semibold">
                 {dialog.type === "rename" ? "Rename file" : "Move file"}
               </h3>
               <button type="button" onClick={() => setDialog(null)} aria-label="Close">
-                <X size={16} className="text-ink-3" />
+                <X size={16} className="text-muted" />
               </button>
             </div>
-            <p className="mt-1 truncate text-xs text-ink-3">{dialog.file.logicalPath}</p>
+            <p className="mt-1 truncate text-xs text-muted">{dialog.file.logicalPath}</p>
             <input
               autoFocus
               value={dialog.value}
               onChange={(e) => setDialog({ ...dialog, value: e.target.value })}
               placeholder={dialog.type === "rename" ? "New filename" : "/files/new-folder/name.ext"}
-              className="mt-3 w-full rounded-lg border border-line bg-field px-3 py-2 text-sm"
+              className="mt-3 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm"
             />
             {dialog.type === "move" && (
-              <p className="mt-1 text-xs text-ink-3">
+              <p className="mt-1 text-xs text-muted">
                 Full path under the same root, e.g. /files/reports/q3.pdf
               </p>
             )}
@@ -458,7 +459,7 @@ export function FileManager({
               <button
                 type="button"
                 onClick={() => setDialog(null)}
-                className="rounded-lg border border-line px-3 py-1.5 text-sm text-ink-2 hover:bg-hover"
+                className="rounded-lg border border-line px-3 py-1.5 text-sm text-muted hover:bg-hover-paper"
               >
                 Cancel
               </button>
@@ -470,7 +471,7 @@ export function FileManager({
                     ? void mutate(dialog.file.id, "rename", { filename: dialog.value.trim() })
                     : void mutate(dialog.file.id, "move", { newPath: dialog.value.trim() })
                 }
-                className="rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-white hover:bg-accent-hover disabled:opacity-50"
+                className="inline-flex items-center rounded-full bg-ink px-4 py-1.5 text-sm font-medium text-white aos-press hover:bg-night-hover disabled:opacity-50"
               >
                 {dialog.type === "rename" ? "Rename" : "Move"}
               </button>

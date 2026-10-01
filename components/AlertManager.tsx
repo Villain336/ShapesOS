@@ -53,13 +53,77 @@ interface Project {
   name: string;
 }
 
+// AOS atoms (local — components/settings/ui.tsx is owned by another slice).
 const inputCls =
-  "w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-violet-400 focus:outline-none";
-const labelCls = "mb-1 block text-xs font-medium text-zinc-500";
+  "w-full h-control-sm rounded-md border-[1.5px] border-control bg-paper px-3 text-sm text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none";
+const labelCls = "mb-1 block text-xs font-medium text-muted";
 const btnPrimary =
-  "rounded-md bg-violet-600 px-3 py-2 text-sm font-medium text-white hover:bg-violet-700 disabled:opacity-50 active:scale-[0.96] transition-[background-color,transform] duration-150 ease-[cubic-bezier(0.2,0,0,1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-600 focus-visible:ring-offset-2";
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-night-hover disabled:opacity-40";
 const btnGhost =
-  "rounded-md border border-zinc-200 px-3 py-2 text-sm text-zinc-500 hover:border-zinc-400 disabled:opacity-50";
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-paper px-4 text-sm font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper disabled:opacity-40";
+const btnDeny =
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-paper px-4 text-sm font-semibold text-failed-text shadow-[inset_0_0_0_1.5px_var(--aos-failed)] aos-press hover:bg-failed-tint disabled:opacity-40";
+const chipCls =
+  "inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-paper px-2 py-0.5 text-xs font-medium text-muted shadow-control";
+
+// Spec switch (44x26 pill track, white 20px knob) with a visible label.
+function Switch({
+  checked,
+  onChange,
+  label,
+}: {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  label: string;
+}) {
+  return (
+    <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-muted">
+      <button
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        aria-label={label}
+        onClick={() => onChange(!checked)}
+        className={`relative h-[26px] w-[44px] shrink-0 rounded-full transition-colors ${
+          checked ? "bg-ink" : "bg-disabled-fg"
+        }`}
+      >
+        <span
+          className={`absolute top-[3px] h-5 w-5 rounded-full bg-white transition-all ${
+            checked ? "left-[21px]" : "left-[3px]"
+          }`}
+        />
+      </button>
+      {label}
+    </label>
+  );
+}
+
+// Multi-select chip (black/white, aria-pressed).
+function MultiChip({
+  pressed,
+  onToggle,
+  children,
+}: {
+  pressed: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={pressed}
+      onClick={onToggle}
+      className={`rounded-full px-3 py-1.5 text-sm font-medium aos-press ${
+        pressed
+          ? "bg-ink text-white"
+          : "bg-paper text-muted shadow-outline hover:text-ink"
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
 
 const TYPE_LABELS: Record<string, string> = { slack: "Slack", telegram: "Telegram", email: "Email" };
 
@@ -143,7 +207,7 @@ function ChannelForm({
   }
 
   return (
-    <div className="rounded-lg border border-zinc-200 bg-white/50 p-4">
+    <div className="rounded-lg border border-line bg-paper p-4">
       <h3 className="mb-3 text-sm font-semibold">{editing ? "Edit channel" : "New channel"}</h3>
       <div className="grid gap-3 sm:grid-cols-2">
         <div>
@@ -203,13 +267,15 @@ function ChannelForm({
           </>
         )}
         <div className="flex items-end">
-          <label className="flex items-center gap-2 text-sm text-zinc-500">
-            <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} className="h-4 w-4" />
-            Enabled
-          </label>
+          <Switch checked={enabled} onChange={setEnabled} label="Enabled" />
         </div>
       </div>
-      {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
+      {error && (
+        <p role="alert" className="mt-3 flex items-start gap-2 rounded-md border border-failed bg-failed-tint px-3 py-2 text-sm text-failed-text">
+          <span className="mt-1 h-3 w-3 shrink-0 bg-failed" aria-hidden="true" />
+          <span>{error}</span>
+        </p>
+      )}
       <div className="mt-4 flex gap-2">
         <button className={btnPrimary} onClick={save} disabled={saving}>
           {saving ? "Saving…" : editing ? "Save changes" : "Create channel"}
@@ -309,7 +375,7 @@ function RuleForm({
   }
 
   return (
-    <div className="rounded-lg border border-zinc-200 bg-white/50 p-4">
+    <div className="rounded-lg border border-line bg-paper p-4">
       <h3 className="mb-3 text-sm font-semibold">{editing ? "Edit rule" : "New rule"}</h3>
       <div className="grid gap-3 sm:grid-cols-2">
         <div>
@@ -326,7 +392,7 @@ function RuleForm({
               </option>
             ))}
           </select>
-          {triggerDef && <p className="mt-1 text-xs text-zinc-500">{triggerDef.description}</p>}
+          {triggerDef && <p className="mt-1 text-xs text-muted">{triggerDef.description}</p>}
         </div>
         <div className="sm:col-span-2">
           <label className={labelCls}>Channels</label>
@@ -334,17 +400,15 @@ function RuleForm({
             {channels
               .filter((c) => c.enabled)
               .map((c) => (
-                <label key={c.id} className="flex items-center gap-1.5 rounded-md border border-zinc-200 px-2.5 py-1.5 text-sm text-zinc-500">
-                  <input
-                    type="checkbox"
-                    checked={channelIds.includes(c.id)}
-                    onChange={() => toggle(channelIds, c.id, setChannelIds)}
-                    className="h-4 w-4"
-                  />
-                  {c.name} <span className="text-xs text-zinc-500">({TYPE_LABELS[c.type]})</span>
-                </label>
+                <MultiChip
+                  key={c.id}
+                  pressed={channelIds.includes(c.id)}
+                  onToggle={() => toggle(channelIds, c.id, setChannelIds)}
+                >
+                  {c.name} <span className="opacity-70">({TYPE_LABELS[c.type]})</span>
+                </MultiChip>
               ))}
-            {!channels.some((c) => c.enabled) && <p className="text-sm text-zinc-500">Create and enable a channel first.</p>}
+            {!channels.some((c) => c.enabled) && <p className="text-sm text-muted">Create and enable a channel first.</p>}
           </div>
         </div>
         {projects.length > 0 && (
@@ -352,15 +416,13 @@ function RuleForm({
             <label className={labelCls}>Projects (empty = all)</label>
             <div className="flex flex-wrap gap-2">
               {projects.map((p) => (
-                <label key={p.id} className="flex items-center gap-1.5 rounded-md border border-zinc-200 px-2.5 py-1.5 text-sm text-zinc-500">
-                  <input
-                    type="checkbox"
-                    checked={projectIds.includes(p.id)}
-                    onChange={() => toggle(projectIds, p.id, setProjectIds)}
-                    className="h-4 w-4"
-                  />
+                <MultiChip
+                  key={p.id}
+                  pressed={projectIds.includes(p.id)}
+                  onToggle={() => toggle(projectIds, p.id, setProjectIds)}
+                >
                   {p.name}
-                </label>
+                </MultiChip>
               ))}
             </div>
           </div>
@@ -381,16 +443,14 @@ function RuleForm({
           <div>
             <label className={labelCls}>Severities</label>
             <div className="flex gap-3 pt-2">
-              {["info", "warn", "critical"].map((s) => (
-                <label key={s} className="flex items-center gap-1.5 text-sm text-zinc-500">
-                  <input
-                    type="checkbox"
-                    checked={severities.includes(s)}
-                    onChange={() => toggle(severities, s, setSeverities)}
-                    className="h-4 w-4"
-                  />
-                  {s}
-                </label>
+              {["info", "warn", "critical"].map((sev) => (
+                <MultiChip
+                  key={sev}
+                  pressed={severities.includes(sev)}
+                  onToggle={() => toggle(severities, sev, setSeverities)}
+                >
+                  {sev[0].toUpperCase() + sev.slice(1)}
+                </MultiChip>
               ))}
             </div>
           </div>
@@ -416,18 +476,20 @@ function RuleForm({
           <label className={labelCls}>Quiet hours (UTC, optional)</label>
           <div className="flex items-center gap-2">
             <input type="time" className={inputCls} value={quietStart} onChange={(e) => setQuietStart(e.target.value)} />
-            <span className="text-zinc-500">–</span>
+            <span className="text-muted">–</span>
             <input type="time" className={inputCls} value={quietEnd} onChange={(e) => setQuietEnd(e.target.value)} />
           </div>
         </div>
         <div className="flex items-end">
-          <label className="flex items-center gap-2 text-sm text-zinc-500">
-            <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} className="h-4 w-4" />
-            Enabled
-          </label>
+          <Switch checked={enabled} onChange={setEnabled} label="Enabled" />
         </div>
       </div>
-      {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
+      {error && (
+        <p role="alert" className="mt-3 flex items-start gap-2 rounded-md border border-failed bg-failed-tint px-3 py-2 text-sm text-failed-text">
+          <span className="mt-1 h-3 w-3 shrink-0 bg-failed" aria-hidden="true" />
+          <span>{error}</span>
+        </p>
+      )}
       <div className="mt-4 flex gap-2">
         <button className={btnPrimary} onClick={save} disabled={saving}>
           {saving ? "Saving…" : editing ? "Save changes" : "Create rule"}
@@ -537,7 +599,7 @@ export default function AlertManager({
 
   return (
     <div>
-      <div className="mb-4 flex gap-1 border-b border-stone-200">
+      <div className="mb-4 flex gap-1 border-b border-line">
         {(
           [
             { id: "rules", label: "Rules", icon: BellRing },
@@ -551,8 +613,8 @@ export default function AlertManager({
               onClick={() => setTab(t.id)}
               className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-[13.5px] font-medium transition ${
                 tab === t.id
-                  ? "border-violet-600 text-violet-700"
-                  : "border-transparent text-stone-500 hover:text-stone-800"
+                  ? "border-ink text-ink"
+                  : "border-transparent text-muted hover:text-ink"
               }`}
             >
               <Icon size={15} />
@@ -562,12 +624,17 @@ export default function AlertManager({
         })}
       </div>
 
-      {error && <p className="mb-4 text-sm text-red-600">{error}</p>}
+      {error && (
+        <p role="alert" className="mb-4 flex items-start gap-2 rounded-md border border-failed bg-failed-tint px-3 py-2 text-sm text-failed-text">
+          <span className="mt-1 h-3 w-3 shrink-0 bg-failed" aria-hidden="true" />
+          <span>{error}</span>
+        </p>
+      )}
 
       {tab === "channels" && (
         <div className="flex flex-col gap-4">
           <div className="flex items-center justify-between">
-            <p className="text-sm text-zinc-500">
+            <p className="text-sm text-muted">
               Destinations for alerts. Secrets are stored encrypted and never shown back.
               {!canManageChannels && " Channel management requires an admin."}
             </p>
@@ -592,15 +659,15 @@ export default function AlertManager({
           )}
 
           {channels.map((c) => (
-            <div key={c.id} className="flex items-center justify-between rounded-lg border border-zinc-200 bg-white/50 p-4">
+            <div key={c.id} className="flex items-center justify-between rounded-lg border border-line bg-paper p-4">
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="font-medium">{c.name}</span>
-                  <span className="rounded bg-zinc-100 px-2 py-0.5 text-xs text-zinc-500">{TYPE_LABELS[c.type]}</span>
-                  {!c.enabled && <span className="rounded bg-zinc-100 px-2 py-0.5 text-xs text-zinc-500">disabled</span>}
+                  <span className="font-medium text-ink">{c.name}</span>
+                  <span className={chipCls}>{TYPE_LABELS[c.type]}</span>
+                  {!c.enabled && <span className={chipCls}>disabled</span>}
                 </div>
-                <p className="mt-1 font-mono text-xs text-zinc-500">{c.hint || "—"}</p>
-                <p className="mt-1 text-xs text-zinc-500">
+                <p className="mt-1 font-mono text-xs text-muted">{c.hint || "—"}</p>
+                <p className="mt-1 text-xs text-muted">
                   {c.ruleCount} rule{c.ruleCount === 1 ? "" : "s"}
                 </p>
               </div>
@@ -612,21 +679,21 @@ export default function AlertManager({
                   <button className={btnGhost} onClick={() => setEditingChannel(c)}>
                     Edit
                   </button>
-                  <button className={btnGhost} onClick={() => deleteChannel(c)} disabled={busy === c.id}>
+                  <button className={btnDeny} onClick={() => deleteChannel(c)} disabled={busy === c.id}>
                     Delete
                   </button>
                 </div>
               )}
             </div>
           ))}
-          {!channels.length && <p className="text-sm text-zinc-500">No channels yet — create one to start receiving alerts.</p>}
+          {!channels.length && <p className="text-sm text-muted">No channels yet — create one to start receiving alerts.</p>}
         </div>
       )}
 
       {tab === "rules" && (
         <div className="flex flex-col gap-4">
           <div className="flex items-center justify-between">
-            <p className="text-sm text-zinc-500">What fires, where it goes, and how often.</p>
+            <p className="text-sm text-muted">What fires, where it goes, and how often.</p>
             {!editingRule && (
               <button className={btnPrimary} onClick={() => setEditingRule("new")}>
                 New rule
@@ -649,22 +716,22 @@ export default function AlertManager({
           )}
 
           {rules.map((r) => (
-            <div key={r.id} className="rounded-lg border border-zinc-200 bg-white/50 p-4">
+            <div key={r.id} className="rounded-lg border border-line bg-paper p-4">
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className="font-medium">{r.name}</span>
-                    {!r.enabled && <span className="rounded bg-zinc-100 px-2 py-0.5 text-xs text-zinc-500">disabled</span>}
+                    <span className="font-medium text-ink">{r.name}</span>
+                    {!r.enabled && <span className={chipCls}>disabled</span>}
                   </div>
-                  <p className="mt-1 text-sm text-zinc-500">{r.triggerLabel}</p>
+                  <p className="mt-1 text-sm text-muted">{r.triggerLabel}</p>
                   <div className="mt-2 flex flex-wrap gap-1.5">
                     {r.channels.map((c) => (
-                      <span key={c.id} className="rounded bg-zinc-100 px-2 py-0.5 text-xs text-zinc-500">
-                        {c.name} <span className="text-zinc-500">({TYPE_LABELS[c.type] ?? c.type})</span>
+                      <span key={c.id} className={chipCls}>
+                        {c.name} <span className="text-subtle">({TYPE_LABELS[c.type] ?? c.type})</span>
                       </span>
                     ))}
                   </div>
-                  <p className="mt-2 text-xs text-zinc-500">
+                  <p className="mt-2 text-xs text-muted">
                     cooldown {fmtCooldown(r.cooldownSec)} · {r.digest === "daily_digest" ? "daily digest" : "immediate"}
                     {r.quietHours ? ` · quiet ${r.quietHours.start}–${r.quietHours.end} UTC` : ""}
                     {r.lastFiredAt ? ` · last fired ${new Date(r.lastFiredAt).toLocaleString()}` : " · never fired"}
@@ -679,14 +746,14 @@ export default function AlertManager({
                   <button className={btnGhost} onClick={() => setEditingRule(r)}>
                     Edit
                   </button>
-                  <button className={btnGhost} onClick={() => deleteRule(r)} disabled={busy === r.id}>
+                  <button className={btnDeny} onClick={() => deleteRule(r)} disabled={busy === r.id}>
                     Delete
                   </button>
                 </div>
               </div>
             </div>
           ))}
-          {!rules.length && <p className="text-sm text-zinc-500">No rules yet — create one to get notified when things change.</p>}
+          {!rules.length && <p className="text-sm text-muted">No rules yet — create one to get notified when things change.</p>}
         </div>
       )}
     </div>

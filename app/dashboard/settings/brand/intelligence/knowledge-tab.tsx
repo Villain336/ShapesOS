@@ -7,18 +7,30 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { BookOpen, Check, CircleAlert, Pencil, Pin, PinOff, Plus, Trash2, X } from "lucide-react";
-import {
-  Chip,
-  btnPrimary,
-  btnGhost,
-  tableShell,
-  theadCls,
-  thCls,
-  rowCls,
-  infoNoteCls,
-  inputCls,
-} from "../../../substrate/ui";
+import { BookOpen, Check, Pencil, Pin, PinOff, Plus, Trash2, TriangleAlert, X } from "lucide-react";
+// ── AOS atoms (local — app/dashboard/substrate/ui.tsx is owned by another slice) ──
+const inputCls =
+  "rounded-md border-[1.5px] border-control bg-paper px-2.5 py-1.5 text-[13px] text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none";
+const btnPrimary =
+  "inline-flex items-center gap-1.5 rounded-full bg-ink px-3 py-1.5 text-[13px] font-medium text-white aos-press hover:bg-night-hover disabled:opacity-40";
+const btnGhost =
+  "inline-flex items-center gap-1.5 rounded-full bg-paper px-2.5 py-1.5 text-[13px] font-medium text-ink shadow-outline aos-press hover:bg-hover-paper disabled:opacity-40";
+const tableShell = "overflow-hidden rounded-lg border border-line bg-paper";
+const theadCls = "border-b border-line text-left text-[12px] text-muted";
+const thCls = "px-3 py-2 text-left font-medium";
+const rowCls = "border-b border-line last:border-0 hover:bg-hover-paper";
+const infoNoteCls = "rounded-lg border border-line bg-canvas p-4 text-[12.5px] text-muted";
+
+// Statuses here are agent/provider states, not agent states — neutral chips.
+function Chip({ children, tone: _tone }: { children: React.ReactNode; tone?: string }) {
+  return (
+    <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-paper px-1.5 py-0.5 text-[10px] font-medium leading-tight text-muted shadow-control">
+      {children}
+    </span>
+  );
+}
+const btnDeny =
+  "inline-flex items-center gap-1.5 rounded-full bg-paper px-3 py-1.5 text-[13px] font-medium text-failed-text shadow-[inset_0_0_0_1.5px_var(--aos-failed)] aos-press hover:bg-failed-tint disabled:opacity-40";
 
 export interface KnowledgeEntry {
   id: string;
@@ -72,14 +84,47 @@ function bodySummary(kind: string, body: Record<string, unknown>): string {
   }
 }
 
+// Spec switch (44x26 pill track, white 20px knob) with a visible label.
+function Switch({
+  checked,
+  onChange,
+  label,
+}: {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  label: string;
+}) {
+  return (
+    <label className="inline-flex cursor-pointer items-center gap-2 text-[13px] text-muted">
+      <button
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        aria-label={label}
+        onClick={() => onChange(!checked)}
+        className={`relative h-[26px] w-[44px] shrink-0 rounded-full transition-colors ${
+          checked ? "bg-ink" : "bg-disabled-fg"
+        }`}
+      >
+        <span
+          className={`absolute top-[3px] h-5 w-5 rounded-full bg-white transition-all ${
+            checked ? "left-[21px]" : "left-[3px]"
+          }`}
+        />
+      </button>
+      {label}
+    </label>
+  );
+}
+
 function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-stone-900/30" onClick={onClose} aria-hidden />
-      <div className="relative max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-lg border border-stone-200 bg-white p-5 shadow-xl">
+      <div className="absolute inset-0 bg-ink/30" onClick={onClose} aria-hidden />
+      <div className="relative max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-lg border border-line bg-paper p-5 shadow-overlay">
         <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-[15px] font-semibold text-stone-900">{title}</h3>
-          <button type="button" onClick={onClose} aria-label="Close" className="rounded-md p-1 text-stone-400 hover:bg-stone-100 hover:text-stone-600">
+          <h3 className="text-[15px] font-semibold text-ink">{title}</h3>
+          <button type="button" onClick={onClose} aria-label="Close" className="rounded-md p-1 text-subtle hover:bg-hover-paper hover:text-muted">
             <X size={16} />
           </button>
         </div>
@@ -220,9 +265,9 @@ export default function KnowledgeTab({
       {notice && (
         <div className={infoNoteCls} role="status">
           <span className="flex items-center gap-2">
-            <Check size={14} className="shrink-0 text-emerald-600" />
+            <Check size={14} className="shrink-0 text-muted" />
             {notice}
-            <button type="button" onClick={() => setNotice(null)} className="ml-auto text-stone-400 hover:text-stone-600" aria-label="Dismiss">
+            <button type="button" onClick={() => setNotice(null)} className="ml-auto text-subtle hover:text-muted" aria-label="Dismiss">
               <X size={14} />
             </button>
           </span>
@@ -231,16 +276,16 @@ export default function KnowledgeTab({
 
       <div className="flex flex-wrap items-center gap-2">
         {pendingReview.length > 0 && (
-          <div className="w-full rounded-lg border border-brand-600/30 bg-brand-50/40 p-3">
-            <p className="text-[13px] font-medium text-stone-900">
+          <div className="w-full rounded-lg border border-line bg-needs-tint aos-shape aos-shape--needs aos-shape--edged p-3">
+            <p className="text-[13px] font-medium text-ink">
               {pendingReview.length} learner proposal{pendingReview.length === 1 ? "" : "s"} waiting for review
             </p>
-            <p className="text-[12.5px] text-stone-500">
+            <p className="text-[12.5px] text-muted">
               Accept the entries you agree with — they go live only when you accept them.
             </p>
           </div>
         )}
-        <div className="flex items-center gap-1.5 text-[13px] text-stone-500">
+        <div className="flex items-center gap-1.5 text-[13px] text-muted">
           <BookOpen size={14} />
           <select value={kindFilter} onChange={(e) => setKindFilter(e.target.value)} className={inputCls} aria-label="Filter by kind">
             <option value="">All kinds</option>
@@ -249,7 +294,7 @@ export default function KnowledgeTab({
             ))}
           </select>
         </div>
-        <span className="text-[12.5px] text-stone-400">{filtered.length} entr{filtered.length === 1 ? "y" : "ies"}</span>
+        <span className="text-[12.5px] text-subtle">{filtered.length} entr{filtered.length === 1 ? "y" : "ies"}</span>
         {canEdit && (
           <button type="button" onClick={openNew} className={`${btnPrimary} ml-auto`}>
             <Plus size={14} /> Add entry
@@ -271,49 +316,49 @@ export default function KnowledgeTab({
           <tbody>
             {filtered.length === 0 && (
               <tr className={rowCls}>
-                <td colSpan={canEdit ? 5 : 4} className="px-3 py-8 text-center text-stone-500">
+                <td colSpan={canEdit ? 5 : 4} className="px-3 py-8 text-center text-muted">
                   No knowledge entries yet — add products, pricing, audiences, competitors, pillars, proof, and positioning so agents know the business.
                 </td>
               </tr>
             )}
             {filtered.map((e) => (
               <tr key={e.id} className={rowCls}>
-                <td className="px-3 py-2.5 font-medium text-stone-900">
+                <td className="px-3 py-2.5 font-medium text-ink">
                   {e.title}
                   {needsReview(e) && (
-                    <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-brand-50 px-2 py-0.5 text-[11px] font-medium text-brand-700">
-                      <CircleAlert size={11} /> Needs review
+                    <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-needs-tint px-2 py-0.5 text-[11px] font-medium text-ink aos-shape aos-shape--needs aos-shape--edged">
+                      <TriangleAlert size={11} /> Needs review
                     </span>
                   )}
                 </td>
-                <td className="px-3 py-2.5"><Chip tone="violet">{e.kind}</Chip></td>
-                <td className="max-w-[340px] truncate px-3 py-2.5 text-stone-600" title={bodySummary(e.kind, e.body)}>
+                <td className="px-3 py-2.5"><Chip>{e.kind}</Chip></td>
+                <td className="max-w-[340px] truncate px-3 py-2.5 text-muted" title={bodySummary(e.kind, e.body)}>
                   {bodySummary(e.kind, e.body)}
                 </td>
                 <td className="px-3 py-2.5">
                   {e.pinned ? (
-                    <span className="inline-flex items-center gap-1 text-[12px] font-medium text-brand-700">
+                    <span className="inline-flex items-center gap-1 text-[12px] font-medium text-muted">
                       <Pin size={12} /> pinned
                     </span>
                   ) : (
-                    <span className="text-[12px] text-stone-400">—</span>
+                    <span className="text-[12px] text-subtle">—</span>
                   )}
                 </td>
                 {canEdit && (
                   <td className="px-3 py-2.5">
                     <div className="flex items-center justify-end gap-1">
                       {needsReview(e) && (
-                        <button type="button" aria-label="Accept learner proposal" title="Accept — mark reviewed and make live" onClick={() => acceptProposal(e)} disabled={busy} className="rounded-md p-1.5 text-brand-700 hover:bg-brand-50">
+                        <button type="button" aria-label="Accept learner proposal" title="Accept — mark reviewed and make live" onClick={() => acceptProposal(e)} disabled={busy} className="rounded-md p-1.5 text-ink hover:bg-hover-paper">
                           <Check size={14} />
                         </button>
                       )}
-                      <button type="button" aria-label={e.pinned ? "Unpin" : "Pin"} title={e.pinned ? "Unpin — learner may refine" : "Pin — learner cannot modify"} onClick={() => togglePin(e)} disabled={busy} className="rounded-md p-1.5 text-stone-400 hover:bg-stone-100 hover:text-stone-700">
+                      <button type="button" aria-label={e.pinned ? "Unpin" : "Pin"} title={e.pinned ? "Unpin — learner may refine" : "Pin — learner cannot modify"} onClick={() => togglePin(e)} disabled={busy} className="rounded-md p-1.5 text-subtle hover:bg-hover-paper hover:text-muted">
                         {e.pinned ? <PinOff size={14} /> : <Pin size={14} />}
                       </button>
-                      <button type="button" aria-label="Edit entry" onClick={() => openEdit(e)} className="rounded-md p-1.5 text-stone-400 hover:bg-stone-100 hover:text-stone-700">
+                      <button type="button" aria-label="Edit entry" onClick={() => openEdit(e)} className="rounded-md p-1.5 text-subtle hover:bg-hover-paper hover:text-muted">
                         <Pencil size={14} />
                       </button>
-                      <button type="button" aria-label="Delete entry" onClick={() => setConfirmDelete(e)} className="rounded-md p-1.5 text-stone-400 hover:bg-red-50 hover:text-red-600">
+                      <button type="button" aria-label="Delete entry" onClick={() => setConfirmDelete(e)} className="rounded-md p-1.5 text-subtle hover:bg-failed-tint hover:text-failed-text">
                         <Trash2 size={14} />
                       </button>
                     </div>
@@ -332,7 +377,7 @@ export default function KnowledgeTab({
         <Modal title={editing === "new" ? "Add knowledge entry" : "Edit knowledge entry"} onClose={() => setEditing(null)}>
           <div className="mb-3 grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1 block text-[12.5px] font-medium text-stone-700">Kind</label>
+              <label className="mb-1 block text-[12.5px] font-medium text-muted">Kind</label>
               <select value={form.kind} onChange={(e) => setForm({ ...form, kind: e.target.value, body: KIND_HINT[e.target.value] ?? "{}" })} className={`${inputCls} w-full`} disabled={editing !== "new"}>
                 {KINDS.map((k) => (
                   <option key={k} value={k}>{k}</option>
@@ -340,16 +385,15 @@ export default function KnowledgeTab({
               </select>
             </div>
             <div>
-              <label className="mb-1 block text-[12.5px] font-medium text-stone-700">Title</label>
+              <label className="mb-1 block text-[12.5px] font-medium text-muted">Title</label>
               <input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className={`${inputCls} w-full`} placeholder="e.g. Acme Starter plan" />
             </div>
           </div>
-          <label className="mb-1 block text-[12.5px] font-medium text-stone-700">Body — JSON</label>
+          <label className="mb-1 block text-[12.5px] font-medium text-muted">Body — JSON</label>
           <textarea value={form.body} onChange={(e) => setForm({ ...form, body: e.target.value })} rows={8} spellCheck={false} className={`${inputCls} mb-3 w-full font-mono text-[12px]`} />
-          <label className="mb-4 flex cursor-pointer items-center gap-2 text-[13px] text-stone-700">
-            <input type="checkbox" checked={form.pinned} onChange={(e) => setForm({ ...form, pinned: e.target.checked })} className="accent-brand-600" />
-            Pin — the learner may never modify this
-          </label>
+          <div className="mb-4">
+            <Switch checked={form.pinned} onChange={(v) => setForm({ ...form, pinned: v })} label="Pin — the learner may never modify this" />
+          </div>
           <div className="flex justify-end gap-2">
             <button type="button" onClick={() => setEditing(null)} className={btnGhost}>Cancel</button>
             <button type="button" onClick={save} disabled={busy} className={btnPrimary}>
@@ -361,11 +405,11 @@ export default function KnowledgeTab({
 
       {confirmDelete && (
         <Modal title="Delete this entry?" onClose={() => setConfirmDelete(null)}>
-          <p className="mb-1 text-[13px] text-stone-700">{confirmDelete.title}</p>
-          <p className="mb-4 text-[12.5px] text-stone-500">Agents will no longer know this. This cannot be undone.</p>
+          <p className="mb-1 text-[13px] text-ink">{confirmDelete.title}</p>
+          <p className="mb-4 text-[12.5px] text-muted">Agents will no longer know this. This cannot be undone.</p>
           <div className="flex justify-end gap-2">
             <button type="button" onClick={() => setConfirmDelete(null)} className={btnGhost}>Cancel</button>
-            <button type="button" onClick={() => remove(confirmDelete)} disabled={busy} className="flex items-center gap-1.5 rounded-md bg-red-600 px-3 py-1.5 text-[13px] font-medium text-white hover:bg-red-700 disabled:opacity-40">
+            <button type="button" onClick={() => remove(confirmDelete)} disabled={busy} className={btnDeny}>
               <Trash2 size={14} /> Delete
             </button>
           </div>

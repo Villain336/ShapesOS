@@ -4,6 +4,17 @@
 "use client";
 
 import { useState } from "react";
+import { Check, X } from "lucide-react";
+
+// AOS atoms (local — components/settings/ui.tsx is owned by another slice).
+const inputCls =
+  "h-control-sm rounded-md border-[1.5px] border-control bg-paper px-3 text-sm text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none";
+const btnGhost =
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-paper px-4 text-sm font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper disabled:opacity-40";
+const chipCls =
+  "inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-paper px-2 py-0.5 text-xs font-medium text-muted shadow-control";
+const failChipCls =
+  "inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-failed-tint px-2 py-0.5 text-xs font-medium text-failed-text";
 
 interface ChannelResult {
   channelId: string;
@@ -34,16 +45,6 @@ interface AlertEvent {
 function isChannelResult(r: unknown): r is ChannelResult {
   return typeof r === "object" && r !== null && "name" in r && "ok" in r;
 }
-
-const STATUS_STYLES: Record<string, string> = {
-  sent: "bg-emerald-900/40 text-emerald-700",
-  failed: "bg-red-100/40 text-red-700",
-  queued: "bg-amber-100/40 text-amber-700",
-  suppressed: "bg-zinc-100 text-zinc-500",
-};
-
-const btnGhost =
-  "rounded-md border border-zinc-200 px-3 py-1.5 text-xs text-zinc-500 hover:border-zinc-400 disabled:opacity-50";
 
 export default function AlertHistory({
   initial,
@@ -97,12 +98,13 @@ export default function AlertHistory({
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap gap-3">
         <select
-          className="rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm"
+          className={inputCls}
           value={status}
           onChange={(e) => {
             setStatus(e.target.value);
             load(e.target.value, ruleId);
           }}
+          aria-label="Filter by status"
         >
           <option value="">All statuses</option>
           <option value="sent">Sent</option>
@@ -111,12 +113,13 @@ export default function AlertHistory({
           <option value="suppressed">Suppressed</option>
         </select>
         <select
-          className="rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm"
+          className={inputCls}
           value={ruleId}
           onChange={(e) => {
             setRuleId(e.target.value);
             load(status, e.target.value);
           }}
+          aria-label="Filter by rule"
         >
           <option value="">All rules</option>
           {rules.map((r) => (
@@ -125,40 +128,47 @@ export default function AlertHistory({
             </option>
           ))}
         </select>
-        {loading && <span className="self-center text-sm text-zinc-500">Loading…</span>}
+        {loading && <span className="self-center text-sm text-muted">Loading…</span>}
       </div>
 
       {events.map((e) => (
-        <div key={e.id} className="rounded-lg border border-zinc-200 bg-white/50 p-4">
+        <div key={e.id} className="rounded-lg border border-line bg-paper p-4">
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                <span className={`rounded px-2 py-0.5 text-xs font-medium ${STATUS_STYLES[e.status]}`}>{e.status}</span>
-                <span className="text-xs text-zinc-500">{e.triggerLabel}</span>
-                <span className="text-xs text-zinc-500">· {e.ruleName}</span>
-                {e.queueReason && <span className="text-xs text-amber-700/80">· waiting: {e.queueReason}</span>}
+                <span className={chipCls}>{e.status}</span>
+                <span className="text-xs text-muted">{e.triggerLabel}</span>
+                <span className="text-xs text-muted">· {e.ruleName}</span>
+                {e.queueReason && (
+                  <span className="text-xs text-muted">· waiting: {e.queueReason}</span>
+                )}
               </div>
-              <p className="mt-2 font-medium">{e.title}</p>
-              <p className="mt-1 whitespace-pre-wrap text-sm text-zinc-500">{e.body}</p>
+              <p className="mt-2 font-medium text-ink">{e.title}</p>
+              <p className="mt-1 whitespace-pre-wrap text-sm text-muted">{e.body}</p>
               <div className="mt-2 flex flex-wrap gap-2">
                 {e.results.map((r, i) =>
                   isChannelResult(r) ? (
                     <span
                       key={i}
                       title={r.error ?? undefined}
-                      className={`rounded px-2 py-0.5 text-xs ${r.ok ? "bg-zinc-100 text-zinc-500" : "bg-red-100/40 text-red-700"}`}
+                      className={r.ok ? chipCls : failChipCls}
                     >
-                      {r.ok ? "✓" : "✗"} {r.name}
+                      {r.ok ? (
+                        <Check size={12} aria-hidden="true" />
+                      ) : (
+                        <X size={12} aria-hidden="true" />
+                      )}
+                      {r.name}
                       {r.error ? `: ${r.error}` : ""}
                     </span>
                   ) : (
-                    <span key={i} className="rounded bg-zinc-100 px-2 py-0.5 text-xs text-zinc-500">
+                    <span key={i} className={chipCls}>
                       {typeof r === "object" && r !== null && "digest" in r ? "folded into digest" : "suppressed"}
                     </span>
                   ),
                 )}
               </div>
-              <p className="mt-2 text-xs text-zinc-500">
+              <p className="mt-2 text-xs text-muted">
                 {new Date(e.createdAt).toLocaleString()}
                 {e.retryCount > 0 && ` · ${e.retryCount} ${e.retryCount === 1 ? "attempt" : "attempts"}`}
               </p>
@@ -178,7 +188,7 @@ export default function AlertHistory({
           </div>
         </div>
       ))}
-      {!events.length && <p className="text-sm text-zinc-500">No alert events yet.</p>}
+      {!events.length && <p className="text-sm text-muted">No alert events yet.</p>}
     </div>
   );
 }

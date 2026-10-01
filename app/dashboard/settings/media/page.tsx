@@ -35,28 +35,28 @@ export default async function MediaSettingsPage() {
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h1 className="text-xl font-bold tracking-tight text-stone-900">Media safety</h1>
-        <p className="mt-0.5 text-[13px] text-stone-500">
+        <h1 className="aos-heading">Media safety</h1>
+        <p className="mt-0.5 text-[13px] text-muted">
           {workspace.name} — trust ladder, approval rules, virtual cards, and kill switches for
           supervised-always media buying.
         </p>
       </div>
       <SettingsNav />
-      <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white">
+      <div className="overflow-hidden rounded-xl border border-line bg-white">
         <table className="w-full text-left text-sm">
           <tbody>
             {rows.map(([k, v]) => (
-              <tr key={k} className="border-b border-zinc-100 last:border-0">
-                <th className="w-56 px-4 py-3 align-top font-medium text-zinc-700">{k}</th>
-                <td className="px-4 py-3 text-zinc-600">{v}</td>
+              <tr key={k} className="border-b border-line last:border-0">
+                <th className="w-56 px-4 py-3 align-top font-medium text-ink">{k}</th>
+                <td className="px-4 py-3 text-muted">{v}</td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
-      <div className="rounded-xl border border-zinc-200 bg-white p-4">
-        <h2 className="text-sm font-semibold text-zinc-900">Role separation</h2>
-        <ul className="mt-2 space-y-1 text-sm text-zinc-600">
+      <div className="rounded-xl border border-line bg-white p-4">
+        <h2 className="text-sm font-semibold text-ink">Role separation</h2>
+        <ul className="mt-2 space-y-1 text-sm text-muted">
           <li>· <span className="font-medium">owner</span> (workspace owner/admin) — propose, approve, emergency stop</li>
           <li>· <span className="font-medium">media_buyer</span> (workspace editor) — propose only; can never approve (enforced in the service layer)</li>
           <li>· <span className="font-medium">viewer</span> — read-only</li>

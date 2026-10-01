@@ -11,7 +11,6 @@ import { requireUser, getOrCreateWorkspace } from "@/lib/session";
 import { requireWorkspaceRole } from "@/lib/authz";
 import SettingsNav from "@/components/settings/SettingsNav";
 import { withWorkspaceScope } from "@/lib/substrate/memory/rls";
-import { PageTitle } from "../../../substrate/ui";
 import VoiceTab from "./voice-tab";
 import KnowledgeTab from "./knowledge-tab";
 import StyleRulesTab from "./style-rules-tab";
@@ -76,14 +75,17 @@ export default async function BrandIntelligencePage({
   ]);
 
   return (
-    <div className="bg-[#FAFAF7] p-4 md:p-6">
+    <div className="bg-canvas p-4 md:p-6">
       <div className="mx-auto flex max-w-5xl flex-col gap-6">
-        <PageTitle
-          title="Brand Intelligence"
-          subtitle={`${workspace.name} — the living model of your business. The learning loop refines it from every interaction; pin anything the learner must not touch.`}
-        />
+        <div>
+          <h1 className="aos-heading">Brand Intelligence</h1>
+          <p className="mt-0.5 text-sm text-muted">
+            {workspace.name} — the living model of your business. The learning loop refines it from every
+            interaction; pin anything the learner must not touch.
+          </p>
+        </div>
         <SettingsNav />
-        <nav aria-label="Intelligence sections" className="flex flex-wrap gap-1 border-b border-stone-200">
+        <nav aria-label="Intelligence sections" className="flex flex-wrap gap-1 border-b border-line">
           {TABS.map((t) => {
             const active = tab === t.id;
             const Icon = t.icon;
@@ -94,8 +96,8 @@ export default async function BrandIntelligencePage({
                 aria-current={active ? "page" : undefined}
                 className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-[13.5px] font-medium transition ${
                   active
-                    ? "border-brand-600 text-brand-700"
-                    : "border-transparent text-stone-500 hover:text-stone-800"
+                    ? "border-ink text-ink"
+                    : "border-transparent text-muted hover:text-ink"
                 }`}
               >
                 <Icon size={15} />

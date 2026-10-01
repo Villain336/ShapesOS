@@ -18,8 +18,8 @@ export default async function WhiteLabelSettingsPage() {
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h1 className="text-xl font-bold tracking-tight text-stone-900">White-label</h1>
-        <p className="mt-0.5 text-[13px] text-stone-500">
+        <h1 className="aos-heading">White-label</h1>
+        <p className="mt-0.5 text-[13px] text-muted">
           {workspace.name} — the client-facing identity: logo, custom domain, and brand color for public pages.
         </p>
       </div>

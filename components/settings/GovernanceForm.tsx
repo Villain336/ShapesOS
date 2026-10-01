@@ -5,14 +5,72 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import {
-  Notice,
-  cardCls,
-  inputCls,
-  labelCls,
-  primaryBtnVioletCls,
-  type NoticeState,
-} from "./ui";
+import { Check } from "lucide-react";
+
+// AOS atoms (local — components/settings/ui.tsx is owned by another slice).
+const cardCls = "rounded-xl border border-line bg-paper p-5";
+const labelCls = "mb-1 block text-xs font-medium text-muted";
+const inputCls =
+  "h-control-sm rounded-md border-[1.5px] border-control bg-paper px-3 text-sm text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none";
+const btnPrimary =
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-night-hover disabled:opacity-40";
+
+type NoticeKind = "ok" | "error" | "info";
+interface NoticeState {
+  kind: NoticeKind;
+  message: string;
+}
+
+function Notice({ notice }: { notice: NoticeState | null }) {
+  if (!notice) return null;
+  if (notice.kind === "error") {
+    return (
+      <div
+        role="alert"
+        className="flex items-start gap-2 rounded-md border border-failed bg-failed-tint px-3 py-2 text-sm text-failed-text"
+      >
+        <span className="mt-1 h-3 w-3 shrink-0 bg-failed" aria-hidden="true" />
+        <span>{notice.message}</span>
+      </div>
+    );
+  }
+  return (
+    <div className="flex items-start gap-2 rounded-md border border-line bg-paper px-3 py-2 text-sm text-muted">
+      <Check size={14} className="mt-0.5 shrink-0 text-ink" aria-hidden="true" />
+      <span>{notice.message}</span>
+    </div>
+  );
+}
+
+function Switch({
+  checked,
+  onChange,
+  label,
+}: {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  label: string;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      onClick={() => onChange(!checked)}
+      className={`relative h-[26px] w-[44px] shrink-0 rounded-full transition-colors ${
+        checked ? "bg-ink" : "bg-disabled-fg"
+      }`}
+    >
+      <span
+        aria-hidden="true"
+        className={`absolute top-[3px] h-5 w-5 rounded-full bg-white shadow transition-all ${
+          checked ? "left-[21px]" : "left-[3px]"
+        }`}
+      />
+    </button>
+  );
+}
 
 interface Governance {
   retentionDays: number;
@@ -40,18 +98,13 @@ function Toggle({
   hint: string;
 }) {
   return (
-    <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-zinc-200 bg-white px-3 py-3">
-      <input
-        type="checkbox"
-        checked={checked}
-        onChange={(e) => onChange(e.target.checked)}
-        className="mt-1 accent-[#0E7C66]"
-      />
-      <span>
-        <span className="block text-sm font-medium">{label}</span>
-        <span className="block text-xs text-zinc-500">{hint}</span>
+    <div className="flex items-start justify-between gap-3 rounded-lg border border-line bg-paper px-3 py-3">
+      <span className="min-w-0">
+        <span className="block text-sm font-medium text-ink">{label}</span>
+        <span className="block text-xs text-muted">{hint}</span>
       </span>
-    </label>
+      <Switch checked={checked} onChange={onChange} label={label} />
+    </div>
   );
 }
 
@@ -102,14 +155,14 @@ export default function GovernanceForm({ workspaceId }: { workspaceId: string })
     }
   }
 
-  if (!loaded) return <p className="text-sm text-zinc-500">Loading…</p>;
+  if (!loaded) return <p className="text-sm text-muted">Loading…</p>;
 
   return (
     <div className="flex flex-col gap-4">
       <Notice notice={notice} />
       <div className={cardCls}>
-        <h2 className="font-medium">Data retention & sharing</h2>
-        <p className="mt-1 text-sm text-zinc-500">
+        <h2 className="font-medium text-ink">Data retention & sharing</h2>
+        <p className="mt-1 text-sm text-muted">
           These workspace defaults are inherited by every project and stored as
           structured JSON.
         </p>
@@ -148,16 +201,16 @@ export default function GovernanceForm({ workspaceId }: { workspaceId: string })
           />
         </div>
         <div className="mt-4">
-          <button onClick={save} disabled={busy} className={primaryBtnVioletCls}>
+          <button onClick={save} disabled={busy} className={btnPrimary}>
             {busy ? "Saving…" : "Save governance settings"}
           </button>
         </div>
       </div>
       <details className={cardCls}>
-        <summary className="cursor-pointer text-sm font-medium">
+        <summary className="cursor-pointer text-sm font-medium text-ink">
           Stored JSON (read-only preview)
         </summary>
-        <pre className="mt-2 overflow-x-auto rounded-md bg-zinc-50 p-3 font-mono text-xs text-zinc-600">
+        <pre className="mt-2 overflow-x-auto rounded-md bg-canvas p-3 font-mono text-xs text-muted">
           {JSON.stringify(gov, null, 2)}
         </pre>
       </details>

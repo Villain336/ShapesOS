@@ -22,17 +22,29 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import {
-  Chip,
-  btnPrimary,
-  btnGhost,
-  tableShell,
-  theadCls,
-  thCls,
-  rowCls,
-  infoNoteCls,
-  inputCls,
-} from "../../substrate/ui";
+// ── AOS atoms (local — app/dashboard/substrate/ui.tsx is owned by another slice) ──
+const inputCls =
+  "rounded-md border-[1.5px] border-control bg-paper px-2.5 py-1.5 text-[13px] text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none";
+const btnPrimary =
+  "inline-flex items-center gap-1.5 rounded-full bg-ink px-3 py-1.5 text-[13px] font-medium text-white aos-press hover:bg-night-hover disabled:opacity-40";
+const btnGhost =
+  "inline-flex items-center gap-1.5 rounded-full bg-paper px-2.5 py-1.5 text-[13px] font-medium text-ink shadow-outline aos-press hover:bg-hover-paper disabled:opacity-40";
+const tableShell = "overflow-hidden rounded-lg border border-line bg-paper";
+const theadCls = "border-b border-line text-left text-[12px] text-muted";
+const thCls = "px-3 py-2 text-left font-medium";
+const rowCls = "border-b border-line last:border-0 hover:bg-hover-paper";
+const infoNoteCls = "rounded-lg border border-line bg-canvas p-4 text-[12.5px] text-muted";
+
+// Statuses here are agent/provider states, not agent states — neutral chips.
+function Chip({ children, tone: _tone }: { children: React.ReactNode; tone?: string }) {
+  return (
+    <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-paper px-1.5 py-0.5 text-[10px] font-medium leading-tight text-muted shadow-control">
+      {children}
+    </span>
+  );
+}
+const btnDeny =
+  "inline-flex items-center gap-1.5 rounded-full bg-paper px-3 py-1.5 text-[13px] font-medium text-failed-text shadow-[inset_0_0_0_1.5px_var(--aos-failed)] aos-press hover:bg-failed-tint disabled:opacity-40";
 import type { LessonRow } from "./page";
 
 interface PrefRow {
@@ -65,13 +77,6 @@ function prettyValue(value: unknown): string {
   return JSON.stringify(value);
 }
 
-function confidenceTone(c: number | null): "green" | "amber" | "red" | "slate" {
-  if (c == null) return "slate";
-  if (c >= 0.8) return "green";
-  if (c >= 0.5) return "amber";
-  return "red";
-}
-
 function fmtDate(iso: string) {
   const d = new Date(iso);
   return Number.isNaN(d.getTime()) ? "—" : d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
@@ -97,15 +102,48 @@ function Toggle({
       disabled={disabled}
       onClick={() => onChange(!on)}
       className={`relative h-5 w-9 shrink-0 rounded-full transition-colors disabled:opacity-40 ${
-        on ? "bg-brand-600" : "bg-stone-300"
+        on ? "bg-ink" : "bg-disabled-fg"
       }`}
     >
       <span
-        className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all ${
+        className={`absolute top-0.5 h-4 w-4 rounded-full bg-paper shadow transition-all ${
           on ? "left-[18px]" : "left-0.5"
         }`}
       />
     </button>
+  );
+}
+
+// Spec switch (44x26 pill track, white 20px knob) with a visible label.
+function Switch({
+  checked,
+  onChange,
+  label,
+}: {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  label: string;
+}) {
+  return (
+    <label className="inline-flex cursor-pointer items-center gap-2 text-[13px] text-muted">
+      <button
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        aria-label={label}
+        onClick={() => onChange(!checked)}
+        className={`relative h-[26px] w-[44px] shrink-0 rounded-full transition-colors ${
+          checked ? "bg-ink" : "bg-disabled-fg"
+        }`}
+      >
+        <span
+          className={`absolute top-[3px] h-5 w-5 rounded-full bg-white transition-all ${
+            checked ? "left-[21px]" : "left-[3px]"
+          }`}
+        />
+      </button>
+      {label}
+    </label>
   );
 }
 
@@ -120,15 +158,15 @@ function Modal({
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-stone-900/30" onClick={onClose} aria-hidden />
-      <div className="relative w-full max-w-lg rounded-lg border border-stone-200 bg-white p-5 shadow-xl">
+      <div className="absolute inset-0 bg-ink/30" onClick={onClose} aria-hidden />
+      <div className="relative max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-lg border border-line bg-paper p-5 shadow-overlay">
         <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-[15px] font-semibold text-stone-900">{title}</h3>
+          <h3 className="text-[15px] font-semibold text-ink">{title}</h3>
           <button
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="rounded-md p-1 text-stone-400 hover:bg-stone-100 hover:text-stone-600"
+            className="rounded-md p-1 text-subtle hover:bg-hover-paper hover:text-muted"
           >
             <X size={16} />
           </button>
@@ -307,9 +345,9 @@ export default function MemoryTab({
       {notice && (
         <div className={infoNoteCls} role="status">
           <span className="flex items-center gap-2">
-            <Check size={14} className="shrink-0 text-emerald-600" />
+            <Check size={14} className="shrink-0 text-muted" />
             {notice}
-            <button type="button" onClick={() => setNotice(null)} className="ml-auto text-stone-400 hover:text-stone-600" aria-label="Dismiss">
+            <button type="button" onClick={() => setNotice(null)} className="ml-auto text-subtle hover:text-muted" aria-label="Dismiss">
               <X size={14} />
             </button>
           </span>
@@ -317,16 +355,16 @@ export default function MemoryTab({
       )}
 
       {/* Learning controls */}
-      <section className="flex flex-wrap items-center gap-4 rounded-lg border border-stone-200 bg-white p-4">
+      <section className="flex flex-wrap items-center gap-4 rounded-lg border border-line bg-paper p-4">
         <div className="flex min-w-0 flex-1 items-center gap-3">
-          <span className={`flex size-9 shrink-0 items-center justify-center rounded-full ${paused ? "bg-stone-200 text-stone-500" : "bg-brand-50 text-brand-700"}`}>
+          <span className={`flex size-9 shrink-0 items-center justify-center rounded-full ${paused ? "bg-canvas text-subtle" : "bg-canvas text-muted"}`}>
             <Brain size={17} />
           </span>
           <div className="min-w-0">
-            <p className="text-[13.5px] font-medium text-stone-900">
+            <p className="text-[13.5px] font-medium text-ink">
               Agent learning is {paused ? "paused" : "on"}
             </p>
-            <p className="text-[12.5px] text-stone-500">
+            <p className="text-[12.5px] text-muted">
               {paused
                 ? "Agents still use what they learned, but nothing new is recorded."
                 : "Every interaction can become a durable lesson. You can inspect, correct, or retire anything below."}
@@ -335,7 +373,7 @@ export default function MemoryTab({
         </div>
         <div className="flex items-center gap-2">
           <Toggle on={paused} onChange={togglePaused} disabled={!canEdit || busy} label="Pause agent learning" />
-          <span className="text-[12.5px] text-stone-500">{paused ? "Paused" : "Learning"}</span>
+          <span className="text-[12.5px] text-muted">{paused ? "Paused" : "Learning"}</span>
         </div>
         <button type="button" onClick={exportJson} className={btnGhost}>
           <Download size={14} /> Export
@@ -366,21 +404,13 @@ export default function MemoryTab({
       {/* Lessons */}
       <section>
         <div className="mb-2 flex items-center justify-between">
-          <h2 className="text-[14px] font-semibold text-stone-900">
-            What I&apos;ve learned <span className="ml-1 font-normal text-stone-400">{activeCount} active</span>
+          <h2 className="text-[14px] font-semibold text-ink">
+            What I&apos;ve learned <span className="ml-1 font-normal text-subtle">{activeCount} active</span>
           </h2>
           <div className="flex items-center gap-2">
-            <label className="flex items-center gap-1.5 text-[12.5px] text-stone-500">
-              <input
-                type="checkbox"
-                checked={showRetired}
-                onChange={(e) => setShowRetired(e.target.checked)}
-                className="accent-brand-600"
-              />
-              Show retired
-            </label>
+            <Switch checked={showRetired} onChange={setShowRetired} label="Show retired" />
             <div className="relative">
-              <Search size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-stone-400" />
+              <Search size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-subtle" />
               <input
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
@@ -405,7 +435,7 @@ export default function MemoryTab({
             <tbody>
               {filtered.length === 0 && (
                 <tr className={rowCls}>
-                  <td colSpan={canEdit ? 6 : 5} className="px-3 py-8 text-center text-stone-500">
+                  <td colSpan={canEdit ? 6 : 5} className="px-3 py-8 text-center text-muted">
                     {lessons.length === 0
                       ? "No lessons yet — they appear here after agents work and the nightly consolidation runs."
                       : "No lessons match your search."}
@@ -415,26 +445,26 @@ export default function MemoryTab({
               {filtered.map((l) => (
                 <tr key={l.id} className={rowCls}>
                   <td className="px-3 py-2.5">
-                    <p className="font-medium leading-snug text-stone-900">{l.hypothesis}</p>
-                    <p className="mt-0.5 text-[12px] text-stone-500">via {l.action}</p>
+                    <p className="font-medium leading-snug text-ink">{l.hypothesis}</p>
+                    <p className="mt-0.5 text-[12px] text-muted">via {l.action}</p>
                   </td>
                   <td className="px-3 py-2.5">
-                    <Chip tone={confidenceTone(l.confidence)}>
+                    <Chip>
                       {l.confidence == null ? "—" : `${Math.round(l.confidence * 100)}%`}
                     </Chip>
                   </td>
                   <td className="px-3 py-2.5">
                     <div className="flex items-center gap-1.5">
-                      <Chip tone="slate">{l.source}</Chip>
-                      <span className="text-[12px] text-stone-500" title="Linked source episodes">
+                      <Chip>{l.source}</Chip>
+                      <span className="text-[12px] text-muted" title="Linked source episodes">
                         {l.sourceCount} ref{l.sourceCount === 1 ? "" : "s"}
                       </span>
                     </div>
                   </td>
                   <td className="px-3 py-2.5">
-                    <Chip tone={l.retired ? "slate" : "green"}>{l.retired ? "retired" : "active"}</Chip>
+                    <Chip>{l.retired ? "retired" : "active"}</Chip>
                   </td>
-                  <td className="px-3 py-2.5 text-stone-500">{fmtDate(l.observedAt)}</td>
+                  <td className="px-3 py-2.5 text-muted">{fmtDate(l.observedAt)}</td>
                   {canEdit && (
                     <td className="px-3 py-2.5">
                       <div className="flex items-center justify-end gap-1">
@@ -443,7 +473,7 @@ export default function MemoryTab({
                             type="button"
                             aria-label="Edit lesson"
                             onClick={() => { setEditing(l); setEditText(l.hypothesis); setEditAction(l.action); }}
-                            className="rounded-md p-1.5 text-stone-400 hover:bg-stone-100 hover:text-stone-700"
+                            className="rounded-md p-1.5 text-subtle hover:bg-hover-paper hover:text-muted"
                           >
                             <Pencil size={14} />
                           </button>
@@ -453,7 +483,7 @@ export default function MemoryTab({
                             type="button"
                             aria-label="Retire lesson"
                             onClick={() => setConfirmDelete(l)}
-                            className="rounded-md p-1.5 text-stone-400 hover:bg-red-50 hover:text-red-600"
+                            className="rounded-md p-1.5 text-subtle hover:bg-failed-tint hover:text-failed-text"
                           >
                             <Trash2 size={14} />
                           </button>
@@ -466,15 +496,15 @@ export default function MemoryTab({
             </tbody>
           </table>
         </div>
-        <p className="mt-2 text-[12px] text-stone-400">
+        <p className="mt-2 text-[12px] text-subtle">
           Retiring removes a lesson from what agents recall. Retired lessons stay in history for audit — they are never hard-deleted.
         </p>
       </section>
 
       {/* Preferences */}
       <section>
-        <h2 className="mb-2 text-[14px] font-semibold text-stone-900">
-          How I should work <span className="ml-1 font-normal text-stone-400">{preferences.length}</span>
+        <h2 className="mb-2 text-[14px] font-semibold text-ink">
+          How I should work <span className="ml-1 font-normal text-subtle">{preferences.length}</span>
         </h2>
         <div className={tableShell}>
           <table className="w-full text-[13px]">
@@ -491,7 +521,7 @@ export default function MemoryTab({
             <tbody>
               {preferences.length === 0 && (
                 <tr className={rowCls}>
-                  <td colSpan={canEdit ? 6 : 5} className="px-3 py-8 text-center text-stone-500">
+                  <td colSpan={canEdit ? 6 : 5} className="px-3 py-8 text-center text-muted">
                     No preferences yet — answer the three questions above and agents stop asking what they should already know.
                   </td>
                 </tr>
@@ -499,23 +529,23 @@ export default function MemoryTab({
               {preferences.map((p) => (
                 <tr key={p.id} className={rowCls}>
                   <td className="px-3 py-2.5">
-                    <span className="flex items-center gap-1.5 font-medium text-stone-900">
+                    <span className="flex items-center gap-1.5 font-medium text-ink">
                       {prettyKey(p.key)}
-                      {p.pinned && <Pin size={12} className="text-brand-600" aria-label="Pinned — the learner cannot change this" />}
+                      {p.pinned && <Pin size={12} className="text-muted" aria-label="Pinned — the learner cannot change this" />}
                     </span>
                   </td>
-                  <td className="max-w-[320px] truncate px-3 py-2.5 text-stone-700" title={prettyValue(p.value)}>
+                  <td className="max-w-[320px] truncate px-3 py-2.5 text-muted" title={prettyValue(p.value)}>
                     {prettyValue(p.value)}
                   </td>
                   <td className="px-3 py-2.5">
-                    <Chip tone={confidenceTone(p.confidence)}>{Math.round(p.confidence * 100)}%</Chip>
+                    <Chip>{Math.round(p.confidence * 100)}%</Chip>
                   </td>
                   <td className="px-3 py-2.5">
-                    <Chip tone={p.origin === "user_told" ? "violet" : "slate"}>
+                    <Chip>
                       {p.origin === "user_told" ? "you" : p.origin.replace(/_/g, " ")}
                     </Chip>
                   </td>
-                  <td className="px-3 py-2.5 text-stone-500">{fmtDate(p.validAt)}</td>
+                  <td className="px-3 py-2.5 text-muted">{fmtDate(p.validAt)}</td>
                   {canEdit && (
                     <td className="px-3 py-2.5">
                       <div className="flex items-center justify-end">
@@ -527,7 +557,7 @@ export default function MemoryTab({
                             setPrefValue(typeof p.value === "string" ? p.value : JSON.stringify(p.value ?? ""));
                             setPrefPinned(p.pinned);
                           }}
-                          className="rounded-md p-1.5 text-stone-400 hover:bg-stone-100 hover:text-stone-700"
+                          className="rounded-md p-1.5 text-subtle hover:bg-hover-paper hover:text-muted"
                         >
                           <Pencil size={14} />
                         </button>
@@ -544,14 +574,14 @@ export default function MemoryTab({
       {/* Edit lesson modal */}
       {editing && (
         <Modal title="Edit lesson" onClose={() => setEditing(null)}>
-          <label className="mb-1 block text-[12.5px] font-medium text-stone-700">Lesson</label>
+          <label className="mb-1 block text-[12.5px] font-medium text-muted">Lesson</label>
           <textarea
             value={editText}
             onChange={(e) => setEditText(e.target.value)}
             rows={3}
             className={`${inputCls} mb-3 w-full`}
           />
-          <label className="mb-1 block text-[12.5px] font-medium text-stone-700">What produced it</label>
+          <label className="mb-1 block text-[12.5px] font-medium text-muted">What produced it</label>
           <input value={editAction} onChange={(e) => setEditAction(e.target.value)} className={`${inputCls} mb-4 w-full`} />
           <div className="flex justify-end gap-2">
             <button type="button" onClick={() => setEditing(null)} className={btnGhost}>Cancel</button>
@@ -565,8 +595,8 @@ export default function MemoryTab({
       {/* Delete confirm */}
       {confirmDelete && (
         <Modal title="Retire this lesson?" onClose={() => setConfirmDelete(null)}>
-          <p className="mb-1 text-[13px] text-stone-700">{confirmDelete.hypothesis}</p>
-          <p className="mb-4 text-[12.5px] text-stone-500">
+          <p className="mb-1 text-[13px] text-ink">{confirmDelete.hypothesis}</p>
+          <p className="mb-4 text-[12.5px] text-muted">
             Agents will stop recalling it. It stays in history for audit — nothing is hard-deleted.
           </p>
           <div className="flex justify-end gap-2">
@@ -575,7 +605,7 @@ export default function MemoryTab({
               type="button"
               onClick={() => deleteLesson(confirmDelete)}
               disabled={busy}
-              className="flex items-center gap-1.5 rounded-md bg-red-600 px-3 py-1.5 text-[13px] font-medium text-white hover:bg-red-700 disabled:opacity-40"
+              className={btnDeny}
             >
               <Trash2 size={14} /> Retire lesson
             </button>
@@ -586,12 +616,11 @@ export default function MemoryTab({
       {/* Edit preference modal */}
       {editPref && (
         <Modal title={`Edit — ${prettyKey(editPref.key)}`} onClose={() => setEditPref(null)}>
-          <label className="mb-1 block text-[12.5px] font-medium text-stone-700">Value</label>
+          <label className="mb-1 block text-[12.5px] font-medium text-muted">Value</label>
           <textarea value={prefValue} onChange={(e) => setPrefValue(e.target.value)} rows={3} className={`${inputCls} mb-3 w-full`} />
-          <label className="mb-4 flex cursor-pointer items-center gap-2 text-[13px] text-stone-700">
-            <input type="checkbox" checked={prefPinned} onChange={(e) => setPrefPinned(e.target.checked)} className="accent-brand-600" />
-            Pin — the learner may never change this
-          </label>
+          <div className="mb-4">
+            <Switch checked={prefPinned} onChange={setPrefPinned} label="Pin — the learner may never change this" />
+          </div>
           <div className="flex justify-end gap-2">
             <button type="button" onClick={() => setEditPref(null)} className={btnGhost}>Cancel</button>
             <button type="button" onClick={savePref} disabled={busy} className={btnPrimary}>
@@ -634,18 +663,18 @@ function OnboardingQuestions({
   const done = ONBOARD_QUESTIONS.every((q) => answers[q.key]);
 
   return (
-    <section className="rounded-lg border border-stone-200 bg-white p-5">
+    <section className="rounded-lg border border-line bg-paper p-5">
       <div className="flex items-center gap-2">
-        <Sparkles size={16} className="text-brand-600" />
-        <h2 className="text-[14px] font-semibold text-stone-900">How do you like to work?</h2>
+        <Sparkles size={16} className="text-muted" />
+        <h2 className="text-[14px] font-semibold text-ink">How do you like to work?</h2>
       </div>
-      <p className="mt-1 text-[12.5px] text-stone-500">
+      <p className="mt-1 text-[12.5px] text-muted">
         Three quick answers seed your preference profile — agents use them immediately instead of learning the hard way.
       </p>
       <div className="mt-4 grid gap-4 md:grid-cols-3">
         {ONBOARD_QUESTIONS.map((q) => (
           <div key={q.key}>
-            <p className="mb-2 text-[12.5px] font-medium text-stone-700">{q.question}</p>
+            <p className="mb-2 text-[12.5px] font-medium text-muted">{q.question}</p>
             <div className="flex flex-col gap-1.5">
               {q.options.map((opt) => {
                 const selected = answers[q.key] === opt;
@@ -655,10 +684,11 @@ function OnboardingQuestions({
                     type="button"
                     disabled={!canEdit || saving}
                     onClick={() => setAnswers((a) => ({ ...a, [q.key]: opt }))}
-                    className={`rounded-md border px-2.5 py-1.5 text-left text-[12.5px] transition disabled:opacity-40 ${
+                    aria-pressed={selected}
+                    className={`rounded-full px-2.5 py-1.5 text-left text-[12.5px] aos-press transition disabled:opacity-40 ${
                       selected
-                        ? "border-brand-600 bg-brand-50 text-brand-700 font-medium"
-                        : "border-stone-200 bg-white text-stone-700 hover:border-stone-300 hover:bg-stone-50"
+                        ? "bg-ink text-white font-medium"
+                        : "bg-paper text-muted shadow-outline hover:text-ink"
                     }`}
                   >
                     {opt}

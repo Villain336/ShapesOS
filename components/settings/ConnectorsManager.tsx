@@ -5,18 +5,49 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Activity, Plug } from "lucide-react";
-import {
-  Notice,
-  btnCls,
-  cardCls,
-  dangerBtnCls,
-  inputCls,
-  labelCls,
-  primaryBtnVioletCls,
-  type NoticeState,
-} from "./ui";
+import { Activity, Check, Plug } from "lucide-react";
 import ConnectorHealthTab from "./ConnectorHealthTab";
+
+// AOS atoms (local — components/settings/ui.tsx is owned by another slice).
+const cardCls = "rounded-xl border border-line bg-paper p-5";
+const labelCls = "mb-1 block text-xs font-medium text-muted";
+const inputCls =
+  "h-control-sm rounded-md border-[1.5px] border-control bg-paper px-3 text-sm text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none";
+const btnPrimary =
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-night-hover disabled:opacity-40";
+const btnGhost =
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-paper px-4 text-sm font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper disabled:opacity-40";
+const btnDeny =
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-paper px-4 text-sm font-semibold text-failed-text shadow-[inset_0_0_0_1.5px_var(--aos-failed)] aos-press hover:bg-failed-tint disabled:opacity-40";
+const chipCls =
+  "inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-paper px-2 py-0.5 text-xs font-medium text-muted shadow-control";
+
+type NoticeKind = "ok" | "error" | "info";
+interface NoticeState {
+  kind: NoticeKind;
+  message: string;
+}
+
+function Notice({ notice }: { notice: NoticeState | null }) {
+  if (!notice) return null;
+  if (notice.kind === "error") {
+    return (
+      <div
+        role="alert"
+        className="flex items-start gap-2 rounded-md border border-failed bg-failed-tint px-3 py-2 text-sm text-failed-text"
+      >
+        <span className="mt-1 h-3 w-3 shrink-0 bg-failed" aria-hidden="true" />
+        <span>{notice.message}</span>
+      </div>
+    );
+  }
+  return (
+    <div className="flex items-start gap-2 rounded-md border border-line bg-paper px-3 py-2 text-sm text-muted">
+      <Check size={14} className="mt-0.5 shrink-0 text-ink" aria-hidden="true" />
+      <span>{notice.message}</span>
+    </div>
+  );
+}
 
 interface Connection {
   id: string;
@@ -38,22 +69,11 @@ interface Connector {
   connections: Connection[];
 }
 
-const STATUS_BADGE: Record<Connection["status"], string> = {
-  active: "bg-emerald-50 text-emerald-700",
-  needs_reauth: "bg-amber-50 text-amber-700",
-  revoked: "bg-red-50 text-red-700",
-};
-
+// Connection/auth states are provider states, not agent states — neutral chips.
 const STATUS_LABEL: Record<Connection["status"], string> = {
   active: "active",
   needs_reauth: "needs re-auth",
   revoked: "revoked",
-};
-
-const AUTH_BADGE: Record<Connector["authType"], string> = {
-  oauth2: "bg-emerald-50 text-emerald-700",
-  apiKey: "bg-zinc-100 text-zinc-600",
-  none: "bg-zinc-100 text-zinc-400",
 };
 
 function connectionLabel(c: Connection): string {
@@ -279,14 +299,12 @@ export default function ConnectorsManager({
       <div key={c.key} data-testid={`connector-card-${c.key}`} className={cardCls}>
         <div className="flex items-start justify-between gap-2">
           <div>
-            <h3 className="font-medium">{c.displayName}</h3>
+            <h3 className="font-medium text-ink">{c.displayName}</h3>
             {c.description && (
-              <p className="mt-1 text-sm text-zinc-500">{c.description}</p>
+              <p className="mt-1 text-sm text-muted">{c.description}</p>
             )}
           </div>
-          <span
-            className={`shrink-0 rounded-full px-2 py-0.5 text-xs ${AUTH_BADGE[c.authType]}`}
-          >
+          <span className={chipCls}>
             {c.authType === "oauth2"
               ? "OAuth"
               : c.authType === "apiKey"
@@ -299,29 +317,25 @@ export default function ConnectorsManager({
           {c.connections.map((conn) => (
             <div
               key={conn.id}
-              className="flex items-center justify-between gap-2 rounded-lg border border-zinc-200 bg-white px-3 py-2"
+              className="flex items-center justify-between gap-2 rounded-lg border border-line bg-paper px-3 py-2"
             >
               <div className="min-w-0">
-                <div className="truncate text-sm font-medium">
+                <div className="truncate text-sm font-medium text-ink">
                   {connectionLabel(conn)}
                 </div>
-                <div className="text-xs text-zinc-500">
+                <div className="text-xs text-muted">
                   connected {new Date(conn.connectedAt).toLocaleDateString()}
                   {conn.scopes.length > 0 &&
                     ` · ${conn.scopes.length} scope${conn.scopes.length === 1 ? "" : "s"}`}
                 </div>
               </div>
               <div className="flex shrink-0 items-center gap-2">
-                <span
-                  className={`rounded-full px-2 py-0.5 text-xs ${STATUS_BADGE[conn.status]}`}
-                >
-                  {STATUS_LABEL[conn.status]}
-                </span>
+                <span className={chipCls}>{STATUS_LABEL[conn.status]}</span>
                 {conn.status !== "revoked" && (
                   <button
                     onClick={() => refreshConnection(conn.id)}
                     disabled={busy === `refresh-${conn.id}`}
-                    className="rounded-md border border-zinc-200 bg-zinc-100 px-2 py-1 text-xs text-zinc-800 hover:bg-zinc-200 disabled:opacity-50"
+                    className={btnGhost}
                   >
                     {busy === `refresh-${conn.id}` ? "Refreshing…" : "Refresh"}
                   </button>
@@ -329,7 +343,7 @@ export default function ConnectorsManager({
                 <button
                   onClick={() => disconnect(conn.id, connectionLabel(conn))}
                   disabled={busy === `disc-${conn.id}`}
-                  className={dangerBtnCls}
+                  className={btnDeny}
                 >
                   Disconnect
                 </button>
@@ -337,20 +351,20 @@ export default function ConnectorsManager({
             </div>
           ))}
           {c.connections.length === 0 && (
-            <p className="text-xs text-zinc-400">Not connected yet.</p>
+            <p className="text-xs text-subtle">Not connected yet.</p>
           )}
         </div>
 
         <div className="mt-4">
           {c.authType === "none" ? (
-            <p className="text-xs text-zinc-400">
+            <p className="text-xs text-subtle">
               This connector needs no credentials — enable it per project instead.
             </p>
           ) : (
             <button
               onClick={() => connect(c)}
               disabled={busy === `oauth-${c.key}`}
-              className={primaryBtnVioletCls}
+              className={btnPrimary}
             >
               {busy === `oauth-${c.key}` ? "Starting…" : "Connect"}
             </button>
@@ -363,13 +377,16 @@ export default function ConnectorsManager({
   return (
     <div className="flex flex-col gap-4">
       {connectedKey && (
-        <div className="rounded-md border border-emerald-200 bg-emerald-50/70 px-3 py-2 text-sm text-emerald-800">
+        <div className="rounded-md border border-line bg-paper px-3 py-2 text-sm text-muted">
           Connected &quot;{connectedKey}&quot; — the OAuth flow finished. It now appears
           below with its status.
         </div>
       )}
       {errorMsg && (
-        <div className="rounded-md border border-red-200 bg-red-50/70 px-3 py-2 text-sm text-red-700">
+        <div
+          role="alert"
+          className="rounded-md border border-failed bg-failed-tint px-3 py-2 text-sm text-failed-text"
+        >
           The connection flow did not complete: {errorMsg}. You can try
           connecting again.
         </div>
@@ -377,7 +394,7 @@ export default function ConnectorsManager({
 
       <Notice notice={notice} />
 
-      <div className="mb-4 flex gap-1 border-b border-stone-200" role="tablist" aria-label="Connectors">
+      <div className="mb-4 flex gap-1 border-b border-line" role="tablist" aria-label="Connectors">
         {(
           [
             { id: "connections", label: "Connections", icon: Plug },
@@ -393,8 +410,8 @@ export default function ConnectorsManager({
               onClick={() => setTab(t.id)}
               className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-[13.5px] font-medium transition ${
                 tab === t.id
-                  ? "border-violet-600 text-violet-700"
-                  : "border-transparent text-stone-500 hover:text-stone-800"
+                  ? "border-ink text-ink"
+                  : "border-transparent text-muted hover:text-ink"
               }`}
             >
               <Icon size={15} />
@@ -411,13 +428,13 @@ export default function ConnectorsManager({
       <div className="grid gap-4 md:grid-cols-2">
         {builtIn.map(connectorCard)}
         {builtIn.length === 0 && (
-          <p className="text-sm text-zinc-500">No connectors available.</p>
+          <p className="text-sm text-muted">No connectors available.</p>
         )}
       </div>
 
       <div className={cardCls}>
-        <h2 className="font-medium">Custom MCP servers</h2>
-        <p className="mt-1 text-sm text-zinc-500">
+        <h2 className="font-medium text-ink">Custom MCP servers</h2>
+        <p className="mt-1 text-sm text-muted">
           Attach a generic MCP server (Streamable HTTP; stdio is allowed on
           self-hosted installs only). Marketr handshakes and lists its tools.
         </p>
@@ -458,7 +475,7 @@ export default function ConnectorsManager({
           <button
             onClick={addMcp}
             disabled={busy === "add-mcp" || !mcpName.trim() || !mcpEndpoint.trim()}
-            className={primaryBtnVioletCls}
+            className={btnPrimary}
           >
             {busy === "add-mcp" ? "Adding…" : "Add MCP server"}
           </button>
@@ -468,18 +485,18 @@ export default function ConnectorsManager({
             {custom.map((c) => (
               <div
                 key={c.key}
-                className="flex items-center justify-between gap-2 rounded-lg border border-zinc-200 bg-white px-3 py-2"
+                className="flex items-center justify-between gap-2 rounded-lg border border-line bg-paper px-3 py-2"
               >
                 <div className="min-w-0">
-                  <div className="truncate text-sm font-medium">{c.displayName}</div>
-                  <div className="truncate font-mono text-xs text-zinc-400">
+                  <div className="truncate text-sm font-medium text-ink">{c.displayName}</div>
+                  <div className="truncate font-mono text-xs text-subtle">
                     {c.description ?? c.key}
                   </div>
                 </div>
                 <button
                   onClick={() => deleteMcp(c)}
                   disabled={busy === `mcp-${c.key}`}
-                  className={dangerBtnCls}
+                  className={btnDeny}
                 >
                   Delete
                 </button>
@@ -490,12 +507,12 @@ export default function ConnectorsManager({
       </div>
 
       {apiKeyFor && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
-          <div className="w-full max-w-md rounded-xl border border-zinc-200 bg-white p-5">
-            <h3 className="font-medium">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/30 p-4">
+          <div className="w-full max-w-md rounded-lg border border-line bg-paper p-5 shadow-overlay">
+            <h3 className="font-medium text-ink">
               Connect {apiKeyFor.displayName} with an API key
             </h3>
-            <p className="mt-1 text-sm text-zinc-500">
+            <p className="mt-1 text-sm text-muted">
               The key is encrypted before storage and never shown again.
             </p>
             <div className="mt-3 flex flex-col gap-2">
@@ -521,13 +538,13 @@ export default function ConnectorsManager({
               </label>
             </div>
             <div className="mt-4 flex justify-end gap-2">
-              <button onClick={() => setApiKeyFor(null)} className={btnCls}>
+              <button onClick={() => setApiKeyFor(null)} className={btnGhost}>
                 Cancel
               </button>
               <button
                 onClick={submitApiKey}
                 disabled={busy === `key-${apiKeyFor.key}` || !apiKey.trim()}
-                className={primaryBtnVioletCls}
+                className={btnPrimary}
               >
                 {busy === `key-${apiKeyFor.key}` ? "Saving…" : "Save & connect"}
               </button>

@@ -1,8 +1,8 @@
 // Marketr — Settings → Agents (Phase 13B, worker 5).
 // The "what I've learned about you" surface: per-workspace agent memory,
 // preference profile, personas. Sub-tabs [Memory | Personas] follow the
-// house sub-tab pattern (Lucide icon + label, active = border-brand-600
-// text-brand-700). Lessons are sourced from memory_learnings (the
+// house sub-tab pattern (Lucide icon + label, active = border-ink
+// text-ink). Lessons are sourced from memory_learnings (the
 // procedural store — AgentLesson is NOT a table, see docs/phases/13b/
 // DATA-MODEL.md); retire = invalidate, never delete.
 
@@ -18,7 +18,6 @@ import {
   getLearningPaused,
   type Preference,
 } from "@/lib/substrate/memory/preferences";
-import { PageTitle } from "../../substrate/ui";
 import MemoryTab from "./memory-tab";
 import PersonasTab from "./personas-tab";
 import { PERSONAS, type PersonaId } from "@/lib/expert/personas";
@@ -154,14 +153,16 @@ export default async function AgentsSettingsPage({
   }));
 
   return (
-    <div className="bg-[#FAFAF7] p-4 md:p-6">
+    <div className="bg-canvas p-4 md:p-6">
       <div className="mx-auto flex max-w-5xl flex-col gap-6">
-        <PageTitle
-          title="Agents"
-          subtitle={`${workspace.name} — what Marketr's agents have learned, how they should work, and who they are.`}
-        />
+        <div>
+          <h1 className="aos-heading">Agents</h1>
+          <p className="mt-0.5 text-sm text-muted">
+            {workspace.name} — what Marketr&apos;s agents have learned, how they should work, and who they are.
+          </p>
+        </div>
         <SettingsNav />
-        <nav aria-label="Agents sections" className="flex flex-wrap gap-1 border-b border-stone-200">
+        <nav aria-label="Agents sections" className="flex flex-wrap gap-1 border-b border-line">
           {TABS.map((t) => {
             const active = tab === t.id;
             const Icon = t.icon;
@@ -172,8 +173,8 @@ export default async function AgentsSettingsPage({
                 aria-current={active ? "page" : undefined}
                 className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-[13.5px] font-medium transition ${
                   active
-                    ? "border-brand-600 text-brand-700"
-                    : "border-transparent text-stone-500 hover:text-stone-800"
+                    ? "border-ink text-ink"
+                    : "border-transparent text-muted hover:text-ink"
                 }`}
               >
                 <Icon size={15} />

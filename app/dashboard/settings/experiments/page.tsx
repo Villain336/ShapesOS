@@ -19,18 +19,18 @@ export default async function ExperimentsSettingsPage() {
   if (!membership) redirect("/dashboard");
 
   return (
-    <div className="flex h-full flex-col gap-4 bg-[#FAFAF7] p-4 md:p-6">
+    <div className="flex h-full flex-col gap-4 bg-canvas p-4 md:p-6">
       <div>
-        <h1 className="text-xl font-bold tracking-tight text-stone-900">Experiments</h1>
-        <p className="mt-0.5 text-[13px] text-stone-500">
+        <h1 className="aos-heading">Experiments</h1>
+        <p className="mt-0.5 text-[13px] text-muted">
           {workspace.name} — feature flags and experiments, powered by a
           self-hosted GrowthBook sidecar (open core, MIT bulk).
         </p>
       </div>
       <SettingsNav />
 
-      <div className="flex items-center gap-1 border-b border-stone-200">
-        <span className="inline-flex items-center gap-1.5 border-b-2 border-violet-600 px-3 py-2 text-[13px] font-medium text-violet-700">
+      <div className="flex items-center gap-1 border-b border-line">
+        <span className="inline-flex items-center gap-1.5 border-b-2 border-ink px-3 py-2 text-[13px] font-medium text-ink">
           <FlaskConical className="h-4 w-4" />
           Flags
         </span>

@@ -34,8 +34,8 @@ export default async function AlertsPage() {
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h1 className="text-xl font-bold tracking-tight text-ink">Alert history</h1>
-        <p className="mt-1 text-sm text-zinc-500">
+        <h1 className="aos-heading">Alert history</h1>
+        <p className="mt-1 text-sm text-muted">
           Every alert the hub sent, queued, or suppressed — with per-channel delivery results.
         </p>
       </div>

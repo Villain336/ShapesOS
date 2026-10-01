@@ -20,7 +20,45 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Globe, ImagePlus, Loader2, Palette, Trash2 } from "lucide-react";
 import { previewBrandTheme, sanitizeBrandHex, DEFAULT_BRAND_PRIMARY } from "@/lib/brand-theme";
-import { cardCls, inputCls, labelCls, Notice, type NoticeState } from "./ui";
+import { Check } from "lucide-react";
+
+// AOS atoms (local — components/settings/ui.tsx is owned by another slice).
+const cardCls = "rounded-xl border border-line bg-paper p-5";
+const inputCls =
+  "h-control-sm rounded-md border-[1.5px] border-control bg-paper px-3 text-sm text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none disabled:opacity-40";
+const btnPrimary =
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-night-hover disabled:opacity-40";
+const btnGhost =
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-paper px-4 text-sm font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper disabled:opacity-40";
+const btnDeny =
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-paper px-4 text-sm font-semibold text-failed-text shadow-[inset_0_0_0_1.5px_var(--aos-failed)] aos-press hover:bg-failed-tint disabled:opacity-40";
+
+type NoticeKind = "ok" | "error" | "info";
+interface NoticeState {
+  kind: NoticeKind;
+  message: string;
+}
+
+function Notice({ notice }: { notice: NoticeState | null }) {
+  if (!notice) return null;
+  if (notice.kind === "error") {
+    return (
+      <div
+        role="alert"
+        className="flex items-start gap-2 rounded-md border border-failed bg-failed-tint px-3 py-2 text-sm text-failed-text"
+      >
+        <span className="mt-1 h-3 w-3 shrink-0 bg-failed" aria-hidden="true" />
+        <span>{notice.message}</span>
+      </div>
+    );
+  }
+  return (
+    <div className="flex items-start gap-2 rounded-md border border-line bg-paper px-3 py-2 text-sm text-muted">
+      <Check size={14} className="mt-0.5 shrink-0 text-ink" aria-hidden="true" />
+      <span>{notice.message}</span>
+    </div>
+  );
+}
 
 interface WhiteLabelState {
   logoUrl: string | null;
@@ -192,7 +230,7 @@ export default function WhiteLabelSettings({
     <div className="flex max-w-3xl flex-col gap-5">
       <Notice notice={notice} />
       {!canEdit && (
-        <p className="rounded-md border border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-600">
+        <p className="rounded-md border border-line bg-canvas px-3 py-2 text-sm text-muted">
           You can view these settings, but only workspace owners and admins can change them.
         </p>
       )}
@@ -200,19 +238,19 @@ export default function WhiteLabelSettings({
       {/* Logo */}
       <section className={cardCls}>
         <div className="flex items-center gap-2">
-          <ImagePlus size={16} className="text-stone-500" />
-          <h2 className="text-sm font-semibold text-stone-900">Workspace logo</h2>
+          <ImagePlus size={16} className="text-muted" />
+          <h2 className="text-sm font-semibold text-ink">Workspace logo</h2>
         </div>
-        <p className="mt-1 text-[13px] text-stone-500">
+        <p className="mt-1 text-[13px] text-muted">
           Shown on public review pages instead of the default star badge.
         </p>
         <div className="mt-3 flex items-center gap-4">
-          <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-xl border border-stone-200 bg-white">
+          <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-xl border border-line bg-paper">
             {logoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={logoUrl} alt="Workspace logo" className="h-full w-full object-contain" onError={cacheBust} />
             ) : (
-              <ImagePlus size={22} className="text-stone-300" />
+              <ImagePlus size={22} className="text-subtle" />
             )}
           </div>
           <div className="flex flex-col gap-2">
@@ -230,9 +268,9 @@ export default function WhiteLabelSettings({
                   type="button"
                   onClick={() => fileInput.current?.click()}
                   disabled={uploading}
-                  className="flex items-center gap-1.5 rounded-md bg-brand-600 px-3 py-1.5 text-[13px] font-medium text-white hover:bg-brand-700 disabled:opacity-40"
+                  className={btnPrimary}
                 >
-                  {uploading && <Loader2 size={14} className="animate-spin" />}
+                  {uploading && <Loader2 size={14} className="aos-spin" />}
                   {logoUrl ? "Replace logo" : "Upload logo"}
                 </button>
                 {logoUrl && (
@@ -240,7 +278,7 @@ export default function WhiteLabelSettings({
                     type="button"
                     onClick={() => void removeLogo()}
                     disabled={uploading}
-                    className="flex items-center gap-1.5 rounded-md border border-red-200 bg-red-50 px-3 py-1.5 text-[13px] font-medium text-red-700 hover:bg-red-100 disabled:opacity-40"
+                    className={btnDeny}
                   >
                     <Trash2 size={14} />
                     Remove
@@ -248,7 +286,7 @@ export default function WhiteLabelSettings({
                 )}
               </div>
             )}
-            <p className="text-xs text-stone-400">
+            <p className="text-xs text-subtle">
               {logoUrl ? "PNG, JPG, GIF, WebP, or SVG — max 2 MB." : "No logo uploaded — public review pages show the default star badge."}
             </p>
           </div>
@@ -258,10 +296,10 @@ export default function WhiteLabelSettings({
       {/* Custom domain */}
       <section className={cardCls}>
         <div className="flex items-center gap-2">
-          <Globe size={16} className="text-stone-500" />
-          <h2 className="text-sm font-semibold text-stone-900">Custom domain</h2>
+          <Globe size={16} className="text-muted" />
+          <h2 className="text-sm font-semibold text-ink">Custom domain</h2>
         </div>
-        <p className="mt-1 text-[13px] text-stone-500">
+        <p className="mt-1 text-[13px] text-muted">
           Your client-facing domain for white-labeled public pages.
         </p>
         <div className="mt-3 flex max-w-md items-center gap-2">
@@ -279,16 +317,16 @@ export default function WhiteLabelSettings({
               type="button"
               onClick={() => void saveDomain()}
               disabled={saving || !domainDirty}
-              className="flex shrink-0 items-center gap-1.5 rounded-md bg-brand-600 px-3 py-1.5 text-[13px] font-medium text-white hover:bg-brand-700 disabled:opacity-40"
+              className={`${btnPrimary} shrink-0`}
             >
-              {saving && <Loader2 size={14} className="animate-spin" />}
+              {saving && <Loader2 size={14} className="aos-spin" />}
               Save
             </button>
           )}
         </div>
-        <p className="mt-2 text-xs text-stone-400">
+        <p className="mt-2 text-xs text-subtle">
           {savedDomain ? (
-            <>Saved as <span className="font-medium text-stone-600">{savedDomain}</span>.</>
+            <>Saved as <span className="font-medium text-muted">{savedDomain}</span>.</>
           ) : (
             <>No custom domain set.</>
           )}{" "}
@@ -300,10 +338,10 @@ export default function WhiteLabelSettings({
       {/* Company color */}
       <section className={cardCls}>
         <div className="flex items-center gap-2">
-          <Palette size={16} className="text-stone-500" />
-          <h2 className="text-sm font-semibold text-stone-900">Company color</h2>
+          <Palette size={16} className="text-muted" />
+          <h2 className="text-sm font-semibold text-ink">Company color</h2>
         </div>
-        <p className="mt-1 text-[13px] text-stone-500">
+        <p className="mt-1 text-[13px] text-muted">
           The primary accent for public pages — and the dashboard, live, as you pick.
         </p>
         <div className="mt-3 flex max-w-md items-center gap-3">
@@ -312,7 +350,7 @@ export default function WhiteLabelSettings({
             value={previewHex ?? DEFAULT_BRAND_PRIMARY}
             onChange={(e) => setColor(e.target.value)}
             disabled={!canEdit}
-            className="h-9 w-12 cursor-pointer rounded-md border border-stone-200 bg-white p-1 disabled:cursor-not-allowed"
+            className="h-9 w-12 cursor-pointer rounded-md border border-line bg-paper p-1 disabled:cursor-not-allowed"
             aria-label="Pick a brand color"
           />
           <input
@@ -330,9 +368,9 @@ export default function WhiteLabelSettings({
                 type="button"
                 onClick={() => void saveColor()}
                 disabled={saving || !colorDirty}
-                className="flex items-center gap-1.5 rounded-md bg-brand-600 px-3 py-1.5 text-[13px] font-medium text-white hover:bg-brand-700 disabled:opacity-40"
+                className={btnPrimary}
               >
-                {saving && <Loader2 size={14} className="animate-spin" />}
+                {saving && <Loader2 size={14} className="aos-spin" />}
                 Save
               </button>
               {savedColor && (
@@ -340,7 +378,7 @@ export default function WhiteLabelSettings({
                   type="button"
                   onClick={() => void clearColor()}
                   disabled={saving}
-                  className="rounded-md border border-stone-200 bg-white px-3 py-1.5 text-[13px] font-medium text-stone-600 hover:bg-stone-50 disabled:opacity-40"
+                  className={btnGhost}
                 >
                   Clear
                 </button>
@@ -364,9 +402,9 @@ export default function WhiteLabelSettings({
             </span>
           </div>
         </div>
-        <p className="mt-2 text-xs text-stone-400">
+        <p className="mt-2 text-xs text-subtle">
           {savedColor ? (
-            <>Saved as <span className="font-mono font-medium text-stone-600">{savedColor}</span> — the dashboard theme follows the brand kit this saves into.</>
+            <>Saved as <span className="font-mono font-medium text-muted">{savedColor}</span> — the dashboard theme follows the brand kit this saves into.</>
           ) : (
             <>No brand color set — the default violet is used.</>
           )}{" "}

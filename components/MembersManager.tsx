@@ -5,10 +5,17 @@
 
 import { useCallback, useEffect, useState } from "react";
 
+// AOS atoms (local — components/settings/ui.tsx is owned by another slice).
 const inputCls =
-  "rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-accent focus:outline-none";
-const btnCls =
-  "rounded-md border border-zinc-200 bg-zinc-100 px-3 py-2 text-sm font-medium hover:bg-zinc-200 disabled:opacity-50";
+  "h-control-sm rounded-md border-[1.5px] border-control bg-paper px-3 text-sm text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none";
+const btnPrimary =
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-night-hover disabled:opacity-40";
+const btnGhost =
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-paper px-4 text-sm font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper disabled:opacity-40";
+const btnDeny =
+  "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-paper px-4 text-sm font-semibold text-failed-text shadow-[inset_0_0_0_1.5px_var(--aos-failed)] aos-press hover:bg-failed-tint disabled:opacity-40";
+const chipCls =
+  "inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-paper px-2 py-0.5 text-xs font-medium text-muted shadow-control";
 
 interface Member {
   id: string;
@@ -109,9 +116,9 @@ export default function MembersManager({ myRole }: { myRole: string }) {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="rounded-xl border border-zinc-200 bg-white/60 p-5">
-        <h2 className="text-sm font-medium">Invite a teammate</h2>
-        <p className="mt-1 text-xs text-zinc-500">
+      <div className="rounded-xl border border-line bg-paper p-5">
+        <h2 className="text-sm font-medium text-ink">Invite a teammate</h2>
+        <p className="mt-1 text-xs text-muted">
           They join through a single-use invite link (valid 7 days) — no email
           is sent, so share the link with them directly. Your role:{" "}
           <span className="font-mono">{myRole}</span>
@@ -136,18 +143,23 @@ export default function MembersManager({ myRole }: { myRole: string }) {
               </option>
             ))}
           </select>
-          <button onClick={invite} disabled={busy || !email} className={btnCls}>
+          <button onClick={invite} disabled={busy || !email} className={btnPrimary}>
             {busy ? "Inviting…" : "Invite"}
           </button>
         </div>
-        {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
+        {error && (
+          <p role="alert" className="mt-2 flex items-start gap-2 rounded-md border border-failed bg-failed-tint px-3 py-2 text-sm text-failed-text">
+            <span className="mt-1 h-3 w-3 shrink-0 bg-failed" aria-hidden="true" />
+            <span>{error}</span>
+          </p>
+        )}
         {inviteUrl && (
-          <div className="mt-3 rounded-md border border-emerald-200 bg-emerald-50/40 p-3">
-            <p className="text-xs text-emerald-700">
+          <div className="mt-3 rounded-md border border-line bg-canvas p-3">
+            <p className="text-xs text-muted">
               Invite created — share this single-use link with them:
             </p>
             <div className="mt-2 flex items-center gap-2">
-              <code className="min-w-0 flex-1 truncate rounded bg-zinc-50 px-2 py-1 text-xs text-zinc-500">
+              <code className="min-w-0 flex-1 truncate rounded bg-paper px-2 py-1 font-mono text-xs text-muted">
                 {typeof window !== "undefined"
                   ? new URL(inviteUrl, window.location.origin).toString()
                   : inviteUrl}
@@ -158,7 +170,7 @@ export default function MembersManager({ myRole }: { myRole: string }) {
                     new URL(inviteUrl, window.location.origin).toString(),
                   )
                 }
-                className={btnCls}
+                className={btnGhost}
               >
                 Copy
               </button>
@@ -167,10 +179,10 @@ export default function MembersManager({ myRole }: { myRole: string }) {
         )}
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-zinc-200">
+      <div className="overflow-hidden rounded-xl border border-line bg-paper">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-zinc-200 bg-white/60 text-left text-xs uppercase tracking-widest text-zinc-500">
+            <tr className="border-b border-line text-left text-xs text-muted">
               <th className="px-4 py-3">Member</th>
               <th className="px-4 py-3">Role</th>
               <th className="px-4 py-3">Status</th>
@@ -179,11 +191,11 @@ export default function MembersManager({ myRole }: { myRole: string }) {
           </thead>
           <tbody>
             {members.map((m) => (
-              <tr key={m.id} className="border-b border-zinc-200/60 last:border-0">
+              <tr key={m.id} className="border-b border-line last:border-0 hover:bg-hover-paper">
                 <td className="px-4 py-3">
-                  <div className="font-medium">{m.name ?? m.email ?? "—"}</div>
+                  <div className="font-medium text-ink">{m.name ?? m.email ?? "—"}</div>
                   {m.name && m.email && (
-                    <div className="text-xs text-zinc-500">{m.email}</div>
+                    <div className="text-xs text-muted">{m.email}</div>
                   )}
                 </td>
                 <td className="px-4 py-3">
@@ -201,13 +213,11 @@ export default function MembersManager({ myRole }: { myRole: string }) {
                 </td>
                 <td className="px-4 py-3">
                   {m.pending ? (
-                    <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs text-amber-700">
+                    <span className={chipCls}>
                       pending — needs invite link
                     </span>
                   ) : (
-                    <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs text-emerald-700">
-                      active
-                    </span>
+                    <span className={chipCls}>active</span>
                   )}
                 </td>
                 <td className="px-4 py-3 text-right">
@@ -215,14 +225,14 @@ export default function MembersManager({ myRole }: { myRole: string }) {
                     {m.pending && (
                       <button
                         onClick={() => copyInviteLink(m.id)}
-                        className="rounded-md border border-zinc-200 bg-zinc-100 px-2 py-1 text-xs text-zinc-800 hover:bg-zinc-200"
+                        className="rounded-md border border-line px-2 py-1 text-xs text-muted hover:bg-hover-paper"
                       >
                         {copied === m.id ? "Copied!" : "Copy invite link"}
                       </button>
                     )}
                     <button
                       onClick={() => remove(m.id)}
-                      className="rounded-md border border-red-200 bg-red-50 px-2 py-1 text-xs text-red-700 hover:bg-red-100"
+                      className="rounded-md px-2 py-1 text-xs text-failed-text shadow-[inset_0_0_0_1px_var(--aos-failed)] hover:bg-failed-tint"
                     >
                       Remove
                     </button>
@@ -232,7 +242,7 @@ export default function MembersManager({ myRole }: { myRole: string }) {
             ))}
             {members.length === 0 && (
               <tr>
-                <td colSpan={4} className="px-4 py-8 text-center text-zinc-500">
+                <td colSpan={4} className="px-4 py-8 text-center text-muted">
                   No members yet.
                 </td>
               </tr>

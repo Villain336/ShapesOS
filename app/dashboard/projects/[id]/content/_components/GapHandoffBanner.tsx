@@ -37,36 +37,36 @@ export default function GapHandoffBanner({ handoff }: { handoff: GapHandoff }) {
   }
 
   return (
-    <div className="rounded-xl border border-violet-200 bg-violet-50/60 p-4">
+    <div className="rounded-xl border border-line bg-paper p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h2 className="flex items-center gap-2 text-sm font-semibold text-violet-900">
+          <h2 className="flex items-center gap-2 text-sm font-semibold text-ink">
             <Link2 className="h-4 w-4" />
             Citation-gap handoff from AI visibility
           </h2>
-          <p className="mt-1 text-[13px] text-violet-900/80">
+          <p className="mt-1 text-[13px] text-muted">
             Engines cite competitors for this buyer question but never your domain. Save{" "}
             <strong>“{handoff.keyword}”</strong> as a keyword, then build the brief from it —
             feed it the sources so the page carries the structured facts engines quote.
           </p>
           <dl className="mt-2 space-y-1 text-[13px]">
             <div className="flex gap-2">
-              <dt className="w-28 shrink-0 font-medium text-violet-900">Engines</dt>
-              <dd className="text-violet-900/80">{handoff.engines || "—"}</dd>
+              <dt className="w-28 shrink-0 font-medium text-ink">Engines</dt>
+              <dd className="text-muted">{handoff.engines || "—"}</dd>
             </div>
             <div className="flex gap-2">
-              <dt className="w-28 shrink-0 font-medium text-violet-900">Cited instead</dt>
-              <dd className="font-mono text-xs text-violet-900/80">{handoff.competitors || "—"}</dd>
+              <dt className="w-28 shrink-0 font-medium text-ink">Cited instead</dt>
+              <dd className="font-mono text-xs text-muted">{handoff.competitors || "—"}</dd>
             </div>
             <div className="flex gap-2">
-              <dt className="w-28 shrink-0 font-medium text-violet-900">Missing facts</dt>
-              <dd className="text-violet-900/80">{handoff.facts || "—"}</dd>
+              <dt className="w-28 shrink-0 font-medium text-ink">Missing facts</dt>
+              <dd className="text-muted">{handoff.facts || "—"}</dd>
             </div>
           </dl>
         </div>
         <button
           onClick={copy}
-          className="flex shrink-0 items-center gap-1.5 rounded-md bg-violet-600 px-3 py-1.5 text-[13px] font-medium text-white hover:bg-violet-700"
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-ink px-3 py-1.5 text-[13px] font-medium text-white aos-press hover:bg-night-hover"
         >
           {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
           {copied ? "Copied" : "Copy brief inputs"}

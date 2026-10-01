@@ -32,58 +32,58 @@ import {
   type ClipSource,
 } from "./api";
 
-// ── Small atoms (mirror app/dashboard/studio/StudioApp.tsx, brand-var law) ───
+// ── Small atoms (AOS local) ───
 
-function Chip({
-  children,
-  tone = "slate",
-}: {
-  children: React.ReactNode;
-  tone?: "slate" | "brand" | "green" | "amber" | "red" | "blue";
-}) {
-  const tones: Record<string, string> = {
-    slate: "bg-slate-100 text-slate-600 border-slate-200",
-    brand: "bg-brand-50 text-brand-700 border-brand-600/20",
-    green: "bg-emerald-50 text-emerald-700 border-emerald-200",
-    amber: "bg-amber-50 text-amber-700 border-amber-200",
-    red: "bg-red-50 text-red-700 border-red-200",
-    blue: "bg-blue-50 text-blue-700 border-blue-200",
-  };
+// Clip/job/source statuses are provider states, not agent states — neutral chips.
+function Chip({ children }: { children: React.ReactNode }) {
   return (
-    <span className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-1.5 py-0.5 text-[10px] font-medium leading-tight ${tones[tone]}`}>
+    <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-paper px-1.5 py-0.5 text-[10px] font-medium leading-tight text-muted shadow-control">
       {children}
     </span>
   );
 }
 
-function scoreTone(score: number): "green" | "amber" | "red" {
-  if (score >= 70) return "green";
-  if (score >= 40) return "amber";
-  return "red";
-}
-
-function statusTone(status: string): "slate" | "brand" | "green" | "amber" | "red" | "blue" {
-  switch (status) {
-    case "approved": return "blue";
-    case "queued": return "brand";
-    case "posted": return "green";
-    case "failed": return "red";
-    case "done": return "green";
-    case "processing": return "amber";
-    case "ready": return "green";
-    case "draft":
-    case "pending":
-    default: return "slate";
-  }
-}
-
+// AOS atoms (local — components/settings/ui.tsx is owned by another slice).
 const inputCls =
-  "rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-[13px] text-stone-900 placeholder:text-stone-400 focus:border-brand-600 focus:outline-none";
+  "rounded-md border-[1.5px] border-control bg-paper px-2.5 py-1.5 text-[13px] text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none";
 
 const btnPrimary =
-  "flex items-center gap-1.5 rounded-md bg-brand-600 px-3 py-1.5 text-[13px] font-medium text-white hover:bg-brand-700 disabled:opacity-40";
+  "inline-flex items-center gap-1.5 rounded-full bg-ink px-3 py-1.5 text-[13px] font-medium text-white aos-press hover:bg-night-hover disabled:opacity-40";
 const btnGhost =
-  "flex items-center gap-1.5 rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-[13px] text-stone-700 hover:bg-stone-50 disabled:opacity-40";
+  "inline-flex items-center gap-1.5 rounded-full bg-paper px-2.5 py-1.5 text-[13px] font-medium text-ink shadow-outline aos-press hover:bg-hover-paper disabled:opacity-40";
+
+// Spec switch (44x26 pill track, white 20px knob) with a visible label.
+function Switch({
+  checked,
+  onChange,
+  label,
+}: {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  label: string;
+}) {
+  return (
+    <label className="inline-flex cursor-pointer items-center gap-2 text-[13px] text-muted">
+      <button
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        aria-label={label}
+        onClick={() => onChange(!checked)}
+        className={`relative h-[26px] w-[44px] shrink-0 rounded-full transition-colors ${
+          checked ? "bg-ink" : "bg-disabled-fg"
+        }`}
+      >
+        <span
+          className={`absolute top-[3px] h-5 w-5 rounded-full bg-white transition-all ${
+            checked ? "left-[21px]" : "left-[3px]"
+          }`}
+        />
+      </button>
+      {label}
+    </label>
+  );
+}
 
 const EMPTY_STYLE: CaptionStyle = {
   font: "Inter",
@@ -138,22 +138,22 @@ function NewSourceDialog({ onClose, onDone }: { onClose: () => void; onDone: () 
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/40 p-4">
-      <div className="flex max-h-[90vh] w-full max-w-md flex-col overflow-hidden rounded-xl bg-white shadow-xl">
-        <div className="flex items-center justify-between border-b border-stone-100 px-5 py-3.5">
-          <h2 className="text-[15px] font-semibold text-stone-900">New source</h2>
-          <button onClick={onClose} className="rounded-md p-1.5 text-stone-400 hover:bg-stone-100 hover:text-stone-600" aria-label="Close">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/30 p-4">
+      <div className="flex max-h-[90vh] w-full max-w-md flex-col overflow-hidden rounded-lg bg-paper shadow-overlay">
+        <div className="flex items-center justify-between border-b border-line px-5 py-3.5">
+          <h2 className="text-[15px] font-semibold text-ink">New source</h2>
+          <button onClick={onClose} className="rounded-md p-1.5 text-subtle hover:bg-hover-paper hover:text-ink" aria-label="Close">
             <X size={16} />
           </button>
         </div>
         <div className="px-5 py-4">
           {error && (
-            <div className="mb-4 flex items-start gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-700">
-              <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+            <div role="alert" className="mb-4 flex items-start gap-2 rounded-md border border-failed bg-failed-tint px-3 py-2 text-[13px] text-failed-text">
+              <span className="mt-1 h-3 w-3 shrink-0 bg-failed" aria-hidden="true" />
               <span>{error}</span>
             </div>
           )}
-          <div className="mb-4 flex gap-1 border-b border-stone-200">
+          <div className="mb-4 flex gap-1 border-b border-line">
             {(
               [
                 { id: "upload", label: "Upload file", icon: UploadCloud },
@@ -166,8 +166,8 @@ function NewSourceDialog({ onClose, onDone }: { onClose: () => void; onDone: () 
                 onClick={() => setMode(id)}
                 className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-[13.5px] font-medium transition ${
                   mode === id
-                    ? "border-brand-600 text-brand-700"
-                    : "border-transparent text-stone-500 hover:text-stone-800"
+                    ? "border-ink text-ink"
+                    : "border-transparent text-muted hover:text-ink"
                 }`}
               >
                 <Icon size={15} />
@@ -176,7 +176,7 @@ function NewSourceDialog({ onClose, onDone }: { onClose: () => void; onDone: () 
             ))}
           </div>
 
-          <label className="mb-1 block text-[12px] font-medium text-stone-600">Title</label>
+          <label className="mb-1 block text-[12px] font-medium text-muted">Title</label>
           <input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
@@ -186,12 +186,12 @@ function NewSourceDialog({ onClose, onDone }: { onClose: () => void; onDone: () 
           />
 
           {mode === "upload" ? (
-            <label className="block cursor-pointer rounded-lg border-2 border-dashed border-stone-200 px-4 py-6 text-center transition hover:border-brand-600/50">
-              <UploadCloud size={20} className="mx-auto text-stone-400" />
-              <div className="mt-1.5 text-[13px] font-medium text-stone-700">
+            <label className="block cursor-pointer rounded-lg border-2 border-dashed border-line px-4 py-6 text-center transition hover:border-ink/50">
+              <UploadCloud size={20} className="mx-auto text-subtle" />
+              <div className="mt-1.5 text-[13px] font-medium text-ink">
                 {file ? file.name : "Choose a video file"}
               </div>
-              <div className="mt-0.5 text-[11px] text-stone-500">MP4, MOV, WebM — long-form works best</div>
+              <div className="mt-0.5 text-[11px] text-muted">MP4, MOV, WebM — long-form works best</div>
               <input
                 type="file"
                 accept="video/*"
@@ -206,7 +206,7 @@ function NewSourceDialog({ onClose, onDone }: { onClose: () => void; onDone: () 
             </label>
           ) : (
             <>
-              <label className="mb-1 block text-[12px] font-medium text-stone-600">Video URL</label>
+              <label className="mb-1 block text-[12px] font-medium text-muted">Video URL</label>
               <input
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
@@ -217,10 +217,10 @@ function NewSourceDialog({ onClose, onDone }: { onClose: () => void; onDone: () 
             </>
           )}
         </div>
-        <div className="flex items-center justify-end gap-2 border-t border-stone-100 px-5 py-3.5">
+        <div className="flex items-center justify-end gap-2 border-t border-line px-5 py-3.5">
           <button onClick={onClose} className={btnGhost} disabled={busy}>Cancel</button>
           <button onClick={create} className={btnPrimary} disabled={busy}>
-            {busy ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+            {busy ? <Loader2 size={14} className="aos-spin" /> : <Plus size={14} />}
             Add source
           </button>
         </div>
@@ -263,26 +263,26 @@ function GenerateDialog({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/40 p-4">
-      <div className="w-full max-w-sm overflow-hidden rounded-xl bg-white shadow-xl">
-        <div className="flex items-center justify-between border-b border-stone-100 px-5 py-3.5">
-          <h2 className="text-[15px] font-semibold text-stone-900">Generate clips</h2>
-          <button onClick={onClose} className="rounded-md p-1.5 text-stone-400 hover:bg-stone-100 hover:text-stone-600" aria-label="Close">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/30 p-4">
+      <div className="w-full max-w-sm overflow-hidden rounded-lg bg-paper shadow-overlay">
+        <div className="flex items-center justify-between border-b border-line px-5 py-3.5">
+          <h2 className="text-[15px] font-semibold text-ink">Generate clips</h2>
+          <button onClick={onClose} className="rounded-md p-1.5 text-subtle hover:bg-hover-paper hover:text-ink" aria-label="Close">
             <X size={16} />
           </button>
         </div>
         <div className="px-5 py-4">
           {error && (
-            <div className="mb-4 flex items-start gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-700">
-              <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+            <div role="alert" className="mb-4 flex items-start gap-2 rounded-md border border-failed bg-failed-tint px-3 py-2 text-[13px] text-failed-text">
+              <span className="mt-1 h-3 w-3 shrink-0 bg-failed" aria-hidden="true" />
               <span>{error}</span>
             </div>
           )}
-          <p className="mb-3 text-[13px] text-stone-600">
-            Scores candidate segments from <span className="font-medium text-stone-900">{source.title}</span> and
+          <p className="mb-3 text-[13px] text-muted">
+            Scores candidate segments from <span className="font-medium text-ink">{source.title}</span> and
             drafts the top {count}. Runs as one background job.
           </p>
-          <label className="mb-1 block text-[12px] font-medium text-stone-600">Number of clips</label>
+          <label className="mb-1 block text-[12px] font-medium text-muted">Number of clips</label>
           <input
             type="number"
             min={1}
@@ -292,10 +292,10 @@ function GenerateDialog({
             className={`${inputCls} w-24`}
           />
         </div>
-        <div className="flex items-center justify-end gap-2 border-t border-stone-100 px-5 py-3.5">
+        <div className="flex items-center justify-end gap-2 border-t border-line px-5 py-3.5">
           <button onClick={onClose} className={btnGhost} disabled={busy}>Cancel</button>
           <button onClick={run} className={btnPrimary} disabled={busy}>
-            {busy ? <Loader2 size={14} className="animate-spin" /> : <Scissors size={14} />}
+            {busy ? <Loader2 size={14} className="aos-spin" /> : <Scissors size={14} />}
             Generate
           </button>
         </div>
@@ -341,10 +341,10 @@ function SourcesTab({ onJob, goJobs }: { onJob: (job: ClipJob) => void; goJobs: 
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-lg border border-stone-200 bg-white">
+      <div className="overflow-hidden rounded-lg border border-line bg-paper">
         <table className="w-full text-left text-[13px]">
           <thead>
-            <tr className="border-b border-stone-100 bg-stone-50/60 text-[11px] uppercase tracking-wide text-stone-500">
+            <tr className="border-b border-line text-[11px] tracking-wide text-muted">
               <th className="px-3 py-2 font-medium">Title</th>
               <th className="px-3 py-2 font-medium">Origin</th>
               <th className="px-3 py-2 font-medium">Duration</th>
@@ -355,21 +355,21 @@ function SourcesTab({ onJob, goJobs }: { onJob: (job: ClipJob) => void; goJobs: 
           </thead>
           <tbody>
             {sources.map((s) => (
-              <tr key={s.id} className="border-b border-stone-100 last:border-0 hover:bg-brand-50/40">
-                <td className="px-3 py-2 font-medium text-stone-900">{s.title}</td>
+              <tr key={s.id} className="border-b border-line last:border-0 hover:bg-hover-paper">
+                <td className="px-3 py-2 font-medium text-ink">{s.title}</td>
                 <td className="px-3 py-2">
-                  <Chip tone={s.origin === "url" ? "blue" : "slate"}>
+                  <Chip>
                     {s.origin === "url" ? "URL" : "Upload"}
                   </Chip>
                 </td>
-                <td className="px-3 py-2 text-stone-600">{fmtTime(s.durationSec)}</td>
+                <td className="px-3 py-2 text-muted">{fmtTime(s.durationSec)}</td>
                 <td className="px-3 py-2">
-                  <Chip tone={statusTone(s.transcriptStatus)}>
-                    {s.transcriptStatus === "processing" && <Loader2 size={10} className="animate-spin" />}
+                  <Chip>
+                    {s.transcriptStatus === "processing" && <Loader2 size={10} className="aos-spin" />}
                     {s.transcriptStatus}
                   </Chip>
                 </td>
-                <td className="px-3 py-2 text-stone-600">{s._count?.clips ?? 0}</td>
+                <td className="px-3 py-2 text-muted">{s._count?.clips ?? 0}</td>
                 <td className="px-3 py-2 text-right">
                   <button
                     onClick={() => setGenFor(s)}
@@ -384,7 +384,7 @@ function SourcesTab({ onJob, goJobs }: { onJob: (job: ClipJob) => void; goJobs: 
             ))}
             {sources.length === 0 && !loading && (
               <tr>
-                <td colSpan={6} className="px-3 py-8 text-center text-[13px] text-stone-400">
+                <td colSpan={6} className="px-3 py-8 text-center text-[13px] text-subtle">
                   No sources yet — add the first one with “New source”.
                 </td>
               </tr>
@@ -469,7 +469,7 @@ function CaptionEditor({
     <div className="space-y-3">
       <div className="grid grid-cols-2 gap-2.5">
         <div>
-          <label className="mb-1 block text-[12px] font-medium text-stone-600">Brand preset</label>
+          <label className="mb-1 block text-[12px] font-medium text-muted">Brand preset</label>
           <select
             className={`${inputCls} w-full`}
             value={presets.find((p) => p.font === style.font && p.highlightColor === style.highlightColor && p.textColor === style.textColor)?.id ?? ""}
@@ -485,7 +485,7 @@ function CaptionEditor({
           </select>
         </div>
         <div>
-          <label className="mb-1 block text-[12px] font-medium text-stone-600">Font</label>
+          <label className="mb-1 block text-[12px] font-medium text-muted">Font</label>
           <select className={`${inputCls} w-full`} value={style.font} onChange={(e) => set({ font: e.target.value })}>
             {fontOptions.map((f) => (
               <option key={f} value={f}>{f}</option>
@@ -493,18 +493,18 @@ function CaptionEditor({
           </select>
         </div>
         <div>
-          <label className="mb-1 block text-[12px] font-medium text-stone-600">Size ({style.size ?? 44}px)</label>
+          <label className="mb-1 block text-[12px] font-medium text-muted">Size ({style.size ?? 44}px)</label>
           <input
             type="range"
             min={24}
             max={72}
             value={style.size ?? 44}
             onChange={(e) => set({ size: Number(e.target.value) })}
-            className="w-full accent-brand-600"
+            className="w-full accent-ink"
           />
         </div>
         <div>
-          <label className="mb-1 block text-[12px] font-medium text-stone-600">Position</label>
+          <label className="mb-1 block text-[12px] font-medium text-muted">Position</label>
           <select
             className={`${inputCls} w-full`}
             value={style.position ?? "bottom"}
@@ -516,13 +516,13 @@ function CaptionEditor({
           </select>
         </div>
         <div>
-          <label className="mb-1 block text-[12px] font-medium text-stone-600">Text color</label>
+          <label className="mb-1 block text-[12px] font-medium text-muted">Text color</label>
           <div className="flex items-center gap-1.5">
             <input
               type="color"
               value={style.textColor ?? "#ffffff"}
               onChange={(e) => set({ textColor: e.target.value })}
-              className="h-8 w-10 cursor-pointer rounded border border-stone-200 bg-white p-0.5"
+              className="h-8 w-10 cursor-pointer rounded border border-line bg-paper p-0.5"
             />
             <input
               value={style.textColor ?? "#ffffff"}
@@ -533,13 +533,13 @@ function CaptionEditor({
           </div>
         </div>
         <div>
-          <label className="mb-1 block text-[12px] font-medium text-stone-600">Highlight color</label>
+          <label className="mb-1 block text-[12px] font-medium text-muted">Highlight color</label>
           <div className="flex items-center gap-1.5">
             <input
               type="color"
               value={style.highlightColor ?? "#7c3aed"}
               onChange={(e) => set({ highlightColor: e.target.value })}
-              className="h-8 w-10 cursor-pointer rounded border border-stone-200 bg-white p-0.5"
+              className="h-8 w-10 cursor-pointer rounded border border-line bg-paper p-0.5"
             />
             <input
               value={style.highlightColor ?? "#7c3aed"}
@@ -551,18 +551,12 @@ function CaptionEditor({
         </div>
       </div>
 
-      <label className="flex cursor-pointer items-center gap-2 text-[13px] text-stone-700">
-        <input
-          type="checkbox"
-          checked={!!style.highlight}
-          onChange={(e) => set({ highlight: e.target.checked })}
-          className="accent-brand-600"
-        />
-        Word highlight on the hook
-      </label>
+      <div className="flex cursor-pointer items-center gap-2">
+        <Switch checked={!!style.highlight} onChange={(v) => set({ highlight: v })} label="Word highlight on the hook" />
+      </div>
 
       <div>
-        <div className="mb-1 text-[12px] font-medium text-stone-600">Preview (9:16)</div>
+        <div className="mb-1 text-[12px] font-medium text-muted">Preview (9:16)</div>
         <div className={`flex aspect-[9/16] h-56 justify-center rounded-lg bg-stone-900 ${positionCls} px-6`}>
           <p
             className="text-center font-bold leading-snug"
@@ -581,7 +575,7 @@ function CaptionEditor({
                 <span key={i}>{w} </span>
               ),
             )}
-            {words.length === 0 && <span className="text-stone-500">Caption preview</span>}
+            {words.length === 0 && <span className="text-subtle">Caption preview</span>}
           </p>
         </div>
       </div>
@@ -698,69 +692,69 @@ function ClipDrawer({
 
   return (
     <div className="fixed inset-0 z-40">
-      <div className="absolute inset-0 bg-stone-900/30" onClick={onClose} />
-      <div className="absolute right-0 top-0 flex h-full w-full max-w-md flex-col bg-white shadow-xl">
-        <div className="flex items-start justify-between border-b border-stone-100 px-4 py-3.5">
+      <div className="absolute inset-0 bg-ink/30" onClick={onClose} />
+      <div className="absolute right-0 top-0 flex h-full w-full max-w-md flex-col bg-paper shadow-overlay">
+        <div className="flex items-start justify-between border-b border-line px-4 py-3.5">
           <div>
-            <h3 className="text-[15px] font-semibold text-stone-900">
+            <h3 className="text-[15px] font-semibold text-ink">
               Clip {fmtTime(c.startSec)} – {fmtTime(c.endSec)}
             </h3>
             <div className="mt-1 flex flex-wrap items-center gap-1.5">
-              <Chip tone={scoreTone(c.viralityScore)}>{Math.round(c.viralityScore)} / 100</Chip>
-              <Chip tone={statusTone(c.status)}>{c.status}</Chip>
-              <Chip tone={statusTone(c.renderStatus)}>render: {c.renderStatus}</Chip>
+              <Chip>{Math.round(c.viralityScore)} / 100</Chip>
+              <Chip>{c.status}</Chip>
+              <Chip>render: {c.renderStatus}</Chip>
             </div>
           </div>
-          <button onClick={onClose} className="rounded-md p-1.5 text-stone-400 hover:bg-stone-100" aria-label="Close">
+          <button onClick={onClose} className="rounded-md p-1.5 text-subtle hover:bg-hover-paper hover:text-ink" aria-label="Close">
             <X size={16} />
           </button>
         </div>
 
         <div className="flex-1 space-y-5 overflow-y-auto px-4 py-4">
           {error && (
-            <div className="flex items-start gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-700">
-              <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+            <div role="alert" className="flex items-start gap-2 rounded-md border border-failed bg-failed-tint px-3 py-2 text-[13px] text-failed-text">
+              <span className="mt-1 h-3 w-3 shrink-0 bg-failed" aria-hidden="true" />
               <span>{error}</span>
             </div>
           )}
 
           <section>
-            <div className="mb-1.5 text-[12px] font-medium uppercase tracking-wide text-stone-500">Hook</div>
-            <p className="text-[13.5px] font-medium leading-snug text-stone-900">“{hook}”</p>
+            <div className="mb-1.5 text-[12px] font-medium tracking-wide text-muted">Hook</div>
+            <p className="text-[13.5px] font-medium leading-snug text-ink">“{hook}”</p>
           </section>
 
           <section>
-            <div className="mb-1.5 text-[12px] font-medium uppercase tracking-wide text-stone-500">Why it scored</div>
+            <div className="mb-1.5 text-[12px] font-medium tracking-wide text-muted">Why it scored</div>
             {(c.scoreReasons ?? []).length > 0 ? (
               <ul className="space-y-1.5">
                 {(c.scoreReasons ?? []).map((r, i) => (
-                  <li key={i} className="rounded-md border border-stone-200 bg-stone-50/60 px-2.5 py-1.5">
+                  <li key={i} className="rounded-md border border-line bg-canvas px-2.5 py-1.5">
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-[12.5px] font-medium text-stone-800">{r.label}</span>
+                      <span className="text-[12.5px] font-medium text-ink">{r.label}</span>
                       {r.weight != null && (
-                        <span className="font-mono text-[11px] text-stone-500">+{r.weight}</span>
+                        <span className="font-mono text-[11px] text-muted">+{r.weight}</span>
                       )}
                     </div>
-                    {r.detail && <div className="mt-0.5 text-[12px] text-stone-600">{r.detail}</div>}
+                    {r.detail && <div className="mt-0.5 text-[12px] text-muted">{r.detail}</div>}
                   </li>
                 ))}
               </ul>
             ) : (
-              <p className="text-[13px] text-stone-500">No score reasons recorded.</p>
+              <p className="text-[13px] text-muted">No score reasons recorded.</p>
             )}
           </section>
 
           <section>
-            <div className="mb-2 text-[12px] font-medium uppercase tracking-wide text-stone-500">Caption style</div>
+            <div className="mb-2 text-[12px] font-medium tracking-wide text-muted">Caption style</div>
             <CaptionEditor style={style} onChange={setStyle} previewText={hook === "—" ? "" : hook} />
             <button onClick={saveStyle} className={`${btnGhost} mt-2.5`} disabled={!!busy}>
-              {busy === "style" ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
+              {busy === "style" ? <Loader2 size={14} className="aos-spin" /> : <CheckCircle2 size={14} />}
               Save caption style
             </button>
           </section>
 
           <section>
-            <div className="mb-1.5 text-[12px] font-medium uppercase tracking-wide text-stone-500">
+            <div className="mb-1.5 text-[12px] font-medium tracking-wide text-muted">
               Captions ({(c.captions?.segments ?? []).length} segments)
             </div>
             <textarea
@@ -771,23 +765,23 @@ function ClipDrawer({
               className={`${inputCls} w-full`}
             />
             <button onClick={saveCaptions} className={`${btnGhost} mt-2`} disabled={!!busy}>
-              {busy === "captions" ? <Loader2 size={14} className="animate-spin" /> : <Pencil size={14} />}
+              {busy === "captions" ? <Loader2 size={14} className="aos-spin" /> : <Pencil size={14} />}
               Save captions
             </button>
           </section>
 
-          <section className="border-t border-stone-100 pt-4">
-            <div className="mb-2 text-[12px] font-medium uppercase tracking-wide text-stone-500">Actions</div>
+          <section className="border-t border-line pt-4">
+            <div className="mb-2 text-[12px] font-medium tracking-wide text-muted">Actions</div>
             <div className="flex flex-wrap gap-2">
               {canApprove && (
                 <button onClick={() => run("approve", () => patchClip({ action: "approve" }))} className={btnPrimary} disabled={!!busy}>
-                  {busy === "approve" ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
+                  {busy === "approve" ? <Loader2 size={14} className="aos-spin" /> : <CheckCircle2 size={14} />}
                   Approve
                 </button>
               )}
               {canRender && (
                 <button onClick={render} className={btnGhost} disabled={!!busy} title="Render the 9:16 video with captions">
-                  {busy === "render" ? <Loader2 size={14} className="animate-spin" /> : <Clapperboard size={14} />}
+                  {busy === "render" ? <Loader2 size={14} className="aos-spin" /> : <Clapperboard size={14} />}
                   Render
                 </button>
               )}
@@ -795,14 +789,14 @@ function ClipDrawer({
             {c.status === "approved" && !c.postizRef && (
               <div className="mt-3 space-y-2">
                 {c.renderStatus !== "ready" ? (
-                  <p className="text-[12.5px] text-stone-500">
+                  <p className="text-[12.5px] text-muted">
                     Render the clip first — queueing needs a rendered file.
                   </p>
                 ) : (
                   <>
-                    <div className="text-[12px] font-medium text-stone-600">Postiz channels</div>
+                    <div className="text-[12px] font-medium text-muted">Postiz channels</div>
                     {channels.length === 0 ? (
-                      <p className="text-[12px] text-stone-500">
+                      <p className="text-[12px] text-muted">
                         No channels connected yet. Connect them in Social → Channels, then come back.
                       </p>
                     ) : (
@@ -813,15 +807,16 @@ function ClipDrawer({
                             <button
                               key={ch.id}
                               type="button"
+                              aria-pressed={on}
                               onClick={() =>
                                 setChannelIds((prev) =>
                                   on ? prev.filter((id) => id !== ch.id) : [...prev, ch.id],
                                 )
                               }
-                              className={`rounded-full border px-2.5 py-1 text-[12px] font-medium transition ${
+                              className={`rounded-full px-2.5 py-1 text-[12px] font-medium aos-press transition ${
                                 on
-                                  ? "border-brand-600 bg-brand-50 text-brand-700"
-                                  : "border-stone-200 bg-white text-stone-600 hover:border-stone-300"
+                                  ? "bg-ink text-white"
+                                  : "bg-paper text-muted shadow-outline hover:text-ink"
                               }`}
                             >
                               {ch.name ?? ch.identifier}
@@ -832,11 +827,11 @@ function ClipDrawer({
                     )}
                     <div>
                       <button onClick={toPostiz} className={btnGhost} disabled={!!busy || channelIds.length === 0}>
-                        {busy === "postiz" ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+                        {busy === "postiz" ? <Loader2 size={14} className="aos-spin" /> : <Send size={14} />}
                         Queue to Postiz (draft)
                       </button>
-                      <p className="mt-1.5 text-[12px] leading-snug text-stone-500">
-                        Creates a <strong className="text-stone-700">draft</strong> in Postiz for your
+                      <p className="mt-1.5 text-[12px] leading-snug text-muted">
+                        Creates a <strong className="text-ink">draft</strong> in Postiz for your
                         approval — nothing publishes automatically.
                       </p>
                     </div>
@@ -845,8 +840,8 @@ function ClipDrawer({
               </div>
             )}
             {c.postizRef && (
-              <p className="mt-2 text-[12px] text-stone-500">
-                Postiz draft: <span className="font-mono text-stone-700">{c.postizRef}</span>
+              <p className="mt-2 text-[12px] text-muted">
+                Postiz draft: <span className="font-mono text-ink">{c.postizRef}</span>
               </p>
             )}
           </section>
@@ -964,16 +959,16 @@ function ClipsTab({ onJob }: { onJob: (job: ClipJob) => void }) {
       </div>
 
       {error && (
-        <div className="mb-3 flex items-start gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-700">
-          <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+        <div role="alert" className="mb-3 flex items-start gap-2 rounded-md border border-failed bg-failed-tint px-3 py-2 text-[13px] text-failed-text">
+          <span className="mt-1 h-3 w-3 shrink-0 bg-failed" aria-hidden="true" />
           <span>{error}</span>
         </div>
       )}
 
-      <div className="overflow-hidden rounded-lg border border-stone-200 bg-white">
+      <div className="overflow-hidden rounded-lg border border-line bg-paper">
         <table className="w-full text-left text-[13px]">
           <thead>
-            <tr className="border-b border-stone-100 bg-stone-50/60 text-[11px] uppercase tracking-wide text-stone-500">
+            <tr className="border-b border-line text-[11px] tracking-wide text-muted">
               <th className="px-3 py-2 font-medium">Score</th>
               <th className="px-3 py-2 font-medium">Time range</th>
               <th className="px-3 py-2 font-medium">Duration</th>
@@ -987,19 +982,19 @@ function ClipsTab({ onJob }: { onJob: (job: ClipJob) => void }) {
               <tr
                 key={c.id}
                 onClick={() => setSelectedId(c.id)}
-                className={`cursor-pointer border-b border-stone-100 last:border-0 hover:bg-brand-50/40 ${selectedId === c.id ? "bg-brand-50/60" : ""}`}
+                className={`cursor-pointer border-b border-line last:border-0 hover:bg-hover-paper ${selectedId === c.id ? "bg-canvas" : ""}`}
               >
                 <td className="px-3 py-2">
-                  <Chip tone={scoreTone(c.viralityScore)}>{Math.round(c.viralityScore)}</Chip>
+                  <Chip>{Math.round(c.viralityScore)}</Chip>
                 </td>
-                <td className="px-3 py-2 font-medium text-stone-900">
+                <td className="px-3 py-2 font-medium text-ink">
                   {fmtTime(c.startSec)} – {fmtTime(c.endSec)}
                 </td>
-                <td className="px-3 py-2 text-stone-600">{fmtTime(c.endSec - c.startSec)}</td>
-                <td className="px-3 py-2"><Chip tone={statusTone(c.status)}>{c.status}</Chip></td>
+                <td className="px-3 py-2 text-muted">{fmtTime(c.endSec - c.startSec)}</td>
+                <td className="px-3 py-2"><Chip>{c.status}</Chip></td>
                 <td className="px-3 py-2">
-                  <Chip tone={statusTone(c.renderStatus)}>
-                    {c.renderStatus === "processing" && <Loader2 size={10} className="animate-spin" />}
+                  <Chip>
+                    {c.renderStatus === "processing" && <Loader2 size={10} className="aos-spin" />}
                     {c.renderStatus}
                   </Chip>
                 </td>
@@ -1007,7 +1002,7 @@ function ClipsTab({ onJob }: { onJob: (job: ClipJob) => void }) {
                   <div className="flex items-center justify-end gap-0.5" onClick={(e) => e.stopPropagation()}>
                     <button
                       onClick={() => setSelectedId(c.id)}
-                      className="rounded-md p-1.5 text-stone-400 hover:bg-stone-100 hover:text-stone-700"
+                      className="rounded-md p-1.5 text-subtle hover:bg-hover-paper hover:text-ink"
                       title="Edit captions"
                       aria-label="Edit captions"
                     >
@@ -1015,7 +1010,7 @@ function ClipsTab({ onJob }: { onJob: (job: ClipJob) => void }) {
                     </button>
                     <button
                       onClick={() => void approve(c)}
-                      className="rounded-md p-1.5 text-stone-400 hover:bg-stone-100 hover:text-stone-700 disabled:opacity-40"
+                      className="rounded-md p-1.5 text-subtle hover:bg-hover-paper hover:text-ink disabled:opacity-40"
                       title={c.status === "draft" ? "Approve" : "Already approved"}
                       aria-label="Approve"
                       disabled={busyId === c.id || c.status !== "draft"}
@@ -1024,7 +1019,7 @@ function ClipsTab({ onJob }: { onJob: (job: ClipJob) => void }) {
                     </button>
                     <button
                       onClick={() => void render(c)}
-                      className="rounded-md p-1.5 text-stone-400 hover:bg-stone-100 hover:text-stone-700 disabled:opacity-40"
+                      className="rounded-md p-1.5 text-subtle hover:bg-hover-paper hover:text-ink disabled:opacity-40"
                       title={(c.status === "draft" || c.status === "approved") && c.renderStatus !== "processing" ? "Render" : "Render (draft/approved clips only)"}
                       aria-label="Render"
                       disabled={busyId === c.id || !((c.status === "draft" || c.status === "approved") && c.renderStatus !== "processing")}
@@ -1033,7 +1028,7 @@ function ClipsTab({ onJob }: { onJob: (job: ClipJob) => void }) {
                     </button>
                     <button
                       onClick={() => setSelectedId(c.id)}
-                      className="rounded-md p-1.5 text-stone-400 hover:bg-stone-100 hover:text-stone-700"
+                      className="rounded-md p-1.5 text-subtle hover:bg-hover-paper hover:text-ink"
                       title="Queue to Postiz (draft) — pick channels in the drawer"
                       aria-label="Queue to Postiz"
                     >
@@ -1045,7 +1040,7 @@ function ClipsTab({ onJob }: { onJob: (job: ClipJob) => void }) {
             ))}
             {filtered.length === 0 && !loading && (
               <tr>
-                <td colSpan={6} className="px-3 py-8 text-center text-[13px] text-stone-400">
+                <td colSpan={6} className="px-3 py-8 text-center text-[13px] text-subtle">
                   {clips.length === 0
                     ? "No clips yet — generate some from a source."
                     : "No clips match your filters."}
@@ -1133,17 +1128,17 @@ function JobsTab({ jobs, setJobs }: { jobs: ClipJob[]; setJobs: React.Dispatch<R
           }}
           className={btnGhost}
         >
-          <RefreshCw size={14} className={loading ? "animate-spin" : ""} /> Refresh
+          <RefreshCw size={14} className={loading ? "aos-spin" : ""} /> Refresh
         </button>
-        <span className="text-[12px] text-stone-400">
+        <span className="text-[12px] text-subtle">
           “Clip this 2-hour webinar into 10 shorts” runs as one generate job — watch it here.
         </span>
       </div>
 
-      <div className="overflow-hidden rounded-lg border border-stone-200 bg-white">
+      <div className="overflow-hidden rounded-lg border border-line bg-paper">
         <table className="w-full text-left text-[13px]">
           <thead>
-            <tr className="border-b border-stone-100 bg-stone-50/60 text-[11px] uppercase tracking-wide text-stone-500">
+            <tr className="border-b border-line text-[11px] tracking-wide text-muted">
               <th className="px-3 py-2 font-medium">Kind</th>
               <th className="px-3 py-2 font-medium">Status</th>
               <th className="px-3 py-2 font-medium">Progress</th>
@@ -1152,35 +1147,35 @@ function JobsTab({ jobs, setJobs }: { jobs: ClipJob[]; setJobs: React.Dispatch<R
           </thead>
           <tbody>
             {jobs.map((j) => (
-              <tr key={j.id} className="border-b border-stone-100 last:border-0 hover:bg-brand-50/40">
-                <td className="px-3 py-2 font-medium text-stone-900">{jobLabel(j.kind)}</td>
+              <tr key={j.id} className="border-b border-line last:border-0 hover:bg-hover-paper">
+                <td className="px-3 py-2 font-medium text-ink">{jobLabel(j.kind)}</td>
                 <td className="px-3 py-2">
-                  <Chip tone={statusTone(j.status)}>
+                  <Chip>
                     {(j.status === "pending" || j.status === "processing") && (
-                      <Loader2 size={10} className="animate-spin" />
+                      <Loader2 size={10} className="aos-spin" />
                     )}
                     {j.status}
                   </Chip>
                 </td>
                 <td className="px-3 py-2">
                   <div className="flex w-40 items-center gap-2">
-                    <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-stone-100">
+                    <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-canvas">
                       <div
-                        className={`h-full rounded-full transition-all ${j.status === "failed" ? "bg-red-400" : "bg-brand-600"}`}
+                        className={`h-full rounded-full transition-all ${j.status === "failed" ? "bg-failed" : "bg-ink"}`}
                         style={{ width: `${j.status === "done" ? 100 : progressPct(j.progress)}%` }}
                       />
                     </div>
-                    <span className="w-9 text-right font-mono text-[11px] text-stone-500">
+                    <span className="w-9 text-right font-mono text-[11px] text-muted">
                       {j.status === "done" ? 100 : progressPct(j.progress)}%
                     </span>
                   </div>
                 </td>
-                <td className="px-3 py-2 text-[12.5px] text-red-600">{j.error ?? "—"}</td>
+                <td className="px-3 py-2 text-[12.5px] text-failed-text">{j.error ?? "—"}</td>
               </tr>
             ))}
             {jobs.length === 0 && (
               <tr>
-                <td colSpan={4} className="px-3 py-8 text-center text-[13px] text-stone-400">
+                <td colSpan={4} className="px-3 py-8 text-center text-[13px] text-subtle">
                   No jobs yet — generate clips from a source to start one.
                 </td>
               </tr>
@@ -1214,15 +1209,15 @@ export function ClipsApp() {
 
   return (
     <div>
-      <div className="mb-4 flex gap-1 border-b border-stone-200">
+      <div className="mb-4 flex gap-1 border-b border-line">
         {TABS.map(({ id, label, icon: Icon }) => (
           <button
             key={id}
             onClick={() => setTab(id)}
             className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-[13.5px] font-medium transition ${
               tab === id
-                ? "border-brand-600 text-brand-700"
-                : "border-transparent text-stone-500 hover:text-stone-800"
+                ? "border-ink text-ink"
+                : "border-transparent text-muted hover:text-ink"
             }`}
           >
             <Icon size={15} />
@@ -1231,8 +1226,8 @@ export function ClipsApp() {
         ))}
       </div>
 
-      <div className="mb-3 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2.5 text-[12.5px] text-stone-600">
-        <span className="font-medium text-stone-800">Drafts until you approve. </span>
+      <div className="mb-3 rounded-lg border border-line bg-canvas px-3 py-2.5 text-[12.5px] text-muted">
+        <span className="font-medium text-ink">Drafts until you approve. </span>
         Clips are drafts until you approve them. Queueing sends a draft to Postiz — nothing publishes automatically.
       </div>
 

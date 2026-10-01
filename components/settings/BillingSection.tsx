@@ -8,9 +8,73 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
-import { Notice, btnCls, cardCls, primaryBtnVioletCls, type NoticeState } from "./ui";
+import { ArrowRight, Check } from "lucide-react";
 import OverageBillingSection, { type OverageState } from "./OverageBillingSection";
+
+// AOS atoms (local — components/settings/ui.tsx is owned by another slice).
+const cardCls = "rounded-xl border border-line bg-paper p-5";
+const btnPrimary =
+  "inline-flex h-control-sm items-center justify-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-night-hover disabled:opacity-40";
+
+type NoticeKind = "ok" | "error" | "info";
+interface NoticeState {
+  kind: NoticeKind;
+  message: string;
+}
+
+function Notice({ notice }: { notice: NoticeState | null }) {
+  if (!notice) return null;
+  if (notice.kind === "error") {
+    return (
+      <div
+        role="alert"
+        className="flex items-start gap-2 rounded-md border border-failed bg-failed-tint px-3 py-2 text-sm text-failed-text"
+      >
+        <span className="mt-1 h-3 w-3 shrink-0 bg-failed" aria-hidden="true" />
+        <span>{notice.message}</span>
+      </div>
+    );
+  }
+  return (
+    <div className="flex items-start gap-2 rounded-md border border-line bg-paper px-3 py-2 text-sm text-muted">
+      <Check size={14} className="mt-0.5 shrink-0 text-ink" aria-hidden="true" />
+      <span>{notice.message}</span>
+    </div>
+  );
+}
+
+function Switch({
+  checked,
+  onChange,
+  label,
+  disabled,
+}: {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  label: string;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      disabled={disabled}
+      onClick={() => onChange(!checked)}
+      className={`relative h-[26px] w-[44px] shrink-0 rounded-full transition-colors disabled:opacity-40 ${
+        checked ? "bg-ink" : "bg-disabled-fg"
+      }`}
+    >
+      <span
+        aria-hidden="true"
+        className={`absolute top-[3px] h-5 w-5 rounded-full bg-white shadow transition-all ${
+          checked ? "left-[21px]" : "left-[3px]"
+        }`}
+      />
+    </button>
+  );
+}
 
 interface Pack {
   id: string;
@@ -117,7 +181,7 @@ export default function BillingSection({ workspaceId }: { workspaceId: string })
     }
   };
 
-  const toggleOverage = async () => {
+  const toggleOverage = async (enabled: boolean) => {
     if (!data) return;
     setToggling(true);
     setNotice(null);
@@ -125,7 +189,7 @@ export default function BillingSection({ workspaceId }: { workspaceId: string })
       const r = await fetch(`/api/billing/overage?${q}`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ workspaceId, enabled: !data.autoOverage }),
+        body: JSON.stringify({ workspaceId, enabled }),
       });
       const j = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(j.error ?? "Failed to update auto-overage");
@@ -145,21 +209,21 @@ export default function BillingSection({ workspaceId }: { workspaceId: string })
 
   return (
     <div className={cardCls}>
-      <h2 className="text-lg font-semibold">Billing</h2>
-      <p className="mt-1 text-sm text-zinc-500">
+      <h2 className="text-lg font-semibold text-ink">Billing</h2>
+      <p className="mt-1 text-sm text-muted">
         Buy credit top-ups and control what happens when you hit your spend cap. 1 credit = $0.01.
       </p>
       {/* Plan & subscription: wires the plan catalogue (lib/billing/plans.ts)
           into the usage drawer without duplicating the billing hub. */}
       {planInfo && (
-        <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-zinc-200 bg-zinc-50/60 px-4 py-3">
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-line bg-canvas px-4 py-3">
           <p className="text-sm">
-            <span className="text-zinc-500">Current plan:</span>{" "}
-            <strong className="text-zinc-800">
+            <span className="text-muted">Current plan:</span>{" "}
+            <strong className="text-ink">
               {planInfo.plans.find((p) => p.id === planInfo.currentPlan)?.name ??
                 (planInfo.currentPlan === "self_hosted" ? "Self-hosted" : planInfo.currentPlan)}
             </strong>
-            <span className="text-zinc-500">
+            <span className="text-muted">
               {" · "}
               {(() => {
                 const p = planInfo.plans.find((x) => x.id === planInfo.currentPlan);
@@ -171,7 +235,7 @@ export default function BillingSection({ workspaceId }: { workspaceId: string })
           </p>
           <Link
             href="/dashboard/billing"
-            className="inline-flex items-center gap-1 text-sm font-medium text-[var(--brand-700)] hover:underline"
+            className="inline-flex items-center gap-1 text-sm font-medium text-ink hover:underline"
           >
             Plans &amp; subscription
             <ArrowRight className="h-3.5 w-3.5" />
@@ -185,9 +249,9 @@ export default function BillingSection({ workspaceId }: { workspaceId: string })
       )}
 
       {loading || !data ? (
-        <p className="mt-4 text-sm text-zinc-500">{loading ? "Loading billing…" : "Billing unavailable."}</p>
+        <p className="mt-4 text-sm text-muted">{loading ? "Loading billing…" : "Billing unavailable."}</p>
       ) : !data.configured ? (
-        <p className="mt-4 rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-600">
+        <p className="mt-4 rounded-md border border-line bg-canvas px-3 py-2 text-sm text-muted">
           Top-up purchases aren&rsquo;t enabled on this deployment yet — usage is still metered locally
           against your included credits. Contact your Marketr host to enable billing.
         </p>
@@ -195,17 +259,17 @@ export default function BillingSection({ workspaceId }: { workspaceId: string })
         <div className="mt-4 flex flex-col gap-6">
           {/* Top-up packs */}
           <div>
-            <h3 className="text-sm font-medium text-zinc-800">Buy credits</h3>
+            <h3 className="text-sm font-medium text-ink">Buy credits</h3>
             <div className="mt-2 grid gap-3 sm:grid-cols-2">
               {data.packs.map((p) => (
-                <div key={p.id} className="rounded-lg border border-zinc-200 p-4">
-                  <p className="text-base font-semibold">{p.label}</p>
-                  <p className="mt-1 text-sm text-zinc-500">
+                <div key={p.id} className="rounded-lg border border-line bg-paper p-4">
+                  <p className="text-base font-semibold text-ink">{p.label}</p>
+                  <p className="mt-1 text-sm text-muted">
                     {money(p.priceCents)} one-time · never expires for 12 months · raises your cap by{" "}
                     {p.credits.toLocaleString()} credits
                   </p>
                   <button
-                    className={`${primaryBtnVioletCls} mt-3`}
+                    className={`${btnPrimary} mt-3`}
                     disabled={buying !== null}
                     onClick={() => buy(p.id)}
                   >
@@ -214,35 +278,38 @@ export default function BillingSection({ workspaceId }: { workspaceId: string })
                 </div>
               ))}
             </div>
-            <p className="mt-2 text-xs text-zinc-500">
+            <p className="mt-2 text-xs text-muted">
               Secure checkout by Stripe. Card details never touch Marketr.
             </p>
           </div>
 
           {/* Auto-overage */}
           <div>
-            <h3 className="text-sm font-medium text-zinc-800">When you hit your spend cap</h3>
-            <div className="mt-2 flex items-start justify-between gap-4 rounded-lg border border-zinc-200 p-4">
-              <div className="text-sm text-zinc-600">
+            <h3 className="text-sm font-medium text-ink">When you hit your spend cap</h3>
+            <div className="mt-2 flex items-start justify-between gap-4 rounded-lg border border-line p-4">
+              <div className="text-sm text-muted">
                 <p>
-                  <strong className="text-zinc-800">Hard cap (default):</strong> usage stops at the
+                  <strong className="text-ink">Hard cap (default):</strong> usage stops at the
                   limit — nothing is ever charged beyond it.
                 </p>
                 <p className="mt-1">
-                  <strong className="text-zinc-800">Auto-overage (opt-in):</strong> usage continues
+                  <strong className="text-ink">Auto-overage (opt-in):</strong> usage continues
                   past the cap at <strong>{data.overageRate}</strong> per credit (about 20% above
                   face value). Overage usage is recorded in the ledger like normal usage; the
                   invoice is billed separately.
                 </p>
+                <p className="mt-2 text-xs text-muted">
+                  Status: {data.autoOverage ? "auto-overage ON" : "hard cap ON"} · changing this is
+                  recorded in the audit log.
+                </p>
               </div>
-              <button className={btnCls} disabled={toggling} onClick={toggleOverage}>
-                {toggling ? "Saving…" : data.autoOverage ? "Turn off auto-overage" : "Turn on auto-overage"}
-              </button>
+              <Switch
+                checked={data.autoOverage}
+                onChange={toggleOverage}
+                disabled={toggling}
+                label="Auto-overage: bill overage instead of blocking at the spend cap"
+              />
             </div>
-            <p className="mt-1 text-xs text-zinc-500">
-              Status: {data.autoOverage ? "auto-overage ON" : "hard cap ON"} · changing this is
-              recorded in the audit log.
-            </p>
           </div>
 
           {/* Overage billing: card on file, accrued overage, invoices */}
@@ -250,13 +317,13 @@ export default function BillingSection({ workspaceId }: { workspaceId: string })
 
           {/* Purchase history */}
           <div>
-            <h3 className="text-sm font-medium text-zinc-800">Purchase history</h3>
+            <h3 className="text-sm font-medium text-ink">Purchase history</h3>
             {data.purchases.length === 0 ? (
-              <p className="mt-2 text-sm text-zinc-500">No top-up purchases yet.</p>
+              <p className="mt-2 text-sm text-muted">No top-up purchases yet.</p>
             ) : (
               <table className="mt-2 w-full text-sm">
                 <thead>
-                  <tr className="text-left text-xs text-zinc-500">
+                  <tr className="text-left text-xs text-muted">
                     <th className="py-1 pr-3 font-medium">Date</th>
                     <th className="py-1 pr-3 font-medium">Credits</th>
                     <th className="py-1 pr-3 font-medium">Paid</th>
@@ -264,12 +331,12 @@ export default function BillingSection({ workspaceId }: { workspaceId: string })
                 </thead>
                 <tbody>
                   {data.purchases.map((p) => (
-                    <tr key={p.sessionId} className="border-t border-zinc-100">
-                      <td className="py-1.5 pr-3 text-zinc-600">
+                    <tr key={p.sessionId} className="border-t border-line hover:bg-hover-paper">
+                      <td className="py-1.5 pr-3 text-muted">
                         {new Date(p.appliedAt).toLocaleString()}
                       </td>
-                      <td className="py-1.5 pr-3">+{p.credits.toLocaleString()}</td>
-                      <td className="py-1.5 pr-3 text-zinc-600">{money(p.amountCents)}</td>
+                      <td className="py-1.5 pr-3 text-ink">+{p.credits.toLocaleString()}</td>
+                      <td className="py-1.5 pr-3 text-muted">{money(p.amountCents)}</td>
                     </tr>
                   ))}
                 </tbody>

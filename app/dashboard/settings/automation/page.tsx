@@ -24,10 +24,10 @@ export default async function AutomationSettingsPage() {
   if (!membership) redirect("/dashboard/settings");
 
   return (
-    <div className="flex h-full flex-col gap-4 bg-[#FAFAF7] p-4 md:p-6">
+    <div className="flex h-full flex-col gap-4 bg-canvas p-4 md:p-6">
       <div>
-        <h1 className="text-xl font-bold tracking-tight text-stone-900">Automation settings</h1>
-        <p className="mt-0.5 text-[13px] text-stone-500">
+        <h1 className="aos-heading">Automation settings</h1>
+        <p className="mt-0.5 text-[13px] text-muted">
           {workspace.name} — what Marketr may do on its own, what asks you first, and what is never
           allowed. The safety core enforces these in code, not in prompts.
         </p>

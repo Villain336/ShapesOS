@@ -11,13 +11,47 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import {
-  AlertTriangle,
   BadgeCheck,
   Check,
   CreditCard,
   ArrowRight,
 } from "lucide-react";
-import { Notice, type NoticeState } from "./ui";
+
+// AOS atoms (local — components/settings/ui.tsx is owned by another slice).
+const cardCls = "rounded-xl border border-line bg-paper p-5";
+const btnPrimary =
+  "inline-flex h-control-sm items-center justify-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-white aos-press hover:bg-night-hover disabled:opacity-40";
+const btnGhost =
+  "inline-flex h-control-sm items-center justify-center gap-1.5 rounded-full bg-paper px-4 text-sm font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper disabled:opacity-40";
+const chipCls =
+  "inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-paper px-2 py-0.5 text-xs font-medium text-muted shadow-control";
+
+type NoticeKind = "ok" | "error" | "info";
+interface NoticeState {
+  kind: NoticeKind;
+  message: string;
+}
+
+function Notice({ notice }: { notice: NoticeState | null }) {
+  if (!notice) return null;
+  if (notice.kind === "error") {
+    return (
+      <div
+        role="alert"
+        className="flex items-start gap-2 rounded-md border border-failed bg-failed-tint px-3 py-2 text-sm text-failed-text"
+      >
+        <span className="mt-1 h-3 w-3 shrink-0 bg-failed" aria-hidden="true" />
+        <span>{notice.message}</span>
+      </div>
+    );
+  }
+  return (
+    <div className="flex items-start gap-2 rounded-md border border-line bg-paper px-3 py-2 text-sm text-muted">
+      <Check size={14} className="mt-0.5 shrink-0 text-ink" aria-hidden="true" />
+      <span>{notice.message}</span>
+    </div>
+  );
+}
 
 interface PlanCard {
   id: string;
@@ -49,21 +83,15 @@ interface SubData {
   hasPaymentMethod: boolean;
 }
 
-const primaryBtnCls =
-  "rounded-md bg-[var(--brand-600)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--brand-700)] disabled:cursor-not-allowed disabled:opacity-40";
-
-const secondaryBtnCls =
-  "rounded-md border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-800 hover:bg-zinc-50 disabled:opacity-50";
-
-function statusBadge(sub: SubData["subscription"]): { text: string; cls: string } {
-  if (!sub) return { text: "No paid subscription", cls: "border-zinc-200 bg-zinc-100 text-zinc-600" };
-  if (sub.cancelAtPeriodEnd)
-    return { text: "Cancels at period end", cls: "border-amber-200 bg-amber-50 text-amber-800" };
+// Subscription/invoice states are money states, not agent states — neutral chips.
+function statusBadge(sub: SubData["subscription"]): { text: string } {
+  if (!sub) return { text: "No paid subscription" };
+  if (sub.cancelAtPeriodEnd) return { text: "Cancels at period end" };
   if (sub.status === "active" || sub.status === "trialing")
-    return { text: sub.status === "trialing" ? "Trialing" : "Active", cls: "border-emerald-200 bg-emerald-50 text-emerald-800" };
+    return { text: sub.status === "trialing" ? "Trialing" : "Active" };
   if (sub.status === "past_due" || sub.status === "incomplete")
-    return { text: "Payment issue", cls: "border-red-200 bg-red-50 text-red-700" };
-  return { text: sub.status, cls: "border-zinc-200 bg-zinc-100 text-zinc-600" };
+    return { text: "Payment issue" };
+  return { text: sub.status };
 }
 
 export default function BillingHub({ workspaceId }: { workspaceId: string }) {
@@ -85,7 +113,7 @@ export default function BillingHub({ workspaceId }: { workspaceId: string }) {
       ]);
       if (!pr.ok) throw new Error("Failed to load plans");
       // A 503 from the subscription endpoint means Stripe isn't configured —
-      // that's an honest no-key state, not a failure. Render the amber banner.
+      // that's an honest no-key state, not a failure. Render the needs banner.
       let subJson: SubData;
       if (sr.status === 503) {
         subJson = { configured: false, plan: "free", subscription: null, hasPaymentMethod: false };
@@ -167,8 +195,8 @@ export default function BillingHub({ workspaceId }: { workspaceId: string }) {
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h1 className="text-xl font-bold tracking-tight text-stone-900">Billing &amp; plans</h1>
-        <p className="mt-0.5 text-[13px] text-stone-500">
+        <h1 className="aos-heading">Billing &amp; plans</h1>
+        <p className="mt-0.5 text-sm text-muted">
           Your subscription, plans, and invoices. Payments run through Stripe — card details never
           touch Marketr.
         </p>
@@ -178,9 +206,9 @@ export default function BillingHub({ workspaceId }: { workspaceId: string }) {
 
       {/* Honest no-key state: nothing purchases, nothing crashes. */}
       {plans && !plans.configured && (
-        <div className="flex items-start gap-3 rounded-md border border-amber-200 bg-amber-50/70 px-3 py-2.5">
-          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-700" />
-          <p className="text-sm text-amber-800">
+        <div className="flex items-start gap-3 rounded-md border border-line bg-needs-tint px-3 py-2.5">
+          <span className="aos-shape aos-shape--needs aos-shape--edged mt-0.5" role="img" aria-label="Needs attention" />
+          <p className="text-sm text-ink">
             <strong>Billing isn&rsquo;t enabled on this deployment.</strong> The Stripe keys
             (STRIPE_SECRET_KEY / STRIPE_WEBHOOK_SECRET) aren&rsquo;t set, so plan purchases,
             top-ups, and card management are disabled. Usage is still metered locally against your
@@ -191,19 +219,19 @@ export default function BillingHub({ workspaceId }: { workspaceId: string }) {
       )}
 
       {loading || !plans || !sub ? (
-        <p className="text-sm text-stone-500">{loading ? "Loading billing…" : "Billing unavailable."}</p>
+        <p className="text-sm text-muted">{loading ? "Loading billing…" : "Billing unavailable."}</p>
       ) : (
         <>
           {/* Current subscription */}
           <section>
-            <h2 className="text-sm font-semibold text-stone-900">Current subscription</h2>
-            <div className="mt-2 rounded-xl border border-zinc-200 bg-white p-5">
+            <h2 className="text-sm font-semibold text-ink">Current subscription</h2>
+            <div className={`${cardCls} mt-2`}>
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
-                  <CreditCard className="h-5 w-5 text-stone-400" />
+                  <CreditCard className="h-5 w-5 text-subtle" />
                   <div>
-                    <p className="text-base font-semibold text-stone-900">{currentPlanName}</p>
-                    <p className="text-[13px] text-stone-500">
+                    <p className="text-base font-semibold text-ink">{currentPlanName}</p>
+                    <p className="text-[13px] text-muted">
                       {sub.subscription?.currentPeriodEnd
                         ? `Renews ${new Date(sub.subscription.currentPeriodEnd).toLocaleDateString()}`
                         : sub.subscription
@@ -211,17 +239,15 @@ export default function BillingHub({ workspaceId }: { workspaceId: string }) {
                           : "No paid subscription — pick a plan below to upgrade"}
                     </p>
                   </div>
-                  <span className={`rounded-full border px-2 py-0.5 text-xs font-medium ${badge.cls}`}>
-                    {badge.text}
-                  </span>
+                  <span className={chipCls}>{badge.text}</span>
                 </div>
                 {sub.subscription && (
-                  <button className={secondaryBtnCls} disabled={openingPortal} onClick={openPortal}>
+                  <button className={btnGhost} disabled={openingPortal} onClick={openPortal}>
                     {openingPortal ? "Opening…" : "Manage subscription & invoices"}
                   </button>
                 )}
               </div>
-              <p className="mt-3 text-xs text-stone-500">
+              <p className="mt-3 text-xs text-muted">
                 Cancellation, invoices, receipts, and card updates happen on Stripe&rsquo;s billing
                 portal — Marketr never stores your card.
               </p>
@@ -230,7 +256,7 @@ export default function BillingHub({ workspaceId }: { workspaceId: string }) {
 
           {/* Plans / pricing — driven by the admin-configurable catalogue */}
           <section>
-            <h2 className="text-sm font-semibold text-stone-900">Plans</h2>
+            <h2 className="text-sm font-semibold text-ink">Plans</h2>
             <div className="mt-2 grid gap-4 md:grid-cols-3">
               {plans.plans.map((p) => {
                 const isCurrent = p.id === plans.currentPlan;
@@ -244,46 +270,46 @@ export default function BillingHub({ workspaceId }: { workspaceId: string }) {
                 return (
                   <div
                     key={p.id}
-                    className={`relative flex flex-col rounded-xl border bg-white p-5 ${
-                      isCurrent ? "border-[var(--brand-600)] ring-1 ring-[var(--brand-600)]" : "border-zinc-200"
+                    className={`relative flex flex-col rounded-xl border bg-paper p-5 ${
+                      isCurrent ? "border-ink ring-1 ring-ink" : "border-line"
                     }`}
                   >
                     {p.badge && (
-                      <span className="absolute -top-2.5 left-4 rounded-full bg-[var(--brand-600)] px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-white">
+                      <span className="absolute -top-2.5 left-4 rounded-full bg-ink px-2.5 py-0.5 text-[11px] font-semibold text-white">
                         {p.badge}
                       </span>
                     )}
-                    <p className="text-lg font-semibold text-stone-900">{p.name}</p>
-                    <p className="mt-0.5 text-[13px] text-stone-500">{p.tagline}</p>
+                    <p className="text-lg font-semibold text-ink">{p.name}</p>
+                    <p className="mt-0.5 text-[13px] text-muted">{p.tagline}</p>
                     <p className="mt-3">
-                      <span className="text-3xl font-bold tracking-tight text-stone-900">{p.priceDisplay}</span>
-                      <span className="text-sm text-stone-500"> / month</span>
+                      <span className="text-3xl font-bold tracking-tight text-ink">{p.priceDisplay}</span>
+                      <span className="text-sm text-muted"> / month</span>
                     </p>
-                    <p className="mt-1 text-[13px] text-stone-600">
+                    <p className="mt-1 text-[13px] text-muted">
                       {p.includedCredits.toLocaleString()} included credits / month
                     </p>
                     <ul className="mt-4 flex flex-1 flex-col gap-1.5">
                       {p.features.map((f) => (
-                        <li key={f} className="flex items-start gap-2 text-[13px] text-stone-600">
-                          <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--brand-600)]" />
+                        <li key={f} className="flex items-start gap-2 text-[13px] text-muted">
+                          <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-ink" />
                           {f}
                         </li>
                       ))}
                     </ul>
                     <button
-                      className={`${isCurrent || !plans.configured || !p.purchasable ? secondaryBtnCls : primaryBtnCls} mt-5 w-full`}
+                      className={`${isCurrent || !plans.configured || !p.purchasable ? btnGhost : btnPrimary} mt-5 w-full`}
                       disabled={isCurrent || !plans.configured || !p.purchasable || buying !== null}
                       onClick={() => choose(p.id)}
                     >
                       {buying === p.id ? "Redirecting to checkout…" : actionText}
                     </button>
                     {!plans.configured ? (
-                      <p className="mt-2 text-xs text-stone-500">
+                      <p className="mt-2 text-xs text-muted">
                         Plan purchases need Stripe keys on this deployment.
                       </p>
                     ) : (
                       !p.purchasable && (
-                        <p className="mt-2 text-xs text-stone-500">
+                        <p className="mt-2 text-xs text-muted">
                           This plan isn&rsquo;t linked to a Stripe price yet — ask the host to
                           configure it.
                         </p>
@@ -293,11 +319,11 @@ export default function BillingHub({ workspaceId }: { workspaceId: string }) {
                 );
               })}
             </div>
-            <div className="mt-3 rounded-md border border-stone-200 bg-stone-50 px-3 py-2 text-[13px] text-stone-600">
+            <div className="mt-3 rounded-md border border-line bg-canvas px-3 py-2 text-[13px] text-muted">
               <p>
                 Switching plans uses Stripe Checkout — proration is shown before you confirm. Plan
                 names, prices, and features are configured by the Marketr host in{" "}
-                <code className="rounded bg-stone-100 px-1 font-mono text-xs">lib/billing/plans.ts</code>{" "}
+                <code className="rounded bg-canvas px-1 font-mono text-xs">lib/billing/plans.ts</code>{" "}
                 (editable defaults, not fetched from Stripe).
               </p>
             </div>
@@ -305,20 +331,20 @@ export default function BillingHub({ workspaceId }: { workspaceId: string }) {
 
           {/* Billing history pointer */}
           <section>
-            <h2 className="text-sm font-semibold text-stone-900">Billing history</h2>
-            <div className="mt-2 rounded-md border border-stone-200 bg-stone-50 px-3 py-2 text-[13px] text-stone-600">
+            <h2 className="text-sm font-semibold text-ink">Billing history</h2>
+            <div className="mt-2 rounded-md border border-line bg-canvas px-3 py-2 text-[13px] text-muted">
               {sub.subscription ? (
                 <p>
                   Subscription invoices and receipts live on Stripe&rsquo;s billing portal — use{" "}
                   <button
-                    className="font-medium text-[var(--brand-700)] underline underline-offset-2"
+                    className="font-medium text-ink underline underline-offset-2"
                     onClick={openPortal}
                     disabled={openingPortal}
                   >
                     Manage subscription &amp; invoices
                   </button>{" "}
                   above. Credit top-up purchases and overage invoices are under{" "}
-                  <Link href="/dashboard/settings/usage" className="font-medium text-[var(--brand-700)] underline underline-offset-2">
+                  <Link href="/dashboard/settings/usage" className="font-medium text-ink underline underline-offset-2">
                     Settings → Usage
                   </Link>
                   .
@@ -327,7 +353,7 @@ export default function BillingHub({ workspaceId }: { workspaceId: string }) {
                 <p>
                   No subscription invoices yet. Credit top-up purchases and overage invoices are
                   under{" "}
-                  <Link href="/dashboard/settings/usage" className="font-medium text-[var(--brand-700)] underline underline-offset-2">
+                  <Link href="/dashboard/settings/usage" className="font-medium text-ink underline underline-offset-2">
                     Settings → Usage
                   </Link>
                   .
@@ -341,7 +367,7 @@ export default function BillingHub({ workspaceId }: { workspaceId: string }) {
       {/* Billing summary link for admins who land here directly */}
       <Link
         href="/dashboard/settings/usage"
-        className="inline-flex w-fit items-center gap-1 text-[13px] font-medium text-[var(--brand-700)] hover:underline"
+        className="inline-flex w-fit items-center gap-1 text-[13px] font-medium text-ink hover:underline"
       >
         <BadgeCheck className="h-3.5 w-3.5" />
         View credit usage, spend cap, and top-ups

@@ -8,13 +8,27 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Pencil, User, X } from "lucide-react";
-import {
-  Chip,
-  btnPrimary,
-  btnGhost,
-  infoNoteCls,
-  inputCls,
-} from "../../substrate/ui";
+// ── AOS atoms (local — app/dashboard/substrate/ui.tsx is owned by another slice) ──
+const inputCls =
+  "rounded-md border-[1.5px] border-control bg-paper px-2.5 py-1.5 text-[13px] text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none";
+const btnPrimary =
+  "inline-flex items-center gap-1.5 rounded-full bg-ink px-3 py-1.5 text-[13px] font-medium text-white aos-press hover:bg-night-hover disabled:opacity-40";
+const btnGhost =
+  "inline-flex items-center gap-1.5 rounded-full bg-paper px-2.5 py-1.5 text-[13px] font-medium text-ink shadow-outline aos-press hover:bg-hover-paper disabled:opacity-40";
+const tableShell = "overflow-hidden rounded-lg border border-line bg-paper";
+const theadCls = "border-b border-line text-left text-[12px] text-muted";
+const thCls = "px-3 py-2 text-left font-medium";
+const rowCls = "border-b border-line last:border-0 hover:bg-hover-paper";
+const infoNoteCls = "rounded-lg border border-line bg-canvas p-4 text-[12.5px] text-muted";
+
+// Statuses here are agent/provider states, not agent states — neutral chips.
+function Chip({ children, tone: _tone }: { children: React.ReactNode; tone?: string }) {
+  return (
+    <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-paper px-1.5 py-0.5 text-[10px] font-medium leading-tight text-muted shadow-control">
+      {children}
+    </span>
+  );
+}
 
 export interface PersonaProfileView {
   register: string;
@@ -45,15 +59,15 @@ function Modal({
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-stone-900/30" onClick={onClose} aria-hidden />
-      <div className="relative max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-lg border border-stone-200 bg-white p-5 shadow-xl">
+      <div className="absolute inset-0 bg-ink/30" onClick={onClose} aria-hidden />
+      <div className="relative max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-lg border border-line bg-paper p-5 shadow-overlay">
         <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-[15px] font-semibold text-stone-900">{title}</h3>
+          <h3 className="text-[15px] font-semibold text-ink">{title}</h3>
           <button
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="rounded-md p-1 text-stone-400 hover:bg-stone-100 hover:text-stone-600"
+            className="rounded-md p-1 text-subtle hover:bg-hover-paper hover:text-muted"
           >
             <X size={16} />
           </button>
@@ -123,16 +137,16 @@ export default function PersonasTab({
   }
 
   const field = "mb-3";
-  const labelCls = "mb-1 block text-[12.5px] font-medium text-stone-700";
+  const labelCls = "mb-1 block text-[12.5px] font-medium text-muted";
 
   return (
     <div className="flex flex-col gap-4">
       {notice && (
         <div className={infoNoteCls} role="status">
           <span className="flex items-center gap-2">
-            <Check size={14} className="shrink-0 text-emerald-600" />
+            <Check size={14} className="shrink-0 text-muted" />
             {notice}
-            <button type="button" onClick={() => setNotice(null)} className="ml-auto text-stone-400 hover:text-stone-600" aria-label="Dismiss">
+            <button type="button" onClick={() => setNotice(null)} className="ml-auto text-subtle hover:text-muted" aria-label="Dismiss">
               <X size={14} />
             </button>
           </span>
@@ -146,19 +160,19 @@ export default function PersonasTab({
 
       <div className="grid gap-3 md:grid-cols-2">
         {personas.map((p) => (
-          <article key={p.id} className="flex flex-col gap-2 rounded-lg border border-stone-200 bg-white p-4">
+          <article key={p.id} className="flex flex-col gap-2 rounded-lg border border-line bg-paper p-4">
             <div className="flex items-start justify-between gap-2">
               <div className="flex items-center gap-2.5">
-                <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-brand-50 text-brand-700">
+                <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-canvas text-muted">
                   <User size={16} />
                 </span>
                 <div>
-                  <h3 className="text-[13.5px] font-semibold text-stone-900">{p.name}</h3>
+                  <h3 className="text-[13.5px] font-semibold text-ink">{p.name}</h3>
                   <div className="mt-0.5 flex flex-wrap gap-1">
                     {p.surfaces.map((s) => (
-                      <Chip key={s} tone="slate">{s}</Chip>
+                      <Chip key={s}>{s}</Chip>
                     ))}
-                    <Chip tone={p.profile ? "green" : "amber"}>{p.profile ? "tuned" : "default voice"}</Chip>
+                    <Chip>{p.profile ? "tuned" : "default voice"}</Chip>
                   </div>
                 </div>
               </div>
@@ -167,33 +181,33 @@ export default function PersonasTab({
                   type="button"
                   onClick={() => openEdit(p)}
                   aria-label={`Edit ${p.name} voice`}
-                  className="rounded-md p-1.5 text-stone-400 hover:bg-stone-100 hover:text-stone-700"
+                  className="rounded-md p-1.5 text-subtle hover:bg-hover-paper hover:text-muted"
                 >
                   <Pencil size={14} />
                 </button>
               )}
             </div>
-            <p className="line-clamp-3 text-[12.5px] leading-relaxed text-stone-500">{p.description}</p>
+            <p className="line-clamp-3 text-[12.5px] leading-relaxed text-muted">{p.description}</p>
             {p.profile ? (
-              <dl className="mt-1 space-y-1.5 border-t border-stone-100 pt-2 text-[12.5px]">
+              <dl className="mt-1 space-y-1.5 border-t border-line pt-2 text-[12.5px]">
                 {p.profile.register && (
-                  <div className="flex gap-2"><dt className="w-24 shrink-0 font-medium text-stone-500">Register</dt><dd className="text-stone-800">{p.profile.register}</dd></div>
+                  <div className="flex gap-2"><dt className="w-24 shrink-0 font-medium text-muted">Register</dt><dd className="text-ink">{p.profile.register}</dd></div>
                 )}
                 {p.profile.manner && (
-                  <div className="flex gap-2"><dt className="w-24 shrink-0 font-medium text-stone-500">Manner</dt><dd className="line-clamp-2 text-stone-800">{p.profile.manner}</dd></div>
+                  <div className="flex gap-2"><dt className="w-24 shrink-0 font-medium text-muted">Manner</dt><dd className="line-clamp-2 text-ink">{p.profile.manner}</dd></div>
                 )}
                 {p.profile.quirks.length > 0 && (
-                  <div className="flex gap-2"><dt className="w-24 shrink-0 font-medium text-stone-500">Quirks</dt><dd className="text-stone-800">{p.profile.quirks.join(" · ")}</dd></div>
+                  <div className="flex gap-2"><dt className="w-24 shrink-0 font-medium text-muted">Quirks</dt><dd className="text-ink">{p.profile.quirks.join(" · ")}</dd></div>
                 )}
                 {p.profile.taboos.length > 0 && (
-                  <div className="flex gap-2"><dt className="w-24 shrink-0 font-medium text-stone-500">Taboos</dt><dd className="text-stone-800">{p.profile.taboos.join(" · ")}</dd></div>
+                  <div className="flex gap-2"><dt className="w-24 shrink-0 font-medium text-muted">Taboos</dt><dd className="text-ink">{p.profile.taboos.join(" · ")}</dd></div>
                 )}
                 {p.profile.uncertaintyStyle && (
-                  <div className="flex gap-2"><dt className="w-24 shrink-0 font-medium text-stone-500">Uncertainty</dt><dd className="line-clamp-2 text-stone-800">{p.profile.uncertaintyStyle}</dd></div>
+                  <div className="flex gap-2"><dt className="w-24 shrink-0 font-medium text-muted">Uncertainty</dt><dd className="line-clamp-2 text-ink">{p.profile.uncertaintyStyle}</dd></div>
                 )}
               </dl>
             ) : (
-              <p className="mt-1 border-t border-stone-100 pt-2 text-[12px] italic text-stone-400">
+              <p className="mt-1 border-t border-line pt-2 text-[12px] italic text-subtle">
                 No workspace voice yet — using the persona seed default.
               </p>
             )}

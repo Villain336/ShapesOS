@@ -70,11 +70,11 @@ export default async function SettingsLandingPage() {
   const workspace = await getOrCreateWorkspace(user.id, user.email);
 
   return (
-    <div className="bg-[#FAFAF7] p-4 md:p-6">
+    <div className="bg-canvas p-4 md:p-6">
       <div className="mx-auto flex max-w-5xl flex-col gap-6">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-stone-900">Settings</h1>
-          <p className="mt-0.5 text-[13px] text-stone-500">
+          <h1 className="aos-heading">Settings</h1>
+          <p className="mt-0.5 text-[13px] text-muted">
             {workspace.name} — every workspace setting in one place. Pick a section below.
           </p>
         </div>
@@ -87,18 +87,18 @@ export default async function SettingsLandingPage() {
                 <li key={s.href}>
                   <Link
                     href={s.href}
-                    className="group flex items-start gap-3 rounded-lg px-3 py-2.5 transition-colors hover:bg-[var(--brand-50)]"
+                    className="group flex items-start gap-3 rounded-lg px-3 py-2.5 transition-colors hover:bg-hover-paper"
                   >
                     <Icon
                       size={16}
-                      className="mt-0.5 shrink-0 text-stone-400 transition-colors group-hover:text-[var(--brand-700)]"
+                      className="mt-0.5 shrink-0 text-subtle transition-colors group-hover:text-ink"
                       aria-hidden
                     />
                     <span className="min-w-0">
-                      <span className="block text-[13.5px] font-medium text-stone-800 transition-colors group-hover:text-[var(--brand-700)]">
+                      <span className="block text-[13.5px] font-medium text-ink transition-colors group-hover:text-ink">
                         {s.label}
                       </span>
-                      <span className="block text-[12.5px] leading-snug text-stone-500">
+                      <span className="block text-[12.5px] leading-snug text-muted">
                         {s.description}
                       </span>
                     </span>

@@ -27,16 +27,16 @@ export default async function StudioPage({ params }: { params: Promise<{ id: str
   return (
     <div className="mx-auto max-w-6xl px-4 py-8">
       <div className="mb-6">
-        <Link href={`/dashboard/projects/${project.id}`} className="text-sm text-zinc-500 hover:text-zinc-600">
+        <Link href={`/dashboard/projects/${project.id}`} className="text-sm text-muted hover:text-ink">
           ← {project.domain}
         </Link>
         {/* Phase 13 A8: scope indicator — this is the project-scoped studio,
             not the workspace-wide Creative Studio. */}
-        <p className="mt-3 text-[11px] font-semibold uppercase tracking-wider text-stone-400">
+        <p className="mt-3 text-[11px] font-medium tracking-wide text-subtle">
           Project
         </p>
         <h1 className="mt-1 text-xl font-bold tracking-tight text-ink">Marketing studio</h1>
-        <p className="mt-1 text-sm text-zinc-500">
+        <p className="mt-1 text-sm text-muted">
           Design assets, domain purchasing, and a shared asset library.
         </p>
       </div>

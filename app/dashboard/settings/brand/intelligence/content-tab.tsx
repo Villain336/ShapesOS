@@ -8,15 +8,27 @@
 
 import { useMemo, useState } from "react";
 import { FileText, Search } from "lucide-react";
-import {
-  Chip,
-  tableShell,
-  theadCls,
-  thCls,
-  rowCls,
-  infoNoteCls,
-  inputCls,
-} from "../../../substrate/ui";
+// ── AOS atoms (local — app/dashboard/substrate/ui.tsx is owned by another slice) ──
+const inputCls =
+  "rounded-md border-[1.5px] border-control bg-paper px-2.5 py-1.5 text-[13px] text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none";
+const btnPrimary =
+  "inline-flex items-center gap-1.5 rounded-full bg-ink px-3 py-1.5 text-[13px] font-medium text-white aos-press hover:bg-night-hover disabled:opacity-40";
+const btnGhost =
+  "inline-flex items-center gap-1.5 rounded-full bg-paper px-2.5 py-1.5 text-[13px] font-medium text-ink shadow-outline aos-press hover:bg-hover-paper disabled:opacity-40";
+const tableShell = "overflow-hidden rounded-lg border border-line bg-paper";
+const theadCls = "border-b border-line text-left text-[12px] text-muted";
+const thCls = "px-3 py-2 text-left font-medium";
+const rowCls = "border-b border-line last:border-0 hover:bg-hover-paper";
+const infoNoteCls = "rounded-lg border border-line bg-canvas p-4 text-[12.5px] text-muted";
+
+// Statuses here are agent/provider states, not agent states — neutral chips.
+function Chip({ children, tone: _tone }: { children: React.ReactNode; tone?: string }) {
+  return (
+    <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-paper px-1.5 py-0.5 text-[10px] font-medium leading-tight text-muted shadow-control">
+      {children}
+    </span>
+  );
+}
 
 export interface ContentRecordView {
   id: string;
@@ -78,7 +90,7 @@ export default function ContentTab({ records }: { workspaceId: string; records: 
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <div className="flex items-center gap-1.5 text-[13px] text-stone-500">
+        <div className="flex items-center gap-1.5 text-[13px] text-muted">
           <FileText size={14} />
           <select value={kindFilter} onChange={(e) => setKindFilter(e.target.value)} className={inputCls} aria-label="Filter by kind">
             <option value="">All kinds</option>
@@ -88,10 +100,10 @@ export default function ContentTab({ records }: { workspaceId: string; records: 
           </select>
         </div>
         <div className="relative">
-          <Search size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-stone-400" />
+          <Search size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-subtle" />
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search content…" className={`${inputCls} w-48 pl-8`} />
         </div>
-        <span className="ml-auto text-[12.5px] text-stone-400">{filtered.length} record{filtered.length === 1 ? "" : "s"}</span>
+        <span className="ml-auto text-[12.5px] text-subtle">{filtered.length} record{filtered.length === 1 ? "" : "s"}</span>
       </div>
 
       <div className={tableShell}>
@@ -109,7 +121,7 @@ export default function ContentTab({ records }: { workspaceId: string; records: 
           <tbody>
             {filtered.length === 0 && (
               <tr className={rowCls}>
-                <td colSpan={6} className="px-3 py-8 text-center text-stone-500">
+                <td colSpan={6} className="px-3 py-8 text-center text-muted">
                   {records.length === 0
                     ? "Nothing made yet — content agents create lands here automatically, with its angle and channel."
                     : "No records match your filters."}
@@ -120,14 +132,14 @@ export default function ContentTab({ records }: { workspaceId: string; records: 
               const perf = perfSummary(r.performance);
               return (
                 <tr key={r.id} className={rowCls}>
-                  <td className="max-w-[300px] truncate px-3 py-2.5 font-medium text-stone-900" title={r.title}>{r.title}</td>
-                  <td className="px-3 py-2.5"><Chip tone="slate">{r.kind.replace(/_/g, " ")}</Chip></td>
-                  <td className="px-3 py-2.5 text-stone-600">{r.channel ?? "—"}</td>
-                  <td className="max-w-[260px] truncate px-3 py-2.5 text-stone-600" title={r.angle ?? ""}>{r.angle ?? "—"}</td>
+                  <td className="max-w-[300px] truncate px-3 py-2.5 font-medium text-ink" title={r.title}>{r.title}</td>
+                  <td className="px-3 py-2.5"><Chip>{r.kind.replace(/_/g, " ")}</Chip></td>
+                  <td className="px-3 py-2.5 text-muted">{r.channel ?? "—"}</td>
+                  <td className="max-w-[260px] truncate px-3 py-2.5 text-muted" title={r.angle ?? ""}>{r.angle ?? "—"}</td>
                   <td className="px-3 py-2.5">
-                    {perf ? <span className="text-[12.5px] text-stone-700">{perf}</span> : <span className="text-[12px] italic text-stone-400">not measured yet</span>}
+                    {perf ? <span className="text-[12.5px] text-muted">{perf}</span> : <span className="text-[12px] italic text-subtle">not measured yet</span>}
                   </td>
-                  <td className="px-3 py-2.5 text-stone-500">{fmtDate(r.createdAt)}</td>
+                  <td className="px-3 py-2.5 text-muted">{fmtDate(r.createdAt)}</td>
                 </tr>
               );
             })}
