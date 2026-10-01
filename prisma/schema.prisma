@@ -4445,6 +4445,156 @@ model SigningRequest {
   @@map("signing_requests")
 }
 
+// Wave 2 quick wins — E-sign module (SPEC-GAP-ESIGN.md).
+// First-class envelope ontology on top of the Phase 12 Documenso API-only
+// integration (lib/integrations/documenso.ts). The vendor seals the PDF; we
+// mirror the evidence. Nothing is ever "signed" here without the vendor's
+// sealed artifact + completion event.
+model EsignEnvelope {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  title String
+  // draft | sent | partially-signed | completed | declined | expired | voided | error
+  status String @default("draft") @map("status")
+  // sequential | parallel
+  signingOrder String @default("sequential") @map("signing_order")
+
+  // Vendor identity. vendor = "documenso" in v1 (adapter interface leaves
+  // room for the DocuSign reserve rail behind the same shape).
+  vendor          String  @default("documenso") @map("vendor")
+  vendorRef       String? @map("vendor_ref")
+  vendorStatus    String? @map("vendor_status")
+
+  // Source document metadata (bytes live transiently; the vendor holds them).
+  documentName String? @map("document_name")
+  documentSize Int?    @map("document_size")
+
+  // Sealed PDF mirror, fetched ONLY on the vendor's completion event.
+  sealedPdf       Bytes?   @map("sealed_pdf")
+  sealedPdfHash   String?  @map("sealed_pdf_hash")
+  sealedPdfFetchedAt DateTime? @map("sealed_pdf_fetched_at")
+
+  // Links into not-yet-built modules: legal/compliance contract object,
+  // proposal / invoice pipeline rows. Generic refs, no FKs — those modules
+  // resolve them when they land.
+  contractType String? @map("contract_type")
+  contractRef  String? @map("contract_ref")
+  pipelineRef  Json?   @map("pipeline_ref")
+
+  templateId String?        @map("template_id")
+  template   EsignTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+
+  expiresAt DateTime? @map("expires_at")
+  voidReason String?  @map("void_reason")
+
+  signers EsignSigner[]
+  fields  EsignField[]
+  events  EsignAuditEvent[]
+
+  createdBy String?  @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([workspaceId, updatedAt])
+  @@index([workspaceId, status])
+  @@index([vendorRef])
+  @@map("esign_envelopes")
+}
+
+model EsignSigner {
+  id         String        @id @default(cuid())
+  envelopeId String        @map("envelope_id")
+  envelope   EsignEnvelope @relation(fields: [envelopeId], references: [id], onDelete: Cascade)
+
+  name  String
+  email String
+  // signer | approver | cc
+  role String @default("signer") @map("role")
+  orderIndex Int @default(0) @map("order_index")
+  // pending | viewed | signed | declined
+  status String @default("pending") @map("status")
+  signedAt DateTime? @map("signed_at")
+  // IP/device snapshot + identity evidence from the vendor. Email + access
+  // code in v1; IDV method when the reserve rail lands.
+  identityEvidence Json? @map("identity_evidence")
+
+  @@index([envelopeId, orderIndex])
+  @@map("esign_signers")
+}
+
+model EsignField {
+  id         String        @id @default(cuid())
+  envelopeId String        @map("envelope_id")
+  envelope   EsignEnvelope @relation(fields: [envelopeId], references: [id], onDelete: Cascade)
+
+  signerId String? @map("signer_id")
+  // signature | initials | date | text | checkbox
+  fieldType String @map("field_type")
+  page      Int    @default(1) @map("page")
+  x         Float  @default(0) @map("x")
+  y         Float  @default(0) @map("y")
+  width     Float  @default(150) @map("width")
+  height    Float  @default(40) @map("height")
+  required  Boolean @default(true) @map("required")
+  value     String? @map("value")
+
+  @@index([envelopeId])
+  @@map("esign_fields")
+}
+
+model EsignTemplate {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  name String
+  // Source document for the blueprint (stored asset ref / uploaded name).
+  sourceDocumentName String? @map("source_document_name")
+  // Field layout: [{ fieldType, page, x, y, width, height, required, signerRole }]
+  fieldLayout Json @default("[]") @map("field_layout")
+  // Signer roles: [{ role, orderIndex, required }]
+  signerRoles Json @default("[]") @map("signer_roles")
+  // Merge-field mapping: { "{{client.name}}": "crm.contact.name", ... }
+  mergeFieldMapping Json @default("{}") @map("merge_field_mapping")
+
+  envelopes EsignEnvelope[]
+  ownerUserId String?  @map("owner_user_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([workspaceId, updatedAt])
+  @@map("esign_templates")
+}
+
+// Hash-chained, vendor-verified evidence log. One row per governed action +
+// one row per ingested vendor webhook event (dedupe via bodyHash — identical
+// deliveries are no-ops, never double-applied).
+model EsignAuditEvent {
+  id         String        @id @default(cuid())
+  envelopeId String        @map("envelope_id")
+  envelope   EsignEnvelope @relation(fields: [envelopeId], references: [id], onDelete: Cascade)
+
+  // created | sent | viewed | signed | completed | declined | expired |
+  // voided | sealed_pdf_fetched | webhook_ignored
+  event String @map("event")
+  actor String @default("system") @map("actor")
+  // SHA-256 of the canonical event payload; chains to the previous event's
+  // hash (hash-chained evidence log per SPEC-GAP-ESIGN.md §4.4).
+  hash         String  @map("hash")
+  previousHash String? @map("previous_hash")
+  // Idempotency: SHA-256 of the raw webhook body (or of the canonical
+  // governed-action payload). Unique — replays are no-ops.
+  bodyHash String @unique @map("body_hash")
+  payload  Json?  @map("payload")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([envelopeId, createdAt])
+  @@map("esign_audit_events")
+}
+
 // Phase 12 (Worker 1): GrapesJS page drafts — responsive landing pages and
 // email templates. Complementary to the Konva Canvas editor (Canvas = PNG/SVG
 // assets; GrapesJS = HTML documents). html/css/components all snapshot the
