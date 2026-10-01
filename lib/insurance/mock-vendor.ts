@@ -4,8 +4,11 @@
 // is staged as the agentic second rail later. This file defines the adapter
 // interface every rail implements and a mock CoverForce adapter backed by
 // fixture data — no live vendor calls until the Startup Program paperwork is
-// signed. Slice 2 wires the quoting methods against fixtures; slice 3 binds
-// behind the LICENSE_MODEL_UNRESOLVED fail-closed gate.
+// signed. Slice 2 wires the quoting methods against fixtures.
+//
+// Producer-of-record (Tico 2026-10-01): LICENSED PARTNER model. bind()
+// requires an appointed partner's id; without one it fails closed with
+// PARTNER_NOT_APPOINTED — never a silent skip.
 
 import type {
   InsuranceAppointmentPath,
@@ -71,9 +74,10 @@ export interface InsuranceVendor {
       declineReason?: string;
     }>
   >;
-  /** Bind a quoted offer. FAIL-CLOSED until the producer-of-record license
-   *  model is resolved (LICENSE_MODEL_UNRESOLVED) — see slice 3. */
-  bind(input: { quoteRef: string }): Promise<{ policyNumber: string }>;
+  /** Bind a quoted offer. FAIL-CLOSED: requires an appointed licensed
+   *  partner's id (LICENSED PARTNER model, Tico 2026-10-01). Without one,
+   *  throws PARTNER_NOT_APPOINTED — never a silent skip. */
+  bind(input: { quoteRef: string; partnerId: string }): Promise<{ policyNumber: string }>;
   /** Policy documents for an issued policy. */
   getPolicyDocuments(input: {
     policyNumber: string;
@@ -238,15 +242,20 @@ export class MockCoverForceVendor implements InsuranceVendor {
     ];
   }
 
-  async bind(input: { quoteRef: string }): Promise<{ policyNumber: string }> {
-    void input;
-    // Fail closed: the producer-of-record license model is Tico's pending
-    // decision. No bind executes — mock or live — until it is resolved.
-    throw new InsuranceVendorError(
-      "LICENSE_MODEL_UNRESOLVED",
-      "Binding is blocked: the producer-of-record license model is unresolved. " +
-        "Quotes and policy inventory remain available; no contract is created.",
-    );
+  async bind(input: { quoteRef: string; partnerId: string }): Promise<{ policyNumber: string }> {
+    if (!input.partnerId || input.partnerId.trim().length === 0) {
+      // Fail closed: LICENSED PARTNER model — no appointed partner, no bind.
+      throw new InsuranceVendorError(
+        "PARTNER_NOT_APPOINTED",
+        "Binding is blocked: no appointed licensed partner was provided. " +
+          "Register a licensed partner (producer license number + licensed " +
+          "states) before binding.",
+      );
+    }
+    void input.quoteRef;
+    return {
+      policyNumber: `MOCK-POL-${Date.now().toString(36).toUpperCase()}`,
+    };
   }
 
   async getPolicyDocuments(input: {

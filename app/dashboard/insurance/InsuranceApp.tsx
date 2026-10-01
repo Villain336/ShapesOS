@@ -102,7 +102,32 @@ interface PolicyRow {
   alertLevel: RenewalAlertLevel;
 }
 
-type Tab = "policies" | "renewals" | "import";
+type Tab = "policies" | "renewals" | "quoting" | "import";
+
+interface QuoteRow {
+  id: string;
+  carrierName: string;
+  quotedPremiumCents: number | null;
+  limitPerOccurrenceCents: number | null;
+  limitAggregateCents: number | null;
+  quoteExpiry: string;
+  status: "quoted" | "declined" | "referred";
+  declineReason?: string;
+  premiumPerMillionAggregateCents: number | null;
+  rank: number | null;
+}
+
+interface SubmissionRow {
+  id: string;
+  line: string;
+  lineLabel: string;
+  applicantName: string;
+  state: string;
+  status: string;
+  vendorRef: string | null;
+  createdAt: string;
+  quotes: QuoteRow[];
+}
 
 // ── Component ────────────────────────────────────────────────────────────────
 
@@ -116,6 +141,20 @@ export function InsuranceApp() {
   const [parsed, setParsed] = useState<ParsedDeclarations | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+
+  const [submissions, setSubmissions] = useState<SubmissionRow[]>([]);
+  const [subsLoading, setSubsLoading] = useState(false);
+  const [intake, setIntake] = useState({
+    line: "gl",
+    applicantName: "",
+    operationsDescription: "",
+    state: "",
+    classCode: "",
+    payrollCents: "",
+    revenueCents: "",
+  });
+  const [quoting, setQuoting] = useState(false);
+  const [quoteError, setQuoteError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -150,6 +189,52 @@ export function InsuranceApp() {
         .sort((a, b) => +new Date(a.expiresAt) - +new Date(b.expiresAt)),
     [policies],
   );
+
+  const loadSubmissions = useCallback(async () => {
+    setSubsLoading(true);
+    setQuoteError(null);
+    try {
+      const res = await fetch("/api/insurance/submissions");
+      if (!res.ok) throw new Error(`Load failed (${res.status})`);
+      const data = await res.json();
+      setSubmissions(data.submissions ?? []);
+    } catch (e) {
+      setQuoteError(e instanceof Error ? e.message : "Load failed");
+    } finally {
+      setSubsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (tab === "quoting") void loadSubmissions();
+  }, [tab, loadSubmissions]);
+
+  const handleQuote = useCallback(async () => {
+    setQuoting(true);
+    setQuoteError(null);
+    try {
+      const res = await fetch("/api/insurance/submissions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          line: intake.line,
+          applicantName: intake.applicantName,
+          operationsDescription: intake.operationsDescription || null,
+          state: intake.state.toUpperCase(),
+          classCode: intake.classCode || null,
+          payrollCents: intake.payrollCents ? Math.round(Number(intake.payrollCents) * 100) : null,
+          revenueCents: intake.revenueCents ? Math.round(Number(intake.revenueCents) * 100) : null,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? `Quote failed (${res.status})`);
+      await loadSubmissions();
+    } catch (e) {
+      setQuoteError(e instanceof Error ? e.message : "Quote failed");
+    } finally {
+      setQuoting(false);
+    }
+  }, [intake, loadSubmissions]);
 
   const handleParse = useCallback(() => {
     setSaveError(null);
@@ -224,6 +309,7 @@ export function InsuranceApp() {
           [
             { key: "policies", label: "Policies", icon: ShieldCheck },
             { key: "renewals", label: "Renewals", icon: CalendarClock },
+            { key: "quoting", label: "Quoting", icon: Plus },
             { key: "import", label: "Import declarations", icon: FileUp },
           ] as const
         ).map(({ key, label, icon: Icon }) => (
@@ -349,6 +435,178 @@ export function InsuranceApp() {
               ))}
             </tbody>
           </table>
+        </div>
+      ) : tab === "quoting" ? (
+        <div className="flex flex-col gap-4">
+          <div className="rounded-lg border border-stone-200 bg-white p-4 shadow-sm">
+            <h2 className="text-[14px] font-semibold text-stone-900">New submission</h2>
+            <p className="mt-0.5 text-[12px] text-stone-500">
+              Submitting a risk discloses business data to carriers — quotes are
+              non-binding. Fixture carrier data until CoverForce credentials exist.
+            </p>
+            <div className="mt-3 grid gap-3 md:grid-cols-3">
+              <label className="flex flex-col gap-1 text-[12px] font-medium text-stone-600">
+                Line of business
+                <select
+                  value={intake.line}
+                  onChange={(e) => setIntake({ ...intake, line: e.target.value })}
+                  className={inputCls}
+                >
+                  {(Object.keys(LINE_LABELS) as Array<keyof typeof LINE_LABELS>).map((l) => (
+                    <option key={l} value={l}>{LINE_LABELS[l]}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="flex flex-col gap-1 text-[12px] font-medium text-stone-600">
+                Applicant name
+                <input
+                  value={intake.applicantName}
+                  onChange={(e) => setIntake({ ...intake, applicantName: e.target.value })}
+                  placeholder="Acme Landscaping LLC"
+                  className={inputCls}
+                />
+              </label>
+              <label className="flex flex-col gap-1 text-[12px] font-medium text-stone-600">
+                State (2-letter)
+                <input
+                  value={intake.state}
+                  onChange={(e) => setIntake({ ...intake, state: e.target.value })}
+                  placeholder="NC"
+                  maxLength={2}
+                  className={inputCls}
+                />
+              </label>
+              <label className="flex flex-col gap-1 text-[12px] font-medium text-stone-600">
+                Operations description
+                <input
+                  value={intake.operationsDescription}
+                  onChange={(e) => setIntake({ ...intake, operationsDescription: e.target.value })}
+                  placeholder="Commercial landscaping, 12 employees"
+                  className={inputCls}
+                />
+              </label>
+              <label className="flex flex-col gap-1 text-[12px] font-medium text-stone-600">
+                Class code
+                <input
+                  value={intake.classCode}
+                  onChange={(e) => setIntake({ ...intake, classCode: e.target.value })}
+                  placeholder="0042"
+                  className={inputCls}
+                />
+              </label>
+              <div className="grid grid-cols-2 gap-3">
+                <label className="flex flex-col gap-1 text-[12px] font-medium text-stone-600">
+                  Payroll ($)
+                  <input
+                    value={intake.payrollCents}
+                    onChange={(e) => setIntake({ ...intake, payrollCents: e.target.value })}
+                    placeholder="1200000"
+                    inputMode="decimal"
+                    className={inputCls}
+                  />
+                </label>
+                <label className="flex flex-col gap-1 text-[12px] font-medium text-stone-600">
+                  Revenue ($)
+                  <input
+                    value={intake.revenueCents}
+                    onChange={(e) => setIntake({ ...intake, revenueCents: e.target.value })}
+                    placeholder="2500000"
+                    inputMode="decimal"
+                    className={inputCls}
+                  />
+                </label>
+              </div>
+            </div>
+            {quoteError && (
+              <div className="mt-3 flex items-center gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[12px] text-red-700">
+                <AlertTriangle size={14} />
+                {quoteError}
+              </div>
+            )}
+            <button
+              className={`${btnPrimary} mt-3`}
+              onClick={() => void handleQuote()}
+              disabled={quoting || !intake.applicantName.trim() || intake.state.trim().length !== 2}
+            >
+              {quoting ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+              {quoting ? "Requesting quotes…" : "Submit & get quotes"}
+            </button>
+          </div>
+
+          {subsLoading ? (
+            <div className="flex items-center justify-center gap-2 py-10 text-stone-500">
+              <Loader2 size={16} className="animate-spin" />
+              <span className="text-[13px]">Loading submissions…</span>
+            </div>
+          ) : (
+            submissions.map((s) => (
+              <div key={s.id} className="rounded-lg border border-stone-200 bg-white shadow-sm">
+                <div className="flex items-center gap-2 border-b border-stone-100 px-4 py-2.5">
+                  <span className="text-[13px] font-semibold text-stone-900">{s.applicantName}</span>
+                  <Chip tone="slate">{s.lineLabel}</Chip>
+                  <Chip tone={s.status === "quoted" ? "green" : s.status === "declined" ? "red" : "blue"}>
+                    {s.status}
+                  </Chip>
+                  <span className="ml-auto text-[11px] text-stone-500">
+                    {s.vendorRef} · {fmtDate(s.createdAt)}
+                  </span>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-[13px]">
+                    <thead>
+                      <tr className="border-b border-stone-100 bg-stone-50 text-[11px] font-medium uppercase tracking-wide text-stone-500">
+                        <th className="px-4 py-2">Carrier</th>
+                        <th className="px-3 py-2">Premium</th>
+                        <th className="px-3 py-2">Limits (occ / agg)</th>
+                        <th className="px-3 py-2">$/ $1M agg</th>
+                        <th className="px-3 py-2">Outcome</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {s.quotes.map((q) => (
+                        <tr key={q.id} className="border-b border-stone-100 last:border-0 hover:bg-[var(--brand-50)]/40">
+                          <td className="px-4 py-2">
+                            <span className="font-medium text-stone-900">{q.carrierName}</span>
+                            {q.rank === 1 && (
+                              <span className="ml-2"><Chip tone="green">Best premium</Chip></span>
+                            )}
+                          </td>
+                          <td className="px-3 py-2 text-stone-700">{fmtMoney(q.quotedPremiumCents)}</td>
+                          <td className="px-3 py-2 text-stone-700">
+                            {fmtMoney(q.limitPerOccurrenceCents)} / {fmtMoney(q.limitAggregateCents)}
+                          </td>
+                          <td className="px-3 py-2 text-stone-700">
+                            {q.premiumPerMillionAggregateCents != null
+                              ? fmtMoney(q.premiumPerMillionAggregateCents)
+                              : "—"}
+                          </td>
+                          <td className="px-3 py-2">
+                            {q.status === "quoted" ? (
+                              <Chip tone="green">Quoted</Chip>
+                            ) : q.status === "referred" ? (
+                              <Chip tone="amber">Referred</Chip>
+                            ) : (
+                              <span className="flex flex-col gap-0.5">
+                                <Chip tone="red">Declined</Chip>
+                                {q.declineReason && (
+                                  <span className="text-[11px] text-stone-500">{q.declineReason}</span>
+                                )}
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ))
+          )}
+          {!subsLoading && submissions.length === 0 && (
+            <p className="py-8 text-center text-[13px] text-stone-500">
+              No submissions yet — submit a risk above to get carrier quotes.
+            </p>
+          )}
         </div>
       ) : (
         <div className="grid gap-4 md:grid-cols-2">

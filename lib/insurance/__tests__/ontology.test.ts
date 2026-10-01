@@ -252,11 +252,15 @@ describe("mock CoverForce vendor contract", () => {
     const quoted = quotes.filter((q) => q.status === "quoted");
     assert.ok(quoted.every((q) => q.quotedPremiumCents != null && q.quotedPremiumCents > 0));
   });
-  it("bind FAILS CLOSED with LICENSE_MODEL_UNRESOLVED", async () => {
+  it("bind FAILS CLOSED with PARTNER_NOT_APPOINTED when no partner is given", async () => {
     await assert.rejects(
-      () => vendor.bind({ quoteRef: "Q-1" }),
+      () => vendor.bind({ quoteRef: "Q-1", partnerId: "" }),
       (e: unknown) =>
-        e instanceof InsuranceVendorError && e.code === "LICENSE_MODEL_UNRESOLVED",
+        e instanceof InsuranceVendorError && e.code === "PARTNER_NOT_APPOINTED",
     );
+  });
+  it("bind with an appointed partner returns a fixture policy number", async () => {
+    const result = await vendor.bind({ quoteRef: "Q-1", partnerId: "partner-1" });
+    assert.ok(result.policyNumber.startsWith("MOCK-POL-"));
   });
 });

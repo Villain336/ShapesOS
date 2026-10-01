@@ -747,6 +747,9 @@ model Workspace {
   insuranceCarriers       InsuranceCarrier[]
   insurancePolicies       InsurancePolicy[]
   insuranceRenewals       InsuranceRenewal[]
+  insuranceSubmissions    InsuranceSubmission[]
+  insuranceQuotes         InsuranceQuote[]
+  insuranceLicensedPartners InsuranceLicensedPartner[]
   // Phase 12 (embeds): tenant-scoped GrowthBook flag overrides.
   flagOverrides           WorkspaceFlagOverride[]
   eddmOrders              EddmOrder[]
@@ -10338,4 +10341,116 @@ model InsuranceRenewal {
   @@index([workspaceId, renewalDate])
   @@index([workspaceId, remarketStatus])
   @@map("insurance_renewals")
+}
+
+// ── Wave 2 Insurance (slice 2): quoting ontology ─────────────────────────────
+// Submission = the risk data packet sent to carriers. Quote = a priced offer.
+// Declines and referrals are first-class outcomes with documented reasons
+// (SPEC-INSURANCE.md §4.5).
+
+enum InsuranceSubmissionStatus {
+  draft
+  submitted
+  quoted
+  declined
+  expired
+}
+
+enum InsuranceQuoteStatus {
+  draft
+  quoted
+  declined
+  referred
+  expired
+  bound
+}
+
+model InsuranceSubmission {
+  id          String   @id @default(cuid())
+  workspaceId String   @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  line            InsuranceLineOfBusiness
+  applicantName   String @map("applicant_name")
+  operationsDescription String? @map("operations_description")
+  state           String
+  classCode       String? @map("class_code")
+  payrollCents    Int?    @map("payroll_cents")
+  revenueCents    Int?    @map("revenue_cents")
+  targetLimitPerOccurrenceCents Int? @map("target_limit_per_occurrence_cents")
+  targetLimitAggregateCents     Int? @map("target_limit_aggregate_cents")
+  // Loss history: [{ year, claimCount, totalCents }] — JSON, never invented.
+  lossHistory     Json    @default("[]") @map("loss_history")
+  status          InsuranceSubmissionStatus @default(draft)
+  vendorRef       String? @map("vendor_ref")
+  submittedBy     String  @map("submitted_by")
+
+  quotes InsuranceQuote[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([workspaceId, status])
+  @@map("insurance_submissions")
+}
+
+model InsuranceQuote {
+  id          String   @id @default(cuid())
+  workspaceId String   @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  submissionId String  @map("submission_id")
+  submission  InsuranceSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+
+  carrierName String @map("carrier_name")
+  quotedPremiumCents       Int? @map("quoted_premium_cents")
+  limitPerOccurrenceCents  Int? @map("limit_per_occurrence_cents")
+  limitAggregateCents      Int? @map("limit_aggregate_cents")
+  quoteExpiry              DateTime? @map("quote_expiry")
+  status                   InsuranceQuoteStatus @default(draft)
+  // Vendor's reasoning / decline notes, verbatim. Never paraphrased into coverage.
+  vendorNotes              String? @map("vendor_notes")
+  // Raw vendor quote payload snapshot.
+  rawPayload               Json @default("{}") @map("raw_payload")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([workspaceId, submissionId])
+  @@index([workspaceId, status])
+  @@map("insurance_quotes")
+}
+
+// ── Wave 2 Insurance (licensed-partner decision, Tico 2026-10-01) ────────────
+// Producer-of-record model: LICENSED PARTNER. The partner holds the insurance
+// licenses; Marketr provides the software. No bind may execute unless an
+// active, appointed licensed partner is on file for the workspace — the bind
+// path fails closed with PARTNER_NOT_APPOINTED otherwise.
+
+enum InsurancePartnerStatus {
+  active
+  suspended
+  revoked
+}
+
+model InsuranceLicensedPartner {
+  id          String   @id @default(cuid())
+  workspaceId String   @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  name            String
+  contactEmail    String? @map("contact_email")
+  // Producer license number(s), as issued by the state DOI.
+  licenseNumber   String? @map("license_number")
+  // States the partner is licensed/appointed in, e.g. ["NC","SC"].
+  statesLicensed  Json    @default("[]") @map("states_licensed")
+  appointmentPath InsuranceAppointmentPath @map("appointment_path")
+  status          InsurancePartnerStatus @default(active)
+  appointedAt     DateTime? @map("appointed_at")
+  notes           String?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([workspaceId, status])
+  @@map("insurance_licensed_partners")
 }
