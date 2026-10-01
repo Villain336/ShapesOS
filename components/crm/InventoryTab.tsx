@@ -5,11 +5,12 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowLeftRight, Boxes, Loader2, Plus, Search, TriangleAlert } from "lucide-react";
+import { ArrowLeftRight, Boxes, Loader2, Plus, Search } from "lucide-react";
 import { formatMoney } from "./types";
 import { ProductDetail } from "./ProductDetail";
 import { NewProductModal } from "./NewProductModal";
 import { StockMoveModal } from "./StockMoveModal";
+import { btnGhost, btnPrimary, chipCls, errorBoxCls, inputCls, needsBoxCls, tableCls, tableWrapCls, trClickableCls } from "./ui";
 
 export interface OpsProduct {
   id: string;
@@ -32,10 +33,10 @@ export function productStockStatus(p: OpsProduct): ProductStockStatus {
 }
 
 export const STOCK_STATUS_META: Record<ProductStockStatus, { label: string; tint: string }> = {
-  untracked: { label: "Not tracked", tint: "bg-stone-100 text-stone-500" },
-  out: { label: "Out of stock", tint: "bg-red-100 text-red-700" },
-  low: { label: "Low stock", tint: "bg-amber-100 text-amber-800" },
-  ok: { label: "In stock", tint: "bg-green-100 text-green-700" },
+  untracked: { label: "Not tracked", tint: "bg-canvas text-muted" },
+  out: { label: "Out of stock", tint: "bg-canvas text-ink" },
+  low: { label: "Low stock", tint: "bg-canvas text-ink" },
+  ok: { label: "In stock", tint: "bg-canvas text-ink" },
 };
 
 export function InventoryTab() {
@@ -87,30 +88,30 @@ export function InventoryTab() {
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h2 className="text-xl font-bold tracking-tight text-stone-900">Inventory</h2>
-          <p className="mt-0.5 text-[13px] text-stone-500">
+          <h2 className="text-xl font-bold tracking-tight text-ink">Inventory</h2>
+          <p className="mt-0.5 text-[13px] text-muted">
             Stock moves only through inventory transactions — the ledger and the balance can never drift.
           </p>
         </div>
-        <div className="flex items-center gap-4 text-[13px] text-stone-500">
+        <div className="flex items-center gap-4 text-[13px] text-muted">
           <span>
             Products{" "}
-            <span className="font-bold text-stone-900 tabular-nums">{products.length}</span>
+            <span className="font-bold text-ink tabular-nums">{products.length}</span>
           </span>
           <span>
             Low-stock alerts{" "}
-            <span className="font-bold text-amber-700 tabular-nums">{alerts.length}</span>
+            <span className="font-bold text-ink tabular-nums">{alerts.length}</span>
           </span>
         </div>
       </div>
 
       {alerts.length > 0 && (
-        <div className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3">
-          <div className="flex items-center gap-2 text-[13px] font-bold text-amber-900">
-            <TriangleAlert size={16} /> {alerts.length} product{alerts.length === 1 ? "" : "s"} at or
+        <div className={needsBoxCls}>
+          <div className="flex items-center gap-2 text-[13px] font-bold text-ink">
+            <span className="aos-shape aos-shape--needs aos-shape--edged" role="img" aria-label="Needs attention" /> {alerts.length} product{alerts.length === 1 ? "" : "s"} at or
             below the low-stock threshold
           </div>
-          <p className="mt-1 text-[13px] text-amber-900">
+          <p className="mt-1 text-[13px] text-ink">
             {alerts
               .slice(0, 5)
               .map((p) => `${p.name} (${p.stockQty} left)`)
@@ -123,9 +124,9 @@ export function InventoryTab() {
       {/* Filter toolbar */}
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative">
-          <Search size={15} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-stone-400" />
+          <Search size={15} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-subtle" />
           <input
-            className="crm-input pl-8"
+            className={`${inputCls} pl-8`}
             placeholder="Search products…"
             value={q}
             onChange={(e) => setQ(e.target.value)}
@@ -134,40 +135,40 @@ export function InventoryTab() {
         <button
           type="button"
           onClick={() => setShowMove(true)}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-stone-300 bg-white px-3 py-[7px] text-[13px] font-semibold text-stone-700 hover:bg-stone-50"
+          className={btnGhost}
         >
           <ArrowLeftRight size={15} /> Record stock move
         </button>
         <button
           type="button"
           onClick={() => setShowNew(true)}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--brand-600)] px-3 py-[7px] text-[13px] font-semibold text-white hover:bg-[var(--brand-700)]"
+          className={btnPrimary}
         >
           <Plus size={15} /> New product
         </button>
       </div>
 
       {error && (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-700">
+        <div className={errorBoxCls}>
           {error}
         </div>
       )}
 
       {loading ? (
-        <div className="flex items-center gap-2 text-[13px] text-stone-500">
+        <div className="flex items-center gap-2 text-[13px] text-muted">
           <Loader2 size={16} className="animate-spin" /> Loading inventory…
         </div>
       ) : filtered.length === 0 ? (
-        <div className="rounded-lg border border-stone-200 bg-stone-50 px-4 py-10 text-center">
-          <Boxes size={28} className="mx-auto text-stone-300" />
-          <p className="mt-2 text-[13px] font-semibold text-stone-700">No products yet</p>
-          <p className="mt-0.5 text-[13px] text-stone-500">
+        <div className="rounded-md border border-line bg-canvas px-4 py-10 text-center">
+          <Boxes size={28} className="mx-auto text-subtle" />
+          <p className="mt-2 text-[13px] font-semibold text-ink">No products yet</p>
+          <p className="mt-0.5 text-[13px] text-muted">
             Add a product to start tracking stock.
           </p>
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-stone-200 bg-white">
-          <table className="crm-table w-full min-w-[760px]">
+        <div className={tableWrapCls}>
+          <table className={`${tableCls} min-w-[760px]`}>
             <thead>
               <tr>
                 <th>Product</th>
@@ -183,17 +184,17 @@ export function InventoryTab() {
                 const st = productStockStatus(p);
                 const meta = STOCK_STATUS_META[st];
                 return (
-                  <tr key={p.id} onClick={() => setSelectedId(p.id)} className="hover:bg-[var(--brand-50)]/40">
-                    <td className="font-semibold text-stone-900">{p.name}</td>
-                    <td className="text-stone-500">{p.sku}</td>
-                    <td className={`text-right font-semibold tabular-nums ${st === "out" ? "text-red-700" : st === "low" ? "text-amber-700" : ""}`}>
+                  <tr key={p.id} onClick={() => setSelectedId(p.id)} className={trClickableCls}>
+                    <td className="font-semibold text-ink">{p.name}</td>
+                    <td className="text-muted">{p.sku}</td>
+                    <td className="text-right font-semibold tabular-nums text-ink">
                       {p.trackInventory ? p.stockQty : "—"}
                     </td>
-                    <td className="text-right tabular-nums text-stone-500">
+                    <td className="text-right tabular-nums text-muted">
                       {p.trackInventory ? p.lowStockThreshold : "—"}
                     </td>
                     <td>
-                      <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${meta.tint}`}>
+                      <span className={chipCls}>
                         {meta.label}
                       </span>
                     </td>

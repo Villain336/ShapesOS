@@ -9,6 +9,7 @@ import { FileText, Loader2, Plus, Search } from "lucide-react";
 import { formatMoney } from "./types";
 import { InvoiceDetail } from "./InvoiceDetail";
 import { NewInvoiceModal } from "./NewInvoiceModal";
+import { btnPrimary, chipCls, errorBoxCls, inputCls, selectCls, tableCls, tableWrapCls, trClickableCls } from "./ui";
 
 export interface OpsInvoice {
   id: string;
@@ -31,11 +32,11 @@ export interface CustomerRef {
 const STATUS_FILTERS = ["all", "draft", "sent", "paid", "overdue", "cancelled"] as const;
 
 export const INVOICE_STATUS_META: Record<string, { label: string; tint: string }> = {
-  draft: { label: "Draft", tint: "bg-stone-200 text-stone-700" },
-  sent: { label: "Sent", tint: "bg-blue-100 text-blue-700" },
-  paid: { label: "Paid", tint: "bg-green-100 text-green-700" },
-  overdue: { label: "Overdue", tint: "bg-red-100 text-red-700" },
-  cancelled: { label: "Voided", tint: "bg-stone-100 text-stone-400" },
+  draft: { label: "Draft", tint: "bg-line text-ink" },
+  sent: { label: "Sent", tint: "bg-canvas text-ink" },
+  paid: { label: "Paid", tint: "bg-canvas text-ink" },
+  overdue: { label: "Overdue", tint: "bg-canvas text-ink" },
+  cancelled: { label: "Voided", tint: "bg-canvas text-subtle" },
 };
 
 export function shortInvoiceId(id: string): string {
@@ -133,17 +134,17 @@ export function InvoicesTab() {
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h2 className="text-xl font-bold tracking-tight text-stone-900">Invoicing</h2>
-          <p className="mt-0.5 text-[13px] text-stone-500">
+          <h2 className="text-xl font-bold tracking-tight text-ink">Invoicing</h2>
+          <p className="mt-0.5 text-[13px] text-muted">
             Draft → approve → send → paid. Sending an invoice needs your approval — money is a red lane.
           </p>
         </div>
-        <div className="flex items-center gap-4 text-[13px] text-stone-500">
+        <div className="flex items-center gap-4 text-[13px] text-muted">
           <span>
-            Outstanding <span className="font-bold text-stone-900 tabular-nums">{formatMoney(totals.outstanding)}</span>
+            Outstanding <span className="font-bold text-ink tabular-nums">{formatMoney(totals.outstanding)}</span>
           </span>
           <span>
-            Overdue <span className="font-bold text-red-700 tabular-nums">{formatMoney(totals.overdue)}</span>
+            Overdue <span className="font-bold text-ink tabular-nums">{formatMoney(totals.overdue)}</span>
           </span>
         </div>
       </div>
@@ -151,7 +152,7 @@ export function InvoicesTab() {
       {/* Filter toolbar */}
       <div className="flex flex-wrap items-center gap-2">
         <select
-          className="crm-select"
+          className={selectCls}
           value={status}
           onChange={(e) => setStatus(e.target.value as typeof status)}
           aria-label="Filter by status"
@@ -163,9 +164,9 @@ export function InvoicesTab() {
           ))}
         </select>
         <div className="relative">
-          <Search size={15} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-stone-400" />
+          <Search size={15} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-subtle" />
           <input
-            className="crm-input pl-8"
+            className={`${inputCls} pl-8`}
             placeholder="Search invoices…"
             value={q}
             onChange={(e) => setQ(e.target.value)}
@@ -174,33 +175,33 @@ export function InvoicesTab() {
         <button
           type="button"
           onClick={() => setShowNew(true)}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--brand-600)] px-3 py-[7px] text-[13px] font-semibold text-white hover:bg-[var(--brand-700)]"
+          className={btnPrimary}
         >
           <Plus size={15} /> New invoice
         </button>
       </div>
 
       {error && (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-700">
+        <div className={errorBoxCls}>
           {error}
         </div>
       )}
 
       {loading ? (
-        <div className="flex items-center gap-2 text-[13px] text-stone-500">
+        <div className="flex items-center gap-2 text-[13px] text-muted">
           <Loader2 size={16} className="animate-spin" /> Loading invoices…
         </div>
       ) : filtered.length === 0 ? (
-        <div className="rounded-lg border border-stone-200 bg-stone-50 px-4 py-10 text-center">
-          <FileText size={28} className="mx-auto text-stone-300" />
-          <p className="mt-2 text-[13px] font-semibold text-stone-700">No invoices yet</p>
-          <p className="mt-0.5 text-[13px] text-stone-500">
+        <div className="rounded-md border border-line bg-canvas px-4 py-10 text-center">
+          <FileText size={28} className="mx-auto text-subtle" />
+          <p className="mt-2 text-[13px] font-semibold text-ink">No invoices yet</p>
+          <p className="mt-0.5 text-[13px] text-muted">
             Create a draft invoice — it stays a draft until you approve the send.
           </p>
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-stone-200 bg-white">
-          <table className="crm-table w-full min-w-[860px]">
+        <div className={tableWrapCls}>
+          <table className={`${tableCls} min-w-[860px]`}>
             <thead>
               <tr>
                 <th>Invoice</th>
@@ -216,28 +217,28 @@ export function InvoicesTab() {
                 const meta = INVOICE_STATUS_META[inv.status];
                 const c = inv.customerId ? customers[inv.customerId] : undefined;
                 return (
-                  <tr key={inv.id} onClick={() => setSelectedId(inv.id)} className="hover:bg-[var(--brand-50)]/40">
-                    <td className="font-semibold text-stone-900">INV-{shortInvoiceId(inv.id)}</td>
+                  <tr key={inv.id} onClick={() => setSelectedId(inv.id)} className={trClickableCls}>
+                    <td className="font-semibold text-ink">INV-{shortInvoiceId(inv.id)}</td>
                     <td>
                       {c ? (
                         <>
-                          <span className="font-medium text-stone-800">{c.name}</span>
-                          {c.company && <span className="text-stone-400"> · {c.company}</span>}
+                          <span className="font-medium text-ink">{c.name}</span>
+                          {c.company && <span className="text-subtle"> · {c.company}</span>}
                         </>
                       ) : (
-                        <span className="text-stone-400">—</span>
+                        <span className="text-subtle">—</span>
                       )}
                     </td>
                     <td>
-                      <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${meta.tint}`}>
+                      <span className={chipCls}>
                         {meta.label}
                       </span>
                     </td>
                     <td className="text-right font-semibold tabular-nums">{formatMoney(inv.totalCents)}</td>
-                    <td className={inv.status === "overdue" ? "font-semibold text-red-700" : ""}>
+                    <td className={inv.status === "overdue" ? "font-semibold text-ink" : ""}>
                       {fmtDate(inv.dueAt)}
                     </td>
-                    <td className="text-stone-500">{fmtDate(inv.sentAt)}</td>
+                    <td className="text-muted">{fmtDate(inv.sentAt)}</td>
                   </tr>
                 );
               })}

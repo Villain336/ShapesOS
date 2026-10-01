@@ -5,6 +5,7 @@
 
 import { useState } from "react";
 import { Loader2, X } from "lucide-react";
+import { backdropCls, btnGhost, btnPrimary, errorBoxCls, inputCls, modalWrapCls } from "./ui";
 
 export function NewMemberModal({
   onClose,
@@ -50,56 +51,56 @@ export function NewMemberModal({
 
   return (
     <>
-      <div className="crm-backdrop" onClick={onClose} />
-      <div className="crm-modal">
-        <div className="flex items-start justify-between border-b border-stone-200 px-5 py-4">
-          <h3 className="text-lg font-bold tracking-tight text-stone-900">New team member</h3>
-          <button onClick={onClose} className="rounded-lg p-1.5 text-stone-400 hover:bg-stone-100" aria-label="Close">
+      <div className={backdropCls} onClick={onClose} />
+      <div className={modalWrapCls}>
+        <div className="flex items-start justify-between border-b border-line px-5 py-4">
+          <h3 className="text-lg font-bold tracking-tight text-ink">New team member</h3>
+          <button onClick={onClose} className="rounded-md p-1.5 text-subtle hover:bg-hover-paper hover:text-ink" aria-label="Close">
             <X size={18} />
           </button>
         </div>
         <div className="flex flex-col gap-4 px-5 py-4">
           {error && (
-            <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-700">
+            <div className={errorBoxCls}>
               {error}
             </div>
           )}
           <label className="block">
-            <span className="mb-1 block text-[12px] font-semibold text-stone-700">Name *</span>
+            <span className="mb-1 block text-[12px] font-semibold text-ink">Name *</span>
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g. Ada Lovelace"
-              className="w-full rounded-lg border border-stone-300 px-3 py-2 text-[13px] text-stone-900 placeholder:text-stone-400 focus:border-[var(--brand-600)] focus:outline-none"
+              className={`${inputCls} w-full`}
             />
           </label>
           <label className="block">
-            <span className="mb-1 block text-[12px] font-semibold text-stone-700">Title</span>
+            <span className="mb-1 block text-[12px] font-semibold text-ink">Title</span>
             <input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="e.g. Operations lead"
-              className="w-full rounded-lg border border-stone-300 px-3 py-2 text-[13px] text-stone-900 placeholder:text-stone-400 focus:border-[var(--brand-600)] focus:outline-none"
+              className={`${inputCls} w-full`}
             />
           </label>
           <div className="grid grid-cols-2 gap-3">
             <label className="block">
-              <span className="mb-1 block text-[12px] font-semibold text-stone-700">Email</span>
+              <span className="mb-1 block text-[12px] font-semibold text-ink">Email</span>
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="name@company.com"
-                className="w-full rounded-lg border border-stone-300 px-3 py-2 text-[13px] text-stone-900 placeholder:text-stone-400 focus:border-[var(--brand-600)] focus:outline-none"
+                className={`${inputCls} w-full`}
               />
             </label>
             <label className="block">
-              <span className="mb-1 block text-[12px] font-semibold text-stone-700">Start date</span>
+              <span className="mb-1 block text-[12px] font-semibold text-ink">Start date</span>
               <input
                 type="date"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
-                className="w-full rounded-lg border border-stone-300 px-3 py-2 text-[13px] text-stone-900 focus:border-[var(--brand-600)] focus:outline-none"
+                className={`${inputCls} w-full`}
               />
             </label>
           </div>
@@ -107,7 +108,7 @@ export function NewMemberModal({
             <button
               type="button"
               onClick={onClose}
-              className="rounded-lg border border-stone-300 bg-white px-4 py-2 text-[13px] font-semibold text-stone-700 hover:bg-stone-50"
+              className={btnGhost}
             >
               Cancel
             </button>
@@ -115,7 +116,7 @@ export function NewMemberModal({
               type="button"
               onClick={submit}
               disabled={saving}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--brand-600)] px-4 py-2 text-[13px] font-semibold text-white hover:bg-[var(--brand-700)] disabled:opacity-50"
+              className={btnPrimary}
             >
               {saving && <Loader2 size={14} className="animate-spin" />} Add member
             </button>

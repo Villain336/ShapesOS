@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import { Loader2, Plus, Search, Trash2, X } from "lucide-react";
 import { formatMoney } from "./types";
 import type { OpsProduct } from "./InventoryTab";
+import { backdropCls, btnGhost, btnPrimary, errorBoxCls, inputCls, labelCls, modalWrapCls, selectCls } from "./ui";
 
 interface LeadHit {
   id: string;
@@ -141,35 +142,35 @@ export function NewPOModal({
 
   return (
     <>
-      <div className="crm-backdrop" onClick={onClose} />
-      <div className="crm-modal">
-        <div className="flex items-start justify-between border-b border-stone-200 px-5 py-4">
+      <div className={backdropCls} onClick={onClose} />
+      <div className={modalWrapCls}>
+        <div className="flex items-start justify-between border-b border-line px-5 py-4">
           <div>
-            <h3 className="text-lg font-bold tracking-tight text-stone-900">New purchase order</h3>
-            <p className="mt-0.5 text-[13px] text-stone-500">
+            <h3 className="text-lg font-bold tracking-tight text-ink">New purchase order</h3>
+            <p className="mt-0.5 text-[13px] text-muted">
               Drafts are free — sending needs your approval (money is a red lane).
             </p>
           </div>
-          <button type="button" onClick={onClose} className="rounded-lg p-1.5 text-stone-400 hover:bg-stone-100" aria-label="Close">
+          <button type="button" onClick={onClose} className="rounded-md p-1.5 text-subtle hover:bg-hover-paper hover:text-ink" aria-label="Close">
             <X size={18} />
           </button>
         </div>
         <div className="max-h-[70vh] overflow-y-auto px-5 py-4">
           {error && (
-            <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-700">
+            <div className={`${errorBoxCls} mb-3`}>
               {error}
             </div>
           )}
 
-          <label className="text-[11px] font-semibold uppercase tracking-wider text-stone-400">
+          <label className={labelCls}>
             Supplier (CRM lead, optional)
           </label>
           <div className="relative mt-1">
             {supplier ? (
-              <div className="flex items-center justify-between rounded-lg border border-stone-200 bg-stone-50 px-3 py-2">
-                <span className="text-[13px] font-medium text-stone-800">
+              <div className="flex items-center justify-between rounded-md border border-line bg-canvas px-3 py-2">
+                <span className="text-[13px] font-medium text-ink">
                   {supplier.name}
-                  {supplier.company && <span className="text-stone-400"> · {supplier.company}</span>}
+                  {supplier.company && <span className="text-subtle"> · {supplier.company}</span>}
                 </span>
                 <button
                   type="button"
@@ -177,7 +178,7 @@ export function NewPOModal({
                     setSupplier(null);
                     setSupplierQuery("");
                   }}
-                  className="text-[12px] font-semibold text-stone-500 hover:text-stone-800"
+                  className="text-[12px] font-semibold text-muted hover:text-ink"
                 >
                   Change
                 </button>
@@ -185,18 +186,18 @@ export function NewPOModal({
             ) : (
               <>
                 <div className="relative">
-                  <Search size={15} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-stone-400" />
+                  <Search size={15} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-subtle" />
                   <input
-                    className="crm-input w-full pl-8"
+                    className={`${inputCls} w-full pl-8`}
                     placeholder="Search leads by name or company…"
                     value={supplierQuery}
                     onChange={(e) => setSupplierQuery(e.target.value)}
                     onFocus={() => hits.length > 0 && setShowHits(true)}
                   />
-                  {searching && <Loader2 size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 animate-spin text-stone-400" />}
+                  {searching && <Loader2 size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 animate-spin text-subtle" />}
                 </div>
                 {showHits && hits.length > 0 && (
-                  <div className="absolute z-10 mt-1 max-h-48 w-full overflow-y-auto rounded-lg border border-stone-200 bg-white shadow-lg">
+                  <div className="absolute z-10 mt-1 max-h-48 w-full overflow-y-auto rounded-md border border-line bg-paper shadow-overlay">
                     {hits.map((h) => (
                       <button
                         key={h.id}
@@ -205,10 +206,10 @@ export function NewPOModal({
                           setSupplier(h);
                           setShowHits(false);
                         }}
-                        className="block w-full px-3 py-2 text-left text-[13px] hover:bg-stone-50"
+                        className="block w-full px-3 py-2 text-left text-[13px] hover:bg-canvas"
                       >
-                        <span className="font-medium text-stone-800">{h.name}</span>
-                        {h.company && <span className="text-stone-400"> · {h.company}</span>}
+                        <span className="font-medium text-ink">{h.name}</span>
+                        {h.company && <span className="text-subtle"> · {h.company}</span>}
                       </button>
                     ))}
                   </div>
@@ -218,7 +219,7 @@ export function NewPOModal({
           </div>
           <div className="mt-2">
             <input
-              className="crm-input w-full"
+              className={`${inputCls} w-full`}
               placeholder="Or type a supplier name…"
               value={supplierName}
               onChange={(e) => setSupplierName(e.target.value)}
@@ -226,25 +227,25 @@ export function NewPOModal({
           </div>
 
           <div className="mt-4 flex items-center justify-between">
-            <label className="text-[11px] font-semibold uppercase tracking-wider text-stone-400">
+            <label className={labelCls}>
               Line items
             </label>
             <button
               type="button"
               onClick={() => setItems([...items, { productId: "", name: "", qty: "1", price: "" }])}
-              className="inline-flex items-center gap-1 text-[12px] font-semibold text-[var(--brand-700)] hover:underline"
+              className="inline-flex items-center gap-1 text-[12px] font-semibold text-ink hover:underline"
             >
               <Plus size={13} /> Add line
             </button>
           </div>
-          <p className="mt-1 text-[12px] text-stone-500">
+          <p className="mt-1 text-[12px] text-muted">
             Link a line to a catalog product and receiving the PO books a restock for it.
           </p>
           <div className="mt-1 space-y-2">
             {items.map((it, i) => (
               <div key={i} className="flex gap-2">
                 <select
-                  className="crm-select w-36"
+                  className={`${selectCls} w-36`}
                   value={it.productId}
                   onChange={(e) => {
                     const pid = e.target.value;
@@ -273,20 +274,20 @@ export function NewPOModal({
                     ))}
                 </select>
                 <input
-                  className="crm-input flex-1"
+                  className={`${inputCls} flex-1`}
                   placeholder="Item name"
                   value={it.name}
                   onChange={(e) => setItems(items.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))}
                 />
                 <input
-                  className="crm-input w-16"
+                  className={`${inputCls} w-16`}
                   placeholder="Qty"
                   inputMode="numeric"
                   value={it.qty}
                   onChange={(e) => setItems(items.map((x, j) => (j === i ? { ...x, qty: e.target.value } : x)))}
                 />
                 <input
-                  className="crm-input w-28"
+                  className={`${inputCls} w-28`}
                   placeholder="$0.00"
                   inputMode="decimal"
                   value={it.price}
@@ -296,7 +297,7 @@ export function NewPOModal({
                   <button
                     type="button"
                     onClick={() => setItems(items.filter((_, j) => j !== i))}
-                    className="rounded-lg p-2 text-stone-400 hover:bg-stone-100 hover:text-red-600"
+                    className="rounded-md p-2 text-subtle hover:bg-failed-tint hover:text-failed-text"
                     aria-label="Remove line"
                   >
                     <Trash2 size={15} />
@@ -308,11 +309,11 @@ export function NewPOModal({
 
           <div className="mt-4 grid grid-cols-2 gap-3">
             <div>
-              <label className="text-[11px] font-semibold uppercase tracking-wider text-stone-400">
+              <label className={labelCls}>
                 Tax (USD)
               </label>
               <input
-                className="crm-input mt-1 w-full"
+                className={`${inputCls} mt-1 w-full`}
                 placeholder="0.00"
                 inputMode="decimal"
                 value={tax}
@@ -320,22 +321,22 @@ export function NewPOModal({
               />
             </div>
             <div className="flex items-end justify-end">
-              <p className="text-[13px] text-stone-500">
+              <p className="text-[13px] text-muted">
                 Subtotal{" "}
-                <span className="font-bold text-stone-900 tabular-nums">{formatMoney(subtotal)}</span>
+                <span className="font-bold text-ink tabular-nums">{formatMoney(subtotal)}</span>
               </p>
             </div>
           </div>
 
           <div className="mt-4 flex justify-end gap-2">
-            <button type="button" onClick={onClose} className="rounded-lg border border-stone-300 bg-white px-3 py-[7px] text-[13px] font-semibold text-stone-700 hover:bg-stone-50">
+            <button type="button" onClick={onClose} className={btnGhost}>
               Cancel
             </button>
             <button
               type="button"
               disabled={busy}
               onClick={submit}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--brand-600)] px-3 py-[7px] text-[13px] font-semibold text-white hover:bg-[var(--brand-700)] disabled:opacity-50"
+              className={btnPrimary}
             >
               {busy && <Loader2 size={14} className="animate-spin" />} Create draft
             </button>

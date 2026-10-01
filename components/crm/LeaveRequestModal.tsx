@@ -7,6 +7,7 @@
 import { useState } from "react";
 import { Loader2, X } from "lucide-react";
 import type { OpsTeamMember } from "./TeamTab";
+import { backdropCls, btnGhost, btnPrimary, errorBoxCls, inputCls, modalWrapCls } from "./ui";
 
 export function LeaveRequestModal({
   members,
@@ -57,26 +58,26 @@ export function LeaveRequestModal({
 
   return (
     <>
-      <div className="crm-backdrop" onClick={onClose} />
-      <div className="crm-modal">
-        <div className="flex items-start justify-between border-b border-stone-200 px-5 py-4">
-          <h3 className="text-lg font-bold tracking-tight text-stone-900">Request leave</h3>
-          <button onClick={onClose} className="rounded-lg p-1.5 text-stone-400 hover:bg-stone-100" aria-label="Close">
+      <div className={backdropCls} onClick={onClose} />
+      <div className={modalWrapCls}>
+        <div className="flex items-start justify-between border-b border-line px-5 py-4">
+          <h3 className="text-lg font-bold tracking-tight text-ink">Request leave</h3>
+          <button onClick={onClose} className="rounded-md p-1.5 text-subtle hover:bg-hover-paper hover:text-ink" aria-label="Close">
             <X size={18} />
           </button>
         </div>
         <div className="flex flex-col gap-4 px-5 py-4">
           {error && (
-            <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-700">
+            <div className={errorBoxCls}>
               {error}
             </div>
           )}
           <label className="block">
-            <span className="mb-1 block text-[12px] font-semibold text-stone-700">Team member *</span>
+            <span className="mb-1 block text-[12px] font-semibold text-ink">Team member *</span>
             <select
               value={memberId}
               onChange={(e) => setMemberId(e.target.value)}
-              className="w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-[13px] text-stone-900 focus:border-[var(--brand-600)] focus:outline-none"
+              className={`${inputCls} w-full`}
             >
               <option value="">Select…</option>
               {members.map((m) => (
@@ -89,11 +90,11 @@ export function LeaveRequestModal({
           </label>
           <div className="grid grid-cols-3 gap-3">
             <label className="block">
-              <span className="mb-1 block text-[12px] font-semibold text-stone-700">Type</span>
+              <span className="mb-1 block text-[12px] font-semibold text-ink">Type</span>
               <select
                 value={type}
                 onChange={(e) => setType(e.target.value as typeof type)}
-                className="w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-[13px] text-stone-900 focus:border-[var(--brand-600)] focus:outline-none"
+                className={`${inputCls} w-full`}
               >
                 <option value="vacation">Vacation</option>
                 <option value="sick">Sick</option>
@@ -101,32 +102,32 @@ export function LeaveRequestModal({
               </select>
             </label>
             <label className="block">
-              <span className="mb-1 block text-[12px] font-semibold text-stone-700">Start *</span>
+              <span className="mb-1 block text-[12px] font-semibold text-ink">Start *</span>
               <input
                 type="date"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
-                className="w-full rounded-lg border border-stone-300 px-3 py-2 text-[13px] text-stone-900 focus:border-[var(--brand-600)] focus:outline-none"
+                className={`${inputCls} w-full`}
               />
             </label>
             <label className="block">
-              <span className="mb-1 block text-[12px] font-semibold text-stone-700">End *</span>
+              <span className="mb-1 block text-[12px] font-semibold text-ink">End *</span>
               <input
                 type="date"
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
-                className="w-full rounded-lg border border-stone-300 px-3 py-2 text-[13px] text-stone-900 focus:border-[var(--brand-600)] focus:outline-none"
+                className={`${inputCls} w-full`}
               />
             </label>
           </div>
-          <p className="text-[12px] text-stone-500">
+          <p className="text-[12px] text-muted">
             Goes out as a request. A manager approves it — that approval is gated and recorded.
           </p>
           <div className="flex justify-end gap-2 pt-1">
             <button
               type="button"
               onClick={onClose}
-              className="rounded-lg border border-stone-300 bg-white px-4 py-2 text-[13px] font-semibold text-stone-700 hover:bg-stone-50"
+              className={btnGhost}
             >
               Cancel
             </button>
@@ -134,7 +135,7 @@ export function LeaveRequestModal({
               type="button"
               onClick={submit}
               disabled={saving}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--brand-600)] px-4 py-2 text-[13px] font-semibold text-white hover:bg-[var(--brand-700)] disabled:opacity-50"
+              className={btnPrimary}
             >
               {saving && <Loader2 size={14} className="animate-spin" />} Request
             </button>

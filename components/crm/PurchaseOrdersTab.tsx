@@ -10,6 +10,7 @@ import { ClipboardList, Loader2, Plus, Search } from "lucide-react";
 import { formatMoney } from "./types";
 import { PODetail } from "./PODetail";
 import { NewPOModal } from "./NewPOModal";
+import { btnPrimary, chipCls, errorBoxCls, inputCls, selectCls, tableCls, tableWrapCls, trClickableCls } from "./ui";
 
 export interface OpsPurchaseOrder {
   id: string;
@@ -33,10 +34,10 @@ export interface SupplierRef {
 const STATUS_FILTERS = ["all", "draft", "sent", "received", "cancelled"] as const;
 
 export const PO_STATUS_META: Record<string, { label: string; tint: string }> = {
-  draft: { label: "Draft", tint: "bg-stone-200 text-stone-700" },
-  sent: { label: "Sent", tint: "bg-blue-100 text-blue-700" },
-  received: { label: "Received", tint: "bg-green-100 text-green-700" },
-  cancelled: { label: "Cancelled", tint: "bg-stone-100 text-stone-400" },
+  draft: { label: "Draft", tint: "bg-line text-ink" },
+  sent: { label: "Sent", tint: "bg-canvas text-ink" },
+  received: { label: "Received", tint: "bg-canvas text-ink" },
+  cancelled: { label: "Cancelled", tint: "bg-canvas text-subtle" },
 };
 
 export function shortPOId(id: string): string {
@@ -131,15 +132,15 @@ export function PurchaseOrdersTab() {
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h2 className="text-xl font-bold tracking-tight text-stone-900">Purchase orders</h2>
-          <p className="mt-0.5 text-[13px] text-stone-500">
+          <h2 className="text-xl font-bold tracking-tight text-ink">Purchase orders</h2>
+          <p className="mt-0.5 text-[13px] text-muted">
             Draft → approve → send → received. Sending is a money commitment and needs your approval.
           </p>
         </div>
-        <div className="flex items-center gap-4 text-[13px] text-stone-500">
+        <div className="flex items-center gap-4 text-[13px] text-muted">
           <span>
             Open orders{" "}
-            <span className="font-bold text-stone-900 tabular-nums">{formatMoney(totals.open)}</span>
+            <span className="font-bold text-ink tabular-nums">{formatMoney(totals.open)}</span>
           </span>
         </div>
       </div>
@@ -147,7 +148,7 @@ export function PurchaseOrdersTab() {
       {/* Filter toolbar */}
       <div className="flex flex-wrap items-center gap-2">
         <select
-          className="crm-select"
+          className={selectCls}
           value={status}
           onChange={(e) => setStatus(e.target.value as typeof status)}
           aria-label="Filter by status"
@@ -159,9 +160,9 @@ export function PurchaseOrdersTab() {
           ))}
         </select>
         <div className="relative">
-          <Search size={15} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-stone-400" />
+          <Search size={15} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-subtle" />
           <input
-            className="crm-input pl-8"
+            className={`${inputCls} pl-8`}
             placeholder="Search purchase orders…"
             value={q}
             onChange={(e) => setQ(e.target.value)}
@@ -170,33 +171,33 @@ export function PurchaseOrdersTab() {
         <button
           type="button"
           onClick={() => setShowNew(true)}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--brand-600)] px-3 py-[7px] text-[13px] font-semibold text-white hover:bg-[var(--brand-700)]"
+          className={btnPrimary}
         >
           <Plus size={15} /> New purchase order
         </button>
       </div>
 
       {error && (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-700">
+        <div className={errorBoxCls}>
           {error}
         </div>
       )}
 
       {loading ? (
-        <div className="flex items-center gap-2 text-[13px] text-stone-500">
+        <div className="flex items-center gap-2 text-[13px] text-muted">
           <Loader2 size={16} className="animate-spin" /> Loading purchase orders…
         </div>
       ) : filtered.length === 0 ? (
-        <div className="rounded-lg border border-stone-200 bg-stone-50 px-4 py-10 text-center">
-          <ClipboardList size={28} className="mx-auto text-stone-300" />
-          <p className="mt-2 text-[13px] font-semibold text-stone-700">No purchase orders yet</p>
-          <p className="mt-0.5 text-[13px] text-stone-500">
+        <div className="rounded-md border border-line bg-canvas px-4 py-10 text-center">
+          <ClipboardList size={28} className="mx-auto text-subtle" />
+          <p className="mt-2 text-[13px] font-semibold text-ink">No purchase orders yet</p>
+          <p className="mt-0.5 text-[13px] text-muted">
             Create a draft — it stays a draft until you approve the send.
           </p>
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-stone-200 bg-white">
-          <table className="crm-table w-full min-w-[820px]">
+        <div className={tableWrapCls}>
+          <table className={`${tableCls} min-w-[820px]`}>
             <thead>
               <tr>
                 <th>PO</th>
@@ -211,17 +212,17 @@ export function PurchaseOrdersTab() {
               {filtered.map((po) => {
                 const meta = PO_STATUS_META[po.status];
                 return (
-                  <tr key={po.id} onClick={() => setSelectedId(po.id)} className="hover:bg-[var(--brand-50)]/40">
-                    <td className="font-semibold text-stone-900">PO-{shortPOId(po.id)}</td>
-                    <td className="text-stone-700">{supplierLabel(po)}</td>
+                  <tr key={po.id} onClick={() => setSelectedId(po.id)} className={trClickableCls}>
+                    <td className="font-semibold text-ink">PO-{shortPOId(po.id)}</td>
+                    <td className="text-ink">{supplierLabel(po)}</td>
                     <td>
-                      <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${meta.tint}`}>
+                      <span className={chipCls}>
                         {meta.label}
                       </span>
                     </td>
                     <td className="text-right font-semibold tabular-nums">{formatMoney(po.totalCents)}</td>
-                    <td className="text-stone-500">{fmtDate(po.sentAt)}</td>
-                    <td className="text-stone-500">{fmtDate(po.receivedAt)}</td>
+                    <td className="text-muted">{fmtDate(po.sentAt)}</td>
+                    <td className="text-muted">{fmtDate(po.receivedAt)}</td>
                   </tr>
                 );
               })}

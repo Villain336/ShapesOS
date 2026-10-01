@@ -6,7 +6,7 @@
 
 import { useState } from "react";
 import {
-  X, Send, BadgeDollarSign, BellRing, Ban, Loader2, Check, ShieldAlert, ExternalLink,
+  X, Send, BadgeDollarSign, BellRing, Ban, Loader2, Check, ExternalLink,
 } from "lucide-react";
 import { formatMoney } from "./types";
 import {
@@ -15,6 +15,7 @@ import {
   type OpsInvoice,
   type CustomerRef,
 } from "./InvoicesTab";
+import { backdropCls, btnApprove, btnDeny, btnExecute, btnGhost, btnPrimary, btnReview, chipCls, errorBoxCls, inputCls, needsBoxCls, noteBoxCls, sectionTitleCls, slideoverCls, tableCls } from "./ui";
 
 interface PendingGate {
   approvalId: string;
@@ -195,48 +196,48 @@ export function InvoiceDetail({
 
   return (
     <>
-      <div className="crm-backdrop" onClick={onClose} />
-      <div className="crm-slideover">
+      <div className={backdropCls} onClick={onClose} />
+      <div className={slideoverCls}>
         <div className="flex h-full flex-col">
-          <div className="flex items-start justify-between border-b border-stone-200 px-5 py-4">
+          <div className="flex items-start justify-between border-b border-line px-5 py-4">
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-lg font-bold tracking-tight text-stone-900">
+                <h3 className="text-lg font-bold tracking-tight text-ink">
                   INV-{shortInvoiceId(invoice.id)}
                 </h3>
-                <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${meta.tint}`}>
+                <span className={chipCls}>
                   {meta.label}
                 </span>
               </div>
-              <p className="mt-0.5 text-[13px] text-stone-500">
+              <p className="mt-0.5 text-[13px] text-muted">
                 {who} · {formatMoney(invoice.totalCents)} · due {fmtDate(invoice.dueAt)}
               </p>
             </div>
-            <button type="button" onClick={onClose} className="rounded-lg p-1.5 text-stone-400 hover:bg-stone-100" aria-label="Close">
+            <button type="button" onClick={onClose} className="rounded-md p-1.5 text-subtle hover:bg-hover-paper hover:text-ink" aria-label="Close">
               <X size={18} />
             </button>
           </div>
 
           <div className="flex-1 overflow-y-auto px-5 py-4">
             {error && (
-              <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-700">
+              <div className={`${errorBoxCls} mb-3`}>
                 {error}
               </div>
             )}
             {note && (
-              <div className="mb-3 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-[13px] text-green-800">
+              <div className={`${noteBoxCls} mb-3`}>
                 {note}
               </div>
             )}
 
             {/* Approval card for the gated write */}
             {pending && (
-              <div className="mb-4 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3">
-                <div className="flex items-center gap-2 text-[13px] font-bold text-amber-900">
-                  <ShieldAlert size={16} /> Approval needed — {pending.actionLabel}
+              <div className={`${needsBoxCls} mb-4`}>
+                <div className="flex items-center gap-2 text-[13px] font-bold text-ink">
+                  <span className="aos-shape aos-shape--needs aos-shape--edged" role="img" aria-label="Needs review" /> Approval needed — {pending.actionLabel}
                 </div>
-                <p className="mt-1 text-[13px] text-amber-900">{pending.summary}</p>
-                <p className="mt-1 text-[12px] text-amber-700">
+                <p className="mt-1 text-[13px] text-ink">{pending.summary}</p>
+                <p className="mt-1 text-[12px] text-ink">
                   Risk tier: {pending.tier}. Nothing executes until you approve — approve here or in the Actions queue.
                 </p>
                 {!pending.approved ? (
@@ -245,7 +246,7 @@ export function InvoiceDetail({
                       type="button"
                       disabled={busy}
                       onClick={() => decide("approved")}
-                      className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--brand-600)] px-3 py-1.5 text-[13px] font-semibold text-white hover:bg-[var(--brand-700)] disabled:opacity-50"
+                      className={btnApprove}
                     >
                       {busy ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />} Approve
                     </button>
@@ -253,27 +254,27 @@ export function InvoiceDetail({
                       type="button"
                       disabled={busy}
                       onClick={() => decide("denied")}
-                      className="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-[13px] font-semibold text-stone-700 hover:bg-stone-50 disabled:opacity-50"
+                      className={btnDeny}
                     >
                       Deny
                     </button>
                     <a
                       href="/dashboard/actions"
-                      className="inline-flex items-center gap-1 text-[12px] font-semibold text-[var(--brand-700)] hover:underline"
+                      className="inline-flex items-center gap-1 text-[12px] font-semibold text-ink hover:underline"
                     >
                       Open Actions queue <ExternalLink size={12} />
                     </a>
                   </div>
                 ) : (
                   <div className="mt-3 flex items-center gap-2">
-                    <span className="inline-flex items-center gap-1 text-[13px] font-semibold text-green-700">
+                    <span className="inline-flex items-center gap-1 text-[13px] font-semibold text-ink">
                       <Check size={14} /> Approved — ready to execute
                     </span>
                     <button
                       type="button"
                       disabled={busy}
                       onClick={execute}
-                      className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--brand-600)] px-3 py-1.5 text-[13px] font-semibold text-white hover:bg-[var(--brand-700)] disabled:opacity-50"
+                      className={btnExecute}
                     >
                       {busy ? <Loader2 size={14} className="animate-spin" /> : null}
                       {pending.kind === "reminder" ? "Send reminder now" : "Execute now"}
@@ -284,9 +285,9 @@ export function InvoiceDetail({
             )}
 
             {/* Line items */}
-            <h4 className="text-[11px] font-semibold uppercase tracking-wider text-stone-400">Line items</h4>
-            <div className="mt-1 overflow-hidden rounded-lg border border-stone-200">
-              <table className="crm-table w-full">
+            <h4 className={sectionTitleCls}>Line items</h4>
+            <div className="mt-1 overflow-hidden rounded-md border border-line">
+              <table className={`${tableCls}`}>
                 <thead>
                   <tr>
                     <th>Description</th>
@@ -308,35 +309,35 @@ export function InvoiceDetail({
               </table>
             </div>
             <div className="mt-2 space-y-1 text-[13px]">
-              <div className="flex justify-between text-stone-500">
+              <div className="flex justify-between text-muted">
                 <span>Subtotal</span>
                 <span className="tabular-nums">{formatMoney(subtotal)}</span>
               </div>
-              <div className="flex justify-between text-stone-500">
+              <div className="flex justify-between text-muted">
                 <span>Tax</span>
                 <span className="tabular-nums">{formatMoney(invoice.taxCents)}</span>
               </div>
-              <div className="flex justify-between border-t border-stone-200 pt-1 text-[15px] font-bold text-stone-900">
+              <div className="flex justify-between border-t border-line pt-1 text-[15px] font-bold text-ink">
                 <span>Total</span>
                 <span className="tabular-nums">{formatMoney(invoice.totalCents)}</span>
               </div>
-              <p className="text-[12px] text-stone-400">Totals are computed on the server from line items.</p>
+              <p className="text-[12px] text-subtle">Totals are computed on the server from line items.</p>
             </div>
 
             {/* Dates */}
-            <h4 className="mt-5 text-[11px] font-semibold uppercase tracking-wider text-stone-400">Dates</h4>
+            <h4 className={`${sectionTitleCls} mt-5!`}>Dates</h4>
             <dl className="mt-1 grid grid-cols-3 gap-2 text-[13px]">
-              <div className="rounded-lg bg-stone-50 px-3 py-2">
-                <dt className="text-[11px] text-stone-400">Created</dt>
-                <dd className="font-medium text-stone-800">{fmtDate(invoice.createdAt)}</dd>
+              <div className="rounded-md bg-canvas px-3 py-2">
+                <dt className="text-[11px] text-subtle">Created</dt>
+                <dd className="font-medium text-ink">{fmtDate(invoice.createdAt)}</dd>
               </div>
-              <div className="rounded-lg bg-stone-50 px-3 py-2">
-                <dt className="text-[11px] text-stone-400">Sent</dt>
-                <dd className="font-medium text-stone-800">{fmtDate(invoice.sentAt)}</dd>
+              <div className="rounded-md bg-canvas px-3 py-2">
+                <dt className="text-[11px] text-subtle">Sent</dt>
+                <dd className="font-medium text-ink">{fmtDate(invoice.sentAt)}</dd>
               </div>
-              <div className="rounded-lg bg-stone-50 px-3 py-2">
-                <dt className="text-[11px] text-stone-400">Due</dt>
-                <dd className={`font-medium ${invoice.status === "overdue" ? "text-red-700" : "text-stone-800"}`}>
+              <div className="rounded-md bg-canvas px-3 py-2">
+                <dt className="text-[11px] text-subtle">Due</dt>
+                <dd className="font-medium text-ink">
                   {fmtDate(invoice.dueAt)}
                 </dd>
               </div>
@@ -344,13 +345,13 @@ export function InvoiceDetail({
 
             {/* Reminder composer */}
             {showRemind && (
-              <div className="mt-4 rounded-lg border border-stone-200 bg-stone-50 px-3 py-3">
-                <h4 className="text-[13px] font-semibold text-stone-800">Payment reminder</h4>
-                <p className="mt-0.5 text-[12px] text-stone-500">
+              <div className="mt-4 rounded-md border border-line bg-canvas px-3 py-3">
+                <h4 className="text-[13px] font-semibold text-ink">Payment reminder</h4>
+                <p className="mt-0.5 text-[12px] text-muted">
                   Draft the reminder — it goes through approval before anything is sent.
                 </p>
                 <textarea
-                  className="crm-input mt-2 min-h-[90px] w-full"
+                  className={`${inputCls} mt-2 min-h-[90px] w-full`}
                   value={reminderText}
                   onChange={(e) => setReminderText(e.target.value)}
                   placeholder={`Hi ${customer?.name ?? "there"} — just a friendly reminder that invoice INV-${shortInvoiceId(invoice.id)} for ${formatMoney(invoice.totalCents)} was due ${fmtDate(invoice.dueAt)}. Let us know if you need anything!`}
@@ -360,7 +361,7 @@ export function InvoiceDetail({
                     type="button"
                     disabled={busy}
                     onClick={requestReminder}
-                    className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--brand-600)] px-3 py-1.5 text-[13px] font-semibold text-white hover:bg-[var(--brand-700)] disabled:opacity-50"
+                    className={btnReview}
                   >
                     {busy ? <Loader2 size={14} className="animate-spin" /> : <BellRing size={14} />}
                     Request approval
@@ -368,7 +369,7 @@ export function InvoiceDetail({
                   <button
                     type="button"
                     onClick={() => setShowRemind(false)}
-                    className="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-[13px] font-semibold text-stone-700"
+                    className={btnGhost}
                   >
                     Cancel
                   </button>
@@ -378,14 +379,14 @@ export function InvoiceDetail({
           </div>
 
           {/* Lifecycle actions */}
-          <div className="border-t border-stone-200 px-5 py-3">
+          <div className="border-t border-line px-5 py-3">
             <div className="flex flex-wrap gap-2">
               {invoice.status === "draft" && (
                 <button
                   type="button"
                   disabled={busy}
                   onClick={() => requestTransition("sent")}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--brand-600)] px-3 py-2 text-[13px] font-semibold text-white hover:bg-[var(--brand-700)] disabled:opacity-50"
+                  className={btnPrimary}
                 >
                   <Send size={14} /> Send invoice
                 </button>
@@ -396,7 +397,7 @@ export function InvoiceDetail({
                     type="button"
                     disabled={busy}
                     onClick={() => requestTransition("paid")}
-                    className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--brand-600)] px-3 py-2 text-[13px] font-semibold text-white hover:bg-[var(--brand-700)] disabled:opacity-50"
+                    className={btnPrimary}
                   >
                     <BadgeDollarSign size={14} /> Record payment
                   </button>
@@ -409,7 +410,7 @@ export function InvoiceDetail({
                       );
                       setShowRemind(true);
                     }}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-stone-300 bg-white px-3 py-2 text-[13px] font-semibold text-stone-700 hover:bg-stone-50 disabled:opacity-50"
+                    className={btnGhost}
                   >
                     <BellRing size={14} /> Send reminder
                   </button>
@@ -420,21 +421,21 @@ export function InvoiceDetail({
                   type="button"
                   disabled={busy}
                   onClick={() => requestTransition("cancelled")}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-stone-300 bg-white px-3 py-2 text-[13px] font-semibold text-stone-500 hover:bg-stone-50 disabled:opacity-50"
+                  className={btnDeny}
                 >
                   <Ban size={14} /> Void
                 </button>
               )}
               {invoice.status === "paid" && (
-                <span className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-green-700">
+                <span className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-ink">
                   <Check size={14} /> Paid in full — nothing left to do.
                 </span>
               )}
               {invoice.status === "cancelled" && (
-                <span className="text-[13px] text-stone-400">This invoice was voided.</span>
+                <span className="text-[13px] text-subtle">This invoice was voided.</span>
               )}
             </div>
-            <p className="mt-2 text-[12px] text-stone-400">
+            <p className="mt-2 text-[12px] text-subtle">
               Sending, recording payment, voiding, and reminders all need your approval first.
             </p>
           </div>

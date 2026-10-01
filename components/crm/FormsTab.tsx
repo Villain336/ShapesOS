@@ -3,7 +3,7 @@
 
 import { useEffect, useState } from "react";
 import { Plus, Trash, Copy, Check, Earth } from "lucide-react";
-import { EmptyState } from "./ui";
+import { EmptyState, btnGhostSm, btnPrimary, chipCls, inputCls } from "./ui";
 
 interface CrmForm {
   id: string;
@@ -77,24 +77,24 @@ export function FormsTab({ pipelineId }: { pipelineId: string }) {
     setTimeout(() => setCopied(false), 1500);
   };
 
-  if (loading) return <p className="py-12 text-center text-sm text-stone-500">Loading forms…</p>;
+  if (loading) return <p className="py-12 text-center text-sm text-muted">Loading forms…</p>;
 
   return (
     <div className="space-y-4">
       {newToken && (
-        <div className="rounded-[10px] border border-violet-300 bg-violet-50 p-4">
-          <p className="text-[13px] font-semibold text-violet-900">
+        <div className="rounded-md border border-line bg-canvas p-4">
+          <p className="text-[13px] font-semibold text-ink">
             Form created. Save this token now — it is never shown again:
           </p>
           <div className="mt-2 flex items-center gap-2">
-            <code className="flex-1 break-all rounded-lg bg-white px-3 py-2 font-mono text-[12.5px] text-stone-800">
+            <code className="flex-1 break-all rounded-md bg-paper px-3 py-2 font-mono text-[12.5px] text-ink">
               {newToken}
             </code>
-            <button className="crm-btn-ghost !py-1.5" onClick={() => copy(newToken)}>
-              {copied ? <Check size={15} className="text-green-600" /> : <Copy size={15} />}
+            <button className={btnGhostSm} onClick={() => copy(newToken)}>
+              {copied ? <Check size={15} className="text-ink" /> : <Copy size={15} />}
             </button>
           </div>
-          <p className="mt-2 text-[12px] text-violet-800">
+          <p className="mt-2 text-[12px] text-ink">
             Submit endpoint: <code className="font-mono">POST /api/crm/public/forms/{newToken}</code> with{" "}
             <code className="font-mono">{"{ name, email, phone, company, message }"}</code>. Include a honeypot field named{" "}
             <code className="font-mono">website</code> (leave blank).
@@ -104,13 +104,13 @@ export function FormsTab({ pipelineId }: { pipelineId: string }) {
 
       <div className="flex gap-2">
         <input
-          className="crm-input max-w-sm flex-1 !text-[13px]"
+          className={`${inputCls} max-w-sm flex-1`}
           placeholder="New form name (e.g. Homepage contact form)"
           value={name}
           onChange={(e) => setName(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter") create(); }}
         />
-        <button className="crm-btn-primary" onClick={create} disabled={creating || !name.trim()}>
+        <button className={btnPrimary} onClick={create} disabled={creating || !name.trim()}>
           <Plus size={15} strokeWidth={2.5} /> {creating ? "Creating…" : "Create form"}
         </button>
       </div>
@@ -122,24 +122,24 @@ export function FormsTab({ pipelineId }: { pipelineId: string }) {
           hint="Create an embeddable form to turn website visitors into pipeline leads automatically."
         />
       ) : (
-        <div className="overflow-hidden rounded-[10px] border border-stone-200 bg-white">
+        <div className="overflow-hidden rounded-md border border-line bg-paper">
           {forms.map((f) => (
-            <div key={f.id} className="flex items-center gap-3 border-b border-stone-100 px-4 py-3 last:border-0">
+            <div key={f.id} className="flex items-center gap-3 border-b border-line px-4 py-3 last:border-0">
               <div className="min-w-0 flex-1">
-                <div className="truncate text-[13.5px] font-semibold text-stone-900">{f.name}</div>
-                <div className="text-[12px] text-stone-500">
+                <div className="truncate text-[13.5px] font-semibold text-ink">{f.name}</div>
+                <div className="text-[12px] text-muted">
                   {f.submitCount} submission{f.submitCount === 1 ? "" : "s"} · created{" "}
                   {new Date(f.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                 </div>
               </div>
-              <span className={`crm-chip ${f.enabled ? "crm-chip-green" : "crm-chip-gray"}`}>
+              <span className={chipCls}>
                 {f.enabled ? "Live" : "Disabled"}
               </span>
-              <button className="crm-btn-ghost !py-1 !px-2.5 !text-[12px]" onClick={() => toggle(f)}>
+              <button className={btnGhostSm} onClick={() => toggle(f)}>
                 {f.enabled ? "Disable" : "Enable"}
               </button>
               <button
-                className="rounded-lg p-1.5 text-stone-400 hover:bg-red-50 hover:text-red-600"
+                className="rounded-md p-1.5 text-subtle hover:bg-failed-tint hover:text-failed-text"
                 onClick={() => remove(f)}
                 title="Delete form"
               >
@@ -149,7 +149,7 @@ export function FormsTab({ pipelineId }: { pipelineId: string }) {
           ))}
         </div>
       )}
-      <p className="text-[12px] text-stone-400">
+      <p className="text-[12px] text-subtle">
         Tokens are stored as SHA-256 hashes and can be revoked by deleting or disabling the form.
       </p>
     </div>

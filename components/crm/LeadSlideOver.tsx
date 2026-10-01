@@ -8,19 +8,19 @@ import {
 } from "lucide-react";
 import type { CrmActivity, CrmLead, CrmPipeline, CrmStage } from "./types";
 import { SOURCE_LABELS, formatMoney, timeAgo } from "./types";
-import { StageBadge, ScoreBar, MiniBars, Avatar } from "./ui";
+import { Avatar, MiniBars, ScoreBar, StageBadge, backdropCls, btnGhostSm, btnPrimarySm, errorBoxCls, inputCls, labelCls, sectionTitleCls, selectCls, slideoverCls } from "./ui";
 
 const ACT_META: Record<string, { label: string; icon: typeof Phone; tint: string }> = {
-  created: { label: "Created", icon: Flag, tint: "bg-violet-100 text-violet-700" },
-  note: { label: "Note", icon: NotebookPen, tint: "bg-stone-200 text-stone-600" },
-  email: { label: "Email", icon: Mail, tint: "bg-blue-100 text-blue-700" },
-  call: { label: "Call", icon: Phone, tint: "bg-green-100 text-green-700" },
-  sms: { label: "SMS", icon: MessageSquareText, tint: "bg-teal-100 text-teal-700" },
-  meeting: { label: "Meeting", icon: Calendar, tint: "bg-amber-100 text-amber-700" },
-  stage_change: { label: "Stage", icon: Flag, tint: "bg-violet-100 text-violet-700" },
-  score_change: { label: "Score", icon: Flag, tint: "bg-stone-200 text-stone-600" },
-  form_submit: { label: "Form", icon: MessageSquareText, tint: "bg-blue-100 text-blue-700" },
-  import: { label: "Import", icon: MessageSquareText, tint: "bg-stone-200 text-stone-600" },
+  created: { label: "Created", icon: Flag, tint: "bg-canvas text-ink" },
+  note: { label: "Note", icon: NotebookPen, tint: "bg-canvas text-ink" },
+  email: { label: "Email", icon: Mail, tint: "bg-canvas text-ink" },
+  call: { label: "Call", icon: Phone, tint: "bg-canvas text-ink" },
+  sms: { label: "SMS", icon: MessageSquareText, tint: "bg-canvas text-ink" },
+  meeting: { label: "Meeting", icon: Calendar, tint: "bg-canvas text-ink" },
+  stage_change: { label: "Stage", icon: Flag, tint: "bg-canvas text-ink" },
+  score_change: { label: "Score", icon: Flag, tint: "bg-canvas text-ink" },
+  form_submit: { label: "Form", icon: MessageSquareText, tint: "bg-canvas text-ink" },
+  import: { label: "Import", icon: MessageSquareText, tint: "bg-canvas text-ink" },
 };
 
 function weeklyBuckets(activities: CrmActivity[]): number[] {
@@ -93,9 +93,9 @@ export function LeadSlideOver({
   if (loading || !lead) {
     return (
       <>
-        <div className="crm-backdrop" onClick={onClose} />
-        <div className="crm-slideover items-center justify-center">
-          <p className="text-sm text-stone-500">{loading ? "Loading lead…" : error || "Not found"}</p>
+        <div className={backdropCls} onClick={onClose} />
+        <div className={`${slideoverCls} items-center justify-center`}>
+          <p className="text-sm text-muted">{loading ? "Loading lead…" : error || "Not found"}</p>
         </div>
       </>
     );
@@ -176,39 +176,39 @@ export function LeadSlideOver({
   };
 
   const setD = (k: string, v: string) => setDraft({ ...draft, [k]: v });
-  const inputCls = "crm-input w-full !text-[13px]";
+  
 
   return (
     <>
-      <div className="crm-backdrop" onClick={onClose} />
-      <div className="crm-slideover">
+      <div className={backdropCls} onClick={onClose} />
+      <div className={slideoverCls}>
         {/* Header */}
-        <div className="flex items-start gap-3 border-b border-stone-200 px-5 py-4">
+        <div className="flex items-start gap-3 border-b border-line px-5 py-4">
           <Avatar name={lead.name} size={44} />
           <div className="min-w-0 flex-1">
-            <h2 className="truncate text-[17px] font-bold text-stone-900">{lead.name}</h2>
-            <p className="truncate text-[13px] text-stone-500">
+            <h2 className="truncate text-[17px] font-bold text-ink">{lead.name}</h2>
+            <p className="truncate text-[13px] text-muted">
               {[lead.title, lead.company].filter(Boolean).join(" · ") || lead.email || "—"}
             </p>
           </div>
           <div className="flex items-center gap-1.5">
             <button
               onClick={toggleStar}
-              className={`crm-btn-ghost !px-2.5 ${lead.starred ? "!text-violet-700 !border-violet-300 !bg-violet-50" : ""}`}
+              className={`${btnGhostSm} ${lead.starred ? "bg-canvas!" : ""}`}
               title={lead.starred ? "Unfollow" : "Follow"}
             >
-              <Star size={15} fill={lead.starred ? "currentColor" : "none"} className={lead.starred ? "text-amber-500" : "text-stone-400"} />
+              <Star size={15} fill={lead.starred ? "currentColor" : "none"} className={lead.starred ? "text-ink" : "text-subtle"} />
               <span className="hidden sm:inline text-[12.5px]">{lead.starred ? "Following" : "Follow"}</span>
             </button>
             <a
               href={`/dashboard/crm?lead=${lead.id}`}
-              className="crm-btn-ghost !px-2.5"
+              className={btnGhostSm}
               title="Open full view"
             >
               <SquareArrowOutUpRight size={15} />
               <span className="hidden sm:inline text-[12.5px]">Open</span>
             </a>
-            <button onClick={onClose} className="rounded-lg p-2 text-stone-400 hover:bg-stone-100 hover:text-stone-700">
+            <button onClick={onClose} className="rounded-md p-2 text-subtle hover:bg-hover-paper hover:text-ink">
               <X size={17} />
             </button>
           </div>
@@ -216,24 +216,24 @@ export function LeadSlideOver({
 
         <div className="flex-1 overflow-y-auto px-5 py-4">
           {error && (
-            <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-700">
+            <div className={`${errorBoxCls} mb-3`}>
               {error}
             </div>
           )}
 
           {/* Account summary */}
           <div className="mb-2 flex items-center justify-between">
-            <h3 className="crm-section-title !mb-0">Lead Details</h3>
+            <h3 className={`${sectionTitleCls} mb-0!`}>Lead Details</h3>
             {!editing ? (
-              <button className="crm-btn-ghost !py-1 !px-2.5 !text-[12px]" onClick={() => setEditing(true)}>
+              <button className={btnGhostSm} onClick={() => setEditing(true)}>
                 <Pencil size={13} /> Edit
               </button>
             ) : (
               <div className="flex gap-2">
-                <button className="crm-btn-ghost !py-1 !px-2.5 !text-[12px]" onClick={() => setEditing(false)} disabled={saving}>
+                <button className={btnGhostSm} onClick={() => setEditing(false)} disabled={saving}>
                   Cancel
                 </button>
-                <button className="crm-btn-primary !py-1 !px-2.5 !text-[12px]" onClick={save} disabled={saving}>
+                <button className={btnPrimarySm} onClick={save} disabled={saving}>
                   {saving ? "Saving…" : "Save"}
                 </button>
               </div>
@@ -246,23 +246,23 @@ export function LeadSlideOver({
                 ["company", "Company"], ["title", "Title"], ["ownerName", "Owner"],
               ].map(([k, label]) => (
                 <div key={k}>
-                  <label className="crm-label">{label}</label>
-                  <input className={inputCls} value={draft[k] ?? ""} onChange={(e) => setD(k, e.target.value)} />
+                  <label className={labelCls}>{label}</label>
+                  <input className={`${inputCls} w-full`} value={draft[k] ?? ""} onChange={(e) => setD(k, e.target.value)} />
                 </div>
               ))}
               <div>
-                <label className="crm-label">Value ($)</label>
-                <input className={inputCls} value={draft.value ?? ""} onChange={(e) => setD("value", e.target.value)} inputMode="decimal" />
+                <label className={labelCls}>Value ($)</label>
+                <input className={`${inputCls} w-full`} value={draft.value ?? ""} onChange={(e) => setD("value", e.target.value)} inputMode="decimal" />
               </div>
               <div>
-                <label className="crm-label">Stage</label>
-                <select className="crm-select w-full !text-[13px]" value={lead.stage} onChange={(e) => changeStage(e.target.value)}>
+                <label className={labelCls}>Stage</label>
+                <select className={`${selectCls} w-full`} value={lead.stage} onChange={(e) => changeStage(e.target.value)}>
                   {stages.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
                 </select>
               </div>
             </div>
           ) : (
-            <dl className="mb-5 grid grid-cols-2 gap-x-4 gap-y-3 rounded-[10px] border border-stone-200 bg-stone-50/60 p-4 sm:grid-cols-3">
+            <dl className="mb-5 grid grid-cols-2 gap-x-4 gap-y-3 rounded-md border border-line bg-canvas/60 p-4 sm:grid-cols-3">
               {[
                 ["Owner", lead.ownerName ?? "—"],
                 ["Source", SOURCE_LABELS[lead.source] ?? lead.source],
@@ -272,72 +272,72 @@ export function LeadSlideOver({
                 ["Created", new Date(lead.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })],
               ].map(([k, v]) => (
                 <div key={k}>
-                  <dt className="text-[11px] font-semibold uppercase tracking-wide text-stone-400">{k}</dt>
-                  <dd className="mt-0.5 truncate text-[13px] font-medium text-stone-800" title={String(v)}>{v}</dd>
+                  <dt className="text-[12px] font-medium text-muted">{k}</dt>
+                  <dd className="mt-0.5 truncate text-[13px] font-medium text-ink" title={String(v)}>{v}</dd>
                 </div>
               ))}
               <div>
-                <dt className="text-[11px] font-semibold uppercase tracking-wide text-stone-400">Stage</dt>
+                <dt className="text-[12px] font-medium text-muted">Stage</dt>
                 <dd className="mt-1"><StageBadge label={stage?.label ?? lead.stage} color={stage?.color ?? "gray"} /></dd>
               </div>
               <div>
-                <dt className="text-[11px] font-semibold uppercase tracking-wide text-stone-400">Score</dt>
+                <dt className="text-[12px] font-medium text-muted">Score</dt>
                 <dd className="mt-1"><ScoreBar score={lead.score} /></dd>
               </div>
               <div>
-                <dt className="text-[11px] font-semibold uppercase tracking-wide text-stone-400">Last touch</dt>
-                <dd className="mt-0.5 text-[13px] font-medium text-stone-800">{timeAgo(lead.lastActivityAt)}</dd>
+                <dt className="text-[12px] font-medium text-muted">Last touch</dt>
+                <dd className="mt-0.5 text-[13px] font-medium text-ink">{timeAgo(lead.lastActivityAt)}</dd>
               </div>
             </dl>
           )}
 
           {/* Pipeline health */}
-          <h3 className="crm-section-title">Pipeline Health</h3>
-          <div className="mb-5 rounded-[10px] border border-stone-200 p-4">
+          <h3 className={sectionTitleCls}>Pipeline Health</h3>
+          <div className="mb-5 rounded-md border border-line p-4">
             <div className="flex items-center gap-4">
-              <div className="text-[34px] font-bold tabular-nums text-stone-900">{lead.score}</div>
+              <div className="text-[34px] font-bold tabular-nums text-ink">{lead.score}</div>
               <div className="flex-1">
                 <div className="mb-1.5 flex gap-1">
                   {stages.map((s, i) => (
                     <div
                       key={s.id}
                       className="h-2 flex-1 rounded-full"
-                      style={{ background: i <= stageIdx ? "#7c3aed" : "#e7e5e4" }}
+                      style={{ background: i <= stageIdx ? "var(--aos-ink)" : "var(--aos-line)" }}
                       title={s.label}
                     />
                   ))}
                 </div>
-                <p className="text-[12px] text-stone-500">
+                <p className="text-[12px] text-muted">
                   Stage {stageIdx + 1} of {stages.length} — {stage?.label}
                 </p>
               </div>
             </div>
             <div className="mt-3 grid grid-cols-3 gap-2">
-              <div className="rounded-lg bg-stone-100 px-3 py-2">
+              <div className="rounded-md bg-canvas px-3 py-2">
                 <div className="text-[16px] font-bold tabular-nums">{activities.length}</div>
-                <div className="text-[11px] text-stone-500">Touchpoints</div>
+                <div className="text-[11px] text-muted">Touchpoints</div>
               </div>
-              <div className="rounded-lg bg-stone-100 px-3 py-2">
+              <div className="rounded-md bg-canvas px-3 py-2">
                 <div className="text-[16px] font-bold tabular-nums">{formatMoney(lead.valueCents)}</div>
-                <div className="text-[11px] text-stone-500">Est. value</div>
+                <div className="text-[11px] text-muted">Est. value</div>
               </div>
-              <div className="rounded-lg bg-violet-50 px-3 py-2">
-                <div className="text-[16px] font-bold tabular-nums text-violet-700">
+              <div className="rounded-md bg-canvas px-3 py-2">
+                <div className="text-[16px] font-bold tabular-nums text-ink">
                   {formatMoney(lead.valueCents != null ? Math.round(lead.valueCents * lead.score / 100) : null)}
                 </div>
-                <div className="text-[11px] text-stone-500">Weighted</div>
+                <div className="text-[11px] text-muted">Weighted</div>
               </div>
             </div>
           </div>
 
           {/* Activity trend */}
-          <h3 className="crm-section-title">Activity Trend</h3>
-          <div className="mb-5 rounded-[10px] border border-stone-200 p-4">
+          <h3 className={sectionTitleCls}>Activity Trend</h3>
+          <div className="mb-5 rounded-md border border-line p-4">
             <div className="flex items-center gap-4">
               <MiniBars data={buckets} />
-              <div className="text-[26px] font-bold tabular-nums text-stone-900">
+              <div className="text-[26px] font-bold tabular-nums text-ink">
                 {buckets.reduce((a, b) => a + b, 0)}
-                <span className="ml-1 text-[12px] font-medium text-stone-500">8 wks</span>
+                <span className="ml-1 text-[12px] font-medium text-muted">8 wks</span>
               </div>
             </div>
             <div className="mt-3 grid grid-cols-5 gap-2">
@@ -345,9 +345,9 @@ export function LeadSlideOver({
                 ["Emails", counts.email], ["Calls", counts.call], ["Meetings", counts.meeting],
                 ["SMS", counts.sms], ["Notes", counts.note],
               ].map(([k, v]) => (
-                <div key={k as string} className="rounded-lg bg-stone-100 px-2 py-1.5 text-center">
+                <div key={k as string} className="rounded-md bg-canvas px-2 py-1.5 text-center">
                   <div className="text-[14px] font-bold tabular-nums">{v as number}</div>
-                  <div className="text-[10.5px] text-stone-500">{k as string}</div>
+                  <div className="text-[10.5px] text-muted">{k as string}</div>
                 </div>
               ))}
             </div>
@@ -356,20 +356,20 @@ export function LeadSlideOver({
           {/* Score detail */}
           {scoreBreakdown && (
             <>
-              <h3 className="crm-section-title">Score Detail</h3>
-              <ul className="mb-5 space-y-1 rounded-[10px] border border-stone-200 p-3">
+              <h3 className={sectionTitleCls}>Score Detail</h3>
+              <ul className="mb-5 space-y-1 rounded-md border border-line p-3">
                 {scoreBreakdown.reasons.map((r, i) => (
-                  <li key={i} className="text-[12.5px] text-stone-600">· {r}</li>
+                  <li key={i} className="text-[12.5px] text-muted">· {r}</li>
                 ))}
               </ul>
             </>
           )}
 
           {/* Timeline */}
-          <h3 className="crm-section-title">Timeline</h3>
+          <h3 className={sectionTitleCls}>Timeline</h3>
           <div className="mb-3 flex gap-2">
             <select
-              className="crm-select !py-[6px] !text-[12.5px]"
+              className={`${selectCls} py-[6px]! text-[12.5px]!`}
               value={newAct.type}
               onChange={(e) => setNewAct({ ...newAct, type: e.target.value })}
             >
@@ -380,13 +380,13 @@ export function LeadSlideOver({
               <option value="meeting">Meeting</option>
             </select>
             <input
-              className="crm-input flex-1 !py-[6px] !text-[12.5px]"
+              className={`${inputCls} flex-1 py-[6px]! text-[12.5px]!`}
               placeholder="Log a touchpoint…"
               value={newAct.body}
               onChange={(e) => setNewAct({ ...newAct, body: e.target.value })}
               onKeyDown={(e) => { if (e.key === "Enter") postActivity(); }}
             />
-            <button className="crm-btn-primary !py-[6px] !text-[12.5px]" onClick={postActivity} disabled={posting || !newAct.body.trim()}>
+            <button className={btnPrimarySm} onClick={postActivity} disabled={posting || !newAct.body.trim()}>
               Log
             </button>
           </div>
@@ -399,20 +399,20 @@ export function LeadSlideOver({
                   <span className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${m.tint}`}>
                     <Icon size={14} />
                   </span>
-                  <div className="min-w-0 flex-1 rounded-lg border border-stone-200 bg-white px-3 py-2">
+                  <div className="min-w-0 flex-1 rounded-md border border-line bg-paper px-3 py-2">
                     <div className="flex items-baseline justify-between gap-2">
-                      <span className="text-[12px] font-semibold text-stone-700">{m.label}</span>
-                      <span className="shrink-0 text-[11px] text-stone-400">
+                      <span className="text-[12px] font-semibold text-ink">{m.label}</span>
+                      <span className="shrink-0 text-[11px] text-subtle">
                         {timeAgo(a.createdAt)}{a.actor ? ` · ${a.actor}` : ""}
                       </span>
                     </div>
-                    {a.body && <p className="mt-0.5 whitespace-pre-wrap text-[13px] text-stone-600">{a.body}</p>}
+                    {a.body && <p className="mt-0.5 whitespace-pre-wrap text-[13px] text-muted">{a.body}</p>}
                   </div>
                 </li>
               );
             })}
             {activities.length === 0 && (
-              <p className="py-4 text-center text-[13px] text-stone-400">No activity yet.</p>
+              <p className="py-4 text-center text-[13px] text-subtle">No activity yet.</p>
             )}
           </ol>
         </div>

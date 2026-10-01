@@ -41,7 +41,7 @@ export function ForecastView({ pipelineId }: { pipelineId: string }) {
       .finally(() => setLoading(false));
   }, [pipelineId]);
 
-  if (loading) return <p className="py-12 text-center text-sm text-stone-500">Loading forecast…</p>;
+  if (loading) return <p className="py-12 text-center text-sm text-muted">Loading forecast…</p>;
   if (stages.length === 0) {
     return <EmptyState icon={ChartLine} title="No forecast yet" hint="Add leads with values to see the weighted pipeline forecast." />;
   }
@@ -53,45 +53,45 @@ export function ForecastView({ pipelineId }: { pipelineId: string }) {
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {[
-          ["Open pipeline", total.openValueCents, "text-stone-900"],
-          ["Weighted forecast", total.weightedCents, "text-violet-700"],
-          ["Won", total.wonCents, "text-green-700"],
-          ["Lost", total.lostCents, "text-red-700"],
+          ["Open pipeline", total.openValueCents, "text-ink"],
+          ["Weighted forecast", total.weightedCents, "text-ink"],
+          ["Won", total.wonCents, "text-ink"],
+          ["Lost", total.lostCents, "text-ink"],
         ].map(([k, v, cls]) => (
-          <div key={k as string} className="rounded-[10px] border border-stone-200 bg-white p-4">
+          <div key={k as string} className="rounded-md border border-line bg-paper p-4">
             <div className={`text-[20px] font-bold tabular-nums ${cls}`}>{formatMoney(v as number)}</div>
-            <div className="mt-0.5 text-[12px] text-stone-500">{k as string}</div>
+            <div className="mt-0.5 text-[12px] text-muted">{k as string}</div>
           </div>
         ))}
       </div>
-      <div className="overflow-hidden rounded-[10px] border border-stone-200 bg-white">
-        <div className="border-b border-stone-200 bg-stone-50 px-4 py-2.5 text-[12px] font-semibold uppercase tracking-wide text-stone-500">
+      <div className="overflow-hidden rounded-md border border-line bg-paper">
+        <div className="border-b border-line bg-canvas px-4 py-2.5 text-[12px] font-semibold text-muted">
           Weighted forecast by stage (value × score ÷ 100)
         </div>
         {stages.map((s) => (
-          <div key={s.stage} className="border-b border-stone-100 px-4 py-3 last:border-0">
+          <div key={s.stage} className="border-b border-line px-4 py-3 last:border-0">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2.5">
                 <StageBadge label={s.label} color={colorOf(s.stage)} />
-                <span className="text-[12px] text-stone-500 tabular-nums">{s.count} open</span>
+                <span className="text-[12px] text-muted tabular-nums">{s.count} open</span>
               </div>
               <div className="flex items-center gap-4 text-[13px]">
-                <span className="tabular-nums text-stone-500">{formatMoney(s.openValueCents)}</span>
-                <span className="w-24 text-right font-bold tabular-nums text-violet-700">
+                <span className="tabular-nums text-muted">{formatMoney(s.openValueCents)}</span>
+                <span className="w-24 text-right font-bold tabular-nums text-ink">
                   {formatMoney(s.weightedCents)}
                 </span>
               </div>
             </div>
-            <div className="mt-2 h-2 overflow-hidden rounded-full bg-stone-100">
+            <div className="mt-2 h-2 overflow-hidden rounded-full bg-canvas">
               <div
-                className="h-full rounded-full bg-violet-500"
+                className="h-full rounded-full bg-ink"
                 style={{ width: `${Math.round((s.openValueCents / max) * 100)}%` }}
               />
             </div>
           </div>
         ))}
       </div>
-      <p className="text-[12px] text-stone-400">
+      <p className="text-[12px] text-subtle">
         Forecast weights each open lead by its AI score (probability proxy). Won and lost stages are excluded from the weighted total.
       </p>
     </div>

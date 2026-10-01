@@ -7,6 +7,7 @@
 import { useEffect, useRef, useState } from "react";
 import { X, Plus, Trash2, Loader2, Search } from "lucide-react";
 import { formatMoney } from "./types";
+import { backdropCls, btnGhost, btnPrimary, errorBoxCls, inputCls, labelCls, modalWrapCls } from "./ui";
 
 interface LineItem {
   description: string;
@@ -134,37 +135,37 @@ export function NewInvoiceModal({
 
   return (
     <>
-      <div className="crm-backdrop" onClick={onClose} />
-      <div className="crm-modal">
-        <div className="flex items-start justify-between border-b border-stone-200 px-5 py-4">
+      <div className={backdropCls} onClick={onClose} />
+      <div className={modalWrapCls}>
+        <div className="flex items-start justify-between border-b border-line px-5 py-4">
           <div>
-            <h3 className="text-lg font-bold tracking-tight text-stone-900">New invoice</h3>
-            <p className="mt-0.5 text-[13px] text-stone-500">
+            <h3 className="text-lg font-bold tracking-tight text-ink">New invoice</h3>
+            <p className="mt-0.5 text-[13px] text-muted">
               Created as a draft — sending it needs your approval.
             </p>
           </div>
-          <button type="button" onClick={onClose} className="rounded-lg p-1.5 text-stone-400 hover:bg-stone-100" aria-label="Close">
+          <button type="button" onClick={onClose} className="rounded-md p-1.5 text-subtle hover:bg-hover-paper hover:text-ink" aria-label="Close">
             <X size={18} />
           </button>
         </div>
 
         <div className="max-h-[70vh] overflow-y-auto px-5 py-4">
           {error && (
-            <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-700">
+            <div className={`${errorBoxCls} mb-3`}>
               {error}
             </div>
           )}
 
           {/* Customer */}
-          <label className="text-[11px] font-semibold uppercase tracking-wider text-stone-400">
+          <label className={labelCls}>
             Customer (CRM lead)
           </label>
           <div className="relative mt-1">
             {customer ? (
-              <div className="flex items-center justify-between rounded-lg border border-stone-200 bg-stone-50 px-3 py-2">
-                <span className="text-[13px] font-medium text-stone-800">
+              <div className="flex items-center justify-between rounded-md border border-line bg-canvas px-3 py-2">
+                <span className="text-[13px] font-medium text-ink">
                   {customer.name}
-                  {customer.company && <span className="text-stone-400"> · {customer.company}</span>}
+                  {customer.company && <span className="text-subtle"> · {customer.company}</span>}
                 </span>
                 <button
                   type="button"
@@ -172,7 +173,7 @@ export function NewInvoiceModal({
                     setCustomer(null);
                     setCustomerQuery("");
                   }}
-                  className="text-[12px] font-semibold text-stone-500 hover:text-stone-800"
+                  className="text-[12px] font-semibold text-muted hover:text-ink"
                 >
                   Change
                 </button>
@@ -180,18 +181,18 @@ export function NewInvoiceModal({
             ) : (
               <>
                 <div className="relative">
-                  <Search size={15} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-stone-400" />
+                  <Search size={15} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-subtle" />
                   <input
-                    className="crm-input w-full pl-8"
+                    className={`${inputCls} w-full pl-8`}
                     placeholder="Search leads by name or company…"
                     value={customerQuery}
                     onChange={(e) => setCustomerQuery(e.target.value)}
                     onFocus={() => customerHits.length > 0 && setShowHits(true)}
                   />
-                  {searching && <Loader2 size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 animate-spin text-stone-400" />}
+                  {searching && <Loader2 size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 animate-spin text-subtle" />}
                 </div>
                 {showHits && customerHits.length > 0 && (
-                  <div className="absolute z-10 mt-1 max-h-48 w-full overflow-y-auto rounded-lg border border-stone-200 bg-white shadow-lg">
+                  <div className="absolute z-10 mt-1 max-h-48 w-full overflow-y-auto rounded-md border border-line bg-paper shadow-overlay">
                     {customerHits.map((h) => (
                       <button
                         key={h.id}
@@ -200,10 +201,10 @@ export function NewInvoiceModal({
                           setCustomer(h);
                           setShowHits(false);
                         }}
-                        className="block w-full px-3 py-2 text-left text-[13px] hover:bg-stone-50"
+                        className="block w-full px-3 py-2 text-left text-[13px] hover:bg-canvas"
                       >
-                        <span className="font-medium text-stone-800">{h.name}</span>
-                        {h.company && <span className="text-stone-400"> · {h.company}</span>}
+                        <span className="font-medium text-ink">{h.name}</span>
+                        {h.company && <span className="text-subtle"> · {h.company}</span>}
                       </button>
                     ))}
                   </div>
@@ -214,13 +215,13 @@ export function NewInvoiceModal({
 
           {/* Line items */}
           <div className="mt-4 flex items-center justify-between">
-            <label className="text-[11px] font-semibold uppercase tracking-wider text-stone-400">
+            <label className={labelCls}>
               Line items
             </label>
             <button
               type="button"
               onClick={() => setItems([...items, { description: "", qty: "1", price: "" }])}
-              className="inline-flex items-center gap-1 text-[12px] font-semibold text-[var(--brand-700)] hover:underline"
+              className="inline-flex items-center gap-1 text-[12px] font-semibold text-ink hover:underline"
             >
               <Plus size={13} /> Add line
             </button>
@@ -229,20 +230,20 @@ export function NewInvoiceModal({
             {items.map((it, i) => (
               <div key={i} className="flex gap-2">
                 <input
-                  className="crm-input flex-1"
+                  className={`${inputCls} flex-1`}
                   placeholder="Description"
                   value={it.description}
                   onChange={(e) => setItems(items.map((x, j) => (j === i ? { ...x, description: e.target.value } : x)))}
                 />
                 <input
-                  className="crm-input w-16"
+                  className={`${inputCls} w-16`}
                   placeholder="Qty"
                   inputMode="numeric"
                   value={it.qty}
                   onChange={(e) => setItems(items.map((x, j) => (j === i ? { ...x, qty: e.target.value } : x)))}
                 />
                 <input
-                  className="crm-input w-28"
+                  className={`${inputCls} w-28`}
                   placeholder="$0.00"
                   inputMode="decimal"
                   value={it.price}
@@ -252,7 +253,7 @@ export function NewInvoiceModal({
                   <button
                     type="button"
                     onClick={() => setItems(items.filter((_, j) => j !== i))}
-                    className="rounded-lg p-2 text-stone-400 hover:bg-stone-100 hover:text-red-600"
+                    className="rounded-md p-2 text-subtle hover:bg-failed-tint hover:text-failed-text"
                     aria-label="Remove line"
                   >
                     <Trash2 size={15} />
@@ -264,11 +265,11 @@ export function NewInvoiceModal({
 
           <div className="mt-4 grid grid-cols-2 gap-3">
             <div>
-              <label className="text-[11px] font-semibold uppercase tracking-wider text-stone-400">
+              <label className={labelCls}>
                 Tax
               </label>
               <input
-                className="crm-input mt-1 w-full"
+                className={`${inputCls} mt-1 w-full`}
                 placeholder="$0.00"
                 inputMode="decimal"
                 value={tax}
@@ -276,39 +277,39 @@ export function NewInvoiceModal({
               />
             </div>
             <div>
-              <label className="text-[11px] font-semibold uppercase tracking-wider text-stone-400">
+              <label className={labelCls}>
                 Due date <span className="font-normal normal-case">(optional — net-30 on send)</span>
               </label>
               <input
                 type="date"
-                className="crm-input mt-1 w-full"
+                className={`${inputCls} mt-1 w-full`}
                 value={dueAt}
                 onChange={(e) => setDueAt(e.target.value)}
               />
             </div>
           </div>
 
-          <div className="mt-4 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-[13px]">
-            <div className="flex justify-between text-stone-500">
+          <div className="mt-4 rounded-md border border-line bg-canvas px-3 py-2 text-[13px]">
+            <div className="flex justify-between text-muted">
               <span>Subtotal</span>
               <span className="tabular-nums">{formatMoney(totals.subtotal)}</span>
             </div>
-            <div className="flex justify-between text-stone-500">
+            <div className="flex justify-between text-muted">
               <span>Tax</span>
               <span className="tabular-nums">{formatMoney(totals.taxCents)}</span>
             </div>
-            <div className="flex justify-between pt-1 text-[15px] font-bold text-stone-900">
+            <div className="flex justify-between pt-1 text-[15px] font-bold text-ink">
               <span>Total</span>
               <span className="tabular-nums">{formatMoney(totals.total)}</span>
             </div>
           </div>
         </div>
 
-        <div className="flex justify-end gap-2 border-t border-stone-200 px-5 py-3">
+        <div className="flex justify-end gap-2 border-t border-line px-5 py-3">
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg border border-stone-300 bg-white px-4 py-2 text-[13px] font-semibold text-stone-700"
+            className={btnGhost}
           >
             Cancel
           </button>
@@ -316,7 +317,7 @@ export function NewInvoiceModal({
             type="button"
             disabled={saving || !totals.valid}
             onClick={submit}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--brand-600)] px-4 py-2 text-[13px] font-semibold text-white hover:bg-[var(--brand-700)] disabled:opacity-50"
+            className={btnPrimary}
           >
             {saving && <Loader2 size={14} className="animate-spin" />} Create draft
           </button>

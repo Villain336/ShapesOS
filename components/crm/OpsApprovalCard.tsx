@@ -4,7 +4,8 @@
 
 "use client";
 
-import { Check, ExternalLink, Loader2, ShieldAlert } from "lucide-react";
+import { Check, ExternalLink, Loader2 } from "lucide-react";
+import { btnApprove, btnDeny, btnExecute, needsBoxCls } from "./ui";
 
 export interface OpsPendingGate {
   approvalId: string;
@@ -31,12 +32,13 @@ export function OpsApprovalCard({
   onExecute: () => void;
 }) {
   return (
-    <div className="mb-4 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3">
-      <div className="flex items-center gap-2 text-[13px] font-bold text-amber-900">
-        <ShieldAlert size={16} /> Approval needed — {pending.actionLabel}
+    <div className={`${needsBoxCls} mb-4`}>
+      <div className="flex items-center gap-2 text-[13px] font-bold text-ink">
+        <span className="aos-shape aos-shape--needs aos-shape--edged" role="img" aria-label="Needs review" />
+        Approval needed — {pending.actionLabel}
       </div>
-      <p className="mt-1 text-[13px] text-amber-900">{pending.summary}</p>
-      <p className="mt-1 text-[12px] text-amber-700">
+      <p className="mt-1 text-[13px] text-ink">{pending.summary}</p>
+      <p className="mt-1 text-[12px] text-ink">
         Risk tier: {pending.tier}. Nothing executes until you approve — approve here or in the
         Actions queue.
       </p>
@@ -46,7 +48,7 @@ export function OpsApprovalCard({
             type="button"
             disabled={busy}
             onClick={onApprove}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--brand-600)] px-3 py-1.5 text-[13px] font-semibold text-white hover:bg-[var(--brand-700)] disabled:opacity-50"
+            className={btnApprove}
           >
             {busy ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />} Approve
           </button>
@@ -54,27 +56,27 @@ export function OpsApprovalCard({
             type="button"
             disabled={busy}
             onClick={onDeny}
-            className="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-[13px] font-semibold text-stone-700 hover:bg-stone-50 disabled:opacity-50"
+            className={btnDeny}
           >
             Deny
           </button>
           <a
             href="/dashboard/actions"
-            className="inline-flex items-center gap-1 text-[12px] font-semibold text-[var(--brand-700)] hover:underline"
+            className="inline-flex items-center gap-1 text-[12px] font-semibold text-ink hover:underline"
           >
             Open Actions queue <ExternalLink size={12} />
           </a>
         </div>
       ) : (
         <div className="mt-3 flex items-center gap-2">
-          <span className="inline-flex items-center gap-1 text-[13px] font-semibold text-green-700">
+          <span className="inline-flex items-center gap-1 text-[13px] font-semibold text-ink">
             <Check size={14} /> Approved
           </span>
           <button
             type="button"
             disabled={busy}
             onClick={onExecute}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--brand-600)] px-3 py-1.5 text-[13px] font-semibold text-white hover:bg-[var(--brand-700)] disabled:opacity-50"
+            className={btnExecute}
           >
             {busy && <Loader2 size={14} className="animate-spin" />} {executeLabel}
           </button>

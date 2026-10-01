@@ -12,6 +12,7 @@ import {
   type OpsProduct,
 } from "./InventoryTab";
 import { StockMoveModal } from "./StockMoveModal";
+import { backdropCls, btnGhost, btnPrimary, chipCls, errorBoxCls, inputCls, labelCls, slideoverCls, tableCls, tableWrapCls } from "./ui";
 
 interface OpsInventoryTxn {
   id: string;
@@ -23,9 +24,9 @@ interface OpsInventoryTxn {
 }
 
 const REASON_META: Record<string, { label: string; tint: string }> = {
-  sale: { label: "Sale", tint: "bg-red-100 text-red-700" },
-  restock: { label: "Restock", tint: "bg-green-100 text-green-700" },
-  adjustment: { label: "Adjustment", tint: "bg-stone-200 text-stone-700" },
+  sale: { label: "Sale", tint: "bg-canvas text-ink" },
+  restock: { label: "Restock", tint: "bg-canvas text-ink" },
+  adjustment: { label: "Adjustment", tint: "bg-line text-ink" },
 };
 
 function fmtDateTime(v: string): string {
@@ -103,41 +104,41 @@ export function ProductDetail({
 
   return (
     <>
-      <div className="crm-backdrop" onClick={onClose} />
-      <div className="crm-slideover">
+      <div className={backdropCls} onClick={onClose} />
+      <div className={slideoverCls}>
         <div className="flex h-full flex-col">
-          <div className="flex items-start justify-between border-b border-stone-200 px-5 py-4">
+          <div className="flex items-start justify-between border-b border-line px-5 py-4">
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-lg font-bold tracking-tight text-stone-900">{product.name}</h3>
-                <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${meta.tint}`}>
+                <h3 className="text-lg font-bold tracking-tight text-ink">{product.name}</h3>
+                <span className={chipCls}>
                   {meta.label}
                 </span>
               </div>
-              <p className="mt-0.5 text-[13px] text-stone-500">
+              <p className="mt-0.5 text-[13px] text-muted">
                 {product.sku} · {formatMoney(product.priceCents)} ·{" "}
                 {product.trackInventory ? `${product.stockQty} in stock` : "not tracked"}
               </p>
             </div>
-            <button type="button" onClick={onClose} className="rounded-lg p-1.5 text-stone-400 hover:bg-stone-100" aria-label="Close">
+            <button type="button" onClick={onClose} className="rounded-md p-1.5 text-subtle hover:bg-hover-paper hover:text-ink" aria-label="Close">
               <X size={18} />
             </button>
           </div>
 
           <div className="flex-1 overflow-y-auto px-5 py-4">
             {error && (
-              <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-700">
+              <div className={`${errorBoxCls} mb-3`}>
                 {error}
               </div>
             )}
 
-            <div className="mb-4 flex flex-wrap items-end gap-2 rounded-lg border border-stone-200 bg-stone-50 px-4 py-3">
+            <div className="mb-4 flex flex-wrap items-end gap-2 rounded-md border border-line bg-canvas px-4 py-3">
               <div>
-                <label className="mb-1 block text-[12px] font-semibold text-stone-600">
+                <label className={labelCls}>
                   Low-stock threshold
                 </label>
                 <input
-                  className="crm-input w-28"
+                  className={`${inputCls} w-28`}
                   type="number"
                   min={0}
                   step={1}
@@ -149,33 +150,33 @@ export function ProductDetail({
                 type="button"
                 disabled={saving}
                 onClick={saveThreshold}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--brand-600)] px-3 py-[7px] text-[13px] font-semibold text-white hover:bg-[var(--brand-700)] disabled:opacity-50"
+                className={btnPrimary}
               >
                 {saving && <Loader2 size={14} className="animate-spin" />} Save
               </button>
               <button
                 type="button"
                 onClick={() => setShowMove(true)}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-stone-300 bg-white px-3 py-[7px] text-[13px] font-semibold text-stone-700 hover:bg-stone-50"
+                className={btnGhost}
               >
                 <ArrowLeftRight size={15} /> Record stock move
               </button>
-              <p className="w-full text-[12px] text-stone-500">
+              <p className="w-full text-[12px] text-muted">
                 Alerts when stock is at or below the threshold. Stock quantity itself can only
                 change through inventory transactions — never edited directly.
               </p>
             </div>
 
-            <h4 className="mb-2 text-[13px] font-bold text-stone-800">Stock history</h4>
+            <h4 className="mb-2 text-[13px] font-bold text-ink">Stock history</h4>
             {loading ? (
-              <div className="flex items-center gap-2 text-[13px] text-stone-500">
+              <div className="flex items-center gap-2 text-[13px] text-muted">
                 <Loader2 size={16} className="animate-spin" /> Loading history…
               </div>
             ) : txns.length === 0 ? (
-              <p className="text-[13px] text-stone-500">No stock moves recorded yet.</p>
+              <p className="text-[13px] text-muted">No stock moves recorded yet.</p>
             ) : (
-              <div className="overflow-x-auto rounded-lg border border-stone-200 bg-white">
-                <table className="crm-table w-full">
+              <div className={tableWrapCls}>
+                <table className={`${tableCls}`}>
                   <thead>
                     <tr>
                       <th>When</th>
@@ -190,17 +191,17 @@ export function ProductDetail({
                       const rm = REASON_META[t.reason] ?? REASON_META.adjustment;
                       return (
                         <tr key={t.id}>
-                          <td className="whitespace-nowrap text-stone-500">{fmtDateTime(t.createdAt)}</td>
+                          <td className="whitespace-nowrap text-muted">{fmtDateTime(t.createdAt)}</td>
                           <td>
-                            <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${rm.tint}`}>
+                            <span className={chipCls}>
                               {rm.label}
                             </span>
                           </td>
-                          <td className={`text-right font-semibold tabular-nums ${t.delta > 0 ? "text-green-700" : "text-red-700"}`}>
+                          <td className="text-right font-semibold tabular-nums text-ink">
                             {t.delta > 0 ? `+${t.delta}` : t.delta}
                           </td>
-                          <td className="text-stone-500">{t.actor ?? "—"}</td>
-                          <td className="text-stone-500">{t.note ?? "—"}</td>
+                          <td className="text-muted">{t.actor ?? "—"}</td>
+                          <td className="text-muted">{t.note ?? "—"}</td>
                         </tr>
                       );
                     })}

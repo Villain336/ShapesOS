@@ -18,7 +18,7 @@ import { ProjectsTab } from "./ProjectsTab";
 import { TeamTab } from "./TeamTab";
 import { WorkflowsTab } from "./WorkflowsTab";
 import { NewLeadModal, PipelineModal, ImportModal } from "./modals";
-import { EmptyState } from "./ui";
+import { EmptyState, btnGhostSm, chipCls, tabCls } from "./ui";
 
 type Tab = "leads" | "pipeline" | "forecast" | "forms" | "invoicing" | "inventory" | "purchase-orders" | "projects" | "team" | "workflows";
 
@@ -176,14 +176,14 @@ export function CrmApp() {
   return (
     <div className="crm flex h-full flex-col">
       {/* Header: breadcrumb + pipeline switcher + tabs */}
-      <div className="border-b border-stone-200 bg-white px-5 pb-0 pt-4">
+      <div className="border-b border-line bg-paper px-5 pb-0 pt-4">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <p className="text-[12px] font-medium text-stone-400">Marketr · CRM</p>
+            <p className="text-[12px] font-medium text-subtle">Marketr · CRM</p>
             <div className="mt-0.5 flex items-center gap-2">
               <div className="relative">
                 <select
-                  className="crm-select !border-0 !bg-transparent !pl-0 !pr-8 !text-[20px] !font-bold !text-stone-900"
+                  className="cursor-pointer border-0 bg-transparent pl-0 pr-8 text-[20px] font-bold text-ink focus:outline-none"
                   value={activePipelineId ?? ""}
                   onChange={(e) => setActivePipelineId(e.target.value)}
                   aria-label="Active pipeline"
@@ -194,10 +194,10 @@ export function CrmApp() {
                     </option>
                   ))}
                 </select>
-                <ChevronDown size={14} className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-stone-500" />
+                <ChevronDown size={14} className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-muted" />
               </div>
               <button
-                className="rounded-lg p-1.5 text-stone-400 hover:bg-violet-50 hover:text-violet-700"
+                className="rounded-md p-1.5 text-subtle hover:bg-hover-paper hover:text-ink"
                 onClick={() => setModal("newPipeline")}
                 title="New pipeline"
               >
@@ -206,7 +206,7 @@ export function CrmApp() {
             </div>
           </div>
           {pipeline?.client && (
-            <span className="crm-chip crm-chip-violet">
+            <span className={chipCls}>
               <SquareArrowOutUpRight size={12} /> {pipeline.client.name}
             </span>
           )}
@@ -215,7 +215,7 @@ export function CrmApp() {
           {TABS.map((t) => (
             <button
               key={t.id}
-              className="crm-tab inline-flex items-center gap-1.5"
+              className={tabCls(tab === t.id)}
               data-active={tab === t.id}
               onClick={() => setTab(t.id)}
             >
@@ -261,7 +261,7 @@ export function CrmApp() {
               </div>
             )}
             {loading && tab !== "forms" ? (
-              <p className="py-12 text-center text-sm text-stone-500">Loading…</p>
+              <p className="py-12 text-center text-sm text-muted">Loading…</p>
             ) : (
               <>
                 {tab === "leads" && pipeline && (
@@ -284,7 +284,7 @@ export function CrmApp() {
             {nextCursor && (tab === "leads" || tab === "pipeline") && (
               <div className="mt-3 text-center">
                 <button
-                  className="crm-btn-ghost !text-[12.5px]"
+                  className={btnGhostSm}
                   onClick={() => loadLeads(true, nextCursor)}
                   disabled={loadingMore}
                 >
@@ -297,23 +297,23 @@ export function CrmApp() {
       </div>
 
       {/* Aggregation status bar */}
-      <div className="flex items-center gap-6 border-t border-stone-200 bg-white px-5 py-2.5 text-[12.5px]">
-        <span className="text-stone-500">
-          <span className="font-bold text-stone-900 tabular-nums">{summary.count}</span> leads in view
+      <div className="flex items-center gap-6 border-t border-line bg-paper px-5 py-2.5 text-[12.5px]">
+        <span className="text-muted">
+          <span className="font-bold text-ink tabular-nums">{summary.count}</span> leads in view
         </span>
-        <span className="text-stone-500">
-          Pipeline <span className="font-bold text-stone-900 tabular-nums">{formatMoney(summary.totalValueCents)}</span>
+        <span className="text-muted">
+          Pipeline <span className="font-bold text-ink tabular-nums">{formatMoney(summary.totalValueCents)}</span>
         </span>
-        <span className="text-stone-500">
+        <span className="text-muted">
           Avg score{" "}
-          <span className="font-bold text-stone-900 tabular-nums">
+          <span className="font-bold text-ink tabular-nums">
             {summary.avgScore != null ? Math.round(summary.avgScore) : "—"}
           </span>
         </span>
         {pipeline && (
-          <span className="ml-auto text-stone-400">
+          <span className="ml-auto text-subtle">
             Active leads (all pipelines):{" "}
-            <span className="font-semibold text-stone-700 tabular-nums">
+            <span className="font-semibold text-ink tabular-nums">
               {pipelines.reduce((a, p) => a + p.activeLeads, 0)}
             </span>
           </span>

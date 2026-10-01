@@ -10,6 +10,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Play, Workflow, X } from "lucide-react";
 import { OpsApprovalCard, decideOpsApproval, type OpsPendingGate } from "./OpsApprovalCard";
+import { RunStatusChip, StepStatusChip, btnPrimary, errorBoxCls, inputCls, noteBoxCls, tableCls, tableWrapCls, trClickableCls } from "./ui";
 
 interface RunStep {
   name: string;
@@ -36,21 +37,6 @@ interface WorkflowRun {
 }
 
 // (plan/rollback-plan types live server-side; the card shows the summary)
-
-const RUN_STATUS_META: Record<string, { label: string; tint: string }> = {
-  running: { label: "Running", tint: "bg-blue-100 text-blue-700" },
-  succeeded: { label: "Succeeded", tint: "bg-green-100 text-green-700" },
-  failed: { label: "Failed — needs attention", tint: "bg-red-100 text-red-700" },
-  compensated: { label: "Failed — compensated", tint: "bg-amber-100 text-amber-700" },
-};
-
-const STEP_STATUS_META: Record<string, { label: string; tint: string }> = {
-  pending: { label: "Pending", tint: "bg-stone-200 text-stone-600" },
-  running: { label: "Running", tint: "bg-blue-100 text-blue-700" },
-  done: { label: "Done", tint: "bg-green-100 text-green-700" },
-  failed: { label: "Failed", tint: "bg-red-100 text-red-700" },
-  compensated: { label: "Compensated", tint: "bg-amber-100 text-amber-700" },
-};
 
 function fmtDate(v: string | null | undefined): string {
   if (!v) return "—";
@@ -178,12 +164,12 @@ export function WorkflowsTab() {
   }
 
   return (
-    <div className="bg-[#FAFAF7] p-4 md:p-6">
+    <div className="bg-canvas p-4 md:p-6">
       <div className="mb-1 flex items-center gap-2">
-        <Workflow className="h-5 w-5 text-[var(--brand-600)]" />
-        <h1 className="text-xl font-bold tracking-tight text-stone-900">Workflows</h1>
+        <Workflow className="h-5 w-5 text-ink" />
+        <h1 className="text-xl font-bold tracking-tight text-ink">Workflows</h1>
       </div>
-      <p className="mb-4 text-[13px] text-stone-500">
+      <p className="mb-4 text-[13px] text-muted">
         Long-running operations run as workflows with transactional semantics: steps execute in
         order, and when a step fails the completed steps are compensated (rolled back) in reverse
         order. Money-moving runs are pre-authorized once — the approval binds the full step plan
@@ -191,11 +177,11 @@ export function WorkflowsTab() {
       </p>
 
       {/* Launcher */}
-      <div className="mb-6 rounded-lg border border-stone-200 bg-white p-4">
-        <h2 className="mb-1 text-[14px] font-semibold text-stone-900">
+      <div className="mb-6 rounded-md border border-line bg-paper p-4">
+        <h2 className="mb-1 text-[14px] font-semibold text-ink">
           Run: Order → payment → fulfillment
         </h2>
-        <p className="mb-3 text-[13px] text-stone-500">
+        <p className="mb-3 text-[13px] text-muted">
           Confirms a draft order, records the Stripe charge, then fulfills the order. If a step
           fails, the charge is refunded and the order cancelled automatically — no new approval
           needed mid-rollback.
@@ -205,20 +191,20 @@ export function WorkflowsTab() {
             value={orderId}
             onChange={(e) => setOrderId(e.target.value)}
             placeholder="Order id (e.g. ord_…)"
-            className="w-64 rounded-lg border border-stone-300 bg-white px-3 py-[7px] text-[13px] text-stone-900 placeholder:text-stone-400 focus:border-[var(--brand-600)] focus:outline-none"
+            className={`${inputCls} w-64`}
           />
           <button
             type="button"
             disabled={launchBusy || !!pending}
             onClick={propose}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--brand-600)] px-3 py-[7px] text-[13px] font-semibold text-white hover:bg-[var(--brand-700)] disabled:opacity-50"
+            className={btnPrimary}
           >
             <Play className="h-4 w-4" />
             Propose run
           </button>
         </div>
         {launchError && (
-          <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-700">
+          <div className={`${errorBoxCls} mt-3`}>
             {launchError}
           </div>
         )}
@@ -235,8 +221,8 @@ export function WorkflowsTab() {
           </div>
         )}
         {lastRun && (
-          <div className="mt-3 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-[13px] text-green-800">
-            Run finished: {RUN_STATUS_META[lastRun.status]?.label ?? lastRun.status} —{" "}
+          <div className={`${noteBoxCls} mt-3`}>
+            Run finished: {lastRun.status} —{" "}
             {(lastRun.compensationLog ?? []).length} compensation entr
             {(lastRun.compensationLog ?? []).length === 1 ? "y" : "ies"}.
           </div>
@@ -244,8 +230,8 @@ export function WorkflowsTab() {
       </div>
 
       {/* Runs table */}
-      <div className="overflow-x-auto rounded-lg border border-stone-200 bg-white">
-        <table className="crm-table w-full min-w-[860px]">
+      <div className={tableWrapCls}>
+        <table className={`${tableCls} min-w-[860px]`}>
           <thead>
             <tr>
               <th>Workflow</th>
@@ -259,19 +245,18 @@ export function WorkflowsTab() {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={6} className="py-6 text-center text-[13px] text-stone-400">
+                <td colSpan={6} className="py-6 text-center text-[13px] text-subtle">
                   Loading runs…
                 </td>
               </tr>
             ) : runs.length === 0 ? (
               <tr>
-                <td colSpan={6} className="py-6 text-center text-[13px] text-stone-400">
+                <td colSpan={6} className="py-6 text-center text-[13px] text-subtle">
                   No workflow runs yet.
                 </td>
               </tr>
             ) : (
               runs.map((run) => {
-                const meta = RUN_STATUS_META[run.status] ?? RUN_STATUS_META.running!;
                 const steps = run.steps ?? [];
                 const done = steps.filter((s) => s.status === "done").length;
                 const comps = run.compensationLog ?? [];
@@ -279,24 +264,20 @@ export function WorkflowsTab() {
                   <tr
                     key={run.id}
                     onClick={() => setSelectedId(run.id)}
-                    className="cursor-pointer hover:bg-[var(--brand-50)]/40"
+                    className={trClickableCls}
                   >
-                    <td className="font-semibold text-stone-900">{run.workflowName}</td>
-                    <td className="font-mono text-[12px] text-stone-500">
+                    <td className="font-semibold text-ink">{run.workflowName}</td>
+                    <td className="font-mono text-[12px] text-muted">
                       {run.runKey ? run.runKey.slice(0, 8) : "—"}
                     </td>
                     <td>
-                      <span
-                        className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${meta.tint}`}
-                      >
-                        {meta.label}
-                      </span>
+                      <RunStatusChip status={run.status} />
                     </td>
-                    <td className="tabular-nums text-stone-600">
+                    <td className="tabular-nums text-muted">
                       {done}/{steps.length}
                     </td>
-                    <td className="tabular-nums text-stone-600">{comps.length}</td>
-                    <td className="text-stone-500">{fmtDate(run.createdAt)}</td>
+                    <td className="tabular-nums text-muted">{comps.length}</td>
+                    <td className="text-muted">{fmtDate(run.createdAt)}</td>
                   </tr>
                 );
               })
@@ -305,7 +286,7 @@ export function WorkflowsTab() {
         </table>
       </div>
       {error && (
-        <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-700">
+        <div className={`${errorBoxCls} mt-3`}>
           {error}
         </div>
       )}
@@ -314,11 +295,11 @@ export function WorkflowsTab() {
       {selected && (
         <div className="fixed inset-0 z-40 flex justify-end">
           <div className="absolute inset-0 bg-black/30" onClick={() => setSelectedId(null)} />
-          <div className="relative flex h-full w-full max-w-md flex-col bg-white shadow-xl">
-            <div className="flex items-center justify-between border-b border-stone-200 px-4 py-3">
+          <div className="relative flex h-full w-full max-w-md flex-col bg-paper shadow-overlay">
+            <div className="flex items-center justify-between border-b border-line px-4 py-3">
               <div>
-                <h3 className="text-[15px] font-bold text-stone-900">{selected.workflowName}</h3>
-                <p className="text-[12px] text-stone-500">
+                <h3 className="text-[15px] font-bold text-ink">{selected.workflowName}</h3>
+                <p className="text-[12px] text-muted">
                   Run key {selected.runKey ? selected.runKey.slice(0, 8) : "—"} ·{" "}
                   {fmtDate(selected.createdAt)}
                 </p>
@@ -326,7 +307,7 @@ export function WorkflowsTab() {
               <button
                 type="button"
                 onClick={() => setSelectedId(null)}
-                className="rounded-lg p-1.5 text-stone-500 hover:bg-stone-100"
+                className="rounded-md p-1.5 text-muted hover:bg-hover-paper hover:text-ink"
                 aria-label="Close"
               >
                 <X className="h-4 w-4" />
@@ -334,55 +315,44 @@ export function WorkflowsTab() {
             </div>
             <div className="flex-1 overflow-y-auto px-4 py-4">
               <div className="mb-2 flex items-center gap-2">
-                <span className="text-[13px] font-semibold text-stone-900">Status</span>
-                <span
-                  className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${
-                    (RUN_STATUS_META[selected.status] ?? RUN_STATUS_META.running!).tint
-                  }`}
-                >
-                  {(RUN_STATUS_META[selected.status] ?? RUN_STATUS_META.running!).label}
-                </span>
+                <span className="text-[13px] font-semibold text-ink">Status</span>
+                <RunStatusChip status={selected.status} />
               </div>
-              <h4 className="mb-2 mt-4 text-[13px] font-semibold text-stone-900">Steps</h4>
+              <h4 className="mb-2 mt-4 text-[13px] font-semibold text-ink">Steps</h4>
               <ol className="space-y-2">
                 {(selected.steps ?? []).map((s, i) => {
-                  const sm = STEP_STATUS_META[s.status] ?? STEP_STATUS_META.pending!;
                   return (
                     <li
                       key={`${s.name}-${i}`}
-                      className="rounded-lg border border-stone-200 bg-stone-50 px-3 py-2"
+                      className="rounded-md border border-line bg-canvas px-3 py-2"
                     >
                       <div className="flex items-center justify-between">
-                        <span className="font-mono text-[12px] font-semibold text-stone-800">
+                        <span className="font-mono text-[12px] font-semibold text-ink">
                           {i + 1}. {s.name}
                         </span>
-                        <span
-                          className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${sm.tint}`}
-                        >
-                          {sm.label}
-                        </span>
+                        <StepStatusChip status={s.status} />
                       </div>
-                      {s.at && <div className="mt-1 text-[11px] text-stone-400">{fmtDate(s.at)}</div>}
+                      {s.at && <div className="mt-1 text-[11px] text-subtle">{fmtDate(s.at)}</div>}
                     </li>
                   );
                 })}
               </ol>
-              <h4 className="mb-2 mt-4 text-[13px] font-semibold text-stone-900">
+              <h4 className="mb-2 mt-4 text-[13px] font-semibold text-ink">
                 Compensation log
               </h4>
               {(selected.compensationLog ?? []).length === 0 ? (
-                <p className="text-[13px] text-stone-400">No compensations — every step succeeded.</p>
+                <p className="text-[13px] text-subtle">No compensations — every step succeeded.</p>
               ) : (
                 <ol className="space-y-2">
                   {(selected.compensationLog ?? []).map((c, i) => (
                     <li
                       key={i}
-                      className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2"
+                      className="rounded-md border border-line bg-canvas px-3 py-2"
                     >
-                      <div className="text-[12px] font-semibold text-amber-900">{c.step}</div>
-                      <div className="text-[12px] text-amber-800">{c.action}</div>
+                      <div className="text-[12px] font-semibold text-ink">{c.step}</div>
+                      <div className="text-[12px] text-ink">{c.action}</div>
                       {c.at && (
-                        <div className="mt-1 text-[11px] text-amber-700/70">{fmtDate(c.at)}</div>
+                        <div className="mt-1 text-[11px] text-ink/70">{fmtDate(c.at)}</div>
                       )}
                     </li>
                   ))}

@@ -15,6 +15,7 @@ import {
   type SupplierRef,
 } from "./PurchaseOrdersTab";
 import { OpsApprovalCard, decideOpsApproval, type OpsPendingGate } from "./OpsApprovalCard";
+import { backdropCls, btnGhost, btnPrimary, chipCls, errorBoxCls, noteBoxCls, slideoverCls, tableCls, tableWrapCls } from "./ui";
 
 interface POLine {
   productId?: string;
@@ -139,36 +140,36 @@ export function PODetail({
 
   return (
     <>
-      <div className="crm-backdrop" onClick={onClose} />
-      <div className="crm-slideover">
+      <div className={backdropCls} onClick={onClose} />
+      <div className={slideoverCls}>
         <div className="flex h-full flex-col">
-          <div className="flex items-start justify-between border-b border-stone-200 px-5 py-4">
+          <div className="flex items-start justify-between border-b border-line px-5 py-4">
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-lg font-bold tracking-tight text-stone-900">
+                <h3 className="text-lg font-bold tracking-tight text-ink">
                   PO-{shortPOId(po.id)}
                 </h3>
-                <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${meta.tint}`}>
+                <span className={chipCls}>
                   {meta.label}
                 </span>
               </div>
-              <p className="mt-0.5 text-[13px] text-stone-500">
+              <p className="mt-0.5 text-[13px] text-muted">
                 {who} · {formatMoney(po.totalCents)} · sent {fmtDate(po.sentAt)}
               </p>
             </div>
-            <button type="button" onClick={onClose} className="rounded-lg p-1.5 text-stone-400 hover:bg-stone-100" aria-label="Close">
+            <button type="button" onClick={onClose} className="rounded-md p-1.5 text-subtle hover:bg-hover-paper hover:text-ink" aria-label="Close">
               <X size={18} />
             </button>
           </div>
 
           <div className="flex-1 overflow-y-auto px-5 py-4">
             {error && (
-              <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-700">
+              <div className={`${errorBoxCls} mb-3`}>
                 {error}
               </div>
             )}
             {note && (
-              <div className="mb-3 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-[13px] text-green-800">
+              <div className={`${noteBoxCls} mb-3`}>
                 {note}
               </div>
             )}
@@ -191,7 +192,7 @@ export function PODetail({
                   type="button"
                   disabled={busy}
                   onClick={() => requestTransition("sent")}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--brand-600)] px-3 py-[7px] text-[13px] font-semibold text-white hover:bg-[var(--brand-700)] disabled:opacity-50"
+                  className={btnPrimary}
                 >
                   {busy ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />} Send purchase order
                 </button>
@@ -201,7 +202,7 @@ export function PODetail({
                   type="button"
                   disabled={busy}
                   onClick={() => requestTransition("received")}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--brand-600)] px-3 py-[7px] text-[13px] font-semibold text-white hover:bg-[var(--brand-700)] disabled:opacity-50"
+                  className={btnPrimary}
                 >
                   {busy ? <Loader2 size={14} className="animate-spin" /> : <PackageCheck size={14} />} Mark received
                 </button>
@@ -211,7 +212,7 @@ export function PODetail({
                   type="button"
                   disabled={busy}
                   onClick={() => requestTransition("cancelled")}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-stone-300 bg-white px-3 py-[7px] text-[13px] font-semibold text-stone-700 hover:bg-stone-50 disabled:opacity-50"
+                  className={btnGhost}
                 >
                   <Ban size={14} /> Cancel
                 </button>
@@ -219,9 +220,9 @@ export function PODetail({
             </div>
 
             {/* Line items */}
-            <h4 className="mb-2 text-[13px] font-bold text-stone-800">Line items</h4>
-            <div className="overflow-x-auto rounded-lg border border-stone-200 bg-white">
-              <table className="crm-table w-full">
+            <h4 className="mb-2 text-[13px] font-bold text-ink">Line items</h4>
+            <div className={tableWrapCls}>
+              <table className={`${tableCls}`}>
                 <thead>
                   <tr>
                     <th>Item</th>
@@ -234,10 +235,10 @@ export function PODetail({
                   {(po.lineItems as POLine[]).map((li, i) => (
                     <tr key={i}>
                       <td>
-                        <span className="font-medium text-stone-800">{li.name}</span>
-                        {li.sku && <span className="text-stone-400"> · {li.sku}</span>}
+                        <span className="font-medium text-ink">{li.name}</span>
+                        {li.sku && <span className="text-subtle"> · {li.sku}</span>}
                         {li.productId && (
-                          <span className="ml-1 inline-flex items-center gap-0.5 rounded bg-green-50 px-1.5 py-0.5 text-[10px] font-semibold text-green-700">
+                          <span className="ml-1 inline-flex items-center gap-0.5 rounded bg-canvas px-1.5 py-0.5 text-[10px] font-semibold text-ink">
                             <Check size={10} /> restocks on receive
                           </span>
                         )}
@@ -250,12 +251,12 @@ export function PODetail({
                 </tbody>
               </table>
             </div>
-            <div className="mt-2 space-y-0.5 text-right text-[13px] text-stone-500">
-              <p>Subtotal <span className="font-semibold text-stone-900 tabular-nums">{formatMoney(subtotal)}</span></p>
-              <p>Tax <span className="font-semibold text-stone-900 tabular-nums">{formatMoney(po.taxCents)}</span></p>
-              <p className="text-[15px]">Total <span className="font-bold text-stone-900 tabular-nums">{formatMoney(po.totalCents)}</span></p>
+            <div className="mt-2 space-y-0.5 text-right text-[13px] text-muted">
+              <p>Subtotal <span className="font-semibold text-ink tabular-nums">{formatMoney(subtotal)}</span></p>
+              <p>Tax <span className="font-semibold text-ink tabular-nums">{formatMoney(po.taxCents)}</span></p>
+              <p className="text-[15px]">Total <span className="font-bold text-ink tabular-nums">{formatMoney(po.totalCents)}</span></p>
             </div>
-            <p className="mt-3 text-[12px] text-stone-500">
+            <p className="mt-3 text-[12px] text-muted">
               Receiving books a restock inventory transaction for every line linked to a catalog
               product — atomically, in the same transaction as the status change.
             </p>

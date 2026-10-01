@@ -4,7 +4,7 @@
 import { useState } from "react";
 import type { CrmLead, CrmPipeline } from "./types";
 import { formatMoney } from "./types";
-import { StageBadge, ScoreBar, Avatar, EmptyState } from "./ui";
+import { Avatar, EmptyState, ScoreBar, StageBadge, kanbanCardCls, kanbanColCls, kanbanColOverCls } from "./ui";
 import { Kanban } from "lucide-react";
 
 export function KanbanBoard({
@@ -41,8 +41,7 @@ export function KanbanBoard({
         return (
           <div
             key={s.id}
-            className="crm-kanban-col"
-            data-over={overCol === s.id}
+            className={overCol === s.id ? `${kanbanColCls} ${kanbanColOverCls}` : kanbanColCls}
             onDragOver={(e) => { e.preventDefault(); setOverCol(s.id); }}
             onDragLeave={() => setOverCol((o) => (o === s.id ? null : o))}
             onDrop={() => drop(s.id)}
@@ -50,9 +49,9 @@ export function KanbanBoard({
             <div className="flex items-center justify-between px-3 pt-3 pb-2">
               <div className="flex items-center gap-2">
                 <StageBadge label={s.label} color={s.color} />
-                <span className="text-[12px] font-semibold text-stone-500 tabular-nums">{col.length}</span>
+                <span className="text-[12px] font-semibold text-muted tabular-nums">{col.length}</span>
               </div>
-              <span className="text-[12px] font-semibold text-stone-500 tabular-nums">
+              <span className="text-[12px] font-semibold text-muted tabular-nums">
                 {formatMoney(colValue)}
               </span>
             </div>
@@ -60,7 +59,7 @@ export function KanbanBoard({
               {col.map((l) => (
                 <div
                   key={l.id}
-                  className="crm-kanban-card"
+                  className={kanbanCardCls}
                   draggable
                   onDragStart={() => setDragId(l.id)}
                   onDragEnd={() => { setDragId(null); setOverCol(null); }}
@@ -70,22 +69,22 @@ export function KanbanBoard({
                   <div className="flex items-center gap-2">
                     <Avatar name={l.name} size={24} />
                     <div className="min-w-0 flex-1">
-                      <div className="truncate text-[13px] font-semibold text-stone-900">{l.name}</div>
+                      <div className="truncate text-[13px] font-semibold text-ink">{l.name}</div>
                       {l.company && (
-                        <div className="truncate text-[12px] text-stone-500">{l.company}</div>
+                        <div className="truncate text-[12px] text-muted">{l.company}</div>
                       )}
                     </div>
                   </div>
                   <div className="mt-2 flex items-center justify-between">
                     <ScoreBar score={l.score} showNumber />
-                    <span className="text-[12.5px] font-semibold text-stone-700 tabular-nums">
+                    <span className="text-[12.5px] font-semibold text-ink tabular-nums">
                       {formatMoney(l.valueCents)}
                     </span>
                   </div>
                 </div>
               ))}
               {col.length === 0 && (
-                <div className="rounded-lg border border-dashed border-stone-300 px-3 py-6 text-center text-[12px] text-stone-400">
+                <div className="rounded-md border border-dashed border-control px-3 py-6 text-center text-[12px] text-subtle">
                   Drop leads here
                 </div>
               )}

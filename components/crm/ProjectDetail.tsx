@@ -9,6 +9,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Check, Clock3, Loader2, Plus, RotateCcw, X } from "lucide-react";
 import { PROJECT_STATUS_META } from "./ProjectsTab";
 import type { CustomerRef } from "./ProjectsTab";
+import { backdropCls, btnDeny, btnPrimary, chipCls, errorBoxCls, inputCls, noteBoxCls, slideoverCls } from "./ui";
 
 interface Milestone {
   title: string;
@@ -180,67 +181,67 @@ export function ProjectDetail({
 
   return (
     <>
-      <div className="crm-backdrop" onClick={onClose} />
-      <div className="crm-slideover">
+      <div className={backdropCls} onClick={onClose} />
+      <div className={slideoverCls}>
         <div className="flex h-full flex-col">
-          <div className="flex items-start justify-between border-b border-stone-200 px-5 py-4">
+          <div className="flex items-start justify-between border-b border-line px-5 py-4">
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-lg font-bold tracking-tight text-stone-900">
+                <h3 className="text-lg font-bold tracking-tight text-ink">
                   {summary ? summary.project.name : "Project"}
                 </h3>
                 {meta && (
-                  <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${meta.tint}`}>
+                  <span className={chipCls}>
                     {meta.label}
                   </span>
                 )}
               </div>
               {summary?.customer && (
-                <p className="mt-0.5 text-[13px] text-stone-500">
+                <p className="mt-0.5 text-[13px] text-muted">
                   {summary.customer.name}
                   {summary.customer.company ? ` · ${summary.customer.company}` : ""}
                 </p>
               )}
             </div>
-            <button onClick={onClose} className="rounded-lg p-1.5 text-stone-400 hover:bg-stone-100" aria-label="Close">
+            <button onClick={onClose} className="rounded-md p-1.5 text-subtle hover:bg-hover-paper hover:text-ink" aria-label="Close">
               <X size={18} />
             </button>
           </div>
 
           <div className="flex-1 overflow-y-auto px-5 py-4">
             {error && (
-              <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-700">
+              <div className={`${errorBoxCls} mb-3`}>
                 {error}
               </div>
             )}
             {nudge && (
-              <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[13px] text-amber-800">
+              <div className={`${noteBoxCls} mb-3`}>
                 {nudge}
               </div>
             )}
             {loading || !summary ? (
-              <div className="flex items-center gap-2 text-[13px] text-stone-500">
+              <div className="flex items-center gap-2 text-[13px] text-muted">
                 <Loader2 size={16} className="animate-spin" /> Loading…
               </div>
             ) : (
               <div className="flex flex-col gap-6">
                 {/* Progress + time header */}
-                <div className="flex flex-wrap gap-4 text-[13px] text-stone-600">
+                <div className="flex flex-wrap gap-4 text-[13px] text-muted">
                   <span>
                     Milestones{" "}
-                    <span className="font-bold text-stone-900 tabular-nums">
+                    <span className="font-bold text-ink tabular-nums">
                       {summary.progress.done}/{summary.progress.total}
                     </span>{" "}
-                    <span className="text-stone-400">({summary.progress.pct}%)</span>
+                    <span className="text-subtle">({summary.progress.pct}%)</span>
                   </span>
                   <span>
                     Time{" "}
-                    <span className="font-bold text-stone-900 tabular-nums">
+                    <span className="font-bold text-ink tabular-nums">
                       {fmtMinutes(summary.totals.totalMinutes)}
                     </span>
                   </span>
                   {summary.totals.unbilledMinutes > 0 && (
-                    <span className="text-amber-700">
+                    <span className="text-ink">
                       Unbilled{" "}
                       <span className="font-bold tabular-nums">
                         {fmtMinutes(summary.totals.unbilledMinutes)}
@@ -251,23 +252,23 @@ export function ProjectDetail({
 
                 {/* Milestones */}
                 <section>
-                  <h4 className="mb-2 text-[13px] font-bold text-stone-900">Milestones</h4>
+                  <h4 className="mb-2 text-[13px] font-bold text-ink">Milestones</h4>
                   {summary.project.milestones.length === 0 ? (
-                    <p className="text-[13px] text-stone-500">No milestones yet — add the first one below.</p>
+                    <p className="text-[13px] text-muted">No milestones yet — add the first one below.</p>
                   ) : (
                     <ul className="flex flex-col gap-1.5">
                       {summary.project.milestones.map((m, i) => (
                         <li
                           key={i}
-                          className="flex items-center gap-2.5 rounded-lg border border-stone-200 bg-white px-3 py-2"
+                          className="flex items-center gap-2.5 rounded-md border border-line bg-paper px-3 py-2"
                         >
                           <button
                             onClick={() => toggleMilestone(i, m.status === "done" ? "open" : "done")}
                             disabled={busy !== null || !!terminal}
                             className={`flex h-5 w-5 items-center justify-center rounded-full border ${
                               m.status === "done"
-                                ? "border-[var(--brand-600)] bg-[var(--brand-600)] text-white"
-                                : "border-stone-300 text-transparent hover:border-[var(--brand-600)]"
+                                ? "border-ink bg-ink text-white"
+                                : "border-control text-transparent hover:border-ink"
                             }`}
                             aria-label={m.status === "done" ? "Reopen milestone" : "Complete milestone"}
                           >
@@ -275,12 +276,12 @@ export function ProjectDetail({
                           </button>
                           <span
                             className={`flex-1 text-[13px] ${
-                              m.status === "done" ? "text-stone-400 line-through" : "text-stone-800"
+                              m.status === "done" ? "text-subtle line-through" : "text-ink"
                             }`}
                           >
                             {m.title}
                           </span>
-                          <span className="text-[12px] text-stone-400">{fmtDate(m.dueAt)}</span>
+                          <span className="text-[12px] text-subtle">{fmtDate(m.dueAt)}</span>
                         </li>
                       ))}
                     </ul>
@@ -288,14 +289,14 @@ export function ProjectDetail({
                   {!terminal && (
                     <div className="mt-2 flex gap-2">
                       <input
-                        className="crm-input flex-1"
+                        className={`${inputCls} flex-1`}
                         placeholder="New milestone title…"
                         value={newTitle}
                         onChange={(e) => setNewTitle(e.target.value)}
                       />
                       <input
                         type="date"
-                        className="crm-input w-36"
+                        className={`${inputCls} w-36`}
                         value={newDue}
                         onChange={(e) => setNewDue(e.target.value)}
                         aria-label="Due date"
@@ -303,7 +304,7 @@ export function ProjectDetail({
                       <button
                         onClick={addMilestone}
                         disabled={!newTitle.trim() || busy !== null}
-                        className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--brand-600)] px-3 py-[7px] text-[13px] font-semibold text-white hover:bg-[var(--brand-700)] disabled:opacity-50"
+                        className={btnPrimary}
                       >
                         {busy === "add-ms" ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} />}
                         Add
@@ -314,11 +315,11 @@ export function ProjectDetail({
 
                 {/* Time ledger */}
                 <section>
-                  <h4 className="mb-2 text-[13px] font-bold text-stone-900">Time</h4>
+                  <h4 className="mb-2 text-[13px] font-bold text-ink">Time</h4>
                   {!terminal && (
                     <div className="mb-2 flex gap-2">
                       <input
-                        className="crm-input w-24"
+                        className={`${inputCls} w-24`}
                         placeholder="Hours"
                         inputMode="decimal"
                         value={hours}
@@ -326,7 +327,7 @@ export function ProjectDetail({
                         aria-label="Hours"
                       />
                       <input
-                        className="crm-input flex-1"
+                        className={`${inputCls} flex-1`}
                         placeholder="What was worked on…"
                         value={timeDesc}
                         onChange={(e) => setTimeDesc(e.target.value)}
@@ -334,7 +335,7 @@ export function ProjectDetail({
                       <button
                         onClick={logTime}
                         disabled={busy !== null}
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-stone-200 bg-white px-3 py-[7px] text-[13px] font-semibold text-stone-700 hover:bg-stone-50 disabled:opacity-50"
+                        className="inline-flex items-center gap-1.5 rounded-md border border-line bg-paper px-3 py-[7px] text-[13px] font-semibold text-ink hover:bg-canvas disabled:opacity-50"
                       >
                         {busy === "log-time" ? <Loader2 size={15} className="animate-spin" /> : <Clock3 size={15} />}
                         Log
@@ -342,28 +343,28 @@ export function ProjectDetail({
                     </div>
                   )}
                   {entries.length === 0 ? (
-                    <p className="text-[13px] text-stone-500">No time logged yet.</p>
+                    <p className="text-[13px] text-muted">No time logged yet.</p>
                   ) : (
                     <ul className="flex flex-col gap-1.5">
                       {entries.map((e) => (
                         <li
                           key={e.id}
-                          className="flex items-center gap-2.5 rounded-lg border border-stone-200 bg-white px-3 py-2"
+                          className="flex items-center gap-2.5 rounded-md border border-line bg-paper px-3 py-2"
                         >
-                          <span className="w-16 shrink-0 text-[13px] font-semibold text-stone-900 tabular-nums">
+                          <span className="w-16 shrink-0 text-[13px] font-semibold text-ink tabular-nums">
                             {fmtMinutes(e.minutes)}
                           </span>
-                          <span className="flex-1 text-[13px] text-stone-700">{e.description ?? "—"}</span>
-                          <span className="text-[12px] text-stone-400">{fmtDate(e.occurredAt)}</span>
+                          <span className="flex-1 text-[13px] text-ink">{e.description ?? "—"}</span>
+                          <span className="text-[12px] text-subtle">{fmtDate(e.occurredAt)}</span>
                           {e.billed ? (
-                            <span className="rounded-full bg-green-100 px-2 py-0.5 text-[11px] font-semibold text-green-700">
+                            <span className="rounded-full bg-canvas px-2 py-0.5 text-[11px] font-semibold text-ink">
                               Billed
                             </span>
                           ) : (
                             <button
                               onClick={() => markBilled(e.id)}
                               disabled={busy !== null}
-                              className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700 hover:bg-amber-200"
+                              className="rounded-full bg-canvas px-2 py-0.5 text-[11px] font-semibold text-ink hover:bg-hover-paper"
                             >
                               Mark billed
                             </button>
@@ -376,20 +377,20 @@ export function ProjectDetail({
 
                 {/* Lifecycle actions */}
                 {!terminal && (
-                  <section className="flex flex-wrap gap-2 border-t border-stone-200 pt-4">
+                  <section className="flex flex-wrap gap-2 border-t border-line pt-4">
                     {summary.project.status === "active" && (
                       <>
                         <button
                           onClick={() => holdOrResume("on_hold")}
                           disabled={busy !== null}
-                          className="rounded-lg border border-stone-200 bg-white px-3 py-[7px] text-[13px] font-semibold text-stone-700 hover:bg-stone-50"
+                          className="rounded-md border border-line bg-paper px-3 py-[7px] text-[13px] font-semibold text-ink hover:bg-canvas"
                         >
                           Put on hold
                         </button>
                         <button
                           onClick={complete}
                           disabled={busy !== null}
-                          className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--brand-600)] px-3 py-[7px] text-[13px] font-semibold text-white hover:bg-[var(--brand-700)]"
+                          className={btnPrimary}
                         >
                           {busy === "complete" ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />}
                           Complete project
@@ -397,7 +398,7 @@ export function ProjectDetail({
                         <button
                           onClick={() => holdOrResume("cancelled")}
                           disabled={busy !== null}
-                          className="rounded-lg border border-red-200 bg-white px-3 py-[7px] text-[13px] font-semibold text-red-600 hover:bg-red-50"
+                          className={btnDeny}
                         >
                           Cancel
                         </button>
@@ -408,14 +409,14 @@ export function ProjectDetail({
                         <button
                           onClick={() => holdOrResume("active")}
                           disabled={busy !== null}
-                          className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--brand-600)] px-3 py-[7px] text-[13px] font-semibold text-white hover:bg-[var(--brand-700)]"
+                          className={btnPrimary}
                         >
                           Start project
                         </button>
                         <button
                           onClick={() => holdOrResume("cancelled")}
                           disabled={busy !== null}
-                          className="rounded-lg border border-red-200 bg-white px-3 py-[7px] text-[13px] font-semibold text-red-600 hover:bg-red-50"
+                          className={btnDeny}
                         >
                           Cancel
                         </button>
@@ -426,14 +427,14 @@ export function ProjectDetail({
                         <button
                           onClick={() => holdOrResume("active")}
                           disabled={busy !== null}
-                          className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--brand-600)] px-3 py-[7px] text-[13px] font-semibold text-white hover:bg-[var(--brand-700)]"
+                          className={btnPrimary}
                         >
                           Resume
                         </button>
                         <button
                           onClick={() => holdOrResume("cancelled")}
                           disabled={busy !== null}
-                          className="rounded-lg border border-red-200 bg-white px-3 py-[7px] text-[13px] font-semibold text-red-600 hover:bg-red-50"
+                          className={btnDeny}
                         >
                           Cancel
                         </button>

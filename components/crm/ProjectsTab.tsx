@@ -9,6 +9,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { FolderKanban, Loader2, Plus, Search } from "lucide-react";
 import { ProjectDetail } from "./ProjectDetail";
 import { NewProjectModal } from "./NewProjectModal";
+import { btnPrimary, chipCls, errorBoxCls, inputCls, selectCls, tableCls, tableWrapCls, trClickableCls } from "./ui";
 
 export interface OpsProject {
   id: string;
@@ -30,11 +31,11 @@ export interface CustomerRef {
 const STATUS_FILTERS = ["all", "planning", "active", "on_hold", "completed", "cancelled"] as const;
 
 export const PROJECT_STATUS_META: Record<string, { label: string; tint: string }> = {
-  planning: { label: "Planning", tint: "bg-stone-200 text-stone-700" },
-  active: { label: "Active", tint: "bg-[var(--brand-50)] text-[var(--brand-700)]" },
-  on_hold: { label: "On hold", tint: "bg-amber-100 text-amber-700" },
-  completed: { label: "Completed", tint: "bg-green-100 text-green-700" },
-  cancelled: { label: "Cancelled", tint: "bg-stone-100 text-stone-400" },
+  planning: { label: "Planning", tint: "bg-line text-ink" },
+  active: { label: "Active", tint: "bg-canvas text-ink" },
+  on_hold: { label: "On hold", tint: "bg-canvas text-ink" },
+  completed: { label: "Completed", tint: "bg-canvas text-ink" },
+  cancelled: { label: "Cancelled", tint: "bg-canvas text-subtle" },
 };
 
 export function projectProgressOf(milestones: OpsProject["milestones"]): { done: number; total: number; pct: number } {
@@ -118,15 +119,15 @@ export function ProjectsTab() {
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h2 className="text-xl font-bold tracking-tight text-stone-900">Projects</h2>
-          <p className="mt-0.5 text-[13px] text-stone-500">
+          <h2 className="text-xl font-bold tracking-tight text-ink">Projects</h2>
+          <p className="mt-0.5 text-[13px] text-muted">
             Client delivery work — milestones, progress, and time tracking, linked to CRM leads.
           </p>
         </div>
-        <div className="flex items-center gap-4 text-[13px] text-stone-500">
+        <div className="flex items-center gap-4 text-[13px] text-muted">
           <span>
             Active{" "}
-            <span className="font-bold text-stone-900 tabular-nums">{activeCount}</span>
+            <span className="font-bold text-ink tabular-nums">{activeCount}</span>
           </span>
         </div>
       </div>
@@ -134,7 +135,7 @@ export function ProjectsTab() {
       {/* Filter toolbar */}
       <div className="flex flex-wrap items-center gap-2">
         <select
-          className="crm-select"
+          className={selectCls}
           value={status}
           onChange={(e) => setStatus(e.target.value as typeof status)}
           aria-label="Filter by status"
@@ -146,9 +147,9 @@ export function ProjectsTab() {
           ))}
         </select>
         <div className="relative">
-          <Search size={15} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-stone-400" />
+          <Search size={15} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-subtle" />
           <input
-            className="crm-input pl-8"
+            className={`${inputCls} pl-8`}
             placeholder="Search projects…"
             value={q}
             onChange={(e) => setQ(e.target.value)}
@@ -157,33 +158,33 @@ export function ProjectsTab() {
         <button
           type="button"
           onClick={() => setShowNew(true)}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--brand-600)] px-3 py-[7px] text-[13px] font-semibold text-white hover:bg-[var(--brand-700)]"
+          className={btnPrimary}
         >
           <Plus size={15} /> New project
         </button>
       </div>
 
       {error && (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-700">
+        <div className={errorBoxCls}>
           {error}
         </div>
       )}
 
       {loading ? (
-        <div className="flex items-center gap-2 text-[13px] text-stone-500">
+        <div className="flex items-center gap-2 text-[13px] text-muted">
           <Loader2 size={16} className="animate-spin" /> Loading projects…
         </div>
       ) : filtered.length === 0 ? (
-        <div className="rounded-lg border border-stone-200 bg-stone-50 px-4 py-10 text-center">
-          <FolderKanban size={28} className="mx-auto text-stone-300" />
-          <p className="mt-2 text-[13px] font-semibold text-stone-700">No projects yet</p>
-          <p className="mt-0.5 text-[13px] text-stone-500">
+        <div className="rounded-md border border-line bg-canvas px-4 py-10 text-center">
+          <FolderKanban size={28} className="mx-auto text-subtle" />
+          <p className="mt-2 text-[13px] font-semibold text-ink">No projects yet</p>
+          <p className="mt-0.5 text-[13px] text-muted">
             Create a project to track milestones and time against a client.
           </p>
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-stone-200 bg-white">
-          <table className="crm-table w-full min-w-[760px]">
+        <div className={tableWrapCls}>
+          <table className={`${tableCls} min-w-[760px]`}>
             <thead>
               <tr>
                 <th>Project</th>
@@ -198,26 +199,26 @@ export function ProjectsTab() {
                 const meta = PROJECT_STATUS_META[p.status];
                 const prog = projectProgressOf(p.milestones);
                 return (
-                  <tr key={p.id} onClick={() => setSelectedId(p.id)} className="hover:bg-[var(--brand-50)]/40">
-                    <td className="font-semibold text-stone-900">{p.name}</td>
-                    <td className="text-stone-700">{customerLabel(p)}</td>
+                  <tr key={p.id} onClick={() => setSelectedId(p.id)} className={trClickableCls}>
+                    <td className="font-semibold text-ink">{p.name}</td>
+                    <td className="text-ink">{customerLabel(p)}</td>
                     <td>
-                      <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${meta.tint}`}>
+                      <span className={chipCls}>
                         {meta.label}
                       </span>
                     </td>
                     <td>
                       <div className="flex items-center gap-2">
-                        <div className="h-1.5 w-24 overflow-hidden rounded-full bg-stone-200">
+                        <div className="h-1.5 w-24 overflow-hidden rounded-full bg-line">
                           <div
-                            className="h-full rounded-full bg-[var(--brand-600)]"
+                            className="h-full rounded-full bg-ink"
                             style={{ width: `${prog.pct}%` }}
                           />
                         </div>
-                        <span className="text-[12px] text-stone-500 tabular-nums">{prog.pct}%</span>
+                        <span className="text-[12px] text-muted tabular-nums">{prog.pct}%</span>
                       </div>
                     </td>
-                    <td className="text-stone-700 tabular-nums">
+                    <td className="text-ink tabular-nums">
                       {prog.done}/{prog.total}
                     </td>
                   </tr>

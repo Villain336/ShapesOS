@@ -9,6 +9,7 @@ import { Loader2, Plus, Search, UserRound } from "lucide-react";
 import { NewMemberModal } from "./NewMemberModal";
 import { LeaveRequestModal } from "./LeaveRequestModal";
 import { LeaveDetail } from "./LeaveDetail";
+import { btnGhost, btnPrimary, chipCls, errorBoxCls, inputCls, tableCls, tableWrapCls, trClickableCls } from "./ui";
 
 export interface OpsTeamMember {
   id: string;
@@ -33,15 +34,15 @@ export interface OpsLeaveRequest {
 }
 
 export const MEMBER_STATUS_META: Record<string, { label: string; tint: string }> = {
-  active: { label: "Active", tint: "bg-[var(--brand-50)] text-[var(--brand-700)]" },
-  inactive: { label: "Inactive", tint: "bg-stone-100 text-stone-400" },
+  active: { label: "Active", tint: "bg-canvas text-ink" },
+  inactive: { label: "Inactive", tint: "bg-canvas text-subtle" },
 };
 
 export const LEAVE_STATUS_META: Record<string, { label: string; tint: string }> = {
-  requested: { label: "Requested", tint: "bg-amber-100 text-amber-700" },
-  approved: { label: "Approved", tint: "bg-[var(--brand-50)] text-[var(--brand-700)]" },
-  denied: { label: "Denied", tint: "bg-red-100 text-red-700" },
-  taken: { label: "Taken", tint: "bg-stone-200 text-stone-700" },
+  requested: { label: "Requested", tint: "bg-canvas text-ink" },
+  approved: { label: "Approved", tint: "bg-canvas text-ink" },
+  denied: { label: "Denied", tint: "bg-canvas text-ink" },
+  taken: { label: "Taken", tint: "bg-line text-ink" },
 };
 
 export const LEAVE_TYPE_LABEL: Record<string, string> = {
@@ -137,8 +138,8 @@ export function TeamTab() {
       {/* Header */}
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-xl font-bold tracking-tight text-stone-900">Team</h2>
-          <p className="mt-0.5 text-[13px] text-stone-500">
+          <h2 className="text-xl font-bold tracking-tight text-ink">Team</h2>
+          <p className="mt-0.5 text-[13px] text-muted">
             Team directory and time-off requests. Approving leave needs a manager&apos;s approval.
           </p>
         </div>
@@ -146,14 +147,14 @@ export function TeamTab() {
           <button
             type="button"
             onClick={() => setShowNewLeave(true)}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-[13px] font-semibold text-stone-700 hover:bg-stone-50"
+            className={btnGhost}
           >
             <Plus size={14} /> Request leave
           </button>
           <button
             type="button"
             onClick={() => setShowNewMember(true)}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--brand-600)] px-3 py-1.5 text-[13px] font-semibold text-white hover:bg-[var(--brand-700)]"
+            className={btnPrimary}
           >
             <Plus size={14} /> New member
           </button>
@@ -161,13 +162,13 @@ export function TeamTab() {
       </div>
 
       {error && (
-        <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-700">
+        <div className={`${errorBoxCls} mb-3`}>
           {error}
         </div>
       )}
 
       {loading ? (
-        <div className="flex items-center gap-2 py-10 text-[13px] text-stone-500">
+        <div className="flex items-center gap-2 py-10 text-[13px] text-muted">
           <Loader2 size={16} className="animate-spin" /> Loading team…
         </div>
       ) : (
@@ -175,18 +176,18 @@ export function TeamTab() {
           {/* Members */}
           <div className="mb-4 flex flex-wrap items-center gap-2">
             <div className="relative">
-              <Search size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-stone-400" />
+              <Search size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-subtle" />
               <input
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
                 placeholder="Search team…"
-                className="w-56 rounded-lg border border-stone-300 bg-white py-1.5 pl-8 pr-2 text-[13px] text-stone-900 placeholder:text-stone-400 focus:border-[var(--brand-600)] focus:outline-none"
+                className={`${inputCls} w-56 pl-8`}
               />
             </div>
             <select
               value={status}
               onChange={(e) => setStatus(e.target.value as typeof status)}
-              className="rounded-lg border border-stone-300 bg-white px-2 py-1.5 text-[13px] text-stone-700 focus:border-[var(--brand-600)] focus:outline-none"
+              className={inputCls}
             >
               <option value="all">All members</option>
               <option value="active">Active</option>
@@ -195,14 +196,14 @@ export function TeamTab() {
           </div>
 
           {filteredMembers.length === 0 ? (
-            <div className="rounded-lg border border-stone-200 bg-stone-50 px-4 py-8 text-center">
-              <UserRound size={20} className="mx-auto text-stone-300" />
-              <p className="mt-2 text-[13px] font-semibold text-stone-700">No team members yet</p>
-              <p className="mt-0.5 text-[13px] text-stone-500">Add your first team member to build the directory.</p>
+            <div className="rounded-md border border-line bg-canvas px-4 py-8 text-center">
+              <UserRound size={20} className="mx-auto text-subtle" />
+              <p className="mt-2 text-[13px] font-semibold text-ink">No team members yet</p>
+              <p className="mt-0.5 text-[13px] text-muted">Add your first team member to build the directory.</p>
             </div>
           ) : (
-            <div className="overflow-x-auto rounded-lg border border-stone-200 bg-white">
-              <table className="crm-table w-full min-w-[680px]">
+            <div className={tableWrapCls}>
+              <table className={`${tableCls} min-w-[680px]`}>
                 <thead>
                   <tr>
                     <th>Name</th>
@@ -216,13 +217,13 @@ export function TeamTab() {
                   {filteredMembers.map((m) => {
                     const meta = MEMBER_STATUS_META[m.status] ?? MEMBER_STATUS_META.active!;
                     return (
-                      <tr key={m.id} className="hover:bg-[var(--brand-50)]/40">
-                        <td className="font-semibold text-stone-900">{m.name}</td>
-                        <td className="text-stone-700">{m.title ?? "—"}</td>
-                        <td className="text-stone-700">{m.email ?? "—"}</td>
-                        <td className="text-stone-700 tabular-nums">{fmtDate(m.startDate)}</td>
+                      <tr key={m.id} className={trClickableCls}>
+                        <td className="font-semibold text-ink">{m.name}</td>
+                        <td className="text-ink">{m.title ?? "—"}</td>
+                        <td className="text-ink">{m.email ?? "—"}</td>
+                        <td className="text-ink tabular-nums">{fmtDate(m.startDate)}</td>
                         <td>
-                          <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${meta.tint}`}>
+                          <span className={chipCls}>
                             {meta.label}
                           </span>
                         </td>
@@ -236,11 +237,11 @@ export function TeamTab() {
 
           {/* Leave requests */}
           <div className="mb-3 mt-8 flex flex-wrap items-center justify-between gap-2">
-            <h3 className="text-[15px] font-bold tracking-tight text-stone-900">Leave requests</h3>
+            <h3 className="text-[15px] font-bold tracking-tight text-ink">Leave requests</h3>
             <select
               value={leaveStatus}
               onChange={(e) => setLeaveStatus(e.target.value as typeof leaveStatus)}
-              className="rounded-lg border border-stone-300 bg-white px-2 py-1.5 text-[13px] text-stone-700 focus:border-[var(--brand-600)] focus:outline-none"
+              className={inputCls}
             >
               <option value="all">All requests</option>
               <option value="requested">Requested</option>
@@ -251,13 +252,13 @@ export function TeamTab() {
           </div>
 
           {leaves.length === 0 ? (
-            <div className="rounded-lg border border-stone-200 bg-stone-50 px-4 py-8 text-center">
-              <p className="text-[13px] font-semibold text-stone-700">No leave requests</p>
-              <p className="mt-0.5 text-[13px] text-stone-500">Requests appear here for manager approval.</p>
+            <div className="rounded-md border border-line bg-canvas px-4 py-8 text-center">
+              <p className="text-[13px] font-semibold text-ink">No leave requests</p>
+              <p className="mt-0.5 text-[13px] text-muted">Requests appear here for manager approval.</p>
             </div>
           ) : (
-            <div className="overflow-x-auto rounded-lg border border-stone-200 bg-white">
-              <table className="crm-table w-full min-w-[680px]">
+            <div className={tableWrapCls}>
+              <table className={`${tableCls} min-w-[680px]`}>
                 <thead>
                   <tr>
                     <th>Member</th>
@@ -270,14 +271,14 @@ export function TeamTab() {
                   {leaves.map((l) => {
                     const meta = LEAVE_STATUS_META[l.status] ?? LEAVE_STATUS_META.requested!;
                     return (
-                      <tr key={l.id} onClick={() => setSelectedLeaveId(l.id)} className="cursor-pointer hover:bg-[var(--brand-50)]/40">
-                        <td className="font-semibold text-stone-900">{memberLabel(l.memberId)}</td>
-                        <td className="text-stone-700">{LEAVE_TYPE_LABEL[l.type] ?? l.type}</td>
-                        <td className="text-stone-700 tabular-nums">
+                      <tr key={l.id} onClick={() => setSelectedLeaveId(l.id)} className={trClickableCls}>
+                        <td className="font-semibold text-ink">{memberLabel(l.memberId)}</td>
+                        <td className="text-ink">{LEAVE_TYPE_LABEL[l.type] ?? l.type}</td>
+                        <td className="text-ink tabular-nums">
                           {fmtDate(l.startDate)} → {fmtDate(l.endDate)}
                         </td>
                         <td>
-                          <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${meta.tint}`}>
+                          <span className={chipCls}>
                             {meta.label}
                           </span>
                         </td>

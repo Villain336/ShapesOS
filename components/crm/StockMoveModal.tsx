@@ -7,6 +7,7 @@
 import { useState } from "react";
 import { Loader2, X } from "lucide-react";
 import type { OpsProduct } from "./InventoryTab";
+import { backdropCls, btnGhost, btnPrimary, errorBoxCls, inputCls, labelCls, modalWrapCls, selectCls } from "./ui";
 
 type Reason = "sale" | "restock" | "adjustment";
 
@@ -63,24 +64,24 @@ export function StockMoveModal({
 
   return (
     <>
-      <div className="crm-backdrop" onClick={onClose} />
-      <div className="crm-modal">
-        <div className="flex items-start justify-between border-b border-stone-200 px-5 py-4">
-          <h3 className="text-lg font-bold tracking-tight text-stone-900">Record stock move</h3>
-          <button type="button" onClick={onClose} className="rounded-lg p-1.5 text-stone-400 hover:bg-stone-100" aria-label="Close">
+      <div className={backdropCls} onClick={onClose} />
+      <div className={modalWrapCls}>
+        <div className="flex items-start justify-between border-b border-line px-5 py-4">
+          <h3 className="text-lg font-bold tracking-tight text-ink">Record stock move</h3>
+          <button type="button" onClick={onClose} className="rounded-md p-1.5 text-subtle hover:bg-hover-paper hover:text-ink" aria-label="Close">
             <X size={18} />
           </button>
         </div>
         <div className="flex flex-col gap-3 px-5 py-4">
           {error && (
-            <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-700">
+            <div className={errorBoxCls}>
               {error}
             </div>
           )}
           {!fixedProduct && (
             <div>
-              <label className="mb-1 block text-[12px] font-semibold text-stone-600">Product</label>
-              <select className="crm-select w-full" value={productId} onChange={(e) => setProductId(e.target.value)}>
+              <label className={labelCls}>Product</label>
+              <select className={`${selectCls} w-full`} value={productId} onChange={(e) => setProductId(e.target.value)}>
                 {tracked.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.name} ({p.sku}) — {p.stockQty} in stock
@@ -91,33 +92,33 @@ export function StockMoveModal({
           )}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1 block text-[12px] font-semibold text-stone-600">Reason</label>
-              <select className="crm-select w-full" value={reason} onChange={(e) => setReason(e.target.value as Reason)}>
+              <label className={labelCls}>Reason</label>
+              <select className={`${selectCls} w-full`} value={reason} onChange={(e) => setReason(e.target.value as Reason)}>
                 <option value="restock">Restock (+)</option>
                 <option value="sale">Sale (−)</option>
                 <option value="adjustment">Adjustment (±)</option>
               </select>
             </div>
             <div>
-              <label className="mb-1 block text-[12px] font-semibold text-stone-600">
+              <label className={labelCls}>
                 Quantity{reason === "adjustment" ? " (signed)" : ""}
               </label>
-              <input className="crm-input w-full" type="number" step={1} value={qty} onChange={(e) => setQty(e.target.value)} />
+              <input className={`${inputCls} w-full`} type="number" step={1} value={qty} onChange={(e) => setQty(e.target.value)} />
             </div>
           </div>
           <div>
-            <label className="mb-1 block text-[12px] font-semibold text-stone-600">Note (optional)</label>
-            <input className="crm-input w-full" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Why is stock moving?" />
+            <label className={labelCls}>Note (optional)</label>
+            <input className={`${inputCls} w-full`} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Why is stock moving?" />
           </div>
           <div className="flex justify-end gap-2 pt-1">
-            <button type="button" onClick={onClose} className="rounded-lg border border-stone-300 bg-white px-3 py-[7px] text-[13px] font-semibold text-stone-700 hover:bg-stone-50">
+            <button type="button" onClick={onClose} className={btnGhost}>
               Cancel
             </button>
             <button
               type="button"
               disabled={busy}
               onClick={submit}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--brand-600)] px-3 py-[7px] text-[13px] font-semibold text-white hover:bg-[var(--brand-700)] disabled:opacity-50"
+              className={btnPrimary}
             >
               {busy && <Loader2 size={14} className="animate-spin" />} Record move
             </button>

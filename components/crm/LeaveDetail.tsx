@@ -14,6 +14,7 @@ import {
   type OpsLeaveRequest,
 } from "./TeamTab";
 import { OpsApprovalCard, decideOpsApproval, type OpsPendingGate } from "./OpsApprovalCard";
+import { backdropCls, btnGhost, btnPrimary, chipCls, errorBoxCls, noteBoxCls, slideoverCls } from "./ui";
 
 interface PendingLeave extends OpsPendingGate {
   toStatus: "approved";
@@ -117,36 +118,36 @@ export function LeaveDetail({
 
   return (
     <>
-      <div className="crm-backdrop" onClick={onClose} />
-      <div className="crm-slideover">
+      <div className={backdropCls} onClick={onClose} />
+      <div className={slideoverCls}>
         <div className="flex h-full flex-col">
-          <div className="flex items-start justify-between border-b border-stone-200 px-5 py-4">
+          <div className="flex items-start justify-between border-b border-line px-5 py-4">
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-lg font-bold tracking-tight text-stone-900">
+                <h3 className="text-lg font-bold tracking-tight text-ink">
                   {memberName} · leave
                 </h3>
-                <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${meta.tint}`}>
+                <span className={chipCls}>
                   {meta.label}
                 </span>
               </div>
-              <p className="mt-0.5 text-[13px] text-stone-500">
+              <p className="mt-0.5 text-[13px] text-muted">
                 {LEAVE_TYPE_LABEL[leave.type] ?? leave.type} · {fmtDate(leave.startDate)} → {fmtDate(leave.endDate)} · #{shortLeaveId(leave.id)}
               </p>
             </div>
-            <button type="button" onClick={onClose} className="rounded-lg p-1.5 text-stone-400 hover:bg-stone-100" aria-label="Close">
+            <button type="button" onClick={onClose} className="rounded-md p-1.5 text-subtle hover:bg-hover-paper hover:text-ink" aria-label="Close">
               <X size={18} />
             </button>
           </div>
 
           <div className="flex-1 overflow-y-auto px-5 py-4">
             {error && (
-              <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-700">
+              <div className={`${errorBoxCls} mb-3`}>
                 {error}
               </div>
             )}
             {note && (
-              <div className="mb-3 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-[13px] text-green-800">
+              <div className={`${noteBoxCls} mb-3`}>
                 {note}
               </div>
             )}
@@ -170,7 +171,7 @@ export function LeaveDetail({
                     type="button"
                     disabled={busy}
                     onClick={() => transition("approved")}
-                    className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--brand-600)] px-3 py-[7px] text-[13px] font-semibold text-white hover:bg-[var(--brand-700)] disabled:opacity-50"
+                    className={btnPrimary}
                   >
                     <Check size={14} /> Approve
                   </button>
@@ -178,7 +179,7 @@ export function LeaveDetail({
                     type="button"
                     disabled={busy}
                     onClick={() => transition("denied")}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-stone-300 bg-white px-3 py-[7px] text-[13px] font-semibold text-stone-700 hover:bg-stone-50 disabled:opacity-50"
+                    className={btnGhost}
                   >
                     <Ban size={14} /> Deny
                   </button>
@@ -189,23 +190,23 @@ export function LeaveDetail({
                   type="button"
                   disabled={busy}
                   onClick={() => transition("taken")}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-stone-300 bg-white px-3 py-[7px] text-[13px] font-semibold text-stone-700 hover:bg-stone-50 disabled:opacity-50"
+                  className={btnGhost}
                 >
                   {busy ? <Loader2 size={14} className="animate-spin" /> : <Undo2 size={14} />} Mark taken
                 </button>
               )}
               {(leave.status === "denied" || leave.status === "taken") && (
-                <p className="text-[13px] text-stone-500">This request is closed — no further transitions.</p>
+                <p className="text-[13px] text-muted">This request is closed — no further transitions.</p>
               )}
             </div>
 
-            <div className="rounded-lg border border-stone-200 bg-stone-50 px-3 py-2.5 text-[13px] text-stone-600">
+            <div className="rounded-md border border-line bg-canvas px-3 py-2.5 text-[13px] text-muted">
               <p>
                 Approving goes to a manager&apos;s approval (Phase 14 gate) and records who decided
                 and when. Denying and marking taken apply immediately.
               </p>
               {leave.decidedAt && (
-                <p className="mt-1 text-stone-500">Decided {fmtDate(leave.decidedAt)}.</p>
+                <p className="mt-1 text-muted">Decided {fmtDate(leave.decidedAt)}.</p>
               )}
             </div>
           </div>
