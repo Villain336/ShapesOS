@@ -586,6 +586,10 @@ model Workspace {
   composioCatalogDrift    ComposioCatalogDrift[]
   // Wave 2 context.dev slice 1: daily credit-budget back-relation.
   contextDevBudgets       ContextDevBudget[]
+  // Wave 2 context.dev slice 2: knowledge back-relations.
+  knowledgeSources        KnowledgeSource[]
+  crawlJobs               CrawlJob[]
+  knowledgeChunks         KnowledgeChunk[]
   // Phase 15 slice 3: per-workspace toolkit enablement back-relation.
   workspaceToolkits       WorkspaceToolkit[]
   // Phase 15 slice 4: per-workspace Composio call budget back-relation.
@@ -9435,4 +9439,84 @@ model ContextDevBudget {
   @@unique([workspaceId, day])
   @@index([workspaceId])
   @@map("context_dev_budgets")
+}
+
+// ── Wave 2 context.dev: knowledge sources, crawl jobs, chunks (slice 2) ─────
+// KnowledgeSource: a registered external source. Own domains (workspace
+// Project domains) auto-activate; third-party domains sit at pending_approval
+// until a tenant approves them once per domain (add_source governed action).
+// CrawlJob: one batch crawl/map execution. KnowledgeChunk: append-only
+// provenance ledger — every chunk records source URL + fetch time so "what
+// did the agent know and when" stays answerable. RAG attach reads this table.
+model KnowledgeSource {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  url String
+  // page | sitemap | brand
+  sourceType String @map("source_type")
+  // manual | daily | weekly
+  cadence String @default("manual")
+  // active | pending_approval | archived
+  status String @default("pending_approval")
+  // Lowercased registrable domain, for the one-time-per-domain approval rule.
+  domain String
+
+  jobs   CrawlJob[]
+  chunks KnowledgeChunk[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([workspaceId, status])
+  @@index([workspaceId, domain])
+  @@map("knowledge_sources")
+}
+
+model CrawlJob {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  sourceId    String    @map("source_id")
+  source      KnowledgeSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+
+  // queued | running | complete | failed
+  status       String  @default("queued")
+  pagesFetched Int     @default(0) @map("pages_fetched")
+  creditsUsed  Int     @default(0) @map("credits_used")
+  error        String?
+
+  startedAt   DateTime? @map("started_at")
+  completedAt DateTime? @map("completed_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  chunks KnowledgeChunk[]
+
+  @@index([workspaceId, status])
+  @@index([sourceId])
+  @@map("crawl_jobs")
+}
+
+model KnowledgeChunk {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  jobId       String    @map("job_id")
+  job         CrawlJob  @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  sourceId    String    @map("source_id")
+  source      KnowledgeSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+
+  sourceUrl   String   @map("source_url")
+  fetchedAt   DateTime @map("fetched_at")
+  // 1-based chunk ordinal within the page.
+  ord         Int
+  contentHash String   @map("content_hash")
+  markdown    String
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([workspaceId, sourceId])
+  @@index([jobId])
+  @@map("knowledge_chunks")
 }
