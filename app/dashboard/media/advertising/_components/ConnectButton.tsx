@@ -7,7 +7,7 @@
 "use client";
 
 import { useState } from "react";
-import { KeyRound, ListChecks, Loader2, PlugZap } from "lucide-react";
+import { Clock, KeyRound, Loader2, PlugZap } from "lucide-react";
 
 function StackAdaptKeyForm() {
   const [open, setOpen] = useState(false);
@@ -118,27 +118,18 @@ export default function ConnectButton({
   if (platformKey === "stackadapt") {
     return <StackAdaptKeyForm />;
   }
-  if (platformKey === "spotify") {
+  if (platformKey === "spotify" || platformKey === "walmart") {
+    // Tico 2026-09-30: both ship as "coming soon" in the hub — the guided
+    // flows stay in the codebase, staged behind this badge until launch.
+    const label = platformKey === "spotify" ? "Spotify" : "Walmart Connect";
     return (
-      <span className="inline-flex items-center gap-1 text-[12px] text-stone-500" title="Spotify has no campaign API — the guided setup flow lands in slice 5">
-        <ListChecks className="h-3.5 w-3.5" />
-        Guided in slice 5
-      </span>
-    );
-  }
-  if (platformKey === "walmart") {
-    // Outcome B (slice 4): no advertiser OAuth exists — partner-level auth
-    // only, after a business application. The guided setup flow is the
-    // product; never a dead OAuth button.
-    return (
-      <a
-        href="/dashboard/media/advertising/guided/walmart"
-        className="inline-flex items-center gap-1.5 rounded-md bg-[var(--brand-600)] px-3 py-1.5 text-[12px] font-medium text-white hover:bg-[var(--brand-700)]"
-        title="Walmart Connect is guided-only: launch in Walmart Ad Center, track spend via CSV import"
+      <span
+        className="inline-flex items-center gap-1 rounded-full border border-stone-200 bg-stone-50 px-2.5 py-1 text-[12px] font-medium text-stone-500"
+        title={`${label} is coming soon`}
       >
-        <ListChecks className="h-3.5 w-3.5" />
-        Guided setup
-      </a>
+        <Clock className="h-3.5 w-3.5" />
+        Coming soon
+      </span>
     );
   }
 
