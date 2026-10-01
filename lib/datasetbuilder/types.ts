@@ -238,6 +238,24 @@ export interface DatasetBuilderStore {
   listDatasetVersionChunks(
     versionId: string,
   ): Promise<DatasetVersionChunkRecord[]>;
+
+  // ---- Slice 4: activate ----------------------------------------------
+  /**
+   * Records that a dataset version was published to a consumer target.
+   * The (datasetId, target, version) triple is unique: republishing the
+   * same version to the same target returns the existing record
+   * (idempotent), so a double-clicked "publish" can never double-write;
+   * publishing a newer version writes a new record, so "what is live
+   * where" stays auditable.
+   */
+  createPublishRecord(
+    input: DatasetPublishInput,
+  ): Promise<DatasetPublishRecord>;
+  getLatestPublishRecord(
+    datasetId: string,
+    target: PublishTarget,
+  ): Promise<DatasetPublishRecord | null>;
+  listPublishRecords(datasetId: string): Promise<DatasetPublishRecord[]>;
 }
 
 export type DatasetBuilderErrorCode =
@@ -260,7 +278,11 @@ export type DatasetBuilderErrorCode =
   | "UNKNOWN_DATASET_VERSION"
   | "DATASET_VERSION_EXISTS"
   | "COMPILE_EMPTY"
-  | "LINEAGE_BROKEN";
+  | "LINEAGE_BROKEN"
+  | "NO_VERSION_TO_PUBLISH"
+  | "INVALID_PUBLISH_TARGET"
+  | "PUBLISH_RECORD_EXISTS"
+  | "ADAPTER_WRITE_FAILED";
 
 export class DatasetBuilderError extends Error {
   readonly code: DatasetBuilderErrorCode;
@@ -350,4 +372,82 @@ export interface DatasetVersionChunkRecord
   extends DatasetVersionChunkInput {
   id: string;
   compiledAt: Date;
+}
+
+// ---- Slice 4: activate --------------------------------------------------
+
+/**
+ * Where a dataset version can be published. "briefnow" ships the version
+ * as a BriefNow data-adapter package (the parameterized FastMCP
+ * connector's real business-data adapter); "rag" pins the version as the
+ * live snapshot the OS RAG/Feed layer grounds answers in.
+ */
+export type PublishTarget = "briefnow" | "rag";
+
+export const PUBLISH_TARGETS: PublishTarget[] = ["briefnow", "rag"];
+
+export function parsePublishTarget(
+  value: unknown,
+): asserts value is PublishTarget {
+  if (value !== "briefnow" && value !== "rag") {
+    throw new DatasetBuilderError(
+      "INVALID_PUBLISH_TARGET",
+      `publish target must be one of ${PUBLISH_TARGETS.join(", ")}`,
+    );
+  }
+}
+
+/** Which compiled version is live on a target, and what was shipped. */
+export interface DatasetPublishInput {
+  workspaceId: string;
+  datasetId: string;
+  target: PublishTarget;
+  /** Pinned compiled version number (monotonic v1, v2, …). */
+  version: number;
+  /** The pinned DatasetVersion id. */
+  versionId: string;
+  chunkCount: number;
+  /**
+   * Where the artifact landed: briefnow → adapter package path;
+   * rag → snapshot pointer (rag://workspace/type/vN).
+   */
+  artifactRef: string;
+}
+
+export interface DatasetPublishRecord extends DatasetPublishInput {
+  id: string;
+  publishedAt: Date;
+}
+
+/**
+ * Contract for the briefnow-dataset-adapter/v1 package the BriefNow
+ * connector's `answer_question` tool (and future data-adapter loaders)
+ * reads. Every entry carries the full Source → Document → Chunk chain so
+ * a consumer can always show where an answer came from.
+ */
+export interface BriefNowAdapterEntry {
+  chunkId: string;
+  documentId: string;
+  documentName: string;
+  sourceId: string;
+  sourceName: string;
+  datasetType: DatasetType;
+  datasetVersion: number;
+  text: string;
+  classification: {
+    engine: string;
+    engineVersion: string;
+    confidence: number;
+  };
+  compiledAt: string;
+}
+
+export interface BriefNowAdapterPackage {
+  contract: "briefnow-dataset-adapter/v1";
+  workspaceId: string;
+  datasetType: string;
+  datasetVersion: number;
+  chunkCount: number;
+  publishedAt: string;
+  entries: BriefNowAdapterEntry[];
 }

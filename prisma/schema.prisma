@@ -762,6 +762,8 @@ model Workspace {
   datasets               Dataset[]
   datasetVersions        DatasetVersion[]
   datasetVersionChunks   DatasetVersionChunk[]
+  // Dataset Builder slice 4: Activate.
+  datasetPublishes       DatasetPublish[]
   insurancePaymentHandoffs InsurancePaymentHandoff[]
   insuranceCertificates     InsuranceCertificate[]
   // Phase 12 (embeds): tenant-scoped GrowthBook flag overrides.
@@ -10812,6 +10814,9 @@ model Dataset {
 
   versions DatasetVersion[]
 
+  // Slice 4: publish records — which version is live on which target.
+  publishes DatasetPublish[]
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -10867,4 +10872,29 @@ model DatasetVersionChunk {
   @@unique([versionId, chunkId])
   @@index([workspaceId, versionId])
   @@map("dataset_version_chunks")
+}
+
+model DatasetPublish {
+  id          String   @id @default(cuid())
+  workspaceId String   @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  datasetId String  @map("dataset_id")
+  dataset   Dataset @relation(fields: [datasetId], references: [id], onDelete: Cascade)
+
+  // Publish target: "briefnow" | "rag".
+  target String
+  // Pinned compiled version number (monotonic v1, v2, …).
+  version Int
+  versionId String @map("version_id")
+  chunkCount Int @map("chunk_count")
+  // briefnow → adapter package path; rag → snapshot pointer
+  // (rag://workspace/type/vN).
+  artifactRef String @map("artifact_ref")
+
+  publishedAt DateTime @default(now()) @map("published_at")
+
+  @@unique([datasetId, target, version])
+  @@index([workspaceId, datasetId, target])
+  @@map("dataset_publishes")
 }

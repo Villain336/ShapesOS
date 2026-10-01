@@ -139,3 +139,40 @@ health panel.
   (coverage, freshness, staleness alerts), per-type dataset cards with
   Compile / JSONL / Parquet actions, and expandable version history with
   lineage (sources + models).
+
+## Slice 4: Activate (built)
+
+One-click publish of compiled dataset versions into two consumers:
+
+- **BriefNow connector** (`briefnow` target) — writes a
+  `briefnow-dataset-adapter/v1` package (every entry carries the full
+  Source → Document → Chunk chain + engine lineage) into the connector's
+  dataset-adapters area via an injectable `AdapterWriter` (filesystem in
+  prod, in-memory in tests). This is the Marketr side of the "real
+  business-data adapters" gap in the BriefNow roadmap: the parameterized
+  FastMCP connector's `answer_question` tool can read the adapter as an
+  extra knowledge corpus. Default root: `../briefnow/runtime/dataset-adapters`
+  (sibling workspace), overridable with `BRIEFNOW_ADAPTERS_ROOT`.
+- **OS RAG/Feed layer** (`rag` target) — pins the version as the live
+  snapshot. `askDataset` answers strictly from that snapshot:
+  deterministic token-overlap retrieval (mirrors the connector's
+  scoring, with a stopword filter), price-intent boost on pricing
+  datasets, top-3 citations. When nothing matches it refuses to guess
+  (`grounded: false`, zero citations) — zero ungrounded content.
+
+Invariants: publish requires a compiled version (`NO_VERSION_TO_PUBLISH`);
+`resolveVersionEntries` throws `LINEAGE_BROKEN` on any dangling
+chunk/document/source/classification pointer; republishing the same
+version+target is idempotent (unique `(dataset_id, target, version)`,
+upsert in Postgres, find-first in memory).
+
+- API: `POST /api/datasets/[id]/publish` (`{ targets: ["briefnow","rag"] }`),
+  `GET /api/datasets/[id]/publish-status` (per-target live version,
+  published-at, artifact ref, `stale` when a newer compile waits),
+  `POST /api/datasets/[id]/ask` (`{ question }` → grounded answer + citations).
+- UI: `/dashboard/datasets` gains an **Activate** tab — per-dataset
+  publish cards (publish/republish per target, stale indicators, artifact
+  refs in mono) plus an "Ask your data" test panel showing answers with
+  Source → Document → Chunk citation breadcrumbs.
+- DB: migration `20261001180000_dataset_builder_slice4` adds
+  `dataset_publishes` (unique `(dataset_id, target, version)`, cascade deletes).

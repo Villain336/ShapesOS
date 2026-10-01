@@ -17,14 +17,16 @@ import {
   ListChecks,
   Loader2,
   Plus,
+  Rocket,
   ShieldCheck,
   Tags,
   TriangleAlert,
   type LucideIcon,
 } from "lucide-react";
+import { ActivateView } from "./ActivateView";
 import { BuildView } from "./BuildView";
 
-type DatasetsTab = "sources" | "types" | "reviews" | "build";
+type DatasetsTab = "sources" | "types" | "reviews" | "build" | "activate";
 
 type SourceKind = "upload" | "drive" | "web" | "paste";
 
@@ -145,6 +147,7 @@ export function DatasetsApp() {
             { id: "sources", label: "Sources", icon: Globe, badge: null },
             { id: "types", label: "By type", icon: Tags, badge: null },
             { id: "build", label: "Build", icon: Database, badge: null },
+            { id: "activate", label: "Activate", icon: Rocket, badge: null },
             {
               id: "reviews",
               label: "Review queue",
@@ -296,6 +299,7 @@ export function DatasetsApp() {
       {tab === "types" && <ByTypeView onClassified={() => void refresh()} />}
 
       {tab === "build" && <BuildView />}
+      {tab === "activate" && <ActivateView />}
 
       {tab === "reviews" && (
         <ReviewQueueView onDecided={() => void refresh()} />

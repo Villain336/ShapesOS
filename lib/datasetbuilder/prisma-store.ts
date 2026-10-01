@@ -14,8 +14,10 @@ import {
   type DatasetChunkRecord,
   type DatasetDocumentInput,
   type DatasetDocumentRecord,
+  type DatasetPublishInput,
+  type DatasetPublishRecord,
   type DatasetRecord,
-  type DatasetSourceInput,
+  type PublishTarget,  type DatasetSourceInput,
   type DatasetSourceRecord,
   type DatasetSourceKind,
   type DatasetType,
@@ -831,5 +833,103 @@ export class PrismaDatasetBuilderStore implements DatasetBuilderStore {
       where: { versionId },
     });
     return rows.map((r) => this.toVersionChunk(r));
+  }
+
+  // ---- Slice 4: activate ----------------------------------------------
+
+  private toDatasetPublish(r: {
+    id: string;
+    workspaceId: string;
+    datasetId: string;
+    target: string;
+    version: number;
+    versionId: string;
+    chunkCount: number;
+    artifactRef: string;
+    publishedAt: Date;
+  }): DatasetPublishRecord {
+    return {
+      id: r.id,
+      workspaceId: r.workspaceId,
+      datasetId: r.datasetId,
+      target: r.target as PublishTarget,
+      version: r.version,
+      versionId: r.versionId,
+      chunkCount: r.chunkCount,
+      artifactRef: r.artifactRef,
+      publishedAt: r.publishedAt,
+    };
+  }
+
+  async createPublishRecord(
+    input: DatasetPublishInput,
+  ): Promise<DatasetPublishRecord> {
+    if (!Number.isInteger(input.version) || input.version < 1) {
+      throw new DatasetBuilderError(
+        "VALIDATION_FAILED",
+        "publish version must be a positive integer",
+      );
+    }
+    try {
+      // Idempotent on (datasetId, target, version): upsert returns the
+      // existing row instead of duplicating it.
+      const r = await this.db.datasetPublish.upsert({
+        where: {
+          datasetId_target_version: {
+            datasetId: input.datasetId,
+            target: input.target,
+            version: input.version,
+          },
+        },
+        update: {},
+        create: {
+          workspaceId: input.workspaceId,
+          datasetId: input.datasetId,
+          target: input.target,
+          version: input.version,
+          versionId: input.versionId,
+          chunkCount: input.chunkCount,
+          artifactRef: input.artifactRef,
+        },
+      });
+      return this.toDatasetPublish(r);
+    } catch {
+      // FK to a missing dataset → UNKNOWN_DATASET.
+      const dataset = await this.db.dataset.findUnique({
+        where: { id: input.datasetId },
+        select: { id: true },
+      });
+      if (!dataset) {
+        throw new DatasetBuilderError(
+          "UNKNOWN_DATASET",
+          `cannot publish: dataset "${input.datasetId}" does not exist`,
+        );
+      }
+      throw new DatasetBuilderError(
+        "PUBLISH_RECORD_EXISTS",
+        `dataset "${input.datasetId}" already published version ${input.version} to "${input.target}"`,
+      );
+    }
+  }
+
+  async getLatestPublishRecord(
+    datasetId: string,
+    target: PublishTarget,
+  ): Promise<DatasetPublishRecord | null> {
+    const r = await this.db.datasetPublish.findFirst({
+      where: { datasetId, target },
+      orderBy: { version: "desc" },
+    });
+    return r ? this.toDatasetPublish(r) : null;
+  }
+
+  async listPublishRecords(
+    datasetId: string,
+  ): Promise<DatasetPublishRecord[]> {
+    const rows = await this.db.datasetPublish.findMany({
+      where: { datasetId },
+      orderBy: { version: "desc" },
+    });
+    return rows.map((r) => this.toDatasetPublish(r));
   }
 }

@@ -13,7 +13,10 @@ import {
   type DatasetChunkRecord,
   type DatasetDocumentInput,
   type DatasetDocumentRecord,
+  type DatasetPublishInput,
+  type DatasetPublishRecord,
   type DatasetRecord,
+  type PublishTarget,
   type DatasetSourceInput,
   type DatasetSourceRecord,
   type DatasetType,
@@ -46,6 +49,7 @@ export class InMemoryDatasetBuilderStore implements DatasetBuilderStore {
   private datasets = new Map<string, DatasetRecord>();
   private versions = new Map<string, DatasetVersionRecord>();
   private versionChunks = new Map<string, DatasetVersionChunkRecord>();
+  private publishRecords = new Map<string, DatasetPublishRecord>();
 
   async createSource(input: DatasetSourceInput): Promise<DatasetSourceRecord> {
     const record: DatasetSourceRecord = {
@@ -555,5 +559,65 @@ export class InMemoryDatasetBuilderStore implements DatasetBuilderStore {
     return [...this.versionChunks.values()].filter(
       (r) => r.versionId === versionId,
     );
+  }
+
+  // ---- Slice 4: activate ----------------------------------------------
+
+  async createPublishRecord(
+    input: DatasetPublishInput,
+  ): Promise<DatasetPublishRecord> {
+    if (!this.datasets.has(input.datasetId)) {
+      throw new DatasetBuilderError(
+        "UNKNOWN_DATASET",
+        `cannot publish: dataset "${input.datasetId}" does not exist`,
+      );
+    }
+    if (!Number.isInteger(input.version) || input.version < 1) {
+      throw new DatasetBuilderError(
+        "VALIDATION_FAILED",
+        "publish version must be a positive integer",
+      );
+    }
+    // Idempotent: republishing the same version to the same target
+    // returns the existing record, never a duplicate.
+    const existing = [...this.publishRecords.values()].find(
+      (r) =>
+        r.datasetId === input.datasetId &&
+        r.target === input.target &&
+        r.version === input.version,
+    );
+    if (existing) return existing;
+    const record: DatasetPublishRecord = {
+      id: newId("dspub"),
+      workspaceId: input.workspaceId,
+      datasetId: input.datasetId,
+      target: input.target,
+      version: input.version,
+      versionId: input.versionId,
+      chunkCount: input.chunkCount,
+      artifactRef: input.artifactRef,
+      publishedAt: new Date(),
+    };
+    this.publishRecords.set(record.id, record);
+    return record;
+  }
+
+  async getLatestPublishRecord(
+    datasetId: string,
+    target: PublishTarget,
+  ): Promise<DatasetPublishRecord | null> {
+    const rows = [...this.publishRecords.values()].filter(
+      (r) => r.datasetId === datasetId && r.target === target,
+    );
+    if (rows.length === 0) return null;
+    return rows.reduce((a, b) => (b.version > a.version ? b : a));
+  }
+
+  async listPublishRecords(
+    datasetId: string,
+  ): Promise<DatasetPublishRecord[]> {
+    return [...this.publishRecords.values()]
+      .filter((r) => r.datasetId === datasetId)
+      .sort((a, b) => b.version - a.version);
   }
 }
