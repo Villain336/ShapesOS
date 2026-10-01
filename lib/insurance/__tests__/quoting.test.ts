@@ -194,10 +194,10 @@ describe("CoverForce adapter gates", () => {
 
 describe("thin MCP shim", () => {
   const ctx = { workspaceId: "ws-1", actor: "user-1" };
-  it("exposes exactly four tools", () => {
+  it("exposes exactly six tools", () => {
     assert.deepEqual(
       INSURANCE_SHIM_TOOLS.map((t) => t.name).sort(),
-      ["insurance_bind_policy", "insurance_check_appetite", "insurance_get_quotes", "insurance_submit_risk"],
+      ["insurance_bind_policy", "insurance_check_appetite", "insurance_get_quotes", "insurance_issue_certificate", "insurance_prepare_certificate", "insurance_submit_risk"],
     );
   });
   it("throws a named error for unknown tools", () => {

@@ -753,6 +753,7 @@ model Workspace {
   insuranceAuditEvents    InsuranceAuditEvent[]
   insuranceQuoteRules     InsuranceQuoteRule[]
   insurancePaymentHandoffs InsurancePaymentHandoff[]
+  insuranceCertificates     InsuranceCertificate[]
   // Phase 12 (embeds): tenant-scoped GrowthBook flag overrides.
   flagOverrides           WorkspaceFlagOverride[]
   eddmOrders              EddmOrder[]
@@ -10323,6 +10324,65 @@ model InsurancePolicy {
   @@index([workspaceId, status])
   @@index([workspaceId, expiresAt])
   @@map("insurance_policies")
+
+  // Slice 5: certificates issued from this policy.
+  certificates InsuranceCertificate[]
+}
+
+// A certificate of insurance (ACORD 25 style). SPEC-INSURANCE.md §4.1, §4.3,
+// §5: COIs render ONLY from the in-force issuing policy's truth — the agent
+// prepares a draft, the human reviews (issue_certificate governed action),
+// and the PDF artifact is generated at issue time from the verified payload.
+// Never from drafts or quotes; unverified fields render "not confirmed".
+enum InsuranceCertificateStatus {
+  draft
+  issued
+  revoked
+}
+
+model InsuranceCertificate {
+  id          String   @id @default(cuid())
+  workspaceId String   @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  policyId    String   @map("policy_id")
+  policy      InsurancePolicy @relation(fields: [policyId], references: [id], onDelete: Restrict)
+
+  holderName    String  @map("holder_name")
+  holderAddress String? @map("holder_address")
+  additionalInsured   Boolean @default(false) @map("additional_insured")
+  waiverOfSubrogation Boolean @default(false) @map("waiver_of_subrogation")
+  operationsDescription String? @map("operations_description")
+
+  issueDate DateTime @map("issue_date")
+  validFrom DateTime @map("valid_from")
+  validTo   DateTime @map("valid_to")
+
+  // PDF artifact, stored like the e-sign sealed evidence (Bytes + sha256).
+  pdfBytes Bytes? @map("pdf_bytes")
+  pdfHash  String? @map("pdf_hash")
+
+  status InsuranceCertificateStatus @default(draft)
+
+  requestedBy String? @map("requested_by")
+  // Contract / client reference that asked for this certificate (holder-request
+  // tracking links back to the requesting contract or client record).
+  requestedFor String? @map("requested_for")
+
+  issuedBy String?   @map("issued_by")
+  issuedAt DateTime? @map("issued_at")
+
+  // The issue_certificate governed approval proposed at prepare time.
+  approvalId String? @map("approval_id")
+
+  revokedReason String? @map("revoked_reason")
+  revokedAt     DateTime? @map("revoked_at")
+  revokedBy     String?   @map("revoked_by")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([workspaceId, status])
+  @@map("insurance_certificates")
 }
 
 // A policy coming due. Auto-renewals are detected and surfaced — never

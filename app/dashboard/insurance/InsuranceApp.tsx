@@ -20,6 +20,7 @@ import {
   Plus,
   RefreshCw,
   RotateCcw,
+  ScrollText,
   ShieldCheck,
   Stamp,
   X,
@@ -111,7 +112,7 @@ interface PolicyRow {
   alertLevel: RenewalAlertLevel;
 }
 
-type Tab = "policies" | "renewals" | "quoting" | "import" | "partners" | "approvals";
+type Tab = "policies" | "renewals" | "quoting" | "import" | "partners" | "approvals" | "certificates";
 
 interface QuoteRow {
   id: string;
@@ -295,6 +296,118 @@ function fmtTermsValue(v: unknown): string {
   if (typeof v === "number" && Number.isInteger(v) && v >= 1000) return fmtMoney(v);
   if (typeof v === "string" && /^\d{4}-\d{2}-\d{2}/.test(v)) return fmtDate(v);
   return String(v);
+}
+
+// ── Slice 5: certificates (COI pipeline) ────────────────────────────────────
+
+type CertificateStatus = "draft" | "issued" | "revoked";
+
+interface CertificateRow {
+  id: string;
+  policyId: string;
+  policyNumber: string | null;
+  carrierName: string | null;
+  lineLabel: string | null;
+  holderName: string;
+  holderAddress: string | null;
+  additionalInsured: boolean;
+  waiverOfSubrogation: boolean;
+  operationsDescription: string | null;
+  issueDate: string;
+  validFrom: string;
+  validTo: string;
+  status: CertificateStatus;
+  requestedBy: string | null;
+  requestedFor: string | null;
+  issuedBy: string | null;
+  issuedAt: string | null;
+  approvalId: string | null;
+  approvalStatus: string | null;
+  approvalPayload: Record<string, unknown> | null;
+  pdfHash: string | null;
+  revokedReason: string | null;
+  revokedBy: string | null;
+}
+
+/**
+ * The rendered certificate data a human reviews before approving: policy
+ * truth on one side, the holder/endorsement input on the other. Unverified
+ * fields read "not confirmed" — coverage is never invented.
+ */
+function CertificateReview({ payload }: { payload: Record<string, unknown> }) {
+  const truth: Array<[string, unknown]> = [
+    ["Policy number", payload.policyNumber],
+    ["Carrier", payload.carrier],
+    ["Named insured", payload.namedInsured],
+    ["Line", payload.lineLabel],
+    ["Per-occurrence limit", payload.limitPerOccurrenceCents],
+    ["Aggregate limit", payload.limitAggregateCents],
+    ["Deductible", payload.deductibleCents],
+    ["Policy effective", payload.effectiveDate],
+    ["Policy expiry", payload.expiryDate],
+  ];
+  const cert: Array<[string, unknown]> = [
+    ["Holder", payload.holderName],
+    ["Holder address", payload.holderAddress],
+    ["Additional insured", payload.additionalInsured === true ? "YES" : payload.additionalInsured === false ? "NO" : null],
+    ["Waiver of subrogation", payload.waiverOfSubrogation === true ? "YES" : payload.waiverOfSubrogation === false ? "NO" : null],
+    ["Operations", payload.operationsDescription],
+    ["Issue date", payload.issueDate],
+    ["Valid from", payload.validFrom],
+    ["Valid to", payload.validTo],
+    ["Requested by", payload.requestedBy],
+    ["Requested for", payload.requestedFor],
+  ];
+  return (
+    <div className="grid gap-4 md:grid-cols-2">
+      <div>
+        <h3 className="text-[12px] font-semibold uppercase tracking-wide text-stone-500">
+          Policy truth — rendered from the in-force policy
+        </h3>
+        <dl className="mt-2 space-y-1.5 text-[13px]">
+          {truth.map(([k, v]) => (
+            <div key={k} className="flex justify-between gap-3 border-b border-stone-200/70 pb-1">
+              <dt className="text-stone-500">{k}</dt>
+              <dd className={`font-medium ${v == null ? "text-stone-400" : "text-stone-900"}`}>
+                {fmtTermsValue(v)}
+              </dd>
+            </div>
+          ))}
+        </dl>
+      </div>
+      <div>
+        <h3 className="text-[12px] font-semibold uppercase tracking-wide text-stone-500">
+          Certificate — the reviewed input
+        </h3>
+        <dl className="mt-2 space-y-1.5 text-[13px]">
+          {cert.map(([k, v]) => (
+            <div key={k} className="flex justify-between gap-3 border-b border-stone-200/70 pb-1">
+              <dt className="text-stone-500">{k}</dt>
+              <dd className={`font-medium ${v == null ? "text-stone-400" : "text-stone-900"}`}>
+                {fmtTermsValue(v)}
+              </dd>
+            </div>
+          ))}
+        </dl>
+      </div>
+    </div>
+  );
+}
+
+function certStatusTone(c: CertificateRow): "slate" | "violet" | "green" | "amber" | "red" | "blue" {
+  if (c.status === "issued") return "green";
+  if (c.status === "revoked") return "red";
+  if (c.approvalStatus === "approved") return "blue";
+  if (c.approvalStatus === "pending") return "amber";
+  return "slate";
+}
+
+function certStatusLabel(c: CertificateRow): string {
+  if (c.status === "issued") return "Issued";
+  if (c.status === "revoked") return "Revoked";
+  if (c.approvalStatus === "approved") return "Approved — ready to issue";
+  if (c.approvalStatus === "pending") return "Pending review";
+  return "Draft";
 }
 
 // ── Component ────────────────────────────────────────────────────────────────
@@ -796,13 +909,195 @@ export function InsuranceApp() {
     [renewalRows, loadRenewals],
   );
 
+  // ── Certificates tab (slice 5: COI pipeline) ─────────────────────────────
+  const [certs, setCerts] = useState<CertificateRow[]>([]);
+  const [certsLoading, setCertsLoading] = useState(false);
+  const [certError, setCertError] = useState<string | null>(null);
+  const [certNotice, setCertNotice] = useState<string | null>(null);
+  const [showPrepare, setShowPrepare] = useState(false);
+  const [preparing, setPreparing] = useState(false);
+  const [prepareError, setPrepareError] = useState<string | null>(null);
+  const [prep, setPrep] = useState({
+    policyId: "",
+    holderName: "",
+    holderAddress: "",
+    additionalInsured: false,
+    waiverOfSubrogation: false,
+    operationsDescription: "",
+    requestedFor: "",
+  });
+  const [certExpandedId, setCertExpandedId] = useState<string | null>(null);
+  const [certDecidingId, setCertDecidingId] = useState<string | null>(null);
+  const [certNote, setCertNote] = useState("");
+  const [issuingId, setIssuingId] = useState<string | null>(null);
+  const [revokeFormId, setRevokeFormId] = useState<string | null>(null);
+  const [revokeReason, setRevokeReason] = useState("");
+
+  const loadCerts = useCallback(async () => {
+    setCertsLoading(true);
+    setCertError(null);
+    try {
+      const res = await fetch("/api/insurance/certificates");
+      if (!res.ok) throw new Error(`Load failed (${res.status})`);
+      const data = await res.json();
+      setCerts(data.certificates ?? []);
+    } catch (e) {
+      setCertError(e instanceof Error ? e.message : "Load failed");
+    } finally {
+      setCertsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (tab === "certificates") void loadCerts();
+  }, [tab, loadCerts]);
+
+  const inForcePolicies = useMemo(
+    () => policies.filter((p) => p.status === "active"),
+    [policies],
+  );
+
+  const handlePrepare = useCallback(async () => {
+    setPreparing(true);
+    setPrepareError(null);
+    setCertNotice(null);
+    try {
+      const res = await fetch("/api/insurance/certificates", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          policyId: prep.policyId,
+          holderName: prep.holderName,
+          holderAddress: prep.holderAddress.trim() ? prep.holderAddress.trim() : null,
+          additionalInsured: prep.additionalInsured,
+          waiverOfSubrogation: prep.waiverOfSubrogation,
+          operationsDescription: prep.operationsDescription.trim()
+            ? prep.operationsDescription.trim()
+            : null,
+          requestedFor: prep.requestedFor.trim() ? prep.requestedFor.trim() : undefined,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        const hint =
+          data.code === "CERT_POLICY_NOT_INFORCE"
+            ? " Pick an in-force policy — only policies with verified limits can issue certificates."
+            : "";
+        throw new Error(`${data.error ?? `Prepare failed (${res.status})`}${hint}`);
+      }
+      setPrep({
+        policyId: "",
+        holderName: "",
+        holderAddress: "",
+        additionalInsured: false,
+        waiverOfSubrogation: false,
+        operationsDescription: "",
+        requestedFor: "",
+      });
+      setShowPrepare(false);
+      await loadCerts();
+      setCertNotice(
+        "Draft prepared from policy truth and sent for review — approve it below (or in the Approvals tab) before issuing.",
+      );
+    } catch (e) {
+      setPrepareError(e instanceof Error ? e.message : "Prepare failed");
+    } finally {
+      setPreparing(false);
+    }
+  }, [prep, loadCerts]);
+
+  const handleCertDecide = useCallback(
+    async (cert: CertificateRow, decision: "approve" | "reject") => {
+      if (!cert.approvalId) return;
+      setCertDecidingId(cert.id);
+      setCertError(null);
+      try {
+        const res = await fetch(`/api/insurance/governance/${cert.approvalId}/decide`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            decision,
+            note: certNote.trim() ? certNote.trim() : undefined,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error ?? `Decision failed (${res.status})`);
+        setCertNote("");
+        setCertExpandedId(null);
+        await loadCerts();
+        if (decision === "approve") {
+          setCertNotice(
+            "Approved — the certificate can now be issued. Issuance re-verifies the disclosure against the live policy before rendering the PDF.",
+          );
+        }
+      } catch (e) {
+        setCertError(e instanceof Error ? e.message : "Decision failed");
+      } finally {
+        setCertDecidingId(null);
+      }
+    },
+    [certNote, loadCerts],
+  );
+
+  const handleIssue = useCallback(
+    async (cert: CertificateRow) => {
+      if (!cert.approvalId) return;
+      setIssuingId(cert.id);
+      setCertError(null);
+      try {
+        const res = await fetch(`/api/insurance/certificates/${cert.id}/issue`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ approvalId: cert.approvalId }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error ?? `Issue failed (${res.status})`);
+        await loadCerts();
+        setCertNotice(
+          `Certificate issued — PDF generated from the verified payload (sha256 ${String(data.pdfHash ?? "").slice(0, 12)}…).`,
+        );
+      } catch (e) {
+        setCertError(e instanceof Error ? e.message : "Issue failed");
+      } finally {
+        setIssuingId(null);
+      }
+    },
+    [loadCerts],
+  );
+
+  const handleRevoke = useCallback(
+    async (cert: CertificateRow) => {
+      setIssuingId(cert.id);
+      setCertError(null);
+      try {
+        const res = await fetch(`/api/insurance/certificates/${cert.id}/revoke`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ reason: revokeReason }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error ?? `Revoke failed (${res.status})`);
+        setRevokeFormId(null);
+        setRevokeReason("");
+        await loadCerts();
+        setCertNotice("Certificate revoked — the download link is disabled and the revocation is in the audit trail.");
+      } catch (e) {
+        setCertError(e instanceof Error ? e.message : "Revoke failed");
+      } finally {
+        setIssuingId(null);
+      }
+    },
+    [revokeReason, loadCerts],
+  );
+
   const handleRefresh = useCallback(() => {
     if (tab === "partners") void loadPartners();
     else if (tab === "approvals") void loadPending();
     else if (tab === "quoting") void loadSubmissions();
     else if (tab === "renewals") void loadRenewals();
+    else if (tab === "certificates") void loadCerts();
     else void load();
-  }, [tab, load, loadPartners, loadPending, loadSubmissions, loadRenewals]);
+  }, [tab, load, loadPartners, loadPending, loadSubmissions, loadRenewals, loadCerts]);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4">
@@ -831,6 +1126,7 @@ export function InsuranceApp() {
             { key: "import", label: "Import declarations", icon: FileUp },
             { key: "partners", label: "Partners", icon: Handshake },
             { key: "approvals", label: "Approvals", icon: Stamp },
+            { key: "certificates", label: "Certificates", icon: ScrollText },
           ] as const
         ).map(({ key, label, icon: Icon }) => (
           <button
@@ -1706,6 +2002,336 @@ export function InsuranceApp() {
             </div>
           )}
         </div>
+      ) : tab === "certificates" ? (
+        <div className="flex flex-col gap-4">
+          <div className="flex items-start gap-2 rounded-md border border-stone-200 bg-stone-50 px-3 py-2 text-[12px] text-stone-600">
+            <Info size={14} className="mt-0.5 shrink-0" />
+            <span>
+              <strong className="text-stone-800">Agent prepares → you review → system issues.</strong>{" "}
+              Certificates render <strong className="text-stone-800">only from in-force policy truth</strong> — the
+              policy picker lists in-force policies only, and unverified fields read "not confirmed". Issuance
+              re-verifies the approval disclosure against the live policy before any PDF is generated.
+            </span>
+          </div>
+          {certNotice && (
+            <div className="flex items-center gap-2 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-[13px] text-blue-800">
+              <Info size={14} />
+              {certNotice}
+            </div>
+          )}
+          {certError && (
+            <div className="flex items-center gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-700">
+              <AlertTriangle size={14} />
+              {certError}
+            </div>
+          )}
+          <div>
+            <button className={btnPrimary} onClick={() => setShowPrepare((v) => !v)}>
+              <Plus size={14} />
+              {showPrepare ? "Hide prepare form" : "Prepare certificate"}
+            </button>
+          </div>
+          {showPrepare && (
+            <div className="rounded-lg border border-stone-200 bg-white p-4 shadow-sm">
+              <h2 className="text-[14px] font-semibold text-stone-900">Prepare certificate of insurance</h2>
+              <p className="mt-0.5 text-[12px] text-stone-500">
+                Prepare creates a draft and proposes the issue_certificate governed action — nothing is issued until
+                you approve and press Issue. The validity window is clamped into the policy term.
+              </p>
+              <div className="mt-3 grid gap-3 md:grid-cols-2">
+                <label className="flex flex-col gap-1 text-[12px] font-medium text-stone-600">
+                  Issuing policy (in-force only)
+                  <select
+                    value={prep.policyId}
+                    onChange={(e) => setPrep({ ...prep, policyId: e.target.value })}
+                    className={inputCls}
+                  >
+                    <option value="">Select a policy…</option>
+                    {inForcePolicies.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.policyNumber} · {p.carrierName} · {p.lineLabel}
+                      </option>
+                    ))}
+                  </select>
+                  {inForcePolicies.length === 0 && (
+                    <span className="text-[11px] text-amber-700">
+                      No in-force policies — certificates can only be issued from policies with status "active".
+                    </span>
+                  )}
+                </label>
+                <label className="flex flex-col gap-1 text-[12px] font-medium text-stone-600">
+                  Certificate holder name
+                  <input
+                    value={prep.holderName}
+                    onChange={(e) => setPrep({ ...prep, holderName: e.target.value })}
+                    placeholder="City of Greensboro"
+                    className={inputCls}
+                  />
+                </label>
+                <label className="flex flex-col gap-1 text-[12px] font-medium text-stone-600">
+                  Holder address
+                  <input
+                    value={prep.holderAddress}
+                    onChange={(e) => setPrep({ ...prep, holderAddress: e.target.value })}
+                    placeholder="300 W Washington St, Greensboro, NC 27401"
+                    className={inputCls}
+                  />
+                </label>
+                <label className="flex flex-col gap-1 text-[12px] font-medium text-stone-600">
+                  Requested for (contract / client reference)
+                  <input
+                    value={prep.requestedFor}
+                    onChange={(e) => setPrep({ ...prep, requestedFor: e.target.value })}
+                    placeholder="Contract 2026-118 with the City of Greensboro"
+                    className={inputCls}
+                  />
+                </label>
+                <label className="flex flex-col gap-1 text-[12px] font-medium text-stone-600">
+                  Description of operations
+                  <input
+                    value={prep.operationsDescription}
+                    onChange={(e) => setPrep({ ...prep, operationsDescription: e.target.value })}
+                    placeholder="Landscaping services per contract 2026-118"
+                    className={inputCls}
+                  />
+                </label>
+                <div className="flex items-end gap-5 pb-1">
+                  <label className="flex items-center gap-2 text-[13px] text-stone-700">
+                    <input
+                      type="checkbox"
+                      checked={prep.additionalInsured}
+                      onChange={(e) => setPrep({ ...prep, additionalInsured: e.target.checked })}
+                      className="h-4 w-4 accent-[var(--brand-600)]"
+                    />
+                    Additional insured
+                  </label>
+                  <label className="flex items-center gap-2 text-[13px] text-stone-700">
+                    <input
+                      type="checkbox"
+                      checked={prep.waiverOfSubrogation}
+                      onChange={(e) => setPrep({ ...prep, waiverOfSubrogation: e.target.checked })}
+                      className="h-4 w-4 accent-[var(--brand-600)]"
+                    />
+                    Waiver of subrogation
+                  </label>
+                </div>
+              </div>
+              {prepareError && (
+                <div className="mt-3 flex items-center gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[12px] text-red-700">
+                  <AlertTriangle size={14} />
+                  {prepareError}
+                </div>
+              )}
+              <button
+                className={`${btnPrimary} mt-3`}
+                onClick={() => void handlePrepare()}
+                disabled={preparing || !prep.policyId || !prep.holderName.trim()}
+              >
+                {preparing ? <Loader2 size={14} className="animate-spin" /> : <ScrollText size={14} />}
+                {preparing ? "Preparing…" : "Prepare for review"}
+              </button>
+            </div>
+          )}
+          {certsLoading ? (
+            <div className="flex items-center justify-center gap-2 py-10 text-stone-500">
+              <Loader2 size={16} className="animate-spin" />
+              <span className="text-[13px]">Loading certificates…</span>
+            </div>
+          ) : (
+            <div className="overflow-x-auto rounded-lg border border-stone-200 bg-white shadow-sm">
+              <table className="w-full text-left text-[13px]">
+                <thead>
+                  <tr className="border-b border-stone-200 bg-stone-50 text-[11px] font-medium uppercase tracking-wide text-stone-500">
+                    <th className="px-3 py-2">Holder</th>
+                    <th className="px-3 py-2">Policy</th>
+                    <th className="px-3 py-2">Endorsements</th>
+                    <th className="px-3 py-2">Validity</th>
+                    <th className="px-3 py-2">Status</th>
+                    <th className="px-3 py-2">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {certs.length === 0 && (
+                    <tr>
+                      <td colSpan={6} className="px-3 py-10 text-center text-stone-500">
+                        <ScrollText size={16} className="mx-auto mb-2 text-stone-400" />
+                        No certificates yet — prepare one from an in-force policy above.
+                      </td>
+                    </tr>
+                  )}
+                  {certs.map((c) => (
+                    <Fragment key={c.id}>
+                      <tr className="border-b border-stone-100 hover:bg-[var(--brand-50)]/40">
+                        <td className="px-3 py-2">
+                          <div className="font-medium text-stone-900">{c.holderName}</div>
+                          {c.requestedFor && (
+                            <div className="text-[11px] text-stone-500">for {c.requestedFor}</div>
+                          )}
+                        </td>
+                        <td className="px-3 py-2">
+                          <div className="text-stone-800">{c.policyNumber ?? "—"}</div>
+                          <div className="text-[11px] text-stone-500">
+                            {c.carrierName ?? "not confirmed"}{c.lineLabel ? ` · ${c.lineLabel}` : ""}
+                          </div>
+                        </td>
+                        <td className="px-3 py-2">
+                          <div className="flex flex-wrap gap-1">
+                            {c.additionalInsured && <Chip tone="violet">AI</Chip>}
+                            {c.waiverOfSubrogation && <Chip tone="blue">WoS</Chip>}
+                            {!c.additionalInsured && !c.waiverOfSubrogation && (
+                              <span className="text-[11px] text-stone-400">none</span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-3 py-2 text-stone-700">
+                          {fmtDate(c.validFrom)} → {fmtDate(c.validTo)}
+                        </td>
+                        <td className="px-3 py-2">
+                          <Chip tone={certStatusTone(c)}>{certStatusLabel(c)}</Chip>
+                        </td>
+                        <td className="px-3 py-2">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            {c.status === "draft" && c.approvalStatus === "pending" && c.approvalPayload && (
+                              <button
+                                className={btnGhost}
+                                onClick={() => setCertExpandedId(certExpandedId === c.id ? null : c.id)}
+                              >
+                                <Eye size={13} />
+                                {certExpandedId === c.id ? "Hide" : "Review"}
+                                <ChevronDown size={13} className={certExpandedId === c.id ? "rotate-180" : ""} />
+                              </button>
+                            )}
+                            {c.status === "draft" && c.approvalStatus === "approved" && (
+                              <button
+                                className={btnPrimary}
+                                disabled={issuingId === c.id}
+                                onClick={() => void handleIssue(c)}
+                              >
+                                {issuingId === c.id ? (
+                                  <Loader2 size={14} className="animate-spin" />
+                                ) : (
+                                  <CheckCircle2 size={14} />
+                                )}
+                                {issuingId === c.id ? "Issuing…" : "Issue certificate"}
+                              </button>
+                            )}
+                            {c.status === "issued" && (
+                              <>
+                                <a
+                                  className={btnGhost}
+                                  href={`/api/insurance/certificates/${c.id}/pdf`}
+                                  download
+                                >
+                                  <FileUp size={13} />
+                                  Download PDF
+                                </a>
+                                <button
+                                  className={btnGhost}
+                                  onClick={() =>
+                                    setRevokeFormId(revokeFormId === c.id ? null : c.id)
+                                  }
+                                >
+                                  <Ban size={13} />
+                                  Revoke
+                                </button>
+                              </>
+                            )}
+                            {c.status === "revoked" && c.revokedReason && (
+                              <span className="max-w-56 text-[11px] text-stone-500">
+                                Revoked: {c.revokedReason}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                      {certExpandedId === c.id && c.approvalPayload && (
+                        <tr className="border-b border-stone-100 bg-stone-50/60">
+                          <td colSpan={6} className="px-4 py-3">
+                            <CertificateReview payload={c.approvalPayload} />
+                            <p className="mt-2 text-[11px] text-stone-500">
+                              Fields the policy has not confirmed read "not confirmed" — coverage is never invented.
+                              Issuance re-verifies this disclosure against the live policy row.
+                            </p>
+                            <div className="mt-3 flex flex-wrap items-center gap-2">
+                              <button
+                                className={btnPrimary}
+                                disabled={certDecidingId === c.id}
+                                onClick={() => void handleCertDecide(c, "approve")}
+                              >
+                                {certDecidingId === c.id ? (
+                                  <Loader2 size={14} className="animate-spin" />
+                                ) : (
+                                  <CheckCircle2 size={14} />
+                                )}
+                                Approve
+                              </button>
+                              <button
+                                className={btnGhost}
+                                disabled={certDecidingId === c.id}
+                                onClick={() => void handleCertDecide(c, "reject")}
+                              >
+                                <XCircle size={14} />
+                                Deny
+                              </button>
+                              <input
+                                value={certNote}
+                                onChange={(e) => setCertNote(e.target.value)}
+                                placeholder="Note (recorded on deny)"
+                                className={`${inputCls} w-64`}
+                              />
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                      {revokeFormId === c.id && c.status === "issued" && (
+                        <tr className="border-b border-stone-100 bg-stone-50/60">
+                          <td colSpan={6} className="px-4 py-3">
+                            <h3 className="text-[13px] font-semibold text-stone-900">
+                              Revoke certificate for {c.holderName}
+                            </h3>
+                            <p className="mt-0.5 text-[12px] text-stone-500">
+                              A reason is required — the revocation is written to the audit trail and the download
+                              link is disabled.
+                            </p>
+                            <div className="mt-2 flex flex-wrap items-center gap-2">
+                              <input
+                                value={revokeReason}
+                                onChange={(e) => setRevokeReason(e.target.value)}
+                                placeholder="e.g. Policy cancelled mid-term"
+                                className={`${inputCls} w-80`}
+                              />
+                              <button
+                                className={btnPrimary}
+                                disabled={issuingId === c.id || !revokeReason.trim()}
+                                onClick={() => void handleRevoke(c)}
+                              >
+                                {issuingId === c.id ? (
+                                  <Loader2 size={14} className="animate-spin" />
+                                ) : (
+                                  <Ban size={14} />
+                                )}
+                                {issuingId === c.id ? "Revoking…" : "Confirm revoke"}
+                              </button>
+                              <button
+                                className={btnGhost}
+                                onClick={() => {
+                                  setRevokeFormId(null);
+                                  setRevokeReason("");
+                                }}
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       ) : (
         <div className="flex flex-col gap-4">
           <div className="flex items-start gap-2 rounded-md border border-stone-200 bg-stone-50 px-3 py-2 text-[12px] text-stone-600">
@@ -1814,6 +2440,23 @@ export function InsuranceApp() {
                                   </div>
                                   <p className="mt-1.5 text-[11px] text-stone-500">
                                     Fields the carrier has not confirmed read "not confirmed" — coverage is never invented.
+                                  </p>
+                                </>
+                              ) : a.kind === "insurance_issue_certificate" ? (
+                                <>
+                                  <h3 className="text-[13px] font-semibold text-stone-900">
+                                    Certificate disclosure — review before approving
+                                  </h3>
+                                  <div className="mt-2">
+                                    <CertificateReview payload={a.payload} />
+                                  </div>
+                                  <p className="mt-2 text-[12px] text-stone-600">
+                                    After approval, issue the certificate from the{" "}
+                                    <strong className="text-stone-800">Certificates</strong> tab — issuance re-verifies
+                                    this disclosure against the live policy row before rendering the PDF.
+                                  </p>
+                                  <p className="mt-1.5 text-[11px] text-stone-500">
+                                    Fields the policy has not confirmed read "not confirmed" — coverage is never invented.
                                   </p>
                                 </>
                               ) : (

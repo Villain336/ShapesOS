@@ -14,6 +14,12 @@ import {
   serializeBindPolicy,
   serializePaymentHandoff,
 } from "./binding";
+import {
+  issueCertificate,
+  prepareCertificate,
+  prismaCertificateStores,
+  serializeCertificate,
+} from "./certificates";
 import { InsuranceError, LINE_LABELS } from "./types";
 
 const LINE_VALUES = Object.keys(LINE_LABELS);
@@ -71,6 +77,22 @@ const quotesSchema = z.object({
 
 const bindSchema = z.object({
   quoteId: z.string().trim().min(1).max(100),
+  approvalId: z.string().trim().min(1).max(100),
+});
+
+const prepareCertificateSchema = z.object({
+  policyId: z.string().trim().min(1).max(100),
+  holderName: z.string().trim().min(1).max(200),
+  holderAddress: z.string().trim().max(500).nullable().optional(),
+  additionalInsured: z.boolean().optional(),
+  waiverOfSubrogation: z.boolean().optional(),
+  operationsDescription: z.string().trim().max(2000).nullable().optional(),
+  requestedBy: z.string().trim().max(200).optional(),
+  requestedFor: z.string().trim().max(500).optional(),
+});
+
+const issueCertificateSchema = z.object({
+  certificateId: z.string().trim().min(1).max(100),
   approvalId: z.string().trim().min(1).max(100),
 });
 
@@ -150,6 +172,84 @@ export const INSURANCE_SHIM_TOOLS: ShimToolDef[] = [
         };
       } catch (e) {
         if (e instanceof InsuranceError || e instanceof InsuranceVendorError) {
+          throw new ShimToolError(e.code, e.message);
+        }
+        throw e;
+      }
+    },
+  },
+  {
+    name: "insurance_prepare_certificate",
+    description:
+      "PREPARE a certificate of insurance from an IN-FORCE policy (agent " +
+      "prepares, human reviews). Fails closed unless the policy is in force " +
+      "with at least one verified limit. Renders from policy truth only — " +
+      "unverified fields read \"not confirmed\", never invented. Returns a " +
+      "draft plus the issue_certificate approval id for human review; " +
+      "nothing is issued until insurance_issue_certificate runs on an " +
+      "approved approval. Data is real workspace policy truth (not vendor " +
+      "fixture).",
+    inputSchema: prepareCertificateSchema,
+    handler: async (ctx, args) => {
+      const parsed = prepareCertificateSchema.parse(args);
+      try {
+        const { certificate, approval, payload } = await prepareCertificate(
+          ctx.workspaceId,
+          {
+            ...parsed,
+            requestedBy: parsed.requestedBy ?? ctx.actor,
+          },
+          prismaCertificateStores(),
+        );
+        return {
+          data: {
+            certificate: serializeCertificate(certificate),
+            approvalId: approval.id,
+            approvalKind: approval.kind,
+            payload,
+            live: true,
+            fixture: false,
+            note: "Draft prepared from in-force policy truth. Issuance requires an approved human review.",
+          },
+        };
+      } catch (e) {
+        if (e instanceof InsuranceError) {
+          throw new ShimToolError(e.code, e.message);
+        }
+        throw e;
+      }
+    },
+  },
+  {
+    name: "insurance_issue_certificate",
+    description:
+      "ISSUE a prepared certificate: renders the ACORD-25-style PDF from the " +
+      "verified payload and stores bytes + sha256. Requires an APPROVED " +
+      "issue_certificate approval whose payload still matches the draft and " +
+      "the live policy row (disclosure drift fails closed). Writes the audit " +
+      "record with the holder trail (who requested, for which contract, who " +
+      "issued). Call only after the human approves the review.",
+    inputSchema: issueCertificateSchema,
+    handler: async (ctx, args) => {
+      const parsed = issueCertificateSchema.parse(args);
+      try {
+        const { certificate, pdfHash } = await issueCertificate(
+          ctx.workspaceId,
+          parsed.certificateId,
+          parsed.approvalId,
+          ctx.actor,
+          prismaCertificateStores(),
+        );
+        return {
+          data: {
+            certificate: serializeCertificate(certificate),
+            pdfHash,
+            live: true,
+            fixture: false,
+          },
+        };
+      } catch (e) {
+        if (e instanceof InsuranceError) {
           throw new ShimToolError(e.code, e.message);
         }
         throw e;
