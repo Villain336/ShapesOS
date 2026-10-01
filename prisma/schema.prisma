@@ -602,6 +602,9 @@ model Workspace {
   wfhModeHistory          WfhModeHistory[]
   // Wave 2 WFH mode slice 2: digest queue back-relation.
   wfhDigestItems          WfhDigestItem[]
+  // Wave 2 WFH mode slice 3: focus blocks + calendar connections.
+  wfhFocusBlocks          WfhFocusBlock[]
+  wfhCalendarConnections  WfhCalendarConnection[]
   // Phase 15 slice 3: per-workspace toolkit enablement back-relation.
   workspaceToolkits       WorkspaceToolkit[]
   // Phase 15 slice 4: per-workspace Composio call budget back-relation.
@@ -9946,4 +9949,61 @@ model WfhDigestItem {
 
   @@index([workspaceId, userId, status, windowMin])
   @@map("wfh_digest_items")
+}
+
+// ── Wave 2 WFH mode (slice 3): focus blocks + calendar connections ──────────
+// FocusBlock: a protected deep-work block. Hard (auto-decline) protection
+// requires a connected calendar + the one-time auto-decline consent gate.
+// Calendar OAuth itself is a stub until the parked calendar integration lands.
+
+model WfhFocusBlock {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  userId String @map("user_id")
+
+  title      String
+  startAt    DateTime @map("start_at")
+  endAt      DateTime @map("end_at")
+  // none | daily | weekdays | weekly
+  recurrence String @default("none")
+  // soft (decline-with-suggestion) | hard (auto-decline, consent-gated)
+  protection String @default("soft")
+  // user | os_suggested | ritual
+  source String @default("user")
+  // scheduled | protected | overridden | completed | cancelled
+  status String @default("scheduled")
+
+  calendarConnectionId String?                @map("calendar_connection_id")
+  calendarConnection   WfhCalendarConnection? @relation(fields: [calendarConnectionId], references: [id], onDelete: SetNull)
+
+  // Event ids this block defended against (read-only link into calendar data).
+  defendedEventIds String[] @default([]) @map("defended_event_ids")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([workspaceId, userId, status, startAt])
+  @@map("wfh_focus_blocks")
+}
+
+model WfhCalendarConnection {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  userId String @map("user_id")
+  // google | microsoft
+  provider String
+  // connected | disconnected (OAuth arrives with the parked calendar integration)
+  status               String    @default("disconnected")
+  // One-time consent: "the OS may decline meetings on my behalf during focus blocks".
+  autoDeclineConsentAt DateTime? @map("auto_decline_consent_at")
+
+  focusBlocks WfhFocusBlock[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([workspaceId, userId, provider])
+  @@map("wfh_calendar_connections")
 }
