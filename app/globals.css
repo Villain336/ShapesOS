@@ -1,146 +1,133 @@
-@import "tailwindcss";
-@import "@fontsource/inter/400.css";
-@import "@fontsource/inter/500.css";
-@import "@fontsource/inter/600.css";
-@import "@fontsource/inter/700.css";
-@import "@fontsource/newsreader/400.css";
-@import "@fontsource/newsreader/500.css";
-@import "@fontsource/newsreader/600.css";
+/* ═══════════════════════════════════════════════════════════════════
+ * Marketr — Agentic OS base theme (Tico 2026-10-01)
+ *
+ * docs/design/tailwind.css is the main stylesheet (Tailwind v4); it imports
+ * docs/design/tokens.css once, globally. This file:
+ *  1. wires the next/font variables from app/layout.tsx into the tokens,
+ *  2. carries MIGRATION-COMPAT shims: old vault var/utility names re-anchored
+ *     to Agentic OS tokens so unmigrated areas keep rendering while the area
+ *     slices land. Compat blocks are marked; each area slice removes what it
+ *     migrates. New code must use the aos tokens directly (bg-canvas,
+ *     bg-paper, text-ink, text-muted, rounded-lg, shadow-hairline, …).
+ * ═══════════════════════════════════════════════════════════════════ */
 
-/* Phase 11 integration #4 — self-hosted brand fonts (Fontsource, OFL-1.1
- * only; no Google Fonts CSS API in the default path). Variable families ship
- * latin(+bundled subsets); woff2 files download lazily on first use
- * (unicode-range + font-display:swap), so this costs ~0 bytes until a family
- * is rendered. Registry + loader: lib/design/fonts.ts */
-@import "@fontsource-variable/space-grotesk";
-@import "@fontsource-variable/sora";
-@import "@fontsource-variable/dm-sans";
-@import "@fontsource-variable/manrope";
-@import "@fontsource-variable/outfit";
-@import "@fontsource-variable/work-sans";
-@import "@fontsource-variable/libre-franklin";
-@import "@fontsource-variable/playfair-display";
-@import "@fontsource-variable/archivo";
-@import "@fontsource-variable/bricolage-grotesque";
-@import "@fontsource-variable/ibm-plex-sans";
-@import "@fontsource/dm-serif-display/latin-400.css";
-@import "@fontsource/dm-serif-display/latin-400-italic.css";
-@import "@fontsource/instrument-serif/latin-400.css";
-@import "@fontsource/instrument-serif/latin-400-italic.css";
-@import "@fontsource/bebas-neue/latin-400.css";
-@import "@fontsource/ibm-plex-mono/latin-400.css";
-@import "@fontsource/ibm-plex-mono/latin-500.css";
-@import "@fontsource/ibm-plex-mono/latin-600.css";
+@import "../docs/design/tailwind.css";
 
+/* .dark class variant (kept: vault/shadcn components use dark: — the class is
+ * never applied, so those styles stay inert, exactly as before). */
 @custom-variant dark (&:where(.dark, .dark *));
 
-/* ══════════════════════════════════════════════════════════
- * Marketr — "Warm Operator" design foundation (design-v2)
- *
- * Claude's warm paper neutrals + Ahrefs' orange-ramp discipline +
- * Semrush's tight tool surfaces + Jasper's flat color-band rhythm +
- * CrewAI's premium type moments.
- *
- * Rules:
- * - Canvas is warm paper #FAFAF7 — never pure white, never blue-gray.
- * - Elevation = 1px rings (rgba(28,25,23,0.08)). Shadows live ONLY on
- *   floating layers (beautiful-shadows tokens).
- * - Orange #C2410C: actions, links, active states, focus ONLY.
- *   Never icons. Never body text. Body links use #C2410C (4.5:1).
- * - Inter for UI chrome; Newsreader for page headlines + empty states.
- * - Radii: cards 10px, controls 8px, chips/pills full. Nothing else.
- * ══════════════════════════════════════════════════════════ */
-
 :root {
-  /* surfaces — warm paper */
-  --page: #fafaf7;
-  --canvas: #f4f2ec;
-  --surface: #ffffff;
-  --inset: #f7f5f0;
-  --hover: #f1ede4;
-  --hover-2: #e7e1d3;
-  --field: #ffffff;
+  /* next/font variables, set on <html> in app/layout.tsx */
+  --aos-font-sans: var(--font-archivo), "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --aos-font-mono: var(--font-jetbrains-mono), ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 
-  /* ink ramp — warm, zero blue-gray */
-  --ink: #1c1917;
-  --ink-2: #57534e;
-  --ink-3: #a8a29e;
+  /* ── MIGRATION COMPAT: old vault vars → Agentic OS tokens ──
+   * The old violet --brand-* lock is gone. Default primary when no tenant
+   * brand is set (BrandTheme clears its inline vars → falls back here):
+   * Agentic OS says primary actions are black. A saved tenant brand still
+   * overrides via BrandTheme's inline vars — that machinery is untouched
+   * (dynamic brand color deferred by Tico 2026-10-01). */
+  --brand-600: var(--aos-ink);
+  --brand-700: var(--aos-ink);
+  --brand-50: var(--aos-canvas);
+  --brand-200: var(--aos-line);
 
-  /* borders — 1px consensus elevation */
-  --line: rgba(28, 25, 23, 0.08);
-  --line-strong: rgba(28, 25, 23, 0.16);
+  --accent: var(--aos-ink);
+  --accent-hover: var(--aos-ink);
+  --accent-ink: var(--aos-ink);
+  --accent-tint: var(--aos-canvas);
+  --accent-deep: var(--aos-ink);
+  --accent-foreground: var(--aos-paper);
 
-  /* brand accent — Phase 13 Wave A (Tico 2026-09-27 amendment): the locked
-   * static violet primary is now a runtime-overridable brand color. Each
-   * workspace's DEFAULT brand kit drives these at runtime, scoped to the
-   * dashboard theme root (components/BrandTheme.tsx); lib/brand-theme.ts is
-   * the single writer. Only --brand-600 is ever overridden — --brand-700 /
-   * --brand-50 auto-derive from it via color-mix (7.6%-white reproduces
-   * violet-50 exactly at default). Defaults = today's violet scale, so
-   * nothing visually changes until a brand color is set. Full law:
-   * docs/audit/THEMING.md */
-  --brand-600: #7c3aed;
-  --brand-700: #6d28d9;
-  --brand-50: #f5f3ff;
+  --page: var(--aos-canvas);
+  --canvas: var(--aos-canvas);
+  --surface: var(--aos-paper);
+  --inset: var(--aos-canvas);
+  --hover: var(--aos-hover);
+  --hover-2: var(--aos-line);
+  --field: var(--aos-paper);
 
-  /* accent — actions, links, active states, focus.
-   * Aliased to the brand vars so the whole UI re-tints with the workspace
-   * brand. --accent-deep stays fixed (deep-violet detail uses; Wave C). */
-  --accent: var(--brand-600);
-  --accent-hover: var(--brand-700);
-  --accent-ink: var(--brand-700);
-  --accent-tint: var(--brand-50);
-  --accent-deep: #5b21b6;
+  --ink: var(--aos-ink);
+  --ink-2: var(--aos-text-muted);
+  --ink-3: var(--aos-text-subtle);
 
-  /* semantic — muted, never orange-adjacent warning */
-  --green: #2e7d4f;
-  --green-tint: #eaf4ee;
-  --amber: #b45309;
-  --amber-tint: #fbf3e4;
-  --red: #b3261e;
-  --red-tint: #fbedea;
+  --line: var(--aos-line);
+  --line-strong: var(--aos-line-strong);
 
-  /* legacy alias — approval gates use warm amber, never red */
-  --orange: #b45309;
-  --orange-tint: #fbf3e4;
+  /* Old semantic colors → the status tokens that carry the same meaning.
+   * Area slices restrict these to agent states per the design system. */
+  --green: var(--aos-done);
+  --green-tint: var(--aos-canvas);
+  --amber: var(--aos-needs);
+  --amber-tint: var(--aos-needs-tint);
+  --orange: var(--aos-needs);
+  --orange-tint: var(--aos-needs-tint);
+  --red: var(--aos-failed);
+  --red-tint: var(--aos-failed-tint);
 
-  /* chart overlays */
-  --tooltip-bg: #292524;
-  --tooltip-fg: #fafaf7;
-  --tooltip-muted: #a8a29e;
-  --tooltip-border: #44403c;
+  --muted: var(--aos-text-muted);
+  --muted-foreground: var(--aos-text-muted);
+  --primary: var(--aos-ink);
+  --secondary: var(--aos-canvas);
+  --foreground: var(--aos-ink);
+  --destructive: var(--aos-failed);
+
+  --popover: var(--aos-paper);
+  --popover-foreground: var(--aos-ink);
+  --border: var(--aos-line);
+  --input: var(--aos-paper);
+  --ring: var(--aos-focus);
+
+  --tooltip-bg: var(--aos-night);
+  --tooltip-fg: var(--aos-night-text);
+  --tooltip-muted: var(--aos-night-text-muted);
+  --tooltip-border: var(--aos-night-border);
+
+  --shadow-hairline: var(--aos-shadow-hairline);
+  --shadow-card: var(--aos-shadow-hairline);
+  --shadow-btn: var(--aos-shadow-outline);
+  --shadow-overlay: var(--aos-shadow-overlay);
+  --shadow-float-sm: var(--aos-shadow-raised);
+  --shadow-float-md: var(--aos-shadow-raised);
+  --shadow-float-lg: var(--aos-shadow-overlay);
+
+  --radius: var(--aos-radius-md);
+  --radius-chip: var(--aos-radius-key);
+  --radius-control: var(--aos-radius-sm);
+  --radius-card: var(--aos-radius-md);
+  --radius-window: var(--aos-radius-lg);
+
+  --font-display: var(--aos-font-sans);
+
+  --ease-out-strong: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out-strong: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-link: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* NOTE: Marketr is light-mode only. No .dark token block — the light tokens
- * above are the single source of truth. */
-
+/* ── MIGRATION COMPAT: old Tailwind utility names → Agentic OS tokens ──
+ * Names that collide with new token names take the NEW meaning (ink, canvas,
+ * line, line-strong, hover, muted, hairline, sans, mono) — see PROGRESS.md. */
 @theme inline {
-  /* vault colors */
   --color-page: var(--page);
-  --color-canvas: var(--canvas);
   --color-surface: var(--surface);
   --color-inset: var(--inset);
-  --color-ink: var(--ink);
+  --color-field: var(--field);
+  --color-hover-2: var(--hover-2);
   --color-ink-2: var(--ink-2);
   --color-ink-3: var(--ink-3);
-  --color-hover: var(--hover);
-  --color-hover-2: var(--hover-2);
-  --color-field: var(--field);
-  --color-line: var(--line);
-  --color-line-strong: var(--line-strong);
+
   --color-accent: var(--accent);
   --color-accent-hover: var(--accent-hover);
   --color-accent-ink: var(--accent-ink);
   --color-accent-tint: var(--accent-tint);
   --color-accent-deep: var(--accent-deep);
+  --color-accent-foreground: var(--accent-foreground);
 
-  /* brand — runtime-overridable primary (Phase 13 Wave A, Tico 2026-09-27).
-   * `inline` keeps the var() reference live so utilities re-tint when the
-   * tenant brand overrides them. Consume as bg-brand-600 / text-brand-700 /
-   * bg-brand-50 — NEVER hardcode a primary color again. */
   --color-brand-600: var(--brand-600);
   --color-brand-700: var(--brand-700);
   --color-brand-50: var(--brand-50);
+
   --color-green: var(--green);
   --color-green-tint: var(--green-tint);
   --color-amber: var(--amber);
@@ -150,75 +137,48 @@
   --color-red: var(--red);
   --color-red-tint: var(--red-tint);
 
-  /* shadcn aliases — registry components speak vault tokens */
   --color-background: var(--page);
-  --color-foreground: var(--ink);
+  --color-foreground: var(--foreground);
   --color-card: var(--surface);
-  --color-card-foreground: var(--ink);
-  --color-popover: var(--surface);
-  --color-popover-foreground: var(--ink);
-  --color-primary: var(--accent);
-  --color-primary-foreground: #ffffff;
-  --color-secondary: var(--inset);
-  --color-secondary-foreground: var(--ink);
-  --color-muted: var(--inset);
-  --color-muted-foreground: var(--ink-2);
-  --color-accent-foreground: #ffffff;
-  --color-destructive: var(--red);
-  --color-destructive-foreground: #ffffff;
-  --color-border: var(--line);
-  --color-input: var(--field);
-  --color-ring: var(--accent);
+  --color-card-foreground: var(--foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--aos-paper);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--foreground);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--aos-on-failed);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
 
-  /* structural elevation — hairline rings, not shadows */
-  --shadow-hairline: 0 0 0 1px var(--line);
-  --shadow-card: 0 0 0 1px var(--line);
-  --shadow-btn: 0 0 0 1px var(--line-strong);
-  --shadow-overlay: 0 0 0 1px var(--line);
+  --radius-chip: var(--radius-chip);
+  --radius-control: var(--radius-control);
+  --radius-card: var(--radius-card);
+  --radius-window: var(--radius-window);
 
-  /* beautiful-shadows — FLOATING LAYERS ONLY (palette, toolbar, composer,
-   * popovers, dialogs, toasts). Never on structural surfaces or lists. */
-  --shadow-float-sm: 0px 2px 3px -1px rgba(0, 0, 0, 0.1), 0px 1px 0px 0px rgba(25, 28, 33, 0.02), 0px 0px 0px 1px rgba(25, 28, 33, 0.08);
-  --shadow-float-md: 0px 0px 0px 1px rgba(0, 0, 0, 0.06), 0px 1px 1px -0.5px rgba(0, 0, 0, 0.06), 0px 3px 3px -1.5px rgba(0, 0, 0, 0.06), 0px 6px 6px -3px rgba(0, 0, 0, 0.06), 0px 12px 12px -6px rgba(0, 0, 0, 0.06), 0px 24px 24px -12px rgba(0, 0, 0, 0.06);
-  --shadow-float-lg: 0 2.8px 2.2px rgba(0, 0, 0, 0.034), 0 6.7px 5.3px rgba(0, 0, 0, 0.048), 0 12.5px 10px rgba(0, 0, 0, 0.06), 0 22.3px 17.9px rgba(0, 0, 0, 0.072), 0 41.8px 33.4px rgba(0, 0, 0, 0.086), 0 100px 80px rgba(0, 0, 0, 0.12);
+  --shadow-card: var(--shadow-card);
+  --shadow-btn: var(--shadow-btn);
+  --shadow-float-sm: var(--shadow-float-sm);
+  --shadow-float-md: var(--shadow-float-md);
+  --shadow-float-lg: var(--shadow-float-lg);
 
-  /* type — Inter UI, Newsreader display */
-  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
-  --font-display: "Newsreader", ui-serif, Georgia, serif;
-  --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
-
-  /* radii — warm utilitarian: cards 10, controls 8, chips 6, pills full */
-  --radius-chip: 6px;
-  --radius-control: 8px;
-  --radius-card: 10px;
-  --radius-window: 14px;
-
-  /* easing — strong curves; built-ins are too weak */
-  --ease-out-strong: cubic-bezier(0.23, 1, 0.32, 1);
-  --ease-in-out-strong: cubic-bezier(0.77, 0, 0.175, 1);
-  --ease-link: cubic-bezier(0.16, 1, 0.3, 1);
+  --font-display: var(--font-display);
 }
 
-/* ── base ─────────────────────────────────────────────── */
-
-html {
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  text-rendering: optimizeLegibility;
-}
+/* ── base ─────────────────────────────────────────────────── */
 
 body {
-  background-color: var(--page);
-  color: var(--ink);
-  font-feature-settings: "cv11", "ss01";
-  font-size: 14px;
-  letter-spacing: -0.005em;
-  line-height: 1.5;
+  background: var(--aos-canvas);
+  color: var(--aos-text);
+  font-size: var(--aos-text-base);
 }
 
 ::selection {
-  background: var(--accent-tint);
-  color: var(--ink);
+  background: var(--aos-hover);
+  color: var(--aos-text);
 }
 
 h1, h2, h3, h4 { text-wrap: balance; }
@@ -229,35 +189,6 @@ a {
   text-decoration-skip-ink: auto;
 }
 
-/* Display serif — page-level headlines + empty-state invitations only */
-.display-serif {
-  font-family: var(--font-display);
-  letter-spacing: -0.02em;
-  line-height: 1.1;
-  font-optical-sizing: auto;
-}
-
-/* Translucent material — floating functional layers (apple-design).
- * Never stack translucent-on-translucent. */
-.material-float {
-  background: rgba(255, 255, 255, 0.72);
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
-}
-@media (prefers-reduced-transparency: reduce) {
-  .material-float {
-    background: var(--surface);
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
-  }
-}
-
-/* Thin warm scrollbars for chat rails */
-.thin-scroll { scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
-.thin-scroll::-webkit-scrollbar { width: 8px; height: 8px; }
-.thin-scroll::-webkit-scrollbar-thumb { background: var(--line-strong); border-radius: 8px; }
-.thin-scroll::-webkit-scrollbar-track { background: transparent; }
-
 button:not(:disabled),
 [role="button"]:not([aria-disabled="true"]),
 label:has(input),
@@ -265,26 +196,45 @@ a {
   cursor: pointer;
 }
 
-/* Press feedback — every pressable element (apple-design §1, emil) */
-.pressable {
-  transition: transform 100ms ease-out;
+/* ── MIGRATION COMPAT: functional classes kept from the old system ──
+ * Remapped to Agentic OS tokens. Area slices replace these with aos
+ * component patterns (.aos-display, real buttons/inputs/cards). */
+
+/* Old display-serif (Newsreader) → Archivo display treatment. */
+.display-serif {
+  font-family: var(--aos-font-sans);
+  font-weight: var(--aos-weight-display);
+  font-stretch: var(--aos-stretch-display);
+  letter-spacing: var(--aos-tracking-display);
+  line-height: 1.1;
 }
+
+/* Translucent floating layer. COMPAT ONLY — the design system forbids
+ * glassmorphism; area slices replace with solid white + shadow-overlay. */
+.material-float {
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+}
+@media (prefers-reduced-transparency: reduce) {
+  .material-float {
+    background: var(--aos-paper);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
+
+/* Thin scrollbars for chat rails */
+.thin-scroll { scrollbar-width: thin; scrollbar-color: var(--aos-line-strong) transparent; }
+.thin-scroll::-webkit-scrollbar { width: 8px; height: 8px; }
+.thin-scroll::-webkit-scrollbar-thumb { background: var(--aos-line-strong); border-radius: 8px; }
+.thin-scroll::-webkit-scrollbar-track { background: transparent; }
+
+/* Press feedback — every pressable element */
+.pressable { transition: transform 100ms ease-out; }
 .pressable:active { transform: scale(0.97); }
 @media (hover: hover) and (pointer: fine) {
   .pressable:hover { transform: none; }
-}
-
-:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-  border-radius: 4px;
-}
-
-input:focus-visible,
-textarea:focus-visible,
-select:focus-visible,
-[contenteditable]:focus-visible {
-  outline: none;
 }
 
 .animated-underline { position: relative; display: inline-block; }
@@ -296,12 +246,8 @@ select:focus-visible,
 a:hover .animated-underline::after,
 a:focus-visible .animated-underline::after { transform: scaleX(1); }
 
-/* ══════════════════════════════════════════════════════════
- * COMPONENT-SPECIFIC — copy alongside the named primitive
- * ══════════════════════════════════════════════════════════ */
-
 /* StreamingText / ContextCards — favicon source avatars */
-.source-avatar { box-shadow: 0 0 0 1px rgba(28, 25, 23, 0.1); }
+.source-avatar { box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.1); }
 
 /* primitive spacing system */
 .primitive-card-pad { padding: 12px; }
@@ -315,27 +261,27 @@ a:focus-visible .animated-underline::after { transform: scaleX(1); }
 
 /* FilterTable — status pills */
 .filter-status-todo, .filter-status-progress, .filter-status-done { border: 1px solid transparent; }
-.filter-status-todo { --tag-base: #b45309; }
-.filter-status-progress { --tag-base: #2e7d4f; }
-.filter-status-done { --tag-base: #2e7d4f; }
+.filter-status-todo { --tag-base: var(--aos-needs); }
+.filter-status-progress { --tag-base: var(--aos-done); }
+.filter-status-done { --tag-base: var(--aos-done); }
 .filter-status-todo, .filter-status-progress, .filter-status-done {
-  color: color-mix(in srgb, var(--tag-base) 92%, var(--ink));
-  background: color-mix(in srgb, var(--tag-base) 20%, var(--surface));
-  border-color: color-mix(in srgb, var(--tag-base) 34%, var(--surface));
+  color: color-mix(in srgb, var(--tag-base) 92%, var(--aos-ink));
+  background: color-mix(in srgb, var(--tag-base) 20%, var(--aos-paper));
+  border-color: color-mix(in srgb, var(--tag-base) 34%, var(--aos-paper));
 }
 
 /* InsightCards — liveline chart tooltip + cursor */
 .insight-chart-stage { overflow: hidden; }
 .insight-chart-cursor {
   position: absolute; z-index: 4; top: 0; bottom: 0; width: 1px;
-  background: var(--ink); opacity: 0.26; pointer-events: none;
+  background: var(--aos-ink); opacity: 0.26; pointer-events: none;
 }
 .insight-chart-tooltip-anchor {
   position: absolute; z-index: 5; top: 8px; transform: translateX(-50%); pointer-events: none;
 }
 .insight-chart-tooltip {
   display: flex; align-items: center; gap: 12px; padding: 5px 9px;
-  border: 1px solid var(--line-strong); border-radius: 8px; color: var(--tooltip-fg);
+  border: 1px solid var(--tooltip-border); border-radius: 8px; color: var(--tooltip-fg);
   background: var(--tooltip-bg); box-shadow: var(--shadow-float-md);
   font-size: 11.5px; font-variant-numeric: tabular-nums; white-space: nowrap;
 }
@@ -350,7 +296,7 @@ a:focus-visible .animated-underline::after { transform: scaleX(1); }
 }
 .stream-caret {
   display: inline-block; width: 2px; height: 1.05em; margin-left: 1.5px;
-  translate: 0 -0.5px; border-radius: 1px; background: var(--accent);
+  translate: 0 -0.5px; border-radius: 1px; background: var(--aos-running);
   vertical-align: text-bottom; animation: caret-blink 1s step-end infinite;
 }
 .stream-caret.is-streaming { animation: none; }
@@ -360,7 +306,7 @@ a:focus-visible .animated-underline::after { transform: scaleX(1); }
   .stream-tail { filter: none; -webkit-mask-image: none; mask-image: none; }
 }
 
-/* ── shared keyframes ─────────────────────────────────── */
+/* ── shared keyframes ─────────────────────────────────────── */
 @keyframes shimmer-text { from { background-position: 150% center; } to { background-position: -50% center; } }
 @keyframes fade-up { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
