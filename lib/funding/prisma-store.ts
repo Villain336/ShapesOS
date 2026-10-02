@@ -50,6 +50,33 @@ import {
   type InvestorStage,
   type TargetInvestorProfileInput,
 } from "./types";
+import {
+  READINESS_CHECKLIST_TEMPLATE,
+  emptyEvidence,
+  rollupCapTable,
+  validateChecklistEvidence,
+  validateChecklistItemUpdate,
+  validateStakeholderInput,
+  type CapTableRollup,
+  type CapTableRow,
+  type ChecklistEvidence,
+  type ChecklistItemView,
+  type ChecklistStatus,
+  type ChecklistTemplateEntry,
+  type ReadinessSignals,
+  type StakeholderInput,
+  type StakeholderType,
+  type StakeholderView,
+} from "./readiness";
+import {
+  getSafeTemplate,
+  validateSafeSelection,
+} from "./safe-templates";
+import {
+  reviewDeck,
+  validateDeckReviewInput,
+  type DeckCriterionResult,
+} from "./deck-review";
 
 export class PrismaFundingStore {
   constructor(private prisma: PrismaClient) {}
@@ -1111,6 +1138,492 @@ export class PrismaFundingStore {
       openedAt: r.openedAt,
     }));
   }
+
+  // ------------------------------------------------------------------
+  // Slice 4: Round readiness — checklist, cap table, SAFE picker, deck
+  // review. All paths are tenant-scoped through the round.
+  // ------------------------------------------------------------------
+
+  private async requireRound(workspaceId: string, roundId: string) {
+    const round = await this.prisma.fundingRound.findFirst({
+      where: { id: roundId, workspaceId },
+    });
+    if (!round) {
+      throw new FundingError("ROUND_NOT_FOUND", "Round not found in this workspace.");
+    }
+    return round;
+  }
+
+  /**
+   * Idempotent checklist seeding: one row per (round, CHECKLIST_KEYS entry).
+   * Safe to call on every readiness read — existing rows are untouched.
+   */
+  async ensureChecklist(workspaceId: string, roundId: string): Promise<void> {
+    await this.requireRound(workspaceId, roundId);
+    await this.prisma.$transaction(
+      READINESS_CHECKLIST_TEMPLATE.map((t) =>
+        this.prisma.fundingRoundChecklistItem.upsert({
+          where: { roundId_key: { roundId, key: t.key } },
+          update: {},
+          create: {
+            workspaceId,
+            roundId,
+            key: t.key,
+            status: "todo",
+            evidence: emptyEvidence() as unknown as Prisma.InputJsonValue,
+          },
+        }),
+      ),
+    );
+  }
+
+  /** Read-only Legal vault cross-link: formation + EIN docs for the tenant.
+   * This feature never writes Legal rows — signals only. */
+  private async legalVaultSignals(workspaceId: string) {
+    const docs = await this.prisma.legalDocument.findMany({
+      where: { workspaceId, docType: { in: ["formation", "ein_letter"] } },
+      select: { id: true, title: true, docType: true },
+      orderBy: { createdAt: "asc" },
+    });
+    return {
+      formationDocs: docs
+        .filter((d) => d.docType === "formation")
+        .map((d) => ({ id: d.id, title: d.title })),
+      einDocs: docs
+        .filter((d) => d.docType === "ein_letter")
+        .map((d) => ({ id: d.id, title: d.title })),
+    };
+  }
+
+  /** Full readiness payload: checklist items (seeded) + computed signals. */
+  async getReadiness(
+    workspaceId: string,
+    roundId: string,
+    now = new Date(),
+  ): Promise<{ items: ChecklistItemView[]; signals: ReadinessSignals }> {
+    await this.requireRound(workspaceId, roundId);
+    await this.ensureChecklist(workspaceId, roundId);
+
+    const [items, legalVault, docs, links, stakeholders, latestReview] =
+      await Promise.all([
+        this.prisma.fundingRoundChecklistItem.findMany({
+          where: { workspaceId, roundId },
+        }),
+        this.legalVaultSignals(workspaceId),
+        this.prisma.fundingDataRoomDoc.findMany({
+          where: {
+            workspaceId,
+            kind: { in: ["pitch_deck", "financials"] },
+          },
+          select: {
+            id: true,
+            title: true,
+            kind: true,
+            currentVersion: { select: { versionNumber: true } },
+          },
+        }),
+        this.prisma.fundingShareLink.findMany({
+          where: { workspaceId },
+          select: { id: true, revoked: true, expiresAt: true, _count: { select: { views: true } } },
+        }),
+        this.prisma.fundingCapTableStakeholder.findMany({
+          where: { workspaceId, roundId },
+          select: { type: true, shares: true },
+        }),
+        this.prisma.fundingDeckReview.findFirst({
+          where: { workspaceId, roundId },
+          orderBy: { createdAt: "desc" },
+          select: { id: true, overallScore: true, createdAt: true },
+        }),
+      ]);
+
+    const byKey = new Map(items.map((i) => [i.key, i]));
+    const itemViews: ChecklistItemView[] = READINESS_CHECKLIST_TEMPLATE.map((t) => {
+      const row = byKey.get(t.key);
+      if (!row) throw new FundingError("CHECKLIST_NOT_SEEDED", `Checklist item ${t.key} missing.`);
+      return toChecklistItemView(row, t);
+    });
+
+    const pitchDeck = docs.find((d) => d.kind === "pitch_deck") ?? null;
+    const financials = docs.find((d) => d.kind === "financials") ?? null;
+    const liveLinks = links.filter(
+      (l) => !l.revoked && (!l.expiresAt || l.expiresAt.getTime() > now.getTime()),
+    );
+
+    const rollup = rollupCapTable(
+      stakeholders.map((s, i) => ({
+        id: String(i),
+        name: "",
+        type: s.type as StakeholderType,
+        shares: s.shares,
+        shareClass: null,
+        vestingSummary: null,
+      })),
+    );
+
+    return {
+      items: itemViews,
+      signals: {
+        legalVault,
+        dataRoom: {
+          pitchDeck: pitchDeck
+            ? {
+                docId: pitchDeck.id,
+                title: pitchDeck.title,
+                version: pitchDeck.currentVersion?.versionNumber ?? 0,
+              }
+            : null,
+          financials: financials
+            ? {
+                docId: financials.id,
+                title: financials.title,
+                version: financials.currentVersion?.versionNumber ?? 0,
+              }
+            : null,
+          shareLinks: {
+            total: links.length,
+            tested: links.filter((l) => l._count.views > 0).length,
+          },
+        },
+        capTable: {
+          rowCount: stakeholders.length,
+          totalShares: rollup.totalShares.toString(),
+          founderPctBp: rollup.pctByTypeBp.founder,
+          investorPctBp: rollup.pctByTypeBp.investor,
+        },
+        deckReview: latestReview
+          ? {
+              id: latestReview.id,
+              overallScore: latestReview.overallScore,
+              createdAt: latestReview.createdAt,
+            }
+          : null,
+      },
+    };
+  }
+
+  /**
+   * Update a checklist item's status/notes/evidence. Transition rules
+   * (validateChecklistItemUpdate): done stamps completedAt/completedBy,
+   * moving off done clears the stamp, waived requires a reason.
+   */
+  async updateChecklistItem(
+    workspaceId: string,
+    itemId: string,
+    input: { status?: unknown; notes?: unknown; evidence?: unknown },
+    actor: string,
+    now = new Date(),
+  ): Promise<ChecklistItemView> {
+    const row = await this.prisma.fundingRoundChecklistItem.findFirst({
+      where: { id: itemId, workspaceId },
+    });
+    if (!row) {
+      throw new FundingError("CHECKLIST_ITEM_NOT_FOUND", "Checklist item not found in this workspace.");
+    }
+    const patch = validateChecklistItemUpdate(input);
+
+    if (patch.status === "waived" && patch.notes === undefined && !row.notes?.trim()) {
+      throw new FundingError(
+        "WAIVE_NEEDS_REASON",
+        "Waiving a checklist item requires a reason — put it in notes.",
+      );
+    }
+
+    const data: {
+      status?: ChecklistStatus;
+      notes?: string | null;
+      evidence?: Prisma.InputJsonValue;
+      completedAt?: Date | null;
+      completedBy?: string | null;
+    } = {};
+    if (patch.status !== undefined) {
+      data.status = patch.status;
+      if (patch.status === "done") {
+        data.completedAt = now;
+        data.completedBy = actor;
+      } else if (row.status === "done") {
+        // Moving off done clears the completion stamp.
+        data.completedAt = null;
+        data.completedBy = null;
+      }
+    }
+    if (patch.notes !== undefined) data.notes = patch.notes;
+    if (patch.evidence !== undefined) data.evidence = patch.evidence as unknown as Prisma.InputJsonValue;
+
+    const updated = await this.prisma.fundingRoundChecklistItem.update({
+      where: { id: row.id },
+      data,
+    });
+    const template = READINESS_CHECKLIST_TEMPLATE.find((t) => t.key === updated.key);
+    if (!template) throw new FundingError("CHECKLIST_NOT_SEEDED", `Unknown checklist key ${updated.key}.`);
+    return toChecklistItemView(updated, template);
+  }
+
+  /**
+   * "Test" every investor-facing share link: resolve revoked/expired status
+   * without opening anything. Writes the result as evidence on the
+   * `data_room_links` item. Pure check — no outbound requests.
+   */
+  async testDataRoomLinks(
+    workspaceId: string,
+    roundId: string,
+    now = new Date(),
+  ): Promise<{ tested: number; passing: number; failing: { linkId: string; reason: string }[] }> {
+    await this.requireRound(workspaceId, roundId);
+    await this.ensureChecklist(workspaceId, roundId);
+
+    const links = await this.prisma.fundingShareLink.findMany({
+      where: { workspaceId },
+      select: { id: true, revoked: true, expiresAt: true },
+    });
+
+    const failing: { linkId: string; reason: string }[] = [];
+    for (const l of links) {
+      if (l.revoked) failing.push({ linkId: l.id, reason: "revoked" });
+      else if (l.expiresAt && l.expiresAt.getTime() <= now.getTime()) {
+        failing.push({ linkId: l.id, reason: "expired" });
+      }
+    }
+
+    const item = await this.prisma.fundingRoundChecklistItem.findUnique({
+      where: { roundId_key: { roundId, key: "data_room_links" } },
+    });
+    if (item) {
+      const evidence = validateChecklistEvidence(item.evidence ?? {});
+      evidence.testedAt = now.toISOString();
+      evidence.note =
+        links.length === 0
+          ? "No share links exist yet — create one from the data room first."
+          : failing.length === 0
+            ? `All ${links.length} link(s) resolve: none revoked, none expired.`
+            : `${failing.length} of ${links.length} link(s) failing: ${failing.map((f) => `${f.linkId.slice(-6)} (${f.reason})`).join(", ")}.`;
+      await this.prisma.fundingRoundChecklistItem.update({
+        where: { id: item.id },
+        data: { evidence: evidence as unknown as Prisma.InputJsonValue },
+      });
+    }
+
+    return { tested: links.length, passing: links.length - failing.length, failing };
+  }
+
+  // -- Cap table ---------------------------------------------------------
+
+  async listStakeholders(
+    workspaceId: string,
+    roundId: string,
+  ): Promise<{ rows: StakeholderView[]; rollup: CapTableRollupView }> {
+    await this.requireRound(workspaceId, roundId);
+    const rows = await this.prisma.fundingCapTableStakeholder.findMany({
+      where: { workspaceId, roundId },
+      orderBy: [{ type: "asc" }, { name: "asc" }],
+    });
+    const capRows: CapTableRow[] = rows.map((r) => ({
+      id: r.id,
+      name: r.name,
+      type: r.type as StakeholderType,
+      shares: r.shares,
+      shareClass: r.shareClass,
+      vestingSummary: r.vestingSummary,
+    }));
+    const rollup = rollupCapTable(capRows);
+    return {
+      rows: rows.map((r, i) => toStakeholderView(r, rollup.rowPctBp[i])),
+      rollup: toCapTableRollupView(rollup),
+    };
+  }
+
+  async addStakeholder(
+    workspaceId: string,
+    roundId: string,
+    input: StakeholderInput,
+  ): Promise<StakeholderView> {
+    await this.requireRound(workspaceId, roundId);
+    const v = validateStakeholderInput(input);
+    const row = await this.prisma.fundingCapTableStakeholder.create({
+      data: {
+        workspaceId,
+        roundId,
+        name: v.name,
+        type: v.type,
+        shares: v.shares,
+        shareClass: v.shareClass,
+        vestingSummary: v.vestingSummary,
+        notes: v.notes,
+      },
+    });
+    // Rollup context for the new row's FD%.
+    const { rows } = await this.listStakeholders(workspaceId, roundId);
+    const created = rows.find((r) => r.id === row.id);
+    if (!created) throw new FundingError("STAKEHOLDER_NOT_FOUND", "Stakeholder was created but could not be read back.");
+    return created;
+  }
+
+  async updateStakeholder(
+    workspaceId: string,
+    stakeholderId: string,
+    input: StakeholderInput,
+  ): Promise<StakeholderView> {
+    const existing = await this.prisma.fundingCapTableStakeholder.findFirst({
+      where: { id: stakeholderId, workspaceId },
+    });
+    if (!existing) {
+      throw new FundingError("STAKEHOLDER_NOT_FOUND", "Stakeholder not found in this workspace.");
+    }
+    // Patch semantics: fill missing fields from the existing row.
+    const v = validateStakeholderInput({
+      name: input.name ?? existing.name,
+      type: input.type ?? existing.type,
+      shares:
+        input.shares ??
+        existing.shares.toString(),
+      shareClass: input.shareClass ?? existing.shareClass ?? undefined,
+      vestingSummary: input.vestingSummary ?? existing.vestingSummary ?? undefined,
+      notes: input.notes ?? existing.notes ?? undefined,
+    });
+    await this.prisma.fundingCapTableStakeholder.update({
+      where: { id: existing.id },
+      data: {
+        name: v.name,
+        type: v.type,
+        shares: v.shares,
+        shareClass: v.shareClass,
+        vestingSummary: v.vestingSummary,
+        notes: v.notes,
+      },
+    });
+    const { rows } = await this.listStakeholders(workspaceId, existing.roundId);
+    const updated = rows.find((r) => r.id === existing.id);
+    if (!updated) throw new FundingError("STAKEHOLDER_NOT_FOUND", "Stakeholder could not be read back.");
+    return updated;
+  }
+
+  async deleteStakeholder(workspaceId: string, stakeholderId: string): Promise<void> {
+    const existing = await this.prisma.fundingCapTableStakeholder.findFirst({
+      where: { id: stakeholderId, workspaceId },
+      select: { id: true },
+    });
+    if (!existing) {
+      throw new FundingError("STAKEHOLDER_NOT_FOUND", "Stakeholder not found in this workspace.");
+    }
+    await this.prisma.fundingCapTableStakeholder.delete({ where: { id: existing.id } });
+  }
+
+  // -- SAFE template selection -------------------------------------------
+
+  /**
+   * Record the founder's SAFE template pick as evidence on the
+   * `safe_template` checklist item. Templates are information, not advice —
+   * the LEGAL_DISCLAIMER ships on every picker surface.
+   */
+  async selectSafeTemplate(
+    workspaceId: string,
+    roundId: string,
+    input: { templateKey?: unknown; valuationCapUsd?: unknown; discountPct?: unknown; note?: unknown },
+    actor: string,
+    now = new Date(),
+  ): Promise<ChecklistItemView> {
+    await this.requireRound(workspaceId, roundId);
+    await this.ensureChecklist(workspaceId, roundId);
+    const sel = validateSafeSelection(input);
+
+    const item = await this.prisma.fundingRoundChecklistItem.findUnique({
+      where: { roundId_key: { roundId, key: "safe_template" } },
+    });
+    if (!item) throw new FundingError("CHECKLIST_NOT_SEEDED", "safe_template item missing.");
+
+    const evidence = validateChecklistEvidence(item.evidence ?? {});
+    evidence.safeTemplateKey = sel.templateKey;
+    evidence.safeTemplateParams = {
+      valuationCapUsd: sel.valuationCapUsd,
+      discountPct: sel.discountPct,
+    };
+    evidence.note = [
+      `Selected "${getSafeTemplate(sel.templateKey).name}"`,
+      sel.note ? `— ${sel.note}` : "",
+      `(recorded by ${actor})`,
+    ]
+      .join(" ")
+      .trim();
+
+    const updated = await this.prisma.fundingRoundChecklistItem.update({
+      where: { id: item.id },
+      data: {
+        evidence: evidence as unknown as Prisma.InputJsonValue,
+        status: "done",
+        completedAt: now,
+        completedBy: actor,
+      },
+    });
+    const template = READINESS_CHECKLIST_TEMPLATE.find((t) => t.key === "safe_template");
+    if (!template) throw new FundingError("CHECKLIST_NOT_SEEDED", "safe_template template missing.");
+    return toChecklistItemView(updated, template);
+  }
+
+  // -- Deterministic deck review -----------------------------------------
+
+  /**
+   * Run the deterministic rubric against the round's latest pitch-deck
+   * version. Stores the review row; every finding cites its signal, missing
+   * data is "not_detected" — nothing is invented.
+   */
+  async runDeckReview(
+    workspaceId: string,
+    roundId: string,
+    input: { deckText?: unknown },
+    now = new Date(),
+  ): Promise<DeckReviewView> {
+    await this.requireRound(workspaceId, roundId);
+    const { deckText } = validateDeckReviewInput(input);
+
+    const doc = await this.prisma.fundingDataRoomDoc.findFirst({
+      where: { workspaceId, kind: "pitch_deck" },
+      orderBy: { updatedAt: "desc" },
+      include: { currentVersion: true },
+    });
+    if (!doc || !doc.currentVersion) {
+      throw new FundingError(
+        "NO_PITCH_DECK",
+        "No pitch deck in the data room yet — upload one before running the review.",
+      );
+    }
+    const v = doc.currentVersion;
+
+    const output = reviewDeck({
+      fileName: v.fileName,
+      mimeType: v.mimeType,
+      sizeBytes: v.sizeBytes,
+      versionNumber: v.versionNumber,
+      uploadedAt: v.uploadedAt.toISOString(),
+      deckText,
+    });
+
+    const row = await this.prisma.fundingDeckReview.create({
+      data: {
+        workspaceId,
+        roundId,
+        docId: doc.id,
+        docVersionId: v.id,
+        inputHash: output.inputHash,
+        overallScore: output.overallScore,
+        results: output.results as unknown as Prisma.InputJsonValue,
+        narrative: output.narrative,
+        deckTextProvided: output.deckTextProvided,
+      },
+    });
+    return toDeckReviewView(row);
+  }
+
+  async getLatestDeckReview(
+    workspaceId: string,
+    roundId: string,
+  ): Promise<DeckReviewView | null> {
+    await this.requireRound(workspaceId, roundId);
+    const row = await this.prisma.fundingDeckReview.findFirst({
+      where: { workspaceId, roundId },
+      orderBy: { createdAt: "desc" },
+    });
+    return row ? toDeckReviewView(row) : null;
+  }
 }
 
 function toContactView(row: {
@@ -1342,3 +1855,144 @@ function toShareLinkView(
     createdAt: row.createdAt,
   };
 }
+
+// ------------------------------------------------------------------
+// Slice 4 view helpers
+// ------------------------------------------------------------------
+
+export interface CapTableRollupView {
+  totalShares: string;
+  byType: Record<StakeholderType, string>;
+  pctByTypeBp: Record<StakeholderType, number>;
+  topHolder: { name: string; shares: string; pctBp: number } | null;
+  rowCount: number;
+}
+
+export interface DeckReviewView {
+  id: string;
+  roundId: string;
+  docId: string | null;
+  docVersionId: string | null;
+  inputHash: string;
+  overallScore: number;
+  results: DeckCriterionResult[];
+  narrative: string;
+  deckTextProvided: boolean;
+  createdAt: Date;
+}
+
+function toChecklistItemView(
+  row: {
+    id: string;
+    roundId: string;
+    key: string;
+    status: string;
+    evidence: unknown;
+    notes: string | null;
+    completedAt: Date | null;
+    completedBy: string | null;
+  },
+  template: ChecklistTemplateEntry,
+): ChecklistItemView {
+  let evidence: ChecklistEvidence;
+  try {
+    evidence = validateChecklistEvidence(row.evidence ?? {});
+  } catch {
+    // Stored evidence predates validation — surface it raw rather than
+    // failing the whole readiness read.
+    evidence = (row.evidence as ChecklistEvidence) ?? { links: [] };
+    if (!Array.isArray(evidence.links)) evidence.links = [];
+  }
+  return {
+    id: row.id,
+    roundId: row.roundId,
+    key: row.key as ChecklistItemView["key"],
+    label: template.label,
+    description: template.description,
+    status: row.status as ChecklistItemView["status"],
+    evidence,
+    notes: row.notes,
+    completedAt: row.completedAt,
+    completedBy: row.completedBy,
+    legalDocTypes: template.legalDocTypes,
+    dataRoomKind: template.dataRoomKind,
+  };
+}
+
+function toStakeholderView(
+  row: {
+    id: string;
+    roundId: string;
+    name: string;
+    type: string;
+    shares: bigint;
+    shareClass: string | null;
+    vestingSummary: string | null;
+    notes: string | null;
+  },
+  fullyDilutedPctBp: number,
+): StakeholderView {
+  return {
+    id: row.id,
+    roundId: row.roundId,
+    name: row.name,
+    type: row.type as StakeholderType,
+    shares: row.shares.toString(),
+    shareClass: row.shareClass,
+    vestingSummary: row.vestingSummary,
+    notes: row.notes,
+    fullyDilutedPctBp,
+  };
+}
+
+function toCapTableRollupView(rollup: CapTableRollup): CapTableRollupView {
+  const str = (b: bigint) => b.toString();
+  return {
+    totalShares: str(rollup.totalShares),
+    byType: {
+      founder: str(rollup.byType.founder),
+      investor: str(rollup.byType.investor),
+      employee: str(rollup.byType.employee),
+      advisor: str(rollup.byType.advisor),
+    },
+    pctByTypeBp: rollup.pctByTypeBp,
+    topHolder: rollup.topHolder
+      ? {
+          name: rollup.topHolder.name,
+          shares: str(rollup.topHolder.shares),
+          pctBp: rollup.topHolder.pctBp,
+        }
+      : null,
+    rowCount: rollup.rowCount,
+  };
+}
+
+function toDeckReviewView(row: {
+  id: string;
+  roundId: string;
+  docId: string | null;
+  docVersionId: string | null;
+  inputHash: string;
+  overallScore: number;
+  results: unknown;
+  narrative: string;
+  deckTextProvided: boolean;
+  createdAt: Date;
+}): DeckReviewView {
+  return {
+    id: row.id,
+    roundId: row.roundId,
+    docId: row.docId,
+    docVersionId: row.docVersionId,
+    inputHash: row.inputHash,
+    overallScore: row.overallScore,
+    results: row.results as DeckCriterionResult[],
+    narrative: row.narrative,
+    deckTextProvided: row.deckTextProvided,
+    createdAt: row.createdAt,
+  };
+}
+
+// Re-exported for route/test convenience (keeps ChecklistStatus in the
+// type graph where the store consumes it).
+export type { ChecklistStatus, StakeholderInput, StakeholderType };

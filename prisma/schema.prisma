@@ -781,6 +781,10 @@ model Workspace {
   fundingFollowUps          FundingFollowUp[]
   fundingIntroRequests      FundingIntroRequest[]
   fundingDataRoomDocs       FundingDataRoomDoc[]
+  // Funding/VC slice 4: round readiness — checklist, cap table, deck reviews.
+  fundingRoundChecklistItems FundingRoundChecklistItem[]
+  fundingCapTableRows        FundingCapTableStakeholder[]
+  fundingDeckReviews         FundingDeckReview[]
   // Funding/VC slice 3: Data room versions, share links, view analytics.
   fundingDataRoomVersions   FundingDataRoomDocVersion[]
   fundingShareLinks         FundingShareLink[]
@@ -11560,6 +11564,8 @@ model FundingDataRoomDoc {
 
   versions   FundingDataRoomDocVersion[] @relation("FundingDocVersions")
   shareLinks FundingShareLink[]
+  // Funding/VC slice 4: deterministic pitch-deck reviews of this doc.
+  deckReviews FundingDeckReview[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -11601,6 +11607,9 @@ model FundingDataRoomDocVersion {
   // Share links pinned to this version; views of this version.
   pinnedShareLinks FundingShareLink[]
   views            FundingDocView[]
+
+  // Funding/VC slice 4: deterministic pitch-deck reviews of this version.
+  deckReviews FundingDeckReview[]
 
   @@unique([documentId, versionNumber])
   @@index([workspaceFileId])
@@ -11695,6 +11704,146 @@ model FundingRound {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
+  checklistItems   FundingRoundChecklistItem[]
+  capTableRows     FundingCapTableStakeholder[]
+  deckReviews      FundingDeckReview[]
+
   @@index([workspaceId, isActive])
   @@map("funding_rounds")
+}
+
+// Funding/VC slice 4: Round readiness checklist (BUSINESS-OS-FEATURE-SPECS.md
+// §3). One row per (round, checklist key); statuses are manual — the founder
+// owns the checklist. Evidence is a JSON bag of links — it may hold
+// read-only cross-links into the Legal feature (legalDocumentId pointing at
+// LegalDocument rows, e.g. docType=formation for incorporation,
+// docType=ein_letter for EIN), data-room refs (dataRoomDocId, shareLinkId),
+// plain URLs, and the selected SAFE template key. Nothing here is ever
+// legal advice; the LEGAL_DISCLAIMER label ships on SAFE-template surfaces.
+enum FundingChecklistItemKey {
+  incorporation
+  ein
+  cap_table
+  safe_template
+  pitch_deck
+  financials
+  data_room_links
+}
+
+enum FundingChecklistItemStatus {
+  todo
+  doing
+  done
+  waived
+}
+
+model FundingRoundChecklistItem {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  roundId String       @map("round_id")
+  round   FundingRound @relation(fields: [roundId], references: [id], onDelete: Cascade)
+
+  key    FundingChecklistItemKey
+  status FundingChecklistItemStatus @default(todo)
+
+  // Evidence bag. Shape: { links: [{ label, url?, legalDocumentId?,
+  // dataRoomDocId?, shareLinkId? }], safeTemplateKey?, safeTemplateParams?,
+  // testedAt?, note? }. Read-only cross-links: the store never writes to
+  // Legal rows from here, it only reads them for signals.
+  evidence Json? @default("{}")
+
+  notes String?
+
+  completedAt DateTime? @map("completed_at")
+  completedBy String?   @map("completed_by")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Exactly one row per (round, checklist key).
+  @@unique([roundId, key])
+  @@index([workspaceId, roundId])
+  @@map("funding_round_checklist_items")
+}
+
+enum FundingStakeholderType {
+  founder
+  investor
+  employee
+  advisor
+}
+
+// Funding/VC slice 4: cap table — v1 is MANUAL entry only, no live Carta
+// sync. Shares are BigInt at the schema level; rollups are pure functions
+// in lib/funding/readiness.ts (fully-diluted %, founder %, investor %).
+model FundingCapTableStakeholder {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  roundId String       @map("round_id")
+  round   FundingRound @relation(fields: [roundId], references: [id], onDelete: Cascade)
+
+  name         String
+  type         FundingStakeholderType
+  shares       BigInt                 // share count, >= 0
+  shareClass   String?                @map("share_class") // e.g. "Common", "Series Seed Preferred", "SAFE"
+  vestingSummary String?              @map("vesting_summary") // free text, e.g. "4yr/1yr cliff"
+  notes        String?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([workspaceId, roundId])
+  @@map("funding_cap_table_stakeholders")
+}
+
+// Funding/VC slice 4: deterministic pitch-deck review. The rubric scores are
+// ALWAYS computed by the pure `reviewDeck` function in
+// lib/funding/deck-review.ts over the latest pitch-deck version's metadata +
+// optional founder-supplied deck text — never by an LLM. The stored
+// `results` JSON cites the signal every finding came from; anything not
+// found is "not_detected", never invented. (The repo's intelligence layer
+// has no general text-completion interface, so v1 ships fully deterministic
+// — the narrative is a template over the deterministic findings.)
+model FundingDeckReview {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  roundId String       @map("round_id")
+  round   FundingRound @relation(fields: [roundId], references: [id], onDelete: Cascade)
+
+  // The deck version reviewed. SetNull: the review is a snapshot — deleting
+  // the doc keeps the review, with docId/versionId nulled.
+  docId        String?                    @map("doc_id")
+  doc          FundingDataRoomDoc?        @relation(fields: [docId], references: [id], onDelete: SetNull)
+  docVersionId String?                    @map("doc_version_id")
+  docVersion   FundingDataRoomDocVersion? @relation(fields: [docVersionId], references: [id], onDelete: SetNull)
+
+  // sha256 of the normalized review input (metadata + deck text) — two
+  // reviews with the same hash have byte-identical results.
+  inputHash String @map("input_hash")
+
+  // 0–100 deterministic overall score.
+  overallScore Int @map("overall_score")
+
+  // Array of { criterion, label, score, maxScore, verdict
+  // ("pass"|"partial"|"not_detected"), signals: [{ source: "deck_text" |
+  // "metadata", excerpt?, field?, value? }], note }.
+  results Json
+
+  // Deterministic template narrative over the findings (not LLM-drafted).
+  narrative String
+
+  // True when the founder supplied deck text; text-driven criteria are
+  // "not_detected" when false.
+  deckTextProvided Boolean @map("deck_text_provided")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([workspaceId, roundId, createdAt])
+  @@map("funding_deck_reviews")
 }
