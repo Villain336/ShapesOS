@@ -799,6 +799,12 @@ model Workspace {
   cadDesignProposals CadDesignProposal[]
   cadMfgRuns      CadMfgRun[]
   cadMfgFlags     CadManufacturabilityFlag[]
+  // CAD + Hardware slice 3: prototype pipeline.
+  cadRateCards     CadRateCard[]
+  cadBomVersions   CadBomVersion[]
+  cadBomLines      CadBomLine[]
+  cadCostEstimates CadCostEstimate[]
+  cadExportRequests CadExportRequest[]
   fundingDocViews           FundingDocView[]
   fundingRounds             FundingRound[]
   // Connector Agent slice 1: graph core — person/company/relationship/
@@ -12484,6 +12490,10 @@ model CadModel {
   mfgRuns     CadMfgRun[]
   mfgFlags    CadManufacturabilityFlag[]
 
+  // Slice 3: BOMs pinned to versions + export/quote requests per model.
+  bomVersions     CadBomVersion[]
+  exportRequests  CadExportRequest[]
+
   // Change-request state (slice 2): set ONLY by approving a design proposal
   // (human-only). Cleared when a new version is published.
   changeRequested           Boolean   @default(false) @map("change_requested")
@@ -12547,6 +12557,11 @@ model CadModelVersion {
   proposalTargets CadDesignProposal[] @relation("CadProposalTargetVersion")
   mfgRuns         CadMfgRun[]
   mfgFlags        CadManufacturabilityFlag[]
+
+  // Slice 3: BOMs pinned to this version + cost estimates + export requests.
+  bomVersions    CadBomVersion[]
+  costEstimates  CadCostEstimate[]
+  exportRequests CadExportRequest[]
 
   @@unique([modelId, versionNumber])
   @@index([workspaceFileId])
@@ -12753,4 +12768,176 @@ model CadManufacturabilityFlag {
 
   @@index([workspaceId, modelId, versionId])
   @@map("cad_mfg_flags")
+}
+
+// CAD + Hardware slice 3: prototype pipeline — rate cards, BOMs pinned to
+// model versions, cost estimates, vendor export / quote requests.
+// v1 boundary: NO live vendor APIs. A quote request is a draft-for-approval
+// record; "send" only records the tenant's own transmission (who, when, to
+// whom, via which connected account) — it never places an order.
+
+// Tenant-configurable process rate card. Rates are USD; `rates` follows the
+// RateCardRates shape documented in lib/cad/prototype.ts
+// ({ setupUsd, perUnitUsd, perCm3Usd, notes }). `source` is a source pointer
+// for ingested vendor/datasheet reference data (clean-sourcing); null for
+// hand-entered cards.
+model CadRateCard {
+  id          String @id @default(cuid())
+  workspaceId String @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  name     String
+  process  String // 3d_print | pcb | cnc (validated in lib/cad/prototype.ts)
+  currency String @default("USD")
+  rates    Json   @default("{}")
+  isDefault Boolean @default(false) @map("is_default")
+  source   String?
+
+  createdBy String?  @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  estimates CadCostEstimate[]
+
+  @@index([workspaceId, process])
+  @@map("cad_rate_cards")
+}
+
+// One BOM revision, pinned to a single immutable model version.
+// bomNumber is sequential per model. v1: all lines are tenant-entered
+// ("manual"); derived sources are rejected until a derived method exists.
+model CadBomVersion {
+  id          String @id @default(cuid())
+  workspaceId String @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  modelId String   @map("model_id")
+  model   CadModel @relation(fields: [modelId], references: [id], onDelete: Cascade)
+
+  // The model version this BOM describes. Never moves when new versions publish.
+  modelVersionId String          @map("model_version_id")
+  modelVersion   CadModelVersion @relation(fields: [modelVersionId], references: [id], onDelete: Cascade)
+
+  bomNumber Int @map("bom_number")
+  notes     String?
+
+  createdBy String  @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  lines     CadBomLine[]
+  estimates CadCostEstimate[]
+
+  @@unique([modelId, bomNumber])
+  @@index([workspaceId, modelId])
+  @@map("cad_bom_versions")
+}
+
+model CadBomLine {
+  id          String @id @default(cuid())
+  workspaceId String @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  bomVersionId String        @map("bom_version_id")
+  bomVersion   CadBomVersion @relation(fields: [bomVersionId], references: [id], onDelete: Cascade)
+
+  partName     String  @map("part_name")
+  qty          Float
+  unitName     String  @default("pcs") @map("unit_name")
+  materialSpec String? @map("material_spec")
+  supplier     String?
+  // USD per unit. Null = unknown: contributes $0, flagged in the rollup.
+  unitCostUsd Float? @map("unit_cost_usd")
+  // "manual" | "derived:<method>". v1 rejects any derived: source.
+  source    String @default("manual")
+  sortOrder Int    @default(0) @map("sort_order")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([bomVersionId, sortOrder])
+  @@map("cad_bom_lines")
+}
+
+// Labeled cost estimate pinned to (model version, BOM version, rate card).
+// `basis` is the CostBreakdown from lib/cad/prototype.ts — isEstimate: true,
+// the rate card cited by id/name, warnings for uncomputable components.
+// This is an estimate, never a vendor quote.
+model CadCostEstimate {
+  id          String @id @default(cuid())
+  workspaceId String @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  modelVersionId String          @map("model_version_id")
+  modelVersion   CadModelVersion @relation(fields: [modelVersionId], references: [id], onDelete: Cascade)
+
+  bomVersionId String        @map("bom_version_id")
+  bomVersion   CadBomVersion @relation(fields: [bomVersionId], references: [id], onDelete: Restrict)
+
+  rateCardId String      @map("rate_card_id")
+  rateCard   CadRateCard @relation(fields: [rateCardId], references: [id], onDelete: Restrict)
+
+  quantity       Float
+  currency       String @default("USD")
+  bomTotalUsd    Float  @map("bom_total_usd")
+  processCostUsd Float  @map("process_cost_usd")
+  grandTotalUsd  Float  @map("grand_total_usd")
+  perUnitUsd     Float? @map("per_unit_usd")
+  // Labeled breakdown + warnings (CostBreakdown).
+  basis Json
+
+  createdBy String  @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([workspaceId, modelVersionId])
+  @@map("cad_cost_estimates")
+}
+
+// Vendor export / quote request. Lifecycle: draft → confirmed → sent.
+// - draft: tenant-entered; reviewable.
+// - confirmed (human-only): the export package (model file + manifest with
+//   checksum + process params + contact) is written to the workspace file
+//   store. manifestPath points at it.
+// - sent (human-only): records the tenant's own transmission — sentBy,
+//   sentAt, recipient, sentViaAccount (the tenant's connected account name).
+//   v1 NEVER places an order and calls no vendor API; the send row is the
+//   auditable event.
+model CadExportRequest {
+  id          String @id @default(cuid())
+  workspaceId String @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  modelId String   @map("model_id")
+  model   CadModel @relation(fields: [modelId], references: [id], onDelete: Cascade)
+
+  modelVersionId String          @map("model_version_id")
+  modelVersion   CadModelVersion @relation(fields: [modelVersionId], references: [id], onDelete: Cascade)
+
+  // 3d_print | pcb | cnc (validated in lib/cad/prototype.ts)
+  process        String
+  quantity       Float
+  processOptions Json   @default("{}") @map("process_options")
+  // { name, email, addressLines } — tenant-entered on the form.
+  contact Json
+
+  // draft | confirmed | sent (validated in lib/cad/prototype.ts)
+  status String @default("draft")
+
+  // Logical path of the package manifest written at confirm time.
+  manifestPath String? @map("manifest_path")
+
+  confirmedBy String?   @map("confirmed_by")
+  confirmedAt DateTime? @map("confirmed_at")
+
+  // Send lineage: the tenant's own account, recorded, never a live send.
+  sentBy         String?   @map("sent_by")
+  sentAt         DateTime? @map("sent_at")
+  recipient      String?
+  sentViaAccount String?   @map("sent_via_account")
+
+  createdBy String  @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([workspaceId, modelId])
+  @@map("cad_export_requests")
 }

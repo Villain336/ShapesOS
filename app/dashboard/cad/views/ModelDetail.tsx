@@ -17,6 +17,7 @@ import {
   Sparkles,
   FlaskConical,
   AlertTriangle,
+  Package,
 } from "lucide-react";
 import { CadViewer } from "./CadViewer";
 import { UploadForm } from "./CadApp";
@@ -25,6 +26,7 @@ import { ShareLinksTab } from "./ShareLinksTab";
 import { AnnotationsTab } from "./AnnotationsTab";
 import { ProposalsTab } from "./ProposalsTab";
 import { ManufacturingTab } from "./ManufacturingTab";
+import { PrototypeTab } from "./PrototypeTab";
 import { STEP_PREVIEW_MESSAGE } from "@/lib/cad/types";
 
 interface Version {
@@ -98,6 +100,7 @@ const TABS = [
   { key: "notes", label: "Notes", icon: StickyNote },
   { key: "changes", label: "Changes", icon: Sparkles },
   { key: "manufacturing", label: "Manufacturing", icon: FlaskConical },
+  { key: "prototype", label: "Prototype", icon: Package },
   { key: "versions", label: "Versions", icon: History },
   { key: "compare", label: "Compare", icon: GitCompareArrows },
   { key: "links", label: "Share links", icon: Link2 },
@@ -267,6 +270,14 @@ export function ModelDetail({
 
       {tab === "manufacturing" && (
         <ManufacturingTab
+          modelId={modelId}
+          versions={detail.versions}
+          currentVersionId={detail.model.currentVersionId}
+        />
+      )}
+
+      {tab === "prototype" && (
+        <PrototypeTab
           modelId={modelId}
           versions={detail.versions}
           currentVersionId={detail.model.currentVersionId}
