@@ -64,6 +64,16 @@ import {
   type FundingInvestorTargetView,
   type ModeTargetListView,
 } from "./modes";
+import {
+  matchDirectoryProfiles,
+  toDirectoryProfileView,
+  validateDirectoryProfileInput,
+  type DirectoryMatch,
+  type DirectoryMatchCriteria,
+  type DirectoryProfileInput,
+  type DirectoryProfileRow,
+  type DirectoryProfileView,
+} from "./directory";
 import type { InvestorStage } from "../funding/types";
 
 type RelationshipRow = {
@@ -1074,6 +1084,121 @@ export class PrismaConnectorStore {
       }
     }
     return { targetsWarmed: targets.length, pathsCached };
+  }
+
+  // ------------------------------------------------------------------
+  // Slice 6 — opt-in discoverability.
+  //
+  // The directory profile is the ONLY cross-tenant-readable connector
+  // data. Opt-in only: a tenant with no profile (or discoverable=false)
+  // is invisible to matching. Reversible: flipping discoverable to false
+  // unpublishes instantly. findDirectoryMatches throws not_discoverable
+  // when the VIEWER isn't discoverable (mutual-discoverability gate) and
+  // never reads the private graph across tenants — only directory rows.
+  // ------------------------------------------------------------------
+
+  /** The tenant's own directory profile. Null when never set (invisible). */
+  async getDirectoryProfile(workspaceId: string): Promise<DirectoryProfileView | null> {
+    const row = (await this.prisma.connectorDirectoryProfile.findUnique({
+      where: { workspaceId },
+    })) as DirectoryProfileRow | null;
+    if (!row) return null;
+    return toDirectoryProfileView(row);
+  }
+
+  /**
+   * Publish / edit / unpublish the tenant's directory profile (upsert —
+   * partial input merges with the existing row). Publishing
+   * (discoverable=true) requires a name (the name+role facet needs an
+   * identity). Unpublishing (discoverable=false) is a plain update and
+   * hides the profile immediately — fully reversible.
+   */
+  async setDirectoryProfile(
+    workspaceId: string,
+    input: DirectoryProfileInput,
+  ): Promise<DirectoryProfileView> {
+    const { errors, value } = validateDirectoryProfileInput(input);
+    if (!value) {
+      throw new ConnectorError("invalid_directory_profile", errors.join(" "));
+    }
+    const existing = (await this.prisma.connectorDirectoryProfile.findUnique({
+      where: { workspaceId },
+    })) as DirectoryProfileRow | null;
+
+    // Merge: undefined = not provided (keep current). Publishing requires a
+    // merged name — the name+role facet needs an identity.
+    const discoverable = value.discoverable ?? existing?.discoverable ?? false;
+    const name = value.name !== undefined ? value.name : (existing?.name ?? null);
+
+    // The merged-name rule: no nameless publishing, even when the name
+    // would have come from the existing row.
+    if (discoverable && !name) {
+      throw new ConnectorError(
+        "publish_requires_name",
+        "name is required to publish — the directory needs an identity.",
+      );
+    }
+
+    const row = (await this.prisma.connectorDirectoryProfile.upsert({
+      where: { workspaceId },
+      create: {
+        workspaceId,
+        discoverable,
+        name: value.name ?? null,
+        role: value.role ?? null,
+        company: value.company ?? null,
+        bio: value.bio ?? null,
+        industries: value.industries ?? [],
+        lookingFor: value.lookingFor ?? null,
+        shareNameRole: value.shareNameRole ?? true,
+        shareFull: value.shareFull ?? false,
+      },
+      update: {
+        ...(value.discoverable !== undefined ? { discoverable: value.discoverable } : {}),
+        ...(value.name !== undefined ? { name: value.name } : {}),
+        ...(value.role !== undefined ? { role: value.role } : {}),
+        ...(value.company !== undefined ? { company: value.company } : {}),
+        ...(value.bio !== undefined ? { bio: value.bio } : {}),
+        ...(value.industries !== undefined ? { industries: value.industries } : {}),
+        ...(value.lookingFor !== undefined ? { lookingFor: value.lookingFor } : {}),
+        ...(value.shareNameRole !== undefined ? { shareNameRole: value.shareNameRole } : {}),
+        ...(value.shareFull !== undefined ? { shareFull: value.shareFull } : {}),
+      },
+    })) as DirectoryProfileRow;
+    return toDirectoryProfileView(row);
+  }
+
+  /**
+   * Mutual-discoverability matching. The viewer's own profile must be
+   * published (else not_discoverable). Candidate rows are read directly —
+   * directory profiles only, NEVER the private graph. Non-discoverable
+   * candidates are filtered by the pure matcher (never matched).
+   */
+  async findDirectoryMatches(
+    workspaceId: string,
+    criteria?: DirectoryMatchCriteria,
+  ): Promise<DirectoryMatch[]> {
+    const own = (await this.prisma.connectorDirectoryProfile.findUnique({
+      where: { workspaceId },
+    })) as DirectoryProfileRow | null;
+    if (!own?.discoverable) {
+      throw new ConnectorError(
+        "not_discoverable",
+        "Directory matching requires mutual discoverability: publish your own profile before matching against other discoverable users.",
+      );
+    }
+    // Bound the candidate set; the pure matcher applies the gates.
+    const candidates = (await this.prisma.connectorDirectoryProfile.findMany({
+      where: { discoverable: true, NOT: { workspaceId } },
+      take: 500,
+      orderBy: { updatedAt: "desc" },
+    })) as DirectoryProfileRow[];
+    return matchDirectoryProfiles({
+      viewerWorkspaceId: workspaceId,
+      viewerDiscoverable: true,
+      candidates,
+      criteria,
+    });
   }
 }
 

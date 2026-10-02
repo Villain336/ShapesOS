@@ -191,3 +191,110 @@ export const inputCls =
 
 export const textareaCls =
   "rounded-md border border-control bg-paper px-3 py-2 text-[14px] leading-relaxed text-ink";
+
+// ---------------------------------------------------------------------------
+// Slice 6 — Directory + Boardy rail shared bits.
+// Agentic OS design system: switches are 44×26 pills (on: ink, off:
+// disabled-fg) with role=switch and a visible label to the left; Boardy
+// request statuses are data (monochrome pills, like intro statuses); the
+// PRIORITY reply flag is a needs-you signal — yellow fill, black text,
+// triangle shape (it demands the tenant's attention).
+// ---------------------------------------------------------------------------
+
+export function Switch({
+  on,
+  onChange,
+  label,
+  disabled,
+}: {
+  on: boolean;
+  onChange: (v: boolean) => void;
+  label: string;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={on}
+      aria-label={label}
+      disabled={disabled}
+      onClick={() => onChange(!on)}
+      className={`relative h-[26px] w-11 shrink-0 rounded-full transition-colors disabled:opacity-40 ${
+        on ? "bg-ink" : "bg-disabled-fg"
+      }`}
+    >
+      <span
+        className={`absolute top-[3px] h-5 w-5 rounded-full bg-paper shadow transition-all ${
+          on ? "left-[21px]" : "left-[3px]"
+        }`}
+        aria-hidden
+      />
+    </button>
+  );
+}
+
+/** A labeled switch row: visible label left, switch right. */
+export function SwitchRow({
+  on,
+  onChange,
+  label,
+  hint,
+  disabled,
+}: {
+  on: boolean;
+  onChange: (v: boolean) => void;
+  label: string;
+  hint?: string;
+  disabled?: boolean;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-4">
+      <div className="min-w-0">
+        <p className="text-[15px] font-semibold text-ink">{label}</p>
+        {hint && <p className="mt-0.5 text-[13px] text-muted">{hint}</p>}
+      </div>
+      <Switch on={on} onChange={onChange} label={label} disabled={disabled} />
+    </div>
+  );
+}
+
+export type BoardyRequestStatusUI =
+  | "draft"
+  | "approved"
+  | "declined"
+  | "sent"
+  | "replied"
+  | "cancelled";
+
+export const BOARDY_STATUS_LABELS: Record<BoardyRequestStatusUI, string> = {
+  draft: "Draft",
+  approved: "Approved",
+  declined: "Declined",
+  sent: "Sent",
+  replied: "Replied",
+  cancelled: "Cancelled",
+};
+
+/** Slice 6: Boardy request status — data, not an agent state: monochrome. */
+export function BoardyStatusPill({ status }: { status: BoardyRequestStatusUI }) {
+  return (
+    <span className="inline-flex h-7 shrink-0 items-center rounded-full border border-line bg-canvas px-3 text-[12px] font-semibold text-ink">
+      {BOARDY_STATUS_LABELS[status] ?? status}
+    </span>
+  );
+}
+
+/** The priority-reply flag: needs-you yellow + triangle + black text. */
+export function PriorityReplyPill() {
+  return (
+    <span className="inline-flex h-7 shrink-0 items-center gap-1.5 rounded-full bg-needs px-3 text-[12px] font-semibold text-black">
+      <span
+        className="aos-shape aos-shape--needs [--aos-shape-size:12px]"
+        style={{ color: "inherit" }}
+        aria-hidden
+      />
+      Priority reply
+    </span>
+  );
+}

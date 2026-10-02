@@ -805,6 +805,9 @@ model Workspace {
   connectorIntroductionEvents ConnectorIntroductionEvent[]
   // Connector Agent slice 5: tenant-level mode preference (LEADS/FUNDING).
   connectorSetting          ConnectorSetting?
+  // Connector Agent slice 6: opt-in directory profile + Boardy escalation rail.
+  connectorDirectoryProfile ConnectorDirectoryProfile?
+  connectorBoardyRequests   ConnectorBoardyRequest[]
   insurancePaymentHandoffs  InsurancePaymentHandoff[]
   insuranceCertificates     InsuranceCertificate[]
   // Phase 12 (embeds): tenant-scoped GrowthBook flag overrides.
@@ -12307,4 +12310,109 @@ model ConnectorIntroductionEvent {
   @@index([workspaceId])
   @@index([introductionId, createdAt])
   @@map("connector_agent_introduction_events")
+}
+
+// Connector Agent slice 6: opt-in discoverability + Boardy escalation rail.
+// SPEC-CONNECTOR-AGENT.md §5/§6.
+//
+// Directory profile — the ONLY cross-tenant-readable connector data.
+// Opt-in only (Tico 2026-09-30): discoverable=false (default) is invisible
+// to matching. Reversible: unpublishing is a plain update. Per-facet
+// publish toggles: name+role vs fuller profile. The private graph
+// (ConnectorPerson/Relationship/...) is NEVER read across tenants.
+model ConnectorDirectoryProfile {
+  id          String    @id @default(cuid())
+  workspaceId String    @unique @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  discoverable Boolean @default(false)
+
+  name       String?
+  role       String?
+  company    String?
+  bio        String?   @db.Text
+  industries String[]  @default([])
+  lookingFor String?   @map("looking_for")
+
+  // Facet toggles: shareNameRole = name+role facet; shareFull = fuller
+  // profile facet (company, bio, industries, lookingFor). Only published
+  // facets are exposed to matching tenants.
+  shareNameRole Boolean @default(true)  @map("share_name_role")
+  shareFull     Boolean @default(false) @map("share_full")
+
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("connector_agent_directory_profiles")
+}
+
+// Boardy escalation lifecycle. boardy.ai/agentskill is an instruction page
+// for an EMAIL flow, not a programmatic API (verified 2026-09-30) — so the
+// rail is: agent drafts → tenant approves per instance (human-only) → sends
+// from the tenant's own address to boardy@boardy.ai → Boardy's reply is
+// triaged as a priority thread. Boardy is FREE to use (Tico 2026-09-30).
+// The native loop NEVER blocks on this rail: escalation is optional and
+// async — propose/send paths throw cleanly and never touch introductions.
+enum ConnectorBoardyRequestStatus {
+  draft
+  approved
+  declined
+  sent
+  replied
+  cancelled
+}
+
+model ConnectorBoardyRequest {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  status ConnectorBoardyRequestStatus @default(draft)
+
+  // The context-rich draft: who the target is, why, what the tenant offers.
+  targetName    String  @map("target_name")
+  targetRole    String? @map("target_role")
+  targetContext String  @map("target_context") @db.Text
+  offerSummary  String  @map("offer_summary") @db.Text
+  draftedSubject String @map("drafted_subject")
+  draftedBody    String @map("drafted_body") @db.Text
+  mode           ConnectorMode @default(leads)
+
+  // Approval gate: NO send without tenant approval (human-only).
+  approvedBy String?   @map("approved_by")
+  approvedAt DateTime? @map("approved_at")
+
+  // Send lineage: from the tenant's own address via their connected account.
+  sentVia String?   @map("sent_via")
+  sentAt  DateTime? @map("sent_at")
+
+  // Reply triage: Boardy's reply flagged as a priority thread.
+  priorityThread Boolean   @default(false) @map("priority_thread")
+  replySummary   String?   @map("reply_summary") @db.Text
+  repliedAt      DateTime? @map("replied_at")
+
+  events ConnectorBoardyRequestEvent[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([workspaceId])
+  @@index([workspaceId, status])
+  @@map("connector_agent_boardy_requests")
+}
+
+// Audit lineage for one Boardy request: what was said, by whom, when.
+model ConnectorBoardyRequestEvent {
+  id        String @id @default(cuid())
+  requestId String @map("request_id")
+  request   ConnectorBoardyRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  kind          String
+  actorKind     String  @map("actor_kind")
+  actorIdentity String  @map("actor_identity")
+  message       String? @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([requestId, createdAt])
+  @@map("connector_agent_boardy_request_events")
 }

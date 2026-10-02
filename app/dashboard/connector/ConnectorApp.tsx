@@ -11,9 +11,11 @@ import { useCallback, useEffect, useState } from "react";
 import {
   ArrowLeftRight,
   Building2,
+  Globe,
   HandCoins,
   Inbox,
   Loader2,
+  Mail,
   Package,
   PhoneIncoming,
   PhoneOutgoing,
@@ -27,6 +29,8 @@ import { ImportSourcesTab } from "./ImportSourcesTab";
 import { FindPathsTab } from "./FindPathsTab";
 import { ApprovalsTab } from "./ApprovalsTab";
 import { IntroductionsTab } from "./IntroductionsTab";
+import { DirectoryTab } from "./DirectoryTab";
+import { BoardyTab } from "./BoardyTab";
 import type {
   ConnectorCompanyView,
   ConnectorGraphView,
@@ -84,7 +88,7 @@ function ModeSwitch({
   );
 }
 
-type Tab = "people" | "companies" | "batches" | "imports" | "paths" | "approvals" | "intros";
+type Tab = "people" | "companies" | "batches" | "imports" | "paths" | "approvals" | "intros" | "directory" | "boardy";
 
 function WarmthMeter({ score, compact }: { score: number; compact?: boolean }) {
   // Monochrome: warmth is data, not an agent state — never the status colors.
@@ -355,6 +359,11 @@ export function ConnectorApp() {
   // Slice 5: tenant-level connector mode (the LEADS/FUNDING switch).
   const [mode, setModeState] = useState<ConnectorMode>("leads");
   const [modeSaving, setModeSaving] = useState(false);
+  // Slice 6: a directory match seeds the Boardy composer ("Ask Boardy").
+  const [boardySeed, setBoardySeed] = useState<{
+    targetName: string;
+    targetRole?: string;
+  } | null>(null);
 
   const loadMode = useCallback(async () => {
     try {
@@ -447,6 +456,8 @@ export function ConnectorApp() {
     { id: "people" as const, label: "People", icon: Users },
     { id: "companies" as const, label: "Companies", icon: Building2 },
     { id: "paths" as const, label: "Find a path", icon: Route },
+    { id: "directory" as const, label: "Directory", icon: Globe },
+    { id: "boardy" as const, label: "Boardy", icon: Mail },
     { id: "approvals" as const, label: "Approvals", icon: Inbox, badge: pendingApprovals },
     { id: "intros" as const, label: "Introductions", icon: ArrowLeftRight },
     { id: "batches" as const, label: "Import batches", icon: Package },
@@ -585,6 +596,19 @@ export function ConnectorApp() {
       )}
 
       {tab === "approvals" && <ApprovalsTab onChanged={refresh} />}
+
+      {tab === "directory" && (
+        <DirectoryTab
+          onAskBoardy={(seed) => {
+            setBoardySeed(seed);
+            setTab("boardy");
+          }}
+        />
+      )}
+
+      {tab === "boardy" && (
+        <BoardyTab seed={boardySeed} onSeedConsumed={() => setBoardySeed(null)} />
+      )}
 
       {tab === "intros" && <IntroductionsTab />}
 

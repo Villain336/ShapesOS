@@ -7,6 +7,8 @@ const NOT_FOUND = new Set([
   "target_not_found",
   "funding_investor_not_found",
   "dataroom_doc_not_found",
+  // Slice 6: Boardy rail.
+  "boardy_request_not_found",
 ]);
 
 export function introErrorResponse(e: ConnectorError) {
