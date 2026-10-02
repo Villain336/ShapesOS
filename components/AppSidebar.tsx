@@ -47,6 +47,7 @@ import {
   Scale,
   Handshake,
   Network,
+  Box,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import GlideMenu from "@/components/vault/primitives/GlideMenu";
@@ -126,6 +127,9 @@ const NAV_SECTIONS: {
       // Connector Agent slice 1: the connector's Network home — people,
       // companies, relationship warmth, import provenance.
       { href: "/dashboard/connector", label: "Network", icon: Network },
+      // CAD + Hardware slice 1: CAD viewer + versioning — project/model
+      // registry, in-browser three.js viewer, version diffs, share links.
+      { href: "/dashboard/cad", label: "CAD", icon: Box },
     ],
   },
 ];

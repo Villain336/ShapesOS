@@ -788,6 +788,12 @@ model Workspace {
   // Funding/VC slice 3: Data room versions, share links, view analytics.
   fundingDataRoomVersions   FundingDataRoomDocVersion[]
   fundingShareLinks         FundingShareLink[]
+  // CAD + Hardware slice 1: CAD viewer + versioning.
+  cadProjects     CadProject[]
+  cadModels       CadModel[]
+  cadModelVersions CadModelVersion[]
+  cadModelDiffs   CadModelDiff[]
+  cadShareLinks   CadShareLink[]
   fundingDocViews           FundingDocView[]
   fundingRounds             FundingRound[]
   // Connector Agent slice 1: graph core — person/company/relationship/
@@ -3266,6 +3272,8 @@ model WorkspaceFile {
   // Legal/Compliance slice 3: Document vault — versions referencing this file.
   legalDocumentVersions      LegalDocumentVersion[]
   fundingDataRoomDocVersions FundingDataRoomDocVersion[]
+  // CAD + Hardware slice 1: model versions referencing this file.
+  cadModelVersions           CadModelVersion[]
 
   @@index([workspaceId, trashedAt])
   @@index([workspaceId, kind])
@@ -12415,4 +12423,169 @@ model ConnectorBoardyRequestEvent {
 
   @@index([requestId, createdAt])
   @@map("connector_agent_boardy_request_events")
+}
+
+// CAD + Hardware slice 1: CAD viewer + versioning (BUSINESS-OS-FEATURE-SPECS.md
+// §2). Tenant-scoped CAD project + model registry with immutable version
+// chains, visual-diff metadata, and expiring/revocable share links.
+// Reference customer: the autonomous drone platform build (drone airframes).
+enum CadModelFormat {
+  stl
+  obj
+  step
+}
+
+model CadProject {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  name        String
+  description String?
+  createdBy   String?   @map("created_by")
+
+  models CadModel[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([workspaceId])
+  @@map("cad_projects")
+}
+
+model CadModel {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  projectId String     @map("project_id")
+  project   CadProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  name        String
+  description String?
+  createdBy   String?   @map("created_by")
+
+  // The live tip of the immutable version chain. New uploads never mutate
+  // published version rows — this pointer moves forward instead.
+  currentVersionId String?           @map("current_version_id")
+  currentVersion   CadModelVersion? @relation("CadModelCurrentVersion", fields: [currentVersionId], references: [id], onDelete: SetNull)
+
+  versions   CadModelVersion[] @relation("CadModelVersions")
+  diffs      CadModelDiff[]
+  shareLinks CadShareLink[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([workspaceId, projectId])
+  @@map("cad_models")
+}
+
+// One row per upload. Immutable once published: no update path exists.
+model CadModelVersion {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  modelId String   @map("model_id")
+  model   CadModel @relation("CadModelVersions", fields: [modelId], references: [id], onDelete: Cascade)
+
+  versionNumber   Int           @map("version_number")
+  workspaceFileId String        @map("workspace_file_id")
+  workspaceFile   WorkspaceFile @relation(fields: [workspaceFileId], references: [id], onDelete: Cascade)
+
+  fileName  String  @map("file_name")
+  mimeType  String? @map("mime_type")
+  sizeBytes Int     @map("size_bytes")
+  // sha256 of the original bytes — integrity + dedup reference.
+  checksum String
+  format   CadModelFormat
+
+  // Geometry stats, parsed from the real bytes at upload (null = the format
+  // was not parseable — STEP always lands here; marked unavailable, never
+  // invented). Drives the visual-diff metadata.
+  triangleCount  Int?   @map("triangle_count")
+  bboxMin        Json?  @map("bbox_min")
+  bboxMax        Json?  @map("bbox_max")
+  volumeEstimate Float? @map("volume_estimate")
+
+  // STEP has no three.js loader: this is false for STEP, always.
+  previewAvailable Boolean @map("preview_available")
+
+  notes      String?
+  uploadedBy String   @map("uploaded_by")
+  uploadedAt DateTime @default(now()) @map("uploaded_at")
+
+  supersedesVersionId String?           @map("supersedes_version_id")
+  supersedes          CadModelVersion?  @relation("CadVersionSupersedes", fields: [supersedesVersionId], references: [id], onDelete: SetNull)
+  supersededBy        CadModelVersion[] @relation("CadVersionSupersedes")
+
+  // Models / share links pointing at this version.
+  currentOf        CadModel[]      @relation("CadModelCurrentVersion")
+  pinnedShareLinks CadShareLink[]
+  diffsFrom        CadModelDiff[]  @relation("CadDiffFrom")
+  diffsTo          CadModelDiff[]  @relation("CadDiffTo")
+
+  @@unique([modelId, versionNumber])
+  @@index([workspaceFileId])
+  @@map("cad_model_versions")
+}
+
+// Visual-diff metadata between two versions of one model. availability is
+// "computed" only when BOTH sides yielded real parsed stats; otherwise every
+// numeric field is null ("unavailable" — the UI says so, never a guess).
+model CadModelDiff {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  modelId String   @map("model_id")
+  model   CadModel @relation(fields: [modelId], references: [id], onDelete: Cascade)
+
+  fromVersionId String          @map("from_version_id")
+  fromVersion   CadModelVersion @relation("CadDiffFrom", fields: [fromVersionId], references: [id], onDelete: Cascade)
+  toVersionId   String          @map("to_version_id")
+  toVersion     CadModelVersion @relation("CadDiffTo", fields: [toVersionId], references: [id], onDelete: Cascade)
+
+  availability  String
+  triangleDelta Int?   @map("triangle_delta")
+  sizeDelta     Json?  @map("size_delta")
+  centerDelta   Float? @map("center_delta")
+  volumeFrom    Float? @map("volume_from")
+  volumeTo      Float? @map("volume_to")
+  volumeDelta   Float? @map("volume_delta")
+
+  computedAt DateTime @default(now()) @map("computed_at")
+
+  @@unique([modelId, fromVersionId, toVersionId])
+  @@map("cad_model_diffs")
+}
+
+// Tokenized collaborator links. Fail-closed: unknown, revoked, or expired
+// tokens resolve to LINK_NOT_FOUND / LINK_REVOKED / LINK_EXPIRED — the public
+// surface 404s all three. null pinnedVersionId = the model's current version
+// at access time.
+model CadShareLink {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  modelId String   @map("model_id")
+  model   CadModel @relation(fields: [modelId], references: [id], onDelete: Cascade)
+
+  pinnedVersionId String?          @map("pinned_version_id")
+  pinnedVersion   CadModelVersion? @relation(fields: [pinnedVersionId], references: [id], onDelete: SetNull)
+
+  // cadsl_<32 hex>, unique — returned ONCE at creation.
+  token     String    @unique
+  label     String?
+  expiresAt DateTime  @map("expires_at")
+  revoked   Boolean   @default(false)
+  revokedAt DateTime? @map("revoked_at")
+
+  createdBy String?  @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([workspaceId, modelId])
+  @@map("cad_share_links")
 }
