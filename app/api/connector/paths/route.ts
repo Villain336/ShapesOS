@@ -4,10 +4,14 @@
 // freshness, and human-readable explanations composed from stored data
 // only. Served from the per-tenant TTL cache unless { recompute: true }.
 // Paths are computed, never persisted.
+// Slice 5: { mode } per-query override — company targets are mode-scoped
+// (LEADS: customer/prospect/partner; FUNDING: investor).
 import { guardWorkspace, httpErrorResponse, readJson } from "@/lib/enrichment/guard";
 import { prisma } from "@/lib/prisma";
 import { PrismaConnectorStore } from "@/lib/connector/prisma-store";
 import { ConnectorError } from "@/lib/connector/types";
+import { CONNECTOR_MODES, type ConnectorMode } from "@/lib/connector/modes";
+import { introErrorResponse } from "../intros/intro-error";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +23,7 @@ export async function POST(req: Request) {
       targetCompanyId?: unknown;
       limit?: unknown;
       recompute?: unknown;
+      mode?: unknown;
     };
 
     const targetPersonId =
@@ -37,6 +42,14 @@ export async function POST(req: Request) {
       }
       limit = n;
     }
+    let mode: ConnectorMode | undefined;
+    if (body.mode != null && body.mode !== "") {
+      const m = typeof body.mode === "string" ? body.mode.trim().toLowerCase() : "";
+      if (!(CONNECTOR_MODES as readonly string[]).includes(m)) {
+        throw new ConnectorError("invalid_mode", `mode must be one of: ${CONNECTOR_MODES.join(", ")}.`);
+      }
+      mode = m as ConnectorMode;
+    }
 
     const store = new PrismaConnectorStore(prisma);
     const { result, cached, computedAt } = await store.computeIntroPaths(workspace.id, {
@@ -44,9 +57,11 @@ export async function POST(req: Request) {
       targetCompanyId,
       maxPaths: limit,
       recompute: body.recompute === true,
+      mode,
     });
     return Response.json({ ...result, cached, computedAt });
   } catch (e) {
+    if (e instanceof ConnectorError) return introErrorResponse(e);
     return httpErrorResponse(e);
   }
 }

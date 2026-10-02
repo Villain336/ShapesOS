@@ -1,7 +1,13 @@
 // Marketr — Connector Agent slice 4 API: shared ConnectorError → HTTP mapping.
 import { ConnectorError } from "@/lib/connector/types";
 
-const NOT_FOUND = new Set(["introduction_not_found", "person_not_found"]);
+const NOT_FOUND = new Set([
+  "introduction_not_found",
+  "person_not_found",
+  "target_not_found",
+  "funding_investor_not_found",
+  "dataroom_doc_not_found",
+]);
 
 export function introErrorResponse(e: ConnectorError) {
   let status = 400;

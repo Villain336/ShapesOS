@@ -1,5 +1,7 @@
 // Marketr — Connector Agent slice 4 UI: shared bits for the approval inbox
 // and the introductions list/detail.
+// Slice 5: ModePill — the LEADS/FUNDING mode an introduction was proposed
+// in (data, not an agent state — monochrome, never the status colors).
 // Agentic OS design system: tokens only, Lucide only, monochrome status
 // pills (intro lifecycle states are data, not agent states — the
 // running/needs/done/failed shapes stay reserved for agents).
@@ -9,6 +11,7 @@ import type {
   ConnectorIntroductionEventView,
   ConnectorIntroductionStatus,
 } from "@/lib/connector/introductions";
+import type { ConnectorMode } from "@/lib/connector/modes";
 
 export interface PathSnapshot {
   hops: Array<{ kind: string; id: string | null; name: string }>;
@@ -41,6 +44,23 @@ export function StatusPill({ status }: { status: ConnectorIntroductionStatus }) 
   return (
     <span className="inline-flex h-7 shrink-0 items-center rounded-full border border-line bg-canvas px-3 text-[12px] font-semibold text-ink">
       {INTRO_STATUS_LABELS[status]}
+    </span>
+  );
+}
+
+export const MODE_LABELS: Record<ConnectorMode, string> = {
+  leads: "Leads",
+  funding: "Funding",
+};
+
+/** Slice 5: which mode the introduction was proposed in. */
+export function ModePill({ mode }: { mode: ConnectorMode }) {
+  return (
+    <span
+      className="inline-flex h-7 shrink-0 items-center rounded-full bg-black px-3 text-[12px] font-semibold text-white"
+      title={`Proposed in ${MODE_LABELS[mode]} mode`}
+    >
+      {MODE_LABELS[mode]}
     </span>
   );
 }

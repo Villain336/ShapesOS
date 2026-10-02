@@ -11,6 +11,7 @@ import { useCallback, useEffect, useState } from "react";
 import {
   ArrowLeftRight,
   Building2,
+  HandCoins,
   Inbox,
   Loader2,
   Package,
@@ -32,6 +33,56 @@ import type {
   ConnectorImportBatchView,
   ConnectorPersonView,
 } from "@/lib/connector/types";
+import type { ConnectorMode } from "@/lib/connector/modes";
+
+/**
+ * Slice 5: the LEADS/FUNDING mode switch. Tenant-level preference —
+ * persisted via PUT /api/connector/mode. Mode scopes path-finding
+ * targets (leads: buyers/partners; funding: investors + the investor
+ * CRM) and every proposal the connector makes.
+ */
+function ModeSwitch({
+  mode,
+  saving,
+  onChange,
+}: {
+  mode: ConnectorMode;
+  saving: boolean;
+  onChange: (mode: ConnectorMode) => void;
+}) {
+  const options: Array<{ id: ConnectorMode; label: string; icon: typeof Users; hint: string }> = [
+    { id: "leads", label: "Leads", icon: Users, hint: "Customer / partner intros" },
+    { id: "funding", label: "Funding", icon: HandCoins, hint: "Investor intros via the raise workflow" },
+  ];
+  return (
+    <div
+      className="flex items-center rounded-full border border-line bg-paper p-1 shadow-hairline"
+      role="group"
+      aria-label="Connector mode"
+    >
+      {options.map((o) => {
+        const Icon = o.icon;
+        const active = mode === o.id;
+        return (
+          <button
+            key={o.id}
+            type="button"
+            disabled={saving}
+            onClick={() => onChange(o.id)}
+            title={o.hint}
+            aria-pressed={active}
+            className={`aos-press flex h-9 items-center gap-2 rounded-full px-4 text-[14px] font-semibold disabled:opacity-50 ${
+              active ? "bg-black text-white" : "text-muted"
+            }`}
+          >
+            {saving && active ? <Loader2 size={14} className="animate-spin" /> : <Icon size={14} />}
+            {o.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 
 type Tab = "people" | "companies" | "batches" | "imports" | "paths" | "approvals" | "intros";
 
@@ -301,6 +352,46 @@ export function ConnectorApp() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [touching, setTouching] = useState(false);
   const [recomputing, setRecomputing] = useState(false);
+  // Slice 5: tenant-level connector mode (the LEADS/FUNDING switch).
+  const [mode, setModeState] = useState<ConnectorMode>("leads");
+  const [modeSaving, setModeSaving] = useState(false);
+
+  const loadMode = useCallback(async () => {
+    try {
+      const res = await fetch("/api/connector/mode");
+      if (res.ok) {
+        const json = await res.json();
+        if (json.mode === "leads" || json.mode === "funding") setModeState(json.mode);
+      }
+    } catch {
+      // Mode defaults to leads; the switch still works (PUT persists).
+    }
+  }, []);
+
+  const setMode = useCallback(
+    async (next: ConnectorMode) => {
+      if (next === mode) return;
+      setModeSaving(true);
+      try {
+        const res = await fetch("/api/connector/mode", {
+          method: "PUT",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ mode: next }),
+        });
+        if (!res.ok) throw new Error("Could not save mode.");
+        setModeState(next);
+      } catch {
+        // Keep the old mode on failure — the switch never lies.
+      } finally {
+        setModeSaving(false);
+      }
+    },
+    [mode],
+  );
+
+  useEffect(() => {
+    void loadMode();
+  }, [loadMode]);
 
   const refresh = useCallback(async () => {
     const res = await fetch("/api/connector/graph");
@@ -399,6 +490,7 @@ export function ConnectorApp() {
           })}
         </div>
         <div className="flex items-center gap-2">
+          <ModeSwitch mode={mode} saving={modeSaving} onChange={setMode} />
           <button
             type="button"
             onClick={recompute}
@@ -489,7 +581,7 @@ export function ConnectorApp() {
       )}
 
       {tab === "paths" && graph && (
-        <FindPathsTab persons={graph.persons} companies={graph.companies} />
+        <FindPathsTab persons={graph.persons} companies={graph.companies} mode={mode} />
       )}
 
       {tab === "approvals" && <ApprovalsTab onChanged={refresh} />}

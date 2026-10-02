@@ -20,6 +20,7 @@ import {
   btnSecondary,
   inputCls,
   IntroTimeline,
+  ModePill,
   PathSnapshotView,
   StatusPill,
   textareaCls,
@@ -352,8 +353,31 @@ function IntroDetail({
             {intro.personB.name}
           </div>
           <StatusPill status={intro.status} />
+          <ModePill mode={intro.mode} />
         </div>
         <PathSnapshotView snapshot={intro.introPathSnapshot} />
+        {/* Slice 5: funding plug-in lineage — linked investor + data-room offer. */}
+        {(intro.fundingInvestor || intro.dataRoomShareLinkId) && (
+          <div className="grid gap-x-6 gap-y-1 text-[13px] text-muted md:grid-cols-2">
+            {intro.fundingInvestor && (
+              <span>
+                Linked investor:{" "}
+                <span className="font-semibold text-ink">
+                  {intro.fundingInvestor.name}
+                  {intro.fundingInvestor.firm ? ` (${intro.fundingInvestor.firm})` : ""}
+                </span>
+              </span>
+            )}
+            {intro.dataRoomShareLinkId && (
+              <span>
+                Data-room offer:{" "}
+                <span className="font-semibold text-ink">
+                  share link attached to the draft offer
+                </span>
+              </span>
+            )}
+          </div>
+        )}
         <div className="grid gap-x-6 gap-y-1 text-[13px] text-muted md:grid-cols-2">
           <span>
             Tenant approval:{" "}
@@ -501,6 +525,7 @@ export function IntroductionsTab() {
               </span>
             </span>
             <StatusPill status={i.status} />
+            <ModePill mode={i.mode} />
           </button>
         ))
       )}

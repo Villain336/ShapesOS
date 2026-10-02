@@ -53,6 +53,18 @@ import {
   type PathCompanyInput,
   type PathPersonInput,
 } from "./intro-paths";
+import {
+  DEFAULT_CONNECTOR_MODE,
+  FUNDING_TARGET_RELATIONSHIPS,
+  LEADS_TARGET_RELATIONSHIPS,
+  companyRelationshipAllowedInMode,
+  isConnectorMode,
+  type ConnectorMode,
+  type ConnectorSettingView,
+  type FundingInvestorTargetView,
+  type ModeTargetListView,
+} from "./modes";
+import type { InvestorStage } from "../funding/types";
 
 type RelationshipRow = {
   id: string;
@@ -497,6 +509,106 @@ export class PrismaConnectorStore {
   }
 
   // ------------------------------------------------------------------
+  // Slice 5 — modes. Tenant-level preference (ConnectorSetting) +
+  // mode-scoped target lists. FUNDING mode reads the Funding/VC
+  // investor CRM directly (read-only; investor data is never duplicated
+  // into connector rows).
+  // ------------------------------------------------------------------
+
+  /** The tenant's connector mode; defaults to LEADS when never set. */
+  async getMode(workspaceId: string): Promise<ConnectorSettingView> {
+    const row = await this.prisma.connectorSetting.findUnique({
+      where: { workspaceId },
+    });
+    const mode: ConnectorMode =
+      row && isConnectorMode(row.mode) ? row.mode : DEFAULT_CONNECTOR_MODE;
+    return { mode, updatedAt: row?.updatedAt ?? new Date(0) };
+  }
+
+  /** Set the tenant's connector mode (the UI's LEADS/FUNDING switch). */
+  async setMode(workspaceId: string, mode: ConnectorMode): Promise<ConnectorSettingView> {
+    if (!isConnectorMode(mode)) {
+      throw new ConnectorError("invalid_mode", "mode must be leads or funding.");
+    }
+    const row = await this.prisma.connectorSetting.upsert({
+      where: { workspaceId },
+      create: { workspaceId, mode },
+      update: { mode },
+    });
+    return { mode: row.mode as ConnectorMode, updatedAt: row.updatedAt };
+  }
+
+  /**
+   * Mode-scoped intro targets. When `mode` is absent, the tenant's
+   * setting decides. LEADS → buyer/partner companies; FUNDING →
+   * investor companies + the Funding/VC investor CRM (read-only).
+   * Every query is tenant-scoped; nothing crosses workspaces.
+   */
+  async listTargets(
+    workspaceId: string,
+    modeInput?: ConnectorMode,
+  ): Promise<ModeTargetListView> {
+    const mode = modeInput ?? (await this.getMode(workspaceId)).mode;
+    const relationships =
+      mode === "funding"
+        ? ([...FUNDING_TARGET_RELATIONSHIPS] as ConnectorCompanyRelationship[])
+        : ([...LEADS_TARGET_RELATIONSHIPS] as ConnectorCompanyRelationship[]);
+
+    const companyRows = await this.prisma.connectorCompany.findMany({
+      where: { workspaceId, relationship: { in: relationships } },
+      orderBy: { name: "asc" },
+      include: { _count: { select: { employments: true } } },
+    });
+
+    let investors: FundingInvestorTargetView[] = [];
+    if (mode === "funding") {
+      const investorRows = await this.prisma.fundingInvestor.findMany({
+        where: { workspaceId },
+        orderBy: { name: "asc" },
+        select: {
+          id: true,
+          name: true,
+          firm: true,
+          title: true,
+          email: true,
+          checkSizeMin: true,
+          checkSizeMax: true,
+          stages: true,
+          sectors: true,
+          thesisFit: true,
+          stage: true,
+        },
+      });
+      investors = investorRows.map((r) => ({
+        id: r.id,
+        name: r.name,
+        firm: r.firm,
+        title: r.title,
+        email: r.email,
+        checkSizeMin: r.checkSizeMin,
+        checkSizeMax: r.checkSizeMax,
+        stages: r.stages,
+        sectors: r.sectors,
+        thesisFit: r.thesisFit,
+        stage: r.stage as InvestorStage,
+      }));
+    }
+
+    return {
+      mode,
+      companies: companyRows.map((r) => ({
+        id: r.id,
+        name: r.name,
+        industry: r.industry,
+        sizeBand: r.sizeBand,
+        relationship: r.relationship,
+        employeeCount: r._count.employments,
+      })),
+      investors,
+    };
+  }
+
+  // ------------------------------------------------------------------
   // Slice 2 — source consent. One row per (workspace, source); the import
   // job refuses to run without it. Deleting = revoking.
   // ------------------------------------------------------------------
@@ -840,7 +952,9 @@ export class PrismaConnectorStore {
    * Compute ranked intro paths to a target person or company. Serves from
    * the per-tenant TTL cache unless recompute is requested. The target id
    * must belong to this tenant — a foreign id reads as target_not_found,
-   * never as another tenant's data.
+   * never as another tenant's data. Slice 5: when `mode` is provided,
+   * company targets are mode-scoped (a buyer company is not a legal
+   * FUNDING-mode target, an investor company is not a legal LEADS target).
    */
   async computeIntroPaths(
     workspaceId: string,
@@ -850,6 +964,8 @@ export class PrismaConnectorStore {
       maxPaths?: number;
       recompute?: boolean;
       now?: Date;
+      /** Slice 5: per-query mode override (default: tenant setting). */
+      mode?: ConnectorMode;
     },
   ): Promise<{ result: IntroPathResult; cached: boolean; computedAt: Date }> {
     const now = input.now ?? new Date();
@@ -863,6 +979,25 @@ export class PrismaConnectorStore {
     }
     const kind = hasPerson ? ("person" as const) : ("company" as const);
     const targetId = (input.targetPersonId ?? input.targetCompanyId) as string;
+
+    // Slice 5: mode-scoped path-finding. The effective mode is the
+    // per-query override or the tenant's setting.
+    const effectiveMode = input.mode ?? (await this.getMode(workspaceId)).mode;
+    if (hasCompany && input.targetCompanyId) {
+      const company = await this.prisma.connectorCompany.findFirst({
+        where: { id: input.targetCompanyId, workspaceId },
+        select: { id: true, name: true, relationship: true },
+      });
+      if (!company) {
+        throw new ConnectorError("target_not_found", "Target company not found in this workspace.");
+      }
+      if (!companyRelationshipAllowedInMode(company.relationship, effectiveMode)) {
+        throw new ConnectorError(
+          "mode_target_mismatch",
+          `${company.name} is a ${company.relationship ?? "unclassified"} company — not a legal target in ${effectiveMode.toUpperCase()} mode.`,
+        );
+      }
+    }
 
     if (!input.recompute) {
       const hit = getCachedIntroPaths(workspaceId, kind, targetId, now);

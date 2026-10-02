@@ -25,6 +25,12 @@ import type { PrismaClient } from "@prisma/client";
 import { Prisma } from "@prisma/client";
 import { ConnectorError } from "./types";
 import {
+  attachDataRoomOffer,
+  buildDataRoomOfferLine,
+  writebackIntroductionMade,
+} from "./funding-plugin";
+import { DEFAULT_CONNECTOR_MODE, type ConnectorMode } from "./modes";
+import {
   assertIntroPreconditions,
   assertIntroTransition,
   DEFAULT_INTRO_EXPIRY_DAYS,
@@ -50,6 +56,8 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 
 type PersonRef = { id: string; name: string; handles: string[] };
 
+type FundingInvestorRef = { id: string; name: string; firm: string | null };
+
 type IntroductionRow = {
   id: string;
   personAId: string;
@@ -57,6 +65,11 @@ type IntroductionRow = {
   personA: PersonRef;
   personB: PersonRef;
   status: ConnectorIntroductionStatus;
+  // Slice 5: mode + funding plug-in.
+  mode: ConnectorMode;
+  fundingInvestorId: string | null;
+  fundingInvestor: FundingInvestorRef | null;
+  dataRoomShareLinkId: string | null;
   introPathSnapshot: unknown;
   draftAskMessage: string;
   draftOfferMessage: string;
@@ -87,6 +100,15 @@ type IntroductionRow = {
 };
 
 const PERSON_REF_SELECT = { id: true, name: true, handles: true } as const;
+const FUNDING_INVESTOR_REF_SELECT = { id: true, name: true, firm: true } as const;
+
+// Slice 5: every introduction read pulls the funding-investor lineage
+// (needed for the writeback display + tenant isolation check).
+const INTRO_INCLUDES = {
+  personA: { select: PERSON_REF_SELECT },
+  personB: { select: PERSON_REF_SELECT },
+  fundingInvestor: { select: FUNDING_INVESTOR_REF_SELECT },
+} as const;
 
 function toIntroductionView(row: IntroductionRow): ConnectorIntroductionView {
   return {
@@ -94,6 +116,13 @@ function toIntroductionView(row: IntroductionRow): ConnectorIntroductionView {
     personA: { id: row.personA.id, name: row.personA.name, handles: row.personA.handles },
     personB: { id: row.personB.id, name: row.personB.name, handles: row.personB.handles },
     status: row.status,
+    // Slice 5: mode + funding plug-in.
+    mode: row.mode ?? DEFAULT_CONNECTOR_MODE,
+    fundingInvestorId: row.fundingInvestorId,
+    fundingInvestor: row.fundingInvestor
+      ? { id: row.fundingInvestor.id, name: row.fundingInvestor.name, firm: row.fundingInvestor.firm }
+      : null,
+    dataRoomShareLinkId: row.dataRoomShareLinkId,
     introPathSnapshot: (row.introPathSnapshot ?? {}) as Record<string, unknown>,
     draftAskMessage: row.draftAskMessage,
     draftOfferMessage: row.draftOfferMessage,
@@ -155,7 +184,7 @@ export class PrismaIntroductionStore {
   ): Promise<IntroductionRow> {
     const row = await this.prisma.connectorIntroduction.findFirst({
       where: { id: introId, workspaceId },
-      include: { personA: { select: PERSON_REF_SELECT }, personB: { select: PERSON_REF_SELECT } },
+      include: { ...INTRO_INCLUDES },
     });
     if (!row) {
       throw new ConnectorError("introduction_not_found", "Introduction not found in this workspace.");
@@ -184,11 +213,14 @@ export class PrismaIntroductionStore {
       status?: ConnectorIntroductionStatus;
       /** The approval inbox: proposed intros the tenant has not approved yet. */
       awaitingApproval?: boolean;
+      /** Slice 5: mode-scoped listing (LEADS vs FUNDING proposals). */
+      mode?: ConnectorMode;
       limit?: number;
     } = {},
   ): Promise<ConnectorIntroductionView[]> {
     const where: Record<string, unknown> = { workspaceId };
     if (opts.status) where["status"] = opts.status;
+    if (opts.mode) where["mode"] = opts.mode;
     if (opts.awaitingApproval) {
       where["status"] = "proposed";
       where["tenantApproved"] = false;
@@ -196,8 +228,7 @@ export class PrismaIntroductionStore {
     const rows = await this.prisma.connectorIntroduction.findMany({
       where,
       include: {
-        personA: { select: PERSON_REF_SELECT },
-        personB: { select: PERSON_REF_SELECT },
+        ...INTRO_INCLUDES,
       },
       orderBy: { createdAt: "desc" },
       take: Math.min(Math.max(opts.limit ?? 100, 1), 500),
@@ -247,7 +278,7 @@ export class PrismaIntroductionStore {
       throw new ConnectorError("invalid_introduction", errors.join(" "));
     }
 
-    const [personA, personB] = await Promise.all([
+    const [personA, personB, fundingInvestor] = await Promise.all([
       this.prisma.connectorPerson.findFirst({
         where: { id: value.personAId, workspaceId },
         include: { relationship: { select: { boundaries: true } } },
@@ -256,11 +287,25 @@ export class PrismaIntroductionStore {
         where: { id: value.personBId, workspaceId },
         select: { id: true, name: true },
       }),
+      // Slice 5: the linked investor must belong to this workspace.
+      // Tenant isolation is enforced here, not trusted from the request.
+      value.fundingInvestorId
+        ? this.prisma.fundingInvestor.findFirst({
+            where: { id: value.fundingInvestorId, workspaceId },
+            select: { id: true, name: true, firm: true },
+          })
+        : Promise.resolve(null),
     ]);
     if (!personA || !personB) {
       throw new ConnectorError(
         "person_not_found",
         "Both sides of the introduction must be people in this workspace.",
+      );
+    }
+    if (value.fundingInvestorId && !fundingInvestor) {
+      throw new ConnectorError(
+        "funding_investor_not_found",
+        "The linked funding investor was not found in this workspace.",
       );
     }
 
@@ -302,21 +347,40 @@ export class PrismaIntroductionStore {
     }
 
     let row: IntroductionRow;
+
+    // Slice 5: data-room offer — mint a REAL share link and append the
+    // offer line to the draft offer message. The draft is still
+    // tenant-approved before anything sends (the money rule holds), and
+    // the link URL is the actual token URL, never a placeholder.
+    let draftOfferMessage = value.draftOfferMessage;
+    let dataRoomShareLinkId: string | null = null;
+    if (value.dataRoomOffer) {
+      const offer = await attachDataRoomOffer(this.prisma, workspaceId, {
+        docId: value.dataRoomOffer.docId,
+        expiresInDays: value.dataRoomOffer.expiresInDays,
+        viewerEmails: value.dataRoomOffer.viewerEmails,
+      });
+      dataRoomShareLinkId = offer.shareLinkId;
+      draftOfferMessage = `${draftOfferMessage}\n\n${buildDataRoomOfferLine(offer)}`;
+    }
+
     try {
       row = (await this.prisma.connectorIntroduction.create({
         data: {
           workspaceId,
           personAId: value.personAId,
           personBId: value.personBId,
+          mode: value.mode,
+          fundingInvestorId: value.fundingInvestorId,
+          dataRoomShareLinkId,
           introPathSnapshot: value.introPath as Prisma.InputJsonValue,
           draftAskMessage: value.draftAskMessage,
-          draftOfferMessage: value.draftOfferMessage,
+          draftOfferMessage,
           rateLimitOverrideMaxAsks: value.rateLimitOverride?.maxAsks ?? null,
           rateLimitOverrideWindowDays: value.rateLimitOverride?.windowDays ?? null,
         },
         include: {
-          personA: { select: PERSON_REF_SELECT },
-          personB: { select: PERSON_REF_SELECT },
+          ...INTRO_INCLUDES,
         },
       })) as IntroductionRow;
     } catch (e) {
@@ -335,7 +399,7 @@ export class PrismaIntroductionStore {
       "proposed",
       opts.proposerKind,
       opts.proposedBy,
-      `Proposed intro: ${personA.name} (side A, the ask) → ${personB.name} (side B, the offer). Draft ask: ${value.draftAskMessage}`,
+      `Proposed intro [mode: ${value.mode}]: ${personA.name} (side A, the ask) → ${personB.name} (side B, the offer).${value.fundingInvestorId && fundingInvestor ? ` Linked investor: ${fundingInvestor.name}${fundingInvestor.firm ? ` (${fundingInvestor.firm})` : ""}.` : ""}${dataRoomShareLinkId ? " Data-room offer attached." : ""} Draft ask: ${value.draftAskMessage}`,
     );
     return toIntroductionView(row);
   }
@@ -373,8 +437,7 @@ export class PrismaIntroductionStore {
         tenantApprovedAt: new Date(),
       },
       include: {
-        personA: { select: PERSON_REF_SELECT },
-        personB: { select: PERSON_REF_SELECT },
+        ...INTRO_INCLUDES,
       },
     })) as IntroductionRow;
 
@@ -423,8 +486,7 @@ export class PrismaIntroductionStore {
         declineReason: reason,
       },
       include: {
-        personA: { select: PERSON_REF_SELECT },
-        personB: { select: PERSON_REF_SELECT },
+        ...INTRO_INCLUDES,
       },
     })) as IntroductionRow;
 
@@ -475,8 +537,7 @@ export class PrismaIntroductionStore {
         sideAAcceptedAt: now,
       },
       include: {
-        personA: { select: PERSON_REF_SELECT },
-        personB: { select: PERSON_REF_SELECT },
+        ...INTRO_INCLUDES,
       },
     })) as IntroductionRow;
 
@@ -527,8 +588,7 @@ export class PrismaIntroductionStore {
         declineReason: note ?? "Side A declined the ask.",
       },
       include: {
-        personA: { select: PERSON_REF_SELECT },
-        personB: { select: PERSON_REF_SELECT },
+        ...INTRO_INCLUDES,
       },
     })) as IntroductionRow;
 
@@ -567,8 +627,7 @@ export class PrismaIntroductionStore {
         sideBAcceptedAt: now,
       },
       include: {
-        personA: { select: PERSON_REF_SELECT },
-        personB: { select: PERSON_REF_SELECT },
+        ...INTRO_INCLUDES,
       },
     })) as IntroductionRow;
 
@@ -605,8 +664,7 @@ export class PrismaIntroductionStore {
         declineReason: note ?? "Side B declined the offer.",
       },
       include: {
-        personA: { select: PERSON_REF_SELECT },
-        personB: { select: PERSON_REF_SELECT },
+        ...INTRO_INCLUDES,
       },
     })) as IntroductionRow;
 
@@ -655,8 +713,7 @@ export class PrismaIntroductionStore {
         madeSentAt: now,
       },
       include: {
-        personA: { select: PERSON_REF_SELECT },
-        personB: { select: PERSON_REF_SELECT },
+        ...INTRO_INCLUDES,
       },
     })) as IntroductionRow;
 
@@ -668,6 +725,40 @@ export class PrismaIntroductionStore {
       `${sentBy} via ${value.sentVia}`,
       `Intro made: ${intro.personA.name} ↔ ${intro.personB.name}. Message: ${value.message}`,
     );
+
+    // Slice 5: raise-workflow writeback. Only fires for FUNDING-mode
+    // intros linked to a FundingInvestor — and only here, after the
+    // money rule has fired. Best-effort: a writeback failure never
+    // unmakes a completed intro; the failure is recorded as lineage.
+    if (intro.mode === "funding" && intro.fundingInvestorId) {
+      try {
+        const result = await writebackIntroductionMade(this.prisma, workspaceId, introId, {
+          sentBy,
+          now,
+        });
+        if (result.written) {
+          const investorName = intro.fundingInvestor?.name ?? intro.fundingInvestorId;
+          await this.recordEvent(
+            workspaceId,
+            introId,
+            "funding_writeback",
+            "system",
+            "connector-funding-plugin",
+            `Raise workflow writeback: "intro" interaction logged on investor ${investorName} (interaction ${result.interactionId}).${result.stageAdvanced ? ` Stage: ${result.stageFrom} → ${result.stageTo}.` : ""}`,
+          );
+        }
+      } catch (e) {
+        await this.recordEvent(
+          workspaceId,
+          introId,
+          "funding_writeback_failed",
+          "system",
+          "connector-funding-plugin",
+          `Raise workflow writeback failed: ${e instanceof Error ? e.message : "unknown error"}. The intro itself is complete.`,
+        );
+      }
+    }
+
     return toIntroductionView(updated);
   }
 
@@ -703,8 +794,7 @@ export class PrismaIntroductionStore {
         pendingFollowupTo: value.to,
       },
       include: {
-        personA: { select: PERSON_REF_SELECT },
-        personB: { select: PERSON_REF_SELECT },
+        ...INTRO_INCLUDES,
       },
     })) as IntroductionRow;
 
@@ -757,8 +847,7 @@ export class PrismaIntroductionStore {
         pendingFollowupTo: null,
       },
       include: {
-        personA: { select: PERSON_REF_SELECT },
-        personB: { select: PERSON_REF_SELECT },
+        ...INTRO_INCLUDES,
       },
     })) as IntroductionRow;
 
@@ -795,8 +884,7 @@ export class PrismaIntroductionStore {
         withdrawnAt: now,
       },
       include: {
-        personA: { select: PERSON_REF_SELECT },
-        personB: { select: PERSON_REF_SELECT },
+        ...INTRO_INCLUDES,
       },
     })) as IntroductionRow;
 

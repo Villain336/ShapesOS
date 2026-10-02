@@ -13,6 +13,7 @@ import {
   btnApprove,
   btnDeny,
   inputCls,
+  ModePill,
   PathSnapshotView,
   StatusPill,
 } from "./IntroShared";
@@ -59,7 +60,10 @@ function ApprovalCard({
           {intro.personA.name} <span className="font-normal text-muted">→</span>{" "}
           {intro.personB.name}
         </div>
-        <StatusPill status={intro.status} />
+        <div className="flex flex-wrap items-center gap-2">
+          <StatusPill status={intro.status} />
+          <ModePill mode={intro.mode} />
+        </div>
       </div>
 
       <PathSnapshotView snapshot={intro.introPathSnapshot} />

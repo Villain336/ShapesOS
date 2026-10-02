@@ -14,6 +14,12 @@
 // make_intro is legal ONLY from side_b_accepted.
 
 import { ConnectorError } from "./types";
+import {
+  assertProposalModeLaw,
+  isConnectorMode,
+  validateConnectorMode,
+  type ConnectorMode,
+} from "./modes";
 
 // ---------------------------------------------------------------------------
 // Statuses.
@@ -229,6 +235,9 @@ export const CONNECTOR_INTRO_AUDIT_KINDS = [
   "followup_sent",
   "withdrawn",
   "expired",
+  // Slice 5: raise-workflow writeback lineage (FUNDING mode).
+  "funding_writeback",
+  "funding_writeback_failed",
 ] as const;
 export type ConnectorIntroAuditKind =
   (typeof CONNECTOR_INTRO_AUDIT_KINDS)[number];
@@ -325,6 +334,18 @@ export interface ProposeIntroductionInput {
   draftOfferMessage?: unknown;
   /** Optional per-instance rate-limit override (tenant-set, recorded). */
   rateLimitOverride?: unknown;
+  // Slice 5: operating mode (default leads) + optional FUNDING-mode
+  // investor link (writeback target) + data-room offer flag.
+  mode?: unknown;
+  fundingInvestorId?: unknown;
+  /** true / { docId?, expiresInDays?, viewerEmails? } — FUNDING mode only. */
+  dataRoomOffer?: unknown;
+}
+
+export interface DataRoomOfferRequest {
+  docId: string | null;
+  expiresInDays: number;
+  viewerEmails: string[];
 }
 
 export interface ValidProposeIntroductionInput {
@@ -334,6 +355,9 @@ export interface ValidProposeIntroductionInput {
   draftAskMessage: string;
   draftOfferMessage: string;
   rateLimitOverride: { maxAsks: number; windowDays: number } | null;
+  mode: ConnectorMode;
+  fundingInvestorId: string | null;
+  dataRoomOffer: DataRoomOfferRequest | null;
 }
 
 function draftMessage(value: unknown, field: string, errors: string[]): string | null {
@@ -406,6 +430,79 @@ export function validateProposeIntroductionInput(
     }
   }
 
+  // Slice 5: mode + funding link. fundingInvestorId is only legal in
+  // FUNDING mode (the mode law throws mode_mismatch otherwise).
+  const modeCheck = validateConnectorMode(input.mode);
+  if (modeCheck.errors.length > 0) errors.push(...modeCheck.errors);
+  const mode: ConnectorMode = modeCheck.value ?? "leads";
+
+  const fundingInvestorIdRaw =
+    input.fundingInvestorId == null
+      ? null
+      : typeof input.fundingInvestorId === "string" && input.fundingInvestorId.trim()
+        ? input.fundingInvestorId.trim()
+        : null;
+  if (input.fundingInvestorId != null && fundingInvestorIdRaw == null) {
+    errors.push("fundingInvestorId must be a non-empty string when provided.");
+  }
+  try {
+    assertProposalModeLaw({ mode, fundingInvestorId: fundingInvestorIdRaw });
+  } catch (e) {
+    errors.push(e instanceof ConnectorError ? e.message : "Invalid mode/fundingInvestorId combination.");
+  }
+
+  // Slice 5: data-room offer — FUNDING mode only; mints a REAL share link
+  // at propose time, never a placeholder.
+  let dataRoomOffer: DataRoomOfferRequest | null = null;
+  if (input.dataRoomOffer != null && input.dataRoomOffer !== false) {
+    if (mode !== "funding") {
+      errors.push("dataRoomOffer is only legal in FUNDING mode.");
+    } else {
+      const o =
+        input.dataRoomOffer === true
+          ? {}
+          : typeof input.dataRoomOffer === "object"
+            ? (input.dataRoomOffer as Record<string, unknown>)
+            : null;
+      if (o == null) {
+        errors.push("dataRoomOffer must be true or { docId?, expiresInDays?, viewerEmails? }.");
+      } else {
+        const docId =
+          o["docId"] == null
+            ? null
+            : typeof o["docId"] === "string" && o["docId"].trim()
+              ? o["docId"].trim()
+              : null;
+        if (o["docId"] != null && docId == null) {
+          errors.push("dataRoomOffer.docId must be a non-empty string when provided.");
+        }
+        let expiresInDays = 30;
+        if (o["expiresInDays"] != null) {
+          const n = Number(o["expiresInDays"]);
+          if (!Number.isInteger(n) || n < 1 || n > 730) {
+            errors.push("dataRoomOffer.expiresInDays must be an integer from 1 to 730.");
+          } else {
+            expiresInDays = n;
+          }
+        }
+        let viewerEmails: string[] = [];
+        if (o["viewerEmails"] != null) {
+          if (
+            !Array.isArray(o["viewerEmails"]) ||
+            !o["viewerEmails"].every((e) => typeof e === "string")
+          ) {
+            errors.push("dataRoomOffer.viewerEmails must be an array of strings.");
+          } else {
+            viewerEmails = (o["viewerEmails"] as string[]).map((e) => e.trim()).filter(Boolean);
+          }
+        }
+        if (errors.length === 0) {
+          dataRoomOffer = { docId, expiresInDays, viewerEmails };
+        }
+      }
+    }
+  }
+
   if (errors.length > 0 || !introPath || !draftAskMessage || !draftOfferMessage) {
     return { errors, value: null };
   }
@@ -418,6 +515,9 @@ export function validateProposeIntroductionInput(
       draftAskMessage,
       draftOfferMessage,
       rateLimitOverride,
+      mode,
+      fundingInvestorId: fundingInvestorIdRaw,
+      dataRoomOffer,
     },
   };
 }
@@ -498,6 +598,12 @@ export interface ConnectorIntroductionView {
   personA: ConnectorIntroductionPersonRef;
   personB: ConnectorIntroductionPersonRef;
   status: ConnectorIntroductionStatus;
+  // Slice 5: mode the proposal was made in; FUNDING-mode investor link.
+  mode: ConnectorMode;
+  fundingInvestorId: string | null;
+  fundingInvestor: { id: string; name: string; firm: string | null } | null;
+  // Slice 5: real data-room share link offered in the draft (never a placeholder).
+  dataRoomShareLinkId: string | null;
   /** The computed IntroPath used, frozen at propose time. */
   introPathSnapshot: Record<string, unknown>;
   draftAskMessage: string;

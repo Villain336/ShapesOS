@@ -2,15 +2,21 @@
 // Pick a target person or company → ranked mutual paths
 // (You → mutual → target) with warmth-product scores, freshness, and
 // explanations composed from stored relationship data only.
+// Slice 5: mode-scoped. LEADS filters the company picker to
+// customer/prospect/partner; FUNDING filters to investor companies AND
+// shows the Funding/VC investor CRM targets (thesis fit, check size,
+// stage) with a warm-path shortcut when the investor matches a network
+// person by email. The effective mode rides on every path query.
 // Agentic OS design system: canvas page, white surfaces, black primary
 // pills, Lucide only, tokens only. Scores render monochrome — status
 // colors are reserved for agent states.
 
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   ArrowRight,
+  HandCoins,
   Loader2,
   RefreshCw,
   Route,
@@ -25,6 +31,33 @@ import type {
   ConnectorCompanyView,
   ConnectorPersonView,
 } from "@/lib/connector/types";
+import type {
+  ConnectorMode,
+  FundingInvestorTargetView,
+} from "@/lib/connector/modes";
+
+/** Mode-scoped company filter. Pure — mirrors companyRelationshipAllowedInMode. */
+export function filterCompaniesByMode(
+  companies: ConnectorCompanyView[],
+  mode: ConnectorMode,
+): ConnectorCompanyView[] {
+  return companies.filter((c) =>
+    mode === "funding"
+      ? c.relationship === "investor"
+      : c.relationship === "customer" ||
+        c.relationship === "prospect" ||
+        c.relationship === "partner",
+  );
+}
+
+function formatCheckSize(min: number | null, max: number | null): string {
+  const fmt = (n: number) =>
+    n >= 1_000_000 ? `$${(n / 1_000_000).toFixed(n % 1_000_000 === 0 ? 0 : 1)}M` : `$${Math.round(n / 1000)}k`;
+  if (min != null && max != null) return `${fmt(min)}–${fmt(max)}`;
+  if (min != null) return `${fmt(min)}+`;
+  if (max != null) return `up to ${fmt(max)}`;
+  return "—";
+}
 
 function StrengthMeter({ strength }: { strength: number }) {
   const pct = Math.round(strength * 100);
@@ -89,9 +122,11 @@ function PathCard({ path, rank }: { path: ComputedIntroPath; rank: number }) {
 export function FindPathsTab({
   persons,
   companies,
+  mode,
 }: {
   persons: ConnectorPersonView[];
   companies: ConnectorCompanyView[];
+  mode: ConnectorMode;
 }) {
   const [targetPersonId, setTargetPersonId] = useState("");
   const [targetCompanyId, setTargetCompanyId] = useState("");
@@ -99,6 +134,52 @@ export function FindPathsTab({
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<(IntroPathResult & { cached: boolean }) | null>(null);
+  // Slice 5: FUNDING-mode investor CRM targets (read-only).
+  const [investors, setInvestors] = useState<FundingInvestorTargetView[] | null>(null);
+
+  const modeCompanies = filterCompaniesByMode(companies, mode);
+
+  useEffect(() => {
+    if (mode !== "funding") {
+      setInvestors(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/connector/targets?mode=funding");
+        if (!res.ok) return;
+        const json = await res.json();
+        if (!cancelled) setInvestors(json.investors ?? []);
+      } catch {
+        if (!cancelled) setInvestors([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [mode]);
+
+  // Reset the target pickers when the mode changes — a buyer company is
+  // not a legal FUNDING-mode target and vice versa.
+  useEffect(() => {
+    setTargetPersonId("");
+    setTargetCompanyId("");
+    setResult(null);
+    setError(null);
+  }, [mode]);
+
+  /** Network person matching an investor by email handle (warm-path shortcut). */
+  const matchPersonForInvestor = useCallback(
+    (investor: FundingInvestorTargetView): ConnectorPersonView | null => {
+      if (!investor.email) return null;
+      const email = investor.email.trim().toLowerCase();
+      return (
+        persons.find((p) => p.handles.some((h) => h.trim().toLowerCase() === email)) ?? null
+      );
+    },
+    [persons],
+  );
 
   const findPaths = useCallback(
     async (recompute: boolean) => {
@@ -115,6 +196,7 @@ export function FindPathsTab({
           headers: { "content-type": "application/json" },
           body: JSON.stringify({
             ...(targetPersonId ? { targetPersonId } : { targetCompanyId }),
+            mode,
             recompute,
           }),
         });
@@ -129,7 +211,7 @@ export function FindPathsTab({
         setRefreshing(false);
       }
     },
-    [targetPersonId, targetCompanyId],
+    [targetPersonId, targetCompanyId, mode],
   );
 
   const pickPerson = (id: string) => {
@@ -162,14 +244,16 @@ export function FindPathsTab({
             </select>
           </label>
           <label className="flex flex-col gap-1.5">
-            <span className="text-[12px] font-semibold text-muted">Target company</span>
+            <span className="text-[12px] font-semibold text-muted">
+              Target company{mode === "funding" ? " (investors)" : " (customers / partners)"}
+            </span>
             <select
               value={targetCompanyId}
               onChange={(e) => pickCompany(e.target.value)}
               className="h-control rounded-md border border-control bg-paper px-3 text-[15px] text-ink"
             >
               <option value="">— choose a company —</option>
-              {companies.map((c) => (
+              {modeCompanies.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name}
                 </option>
@@ -200,6 +284,71 @@ export function FindPathsTab({
           </button>
         </div>
       </div>
+
+      {/* Slice 5: FUNDING-mode investor CRM targets (read-only). A
+          proposal to an investor rides mode: "funding" +
+          fundingInvestorId — and writes back to the raise workflow when
+          made. */}
+      {mode === "funding" && (
+        <div className="flex flex-col gap-3 rounded-lg bg-paper p-4 shadow-hairline">
+          <div className="flex items-center gap-2">
+            <HandCoins size={15} className="text-ink" />
+            <p className="aos-subheading">Investor targets — your raise CRM</p>
+          </div>
+          {investors == null ? (
+            <p className="flex items-center gap-2 text-[13px] text-muted">
+              <Loader2 size={14} className="animate-spin" /> Loading investor targets
+            </p>
+          ) : investors.length === 0 ? (
+            <p className="text-[13px] text-muted">
+              No investors in the CRM yet. Add them in the Funding module, then
+              target them here.
+            </p>
+          ) : (
+            <div className="flex flex-col gap-2">
+              {investors.map((inv) => {
+                const match = matchPersonForInvestor(inv);
+                return (
+                  <div
+                    key={inv.id}
+                    className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-line bg-canvas px-4 py-3"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-[14px] font-semibold text-ink">
+                        {inv.name}
+                        {inv.firm ? <span className="font-normal text-muted"> · {inv.firm}</span> : null}
+                      </p>
+                      <p className="mt-0.5 text-[12px] text-muted">
+                        {inv.stage} · check {formatCheckSize(inv.checkSizeMin, inv.checkSizeMax)}
+                        {inv.stages.length > 0 ? ` · ${inv.stages.join(", ")}` : ""}
+                        {inv.thesisFit ? ` · ${inv.thesisFit}` : ""}
+                      </p>
+                    </div>
+                    {match ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          pickPerson(match.id);
+                          setTargetCompanyId("");
+                        }}
+                        className="aos-press flex h-9 shrink-0 items-center gap-2 rounded-full bg-black px-4 text-[13px] font-semibold text-white"
+                        title={`Find a warm path to ${match.name} (matched by email)`}
+                      >
+                        <Route size={14} />
+                        Path to {match.name}
+                      </button>
+                    ) : (
+                      <span className="shrink-0 text-[12px] text-muted">
+                        No network contact yet — add them to find a path
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
 
       {result && result.blocked === "target_excluded" && (
         <div className="flex items-start gap-2 rounded-lg bg-paper p-5 text-[14px] text-muted shadow-hairline">

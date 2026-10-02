@@ -803,6 +803,8 @@ model Workspace {
   // Connector Agent slice 4: double-opt-in introductions + audit lineage.
   connectorIntroductions    ConnectorIntroduction[]
   connectorIntroductionEvents ConnectorIntroductionEvent[]
+  // Connector Agent slice 5: tenant-level mode preference (LEADS/FUNDING).
+  connectorSetting          ConnectorSetting?
   insurancePaymentHandoffs  InsurancePaymentHandoff[]
   insuranceCertificates     InsuranceCertificate[]
   // Phase 12 (embeds): tenant-scoped GrowthBook flag overrides.
@@ -11434,6 +11436,9 @@ model FundingInvestor {
   interactions  FundingInteraction[]
   introRequests FundingIntroRequest[]
   followUps     FundingFollowUp[]
+  // Slice 5 (connector plug-in): introductions brokered to this investor
+  // by the tenant's connector agent in FUNDING mode.
+  connectorIntroductions ConnectorIntroduction[]
 
   @@index([workspaceId, stage])
   @@map("funding_investors")
@@ -11654,6 +11659,10 @@ model FundingShareLink {
   revokedAt    DateTime? @map("revoked_at")
 
   views FundingDocView[]
+
+  // Slice 5 (connector plug-in): intros whose draft offer message carries
+  // a data-room share-link offer minted for the introduction.
+  connectorIntroductions ConnectorIntroduction[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -12161,6 +12170,9 @@ enum ConnectorIntroductionEventKind {
   followup_sent
   withdrawn
   expired
+  // Slice 5: raise-workflow writeback lineage (FUNDING mode).
+  funding_writeback
+  funding_writeback_failed
 }
 
 enum ConnectorIntroductionActorKind {
@@ -12169,6 +12181,29 @@ enum ConnectorIntroductionActorKind {
   side_a
   side_b
   system
+}
+
+// Slice 5: the connector's operating mode. Tenant-scoped preference
+// (ConnectorSetting) and per-introduction record (each proposal is
+// mode-scoped). LEADS = customer/partner intros; FUNDING = investor
+// intros plugged into the Funding/VC module.
+enum ConnectorMode {
+  leads
+  funding
+}
+
+// Slice 5: tenant-level connector preference (one row per workspace).
+// The UI's LEADS/FUNDING switch writes here; per-query/per-proposal
+// mode overrides ride along on the request.
+model ConnectorSetting {
+  id          String      @id @default(cuid())
+  workspaceId String      @unique @map("workspace_id")
+  workspace   Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  mode        ConnectorMode @default(leads)
+
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("connector_agent_settings")
 }
 
 model ConnectorIntroduction {
@@ -12183,6 +12218,19 @@ model ConnectorIntroduction {
   personB   ConnectorPerson @relation("IntroSideB", fields: [personBId], references: [id], onDelete: Cascade)
 
   status ConnectorIntroductionStatus @default(proposed)
+
+  // Slice 5: mode the proposal was made in. FUNDING-mode intros link to
+  // the investor CRM (fundingInvestorId) and write back to the raise
+  // workflow when made; LEADS-mode intros never touch funding rows.
+  mode              ConnectorMode   @default(leads)
+  fundingInvestorId String?         @map("funding_investor_id")
+  fundingInvestor   FundingInvestor? @relation(fields: [fundingInvestorId], references: [id], onDelete: SetNull)
+
+  // Slice 5: data-room offer attached to the draft offer message. Always
+  // a real minted share link (never a placeholder) — lineage back to it
+  // lives here.
+  dataRoomShareLinkId String?          @map("data_room_share_link_id")
+  dataRoomShareLink   FundingShareLink? @relation(fields: [dataRoomShareLinkId], references: [id], onDelete: SetNull)
 
   // The computed IntroPath used, frozen at propose time. IntroPaths are
   // computed (slice 3), never persisted — the snapshot preserves the
@@ -12236,6 +12284,7 @@ model ConnectorIntroduction {
   @@index([workspaceId])
   @@index([workspaceId, status])
   @@index([workspaceId, personAId])
+  @@index([workspaceId, mode])
   @@map("connector_agent_introductions")
 }
 
