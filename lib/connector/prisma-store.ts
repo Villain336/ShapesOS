@@ -44,6 +44,15 @@ import {
   type TouchInput,
   type WarmthBreakdown,
 } from "./types";
+import {
+  INTRO_DEFAULT_MAX_PATHS,
+  computeIntroPaths,
+  getCachedIntroPaths,
+  setCachedIntroPaths,
+  type IntroPathResult,
+  type PathCompanyInput,
+  type PathPersonInput,
+} from "./intro-paths";
 
 type RelationshipRow = {
   id: string;
@@ -743,6 +752,193 @@ export class PrismaConnectorStore {
       where: { workspaceId, externalId },
       select: { id: true },
     });
+  }
+
+  // ------------------------------------------------------------------
+  // Slice 3 — IntroPath engine. Paths are COMPUTED over a tenant-scoped
+  // snapshot and served from a bounded TTL cache — never persisted.
+  // ------------------------------------------------------------------
+
+  /**
+   * Load the per-tenant graph snapshot the IntroPath engine walks.
+   * Tenant-scoped: persons (with their relationship edge + employments),
+   * companies, and exclusion rules. No cross-tenant rows by construction.
+   */
+  async loadPathInputs(
+    workspaceId: string,
+  ): Promise<{
+    persons: PathPersonInput[];
+    companies: PathCompanyInput[];
+    exclusions: Array<{ type: ConnectorExclusionType; value: string }>;
+  }> {
+    const [personRows, companyRows, exclusionRows] = await Promise.all([
+      this.prisma.connectorPerson.findMany({
+        where: { workspaceId },
+        orderBy: [{ createdAt: "asc" }],
+        select: {
+          id: true,
+          name: true,
+          handles: true,
+          relationship: {
+            select: {
+              warmthScore: true,
+              lastTouchAt: true,
+              notes: true,
+              boundaries: true,
+            },
+          },
+          employments: {
+            select: {
+              companyId: true,
+              title: true,
+              startYear: true,
+              endYear: true,
+              isCurrent: true,
+              company: { select: { name: true } },
+            },
+          },
+        },
+      }),
+      this.prisma.connectorCompany.findMany({
+        where: { workspaceId },
+        orderBy: [{ name: "asc" }],
+        select: { id: true, name: true },
+      }),
+      this.prisma.connectorExclusion.findMany({
+        where: { workspaceId },
+        select: { type: true, value: true },
+      }),
+    ]);
+    return {
+      persons: personRows.map((p) => ({
+        id: p.id,
+        name: p.name,
+        handles: p.handles,
+        relationship: p.relationship
+          ? {
+              warmthScore: p.relationship.warmthScore,
+              lastTouchAt: p.relationship.lastTouchAt,
+              notes: p.relationship.notes,
+              boundaries: p.relationship.boundaries,
+            }
+          : null,
+        employments: p.employments.map((e) => ({
+          companyId: e.companyId,
+          companyName: e.company.name,
+          title: e.title,
+          startYear: e.startYear,
+          endYear: e.endYear,
+          isCurrent: e.isCurrent,
+        })),
+      })),
+      companies: companyRows.map((c) => ({ id: c.id, name: c.name })),
+      exclusions: exclusionRows,
+    };
+  }
+
+  /**
+   * Compute ranked intro paths to a target person or company. Serves from
+   * the per-tenant TTL cache unless recompute is requested. The target id
+   * must belong to this tenant — a foreign id reads as target_not_found,
+   * never as another tenant's data.
+   */
+  async computeIntroPaths(
+    workspaceId: string,
+    input: {
+      targetPersonId?: string;
+      targetCompanyId?: string;
+      maxPaths?: number;
+      recompute?: boolean;
+      now?: Date;
+    },
+  ): Promise<{ result: IntroPathResult; cached: boolean; computedAt: Date }> {
+    const now = input.now ?? new Date();
+    const hasPerson = !!input.targetPersonId;
+    const hasCompany = !!input.targetCompanyId;
+    if (hasPerson === hasCompany) {
+      throw new ConnectorError(
+        "invalid_target",
+        "Exactly one of targetPersonId or targetCompanyId is required.",
+      );
+    }
+    const kind = hasPerson ? ("person" as const) : ("company" as const);
+    const targetId = (input.targetPersonId ?? input.targetCompanyId) as string;
+
+    if (!input.recompute) {
+      const hit = getCachedIntroPaths(workspaceId, kind, targetId, now);
+      if (hit) {
+        return { result: hit, cached: true, computedAt: now };
+      }
+    }
+
+    const snapshot = await this.loadPathInputs(workspaceId);
+    const result = computeIntroPaths({
+      persons: snapshot.persons,
+      companies: snapshot.companies,
+      exclusions: snapshot.exclusions,
+      targetPersonId: input.targetPersonId,
+      targetCompanyId: input.targetCompanyId,
+      maxPaths: input.maxPaths,
+      now,
+    });
+    if (!result.blocked) {
+      setCachedIntroPaths(workspaceId, kind, targetId, result, now);
+    }
+    return { result, cached: false, computedAt: now };
+  }
+
+  /**
+   * Bounded sweep: refresh cached top paths per tenant. Warms at most
+   * maxTargets candidate targets (persons with a relationship edge first,
+   * then companies), capped to maxPaths paths each. Used by the scheduled
+   * recompute and the manual recompute trigger.
+   */
+  async warmPathCache(
+    workspaceId: string,
+    opts: { maxTargets?: number; maxPaths?: number; now?: Date } = {},
+  ): Promise<{ targetsWarmed: number; pathsCached: number }> {
+    const now = opts.now ?? new Date();
+    const maxTargets = Math.max(1, Math.min(50, opts.maxTargets ?? 25));
+    const maxPaths = Math.max(1, Math.min(25, opts.maxPaths ?? INTRO_DEFAULT_MAX_PATHS));
+    const snapshot = await this.loadPathInputs(workspaceId);
+
+    // Candidate targets: people the tenant actually has a relationship
+    // edge to (warmest first), then companies. Bounded.
+    const rankedPersons = [...snapshot.persons]
+      .filter((p) => p.relationship)
+      .sort(
+        (a, b) =>
+          (b.relationship?.warmthScore ?? 0) - (a.relationship?.warmthScore ?? 0),
+      );
+    const employedCompanyIds = new Set<string>();
+    for (const p of snapshot.persons) {
+      for (const e of p.employments) employedCompanyIds.add(e.companyId);
+    }
+    const rankedCompanies = snapshot.companies.filter((c) =>
+      employedCompanyIds.has(c.id),
+    );
+    const targets: Array<{ kind: "person" | "company"; id: string }> = [
+      ...rankedPersons.map((p) => ({ kind: "person" as const, id: p.id })),
+      ...rankedCompanies.map((c) => ({ kind: "company" as const, id: c.id })),
+    ].slice(0, maxTargets);
+
+    let pathsCached = 0;
+    for (const t of targets) {
+      const result = computeIntroPaths({
+        persons: snapshot.persons,
+        companies: snapshot.companies,
+        exclusions: snapshot.exclusions,
+        targetPersonId: t.kind === "person" ? t.id : undefined,
+        targetCompanyId: t.kind === "company" ? t.id : undefined,
+        maxPaths,
+        now,
+      });
+      if (!result.blocked) {
+        setCachedIntroPaths(workspaceId, t.kind, t.id, result, now);
+        pathsCached += result.paths.length;
+      }
+    }
+    return { targetsWarmed: targets.length, pathsCached };
   }
 }
 

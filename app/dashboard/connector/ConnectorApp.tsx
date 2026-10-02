@@ -18,9 +18,11 @@ import {
   Plug,
   Plus,
   RefreshCw,
+  Route,
   Users,
 } from "lucide-react";
 import { ImportSourcesTab } from "./ImportSourcesTab";
+import { FindPathsTab } from "./FindPathsTab";
 import type {
   ConnectorCompanyView,
   ConnectorGraphView,
@@ -28,7 +30,7 @@ import type {
   ConnectorPersonView,
 } from "@/lib/connector/types";
 
-type Tab = "people" | "companies" | "batches" | "imports";
+type Tab = "people" | "companies" | "batches" | "imports" | "paths";
 
 function WarmthMeter({ score, compact }: { score: number; compact?: boolean }) {
   // Monochrome: warmth is data, not an agent state — never the status colors.
@@ -344,6 +346,7 @@ export function ConnectorApp() {
   const tabs = [
     { id: "people" as const, label: "People", icon: Users },
     { id: "companies" as const, label: "Companies", icon: Building2 },
+    { id: "paths" as const, label: "Find a path", icon: Route },
     { id: "batches" as const, label: "Import batches", icon: Package },
     { id: "imports" as const, label: "Import sources", icon: Plug },
   ];
@@ -462,6 +465,10 @@ export function ConnectorApp() {
             ))
           )}
         </div>
+      )}
+
+      {tab === "paths" && graph && (
+        <FindPathsTab persons={graph.persons} companies={graph.companies} />
       )}
 
       {tab === "imports" && <ImportSourcesTab />}
