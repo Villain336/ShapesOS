@@ -13,11 +13,18 @@ import {
   GitCompareArrows,
   Link2,
   Eye,
+  StickyNote,
+  Sparkles,
+  FlaskConical,
+  AlertTriangle,
 } from "lucide-react";
 import { CadViewer } from "./CadViewer";
 import { UploadForm } from "./CadApp";
 import { CompareTab } from "./CompareTab";
 import { ShareLinksTab } from "./ShareLinksTab";
+import { AnnotationsTab } from "./AnnotationsTab";
+import { ProposalsTab } from "./ProposalsTab";
+import { ManufacturingTab } from "./ManufacturingTab";
 import { STEP_PREVIEW_MESSAGE } from "@/lib/cad/types";
 
 interface Version {
@@ -63,7 +70,17 @@ interface ShareLink {
 }
 
 interface Detail {
-  model: { id: string; name: string; description: string | null; projectId: string; currentVersionId: string | null };
+  model: {
+    id: string;
+    name: string;
+    description: string | null;
+    projectId: string;
+    currentVersionId: string | null;
+    changeRequested: boolean;
+    changeRequestedAt: string | null;
+    changeRequestedBy: string | null;
+    changeRequestedProposalId: string | null;
+  };
   versions: Version[];
   diffs: Diff[];
   shareLinks: ShareLink[];
@@ -78,6 +95,9 @@ async function api<T>(url: string, init?: RequestInit): Promise<T> {
 
 const TABS = [
   { key: "viewer", label: "Viewer", icon: Eye },
+  { key: "notes", label: "Notes", icon: StickyNote },
+  { key: "changes", label: "Changes", icon: Sparkles },
+  { key: "manufacturing", label: "Manufacturing", icon: FlaskConical },
   { key: "versions", label: "Versions", icon: History },
   { key: "compare", label: "Compare", icon: GitCompareArrows },
   { key: "links", label: "Share links", icon: Link2 },
@@ -195,6 +215,24 @@ export function ModelDetail({
         })}
       </div>
 
+      {detail.model.changeRequested && (
+        <div className="mb-4 flex items-start gap-3 rounded-lg border border-line bg-paper p-4 shadow-hairline">
+          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-ink" aria-hidden />
+          <div>
+            <p className="text-sm font-semibold text-ink">Change requested</p>
+            <p className="text-sm text-muted">
+              An approved design proposal asks for a change on this model
+              {detail.model.changeRequestedBy &&
+                ` (approved by ${detail.model.changeRequestedBy}`}
+              {detail.model.changeRequestedAt &&
+                ` · ${new Date(detail.model.changeRequestedAt).toLocaleString()})`}
+              . Make the edit in your CAD tool and publish a new version —
+              publishing clears this flag. The geometry has not been touched.
+            </p>
+          </div>
+        </div>
+      )}
+
       {tab === "viewer" && current && (
         <div>
           {current.previewAvailable ? (
@@ -208,6 +246,31 @@ export function ModelDetail({
           )}
           <VersionStats version={current} />
         </div>
+      )}
+
+      {tab === "notes" && (
+        <AnnotationsTab
+          modelId={modelId}
+          versions={detail.versions}
+          currentVersionId={detail.model.currentVersionId}
+        />
+      )}
+
+      {tab === "changes" && (
+        <ProposalsTab
+          modelId={modelId}
+          versions={detail.versions.map((v) => ({ id: v.id, versionNumber: v.versionNumber, fileName: v.fileName }))}
+          currentVersionId={detail.model.currentVersionId}
+          onChanged={load}
+        />
+      )}
+
+      {tab === "manufacturing" && (
+        <ManufacturingTab
+          modelId={modelId}
+          versions={detail.versions}
+          currentVersionId={detail.model.currentVersionId}
+        />
       )}
 
       {tab === "versions" && (

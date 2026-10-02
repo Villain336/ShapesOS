@@ -82,3 +82,52 @@ drone platform build (drone airframe revisions are the model use case).
    public surface, no distinction leaks.
 4. **Tenant-scoped everywhere.** Every row carries `workspaceId`; every query
    filters on it.
+
+## Slice 2 — AI design assistant (annotations, proposals, manufacturability)
+
+- `geometry.ts` — `extractMeshTriangles` returns the raw triangle soup for
+  STL/OBJ (mirrors the slice-1 parsers exactly); STEP returns null, always.
+- `manufacturability.ts` — deterministic checks over real triangles:
+  wall thickness (grid + DDA raycast estimate, bounded sample, honest
+  confidence), overhangs (face normal vs +Z print axis at the 45° guideline;
+  faces resting on the build plate are excluded), tolerance risks
+  (sub-resolution edges, sub-slicing-floor dimensions). Every flag cites its
+  measurement; checks that cannot run report "unavailable". Process limits
+  keep source pointers in `MFG_REFERENCES`. Mesh units are labeled
+  "mm (assumed — mesh files carry no unit metadata)".
+- `design-proposals.ts` — deterministic NL parser: operation vocabulary,
+  measurement normalization to mm, feature-label + rationale extraction,
+  honest high/medium/low confidence. Proposals stay editable while draft.
+- `ai-store.ts` — `PrismaCadAiStore extends PrismaCadStore` (parent's
+  `prisma` is now `protected`): annotations (point/region/whole-model,
+  immutable), proposals (draft → approved | rejected; approve/reject are
+  human-only via `requireCadHuman`, agents get `AGENT_CANNOT_ACT`),
+  manufacturability runs + flags, dismissal-with-reason audit trail.
+
+**The proposal-execution boundary (v1):** the ONLY code path that sets
+`CadModel.changeRequested` is `approveProposal`. No method anywhere rewrites
+mesh geometry from a proposal — proposing + approving + tracking is the v1
+contract. The tenant carries the edit out in their CAD tool and publishes a
+new version, which clears the flag. STEP manufacturability records an
+"unavailable" run — never invented numbers.
+
+## Routes (slice 2)
+
+- `GET/POST /api/cad/models/[id]/annotations` — list (?versionId=) / create (editor).
+- `DELETE /api/cad/annotations/[id]` — delete (editor).
+- `GET/POST /api/cad/models/[id]/proposals` — approval queue (?status=) / draft from NL (editor).
+- `GET/PATCH /api/cad/proposals/[id]` — detail / fix the parse while draft (editor).
+- `POST /api/cad/proposals/[id]/approve` — approve (editor; human-only; marks model change-requested).
+- `POST /api/cad/proposals/[id]/reject` — reject (editor; human-only).
+- `GET/POST /api/cad/models/[id]/versions/[vid]/manufacturability` — runs + flags / run analysis (editor).
+- `POST /api/cad/flags/[id]/dismiss` — dismiss with required reason (editor).
+
+## UI (slice 2)
+
+`/dashboard/cad` model detail gains Notes (click-to-place markers in the
+three.js viewer via `CadViewer`'s `onPointPicked` + `markers`, or whole-model
+notes; annotation list panel), Changes (NL composer → parsed draft card for
+review → approve/reject with confirmation, parse editor, change-requested
+banner on the model), and Manufacturing (run analysis, findings with the
+cited measurements, dismiss-with-reason, run history with per-check details
+and process-limit source links). Agentic OS design system throughout.

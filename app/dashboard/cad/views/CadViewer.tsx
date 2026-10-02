@@ -6,7 +6,7 @@
 // panel instead (see STEP_PREVIEW_MESSAGE in lib/cad/types).
 
 import { useEffect, useRef, useState } from "react";
-import { Box, Loader2, RotateCcw, RefreshCw, Grid3x3 } from "lucide-react";
+import { Box, Loader2, RotateCcw, RefreshCw, Grid3x3, MapPin } from "lucide-react";
 // Type-only: the runtime three.js module is loaded dynamically below (so the
 // page shell stays light); this gives tsc the THREE namespace for annotations.
 import type * as THREE from "three";
@@ -19,16 +19,27 @@ interface Props {
   fileName: string;
   /** Compact mode for side-by-side diffs. */
   compact?: boolean;
+  /** When provided, a "Place note" mode appears: clicking the model calls
+   *  this with the picked 3D point (viewer/world coordinates). */
+  onPointPicked?: (point: [number, number, number]) => void;
+  /** Annotation markers rendered in the same world coordinates. */
+  markers?: { id: string; point: [number, number, number] }[];
 }
 
 type LoadState = "loading" | "ready" | "error";
 
-export function CadViewer({ fileUrl, format, fileName, compact = false }: Props) {
+export function CadViewer({ fileUrl, format, fileName, compact = false, onPointPicked, markers = [] }: Props) {
   const mountRef = useRef<HTMLDivElement>(null);
   const [state, setState] = useState<LoadState>("loading");
   const [wireframe, setWireframe] = useState(false);
   const [spin, setSpin] = useState(true);
+  const [picking, setPicking] = useState(false);
   const controlsRef = useRef<{ setWireframe: (w: boolean) => void; reset: () => void } | null>(null);
+  const sceneRef = useRef<{ camera: any; object: any; markerGroup: any; THREE: any; maxDim: number } | null>(null);
+  const onPointPickedRef = useRef(onPointPicked);
+  onPointPickedRef.current = onPointPicked;
+  const pickingRef = useRef(picking);
+  pickingRef.current = picking;
   const cleanupRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
@@ -124,6 +135,11 @@ export function CadViewer({ fileUrl, format, fileName, compact = false }: Props)
       grid.position.y = -size.y / 2 - 0.001;
       scene.add(object);
 
+      // Annotation markers (slice 2): small spheres in world coordinates.
+      const markerGroup = new THREE.Group();
+      scene.add(markerGroup);
+      sceneRef.current = { camera, object, markerGroup, THREE, maxDim };
+
       const fitDist = (maxDim / 2) / Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
       camera.position.set(fitDist * 1.1, fitDist * 0.85, fitDist * 1.35);
       controls.target.set(0, 0, 0);
@@ -170,6 +186,7 @@ export function CadViewer({ fileUrl, format, fileName, compact = false }: Props)
         window.removeEventListener("resize", onResize);
         controls.dispose();
         renderer.dispose();
+        sceneRef.current = null;
         const mount = mountRef.current;
         if (mount && renderer.domElement.parentElement === mount) {
           mount.removeChild(renderer.domElement);
@@ -178,6 +195,10 @@ export function CadViewer({ fileUrl, format, fileName, compact = false }: Props)
         object.traverse((child) => {
           const mesh = child as THREE.Mesh;
           if (mesh.isMesh) (mesh.geometry as THREE.BufferGeometry).dispose();
+        });
+        markerGroup.traverse((child: any) => {
+          child.geometry?.dispose?.();
+          child.material?.dispose?.();
         });
       };
     })().catch(() => {
@@ -194,6 +215,73 @@ export function CadViewer({ fileUrl, format, fileName, compact = false }: Props)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fileUrl, format]);
 
+  // Slice 2: click-to-place annotation picking. A drag is not a click —
+  // only count presses that barely move, so orbiting never places a note.
+  useEffect(() => {
+    const mount = mountRef.current;
+    if (!mount || !onPointPicked) return;
+    let downX = 0;
+    let downY = 0;
+    const onDown = (e: PointerEvent) => {
+      downX = e.clientX;
+      downY = e.clientY;
+    };
+    const onUp = (e: PointerEvent) => {
+      if (!pickingRef.current) return;
+      if (Math.hypot(e.clientX - downX, e.clientY - downY) > 6) return;
+      const s = sceneRef.current;
+      if (!s) return;
+      const { camera, object, THREE } = s;
+      const canvas = mount.querySelector("canvas");
+      if (!canvas) return;
+      const rect = canvas.getBoundingClientRect();
+      const ndc = new THREE.Vector2(
+        ((e.clientX - rect.left) / rect.width) * 2 - 1,
+        -((e.clientY - rect.top) / rect.height) * 2 + 1,
+      );
+      const raycaster = new THREE.Raycaster();
+      raycaster.setFromCamera(ndc, camera);
+      const hits = raycaster.intersectObject(object, true);
+      if (hits.length > 0) {
+        const p = hits[0].point;
+        onPointPickedRef.current?.([
+          Math.round(p.x * 1000) / 1000,
+          Math.round(p.y * 1000) / 1000,
+          Math.round(p.z * 1000) / 1000,
+        ]);
+      }
+    };
+    mount.addEventListener("pointerdown", onDown);
+    mount.addEventListener("pointerup", onUp);
+    return () => {
+      mount.removeEventListener("pointerdown", onDown);
+      mount.removeEventListener("pointerup", onUp);
+    };
+  }, [onPointPicked]);
+
+  // Slice 2: render annotation markers in world coordinates.
+  useEffect(() => {
+    const s = sceneRef.current;
+    if (!s) return;
+    const { markerGroup, THREE, maxDim } = s;
+    while (markerGroup.children.length > 0) {
+      const child = markerGroup.children.pop();
+      if (child) {
+        child.geometry?.dispose();
+        child.material?.dispose();
+      }
+    }
+    const radius = Math.max((maxDim ?? 100) / 120, 1e-6);
+    for (const m of markers) {
+      const sphere = new THREE.Mesh(
+        new THREE.SphereGeometry(radius, 12, 12),
+        new THREE.MeshBasicMaterial({ color: 0x111111 }),
+      );
+      sphere.position.set(m.point[0], m.point[1], m.point[2]);
+      markerGroup.add(sphere);
+    }
+  }, [markers]);
+
   useEffect(() => {
     controlsRef.current?.setWireframe(wireframe);
   }, [wireframe]);
@@ -206,6 +294,20 @@ export function CadViewer({ fileUrl, format, fileName, compact = false }: Props)
           <span className="truncate font-mono text-xs text-muted">{fileName}</span>
         </div>
         <div className="flex shrink-0 items-center gap-1">
+          {onPointPicked && (
+            <button
+              type="button"
+              onClick={() => setPicking((p) => !p)}
+              aria-pressed={picking}
+              title={picking ? "Cancel note placement" : "Click the model to place a note"}
+              className={`flex h-8 items-center gap-1.5 rounded-full px-3 text-xs font-semibold transition-colors ${
+                picking ? "bg-ink text-paper" : "bg-paper text-ink shadow-[inset_0_0_0_1.5px_var(--aos-ink)]"
+              }`}
+            >
+              <MapPin className="h-3.5 w-3.5" aria-hidden />
+              {picking ? "Placing…" : "Place note"}
+            </button>
+          )}
           <button
             type="button"
             onClick={() => setWireframe((w) => !w)}
@@ -241,7 +343,16 @@ export function CadViewer({ fileUrl, format, fileName, compact = false }: Props)
         </div>
       </div>
       <div className="relative">
-        <div ref={mountRef} className="w-full" style={{ height: compact ? 320 : 480 }} />
+        <div
+          ref={mountRef}
+          className="w-full"
+          style={{ height: compact ? 320 : 480, cursor: picking ? "crosshair" : undefined }}
+        />
+        {picking && (
+          <div className="absolute left-3 top-3 rounded-full bg-ink px-3 py-1.5 text-xs font-semibold text-paper">
+            Click a point on the model to place the note
+          </div>
+        )}
         {state === "loading" && (
           <div className="absolute inset-0 flex items-center justify-center bg-canvas">
             <div className="flex items-center gap-2 text-sm text-muted">

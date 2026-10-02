@@ -212,3 +212,114 @@ export function parseMeshStats(buf: Buffer, format: CadFormat): MeshStats | null
     return null;
   }
 }
+
+/**
+ * Extract the raw triangle soup (9 floats per triangle: ax,ay,az,bx,…) from
+ * a mesh upload. Slice 2 (manufacturability) needs the actual triangles —
+ * stats alone cannot answer wall-thickness or overhang questions. Mirrors
+ * the parsing logic above exactly; STEP returns null (no geometry is ever
+ * extracted from STEP, same rule as parseMeshStats).
+ */
+export interface MeshTriangles {
+  /** Flat xyz triples: positions[9*i .. 9*i+8] = one triangle. */
+  positions: Float32Array;
+  triangleCount: number;
+}
+
+function extractBinaryStlTriangles(buf: Buffer): MeshTriangles | null {
+  const count = buf.readUInt32LE(80);
+  const positions = new Float32Array(count * 9);
+  let offset = 84;
+  for (let i = 0; i < count; i++) {
+    // Same layout as parseBinaryStl: 12 normal floats (ignored) + 9 vertex floats.
+    for (let k = 0; k < 9; k++) {
+      positions[i * 9 + k] = buf.readFloatLE(offset + 12 + k * 4);
+    }
+    offset += 50;
+  }
+  return { positions, triangleCount: count };
+}
+
+function extractAsciiStlTriangles(text: string): MeshTriangles | null {
+  const verts: number[] = [];
+  const lines = text.split("\n");
+  for (const raw of lines) {
+    const line = raw.trim();
+    if (line.startsWith("vertex ")) {
+      const parts = line.split(/\s+/).slice(1, 4).map(Number);
+      if (parts.length === 3 && parts.every(Number.isFinite)) verts.push(...parts);
+    } else if (line.startsWith("endfacet")) {
+      if (verts.length % 9 !== 0) return null;
+    }
+  }
+  if (verts.length === 0 || verts.length % 9 !== 0) return null;
+  return { positions: new Float32Array(verts), triangleCount: verts.length / 9 };
+}
+
+function extractObjTriangles(text: string): MeshTriangles | null {
+  const verts: Vec3[] = [];
+  const out: number[] = [];
+  const resolve = (ref: number): Vec3 | null => {
+    const idx = ref > 0 ? ref - 1 : verts.length + ref;
+    return verts[idx] ?? null;
+  };
+  const lines = text.split("\n");
+  for (const raw of lines) {
+    const line = raw.trim();
+    if (line.startsWith("v ")) {
+      const parts = line.split(/\s+/).slice(1, 4).map(Number);
+      if (parts.length === 3 && parts.every(Number.isFinite)) {
+        verts.push([parts[0], parts[1], parts[2]]);
+      }
+    } else if (line.startsWith("f ")) {
+      const refs = line
+        .split(/\s+/)
+        .slice(1)
+        .map((tok) => parseInt(tok.split("/")[0]!, 10))
+        .filter(Number.isInteger);
+      if (refs.length < 3) continue;
+      const v0 = resolve(refs[0]!);
+      if (!v0) continue;
+      for (let i = 1; i < refs.length - 1; i++) {
+        const a = resolve(refs[i]!);
+        const b = resolve(refs[i + 1]!);
+        if (!a || !b) continue;
+        out.push(v0[0], v0[1], v0[2], a[0], a[1], a[2], b[0], b[1], b[2]);
+      }
+    }
+  }
+  if (out.length === 0) return null;
+  return { positions: new Float32Array(out), triangleCount: out.length / 9 };
+}
+
+/**
+ * Extract raw triangles from a mesh upload. Returns null for STEP (never
+ * faked) and for anything unparseable. Browser-safe: pure JS, no three.js,
+ * no prisma.
+ */
+export function extractMeshTriangles(
+  buf: Buffer,
+  format: CadFormat,
+): MeshTriangles | null {
+  try {
+    if (format === "stl") {
+      if (buf.length >= 84) {
+        const count = buf.readUInt32LE(80);
+        // Same size-equation gate as the sniffer: binary STLs must fit exactly.
+        if (count > 0 && count <= 20_000_000 && 84 + count * 50 === buf.length) {
+          return extractBinaryStlTriangles(buf);
+        }
+      }
+      const text = buf.toString("utf8");
+      if (/facet\s+normal/m.test(text)) return extractAsciiStlTriangles(text);
+      return null;
+    }
+    if (format === "obj") {
+      return extractObjTriangles(buf.toString("utf8"));
+    }
+    // step: no geometry extraction — conversion is pending, not faked.
+    return null;
+  } catch {
+    return null;
+  }
+}

@@ -120,7 +120,7 @@ function snapshotOf(v: {
 }
 
 export class PrismaCadStore {
-  constructor(private prisma: PrismaClient) {}
+  constructor(protected prisma: PrismaClient) {}
 
   // ---------- Projects ----------
 
