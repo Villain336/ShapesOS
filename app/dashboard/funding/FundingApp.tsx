@@ -1,20 +1,22 @@
-// Marketr — Funding/VC slice 1: dashboard app (client).
-// Two tabs: Network (funding graph, Boardy first) and Raise (the founder's
-// target investor profile — the front door). Pill tabs per the Agentic OS
-// pattern; tokens only; Lucide icons only.
+// Marketr — Funding/VC slices 1–2: dashboard app (client).
+// Three tabs: Network (funding graph, Boardy first), Pipeline (investor
+// CRM kanban, slice 2), and Raise (the founder's target investor profile —
+// the front door). Pill tabs per the Agentic OS pattern; tokens only;
+// Lucide icons only.
 
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Loader2, Target, Users } from "lucide-react";
+import { KanbanSquare, Loader2, Target, Users } from "lucide-react";
 import {
   NetworkView,
   type ContactView,
   type IntroRequestView,
 } from "./views/NetworkView";
+import { PipelineView } from "./views/PipelineView";
 import { RaiseView, type RoundView } from "./views/RaiseView";
 
-type Tab = "network" | "raise";
+type Tab = "network" | "pipeline" | "raise";
 
 export function FundingApp() {
   const [loading, setLoading] = useState(true);
@@ -49,6 +51,7 @@ export function FundingApp() {
 
   const tabs = [
     { id: "network" as const, label: "Network", icon: Users },
+    { id: "pipeline" as const, label: "Pipeline", icon: KanbanSquare },
     { id: "raise" as const, label: "Raise", icon: Target },
   ];
 
@@ -78,6 +81,8 @@ export function FundingApp() {
 
       {tab === "network" ? (
         <NetworkView contacts={contacts} introRequests={introRequests} loading={false} />
+      ) : tab === "pipeline" ? (
+        <PipelineView />
       ) : (
         <RaiseView round={round} onSaved={setRound} />
       )}

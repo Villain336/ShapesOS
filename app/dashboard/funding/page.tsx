@@ -27,7 +27,7 @@ export default async function FundingPage() {
       <div>
         <h1 className="aos-heading">Funding</h1>
         <p className="mt-0.5 text-sm text-muted">
-          Your funding network and raise workflow. Boardy — the AI
+          Your funding network, investor pipeline, and raise workflow. Boardy — the AI
           superconnector — is preloaded as your first contact: tell him your
           target investor profile and he helps you get warm intros to more of
           the right people.

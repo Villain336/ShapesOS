@@ -258,6 +258,15 @@ export const TRIGGERS: TriggerDef[] = [
     dedupAvailable: true,
     live: true, // Legal slice 3: emitted by the legal document sweep cron.
   },
+  {
+    key: "funding_followup",
+    label: "Investor follow-up due",
+    description:
+      "A follow-up reminder on a pipeline investor is upcoming, due today, or overdue (escalation tiers: upcoming, due_today, overdue — each fires at most once). Emitted by the funding follow-up sweep.",
+    conditionKeys: ["severities"],
+    dedupAvailable: true,
+    live: true, // Funding slice 2: emitted by the funding follow-up sweep cron.
+  },
 ];
 
 export function triggerDef(key: string): TriggerDef | undefined {

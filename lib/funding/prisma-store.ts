@@ -13,11 +13,23 @@ import {
   BOARDY_STARTER_KEY,
   FundingError,
   MAX_INTRO_REQUESTS_PER_CONTACT_PER_24H,
+  STAGE_TRANSITIONS,
+  isLegalStageTransition,
+  validateFollowUpInput,
+  validateInteractionInput,
   validateIntroRequestInput,
+  validateInvestorEnrichment,
   validateTargetInvestorProfile,
+  type FollowUpInput,
   type FundingContactView,
+  type FundingFollowUpView,
+  type FundingInteractionView,
+  type FundingInvestorView,
   type FundingRoundView,
+  type InteractionInput,
   type IntroRequestInput,
+  type InvestorEnrichmentInput,
+  type InvestorStage,
   type TargetInvestorProfileInput,
 } from "./types";
 
@@ -203,6 +215,316 @@ export class PrismaFundingStore {
       throw e;
     }
   }
+
+  // ---------------------------------------------------------------------------
+  // Slice 2 — Investor CRM.
+  // ---------------------------------------------------------------------------
+
+  /** Create an investor in the pipeline. v1 = manual entry. */
+  async createInvestor(
+    workspaceId: string,
+    input: { name?: string; firm?: string | null; email?: string | null; source?: string | null },
+  ): Promise<FundingInvestorView> {
+    if (!input.name?.trim()) {
+      throw new FundingError("invalid_investor", "name is required.");
+    }
+    if (input.email != null && input.email.trim() && !/^\S+@\S+\.\S+$/.test(input.email.trim())) {
+      throw new FundingError("invalid_investor", "email must be a valid email address.");
+    }
+    const row = await this.prisma.fundingInvestor.create({
+      data: {
+        workspaceId,
+        name: input.name.trim(),
+        firm: input.firm?.trim() || null,
+        email: input.email?.trim() || null,
+        source: input.source?.trim() || null,
+      },
+    });
+    return toInvestorView(row);
+  }
+
+  /** The tenant's pipeline investors, stage-grouped at the UI. */
+  async listInvestors(workspaceId: string): Promise<FundingInvestorView[]> {
+    const rows = await this.prisma.fundingInvestor.findMany({
+      where: { workspaceId },
+      orderBy: [{ createdAt: "asc" }],
+    });
+    return rows.map(toInvestorView);
+  }
+
+  /** Investor detail: profile + enrichment + interactions timeline + follow-ups. */
+  async getInvestorDetail(
+    workspaceId: string,
+    investorId: string,
+  ): Promise<{
+    investor: FundingInvestorView;
+    interactions: FundingInteractionView[];
+    followUps: FundingFollowUpView[];
+  }> {
+    const row = await this.prisma.fundingInvestor.findFirst({
+      where: { id: investorId, workspaceId },
+    });
+    if (!row) {
+      throw new FundingError("investor_not_found", "Investor not found in this workspace.");
+    }
+    const [interactions, followUps] = await Promise.all([
+      this.prisma.fundingInteraction.findMany({
+        where: { workspaceId, investorId },
+        include: { contact: { select: { name: true } } },
+        orderBy: [{ occurredAt: "desc" }, { createdAt: "desc" }],
+      }),
+      this.prisma.fundingFollowUp.findMany({
+        where: { workspaceId, investorId },
+        include: { investor: { select: { name: true } } },
+        orderBy: [{ done: "asc" }, { dueAt: "asc" }],
+      }),
+    ]);
+    return {
+      investor: toInvestorView(row),
+      interactions: interactions.map(toInteractionView),
+      followUps: followUps.map(toFollowUpView),
+    };
+  }
+
+  /**
+   * Update an investor's enrichment fields (v1 = manual/structured entry).
+   * `enriched` provenance requires fetchedAt — provenance rule enforced here.
+   */
+  async updateInvestorEnrichment(
+    workspaceId: string,
+    investorId: string,
+    input: InvestorEnrichmentInput,
+  ): Promise<FundingInvestorView> {
+    const errors = validateInvestorEnrichment(input);
+    if (errors.length > 0) {
+      throw new FundingError("invalid_enrichment", errors.join(" "));
+    }
+    const existing = await this.prisma.fundingInvestor.findFirst({
+      where: { id: investorId, workspaceId },
+    });
+    if (!existing) {
+      throw new FundingError("investor_not_found", "Investor not found in this workspace.");
+    }
+    const row = await this.prisma.fundingInvestor.update({
+      where: { id: investorId },
+      data: {
+        firm: input.firm?.trim() || null,
+        title: input.title?.trim() || null,
+        email: input.email?.trim() || null,
+        checkSizeMin: input.checkSizeMin ?? null,
+        checkSizeMax: input.checkSizeMax ?? null,
+        stages: (input.stages ?? []).map((s) => s.trim()).filter(Boolean),
+        sectors: (input.sectors ?? []).map((s) => s.trim()).filter(Boolean),
+        thesisFit: input.thesisFit?.trim() || null,
+        enrichmentSource: input.enrichmentSource ?? "self_reported",
+        enrichmentFetchedAt: input.enrichmentFetchedAt ? new Date(input.enrichmentFetchedAt) : null,
+        enrichmentNotes: input.enrichmentNotes?.trim() || null,
+      },
+    });
+    return toInvestorView(row);
+  }
+
+  /**
+   * Move an investor to a new pipeline stage. Only legal transitions
+   * (STAGE_TRANSITIONS) are allowed — illegal moves throw. Every move is
+   * recorded as a FundingInteraction (kind stage_change) with the actor and
+   * timestamp, so the pipeline always has lineage: who moved what, when.
+   */
+  async transitionStage(
+    workspaceId: string,
+    investorId: string,
+    toStage: InvestorStage,
+    actor: string,
+  ): Promise<FundingInvestorView> {
+    const investor = await this.prisma.fundingInvestor.findFirst({
+      where: { id: investorId, workspaceId },
+    });
+    if (!investor) {
+      throw new FundingError("investor_not_found", "Investor not found in this workspace.");
+    }
+    const fromStage = investor.stage as InvestorStage;
+    if (fromStage === toStage) {
+      return toInvestorView(investor);
+    }
+    if (!isLegalStageTransition(fromStage, toStage)) {
+      const legal = STAGE_TRANSITIONS[fromStage] ?? [];
+      throw new FundingError(
+        "illegal_stage_transition",
+        `Cannot move from ${fromStage} to ${toStage}. Legal moves from ${fromStage}: ${legal.join(", ") || "none — this stage is terminal"}.`,
+      );
+    }
+    const actorName = actor.trim() || "founder";
+    const row = await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.fundingInvestor.update({
+        where: { id: investorId },
+        data: { stage: toStage },
+      });
+      await tx.fundingInteraction.create({
+        data: {
+          workspaceId,
+          investorId,
+          kind: "stage_change",
+          summary: `Stage: ${fromStage} → ${toStage}`,
+          actor: actorName,
+        },
+      });
+      return updated;
+    });
+    return toInvestorView(row);
+  }
+
+  /**
+   * Log an interaction (call, email, meeting, note, ...). The investor — and
+   * the linked contact, if any — must belong to this workspace.
+   * stage_change rows are written by transitionStage only, never here.
+   */
+  async logInteraction(
+    workspaceId: string,
+    investorId: string,
+    input: InteractionInput,
+    actor?: string,
+  ): Promise<FundingInteractionView> {
+    const errors = validateInteractionInput(input);
+    if (errors.length > 0) {
+      throw new FundingError("invalid_interaction", errors.join(" "));
+    }
+    const investor = await this.prisma.fundingInvestor.findFirst({
+      where: { id: investorId, workspaceId },
+    });
+    if (!investor) {
+      throw new FundingError("investor_not_found", "Investor not found in this workspace.");
+    }
+    let contactName: string | null = null;
+    if (input.contactId) {
+      const contact = await this.prisma.fundingContact.findFirst({
+        where: { id: input.contactId, workspaceId },
+        select: { id: true, name: true },
+      });
+      if (!contact) {
+        throw new FundingError("contact_not_found", "Contact not found in this workspace.");
+      }
+      contactName = contact.name;
+    }
+    const row = await this.prisma.fundingInteraction.create({
+      data: {
+        workspaceId,
+        investorId,
+        kind: input.kind,
+        summary: input.summary.trim(),
+        occurredAt: input.occurredAt ? new Date(input.occurredAt) : undefined,
+        actor: actor?.trim() || "founder",
+        contactId: input.contactId ?? null,
+      },
+    });
+    return toInteractionView({ ...row, contact: contactName ? { name: contactName } : null });
+  }
+
+  /** Create a follow-up reminder on an investor. */
+  async createFollowUp(
+    workspaceId: string,
+    investorId: string,
+    input: FollowUpInput,
+  ): Promise<FundingFollowUpView> {
+    const errors = validateFollowUpInput(input);
+    if (errors.length > 0) {
+      throw new FundingError("invalid_followup", errors.join(" "));
+    }
+    const investor = await this.prisma.fundingInvestor.findFirst({
+      where: { id: investorId, workspaceId },
+      select: { id: true, name: true },
+    });
+    if (!investor) {
+      throw new FundingError("investor_not_found", "Investor not found in this workspace.");
+    }
+    const row = await this.prisma.fundingFollowUp.create({
+      data: {
+        workspaceId,
+        investorId,
+        dueAt: new Date(input.dueAt),
+        note: input.note.trim(),
+      },
+      include: { investor: { select: { name: true } } },
+    });
+    return toFollowUpView(row);
+  }
+
+  /** Open (not done) follow-ups — used by the dashboard and the sweep. */
+  async listOpenFollowUps(
+    workspaceId: string,
+  ): Promise<
+    (FundingFollowUpView & { lastAlertedTier: string | null })[]
+  > {
+    const rows = await this.prisma.fundingFollowUp.findMany({
+      where: { workspaceId, done: false },
+      include: { investor: { select: { name: true } } },
+      orderBy: { dueAt: "asc" },
+    });
+    return rows.map((r) => ({
+      ...toFollowUpView(r),
+      lastAlertedTier: r.lastAlertedTier,
+    }));
+  }
+
+  /** Mark a follow-up done. */
+  async completeFollowUp(
+    workspaceId: string,
+    followUpId: string,
+  ): Promise<FundingFollowUpView> {
+    const existing = await this.prisma.fundingFollowUp.findFirst({
+      where: { id: followUpId, workspaceId },
+    });
+    if (!existing) {
+      throw new FundingError("followup_not_found", "Follow-up not found in this workspace.");
+    }
+    const row = await this.prisma.fundingFollowUp.update({
+      where: { id: followUpId },
+      data: { done: true, doneAt: new Date() },
+      include: { investor: { select: { name: true } } },
+    });
+    return toFollowUpView(row);
+  }
+
+  /** Record that the follow-up sweep alerted a tier (dedup). */
+  async recordFollowUpAlertedTier(
+    workspaceId: string,
+    followUpId: string,
+    tier: string,
+  ): Promise<void> {
+    await this.prisma.fundingFollowUp.updateMany({
+      where: { id: followUpId, workspaceId },
+      data: { lastAlertedTier: tier },
+    });
+  }
+
+  /**
+   * The tenant's pipeline: investors with their open (not done) follow-ups
+   * attached, for the kanban board.
+   */
+  async listPipelineInvestors(
+    workspaceId: string,
+  ): Promise<(FundingInvestorView & { openFollowUps: FundingFollowUpView[] })[]> {
+    const [investors, followUps] = await Promise.all([
+      this.prisma.fundingInvestor.findMany({
+        where: { workspaceId },
+        orderBy: [{ createdAt: "asc" }],
+      }),
+      this.prisma.fundingFollowUp.findMany({
+        where: { workspaceId, done: false },
+        include: { investor: { select: { name: true } } },
+        orderBy: { dueAt: "asc" },
+      }),
+    ]);
+    const byInvestor = new Map<string, FundingFollowUpView[]>();
+    for (const f of followUps) {
+      const list = byInvestor.get(f.investorId) ?? [];
+      list.push(toFollowUpView(f));
+      byInvestor.set(f.investorId, list);
+    }
+    return investors.map((i) => ({
+      ...toInvestorView(i),
+      openFollowUps: byInvestor.get(i.id) ?? [],
+    }));
+  }
 }
 
 function toContactView(row: {
@@ -227,8 +549,7 @@ function toContactView(row: {
   };
 }
 
-function toRoundView(row: {
-  id: string;
+function toRoundView(row: {  id: string;
   name: string;
   status: string;
   isActive: boolean;
@@ -250,5 +571,87 @@ function toRoundView(row: {
     sectors: row.sectors,
     thesisSummary: row.thesisSummary,
     targetClose: row.targetClose,
+  };
+}
+
+function toInvestorView(row: {
+  id: string;
+  name: string;
+  firm: string | null;
+  title: string | null;
+  email: string | null;
+  checkSizeMin: number | null;
+  checkSizeMax: number | null;
+  stages: string[];
+  sectors: string[];
+  thesisFit: string | null;
+  enrichmentSource: string;
+  enrichmentFetchedAt: Date | null;
+  enrichmentNotes: string | null;
+  stage: string;
+  source: string | null;
+  createdAt: Date;
+}): FundingInvestorView {
+  return {
+    id: row.id,
+    name: row.name,
+    firm: row.firm,
+    title: row.title,
+    email: row.email,
+    checkSizeMin: row.checkSizeMin,
+    checkSizeMax: row.checkSizeMax,
+    stages: row.stages,
+    sectors: row.sectors,
+    thesisFit: row.thesisFit,
+    enrichmentSource: row.enrichmentSource as FundingInvestorView["enrichmentSource"],
+    enrichmentFetchedAt: row.enrichmentFetchedAt,
+    enrichmentNotes: row.enrichmentNotes,
+    stage: row.stage as FundingInvestorView["stage"],
+    source: row.source,
+    createdAt: row.createdAt,
+  };
+}
+
+function toInteractionView(row: {
+  id: string;
+  occurredAt: Date;
+  kind: string;
+  summary: string;
+  actor: string | null;
+  contactId: string | null;
+  createdAt: Date;
+  contact: { name: string } | null;
+}): FundingInteractionView {
+  return {
+    id: row.id,
+    occurredAt: row.occurredAt,
+    kind: row.kind as FundingInteractionView["kind"],
+    summary: row.summary,
+    actor: row.actor,
+    contactId: row.contactId,
+    contactName: row.contact?.name ?? null,
+    createdAt: row.createdAt,
+  };
+}
+
+function toFollowUpView(row: {
+  id: string;
+  investorId: string;
+  dueAt: Date;
+  note: string;
+  done: boolean;
+  doneAt: Date | null;
+  createdAt: Date;
+  investor: { name: string };
+}): FundingFollowUpView {
+  return {
+    id: row.id,
+    investorId: row.investorId,
+    investorName: row.investor.name,
+    dueAt: row.dueAt,
+    note: row.note,
+    done: row.done,
+    doneAt: row.doneAt,
+    createdAt: row.createdAt,
   };
 }

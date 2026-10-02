@@ -778,6 +778,7 @@ model Workspace {
   fundingContacts     FundingContact[]
   fundingInvestors    FundingInvestor[]
   fundingInteractions FundingInteraction[]
+  fundingFollowUps    FundingFollowUp[]
   fundingIntroRequests FundingIntroRequest[]
   fundingDataRoomDocs FundingDataRoomDoc[]
   fundingRounds       FundingRound[]
@@ -11363,6 +11364,18 @@ enum FundingInvestorStage {
   diligence
   term_sheet
   passed
+  // Slice 2: terminal outcomes. `won` = the investor committed; `lost` =
+  // the founder walked away; `passed` (slice 1) = the investor passed.
+  won
+  lost
+}
+
+// Slice 2: who supplied the enrichment data. v1 = manual/structured entry
+// only — `enriched` marks fields fetched through a provider later, and every
+// enriched row must carry fetched-at. No live scraping in v1.
+enum FundingEnrichmentSource {
+  self_reported
+  enriched
 }
 
 model FundingInvestor {
@@ -11373,6 +11386,8 @@ model FundingInvestor {
   name  String
   firm  String?
   email String?
+  // Slice 2 enrichment: the person's role/title at the firm.
+  title String?
 
   // Investor's known check range and thesis (founder-entered for now).
   checkSizeMin Int? @map("check_size_min")
@@ -11380,6 +11395,12 @@ model FundingInvestor {
   stages       String[]
   sectors      String[]
   thesisFit    String? @map("thesis_fit")
+
+  // Enrichment provenance: which fields came from the founder
+  // (self_reported) vs an enrichment fetch (enriched, + fetched-at).
+  enrichmentSource    FundingEnrichmentSource @default(self_reported) @map("enrichment_source")
+  enrichmentFetchedAt DateTime?               @map("enrichment_fetched_at")
+  enrichmentNotes     String?                 @map("enrichment_notes")
 
   stage FundingInvestorStage @default(target)
   // How this investor entered the pipeline (e.g. "boardy_intro", "crunchbase").
@@ -11390,6 +11411,7 @@ model FundingInvestor {
 
   interactions  FundingInteraction[]
   introRequests FundingIntroRequest[]
+  followUps     FundingFollowUp[]
 
   @@index([workspaceId, stage])
   @@map("funding_investors")
@@ -11402,6 +11424,8 @@ enum FundingInteractionKind {
   intro
   deck_sent
   note
+  // Slice 2: recorded automatically by stage transitions (with an actor).
+  stage_change
 }
 
 model FundingInteraction {
@@ -11412,6 +11436,9 @@ model FundingInteraction {
   occurredAt DateTime @default(now()) @map("occurred_at")
   kind       FundingInteractionKind
   summary    String
+  // Who recorded the interaction (founder email/handle, "founder", "agent").
+  // Slice 2: always set on auto-recorded stage_change rows.
+  actor      String?
 
   contactId String?         @map("contact_id")
   contact   FundingContact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
@@ -11423,6 +11450,35 @@ model FundingInteraction {
 
   @@index([workspaceId, occurredAt])
   @@map("funding_interactions")
+}
+
+// Slice 2: follow-up reminders on an investor. The follow-up sweep
+// (lib/funding/followup-sweep.ts) surfaces due/upcoming/overdue rows
+// through the alert hub (trigger "funding_followup"), at most once per
+// tier per follow-up (recorded on lastAlertedTier).
+model FundingFollowUp {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  investorId String          @map("investor_id")
+  investor   FundingInvestor @relation(fields: [investorId], references: [id], onDelete: Cascade)
+
+  dueAt DateTime @map("due_at")
+  note  String
+  done  Boolean  @default(false)
+
+  doneAt DateTime? @map("done_at")
+  // Sweep dedup: the escalation tier already alerted for ("upcoming",
+  // "due_today", "overdue"), null when never alerted.
+  lastAlertedTier String? @map("last_alerted_tier")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([workspaceId, done, dueAt])
+  @@index([investorId])
+  @@map("funding_follow_ups")
 }
 
 enum FundingIntroStatus {
