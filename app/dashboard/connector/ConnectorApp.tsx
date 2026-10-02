@@ -11,6 +11,7 @@ import { useCallback, useEffect, useState } from "react";
 import {
   ArrowLeftRight,
   Building2,
+  Inbox,
   Loader2,
   Package,
   PhoneIncoming,
@@ -23,6 +24,8 @@ import {
 } from "lucide-react";
 import { ImportSourcesTab } from "./ImportSourcesTab";
 import { FindPathsTab } from "./FindPathsTab";
+import { ApprovalsTab } from "./ApprovalsTab";
+import { IntroductionsTab } from "./IntroductionsTab";
 import type {
   ConnectorCompanyView,
   ConnectorGraphView,
@@ -30,7 +33,7 @@ import type {
   ConnectorPersonView,
 } from "@/lib/connector/types";
 
-type Tab = "people" | "companies" | "batches" | "imports" | "paths";
+type Tab = "people" | "companies" | "batches" | "imports" | "paths" | "approvals" | "intros";
 
 function WarmthMeter({ score, compact }: { score: number; compact?: boolean }) {
   // Monochrome: warmth is data, not an agent state — never the status colors.
@@ -294,6 +297,7 @@ export function ConnectorApp() {
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<Tab>("people");
   const [graph, setGraph] = useState<ConnectorGraphView | null>(null);
+  const [pendingApprovals, setPendingApprovals] = useState(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [touching, setTouching] = useState(false);
   const [recomputing, setRecomputing] = useState(false);
@@ -301,6 +305,11 @@ export function ConnectorApp() {
   const refresh = useCallback(async () => {
     const res = await fetch("/api/connector/graph");
     if (res.ok) setGraph(await res.json());
+    const inbox = await fetch("/api/connector/intros?inbox=1");
+    if (inbox.ok) {
+      const json = await inbox.json();
+      setPendingApprovals(json.introductions.length);
+    }
     setLoading(false);
   }, []);
 
@@ -347,6 +356,8 @@ export function ConnectorApp() {
     { id: "people" as const, label: "People", icon: Users },
     { id: "companies" as const, label: "Companies", icon: Building2 },
     { id: "paths" as const, label: "Find a path", icon: Route },
+    { id: "approvals" as const, label: "Approvals", icon: Inbox, badge: pendingApprovals },
+    { id: "intros" as const, label: "Introductions", icon: ArrowLeftRight },
     { id: "batches" as const, label: "Import batches", icon: Package },
     { id: "imports" as const, label: "Import sources", icon: Plug },
   ];
@@ -356,7 +367,7 @@ export function ConnectorApp() {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-2" role="tablist" aria-label="Network views">
+        <div className="flex flex-wrap items-center gap-2" role="tablist" aria-label="Network views">
           {tabs.map((t) => {
             const Icon = t.icon;
             const active = tab === t.id;
@@ -373,6 +384,16 @@ export function ConnectorApp() {
               >
                 <Icon size={15} />
                 {t.label}
+                {typeof t.badge === "number" && t.badge > 0 && (
+                  <span
+                    className={`flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[11px] font-bold ${
+                      active ? "bg-needs text-black" : "bg-needs text-black"
+                    }`}
+                    aria-label={`${t.badge} pending approvals`}
+                  >
+                    {t.badge}
+                  </span>
+                )}
               </button>
             );
           })}
@@ -470,6 +491,10 @@ export function ConnectorApp() {
       {tab === "paths" && graph && (
         <FindPathsTab persons={graph.persons} companies={graph.companies} />
       )}
+
+      {tab === "approvals" && <ApprovalsTab onChanged={refresh} />}
+
+      {tab === "intros" && <IntroductionsTab />}
 
       {tab === "imports" && <ImportSourcesTab />}
 

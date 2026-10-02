@@ -1,0 +1,173 @@
+// Marketr — Connector Agent slice 4 UI: shared bits for the approval inbox
+// and the introductions list/detail.
+// Agentic OS design system: tokens only, Lucide only, monochrome status
+// pills (intro lifecycle states are data, not agent states — the
+// running/needs/done/failed shapes stay reserved for agents).
+
+import { ArrowRight } from "lucide-react";
+import type {
+  ConnectorIntroductionEventView,
+  ConnectorIntroductionStatus,
+} from "@/lib/connector/introductions";
+
+export interface PathSnapshot {
+  hops: Array<{ kind: string; id: string | null; name: string }>;
+  strength: number;
+  components: { tenantWarmth: number; linkStrength: number; freshness: number };
+  explanation: { text: string; facts: { lastTouchText: string } };
+  mutual: { id: string; name: string };
+  target: { kind: string; id: string; name: string };
+}
+
+export function asPathSnapshot(v: unknown): PathSnapshot | null {
+  if (!v || typeof v !== "object") return null;
+  const s = v as Record<string, unknown>;
+  if (!Array.isArray(s["hops"])) return null;
+  return s as unknown as PathSnapshot;
+}
+
+export const INTRO_STATUS_LABELS: Record<ConnectorIntroductionStatus, string> = {
+  proposed: "Proposed",
+  side_a_accepted: "Side A accepted",
+  side_b_accepted: "Both accepted",
+  made: "Made",
+  followed_up: "Followed up",
+  declined: "Declined",
+  expired: "Expired",
+  withdrawn: "Withdrawn",
+};
+
+export function StatusPill({ status }: { status: ConnectorIntroductionStatus }) {
+  return (
+    <span className="inline-flex h-7 shrink-0 items-center rounded-full border border-line bg-canvas px-3 text-[12px] font-semibold text-ink">
+      {INTRO_STATUS_LABELS[status]}
+    </span>
+  );
+}
+
+export function StrengthMeter({ strength }: { strength: number }) {
+  const pct = Math.round(strength * 100);
+  return (
+    <span className="flex items-center gap-2" title={`Path strength ${pct}%`}>
+      <span className="h-2 w-24 overflow-hidden rounded-full bg-canvas">
+        <span className="block h-full rounded-full bg-ink" style={{ width: `${pct}%` }} />
+      </span>
+      <span className="text-[13px] font-semibold text-ink">{pct}%</span>
+    </span>
+  );
+}
+
+/** The frozen IntroPath the tenant approved, rendered from the snapshot. */
+export function PathSnapshotView({ snapshot }: { snapshot: unknown }) {
+  const path = asPathSnapshot(snapshot);
+  if (!path) {
+    return <p className="text-[13px] text-muted">Path snapshot unavailable.</p>;
+  }
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-1.5 text-[14px] font-semibold text-ink">
+          {path.hops.map((h, i) => (
+            <span key={`${h.kind}-${h.id ?? "tenant"}-${i}`} className="flex items-center gap-1.5">
+              {i > 0 && <ArrowRight size={14} className="text-muted" />}
+              <span className={i === 0 ? "text-muted" : ""}>{h.name}</span>
+            </span>
+          ))}
+        </div>
+        <StrengthMeter strength={path.strength} />
+      </div>
+      <p className="text-[14px] leading-relaxed text-ink">{path.explanation.text}</p>
+      <div className="flex flex-wrap gap-x-4 gap-y-1 text-[12px] text-muted">
+        <span>
+          Your warmth with {path.mutual.name}:{" "}
+          <span className="font-semibold text-ink">{path.components.tenantWarmth}/100</span>
+        </span>
+        <span>
+          Their link:{" "}
+          <span className="font-semibold text-ink">
+            {Math.round(path.components.linkStrength * 100)}%
+          </span>
+        </span>
+        <span>
+          Freshness:{" "}
+          <span className="font-semibold text-ink">
+            {Math.round(path.components.freshness * 100)}%
+          </span>
+        </span>
+        <span>
+          Last touch:{" "}
+          <span className="font-semibold text-ink">{path.explanation.facts.lastTouchText}</span>
+        </span>
+      </div>
+    </div>
+  );
+}
+
+const EVENT_LABELS: Record<string, string> = {
+  proposed: "Proposed",
+  tenant_approved: "You approved the draft",
+  tenant_declined: "You declined the proposal",
+  ask_sent_to_side_a: "Ask sent to side A",
+  side_a_accepted: "Side A accepted the ask",
+  side_a_declined: "Side A declined the ask",
+  offer_sent_to_side_b: "Offer sent to side B",
+  side_b_accepted: "Side B accepted the offer",
+  side_b_declined: "Side B declined the offer",
+  intro_sent: "Intro made",
+  followup_proposed: "Followup drafted",
+  followup_sent: "Followup sent",
+  withdrawn: "Withdrawn",
+  expired: "Expired",
+};
+
+/** The full lineage timeline: who did what, what was said, when. */
+export function IntroTimeline({ events }: { events: ConnectorIntroductionEventView[] }) {
+  if (events.length === 0) {
+    return <p className="text-[13px] text-muted">No events yet.</p>;
+  }
+  return (
+    <ol className="flex flex-col">
+      {events.map((e, i) => (
+        <li key={e.id} className="relative flex gap-3 pb-4 last:pb-0">
+          {i < events.length - 1 && (
+            <span className="absolute left-[5px] top-4 h-full w-px bg-line" aria-hidden />
+          )}
+          <span className="mt-1.5 h-[11px] w-[11px] shrink-0 rounded-full border-2 border-ink bg-paper" aria-hidden />
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-baseline gap-x-2">
+              <span className="text-[14px] font-semibold text-ink">
+                {EVENT_LABELS[e.kind] ?? e.kind}
+              </span>
+              <span className="text-[12px] text-muted">
+                {e.actorIdentity} · {new Date(e.createdAt).toLocaleString()}
+              </span>
+            </div>
+            {e.message && (
+              <p className="mt-1 rounded-md border border-line bg-canvas p-2.5 text-[13px] leading-relaxed text-ink">
+                {e.message}
+              </p>
+            )}
+          </div>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+export const btnApprove =
+  "flex h-11 min-w-[88px] items-center justify-center gap-1.5 rounded-full bg-done px-4 text-sm font-semibold text-white aos-press disabled:opacity-40";
+
+export const btnDeny =
+  "flex h-11 min-w-[88px] items-center justify-center gap-1.5 rounded-full bg-paper px-4 text-sm font-semibold text-failed-text aos-press shadow-[inset_0_0_0_1.5px_var(--aos-failed)] disabled:opacity-40";
+
+export const btnPrimary =
+  "aos-press flex h-11 items-center gap-2 rounded-full bg-black px-5 text-[15px] font-semibold text-white disabled:opacity-50";
+
+export const btnSecondary =
+  "aos-press flex h-11 items-center gap-2 rounded-full bg-paper px-5 text-[15px] font-semibold text-ink shadow-outline disabled:opacity-50";
+
+export const inputCls =
+  "h-control rounded-md border border-control bg-paper px-3 text-[15px] text-ink";
+
+export const textareaCls =
+  "rounded-md border border-control bg-paper px-3 py-2 text-[14px] leading-relaxed text-ink";

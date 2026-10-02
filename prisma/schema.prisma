@@ -800,6 +800,9 @@ model Workspace {
   // Connector Agent slice 2: per-source consent grants + exclusion lists.
   connectorSourceConsents   ConnectorSourceConsent[]
   connectorExclusions       ConnectorExclusion[]
+  // Connector Agent slice 4: double-opt-in introductions + audit lineage.
+  connectorIntroductions    ConnectorIntroduction[]
+  connectorIntroductionEvents ConnectorIntroductionEvent[]
   insurancePaymentHandoffs  InsurancePaymentHandoff[]
   insuranceCertificates     InsuranceCertificate[]
   // Phase 12 (embeds): tenant-scoped GrowthBook flag overrides.
@@ -12026,6 +12029,12 @@ model ConnectorPerson {
   relationship ConnectorRelationship?
   employments  ConnectorEmployment[]
 
+  // Slice 4: introductions where this person is side A (the mutual, asked
+  // for the intro) or side B (the target, offered the intro). Named
+  // relations because one model has two FKs to ConnectorPerson.
+  introsAsSideA ConnectorIntroduction[] @relation("IntroSideA")
+  introsAsSideB ConnectorIntroduction[] @relation("IntroSideB")
+
   @@unique([workspaceId, externalId])
   @@index([workspaceId])
   @@map("connector_agent_persons")
@@ -12108,4 +12117,145 @@ model ConnectorRelationship {
 
   @@index([workspaceId])
   @@map("connector_agent_relationships")
+}
+
+// ---------------------------------------------------------------------------
+// Connector Agent — slice 4: double-opt-in lifecycle (SPEC-CONNECTOR-AGENT.md
+// §6). The Introduction is the brokered intro with a strict state machine:
+//
+//   proposed → side_a_accepted → side_b_accepted → made → followed_up
+//   Terminal: declined, expired, withdrawn.
+//
+// Side A = the mutual (the ask goes to them, after tenant approval).
+// Side B = the target (the offer goes to them only after A accepts).
+// Drafts are data; sends happen only via the tenant's connected messaging
+// account, only after tenant approval + dual acceptance, and every send is
+// an auditable event (ConnectorIntroductionEvent — the full lineage).
+// One Introduction per pair for ACTIVE intros: enforced by a partial unique
+// index in the slice-4 migration (Prisma cannot express partial indexes).
+// ---------------------------------------------------------------------------
+
+enum ConnectorIntroductionStatus {
+  proposed
+  side_a_accepted
+  side_b_accepted
+  made
+  followed_up
+  declined
+  expired
+  withdrawn
+}
+
+enum ConnectorIntroductionEventKind {
+  proposed
+  tenant_approved
+  tenant_declined
+  ask_sent_to_side_a
+  side_a_accepted
+  side_a_declined
+  offer_sent_to_side_b
+  side_b_accepted
+  side_b_declined
+  intro_sent
+  followup_proposed
+  followup_sent
+  withdrawn
+  expired
+}
+
+enum ConnectorIntroductionActorKind {
+  agent
+  tenant
+  side_a
+  side_b
+  system
+}
+
+model ConnectorIntroduction {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  // The pair. Side A = the mutual the tenant asks; side B = the target.
+  personAId String          @map("person_a_id")
+  personA   ConnectorPerson @relation("IntroSideA", fields: [personAId], references: [id], onDelete: Cascade)
+  personBId String          @map("person_b_id")
+  personB   ConnectorPerson @relation("IntroSideB", fields: [personBId], references: [id], onDelete: Cascade)
+
+  status ConnectorIntroductionStatus @default(proposed)
+
+  // The computed IntroPath used, frozen at propose time. IntroPaths are
+  // computed (slice 3), never persisted — the snapshot preserves the
+  // lineage the tenant approved.
+  introPathSnapshot Json @map("intro_path_snapshot")
+
+  // Draft copy (data until tenant-approved, then sent via the tenant's
+  // connected messaging account).
+  draftAskMessage   String @map("draft_ask_message")
+  draftOfferMessage String @map("draft_offer_message")
+
+  // Tenant approval gate (v1: every draft is tenant-approved).
+  tenantApproved   Boolean   @default(false) @map("tenant_approved")
+  tenantApprovedBy String?   @map("tenant_approved_by")
+  tenantApprovedAt DateTime? @map("tenant_approved_at")
+
+  // Double-opt-in lineage (human actors only — enforced in the store).
+  sideAAcceptedBy String?   @map("side_a_accepted_by")
+  sideAAcceptedAt DateTime? @map("side_a_accepted_at")
+  sideBAcceptedBy String?   @map("side_b_accepted_by")
+  sideBAcceptedAt DateTime? @map("side_b_accepted_at")
+
+  // The made send: legal ONLY from side_b_accepted (the money rule).
+  madeMessage String?   @map("made_message")
+  madeSentVia String?   @map("made_sent_via")
+  madeSentBy  String?   @map("made_sent_by")
+  madeSentAt  DateTime? @map("made_sent_at")
+
+  // Decline / withdraw / expire lineage.
+  declinedBy    String?   @map("declined_by")
+  declinedAt    DateTime? @map("declined_at")
+  declineReason String?   @map("decline_reason")
+  withdrawnBy   String?   @map("withdrawn_by")
+  withdrawnAt   DateTime? @map("withdrawn_at")
+  expiredAt     DateTime? @map("expired_at")
+
+  // Tenant per-instance rate-limit override (recorded for the audit).
+  rateLimitOverrideMaxAsks    Int? @map("rate_limit_override_max_asks")
+  rateLimitOverrideWindowDays Int? @map("rate_limit_override_window_days")
+
+  // Followups: only after made, once, unless the tenant approves more.
+  followupCount       Int     @default(0) @map("followup_count")
+  pendingFollowupDraft String? @map("pending_followup_draft")
+  pendingFollowupTo    String? @map("pending_followup_to")
+
+  events ConnectorIntroductionEvent[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([workspaceId])
+  @@index([workspaceId, status])
+  @@index([workspaceId, personAId])
+  @@map("connector_agent_introductions")
+}
+
+// Every approval event on an Introduction: who proposed, who accepted,
+// what was said, when. The lifecycle timeline is rendered from this.
+model ConnectorIntroductionEvent {
+  id             String @id @default(cuid())
+  workspaceId    String @map("workspace_id")
+  workspace      Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  introductionId String @map("introduction_id")
+  introduction   ConnectorIntroduction @relation(fields: [introductionId], references: [id], onDelete: Cascade)
+
+  kind          ConnectorIntroductionEventKind
+  actorKind     ConnectorIntroductionActorKind @map("actor_kind")
+  actorIdentity String @map("actor_identity")
+  message       String?
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([workspaceId])
+  @@index([introductionId, createdAt])
+  @@map("connector_agent_introduction_events")
 }

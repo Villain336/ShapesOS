@@ -28,7 +28,8 @@ export default async function ConnectorPage() {
         <h1 className="aos-heading">Network</h1>
         <p className="mt-0.5 text-sm text-muted">
           Your connector agent&apos;s graph: the people you know, how warm each
-          relationship is, and where every contact came from.
+          relationship is, warm intro paths — and the double-opt-in
+          introductions the agent proposes for your approval.
         </p>
       </div>
       <ConnectorApp />
