@@ -805,6 +805,13 @@ model Workspace {
   cadBomLines      CadBomLine[]
   cadCostEstimates CadCostEstimate[]
   cadExportRequests CadExportRequest[]
+  // CAD + Hardware slice 4: hardware project management.
+  cadParts        CadPart[]
+  cadStockEvents  CadStockEvent[]
+  cadSuppliers    CadSupplier[]
+  cadPartSuppliers CadPartSupplier[]
+  cadTasks        CadTask[]
+  cadTaskComments CadTaskComment[]
   fundingDocViews           FundingDocView[]
   fundingRounds             FundingRound[]
   // Connector Agent slice 1: graph core — person/company/relationship/
@@ -12457,6 +12464,9 @@ model CadProject {
 
   models CadModel[]
 
+  // Slice 4: tasks/issues on this project (optionally pinned to a revision).
+  tasks CadTask[]
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -12562,6 +12572,10 @@ model CadModelVersion {
   bomVersions    CadBomVersion[]
   costEstimates  CadCostEstimate[]
   exportRequests CadExportRequest[]
+
+  // Slice 4: tasks/issues pinned to this immutable revision. The pin is a
+  // reference only — closing or editing a task never mutates this row.
+  taskPins CadTask[] @relation("CadTaskPinnedVersion")
 
   @@unique([modelId, versionNumber])
   @@index([workspaceFileId])
@@ -12851,10 +12865,18 @@ model CadBomLine {
   source    String @default("manual")
   sortOrder Int    @default(0) @map("sort_order")
 
+  // Slice 4: optional link into the tenant's parts inventory. When set and
+  // the line's unit cost was not entered manually, the preferred supplier's
+  // quoted cost (USD only — no FX is ever invented) is used as the line's
+  // unit cost with source "supplier_quote:…". Deleting the part nulls this.
+  inventoryPartId String?  @map("inventory_part_id")
+  inventoryPart   CadPart? @relation(fields: [inventoryPartId], references: [id], onDelete: SetNull)
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@index([bomVersionId, sortOrder])
+  @@index([inventoryPartId])
   @@map("cad_bom_lines")
 }
 
@@ -12940,4 +12962,192 @@ model CadExportRequest {
 
   @@index([workspaceId, modelId])
   @@map("cad_export_requests")
+}
+
+// CAD + Hardware slice 4: hardware project management.
+// Parts inventory (tenant-scoped catalog, auditable stock events),
+// supplier tracking with quoted-cost sourcing, and revision-linked
+// tasks/issues. Everything is tenant-scoped via workspaceId, like every
+// other CAD row.
+
+// One cataloged part. onHandQty is NEVER edited in place by anything other
+// than a CadStockEvent row (adjustPartStock); the current value is the
+// auditable sum of events, materialized here for cheap reads.
+model CadPart {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  name            String
+  // SKU or MPN — free text, tenant's own part numbering.
+  sku             String?
+  // mechanical | electrical | fastener | pcb | cable | tooling | consumable | other
+  category        String  @default("other")
+  onHandQty       Float   @default(0) @map("on_hand_qty")
+  reorderPoint    Float   @default(0) @map("reorder_point")
+  unitOfMeasure   String  @default("pcs") @map("unit_of_measure")
+  storageLocation String? @map("storage_location")
+
+  stockEvents   CadStockEvent[]
+  supplierLinks CadPartSupplier[]
+  bomLines      CadBomLine[]
+
+  createdBy String?  @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([workspaceId])
+  @@index([workspaceId, category])
+  @@map("cad_parts")
+}
+
+// One auditable stock adjustment. Rows are append-only: adjustments are
+// events (who/when/delta/reason), never silent overwrites of onHandQty.
+model CadStockEvent {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  partId String  @map("part_id")
+  part   CadPart @relation(fields: [partId], references: [id], onDelete: Cascade)
+
+  // Positive = stock in, negative = stock out. Quantity after this event.
+  delta         Float
+  quantityAfter Float  @map("quantity_after")
+  // Required: "why" is the audit trail. e.g. "received PO-114", "used in airframe v7 build".
+  reason String
+  actor  String
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([workspaceId, partId])
+  @@map("cad_stock_events")
+}
+
+// A supplier the tenant buys from: who they are, how long they take, notes.
+model CadSupplier {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  name String
+  // Free text: name/phone/email of the tenant's contact there.
+  contact String?
+  // Free text: "10 business days", "2–3 weeks" — the supplier's stated lead time.
+  leadTime String? @map("lead_time")
+  notes    String?
+
+  partLinks CadPartSupplier[]
+
+  createdBy String?  @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([workspaceId])
+  @@map("cad_suppliers")
+}
+
+// Part ↔ supplier link. The quote is the sourcing for every cost figure
+// derived from it: quotedUnitCost + currency + quotedDate + quoteSource
+// (who/what said this price — a quote PDF name, an email, a URL).
+// Cost figures are NEVER invented; a link with no quote carries no cost.
+model CadPartSupplier {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  partId String  @map("part_id")
+  part   CadPart @relation(fields: [partId], references: [id], onDelete: Cascade)
+
+  supplierId String      @map("supplier_id")
+  supplier   CadSupplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+
+  quotedUnitCost Float?    @map("quoted_unit_cost")
+  // 3-letter ISO code.
+  currency     String    @default("USD")
+  quotedDate   DateTime? @map("quoted_date")
+  // Source citation, e.g. "quote PDF mcmaster-quote-2026-09-30.pdf" or
+  // "emailed by sales@acmefasteners.com 2026-09-28". Required with a cost.
+  quoteSource String? @map("quote_source")
+
+  // One preferred supplier per part (enforced in the store: marking one
+  // preferred demotes the others).
+  preferred Boolean @default(false)
+
+  createdBy String?  @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([partId, supplierId])
+  @@index([workspaceId, partId])
+  @@map("cad_part_suppliers")
+}
+
+// A task or issue on a CAD project, optionally pinned to one immutable
+// model revision (e.g. "fix motor mount clearance" pinned to airframe v7).
+// The pin is a reference: closing/editing a task never alters the version.
+model CadTask {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  projectId String     @map("project_id")
+  project   CadProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  // Optional pin to a specific immutable revision. The version row is never
+  // mutated through this link (see taskPins on CadModelVersion).
+  modelVersionId String?          @map("model_version_id")
+  modelVersion   CadModelVersion? @relation("CadTaskPinnedVersion", fields: [modelVersionId], references: [id], onDelete: SetNull)
+
+  // "task" | "issue" (validated in lib/cad/hardware.ts).
+  kind  String  @default("task")
+  title String
+  description String?
+
+  // open | in_progress | blocked | done (validated).
+  status String @default("open")
+  // low | medium | high (validated).
+  priority String @default("medium")
+
+  assignee String?
+  dueDate  DateTime? @map("due_date")
+
+  comments CadTaskComment[]
+
+  closedAt DateTime? @map("closed_at")
+  closedBy String?   @map("closed_by")
+
+  createdBy String  @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([workspaceId, projectId])
+  @@index([workspaceId, status])
+  @@index([modelVersionId])
+  @@map("cad_tasks")
+}
+
+// Comments and the activity trail on a task. Status changes, creation, and
+// version pins are recorded here as system events so the trail is one list.
+// Rows are append-only (no update/delete path).
+model CadTaskComment {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  taskId String  @map("task_id")
+  task   CadTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  // "comment" | "created" | "status_change" | "version_pin" (validated).
+  eventKind String @default("comment") @map("event_kind")
+  body   String
+  author String
+  // Machine-readable detail for system events: { from, to } for
+  // status_change, { versionId } for version_pin.
+  eventMeta Json? @map("event_meta")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([workspaceId, taskId])
+  @@map("cad_task_comments")
 }

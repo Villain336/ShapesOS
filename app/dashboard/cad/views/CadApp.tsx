@@ -6,8 +6,9 @@
 // Reference customer: the drone program's airframe revisions.
 
 import { useCallback, useEffect, useState } from "react";
-import { Box, Plus, Loader2, FolderKanban } from "lucide-react";
+import { Box, Plus, Loader2, FolderKanban, TableProperties, LayoutDashboard } from "lucide-react";
 import { ModelDetail } from "./ModelDetail";
+import { ProjectHubTab } from "./ProjectHubTab";
 
 interface Project {
   id: string;
@@ -39,6 +40,7 @@ export function CadApp() {
   const [models, setModels] = useState<ModelSummary[]>([]);
   const [modelsLoading, setModelsLoading] = useState(false);
   const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
+  const [projectView, setProjectView] = useState<"models" | "hub">("models");
   const [showNewProject, setShowNewProject] = useState(false);
   const [newName, setNewName] = useState("");
   const [newDesc, setNewDesc] = useState("");
@@ -223,7 +225,35 @@ export function CadApp() {
                 <p className="mt-0.5 text-sm text-muted">{selectedProject.description}</p>
               )}
             </div>
-            {modelsLoading ? (
+            <div className="mb-4 flex gap-1 border-b border-line" role="tablist" aria-label="Project views">
+              {(
+                [
+                  { key: "models", label: "Models", icon: TableProperties },
+                  { key: "hub", label: "Project hub", icon: LayoutDashboard },
+                ] as const
+              ).map((t) => {
+                const Icon = t.icon;
+                const active = projectView === t.key;
+                return (
+                  <button
+                    key={t.key}
+                    type="button"
+                    role="tab"
+                    aria-selected={active}
+                    onClick={() => setProjectView(t.key)}
+                    className={`flex h-11 items-center gap-2 border-b-2 px-4 text-sm font-semibold transition-colors ${
+                      active ? "border-ink text-ink" : "border-transparent text-muted hover:text-ink"
+                    }`}
+                  >
+                    <Icon className="h-4 w-4" aria-hidden />
+                    {t.label}
+                  </button>
+                );
+              })}
+            </div>
+            {projectView === "hub" ? (
+              <ProjectHubTab projectId={selectedProject.id} />
+            ) : modelsLoading ? (
               <div className="flex items-center gap-2 p-4 text-sm text-muted">
                 <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
                 Loading models…
