@@ -774,6 +774,13 @@ model Workspace {
   legalRadarTriage       LegalRadarTriage[]
   // Legal/Compliance slice 5: Digital properties (Hullcheck synergy).
   legalDigitalProperties LegalDigitalProperty[]
+  // Funding/VC slice 1: Starter network (Boardy preloaded).
+  fundingContacts     FundingContact[]
+  fundingInvestors    FundingInvestor[]
+  fundingInteractions FundingInteraction[]
+  fundingIntroRequests FundingIntroRequest[]
+  fundingDataRoomDocs FundingDataRoomDoc[]
+  fundingRounds       FundingRound[]
   insurancePaymentHandoffs InsurancePaymentHandoff[]
   insuranceCertificates     InsuranceCertificate[]
   // Phase 12 (embeds): tenant-scoped GrowthBook flag overrides.
@@ -11294,4 +11301,229 @@ model LegalDigitalFinding {
 
   @@index([propertyId, status])
   @@map("legal_digital_findings")
+}
+
+// Funding/VC slice 1: Starter network (BUSINESS-OS-FEATURE-SPECS.md §3).
+// Boardy AI ships as a PRELOADED starter contact in every tenant's funding
+// graph — the first card in the deck, never the gateway. Boardy's job is to
+// help the founder get MORE contacts through warm intros matched to the
+// founder's target investor profile; the front door is the founder's own
+// raise workflow (FundingRound target investor profile below).
+//
+// There is NO programmatic Boardy API or MCP — https://boardy.ai/agentskill
+// is an instruction page for an EMAIL flow, and Boardy's double-opt-in norms
+// govern his side. The graph models Boardy as a contact intros are requested
+// THROUGH; the agent-drafted email rail lands in the Connector Agent slices.
+//
+// Guardrails (slice 1 scaffolding; full enforcement lands in Connector slice 4):
+// - Intro requests are context-rich and one-per-(contact, investor) pair:
+//   no bulk creation, no spray-and-pray.
+// - Rate limits on intro requests protect Boardy's reputation — the asset.
+
+enum FundingContactSource {
+  boardy_starter
+  founder_added
+  boardy_intro
+  connector_import
+}
+
+model FundingContact {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  // Boardy starter row: name "Boardy", role "AI superconnector".
+  name   String
+  role   String?
+  handle String? // email or other contact handle, e.g. boardy@boardy.ai
+  note   String?
+
+  source FundingContactSource @default(founder_added)
+  // Human-readable marker: Boardy is THE preloaded starter contact.
+  isStarterContact Boolean @default(false) @map("is_starter_contact")
+  // Idempotency key: "boardy_starter" on the starter row, null otherwise.
+  // Nulls are distinct in Postgres, so founder-added rows never collide.
+  starterKey String? @map("starter_key")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  interactions FundingInteraction[]
+  introRequests FundingIntroRequest[]
+
+  @@unique([workspaceId, starterKey])
+  @@index([workspaceId, source])
+  @@map("funding_contacts")
+}
+
+enum FundingInvestorStage {
+  target
+  contacted
+  meeting
+  diligence
+  term_sheet
+  passed
+}
+
+model FundingInvestor {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  name  String
+  firm  String?
+  email String?
+
+  // Investor's known check range and thesis (founder-entered for now).
+  checkSizeMin Int? @map("check_size_min")
+  checkSizeMax Int? @map("check_size_max")
+  stages       String[]
+  sectors      String[]
+  thesisFit    String? @map("thesis_fit")
+
+  stage FundingInvestorStage @default(target)
+  // How this investor entered the pipeline (e.g. "boardy_intro", "crunchbase").
+  source String?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  interactions  FundingInteraction[]
+  introRequests FundingIntroRequest[]
+
+  @@index([workspaceId, stage])
+  @@map("funding_investors")
+}
+
+enum FundingInteractionKind {
+  email
+  call
+  meeting
+  intro
+  deck_sent
+  note
+}
+
+model FundingInteraction {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  occurredAt DateTime @default(now()) @map("occurred_at")
+  kind       FundingInteractionKind
+  summary    String
+
+  contactId String?         @map("contact_id")
+  contact   FundingContact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  investorId String?          @map("investor_id")
+  investor   FundingInvestor? @relation(fields: [investorId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([workspaceId, occurredAt])
+  @@map("funding_interactions")
+}
+
+enum FundingIntroStatus {
+  draft
+  pending_approval
+  approved
+  sent
+  accepted
+  declined
+  expired
+}
+
+model FundingIntroRequest {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  // The connector making the intro (e.g. the Boardy starter contact).
+  contactId String         @map("contact_id")
+  contact   FundingContact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  // The target investor.
+  investorId String          @map("investor_id")
+  investor   FundingInvestor @relation(fields: [investorId], references: [id], onDelete: Cascade)
+
+  status FundingIntroStatus @default(draft)
+
+  // Context-required fields — guardrail: no context, no intro, ever.
+  reason     String  // why THIS investor, why now
+  founderAsk String  @map("founder_ask") // the specific ask
+  fitNotes   String? @map("fit_notes")   // thesis-fit evidence
+
+  requestedAt DateTime @default(now()) @map("requested_at")
+  decidedAt   DateTime? @map("decided_at")
+  decidedBy   String?   @map("decided_by")
+  declineReason String? @map("decline_reason")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Guardrail: exactly ONE intro request per (contact, investor) pair per
+  // tenant. A declined request is edited/reopened in place, never duplicated —
+  // this is the schema-level no-spray-and-pray rule.
+  @@unique([workspaceId, contactId, investorId])
+  @@index([workspaceId, status])
+  @@map("funding_intro_requests")
+}
+
+enum FundingDataRoomDocKind {
+  pitch_deck
+  financials
+  metrics
+  other
+}
+
+model FundingDataRoomDoc {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  title   String
+  kind    FundingDataRoomDocKind
+  version Int     @default(1)
+  fileUrl String? @map("file_url")
+  notes   String?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([workspaceId, kind])
+  @@map("funding_data_room_docs")
+}
+
+enum FundingRoundStatus {
+  planning
+  active
+  paused
+  closed
+}
+
+model FundingRound {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  name   String
+  status FundingRoundStatus @default(planning)
+  // One active round per tenant: the founder's current raise workflow entry.
+  isActive Boolean @default(false) @map("is_active")
+
+  // Target investor profile — the front door of the funding feature.
+  checkSizeMin Int?    @map("check_size_min") // USD
+  checkSizeMax Int?    @map("check_size_max") // USD
+  stages       String[] // e.g. ["pre-seed", "seed"]
+  sectors      String[] // thesis sectors, e.g. ["fintech", "dev-tools"]
+  thesisSummary String? @map("thesis_summary")
+
+  targetClose DateTime? @map("target_close")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([workspaceId, isActive])
+  @@map("funding_rounds")
 }

@@ -45,6 +45,7 @@ import {
   Phone,
   Star,
   Scale,
+  Handshake,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import GlideMenu from "@/components/vault/primitives/GlideMenu";
@@ -117,6 +118,10 @@ const NAV_SECTIONS: {
       // Business OS: Legal/Compliance slice 1 — per-tenant obligation map
       // (licenses, filings, tax registrations, insurance, permits).
       { href: "/dashboard/legal", label: "Legal", icon: Scale },
+      // Business OS: Funding/VC slice 1 — starter network. Boardy AI ships
+      // as the preloaded starter contact in every tenant's funding graph;
+      // the front door is the founder's own raise workflow.
+      { href: "/dashboard/funding", label: "Funding", icon: Handshake },
     ],
   },
 ];
