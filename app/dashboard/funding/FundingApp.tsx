@@ -1,22 +1,24 @@
-// Marketr — Funding/VC slices 1–2: dashboard app (client).
-// Three tabs: Network (funding graph, Boardy first), Pipeline (investor
-// CRM kanban, slice 2), and Raise (the founder's target investor profile —
-// the front door). Pill tabs per the Agentic OS pattern; tokens only;
-// Lucide icons only.
+// Marketr — Funding/VC slices 1–3: dashboard app (client).
+// Four tabs: Network (funding graph, Boardy first), Pipeline (investor
+// CRM kanban, slice 2), Data room (versioned docs + expiring share links +
+// per-viewer analytics, slice 3), and Raise (the founder's target investor
+// profile — the front door). Pill tabs per the Agentic OS pattern; tokens
+// only; Lucide icons only.
 
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { KanbanSquare, Loader2, Target, Users } from "lucide-react";
+import { Files, KanbanSquare, Loader2, Target, Users } from "lucide-react";
 import {
   NetworkView,
   type ContactView,
   type IntroRequestView,
 } from "./views/NetworkView";
 import { PipelineView } from "./views/PipelineView";
+import { DataRoomView } from "./views/DataRoomView";
 import { RaiseView, type RoundView } from "./views/RaiseView";
 
-type Tab = "network" | "pipeline" | "raise";
+type Tab = "network" | "pipeline" | "dataroom" | "raise";
 
 export function FundingApp() {
   const [loading, setLoading] = useState(true);
@@ -52,6 +54,7 @@ export function FundingApp() {
   const tabs = [
     { id: "network" as const, label: "Network", icon: Users },
     { id: "pipeline" as const, label: "Pipeline", icon: KanbanSquare },
+    { id: "dataroom" as const, label: "Data room", icon: Files },
     { id: "raise" as const, label: "Raise", icon: Target },
   ];
 
@@ -83,6 +86,8 @@ export function FundingApp() {
         <NetworkView contacts={contacts} introRequests={introRequests} loading={false} />
       ) : tab === "pipeline" ? (
         <PipelineView />
+      ) : tab === "dataroom" ? (
+        <DataRoomView />
       ) : (
         <RaiseView round={round} onSaved={setRound} />
       )}

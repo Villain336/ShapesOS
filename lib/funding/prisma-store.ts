@@ -8,7 +8,25 @@
 
 import type { PrismaClient } from "@prisma/client";
 import { Prisma } from "@prisma/client";
+import { writeFile, FsError } from "@/lib/filesystem/service";
+import { normalizeLogicalPath } from "@/lib/filesystem/paths";
+import { safeFilename } from "@/lib/security/upload-safety";
 import { BOARDY_STARTER_CONTACT, validateStarterSeed } from "./seeds";
+import {
+  assertNonEmptyUpload,
+  DATA_ROOM_DOC_KINDS,
+  generateShareToken,
+  normalizeViewerEmails,
+  planNewDocVersion,
+  validateDocInput,
+  validateShareLinkInput,
+  type DataRoomDocKind,
+  type FundingDataRoomDocView,
+  type FundingDocVersionView,
+  type FundingDocViewRow,
+  type FundingShareLinkView,
+  type ShareLinkCreateInput,
+} from "./dataroom";
 import {
   BOARDY_STARTER_KEY,
   FundingError,
@@ -525,6 +543,574 @@ export class PrismaFundingStore {
       openFollowUps: byInvestor.get(i.id) ?? [],
     }));
   }
+
+  // ------------------------------------------------------------------
+  // Slice 3: Data room (versioned docs, share links, view analytics)
+  // ------------------------------------------------------------------
+
+  /**
+   * Write one data-room file through the EXISTING filesystem pipeline —
+   * the same writeFile the /api/files route uses, so upload safety, the
+   * 25 MB cap, and quota all apply unchanged. Files land under
+   * /files/funding/<kind>/ with a version-distinct filename, so an old
+   * version's bytes can never be replaced in place.
+   */
+  private async writeDataRoomFile(opts: {
+    workspaceId: string;
+    userId: string;
+    kind: DataRoomDocKind;
+    versionNumber: number;
+    fileName: string;
+    fileBytes: Buffer;
+    mimeType?: string;
+  }) {
+    const logicalPath = `/files/funding/${opts.kind}/v${opts.versionNumber}-${safeFilename(opts.fileName || "file")}`;
+    const check = normalizeLogicalPath(logicalPath);
+    if (!check.ok) throw new FundingError("INVALID_PATH", check.reason);
+    if (!logicalPath.startsWith("/files/funding/")) {
+      throw new FundingError(
+        "INVALID_PATH",
+        "Data-room files must live under /files/funding/.",
+      );
+    }
+    return writeFile({
+      workspaceId: opts.workspaceId,
+      logicalPath,
+      kind: check.kind,
+      bytes: opts.fileBytes,
+      mimeType: opts.mimeType,
+      createdBy: opts.userId,
+    });
+  }
+
+  /**
+   * Create a document with its first version. The upload becomes version 1;
+   * the file goes to /files/funding/<kind>/ and is registered on the
+   * version row. `fileUrl`/`version` legacy fields are kept in sync for
+   * readers that still use them.
+   */
+  async createDoc(
+    workspaceId: string,
+    userId: string,
+    input: {
+      title: string;
+      kind: DataRoomDocKind;
+      notes?: string | null;
+      fileName: string;
+      fileBytes: Buffer;
+      mimeType?: string;
+    },
+  ): Promise<FundingDataRoomDocView> {
+    const errors = validateDocInput(input);
+    if (errors.length > 0) {
+      throw new FundingError("INVALID_DOC", errors.join(" "));
+    }
+    assertNonEmptyUpload(input.fileBytes);
+
+    const plan = planNewDocVersion(null);
+    const file = await this.writeDataRoomFile({
+      workspaceId,
+      userId,
+      kind: input.kind,
+      versionNumber: plan.versionNumber,
+      fileName: input.fileName,
+      fileBytes: input.fileBytes,
+      mimeType: input.mimeType,
+    });
+
+    const doc = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.fundingDataRoomDoc.create({
+        data: {
+          workspaceId,
+          title: input.title.trim(),
+          kind: input.kind,
+          notes: input.notes?.trim() || null,
+        },
+      });
+      const version = await tx.fundingDataRoomDocVersion.create({
+        data: {
+          workspaceId,
+          documentId: created.id,
+          versionNumber: plan.versionNumber,
+          workspaceFileId: file.id,
+          fileName: file.filename || safeFilename(input.fileName || "file"),
+          mimeType: file.mimeType ?? input.mimeType ?? null,
+          sizeBytes: input.fileBytes.length,
+          uploadedBy: userId,
+        },
+      });
+      return tx.fundingDataRoomDoc.update({
+        where: { id: created.id },
+        data: {
+          currentVersionId: version.id,
+          // Legacy compat: keep the flat fields in sync.
+          version: plan.versionNumber,
+          fileUrl: file.logicalPath ?? null,
+        },
+      });
+    });
+    return this.getDoc(workspaceId, doc.id);
+  }
+
+  /**
+   * Upload a new version of an existing document. NEVER mutates a published
+   * version: it writes a new file and a new version row, then moves the
+   * doc's currentVersion pointer forward.
+   */
+  async addDocVersion(
+    workspaceId: string,
+    userId: string,
+    documentId: string,
+    input: { fileName: string; fileBytes: Buffer; mimeType?: string },
+  ): Promise<FundingDataRoomDocView> {
+    assertNonEmptyUpload(input.fileBytes);
+    const doc = await this.prisma.fundingDataRoomDoc.findFirst({
+      where: { id: documentId, workspaceId },
+      include: { currentVersion: true },
+    });
+    if (!doc) throw new FundingError("DOC_NOT_FOUND", "Document not found.");
+
+    const plan = planNewDocVersion(
+      doc.currentVersion
+        ? {
+            id: doc.currentVersion.id,
+            versionNumber: doc.currentVersion.versionNumber,
+          }
+        : null,
+    );
+    const file = await this.writeDataRoomFile({
+      workspaceId,
+      userId,
+      kind: doc.kind as DataRoomDocKind,
+      versionNumber: plan.versionNumber,
+      fileName: input.fileName,
+      fileBytes: input.fileBytes,
+      mimeType: input.mimeType,
+    });
+
+    await this.prisma.$transaction(async (tx) => {
+      const version = await tx.fundingDataRoomDocVersion.create({
+        data: {
+          workspaceId,
+          documentId: doc.id,
+          versionNumber: plan.versionNumber,
+          workspaceFileId: file.id,
+          fileName: file.filename || safeFilename(input.fileName || "file"),
+          mimeType: file.mimeType ?? input.mimeType ?? null,
+          sizeBytes: input.fileBytes.length,
+          uploadedBy: userId,
+          supersedesVersionId: plan.supersedesVersionId,
+        },
+      });
+      await tx.fundingDataRoomDoc.update({
+        where: { id: doc.id },
+        data: {
+          currentVersionId: version.id,
+          version: plan.versionNumber,
+          fileUrl: file.logicalPath ?? null,
+        },
+      });
+    });
+    return this.getDoc(workspaceId, doc.id);
+  }
+
+  /** One doc with its current version + counts (404 if not found). */
+  async getDoc(
+    workspaceId: string,
+    docId: string,
+  ): Promise<FundingDataRoomDocView> {
+    const doc = await this.prisma.fundingDataRoomDoc.findFirst({
+      where: { id: docId, workspaceId },
+      include: {
+        currentVersion: { include: { _count: { select: { views: true } } } },
+        _count: {
+          select: { versions: true, shareLinks: true },
+        },
+      },
+    });
+    if (!doc) throw new FundingError("DOC_NOT_FOUND", "Document not found.");
+    // Total views across all versions (room + doc links land on versions).
+    const totalViews = await this.prisma.fundingDocView.count({
+      where: {
+        workspaceId,
+        docVersion: { documentId: doc.id },
+      },
+    });
+    return toDataRoomDocView(doc, totalViews);
+  }
+
+  /** The tenant's data-room docs, newest first. */
+  async listDocs(workspaceId: string): Promise<FundingDataRoomDocView[]> {
+    const docs = await this.prisma.fundingDataRoomDoc.findMany({
+      where: { workspaceId },
+      orderBy: { updatedAt: "desc" },
+      include: {
+        currentVersion: { include: { _count: { select: { views: true } } } },
+        _count: { select: { versions: true, shareLinks: true } },
+      },
+    });
+    const docIds = docs.map((d) => d.id);
+    const viewCounts = await this.prisma.fundingDocView.groupBy({
+      by: ["docVersionId"],
+      where: { workspaceId, docVersion: { documentId: { in: docIds } } },
+      _count: { _all: true },
+    });
+    const byVersion = new Map<string, number>();
+    const versionToDoc = new Map<string, string>();
+    const versionRows = await this.prisma.fundingDataRoomDocVersion.findMany({
+      where: { workspaceId, documentId: { in: docIds } },
+      select: { id: true, documentId: true },
+    });
+    for (const v of versionRows) versionToDoc.set(v.id, v.documentId);
+    for (const g of viewCounts) {
+      if (!g.docVersionId) continue;
+      const docId = versionToDoc.get(g.docVersionId);
+      if (!docId) continue;
+      byVersion.set(docId, (byVersion.get(docId) ?? 0) + g._count._all);
+    }
+    return docs.map((d) => toDataRoomDocView(d, byVersion.get(d.id) ?? 0));
+  }
+
+  /** Full detail: versions (newest first), share links, recent views. */
+  async getDocDetail(
+    workspaceId: string,
+    docId: string,
+  ): Promise<
+    FundingDataRoomDocView & {
+      versions: FundingDocVersionView[];
+      shareLinks: FundingShareLinkView[];
+      views: FundingDocViewRow[];
+    }
+  > {
+    const doc = await this.prisma.fundingDataRoomDoc.findFirst({
+      where: { id: docId, workspaceId },
+      include: {
+        versions: {
+          orderBy: { versionNumber: "desc" },
+          include: { _count: { select: { views: true } } },
+        },
+        shareLinks: {
+          orderBy: { createdAt: "desc" },
+          include: {
+            doc: { select: { title: true } },
+            docVersion: { select: { versionNumber: true } },
+            _count: { select: { views: true } },
+          },
+        },
+      },
+    });
+    if (!doc) throw new FundingError("DOC_NOT_FOUND", "Document not found.");
+    const base = await this.getDoc(workspaceId, docId);
+    const views = await this.listViews(workspaceId, { docId, limit: 100 });
+    return {
+      ...base,
+      versions: doc.versions.map((v) =>
+        toDocVersionView(v, v.id === doc.currentVersionId),
+      ),
+      shareLinks: doc.shareLinks.map((l) => toShareLinkView(l)),
+      views,
+    };
+  }
+
+  /**
+   * Delete a document and everything under it (versions, share links,
+   * views — schema cascades). File cleanup is owned by the files trash
+   * flow, matching the Legal vault convention.
+   */
+  async deleteDoc(workspaceId: string, docId: string): Promise<void> {
+    const result = await this.prisma.fundingDataRoomDoc.deleteMany({
+      where: { id: docId, workspaceId },
+    });
+    if (result.count === 0) {
+      throw new FundingError("DOC_NOT_FOUND", "Document not found.");
+    }
+  }
+
+  /**
+   * Create a share link: one doc (pinned version or current at access time)
+   * or the whole room (docId = null). Expiry/allowlist validation is pure;
+   * the token is unguessable and regenerated on collision.
+   */
+  async createShareLink(
+    workspaceId: string,
+    input: ShareLinkCreateInput,
+    now = new Date(),
+  ): Promise<FundingShareLinkView> {
+    const errors = validateShareLinkInput(input, now);
+    if (errors.length > 0) {
+      throw new FundingError("INVALID_SHARE_LINK", errors.join(" "));
+    }
+    if (input.docId) {
+      const doc = await this.prisma.fundingDataRoomDoc.findFirst({
+        where: { id: input.docId, workspaceId },
+        select: { id: true, currentVersionId: true },
+      });
+      if (!doc) throw new FundingError("DOC_NOT_FOUND", "Document not found.");
+      if (input.docVersionId) {
+        const version = await this.prisma.fundingDataRoomDocVersion.findFirst({
+          where: {
+            id: input.docVersionId,
+            documentId: doc.id,
+            workspaceId,
+          },
+          select: { id: true },
+        });
+        if (!version) {
+          throw new FundingError(
+            "VERSION_NOT_FOUND",
+            "That version does not belong to this document.",
+          );
+        }
+      }
+    }
+    const viewerEmails = normalizeViewerEmails(input.viewerEmails ?? []);
+    const expiresAt = input.expiresAt ? new Date(input.expiresAt) : null;
+
+    // Retry on the astronomically-unlikely token collision.
+    let lastError: unknown = null;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const created = await this.prisma.fundingShareLink.create({
+          data: {
+            workspaceId,
+            docId: input.docId,
+            docVersionId: input.docVersionId,
+            token: generateShareToken(),
+            expiresAt,
+            viewerEmails,
+          },
+          include: {
+            doc: { select: { title: true } },
+            docVersion: { select: { versionNumber: true } },
+            _count: { select: { views: true } },
+          },
+        });
+        return toShareLinkView(created);
+      } catch (e) {
+        if (
+          e instanceof Prisma.PrismaClientKnownRequestError &&
+          e.code === "P2002"
+        ) {
+          lastError = e;
+          continue;
+        }
+        throw e;
+      }
+    }
+    throw lastError instanceof Error
+      ? lastError
+      : new FundingError("TOKEN_COLLISION", "Could not mint a share token.");
+  }
+
+  /** The tenant's share links, newest first (tokens included for display). */
+  async listShareLinks(workspaceId: string): Promise<FundingShareLinkView[]> {
+    const links = await this.prisma.fundingShareLink.findMany({
+      where: { workspaceId },
+      orderBy: { createdAt: "desc" },
+      include: {
+        doc: { select: { title: true } },
+        docVersion: { select: { versionNumber: true } },
+        _count: { select: { views: true } },
+      },
+    });
+    return links.map((l) => toShareLinkView(l));
+  }
+
+  /** Revoke a share link. Revoked links 404 at the public route. */
+  async revokeShareLink(
+    workspaceId: string,
+    linkId: string,
+    now = new Date(),
+  ): Promise<FundingShareLinkView> {
+    const link = await this.prisma.fundingShareLink.findFirst({
+      where: { id: linkId, workspaceId },
+      include: {
+        doc: { select: { title: true } },
+        docVersion: { select: { versionNumber: true } },
+        _count: { select: { views: true } },
+      },
+    });
+    if (!link) {
+      throw new FundingError("LINK_NOT_FOUND", "Share link not found.");
+    }
+    if (link.revoked) return toShareLinkView(link);
+    const updated = await this.prisma.fundingShareLink.update({
+      where: { id: link.id },
+      data: { revoked: true, revokedAt: now },
+      include: {
+        doc: { select: { title: true } },
+        docVersion: { select: { versionNumber: true } },
+        _count: { select: { views: true } },
+      },
+    });
+    return toShareLinkView(updated);
+  }
+
+  /**
+   * Public-route lookup by token. Returns the link with enough to serve:
+   * the resolved version (pinned, or current at access time) for doc
+   * links. Whole-room links resolve the version from the request's `v`
+   * param (validated separately by the route).
+   */
+  async getShareLinkByToken(token: string, now = new Date()) {
+    const link = await this.prisma.fundingShareLink.findUnique({
+      where: { token },
+      include: {
+        doc: {
+          select: { id: true, title: true, currentVersionId: true },
+        },
+        docVersion: {
+          select: {
+            id: true,
+            documentId: true,
+            versionNumber: true,
+            workspaceFileId: true,
+            fileName: true,
+            mimeType: true,
+            sizeBytes: true,
+          },
+        },
+      },
+    });
+    if (!link) return null;
+    let resolvedVersion = link.docVersion;
+    if (!resolvedVersion && link.doc?.currentVersionId) {
+      resolvedVersion = await this.prisma.fundingDataRoomDocVersion.findFirst({
+        where: {
+          id: link.doc.currentVersionId,
+          workspaceId: link.workspaceId,
+        },
+        select: {
+          id: true,
+          documentId: true,
+          versionNumber: true,
+          workspaceFileId: true,
+          fileName: true,
+          mimeType: true,
+          sizeBytes: true,
+        },
+      });
+    }
+    return {
+      id: link.id,
+      workspaceId: link.workspaceId,
+      docId: link.docId,
+      docTitle: link.doc?.title ?? null,
+      docVersionId: link.docVersionId,
+      revoked: link.revoked,
+      expiresAt: link.expiresAt,
+      viewerEmails: link.viewerEmails,
+      resolvedVersion,
+      now,
+    };
+  }
+
+  /**
+   * Resolve a specific version for a whole-room link request, tenant-scoped.
+   * Returns null when the version does not belong to this link's workspace.
+   */
+  async getRoomVersion(workspaceId: string, versionId: string) {
+    return this.prisma.fundingDataRoomDocVersion.findFirst({
+      where: { id: versionId, workspaceId },
+      select: {
+        id: true,
+        documentId: true,
+        versionNumber: true,
+        workspaceFileId: true,
+        fileName: true,
+        mimeType: true,
+        sizeBytes: true,
+        document: { select: { title: true } },
+      },
+    });
+  }
+
+  /**
+   * Log one view BEFORE serving the file — the route calls this, then
+   * streams the bytes. This is the "who opened what, when" record.
+   */
+  async recordDocView(
+    workspaceId: string,
+    input: {
+      linkId: string;
+      docVersionId?: string | null;
+      viewerIdentity: string;
+      userAgent?: string | null;
+    },
+  ): Promise<{ id: string }> {
+    const created = await this.prisma.fundingDocView.create({
+      data: {
+        workspaceId,
+        linkId: input.linkId,
+        docVersionId: input.docVersionId ?? null,
+        viewerIdentity: input.viewerIdentity,
+        userAgent: input.userAgent ?? null,
+      },
+      select: { id: true },
+    });
+    return created;
+  }
+
+  /** Optional duration beacon: how long the viewer kept the doc open. */
+  async updateViewDuration(
+    workspaceId: string,
+    viewId: string,
+    durationMs: number,
+  ): Promise<void> {
+    if (!Number.isInteger(durationMs) || durationMs < 0) {
+      throw new FundingError(
+        "INVALID_DURATION",
+        "durationMs must be a non-negative integer.",
+      );
+    }
+    const result = await this.prisma.fundingDocView.updateMany({
+      where: { id: viewId, workspaceId },
+      data: { durationMs },
+    });
+    if (result.count === 0) {
+      throw new FundingError("VIEW_NOT_FOUND", "View not found.");
+    }
+  }
+
+  /**
+   * Analytics read (spec §3: "who opened what, when"). Newest first.
+   * Filter by doc or link; tenant-scoped on every path.
+   */
+  async listViews(
+    workspaceId: string,
+    opts: { docId?: string; linkId?: string; limit?: number } = {},
+  ): Promise<FundingDocViewRow[]> {
+    const limit = Math.min(Math.max(opts.limit ?? 100, 1), 500);
+    const rows = await this.prisma.fundingDocView.findMany({
+      where: {
+        workspaceId,
+        ...(opts.linkId ? { linkId: opts.linkId } : {}),
+        ...(opts.docId ? { docVersion: { documentId: opts.docId } } : {}),
+      },
+      orderBy: { openedAt: "desc" },
+      take: limit,
+      include: {
+        link: { select: { docId: true } },
+        docVersion: {
+          select: {
+            versionNumber: true,
+            document: { select: { id: true, title: true } },
+          },
+        },
+      },
+    });
+    return rows.map((r) => ({
+      id: r.id,
+      linkId: r.linkId,
+      docId: r.docVersion?.document.id ?? r.link.docId,
+      docTitle: r.docVersion?.document.title ?? null,
+      docVersionNumber: r.docVersion?.versionNumber ?? null,
+      viewerIdentity: r.viewerIdentity,
+      userAgent: r.userAgent,
+      durationMs: r.durationMs,
+      openedAt: r.openedAt,
+    }));
+  }
 }
 
 function toContactView(row: {
@@ -652,6 +1238,107 @@ function toFollowUpView(row: {
     note: row.note,
     done: row.done,
     doneAt: row.doneAt,
+    createdAt: row.createdAt,
+  };
+}
+
+// ------------------------------------------------------------------
+// Slice 3: data-room view mappers.
+// ------------------------------------------------------------------
+
+function toDataRoomDocView(
+  row: {
+    id: string;
+    title: string;
+    kind: string;
+    notes: string | null;
+    createdAt: Date;
+    currentVersion: {
+      id: string;
+      versionNumber: number;
+      fileName: string;
+      mimeType: string | null;
+      sizeBytes: number;
+      uploadedBy: string;
+      uploadedAt: Date;
+      supersedesVersionId: string | null;
+      _count: { views: number };
+    } | null;
+    _count: { versions: number; shareLinks: number };
+  },
+  totalViewCount: number,
+): FundingDataRoomDocView {
+  return {
+    id: row.id,
+    title: row.title,
+    kind: row.kind as DataRoomDocKind,
+    notes: row.notes,
+    currentVersion: row.currentVersion
+      ? toDocVersionView(row.currentVersion, true)
+      : null,
+    versionCount: row._count.versions,
+    shareLinkCount: row._count.shareLinks,
+    viewCount: totalViewCount,
+    createdAt: row.createdAt,
+  };
+}
+
+function toDocVersionView(
+  row: {
+    id: string;
+    versionNumber: number;
+    fileName: string;
+    mimeType: string | null;
+    sizeBytes: number;
+    uploadedBy: string;
+    uploadedAt: Date;
+    supersedesVersionId: string | null;
+    _count: { views: number };
+  },
+  isCurrent: boolean,
+): FundingDocVersionView {
+  return {
+    id: row.id,
+    versionNumber: row.versionNumber,
+    fileName: row.fileName,
+    mimeType: row.mimeType,
+    sizeBytes: row.sizeBytes,
+    uploadedBy: row.uploadedBy,
+    uploadedAt: row.uploadedAt,
+    isCurrent,
+    supersedesVersionId: row.supersedesVersionId,
+    viewCount: row._count.views,
+  };
+}
+
+function toShareLinkView(
+  row: {
+    id: string;
+    docId: string | null;
+    docVersionId: string | null;
+    token: string;
+    expiresAt: Date | null;
+    viewerEmails: string[];
+    revoked: boolean;
+    createdAt: Date;
+    doc: { title: string } | null;
+    docVersion: { versionNumber: number } | null;
+    _count: { views: number };
+  },
+  now = new Date(),
+): FundingShareLinkView {
+  return {
+    id: row.id,
+    docId: row.docId,
+    docTitle: row.doc?.title ?? null,
+    docVersionId: row.docVersionId,
+    pinnedVersionNumber: row.docVersion?.versionNumber ?? null,
+    urlPath: `/r/funding/${row.token}`,
+    expiresAt: row.expiresAt,
+    expired: !!row.expiresAt && row.expiresAt.getTime() <= now.getTime(),
+    viewerEmails: row.viewerEmails,
+    revoked: row.revoked,
+    viewCount: row._count.views,
     createdAt: row.createdAt,
   };
 }

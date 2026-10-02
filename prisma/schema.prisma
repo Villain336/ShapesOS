@@ -499,355 +499,359 @@ model Workspace {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  projects                Project[]
-  clients                 Client[]
-  apiUsage                ApiUsage[]
+  projects                  Project[]
+  clients                   Client[]
+  apiUsage                  ApiUsage[]
   // Phase 8 G2: campaign object back-relations.
-  growthCampaigns         GrowthCampaign[]
-  campaignLinkProposals   CampaignLinkProposal[]
+  growthCampaigns           GrowthCampaign[]
+  campaignLinkProposals     CampaignLinkProposal[]
   // Phase 1 (R1): Lead Pipeline CRM back-relations.
-  pipelines               Pipeline[]
-  leads                   Lead[]
-  leadActivities          LeadActivity[]
+  pipelines                 Pipeline[]
+  leads                     Lead[]
+  leadActivities            LeadActivity[]
   // Phase 7 (F4/F6): flywheel back-relations for fragment models with
   // explicit Workspace relations (CTV track + launch checklist).
-  ctvCampaigns            CtvCampaign[]
-  ctvCreativeValidations  CtvCreativeValidation[]
-  ctvSpots                CtvSpot[]
+  ctvCampaigns              CtvCampaign[]
+  ctvCreativeValidations    CtvCreativeValidation[]
+  ctvSpots                  CtvSpot[]
   // Phase 8 (G1): business-graph substrate back-relations.
-  graphFacts              GraphFact[]
-  graphNodes              GraphNode[]
-  graphEdges              GraphEdge[]
-  graphErQueue            GraphErQueue[]
-  graphConnectors         GraphConnector[]
-  graphSyncJobs           GraphSyncJob[]
+  graphFacts                GraphFact[]
+  graphNodes                GraphNode[]
+  graphEdges                GraphEdge[]
+  graphErQueue              GraphErQueue[]
+  graphConnectors           GraphConnector[]
+  graphSyncJobs             GraphSyncJob[]
   // Phase 8 (G3): growth-memory substrate back-relations.
-  memoryEpisodes          MemoryEpisode[]
-  memoryFacts             MemoryFact[]
-  memoryLearnings         MemoryLearning[]
-  memoryConsolidationRuns MemoryConsolidationRun[]
+  memoryEpisodes            MemoryEpisode[]
+  memoryFacts               MemoryFact[]
+  memoryLearnings           MemoryLearning[]
+  memoryConsolidationRuns   MemoryConsolidationRun[]
   // Phase 13B: agent learning + company intelligence back-relations.
-  agentFeedback           AgentFeedback[]
-  brandVoiceProfiles      BrandVoiceProfile[]
-  companyKnowledge        CompanyKnowledge[]
-  styleRules              StyleRule[]
-  contentRecords          ContentRecord[]
-  personaProfiles         PersonaProfile[]
+  agentFeedback             AgentFeedback[]
+  brandVoiceProfiles        BrandVoiceProfile[]
+  companyKnowledge          CompanyKnowledge[]
+  styleRules                StyleRule[]
+  contentRecords            ContentRecord[]
+  personaProfiles           PersonaProfile[]
   // Phase 13C: clipper (OpusClip-style video clipping) back-relations.
-  clipSources             ClipSource[]
-  clips                   Clip[]
-  clipJobs                ClipJob[]
+  clipSources               ClipSource[]
+  clips                     Clip[]
+  clipJobs                  ClipJob[]
   // Phase 13D: voice/text agents back-relations.
-  voiceAgents             VoiceAgent[]
-  callScripts             CallScript[]
-  callSessions            CallSession[]
-  voiceoverJobs           VoiceoverJob[]
-  pronunciationEntries    PronunciationEntry[]
+  voiceAgents               VoiceAgent[]
+  callScripts               CallScript[]
+  callSessions              CallSession[]
+  voiceoverJobs             VoiceoverJob[]
+  pronunciationEntries      PronunciationEntry[]
   // Phase 14: actions & office back-relations.
-  composioConnections     ComposioConnection[]
-  composioActionApprovals ComposioActionApproval[]
-  composioActionLogs      ComposioActionLog[]
+  composioConnections       ComposioConnection[]
+  composioActionApprovals   ComposioActionApproval[]
+  composioActionLogs        ComposioActionLog[]
   // Phase 15 slice 1: per-workspace discovered tool catalog back-relation.
-  composioToolCatalog     ComposioToolCatalog[]
+  composioToolCatalog       ComposioToolCatalog[]
   // Phase 16 slice 5: viewable agent runs back-relation.
-  agentRuns               AgentRun[]
+  agentRuns                 AgentRun[]
   // Phase 16 slice 9: branded report engine back-relation.
-  reportSendApprovals     ReportSendApproval[]
+  reportSendApprovals       ReportSendApproval[]
   // Phase 17 slice 1: Business Operations back-relations (DocType entities).
-  opsProducts             OpsProduct[]
-  opsOrders               OpsOrder[]
-  opsPayments             OpsPayment[]
-  opsPromotions           OpsPromotion[]
-  opsInvoices             OpsInvoice[]
-  opsInventoryTxns        OpsInventoryTxn[]
-  opsProjects             OpsProject[]
-  opsWorkflowRuns         OpsWorkflowRun[]
-  opsAuditEvents          OpsAuditEvent[]
+  opsProducts               OpsProduct[]
+  opsOrders                 OpsOrder[]
+  opsPayments               OpsPayment[]
+  opsPromotions             OpsPromotion[]
+  opsInvoices               OpsInvoice[]
+  opsInventoryTxns          OpsInventoryTxn[]
+  opsProjects               OpsProject[]
+  opsWorkflowRuns           OpsWorkflowRun[]
+  opsAuditEvents            OpsAuditEvent[]
   // Phase 17 slice 3: purchase orders back-relation.
-  opsPurchaseOrders       OpsPurchaseOrder[]
+  opsPurchaseOrders         OpsPurchaseOrder[]
   // Phase 17 slice 4: project time-entry ledger back-relation.
-  opsTimeEntries          OpsTimeEntry[]
+  opsTimeEntries            OpsTimeEntry[]
   // Phase 17 slice 5: HR essentials back-relations.
-  opsTeamMembers          OpsTeamMember[]
-  opsLeaveRequests        OpsLeaveRequest[]
+  opsTeamMembers            OpsTeamMember[]
+  opsLeaveRequests          OpsLeaveRequest[]
   // Phase 18 slice 1: ad-platforms ontology back-relations.
-  adPlatforms             AdPlatform[]
-  adAccounts              AdAccount[]
-  paidAdCampaigns         PaidAdCampaign[]
-  paidAdGroups            PaidAdGroup[]
-  paidAdCreatives         PaidAdCreative[]
-  spendProposals          SpendProposal[]
-  spendApprovals          SpendApproval[]
-  adReports               AdReport[]
+  adPlatforms               AdPlatform[]
+  adAccounts                AdAccount[]
+  paidAdCampaigns           PaidAdCampaign[]
+  paidAdGroups              PaidAdGroup[]
+  paidAdCreatives           PaidAdCreative[]
+  spendProposals            SpendProposal[]
+  spendApprovals            SpendApproval[]
+  adReports                 AdReport[]
   // Wave 2 ChatGPT Ads: conversational-intent campaign back-relations.
-  chatGPTCampaigns        ChatGPTCampaign[]
-  creativeVariants        CreativeVariant[]
+  chatGPTCampaigns          ChatGPTCampaign[]
+  creativeVariants          CreativeVariant[]
   // Phase 15 slice 5: per-workspace catalog drift reports back-relation.
-  composioCatalogDrift    ComposioCatalogDrift[]
+  composioCatalogDrift      ComposioCatalogDrift[]
   // Wave 2 context.dev slice 1: daily credit-budget back-relation.
-  contextDevBudgets       ContextDevBudget[]
+  contextDevBudgets         ContextDevBudget[]
   // Wave 2 context.dev slice 2: knowledge back-relations.
-  knowledgeSources        KnowledgeSource[]
-  crawlJobs               CrawlJob[]
-  knowledgeChunks         KnowledgeChunk[]
+  knowledgeSources          KnowledgeSource[]
+  crawlJobs                 CrawlJob[]
+  knowledgeChunks           KnowledgeChunk[]
   // Wave 2 context.dev slice 3: research back-relation.
-  researchTasks           ResearchTask[]
+  researchTasks             ResearchTask[]
   // Wave 2 context.dev slice 4: monitor back-relations.
-  monitors                Monitor[]
-  monitorChanges          MonitorChange[]
+  monitors                  Monitor[]
+  monitorChanges            MonitorChange[]
   // Wave 2 context.dev slice 5: brand sync back-relations.
-  brandSyncs              BrandSync[]
+  brandSyncs                BrandSync[]
   // Wave 2 WFH mode slice 1: per-user work mode back-relations.
-  wfhWorkModes            WfhWorkMode[]
-  wfhModeHistory          WfhModeHistory[]
+  wfhWorkModes              WfhWorkMode[]
+  wfhModeHistory            WfhModeHistory[]
   // Wave 2 WFH mode slice 2: digest queue back-relation.
-  wfhDigestItems          WfhDigestItem[]
+  wfhDigestItems            WfhDigestItem[]
   // Wave 2 WFH mode slice 3: focus blocks + calendar connections.
-  wfhFocusBlocks          WfhFocusBlock[]
-  wfhCalendarConnections  WfhCalendarConnection[]
+  wfhFocusBlocks            WfhFocusBlock[]
+  wfhCalendarConnections    WfhCalendarConnection[]
   // Wave 2 WFH mode slice 4: async standups.
-  wfhStandups             WfhStandup[]
+  wfhStandups               WfhStandup[]
   // Wave 2 WFH mode slice 5: team rituals.
-  wfhRituals              WfhRitual[]
+  wfhRituals                WfhRitual[]
   // Wave 2 WFH mode slice 6: home-office expense pack.
-  wfhExpenseCategories    WfhExpenseCategory[]
-  wfhExpenses             WfhExpense[]
+  wfhExpenseCategories      WfhExpenseCategory[]
+  wfhExpenses               WfhExpense[]
   // Wave 2 WFH mode slice 7: 13B learning-loop signals.
-  wfhLearningSignals      WfhLearningSignal[]
+  wfhLearningSignals        WfhLearningSignal[]
   // Phase 15 slice 3: per-workspace toolkit enablement back-relation.
-  workspaceToolkits       WorkspaceToolkit[]
+  workspaceToolkits         WorkspaceToolkit[]
   // Phase 15 slice 4: per-workspace Composio call budget back-relation.
-  workspaceActionBudget   WorkspaceActionBudget?
-  univerDocs              UniverDoc[]
+  workspaceActionBudget     WorkspaceActionBudget?
+  univerDocs                UniverDoc[]
   // Phase 10 (intelligence depth): owned data assets back-relations.
-  dataSources             DataSource[]
-  serpVendorConfigs       SerpVendorConfig[]
-  apiMeterEntries         ApiMeterEntry[]
-  gscSnapshots            GscSnapshot[]
-  platformEvents          PlatformEvent[]
-  pageImpacts             PageImpact[]
-  geoPromptPanels         GeoPromptPanel[]
-  geoObservations         GeoObservation[]
-  competitorWatches       CompetitorWatch[]
-  competitorChanges       CompetitorChange[]
-  difficultyEstimates     DifficultyEstimate[]
-  linkVerifications       LinkVerification[]
-  ctvIos                  CtvIo[]
-  ctvPixels               CtvPixel[]
-  launchChecklists        LaunchChecklist[]
-  leadCaptureForms        LeadCaptureForm[]
+  dataSources               DataSource[]
+  serpVendorConfigs         SerpVendorConfig[]
+  apiMeterEntries           ApiMeterEntry[]
+  gscSnapshots              GscSnapshot[]
+  platformEvents            PlatformEvent[]
+  pageImpacts               PageImpact[]
+  geoPromptPanels           GeoPromptPanel[]
+  geoObservations           GeoObservation[]
+  competitorWatches         CompetitorWatch[]
+  competitorChanges         CompetitorChange[]
+  difficultyEstimates       DifficultyEstimate[]
+  linkVerifications         LinkVerification[]
+  ctvIos                    CtvIo[]
+  ctvPixels                 CtvPixel[]
+  launchChecklists          LaunchChecklist[]
+  leadCaptureForms          LeadCaptureForm[]
   // Phase 2 (C2): revenue attribution back-relations.
-  attributionTouches      AttributionTouch[]
-  attributionSpend        AttributionSpend[]
+  attributionTouches        AttributionTouch[]
+  attributionSpend          AttributionSpend[]
   // Phase 2 (R5): call tracking & booking back-relations.
-  callNumbers             CallNumber[]
-  calls                   Call[]
-  bookingPages            BookingPage[]
-  bookings                Booking[]
-  reminders               Reminder[]
+  callNumbers               CallNumber[]
+  calls                     Call[]
+  bookingPages              BookingPage[]
+  bookings                  Booking[]
+  reminders                 Reminder[]
   // Milestone 11: workspace membership for RBAC (owner/admin/editor/viewer).
-  members                 WorkspaceMember[]
+  members                   WorkspaceMember[]
   // Milestone 11: workspace-scoped audit events.
-  auditEvents             FileChangeLog[]
+  auditEvents               FileChangeLog[]
   // Phase C (W4): hosted metering.
-  usageEvents             UsageEvent[]
-  creditBalance           CreditBalance?
-  spendCap                SpendCap?
+  usageEvents               UsageEvent[]
+  creditBalance             CreditBalance?
+  spendCap                  SpendCap?
   // Drift reconciliation (2026-09-26): billing_topup_idempotency was
   // runtime-created by lib/metering/billing.ts; now Prisma-adopted.
-  billingTopups           BillingTopupIdempotency[]
+  billingTopups             BillingTopupIdempotency[]
   // Milestone 12: white-label brand kits and report templates.
-  brandKits               BrandKit[]
-  reportTemplates         ReportTemplate[]
+  brandKits                 BrandKit[]
+  reportTemplates           ReportTemplate[]
   // Milestone 13: alerting hub (channels, rules, event history).
-  alertChannels           AlertChannel[]
-  alertRules              AlertRule[]
-  alertEvents             AlertEvent[]
+  alertChannels             AlertChannel[]
+  alertRules                AlertRule[]
+  alertEvents               AlertEvent[]
   // Milestone 15: backlink pull audit trail (cost accounting).
-  backlinkPulls           BacklinkPull[]
+  backlinkPulls             BacklinkPull[]
   // Milestone 19: newsletter settings (BYO Resend key) and sending domains.
-  newsletterSettings      NewsletterSettings?
-  newsletterDomains       NewsletterDomain[]
+  newsletterSettings        NewsletterSettings?
+  newsletterDomains         NewsletterDomain[]
   // Milestone 20: social scheduling (BYO Buffer access token).
-  socialSettings          SocialSettings?
+  socialSettings            SocialSettings?
   // Milestone 21: ad factory (BYO Higgsfield API key).
-  adSettings              AdSettings?
+  adSettings                AdSettings?
   // Milestone 22: Porkbun keys + registrant contact.
-  studioPorkbunSettings   StudioPorkbunSettings?
-  studioRegistrant        StudioRegistrant?
+  studioPorkbunSettings     StudioPorkbunSettings?
+  studioRegistrant          StudioRegistrant?
   // Milestone 14: composite visibility score weights per workspace.
   // { rankings?: number, aiPresence?: number, freshness?: number, coverage?: number }
   // Null = defaults in lib/retention/visibility-score.ts.
   // NOTE (milestone 15): a `backlinks` component is reserved for a later
   // milestone — do not add it to the score until the backlink quality
   // signal is calibrated. visibility-score.ts documents the same note.
-  visibilityWeights       Json?                     @map("visibility_weights")
+  visibilityWeights         Json?                       @map("visibility_weights")
   // Milestone 15: workspace-level monthly cap (USD) on DataForSEO Backlinks
   // spend. Null = DEFAULT_MONTHLY_SPEND_CAP_USD in lib/seo/backlinks-cost.ts.
-  backlinksSpendCapUsd    Float?                    @map("backlinks_spend_cap_usd")
+  backlinksSpendCapUsd      Float?                      @map("backlinks_spend_cap_usd")
   // Milestone 16: workspace-level monthly cap (USD) on DataForSEO local-SEO
   // spend (maps SERP, business data, reviews). Null = DEFAULT_LOCAL_SPEND_CAP_USD.
-  localSeoSpendCapUsd     Float?                    @map("local_seo_spend_cap_usd")
+  localSeoSpendCapUsd       Float?                      @map("local_seo_spend_cap_usd")
   // Phase B (W3, track B1): private workspace filesystem. WorkspaceFile is
   // the authorization boundary — every FS operation re-checks workspace_id
   // against these rows. Storage keys are opaque UUIDs; user filenames never
   // touch storage paths.
-  files                   WorkspaceFile[]
-  quota                   WorkspaceQuota?
+  files                     WorkspaceFile[]
+  quota                     WorkspaceQuota?
   // Milestone 16: local-SEO pull audit trail (cost accounting) + GBP scaffold.
-  localPulls              LocalPull[]
-  gbpAccounts             GbpAccount[]
+  localPulls                LocalPull[]
+  gbpAccounts               GbpAccount[]
   // Milestone 18: content autopilot kill switches (workspace-level).
-  autopilotKills          AutopilotKillSwitch[]
+  autopilotKills            AutopilotKillSwitch[]
   // Phase 9 (M1): workspace-freeze kill switch. Non-null = frozen; every
   // executor entry point checks this FIRST and halts while set.
-  frozenAt                DateTime?                 @map("frozen_at")
+  frozenAt                  DateTime?                   @map("frozen_at")
   // Milestone 21: skills, connectors, settings.
-  skills                  Skill[]
-  customConnectors        Connector[]
-  connectorConnections    ConnectorConnection[]
-  permissionGrants        PermissionGrant[]
-  workspaceSettings       WorkspaceSettings?
+  skills                    Skill[]
+  customConnectors          Connector[]
+  connectorConnections      ConnectorConnection[]
+  permissionGrants          PermissionGrant[]
+  workspaceSettings         WorkspaceSettings?
   // Phase B (W2, track B2): scheduled skills + parallel subagent runs.
-  scheduledSkills         ScheduledSkill[]
-  skillRuns               SkillRun[]
+  scheduledSkills           ScheduledSkill[]
+  skillRuns                 SkillRun[]
   // Hosted Stripe track: overage invoicing state + invoice history.
-  billingWorkspace        BillingWorkspace?
-  billingOverageInvoices  BillingOverageInvoice[]
+  billingWorkspace          BillingWorkspace?
+  billingOverageInvoices    BillingOverageInvoice[]
   // Phase 3 (R3): acquisition-loop messaging back-relations.
-  contactConsents         ContactConsent[]
-  outboundMessages        OutboundMessage[]
-  approvalItems           ApprovalItem[]
-  nurtureSequences        NurtureSequence[]
-  sequenceEnrollments     SequenceEnrollment[]
+  contactConsents           ContactConsent[]
+  outboundMessages          OutboundMessage[]
+  approvalItems             ApprovalItem[]
+  nurtureSequences          NurtureSequence[]
+  sequenceEnrollments       SequenceEnrollment[]
   // Phase 3 (R4): review engine back-relations.
-  reviewRequests          ReviewRequest[]
-  reviewSiteConfigs       ReviewSiteConfig[]
+  reviewRequests            ReviewRequest[]
+  reviewSiteConfigs         ReviewSiteConfig[]
   // Phase 3 (R6): prospecting & enrichment back-relations.
-  prospectLists           ProspectList[]
-  prospects               Prospect[]
-  enrichmentLookups       EnrichmentLookup[]
-  mailProviders           MailProvider[]
-  mailCreatives           MailCreative[]
-  mailCampaigns           MailCampaign[]
-  designs                 Design[]
+  prospectLists             ProspectList[]
+  prospects                 Prospect[]
+  enrichmentLookups         EnrichmentLookup[]
+  mailProviders             MailProvider[]
+  mailCreatives             MailCreative[]
+  mailCampaigns             MailCampaign[]
+  designs                   Design[]
   // Phase 12 (Worker 1): GrapesJS page drafts.
-  pageDrafts              PageDraft[]
+  pageDrafts                PageDraft[]
   // Phase 11 (Feature 6): collaboration back-relations.
-  designShares            DesignShare[]
-  designComments          DesignComment[]
+  designShares              DesignShare[]
+  designComments            DesignComment[]
   // Phase 12 (embeds): rrweb replay sessions + Documenso signing requests.
-  designReplaySessions    DesignReplaySession[]
-  signingRequests         SigningRequest[]
+  designReplaySessions      DesignReplaySession[]
+  signingRequests           SigningRequest[]
   // Wave 2 E-sign module (SPEC-GAP-ESIGN.md).
-  esignEnvelopes          EsignEnvelope[]
-  esignTemplates          EsignTemplate[]
-  esignVaultEntries       EsignVaultEntry[]
+  esignEnvelopes            EsignEnvelope[]
+  esignTemplates            EsignTemplate[]
+  esignVaultEntries         EsignVaultEntry[]
   // Wave 2 Insurance module (SPEC-INSURANCE.md).
-  insuranceCarriers       InsuranceCarrier[]
-  insurancePolicies       InsurancePolicy[]
-  insuranceRenewals       InsuranceRenewal[]
-  insuranceSubmissions    InsuranceSubmission[]
-  insuranceQuotes         InsuranceQuote[]
+  insuranceCarriers         InsuranceCarrier[]
+  insurancePolicies         InsurancePolicy[]
+  insuranceRenewals         InsuranceRenewal[]
+  insuranceSubmissions      InsuranceSubmission[]
+  insuranceQuotes           InsuranceQuote[]
   insuranceLicensedPartners InsuranceLicensedPartner[]
-  insuranceAuditEvents    InsuranceAuditEvent[]
-  insuranceQuoteRules     InsuranceQuoteRule[]
+  insuranceAuditEvents      InsuranceAuditEvent[]
+  insuranceQuoteRules       InsuranceQuoteRule[]
   // Dataset Builder slice 1: Ingest.
-  datasetSources   DatasetSource[]
-  datasetDocuments DatasetDocument[]
-  datasetChunks    DatasetChunk[]
-  datasetClassifications DatasetClassification[]
-  datasetReviewItems     DatasetReviewItem[]
+  datasetSources            DatasetSource[]
+  datasetDocuments          DatasetDocument[]
+  datasetChunks             DatasetChunk[]
+  datasetClassifications    DatasetClassification[]
+  datasetReviewItems        DatasetReviewItem[]
   // Dataset Builder slice 3: Build.
-  datasets               Dataset[]
-  datasetVersions        DatasetVersion[]
-  datasetVersionChunks   DatasetVersionChunk[]
+  datasets                  Dataset[]
+  datasetVersions           DatasetVersion[]
+  datasetVersionChunks      DatasetVersionChunk[]
   // Dataset Builder slice 4: Activate.
-  datasetPublishes       DatasetPublish[]
+  datasetPublishes          DatasetPublish[]
   // Legal/Compliance slice 1: Obligation map.
-  legalProfile           LegalProfile?
-  obligations            Obligation[]
-  legalDeadlines         LegalDeadline[]
+  legalProfile              LegalProfile?
+  obligations               Obligation[]
+  legalDeadlines            LegalDeadline[]
   // Legal/Compliance slice 3: Document vault.
-  legalDocuments         LegalDocument[]
+  legalDocuments            LegalDocument[]
   // Legal/Compliance slice 4: Change radar.
-  legalRadarTriage       LegalRadarTriage[]
+  legalRadarTriage          LegalRadarTriage[]
   // Legal/Compliance slice 5: Digital properties (Hullcheck synergy).
-  legalDigitalProperties LegalDigitalProperty[]
+  legalDigitalProperties    LegalDigitalProperty[]
   // Funding/VC slice 1: Starter network (Boardy preloaded).
-  fundingContacts     FundingContact[]
-  fundingInvestors    FundingInvestor[]
-  fundingInteractions FundingInteraction[]
-  fundingFollowUps    FundingFollowUp[]
-  fundingIntroRequests FundingIntroRequest[]
-  fundingDataRoomDocs FundingDataRoomDoc[]
-  fundingRounds       FundingRound[]
-  insurancePaymentHandoffs InsurancePaymentHandoff[]
+  fundingContacts           FundingContact[]
+  fundingInvestors          FundingInvestor[]
+  fundingInteractions       FundingInteraction[]
+  fundingFollowUps          FundingFollowUp[]
+  fundingIntroRequests      FundingIntroRequest[]
+  fundingDataRoomDocs       FundingDataRoomDoc[]
+  // Funding/VC slice 3: Data room versions, share links, view analytics.
+  fundingDataRoomVersions   FundingDataRoomDocVersion[]
+  fundingShareLinks         FundingShareLink[]
+  fundingDocViews           FundingDocView[]
+  fundingRounds             FundingRound[]
+  insurancePaymentHandoffs  InsurancePaymentHandoff[]
   insuranceCertificates     InsuranceCertificate[]
   // Phase 12 (embeds): tenant-scoped GrowthBook flag overrides.
-  flagOverrides           WorkspaceFlagOverride[]
-  eddmOrders              EddmOrder[]
+  flagOverrides             WorkspaceFlagOverride[]
+  eddmOrders                EddmOrder[]
   // Phase 5 (S1–S4): media safety back-relations.
-  mediaApprovals          MediaApproval[]
-  mediaApprovalEvents     MediaApprovalEvent[]
-  mediaAuditEvents        MediaAuditEvent[]
-  budgetPools             BudgetPool[]
-  poolTransactions        PoolTransaction[]
-  mediaBuys               MediaBuy[]
-  killRules               KillRule[]
+  mediaApprovals            MediaApproval[]
+  mediaApprovalEvents       MediaApprovalEvent[]
+  mediaAuditEvents          MediaAuditEvent[]
+  budgetPools               BudgetPool[]
+  poolTransactions          PoolTransaction[]
+  mediaBuys                 MediaBuy[]
+  killRules                 KillRule[]
   // Phase 5 (B1–B3): buying-path back-relations.
-  doohPlans               DoohPlan[]
-  launchPackets           LaunchPacket[]
-  audioBuys               AudioBuy[]
-  ioBriefs                IoBrief[]
-  mediaReceipts           MediaReceipt[]
+  doohPlans                 DoohPlan[]
+  launchPackets             LaunchPacket[]
+  audioBuys                 AudioBuy[]
+  ioBriefs                  IoBrief[]
+  mediaReceipts             MediaReceipt[]
   // Phase 6: authority & relevance back-relations.
-  authorityApprovals      AuthorityApproval[]
-  authorityAuditEvents    AuthorityAuditEvent[]
-  outreachCampaigns       OutreachCampaign[]
-  sendingDomains          SendingDomain[]
-  outreachProspects       OutreachProspect[]
-  outreachSequences       OutreachSequence[]
-  outreachEvents          OutreachEvent[]
-  suppressionLists        SuppressionList[]
-  prOpportunities         PrOpportunity[]
-  prDrafts                PrDraft[]
-  prRelationships         PrRelationship[]
-  prPlacements            PrPlacement[]
-  listingChannels         ListingChannel[]
-  listingProfiles         ListingProfile[]
-  listingSyncJobs         ListingSyncJob[]
-  citationBriefs          CitationBrief[]
-  reviewQueue             ReviewQueue[]
-  reviewVelocity          ReviewVelocity[]
-  aeoPromptSets           AeoPromptSet[]
-  aeoRuns                 AeoRun[]
-  aeoSourceImpact         AeoSourceImpact[]
-  aeoActions              AeoAction[]
-  intelligenceReports     IntelligenceReport[]
-  mediaBuyingEvents       MediaBuyingEvent[]
+  authorityApprovals        AuthorityApproval[]
+  authorityAuditEvents      AuthorityAuditEvent[]
+  outreachCampaigns         OutreachCampaign[]
+  sendingDomains            SendingDomain[]
+  outreachProspects         OutreachProspect[]
+  outreachSequences         OutreachSequence[]
+  outreachEvents            OutreachEvent[]
+  suppressionLists          SuppressionList[]
+  prOpportunities           PrOpportunity[]
+  prDrafts                  PrDraft[]
+  prRelationships           PrRelationship[]
+  prPlacements              PrPlacement[]
+  listingChannels           ListingChannel[]
+  listingProfiles           ListingProfile[]
+  listingSyncJobs           ListingSyncJob[]
+  citationBriefs            CitationBrief[]
+  reviewQueue               ReviewQueue[]
+  reviewVelocity            ReviewVelocity[]
+  aeoPromptSets             AeoPromptSet[]
+  aeoRuns                   AeoRun[]
+  aeoSourceImpact           AeoSourceImpact[]
+  aeoActions                AeoAction[]
+  intelligenceReports       IntelligenceReport[]
+  mediaBuyingEvents         MediaBuyingEvent[]
   // Phase 5 (A1): offline attribution back-relations.
   // (MediaCallNumber is the A1 model — `CallNumber` was already taken by
   // Phase 2 R5 call tracking, which maps to the `call_number` table.)
-  mediaTrackingLinks      TrackingLink[]
-  mediaPromoCodes         PromoCode[]
+  mediaTrackingLinks        TrackingLink[]
+  mediaPromoCodes           PromoCode[]
   // RedemptionEvent is reached via PromoCode.redemptions (no workspaceId).
-  mediaCallNumbers        MediaCallNumber[]
-  mediaCallWebhookEvents  CallWebhookEvent[]
-  mediaLiftSnapshots      LiftSnapshot[]
-  mediaSpendEntries       MediaSpendEntry[]
+  mediaCallNumbers          MediaCallNumber[]
+  mediaCallWebhookEvents    CallWebhookEvent[]
+  mediaLiftSnapshots        LiftSnapshot[]
+  mediaSpendEntries         MediaSpendEntry[]
   // Phase 9 (M1): GrowthOS orchestrator back-relations.
-  missions                Mission[]
-  missionEvents           MissionEvent[]
-  missionApprovals        MissionApproval[]
-  missionApprovalEvents   MissionApprovalEvent[]
+  missions                  Mission[]
+  missionEvents             MissionEvent[]
+  missionApprovals          MissionApproval[]
+  missionApprovalEvents     MissionApprovalEvent[]
   // Phase 12 "Reconsider trio": one Plane project link per mission (optional).
-  missionPlaneLinks       MissionPlaneLink[]
-  escalationRules         EscalationRule[]
-  playbooks               Playbook[]
-  playbookVersions        PlaybookVersion[]
-  automationSettings      AutomationSetting[]
-  commandAudits           CommandAudit[]
+  missionPlaneLinks         MissionPlaneLink[]
+  escalationRules           EscalationRule[]
+  playbooks                 Playbook[]
+  playbookVersions          PlaybookVersion[]
+  automationSettings        AutomationSetting[]
+  commandAudits             CommandAudit[]
 
   @@map("workspaces")
 }
@@ -1126,7 +1130,7 @@ model BrandKit {
   // Phase 16 slice 9: branded report engine send approvals using this kit.
   reportSendApprovals ReportSendApproval[]
   // Wave 2 context.dev slice 5: brand sync proposals targeting this kit.
-  brandSyncs BrandSync[]
+  brandSyncs          BrandSync[]
 
   @@map("brand_kits")
 }
@@ -3221,24 +3225,25 @@ enum WorkspaceFileKind {
 // Phase B (W3, track B1): registry-gated private workspace filesystem.
 // The DB registry is the isolation boundary; storage keys are opaque UUIDs.
 model WorkspaceFile {
-  id          String            @id @default(cuid())
-  workspaceId String            @map("workspace_id")
-  workspace   Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  id                         String                      @id @default(cuid())
+  workspaceId                String                      @map("workspace_id")
+  workspace                  Workspace                   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   // Normalized logical path, e.g. "/files/reports/q3.pdf". Unique among
   // live (non-trashed) files per workspace.
-  logicalPath String            @map("logical_path")
+  logicalPath                String                      @map("logical_path")
   // Opaque UUID storage key. Never serialized to clients.
-  storageKey  String            @unique @map("storage_key")
-  filename    String            @db.VarChar(255)
-  mimeType    String            @map("mime_type")
-  sizeBytes   Int               @map("size_bytes")
-  kind        WorkspaceFileKind
-  createdBy   String            @map("created_by")
-  createdAt   DateTime          @default(now()) @map("created_at")
+  storageKey                 String                      @unique @map("storage_key")
+  filename                   String                      @db.VarChar(255)
+  mimeType                   String                      @map("mime_type")
+  sizeBytes                  Int                         @map("size_bytes")
+  kind                       WorkspaceFileKind
+  createdBy                  String                      @map("created_by")
+  createdAt                  DateTime                    @default(now()) @map("created_at")
   // Trash: set on soft-delete, 30-day retention, then purge.
-  trashedAt   DateTime?         @map("trashed_at")
+  trashedAt                  DateTime?                   @map("trashed_at")
   // Legal/Compliance slice 3: Document vault — versions referencing this file.
-  legalDocumentVersions LegalDocumentVersion[]
+  legalDocumentVersions      LegalDocumentVersion[]
+  fundingDataRoomDocVersions FundingDataRoomDocVersion[]
 
   @@index([workspaceId, trashedAt])
   @@index([workspaceId, kind])
@@ -4519,29 +4524,29 @@ model EsignEnvelope {
   workspaceId String    @map("workspace_id")
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
-  title String
+  title        String
   // draft | sent | partially-signed | completed | declined | expired | voided | error
-  status String @default("draft") @map("status")
+  status       String @default("draft") @map("status")
   // sequential | parallel
   signingOrder String @default("sequential") @map("signing_order")
 
   // Vendor identity. vendor = "documenso" in v1 (adapter interface leaves
   // room for the DocuSign reserve rail behind the same shape).
-  vendor          String  @default("documenso") @map("vendor")
-  vendorRef       String? @map("vendor_ref")
-  vendorStatus    String? @map("vendor_status")
+  vendor       String  @default("documenso") @map("vendor")
+  vendorRef    String? @map("vendor_ref")
+  vendorStatus String? @map("vendor_status")
 
   // Source document metadata (bytes live transiently; the vendor holds them).
-  documentName String? @map("document_name")
-  documentSize Int?    @map("document_size")
+  documentName  String? @map("document_name")
+  documentSize  Int?    @map("document_size")
   // The exact bytes the approver reviews; the send confirmation token binds
   // to their hash so a changed draft can never be sent on a stale approval.
   sourcePdf     Bytes?  @map("source_pdf")
   sourcePdfHash String? @map("source_pdf_hash")
 
   // Sealed PDF mirror, fetched ONLY on the vendor's completion event.
-  sealedPdf       Bytes?   @map("sealed_pdf")
-  sealedPdfHash   String?  @map("sealed_pdf_hash")
+  sealedPdf          Bytes?    @map("sealed_pdf")
+  sealedPdfHash      String?   @map("sealed_pdf_hash")
   sealedPdfFetchedAt DateTime? @map("sealed_pdf_fetched_at")
 
   // Links into not-yet-built modules: legal/compliance contract object,
@@ -4554,12 +4559,12 @@ model EsignEnvelope {
   templateId String?        @map("template_id")
   template   EsignTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
 
-  expiresAt DateTime? @map("expires_at")
-  voidReason String?  @map("void_reason")
+  expiresAt  DateTime? @map("expires_at")
+  voidReason String?   @map("void_reason")
 
-  signers EsignSigner[]
-  fields  EsignField[]
-  events  EsignAuditEvent[]
+  signers    EsignSigner[]
+  fields     EsignField[]
+  events     EsignAuditEvent[]
   vaultEntry EsignVaultEntry?
 
   createdBy String?  @map("created_by")
@@ -4577,17 +4582,17 @@ model EsignSigner {
   envelopeId String        @map("envelope_id")
   envelope   EsignEnvelope @relation(fields: [envelopeId], references: [id], onDelete: Cascade)
 
-  name  String
-  email String
+  name             String
+  email            String
   // signer | approver | cc
-  role String @default("signer") @map("role")
-  orderIndex Int @default(0) @map("order_index")
+  role             String    @default("signer") @map("role")
+  orderIndex       Int       @default(0) @map("order_index")
   // pending | viewed | signed | declined
-  status String @default("pending") @map("status")
-  signedAt DateTime? @map("signed_at")
+  status           String    @default("pending") @map("status")
+  signedAt         DateTime? @map("signed_at")
   // IP/device snapshot + identity evidence from the vendor. Email + access
   // code in v1; IDV method when the reserve rail lands.
-  identityEvidence Json? @map("identity_evidence")
+  identityEvidence Json?     @map("identity_evidence")
 
   @@index([envelopeId, orderIndex])
   @@map("esign_signers")
@@ -4598,14 +4603,14 @@ model EsignField {
   envelopeId String        @map("envelope_id")
   envelope   EsignEnvelope @relation(fields: [envelopeId], references: [id], onDelete: Cascade)
 
-  signerId String? @map("signer_id")
+  signerId  String? @map("signer_id")
   // signature | initials | date | text | checkbox
-  fieldType String @map("field_type")
-  page      Int    @default(1) @map("page")
-  x         Float  @default(0) @map("x")
-  y         Float  @default(0) @map("y")
-  width     Float  @default(150) @map("width")
-  height    Float  @default(40) @map("height")
+  fieldType String  @map("field_type")
+  page      Int     @default(1) @map("page")
+  x         Float   @default(0) @map("x")
+  y         Float   @default(0) @map("y")
+  width     Float   @default(150) @map("width")
+  height    Float   @default(40) @map("height")
   required  Boolean @default(true) @map("required")
   value     String? @map("value")
 
@@ -4618,7 +4623,7 @@ model EsignTemplate {
   workspaceId String    @map("workspace_id")
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
-  name String
+  name               String
   // Source document for the blueprint (stored asset ref / uploaded name).
   sourceDocumentName String? @map("source_document_name")
   // Blueprint PDF bytes — instantiateTemplate mints drafts from these exact
@@ -4627,19 +4632,19 @@ model EsignTemplate {
   sourceDocumentHash String? @map("source_document_hash")
   sourceDocumentSize Int?    @map("source_document_size")
   // Field layout: [{ fieldType, page, x, y, width, height, required, signerRole }]
-  fieldLayout Json @default("[]") @map("field_layout")
+  fieldLayout        Json    @default("[]") @map("field_layout")
   // Signer roles: [{ role, orderIndex, required }]
-  signerRoles Json @default("[]") @map("signer_roles")
+  signerRoles        Json    @default("[]") @map("signer_roles")
   // Merge-field mapping: { "{{client.name}}": "crm.contact.name", ... }
-  mergeFieldMapping Json @default("{}") @map("merge_field_mapping")
+  mergeFieldMapping  Json    @default("{}") @map("merge_field_mapping")
   // Template bound to a contract type (e.g. MSA template → MSA contract
   // object in the legal/compliance module, which arrives next phase).
-  contractType String? @map("contract_type")
+  contractType       String? @map("contract_type")
 
-  envelopes EsignEnvelope[]
-  ownerUserId String?  @map("owner_user_id")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  envelopes   EsignEnvelope[]
+  ownerUserId String?         @map("owner_user_id")
+  createdAt   DateTime        @default(now()) @map("created_at")
+  updatedAt   DateTime        @updatedAt @map("updated_at")
 
   @@index([workspaceId, updatedAt])
   @@map("esign_templates")
@@ -4655,16 +4660,16 @@ model EsignAuditEvent {
 
   // created | sent | viewed | signed | completed | declined | expired |
   // voided | sealed_pdf_fetched | webhook_ignored
-  event String @map("event")
-  actor String @default("system") @map("actor")
+  event        String  @map("event")
+  actor        String  @default("system") @map("actor")
   // SHA-256 of the canonical event payload; chains to the previous event's
   // hash (hash-chained evidence log per SPEC-GAP-ESIGN.md §4.4).
   hash         String  @map("hash")
   previousHash String? @map("previous_hash")
   // Idempotency: SHA-256 of the raw webhook body (or of the canonical
   // governed-action payload). Unique — replays are no-ops.
-  bodyHash String @unique @map("body_hash")
-  payload  Json?  @map("payload")
+  bodyHash     String  @unique @map("body_hash")
+  payload      Json?   @map("payload")
 
   createdAt DateTime @default(now()) @map("created_at")
 
@@ -4684,10 +4689,10 @@ model EsignVaultEntry {
   envelopeId  String        @unique @map("envelope_id")
   envelope    EsignEnvelope @relation(fields: [envelopeId], references: [id], onDelete: Cascade)
 
-  sealedPdfHash String @map("sealed_pdf_hash")
-  auditHeadHash String @map("audit_head_hash")
-  eventCount    Int    @map("event_count")
-  signerCount   Int    @map("signer_count")
+  sealedPdfHash String   @map("sealed_pdf_hash")
+  auditHeadHash String   @map("audit_head_hash")
+  eventCount    Int      @map("event_count")
+  signerCount   Int      @map("signer_count")
   storedAt      DateTime @default(now()) @map("stored_at")
 
   retentionUntil  DateTime? @map("retention_until")
@@ -8987,20 +8992,20 @@ enum OpsLeaveStatus {
 // Catalog: sellable products/services. trackInventory=false means the
 // product is a service / non-stocked item (stockQty ignored).
 model OpsProduct {
-  id           String   @id @default(cuid())
-  workspaceId  String   @map("workspace_id")
-  workspace    Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  name         String
-  sku          String
+  id                String    @id @default(cuid())
+  workspaceId       String    @map("workspace_id")
+  workspace         Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name              String
+  sku               String
   // Integer minor units (cents).
-  priceCents   Int      @map("price_cents")
-  stockQty     Int      @default(0) @map("stock_qty")
-  trackInventory Boolean @default(true) @map("track_inventory")
+  priceCents        Int       @map("price_cents")
+  stockQty          Int       @default(0) @map("stock_qty")
+  trackInventory    Boolean   @default(true) @map("track_inventory")
   // Low-stock alert threshold: alert when trackInventory && stockQty <=
   // lowStockThreshold. Slice 3. Default 0 = alert only when out of stock.
-  lowStockThreshold Int @default(0) @map("low_stock_threshold")
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
+  lowStockThreshold Int       @default(0) @map("low_stock_threshold")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
 
   inventoryTxns OpsInventoryTxn[]
 
@@ -9013,19 +9018,19 @@ model OpsProduct {
 // draft → confirmed → fulfilled (cancelled terminal). Totals are
 // server-computed from line items (never trusted from the client).
 model OpsOrder {
-  id          String         @id @default(cuid())
-  workspaceId String         @map("workspace_id")
-  workspace   Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  id            String         @id @default(cuid())
+  workspaceId   String         @map("workspace_id")
+  workspace     Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   // CRM adjacency: the lead-turned-customer this order belongs to.
-  customerId  String?        @map("customer_id")
+  customerId    String?        @map("customer_id")
   // [{ name, sku?, qty, priceCents }]
-  lineItems   Json           @map("line_items")
-  status      OpsOrderStatus @default(draft)
-  subtotalCents Int          @map("subtotal_cents")
-  taxCents      Int          @default(0) @map("tax_cents")
-  totalCents    Int          @map("total_cents")
-  createdAt   DateTime       @default(now()) @map("created_at")
-  updatedAt   DateTime       @updatedAt @map("updated_at")
+  lineItems     Json           @map("line_items")
+  status        OpsOrderStatus @default(draft)
+  subtotalCents Int            @map("subtotal_cents")
+  taxCents      Int            @default(0) @map("tax_cents")
+  totalCents    Int            @map("total_cents")
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
 
   payments OpsPayment[]
 
@@ -9038,19 +9043,19 @@ model OpsOrder {
 // charge/refund happened on the provider (Stripe). Every write is a gated
 // write (medium minimum; bulk refunds high) via lib/ops/gate.ts.
 model OpsPayment {
-  id          String          @id @default(cuid())
-  workspaceId String          @map("workspace_id")
-  workspace   Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  orderId     String?         @map("order_id")
-  order       OpsOrder?       @relation(fields: [orderId], references: [id], onDelete: SetNull)
-  provider    String          @default("stripe")
-  kind        OpsPaymentKind  @default(charge)
+  id          String           @id @default(cuid())
+  workspaceId String           @map("workspace_id")
+  workspace   Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  orderId     String?          @map("order_id")
+  order       OpsOrder?        @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  provider    String           @default("stripe")
+  kind        OpsPaymentKind   @default(charge)
   // Integer minor units (cents), always positive; kind says the direction.
-  amountCents Int             @map("amount_cents")
+  amountCents Int              @map("amount_cents")
   status      OpsPaymentStatus @default(pending)
   // Provider-side reference (Stripe payment intent / charge id).
-  providerRef String?         @map("provider_ref")
-  createdAt   DateTime        @default(now()) @map("created_at")
+  providerRef String?          @map("provider_ref")
+  createdAt   DateTime         @default(now()) @map("created_at")
 
   @@index([workspaceId, orderId, createdAt])
   @@index([workspaceId, kind, status])
@@ -9060,16 +9065,16 @@ model OpsPayment {
 // Discount codes: rules JSON evaluated at order time
 // ({ percentOff?, amountOffCents?, minSubtotalCents?, productSkus? }).
 model OpsPromotion {
-  id          String   @id @default(cuid())
-  workspaceId String   @map("workspace_id")
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   code        String
-  rules       Json     @default("{}")
-  usageLimit  Int?     @map("usage_limit")
-  usedCount   Int      @default(0) @map("used_count")
-  active      Boolean  @default(true)
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  rules       Json      @default("{}")
+  usageLimit  Int?      @map("usage_limit")
+  usedCount   Int       @default(0) @map("used_count")
+  active      Boolean   @default(true)
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
 
   @@unique([workspaceId, code])
   @@index([workspaceId, active])
@@ -9079,24 +9084,24 @@ model OpsPromotion {
 // Invoice: draft → sent → paid (overdue derived by age). Sending is a
 // gated write (medium, approval required — money is a red lane).
 model OpsInvoice {
-  id          String          @id @default(cuid())
-  workspaceId String          @map("workspace_id")
-  workspace   Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  id             String           @id @default(cuid())
+  workspaceId    String           @map("workspace_id")
+  workspace      Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   // CRM adjacency: the lead-turned-customer being billed.
-  customerId  String?         @map("customer_id")
+  customerId     String?          @map("customer_id")
   // [{ description, qty, priceCents }]
-  lineItems   Json            @map("line_items")
-  taxCents    Int             @default(0) @map("tax_cents")
-  totalCents  Int             @map("total_cents")
-  status      OpsInvoiceStatus @default(draft)
-  sentAt      DateTime?       @map("sent_at")
+  lineItems      Json             @map("line_items")
+  taxCents       Int              @default(0) @map("tax_cents")
+  totalCents     Int              @map("total_cents")
+  status         OpsInvoiceStatus @default(draft)
+  sentAt         DateTime?        @map("sent_at")
   // Payment due date. Set explicitly at draft time or defaulted to
   // sentAt + 30 days when the invoice is sent. Drives the overdue sweep.
-  dueAt       DateTime?       @map("due_at")
+  dueAt          DateTime?        @map("due_at")
   // Idempotency / dedupe key for agent retries (nullable = not set).
-  idempotencyKey String?      @map("idempotency_key")
-  createdAt   DateTime        @default(now()) @map("created_at")
-  updatedAt   DateTime        @updatedAt @map("updated_at")
+  idempotencyKey String?          @map("idempotency_key")
+  createdAt      DateTime         @default(now()) @map("created_at")
+  updatedAt      DateTime         @updatedAt @map("updated_at")
 
   @@unique([workspaceId, idempotencyKey])
   @@index([workspaceId, status, createdAt])
@@ -9108,18 +9113,18 @@ model OpsInvoice {
 // stockQty is the materialized balance, updated in the SAME transaction as
 // the txn row (so inventory decrements exactly once per sale).
 model OpsInventoryTxn {
-  id          String            @id @default(cuid())
-  workspaceId String            @map("workspace_id")
-  workspace   Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  productId   String            @map("product_id")
-  product     OpsProduct        @relation(fields: [productId], references: [id], onDelete: Cascade)
+  id          String             @id @default(cuid())
+  workspaceId String             @map("workspace_id")
+  workspace   Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  productId   String             @map("product_id")
+  product     OpsProduct         @relation(fields: [productId], references: [id], onDelete: Cascade)
   // Signed: sale = negative, restock = positive, adjustment = either.
   delta       Int
   reason      OpsInventoryReason
   // Who/what moved the stock: user id or "agent:<surface>".
   actor       String?
-  note        String?           @db.Text
-  createdAt   DateTime          @default(now()) @map("created_at")
+  note        String?            @db.Text
+  createdAt   DateTime           @default(now()) @map("created_at")
 
   @@index([workspaceId, productId, createdAt])
   @@index([workspaceId, reason, createdAt])
@@ -9131,22 +9136,22 @@ model OpsInventoryTxn {
 // is a free fulfillment write that atomically books restock inventory
 // txns for line items carrying a productId.
 model OpsPurchaseOrder {
-  id          String                @id @default(cuid())
-  workspaceId String                @map("workspace_id")
-  workspace   Workspace             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  id            String                 @id @default(cuid())
+  workspaceId   String                 @map("workspace_id")
+  workspace     Workspace              @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   // Supplier: a CRM lead id (optional) + free-text name fallback.
-  supplierId   String? @map("supplier_id")
-  supplierName String? @map("supplier_name")
+  supplierId    String?                @map("supplier_id")
+  supplierName  String?                @map("supplier_name")
   // [{ productId?, name, sku?, qty, priceCents }]
-  lineItems   Json    @map("line_items")
-  taxCents    Int     @default(0) @map("tax_cents")
-  subtotalCents Int    @map("subtotal_cents")
-  totalCents  Int     @map("total_cents")
-  status      OpsPurchaseOrderStatus @default(draft)
-  sentAt      DateTime? @map("sent_at")
-  receivedAt  DateTime? @map("received_at")
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
+  lineItems     Json                   @map("line_items")
+  taxCents      Int                    @default(0) @map("tax_cents")
+  subtotalCents Int                    @map("subtotal_cents")
+  totalCents    Int                    @map("total_cents")
+  status        OpsPurchaseOrderStatus @default(draft)
+  sentAt        DateTime?              @map("sent_at")
+  receivedAt    DateTime?              @map("received_at")
+  createdAt     DateTime               @default(now()) @map("created_at")
+  updatedAt     DateTime               @updatedAt @map("updated_at")
 
   @@index([workspaceId, status, createdAt])
   @@index([workspaceId, supplierId])
@@ -9156,18 +9161,18 @@ model OpsPurchaseOrder {
 // Client delivery work: milestones JSON
 // ([{ title, dueAt?, status }]), linked to CRM lead/deal.
 model OpsProject {
-  id          String          @id @default(cuid())
-  workspaceId String          @map("workspace_id")
-  workspace   Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  customerId  String?         @map("customer_id")
+  id          String           @id @default(cuid())
+  workspaceId String           @map("workspace_id")
+  workspace   Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  customerId  String?          @map("customer_id")
   name        String
-  milestones  Json            @default("[]")
+  milestones  Json             @default("[]")
   status      OpsProjectStatus @default(planning)
   // CRM adjacency (Wave B canonical models).
-  leadId      String?         @map("lead_id")
-  dealId      String?         @map("deal_id")
-  createdAt   DateTime        @default(now()) @map("created_at")
-  updatedAt   DateTime        @updatedAt @map("updated_at")
+  leadId      String?          @map("lead_id")
+  dealId      String?          @map("deal_id")
+  createdAt   DateTime         @default(now()) @map("created_at")
+  updatedAt   DateTime         @updatedAt @map("updated_at")
 
   timeEntries OpsTimeEntry[]
 
@@ -9248,26 +9253,26 @@ model OpsLeaveRequest {
 // When a step fails, the compensation log drives rollback so a failed order
 // workflow never leaves a half-charged customer.
 model OpsWorkflowRun {
-  id              String              @id @default(cuid())
-  workspaceId     String              @map("workspace_id")
-  workspace       Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  workflowName    String              @map("workflow_name")
+  id              String               @id @default(cuid())
+  workspaceId     String               @map("workspace_id")
+  workspace       Workspace            @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  workflowName    String               @map("workflow_name")
   // Slice 6: idempotency key — one run per (workspace, runKey), so an
   // approved workflow plan can never execute twice (replay lock).
-  runKey          String?             @map("run_key")
+  runKey          String?              @map("run_key")
   // [{ name, status, at?, detail? }] — the saga steps in order.
-  steps           Json                @default("[]")
+  steps           Json                 @default("[]")
   // [{ step, action, at, result }] — append-only compensation record.
-  compensationLog Json                @default("[]") @map("compensation_log")
+  compensationLog Json                 @default("[]") @map("compensation_log")
   status          OpsWorkflowRunStatus @default(running)
-  createdAt       DateTime            @default(now()) @map("created_at")
-  updatedAt       DateTime            @updatedAt @map("updated_at")
+  createdAt       DateTime             @default(now()) @map("created_at")
+  updatedAt       DateTime             @updatedAt @map("updated_at")
 
-  @@index([workspaceId, workflowName, createdAt])
-  @@index([workspaceId, status])
   // Slice 6: NULLs are distinct in a Postgres unique index, so pre-slice-6
   // rows (runKey NULL) are unaffected; every new run carries a key.
   @@unique([workspaceId, runKey])
+  @@index([workspaceId, workflowName, createdAt])
+  @@index([workspaceId, status])
   @@map("ops_workflow_runs")
 }
 
@@ -9276,17 +9281,17 @@ model OpsWorkflowRun {
 // ("runs freely (logged)"). Append-only; never updated or deleted by the
 // API surface.
 model OpsAuditEvent {
-  id          String   @id @default(cuid())
-  workspaceId String   @map("workspace_id")
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   // Entity slug: "invoices", "products", ...
   entity      String
-  entityId    String?  @map("entity_id")
+  entityId    String?   @map("entity_id")
   // list | get | create | update | gate_proposed | gate_denied | gate_executed
   action      String
   actor       String
-  summary     String   @db.Text
-  createdAt   DateTime @default(now()) @map("created_at")
+  summary     String    @db.Text
+  createdAt   DateTime  @default(now()) @map("created_at")
 
   @@index([workspaceId, entity, createdAt])
   @@index([workspaceId, entityId])
@@ -9355,17 +9360,17 @@ enum SpendProposalStatus {
 // gets its own four rows at seed/enablement time); capability flags drive
 // which actions the UI and the gate expose per platform.
 model AdPlatform {
-  id          String           @id @default(cuid())
-  workspaceId String           @map("workspace_id")
-  workspace   Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  key         AdPlatformKey
-  displayName String           @map("display_name")
-  authKind    AdPlatformAuthKind @map("auth_kind")
+  id                   String             @id @default(cuid())
+  workspaceId          String             @map("workspace_id")
+  workspace            Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  key                  AdPlatformKey
+  displayName          String             @map("display_name")
+  authKind             AdPlatformAuthKind @map("auth_kind")
   // Capability flags — what slice-N connectors actually support.
-  supportsApiLaunch    Boolean @default(false) @map("supports_api_launch")
-  supportsReportingApi Boolean @default(false) @map("supports_reporting_api")
-  guidedOnly           Boolean @default(false) @map("guided_only")
-  enabled              Boolean @default(true)
+  supportsApiLaunch    Boolean            @default(false) @map("supports_api_launch")
+  supportsReportingApi Boolean            @default(false) @map("supports_reporting_api")
+  guidedOnly           Boolean            @default(false) @map("guided_only")
+  enabled              Boolean            @default(true)
 
   accounts AdAccount[]
 
@@ -9380,20 +9385,20 @@ model AdPlatform {
 // lives in the Latchkey vault — tokenRef is an opaque vault reference
 // ("vault:oauth:<platform>:<id>"), NEVER the credential.
 model AdAccount {
-  id                String         @id @default(cuid())
-  workspaceId       String         @map("workspace_id")
-  workspace         Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  platformId        String         @map("platform_id")
-  platform          AdPlatform     @relation(fields: [platformId], references: [id], onDelete: Cascade)
+  id                String          @id @default(cuid())
+  workspaceId       String          @map("workspace_id")
+  workspace         Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  platformId        String          @map("platform_id")
+  platform          AdPlatform      @relation(fields: [platformId], references: [id], onDelete: Cascade)
   name              String?
-  externalAccountId String         @map("external_account_id")
+  externalAccountId String          @map("external_account_id")
   // Opaque vault reference to the stored credential. Nullable until the
   // OAuth/API-key flow completes.
-  tokenRef          String?        @map("token_ref")
+  tokenRef          String?         @map("token_ref")
   status            AdAccountStatus @default(pending)
   // Reserved for the agency white-label open decision (Phase 18 spec §6):
   // sub-accounts (GHL-style snapshots) get per-client ad accounts in v2.
-  subAccountId      String?        @map("sub_account_id")
+  subAccountId      String?         @map("sub_account_id")
 
   campaigns PaidAdCampaign[]
   reports   AdReport[]
@@ -9409,25 +9414,25 @@ model AdAccount {
 // Unified paid campaign across all platforms. Platform-native naming is
 // mapped into this shape by each slice-N connector.
 model PaidAdCampaign {
-  id          String       @id @default(cuid())
-  workspaceId String       @map("workspace_id")
-  workspace   Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  accountId   String       @map("account_id")
-  account     AdAccount    @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  id          String        @id @default(cuid())
+  workspaceId String        @map("workspace_id")
+  workspace   Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  accountId   String        @map("account_id")
+  account     AdAccount     @relation(fields: [accountId], references: [id], onDelete: Cascade)
   // Denormalized for queries that must not join through the account.
   platformKey AdPlatformKey @map("platform_key")
 
-  name       String
-  objective  String?
-  externalId String?        @map("external_id")
-  status     PaidAdStatus   @default(draft)
+  name        String
+  objective   String?
+  externalId  String?      @map("external_id")
+  status      PaidAdStatus @default(draft)
   // Lifetime budget in minor currency units (cents). Null = unmanaged.
-  budgetCents Int?          @map("budget_cents")
-  flightStart DateTime?     @map("flight_start")
-  flightEnd   DateTime?     @map("flight_end")
+  budgetCents Int?         @map("budget_cents")
+  flightStart DateTime?    @map("flight_start")
+  flightEnd   DateTime?    @map("flight_end")
 
-  groups  PaidAdGroup[]
-  reports AdReport[]
+  groups           PaidAdGroup[]
+  reports          AdReport[]
   // Wave 2 ChatGPT Ads: 1:1 conversational-intent extension (optional).
   chatGPTExtension ChatGPTCampaign?
 
@@ -9448,9 +9453,9 @@ model PaidAdGroup {
   campaign    PaidAdCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
 
   name        String
-  externalId  String?        @map("external_id")
-  status      PaidAdStatus   @default(draft)
-  budgetCents Int?           @map("budget_cents")
+  externalId  String?      @map("external_id")
+  status      PaidAdStatus @default(draft)
+  budgetCents Int?         @map("budget_cents")
 
   creatives PaidAdCreative[]
 
@@ -9469,11 +9474,11 @@ model PaidAdCreative {
   group       PaidAdGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
 
   name           String
-  externalId     String?  @map("external_id")
+  externalId     String? @map("external_id")
   // Asset refs: [{ url, kind: image|video|audio, hash }] — hashed at
   // approval time so the executor can re-verify (TOCTOU protection).
-  assetRefs      Json     @default("[]") @map("asset_refs")
-  platformStatus String?  @map("platform_status")
+  assetRefs      Json    @default("[]") @map("asset_refs")
+  platformStatus String? @map("platform_status")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -9488,20 +9493,20 @@ model PaidAdCreative {
 // expired / already-executed proposal, or scope-hash mismatch (what was
 // approved must be byte-identical to what executes).
 model SpendProposal {
-  id          String             @id @default(cuid())
-  workspaceId String             @map("workspace_id")
-  workspace   Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
-  kind   SpendProposalKind
-  action String // launch | pause | adjust_budget — mirrors the governed action
+  kind       SpendProposalKind
+  action     String // launch | pause | adjust_budget — mirrors the governed action
   // Polymorphic target: "campaign" | "group". Kept as strings so v2 can
   // add targets without a schema change.
-  targetType String @map("target_type")
-  targetId   String @map("target_id")
+  targetType String            @map("target_type")
+  targetId   String            @map("target_id")
   // Full execution payload (budgets, flight dates, creative refs). The
   // scopeHash binds approval → execution: canonical JSON → SHA-256.
-  payload   Json
-  scopeHash String @map("scope_hash")
+  payload    Json
+  scopeHash  String            @map("scope_hash")
 
   status     SpendProposalStatus @default(pending)
   proposedBy String              @map("proposed_by")
@@ -9567,10 +9572,10 @@ model AdReport {
 
   // Lineage: which approval authorized the spend, and the platform's own
   // receipt/report id for the row.
-  approvalId        String?       @map("approval_id")
-  platformReceiptId String?       @map("platform_receipt_id")
+  approvalId        String? @map("approval_id")
+  platformReceiptId String? @map("platform_receipt_id")
   // Raw platform row for audit/reconciliation.
-  raw               Json          @default("{}")
+  raw               Json    @default("{}")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -9623,25 +9628,25 @@ enum CreativeApprovalStatus {
 }
 
 model ChatGPTCampaign {
-  id          String   @id @default(cuid())
-  workspaceId String   @map("workspace_id")
-  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  id          String         @id @default(cuid())
+  workspaceId String         @map("workspace_id")
+  workspace   Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   // 1:1 extension of the Phase 18 paid campaign (stackadapt platform key).
-  campaignId String         @unique @map("campaign_id")
-  campaign   PaidAdCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  campaignId  String         @unique @map("campaign_id")
+  campaign    PaidAdCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
 
-  objective  String?
-  targetTiers ChatGPTTier[] @map("target_tiers")
+  objective            String?
+  targetTiers          ChatGPTTier[]         @map("target_tiers")
   // Conversation-topic intent tags (Audience Tools, June 2026).
-  topicIntentTags String[] @map("topic_intent_tags")
+  topicIntentTags      String[]              @map("topic_intent_tags")
   // Budgets in minor currency units (cents). At least one must be set —
   // propose_chatgpt_campaign fails closed without a budget cap.
-  budgetDailyCents Int? @map("budget_daily_cents")
-  budgetTotalCents Int? @map("budget_total_cents")
-  bidStrategy ChatGPTBidStrategy @default(cpc) @map("bid_strategy")
+  budgetDailyCents     Int?                  @map("budget_daily_cents")
+  budgetTotalCents     Int?                  @map("budget_total_cents")
+  bidStrategy          ChatGPTBidStrategy    @default(cpc) @map("bid_strategy")
   // StackAdapt campaign id once launched (buying on-ramp).
-  stackAdaptExternalId String? @map("stackadapt_external_id")
-  status ChatGPTCampaignStatus @default(draft)
+  stackAdaptExternalId String?               @map("stackadapt_external_id")
+  status               ChatGPTCampaignStatus @default(draft)
 
   creatives CreativeVariant[]
 
@@ -9653,27 +9658,27 @@ model ChatGPTCampaign {
 }
 
 model CreativeVariant {
-  id          String   @id @default(cuid())
-  workspaceId String   @map("workspace_id")
-  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  campaignId  String   @map("campaign_id")
+  id          String          @id @default(cuid())
+  workspaceId String          @map("workspace_id")
+  workspace   Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  campaignId  String          @map("campaign_id")
   campaign    ChatGPTCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
 
-  headline String
-  body     String
-  ctaLabel String? @map("cta_label")
-  locale   String  @default("en-US")
-  source   CreativeVariantSource @default(human)
+  headline        String
+  body            String
+  ctaLabel        String?                @map("cta_label")
+  locale          String                 @default("en-US")
+  source          CreativeVariantSource  @default(human)
   // Provenance: who made this ad (provider + model), answerable on demand.
-  aiProviderUsed String? @map("ai_provider_used")
-  aiModelUsed    String? @map("ai_model_used")
-  approvalStatus CreativeApprovalStatus @default(pending) @map("approval_status")
+  aiProviderUsed  String?                @map("ai_provider_used")
+  aiModelUsed     String?                @map("ai_model_used")
+  approvalStatus  CreativeApprovalStatus @default(pending) @map("approval_status")
   // OpenAI policy flags raised during review (empty = clean).
-  policyFlags String[] @default([]) @map("policy_flags")
+  policyFlags     String[]               @default([]) @map("policy_flags")
   // Lineage: localized/mutated variants keep their parent link.
-  parentVariantId String? @map("parent_variant_id")
-  parentVariant   CreativeVariant? @relation("VariantLineage", fields: [parentVariantId], references: [id], onDelete: SetNull)
-  childVariants   CreativeVariant[] @relation("VariantLineage")
+  parentVariantId String?                @map("parent_variant_id")
+  parentVariant   CreativeVariant?       @relation("VariantLineage", fields: [parentVariantId], references: [id], onDelete: SetNull)
+  childVariants   CreativeVariant[]      @relation("VariantLineage")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -9693,8 +9698,8 @@ model ContextDevBudget {
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   day         String
-  creditsUsed Int       @default(0) @map("credits_used")
-  capCredits  Int       @default(100) @map("cap_credits")
+  creditsUsed Int    @default(0) @map("credits_used")
+  capCredits  Int    @default(100) @map("cap_credits")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -9716,18 +9721,18 @@ model KnowledgeSource {
   workspaceId String    @map("workspace_id")
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
-  url String
+  url        String
   // page | sitemap | brand
   sourceType String @map("source_type")
   // manual | daily | weekly
-  cadence String @default("manual")
+  cadence    String @default("manual")
   // active | pending_approval | archived
-  status String @default("pending_approval")
+  status     String @default("pending_approval")
   // Lowercased registrable domain, for the one-time-per-domain approval rule.
-  domain String
+  domain     String
 
-  jobs   CrawlJob[]
-  chunks KnowledgeChunk[]
+  jobs     CrawlJob[]
+  chunks   KnowledgeChunk[]
   monitors Monitor[]
 
   createdAt DateTime @default(now()) @map("created_at")
@@ -9739,10 +9744,10 @@ model KnowledgeSource {
 }
 
 model CrawlJob {
-  id          String    @id @default(cuid())
-  workspaceId String    @map("workspace_id")
-  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  sourceId    String    @map("source_id")
+  id          String          @id @default(cuid())
+  workspaceId String          @map("workspace_id")
+  workspace   Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  sourceId    String          @map("source_id")
   source      KnowledgeSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
 
   // queued | running | complete | failed
@@ -9763,12 +9768,12 @@ model CrawlJob {
 }
 
 model KnowledgeChunk {
-  id          String    @id @default(cuid())
-  workspaceId String    @map("workspace_id")
-  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  jobId       String    @map("job_id")
-  job         CrawlJob  @relation(fields: [jobId], references: [id], onDelete: Cascade)
-  sourceId    String    @map("source_id")
+  id          String          @id @default(cuid())
+  workspaceId String          @map("workspace_id")
+  workspace   Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  jobId       String          @map("job_id")
+  job         CrawlJob        @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  sourceId    String          @map("source_id")
   source      KnowledgeSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
 
   sourceUrl   String   @map("source_url")
@@ -9795,13 +9800,13 @@ model ResearchTask {
   workspaceId String    @map("workspace_id")
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
-  question  String
-  locale    String @default("en")
+  question    String
+  locale      String   @default("en")
   // fast | ultra
-  mode      String @default("fast")
+  mode        String   @default("fast")
   // complete | partial | failed
-  status    String @default("complete")
-  jsonContent Json   @map("json_content")
+  status      String   @default("complete")
+  jsonContent Json     @map("json_content")
   sources     String[]
   confidence  Float    @default(0)
   creditsUsed Int      @default(0) @map("credits_used")
@@ -9825,20 +9830,20 @@ model Monitor {
   workspaceId String    @map("workspace_id")
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
-  name   String
-  url    String
+  name    String
+  url     String
   // hourly | daily | weekly
   cadence String @default("daily")
   // active | paused | archived
   status  String @default("active")
 
-  lastSeenHash String?   @map("last_seen_hash")
-  lastContent  String?   @map("last_content")
-  lastCheckedAt DateTime? @map("last_checked_at")
-  lastChangeAt  DateTime? @map("last_change_at")
-  consecutiveFailures Int @default(0) @map("consecutive_failures")
+  lastSeenHash        String?   @map("last_seen_hash")
+  lastContent         String?   @map("last_content")
+  lastCheckedAt       DateTime? @map("last_checked_at")
+  lastChangeAt        DateTime? @map("last_change_at")
+  consecutiveFailures Int       @default(0) @map("consecutive_failures")
   // Spawn a ResearchTask on each detected change (budget-gated).
-  autoResearch Boolean @default(false) @map("auto_research")
+  autoResearch        Boolean   @default(false) @map("auto_research")
 
   sourceId String?          @map("source_id")
   source   KnowledgeSource? @relation(fields: [sourceId], references: [id], onDelete: SetNull)
@@ -9891,9 +9896,9 @@ model BrandSync {
   // pending_approval | approved(legacy) | rejected | applied | unchanged | failed
   status String @default("pending_approval")
 
-  profileJson Json @map("profile_json")
-  diffJson    Json @default("[]") @map("diff_json")
-  creditsUsed Int  @default(0) @map("credits_used")
+  profileJson Json    @map("profile_json")
+  diffJson    Json    @default("[]") @map("diff_json")
+  creditsUsed Int     @default(0) @map("credits_used")
   error       String?
 
   decidedAt DateTime? @map("decided_at")
@@ -9930,8 +9935,8 @@ model WfhWorkMode {
   workspaceId String    @map("workspace_id")
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   // Auth.js user id (subject). The mode is per-user, not per-workspace.
-  userId String @map("user_id")
-  email  String?
+  userId      String    @map("user_id")
+  email       String?
 
   mode                WfhMode                @default(office)
   // Effective WFH days for hybrid mode (lowercase 3-letter codes: mon..sun).
@@ -9946,7 +9951,7 @@ model WfhWorkMode {
   digestTimesMin      Int[]                  @default([]) @map("digest_times_min")
   // Mandatory first-enable setup interstitial completed at (wfh days, focus
   // hours, standup cadence). Enabling wfh/hybrid without this fails closed.
-  setupCompletedAt DateTime? @map("setup_completed_at")
+  setupCompletedAt    DateTime?              @map("setup_completed_at")
 
   history   WfhModeHistory[]
   createdAt DateTime         @default(now()) @map("created_at")
@@ -9983,19 +9988,19 @@ model WfhDigestItem {
   id          String    @id @default(cuid())
   workspaceId String    @map("workspace_id")
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  userId String @map("user_id")
+  userId      String    @map("user_id")
 
   kind    String
   title   String
   body    String? @db.Text
   link    String?
-  urgency String @default("routine")
+  urgency String  @default("routine")
 
   // Digest window this item waits for (minutes since midnight local).
-  windowMin Int @map("window_min")
+  windowMin Int       @map("window_min")
   // queued | sent
-  status  String    @default("queued")
-  sentAt  DateTime? @map("sent_at")
+  status    String    @default("queued")
+  sentAt    DateTime? @map("sent_at")
 
   queuedAt DateTime @default(now()) @map("queued_at")
 
@@ -10012,19 +10017,19 @@ model WfhFocusBlock {
   id          String    @id @default(cuid())
   workspaceId String    @map("workspace_id")
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  userId String @map("user_id")
+  userId      String    @map("user_id")
 
   title      String
   startAt    DateTime @map("start_at")
   endAt      DateTime @map("end_at")
   // none | daily | weekdays | weekly
-  recurrence String @default("none")
+  recurrence String   @default("none")
   // soft (decline-with-suggestion) | hard (auto-decline, consent-gated)
-  protection String @default("soft")
+  protection String   @default("soft")
   // user | os_suggested | ritual
-  source String @default("user")
+  source     String   @default("user")
   // scheduled | protected | overridden | completed | cancelled
-  status String @default("scheduled")
+  status     String   @default("scheduled")
 
   calendarConnectionId String?                @map("calendar_connection_id")
   calendarConnection   WfhCalendarConnection? @relation(fields: [calendarConnectionId], references: [id], onDelete: SetNull)
@@ -10040,12 +10045,12 @@ model WfhFocusBlock {
 }
 
 model WfhCalendarConnection {
-  id          String    @id @default(cuid())
-  workspaceId String    @map("workspace_id")
-  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  userId String @map("user_id")
+  id                   String    @id @default(cuid())
+  workspaceId          String    @map("workspace_id")
+  workspace            Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  userId               String    @map("user_id")
   // google | microsoft
-  provider String
+  provider             String
   // connected | disconnected (OAuth arrives with the parked calendar integration)
   status               String    @default("disconnected")
   // One-time consent: "the OS may decline meetings on my behalf during focus blocks".
@@ -10069,16 +10074,16 @@ model WfhStandup {
   id          String    @id @default(cuid())
   workspaceId String    @map("workspace_id")
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  userId String @map("user_id")
+  userId      String    @map("user_id")
 
   // Workday covered, normalized to noon UTC.
   date       DateTime
   yesterday  String
   today      String
   blockers   String?
-  videoUrl   String? @map("video_url")
+  videoUrl   String?  @map("video_url")
   // team | private
-  visibility String  @default("team")
+  visibility String   @default("team")
 
   comments  WfhStandupComment[]
   reactions WfhStandupReaction[]
@@ -10095,7 +10100,7 @@ model WfhStandupComment {
   id        String     @id @default(cuid())
   standupId String     @map("standup_id")
   standup   WfhStandup @relation(fields: [standupId], references: [id], onDelete: Cascade)
-  userId String @map("user_id")
+  userId    String     @map("user_id")
   body      String
 
   createdAt DateTime @default(now()) @map("created_at")
@@ -10108,7 +10113,7 @@ model WfhStandupReaction {
   id        String     @id @default(cuid())
   standupId String     @map("standup_id")
   standup   WfhStandup @relation(fields: [standupId], references: [id], onDelete: Cascade)
-  userId String @map("user_id")
+  userId    String     @map("user_id")
   emoji     String
 
   createdAt DateTime @default(now()) @map("created_at")
@@ -10133,9 +10138,9 @@ model WfhRitual {
   title       String
   description String
   // daily | weekly | biweekly | monthly
-  cadence    String   @default("weekly")
-  anchorDate DateTime @map("anchor_date")
-  active     Boolean  @default(true)
+  cadence     String   @default("weekly")
+  anchorDate  DateTime @map("anchor_date")
+  active      Boolean  @default(true)
 
   subscriptions  WfhRitualSubscription[]
   participations WfhRitualParticipation[]
@@ -10148,10 +10153,10 @@ model WfhRitual {
 }
 
 model WfhRitualSubscription {
-  id        String    @id @default(cuid())
-  ritualId  String    @map("ritual_id")
-  ritual    WfhRitual @relation(fields: [ritualId], references: [id], onDelete: Cascade)
-  userId    String    @map("user_id")
+  id       String    @id @default(cuid())
+  ritualId String    @map("ritual_id")
+  ritual   WfhRitual @relation(fields: [ritualId], references: [id], onDelete: Cascade)
+  userId   String    @map("user_id")
 
   createdAt DateTime @default(now()) @map("created_at")
 
@@ -10160,12 +10165,12 @@ model WfhRitualSubscription {
 }
 
 model WfhRitualParticipation {
-  id        String    @id @default(cuid())
-  ritualId  String    @map("ritual_id")
-  ritual    WfhRitual @relation(fields: [ritualId], references: [id], onDelete: Cascade)
-  userId    String    @map("user_id")
-  note      String?
-  occurredAt DateTime @map("occurred_at")
+  id         String    @id @default(cuid())
+  ritualId   String    @map("ritual_id")
+  ritual     WfhRitual @relation(fields: [ritualId], references: [id], onDelete: Cascade)
+  userId     String    @map("user_id")
+  note       String?
+  occurredAt DateTime  @map("occurred_at")
 
   createdAt DateTime @default(now()) @map("created_at")
 
@@ -10182,16 +10187,16 @@ model WfhExpenseCategory {
   id          String    @id @default(cuid())
   workspaceId String    @map("workspace_id")
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  userId String @map("user_id")
+  userId      String    @map("user_id")
 
   // utilities | internet | phone | equipment | supplies | home-office-space
   key              String
   name             String
   description      String
-  allocationMethod String  @default("flat_percent") @map("allocation_method")
-  allocationPct    Float   @default(0) @map("allocation_pct")
-  officeSqft       Float?  @map("office_sqft")
-  totalSqft        Float?  @map("total_sqft")
+  allocationMethod String @default("flat_percent") @map("allocation_method")
+  allocationPct    Float  @default(0) @map("allocation_pct")
+  officeSqft       Float? @map("office_sqft")
+  totalSqft        Float? @map("total_sqft")
 
   expenses WfhExpense[]
 
@@ -10206,7 +10211,7 @@ model WfhExpense {
   id          String    @id @default(cuid())
   workspaceId String    @map("workspace_id")
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  userId String @map("user_id")
+  userId      String    @map("user_id")
 
   categoryId String             @map("category_id")
   category   WfhExpenseCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
@@ -10235,11 +10240,11 @@ model WfhLearningSignal {
   id          String    @id @default(cuid())
   workspaceId String    @map("workspace_id")
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  userId String @map("user_id")
+  userId      String    @map("user_id")
 
   // focus_block_created | focus_block_overridden | focus_block_completed |
   // standup_submitted | ritual_joined | ritual_retired | mode_enabled | mode_disabled
-  signalType String @map("signal_type")
+  signalType String   @map("signal_type")
   // focus | standup | ritual | mode
   source     String
   payload    Json
@@ -10291,16 +10296,16 @@ enum InsuranceRemarketStatus {
 
 // An insurance carrier or MGA reachable through the vendor rail.
 model InsuranceCarrier {
-  id          String   @id @default(cuid())
-  workspaceId String   @map("workspace_id")
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   name            String
-  amBestRating    String?                 @map("am_best_rating")
-  naicCode        String?                 @map("naic_code")
+  amBestRating    String?                  @map("am_best_rating")
+  naicCode        String?                  @map("naic_code")
   appointmentPath InsuranceAppointmentPath @map("appointment_path")
   // Lines supported: ["gl","bop","wc",...] — JSON so new lines need no schema change.
-  linesSupported  Json                    @default("[]") @map("lines_supported")
+  linesSupported  Json                     @default("[]") @map("lines_supported")
 
   policies InsurancePolicy[]
 
@@ -10315,50 +10320,50 @@ model InsuranceCarrier {
 // An in-force (or historical) insurance contract. Coverage data renders ONLY
 // from vendor/carrier truth — the OS never invents limits or premiums.
 model InsurancePolicy {
-  id          String   @id @default(cuid())
-  workspaceId String   @map("workspace_id")
-  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  carrierId   String   @map("carrier_id")
+  id          String           @id @default(cuid())
+  workspaceId String           @map("workspace_id")
+  workspace   Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  carrierId   String           @map("carrier_id")
   carrier     InsuranceCarrier @relation(fields: [carrierId], references: [id], onDelete: Restrict)
 
-  policyNumber String @map("policy_number")
-  line         InsuranceLineOfBusiness
-  namedInsured String @map("named_insured")
-  effectiveAt  DateTime @map("effective_at")
-  expiresAt    DateTime @map("expires_at")
+  policyNumber            String                  @map("policy_number")
+  line                    InsuranceLineOfBusiness
+  namedInsured            String                  @map("named_insured")
+  effectiveAt             DateTime                @map("effective_at")
+  expiresAt               DateTime                @map("expires_at")
   // Limits in minor currency units (cents).
-  limitPerOccurrenceCents Int? @map("limit_per_occurrence_cents")
-  limitAggregateCents      Int? @map("limit_aggregate_cents")
-  deductibleCents          Int? @map("deductible_cents")
-  annualPremiumCents       Int? @map("annual_premium_cents")
-  paymentSchedule          String? @map("payment_schedule")
-  status                   InsurancePolicyStatus @default(active)
+  limitPerOccurrenceCents Int?                    @map("limit_per_occurrence_cents")
+  limitAggregateCents     Int?                    @map("limit_aggregate_cents")
+  deductibleCents         Int?                    @map("deductible_cents")
+  annualPremiumCents      Int?                    @map("annual_premium_cents")
+  paymentSchedule         String?                 @map("payment_schedule")
+  status                  InsurancePolicyStatus   @default(active)
   // "coverforce" | "manual" — where this record came from.
-  source     String @default("manual")
+  source                  String                  @default("manual")
   // Raw vendor payload snapshot for audit and re-parsing.
-  rawPayload Json   @default("{}") @map("raw_payload")
+  rawPayload              Json                    @default("{}") @map("raw_payload")
 
-  renewals InsuranceRenewal[]
+  renewals        InsuranceRenewal[]
   // Quote → policy lineage (slice 3b): quotes bound into this policy.
-  quotes InsuranceQuote[]
+  quotes          InsuranceQuote[]
   // Zero-custody payment handoffs: premium funds move carrier-direct; the OS
   // holds nothing. This table deliberately carries NO OS account fields.
   paymentHandoffs InsurancePaymentHandoff[]
   // Prior-term lineage: a renewal creates a new Policy row linked back here.
-  priorPolicyId String?         @map("prior_policy_id")
-  priorPolicy   InsurancePolicy? @relation("PolicyLineage", fields: [priorPolicyId], references: [id], onDelete: SetNull)
-  nextTerms     InsurancePolicy[] @relation("PolicyLineage")
+  priorPolicyId   String?                   @map("prior_policy_id")
+  priorPolicy     InsurancePolicy?          @relation("PolicyLineage", fields: [priorPolicyId], references: [id], onDelete: SetNull)
+  nextTerms       InsurancePolicy[]         @relation("PolicyLineage")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Slice 5: certificates issued from this policy.
+  certificates InsuranceCertificate[]
 
   @@unique([workspaceId, policyNumber])
   @@index([workspaceId, status])
   @@index([workspaceId, expiresAt])
   @@map("insurance_policies")
-
-  // Slice 5: certificates issued from this policy.
-  certificates InsuranceCertificate[]
 }
 
 // A certificate of insurance (ACORD 25 style). SPEC-INSURANCE.md §4.1, §4.3,
@@ -10373,16 +10378,16 @@ enum InsuranceCertificateStatus {
 }
 
 model InsuranceCertificate {
-  id          String   @id @default(cuid())
-  workspaceId String   @map("workspace_id")
-  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  policyId    String   @map("policy_id")
+  id          String          @id @default(cuid())
+  workspaceId String          @map("workspace_id")
+  workspace   Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  policyId    String          @map("policy_id")
   policy      InsurancePolicy @relation(fields: [policyId], references: [id], onDelete: Restrict)
 
-  holderName    String  @map("holder_name")
-  holderAddress String? @map("holder_address")
-  additionalInsured   Boolean @default(false) @map("additional_insured")
-  waiverOfSubrogation Boolean @default(false) @map("waiver_of_subrogation")
+  holderName            String  @map("holder_name")
+  holderAddress         String? @map("holder_address")
+  additionalInsured     Boolean @default(false) @map("additional_insured")
+  waiverOfSubrogation   Boolean @default(false) @map("waiver_of_subrogation")
   operationsDescription String? @map("operations_description")
 
   issueDate DateTime @map("issue_date")
@@ -10390,12 +10395,12 @@ model InsuranceCertificate {
   validTo   DateTime @map("valid_to")
 
   // PDF artifact, stored like the e-sign sealed evidence (Bytes + sha256).
-  pdfBytes Bytes? @map("pdf_bytes")
+  pdfBytes Bytes?  @map("pdf_bytes")
   pdfHash  String? @map("pdf_hash")
 
   status InsuranceCertificateStatus @default(draft)
 
-  requestedBy String? @map("requested_by")
+  requestedBy  String? @map("requested_by")
   // Contract / client reference that asked for this certificate (holder-request
   // tracking links back to the requesting contract or client record).
   requestedFor String? @map("requested_for")
@@ -10406,7 +10411,7 @@ model InsuranceCertificate {
   // The issue_certificate governed approval proposed at prepare time.
   approvalId String? @map("approval_id")
 
-  revokedReason String? @map("revoked_reason")
+  revokedReason String?   @map("revoked_reason")
   revokedAt     DateTime? @map("revoked_at")
   revokedBy     String?   @map("revoked_by")
 
@@ -10420,23 +10425,23 @@ model InsuranceCertificate {
 // A policy coming due. Auto-renewals are detected and surfaced — never
 // silently accepted; the agent flags premium/coverage deltas before approval.
 model InsuranceRenewal {
-  id          String   @id @default(cuid())
-  workspaceId String   @map("workspace_id")
-  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  policyId    String   @map("policy_id")
+  id          String          @id @default(cuid())
+  workspaceId String          @map("workspace_id")
+  workspace   Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  policyId    String          @map("policy_id")
   policy      InsurancePolicy @relation(fields: [policyId], references: [id], onDelete: Cascade)
 
-  renewalDate     DateTime @map("renewal_date")
-  remarketStatus  InsuranceRemarketStatus @default(detected) @map("remarket_status")
-  priorPremiumCents Int?  @map("prior_premium_cents")
-  newPremiumCents   Int?  @map("new_premium_cents")
+  renewalDate       DateTime                @map("renewal_date")
+  remarketStatus    InsuranceRemarketStatus @default(detected) @map("remarket_status")
+  priorPremiumCents Int?                    @map("prior_premium_cents")
+  newPremiumCents   Int?                    @map("new_premium_cents")
   // (new - prior) / prior * 100, stored when a renewal quote is bound.
-  premiumDeltaPct   Float? @map("premium_delta_pct")
-  alertSentAt       DateTime? @map("alert_sent_at")
+  premiumDeltaPct   Float?                  @map("premium_delta_pct")
+  alertSentAt       DateTime?               @map("alert_sent_at")
   // Carrier's auto-renewal terms snapshot (slice 4). Auto-renewals are
   // detected and surfaced, NEVER silently accepted — the snapshot plus the
   // delta flags go to human review before any renewal approval.
-  autoRenewTerms    Json? @map("auto_renew_terms")
+  autoRenewTerms    Json?                   @map("auto_renew_terms")
 
   // Submissions created by remarketing this renewal (slice 4).
   submissions InsuranceSubmission[]
@@ -10473,28 +10478,28 @@ enum InsuranceQuoteStatus {
 }
 
 model InsuranceSubmission {
-  id          String   @id @default(cuid())
-  workspaceId String   @map("workspace_id")
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
-  line            InsuranceLineOfBusiness
-  applicantName   String @map("applicant_name")
-  operationsDescription String? @map("operations_description")
-  state           String
-  classCode       String? @map("class_code")
-  payrollCents    Int?    @map("payroll_cents")
-  revenueCents    Int?    @map("revenue_cents")
-  targetLimitPerOccurrenceCents Int? @map("target_limit_per_occurrence_cents")
-  targetLimitAggregateCents     Int? @map("target_limit_aggregate_cents")
+  line                          InsuranceLineOfBusiness
+  applicantName                 String                    @map("applicant_name")
+  operationsDescription         String?                   @map("operations_description")
+  state                         String
+  classCode                     String?                   @map("class_code")
+  payrollCents                  Int?                      @map("payroll_cents")
+  revenueCents                  Int?                      @map("revenue_cents")
+  targetLimitPerOccurrenceCents Int?                      @map("target_limit_per_occurrence_cents")
+  targetLimitAggregateCents     Int?                      @map("target_limit_aggregate_cents")
   // Loss history: [{ year, claimCount, totalCents }] — JSON, never invented.
-  lossHistory     Json    @default("[]") @map("loss_history")
-  status          InsuranceSubmissionStatus @default(draft)
-  vendorRef       String? @map("vendor_ref")
-  submittedBy     String  @map("submitted_by")
+  lossHistory                   Json                      @default("[]") @map("loss_history")
+  status                        InsuranceSubmissionStatus @default(draft)
+  vendorRef                     String?                   @map("vendor_ref")
+  submittedBy                   String                    @map("submitted_by")
   // The renewal this submission was created to remarket (slice 4). Null for
   // ordinary new-business submissions.
-  renewalId       String? @map("renewal_id")
-  renewal         InsuranceRenewal? @relation(fields: [renewalId], references: [id], onDelete: SetNull)
+  renewalId                     String?                   @map("renewal_id")
+  renewal                       InsuranceRenewal?         @relation(fields: [renewalId], references: [id], onDelete: SetNull)
 
   quotes InsuranceQuote[]
 
@@ -10506,28 +10511,28 @@ model InsuranceSubmission {
 }
 
 model InsuranceQuote {
-  id          String   @id @default(cuid())
-  workspaceId String   @map("workspace_id")
-  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  submissionId String  @map("submission_id")
-  submission  InsuranceSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  id           String              @id @default(cuid())
+  workspaceId  String              @map("workspace_id")
+  workspace    Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  submissionId String              @map("submission_id")
+  submission   InsuranceSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
 
-  carrierName String @map("carrier_name")
-  quotedPremiumCents       Int? @map("quoted_premium_cents")
-  limitPerOccurrenceCents  Int? @map("limit_per_occurrence_cents")
-  limitAggregateCents      Int? @map("limit_aggregate_cents")
-  quoteExpiry              DateTime? @map("quote_expiry")
-  status                   InsuranceQuoteStatus @default(draft)
+  carrierName             String               @map("carrier_name")
+  quotedPremiumCents      Int?                 @map("quoted_premium_cents")
+  limitPerOccurrenceCents Int?                 @map("limit_per_occurrence_cents")
+  limitAggregateCents     Int?                 @map("limit_aggregate_cents")
+  quoteExpiry             DateTime?            @map("quote_expiry")
+  status                  InsuranceQuoteStatus @default(draft)
   // Vendor's reasoning / decline notes, verbatim. Never paraphrased into coverage.
-  vendorNotes              String? @map("vendor_notes")
+  vendorNotes             String?              @map("vendor_notes")
   // Raw vendor quote payload snapshot.
-  rawPayload               Json @default("{}") @map("raw_payload")
+  rawPayload              Json                 @default("{}") @map("raw_payload")
   // Set when this quote is bound: the policy it became (slice 3b lineage).
   // A renewal quote may also reference the prior term's policy in
   // rawPayload.renewalOfPolicyId; binding then sets the new policy's
   // priorPolicyId.
-  policyId String?          @map("policy_id")
-  policy   InsurancePolicy? @relation(fields: [policyId], references: [id], onDelete: SetNull)
+  policyId                String?              @map("policy_id")
+  policy                  InsurancePolicy?     @relation(fields: [policyId], references: [id], onDelete: SetNull)
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -10547,15 +10552,15 @@ model InsuranceQuote {
 // so a future schema edit adding a custody field fails loudly instead of
 // silently.
 model InsurancePaymentHandoff {
-  id          String   @id @default(cuid())
-  workspaceId String   @map("workspace_id")
-  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  policyId    String   @map("policy_id")
+  id          String          @id @default(cuid())
+  workspaceId String          @map("workspace_id")
+  workspace   Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  policyId    String          @map("policy_id")
   policy      InsurancePolicy @relation(fields: [policyId], references: [id], onDelete: Cascade)
 
   // Premium amount the carrier will collect, from vendor bind data.
   // Null = "not confirmed" (never a guess).
-  amountCents Int? @map("amount_cents")
+  amountCents      Int?    @map("amount_cents")
   // Who gets paid: carrier name (+ NAIC when the vendor supplies it).
   // Always the carrier — never an OS account.
   payeeCarrier     String  @map("payee_carrier")
@@ -10563,7 +10568,7 @@ model InsurancePaymentHandoff {
   // The vendor rail's payment reference (carrier-direct transaction).
   vendorPaymentRef String? @map("vendor_payment_ref")
   // Zero-custody assertion. Always "carrier_direct".
-  custodyAssertion String @default("carrier_direct") @map("custody_assertion")
+  custodyAssertion String  @default("carrier_direct") @map("custody_assertion")
 
   createdAt DateTime @default(now()) @map("created_at")
 
@@ -10584,19 +10589,19 @@ enum InsurancePartnerStatus {
 }
 
 model InsuranceLicensedPartner {
-  id          String   @id @default(cuid())
-  workspaceId String   @map("workspace_id")
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   name            String
-  contactEmail    String? @map("contact_email")
+  contactEmail    String?                  @map("contact_email")
   // Producer license number(s), as issued by the state DOI.
-  licenseNumber   String? @map("license_number")
+  licenseNumber   String?                  @map("license_number")
   // States the partner is licensed/appointed in, e.g. ["NC","SC"].
-  statesLicensed  Json    @default("[]") @map("states_licensed")
+  statesLicensed  Json                     @default("[]") @map("states_licensed")
   appointmentPath InsuranceAppointmentPath @map("appointment_path")
-  status          InsurancePartnerStatus @default(active)
-  appointedAt     DateTime? @map("appointed_at")
+  status          InsurancePartnerStatus   @default(active)
+  appointedAt     DateTime?                @map("appointed_at")
   notes           String?
 
   createdAt DateTime @default(now()) @map("created_at")
@@ -10611,24 +10616,24 @@ model InsuranceLicensedPartner {
 // who approved, what was approved (payload snapshot), timestamp, and the
 // vendor transaction reference once the licensed rail executes.
 model InsuranceAuditEvent {
-  id          String   @id @default(cuid())
-  workspaceId String   @map("workspace_id")
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   // "request_quote" | "bind_policy" | "issue_certificate".
-  action String
+  action               String
   // "quote" | "policy" | "certificate".
-  subjectType String @map("subject_type")
-  subjectId   String @map("subject_id")
+  subjectType          String   @map("subject_type")
+  subjectId            String   @map("subject_id")
   // "approved" | "denied".
-  result    String
-  decidedBy String?  @map("decided_by")
-  decidedAt DateTime @map("decided_at")
+  result               String
+  decidedBy            String?  @map("decided_by")
+  decidedAt            DateTime @map("decided_at")
   // Payload snapshot as approved: premium/limits/carrier/effective dates.
   // Fields not present at approval read "not confirmed" at render; never invented.
-  payload Json
+  payload              Json
   // Set when the licensed rail executes (post-approval). Nullable until then.
-  vendorTransactionRef String? @map("vendor_transaction_ref")
+  vendorTransactionRef String?  @map("vendor_transaction_ref")
   note                 String?
 
   createdAt DateTime @default(now()) @map("created_at")
@@ -10642,8 +10647,8 @@ model InsuranceAuditEvent {
 // needs one approval OR a standing rule. bind_policy NEVER has a standing
 // rule (hard refusal in governance.ts) — no auto-bind in v1.
 model InsuranceQuoteRule {
-  id          String   @id @default(cuid())
-  workspaceId String   @map("workspace_id")
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   // InsuranceLineOfBusiness value, e.g. "general_liability".
@@ -10677,17 +10682,17 @@ enum DatasetDocumentStatus {
 }
 
 model DatasetSource {
-  id          String   @id @default(cuid())
-  workspaceId String   @map("workspace_id")
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
-  kind DatasetSourceKind @map("kind")
+  kind        DatasetSourceKind @map("kind")
   // Human label, e.g. "Pricing one-pager.pdf" or "Acme help center crawl".
-  name String
+  name        String
   // Origin identifier: drive file id, crawled URL, uploaded filename.
-  externalRef String? @map("external_ref")
+  externalRef String?           @map("external_ref")
   // Kind-specific config (drive connection id, crawl depth, …).
-  config Json @default("{}")
+  config      Json              @default("{}")
 
   documents DatasetDocument[]
 
@@ -10699,8 +10704,8 @@ model DatasetSource {
 }
 
 model DatasetDocument {
-  id          String   @id @default(cuid())
-  workspaceId String   @map("workspace_id")
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   // Non-nullable: a document always belongs to exactly one source.
@@ -10708,9 +10713,9 @@ model DatasetDocument {
   source   DatasetSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
 
   name      String
-  mimeType  String? @map("mime_type")
-  byteSize  Int?    @map("byte_size")
-  charCount Int     @default(0) @map("char_count")
+  mimeType  String?               @map("mime_type")
+  byteSize  Int?                  @map("byte_size")
+  charCount Int                   @default(0) @map("char_count")
   status    DatasetDocumentStatus @default(pending)
   error     String?
 
@@ -10724,8 +10729,8 @@ model DatasetDocument {
 }
 
 model DatasetChunk {
-  id          String   @id @default(cuid())
-  workspaceId String   @map("workspace_id")
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   // Non-nullable: the zero-orphaned-chunks invariant. A chunk is never
@@ -10734,16 +10739,16 @@ model DatasetChunk {
   document   DatasetDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
 
   // Ordinal position of the chunk within its document (0-based).
-  position Int
+  position  Int
   // Character offsets into the document's extracted text.
-  charStart Int @map("char_start")
-  charEnd   Int @map("char_end")
+  charStart Int    @map("char_start")
+  charEnd   Int    @map("char_end")
   text      String
 
   createdAt DateTime @default(now()) @map("created_at")
 
   classifications DatasetClassification[]
-  versionChunks DatasetVersionChunk[]
+  versionChunks   DatasetVersionChunk[]
 
   @@unique([documentId, position])
   @@map("dataset_chunks")
@@ -10772,23 +10777,23 @@ enum ReviewItemStatus {
 }
 
 model DatasetClassification {
-  id          String   @id @default(cuid())
-  workspaceId String   @map("workspace_id")
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   // Non-nullable: a classification always points at a live chunk. A
   // classification of an orphaned chunk is as invalid as the chunk itself.
-  chunkId String      @map("chunk_id")
+  chunkId String       @map("chunk_id")
   chunk   DatasetChunk @relation(fields: [chunkId], references: [id], onDelete: Cascade)
 
-  datasetType DatasetType @map("dataset_type")
-  confidence  Float
+  datasetType   DatasetType          @map("dataset_type")
+  confidence    Float
   // Lineage: which engine classified this chunk, and which version.
   engine        String
-  engineVersion String @map("engine_version")
-  status ClassificationStatus @default(applied)
+  engineVersion String               @map("engine_version")
+  status        ClassificationStatus @default(applied)
 
-  reviewItem DatasetReviewItem?
+  reviewItem    DatasetReviewItem?
   versionChunks DatasetVersionChunk[]
 
   createdAt DateTime @default(now()) @map("created_at")
@@ -10801,19 +10806,19 @@ model DatasetClassification {
 }
 
 model DatasetReviewItem {
-  id          String   @id @default(cuid())
-  workspaceId String   @map("workspace_id")
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   // Exactly one review item per classification — the queue can never
   // lose or double-count a pending decision.
-  classificationId String               @unique @map("classification_id")
+  classificationId String                @unique @map("classification_id")
   classification   DatasetClassification @relation(fields: [classificationId], references: [id], onDelete: Cascade)
 
   status    ReviewItemStatus @default(pending)
   note      String?
-  decidedBy String? @map("decided_by")
-  decidedAt DateTime? @map("decided_at")
+  decidedBy String?          @map("decided_by")
+  decidedAt DateTime?        @map("decided_at")
 
   createdAt DateTime @default(now()) @map("created_at")
 
@@ -10823,8 +10828,8 @@ model DatasetReviewItem {
 
 // ---- Slice 3: versioned dataset compiler -------------------------------
 model Dataset {
-  id          String   @id @default(cuid())
-  workspaceId String   @map("workspace_id")
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   // One dataset per type per workspace — "the pricing dataset".
@@ -10845,18 +10850,18 @@ model Dataset {
 }
 
 model DatasetVersion {
-  id          String   @id @default(cuid())
-  workspaceId String   @map("workspace_id")
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   datasetId String  @map("dataset_id")
   dataset   Dataset @relation(fields: [datasetId], references: [id], onDelete: Cascade)
 
   // Monotonic per dataset: v1, v2, …
-  version Int
-  chunkCount Int @map("chunk_count")
+  version    Int
+  chunkCount Int  @map("chunk_count")
   // Compile-time transform lineage: which compiler, which settings, when.
-  settings Json @default("{}")
+  settings   Json @default("{}")
 
   chunks DatasetVersionChunk[]
 
@@ -10868,24 +10873,24 @@ model DatasetVersion {
 }
 
 model DatasetVersionChunk {
-  id          String   @id @default(cuid())
-  workspaceId String   @map("workspace_id")
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
-  versionId String        @map("version_id")
+  versionId String         @map("version_id")
   version   DatasetVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
 
   // Per-chunk lineage: version ← chunk ← classification, tracing back to
   // Source/Document through the chunk's own FK chain. A version chunk can
   // never point at a missing version, chunk, or classification — the
   // zero-orphaned-data invariant extends down to compiled snapshots.
-  chunkId String      @map("chunk_id")
-  chunk   DatasetChunk @relation(fields: [chunkId], references: [id], onDelete: Cascade)
-  classificationId String               @map("classification_id")
+  chunkId          String                @map("chunk_id")
+  chunk            DatasetChunk          @relation(fields: [chunkId], references: [id], onDelete: Cascade)
+  classificationId String                @map("classification_id")
   classification   DatasetClassification @relation(fields: [classificationId], references: [id], onDelete: Cascade)
   // Model lineage copied at compile time so it survives engine renames.
-  engine        String
-  engineVersion String @map("engine_version")
+  engine           String
+  engineVersion    String                @map("engine_version")
 
   compiledAt DateTime @default(now()) @map("compiled_at")
 
@@ -10895,19 +10900,19 @@ model DatasetVersionChunk {
 }
 
 model DatasetPublish {
-  id          String   @id @default(cuid())
-  workspaceId String   @map("workspace_id")
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   datasetId String  @map("dataset_id")
   dataset   Dataset @relation(fields: [datasetId], references: [id], onDelete: Cascade)
 
   // Publish target: "briefnow" | "rag".
-  target String
+  target      String
   // Pinned compiled version number (monotonic v1, v2, …).
-  version Int
-  versionId String @map("version_id")
-  chunkCount Int @map("chunk_count")
+  version     Int
+  versionId   String @map("version_id")
+  chunkCount  Int    @map("chunk_count")
   // briefnow → adapter package path; rag → snapshot pointer
   // (rag://workspace/type/vN).
   artifactRef String @map("artifact_ref")
@@ -10932,7 +10937,7 @@ model LegalProfile {
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   // food | drones | saas | services (see lib/legal/types.ts INDUSTRIES).
-  industry String
+  industry      String
   // sole_proprietor | llc | corporation | partnership.
   businessModel String   @map("business_model")
   // e.g. ["NC"]. "national" templates apply in every jurisdiction.
@@ -10945,25 +10950,25 @@ model LegalProfile {
 }
 
 model ObligationTemplate {
-  id String @id @default(cuid())
+  id  String @id @default(cuid())
   // Stable slug, e.g. "nc-sos-registration". Joins tenant Obligation rows.
   key String @unique
 
   // Empty = applies to all industries.
-  industries String[]
+  industries    String[]
   // "national" = applies in every jurisdiction; otherwise codes like "NC".
   jurisdictions String[]
 
-  category ObligationCategory
-  title       String
-  description String
+  category       ObligationCategory
+  title          String
+  description    String
   // Where the claim comes from, e.g. "IRS — irs.gov (verify before acting)".
   // Never empty: the no-invention guardrail requires a source on every template.
-  sourceRef String @map("source_ref")
+  sourceRef      String             @map("source_ref")
   // Renewal cadence in plain words; null when unknown rather than invented.
-  renewalCadence String? @map("renewal_cadence")
+  renewalCadence String?            @map("renewal_cadence")
   // True when specifics were deliberately left out for verification.
-  needsReview Boolean @default(false) @map("needs_review")
+  needsReview    Boolean            @default(false) @map("needs_review")
 
   version Int @default(1)
 
@@ -11018,26 +11023,26 @@ enum ObligationStatus {
 // or effective dates (effectiveDate is null unless verified).
 
 model RegulationChange {
-  id String @id @default(cuid())
+  id  String @id @default(cuid())
   // Stable slug, e.g. "nc-privacy-update". Joins tenant triage rows.
   key String @unique
 
   // Empty = applies to all industries.
-  industries String[]
+  industries    String[]
   // "national" = applies in every jurisdiction; otherwise codes like "NC".
   jurisdictions String[]
 
-  category RegulationChangeCategory
-  title                String
-  plainEnglishSummary  String   @map("plain_english_summary")
+  category            RegulationChangeCategory
+  title               String
+  plainEnglishSummary String                   @map("plain_english_summary")
   // Where the claim comes from. Never empty: the no-invention guardrail
   // requires a source on every change.
-  sourceRef String @map("source_ref")
+  sourceRef           String                   @map("source_ref")
   // Only when the date itself was verified — never a guess.
-  effectiveDate DateTime? @map("effective_date")
-  publishedAt   DateTime  @map("published_at")
+  effectiveDate       DateTime?                @map("effective_date")
+  publishedAt         DateTime                 @map("published_at")
   // True for the illustrative v1 seed feed.
-  seedFlag Boolean @default(true) @map("seed_flag")
+  seedFlag            Boolean                  @default(true) @map("seed_flag")
 
   version Int @default(1)
 
@@ -11117,10 +11122,10 @@ model LegalDeadline {
   // Obligation template key this deadline tracks (e.g. "nc-annual-report").
   templateKey String @map("template_key")
   // Denormalized title from the template at creation time.
-  title String
+  title       String
 
   // Null = the tenant has not confirmed a date yet ("date needed").
-  dueDate DateTime? @map("due_date")
+  dueDate    DateTime?          @map("due_date")
   recurrence DeadlineRecurrence @default(none)
   source     DeadlineSource     @default(tenant_set)
   status     DeadlineStatus     @default(open)
@@ -11202,8 +11207,8 @@ model LegalDocumentVersion {
   issuer       String?
 
   // Version-chain bookkeeping: a new version supersedes the previous one.
-  supersedesVersionId String?               @map("supersedes_version_id")
-  supersedes          LegalDocumentVersion? @relation("LegalDocumentVersionSupersedes", fields: [supersedesVersionId], references: [id], onDelete: SetNull)
+  supersedesVersionId String?                @map("supersedes_version_id")
+  supersedes          LegalDocumentVersion?  @relation("LegalDocumentVersionSupersedes", fields: [supersedesVersionId], references: [id], onDelete: SetNull)
   supersededBy        LegalDocumentVersion[] @relation("LegalDocumentVersionSupersedes")
 
   // Documents that point at this version as their current one.
@@ -11261,9 +11266,9 @@ enum DigitalFindingSource {
 }
 
 model LegalDigitalProperty {
-  id          String             @id @default(cuid())
-  workspaceId String             @map("workspace_id")
-  workspace   Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   name  String
   url   String?
@@ -11287,15 +11292,15 @@ model LegalDigitalFinding {
   // Stable self-assessment checklist item key; null for freeform manual findings.
   itemKey String? @map("item_key")
 
-  hullcheckLayer      HullcheckLayer       @map("hullcheck_layer")
+  hullcheckLayer      HullcheckLayer         @map("hullcheck_layer")
   title               String
   // "What this means for your business" (Hullcheck SPEC §3) — plain English, always present.
-  plainEnglishSummary String               @map("plain_english_summary")
+  plainEnglishSummary String                 @map("plain_english_summary")
   severity            DigitalFindingSeverity
-  status              DigitalFindingStatus @default(open)
+  status              DigitalFindingStatus   @default(open)
   source              DigitalFindingSource
   // Optional link into slice 1's obligation templates (by key).
-  obligationKey String? @map("obligation_key")
+  obligationKey       String?                @map("obligation_key")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -11339,17 +11344,17 @@ model FundingContact {
   handle String? // email or other contact handle, e.g. boardy@boardy.ai
   note   String?
 
-  source FundingContactSource @default(founder_added)
+  source           FundingContactSource @default(founder_added)
   // Human-readable marker: Boardy is THE preloaded starter contact.
-  isStarterContact Boolean @default(false) @map("is_starter_contact")
+  isStarterContact Boolean              @default(false) @map("is_starter_contact")
   // Idempotency key: "boardy_starter" on the starter row, null otherwise.
   // Nulls are distinct in Postgres, so founder-added rows never collide.
-  starterKey String? @map("starter_key")
+  starterKey       String?              @map("starter_key")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  interactions FundingInteraction[]
+  interactions  FundingInteraction[]
   introRequests FundingIntroRequest[]
 
   @@unique([workspaceId, starterKey])
@@ -11390,11 +11395,11 @@ model FundingInvestor {
   title String?
 
   // Investor's known check range and thesis (founder-entered for now).
-  checkSizeMin Int? @map("check_size_min")
-  checkSizeMax Int? @map("check_size_max")
+  checkSizeMin Int?     @map("check_size_min")
+  checkSizeMax Int?     @map("check_size_max")
   stages       String[]
   sectors      String[]
-  thesisFit    String? @map("thesis_fit")
+  thesisFit    String?  @map("thesis_fit")
 
   // Enrichment provenance: which fields came from the founder
   // (self_reported) vs an enrichment fetch (enriched, + fetched-at).
@@ -11402,7 +11407,7 @@ model FundingInvestor {
   enrichmentFetchedAt DateTime?               @map("enrichment_fetched_at")
   enrichmentNotes     String?                 @map("enrichment_notes")
 
-  stage FundingInvestorStage @default(target)
+  stage  FundingInvestorStage @default(target)
   // How this investor entered the pipeline (e.g. "boardy_intro", "crunchbase").
   source String?
 
@@ -11433,15 +11438,15 @@ model FundingInteraction {
   workspaceId String    @map("workspace_id")
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
-  occurredAt DateTime @default(now()) @map("occurred_at")
+  occurredAt DateTime               @default(now()) @map("occurred_at")
   kind       FundingInteractionKind
   summary    String
   // Who recorded the interaction (founder email/handle, "founder", "agent").
   // Slice 2: always set on auto-recorded stage_change rows.
   actor      String?
 
-  contactId String?         @map("contact_id")
-  contact   FundingContact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  contactId  String?          @map("contact_id")
+  contact    FundingContact?  @relation(fields: [contactId], references: [id], onDelete: SetNull)
   investorId String?          @map("investor_id")
   investor   FundingInvestor? @relation(fields: [investorId], references: [id], onDelete: SetNull)
 
@@ -11468,10 +11473,10 @@ model FundingFollowUp {
   note  String
   done  Boolean  @default(false)
 
-  doneAt DateTime? @map("done_at")
+  doneAt          DateTime? @map("done_at")
   // Sweep dedup: the escalation tier already alerted for ("upcoming",
   // "due_today", "overdue"), null when never alerted.
-  lastAlertedTier String? @map("last_alerted_tier")
+  lastAlertedTier String?   @map("last_alerted_tier")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -11497,8 +11502,8 @@ model FundingIntroRequest {
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   // The connector making the intro (e.g. the Boardy starter contact).
-  contactId String         @map("contact_id")
-  contact   FundingContact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  contactId  String          @map("contact_id")
+  contact    FundingContact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
   // The target investor.
   investorId String          @map("investor_id")
   investor   FundingInvestor @relation(fields: [investorId], references: [id], onDelete: Cascade)
@@ -11506,14 +11511,14 @@ model FundingIntroRequest {
   status FundingIntroStatus @default(draft)
 
   // Context-required fields — guardrail: no context, no intro, ever.
-  reason     String  // why THIS investor, why now
+  reason     String // why THIS investor, why now
   founderAsk String  @map("founder_ask") // the specific ask
-  fitNotes   String? @map("fit_notes")   // thesis-fit evidence
+  fitNotes   String? @map("fit_notes") // thesis-fit evidence
 
-  requestedAt DateTime @default(now()) @map("requested_at")
-  decidedAt   DateTime? @map("decided_at")
-  decidedBy   String?   @map("decided_by")
-  declineReason String? @map("decline_reason")
+  requestedAt   DateTime  @default(now()) @map("requested_at")
+  decidedAt     DateTime? @map("decided_at")
+  decidedBy     String?   @map("decided_by")
+  declineReason String?   @map("decline_reason")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -11539,16 +11544,126 @@ model FundingDataRoomDoc {
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   title   String
+  // docType (spec §3): pitch_deck / financials / metrics / other — the
+  // slice-1 `kind` enum already covers these exact values, so it IS the
+  // docType; no new enum was introduced.
   kind    FundingDataRoomDocKind
-  version Int     @default(1)
-  fileUrl String? @map("file_url")
+  version Int                    @default(1)
+  fileUrl String?                @map("file_url")
   notes   String?
+
+  // Slice 3: immutable version chain. Each upload is a NEW
+  // FundingDataRoomDocVersion row; the doc points at the current one.
+  // Published version rows are never mutated — only superseded.
+  currentVersionId String?                    @map("current_version_id")
+  currentVersion   FundingDataRoomDocVersion? @relation("FundingDataRoomCurrentVersion", fields: [currentVersionId], references: [id], onDelete: SetNull)
+
+  versions   FundingDataRoomDocVersion[] @relation("FundingDocVersions")
+  shareLinks FundingShareLink[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@index([workspaceId, kind])
   @@map("funding_data_room_docs")
+}
+
+// Funding/VC slice 3: Data room version chain (BUSINESS-OS-FEATURE-SPECS.md
+// §3). One row per upload — a new version never mutates a published one;
+// the doc's currentVersion pointer moves forward instead.
+model FundingDataRoomDocVersion {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  documentId String             @map("document_id")
+  document   FundingDataRoomDoc @relation("FundingDocVersions", fields: [documentId], references: [id], onDelete: Cascade)
+
+  versionNumber   Int           @map("version_number")
+  workspaceFileId String        @map("workspace_file_id")
+  workspaceFile   WorkspaceFile @relation(fields: [workspaceFileId], references: [id], onDelete: Cascade)
+
+  fileName  String  @map("file_name")
+  mimeType  String? @map("mime_type")
+  sizeBytes Int     @map("size_bytes")
+
+  uploadedBy String   @map("uploaded_by")
+  uploadedAt DateTime @default(now()) @map("uploaded_at")
+
+  // Version-chain bookkeeping: a new version supersedes the previous one.
+  supersedesVersionId String?                     @map("supersedes_version_id")
+  supersedes          FundingDataRoomDocVersion?  @relation("FundingDocVersionSupersedes", fields: [supersedesVersionId], references: [id], onDelete: SetNull)
+  supersededBy        FundingDataRoomDocVersion[] @relation("FundingDocVersionSupersedes")
+
+  // Documents that point at this version as their current one.
+  currentOf FundingDataRoomDoc[] @relation("FundingDataRoomCurrentVersion")
+
+  // Share links pinned to this version; views of this version.
+  pinnedShareLinks FundingShareLink[]
+  views            FundingDocView[]
+
+  @@unique([documentId, versionNumber])
+  @@index([workspaceFileId])
+  @@map("funding_data_room_versions")
+}
+
+// Funding/VC slice 3: shareable, expiring data-room links (spec §3).
+// A link shares one doc (resolving to its current version at access time,
+// or a pinned version) or the whole room (docId = null). Expiry is
+// enforced at access time; revoked links 404.
+model FundingShareLink {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  // null = whole-room link.
+  docId        String?                    @map("doc_id")
+  doc          FundingDataRoomDoc?        @relation(fields: [docId], references: [id], onDelete: Cascade)
+  // null = resolve to the doc's current version at access time.
+  docVersionId String?                    @map("doc_version_id")
+  docVersion   FundingDataRoomDocVersion? @relation(fields: [docVersionId], references: [id], onDelete: SetNull)
+
+  token        String    @unique // fsr_<32 hex>
+  expiresAt    DateTime? @map("expires_at")
+  // Viewer-email allowlist: empty = open link. Allowlisted links require
+  // the email query param to match (case-insensitive) at access time.
+  viewerEmails String[]  @map("viewer_emails")
+  revoked      Boolean   @default(false)
+  revokedAt    DateTime? @map("revoked_at")
+
+  views FundingDocView[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([workspaceId, revoked])
+  @@map("funding_share_links")
+}
+
+// Funding/VC slice 3: per-viewer analytics (spec §3: "who opened what,
+// when"). Logged by the public token route before serving the file.
+// viewerIdentity = allowlisted email when provided, otherwise a
+// fingerprint hash (no cookies, no tracking).
+model FundingDocView {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  linkId       String                     @map("link_id")
+  link         FundingShareLink           @relation(fields: [linkId], references: [id], onDelete: Cascade)
+  // The exact version served (pinned, or current at access time).
+  docVersionId String?                    @map("doc_version_id")
+  docVersion   FundingDataRoomDocVersion? @relation(fields: [docVersionId], references: [id], onDelete: SetNull)
+
+  viewerIdentity String  @map("viewer_identity")
+  userAgent      String? @map("user_agent")
+  durationMs     Int?    @map("duration_ms")
+
+  openedAt DateTime @default(now()) @map("opened_at")
+
+  @@index([workspaceId, openedAt])
+  @@index([linkId, openedAt])
+  @@map("funding_doc_views")
 }
 
 enum FundingRoundStatus {
@@ -11563,17 +11678,17 @@ model FundingRound {
   workspaceId String    @map("workspace_id")
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
-  name   String
-  status FundingRoundStatus @default(planning)
+  name     String
+  status   FundingRoundStatus @default(planning)
   // One active round per tenant: the founder's current raise workflow entry.
-  isActive Boolean @default(false) @map("is_active")
+  isActive Boolean            @default(false) @map("is_active")
 
   // Target investor profile — the front door of the funding feature.
-  checkSizeMin Int?    @map("check_size_min") // USD
-  checkSizeMax Int?    @map("check_size_max") // USD
-  stages       String[] // e.g. ["pre-seed", "seed"]
-  sectors      String[] // thesis sectors, e.g. ["fintech", "dev-tools"]
-  thesisSummary String? @map("thesis_summary")
+  checkSizeMin  Int?     @map("check_size_min") // USD
+  checkSizeMax  Int?     @map("check_size_max") // USD
+  stages        String[] // e.g. ["pre-seed", "seed"]
+  sectors       String[] // thesis sectors, e.g. ["fintech", "dev-tools"]
+  thesisSummary String?  @map("thesis_summary")
 
   targetClose DateTime? @map("target_close")
 
