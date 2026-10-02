@@ -58,6 +58,28 @@ export const OAUTH_CONFIGS: Record<string, OAuthProviderConfig> = {
     clientSecretEnv: GOOGLE_SECRET_ENV,
     extra: { access_type: "offline", prompt: "consent" },
   },
+  // Connector Agent slice 2: Gmail contact import (network bootstrapping).
+  // Read-only: message metadata (From/To/Cc/Date) only — bodies are never
+  // fetched. OAuth goes through the same signed-state vault flow; tokens
+  // stay vault-encrypted, only an opaque connection id leaves the vault.
+  gmail: {
+    authorizeUrl: GOOGLE_AUTH_URL,
+    tokenUrl: GOOGLE_TOKEN_URL,
+    scopes: ["https://www.googleapis.com/auth/gmail.readonly"],
+    clientIdEnv: GOOGLE_ID_ENV,
+    clientSecretEnv: GOOGLE_SECRET_ENV,
+    extra: { access_type: "offline", prompt: "consent" },
+  },
+  // Connector Agent slice 2: Google Calendar contact import (attendees).
+  // Read-only: event attendees + organizer only — no event bodies.
+  "google-calendar": {
+    authorizeUrl: GOOGLE_AUTH_URL,
+    tokenUrl: GOOGLE_TOKEN_URL,
+    scopes: ["https://www.googleapis.com/auth/calendar.readonly"],
+    clientIdEnv: GOOGLE_ID_ENV,
+    clientSecretEnv: GOOGLE_SECRET_ENV,
+    extra: { access_type: "offline", prompt: "consent" },
+  },
   notion: {
     authorizeUrl: "https://api.notion.com/v1/oauth/authorize",
     tokenUrl: "https://api.notion.com/v1/oauth/token",

@@ -797,6 +797,9 @@ model Workspace {
   connectorEmployments      ConnectorEmployment[]
   connectorRelationships    ConnectorRelationship[]
   connectorImportBatches    ConnectorImportBatch[]
+  // Connector Agent slice 2: per-source consent grants + exclusion lists.
+  connectorSourceConsents   ConnectorSourceConsent[]
+  connectorExclusions       ConnectorExclusion[]
   insurancePaymentHandoffs  InsurancePaymentHandoff[]
   insuranceCertificates     InsuranceCertificate[]
   // Phase 12 (embeds): tenant-scoped GrowthBook flag overrides.
@@ -11889,9 +11892,27 @@ enum ConnectorImportSource {
   boardy_starter
 }
 
+// Slice 2: import-batch lifecycle. A batch is created in `consented` state
+// (consent recorded); the import job moves it to `running`, then to
+// `completed` or `failed`. `consented` is also the RESTING state after
+// consent without a run yet.
+enum ConnectorImportBatchStatus {
+  consented
+  running
+  completed
+  failed
+}
+
 // One consented import run. Explicit tenant consent per source is recorded
 // HERE (consentedBy + consentedAt) — slice 2's import job may not write
-// Person rows without a batch row carrying consent.
+// Person rows without a batch row carrying consent. Slice 2 adds the run
+// lifecycle: cursor (incremental-sync watermark), stats JSON, completedAt,
+// error.
+//
+// The durable per-source consent grant itself lives on
+// ConnectorSourceConsent (one row per workspace+source, set BEFORE any
+// import runs). This batch row copies its consentedBy/consentedAt at run
+// start — the consent record is the gate, the batch is the receipt.
 model ConnectorImportBatch {
   id          String    @id @default(cuid())
   workspaceId String    @map("workspace_id")
@@ -11902,13 +11923,81 @@ model ConnectorImportBatch {
   consentedAt DateTime              @default(now()) @map("consented_at")
   note        String?
 
+  status      ConnectorImportBatchStatus @default(consented)
+  // Incremental-sync watermark: Gmail = ISO date of the newest message
+  // processed; Calendar = ISO date of the newest event processed. The next
+  // run only fetches newer contacts.
+  cursor      String?
+  // Run stats: { fetched, created, dedupSkipped, excludedSkipped,
+  //            relationshipSeeded, errors[] }.
+  stats       Json?
+  completedAt DateTime? @map("completed_at")
+  error       String?
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
   persons ConnectorPerson[]
 
   @@index([workspaceId])
+  @@index([workspaceId, source])
   @@map("connector_agent_import_batches")
+}
+
+// Slice 2: the durable per-source consent grant. ONE row per
+// (workspace, source). Explicit tenant consent is recorded here BEFORE any
+// import runs; runImport refuses to run without it (code: no_consent).
+// Deleting the row revokes consent — subsequent runs are blocked.
+model ConnectorSourceConsent {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  source      ConnectorImportSource
+  consentedBy String   @map("consented_by")
+  consentedAt DateTime @default(now()) @map("consented_at")
+  // Scopes the tenant agreed to at consent time (e.g. gmail.readonly) —
+  // informational; the vault holds the actual granted scopes.
+  scopes      String[] @default([])
+  note        String?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([workspaceId, source])
+  @@index([workspaceId])
+  @@map("connector_agent_source_consents")
+}
+
+// Slice 2: exclusion rule kinds for the tenant's import exclusion list.
+enum ConnectorExclusionType {
+  // Whole email domain (e.g. "competitor.com"; subdomains match too).
+  domain
+  // Exact email address (lowercased).
+  email
+  // Case-insensitive substring match on the contact's display name.
+  person_name
+}
+
+// Slice 2: one exclusion rule. Checked BEFORE any Person row is created —
+// an excluded contact never becomes a Person. Tenant-level: applies to
+// every import run in this workspace.
+model ConnectorExclusion {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  type  ConnectorExclusionType
+  // Normalized at write: lowercased + trimmed. Domains stored bare
+  // ("acme.com", never "@acme.com").
+  value String
+  note  String?
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([workspaceId, type, value])
+  @@index([workspaceId])
+  @@map("connector_agent_exclusions")
 }
 
 // A human in the tenant's graph. Provenance (which import, when, with whose
@@ -11922,6 +12011,10 @@ model ConnectorPerson {
   roles   String[] @default([])
   handles String[] @default([])
 
+  // Slice 2: dedup key. Namespaced per source, e.g. "gmail:email:a@b.com",
+  // "gcal:email:a@b.com". Unique within the tenant; nulls never collide.
+  externalId String? @map("external_id")
+
   importBatchId String?               @map("import_batch_id")
   importBatch   ConnectorImportBatch? @relation(fields: [importBatchId], references: [id], onDelete: SetNull)
   consentedBy   String                @map("consented_by")
@@ -11933,6 +12026,7 @@ model ConnectorPerson {
   relationship ConnectorRelationship?
   employments  ConnectorEmployment[]
 
+  @@unique([workspaceId, externalId])
   @@index([workspaceId])
   @@map("connector_agent_persons")
 }

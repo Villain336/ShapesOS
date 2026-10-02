@@ -135,6 +135,33 @@ export const BUILT_IN_CONNECTORS: BuiltinConnectorMeta[] = [
     },
     authNote: "Google OAuth2 + a developer token (per-user).",
   },
+  // Connector Agent slice 2: Gmail contact import (network bootstrapping).
+  // Metadata only (From/To/Cc/Date) — message bodies are never fetched.
+  {
+    key: "gmail",
+    displayName: "Gmail",
+    authType: "oauth2",
+    description:
+      "Import your email network: message metadata (who you email, how often, how recently) becomes contact-graph signal. Bodies are never read.",
+    oauth: {
+      scopes: ["https://www.googleapis.com/auth/gmail.readonly"],
+      envVars: ["GOOGLE_OAUTH_CLIENT_ID", "GOOGLE_OAUTH_CLIENT_SECRET"],
+    },
+    authNote: "Google OAuth2 (shared Google app credentials).",
+  },
+  // Connector Agent slice 2: Google Calendar contact import (attendees).
+  {
+    key: "google-calendar",
+    displayName: "Google Calendar",
+    authType: "oauth2",
+    description:
+      "Import your meeting network: event attendees and organizers become contact-graph nodes. Event details are never read.",
+    oauth: {
+      scopes: ["https://www.googleapis.com/auth/calendar.readonly"],
+      envVars: ["GOOGLE_OAUTH_CLIENT_ID", "GOOGLE_OAUTH_CLIENT_SECRET"],
+    },
+    authNote: "Google OAuth2 (shared Google app credentials).",
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -191,6 +218,8 @@ import { ResendAdapter } from "./native/resend";
 import { DataForSeoAdapter } from "./native/dataforseo";
 import { MetaAdsAdapter } from "./native/meta-ads";
 import { GoogleAdsAdapter } from "./native/google-ads";
+import { GmailAdapter } from "./native/gmail";
+import { GoogleCalendarAdapter } from "./native/google-calendar";
 
 const ADAPTER_CLASSES: Record<string, () => ConnectorAdapter> = {
   "google-search-console": () => new GoogleSearchConsoleAdapter(),
@@ -204,6 +233,9 @@ const ADAPTER_CLASSES: Record<string, () => ConnectorAdapter> = {
   dataforseo: () => new DataForSeoAdapter(),
   "meta-ads": () => new MetaAdsAdapter(),
   "google-ads": () => new GoogleAdsAdapter(),
+  // Connector Agent slice 2: live-wired import adapters (NOT mock-only).
+  gmail: () => new GmailAdapter(),
+  "google-calendar": () => new GoogleCalendarAdapter(),
 };
 
 /** Resolve a built-in connector key to its native adapter. Throws on unknown key. */

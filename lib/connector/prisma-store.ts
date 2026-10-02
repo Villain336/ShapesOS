@@ -13,24 +13,33 @@ import {
   computeWarmth,
   validateCompanyInput,
   validateEmploymentInput,
+  validateExclusionInput,
   validateImportBatchInput,
   validatePersonInput,
   validateRelationshipPatch,
+  validateSourceConsentInput,
   validateTouchInput,
   type CompanyInput,
   type ConnectorCompanySizeBand,
   type ConnectorCompanyRelationship,
   type ConnectorCompanyView,
   type ConnectorEmploymentView,
+  type ConnectorExclusionType,
+  type ConnectorExclusionView,
   type ConnectorGraphView,
+  type ConnectorImportBatchStatus,
   type ConnectorImportBatchView,
   type ConnectorImportSource,
+  type ConnectorImportStats,
   type ConnectorPersonView,
   type ConnectorRelationshipView,
+  type ConnectorSourceConsentView,
   type EmploymentInput,
+  type ExclusionInput,
   type ImportBatchInput,
   type PersonInput,
   type RelationshipPatchInput,
+  type SourceConsentInput,
   type TouchDirection,
   type TouchInput,
   type WarmthBreakdown,
@@ -148,6 +157,8 @@ export class PrismaConnectorStore {
         importBatchId: value.importBatchId,
         consentedBy: value.consentedBy,
         consentedAt: value.consentedAt,
+        // Slice 2: provider dedup key (null for manual adds).
+        externalId: value.externalId,
       },
     });
     const detail = await this.getPersonDetail(workspaceId, row.id);
@@ -475,21 +486,288 @@ export class PrismaConnectorStore {
     ]);
     return { persons, companies, batches };
   }
+
+  // ------------------------------------------------------------------
+  // Slice 2 — source consent. One row per (workspace, source); the import
+  // job refuses to run without it. Deleting = revoking.
+  // ------------------------------------------------------------------
+
+  async recordSourceConsent(
+    workspaceId: string,
+    input: SourceConsentInput,
+    now = new Date(),
+  ): Promise<ConnectorSourceConsentView> {
+    const { errors, value } = validateSourceConsentInput(input);
+    if (!value) {
+      throw new ConnectorError("invalid_source_consent", errors.join(" "));
+    }
+    const row = await this.prisma.connectorSourceConsent.upsert({
+      where: { workspaceId_source: { workspaceId, source: value.source } },
+      update: {
+        consentedBy: value.consentedBy,
+        consentedAt: now,
+        scopes: value.scopes,
+        note: value.note,
+      },
+      create: {
+        workspaceId,
+        source: value.source,
+        consentedBy: value.consentedBy,
+        consentedAt: now,
+        scopes: value.scopes,
+        note: value.note,
+      },
+    });
+    return toSourceConsentView(row);
+  }
+
+  async revokeSourceConsent(
+    workspaceId: string,
+    source: ConnectorImportSource,
+  ): Promise<{ revoked: boolean }> {
+    const res = await this.prisma.connectorSourceConsent.deleteMany({
+      where: { workspaceId, source },
+    });
+    return { revoked: res.count > 0 };
+  }
+
+  async getSourceConsent(
+    workspaceId: string,
+    source: ConnectorImportSource,
+  ): Promise<ConnectorSourceConsentView | null> {
+    const row = await this.prisma.connectorSourceConsent.findFirst({
+      where: { workspaceId, source },
+    });
+    return row ? toSourceConsentView(row) : null;
+  }
+
+  async listSourceConsents(
+    workspaceId: string,
+  ): Promise<ConnectorSourceConsentView[]> {
+    const rows = await this.prisma.connectorSourceConsent.findMany({
+      where: { workspaceId },
+      orderBy: { source: "asc" },
+    });
+    return rows.map(toSourceConsentView);
+  }
+
+  // ------------------------------------------------------------------
+  // Slice 2 — exclusion lists. Checked BEFORE any Person row is created.
+  // ------------------------------------------------------------------
+
+  async listExclusions(workspaceId: string): Promise<ConnectorExclusionView[]> {
+    const rows = await this.prisma.connectorExclusion.findMany({
+      where: { workspaceId },
+      orderBy: [{ type: "asc" }, { value: "asc" }],
+    });
+    return rows.map(toExclusionView);
+  }
+
+  async addExclusion(
+    workspaceId: string,
+    input: ExclusionInput,
+  ): Promise<ConnectorExclusionView> {
+    const { errors, value } = validateExclusionInput(input);
+    if (!value) {
+      throw new ConnectorError("invalid_exclusion", errors.join(" "));
+    }
+    try {
+      const row = await this.prisma.connectorExclusion.create({
+        data: {
+          workspaceId,
+          type: value.type,
+          value: value.value,
+          note: value.note,
+        },
+      });
+      return toExclusionView(row);
+    } catch (e) {
+      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
+        throw new ConnectorError(
+          "duplicate_exclusion",
+          "This exclusion rule already exists in this workspace.",
+        );
+      }
+      throw e;
+    }
+  }
+
+  async removeExclusion(
+    workspaceId: string,
+    exclusionId: string,
+  ): Promise<{ removed: boolean }> {
+    const res = await this.prisma.connectorExclusion.deleteMany({
+      where: { id: exclusionId, workspaceId },
+    });
+    return { removed: res.count > 0 };
+  }
+
+  // ------------------------------------------------------------------
+  // Slice 2 — import batch lifecycle + relationship signal seeding.
+  // ------------------------------------------------------------------
+
+  /**
+   * Update a batch's run lifecycle fields. Tenant-scoped: a batch id from
+   * another workspace throws batch_not_found.
+   */
+  async updateImportBatch(
+    workspaceId: string,
+    batchId: string,
+    patch: {
+      status: ConnectorImportBatchStatus;
+      cursor?: string | null;
+      stats?: ConnectorImportStats | null;
+      error?: string | null;
+      completedAt?: Date | null;
+    },
+  ): Promise<ConnectorImportBatchView> {
+    const batch = await this.prisma.connectorImportBatch.findFirst({
+      where: { id: batchId, workspaceId },
+      select: { id: true },
+    });
+    if (!batch) {
+      throw new ConnectorError("batch_not_found", "Import batch not found in this workspace.");
+    }
+    const row = await this.prisma.connectorImportBatch.update({
+      where: { id: batchId },
+      data: {
+        status: patch.status,
+        ...(patch.cursor !== undefined ? { cursor: patch.cursor } : {}),
+        ...(patch.stats !== undefined
+          ? { stats: patch.stats as unknown as Prisma.InputJsonValue }
+          : {}),
+        ...(patch.error !== undefined ? { error: patch.error } : {}),
+        ...(patch.completedAt !== undefined ? { completedAt: patch.completedAt } : {}),
+      },
+      include: { _count: { select: { persons: true } } },
+    });
+    return toBatchView(row);
+  }
+
+  /**
+   * Merge aggregated interaction signals into a person's relationship edge
+   * (seed on first import, merge on re-import). Warmth is RECOMPUTED from
+   * the merged signals via computeWarmth — never hand-set.
+   */
+  async addRelationshipSignals(
+    workspaceId: string,
+    personId: string,
+    signals: {
+      touchCount: number;
+      inboundCount: number;
+      outboundCount: number;
+      lastTouchAt: Date | null;
+    },
+    now = new Date(),
+  ): Promise<ConnectorRelationshipView> {
+    await this.requirePerson(workspaceId, personId);
+    const row = await this.prisma.$transaction(async (tx) => {
+      const existing = await tx.connectorRelationship.findUnique({
+        where: { personId },
+      });
+      if (existing && existing.workspaceId !== workspaceId) {
+        throw new ConnectorError(
+          "relationship_not_found",
+          "Relationship not found in this workspace.",
+        );
+      }
+      const prev = existing ?? {
+        touchCount: 0,
+        inboundCount: 0,
+        outboundCount: 0,
+        lastTouchAt: null as Date | null,
+        lastReciprocalTouchAt: null as Date | null,
+      };
+      const touchCount = prev.touchCount + signals.touchCount;
+      const inboundCount = prev.inboundCount + signals.inboundCount;
+      const outboundCount = prev.outboundCount + signals.outboundCount;
+      const lastTouchAt =
+        signals.lastTouchAt &&
+        (!prev.lastTouchAt || signals.lastTouchAt.getTime() > prev.lastTouchAt.getTime())
+          ? signals.lastTouchAt
+          : prev.lastTouchAt;
+      const lastReciprocalTouchAt =
+        signals.inboundCount > 0 &&
+        signals.lastTouchAt &&
+        (!prev.lastReciprocalTouchAt ||
+          signals.lastTouchAt.getTime() > prev.lastReciprocalTouchAt.getTime())
+          ? signals.lastTouchAt
+          : prev.lastReciprocalTouchAt;
+      const { score } = computeWarmth(
+        { lastTouchAt, touchCount, inboundCount, outboundCount },
+        now,
+      );
+      const data = {
+        touchCount,
+        inboundCount,
+        outboundCount,
+        lastTouchAt,
+        lastReciprocalTouchAt,
+        warmthScore: score,
+        warmthComputedAt: now,
+      };
+      return existing
+        ? await tx.connectorRelationship.update({ where: { personId }, data })
+        : await tx.connectorRelationship.create({
+            data: { workspaceId, personId, ...data },
+          });
+    });
+    return toRelationshipView(row, now);
+  }
+
+  /**
+   * Latest completed batch cursor for (workspace, source) — the
+   * incremental-sync watermark. The next run fetches only newer contacts.
+   */
+  async getImportCursor(
+    workspaceId: string,
+    source: ConnectorImportSource,
+  ): Promise<string | null> {
+    const row = await this.prisma.connectorImportBatch.findFirst({
+      where: { workspaceId, source, status: "completed", cursor: { not: null } },
+      orderBy: { completedAt: "desc" },
+      select: { cursor: true },
+    });
+    return row?.cursor ?? null;
+  }
+
+  /**
+   * Find a person by the provider dedup key. Tenant-scoped — another
+   * tenant's externalId never matches.
+   */
+  async findPersonByExternalId(
+    workspaceId: string,
+    externalId: string,
+  ): Promise<{ id: string } | null> {
+    return this.prisma.connectorPerson.findFirst({
+      where: { workspaceId, externalId },
+      select: { id: true },
+    });
+  }
 }
 
 // ---------------------------------------------------------------------------
 // View converters (module-private).
 // ---------------------------------------------------------------------------
 
-function toBatchView(row: {
+/** The batch row shape every include/select in this store returns. */
+type ImportBatchRow = {
   id: string;
   source: ConnectorImportSource;
   consentedBy: string;
   consentedAt: Date;
   note: string | null;
   createdAt: Date;
+  updatedAt: Date;
+  status: ConnectorImportBatchStatus;
+  cursor: string | null;
+  stats: unknown;
+  completedAt: Date | null;
+  error: string | null;
   _count: { persons: number };
-}): ConnectorImportBatchView {
+};
+
+function toBatchView(row: ImportBatchRow): ConnectorImportBatchView {
   return {
     id: row.id,
     source: row.source,
@@ -497,6 +775,48 @@ function toBatchView(row: {
     consentedAt: row.consentedAt,
     note: row.note,
     personCount: row._count.persons,
+    createdAt: row.createdAt,
+    status: row.status,
+    cursor: row.cursor,
+    stats: (row.stats ?? null) as ConnectorImportStats | null,
+    completedAt: row.completedAt,
+    error: row.error,
+    updatedAt: row.updatedAt,
+  };
+}
+
+function toSourceConsentView(row: {
+  id: string;
+  source: ConnectorImportSource;
+  consentedBy: string;
+  consentedAt: Date;
+  scopes: string[];
+  note: string | null;
+  updatedAt: Date;
+}): ConnectorSourceConsentView {
+  return {
+    id: row.id,
+    source: row.source,
+    consentedBy: row.consentedBy,
+    consentedAt: row.consentedAt,
+    scopes: row.scopes,
+    note: row.note,
+    updatedAt: row.updatedAt,
+  };
+}
+
+function toExclusionView(row: {
+  id: string;
+  type: ConnectorExclusionType;
+  value: string;
+  note: string | null;
+  createdAt: Date;
+}): ConnectorExclusionView {
+  return {
+    id: row.id,
+    type: row.type,
+    value: row.value,
+    note: row.note,
     createdAt: row.createdAt,
   };
 }
@@ -564,15 +884,7 @@ function toPersonView(
     updatedAt: Date;
     relationship: RelationshipRow | null;
     employments: Array<Parameters<typeof toEmploymentView>[0]>;
-    importBatch: {
-      id: string;
-      source: ConnectorImportSource;
-      consentedBy: string;
-      consentedAt: Date;
-      note: string | null;
-      createdAt: Date;
-      _count: { persons: number };
-    } | null;
+    importBatch: ImportBatchRow | null;
   },
   now: Date,
 ): ConnectorPersonView {

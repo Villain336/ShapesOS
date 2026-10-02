@@ -173,6 +173,9 @@ export interface PersonInput {
   importBatchId?: unknown;
   consentedBy?: unknown;
   consentedAt?: unknown;
+  // Slice 2: provider dedup key (e.g. "gmail:email:a@b.com"). Optional;
+  // manual adds don't set it.
+  externalId?: unknown;
 }
 
 export interface ValidPersonInput {
@@ -182,6 +185,7 @@ export interface ValidPersonInput {
   importBatchId: string | null;
   consentedBy: string;
   consentedAt: Date;
+  externalId: string | null;
 }
 
 function asStringArray(value: unknown, field: string): string[] {
@@ -239,6 +243,16 @@ export function validatePersonInput(input: PersonInput): {
   }
 
   if (errors.length > 0) return { errors, value: null };
+  const externalId =
+    input.externalId == null
+      ? null
+      : typeof input.externalId === "string" && input.externalId.trim()
+        ? input.externalId.trim()
+        : null;
+  if (input.externalId != null && externalId == null) {
+    errors.push("externalId must be a non-empty string when provided.");
+  }
+  if (errors.length > 0) return { errors, value: null };
   return {
     errors,
     value: {
@@ -248,6 +262,7 @@ export function validatePersonInput(input: PersonInput): {
       importBatchId,
       consentedBy,
       consentedAt: consentedAt as Date,
+      externalId,
     },
   };
 }
@@ -553,6 +568,14 @@ export interface ConnectorImportBatchView {
   note: string | null;
   personCount: number;
   createdAt: Date;
+  // Slice 2: run lifecycle.
+  status: ConnectorImportBatchStatus;
+  /** Incremental-sync watermark (ISO date of newest contact processed). */
+  cursor: string | null;
+  stats: ConnectorImportStats | null;
+  completedAt: Date | null;
+  error: string | null;
+  updatedAt: Date;
 }
 
 export interface ConnectorPersonView {
@@ -585,4 +608,262 @@ export interface ConnectorGraphView {
   persons: ConnectorPersonView[];
   companies: ConnectorCompanyView[];
   batches: ConnectorImportBatchView[];
+}
+
+// ---------------------------------------------------------------------------
+// Slice 2 — Import + consent.
+// ---------------------------------------------------------------------------
+
+export const CONNECTOR_IMPORT_BATCH_STATUSES = [
+  "consented",
+  "running",
+  "completed",
+  "failed",
+] as const;
+export type ConnectorImportBatchStatus =
+  (typeof CONNECTOR_IMPORT_BATCH_STATUSES)[number];
+
+export const CONNECTOR_EXCLUSION_TYPES = [
+  "domain",
+  "email",
+  "person_name",
+] as const;
+export type ConnectorExclusionType =
+  (typeof CONNECTOR_EXCLUSION_TYPES)[number];
+
+/**
+ * Import source → built-in OS connector key. email/calendar reuse the
+ * existing M21 OAuth vault flow (no parallel OAuth system). null = the
+ * source has no provider-backed import path (manual entry / CSV upload).
+ */
+export const CONNECTOR_IMPORT_SOURCE_KEYS: Record<
+  ConnectorImportSource,
+  string | null
+> = {
+  manual: null,
+  csv: null,
+  email: "gmail",
+  calendar: "google-calendar",
+  boardy_starter: null,
+};
+
+/** Only these sources run the provider import job. */
+export const CONNECTOR_PROVIDER_SOURCES: ConnectorImportSource[] = [
+  "email",
+  "calendar",
+];
+
+/** Run stats recorded on the batch (stats JSON column). */
+export interface ConnectorImportStats {
+  fetched: number;
+  created: number;
+  /** Existing persons whose signals were merged (dedup hits, re-import). */
+  merged: number;
+  dedupSkipped: number;
+  excludedSkipped: number;
+  staleSkipped: number;
+  errors: string[];
+}
+
+// ---------------------------------------------------------------------------
+// Source consent.
+// ---------------------------------------------------------------------------
+
+export interface SourceConsentInput {
+  source?: unknown;
+  consentedBy?: unknown;
+  scopes?: unknown;
+  note?: unknown;
+}
+
+export interface ValidSourceConsentInput {
+  source: ConnectorImportSource;
+  consentedBy: string;
+  scopes: string[];
+  note: string | null;
+}
+
+export function validateSourceConsentInput(input: SourceConsentInput): {
+  errors: string[];
+  value: ValidSourceConsentInput | null;
+} {
+  const errors: string[] = [];
+  let source: ConnectorImportSource = "email";
+  if (input.source != null) {
+    if (
+      typeof input.source === "string" &&
+      (CONNECTOR_IMPORT_SOURCES as readonly string[]).includes(input.source)
+    ) {
+      source = input.source as ConnectorImportSource;
+    } else {
+      errors.push(
+        `source must be one of: ${CONNECTOR_IMPORT_SOURCES.join(", ")}.`,
+      );
+    }
+  }
+  const consentedBy =
+    typeof input.consentedBy === "string" ? input.consentedBy.trim() : "";
+  if (!consentedBy) errors.push("consentedBy is required — consent must name who granted it.");
+
+  let scopes: string[] = [];
+  if (input.scopes != null) {
+    if (
+      Array.isArray(input.scopes) &&
+      input.scopes.every((s) => typeof s === "string")
+    ) {
+      scopes = (input.scopes as string[]).map((s) => s.trim()).filter(Boolean);
+    } else {
+      errors.push("scopes must be an array of strings.");
+    }
+  }
+  const note =
+    input.note == null
+      ? null
+      : typeof input.note === "string" && input.note.trim()
+        ? input.note.trim()
+        : null;
+  if (input.note != null && typeof input.note !== "string") {
+    errors.push("note must be a string.");
+  }
+  if (errors.length > 0) return { errors, value: null };
+  return { errors, value: { source, consentedBy, scopes, note } };
+}
+
+export interface ConnectorSourceConsentView {
+  id: string;
+  source: ConnectorImportSource;
+  consentedBy: string;
+  consentedAt: Date;
+  scopes: string[];
+  note: string | null;
+  updatedAt: Date;
+}
+
+// ---------------------------------------------------------------------------
+// Exclusion lists.
+// ---------------------------------------------------------------------------
+
+export interface ExclusionInput {
+  type?: unknown;
+  value?: unknown;
+  note?: unknown;
+}
+
+export interface ValidExclusionInput {
+  type: ConnectorExclusionType;
+  value: string;
+  note: string | null;
+}
+
+const EMAIL_LIKE_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/** Normalize an exclusion value for storage. Pure — tested directly. */
+export function normalizeExclusionValue(
+  type: ConnectorExclusionType,
+  value: string,
+): string {
+  const v = value.trim().toLowerCase();
+  if (type === "domain") return v.replace(/^@+/, "");
+  return v;
+}
+
+export function validateExclusionInput(input: ExclusionInput): {
+  errors: string[];
+  value: ValidExclusionInput | null;
+} {
+  const errors: string[] = [];
+  let type: ConnectorExclusionType | null = null;
+  if (
+    typeof input.type === "string" &&
+    (CONNECTOR_EXCLUSION_TYPES as readonly string[]).includes(input.type)
+  ) {
+    type = input.type as ConnectorExclusionType;
+  } else {
+    errors.push(
+      `type must be one of: ${CONNECTOR_EXCLUSION_TYPES.join(", ")}.`,
+    );
+  }
+  const raw = typeof input.value === "string" ? input.value.trim() : "";
+  if (!raw) errors.push("value is required.");
+  let value = "";
+  if (type && raw) {
+    value = normalizeExclusionValue(type, raw);
+    if (type === "email" && !EMAIL_LIKE_RE.test(value)) {
+      errors.push("email exclusions must be a valid email address.");
+    }
+    if (type === "domain") {
+      if (!value.includes(".") || value.includes("@") || value.includes(" ")) {
+        errors.push("domain exclusions must be a bare domain like acme.com.");
+      }
+    }
+  }
+  const note =
+    input.note == null
+      ? null
+      : typeof input.note === "string" && input.note.trim()
+        ? input.note.trim()
+        : null;
+  if (input.note != null && typeof input.note !== "string") {
+    errors.push("note must be a string.");
+  }
+  if (errors.length > 0 || !type) return { errors, value: null };
+  return { errors, value: { type, value, note } };
+}
+
+export interface ConnectorExclusionView {
+  id: string;
+  type: ConnectorExclusionType;
+  value: string;
+  note: string | null;
+  createdAt: Date;
+}
+
+export interface ExclusionCandidate {
+  email: string;
+  name: string | null;
+}
+
+function emailDomain(email: string): string {
+  const at = email.lastIndexOf("@");
+  return at >= 0 ? email.slice(at + 1).toLowerCase() : "";
+}
+
+/**
+ * Pure exclusion matcher — the "excluded contacts never become Persons"
+ * guarantee, tested directly. Checks run BEFORE any Person row is created.
+ */
+export function exclusionMatches(
+  exclusions: Array<{ type: ConnectorExclusionType; value: string }>,
+  candidate: ExclusionCandidate,
+): { type: ConnectorExclusionType; value: string } | null {
+  const email = candidate.email.trim().toLowerCase();
+  const domain = emailDomain(email);
+  const name = (candidate.name ?? "").trim().toLowerCase();
+  for (const rule of exclusions) {
+    if (rule.type === "email" && email === rule.value) return rule;
+    if (
+      rule.type === "domain" &&
+      domain &&
+      (domain === rule.value || domain.endsWith(`.${rule.value}`))
+    ) {
+      return rule;
+    }
+    if (rule.type === "person_name" && name && name.includes(rule.value)) {
+      return rule;
+    }
+  }
+  return null;
+}
+
+/**
+ * Dedup key: namespaced per source so the same email imported from Gmail
+ * and Calendar stays distinct per the spec's (source, externalId) rule.
+ * Pure — tested directly.
+ */
+export function buildExternalId(
+  source: ConnectorImportSource,
+  email: string,
+): string {
+  const ns = source === "email" ? "gmail" : source === "calendar" ? "gcal" : source;
+  return `${ns}:email:${email.trim().toLowerCase()}`;
 }
