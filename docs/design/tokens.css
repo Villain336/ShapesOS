@@ -1,0 +1,254 @@
+/* Agentic OS design tokens
+   Source of truth for color, type, shape, elevation and motion.
+   Framework-agnostic: import once, globally, before component styles.
+
+   Fonts (add to <head>, or self-host the same families):
+   <link rel="preconnect" href="https://fonts.googleapis.com">
+   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+   <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+*/
+
+:root {
+  /* ---------- Neutrals ---------- */
+  --aos-ink: #000000;            /* text, primary buttons, sidebar */
+  --aos-paper: #FFFFFF;          /* cards, inputs, popovers */
+  --aos-canvas: #F3F3F1;         /* app background */
+  --aos-line: #E2E2DF;           /* dividers, card hairlines */
+  --aos-line-strong: #D6D6D2;    /* overlay hairlines, keycaps */
+  --aos-control: #CFCFCB;        /* input and chip borders */
+  --aos-hover: #E6E6E3;          /* quiet hover on canvas */
+  --aos-hover-on-paper: #F3F3F1; /* quiet hover on paper */
+  --aos-text: #000000;
+  --aos-text-muted: #5E5E5B;     /* secondary text (6.5:1 on paper) */
+  --aos-text-subtle: #76766F;    /* placeholders only */
+  --aos-disabled-bg: #E2E2DF;
+  --aos-disabled-fg: #8A8A86;
+
+  /* ---------- Status: the only meaning color carries ---------- */
+  /* Running: blue circle, pulses */
+  --aos-running: #2450E0;
+  --aos-running-pressed: #1A3BB0;
+  --aos-running-tint: #EAF0FF;
+  --aos-running-on-night: #4D74FF;
+  --aos-on-running: #FFFFFF;
+
+  /* Needs you: yellow triangle. Always black text/marks on yellow. */
+  --aos-needs: #F7C21B;
+  --aos-needs-tint: #FFF6D6;
+  --aos-on-needs: #000000;
+
+  /* Done: green quarter-disc */
+  --aos-done: #0F7F45;
+  --aos-done-on-night: #1FA862;
+  --aos-on-done: #FFFFFF;
+
+  /* Failed: red square */
+  --aos-failed: #D92D20;
+  --aos-failed-text: #C42A1E;    /* red text on paper (5.7:1) */
+  --aos-failed-tint: #FCECEA;
+  --aos-failed-on-night: #E5392B;
+  --aos-on-failed: #FFFFFF;
+
+  /* Queued (outline circle) and Paused (two bars) use ink, no color. */
+
+  /* ---------- Night surfaces (sidebar, toasts, code blocks) ---------- */
+  --aos-night: #000000;
+  --aos-night-hover: #1C1C1B;
+  --aos-night-raised: #2A2A28;
+  --aos-night-line: #3A3A38;
+  --aos-night-border: #4A4A47;
+  --aos-night-text: #FFFFFF;
+  --aos-night-text-soft: #BDBDB8; /* inactive nav items */
+  --aos-night-text-muted: #A3A39E;
+
+  /* ---------- Focus ---------- */
+  --aos-focus: #2450E0;
+  --aos-focus-on-night: #4D74FF;
+  --aos-focus-halo: rgba(36, 80, 224, 0.22);
+
+  /* ---------- Type ---------- */
+  --aos-font-sans: "Archivo", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --aos-font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  --aos-text-2xs: 11px;  /* keycaps */
+  --aos-text-xs: 12px;   /* captions, group labels */
+  --aos-text-sm: 13px;   /* badges, chips, helper text */
+  --aos-text-md: 14px;   /* secondary body */
+  --aos-text-base: 15px; /* body, buttons, list rows */
+  --aos-text-lg: 18px;   /* section headings */
+  --aos-text-xl: 24px;   /* page headings */
+  --aos-text-2xl: 32px;  /* display */
+  --aos-text-3xl: 40px;  /* hero display */
+
+  --aos-leading-tight: 1.15;
+  --aos-leading-snug: 1.3;
+  --aos-leading-body: 1.5;
+
+  --aos-weight-regular: 400;
+  --aos-weight-medium: 500;
+  --aos-weight-semibold: 600; /* default UI weight */
+  --aos-weight-heading: 750;
+  --aos-weight-display: 800;
+
+  /* Archivo is a width-variable font: headings get wider, not just heavier */
+  --aos-stretch-body: 100%;
+  --aos-stretch-heading: 115%;
+  --aos-stretch-display: 125%;
+
+  --aos-tracking-heading: -0.01em;
+  --aos-tracking-display: -0.02em;
+
+  /* ---------- Shape: round things you press, square-ish things that hold ---------- */
+  --aos-radius-pill: 999px; /* buttons, chips, badges, toggles, segmented controls */
+  --aos-radius-key: 6px;    /* keycaps, tiny tiles */
+  --aos-radius-sm: 8px;     /* list rows, nav items, avatar tiles */
+  --aos-radius-md: 10px;    /* inputs, small cards, tool-call blocks */
+  --aos-radius-lg: 14px;    /* cards, popovers, menus, command palette */
+  --aos-radius-xl: 18px;    /* composer */
+
+  /* ---------- Control heights ---------- */
+  --aos-h-badge: 28px;
+  --aos-h-chip: 32px;
+  --aos-h-sm: 36px;
+  --aos-h-md: 44px; /* default buttons and inputs; also the minimum touch target */
+  --aos-h-lg: 52px;
+
+  /* ---------- Spacing (4px grid) ---------- */
+  --aos-space-1: 4px;
+  --aos-space-2: 8px;
+  --aos-space-3: 12px;
+  --aos-space-4: 16px;
+  --aos-space-5: 20px;
+  --aos-space-6: 24px;
+  --aos-space-8: 32px;
+  --aos-space-10: 40px;
+  --aos-space-12: 48px;
+  --aos-space-14: 56px;
+
+  /* ---------- Elevation ---------- */
+  --aos-shadow-hairline: 0 0 0 1px var(--aos-line);
+  --aos-shadow-outline: inset 0 0 0 1.5px var(--aos-ink);   /* secondary buttons */
+  --aos-shadow-control: inset 0 0 0 1px var(--aos-control); /* chips */
+  --aos-shadow-key: inset 0 0 0 1px var(--aos-line-strong), inset 0 -2px 0 var(--aos-line-strong);
+  --aos-shadow-raised: 0 0 0 1px var(--aos-line), 0 1px 2px rgba(0, 0, 0, 0.06), 0 16px 40px -12px rgba(0, 0, 0, 0.22); /* menus, popovers */
+  --aos-shadow-overlay: 0 0 0 1px var(--aos-line-strong), 0 1px 2px rgba(0, 0, 0, 0.05), 0 24px 56px -24px rgba(0, 0, 0, 0.28); /* palette, dialogs */
+  --aos-shadow-toast: 0 1px 2px rgba(0, 0, 0, 0.2), 0 18px 36px -18px rgba(0, 0, 0, 0.5);
+
+  /* ---------- Motion ---------- */
+  --aos-ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --aos-dur-fast: 120ms;  /* hover color */
+  --aos-dur-base: 150ms;  /* press, toggles */
+  --aos-dur-slow: 300ms;  /* toasts entering, panels */
+  --aos-dur-pulse: 1.6s;  /* running indicator */
+}
+
+/* ---------- Base ---------- */
+html {
+  font-family: var(--aos-font-sans);
+  color: var(--aos-text);
+  background: var(--aos-canvas);
+  -webkit-font-smoothing: antialiased;
+}
+
+:where(button, a, input, textarea, select, [tabindex]):focus-visible {
+  outline: 2px solid var(--aos-focus);
+  outline-offset: 2px;
+}
+.aos-night :where(button, a, input, textarea, select, [tabindex]):focus-visible {
+  outline-color: var(--aos-focus-on-night);
+}
+
+/* Night surfaces: put this class on the sidebar, toasts and code blocks */
+.aos-night {
+  background: var(--aos-night);
+  color: var(--aos-night-text);
+}
+
+/* Code, tool calls, keycaps, IDs */
+.aos-mono {
+  font-family: var(--aos-font-mono);
+  font-feature-settings: "calt" 0;
+}
+
+/* ---------- Type roles ---------- */
+.aos-display {
+  font-size: var(--aos-text-2xl);
+  line-height: var(--aos-leading-tight);
+  font-weight: var(--aos-weight-display);
+  font-stretch: var(--aos-stretch-display);
+  letter-spacing: var(--aos-tracking-display);
+}
+.aos-heading {
+  font-size: var(--aos-text-xl);
+  line-height: var(--aos-leading-snug);
+  font-weight: var(--aos-weight-heading);
+  font-stretch: var(--aos-stretch-heading);
+  letter-spacing: var(--aos-tracking-heading);
+}
+.aos-subheading {
+  font-size: var(--aos-text-lg);
+  line-height: var(--aos-leading-snug);
+  font-weight: var(--aos-weight-heading);
+  font-stretch: var(--aos-stretch-heading);
+  letter-spacing: var(--aos-tracking-heading);
+}
+
+/* ---------- Status shapes ----------
+   <span class="aos-shape aos-shape--running" role="img" aria-label="Running"></span>
+   Size with --aos-shape-size; color defaults to the status color.
+   Inside a filled badge, set color to the badge's text color (e.g. white on blue). */
+.aos-shape {
+  --aos-shape-size: 10px;
+  display: inline-block;
+  flex-shrink: 0;
+  width: var(--aos-shape-size);
+  height: var(--aos-shape-size);
+  box-sizing: border-box;
+  background: currentColor;
+}
+.aos-shape--running { color: var(--aos-running); border-radius: 50%; }
+.aos-shape--running.aos-is-live { animation: aos-pulse var(--aos-dur-pulse) ease-in-out infinite; }
+.aos-shape--needs { color: var(--aos-needs); clip-path: polygon(50% 6%, 97% 94%, 3% 94%); }
+/* Standalone yellow triangle on paper or canvas: add a black edge so it holds up on white */
+.aos-shape--needs.aos-shape--edged { background: var(--aos-ink); position: relative; }
+.aos-shape--needs.aos-shape--edged::before {
+  content: "";
+  position: absolute;
+  inset: 14% 9% 7%;
+  background: var(--aos-needs);
+  clip-path: polygon(50% 6%, 97% 94%, 3% 94%);
+}
+.aos-shape--done { color: var(--aos-done); border-top-right-radius: 100%; transform: scale(0.86); }
+.aos-shape--failed { color: var(--aos-failed); clip-path: inset(7%); }
+.aos-shape--queued { color: var(--aos-ink); background: transparent; border-radius: 50%; border: max(1.5px, calc(var(--aos-shape-size) * 0.17)) solid currentColor; }
+.aos-shape--paused {
+  color: var(--aos-ink);
+  background: linear-gradient(to right, transparent 18%, currentColor 18% 39%, transparent 39% 61%, currentColor 61% 82%, transparent 82%);
+  clip-path: inset(10% 0);
+}
+
+/* ---------- Motion primitives ---------- */
+@keyframes aos-pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(0.7); opacity: 0.55; }
+}
+@keyframes aos-spin { to { transform: rotate(360deg); } }
+@keyframes aos-toast-in {
+  from { transform: translateY(8px); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+.aos-spin { animation: aos-spin 0.9s linear infinite; }
+
+/* Pressable feedback for pill buttons */
+.aos-press { transition: transform var(--aos-dur-base) ease, background-color var(--aos-dur-base) ease; }
+.aos-press:hover { transform: translateY(-1px); }
+.aos-press:active { transform: scale(0.97); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  .aos-press:hover, .aos-press:active { transform: none; }
+}

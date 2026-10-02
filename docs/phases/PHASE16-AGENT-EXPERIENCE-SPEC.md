@@ -55,13 +55,15 @@
 6. Run viewer page (timeline + replay + video).
 7. Live watch mode (transport per decision b).
 8. Retention policy + storage accounting.
-9. Evals: generative-component allowlist enforcement (model cannot emit unregistered components), HITL interrupt → gate decision round-trip tests, trace fidelity tests.
+9. **Report engine slice:** BrandKit model + versioned report templates + WeasyPrint render service + report-preview generative components + draft-for-approval send flow behind the gate. Lint rule for the double-position color-stop trap.
+10. **Mobile slice:** React Native (Expo) shell on the same AG-UI backend — agent chat, native approval HITL (approve/deny/edit), shared-state widgets. Mobile generative components are the native-mapped allowlist subset.
+11. Evals: generative-component allowlist enforcement (model cannot emit unregistered components), HITL interrupt → gate decision round-trip tests, trace fidelity tests, report number-grounding tests (no figure without a source pointer), mobile HITL round-trip tests.
 
 ## 7. Verification (definition of done)
 
 - tsc clean (heap flag), production build green, tests green (new suites: AG-UI adapter events, component allowlist negatives, HITL→gate round-trip, trace capture fidelity, retention sweep).
-- Acceptance: an agent run renders an approval as a live component in-flow; approving it there executes through the gate with an audit entry; a browser run produces a replayable timeline + video; live watch shows the run in progress.
-- Secret scan clean. Screenshots: generative approval card, run viewer, live watch. Local-only commit.
+- Acceptance: an agent run renders an approval as a live component in-flow; approving it there executes through the gate with an audit entry; a browser run produces a replayable timeline + video; live watch shows the run in progress; a branded report renders from the tenant brand kit to PDF with every figure source-traced; a phone approval on iOS/Android executes through the gate.
+- Secret scan clean. Screenshots: generative approval card, run viewer, live watch, branded report PDF, mobile approval screen. Local-only commit.
 
 ## 8. Cost & license reality check
 
@@ -76,6 +78,11 @@
 - **(a) Approvals only.** Generative UI lands on the approval queue first; missions and everything else stay chat until v2.
 - **(b) Real-time stream.** True watch-it-work headed-browser stream to the dashboard.
 - **(c) 30 days, then summarize** (default — Tico didn't pick: traces kept, videos dropped after 30 days unless pinned).
+
+## DECISIONS — LOCKED by Tico 2026-09-29
+
+- **Branded Report Engine joins Phase 16** (Tico 2026-09-29: "just added a new build for reports"). Slice 1 lands here: brand kit + versioned HTML+CSS templates + WeasyPrint PDF renderer (proven 2026-09-29: ~2s A4 render on the CPU box, zero new infra; template lint rule: no CSS Images L4 double-position color stops). Template #1 defaults to the Grow client-performance report (first full vertical per the engine spec) unless Tico picks another. Report previews render as generative UI components; report send/publish is draft-for-approval behind the Phase 14 gate. Guardrails hold: never invent numbers — a figure with no connected source flags for review, never renders. Engine spec: `docs/BUSINESS-OS-FEATURE-SPECS.md` §5; proof: `workspace/biz-os/report-engine-proof/`.
+- **CopilotKit iPhone + Android in Phase 16.** CopilotKit's official React Native SDK (supported, docs.copilotkit.ai/react-native) — same AG-UI agent backend, one agent, every frontend. Mobile surface: agent chat + approval HITL as native generative components (approve/deny/edit from the phone), shared-state widgets (mission progress, approval queue). Web generative-component registry stays the allowlist authority; mobile renders the native-mapped subset. No separate mobile agent logic — the AG-UI protocol is the contract.
 
 ---
 

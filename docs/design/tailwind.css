@@ -1,0 +1,116 @@
+/* Agentic OS for Tailwind CSS v4.
+   Use this as the app's main stylesheet (in place of a bare @import "tailwindcss").
+   Defaults for color, font, radius, text size and shadow are cleared on purpose,
+   so only system values exist: bg-gray-100 or rounded-2xl simply won't compile.
+   transparent, current, inherit and rounded-full still work. */
+
+@import "tailwindcss";
+@import "./tokens.css";
+
+@theme inline {
+  /* Colors */
+  --color-*: initial;
+  --color-white: var(--aos-paper);
+  --color-black: var(--aos-ink);
+  --color-ink: var(--aos-ink);
+  --color-paper: var(--aos-paper);
+  --color-canvas: var(--aos-canvas);
+  --color-line: var(--aos-line);
+  --color-line-strong: var(--aos-line-strong);
+  --color-control: var(--aos-control);
+  --color-hover: var(--aos-hover);
+  --color-hover-paper: var(--aos-hover-on-paper);
+  --color-muted: var(--aos-text-muted);
+  --color-subtle: var(--aos-text-subtle);
+  --color-disabled: var(--aos-disabled-bg);
+  --color-disabled-fg: var(--aos-disabled-fg);
+
+  --color-running: var(--aos-running);
+  --color-running-pressed: var(--aos-running-pressed);
+  --color-running-tint: var(--aos-running-tint);
+  --color-running-night: var(--aos-running-on-night);
+  --color-needs: var(--aos-needs);
+  --color-needs-tint: var(--aos-needs-tint);
+  --color-done: var(--aos-done);
+  --color-done-night: var(--aos-done-on-night);
+  --color-failed: var(--aos-failed);
+  --color-failed-text: var(--aos-failed-text);
+  --color-failed-tint: var(--aos-failed-tint);
+  --color-failed-night: var(--aos-failed-on-night);
+
+  --color-night: var(--aos-night);
+  --color-night-hover: var(--aos-night-hover);
+  --color-night-raised: var(--aos-night-raised);
+  --color-night-line: var(--aos-night-line);
+  --color-night-border: var(--aos-night-border);
+  --color-night-soft: var(--aos-night-text-soft);
+  --color-night-muted: var(--aos-night-text-muted);
+
+  --color-focus: var(--aos-focus);
+  --color-focus-night: var(--aos-focus-on-night);
+
+  /* Fonts */
+  --font-*: initial;
+  --font-sans: var(--aos-font-sans);
+  --font-mono: var(--aos-font-mono);
+
+  /* Text sizes: text-2xs ... text-3xl */
+  --text-*: initial;
+  --text-2xs: var(--aos-text-2xs);
+  --text-2xs--line-height: 1.2;
+  --text-xs: var(--aos-text-xs);
+  --text-xs--line-height: 1.35;
+  --text-sm: var(--aos-text-sm);
+  --text-sm--line-height: 1.4;
+  --text-md: var(--aos-text-md);
+  --text-md--line-height: 1.5;
+  --text-base: var(--aos-text-base);
+  --text-base--line-height: 1.5;
+  --text-lg: var(--aos-text-lg);
+  --text-lg--line-height: 1.3;
+  --text-xl: var(--aos-text-xl);
+  --text-xl--line-height: 1.25;
+  --text-2xl: var(--aos-text-2xl);
+  --text-2xl--line-height: 1.15;
+  --text-3xl: var(--aos-text-3xl);
+  --text-3xl--line-height: 1.1;
+
+  --font-weight-heading: var(--aos-weight-heading);
+  --font-weight-display: var(--aos-weight-display);
+  --tracking-heading: var(--aos-tracking-heading);
+  --tracking-display: var(--aos-tracking-display);
+
+  /* Radius: rounded-full for anything pressable; these for containers */
+  --radius-*: initial;
+  --radius-key: var(--aos-radius-key);
+  --radius-sm: var(--aos-radius-sm);
+  --radius-md: var(--aos-radius-md);
+  --radius-lg: var(--aos-radius-lg);
+  --radius-xl: var(--aos-radius-xl);
+
+  /* Shadows */
+  --shadow-*: initial;
+  --shadow-hairline: var(--aos-shadow-hairline);
+  --shadow-outline: var(--aos-shadow-outline);
+  --shadow-control: var(--aos-shadow-control);
+  --shadow-key: var(--aos-shadow-key);
+  --shadow-raised: var(--aos-shadow-raised);
+  --shadow-overlay: var(--aos-shadow-overlay);
+  --shadow-toast: var(--aos-shadow-toast);
+
+  /* Motion */
+  --ease-aos: var(--aos-ease-out);
+  --animate-status-pulse: aos-pulse 1.6s ease-in-out infinite;
+  --animate-toast-in: aos-toast-in 300ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* Control heights: h-badge, h-chip, h-control-sm, h-control, h-control-lg */
+@utility h-badge { height: var(--aos-h-badge); }
+@utility h-chip { height: var(--aos-h-chip); }
+@utility h-control-sm { height: var(--aos-h-sm); }
+@utility h-control { height: var(--aos-h-md); }
+@utility h-control-lg { height: var(--aos-h-lg); }
+
+/* Width axis for Archivo headings */
+@utility stretch-heading { font-stretch: var(--aos-stretch-heading); }
+@utility stretch-display { font-stretch: var(--aos-stretch-display); }
