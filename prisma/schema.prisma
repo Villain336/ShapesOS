@@ -790,6 +790,13 @@ model Workspace {
   fundingShareLinks         FundingShareLink[]
   fundingDocViews           FundingDocView[]
   fundingRounds             FundingRound[]
+  // Connector Agent slice 1: graph core — person/company/relationship/
+  // import-batch nodes. Tenant-scoped; no cross-tenant edges in schema.
+  connectorPersons          ConnectorPerson[]
+  connectorCompanies        ConnectorCompany[]
+  connectorEmployments      ConnectorEmployment[]
+  connectorRelationships    ConnectorRelationship[]
+  connectorImportBatches    ConnectorImportBatch[]
   insurancePaymentHandoffs  InsurancePaymentHandoff[]
   insuranceCertificates     InsuranceCertificate[]
   // Phase 12 (embeds): tenant-scoped GrowthBook flag overrides.
@@ -11846,4 +11853,165 @@ model FundingDeckReview {
 
   @@index([workspaceId, roundId, createdAt])
   @@map("funding_deck_reviews")
+}
+
+// ---------------------------------------------------------------------------
+// Connector Agent — slice 1: graph core (SPEC-CONNECTOR-AGENT.md §6).
+//
+// Tenant-scoped, vault-held contact graph. Every model carries workspaceId;
+// there are no cross-tenant edges in the schema. IntroPaths are computed
+// (slice 3), never persisted across tenants. DB tables use the
+// connector_agent_* prefix to avoid colliding with the OS connector layer's
+// existing connector_* tables (connector_connections, etc.).
+// ---------------------------------------------------------------------------
+
+enum ConnectorCompanySizeBand {
+  solo
+  startup
+  smb
+  midmarket
+  enterprise
+}
+
+enum ConnectorCompanyRelationship {
+  customer
+  prospect
+  investor
+  partner
+  vendor
+}
+
+enum ConnectorImportSource {
+  manual
+  csv
+  email
+  calendar
+  boardy_starter
+}
+
+// One consented import run. Explicit tenant consent per source is recorded
+// HERE (consentedBy + consentedAt) — slice 2's import job may not write
+// Person rows without a batch row carrying consent.
+model ConnectorImportBatch {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  source      ConnectorImportSource
+  consentedBy String                @map("consented_by")
+  consentedAt DateTime              @default(now()) @map("consented_at")
+  note        String?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  persons ConnectorPerson[]
+
+  @@index([workspaceId])
+  @@map("connector_agent_import_batches")
+}
+
+// A human in the tenant's graph. Provenance (which import, when, with whose
+// consent) is mandatory on every row.
+model ConnectorPerson {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  name    String
+  roles   String[] @default([])
+  handles String[] @default([])
+
+  importBatchId String?               @map("import_batch_id")
+  importBatch   ConnectorImportBatch? @relation(fields: [importBatchId], references: [id], onDelete: SetNull)
+  consentedBy   String                @map("consented_by")
+  consentedAt   DateTime              @default(now()) @map("consented_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  relationship ConnectorRelationship?
+  employments  ConnectorEmployment[]
+
+  @@index([workspaceId])
+  @@map("connector_agent_persons")
+}
+
+// An employer/org node. relationship = this org's relationship TO THE TENANT.
+model ConnectorCompany {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  name         String
+  industry     String?
+  sizeBand     ConnectorCompanySizeBand?      @map("size_band")
+  relationship ConnectorCompanyRelationship?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  employments ConnectorEmployment[]
+
+  @@unique([workspaceId, name])
+  @@index([workspaceId])
+  @@map("connector_agent_companies")
+}
+
+// Person N:M Company employment history.
+model ConnectorEmployment {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  personId String          @map("person_id")
+  person   ConnectorPerson @relation(fields: [personId], references: [id], onDelete: Cascade)
+  companyId String           @map("company_id")
+  company   ConnectorCompany @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  title     String?
+  startYear Int?     @map("start_year")
+  endYear   Int?     @map("end_year")
+  isCurrent Boolean  @default(true) @map("is_current")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([workspaceId, personId, companyId])
+  @@index([workspaceId])
+  @@map("connector_agent_employments")
+}
+
+// The edge between the tenant and a Person (1:1 tenant–Person).
+// warmthScore is RECOMPUTED from the interaction signals below — never
+// hand-set as the only signal (see lib/connector/types.ts computeWarmth).
+model ConnectorRelationship {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  personId String          @unique @map("person_id")
+  person   ConnectorPerson @relation(fields: [personId], references: [id], onDelete: Cascade)
+
+  // Recomputed warmth, 0–100.
+  warmthScore      Int       @default(0) @map("warmth_score")
+  warmthComputedAt DateTime? @map("warmth_computed_at")
+
+  // Interaction signals the score is derived from.
+  lastTouchAt           DateTime? @map("last_touch_at")
+  touchCount            Int       @default(0) @map("touch_count")
+  inboundCount          Int       @default(0) @map("inbound_count")
+  outboundCount         Int       @default(0) @map("outbound_count")
+  lastReciprocalTouchAt DateTime? @map("last_reciprocal_touch_at")
+
+  // Free-text context + the tenant's own guardrails, e.g. "don't ask for
+  // intros more than quarterly".
+  notes      String?
+  boundaries String?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([workspaceId])
+  @@map("connector_agent_relationships")
 }

@@ -46,6 +46,7 @@ import {
   Star,
   Scale,
   Handshake,
+  Network,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import GlideMenu from "@/components/vault/primitives/GlideMenu";
@@ -122,6 +123,9 @@ const NAV_SECTIONS: {
       // as the preloaded starter contact in every tenant's funding graph;
       // the front door is the founder's own raise workflow.
       { href: "/dashboard/funding", label: "Funding", icon: Handshake },
+      // Connector Agent slice 1: the connector's Network home — people,
+      // companies, relationship warmth, import provenance.
+      { href: "/dashboard/connector", label: "Network", icon: Network },
     ],
   },
 ];
