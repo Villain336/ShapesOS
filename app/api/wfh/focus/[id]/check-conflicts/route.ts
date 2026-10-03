@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireUser, getOrCreateWorkspace } from "@/lib/session";
 import { requireWorkspaceRole } from "@/lib/authz";
 import { prisma } from "@/lib/prisma";
+import { resolveTimeZone } from "@/lib/time/zoned";
 import {
   findConflicts,
   suggestReschedules,
@@ -58,10 +59,15 @@ export async function POST(
     .filter((e): e is CalendarEventLike => e !== null);
 
   const conflicts = findConflicts({ startAt: block.startAt, endAt: block.endAt }, events);
+  const mode = await prisma.wfhWorkMode.findUnique({
+    where: { workspaceId_userId: { workspaceId: workspace.id, userId: user.id } },
+    select: { timezone: true },
+  });
   const suggestions = suggestReschedules(
     { startAt: block.startAt, endAt: block.endAt },
     conflicts,
     events,
+    resolveTimeZone(mode?.timezone),
   );
 
   return NextResponse.json({

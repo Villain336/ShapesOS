@@ -167,6 +167,8 @@ export default function WfhModePanel({
           focusBlockMinutes: parseInt(blockMin, 10),
           standupCadence: cadence,
           notificationProfile: profile,
+          // Standups, digests and focus hours follow the user's own zone.
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         }),
       });
       const data = await res.json();
