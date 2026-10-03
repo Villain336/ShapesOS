@@ -9,6 +9,7 @@ lib/agents/runs/__tests__/run-viewer.test.ts
 lib/agents/runs/__tests__/runs-rls.test.ts
 lib/agents/runs/__tests__/trace-fidelity.eval.test.ts
 lib/agents/runs/__tests__/watch.test.ts
+lib/approvals/__tests__/inbox-db.test.ts
 lib/auth/__tests__/member-roles.test.ts
 lib/auth/__tests__/signup-mode.test.ts
 lib/authority/outreach/__tests__/webhook-tenant-db.test.ts
@@ -37,6 +38,7 @@ lib/messaging/__tests__/dispatch-claim.test.ts
 lib/messaging/__tests__/inbound-sms-workspace.test.ts
 lib/metering/__tests__/credits-integrity-db.test.ts
 lib/metering/__tests__/self-hosted-cap-db.test.ts
+lib/notifications/__tests__/notifications-db.test.ts
 lib/ops/__tests__/ops-consume-db.test.ts
 lib/ops/__tests__/ops-rls.test.ts
 lib/ops/__tests__/workflows-rls.test.ts
