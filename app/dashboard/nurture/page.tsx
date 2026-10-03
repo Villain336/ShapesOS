@@ -2,6 +2,7 @@
 import { redirect } from "next/navigation";
 import { requireUser, getOrCreateWorkspace } from "@/lib/session";
 import { NurtureApp } from "./NurtureApp";
+import { parseNurtureTab } from "./tabs";
 
 export const dynamic = "force-dynamic";
 
@@ -10,7 +11,12 @@ export const metadata = {
   description: "Approval-gated nurture sequences: builder, enrollments, approval queue, message log, consent.",
 };
 
-export default async function NurturePage() {
+export default async function NurturePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tab?: string }>;
+}) {
+  const { tab } = await searchParams;
   const user = await requireUser();
   if (!user) redirect("/login");
   await getOrCreateWorkspace(user.id, user.email);
@@ -23,7 +29,7 @@ export default async function NurturePage() {
           nothing auto-sends. The Broadcasts tab runs newsletter campaigns through the Listmonk email sidecar.
         </p>
       </div>
-      <NurtureApp />
+      <NurtureApp initialTab={parseNurtureTab(tab)} />
     </div>
   );
 }

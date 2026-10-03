@@ -45,8 +45,9 @@ import {
   inputCls,
 } from "./ui";
 import { confirmAction } from "@/lib/ui/feedback";
+import type { NurtureTab } from "./tabs";
 
-type Tab = "sequences" | "broadcasts" | "enrollments" | "approvals" | "log" | "consent";
+type Tab = NurtureTab;
 
 async function api<T>(url: string, opts?: RequestInit): Promise<T> {
   const res = await fetch(url, { ...opts, headers: { "content-type": "application/json", ...(opts?.headers ?? {}) } });
@@ -74,8 +75,8 @@ function delayLabel(min: number): string {
   return `${Math.floor(h / 24)}d`;
 }
 
-export function NurtureApp() {
-  const [tab, setTab] = useState<Tab>("sequences");
+export function NurtureApp({ initialTab = "sequences" }: { initialTab?: Tab } = {}) {
+  const [tab, setTab] = useState<Tab>(initialTab);
   const [sequences, setSequences] = useState<NurtureSequence[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
