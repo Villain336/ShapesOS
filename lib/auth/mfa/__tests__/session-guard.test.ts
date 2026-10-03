@@ -31,7 +31,9 @@ describe("applySignIn / sessionView", () => {
     assert.deepEqual(t.amr, ["pwd"]);
     assert.equal(t.mfaPendingSub, undefined);
     const v = sessionView(t, NOW);
-    assert.deepEqual(v.user, { id: "u1", twoFactor: false, mfaAt: null });
+    assert.deepEqual(v.user, { id: "u1", twoFactor: false, mfaAt: null, authAt: NOW });
+    // Sessions minted before authAt existed expose null (account-deletion cutoff treats them as old).
+    assert.equal(sessionView({ sub: "u1" }, NOW).user?.authAt, null);
     assert.equal(v.mfa, null);
   });
 
@@ -71,7 +73,7 @@ describe("applySignIn / sessionView", () => {
     assert.equal(t.mfaPendingSub, undefined);
     assert.deepEqual(t.amr, ["pwd", "otp"]);
     assert.equal(t.mfaAt, NOW);
-    assert.deepEqual(sessionView(t, NOW).user, { id: "u1", twoFactor: true, mfaAt: NOW });
+    assert.deepEqual(sessionView(t, NOW).user, { id: "u1", twoFactor: true, mfaAt: NOW, authAt: NOW });
   });
 
   it("a passkey sign-in is complete and counts as a second factor", () => {

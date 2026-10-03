@@ -951,6 +951,9 @@ model Workspace {
   // Phase 4a (identity): SCIM 2.0 provisioning back-relations.
   scimTokens                ScimToken[]
   scimGroups                ScimGroup[]
+  // Phase 4a integration: direct workspace cascade (orphan guard).
+  scimGroupMembers          ScimGroupMember[]
+  webhookDeliveries         WebhookDelivery[]
   // Phase 4a (orphaned rows): tables that had a workspace_id but no FK.
   agentRunEvents              AgentRunEvent[]
   agentRunRecordings          AgentRunRecording[]
@@ -13430,6 +13433,7 @@ model WebhookEndpoint {
 model WebhookDelivery {
   id             String                @id @default(cuid())
   workspaceId    String                @map("workspace_id")
+  workspace      Workspace             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   endpointId     String                @map("endpoint_id")
   endpoint       WebhookEndpoint       @relation(fields: [endpointId], references: [id], onDelete: Cascade)
   // Shared by every endpoint's copy of the same event ("evt_…").
@@ -13486,6 +13490,9 @@ model UserSecurity {
   // Stable random WebAuthn user handle (base64url), never PII.
   webauthnUserHandle String?   @unique @map("webauthn_user_handle")
   createdAt          DateTime  @default(now()) @map("created_at")
+  // Account deleted (GDPR): sessions that signed in before this can no
+  // longer provision a workspace; every other field is cleared.
+  accountDeletedAt   DateTime? @map("account_deleted_at")
   updatedAt          DateTime  @updatedAt @map("updated_at")
 
   @@map("user_security")
@@ -13580,6 +13587,7 @@ model ScimGroupMember {
   memberId    String          @map("member_id")
   member      WorkspaceMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
   workspaceId String          @map("workspace_id")
+  workspace   Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   createdAt   DateTime        @default(now()) @map("created_at")
 
   @@id([groupId, memberId])

@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
     if (denial) return entitlementDenied(denial);
     const body = (await req.json().catch(() => null)) as { name?: unknown } | null;
     if (!body) return Response.json({ error: "Invalid JSON" }, { status: 400 });
-    const workspace = await createWorkspaceForUser({ userId: user.id, name: body.name });
+    const workspace = await createWorkspaceForUser({ userId: user.id, name: body.name, authAt: user.authAt });
     const res = NextResponse.json(
       { workspace: { id: workspace.id, name: workspace.name, plan: workspace.plan } },
       { status: 201 },

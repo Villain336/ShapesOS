@@ -124,6 +124,12 @@ export const PERSONAL_TABLES: readonly { table: string; column: string }[] = [
   { table: "wfh_ritual_subscriptions", column: "user_id" },
   { table: "wfh_standup_reactions", column: "user_id" },
   { table: "wfh_work_modes", column: "user_id" },
+  // Phase 4a identity: sign-in factors. user_security is re-created below as
+  // a bare tombstone (account_deleted_at) so older sessions are refused.
+  { table: "user_recovery_codes", column: "user_id" },
+  { table: "user_passkeys", column: "user_id" },
+  { table: "auth_challenges", column: "user_id" },
+  { table: "user_security", column: "user_id" },
 ];
 
 /**
@@ -257,6 +263,12 @@ export async function deleteAccount(opts: {
           UPDATE "file_change_log" SET "summary" = replace("summary", ${email}, '[deleted user]')
            WHERE "summary" ILIKE ${`%${email.replace(/[\\%_]/g, (c) => `\\${c}`)}%`}`;
       }
+      // Tombstone: no secrets, no email, only when the account was deleted.
+      await tx.userSecurity.upsert({
+        where: { userId },
+        create: { userId, accountDeletedAt: new Date() },
+        update: { accountDeletedAt: new Date() },
+      });
       for (const target of pseudonymizeTargets(catalog)) {
         const set = target.columns.map((c) => `${q(c)} = CASE WHEN ${q(c)} = $1 THEN $2 ELSE ${q(c)} END`).join(", ");
         const where = target.columns.map((c) => `${q(c)} = $1`).join(" OR ");

@@ -39,6 +39,8 @@ export interface MfaTokenFields {
   mfaMethods?: string[];
   amr?: AuthMethod[];
   mfaAt?: number;
+  /** Unix seconds of the sign-in that produced this session (account-deletion cutoff). */
+  authAt?: number;
   [key: string]: unknown;
 }
 
@@ -76,6 +78,7 @@ export function applySignIn<T extends MfaTokenFields>(
   },
 ): T & MfaTokenFields {
   const t: T = { ...token };
+  t.authAt = opts.nowSec;
   delete t.mfaPendingSub;
   delete t.mfaPendingExp;
   delete t.mfaMethods;
@@ -130,6 +133,8 @@ export interface SessionUserMfa {
   twoFactor: boolean;
   /** Unix seconds of the last second-factor check, when any. */
   mfaAt: number | null;
+  /** Unix seconds this session signed in; null for sessions minted before Phase 4a. */
+  authAt: number | null;
 }
 
 /**
@@ -143,7 +148,12 @@ export function sessionView(
   const sub = fullSubject(token);
   if (sub) {
     return {
-      user: { id: sub, twoFactor: sessionHasSecondFactor(token), mfaAt: typeof token.mfaAt === "number" ? token.mfaAt : null },
+      user: {
+        id: sub,
+        twoFactor: sessionHasSecondFactor(token),
+        mfaAt: typeof token.mfaAt === "number" ? token.mfaAt : null,
+        authAt: typeof token.authAt === "number" ? token.authAt : null,
+      },
       mfa: null,
     };
   }

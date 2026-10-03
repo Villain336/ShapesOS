@@ -314,6 +314,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         session.user.id = view.user.id;
         session.user.twoFactor = view.user.twoFactor;
         session.user.mfaAt = view.user.mfaAt;
+        session.user.authAt = view.user.authAt;
         return session;
       }
       // Pending second factor (or no subject): expose NO user, so every guard

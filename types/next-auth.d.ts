@@ -6,6 +6,8 @@ declare module "next-auth" {
       id: string;
       /** Phase 4a: this session passed a second factor (TOTP, recovery code or passkey). */
       twoFactor?: boolean;
+      /** Unix seconds this session signed in (first or second factor). */
+      authAt?: number | null;
       /** Phase 4a: unix seconds of the last second-factor check (re-auth window). */
       mfaAt?: number | null;
     } & DefaultSession["user"];

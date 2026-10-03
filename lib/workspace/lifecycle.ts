@@ -18,7 +18,7 @@
 import type { Prisma, Workspace, WorkspaceRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getMembership, roleAtLeast } from "@/lib/authz";
-import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from "@/lib/api/errors";
+import { BadRequestError, ConflictError, ForbiddenError, NotFoundError, UnauthorizedError } from "@/lib/api/errors";
 import { deploymentMode, initialPlanFor } from "@/lib/billing/trial";
 import { WORKSPACE_GUC } from "@/lib/substrate/memory/rls";
 
@@ -104,6 +104,21 @@ export async function hasHadTrial(userId: string, tx: Tx | typeof prisma = prism
 // ── Create ───────────────────────────────────────────────────────────────────
 
 /**
+ * True when the account was deleted (GDPR) at or after the session's sign-in
+ * — i.e. the caller is a session that outlived its account. Sessions without
+ * a sign-in time (minted before Phase 4a) count as older.
+ */
+export async function deletedBeforeSignIn(
+  db: Pick<Prisma.TransactionClient, "userSecurity">,
+  userId: string,
+  authAt: number | null | undefined,
+): Promise<boolean> {
+  const row = await db.userSecurity.findUnique({ where: { userId }, select: { accountDeletedAt: true } });
+  if (!row?.accountDeletedAt) return false;
+  return !(typeof authAt === "number" && authAt * 1000 > row.accountDeletedAt.getTime());
+}
+
+/**
  * Create a workspace owned by `userId` (with its `owner` membership row).
  * Serialized per user (advisory lock) so two concurrent signups can't both
  * claim the one free trial. The new workspace starts the onboarding wizard.
@@ -118,12 +133,21 @@ export async function createWorkspaceForUser(opts: {
    * they already have one (two first page loads racing each other).
    */
   ifNoneExists?: boolean;
+  /**
+   * Unix seconds the caller's session signed in (session.user.authAt). A
+   * deleted account's older sessions must not provision a fresh workspace;
+   * signing in again afterwards starts over.
+   */
+  authAt?: number | null;
 }): Promise<Workspace> {
   const name = normalizeWorkspaceName(opts.name);
   const now = opts.now ?? new Date();
   const mode = deploymentMode(opts.env);
   return prisma.$transaction(async (tx) => {
     await tx.$queryRaw`SELECT 1 AS locked FROM pg_advisory_xact_lock(hashtext(${`workspace-create:${opts.userId}`}))`;
+    if (await deletedBeforeSignIn(tx, opts.userId, opts.authAt)) {
+      throw new UnauthorizedError("This account was deleted. Sign in again to start over.");
+    }
     if (opts.ifNoneExists) {
       const existing = await tx.workspace.findFirst({
         where: { OR: [{ ownerUserId: opts.userId }, { members: { some: { userId: opts.userId } } }] },

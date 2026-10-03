@@ -87,6 +87,9 @@ before(async () => {
   await prisma.fileChangeLog.create({
     data: { workspaceId: SHARED, filePath: "(test)", actor: "user", action: "workspace_renamed", summary: `admin-${RUN}`, approvedBy: ADMIN },
   });
+  // Phase 4a identity: sign-in factors the deletion must remove.
+  await prisma.userSecurity.create({ data: { userId: OWNER, email: OWNER_EMAIL, totpSecretEnc: "sealed", totpEnabledAt: new Date() } });
+  await prisma.userRecoveryCode.create({ data: { userId: OWNER, codeHash: `rc-${RUN}` } });
   wsExport = await import("@/app/api/workspaces/[id]/export/route");
   accExport = await import("@/app/api/account/export/route");
   account = await import("@/app/api/account/route");
@@ -95,6 +98,7 @@ before(async () => {
 after(async () => {
   await prisma.workspace.deleteMany({ where: { id: { in: [SHARED, SOLO, OTHER] } } });
   await prisma.workspaceLifecycleEvent.deleteMany({ where: { workspaceId: { in: [SHARED, SOLO, OTHER] } } });
+  await prisma.userSecurity.deleteMany({ where: { userId: OWNER } });
   await prisma.$disconnect();
 });
 
@@ -231,5 +235,28 @@ describe("account deletion", () => {
     const ev = await prisma.workspaceLifecycleEvent.findFirst({ where: { workspaceId: SOLO, action: "deleted" } });
     assert.equal(ev?.actorUserId, OWNER);
     assert.deepEqual(ev?.detail, { reason: "account_deleted" });
+
+    // Sign-in factors gone; user_security is a bare tombstone.
+    assert.equal(await prisma.userRecoveryCode.count({ where: { userId: OWNER } }), 0);
+    const tomb = await prisma.userSecurity.findUniqueOrThrow({ where: { userId: OWNER } });
+    assert.ok(tomb.accountDeletedAt);
+    assert.equal(tomb.totpSecretEnc, null);
+    assert.equal(tomb.email, null);
+  });
+
+  it("a session from before the deletion can't provision a fresh workspace; a new sign-in can", async () => {
+    const { createWorkspaceForUser } = await import("@/lib/workspace/lifecycle");
+    const tomb = await prisma.userSecurity.findUniqueOrThrow({ where: { userId: OWNER } });
+    const deletedSec = Math.floor(tomb.accountDeletedAt!.getTime() / 1000);
+    for (const authAt of [undefined, null, deletedSec - 60]) {
+      await assert.rejects(
+        createWorkspaceForUser({ userId: OWNER, name: "again", ifNoneExists: true, authAt }),
+        (e: Error) => e.name === "UnauthorizedError",
+      );
+    }
+    assert.equal(await prisma.workspace.count({ where: { ownerUserId: OWNER } }), 0);
+    const ws = await createWorkspaceForUser({ userId: OWNER, name: "fresh start", ifNoneExists: true, authAt: deletedSec + 5 });
+    assert.equal(ws.ownerUserId, OWNER);
+    await prisma.workspace.deleteMany({ where: { id: ws.id } });
   });
 });
