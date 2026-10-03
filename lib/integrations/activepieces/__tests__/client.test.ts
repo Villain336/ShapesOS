@@ -7,6 +7,7 @@
 
 import { describe, it, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 
 import {
   isTerminalRunStatus,
@@ -233,6 +234,23 @@ describe("curated piece catalog", () => {
     for (const p of pieces) {
       assert.ok(p.version && p.version !== "unknown", `${p.packageName} has a version`);
       assert.ok(p.marketingUse.length > 10, `${p.packageName} has a marketing use note`);
+    }
+  });
+
+  it("loads pieces with literal imports only (production-build safe)", () => {
+    // A computed import(spec.packageName) / require(`${name}/...`) compiles but
+    // fails at runtime in the Turbopack production build ("Cannot find module
+    // as expression is too dynamic"), which 502'd the catalog route.
+    const src = readFileSync(new URL("../pieces.ts", import.meta.url), "utf8");
+    const imports = [...src.matchAll(/\bimport\(([^)]*)\)/g)].map((m) => m[1].trim());
+    assert.ok(imports.length >= 13, "one literal loader per curated piece");
+    for (const arg of imports) {
+      assert.match(arg, /^"@activepieces\/piece-[a-z-]+"$/, `non-literal import(${arg})`);
+    }
+    assert.doesNotMatch(src, /\brequire\(`/, "no template-literal require");
+    const config = readFileSync(new URL("../../../../next.config.ts", import.meta.url), "utf8");
+    for (const arg of imports) {
+      assert.ok(config.includes(arg), `${arg} is in serverExternalPackages`);
     }
   });
 

@@ -11,9 +11,19 @@
 
 import type { CuratedPiece, AutomationRecipe } from "./types";
 
+type PieceModule = Record<string, unknown>;
+
 /** One curated piece: which npm package + which export to read. */
 interface CuratedSpec {
   packageName: string;
+  /**
+   * Static loader. Must be a string-literal dynamic import per package: a computed
+   * import of `spec.packageName` compiles but throws "Cannot find module as
+   * expression is too dynamic" in the production (Turbopack) build. The
+   * packages are also listed in next.config.ts serverExternalPackages so
+   * Node resolves them at runtime instead of Turbopack bundling them.
+   */
+  load: () => Promise<PieceModule>;
   /** Key inside the package's default export (auth/connection helpers skipped). */
   exportKey: string;
   /** Why this piece matters for marketing automation. */
@@ -23,66 +33,79 @@ interface CuratedSpec {
 const CURATED: CuratedSpec[] = [
   {
     packageName: "@activepieces/piece-webhook",
+    load: () => import("@activepieces/piece-webhook"),
     exportKey: "webhook",
     marketingUse: "Entry point: let Marketr missions, playbooks, or external apps fire a flow with a JSON payload.",
   },
   {
     packageName: "@activepieces/piece-schedule",
+    load: () => import("@activepieces/piece-schedule"),
     exportKey: "schedule",
     marketingUse: "Cron-style triggers: weekly rank digests, review-velocity drives, content cadences.",
   },
   {
     packageName: "@activepieces/piece-http",
+    load: () => import("@activepieces/piece-http"),
     exportKey: "http",
     marketingUse: "Call any Marketr API route or third-party endpoint from inside a flow.",
   },
   {
     packageName: "@activepieces/piece-smtp",
+    load: () => import("@activepieces/piece-smtp"),
     exportKey: "smtp",
     marketingUse: "Send transactional and marketing email from your own SMTP — no vendor lock-in.",
   },
   {
     packageName: "@activepieces/piece-google-sheets",
+    load: () => import("@activepieces/piece-google-sheets"),
     exportKey: "googleSheets",
     marketingUse: "Append leads, rankings, and spend rows to sheets the agency already owns.",
   },
   {
     packageName: "@activepieces/piece-mailchimp",
+    load: () => import("@activepieces/piece-mailchimp"),
     exportKey: "mailchimp",
     marketingUse: "Email campaigns, audience sync, and subscriber tagging for nurture programs.",
   },
   {
     packageName: "@activepieces/piece-twitter",
+    load: () => import("@activepieces/piece-twitter"),
     exportKey: "twitter",
     marketingUse: "Post tweets and replies for the social publishing layer.",
   },
   {
     packageName: "@activepieces/piece-facebook-pages",
+    load: () => import("@activepieces/piece-facebook-pages"),
     exportKey: "facebookPages",
     marketingUse: "Post to managed Facebook Pages (text, photo, video).",
   },
   {
     packageName: "@activepieces/piece-instagram-business",
+    load: () => import("@activepieces/piece-instagram-business"),
     exportKey: "instagramBusiness",
     marketingUse: "Publish photos, reels, carousels, and stories to Instagram Business accounts.",
   },
   {
     packageName: "@activepieces/piece-linkedin",
+    load: () => import("@activepieces/piece-linkedin"),
     exportKey: "linkedin",
     marketingUse: "Post personal and company updates for B2B distribution.",
   },
   {
     packageName: "@activepieces/piece-slack",
+    load: () => import("@activepieces/piece-slack"),
     exportKey: "slack",
     marketingUse: "Alert the team in Slack; approve-or-deny flows via message actions.",
   },
   {
     packageName: "@activepieces/piece-openai",
+    load: () => import("@activepieces/piece-openai"),
     exportKey: "openai",
     marketingUse: "Summarize, classify, and draft inside flows (run summaries, review triage).",
   },
   {
     packageName: "@activepieces/piece-rss",
+    load: () => import("@activepieces/piece-rss"),
     exportKey: "rssFeed",
     marketingUse: "Trigger on new feed items — competitor blogs, industry news for the Wire.",
   },
@@ -96,9 +119,9 @@ interface PieceMetadataLike {
 }
 
 async function readPieceMeta(spec: CuratedSpec): Promise<CuratedPiece> {
-  // Dynamic import keeps the catalog lazy — routes/tests only pay for it
+  // Lazy import keeps the catalog cheap — routes/tests only pay for it
   // when they ask for the catalog.
-  const mod = (await import(spec.packageName)) as Record<string, unknown>;
+  const mod = await spec.load();
   // Dual-build packages expose the piece either as a named export or under
   // `default` — accept both shapes (they differ between CJS/ESM builds).
   const named = mod[spec.exportKey];
@@ -119,14 +142,7 @@ async function readPieceMeta(spec: CuratedSpec): Promise<CuratedPiece> {
   const displayName = piece?.displayName ?? meta.displayName ?? spec.exportKey;
   const description = piece?.description ?? meta.description ?? null;
   // Version comes from the installed package (npm metadata).
-  let version = "unknown";
-  try {
-    const { createRequire } = await import("node:module");
-    const require = createRequire(import.meta.url);
-    version = String(require(`${spec.packageName}/package.json`).version ?? "unknown");
-  } catch {
-    // keep "unknown"
-  }
+  const version = installedVersion(spec.packageName);
   return {
     packageName: spec.packageName,
     name: spec.packageName,
@@ -142,12 +158,34 @@ async function readPieceMeta(spec: CuratedSpec): Promise<CuratedPiece> {
   };
 }
 
+/**
+ * Installed version from the package's own package.json. Resolved with a
+ * runtime require built via process.getBuiltinModule, which the bundler does
+ * not rewrite (a bundled computed require of "<name>/package.json" is "too
+ * dynamic" in production). Never throws — "unknown" when it can't be read.
+ */
+function installedVersion(packageName: string): string {
+  try {
+    const nodeModule = process.getBuiltinModule?.("node:module");
+    if (!nodeModule) return "unknown";
+    const req = nodeModule.createRequire(`${process.cwd()}/package.json`);
+    const pkg = req(`${packageName}/package.json`) as { version?: unknown };
+    return String(pkg.version ?? "unknown");
+  } catch {
+    return "unknown";
+  }
+}
+
 let cached: Promise<CuratedPiece[]> | null = null;
 
 /** The curated marketing piece catalog, read live from installed packages. */
 export function curatedPieces(): Promise<CuratedPiece[]> {
   if (!cached) {
     cached = Promise.all(CURATED.map(readPieceMeta));
+    // A failed load must not poison the cache for the life of the process.
+    cached.catch(() => {
+      cached = null;
+    });
   }
   return cached;
 }
