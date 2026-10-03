@@ -104,8 +104,8 @@ Follow-ups found while doing Phase 2 (carried forward)
 - [ ] Reviews links to real approval UI (not raw JSON)
 - [ ] Confirmations on all destructive actions (replace `window.confirm`), shared toast system, undo where cheap
 - [ ] Accessibility fixes (clickable divs, alt text, focus styles)
-- [ ] Docs: README, COMPLETE-VISION statuses, COMPETITORS; root docs moved under docs/
-- [ ] Repo hygiene: untrack previews/ + training/traces + docs scratch; remove dead vault primitives and duplicate `/api/websites` tree
+- [x] Docs: README, COMPLETE-VISION statuses, COMPETITORS; root docs moved under docs/ (specs → `docs/specs/`, threat models → `docs/security/`, past audits/reports/design maps → `docs/history/`, M9 source lists → `docs/research/`, `docs/COMPETITORS.md`; references updated; `docs/quickstart.md` DB steps fixed for the app role)
+- [ ] Repo hygiene: untrack previews/ + training/traces + docs scratch; remove dead vault primitives and duplicate `/api/websites` tree (done: 14 zero-importer files removed from `components/vault/primitives`. Left: `/api/websites` — the "duplicate of `/api/sites`" claim is unverified and `scripts/verify-m11-security.mjs` checks routes under it)
 
 ## Phase 4 — next builds (PRs 4a…)
 - [ ] Observability: `/api/health`, compose app healthcheck, Sentry/OTel hooks, structured logging; backup job
