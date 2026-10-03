@@ -96,8 +96,7 @@ export interface WebhookEventStore {
 }
 
 /** In-memory store (unit tests / batteries). Production uses the Prisma store. */
-export function memoryWebhookEventStore(): WebhookEventStore {
-  const seen = new Set<string>();
+export function memoryWebhookEventStore(seen: Set<string> = new Set<string>()): WebhookEventStore {
   return {
     async claim({ provider, eventId }) {
       const key = `${provider}:${eventId}`;
@@ -111,7 +110,8 @@ export function memoryWebhookEventStore(): WebhookEventStore {
   };
 }
 
-const defaultEventStore = memoryWebhookEventStore();
+const defaultClaims = new Set<string>();
+const defaultEventStore = memoryWebhookEventStore(defaultClaims);
 
 export interface WebhookDeps {
   sequences: SequenceStore;
@@ -233,7 +233,7 @@ async function processWebhookEvent(
   return { provider: opts.provider, eventId: payload.eventId, type: payload.type, handled, duplicate: false };
 }
 
-/** Test seam: clear the in-process idempotency set. */
+/** Test seam: forget the default in-memory claims (the Prisma store is durable). */
 export function __clearWebhookIdempotency(): void {
-  seenEventIds.clear();
+  for (const key of [...defaultClaims]) defaultClaims.delete(key);
 }

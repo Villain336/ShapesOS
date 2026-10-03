@@ -10,7 +10,7 @@ import { isPlatformOperator, platformOperatorList } from "../platform-operator";
 import { requirePlatformOperator } from "../require-platform-operator";
 
 const ROOT = join(__dirname, "..", "..", "..");
-const ENV = { MARKETR_PLATFORM_OPERATORS: " ops@example.com , user_op " } as NodeJS.ProcessEnv;
+const ENV = { MARKETR_PLATFORM_OPERATORS: " ops@example.com , user_op " } as unknown as NodeJS.ProcessEnv;
 
 describe("isPlatformOperator", () => {
   it("nobody is an operator when unset (fail closed)", () => {
