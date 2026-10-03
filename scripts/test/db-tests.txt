@@ -31,6 +31,7 @@ lib/integrations/actions/__tests__/separation-of-duties.test.ts
 lib/integrations/activepieces/__tests__/bindings-db.test.ts
 lib/intelligence/company/__tests__/knowledge-rls.test.ts
 lib/mcp/__tests__/mcp-auth-roles.test.ts
+lib/metering/__tests__/credits-integrity-db.test.ts
 lib/messaging/__tests__/inbound-sms-workspace.test.ts
 lib/ops/__tests__/ops-consume-db.test.ts
 lib/ops/__tests__/ops-rls.test.ts

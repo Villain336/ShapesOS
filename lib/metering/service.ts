@@ -13,7 +13,7 @@
 //   T6 rollover — period rollover happens inside the same locked transaction
 //        before the charge lands, so a charge can never count twice.
 
-import { Prisma } from "@prisma/client";
+import { Prisma, type Plan } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { emitAlert } from "@/lib/alerts/evaluate";
 import {
@@ -271,6 +271,16 @@ export async function meter(opts: MeterOptions): Promise<MeterResult> {
         if (rolled) {
           usedCredits = 0;
           if (purchasedExpiresAt && now > purchasedExpiresAt) {
+            // applyTopUp raised the cap by every purchased credit; expiring
+            // them must take that headroom back too, or the expired credits
+            // stay spendable (unpaid, and unbilled without auto-overage).
+            // Lowered by exactly the expired amount, so an admin's own
+            // headroom above or below the pool is kept; never below 0.
+            if (purchasedCredits > 0) {
+              const capCredits = Math.max(0, cap.capCredits - purchasedCredits);
+              await tx.spendCap.update({ where: { workspaceId }, data: { capCredits } });
+              cap.capCredits = capCredits;
+            }
             purchasedCredits = 0;
             purchasedExpiresAt = null;
           }
@@ -515,6 +525,29 @@ export async function applyTopUp(
     const capCredits = cap.capCredits + topUp.creditsAdded;
     await tx.spendCap.update({ where: { workspaceId }, data: { capCredits } });
     return { purchasedCredits, capCredits };
+  });
+}
+
+/**
+ * Plan change: set the workspace's plan tier AND re-sync its credit pool in
+ * ONE locked transaction (balance + cap rows FOR UPDATE, so concurrent
+ * meter() calls serialize behind it). includedCredits follows the plan; the
+ * cap moves by the same delta — an upgrade raises it, a downgrade lowers it
+ * — so any headroom an admin set relative to the pool is preserved. Floor 0.
+ */
+export async function applyPlanChange(
+  workspaceId: string,
+  plan: Plan,
+): Promise<{ includedCredits: number; capCredits: number }> {
+  return prisma.$transaction(async (tx) => {
+    const bal = await lockBalance(tx, workspaceId);
+    const cap = await lockSpendCap(tx, workspaceId, bal.includedCredits + bal.purchasedCredits);
+    await tx.workspace.update({ where: { id: workspaceId }, data: { plan } });
+    const includedCredits = includedCreditsForPlan(plan);
+    const capCredits = Math.max(0, cap.capCredits + (includedCredits - bal.includedCredits));
+    await tx.creditBalance.update({ where: { workspaceId }, data: { includedCredits } });
+    await tx.spendCap.update({ where: { workspaceId }, data: { capCredits } });
+    return { includedCredits, capCredits };
   });
 }
 

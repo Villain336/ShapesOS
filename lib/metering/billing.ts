@@ -14,7 +14,7 @@
 import Stripe from "stripe";
 import { Prisma, type BillingOverageInvoice, type Plan } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { applyTopUp, setSpendCap } from "./service";
+import { applyPlanChange, applyTopUp, setSpendCap } from "./service";
 import { TOPUP_PACKS, OVERAGE_CREDITS_PER_CENT } from "./credits";
 import {
   PLANS,
@@ -1384,7 +1384,9 @@ function subscriptionPeriodEnd(sub: Stripe.Subscription): Date | null {
  * signed Stripe webhook paths in this module — never from UI input.
  */
 async function setWorkspacePlan(workspaceId: string, planId: Plan, reason: string): Promise<void> {
-  await prisma.workspace.update({ where: { id: workspaceId }, data: { plan: planId } });
+  // Plan + included pool + cap move together (one locked transaction) —
+  // an upgraded workspace is never left capped at the old tier's pool.
+  await applyPlanChange(workspaceId, planId);
   await auditBilling(workspaceId, `Billing: plan set to ${planId} (${reason})`);
 }
 
