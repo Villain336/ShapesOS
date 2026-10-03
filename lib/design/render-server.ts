@@ -25,12 +25,13 @@
 //    { ok: false, error }; rasterization surprises are logged server-side
 //    and surfaced as a light "Render failed" message.
 
-import { promises as dns } from "node:dns";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import sharp from "sharp";
 
+import { safeFetch } from "@/lib/connectors/safe-fetch";
+import { isBlockedAddress, UnsafeUrlError } from "@/lib/safe-url";
 import { exportPageToSvg } from "./export-svg";
 import { validateDesignDocument } from "./validate";
 import { INTER_WOFF2 } from "./render/inter-fonts";
@@ -121,51 +122,19 @@ function ensureRenderFonts(): void {
 
 // ── Image resolution ─────────────────────────────────────────────────────
 
-/** True for IPv4/IPv6 addresses that must never be fetched server-side. */
+/**
+ * True for IPv4/IPv6 addresses that must never be fetched server-side.
+ * Delegates to the shared SSRF classifier (lib/safe-url.ts): every
+ * special-purpose range, plus IPv6 forms that embed a blocked IPv4 address.
+ */
 export function isBlockedIp(ip: string): boolean {
-  if (ip.includes(":")) return true; // block all IPv6 (loopback, link-local, ULA)
-  const parts = ip.split(".").map(Number);
-  if (
-    parts.length !== 4 ||
-    parts.some((p) => !Number.isInteger(p) || p < 0 || p > 255)
-  )
-    return true;
-  const [a, b] = parts;
-  return (
-    a === 0 || // "this network"
-    a === 10 || // RFC1918
-    a === 127 || // loopback
-    (a === 172 && b >= 16 && b <= 31) || // RFC1918
-    (a === 192 && b === 168) || // RFC1918
-    (a === 169 && b === 254) || // link-local incl. cloud metadata
-    (a === 100 && b >= 64 && b <= 127) || // CGNAT
-    a >= 224 // multicast + reserved
-  );
+  return isBlockedAddress(ip);
 }
 
 export interface ImageResolveDeps {
   fetchImpl?: typeof fetch;
   /** Test seam: host → addresses (defaults to real DNS). */
   resolveHost?: (hostname: string) => Promise<string[]>;
-}
-
-async function resolveHostSafe(
-  hostname: string,
-  resolveHost?: ImageResolveDeps["resolveHost"],
-): Promise<void> {
-  const addrs = resolveHost
-    ? await resolveHost(hostname).catch(() => {
-        throw new Error("unresolvable host");
-      })
-    : await dns
-        .lookup(hostname, { all: true })
-        .then((all) => all.map((a) => a.address))
-        .catch(() => {
-          throw new Error("unresolvable host");
-        });
-  if (addrs.length === 0 || addrs.some(isBlockedIp)) {
-    throw new Error("blocked host");
-  }
 }
 
 let placeholderCache: string | null = null;
@@ -195,16 +164,20 @@ async function fetchImageDataUrl(
   url: string,
   deps: ImageResolveDeps,
 ): Promise<string> {
-  const parsed = new URL(url);
-  await resolveHostSafe(parsed.hostname, deps.resolveHost);
-  const fetchImpl = deps.fetchImpl ?? fetch;
-  const res = await fetchImpl(url, {
-    signal: AbortSignal.timeout(IMAGE_FETCH_TIMEOUT_MS),
-    redirect: "follow",
-  });
+  // safeFetch validates DNS before EVERY hop (redirects are followed
+  // manually), so an intermediate redirect can't reach an internal address.
+  let res: Response;
+  try {
+    res = await safeFetch(
+      url,
+      { signal: AbortSignal.timeout(IMAGE_FETCH_TIMEOUT_MS) },
+      { fetchFn: deps.fetchImpl, resolve: deps.resolveHost },
+    );
+  } catch (err) {
+    if (err instanceof UnsafeUrlError) throw new Error("blocked host");
+    throw err;
+  }
   if (!res.ok) throw new Error(`http ${res.status}`);
-  // Re-check after redirects (response.url is the final URL).
-  await resolveHostSafe(new URL(res.url || url).hostname, deps.resolveHost);
   const contentType = (res.headers.get("content-type") ?? "").split(";")[0].trim();
   if (!contentType.startsWith("image/")) throw new Error("not an image");
   const reader = res.body?.getReader();

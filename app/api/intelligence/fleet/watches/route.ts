@@ -11,6 +11,7 @@ import { requireUser, getOrCreateWorkspace } from "@/lib/session";
 import { requireProjectRole } from "@/lib/authz";
 import { withWorkspaceScope } from "@/lib/substrate/graph/rls";
 import { normalizeDomain } from "@/lib/competitors";
+import { assertSafeUrl, UnsafeUrlError } from "@/lib/safe-url";
 
 export async function GET(req: NextRequest) {
   const user = await requireUser();
@@ -69,6 +70,16 @@ export async function POST(req: NextRequest) {
   let sitemapUrl: string | null = (body.sitemapUrl ?? "").trim() || null;
   if (sitemapUrl && !/^https?:\/\//i.test(sitemapUrl)) {
     return Response.json({ error: "sitemapUrl must be an absolute http(s) URL" }, { status: 400 });
+  }
+  if (sitemapUrl) {
+    // H8: refuse internal targets up front (the fleet's safeFetch re-checks
+    // every request and redirect hop at crawl time too).
+    try {
+      await assertSafeUrl(sitemapUrl);
+    } catch (err) {
+      const msg = err instanceof UnsafeUrlError ? err.message : "sitemapUrl is not allowed";
+      return Response.json({ error: `sitemapUrl refused: ${msg}` }, { status: 400 });
+    }
   }
 
   const workspaceId = (await getOrCreateWorkspace(user.id, user.email)).id;

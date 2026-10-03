@@ -4,6 +4,7 @@
 // injectable fetchImpl so tests never touch the network.
 
 import type { PrismaClient } from "@prisma/client";
+import { safeFetch } from "@/lib/connectors/safe-fetch";
 import { parseSkillMd } from "./frontmatter";
 import { getRegistryPack, listRegistryPacks } from "./registry";
 import type { UrlSkillPreview } from "./types";
@@ -81,6 +82,27 @@ export async function installFromRegistry(
 
 type FetchImpl = (url: string, init?: RequestInit) => Promise<Response>;
 
+/**
+ * Default fetch for URL imports: SSRF-guarded (per-request DNS validation,
+ * every redirect hop re-checked, credentials dropped cross-origin). A direct
+ * SKILL.md URL is operator-supplied, so it must never reach internal hosts.
+ */
+export const safeImportFetch: FetchImpl = (url, init) => {
+  // E2E TEST SEAM: the Playwright suite serves its fixture SKILL.md from the
+  // app itself (localhost /api/e2e/...). Only that path, only with
+  // E2E_MOCK_OAUTH=1 — the same gate as every other E2E seam.
+  if (process.env.E2E_MOCK_OAUTH === "1" && isE2eFixtureUrl(url)) return fetch(url, init);
+  return safeFetch(url, init ?? {});
+};
+
+function isE2eFixtureUrl(url: string): boolean {
+  try {
+    return new URL(url).pathname.startsWith("/api/e2e/");
+  } catch {
+    return false;
+  }
+}
+
 function isGithubRepoUrl(url: URL): boolean {
   return url.hostname.toLowerCase() === "github.com";
 }
@@ -97,7 +119,7 @@ function isGithubRepoUrl(url: URL): boolean {
  */
 export async function previewFromUrl(
   url: string,
-  fetchImpl: FetchImpl = fetch,
+  fetchImpl: FetchImpl = safeImportFetch,
 ): Promise<UrlSkillPreview> {
   const warnings: string[] = [];
   let parsedUrl: URL;

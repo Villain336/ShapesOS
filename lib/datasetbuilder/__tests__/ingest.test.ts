@@ -202,14 +202,17 @@ describe("ingestWeb", () => {
   // Patch global fetch for the crawl path only.
   const realFetch = globalThis.fetch;
 
+  const publicDns = async () => ["93.184.216.34"];
+
   it("crawls a URL and chunks with the URL as source pointer", async () => {
     globalThis.fetch = fakeFetch;
     try {
       const store = makeStore();
-      const result = await ingestWeb(store, {
-        workspaceId: WS,
-        url: "https://acme.example/faq",
-      });
+      const result = await ingestWeb(
+        store,
+        { workspaceId: WS, url: "https://acme.example/faq" },
+        { resolve: publicDns },
+      );
       assert.equal(result.source.kind, "web");
       assert.equal(result.source.externalRef, "https://acme.example/faq");
       assert.equal(result.document.status, "ready");
@@ -229,6 +232,51 @@ describe("ingestWeb", () => {
       (e) =>
         e instanceof DatasetBuilderError && e.code === "VALIDATION_FAILED",
     );
+  });
+
+  it("refuses internal targets before creating any row (H7 SSRF)", async () => {
+    let fetched = 0;
+    const spy = (async () => {
+      fetched++;
+      return new Response("secret", { status: 200, headers: { "content-type": "text/html" } });
+    }) as typeof fetch;
+    for (const url of [
+      "http://169.254.169.254/latest/meta-data/",
+      "http://[::ffff:a9fe:a9fe]/latest/meta-data/",
+      "http://localhost:3000/api/admin",
+      "https://internal.example/",
+    ]) {
+      const store = makeStore();
+      await assert.rejects(
+        () =>
+          ingestWeb(store, { workspaceId: WS, url }, {
+            fetchImpl: spy,
+            resolve: async () => ["10.0.0.7"],
+          }),
+        (e) => e instanceof DatasetBuilderError && e.code === "VALIDATION_FAILED",
+      );
+      assert.equal((await store.listSources(WS)).length, 0);
+    }
+    assert.equal(fetched, 0);
+  });
+
+  it("does not follow a redirect into an internal address", async () => {
+    const calls: string[] = [];
+    const redirecting = (async (u: string | URL | Request) => {
+      calls.push(String(u));
+      return new Response(null, { status: 302, headers: { location: "http://169.254.169.254/latest/" } });
+    }) as typeof fetch;
+    const store = makeStore();
+    await assert.rejects(
+      () =>
+        ingestWeb(
+          store,
+          { workspaceId: WS, url: "https://acme.example/faq" },
+          { fetchImpl: redirecting, resolve: publicDns },
+        ),
+      (e) => e instanceof DatasetBuilderError && e.code === "FETCH_FAILED",
+    );
+    assert.deepEqual(calls, ["https://acme.example/faq"]);
   });
 
   it("rejects malformed URLs", async () => {

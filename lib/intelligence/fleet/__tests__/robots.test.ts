@@ -120,6 +120,7 @@ describe("runChangeDetection robots enforcement", () => {
 
     const fetcher = new PoliteFetcher({
       fetchImpl,
+      resolve: async () => ["93.184.216.34"],
       minDelayMs: 0, // speed up the test; the politeness suite covers delays
       sleep: async () => {},
     });
@@ -164,6 +165,7 @@ describe("runChangeDetection robots enforcement", () => {
       new PoliteFetcher({
         fetchImpl: (async () =>
           new Response(html, { status: 200, headers: { "content-type": "text/html" } })) as typeof fetch,
+        resolve: async () => ["93.184.216.34"],
         minDelayMs: 0,
         sleep: async () => {},
       });

@@ -257,4 +257,22 @@ describe("renderDocumentToPng — images", () => {
     assert.equal(ok.warnings.length, 1);
     assert.equal(ok.warnings[0].elementId, "img-3");
   });
+
+  it("never follows a redirect hop into an internal address (blind SSRF)", async () => {
+    const seen: string[] = [];
+    const redirecting = (async (u: string | URL | Request) => {
+      seen.push(String(u));
+      return new Response(null, { status: 302, headers: { location: "http://[::ffff:a9fe:a9fe]/latest/" } });
+    }) as typeof fetch;
+    const doc = fixtureDoc({ id: "img-4", src: "https://cdn.example.com/a.png" });
+    const r = await renderDocumentToPng(doc, {}, {
+      fetchImpl: redirecting,
+      resolveHost: async () => ["93.184.216.34"],
+    });
+    assert.equal(r.ok, true);
+    assert.deepEqual(seen, ["https://cdn.example.com/a.png"], "the internal hop is never requested");
+    const ok = r as RenderSuccess;
+    assert.equal(ok.warnings.length, 1);
+    assert.match(ok.warnings[0].message, /blocked host/);
+  });
 });
