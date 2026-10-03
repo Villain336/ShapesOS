@@ -74,6 +74,10 @@ function fixtures() {
     mailApproval: both((ws) => [
       { id: `${ws}_mail`, status: "pending", pieceCount: 500, maxSpendCents: 40_000, createdAt: at(20), campaign: { workspaceId: ws, name: "Fall postcard" } },
     ]),
+    socialPublication: both((ws) => [
+      { id: `${ws}_social`, workspaceId: ws, status: "pending_approval", content: "Launch post", media: [{ fileId: "f1" }], channels: [{ id: "c1", name: "Our X" }], publishMode: "now", scheduledFor: null, requestedBy: "u_editor", requestedAt: at(21), createdAt: at(21) },
+      { id: `${ws}_social_draft`, workspaceId: ws, status: "draft", content: "Not yet", media: [], channels: [], publishMode: "now", scheduledFor: null, requestedBy: null, requestedAt: null, createdAt: at(22) },
+    ]),
     workspaceMember: [
       { workspaceId: A, userId: "u_editor", name: "Eddie Editor", email: "eddie@example.com" },
       { workspaceId: A, userId: "u_owner", name: null, email: "owner@example.com" },
@@ -114,8 +118,9 @@ describe("approvals inbox: workspace scoping", () => {
   it("RLS-protected queues run inside the tenant scope for the viewer's workspace", async () => {
     const h = harness();
     await loadInbox(viewer("owner"), h.opts);
-    // mission_approvals, report_send_approvals, composio_action_approvals
-    assert.equal(h.scoped.length, 3);
+    // mission_approvals, report_send_approvals, composio_action_approvals,
+    // social_publications
+    assert.equal(h.scoped.length, 4);
     assert.ok(h.scoped.every((w) => w === A));
   });
 
@@ -130,7 +135,24 @@ describe("approvals inbox: workspace scoping", () => {
     assert.ok(!ids.has(`${A}_env_human`), "a person's own draft is not an approval");
     assert.ok(ids.has(`${A}_nudge`), "unapproved nudge");
     assert.ok(!ids.has(`${A}_nudge2`), "approved nudge is gone");
-    assert.equal(res.total, 15);
+    assert.ok(ids.has(`${A}_social`), "submitted social post");
+    assert.ok(!ids.has(`${A}_social_draft`), "a draft post is not an approval");
+    assert.equal(res.total, 16);
+  });
+
+  it("social posts: inline decision API, and no self-approval while another approver exists", async () => {
+    const h = harness();
+    const asRequester = await loadInbox(viewer("editor", { userId: "u_editor" }), h.opts);
+    const own = asRequester.items.find((i) => i.id === `${A}_social`)!;
+    assert.equal(own.source, "social");
+    assert.equal(own.canDecide, false);
+    assert.match(own.blockedReason ?? "", /Someone else approves/);
+    const solo = await loadInbox(viewer("editor", { userId: "u_editor", hasOtherApprover: false }), h.opts);
+    const mine = solo.items.find((i) => i.id === `${A}_social`)!;
+    assert.equal(mine.canDecide, true);
+    assert.equal(mine.approve?.url, `/api/social/posts/${A}_social/decision`);
+    assert.deepEqual(mine.approve?.body, { decision: "approve" });
+    assert.equal(mine.href, `/dashboard/social?post=${A}_social`);
   });
 
   it("insurance governed actions are their own queue, not messaging", async () => {

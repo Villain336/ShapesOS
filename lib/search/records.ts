@@ -2,7 +2,8 @@
 //
 // One query, many record types, always inside the caller's workspace:
 // leads, invoices, Office docs, files, SEO projects, ops projects, missions,
-// CAD projects, e-sign envelopes, legal documents and agency clients.
+// CAD projects, e-sign envelopes, legal documents, agency clients and social
+// posts.
 // Every source runs in ONE withWorkspaceScope transaction, so FORCE-RLS
 // tables (ops_invoices, ops_projects, univer_docs, missions) are filtered by
 // Postgres itself, and every statement also carries an explicit
@@ -43,6 +44,7 @@ export const RECORD_MIN_ROLE: Record<RecordKind, WorkspaceRole> = {
   // page reads at viewer).
   bom_line: "viewer",
   dataset: "viewer",
+  social_post: "viewer",
 };
 
 export interface RecordHit {
@@ -264,6 +266,19 @@ const SOURCES: Record<RecordKind, { query: SourceQuery; hit: (r: Row) => Omit<Re
       title: `${r.title ?? "Dataset"} dataset`,
       subtitle: r.sub ? `Dataset · latest ${r.sub}` : "Dataset · not compiled yet",
       href: "/dashboard/datasets?tab=build",
+  // Phase 4b: social posts (FORCE RLS; the scope transaction filters them).
+  social_post: {
+    query: (tx, ws, q, p, n) => tx.$queryRaw<Row[]>`
+      SELECT id, left(regexp_replace(content, '[[:space:]]+', ' ', 'g'), 120) AS title, status::text AS sub, NULL::text AS extra, NULL::int AS n
+        FROM social_publications
+       WHERE workspace_id = ${ws} AND content ILIKE ${p}
+       ORDER BY similarity(content, ${q}) DESC, updated_at DESC
+       LIMIT ${n}`,
+    hit: (r) => ({
+      id: r.id,
+      title: r.title || "Social post",
+      subtitle: r.sub ? `Social · ${r.sub.replace(/_/g, " ")}` : "Social",
+      href: `/dashboard/social?post=${encodeURIComponent(r.id)}`,
     }),
   },
 };

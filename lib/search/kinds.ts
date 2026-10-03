@@ -16,6 +16,7 @@ export const RECORD_KINDS = [
   // Phase 4b
   "bom_line",
   "dataset",
+  "social_post",
 ] as const;
 export type RecordKind = (typeof RECORD_KINDS)[number];
 
@@ -33,4 +34,5 @@ export const RECORD_KIND_LABELS: Record<RecordKind, string> = {
   client: "Client",
   bom_line: "BOM part",
   dataset: "Dataset",
+  social_post: "Social post",
 };

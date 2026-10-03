@@ -76,6 +76,20 @@ export const NotificationCreatedData = z.object({
   sourceId: z.string().nullable(),
 });
 
+/** Phase 4b: a social post went live on every target channel. */
+export const SocialPostPublishedData = z.object({
+  id: z.string().describe("ShapesOS social post id (also the utm_content of its links)"),
+  title: z.string(),
+  platforms: z.array(z.string()).describe("Normalized platform keys, e.g. x, linkedin"),
+  mediaCount: z.number().int(),
+  link: z.string().nullable(),
+  utmCampaign: z.string().nullable(),
+  source: z.string().describe("compose, studio or ads"),
+  provider: z.string().nullable(),
+  releaseUrls: z.array(z.string()),
+  publishedAt: isoDate,
+});
+
 export const PingData = z.object({
   message: z.string(),
 });
@@ -133,6 +147,7 @@ export const WEBHOOK_EVENT_SCHEMAS = {
   "agent_run.finished": AgentRunData,
   "agent_run.failed": AgentRunData,
   "notification.created": NotificationCreatedData,
+  "social_post.published": SocialPostPublishedData,
   "webhook.ping": PingData,
   // Phase 4b
   "cad.bom_derived": CadBomDerivedData,
@@ -158,6 +173,7 @@ export const WEBHOOK_EVENT_LABELS: Record<WebhookEventType, string> = {
   "agent_run.finished": "An agent run finishes",
   "agent_run.failed": "An agent run fails",
   "notification.created": "A notification is created",
+  "social_post.published": "A social post is published",
   "webhook.ping": "Test event",
   // Phase 4b
   "cad.bom_derived": "A CAD BOM is derived from geometry",
