@@ -55,6 +55,13 @@ export const NODE_CATALOG: Record<WorkflowNodeKind, NodeTypeDef[]> = {
           hint: "Minute hour day month weekday. Checked every minute by /api/cron/workflows.",
           required: true,
         },
+        {
+          key: "timezone",
+          label: "Timezone (IANA)",
+          type: "text",
+          placeholder: "America/New_York",
+          hint: "The cron is read in this timezone. Blank = the workflow's timezone (UTC by default).",
+        },
       ],
     },
     {
