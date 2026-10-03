@@ -90,7 +90,27 @@ export interface AllocationRule {
   totalSqft?: number | null;
 }
 
-export function validateAllocationRule(rule: Partial<AllocationRule>): {
+/**
+ * A numeric input from a form/JSON body. Missing values — undefined, null, an
+ * empty or whitespace-only string — are NaN, never 0 (`Number("")` is 0,
+ * which silently turned a blank percent into a 0% deduction). Booleans,
+ * arrays and objects are NaN too.
+ */
+export function numericInput(value: unknown): number {
+  if (typeof value === "number") return value;
+  if (typeof value === "string" && value.trim() !== "") return Number(value.trim());
+  return NaN;
+}
+
+/** Raw (unparsed) allocation fields as they arrive from a request body. */
+export interface AllocationRuleInput {
+  method?: AllocationMethod | string;
+  percent?: unknown;
+  officeSqft?: unknown;
+  totalSqft?: unknown;
+}
+
+export function validateAllocationRule(rule: AllocationRuleInput | Partial<AllocationRule>): {
   ok: boolean;
   errors: string[];
   normalized?: AllocationRule;
@@ -101,10 +121,10 @@ export function validateAllocationRule(rule: Partial<AllocationRule>): {
     errors.push(`method: must be one of ${ALLOCATION_METHODS.join(", ")}`);
   }
 
-  let percent = Number(rule.percent);
+  let percent = numericInput(rule.percent);
   if (method === "square_footage") {
-    const office = Number(rule.officeSqft);
-    const total = Number(rule.totalSqft);
+    const office = numericInput(rule.officeSqft);
+    const total = numericInput(rule.totalSqft);
     if (!isFinite(office) || office <= 0) errors.push("officeSqft: required, positive");
     if (!isFinite(total) || total <= 0) errors.push("totalSqft: required, positive");
     if (isFinite(office) && isFinite(total) && office > total) {
@@ -112,20 +132,24 @@ export function validateAllocationRule(rule: Partial<AllocationRule>): {
     }
     if (errors.length === 0) percent = (office / total) * 100;
   } else {
-    if (!isFinite(percent) || percent < 0 || percent > 100) {
+    if (Number.isNaN(percent)) {
+      errors.push("percent: required (a number between 0 and 100)");
+    } else if (!isFinite(percent) || percent < 0 || percent > 100) {
       errors.push("percent: must be between 0 and 100");
     }
   }
 
   if (errors.length > 0) return { ok: false, errors };
+  const office = numericInput(rule.officeSqft);
+  const total = numericInput(rule.totalSqft);
   return {
     ok: true,
     errors: [],
     normalized: {
       method,
       percent: Math.round(percent * 100) / 100,
-      officeSqft: rule.officeSqft != null ? Number(rule.officeSqft) : null,
-      totalSqft: rule.totalSqft != null ? Number(rule.totalSqft) : null,
+      officeSqft: isFinite(office) ? office : null,
+      totalSqft: isFinite(total) ? total : null,
     },
   };
 }
