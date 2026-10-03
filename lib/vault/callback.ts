@@ -12,7 +12,7 @@
 import { prisma } from "@/lib/prisma";
 import { secrets } from "@/lib/secrets";
 import type { ConnectorConnection } from "@prisma/client";
-import { parseOAuthState, getOAuthConfig, type OAuthProviderConfig } from "./oauth";
+import { parseOAuthState, getOAuthConfig, buildTokenRequest, type OAuthProviderConfig } from "./oauth";
 
 export interface CallbackDeps {
   fetchImpl?: typeof fetch;
@@ -45,18 +45,15 @@ export async function exchangeCodeForTokens(
       `OAuth is not configured for "${connectorKey}": ${config.clientIdEnv}/${config.clientSecretEnv}`,
     );
   }
-  const body = new URLSearchParams({
-    grant_type: "authorization_code",
-    code,
-    redirect_uri: redirectUri,
-    client_id: clientId,
-    client_secret: clientSecret,
-  });
-  const res = await fetchImpl(config.tokenUrl, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
-    body,
-  });
+  const res = await fetchImpl(
+    config.tokenUrl,
+    buildTokenRequest(
+      config,
+      { grant_type: "authorization_code", code, redirect_uri: redirectUri },
+      clientId,
+      clientSecret,
+    ),
+  );
   if (!res.ok) {
     throw new Error(`Token exchange failed for "${connectorKey}" (HTTP ${res.status})`);
   }
