@@ -95,6 +95,9 @@ export const tdNum = "px-3 py-2.5 align-top text-right text-[13px] tabular-nums 
 const chipBase = "inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-canvas px-2 py-0.5 text-[12px] font-semibold text-ink";
 
 /** Post state: needs-you triangle for approvals, done/failed shapes, queued outline when handed off. */
+/** Post state. Status shapes are reserved for agent states (DESIGN.md);
+ *  only "needs approval" keeps the needs-you triangle, since it sits in the
+ *  approvals inbox. Everything else is a text label. */
 export function StatusChip({ status, scheduledFor }: { status: PostStatus; scheduledFor?: string | null }) {
   const due = isPast(scheduledFor ?? null);
   switch (status) {
@@ -108,29 +111,17 @@ export function StatusChip({ status, scheduledFor }: { status: PostStatus; sched
     case "approved":
     case "scheduled":
       return due ? (
-        <span className={chipBase}>
-          <span className="aos-shape aos-shape--running aos-is-live" role="img" aria-label="Publishing" />
-          Publishing
-        </span>
+        <span className={chipBase}>Publishing</span>
       ) : (
-        <span className={chipBase}>
-          <span className="aos-shape aos-shape--queued" role="img" aria-label="Scheduled" />
-          Scheduled
-        </span>
+        <span className={`${chipBase} text-muted`}>Scheduled</span>
       );
     case "published":
       return (
-        <span className={chipBase}>
-          <span className="aos-shape aos-shape--done" role="img" aria-label="Published" />
-          Published
-        </span>
+        <span className={chipBase}>Published</span>
       );
     case "failed":
       return (
-        <span className={chipBase}>
-          <span className="aos-shape aos-shape--failed" role="img" aria-label="Failed" />
-          Failed
-        </span>
+        <span className={`${chipBase} text-failed-text`}>Failed</span>
       );
     case "cancelled":
       return <span className={`${chipBase} text-muted`}>Cancelled</span>;

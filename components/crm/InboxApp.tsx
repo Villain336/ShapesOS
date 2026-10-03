@@ -109,16 +109,17 @@ function ChannelIcon({ channel, size = 13 }: { channel: string; size?: number })
   );
 }
 
+/** Delivery state as text. Status shapes are reserved for agent states
+ *  (DESIGN.md); only a message waiting on approval keeps the needs-you
+ *  triangle, since it sits in the approvals inbox. */
 function StatusMark({ m }: { m: ThreadMessage }) {
   const { mark, label } = messageMark(m);
   return (
-    <span className="inline-flex items-center gap-1 text-[11.5px] font-semibold text-muted">
-      {mark ? (
-        <span
-          aria-hidden
-          className={`aos-shape aos-shape--${mark}${mark === "needs" ? " aos-shape--edged" : ""}`}
-          style={{ ["--aos-shape-size" as string]: "9px" }}
-        />
+    <span
+      className={`inline-flex items-center gap-1 text-[11.5px] font-semibold ${mark === "failed" ? "text-failed-text" : "text-muted"}`}
+    >
+      {mark === "needs" ? (
+        <span aria-hidden className="aos-shape aos-shape--needs aos-shape--edged" style={{ ["--aos-shape-size" as string]: "9px" }} />
       ) : null}
       {label}
     </span>

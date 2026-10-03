@@ -463,18 +463,21 @@ function CalendarView({ posts, onOpen }: { posts: Post[]; onOpen: (p: Post) => v
   );
 }
 
+/** Calendar marker. Status shapes are reserved for agent states
+ *  (DESIGN.md): only "needs approval" keeps the needs-you triangle; a failed
+ *  post reads "Failed" in failed-text; the rest are screen-reader text. */
 function StatusDot({ status }: { status: PostStatus }) {
-  const cls =
-    status === "pending_approval"
-      ? "aos-shape aos-shape--needs aos-shape--edged"
-      : status === "published"
-        ? "aos-shape aos-shape--done"
-        : status === "failed"
-          ? "aos-shape aos-shape--failed"
-          : status === "scheduled" || status === "approved"
-            ? "aos-shape aos-shape--queued"
-            : null;
   const label = status.replace(/_/g, " ");
-  if (!cls) return <span className="sr-only">{label}</span>;
-  return <span className={cls} style={{ ["--aos-shape-size" as string]: "8px" }} role="img" aria-label={label} />;
+  if (status === "pending_approval") {
+    return (
+      <span
+        className="aos-shape aos-shape--needs aos-shape--edged"
+        style={{ ["--aos-shape-size" as string]: "8px" }}
+        role="img"
+        aria-label={label}
+      />
+    );
+  }
+  if (status === "failed") return <span className="text-[10px] font-semibold text-failed-text">Failed</span>;
+  return <span className="sr-only">{label}</span>;
 }

@@ -1,8 +1,10 @@
 // Marketr — Postiz sidecar: posts (Phase 12).
 // GET  /api/integrations/postiz/posts?from=&to= → { posts }
-// POST /api/integrations/postiz/posts { type: "now"|"schedule"|"draft", date?, content, channelIds, platformTypes? }
-//   → schedules or publishes via the Postiz public API (raw fetch, no SDK).
-// Publishing is a real-world action: the UI confirms before calling this.
+// POST /api/integrations/postiz/posts { type: "draft", content, channelIds, platformTypes? }
+//   → creates a Postiz DRAFT via the public API (raw fetch, no SDK).
+// Phase 4b: publishing ("now"/"schedule") goes through the ShapesOS social
+// composer (/api/social/posts → submit → approval inbox) only; this legacy
+// route no longer publishes, so it can't bypass approval. Those types → 409.
 
 import { z } from "zod";
 import { guardWorkspace, readJson, sidecarError } from "../../_lib";
@@ -52,6 +54,15 @@ export async function POST(req: Request) {
       return Response.json({ error: "Invalid input", issues: parsed.error.issues }, { status: 400 });
     }
     const d = parsed.data;
+    if (d.type !== "draft") {
+      return Response.json(
+        {
+          error: "Publishing needs approval. Create the post in Social and submit it for approval.",
+          code: "approval_required",
+        },
+        { status: 409 },
+      );
+    }
     const result = await schedulePostizPost({
       type: d.type as PostizPostType,
       date: d.date,

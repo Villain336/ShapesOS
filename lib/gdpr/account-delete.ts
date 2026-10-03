@@ -133,6 +133,15 @@ export const PERSONAL_TABLES: readonly { table: string; column: string }[] = [
 ];
 
 /**
+ * Per-user rows in FORCE-RLS tables: deleted inside each remaining
+ * workspace's scope (solo workspaces cascade with the workspace itself).
+ */
+export const PERSONAL_RLS_TABLES: readonly { table: string; column: string }[] = [
+  { table: "push_devices", column: "user_id" },
+  { table: "conversation_reads", column: "user_id" },
+];
+
+/**
  * Tables whose person references are kept as they are:
  *   workspaces / workspace_members  handled explicitly (ownership, membership)
  *   workspace_lifecycle_events      the platform's own record of who created
@@ -144,7 +153,7 @@ export const KEEP_REFERENCES: readonly string[] = ["workspaces", "workspace_memb
 
 /** Columns pseudonymized on account deletion (catalog-driven; pure). */
 export function pseudonymizeTargets(catalog: Catalog): { table: string; columns: string[]; rls: boolean }[] {
-  const skip = new Set([...PERSONAL_TABLES.map((p) => p.table), ...KEEP_REFERENCES]);
+  const skip = new Set([...PERSONAL_TABLES.map((p) => p.table), ...PERSONAL_RLS_TABLES.map((p) => p.table), ...KEEP_REFERENCES]);
   const out: { table: string; columns: string[]; rls: boolean }[] = [];
   for (const name of [...catalog.keys()].sort()) {
     if (skip.has(name)) continue;
@@ -262,6 +271,13 @@ export async function deleteAccount(opts: {
         referencesPseudonymized += await tx.$executeRaw`
           UPDATE "file_change_log" SET "summary" = replace("summary", ${email}, '[deleted user]')
            WHERE "summary" ILIKE ${`%${email.replace(/[\\%_]/g, (c) => `\\${c}`)}%`}`;
+      }
+      for (const p of PERSONAL_RLS_TABLES) {
+        if (!catalog.has(p.table)) continue;
+        for (const ws of scopeWorkspaces) {
+          await tx.$queryRaw`SELECT set_config(${WORKSPACE_GUC}, ${ws}, true)`;
+          personalRowsDeleted += await tx.$executeRawUnsafe(`DELETE FROM ${q(p.table)} WHERE ${q(p.column)} = $1`, userId);
+        }
       }
       // Tombstone: no secrets, no email, only when the account was deleted.
       await tx.userSecurity.upsert({
