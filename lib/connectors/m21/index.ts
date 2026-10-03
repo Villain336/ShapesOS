@@ -12,7 +12,20 @@ import { McpConnectorClient } from "./mcp";
 export interface ConnectionRef {
   /** Built-in native key (e.g. "wordpress") or a custom Connector.key. */
   connectorKey: string;
-  connector?: { mcpEndpoint: string | null } | null;
+  /** `config` carries the admin read-only allow-list (`readOnlyTools`). */
+  connector?: { mcpEndpoint: string | null; config?: unknown } | null;
+}
+
+/**
+ * Admin allow-list of MCP tool names treated as read-only (H5), stored at
+ * Connector.config.readOnlyTools. Anything malformed → empty (fail closed:
+ * every tool stays mutating).
+ */
+export function readOnlyToolsFromConfig(config: unknown): string[] {
+  if (!config || typeof config !== "object" || Array.isArray(config)) return [];
+  const list = (config as Record<string, unknown>).readOnlyTools;
+  if (!Array.isArray(list)) return [];
+  return list.filter((t): t is string => typeof t === "string" && t.length > 0 && t.length <= 200);
 }
 
 interface CachedTools {
@@ -48,6 +61,7 @@ export class McpBackedAdapter implements ConnectorAdapter {
     connectorKey: string,
     displayName: string,
     private endpoint: string,
+    private readOnlyTools: readonly string[] = [],
   ) {
     this.key = connectorKey;
     this.displayName = displayName;
@@ -59,9 +73,16 @@ export class McpBackedAdapter implements ConnectorAdapter {
     );
   }
 
-  /** Async tool listing (cached per process, 5-min TTL). */
+  /**
+   * Async tool listing (cached per process, 5-min TTL). Cached defs carry
+   * only the server's own readOnlyHint; this connector's admin allow-list is
+   * applied on top (never cached across connectors sharing an endpoint).
+   */
   async listToolsAsync(): Promise<ConnectorToolDef[]> {
-    return listMcpToolsCached(this.endpoint);
+    const tools = await listMcpToolsCached(this.endpoint);
+    if (this.readOnlyTools.length === 0) return tools;
+    const allow = new Set(this.readOnlyTools);
+    return tools.map((t) => (allow.has(t.name) ? { ...t, mutating: false } : t));
   }
 
   async invoke(
@@ -99,5 +120,10 @@ export async function getAdapterForConnection(conn: ConnectionRef): Promise<Conn
       `Connector "${conn.connectorKey}" is not a built-in key and has no mcpEndpoint configured.`,
     );
   }
-  return new McpBackedAdapter(conn.connectorKey, conn.connectorKey, endpoint);
+  return new McpBackedAdapter(
+    conn.connectorKey,
+    conn.connectorKey,
+    endpoint,
+    readOnlyToolsFromConfig(conn.connector?.config),
+  );
 }

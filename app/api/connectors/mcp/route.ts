@@ -25,6 +25,9 @@ const BodySchema = z.object({
   name: boundedString(120, "name"),
   endpoint: boundedString(2000, "endpoint"),
   transport: z.string().trim().max(40).optional(),
+  // H5: tools are mutating (confirmation-gated) unless the server annotates
+  // them readOnlyHint or an admin allow-lists them here.
+  readOnlyTools: z.array(z.string().trim().min(1).max(200)).max(200).optional(),
 });
 
 async function guard(req: NextRequest, body: { workspaceId?: unknown } | null, userId: string) {
@@ -67,7 +70,7 @@ export async function POST(req: NextRequest) {
   const client = new McpConnectorClient();
   let tools: Array<{ name: string; description: string; mutating: boolean }>;
   try {
-    const info = await client.connect(endpoint);
+    const info = await client.connect(endpoint, { readOnlyTools: body.readOnlyTools ?? [] });
     tools = info.tools.map((t) => ({ name: t.name, description: t.description, mutating: t.mutating }));
   } catch (err) {
     return badRequest(`MCP handshake failed: ${err instanceof Error ? err.message : "unknown error"}`);
@@ -94,6 +97,7 @@ export async function POST(req: NextRequest) {
         endpoint,
         transport: body.transport ? body.transport : isStdio ? "stdio" : "http",
         toolCount: tools.length,
+        readOnlyTools: body.readOnlyTools ?? [],
       },
       mcpEndpoint: endpoint,
       createdBy: user.id,

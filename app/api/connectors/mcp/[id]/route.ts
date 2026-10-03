@@ -9,6 +9,8 @@ import { requireUser } from "@/lib/session";
 import { requirePermission, forbidden } from "@/lib/authz";
 import { workspaceIdFrom, badRequest, notFound } from "@/lib/route-utils";
 import { auditEvent } from "@/lib/auditlog";
+import { readJsonBody } from "@/lib/sitefiles/api";
+import { validateBody, z } from "@/lib/api/validate";
 
 export const dynamic = "force-dynamic";
 
@@ -51,4 +53,49 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     actorUserId: user.id,
   });
   return Response.json({ ok: true });
+}
+
+const PatchSchema = z.object({
+  workspaceId: z.string().trim().max(120).optional(),
+  readOnlyTools: z.array(z.string().trim().min(1).max(200)).max(200),
+});
+
+/**
+ * PATCH /api/connectors/mcp/[id]?workspaceId= { readOnlyTools: string[] }
+ * Admin allow-list of tools the agent may run WITHOUT confirmation (H5).
+ * Everything else on a custom MCP server is mutating (confirmation-gated)
+ * unless the server itself annotates it readOnlyHint. Audited.
+ */
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const user = await requireUser();
+  if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
+  const { id } = await params;
+  const v = validateBody(PatchSchema, await readJsonBody(req));
+  if (!v.ok) return v.error;
+  const workspaceId = workspaceIdFrom(req, v.data);
+  if (!workspaceId) return badRequest("workspaceId is required");
+  if (!(await requirePermission(user.id, workspaceId, "connectors.connect"))) {
+    return forbidden("connectors.connect permission required.");
+  }
+  const connector = await prisma.connector.findFirst({ where: { id, workspaceId } });
+  if (!connector) return notFound("Connector not found");
+  if (connector.kind !== "mcp") return badRequest("Only custom MCP connectors have a read-only allow-list");
+
+  const readOnlyTools = [...new Set(v.data.readOnlyTools)];
+  const prevConfig =
+    connector.config && typeof connector.config === "object" && !Array.isArray(connector.config)
+      ? (connector.config as Record<string, unknown>)
+      : {};
+  await prisma.connector.update({
+    where: { id: connector.id },
+    data: { config: { ...prevConfig, readOnlyTools } },
+  });
+  await auditEvent({
+    projectId: null,
+    workspaceId,
+    action: "settings_workspace_updated",
+    summary: `MCP connector "${connector.displayName}": read-only allow-list set to [${readOnlyTools.join(", ")}]`,
+    actorUserId: user.id,
+  });
+  return Response.json({ ok: true, readOnlyTools });
 }

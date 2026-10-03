@@ -27,6 +27,8 @@ export interface McpServerInfo {
 interface RawTool {
   name: string;
   description?: string | null;
+  /** MCP tool annotations (spec 2025-03-26+); only readOnlyHint is used. */
+  annotations?: { readOnlyHint?: unknown } | null;
   inputSchema?: {
     type?: string;
     properties?: Record<string, { type?: string; description?: string }>;
@@ -34,8 +36,22 @@ interface RawTool {
   } | null;
 }
 
-/** Convert an MCP tool schema to a ConnectorToolDef. Mutating is unknown from MCP → defaults false. */
-export function mcpToolToDef(raw: RawTool): ConnectorToolDef {
+/**
+ * Convert an MCP tool schema to a ConnectorToolDef.
+ *
+ * H5: a custom MCP server's tools are MUTATING BY DEFAULT, so the chat
+ * confirmation gate stops them (prompt-injected text from a file, connector
+ * read or recalled memory can't make the agent call send_/delete_/create_
+ * tools without a human "yes"). A tool counts as read-only only when the
+ * server annotates it `readOnlyHint: true` or a workspace admin allow-lists
+ * it (Connector.config.readOnlyTools).
+ */
+export function mcpToolToDef(
+  raw: RawTool,
+  opts: { readOnlyTools?: Iterable<string> } = {},
+): ConnectorToolDef {
+  const allowListed = new Set(opts.readOnlyTools ?? []);
+  const readOnly = raw.annotations?.readOnlyHint === true || allowListed.has(raw.name);
   const props: Record<string, { type: string; description: string }> = {};
   for (const [k, v] of Object.entries(raw.inputSchema?.properties ?? {})) {
     props[k] = {
@@ -46,7 +62,7 @@ export function mcpToolToDef(raw: RawTool): ConnectorToolDef {
   return {
     name: raw.name,
     description: raw.description ?? raw.name,
-    mutating: false,
+    mutating: !readOnly,
     argsSchema: {
       type: "object",
       properties: props,
@@ -65,7 +81,10 @@ export class McpConnectorClient {
    * - endpoint: Streamable-HTTP URL (all deployments), or
    * - stdio command (`stdio:<command> <args...>`) — self-hosted ONLY.
    */
-  async connect(endpoint: string): Promise<McpServerInfo> {
+  async connect(
+    endpoint: string,
+    opts: { readOnlyTools?: Iterable<string> } = {},
+  ): Promise<McpServerInfo> {
     if (this.client) throw new Error("McpConnectorClient already connected");
     this.endpoint = endpoint;
     const client = new Client({ name: "marketr-mcp", version: "1.0.0" });
@@ -88,7 +107,7 @@ export class McpConnectorClient {
     this.client = client;
     return {
       serverName: endpoint,
-      tools: (tools as RawTool[]).map(mcpToolToDef),
+      tools: (tools as RawTool[]).map((t) => mcpToolToDef(t, opts)),
     };
   }
 
