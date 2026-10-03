@@ -8,6 +8,7 @@ lib/agents/runs/__tests__/run-viewer.test.ts
 lib/agents/runs/__tests__/runs-rls.test.ts
 lib/agents/runs/__tests__/trace-fidelity.eval.test.ts
 lib/agents/runs/__tests__/watch.test.ts
+lib/auth/__tests__/member-roles.test.ts
 lib/cad/__tests__/cad-slice1.test.ts
 lib/cad/__tests__/cad-slice2.test.ts
 lib/cad/__tests__/cad-slice3.test.ts

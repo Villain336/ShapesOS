@@ -8,7 +8,7 @@
 import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireUser, getOrCreateWorkspace } from "@/lib/session";
-import { mintInviteToken, requireWorkspaceRole, forbidden } from "@/lib/authz";
+import { mintInviteToken, requireWorkspaceRole, forbidden, memberChangeError } from "@/lib/authz";
 
 export const dynamic = "force-dynamic";
 
@@ -19,8 +19,8 @@ export async function POST(
   const user = await requireUser();
   if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
   const workspace = await getOrCreateWorkspace(user.id, user.email);
-  if (!(await requireWorkspaceRole(user.id, workspace.id, "admin")))
-    return forbidden("Member management requires the admin role.");
+  const me = await requireWorkspaceRole(user.id, workspace.id, "admin");
+  if (!me) return forbidden("Member management requires the admin role.");
 
   const { id } = await params;
   const member = await prisma.workspaceMember.findFirst({
@@ -29,6 +29,9 @@ export async function POST(
   if (!member) return Response.json({ error: "Member not found" }, { status: 404 });
   if (member.userId)
     return Response.json({ error: "Only pending invites have invite links." }, { status: 400 });
+  // Phase 1: owner invites are owner-only, including re-issuing their link.
+  const denial = memberChangeError(me.role, { currentRole: member.role });
+  if (denial) return forbidden(denial);
 
   const { inviteToken, inviteExpiresAt } = mintInviteToken();
   await prisma.workspaceMember.update({
