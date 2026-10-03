@@ -8,7 +8,7 @@
 // the fleet acted.
 
 import type { NextRequest } from "next/server";
-import { requireUser } from "@/lib/session";
+import { getOrCreateWorkspace, requireUser } from "@/lib/session";
 import { requireProjectRole } from "@/lib/authz";
 import { prisma } from "@/lib/prisma";
 import { withWorkspaceScope } from "@/lib/substrate/graph/rls";
@@ -34,7 +34,6 @@ const ChangesQuerySchema = z.object({
 });
 
 async function workspaceIdFor(userId: string, email?: string | null): Promise<string> {
-  const { getOrCreateWorkspace } = await import("@/lib/session");
   return (await getOrCreateWorkspace(userId, email ?? "")).id;
 }
 
