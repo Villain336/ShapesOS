@@ -24,6 +24,10 @@ const KNOWN_NOISE = [
   /^DROP INDEX "(insurance_submissions_workspace_id_renewal_id_idx|memory_consolidation_runs_workspace_id_started_at_idx)";$/,
   /^CREATE INDEX "memory_consolidation_runs_workspace_id_started_at_idx" ON .*;$/,
   /^ALTER TABLE "(billing_topup_idempotency|esign_vault_entries)" (DROP|ADD) CONSTRAINT "[a-z_]+_fkey".*;$/,
+  // billing_subscriptions is a raw-SQL table (lib/metering/billing.ts), not a
+  // Prisma model; the migration exists so the least-privilege role never needs DDL.
+  /^DROP TABLE "billing_subscriptions";$/,
+  /^ALTER TABLE "billing_subscriptions" DROP CONSTRAINT "billing_subscriptions_[a-z_]+";$/,
 ];
 
 const out = execFileSync(
