@@ -324,7 +324,10 @@ export default function McpManager() {
             </div>
           </fieldset>
           <label className="flex flex-col gap-1 text-sm">
-            <span className="text-xs font-medium text-muted">Expires (optional)</span>
+            <span className="text-xs font-medium text-muted">
+              Expires (defaults to 90 days, at most 1 year). Keys also stop working if their creator
+              stops being an admin.
+            </span>
             <input
               type="datetime-local"
               value={expiresAt}

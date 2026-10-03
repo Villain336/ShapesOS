@@ -6,9 +6,16 @@
 //
 // Raw key/token material is NEVER persisted, logged, or returned after the
 // one-time creation response. Comparisons are constant-time.
+//
+// Phase 1: every call re-checks the credential user's CURRENT membership
+// (removed → denied; API key creator no longer admin → denied) and caps the
+// scopes to that role.
 
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
+import type { WorkspaceRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { getMembership, roleAtLeast } from "@/lib/authz";
+import { capScopesToRole } from "./scopes";
 
 export const MCP_KEY_PREFIX = "mcpk_";
 export const MCP_TOKEN_PREFIX = "mcpt_";
@@ -51,7 +58,29 @@ export type McpAuthFailure =
   | { ok: false; reason: "malformed" }
   | { ok: false; reason: "unknown" }
   | { ok: false; reason: "revoked" }
-  | { ok: false; reason: "expired" };
+  | { ok: false; reason: "expired" }
+  | { ok: false; reason: "not_member" }
+  | { ok: false; reason: "insufficient_role" };
+
+/** Minimum CURRENT role of the credential's user, per credential kind. */
+export const MCP_KEY_MIN_ROLE: WorkspaceRole = "admin";
+
+/**
+ * Phase 1: re-check the credential user's membership on EVERY call. A
+ * removed member's keys/tokens stop working immediately; an API key stops
+ * working once its creator is no longer an admin; scopes are capped to what
+ * the user's current role allows (lib/mcp/scopes.ts TOOL_MIN_ROLE).
+ */
+async function withCurrentRole(
+  ctx: McpAuthContext,
+): Promise<{ ok: true; ctx: McpAuthContext } | McpAuthFailure> {
+  const membership = await getMembership(ctx.userId, ctx.workspaceId);
+  if (!membership) return { ok: false, reason: "not_member" };
+  if (ctx.credential.kind === "api_key" && !roleAtLeast(membership.role, MCP_KEY_MIN_ROLE)) {
+    return { ok: false, reason: "insufficient_role" };
+  }
+  return { ok: true, ctx: { ...ctx, scopes: capScopesToRole(ctx.scopes, membership.role) } };
+}
 
 /**
  * requireMcpAuth — the M11-recognized authorization primitive for MCP routes.
@@ -60,6 +89,14 @@ export type McpAuthFailure =
  * goes to the client — see THREAT-MODEL-MCP.md T3).
  */
 export async function requireMcpAuth(
+  authorizationHeader: string | null,
+): Promise<{ ok: true; ctx: McpAuthContext } | McpAuthFailure> {
+  const resolved = await resolveCredential(authorizationHeader);
+  if (!resolved.ok) return resolved;
+  return withCurrentRole(resolved.ctx);
+}
+
+async function resolveCredential(
   authorizationHeader: string | null,
 ): Promise<{ ok: true; ctx: McpAuthContext } | McpAuthFailure> {
   if (!authorizationHeader) return { ok: false, reason: "missing" };

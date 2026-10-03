@@ -1,6 +1,6 @@
 "use client";
 
-// Marketr — OAuth consent form (Phase C, W5; G3 workspace picker). Client
+// ShapesOS — OAuth consent form (Phase C, W5; G3 workspace picker). Client
 // component: workspace picker + Approve/Deny. Approve is two server steps,
 // transparent to the user:
 //   1. POST { grant, decision: "select", workspaceId } → re-sealed grant with
@@ -9,6 +9,12 @@
 // Deny POSTs { grant, decision: "deny" } directly.
 
 import { useState } from "react";
+
+const ERROR_COPY: Record<string, string> = {
+  insufficient_role: "You need the editor role or higher in this workspace to connect apps.",
+  workspace_not_accessible: "You're no longer a member of this workspace. Pick another one.",
+  no_permitted_scopes: "Your role in this workspace doesn't allow any of the requested permissions.",
+};
 
 interface WorkspaceOption {
   id: string;
@@ -35,7 +41,7 @@ export function ConsentForm({
       body: JSON.stringify(body),
     });
     const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.error ?? "Authorization failed");
+    if (!res.ok) throw new Error(ERROR_COPY[data.error as string] ?? data.error ?? "Authorization failed");
     return data as { grant?: string; redirect?: string };
   }
 
@@ -72,13 +78,13 @@ export function ConsentForm({
   return (
     <div className="mt-6">
       <fieldset>
-        <legend className="text-sm font-medium">Connect to workspace</legend>
-        <p className="mt-1 text-xs text-zinc-500">
+        <legend className="text-sm font-semibold text-ink">Connect to workspace</legend>
+        <p className="mt-1 text-[13px] text-muted">
           The app will act within this workspace only. The choice is verified on our servers.
         </p>
-        <div className="mt-2 max-h-48 divide-y divide-zinc-100 overflow-y-auto rounded-lg border border-zinc-200">
+        <div className="mt-2 max-h-48 divide-y divide-line overflow-y-auto rounded-md border border-line">
           {workspaces.map((w) => (
-            <label key={w.id} className="flex cursor-pointer items-center gap-3 p-3 text-sm hover:bg-zinc-50">
+            <label key={w.id} className="flex cursor-pointer items-center gap-3 p-3 text-sm text-ink hover:bg-hover-paper">
               <input
                 type="radio"
                 name="mcp-workspace"
@@ -87,8 +93,8 @@ export function ConsentForm({
                 onChange={() => setWorkspaceId(w.id)}
                 className="h-4 w-4"
               />
-              <span className="font-medium">{w.name}</span>
-              <code className="ml-auto rounded bg-zinc-100 px-1.5 py-0.5 text-xs text-zinc-500">
+              <span className="font-semibold">{w.name}</span>
+              <code className="ml-auto rounded bg-canvas px-1.5 py-0.5 font-mono text-xs text-muted">
                 {w.id.slice(0, 8)}…
               </code>
             </label>
@@ -100,19 +106,24 @@ export function ConsentForm({
           type="button"
           disabled={busy}
           onClick={approve}
-          className="rounded-md bg-emerald-700 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+          className="inline-flex h-control items-center rounded-full bg-ink px-[22px] text-[15px] font-semibold text-white aos-press hover:bg-night-hover disabled:opacity-40"
         >
-          {busy ? "Working…" : "Approve"}
+          {busy ? "Allowing…" : "Allow access"}
         </button>
         <button
           type="button"
           disabled={busy}
           onClick={deny}
-          className="rounded-md border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 disabled:opacity-50"
+          className="inline-flex h-control items-center rounded-full bg-paper px-[22px] text-[15px] font-semibold text-failed-text shadow-[inset_0_0_0_1.5px_var(--aos-failed)] aos-press hover:bg-failed-tint disabled:opacity-40"
         >
           Deny
         </button>
-        {error && <p className="self-center text-sm text-red-600">{error}</p>}
+        {error && (
+          <p role="alert" className="flex items-center gap-2 self-center text-sm text-failed-text">
+            <span className="h-2.5 w-2.5 shrink-0 bg-failed" aria-hidden="true" />
+            {error}
+          </p>
+        )}
       </div>
     </div>
   );
