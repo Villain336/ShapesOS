@@ -40,6 +40,7 @@ lib/metering/__tests__/billing-least-privilege-db.test.ts
 lib/metering/__tests__/credits-integrity-db.test.ts
 lib/metering/__tests__/self-hosted-cap-db.test.ts
 lib/metering/__tests__/trial-db.test.ts
+lib/notifications/__tests__/decided-producers-db.test.ts
 lib/notifications/__tests__/notifications-db.test.ts
 lib/ops/__tests__/ops-consume-db.test.ts
 lib/ops/__tests__/ops-rls.test.ts

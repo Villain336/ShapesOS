@@ -15,6 +15,7 @@ import { approveApproval } from "@/lib/media/approvals";
 import { encumberForApproval } from "@/lib/media/pools";
 import { twoPersonThresholdCents } from "@/lib/media/safety";
 import { otpChallenges } from "@/lib/media/otp";
+import { mediaDecisionOf, notifyMediaApprovalDecided } from "@/lib/media/decision-notify";
 
 export const dynamic = "force-dynamic";
 
@@ -41,6 +42,7 @@ export async function POST(
   try {
     const { id } = await params;
     const { approvals, pools } = mediaStores();
+    const before = await approvals.get(id, gate.workspaceId);
     const approval = await approveApproval(approvals, {
       id,
       workspaceId: gate.workspaceId,
@@ -63,6 +65,10 @@ export async function POST(
         });
       },
     });
+    // Phase 4a: "decided" notification once the buy is actually approved
+    // (best-effort, never throws — the decision already landed).
+    const decision = mediaDecisionOf(before?.status, approval.status);
+    if (decision) await notifyMediaApprovalDecided(approval, decision, gate.userId);
     return Response.json({ approval });
   } catch (err) {
     return safetyError(err);

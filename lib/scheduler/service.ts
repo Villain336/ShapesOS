@@ -26,7 +26,7 @@ import {
 } from "./guard";
 import { executeSkillRun } from "./runner";
 import { schedulerAudit } from "./audit";
-import { notifyApprovalNeeded } from "@/lib/notifications/producers";
+import { notifyApprovalDecided, notifyApprovalNeeded } from "@/lib/notifications/producers";
 
 export { CronParseError };
 
@@ -355,7 +355,7 @@ export async function fireSchedule(db: Db, schedule: ScheduledSkill, opts: FireO
 export async function approveRun(db: Db, runId: string, workspaceId: string, approverId: string) {
   const run = await db.skillRun.findFirst({
     where: { id: runId, workspaceId },
-    include: { skill: true },
+    include: { skill: true, schedule: { select: { createdBy: true } } },
   });
   if (!run) throw new ScheduleServiceError(`run not found: ${runId}`);
   if (run.status !== "awaiting_approval") {
@@ -372,13 +372,19 @@ export async function approveRun(db: Db, runId: string, workspaceId: string, app
     summary: `Supervised run approved: "${run.skill.name}" (run ${run.id.slice(0, 8)})`,
     actorUserId: approverId,
   });
+  // Phase 4a: best-effort "decided" notification to the schedule's owner
+  // (never throws — the decision already landed).
+  await notifyScheduledRunDecided(run, "approved", approverId);
   await executeSkillRun(db, run.id);
   return run.id;
 }
 
 /** Reject a supervised run → it never executes. */
 export async function rejectRun(db: Db, runId: string, workspaceId: string, approverId: string) {
-  const run = await db.skillRun.findFirst({ where: { id: runId, workspaceId } });
+  const run = await db.skillRun.findFirst({
+    where: { id: runId, workspaceId },
+    include: { skill: true, schedule: { select: { createdBy: true } } },
+  });
   if (!run) throw new ScheduleServiceError(`run not found: ${runId}`);
   if (run.status !== "awaiting_approval") {
     throw new ScheduleServiceError(`run is not awaiting approval (status ${run.status})`);
@@ -390,6 +396,27 @@ export async function rejectRun(db: Db, runId: string, workspaceId: string, appr
     action: "scheduler_run_rejected",
     summary: `Supervised run rejected: run ${run.id.slice(0, 8)}`,
     actorUserId: approverId,
+  });
+  await notifyScheduledRunDecided(run, "denied", approverId);
+}
+
+/** "Your supervised run was approved/rejected" → the schedule's creator. Never throws. */
+async function notifyScheduledRunDecided(
+  run: { id: string; workspaceId: string; projectId: string | null; skill: { name: string }; schedule: { createdBy: string } | null },
+  decision: "approved" | "denied",
+  decidedBy: string,
+): Promise<void> {
+  await notifyApprovalDecided({
+    workspaceId: run.workspaceId,
+    source: "scheduler",
+    sourceId: run.id,
+    title: `Supervised run of "${run.skill.name}"`,
+    decision,
+    decidedBy,
+    requestedBy: run.schedule?.createdBy ?? null,
+    href: run.projectId
+      ? `/dashboard/projects/${encodeURIComponent(run.projectId)}/automations/schedules/runs/${encodeURIComponent(run.id)}`
+      : undefined,
   });
 }
 
