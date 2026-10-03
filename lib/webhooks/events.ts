@@ -80,6 +80,50 @@ export const PingData = z.object({
   message: z.string(),
 });
 
+// ── Phase 4b: CAD derived BOM + Dataset Builder ──────────────────────────
+export const CadBomDerivedData = z.object({
+  bomId: z.string(),
+  bomNumber: z.number().int(),
+  modelId: z.string(),
+  modelVersionId: z.string(),
+  versionNumber: z.number().int(),
+  lineCount: z.number().int(),
+  bodyCount: z.number().int(),
+  material: z.string().nullable(),
+  totalMassG: z.number().nullable().describe("Known masses only (mesh units assumed mm)"),
+  totalUsd: z.number().describe("Known line costs only; a lower bound when linesMissingCost > 0"),
+  linesMissingCost: z.number().int(),
+});
+
+export const DatasetCompiledData = z.object({
+  datasetId: z.string(),
+  type: z.string(),
+  version: z.number().int(),
+  chunkCount: z.number().int(),
+  compiledAt: isoDate,
+});
+
+export const DatasetPublishedData = z.object({
+  datasetId: z.string(),
+  type: z.string(),
+  target: z.string().describe("briefnow | rag"),
+  version: z.number().int(),
+  latestVersion: z.number().int(),
+  rollback: z.boolean().describe("True when an older compiled version was made live"),
+  chunkCount: z.number().int(),
+  artifactRef: z.string(),
+  publishedAt: isoDate,
+});
+
+export const DatasetStaleData = z.object({
+  datasetId: z.string(),
+  type: z.string(),
+  version: z.number().int(),
+  ageDays: z.number().int(),
+  thresholdDays: z.number().int(),
+  message: z.string(),
+});
+
 export const WEBHOOK_EVENT_SCHEMAS = {
   "lead.created": LeadEventData,
   "lead.updated": LeadEventData,
@@ -90,6 +134,11 @@ export const WEBHOOK_EVENT_SCHEMAS = {
   "agent_run.failed": AgentRunData,
   "notification.created": NotificationCreatedData,
   "webhook.ping": PingData,
+  // Phase 4b
+  "cad.bom_derived": CadBomDerivedData,
+  "dataset.compiled": DatasetCompiledData,
+  "dataset.published": DatasetPublishedData,
+  "dataset.stale": DatasetStaleData,
 } as const;
 
 export type WebhookEventType = keyof typeof WEBHOOK_EVENT_SCHEMAS;
@@ -110,6 +159,11 @@ export const WEBHOOK_EVENT_LABELS: Record<WebhookEventType, string> = {
   "agent_run.failed": "An agent run fails",
   "notification.created": "A notification is created",
   "webhook.ping": "Test event",
+  // Phase 4b
+  "cad.bom_derived": "A CAD BOM is derived from geometry",
+  "dataset.compiled": "A dataset version is compiled",
+  "dataset.published": "A dataset version goes live",
+  "dataset.stale": "A dataset goes stale",
 };
 
 export function isWebhookEventType(v: unknown): v is WebhookEventType {

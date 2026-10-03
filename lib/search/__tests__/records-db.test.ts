@@ -94,6 +94,6 @@ describe("record search (DB)", () => {
     assert.deepEqual(await searchRecords(WS, null, "zephyrine"), []);
     const onlyLeads = await searchRecords(WS, "viewer", "zephyrine", { kinds: ["lead"] });
     assert.ok(onlyLeads.length > 0 && onlyLeads.every((h) => h.kind === "lead"));
-    assert.equal(RECORD_KINDS.length, 11);
+    assert.equal(RECORD_KINDS.length, 13);
   });
 });

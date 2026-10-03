@@ -13,6 +13,9 @@ export const RECORD_KINDS = [
   "envelope",
   "legal_document",
   "client",
+  // Phase 4b
+  "bom_line",
+  "dataset",
 ] as const;
 export type RecordKind = (typeof RECORD_KINDS)[number];
 
@@ -28,4 +31,6 @@ export const RECORD_KIND_LABELS: Record<RecordKind, string> = {
   envelope: "E-sign",
   legal_document: "Legal",
   client: "Client",
+  bom_line: "BOM part",
+  dataset: "Dataset",
 };

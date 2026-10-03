@@ -24,6 +24,10 @@ import {
   workspaceFlows,
 } from "@/lib/integrations/activepieces";
 /* END */
+// Phase 4b: Dataset Builder activation.
+import { PrismaDatasetBuilderStore } from "@/lib/datasetbuilder/prisma-store";
+import { askPublishedDatasets, getLiveBriefNowPackage } from "@/lib/datasetbuilder/activate";
+import { DATASET_TYPES } from "@/lib/datasetbuilder/classify";
 
 export interface ToolResult {
   /** JSON-serializable payload. */
@@ -426,6 +430,48 @@ const tools: ToolDef[] = [
     },
   },
   /* END */
+  // Phase 4b: Dataset Builder activation. Both read only what the tenant
+  // explicitly published (RAG + Feed / BriefNow), always with lineage.
+  {
+    name: "ask_business_data",
+    description:
+      "Answer a question strictly from the business datasets this workspace published to RAG + Feed (FAQs, products, policies, SOPs, company facts, pricing). Every answer cites Source → Document → Chunk; when nothing matches it says so instead of guessing. Read-only, no credits.",
+    inputSchema: z
+      .object({ question: z.string().min(1).max(2000), maxCitations: z.number().int().min(1).max(10).optional() })
+      .strict(),
+    inputJsonSchema: {"type":"object","properties":{"question":{"type":"string","minLength":1,"maxLength":2000},"maxCitations":{"type":"integer","minimum":1,"maximum":10}},"required":["question"],"additionalProperties":false},
+    handler: async (ctx, args) => {
+      const { question, maxCitations } = args as { question: string; maxCitations?: number };
+      const store = new PrismaDatasetBuilderStore(prisma);
+      const answer = await askPublishedDatasets(store, ctx.workspaceId, question, maxCitations ?? 3);
+      return { data: { ...answer } };
+    },
+  },
+  {
+    name: "get_dataset_adapter",
+    description:
+      "The live BriefNow dataset adapter package (contract briefnow-dataset-adapter/v1) for one published dataset type: every entry with its source, document, chunk and classification lineage. Paged (offset/limit, max 200). This is how a BriefNow connector pulls the tenant's business data. Read-only, no credits.",
+    inputSchema: z
+      .object({
+        type: z.enum(DATASET_TYPES as unknown as [string, ...string[]]),
+        offset: z.number().int().min(0).optional(),
+        limit: z.number().int().min(1).max(200).optional(),
+      })
+      .strict(),
+    inputJsonSchema: {"type":"object","properties":{"type":{"type":"string","enum":["faq","product_catalog","policy","process_sop","company_fact","pricing"]},"offset":{"type":"integer","minimum":0},"limit":{"type":"integer","minimum":1,"maximum":200}},"required":["type"],"additionalProperties":false},
+    handler: async (ctx, args) => {
+      const { type, offset, limit } = args as { type: (typeof DATASET_TYPES)[number]; offset?: number; limit?: number };
+      const store = new PrismaDatasetBuilderStore(prisma);
+      const live = await getLiveBriefNowPackage(store, ctx.workspaceId, type, { offset, limit });
+      if (!live) {
+        throw new ToolError(
+          "dataset_not_published",
+          "This dataset type has not been published to BriefNow in this workspace.",
+        );
+      }
+      return { data: { package: live.package, page: live.page } };
+    },
+  },
 ];
 
 export function getTool(name: string): ToolDef | undefined {

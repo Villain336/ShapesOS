@@ -27,7 +27,9 @@ import {
   FileText,
   FolderKanban,
   Globe,
+  Database,
   Loader2,
+  Package,
   PenLine,
   ReceiptText,
   Rocket,
@@ -112,6 +114,8 @@ const RECORD_ICONS: Record<string, LucideIcon> = {
   envelope: PenLine,
   legal_document: Scale,
   client: Briefcase,
+  bom_line: Package,
+  dataset: Database,
 };
 
 const DO_ITEMS: UICommand[] = [

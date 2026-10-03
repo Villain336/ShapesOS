@@ -35,16 +35,14 @@ export interface AdapterWriter {
 }
 
 /**
- * Filesystem adapter writer. Root defaults to the BriefNow runtime's
- * dataset-adapters directory (sibling workspace), overridable with
- * BRIEFNOW_ADAPTERS_ROOT for ops that host connectors elsewhere.
- * Tests inject a fake writer — never the filesystem.
+ * Filesystem adapter writer (optional file drop). Phase 4b: the live
+ * BriefNow path is the MCP pull (`get_dataset_adapter`, built from the DB
+ * on every call); a file is also written only when BRIEFNOW_ADAPTERS_ROOT
+ * names a directory a co-located connector reads. Tests inject a fake
+ * writer — never the filesystem.
  */
-export function createFsAdapterWriter(root?: string): AdapterWriter {
-  const base =
-    root ??
-    process.env.BRIEFNOW_ADAPTERS_ROOT ??
-    path.resolve(__dirname, "../../../briefnow/runtime/dataset-adapters");
+export function createFsAdapterWriter(root: string): AdapterWriter {
+  const base = root;
   return {
     async write(relativePath: string, pkg: BriefNowAdapterPackage) {
       const target = path.resolve(base, relativePath);
@@ -170,6 +168,17 @@ export function buildBriefNowAdapterPackage(
   };
 }
 
+/** The live pull reference for a BriefNow publish (ShapesOS MCP tool). */
+export function briefNowPullRef(type: DatasetType, version: number): string {
+  return `mcp://get_dataset_adapter?type=${type}&version=${version}`;
+}
+
+/** File-drop root for co-located BriefNow runtimes; null = MCP pull only. */
+export function briefNowAdaptersRoot(env: NodeJS.ProcessEnv = process.env): string | null {
+  const root = (env.BRIEFNOW_ADAPTERS_ROOT ?? "").trim();
+  return root ? path.resolve(root) : null;
+}
+
 export function ragSnapshotRef(
   workspaceId: string,
   type: DatasetType,
@@ -182,13 +191,28 @@ export interface PublishOptions {
   workspaceId: string;
   datasetId: string;
   target: PublishTarget;
-  adapterWriter?: AdapterWriter;
+  /**
+   * Compiled version to make live (rollback / roll-forward). Omitted = the
+   * latest compiled version.
+   */
+  version?: number;
+  /**
+   * BriefNow file drop. Omitted = a filesystem writer when
+   * BRIEFNOW_ADAPTERS_ROOT is set, otherwise no file (MCP pull only).
+   * null = never write a file.
+   */
+  adapterWriter?: AdapterWriter | null;
 }
 
 export interface PublishResult {
   record: DatasetPublishRecord;
   /** Present for briefnow: the shipped adapter package. */
   adapterPackage?: BriefNowAdapterPackage;
+  /** True when this version was already the live one (nothing changed). */
+  alreadyLive: boolean;
+  /** True when the published version is older than the latest compile. */
+  rollback: boolean;
+  latestVersion: number;
 }
 
 /**
@@ -221,41 +245,94 @@ export async function publishDataset(
       `compile the "${DATASET_TYPE_LABELS[dataset.type]}" dataset before publishing`,
     );
   }
-  const entries = await resolveVersionEntries(
-    store,
-    workspaceId,
-    latest.id,
-  );
+  let chosen = latest;
+  if (options.version !== undefined && options.version !== latest.version) {
+    const found = (await store.listDatasetVersions(datasetId)).find(
+      (v) => v.version === options.version,
+    );
+    if (!found || found.workspaceId !== workspaceId) {
+      throw new DatasetBuilderError(
+        "UNKNOWN_DATASET_VERSION",
+        `the ${DATASET_TYPE_LABELS[dataset.type]} dataset has no compiled version ${options.version}`,
+      );
+    }
+    chosen = found;
+  }
+  const rollback = chosen.version < latest.version;
+
+  // Idempotent: publishing the version that is already live changes nothing.
+  const live = await store.getLatestPublishRecord(datasetId, target);
+  if (live && live.version === chosen.version) {
+    return { record: live, alreadyLive: true, rollback, latestVersion: latest.version };
+  }
+
+  const entries = await resolveVersionEntries(store, workspaceId, chosen.id);
 
   const input: DatasetPublishInput = {
     workspaceId,
     datasetId,
     target,
-    version: latest.version,
-    versionId: latest.id,
+    version: chosen.version,
+    versionId: chosen.id,
     chunkCount: entries.length,
     artifactRef: "",
+    makeLive: true,
   };
 
   let adapterPackage: BriefNowAdapterPackage | undefined;
   if (target === "briefnow") {
-    adapterPackage = buildBriefNowAdapterPackage(
-      dataset,
-      latest.version,
-      entries,
-    );
-    const writer = options.adapterWriter ?? createFsAdapterWriter();
-    const relativePath = path.join(
-      workspaceId,
-      `${dataset.type}.v${latest.version}.json`,
-    );
-    input.artifactRef = await writer.write(relativePath, adapterPackage);
+    adapterPackage = buildBriefNowAdapterPackage(dataset, chosen.version, entries);
+    const root = briefNowAdaptersRoot();
+    const writer =
+      options.adapterWriter === undefined
+        ? root
+          ? createFsAdapterWriter(root)
+          : null
+        : options.adapterWriter;
+    input.artifactRef = writer
+      ? await writer.write(path.join(workspaceId, `${dataset.type}.v${chosen.version}.json`), adapterPackage)
+      : briefNowPullRef(dataset.type, chosen.version);
   } else {
-    input.artifactRef = ragSnapshotRef(workspaceId, dataset.type, latest.version);
+    input.artifactRef = ragSnapshotRef(workspaceId, dataset.type, chosen.version);
   }
 
   const record = await store.createPublishRecord(input);
-  return { record, adapterPackage };
+  return { record, adapterPackage, alreadyLive: false, rollback, latestVersion: latest.version };
+}
+
+/**
+ * The live BriefNow adapter package for one dataset type, rebuilt from the
+ * database on every call (the MCP `get_dataset_adapter` pull). Entries are
+ * paged so a large dataset never becomes one giant response. Null when the
+ * type was never published to BriefNow.
+ */
+export async function getLiveBriefNowPackage(
+  store: DatasetBuilderStore,
+  workspaceId: string,
+  type: DatasetType,
+  page: { offset?: number; limit?: number } = {},
+): Promise<{
+  package: BriefNowAdapterPackage;
+  page: { offset: number; limit: number; total: number; nextOffset: number | null };
+} | null> {
+  const dataset = await store.getDatasetByType(workspaceId, type);
+  if (!dataset || dataset.workspaceId !== workspaceId) return null;
+  const live = await store.getLatestPublishRecord(dataset.id, "briefnow");
+  if (!live) return null;
+  const entries = await resolveVersionEntries(store, workspaceId, live.versionId);
+  const full = buildBriefNowAdapterPackage(dataset, live.version, entries);
+  const offset = Math.max(0, Math.floor(page.offset ?? 0));
+  const limit = Math.min(Math.max(Math.floor(page.limit ?? 100), 1), 200);
+  const slice = full.entries.slice(offset, offset + limit);
+  return {
+    package: { ...full, publishedAt: live.publishedAt.toISOString(), entries: slice },
+    page: {
+      offset,
+      limit,
+      total: full.entries.length,
+      nextOffset: offset + limit < full.entries.length ? offset + limit : null,
+    },
+  };
 }
 
 export interface PublishTargetStatus {
@@ -356,6 +433,29 @@ export interface GroundedAnswer {
 
 const MAX_QUESTION_LENGTH = 2000;
 
+/** Deterministic token-overlap scoring (price-intent boost on pricing). */
+function scoreEntries(
+  entries: ResolvedPublishEntry[],
+  question: string,
+  type: DatasetType,
+): { entry: ResolvedPublishEntry; score: number }[] {
+  const qTokens = tokens(question);
+  const priceIntent = [...qTokens].some((t) =>
+    ["much", "cost", "price", "pricing", "charge", "expensive", "cheap"].includes(t),
+  );
+  const scored = entries.map((e) => {
+    const cTokens = tokens(e.chunk.text);
+    let score = 0;
+    for (const t of qTokens) {
+      if (cTokens.has(t)) score += 1;
+    }
+    if (priceIntent && type === "pricing") score += 3;
+    return { entry: e, score };
+  });
+  scored.sort((a, b) => b.score - a.score);
+  return scored.filter((s) => s.score > 0);
+}
+
 export function excerpt(text: string, maxLength = 220): string {
   const clean = text.replace(/\s+/g, " ").trim();
   return clean.length > maxLength
@@ -405,21 +505,7 @@ export async function askDataset(
     published?.version ?? (await store.getLatestDatasetVersion(datasetId))?.version ?? 0;
   const label = DATASET_TYPE_LABELS[dataset.type];
 
-  const qTokens = tokens(trimmed);
-  const priceIntent = [...qTokens].some((t) =>
-    ["much", "cost", "price", "pricing", "charge", "expensive", "cheap"].includes(t),
-  );
-  const scored = entries.map((e) => {
-    const cTokens = tokens(e.chunk.text);
-    let score = 0;
-    for (const t of qTokens) {
-      if (cTokens.has(t)) score += 1;
-    }
-    if (priceIntent && dataset.type === "pricing") score += 3;
-    return { entry: e, score };
-  });
-  scored.sort((a, b) => b.score - a.score);
-  const hits = scored.filter((s) => s.score > 0);
+  const hits = scoreEntries(entries, trimmed, dataset.type);
 
   if (hits.length === 0) {
     return {
@@ -452,5 +538,88 @@ export async function askDataset(
     datasetType: dataset.type,
     datasetLabel: label,
     datasetVersion,
+  };
+}
+
+// ---- OS grounding (Phase 4b) -------------------------------------------------
+
+export interface BusinessDataCitation extends GroundedCitation {
+  datasetType: DatasetType;
+  datasetLabel: string;
+}
+
+export interface BusinessDataAnswer {
+  grounded: boolean;
+  answer: string;
+  citations: BusinessDataCitation[];
+  confidence: "high" | "medium" | "low";
+  /** Datasets that are live on the RAG target (what was searched). */
+  searched: { type: DatasetType; label: string; version: number }[];
+}
+
+/**
+ * Answers from every dataset the workspace has ACTIVATED into the OS layer
+ * (published to "rag") — the grounding the chat agent and the MCP
+ * `ask_business_data` tool use. Compiled-but-unpublished datasets are not
+ * searched: activation is the tenant's explicit choice. Refuses to guess
+ * when nothing matches (grounded: false, zero citations).
+ */
+export async function askPublishedDatasets(
+  store: DatasetBuilderStore,
+  workspaceId: string,
+  question: string,
+  maxCitations = 3,
+): Promise<BusinessDataAnswer> {
+  const trimmed = question.trim();
+  if (!trimmed || trimmed.length > MAX_QUESTION_LENGTH) {
+    throw new DatasetBuilderError(
+      "VALIDATION_FAILED",
+      "question must be non-empty and under 2000 characters",
+    );
+  }
+  const searched: BusinessDataAnswer["searched"] = [];
+  const hits: { entry: ResolvedPublishEntry; score: number; type: DatasetType; version: number }[] = [];
+  for (const dataset of await store.listDatasets(workspaceId)) {
+    if (dataset.workspaceId !== workspaceId) continue;
+    const live = await store.getLatestPublishRecord(dataset.id, "rag");
+    if (!live) continue;
+    searched.push({ type: dataset.type, label: DATASET_TYPE_LABELS[dataset.type], version: live.version });
+    const entries = await resolveVersionEntries(store, workspaceId, live.versionId);
+    for (const h of scoreEntries(entries, trimmed, dataset.type)) {
+      hits.push({ ...h, type: dataset.type, version: live.version });
+    }
+  }
+  hits.sort((a, b) => b.score - a.score);
+  if (hits.length === 0) {
+    return {
+      grounded: false,
+      answer:
+        searched.length === 0
+          ? "No datasets are live in the OS yet. Publish a dataset to RAG + Feed in Datasets → Activate first."
+          : "I couldn't find an answer in your published datasets. Try rephrasing, or add documents covering this topic.",
+      citations: [],
+      confidence: "low",
+      searched,
+    };
+  }
+  const top = hits.slice(0, Math.max(1, Math.min(maxCitations, 10)));
+  return {
+    grounded: true,
+    answer: top[0]!.entry.chunk.text.trim(),
+    citations: top.map(({ entry, type, version }) => ({
+      chunkId: entry.chunk.id,
+      documentId: entry.documentId,
+      documentName: entry.documentName,
+      sourceId: entry.sourceId,
+      sourceName: entry.sourceName,
+      excerpt: excerpt(entry.chunk.text),
+      engine: entry.engine,
+      engineVersion: entry.engineVersion,
+      datasetVersion: version,
+      datasetType: type,
+      datasetLabel: DATASET_TYPE_LABELS[type],
+    })),
+    confidence: hits[0]!.score >= 3 ? "high" : "medium",
+    searched,
   };
 }

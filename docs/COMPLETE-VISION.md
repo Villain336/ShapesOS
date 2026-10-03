@@ -81,7 +81,7 @@
 - Brain dark v2 — full dark particle-universe reskin: bloom-on-load cinematic, node → document transitions, 3-pane layout; spec approved, build explicitly cancelled by Tico ("Don't build") — 📝 specced + parked
 - Branded report engine (Phase 16) — BrandKit model + versioned HTML+CSS templates + WeasyPrint PDF renderer; every figure source-traced, never invented numbers; report send is draft-for-approval — ✅ shipped
 - Agentic OS design system — Archivo, #F3F3F1 canvas, black sidebar, status color+shape language, black primary actions; replaces the earlier dynamic brand-color theming (deferred by Tico) — 🟡 in-flight (foundation + 14 migration slices committed 2026-10-01; a CSS compat block maps the remaining legacy Tailwind palettes to tokens so ~95 unmigrated files render; migrating those files and deleting the compat block is Phase 4)
-- CAD + Hardware — in-browser CAD viewer + versioning, AI design assistant with manufacturability flags, prototype pipeline (3D print/PCB/CNC export), hardware project management — ⚠️ partial: slices 1–4 built 2026-10-02 (`/dashboard/cad`); the derived auto-BOM + cost estimates are still to build (Phase 4)
+- CAD + Hardware — in-browser CAD viewer + versioning, AI design assistant with manufacturability flags, prototype pipeline (3D print/PCB/CNC export), hardware project management — ✅ slices 1–4 built 2026-10-02 (`/dashboard/cad`); Phase 4b adds the BOM derived from geometry (parts, quantities, volume, material mass, rollups across revisions, CSV). Live vendor ordering is still out of scope (quote requests are recorded, not placed)
 
 ---
 
@@ -102,7 +102,7 @@
 - context.dev integration — connector core (budgets, vault keys), KnowledgeSource + crawl jobs, research agent tool, change-monitor engine, approval-gated brand sync — ✅ shipped
 
 ### Launch-pillar on-ramp ✅ / ⚠️
-- Dataset Builder — "transfer your business into the AI world": ingest (uploads, Drive, web crawl) → auto-classify into FAQs/products/policies/SOPs → compile versioned datasets with lineage → one-click publish into the tenant's BriefNow connector and OS RAG layer — ⚠️ partial: slices 1–4 built (`/dashboard/datasets`: ingest, structure, build, activate); the BriefNow publish writes an adapter package to the local filesystem rather than a live connector, and Drive ingest needs Nango Cloud credentials (fails closed without them)
+- Dataset Builder — "transfer your business into the AI world": ingest (uploads, Drive, web crawl) → auto-classify into FAQs/products/policies/SOPs → compile versioned datasets with lineage → one-click publish into the tenant's BriefNow connector and OS RAG layer — ⚠️ partial: slices 1–4 built (`/dashboard/datasets`: ingest, structure, build, activate); Phase 4b: BriefNow pulls published datasets live over the ShapesOS MCP tool `get_dataset_adapter`, the chat agent and MCP answer from published datasets, staleness alerts fire, and any compiled version can be rolled back to. Drive ingest still needs Nango Cloud credentials (fails closed without them)
 
 ### Built after the 2026-10-01 compile ✅
 - Legal/Compliance — per-tenant obligation map (industry × business model × jurisdiction), deadline engine, document vault, regulation change radar, digital-properties checks — ✅ shipped (slices 1–5, `/dashboard/legal`; deadline completion guarded + recurrence anchored in Phase 2)
@@ -170,7 +170,7 @@
 1. **Agentic OS design-system migration** — 🟡 in-flight (visual-only, whole app; foundation + 14 slices committed 2026-10-01; remaining legacy files behind the compat block)
 2. ~~Dataset Builder~~ — slices 1–4 built
 3. **Wave B completion** — ⚠️ partial: messaging inbox UI, `OutreachProspect` → `Lead`, analytics home
-4. ~~Legal/Compliance → Funding/VC (+ Connector agent) → CAD + Hardware~~ — all built 2026-10-01 → 2026-10-02 (CAD auto-BOM still open)
+4. ~~Legal/Compliance → Funding/VC (+ Connector agent) → CAD + Hardware~~ — all built 2026-10-01 → 2026-10-02 (CAD derived BOM added in Phase 4b)
 5. **Spec-complete wave** (build order Tico's call): Finance module · wave-2 modules (digital twin, multilingual, compliance, expansion, acquisition, IP, manufacturing, permits, school, C-level, contractors) · gap modules G1–G8 (payroll, field service, booking, multi-entity, inventory depth, procurement depth, subscriptions)
 6. ~~Phase 13B~~ — agent learning + company intelligence built
 7. **OS Cursor** → **Simulated World v2** → **Twin-in-Sim** — build last, in that order
