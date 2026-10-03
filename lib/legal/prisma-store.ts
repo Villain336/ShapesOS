@@ -12,8 +12,8 @@
 // deadlines. A deadline only exists once the TENANT sets/confirms a due date
 // (source "tenant_set"). Recurring reminders are computed from the tenant's
 // renewal cadence anchored to that real date (source "computed", via
-// nextDueDate). A null dueDate is ALWAYS "date needed" — the store never
-// invents dates.
+// nextOccurrenceFromAnchor — anchored to the series' first date). A null
+// dueDate is ALWAYS "date needed" — the store never invents dates.
 
 import type { PrismaClient } from "@prisma/client";
 import { writeFile, FsError } from "@/lib/filesystem/service";
@@ -46,7 +46,7 @@ import {
 import {
   daysUntilDue,
   isValidRecurrence,
-  nextDueDate,
+  nextOccurrenceFromAnchor,
   tierForDeadline,
   type DeadlineRecurrence,
   type DeadlineSource,
@@ -353,9 +353,11 @@ export class PrismaLegalStore {
       recurrence,
       source: "tenant_set" as const,
       note: input.note ?? null,
-      // A re-set date resets the escalation ladder — new tier, new alerts.
+      // A re-set date resets the escalation ladder — new tier, new alerts —
+      // and becomes the series anchor for future occurrences.
       lastAlertedTier: null,
       lastAlertedAt: null,
+      recurrenceAnchor: null,
     };
     const row = existing
       ? await this.prisma.legalDeadline.update({
@@ -415,8 +417,10 @@ export class PrismaLegalStore {
       where: { id },
       data: {
         ...data,
+        // A changed date resets the escalation ladder and makes the new
+        // date the series anchor for future occurrences.
         ...(input.dueDate !== undefined
-          ? { lastAlertedTier: null, lastAlertedAt: null }
+          ? { lastAlertedTier: null, lastAlertedAt: null, recurrenceAnchor: null }
           : {}),
       },
     });
@@ -425,9 +429,14 @@ export class PrismaLegalStore {
 
   /**
    * Tenant marks a deadline done. When the deadline recurs, the engine
-   * creates the NEXT occurrence anchored to the confirmed due date
-   * (source "computed") — this is computed, never invented: the anchor is
-   * always a tenant-set date.
+   * creates the NEXT occurrence anchored to the series' original confirmed
+   * due date (source "computed") — this is computed, never invented: the
+   * anchor is always a tenant-set date.
+   *
+   * Guarded: the open → done flip is an updateMany (count===1), and only the
+   * caller whose write flipped it creates the next occurrence — a double
+   * click / retry / concurrent request yields exactly one. Completing an
+   * already-done deadline is an idempotent no-op; a dismissed one is refused.
    */
   async markDeadlineDone(
     workspaceId: string,
@@ -439,15 +448,25 @@ export class PrismaLegalStore {
     if (!existing) {
       throw new LegalError("UNKNOWN_DEADLINE", `No deadline: ${id}`);
     }
-    const next = existing.dueDate
-      ? nextDueDate(existing.dueDate, existing.recurrence as DeadlineRecurrence)
-      : null;
+    if (existing.status === "done") return toComputedDeadline(existing);
+    if (existing.status !== "open") {
+      throw new LegalError(
+        "DEADLINE_NOT_OPEN",
+        `Only open deadlines can be marked done (status: ${existing.status}).`,
+      );
+    }
+    const anchor = existing.recurrenceAnchor ?? existing.dueDate;
+    const next =
+      anchor && existing.dueDate
+        ? nextOccurrenceFromAnchor(anchor, existing.dueDate, existing.recurrence as DeadlineRecurrence)
+        : null;
 
     const row = await this.prisma.$transaction(async (tx) => {
-      const done = await tx.legalDeadline.update({
-        where: { id },
+      const flipped = await tx.legalDeadline.updateMany({
+        where: { id, workspaceId, status: "open" },
         data: { status: "done" },
       });
+      if (flipped.count !== 1) return null; // another request completed it first
       if (next) {
         await tx.legalDeadline.create({
           data: {
@@ -456,15 +475,22 @@ export class PrismaLegalStore {
             title: existing.title,
             dueDate: next,
             recurrence: existing.recurrence,
+            recurrenceAnchor: anchor,
             source: "computed",
             status: "open",
             note: null,
           },
         });
       }
-      return done;
+      return tx.legalDeadline.findFirst({ where: { id, workspaceId } });
     });
-    return toComputedDeadline(row);
+    if (row) return toComputedDeadline(row);
+    const current = await this.prisma.legalDeadline.findFirst({ where: { id, workspaceId } });
+    if (current?.status === "done") return toComputedDeadline(current);
+    throw new LegalError(
+      "DEADLINE_NOT_OPEN",
+      `Only open deadlines can be marked done (status: ${current?.status ?? "deleted"}).`,
+    );
   }
 
   async deleteDeadline(workspaceId: string, id: string): Promise<void> {
