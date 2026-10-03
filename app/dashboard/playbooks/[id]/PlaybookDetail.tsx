@@ -25,6 +25,7 @@ import {
   Zap,
 } from "lucide-react";
 import { confirmAction, toastError } from "@/lib/ui/feedback";
+import { closeOnEscape } from "@/lib/ui/keyboard";
 
 type Status = "draft" | "eval" | "review" | "canary" | "production" | "deprecated";
 type Label = "production" | "staging" | "latest";
@@ -112,7 +113,7 @@ function ErrorBox({ message }: { message: string }) {
 
 function Modal({ title, onClose, children, wide }: { title: string; onClose: () => void; children: React.ReactNode; wide?: boolean }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/30 p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/30 p-4" role="presentation" onClick={onClose} onKeyDown={closeOnEscape(onClose)}>
       <div
         className={`relative max-h-[85vh] w-full ${wide ? "max-w-3xl" : "max-w-lg"} overflow-y-auto rounded-lg bg-paper p-5 shadow-overlay`}
         onClick={(e) => e.stopPropagation()}

@@ -350,7 +350,7 @@ export default function ApprovalCard({
                           </button>
                         );
                       })}
-                      <label data-menu-row className="relative z-10 flex items-center gap-1.5 rounded-control pl-1 pr-2 py-1 transition-colors duration-100">
+                      <label data-menu-row className="relative z-10 flex items-center gap-1.5 rounded-control pl-1 pr-2 py-1 transition-colors duration-100 focus-within:ring-2 focus-within:ring-focus">
                         <input
                           value={custom[qIdx] ?? ""}
                           tabIndex={active ? 0 : -1}
@@ -367,6 +367,7 @@ export default function ApprovalCard({
                           }}
                           placeholder={t.customPlaceholder}
                           aria-label="Custom answer"
+                          data-focus-ring="container"
                           className="min-w-0 flex-1 bg-transparent pl-1.5 text-[13px] text-ink outline-none placeholder:text-ink-3"
                         />
                       </label>

@@ -6,16 +6,28 @@ import { X, Upload } from "lucide-react";
 import type { CrmPipeline } from "./types";
 import { SOURCE_LABELS } from "./types";
 import { btnGhost, btnPrimary, errorBoxCls, inputCls, labelCls, modalCardCls, modalWrapCls, selectCls } from "./ui";
+import { closeOnEscape } from "@/lib/ui/keyboard";
 
 function Shell({ title, onClose, children, wide }: {
   title: string; onClose: () => void; children: React.ReactNode; wide?: boolean;
 }) {
   return (
-    <div className={modalWrapCls} onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className={modalCardCls} style={wide ? { width: 640 } : undefined}>
+    <div
+      className={modalWrapCls}
+      role="presentation"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      onKeyDown={closeOnEscape(onClose)}
+    >
+      <div
+        className={modalCardCls}
+        style={wide ? { width: 640 } : undefined}
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+      >
         <div className="flex items-center justify-between border-b border-line px-5 py-3.5">
           <h3 className="text-[15px] font-bold text-ink">{title}</h3>
-          <button onClick={onClose} className="rounded-md p-1.5 text-subtle hover:bg-hover-paper hover:text-ink">
+          <button type="button" onClick={onClose} aria-label="Close" className="rounded-full p-1.5 text-subtle hover:bg-hover-paper hover:text-ink">
             <X size={16} />
           </button>
         </div>

@@ -138,7 +138,7 @@ export function NewInvoiceModal({
 
   return (
     <>
-      <div className={backdropCls} onClick={onClose} />
+      <div className={backdropCls} onClick={onClose} aria-hidden />
       <div className={modalWrapCls}>
         <div className="flex items-start justify-between border-b border-line px-5 py-4">
           <div>

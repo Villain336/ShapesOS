@@ -38,6 +38,7 @@ import { CreativeWizard, ValidationView } from "./CreativeWizard";
 import { QrDesignerTab } from "./QrDesigner";
 import { TEMPLATES } from "@/lib/design/templates";
 import { confirmAction, toastError } from "@/lib/ui/feedback";
+import { activateOnKey } from "@/lib/ui/keyboard";
 
 // ── Small atoms ──────────────────────────────────────────────────────────────
 
@@ -167,6 +168,8 @@ function CreativesTab() {
               <tr
                 key={c.id}
                 onClick={() => setSelectedId(c.id)}
+                tabIndex={0}
+                onKeyDown={activateOnKey(() => setSelectedId(c.id))}
                 className={`cursor-pointer border-b border-line last:border-0 hover:bg-hover-paper ${selectedId === c.id ? "bg-hover-paper" : ""}`}
               >
                 <td className="px-3 py-2 font-medium text-ink">{c.name}</td>
@@ -244,7 +247,7 @@ function CreativeDrawer({ creative, onClose, onChange }: { creative: Creative; o
 
   return (
     <div className="fixed inset-0 z-40">
-      <div className="absolute inset-0 bg-night/30" onClick={onClose} />
+      <div className="absolute inset-0 bg-night/30" onClick={onClose} aria-hidden />
       <div className="absolute right-0 top-0 flex h-full w-full max-w-md flex-col bg-white shadow-xl">
         <div className="flex items-start justify-between border-b border-line px-4 py-3.5">
           <div>
@@ -638,6 +641,10 @@ function DesignsTab() {
                 onClick={() => {
                   window.location.href = `/dashboard/studio/designs/${d.id}`;
                 }}
+                tabIndex={0}
+                onKeyDown={activateOnKey(() => {
+                  window.location.href = `/dashboard/studio/designs/${d.id}`;
+                })}
                 className="cursor-pointer border-b border-line last:border-0 hover:bg-hover-paper"
               >
                 <td className="px-3 py-2 font-medium text-ink">{d.name}</td>
@@ -906,6 +913,10 @@ function PagesTab() {
                 onClick={() => {
                   window.location.href = `/dashboard/studio/pages/${p.id}`;
                 }}
+                tabIndex={0}
+                onKeyDown={activateOnKey(() => {
+                  window.location.href = `/dashboard/studio/pages/${p.id}`;
+                })}
                 className="cursor-pointer border-b border-line last:border-0 hover:bg-hover-paper"
               >
                 <td className="px-3 py-2 font-medium text-ink">{p.name}</td>

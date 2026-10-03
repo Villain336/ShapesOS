@@ -17,6 +17,7 @@ import {
   MIN_GRID_SIZE,
 } from "@/lib/seo/local-cost";
 import { confirmAction } from "@/lib/ui/feedback";
+import { closeOnEscape } from "@/lib/ui/keyboard";
 
 export interface LocalGridRow {
   id: string;
@@ -144,9 +145,13 @@ function Modal({ onClose, children }: { onClose: () => void; children: React.Rea
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+      role="presentation"
       onClick={onClose}
+      onKeyDown={closeOnEscape(onClose)}
     >
       <div
+        role="dialog"
+        aria-modal="true"
         className="w-full max-w-lg rounded-lg border border-zinc-200 bg-white p-6"
         onClick={(e) => e.stopPropagation()}
       >

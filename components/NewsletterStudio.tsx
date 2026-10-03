@@ -48,6 +48,7 @@ import {
   type EmailTiptapDoc,
 } from "@/lib/newsletter/blocks";
 import { confirmAction } from "@/lib/ui/feedback";
+import { closeOnEscape } from "@/lib/ui/keyboard";
 
 const TemplateEditor = dynamic(() => import("@/components/TemplateEditor"), { ssr: false });
 
@@ -807,7 +808,7 @@ function BroadcastsTab({
       </div>
 
       {preview && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => setPreview(null)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" role="presentation" onClick={() => setPreview(null)} onKeyDown={closeOnEscape(() => setPreview(null))}>
           <div
             className="h-[85vh] w-full max-w-3xl overflow-hidden rounded-xl border border-zinc-200 bg-white"
             onClick={(e) => e.stopPropagation()}

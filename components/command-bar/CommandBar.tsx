@@ -524,7 +524,7 @@ export function CommandBar({ workspaceId }: { workspaceId: string }) {
             onKeyDown={onPaletteKeyDown}
           >
             {/* Input row */}
-            <div className="flex items-center gap-2 border-b border-line px-3">
+            <div className="flex items-center gap-2 border-b border-line px-3 focus-within:border-focus">
               {isNested && (
                 <button
                   type="button"
@@ -558,6 +558,7 @@ export function CommandBar({ workspaceId }: { workspaceId: string }) {
                 aria-label={pageTitle}
                 autoComplete="off"
                 spellCheck={false}
+                data-focus-ring="container"
                 className="h-12 w-full bg-transparent text-[14px] text-ink outline-none placeholder:text-subtle"
               />
               {isNested && page.name !== "ask" && (

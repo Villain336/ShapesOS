@@ -21,6 +21,7 @@ import {
   X,
 } from "lucide-react";
 import { confirmAction } from "@/lib/ui/feedback";
+import { activateOnKey } from "@/lib/ui/keyboard";
 
 const KIND_LABELS: Record<string, string> = {
   pitch_deck: "Pitch deck",
@@ -372,6 +373,8 @@ export function DataRoomView() {
                 <tr
                   key={d.id}
                   onClick={() => void openDetail(d.id)}
+                  tabIndex={0}
+                  onKeyDown={activateOnKey(() => void openDetail(d.id))}
                   className="cursor-pointer border-b border-line last:border-0 hover:bg-canvas"
                 >
                   <td className="px-4 py-3">

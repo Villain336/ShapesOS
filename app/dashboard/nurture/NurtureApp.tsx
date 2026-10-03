@@ -830,7 +830,7 @@ function ConsentTab() {
                   {(["sms", "email", "voice", "mail"] as const).map((ch) => (
                     <td key={ch} className="px-3 py-2">
                       <select
-                        className="rounded-full border border-line bg-paper px-2 py-0.5 text-[12px] font-medium text-ink focus:outline-none"
+                        className="rounded-full border border-line bg-paper px-2 py-0.5 text-[12px] font-medium text-ink focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)]"
                         value={r.consent[ch] ?? "unknown"}
                         onChange={(e) => setConsent(r.id, ch, e.target.value)}
                       >

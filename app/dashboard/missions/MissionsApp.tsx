@@ -25,6 +25,7 @@ import {
   type BusinessType,
   type MissionTemplate,
 } from "@/lib/missions/templates";
+import { activateOnKey, closeOnEscape } from "@/lib/ui/keyboard";
 
 async function api<T>(url: string, init?: RequestInit): Promise<T> {
   const r = await fetch(url, {
@@ -208,7 +209,7 @@ function TemplatePicker({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/30 p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/30 p-4" role="presentation" onClick={onClose} onKeyDown={closeOnEscape(onClose)}>
       <div
         className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-lg bg-paper shadow-overlay"
         onClick={(e) => e.stopPropagation()}
@@ -249,10 +250,22 @@ function TemplatePicker({ onClose }: { onClose: () => void }) {
                 className={`cursor-pointer rounded-lg border px-3.5 py-3 ${
                   selectedId === t.id ? "border-ink bg-canvas" : "border-line bg-paper hover:border-control"
                 }`}
+                role="presentation"
                 onClick={() => setSelectedId(t.id === selectedId ? null : t.id)}
               >
                 <div className="flex items-center justify-between gap-2">
-                  <div className="text-sm font-semibold text-ink">{t.name}</div>
+                  {/* Keyboard path: the card is a mouse target; the name is the button. */}
+                  <button
+                    type="button"
+                    aria-expanded={selectedId === t.id}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedId(t.id === selectedId ? null : t.id);
+                    }}
+                    className="rounded-sm text-left text-sm font-semibold text-ink"
+                  >
+                    {t.name}
+                  </button>
                   <Chip>{t.goals.length} goals</Chip>
                 </div>
                 <p className="mt-0.5 text-xs text-muted">{t.description}</p>
@@ -403,6 +416,8 @@ export function MissionsApp() {
                 <tr
                   key={m.id}
                   onClick={() => router.push(`/dashboard/missions/${m.id}`)}
+                  tabIndex={0}
+                  onKeyDown={activateOnKey(() => router.push(`/dashboard/missions/${m.id}`))}
                   className="cursor-pointer border-b border-line last:border-0 hover:bg-hover-paper"
                 >
                   <td className="px-3 py-2 font-medium text-ink">{m.name}</td>

@@ -419,13 +419,14 @@ export default function AutomationSettingsForm() {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <div className="flex items-center rounded-md border border-line bg-canvas px-2">
+              <div className="flex items-center rounded-md border border-line bg-canvas px-2 focus-within:border-focus focus-within:ring-[3px] focus-within:ring-[var(--aos-focus-halo)]">
                 <span className="text-[13px] text-subtle">$</span>
                 <input
                   value={thresholdInput}
                   onChange={(e) => setThresholdInput(e.target.value)}
                   inputMode="decimal"
                   aria-label="Small-action threshold in dollars"
+                  data-focus-ring="container"
                   className="w-20 bg-transparent px-1 py-1.5 text-[13px] text-ink outline-none"
                 />
               </div>
@@ -477,7 +478,7 @@ export default function AutomationSettingsForm() {
                       </td>
                       <td className="px-3 py-2.5 align-top">
                         {a.tier === 1 ? (
-                          <div className="flex items-center rounded-md border border-line bg-canvas px-2">
+                          <div className="flex items-center rounded-md border border-line bg-canvas px-2 focus-within:border-focus focus-within:ring-[3px] focus-within:ring-[var(--aos-focus-halo)]">
                             <span className="text-[13px] text-subtle">$</span>
                             <input
                               defaultValue={row?.thresholdCents != null ? String(row.thresholdCents / 100) : ""}
@@ -493,6 +494,7 @@ export default function AutomationSettingsForm() {
                                   putSetting(a.action, behavior, next);
                                 }
                               }}
+                              data-focus-ring="container"
                               className="w-20 bg-transparent px-1 py-1.5 text-[13px] text-ink outline-none placeholder:text-subtle"
                             />
                           </div>

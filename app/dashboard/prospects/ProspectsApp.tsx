@@ -27,6 +27,7 @@ import {
   Zap,
   CheckCircle2,
 } from "lucide-react";
+import { closeOnEscape } from "@/lib/ui/keyboard";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -662,7 +663,7 @@ export function ProspectsApp() {
       )}
 
       {researchTarget && (
-        <div className="fixed inset-0 z-40 flex justify-end bg-ink/30" onClick={() => setResearchTarget(null)}>
+        <div className="fixed inset-0 z-40 flex justify-end bg-ink/30" role="presentation" onClick={() => setResearchTarget(null)} onKeyDown={closeOnEscape(() => setResearchTarget(null))}>
           <div className="h-full w-full max-w-md overflow-y-auto border-l border-line bg-paper p-5 shadow-overlay" onClick={(e) => e.stopPropagation()}>
             <div className="mb-3 flex items-start justify-between">
               <div>
@@ -709,7 +710,7 @@ export function ProspectsApp() {
 
 function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-ink/30 p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-ink/30 p-4" role="presentation" onClick={onClose} onKeyDown={closeOnEscape(onClose)}>
       <div className="w-full max-w-lg rounded-lg border border-line bg-paper p-5 shadow-overlay" onClick={(e) => e.stopPropagation()}>
         <div className="mb-3 flex items-center justify-between">
           <h3 className="text-sm font-semibold text-ink">{title}</h3>

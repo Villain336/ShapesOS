@@ -183,7 +183,7 @@ export function CrmApp() {
             <div className="mt-0.5 flex items-center gap-2">
               <div className="relative">
                 <select
-                  className="cursor-pointer border-0 bg-transparent pl-0 pr-8 text-[20px] font-bold text-ink focus:outline-none"
+                  className="cursor-pointer border-0 bg-transparent pl-0 pr-8 rounded-sm text-[20px] font-bold text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-focus"
                   value={activePipelineId ?? ""}
                   onChange={(e) => setActivePipelineId(e.target.value)}
                   aria-label="Active pipeline"

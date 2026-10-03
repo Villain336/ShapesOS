@@ -22,6 +22,7 @@ import {
   X,
 } from "lucide-react";
 import { confirmAction } from "@/lib/ui/feedback";
+import { closeOnEscape } from "@/lib/ui/keyboard";
 
 interface PostizChannel {
   id: string;
@@ -378,7 +379,7 @@ function ComposeModal({
   const valid = content.trim().length > 0 && picked.size > 0 && (mode !== "schedule" || when.trim().length > 0);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/30 p-4 pt-[8vh]" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/30 p-4 pt-[8vh]" role="presentation" onClick={onClose} onKeyDown={closeOnEscape(onClose)}>
       <div className="w-full max-w-3xl rounded-xl border border-stone-200 bg-white shadow-xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between border-b border-stone-200 px-4 py-2.5">
           <h3 className="text-[14px] font-semibold text-stone-900">Compose post</h3>

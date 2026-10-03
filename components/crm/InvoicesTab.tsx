@@ -10,6 +10,7 @@ import { formatMoney } from "./types";
 import { InvoiceDetail } from "./InvoiceDetail";
 import { NewInvoiceModal } from "./NewInvoiceModal";
 import { btnPrimary, chipCls, errorBoxCls, inputCls, selectCls, tableCls, tableWrapCls, trClickableCls } from "./ui";
+import { activateOnKey } from "@/lib/ui/keyboard";
 
 export interface OpsInvoice {
   id: string;
@@ -217,7 +218,7 @@ export function InvoicesTab() {
                 const meta = INVOICE_STATUS_META[inv.status];
                 const c = inv.customerId ? customers[inv.customerId] : undefined;
                 return (
-                  <tr key={inv.id} onClick={() => setSelectedId(inv.id)} className={trClickableCls}>
+                  <tr key={inv.id} onClick={() => setSelectedId(inv.id)} tabIndex={0} onKeyDown={activateOnKey(() => setSelectedId(inv.id))} className={trClickableCls}>
                     <td className="font-semibold text-ink">INV-{shortInvoiceId(inv.id)}</td>
                     <td>
                       {c ? (

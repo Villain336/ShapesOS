@@ -25,6 +25,7 @@ import {
   AlertTriangle,
   ShieldCheck,
 } from "lucide-react";
+import { closeOnEscape } from "@/lib/ui/keyboard";
 
 // ---------------------------------------------------------------------------
 // Small primitives
@@ -469,7 +470,7 @@ function QrModal({ requestId, leadName, onClose }: { requestId: string; leadName
       .then((j) => { if (j.qrDataUrl) setData(j); });
   }, [requestId]);
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/30 p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/30 p-4" role="presentation" onClick={onClose} onKeyDown={closeOnEscape(onClose)}>
       <div className="w-full max-w-xs rounded-lg bg-paper p-5 text-center shadow-overlay" onClick={(e) => e.stopPropagation()}>
         <div className="mb-2 flex items-center justify-between">
           <h3 className="text-[13px] font-semibold text-ink">Print QR — {leadName}</h3>

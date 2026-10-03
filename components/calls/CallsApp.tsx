@@ -24,6 +24,7 @@ import {
 import { EmptyState } from "../crm/ui";
 import { formatMoney } from "../crm/types";
 import { confirmAction } from "@/lib/ui/feedback";
+import { activateOnKey, closeOnEscape } from "@/lib/ui/keyboard";
 
 // ── Agentic OS atoms ─────────────────────────────────────────────────────────
 // Visual migration only: same layout, same behavior. Call/booking statuses
@@ -258,7 +259,7 @@ function NumbersPanel() {
       </section>
 
       {showPurchase && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/30 p-4" onClick={() => setShowPurchase(false)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/30 p-4" role="presentation" onClick={() => setShowPurchase(false)} onKeyDown={closeOnEscape(() => setShowPurchase(false))}>
           <div className="w-full max-w-[420px] rounded-lg bg-paper p-5 shadow-overlay" onClick={(e) => e.stopPropagation()}>
             <div className="mb-4 flex items-center justify-between">
               <h3 className="text-[15px] font-semibold text-ink">Buy tracking number</h3>
@@ -337,7 +338,7 @@ function CallsPanel() {
             <tbody>
               {calls.map((c) => (
                 <>
-                  <tr key={c.id} className="cursor-pointer border-b border-line last:border-0 hover:bg-hover-paper" onClick={() => setExpanded(expanded === c.id ? null : c.id)}>
+                  <tr key={c.id} className="cursor-pointer border-b border-line last:border-0 hover:bg-hover-paper" onClick={() => setExpanded(expanded === c.id ? null : c.id)} tabIndex={0} onKeyDown={activateOnKey(() => setExpanded(expanded === c.id ? null : c.id))}>
                     <td className={tdCls}>{fmtDateTime(c.startedAt)}</td>
                     <td className={`${tdCls} font-medium text-ink`}>{c.from}</td>
                     <td className={tdCls}>{c.number.friendlyName ?? c.number.e164}</td>
@@ -494,7 +495,7 @@ function PagesPanel() {
       </section>
 
       {showCreate && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/30 p-4" onClick={() => setShowCreate(false)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/30 p-4" role="presentation" onClick={() => setShowCreate(false)} onKeyDown={closeOnEscape(() => setShowCreate(false))}>
           <div className="w-full max-w-[420px] rounded-lg bg-paper p-5 shadow-overlay" onClick={(e) => e.stopPropagation()}>
             <div className="mb-4 flex items-center justify-between">
               <h3 className="text-[15px] font-semibold text-ink">New booking page</h3>

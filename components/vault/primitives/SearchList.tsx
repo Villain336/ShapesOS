@@ -52,7 +52,7 @@ export default function SearchList({
     <div className="flex min-h-[248px] w-full max-w-72 flex-col items-stretch">
       <div className="w-full self-start overflow-hidden rounded-card bg-surface shadow-raised">
         {/* input row */}
-        <div className="flex h-10 items-center gap-2 border-b border-line px-3 transition-colors duration-100 hover:bg-hover">
+        <div className="flex h-10 items-center gap-2 border-b border-line px-3 transition-colors duration-100 hover:bg-hover focus-within:border-focus">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--ink-3)" strokeWidth="2" strokeLinecap="round" className="shrink-0">
             <circle cx="11" cy="11" r="7" />
             <path d="M21 21l-4.3-4.3" />
@@ -62,6 +62,7 @@ export default function SearchList({
             onChange={(event) => setQuery(event.target.value)}
             placeholder={labels.placeholder}
             aria-label={labels.ariaLabel}
+            data-focus-ring="container"
             className="min-w-0 flex-1 bg-transparent text-[13px] text-ink outline-none placeholder:text-ink-3"
           />
           {query && (

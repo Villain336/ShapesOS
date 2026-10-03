@@ -21,6 +21,7 @@ import {
   X,
   Zap,
 } from "lucide-react";
+import { closeOnEscape } from "@/lib/ui/keyboard";
 
 async function api<T>(url: string, init?: RequestInit): Promise<T> {
   const r = await fetch(url, {
@@ -893,7 +894,7 @@ function AutomationModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/30 p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/30 p-4" role="presentation" onClick={onClose} onKeyDown={closeOnEscape(onClose)}>
       <div
         className="w-full max-w-lg rounded-lg bg-paper shadow-overlay"
         onClick={(e) => e.stopPropagation()}

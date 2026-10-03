@@ -35,6 +35,7 @@ import {
   X,
 } from "lucide-react";
 import { confirmAction, toastError } from "@/lib/ui/feedback";
+import { activateOnKey } from "@/lib/ui/keyboard";
 
 // ── Agentic OS atoms ─────────────────────────────────────────────────────────
 
@@ -1277,6 +1278,8 @@ function EnvelopesTab() {
                     <tr
                       key={e.id}
                       onClick={() => setSelectedId(e.id)}
+                      tabIndex={0}
+                      onKeyDown={activateOnKey(() => setSelectedId(e.id))}
                       className="cursor-pointer border-b border-line last:border-0 hover:bg-hover-paper"
                     >
                       <td className="px-3 py-2.5 font-medium text-ink">{e.title}</td>

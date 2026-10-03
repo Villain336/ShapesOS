@@ -22,6 +22,7 @@ import {
 import { Button } from "@/components/vault/shadcn/button";
 import { Input } from "@/components/vault/shadcn/input";
 import { Textarea } from "@/components/vault/shadcn/textarea";
+import { closeOnEscape } from "@/lib/ui/keyboard";
 // Category chips are neutral by default (tone accepted for call-site compat).
 function chip(text: React.ReactNode, cls?: string) {
   void cls;
@@ -431,7 +432,7 @@ export function RecyclingApp() {
 
       {/* ── Detail drawer ── */}
       {selectedId && (
-        <div className="fixed inset-0 z-50 flex justify-end bg-ink/30" onClick={closeDetail}>
+        <div className="fixed inset-0 z-50 flex justify-end bg-ink/30" role="presentation" onClick={closeDetail} onKeyDown={closeOnEscape(closeDetail)}>
           <div
             className="flex h-full w-full max-w-2xl flex-col overflow-y-auto bg-white p-5 shadow-overlay"
             onClick={(e) => e.stopPropagation()}

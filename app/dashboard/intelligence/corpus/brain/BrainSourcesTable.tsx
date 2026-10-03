@@ -9,6 +9,7 @@
 import { Crosshair } from "lucide-react";
 import type { BrainGraph, BrainNode, BrainPillar } from "@/lib/intelligence/corpus/graph";
 import { Chip, PILLAR_COLORS, PILLAR_LABEL } from "./brain-ui";
+import { activateOnKey } from "@/lib/ui/keyboard";
 
 const PILLAR_ORDER: BrainPillar[] = ["marketing", "growth", "design"];
 const TIER_ORDER: Record<string, number> = { "1": 0, "2": 1, "1S": 2 };
@@ -94,6 +95,8 @@ export function BrainSourcesTable({
                 <tr
                   key={n.id}
                   onClick={() => onFlyTo(n.id)}
+                  tabIndex={0}
+                  onKeyDown={activateOnKey(() => onFlyTo(n.id))}
                   className={`cursor-pointer border-t border-line transition ${
                     selected ? "bg-canvas" : "hover:bg-hover-paper"
                   }`}

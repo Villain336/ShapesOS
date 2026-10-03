@@ -26,6 +26,7 @@ import {
   X,
 } from "lucide-react";
 import { toast } from "@/lib/ui/feedback";
+import { activateOnKey } from "@/lib/ui/keyboard";
 
 type Tab = "campaigns" | "pieces" | "builder";
 
@@ -307,7 +308,7 @@ function CampaignsTab({ onNew }: { onNew: () => void }) {
             </thead>
             <tbody>
               {(campaigns ?? []).map((c) => (
-                <tr key={c.id} className="cursor-pointer border-b border-line last:border-0 hover:bg-hover-paper" onClick={() => openDetail(c.id)}>
+                <tr key={c.id} className="cursor-pointer border-b border-line last:border-0 hover:bg-hover-paper" onClick={() => openDetail(c.id)} tabIndex={0} onKeyDown={activateOnKey(() => openDetail(c.id))}>
                   <td className="px-3 py-2 font-medium text-ink">{c.name}</td>
                   <td className="px-3 py-2"><StatusChip status={c.status} /></td>
                   <td className="px-3 py-2 text-muted">{c.pieceCount ?? "—"}</td>
