@@ -13,6 +13,8 @@ import { unsplashStatus } from "@/lib/design/unsplash";
 /* PROVIDER:cloudinary */ import { cloudinaryStatus } from "@/lib/design/cloudinary"; /* END */
 /* PROVIDER:brandfetch */ import { brandfetchStatus } from "@/lib/design/brandfetch"; /* END */
 import SettingsNav from "@/components/settings/SettingsNav";
+import { isPlatformOperator } from "@/lib/auth/platform-operator";
+/* INTEGRATION:activepieces */ import ActivepiecesFlowBindings from "@/components/settings/ActivepiecesFlowBindings"; /* END */
 // Phase 12 (embeds): integration status helpers.
 import { umamiStatus } from "@/lib/integrations/umami";
 import { chatwootStatus } from "@/lib/integrations/chatwoot";
@@ -59,6 +61,9 @@ export default async function ProvidersSettingsPage() {
   /* PROVIDER:listmonk */ const listmonk = listmonkStatus(); /* END */
   /* PROVIDER:postiz */ const postiz = postizStatus(); /* END */
   /* INTEGRATION:activepieces */ const activepieces = activepiecesStatus(); /* END */
+  // Host-wide resources (the Activepieces engine) are managed by platform
+  // operators, not workspace admins — decided here, enforced again by the API.
+  const operator = isPlatformOperator({ id: user.id, email: user.email });
 
   return (
     <div className="flex flex-col gap-6">
@@ -469,6 +474,9 @@ export default async function ProvidersSettingsPage() {
             and automation tools report an honest “not connected” state and
             nothing is fabricated.
           </p>
+        )}
+        {activepieces.configured && operator && (
+          <ActivepiecesFlowBindings workspaceId={workspace.id} workspaceName={workspace.name} />
         )}
       </div>
       {/* END */}

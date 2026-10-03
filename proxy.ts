@@ -1,6 +1,12 @@
-// Marketr — API proxy (Next.js 16 "proxy", formerly middleware).
+// ShapesOS — request proxy (Next.js 16 "proxy", formerly middleware).
 //
-// Single choke point for Fix 6 (Phase A hardening):
+// Every request except static assets — Content-Security-Policy (Phase 3):
+//   a fresh nonce per request; the policy (lib/security/headers.ts, the single
+//   source of truth) goes on the REQUEST headers — Next's renderer parses the
+//   nonce out of it and stamps it on its own scripts — and on the response.
+//   /api/* gets the scriptless API policy instead (no nonce involved).
+//
+// API requests only — single choke point for Fix 6 (Phase A hardening):
 //   1. Oversize-body guard: declared Content-Length past the cap → 400
 //      (kept at 400 per the Fix 6 adversarial contract: malformed/oversize
 //      bodies are 400, exhausted budgets are 429).
@@ -27,24 +33,55 @@ import {
   tooManyRequests,
   clientIp,
 } from "./lib/api/rate-limit";
+import { contentSecurityPolicyFor, generateCspNonce } from "./lib/security/headers";
 
 export const config = {
-  matcher: "/api/:path*",
+  matcher: [
+    // Every API route — rate limiting must see all of them, whatever the suffix.
+    "/api/:path*",
+    // Everything else except build output, the image optimizer and static
+    // files from public/ (they need no CSP; skipping them keeps assets cheap).
+    "/((?!api/|_next/static/|_next/image|favicon\\.ico$|.*\\.(?:png|jpe?g|gif|webp|avif|svg|ico|woff2?|ttf|otf|map)$).*)",
+  ],
 };
 
 /** Hard backstop on declared body size — the route layer never buffers past this. */
 export const MAX_API_CONTENT_LENGTH = 10 * 1024 * 1024; // 10 MiB
 
+function isApiPath(pathname: string): boolean {
+  return pathname === "/api" || pathname.startsWith("/api/");
+}
+
 export async function proxy(req: NextRequest) {
+  // 0. Content-Security-Policy. The policy rides on the forwarded request
+  //    (Next reads the nonce from it; server components can read x-nonce)
+  //    and on every response this proxy produces.
+  const nonce = generateCspNonce();
+  const csp = contentSecurityPolicyFor(req.nextUrl.pathname, {
+    nonce,
+    dev: process.env.NODE_ENV === "development",
+  });
+  const withCsp = <T extends Response>(res: T): T => {
+    res.headers.set("Content-Security-Policy", csp);
+    return res;
+  };
+  const pass = () => {
+    const requestHeaders = new Headers(req.headers);
+    requestHeaders.set("x-nonce", nonce);
+    requestHeaders.set("content-security-policy", csp);
+    return withCsp(NextResponse.next({ request: { headers: requestHeaders } }));
+  };
+
+  if (!isApiPath(req.nextUrl.pathname)) return pass();
+
   // 1. Oversize-body guard (declared length only; chunked streams are bounded
   //    per-route by body readers).
   const declared = req.headers.get("content-length");
   if (declared !== null && declared !== "") {
     const n = Number(declared);
     if (Number.isFinite(n) && n > MAX_API_CONTENT_LENGTH) {
-      return NextResponse.json(
-        { error: "Request body too large (max 10 MiB)." },
-        { status: 400 },
+      return withCsp(
+        NextResponse.json({ error: "Request body too large (max 10 MiB)." }, { status: 400 }),
       );
     }
   }
@@ -72,8 +109,8 @@ export async function proxy(req: NextRequest) {
   const key = rateLimitKey(tier, userId, clientIp(req.headers));
   const result = checkRateLimit(key, tier);
   if (!result.allowed) {
-    return tooManyRequests(result.retryAfterMs);
+    return withCsp(tooManyRequests(result.retryAfterMs));
   }
 
-  return NextResponse.next();
+  return pass();
 }

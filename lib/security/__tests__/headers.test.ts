@@ -1,4 +1,4 @@
-// Phase 1 (untrusted content): response security headers.
+// Phase 1 (untrusted content) + Phase 3 (nonce CSP): response security headers.
 // Run: npx tsx --test lib/security/__tests__/headers.test.ts
 
 import { describe, it } from "node:test";
@@ -6,13 +6,17 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 import {
+  API_CONTENT_SECURITY_POLICY,
   buildContentSecurityPolicy,
   buildSecurityHeaders,
+  contentSecurityPolicyFor,
+  generateCspNonce,
   shouldSendHsts,
   USER_CONTENT_CSP,
 } from "../headers";
 import { brandLogoHeaders } from "../../brand-logo";
 import { buildDownloadHeaders } from "../../filesystem/download";
+import { getScriptNonceFromHeader } from "next/dist/server/app-render/get-script-nonce-from-header";
 
 function directives(csp: string): Map<string, string> {
   return new Map(
@@ -23,10 +27,54 @@ function directives(csp: string): Map<string, string> {
   );
 }
 
-describe("app-wide Content-Security-Policy", () => {
-  const d = directives(buildContentSecurityPolicy());
+const NONCE = "AAECAwQFBgcICQoLDA0ODw==";
+const escapeRe = (s: string) => s.replace(/[+/=]/g, "\\$&");
 
-  it("blocks inline event handlers (the H1/XSS sink) and plugins", () => {
+describe("CSP nonce", () => {
+  it("is base64 of 128 random bits and fresh every call", () => {
+    const seen = new Set<string>();
+    for (let i = 0; i < 200; i++) {
+      const n = generateCspNonce();
+      assert.match(n, /^[A-Za-z0-9+/]{22}==$/);
+      assert.equal(Buffer.from(n, "base64").length, 16);
+      seen.add(n);
+    }
+    assert.equal(seen.size, 200);
+  });
+
+  it("is what Next's renderer extracts from the policy (so its scripts get stamped)", () => {
+    const n = generateCspNonce();
+    assert.equal(getScriptNonceFromHeader(buildContentSecurityPolicy({ nonce: n })), n);
+    assert.equal(getScriptNonceFromHeader(buildContentSecurityPolicy({ nonce: n, dev: true })), n);
+  });
+
+  it("rejects a malformed nonce instead of emitting a policy Next can't parse", () => {
+    assert.throws(() => buildContentSecurityPolicy({ nonce: "" }));
+    assert.throws(() => buildContentSecurityPolicy({ nonce: "abcdefghijklmnop' 'unsafe-inline" }));
+    assert.throws(() => buildContentSecurityPolicy({ nonce: "short" }));
+  });
+});
+
+describe("page Content-Security-Policy (nonce-based)", () => {
+  const d = directives(buildContentSecurityPolicy({ nonce: NONCE }));
+  const script = d.get("script-src")!;
+
+  it("runs only nonce'd scripts (+ what they load): no 'unsafe-inline', no eval in production", () => {
+    assert.match(script, new RegExp(`'nonce-${escapeRe(NONCE)}'`));
+    assert.match(script, /'strict-dynamic'/);
+    assert.doesNotMatch(script, /'unsafe-inline'/);
+    assert.doesNotMatch(script, /'unsafe-eval'/);
+    assert.doesNotMatch(script, /(^|\s)http:/, "no cleartext script origins");
+    assert.doesNotMatch(script, /\*/);
+  });
+
+  it("allows eval only in dev (React dev error-stack reconstruction)", () => {
+    const dev = directives(buildContentSecurityPolicy({ nonce: NONCE, dev: true }));
+    assert.match(dev.get("script-src")!, /'unsafe-eval'/);
+    assert.doesNotMatch(dev.get("script-src")!, /'unsafe-inline'/);
+  });
+
+  it("blocks inline event handlers and plugins; locks base/framing", () => {
     assert.equal(d.get("script-src-attr"), "'none'");
     assert.equal(d.get("object-src"), "'none'");
     assert.equal(d.get("base-uri"), "'self'");
@@ -34,27 +82,50 @@ describe("app-wide Content-Security-Policy", () => {
     assert.equal(d.get("default-src"), "'self'");
   });
 
-  it("keeps what the app needs (Next inline bootstrap, Monaco CDN, data:/blob: images, workers)", () => {
-    assert.match(d.get("script-src")!, /'self'/);
-    assert.match(d.get("script-src")!, /'unsafe-inline'/);
-    assert.match(d.get("script-src")!, /https:/);
-    assert.doesNotMatch(d.get("script-src")!, /(^|\s)http:/, "no cleartext script origins");
+  it("keeps what the app needs (inline styles, data:/blob: images, blob workers)", () => {
+    assert.match(d.get("style-src")!, /'unsafe-inline'/);
     assert.match(d.get("img-src")!, /data:/);
     assert.match(d.get("img-src")!, /blob:/);
     assert.match(d.get("worker-src")!, /blob:/);
-    assert.doesNotMatch(d.get("script-src")!, /\*/);
   });
 
   it("does not emit upgrade-insecure-requests (would break plain-http LAN installs)", () => {
     assert.equal(d.has("upgrade-insecure-requests"), false);
   });
+
+  it("puts script-src before script-src-attr (Next reads the first script-src* directive)", () => {
+    const csp = buildContentSecurityPolicy({ nonce: NONCE });
+    assert.ok(csp.indexOf("script-src ") < csp.indexOf("script-src-attr"));
+  });
+});
+
+describe("API Content-Security-Policy", () => {
+  const d = directives(API_CONTENT_SECURITY_POLICY);
+
+  it("is scriptless and sandboxed — at least as strict as the per-route user-content policies it supersedes", () => {
+    assert.equal(d.get("default-src"), "'none'");
+    assert.equal(d.has("script-src"), false);
+    assert.match(d.get("sandbox") ?? "", /allow-forms/);
+    assert.doesNotMatch(d.get("sandbox") ?? "", /allow-scripts|allow-same-origin/);
+    assert.equal(d.get("frame-ancestors"), "'self'");
+    assert.equal(d.get("base-uri"), "'none'");
+  });
+
+  it("is chosen for /api paths; everything else gets the nonce policy", () => {
+    assert.equal(contentSecurityPolicyFor("/api/projects", { nonce: NONCE }), API_CONTENT_SECURITY_POLICY);
+    assert.equal(contentSecurityPolicyFor("/api", { nonce: NONCE }), API_CONTENT_SECURITY_POLICY);
+    for (const p of ["/", "/dashboard", "/apiary", "/admin", "/r/funding/x", "/s/abc"]) {
+      assert.equal(getScriptNonceFromHeader(contentSecurityPolicyFor(p, { nonce: NONCE })), NONCE, p);
+    }
+  });
 });
 
 describe("security header set", () => {
-  it("always carries CSP + nosniff + frame options; HSTS only when asked", () => {
+  it("carries nosniff + frame options, never a CSP (proxy.ts owns it); HSTS only when asked", () => {
     const keys = (h: Array<{ key: string }>) => h.map((x) => x.key);
-    assert.ok(keys(buildSecurityHeaders({ hsts: false })).includes("Content-Security-Policy"));
+    assert.ok(!keys(buildSecurityHeaders({ hsts: true })).includes("Content-Security-Policy"));
     assert.ok(keys(buildSecurityHeaders({ hsts: false })).includes("X-Content-Type-Options"));
+    assert.ok(keys(buildSecurityHeaders({ hsts: false })).includes("X-Frame-Options"));
     assert.ok(!keys(buildSecurityHeaders({ hsts: false })).includes("Strict-Transport-Security"));
     assert.ok(keys(buildSecurityHeaders({ hsts: true })).includes("Strict-Transport-Security"));
   });
@@ -66,11 +137,12 @@ describe("security header set", () => {
     assert.equal(shouldSendHsts({ NODE_ENV: "development", NEXTAUTH_URL: "https://app.example" }), false);
   });
 
-  it("next.config.ts wires the headers and disables X-Powered-By", () => {
+  it("next.config.ts wires the static headers, sends no CSP of its own, disables X-Powered-By", () => {
     const src = readFileSync(new URL("../../../next.config.ts", import.meta.url), "utf8");
     assert.match(src, /poweredByHeader:\s*false/);
     assert.match(src, /buildSecurityHeaders\(/);
     assert.match(src, /source:\s*"\/:path\*",\s*headers:\s*securityHeaders/);
+    assert.doesNotMatch(src, /buildContentSecurityPolicy|key:\s*"Content-Security-Policy"/);
   });
 });
 

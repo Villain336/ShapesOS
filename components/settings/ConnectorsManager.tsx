@@ -7,6 +7,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Activity, Check, Plug } from "lucide-react";
 import ConnectorHealthTab from "./ConnectorHealthTab";
+import McpReadOnlyToolsEditor from "./McpReadOnlyToolsEditor";
 
 // AOS atoms (local — components/settings/ui.tsx is owned by another slice).
 const cardCls = "rounded-xl border border-line bg-paper p-5";
@@ -67,6 +68,8 @@ interface Connector {
   description: string | null;
   custom: boolean;
   connections: Connection[];
+  /** Custom MCP only: tools the agent may run without asking (admin allow-list). */
+  readOnlyTools?: string[];
 }
 
 // Connection/auth states are provider states, not agent states — neutral chips.
@@ -106,6 +109,7 @@ export default function ConnectorsManager({
   const [mcpTransport, setMcpTransport] = useState<"streamable-http" | "stdio">(
     "streamable-http",
   );
+  const [editingReadOnly, setEditingReadOnly] = useState<string | null>(null);
 
   const q = `workspaceId=${encodeURIComponent(workspaceId)}`;
 
@@ -482,26 +486,63 @@ export default function ConnectorsManager({
         </div>
         {custom.length > 0 && (
           <div className="mt-4 flex flex-col gap-2">
-            {custom.map((c) => (
-              <div
-                key={c.key}
-                className="flex items-center justify-between gap-2 rounded-lg border border-line bg-paper px-3 py-2"
-              >
-                <div className="min-w-0">
-                  <div className="truncate text-sm font-medium text-ink">{c.displayName}</div>
-                  <div className="truncate font-mono text-xs text-subtle">
-                    {c.description ?? c.key}
+            {custom.map((c) => {
+              const ro = c.readOnlyTools ?? [];
+              return (
+                <div key={c.key}>
+                  <div className="flex items-center justify-between gap-2 rounded-lg border border-line bg-paper px-3 py-2">
+                    <div className="min-w-0">
+                      <div className="truncate text-sm font-medium text-ink">{c.displayName}</div>
+                      <div className="truncate font-mono text-xs text-subtle">
+                        {c.description ?? c.key}
+                      </div>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <span className={chipCls}>
+                        {ro.length === 0
+                          ? "all tools ask first"
+                          : `${ro.length} read-only tool${ro.length === 1 ? "" : "s"}`}
+                      </span>
+                      {c.id && (
+                        <button
+                          onClick={() => setEditingReadOnly(editingReadOnly === c.id ? null : c.id!)}
+                          aria-expanded={editingReadOnly === c.id}
+                          className={btnGhost}
+                        >
+                          Read-only tools
+                        </button>
+                      )}
+                      <button
+                        onClick={() => deleteMcp(c)}
+                        disabled={busy === `mcp-${c.key}`}
+                        className={btnDeny}
+                      >
+                        Delete
+                      </button>
+                    </div>
                   </div>
+                  {c.id && editingReadOnly === c.id && (
+                    <McpReadOnlyToolsEditor
+                      workspaceId={workspaceId}
+                      connectorId={c.id}
+                      connectorName={c.displayName}
+                      initial={ro}
+                      onCancel={() => setEditingReadOnly(null)}
+                      onSaved={(tools) => {
+                        setEditingReadOnly(null);
+                        setConnectors((prev) =>
+                          prev.map((x) => (x.id === c.id ? { ...x, readOnlyTools: tools } : x)),
+                        );
+                        setNotice({
+                          kind: "ok",
+                          message: `Saved the read-only allow-list for "${c.displayName}".`,
+                        });
+                      }}
+                    />
+                  )}
                 </div>
-                <button
-                  onClick={() => deleteMcp(c)}
-                  disabled={busy === `mcp-${c.key}`}
-                  className={btnDeny}
-                >
-                  Delete
-                </button>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

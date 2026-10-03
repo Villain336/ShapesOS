@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { connection } from "next/server";
 import { Archivo, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import "@xyflow/react/dist/style.css"; // React Flow base styles (Business Graph mind-map view)
@@ -28,7 +29,11 @@ export const metadata: Metadata = {
     "Marketr is the open-source marketing and SEO workspace: keyword research, competitor gaps, content engine, and rank tracking.",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default async function RootLayout({ children }: LayoutProps<"/">) {
+  // Nonce-based CSP (proxy.ts): every page must render per request so Next
+  // can stamp that request's nonce on its scripts — a page prerendered at
+  // build time would ship nonce-less scripts the browser then blocks.
+  await connection();
   return (
     <html
       lang="en"

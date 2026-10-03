@@ -318,12 +318,15 @@ async function serveVersion(
     }`;
     const beaconUrl = `/r/funding/${encodeURIComponent(opts.token)}/views/${encodeURIComponent(view.id)}`;
     const openedAt = Math.round(opts.now.getTime());
+    // The page CSP (proxy.ts) only runs scripts carrying this request's nonce.
+    const nonce = req.headers.get("x-nonce") ?? "";
+    const nonceAttr = /^[A-Za-z0-9+/]+={0,2}$/.test(nonce) ? ` nonce="${nonce}"` : "";
     return page(
       opts.docTitle,
       `<h1>${esc(opts.docTitle)}</h1>` +
         `<div class="meta">Version ${opts.version.versionNumber} · ${esc(opts.version.fileName)} · this view was logged for the sender</div>` +
         `<iframe class="viewer" src="${iframeSrc}" title="${esc(opts.docTitle)}"></iframe>` +
-        `<script>(function(){var t0=${openedAt};function send(){var ms=Date.now()-t0;try{navigator.sendBeacon(${JSON.stringify(beaconUrl)},JSON.stringify({durationMs:ms}))}catch(e){}}window.addEventListener("pagehide",send);})();</script>`,
+        `<script${nonceAttr}>(function(){var t0=${openedAt};function send(){var ms=Date.now()-t0;try{navigator.sendBeacon(${JSON.stringify(beaconUrl)},JSON.stringify({durationMs:ms}))}catch(e){}}window.addEventListener("pagehide",send);})();</script>`,
     );
   }
 
