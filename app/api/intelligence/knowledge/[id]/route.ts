@@ -1,5 +1,7 @@
 // Marketr — Phase 13B: single knowledge entry.
-// PATCH  /api/intelligence/knowledge/[id] { title?, body?, confidence?, pinned?, validFrom?, validTo? }
+// PATCH  /api/intelligence/knowledge/[id] { title?, body?, confidence?, pinned?, validFrom?, validTo?, accept? }
+//        accept: true — a human accepts a learner proposal: clears
+//        body.needsReview so the entry starts reaching prompts.
 // DELETE /api/intelligence/knowledge/[id]
 // Pinned entries stay user-editable here; the pin binds the *learner*
 // (worker 6), not this route.
@@ -37,6 +39,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     pinned?: boolean;
     validFrom?: string | null;
     validTo?: string | null;
+    accept?: boolean;
   };
   try {
     body = await req.json();
@@ -53,14 +56,23 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   const existing = await ownedEntry(access.workspaceId, id);
   if (!existing) return notFound("Knowledge entry not found");
 
+  // Body to write: the client's body (if any), and on accept the
+  // needsReview flag is removed (from whichever body ends up stored).
+  let nextBody: object | undefined =
+    body.body != null && typeof body.body === "object" ? (body.body as object) : undefined;
+  if (body.accept === true) {
+    const base = (nextBody ?? existing.body) as unknown;
+    const obj = base && typeof base === "object" && !Array.isArray(base) ? { ...(base as Record<string, unknown>) } : {};
+    delete obj.needsReview;
+    nextBody = obj;
+  }
+
   const updated = await withWorkspaceScope(access.workspaceId, (tx) =>
     tx.companyKnowledge.update({
       where: { id: existing.id },
       data: {
         ...(body.title?.trim() ? { title: body.title.trim().slice(0, 300) } : {}),
-        ...(body.body != null && typeof body.body === "object"
-          ? { body: body.body as object }
-          : {}),
+        ...(nextBody !== undefined ? { body: nextBody } : {}),
         ...(typeof body.confidence === "number"
           ? { confidence: Math.min(Math.max(body.confidence, 0), 1) }
           : {}),

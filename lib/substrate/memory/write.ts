@@ -210,6 +210,30 @@ export async function invalidateLearning(
   });
 }
 
+/**
+ * Human acceptance of an agent-inferred learning (memory-poisoning guard):
+ * stamps contextRefs.acceptedAt/acceptedBy so prompt-feeding recall
+ * (RecallOptions.acceptedOnly) starts including it. Idempotent.
+ */
+export async function acceptLearning(
+  workspaceId: string,
+  learningId: string,
+  userId: string,
+): Promise<{ acceptedAt: string }> {
+  return withWorkspaceScope(workspaceId, async (tx) => {
+    const row = await tx.memoryLearning.findUnique({ where: { id: learningId } });
+    if (!row || row.workspaceId !== workspaceId) throw new Error("Learning not found in workspace.");
+    const refs = (row.contextRefs as Record<string, unknown>) ?? {};
+    if (typeof refs.acceptedAt === "string") return { acceptedAt: refs.acceptedAt };
+    const acceptedAt = new Date().toISOString();
+    await tx.memoryLearning.update({
+      where: { id: learningId },
+      data: { contextRefs: { ...refs, acceptedAt, acceptedBy: userId } },
+    });
+    return { acceptedAt };
+  });
+}
+
 /** Episodes have no update path — this exists only to fail loudly if called. */
 export function updateEpisode(): never {
   throw new Error(

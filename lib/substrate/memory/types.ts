@@ -86,6 +86,13 @@ export interface RecallOptions {
   alpha?: number;
   /** Skip the cross-encoder (used by the nDCG battery for ablations). */
   skipRerank?: boolean;
+  /**
+   * Memory-poisoning guard: leave out agent-INFERRED learnings (nightly
+   * consolidation lessons, origin agent_inferred) that no human has accepted
+   * yet. Every path that feeds recall into a model prompt sets this; the
+   * memory UI/API leaves it off so reviewers can see and accept them.
+   */
+  acceptedOnly?: boolean;
 }
 
 /** Provenance string rendered in UI / agent context packets. */
