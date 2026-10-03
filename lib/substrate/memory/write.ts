@@ -26,6 +26,7 @@ import type {
   MemoryLearningResult,
   MemoryLearningSource,
 } from "./types";
+import { NotFoundError } from "@/lib/api/errors";
 
 /** Selectivity gate: refuse writes that are trivially derivable/empty. */
 export function assertWriteWorthy(kind: string, text: string): void {
@@ -221,13 +222,13 @@ export async function acceptLearning(
   userId: string,
 ): Promise<{ acceptedAt: string }> {
   return withWorkspaceScope(workspaceId, async (tx) => {
-    const row = await tx.memoryLearning.findUnique({ where: { id: learningId } });
-    if (!row || row.workspaceId !== workspaceId) throw new Error("Learning not found in workspace.");
+    const row = await tx.memoryLearning.findFirst({ where: { id: learningId, workspaceId } });
+    if (!row) throw new NotFoundError("Learning not found in workspace.");
     const refs = (row.contextRefs as Record<string, unknown>) ?? {};
     if (typeof refs.acceptedAt === "string") return { acceptedAt: refs.acceptedAt };
     const acceptedAt = new Date().toISOString();
     await tx.memoryLearning.update({
-      where: { id: learningId },
+      where: { id: learningId, workspaceId },
       data: { contextRefs: { ...refs, acceptedAt, acceptedBy: userId } },
     });
     return { acceptedAt };
