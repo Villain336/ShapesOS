@@ -1,6 +1,6 @@
 // Marketr — Phase 5 S2: virtual-card provider abstraction.
 //
-// The money-layer backstop (dual enforcement, SPEC-PHASE5.md §2 S2): a
+// The money-layer backstop (dual enforcement, docs/specs/SPEC-PHASE5.md §2 S2): a
 // virtual card per pool, issued on the CLIENT's own Brex/Ramp account with
 // limit = pool cap. Card declines survive Marketr software bugs — this is
 // the layer that kills the €7,937/day failure class (Apr 2026: no

@@ -1,5 +1,5 @@
 // Marketr — Phase 8 G2: backfill proposal review queue.
-// SPEC-PHASE8.md §2 G2, §9.7: precision over recall — every proposal is
+// docs/specs/SPEC-PHASE8.md §2 G2, §9.7: precision over recall — every proposal is
 // human-confirmed; rejected candidates are recorded as negative signals.
 
 import { redirect } from "next/navigation";

@@ -1,4 +1,4 @@
-// Marketr — Phase 9 M5: Agent Playbooks versioning store (SPEC-PHASE9.md §P9D, §5).
+// Marketr — Phase 9 M5: Agent Playbooks versioning store (docs/specs/SPEC-PHASE9.md §P9D, §5).
 //
 // Versioning model (research §4: immutable versions, mutable label pointers):
 //   - `playbook`          — the named procedure (learned | community | seed).

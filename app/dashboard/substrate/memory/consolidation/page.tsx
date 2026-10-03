@@ -1,4 +1,4 @@
-// Marketr — Phase 8 G3: consolidation status (SPEC-PHASE8.md §6).
+// Marketr — Phase 8 G3: consolidation status (docs/specs/SPEC-PHASE8.md §6).
 // Server status + client trigger button. Async by design: trigger returns
 // 202 immediately; the pass runs detached on the worker pool.
 

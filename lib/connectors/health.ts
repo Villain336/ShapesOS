@@ -4,7 +4,7 @@
 // checker job. The scheduler track invokes the exported runHealthChecks()
 // on its own cron — this module owns NO timer loop.
 //
-// HONESTY RULES (see THREAT-MODEL-connector-health.md):
+// HONESTY RULES (see docs/security/THREAT-MODEL-connector-health.md):
 //   1. The checker performs ZERO network probes to user-configured URLs
 //      (no SSRF surface). Health is derived from credential/token lifecycle
 //      state the server already holds: adapter live-wiring flag, connection

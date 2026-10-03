@@ -1,4 +1,4 @@
-// Marketr — Phase 9 M6: data-driven automation policy (SPEC-PHASE9.md §P9E).
+// Marketr — Phase 9 M6: data-driven automation policy (docs/specs/SPEC-PHASE9.md §P9E).
 //
 // Closes M1 gap #4: the Tier-1 allowlist / automation toggles are no longer
 // code-only. `resolveAutomation(workspaceId, action)` reads the

@@ -1,6 +1,6 @@
 // Marketr — Growth Memory (Phase 8 G3): shared types.
 //
-// Three stores, one retrieval contract (SPEC-PHASE8.md §2 G3):
+// Three stores, one retrieval contract (docs/specs/SPEC-PHASE8.md §2 G3):
 //   episodic  — memory_episodes  (what happened; immutable)
 //   semantic  — memory_facts     (distilled, bi-temporal; invalidate, never delete)
 //   procedural— memory_learnings (what worked / failed / when; the F3 sink schema)

@@ -1,4 +1,4 @@
-// Marketr — Phase 9 M4: Prisma-backed MissionStore (SPEC-PHASE9.md §P9C).
+// Marketr — Phase 9 M4: Prisma-backed MissionStore (docs/specs/SPEC-PHASE9.md §P9C).
 //
 // API-layer only — this module uses the @/ alias and the generated Prisma
 // client, so it is NOT imported by lib/missions/engine.ts or the tsx tests.

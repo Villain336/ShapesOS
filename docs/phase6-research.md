@@ -294,4 +294,4 @@ Shaped by the four locked decisions. "API-real / concierge / not feasible" verdi
 
 ---
 
-*End of Phase 6 research brief. Next step: SPEC-PHASE6.md.*
+*End of Phase 6 research brief. Next step: docs/specs/SPEC-PHASE6.md.*

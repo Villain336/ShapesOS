@@ -115,7 +115,7 @@ export function assetCounts(): Record<CorpusAsset, number> {
 const MAIN_LICENSE_NOTE = `ShapesOS expert-corpus — main asset
 ========================================
 This data asset contains marketing-expertise text chunks ingested under the
-clean-sourcing tiers of SPEC-PHASE10.md §M9:
+clean-sourcing tiers of docs/specs/SPEC-PHASE10.md §M9:
 
   • Google Search Central documentation — © Google, licensed CC-BY 4.0
     (https://creativecommons.org/licenses/by/4.0/). Attribution: Google.

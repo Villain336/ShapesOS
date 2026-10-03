@@ -1,7 +1,7 @@
 # M9 Expert-Corpus Source List — "Marketr, expert from day 1"
 
 Compiled 2026-09-26. Licensing verified against Sept 2026 sources; [UNVERIFIED] marks single-source items.
-Binding tiers (from SPEC-PHASE10.md §M9):
+Binding tiers (from docs/specs/SPEC-PHASE10.md §M9):
 - **Tier 1** — official platform materials. Free to learn from; shippable ONLY where the license permits.
 - **Tier 2** — openly-licensed / public-domain. Shippable into the corpus with attribution.
 - **Tier 3** — paywalled courses & books. Private-deployment overlay ONLY (Tico's buy list). Never ships.

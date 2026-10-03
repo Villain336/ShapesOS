@@ -66,7 +66,7 @@ Full table: `docs/audit/scratch/ws1-features.md`. Statuses: **SHIPPED+TESTED** (
 
 | Feature | Status | Evidence |
 |---|---|---|
-| Expert constitution | SHIPPED+TESTED | `EXPERT-CONSTITUTION.md` + `lib/expert/constitution.ts` + tests; consumed by chat agent + planner |
+| Expert constitution | SHIPPED+TESTED | `docs/specs/EXPERT-CONSTITUTION.md` + `lib/expert/constitution.ts` + tests; consumed by chat agent + planner |
 | Trace dataset | SHIPPED+TESTED (evals) | `training/traces/` 7×`.jsonl` (200 + 300 line pilots measured); evals; gen scripts |
 | GrowthOS direction | Direction-documented, partially embodied | No standalone module — embodied in orchestrator + command bar + substrate |
 

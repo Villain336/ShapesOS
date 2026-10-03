@@ -1,7 +1,7 @@
 // Marketr — Phase 10 M2: volatility corroboration (read-only, display-only).
 //
 // Cross-references public volatility trackers for SERP-flux confirmation —
-// as CORROBORATION, never as the impact source (SPEC-PHASE10.md §M2).
+// as CORROBORATION, never as the impact source (docs/specs/SPEC-PHASE10.md §M2).
 // Graceful when unreachable: a tracker that 403s server-side (SEMrush
 // Sensor) yields available:false, never an error, never a guess.
 

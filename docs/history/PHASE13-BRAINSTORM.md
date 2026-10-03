@@ -35,7 +35,7 @@ Everything below respects the non-negotiables: zero custody of client spend, aut
 - **What:** Structured launch missions: Product Hunt / Hacker News / Reddit / BetaList / directory stack with a T-4-weeks-to-launch-day checklist, asset prep (tagline, gallery, maker comment drafts), hunter/supporter outreach sequencing, channel-stacking timeline (all channels same day, not spread across weeks), launch-day war room (comment triage), post-launch follow-up.
 - **Why / who:** Every founder launching anything; agencies launching clients. Launch day is the highest-leverage 24 hours a startup gets and it's currently run from spreadsheets.
 - **Gap today:** None. M8 (Phase 10) covers ongoing community participation; a structured launch-day operation is distinct.
-- **2026 evidence:** 2026 PH field data: Daily #1 ≈ 3–5k visits and ~$5–15k MRR uplift; 2026 algorithm added account-age weighting (~5x veteran weight); open 47-task launch checklists exist; the "stack channels same-day" mechanic is the current best practice. Marketr's own success metrics (SPEC.md §12) target "Product Hunt top-5" — dogfood this on ourselves.
+- **2026 evidence:** 2026 PH field data: Daily #1 ≈ 3–5k visits and ~$5–15k MRR uplift; 2026 algorithm added account-age weighting (~5x veteran weight); open 47-task launch checklists exist; the "stack channels same-day" mechanic is the current best practice. Marketr's own success metrics (docs/specs/SPEC.md §12) target "Product Hunt top-5" — dogfood this on ourselves.
 - **Phase:** 13. Ships as Growth Mission templates + command-bar "Do" actions.
 
 ### 3. Founder Metrics Command
@@ -84,7 +84,7 @@ Everything below respects the non-negotiables: zero custody of client spend, aut
 - **What:** Onboarding drips, activation nudges, trial-expiry sequences, win-back series — designed in Marketr, *sent through the user's own ESP* (Resend/Loops/Customer.io). Marketr drafts, scores, and triggers; it never becomes a bulk sender.
 - **Why / who:** Lifecycle email is the highest-ROI channel per dollar and the connective tissue between acquisition and retention.
 - **Gap today:** Partial — Agent Playbooks already include "cart abandon email series" and "review request drip" as demos, but there's no lifecycle engine (triggers, sequencing, ESP integration).
-- **2026 evidence:** Loops, Customer.io ($39–100+/mo) prove the spend; every 2026 growth playbook sequences email as the waitlist→launch→activation spine. Honest note: email marketing was an explicit MVP non-goal (SPEC.md §8) — this proposal respects that by integrating with ESPs rather than building a sender.
+- **2026 evidence:** Loops, Customer.io ($39–100+/mo) prove the spend; every 2026 growth playbook sequences email as the waitlist→launch→activation spine. Honest note: email marketing was an explicit MVP non-goal (docs/specs/SPEC.md §8) — this proposal respects that by integrating with ESPs rather than building a sender.
 - **Phase:** 13.
 
 ### 10. Idea Validation Engine

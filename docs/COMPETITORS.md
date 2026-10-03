@@ -1,7 +1,7 @@
 # Marketr Competitor Landscape & Head-to-Head
 
 Research compiled 2026-09-26. Prices verified against Sept 2026 sources; [UNVERIFIED] marks single-source items.
-Companion: `SPEC-PHASE10.md` (what we're building), `PHASE13-BRAINSTORM.md` (where we go next).
+Companion: `docs/specs/SPEC-PHASE10.md` (what we're building), `docs/history/PHASE13-BRAINSTORM.md` (where we go next).
 
 ## 1. Competitor list by category
 

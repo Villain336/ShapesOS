@@ -1,7 +1,7 @@
 // Marketr — Public-launch readiness tracker (Phase 7, F6).
 // Readiness checklist by category with evidence links; the open-core split
 // decision brief. READINESS ONLY — no public flip is part of this phase
-// (SPEC-PHASE7.md §12.5).
+// (docs/specs/SPEC-PHASE7.md §12.5).
 
 import { redirect } from "next/navigation";
 import { requireUser, getOrCreateWorkspace } from "@/lib/session";

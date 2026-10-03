@@ -1,4 +1,4 @@
-// Marketr — automation settings page (Phase 9 M6, SPEC-PHASE9.md §P9E).
+// Marketr — automation settings page (Phase 9 M6, docs/specs/SPEC-PHASE9.md §P9E).
 // Server-gated: editor+ only (this page changes what the agent may do on
 // its own). Renders the per-action policy table + escalation rules form.
 

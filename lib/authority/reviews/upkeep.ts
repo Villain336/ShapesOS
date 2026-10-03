@@ -1,6 +1,6 @@
 // Marketr — R1 listing upkeep (GBP API) + review-media brand intelligence.
 //
-// SPEC-PHASE6.md §2/R1: listing upkeep (hours, attributes, categories, photo
+// docs/specs/SPEC-PHASE6.md §2/R1: listing upkeep (hours, attributes, categories, photo
 // upload, local posts incl. recurring), review-media objects as a
 // brand-intelligence surface.
 //

@@ -1,4 +1,4 @@
-// Marketr — Phase 8 G1: Tier-M manual/assisted connectors (SPEC-PHASE8.md §2 G1).
+// Marketr — Phase 8 G1: Tier-M manual/assisted connectors (docs/specs/SPEC-PHASE8.md §2 G1).
 //
 // WooCommerce (per-site consumer key handoff + GENTLE polling — never melt a
 // shared host), CSV import, and the onboarding-wizard bootstrap that seeds

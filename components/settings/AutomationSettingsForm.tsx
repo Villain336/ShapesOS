@@ -1,4 +1,4 @@
-// Marketr — automation settings form (Phase 9 M6, SPEC-PHASE9.md §P9E).
+// Marketr — automation settings form (Phase 9 M6, docs/specs/SPEC-PHASE9.md §P9E).
 // Client component: per-action Auto/Ask/Never policy table, workspace
 // small-action threshold, and user-editable escalation rules.
 // House style: dense tables, Agentic OS tokens, Lucide only, light mode.

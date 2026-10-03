@@ -1,5 +1,5 @@
 // Marketr — Phase 8 G2: Campaign object shared types.
-// (SPEC-PHASE8.md §2 G2, §4.) The object LINKS to fragment tables; it never
+// (docs/specs/SPEC-PHASE8.md §2 G2, §4.) The object LINKS to fragment tables; it never
 // re-models them. "Campaign" is overloaded across ten tables, so the model
 // is `growth_campaign` in code.
 

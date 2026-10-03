@@ -1,5 +1,5 @@
 // Marketr — Phase 9 M1: Delegation of Authority (DoA) tier evaluator
-// (SPEC-PHASE9.md §P9E, §3.4).
+// (docs/specs/SPEC-PHASE9.md §P9E, §3.4).
 //
 // PURE function — no LLM, no prompts, no I/O. Evaluated per action AT
 // EXECUTION TIME by the approval executor (lib/authority/executor.ts), never

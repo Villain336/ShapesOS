@@ -1,4 +1,4 @@
-// Marketr — Phase 9 M1: kill switches (SPEC-PHASE9.md §3.5).
+// Marketr — Phase 9 M1: kill switches (docs/specs/SPEC-PHASE9.md §3.5).
 //
 // Three levels, checked by every executor entry point BEFORE anything acts:
 //   1. pauseMission   — per-mission pause; running loops must check status.

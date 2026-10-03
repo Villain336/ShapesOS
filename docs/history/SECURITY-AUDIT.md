@@ -204,7 +204,7 @@ All 7 recommended must-fix items were remediated and fixture-verified. Baseline 
 | 6 | WordPress `baseUrl` SSRF validation (M6) | ✅ Fixed — centralized `lib/connectors/safe-fetch.ts` (pre-request validation, manual redirects, per-hop revalidation, redirect cap, injected fake DNS/fetch); all WP operations use it; `connectors/ssrf` 14/14 |
 | 7 | Strong DB password default (L11) + `ADMIN_PASSWORD` docs | ✅ Fixed — stronger `.env.example` guidance |
 
-Additional day-1 edge-case fixes (all 🔴/🟠 items in `EDGE-CASE-REPORT.md` items 1–16) are also remediated and fixture-verified; see that report for details. Everything else from the audit (atomic spend caps hardening, CSP, PKCE, JWT revocation, Zod adoption) remains deferred post-beta hardening.
+Additional day-1 edge-case fixes (all 🔴/🟠 items in `docs/history/EDGE-CASE-REPORT.md` items 1–16) are also remediated and fixture-verified; see that report for details. Everything else from the audit (atomic spend caps hardening, CSP, PKCE, JWT revocation, Zod adoption) remains deferred post-beta hardening.
 
 **Verification (2026-09-22):** `tsc --noEmit` clean; Next.js production build passed; `prisma format`/`validate`/`generate`/`migrate status`/`migrate deploy` all clean; all four edge fixtures run twice with identical deterministic counts.
 

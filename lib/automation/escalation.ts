@@ -1,4 +1,4 @@
-// Marketr — Phase 9 M6: escalation rules (SPEC-PHASE9.md §P9E, research §5).
+// Marketr — Phase 9 M6: escalation rules (docs/specs/SPEC-PHASE9.md §P9E, research §5).
 //
 // Escalation rules beat blanket approval queues (which degrade to
 // reflex-confirming): the system stops on DEFINED conditions — dollar

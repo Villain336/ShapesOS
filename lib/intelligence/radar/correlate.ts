@@ -4,7 +4,7 @@
 // GSC hourly deltas (pre-window baseline vs. during/post window) and writes
 // per-page, per-query impact rows with magnitudes and confidence bands.
 //
-// Honesty rules (SPEC-PHASE10.md §M2):
+// Honesty rules (docs/specs/SPEC-PHASE10.md §M2):
 //   - Only ROLLOUT events are correlated. docs_change / volatility never are.
 //   - Only claim impact where the delta exceeds the baseline noise band.
 //     The noise band is computed from the delta set itself: threshold =

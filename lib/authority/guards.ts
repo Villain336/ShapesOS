@@ -1,5 +1,5 @@
 // Marketr — Phase 6 deliverability & outreach guards (pure).
-// SPEC-PHASE6.md §9 invariants 2–5. Fail closed: any violation throws.
+// docs/specs/SPEC-PHASE6.md §9 invariants 2–5. Fail closed: any violation throws.
 // These are structural — not configurable, not skippable.
 
 export class DeliverabilityBlockedError extends Error {

@@ -1,6 +1,6 @@
 // Marketr — R1 review-velocity engine (2026-compliant).
 //
-// SPEC-PHASE6.md §2/R1: smart-timing velocity triggers. CRM/POS transaction
+// docs/specs/SPEC-PHASE6.md §2/R1: smart-timing velocity triggers. CRM/POS transaction
 // webhooks → request inside the four Google-documented channels only:
 // receipts, thank-you emails, end-of-chat, in-store QR. Sentiment-split
 // funnels are "feedback triage" only — never review gating.

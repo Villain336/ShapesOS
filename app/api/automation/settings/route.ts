@@ -1,4 +1,4 @@
-// Marketr — GET/PUT /api/automation/settings (Phase 9 M6, SPEC-PHASE9.md §P9E).
+// Marketr — GET/PUT /api/automation/settings (Phase 9 M6, docs/specs/SPEC-PHASE9.md §P9E).
 //
 // GET  → { settings, defaults, thresholdCents }
 //   settings: the workspace's automation_setting rows (workspace × action)

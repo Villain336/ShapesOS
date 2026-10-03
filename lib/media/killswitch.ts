@@ -52,7 +52,7 @@ export interface KillRuleStore {
   markFired(id: string, workspaceId: string, at: Date): Promise<void>;
 }
 
-/** Default v1 rule pack — ships ENABLED (SPEC-PHASE5.md §9.8). */
+/** Default v1 rule pack — ships ENABLED (docs/specs/SPEC-PHASE5.md §9.8). */
 export function defaultRulePack(workspaceId: string, clientId: string | null, createdBy: string): Array<Omit<KillRule, "id" | "createdAt" | "updatedAt" | "lastFiredAt">> {
   const base = { workspaceId, clientId, enabled: true, createdBy };
   return [
