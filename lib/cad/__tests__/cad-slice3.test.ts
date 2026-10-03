@@ -132,8 +132,8 @@ describe("BOM rollup math (pure)", () => {
     assert.equal(rollup.lines[1]!.missingCost, true);
   });
 
-  it("rejects derived: sources in v1 — no derived methods exist", async () => {
-    assert.deepEqual(DERIVED_METHODS, []);
+  it("rejects hand-typed derived: sources — only real derivations create them", async () => {
+    assert.deepEqual(DERIVED_METHODS, ["mesh_bodies"]);
     assert.equal(await codeOf(Promise.resolve().then(() => validateBomLineInput({
       partName: "Fasteners",
       qty: 20,
