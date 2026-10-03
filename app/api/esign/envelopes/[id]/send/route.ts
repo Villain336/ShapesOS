@@ -26,7 +26,8 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
     const { id } = await ctx.params;
     const envelope = await load(workspace.id, id);
     if (!envelope) return Response.json({ error: "Envelope not found." }, { status: 404 });
-    if (envelope.status !== "draft") {
+    // "error" = an earlier send failed; it can be reviewed and re-sent.
+    if (envelope.status !== "draft" && envelope.status !== "error") {
       return Response.json({ error: `Only drafts can be sent (status: ${envelope.status}).` }, { status: 409 });
     }
     const token = buildSendToken({

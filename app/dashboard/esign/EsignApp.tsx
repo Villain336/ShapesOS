@@ -607,8 +607,8 @@ function DetailView({ id, onBack, onChanged }: { id: string; onBack: () => void;
     );
   }
 
-  const canSend = detail.status === "draft";
-  const canVoid = ["draft", "sent", "partially-signed"].includes(detail.status);
+  const canSend = detail.status === "draft" || detail.status === "error";
+  const canVoid = ["draft", "error", "sent", "partially-signed", "expired"].includes(detail.status);
   const canRefresh = ["sent", "partially-signed", "completed"].includes(detail.status);
   const canClone = ["expired", "declined"].includes(detail.status);
   const [cloning, setCloning] = useState(false);
