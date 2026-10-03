@@ -20,6 +20,7 @@
 // hasn't opened their invite link yet.
 
 import { prisma } from "@/lib/prisma";
+import { ForbiddenError } from "@/lib/api/errors";
 
 export type SignupMode = "open" | "invite";
 
@@ -28,8 +29,9 @@ export function signupMode(env: NodeJS.ProcessEnv = process.env): SignupMode {
 }
 
 /** Thrown by getOrCreateWorkspace in invite mode instead of provisioning. */
-export class InviteRequiredError extends Error {
-  readonly status = 403;
+// A ForbiddenError so routes using the shared error helper (lib/api/errors)
+// answer 403, not a generic 500, for not-yet-invited users.
+export class InviteRequiredError extends ForbiddenError {
   constructor() {
     super("An invite is required to join this ShapesOS instance.");
     this.name = "InviteRequiredError";
