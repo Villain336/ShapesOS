@@ -16,8 +16,11 @@
 //       never suppress — mirrors lib/calls/reminders.ts). Direct mail
 //       (postcard|letter) skips this: timing is the date-based in-home
 //       window (mailDate + USPS transit) — see ./mail-channel.ts.
-//   (c) per-workspace daily cap → suppress "cap" (shared across channels,
-//       counting SMS/email/voice rows AND mail pieces).
+//   (c) per-workspace daily cap → suppress "cap". Pre-checked when queueing;
+//       enforced atomically when a row is claimed for sending (advisory lock
+//       per workspace-day, then count + conditional claim in one transaction
+//       — see claimWithinDailyCap). Mail pieces keep their own count check
+//       in ./mail-channel.ts (shared counter).
 //   (d) approval → Phase 3 is MANUAL-ONLY: without a valid approved
 //       ApprovalItem the message stays "queued" (a pending ApprovalItem is
 //       created when none was supplied). Nothing sends autonomously. Direct
@@ -220,15 +223,62 @@ function utcDayStart(d: Date): Date {
   return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
 }
 
-/** Sends (status sent/delivered) this UTC day — the daily-cap counter. */
+/**
+ * Sends this UTC day — the daily-cap counter: rows sent/delivered today plus
+ * rows claimed today and still "sending" (in flight to the provider). A
+ * failed or requeued send drops out of the count by itself, so the counter
+ * can never drift from the rows.
+ */
+function sentTodayWhere(workspaceId: string, now: Date): Prisma.OutboundMessageWhereInput {
+  const dayStart = utcDayStart(now);
+  return {
+    workspaceId,
+    OR: [
+      { status: { in: ["sent", "delivered"] }, sentAt: { gte: dayStart } },
+      { status: "sending", claimedAt: { gte: dayStart } },
+    ],
+  };
+}
+
+/** Pre-check only (queue time). The authority is claimWithinDailyCap. */
 async function sentTodayCount(workspaceId: string, now: Date): Promise<number> {
-  return prisma.outboundMessage.count({
-    where: {
-      workspaceId,
-      status: { in: ["sent", "delivered"] },
-      sentAt: { gte: utcDayStart(now) },
+  return prisma.outboundMessage.count({ where: sentTodayWhere(workspaceId, now) });
+}
+
+/**
+ * Claim one queued message for sending, atomically against the workspace's
+ * daily cap. A transaction-scoped advisory lock keyed on (workspace, UTC day)
+ * serializes every claim for that workspace-day; inside it the count and the
+ * conditional claim (queued → sending) run as one unit, so N concurrent
+ * claims can never all see headroom and overshoot the cap (the Phase 2
+ * check-then-act gap). Over the cap the row is suppressed "cap" instead.
+ */
+async function claimWithinDailyCap(
+  messageId: string,
+  workspaceId: string,
+  dailyCap: number,
+  now: Date = new Date(),
+): Promise<"claimed" | "cap" | "lost"> {
+  const lockKey = `outbound-daily-cap:${workspaceId}:${now.toISOString().slice(0, 10)}`;
+  return prisma.$transaction(
+    async (tx) => {
+      await tx.$queryRaw`SELECT 1 AS locked FROM pg_advisory_xact_lock(hashtext(${lockKey}))`;
+      const sentToday = await tx.outboundMessage.count({ where: sentTodayWhere(workspaceId, now) });
+      if (sentToday >= dailyCap) {
+        const res = await tx.outboundMessage.updateMany({
+          where: { id: messageId, status: "queued" },
+          data: { status: "suppressed", suppressionReason: "cap" },
+        });
+        return res.count === 1 ? "cap" : "lost";
+      }
+      const claim = await tx.outboundMessage.updateMany({
+        where: { id: messageId, status: "queued" },
+        data: { status: "sending", claimedAt: now },
+      });
+      return claim.count === 1 ? "claimed" : "lost";
     },
-  });
+    { maxWait: 15_000, timeout: 15_000 },
+  );
 }
 
 export async function queueMessage(input: QueueMessageInput): Promise<OutboundMessage> {
@@ -365,18 +415,24 @@ async function attemptSend(messageId: string): Promise<OutboundMessage> {
 }
 
 async function claimAndSend(messageId: string): Promise<{ row: OutboundMessage; claimed: boolean }> {
-  // Claim first: queued → sending. Exactly one concurrent caller flips the
-  // row; everyone else returns it untouched. Nothing below runs unclaimed.
-  const claim = await prisma.outboundMessage.updateMany({
-    where: { id: messageId, status: "queued" },
-    data: { status: "sending", claimedAt: new Date() },
+  // Claim first: queued → sending, atomically within the daily cap. Exactly
+  // one concurrent caller flips the row; everyone else returns it untouched.
+  // Nothing below runs unclaimed.
+  const target = await prisma.outboundMessage.findUnique({
+    where: { id: messageId },
+    select: { workspaceId: true },
   });
+  if (!target) throw new Error("message not found");
+  const settings = await getMessagingSettings(target.workspaceId);
+  const outcome = await claimWithinDailyCap(messageId, target.workspaceId, settings.dailyCap);
   const msg = await prisma.outboundMessage.findUnique({
     where: { id: messageId },
     include: { lead: { select: { id: true, phone: true, email: true } } },
   });
   if (!msg) throw new Error("message not found");
-  if (claim.count !== 1) return { row: msg, claimed: false };
+  // "cap": this caller suppressed the row (it reports it, like a send).
+  if (outcome === "cap") return { row: msg, claimed: true };
+  if (outcome !== "claimed") return { row: msg, claimed: false };
   return { row: await sendClaimed(msg), claimed: true };
 }
 
@@ -627,13 +683,8 @@ export async function dispatchDue(workspaceId?: string): Promise<DispatchResult>
       continue;
     }
 
-    // (c) daily cap re-check.
-    if ((await sentTodayCount(msg.workspaceId, now)) >= settings.dailyCap) {
-      const res = await updateIfQueued(msg.id, { status: "suppressed", suppressionReason: "cap" });
-      out.suppressed += res.count;
-      continue;
-    }
-
+    // (c) daily cap: enforced atomically by the claim (claimWithinDailyCap);
+    // an over-cap row comes back suppressed "cap".
     const { row: sent, claimed } = await claimAndSend(msg.id);
     // Another run claimed it first: that run sends and counts it.
     if (!claimed) continue;
