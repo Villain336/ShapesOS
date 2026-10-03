@@ -16,6 +16,13 @@ import { prisma } from "@/lib/prisma";
 import { requireUser, getOrCreateWorkspace } from "@/lib/session";
 import { requireWorkspaceRole, forbidden } from "@/lib/authz";
 import { sanitizeBrandHex, DEFAULT_BRAND_PRIMARY } from "@/lib/brand-theme";
+import {
+  EntitlementError,
+  entitlementDenied,
+  entitlementSummary,
+  featureUpgradeMessage,
+  planHasFeature,
+} from "@/lib/billing/entitlements";
 
 export const dynamic = "force-dynamic";
 
@@ -86,6 +93,11 @@ export async function GET() {
       brandColor: workspace.whiteLabelBrandColor ?? null,
     },
     canEdit,
+    // Phase 4a: what the plan includes, so the UI can disable what it doesn't.
+    entitlements: {
+      whiteLabel: entitlementSummary(workspace.plan).features.white_label,
+      customDomain: entitlementSummary(workspace.plan).features.custom_domain,
+    },
   });
 }
 
@@ -94,6 +106,10 @@ export async function PUT(req: NextRequest) {
   if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
   const workspace = await getOrCreateWorkspace(user.id, user.email);
   if (!(await requireWorkspaceRole(user.id, workspace.id, "admin"))) return forbidden();
+  // Phase 4a: white-label is a plan entitlement (403 + upgrade prompt).
+  if (!planHasFeature(workspace.plan, "white_label")) {
+    return entitlementDenied(new EntitlementError(featureUpgradeMessage("white_label"), "white_label"));
+  }
 
   let body: { customDomain?: unknown; brandColor?: unknown };
   try {
@@ -107,6 +123,10 @@ export async function PUT(req: NextRequest) {
   if (body.customDomain !== undefined) {
     const check = validateCustomDomain(body.customDomain);
     if (!check.ok) return Response.json({ error: check.reason }, { status: 400 });
+    // Setting (not clearing) a custom domain needs its own entitlement.
+    if (check.domain && !planHasFeature(workspace.plan, "custom_domain")) {
+      return entitlementDenied(new EntitlementError(featureUpgradeMessage("custom_domain"), "custom_domain"));
+    }
     data.whiteLabelCustomDomain = check.domain || null;
   }
 

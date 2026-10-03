@@ -43,6 +43,8 @@ export default function MembersManager({ myRole }: { myRole: string }) {
   const [inviteUrl, setInviteUrl] = useState<string | null>(null);
   // Phase 3: invites are emailed when the deployment has mail set up.
   const [inviteEmail, setInviteEmail] = useState(false);
+  // Phase 4a: the plan's seat limit (null = unlimited).
+  const [seatLimit, setSeatLimit] = useState<number | null>(null);
   const [inviteResult, setInviteResult] = useState<{ emailed: boolean; to: string; note?: string } | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
   const [resent, setResent] = useState<string | null>(null);
@@ -53,6 +55,7 @@ export default function MembersManager({ myRole }: { myRole: string }) {
       const j = await r.json();
       setMembers(j.members ?? []);
       setInviteEmail(j.inviteEmail === true);
+      setSeatLimit(typeof j.seatLimit === "number" ? j.seatLimit : null);
     }
   }, []);
 
@@ -156,7 +159,21 @@ export default function MembersManager({ myRole }: { myRole: string }) {
             ? "We email them a single-use invite link (valid 7 days). You can also copy the link and send it yourself."
             : "They join through a single-use invite link (valid 7 days). Email isn't set up on this deployment, so share the link with them directly."}{" "}
           Your role: <span className="font-mono">{myRole}</span>
+          {seatLimit !== null && (
+            <>
+              {" "}· Seats: {members.length} of {seatLimit} on your plan
+            </>
+          )}
         </p>
+        {seatLimit !== null && members.length >= seatLimit && (
+          <p className="mt-2 text-xs text-muted">
+            Every seat on your plan is taken.{" "}
+            <a href="/dashboard/billing" className="font-semibold text-ink underline">
+              Upgrade in Billing
+            </a>{" "}
+            to invite more people.
+          </p>
+        )}
         <div className="mt-3 flex flex-wrap gap-2">
           <input
             type="email"
@@ -177,7 +194,11 @@ export default function MembersManager({ myRole }: { myRole: string }) {
               </option>
             ))}
           </select>
-          <button onClick={invite} disabled={busy || !email} className={btnPrimary}>
+          <button
+            onClick={invite}
+            disabled={busy || !email || (seatLimit !== null && members.length >= seatLimit)}
+            className={btnPrimary}
+          >
             {busy ? "Inviting…" : "Invite"}
           </button>
         </div>

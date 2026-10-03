@@ -9,6 +9,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireUser, getOrCreateWorkspace } from "@/lib/session";
 import { requireWorkspaceRole, forbidden } from "@/lib/authz";
+import { EntitlementError, entitlementDenied, featureUpgradeMessage, planHasFeature } from "@/lib/billing/entitlements";
 
 export const dynamic = "force-dynamic";
 
@@ -24,7 +25,11 @@ async function adminCtx() {
 export async function GET() {
   const ctx = await adminCtx();
   if ("error" in ctx) return ctx.error;
-  return Response.json({ enabled: ctx.workspace.mcpEnabled });
+  return Response.json({
+    enabled: ctx.workspace.mcpEnabled,
+    // Phase 4a: whether the plan includes API/MCP access.
+    entitled: planHasFeature(ctx.workspace.plan, "api_access"),
+  });
 }
 
 export async function PUT(req: NextRequest) {
@@ -38,6 +43,11 @@ export async function PUT(req: NextRequest) {
   }
   const parsed = z.object({ enabled: z.boolean() }).strict().safeParse(body);
   if (!parsed.success) return Response.json({ error: "invalid request" }, { status: 400 });
+  // Phase 4a: turning the API on needs the api_access entitlement (turning it
+  // off is always allowed).
+  if (parsed.data.enabled && !planHasFeature(ctx.workspace.plan, "api_access")) {
+    return entitlementDenied(new EntitlementError(featureUpgradeMessage("api_access"), "api_access"));
+  }
   const updated = await prisma.workspace.update({
     where: { id: ctx.workspace.id },
     data: { mcpEnabled: parsed.data.enabled },

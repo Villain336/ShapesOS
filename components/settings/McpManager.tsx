@@ -78,6 +78,8 @@ interface OAuthClient {
 
 export default function McpManager() {
   const [enabled, setEnabled] = useState<boolean | null>(null);
+  // Phase 4a: false when the plan doesn't include API/MCP access.
+  const [entitled, setEntitled] = useState(true);
   const [keys, setKeys] = useState<ApiKey[]>([]);
   const [clients, setClients] = useState<OAuthClient[]>([]);
   const [loading, setLoading] = useState(true);
@@ -97,6 +99,7 @@ export default function McpManager() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Failed to load");
       setEnabled(data.enabled);
+      setEntitled(data.entitled !== false);
       setKeys(data.keys);
       const cres = await fetch("/api/mcp/oauth/clients");
       const cdata = await cres.json().catch(() => ({ clients: [] }));
@@ -195,6 +198,20 @@ export default function McpManager() {
         </p>
       )}
 
+      {!entitled && (
+        <div role="status" className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-paper px-4 py-3 shadow-hairline">
+          <p className="text-sm text-ink">
+            API and MCP access isn&apos;t included in your plan. Upgrade to Pro or above in Billing.
+          </p>
+          <a
+            href="/dashboard/billing"
+            className="inline-flex h-control-sm items-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-paper aos-press"
+          >
+            See plans
+          </a>
+        </div>
+      )}
+
       <section className={cardCls}>
         <h2 className="text-base font-semibold text-ink">MCP server</h2>
         <p className="mt-1 text-sm text-muted">
@@ -205,7 +222,10 @@ export default function McpManager() {
         <div className="mt-4 flex items-center gap-3">
           <Switch
             checked={enabled === true}
-            onChange={toggleEnabled}
+            onChange={(v) => {
+              if (v && !entitled) return;
+              void toggleEnabled(v);
+            }}
             label="Enable MCP server for this workspace"
           />
           <span className="text-sm font-medium text-ink">Enable MCP server for this workspace</span>
@@ -339,7 +359,7 @@ export default function McpManager() {
           <button
             type="button"
             onClick={createKey}
-            disabled={creating || enabled !== true}
+            disabled={creating || enabled !== true || !entitled}
             className={`${btnPrimary} self-start`}
           >
             {creating ? "Creating…" : "Create key"}

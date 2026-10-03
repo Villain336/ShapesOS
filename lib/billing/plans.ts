@@ -55,6 +55,8 @@ export const PLANS: BillingPlan[] = [
       "Keyword research + competitor gap",
       "AI content engine",
     ],
+    // Phase 4a: limits + tiered features are enforced from
+    // lib/billing/entitlements.ts — keep these strings in step with it.
   },
   {
     id: "pro",
@@ -69,6 +71,8 @@ export const PLANS: BillingPlan[] = [
       "Everything in Starter",
       "Growth memory + missions + playbooks",
       "Competitor radar + content refresh engine",
+      "API, MCP and outbound webhooks",
+      "Custom dashboard branding",
     ],
   },
   {
@@ -81,7 +85,9 @@ export const PLANS: BillingPlan[] = [
       "30,000 included credits / month",
       "Unlimited projects · 15 seats",
       "Everything in Pro",
-      "White-label client reports",
+      "White-label client pages + custom domains",
+      "SSO and SCIM",
+      "Up to 25 client workspaces",
       "Priority support",
     ],
   },

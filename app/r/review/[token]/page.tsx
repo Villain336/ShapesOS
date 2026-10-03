@@ -9,6 +9,7 @@ import { getRequestByToken, markViewedByToken } from "@/lib/reviews/engine";
 import { checkReviewPageRateLimit } from "@/lib/reviews/rate-limit";
 import { ReviewLandingClient } from "./ReviewLandingClient";
 import { clientIpFromHeaders } from "@/lib/api/client-ip";
+import { effectiveWhiteLabel } from "@/lib/billing/entitlements";
 
 export const metadata = { title: "Leave a review — ShapesOS" };
 
@@ -50,16 +51,18 @@ export default async function ReviewLandingPage({
   }
 
   await markViewedByToken(clean);
+  const wl = effectiveWhiteLabel(req.workspace);
 
   return (
     <ReviewLandingClient
       token={clean}
       businessName={req.workspace.name}
       reviewUrl={req.reviewUrl ?? "https://www.google.com/maps"}
-      brandColor={req.workspace.whiteLabelBrandColor}
-      // Logo + domain are white-label fields set under Settings → White-label.
-      logoUrl={req.workspace.whiteLabelLogoUrl ? `/api/public/workspaces/${req.workspace.id}/logo` : null}
-      customDomain={req.workspace.whiteLabelCustomDomain}
+      brandColor={wl.brandColor}
+      // Logo + domain are white-label fields set under Settings → White-label;
+      // effectiveWhiteLabel drops them on plans without white-label (Phase 4a).
+      logoUrl={wl.logoUrl ? `/api/public/workspaces/${req.workspace.id}/logo` : null}
+      customDomain={wl.customDomain}
     />
   );
 }

@@ -13,6 +13,7 @@ import { requireWorkspaceRole, forbidden } from "@/lib/authz";
 import { mintApiKey } from "@/lib/mcp/auth";
 import { readUsageSummary } from "@/lib/mcp/metering";
 import { MCP_TOOL_NAMES, scopeForTool } from "@/lib/mcp/scopes";
+import { EntitlementError, entitlementDenied, featureUpgradeMessage, planHasFeature } from "@/lib/billing/entitlements";
 
 export const dynamic = "force-dynamic";
 
@@ -70,7 +71,12 @@ export async function GET() {
     byKey = {};
   }
   const withUsage = keys.map((k) => ({ ...publicKey(k), usageCredits: byKey[k.id] ?? 0 }));
-  return Response.json({ enabled: ctx.workspace.mcpEnabled, keys: withUsage });
+  return Response.json({
+    enabled: ctx.workspace.mcpEnabled,
+    // Phase 4a: whether the plan includes API/MCP access.
+    entitled: planHasFeature(ctx.workspace.plan, "api_access"),
+    keys: withUsage,
+  });
 }
 
 const CreateKeySchema = z
@@ -86,6 +92,10 @@ export async function POST(req: NextRequest) {
   if ("error" in ctx) return ctx.error;
   if (!ctx.workspace.mcpEnabled) {
     return Response.json({ error: "MCP is not enabled for this workspace" }, { status: 403 });
+  }
+  // Phase 4a: API keys need the api_access entitlement.
+  if (!planHasFeature(ctx.workspace.plan, "api_access")) {
+    return entitlementDenied(new EntitlementError(featureUpgradeMessage("api_access"), "api_access"));
   }
   let body: unknown;
   try {
