@@ -50,6 +50,8 @@ export interface SendEmailInput {
   html: string;
   text?: string;
   headers?: Record<string, string>;
+  /** Phase 4b: where replies go (the workspace's inbound reply address). */
+  replyTo?: string;
   /** See SendSmsInput.idempotencyKey — sent as Resend's Idempotency-Key. */
   idempotencyKey?: string;
 }
@@ -212,6 +214,7 @@ export class ResendEmailProvider implements MessagingProvider {
         html: input.html,
         text: input.text,
         headers: input.headers,
+        ...(input.replyTo ? { replyTo: input.replyTo } : {}),
       },
       input.idempotencyKey ? { idempotencyKey: input.idempotencyKey } : undefined,
     );

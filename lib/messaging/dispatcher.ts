@@ -61,6 +61,8 @@ import {
   ProviderNotConfiguredError,
 } from "./provider";
 import { signUnsubscribeToken } from "./consent";
+// Phase 4b: replies to outbound email route back to the CRM inbox.
+import { replyAddressForSend } from "./inbound-email";
 import { isMailChannel, dispatchDueNurtureMail } from "./mail-channel";
 
 import {
@@ -525,6 +527,7 @@ async function sendClaimed(
         html: composed.html,
         text: composed.text,
         headers: composed.headers,
+        replyTo: replyAddressForSend(msg.workspaceId),
         idempotencyKey: msg.id,
       });
       providerSid = res.providerSid;
