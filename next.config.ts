@@ -45,7 +45,30 @@ const nextConfig: NextConfig = {
   // (sshcrypto.node) that Turbopack cannot bundle; when it compiles (normal on
   // CI/Docker images with build tools) the production build fails. Keep it and
   // its optional native dep external so Node resolves them at runtime.
-  serverExternalPackages: ["takumi-pdf", "ssh2", "cpu-features"],
+  // The curated Activepieces pieces (lib/integrations/activepieces/pieces.ts)
+  // are CommonJS packages with a deep dependency tree; keep them (and the
+  // framework they share) external so Node loads them at runtime and the
+  // standalone trace copies them, instead of Turbopack bundling them.
+  serverExternalPackages: [
+    "takumi-pdf",
+    "ssh2",
+    "cpu-features",
+    "@activepieces/pieces-framework",
+    "@activepieces/shared",
+    "@activepieces/piece-webhook",
+    "@activepieces/piece-schedule",
+    "@activepieces/piece-http",
+    "@activepieces/piece-smtp",
+    "@activepieces/piece-google-sheets",
+    "@activepieces/piece-mailchimp",
+    "@activepieces/piece-twitter",
+    "@activepieces/piece-facebook-pages",
+    "@activepieces/piece-instagram-business",
+    "@activepieces/piece-linkedin",
+    "@activepieces/piece-slack",
+    "@activepieces/piece-openai",
+    "@activepieces/piece-rss",
+  ],
   // Phase 12: the standalone trace copies onnxruntime's .node binding but not
   // its companion libonnxruntime.so, so any route touching @xenova/transformers
   // (embeddings — e.g. /dashboard/intelligence/repurpose) 500s at runtime with

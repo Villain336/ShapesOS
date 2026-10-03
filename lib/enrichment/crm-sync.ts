@@ -18,6 +18,7 @@ import { dedupKeyFor, logActivity } from "@/lib/crm/dedup";
 import { createLeadRecord, type LeadSource } from "@/lib/crm/leads";
 import type { FileChangeAction } from "@prisma/client";
 import type { Lead } from "@prisma/client";
+import { ConflictError, NotFoundError } from "@/lib/api/errors";
 
 // TODO(schema): change to "prospecting" once LeadSource gains the member.
 const PROSPECTING_SOURCE: LeadSource = "import";
@@ -53,7 +54,7 @@ export async function convertToLead(
     where: { id: prospectId, workspaceId },
     include: { list: { select: { name: true } } },
   });
-  if (!prospect) throw new Error("Prospect not found");
+  if (!prospect) throw new NotFoundError("Prospect not found");
   if (prospect.status === "converted" && prospect.leadId) {
     const existing = await prisma.lead.findFirst({
       where: { id: prospect.leadId, workspaceId },
@@ -70,7 +71,7 @@ export async function convertToLead(
       orderBy: { createdAt: "asc" },
       select: { id: true },
     }));
-  if (!pipeline) throw new Error("No pipeline found in workspace — create a pipeline before converting prospects.");
+  if (!pipeline) throw new ConflictError("No pipeline found in workspace — create a pipeline before converting prospects.");
 
   const listName = prospect.list.name;
   const sourceDetail = `Prospecting list: ${listName}`;

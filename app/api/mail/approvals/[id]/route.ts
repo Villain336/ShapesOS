@@ -8,6 +8,7 @@ import type { NextRequest } from "next/server";
 import { z } from "zod";
 import { mailGuard, badRequest } from "../../_lib";
 import { decideApproval } from "@/lib/mail/service";
+import { errorResponse } from "@/lib/api/errors";
 
 export const dynamic = "force-dynamic";
 
@@ -43,8 +44,6 @@ export async function POST(
     );
     return Response.json({ approval });
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "Decision failed";
-    const status = msg.includes("not found") ? 404 : 400;
-    return Response.json({ error: msg }, { status });
+    return errorResponse(e, "POST /api/mail/approvals/[id]");
   }
 }

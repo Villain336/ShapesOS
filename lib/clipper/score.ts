@@ -7,6 +7,7 @@
 
 import { getLlmProviderFor, WORKLOAD_MAX_TOKENS } from "@/lib/llm/router";
 import type { ClipCandidate, WordTimedTranscript } from "./types";
+import { ServiceUnavailableError } from "@/lib/api/errors";
 
 export interface ScoreOptions {
   /** How many candidate segments to ask for. */
@@ -79,7 +80,7 @@ export async function scoreSegments(
 async function scoreWithLlm(text: string, count: number): Promise<RawSegment[]> {
   const provider = getLlmProviderFor("background");
   if (!provider.isLive) {
-    throw new Error(
+    throw new ServiceUnavailableError(
       "Virality scoring needs a live LLM (background workload); the provider resolved to mock. Configure LLM keys to score clips.",
     );
   }

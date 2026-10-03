@@ -42,6 +42,7 @@ import {
 import { FakeMailProvider } from "./fake";
 import { LobProvider } from "./lob";
 import { PostGridProvider } from "./postgrid";
+import { BadRequestError, ConflictError, NotFoundError } from "@/lib/api/errors";
 
 export const MAIL_CONSENT_CHANNEL = "mail";
 export const SENDABLE_VERIFICATION = ["valid", "corrected"] as const;
@@ -68,7 +69,7 @@ function constructProvider(
   const n = name.trim().toLowerCase();
   if (n === "lob") return new LobProvider(key, { webhookSecret: webhookSecret ?? undefined });
   if (n === "postgrid") return new PostGridProvider(key, { webhookSecret: webhookSecret ?? undefined });
-  throw new Error(`Unknown mail provider: ${name}`);
+  throw new BadRequestError(`Unknown mail provider: ${name}`);
 }
 
 /**
@@ -104,7 +105,7 @@ export async function resolveMailProvider(workspaceId: string): Promise<Resolved
 /** Look up a provider row by id, workspace-scoped (routes). */
 export async function getMailProviderRow(workspaceId: string, id: string) {
   const row = await prisma.mailProvider.findFirst({ where: { id, workspaceId } });
-  if (!row) throw new Error("Mail provider not found");
+  if (!row) throw new NotFoundError("Mail provider not found");
   return row;
 }
 
@@ -219,7 +220,7 @@ async function getCampaign(workspaceId: string, campaignId: string) {
     where: { id: campaignId, workspaceId },
     include: { creative: true },
   });
-  if (!c) throw new Error("Mail campaign not found");
+  if (!c) throw new NotFoundError("Mail campaign not found");
   return c;
 }
 
@@ -238,7 +239,7 @@ export async function buildPieces(
 ): Promise<BuildPiecesResult> {
   const campaign = await getCampaign(workspaceId, campaignId);
   if (campaign.status !== "draft") {
-    throw new Error(`Cannot build pieces: campaign is ${campaign.status} (must be draft)`);
+    throw new ConflictError(`Cannot build pieces: campaign is ${campaign.status} (must be draft)`);
   }
   const slugBase = campaign.name
     .toLowerCase()
@@ -269,7 +270,7 @@ export async function buildPieces(
     }
   } else if (audience.kind === "prospect_list") {
     const listId = (audience.ref ?? "").trim();
-    if (!listId) throw new Error("prospect_list audience requires ref = ProspectList id");
+    if (!listId) throw new BadRequestError("prospect_list audience requires ref = ProspectList id");
     const prospects = await prisma.prospect.findMany({
       where: { listId, workspaceId },
       select: { leadId: true },
@@ -297,7 +298,7 @@ export async function buildPieces(
     try {
       filter = audience.ref ? (JSON.parse(audience.ref) as CrmSegmentFilter) : {};
     } catch {
-      throw new Error("crm_segment ref must be JSON: {pipelineId?, stage?, source?, minScore?, limit?}");
+      throw new BadRequestError("crm_segment ref must be JSON: {pipelineId?, stage?, source?, minScore?, limit?}");
     }
     const where: Record<string, unknown> = { workspaceId };
     if (filter.pipelineId) where.pipelineId = filter.pipelineId;
@@ -359,7 +360,7 @@ export async function verifyAddresses(
 ): Promise<VerifyResult> {
   const campaign = await getCampaign(workspaceId, campaignId);
   if (campaign.status !== "draft") {
-    throw new Error(`Cannot verify: campaign is ${campaign.status} (must be draft)`);
+    throw new ConflictError(`Cannot verify: campaign is ${campaign.status} (must be draft)`);
   }
   const { provider } = await resolveMailProvider(workspaceId);
   const pieces = await prisma.mailPiece.findMany({
@@ -475,15 +476,15 @@ export async function requestApproval(
 ) {
   const campaign = await getCampaign(workspaceId, campaignId);
   if (!["draft", "pending_approval"].includes(campaign.status)) {
-    throw new Error(`Cannot request approval: campaign is ${campaign.status}`);
+    throw new ConflictError(`Cannot request approval: campaign is ${campaign.status}`);
   }
   const creative = campaign.creative;
   if (!creative?.creativeHash) {
-    throw new Error("Campaign creative has no hash — creative must be finalized (T2 Studio) before approval");
+    throw new ConflictError("Campaign creative has no hash — creative must be finalized (T2 Studio) before approval");
   }
   const estimate = await estimateCampaign(workspaceId, campaignId);
   if (estimate.sendablePieces === 0) {
-    throw new Error("Nothing to approve: no sendable (verified) pieces");
+    throw new ConflictError("Nothing to approve: no sendable (verified) pieces");
   }
   const approval = await prisma.mailApproval.create({
     data: {
@@ -514,10 +515,10 @@ export async function decideApproval(
     include: { campaign: { select: { id: true, workspaceId: true, status: true } } },
   });
   if (!approval || approval.campaign.workspaceId !== workspaceId) {
-    throw new Error("Approval not found");
+    throw new NotFoundError("Approval not found");
   }
   if (approval.status !== "pending") {
-    throw new Error(`Approval is already ${approval.status}`);
+    throw new ConflictError(`Approval is already ${approval.status}`);
   }
   const now = new Date();
   const updated = await prisma.mailApproval.update({
@@ -556,7 +557,7 @@ export async function executeCampaign(
 ): Promise<ExecuteResult> {
   const campaign = await getCampaign(workspaceId, campaignId);
   if (!["approved"].includes(campaign.status)) {
-    throw new Error(
+    throw new ConflictError(
       `Refusing to send: campaign is ${campaign.status} (must be approved)`,
     );
   }
@@ -565,11 +566,11 @@ export async function executeCampaign(
     orderBy: { decidedAt: "desc" },
   });
   if (!approval) {
-    throw new Error("Refusing to send: no approved MailApproval for this campaign");
+    throw new ConflictError("Refusing to send: no approved MailApproval for this campaign");
   }
   const creative = campaign.creative;
   if (!creative?.creativeHash || creative.creativeHash !== approval.creativeHash) {
-    throw new Error("Refusing to send: creative hash changed since approval (hash mismatch)");
+    throw new ConflictError("Refusing to send: creative hash changed since approval (hash mismatch)");
   }
 
   // Provider + mode. Live mode demands an approved approval (have it) and a
@@ -587,7 +588,7 @@ export async function executeCampaign(
   const quarantinedSkipped = pieces.length - sendable.length;
 
   if (sendable.length > approval.pieceCount) {
-    throw new Error(
+    throw new ConflictError(
       `Refusing to send: ${sendable.length} sendable pieces exceeds approved ${approval.pieceCount} (over-count)`,
     );
   }
@@ -597,7 +598,7 @@ export async function executeCampaign(
   const estimateLines = await provider.estimateCost({ format, count: sendable.length, verifications: 0 });
   const spendCents = estimateLines.reduce((s, l) => s + l.cents, 0);
   if (spendCents > approval.maxSpendCents) {
-    throw new Error(
+    throw new ConflictError(
       `Refusing to send: estimated spend ${spendCents}¢ exceeds approved max ${approval.maxSpendCents}¢ (over-spend)`,
     );
   }

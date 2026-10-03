@@ -30,6 +30,7 @@ import {
   isToolkitEnabled,
   resolveToolkitForTool,
 } from "@/lib/integrations/actions/toolkits";
+import { ConflictError, ForbiddenError, HttpError, NotFoundError } from "@/lib/api/errors";
 
 export const APPROVAL_TTL_MS = Number(process.env.ACTION_APPROVAL_TTL_MS ?? 24 * 3600_000);
 
@@ -114,7 +115,7 @@ export async function proposeAction(input: ProposeInput) {
       status: "denied",
       executedBy: `gate:${input.proposedBy}`,
     });
-    throw new Error(
+    throw new ForbiddenError(
       `Refused by toolkit gate: ${reason}. No approval was created and nothing executed.`,
     );
   }
@@ -169,16 +170,16 @@ export async function decideApproval(input: DecideInput) {
         select: { toolName: true },
       }),
     );
-    if (!lite) throw new Error("Approval not found");
+    if (!lite) throw new NotFoundError("Approval not found");
     reclassToolkitSlug = await resolveToolkitForTool(input.workspaceId, lite.toolName);
   }
   return withWorkspaceScope(input.workspaceId, async (tx) => {
     const approval = await tx.composioActionApproval.findFirst({
       where: { id: input.approvalId, workspaceId: input.workspaceId },
     });
-    if (!approval) throw new Error("Approval not found");
+    if (!approval) throw new NotFoundError("Approval not found");
     if (approval.status !== "pending") {
-      throw new Error(`Approval is ${approval.status}, not pending`);
+      throw new ConflictError(`Approval is ${approval.status}, not pending`);
     }
     if (approval.expiresAt.getTime() < Date.now()) {
       const expired = await tx.composioActionApproval.update({
@@ -189,7 +190,7 @@ export async function decideApproval(input: DecideInput) {
         },
         select: { id: true, status: true },
       });
-      throw new Error("Approval expired before decision");
+      throw new ConflictError("Approval expired before decision");
     }
     const redacted = input.editedArgs ? redactArgs(input.editedArgs) : undefined;
     // Edit-before-approve reclassifies with FRESH overrides (slice 5): the
@@ -267,7 +268,7 @@ export async function getApproval(workspaceId: string, id: string) {
       where: { id, workspaceId },
     }),
   );
-  if (!approval) throw new Error("Approval not found");
+  if (!approval) throw new NotFoundError("Approval not found");
   return approval;
 }
 
@@ -335,20 +336,20 @@ export async function executeApproved(input: ExecuteApprovedInput) {
       where: { id: input.approvalId, workspaceId: input.workspaceId },
     }),
   );
-  if (!approval) throw new Error("Approval not found");
+  if (!approval) throw new NotFoundError("Approval not found");
   if (approval.status === "executed") {
-    throw new Error("Cannot execute: approval already executed (replay blocked)");
+    throw new ConflictError("Cannot execute: approval already executed (replay blocked)");
   }
   if (approval.status !== "approved") {
-    throw new Error(`Cannot execute: approval is ${approval.status} (must be approved)`);
+    throw new ConflictError(`Cannot execute: approval is ${approval.status} (must be approved)`);
   }
   if (approval.expiresAt.getTime() < Date.now()) {
     await expireStaleApprovals(input.workspaceId);
-    throw new Error("Cannot execute: approval expired");
+    throw new ConflictError("Cannot execute: approval expired");
   }
   const tier = approval.riskTier as RiskTier;
   if (tier === "high" && input.destructiveConfirm !== true) {
-    throw new Error(
+    throw new ConflictError(
       "Cannot execute: destructive (high-tier) actions require an explicit second confirmation",
     );
   }
@@ -360,7 +361,7 @@ export async function executeApproved(input: ExecuteApprovedInput) {
   // "approved" and can be fixed via edit-before-approve (or denied).
   // Credential-bearing tools need the encrypted-secrets path (planned).
   if (containsRedactedPlaceholder(proposedArgs)) {
-    throw new Error(
+    throw new ConflictError(
       `Cannot execute: stored arguments contain the ${REDACTED_PLACEHOLDER} placeholder — ` +
         "the gate stores secrets redacted and will not run a tool with placeholder values. " +
         "Use edit-before-approve to remove the secret-bearing argument, or deny this approval. " +
@@ -369,7 +370,7 @@ export async function executeApproved(input: ExecuteApprovedInput) {
   }
   const bulk = extractBulkItems(proposedArgs);
   if (bulk && input.confirmedBulkCount !== bulk.count) {
-    throw new Error(
+    throw new ConflictError(
       `Cannot execute: bulk action targets ${bulk.count} items via "${bulk.field}" — ` +
         `the confirmed count (${input.confirmedBulkCount ?? "none"}) must match what was reviewed`,
     );
@@ -397,7 +398,7 @@ export async function executeApproved(input: ExecuteApprovedInput) {
       status: "denied",
       executedBy: `gate:${input.executedBy}`,
     });
-    throw new Error(`Cannot execute: ${reason}`);
+    throw new ConflictError(`Cannot execute: ${reason}`);
   }
   // Atomic claim: approved -> executed. Concurrent/second attempts affect
   // 0 rows and fail closed.
@@ -421,7 +422,7 @@ export async function executeApproved(input: ExecuteApprovedInput) {
     }),
   );
   if (claimed.count !== 1) {
-    throw new Error("Cannot execute: approval was already claimed (replay blocked)");
+    throw new ConflictError("Cannot execute: approval was already claimed (replay blocked)");
   }
 
   const connectedAccountId = await requireConnectedEntity(input.workspaceId, approval.appKey);
@@ -500,7 +501,8 @@ export async function executeApproved(input: ExecuteApprovedInput) {
         },
       }),
     );
-    throw new Error(`Action failed: ${JSON.stringify(resultSummary).slice(0, 200)}`);
+    // Upstream (Composio/app) failure: 502 with the truncated result summary.
+    throw new HttpError(502, `Action failed: ${JSON.stringify(resultSummary).slice(0, 200)}`);
   }
   return { ok: true, latencyMs: Date.now() - started };
 }

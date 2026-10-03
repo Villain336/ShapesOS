@@ -17,6 +17,7 @@
 import { prisma } from "@/lib/prisma";
 import { withWorkspaceScope } from "@/lib/substrate/memory/rls";
 import { V1_ACTION_CATALOG } from "@/lib/integrations/actions/risk";
+import { BadRequestError } from "@/lib/api/errors";
 
 export interface ComposioToolkitTool {
   /** e.g. "SALESFORCE_CREATE_LEAD" */
@@ -286,7 +287,7 @@ export const fixtureToolRouter: ComposioToolRouter = {
   async getToolkitTools(toolkitSlug: string): Promise<ComposioToolkitTool[]> {
     const defs = fixtureDriftMode ? getDriftScenario() : FIXTURE_TOOLKITS;
     const found = defs.find((t) => t.toolkitSlug === toolkitSlug);
-    if (!found) throw new Error(`Unknown toolkit "${toolkitSlug}"`);
+    if (!found) throw new BadRequestError(`Unknown toolkit "${toolkitSlug}"`);
     return found.tools;
   },
 };
@@ -327,7 +328,7 @@ export async function refreshCatalogForConnection(
     toolkits.find((t) => t.appKey === appKey) ??
     toolkits.find((t) => t.toolkitSlug === appKey);
   if (!toolkit) {
-    throw new Error(`No toolkit found for app "${appKey}"`);
+    throw new BadRequestError(`No toolkit found for app "${appKey}"`);
   }
   const tools = await router.getToolkitTools(toolkit.toolkitSlug);
 

@@ -10,21 +10,10 @@ import {
   guardWorkspace,
   httpErrorResponse,
   readJson,
-  HttpError,
 } from "@/lib/enrichment/guard";
 import { listAgents, createAgent } from "@/lib/voice/agents";
 
 export const dynamic = "force-dynamic";
-
-// Plain validation Errors from the lib layer surface as 400; HttpErrors keep
-// their own status via httpErrorResponse.
-function asResponse(e: unknown, fallback: string) {
-  if (e instanceof HttpError) return httpErrorResponse(e);
-  return Response.json(
-    { error: e instanceof Error ? e.message : fallback },
-    { status: 400 },
-  );
-}
 
 export async function GET() {
   try {
@@ -49,6 +38,6 @@ export async function POST(req: NextRequest) {
     });
     return Response.json({ agent }, { status: 201 });
   } catch (e) {
-    return asResponse(e, "Failed to create agent");
+    return httpErrorResponse(e);
   }
 }

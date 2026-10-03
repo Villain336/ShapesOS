@@ -50,9 +50,6 @@ export async function POST(req: Request) {
     }
     return Response.json({ job }, { status: 201 });
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Internal error";
-    const status =
-      /empty|required|limit|not found/i.test(message) ? 400 : 500;
-    return Response.json({ error: message }, { status });
+    return httpErrorResponse(e);
   }
 }

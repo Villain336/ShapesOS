@@ -10,6 +10,7 @@ import { requireUser, getOrCreateWorkspace } from "@/lib/session";
 import { requireProjectRole } from "@/lib/authz";
 import { withWorkspaceScope } from "@/lib/substrate/graph/rls";
 import { buildWeeklyDigest } from "@/lib/intelligence/fleet/digest";
+import { errorResponse } from "@/lib/api/errors";
 
 export const dynamic = "force-dynamic";
 
@@ -29,9 +30,6 @@ export async function GET(req: NextRequest) {
     );
     return Response.json({ digest });
   } catch (err) {
-    return Response.json(
-      { error: err instanceof Error ? err.message : "digest failed" },
-      { status: 500 },
-    );
+    return errorResponse(err, "GET /api/intelligence/fleet/digest");
   }
 }

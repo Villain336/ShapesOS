@@ -9,6 +9,7 @@ import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
 import { validateBody, z, boundedString } from "@/lib/api/validate";
 import { runAgentTurnWithCapture, maybeAutoTitle, type ChatToolCall } from "@/lib/chat/agent";
+import { errorResponse } from "@/lib/api/errors";
 
 export const dynamic = "force-dynamic";
 
@@ -77,8 +78,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       attachmentIds,
     });
   } catch (err) {
-    const msg = err instanceof Error ? err.message : "Agent turn failed";
-    return Response.json({ error: msg }, { status: 500 });
+    return errorResponse(err, "POST /api/chat/threads/[id]/messages");
   }
 
   const threadTitle = await maybeAutoTitle(thread.id, content);

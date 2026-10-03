@@ -16,6 +16,7 @@
 import { randomBytes } from "node:crypto";
 import { Prisma, type EddmOrder, type MailCreative } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { BadRequestError, ConflictError, NotFoundError } from "@/lib/api/errors";
 
 // NOTE: EddmOrder carries creativeId as a plain scalar — there is no Prisma
 // relation to MailCreative (schema change is out of scope), so creatives are
@@ -224,11 +225,11 @@ const EDDM_TRANSITIONS: Record<EddmStatus, EddmStatus[]> = {
 /** Throw unless `to` is a legal transition from `from`. */
 export function assertEddmTransition(from: string, to: string): asserts to is EddmStatus {
   if (!EDDM_STATUSES.includes(to as EddmStatus)) {
-    throw new Error(`Unknown EDDM status "${to}".`);
+    throw new BadRequestError(`Unknown EDDM status "${to}".`);
   }
   const allowed = EDDM_TRANSITIONS[from as EddmStatus] ?? [];
   if (!allowed.includes(to as EddmStatus)) {
-    throw new Error(
+    throw new ConflictError(
       `Illegal EDDM transition: ${from} → ${to}. Allowed: ${allowed.length ? allowed.join(", ") : "none"}.`,
     );
   }
@@ -308,8 +309,8 @@ export async function createEddmOrder(input: {
   createdBy?: string | null;
 }): Promise<EddmOrder> {
   const name = input.name.trim();
-  if (!name) throw new Error("Order name is required.");
-  if (name.length > 160) throw new Error("Order name is too long (max 160).");
+  if (!name) throw new BadRequestError("Order name is required.");
+  if (name.length > 160) throw new BadRequestError("Order name is too long (max 160).");
   return prisma.eddmOrder.create({
     data: {
       workspaceId: input.workspaceId,
@@ -324,7 +325,7 @@ export async function createEddmOrder(input: {
 
 function assertEditable(order: EddmOrder): void {
   if (order.status !== "draft" && order.status !== "briefed") {
-    throw new Error(`Order is ${order.status} — fields are locked. Cancel or duplicate it to change.`);
+    throw new ConflictError(`Order is ${order.status} — fields are locked. Cancel or duplicate it to change.`);
   }
 }
 
@@ -334,17 +335,17 @@ export async function updateEddmOrderFields(
   patch: { name?: string; mailhouse?: string | null; dropDate?: Date | null },
 ): Promise<EddmOrder> {
   const order = await getEddmOrder(workspaceId, id);
-  if (!order) throw new Error("EDDM order not found");
+  if (!order) throw new NotFoundError("EDDM order not found");
   assertEditable(order);
   const data: Prisma.EddmOrderUpdateInput = {};
   if (patch.name !== undefined) {
     const name = patch.name.trim();
-    if (!name) throw new Error("Order name is required.");
+    if (!name) throw new BadRequestError("Order name is required.");
     data.name = name.slice(0, 160);
   }
   if (patch.mailhouse !== undefined) data.mailhouse = patch.mailhouse?.trim() || null;
   if (patch.dropDate !== undefined) {
-    if (patch.dropDate && Number.isNaN(patch.dropDate.getTime())) throw new Error("Invalid drop date.");
+    if (patch.dropDate && Number.isNaN(patch.dropDate.getTime())) throw new BadRequestError("Invalid drop date.");
     data.dropDate = patch.dropDate;
   }
   return prisma.eddmOrder.update({ where: { id }, data });
@@ -358,13 +359,13 @@ export async function setEddmRoutes(
   postageTier: EddmPostageTier = "retail",
 ): Promise<EddmOrder> {
   const order = await getEddmOrder(workspaceId, id);
-  if (!order) throw new Error("EDDM order not found");
+  if (!order) throw new NotFoundError("EDDM order not found");
   if (order.status !== "draft") {
-    throw new Error("Routes can only change while the order is a draft.");
+    throw new ConflictError("Routes can only change while the order is a draft.");
   }
   const validation = validateEddmRoutes(routes, postageTier);
   if (!validation.ok) {
-    throw new Error(`Route validation failed: ${validation.errors[0]}`);
+    throw new BadRequestError(`Route validation failed: ${validation.errors[0]}`);
   }
   const zips = [...new Set(coerceEddmRoutes(routes).filter((r) => r.selected !== false).map((r) => r.zip))];
   return prisma.eddmOrder.update({
@@ -388,14 +389,14 @@ export async function setEddmCreative(
   creativeId: string,
 ): Promise<EddmOrder> {
   const order = await getEddmOrder(workspaceId, orderId);
-  if (!order) throw new Error("EDDM order not found");
+  if (!order) throw new NotFoundError("EDDM order not found");
   assertEditable(order);
   const creative = await prisma.mailCreative.findFirst({
     where: { id: creativeId, workspaceId },
   });
-  if (!creative) throw new Error("Creative not found");
+  if (!creative) throw new NotFoundError("Creative not found");
   if (creative.formatTrack !== "eddm") {
-    throw new Error(
+    throw new BadRequestError(
       `Creative "${creative.name}" is on the "${creative.formatTrack}" format track — EDDM orders require an "eddm"-track flat (min 6.125" x 11.5"; a 4x6 postcard does not qualify).`,
     );
   }
@@ -409,12 +410,12 @@ export async function saveEddmEstimate(
   input: { postageTier?: EddmPostageTier; printCentsPerPiece?: number },
 ): Promise<{ order: EddmOrder; estimate: EddmEstimate }> {
   const order = await getEddmOrder(workspaceId, id);
-  if (!order) throw new Error("EDDM order not found");
+  if (!order) throw new NotFoundError("EDDM order not found");
   assertEditable(order);
   const routes = coerceEddmRoutes(order.routes);
   const validation = validateEddmRoutes(routes, input.postageTier ?? "retail");
   if (!validation.ok) {
-    throw new Error(`Route validation failed: ${validation.errors[0]}`);
+    throw new BadRequestError(`Route validation failed: ${validation.errors[0]}`);
   }
   const estimate = estimateEddmCost({
     routes,
@@ -463,7 +464,7 @@ export async function recordEddmDropAttribution(input: {
   origin: string;
 }): Promise<EddmDropAttribution> {
   const order = await getEddmOrder(input.workspaceId, input.orderId);
-  if (!order) throw new Error("EDDM order not found");
+  if (!order) throw new NotFoundError("EDDM order not found");
   let qrSlug = order.qrSlug;
   if (!qrSlug) {
     qrSlug = await mintEddmQrSlug();
@@ -488,21 +489,21 @@ export interface EddmTransitionInput {
 
 export async function applyEddmStatus(input: EddmTransitionInput): Promise<EddmOrder> {
   const order = await getEddmOrder(input.workspaceId, input.id);
-  if (!order) throw new Error("EDDM order not found");
+  if (!order) throw new NotFoundError("EDDM order not found");
   assertEddmTransition(order.status, input.to);
 
   const data: Prisma.EddmOrderUpdateInput = { status: input.to };
 
   if (input.to === "briefed" && !order.briefPdfUrl) {
-    throw new Error("Generate the mailhouse handoff brief before marking the order briefed.");
+    throw new ConflictError("Generate the mailhouse handoff brief before marking the order briefed.");
   }
   if (input.to === "at_mailhouse" && order.pieceCount <= 0) {
-    throw new Error("Order has no pieces — set carrier routes first.");
+    throw new ConflictError("Order has no pieces — set carrier routes first.");
   }
   if (input.to === "dropped") {
     const dropDate = input.dropDate ?? order.dropDate;
     if (!dropDate || Number.isNaN(dropDate.getTime())) {
-      throw new Error("A drop date is required to mark the order dropped.");
+      throw new BadRequestError("A drop date is required to mark the order dropped.");
     }
     data.dropDate = dropDate;
     if (!order.inHomeStart || !order.inHomeEnd) {

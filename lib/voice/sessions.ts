@@ -30,6 +30,7 @@ import {
 } from "./consent";
 import { hasAiDisclosure, canAttachToLiveSession } from "./scripts";
 import { isAgentLiveBlocked } from "./agents";
+import { ConflictError, ForbiddenError, NotFoundError } from "@/lib/api/errors";
 
 const json = (v: unknown): Prisma.InputJsonValue => v as Prisma.InputJsonValue;
 
@@ -170,7 +171,7 @@ export async function requestSession(
       where: { id: input.agentId, workspaceId },
     }),
   );
-  if (!agent) throw new Error("Voice agent not found.");
+  if (!agent) throw new NotFoundError("Voice agent not found.");
   const consent = await checkOutboundConsent(workspaceId, input.leadId, input.channel);
   const agentBlock = isAgentLiveBlocked(agent);
   if (agentBlock.blocked) {
@@ -309,10 +310,10 @@ export async function transitionSession(
   const current = await withWorkspaceScope(workspaceId, (tx) =>
     tx.callSession.findFirst({ where: { id: sessionId, workspaceId } }),
   );
-  if (!current) throw new Error("Call session not found.");
+  if (!current) throw new NotFoundError("Call session not found.");
   const from = current.status as SessionStatus;
   if (!isLegalTransition(from, to))
-    throw new Error(`Illegal session transition: ${from} → ${to}.`);
+    throw new ConflictError(`Illegal session transition: ${from} → ${to}.`);
   const trail = (current.auditTrail ?? []) as unknown as AuditEntry[];
   const actor = opts?.actorUserId ?? "system";
   const auditTrail = appendAuditEntry(trail, {
@@ -342,7 +343,7 @@ export async function appendTranscriptTurn(
   const current = await withWorkspaceScope(workspaceId, (tx) =>
     tx.callSession.findFirst({ where: { id: sessionId, workspaceId } }),
   );
-  if (!current) throw new Error("Call session not found.");
+  if (!current) throw new NotFoundError("Call session not found.");
   const transcript = (current.transcript ?? []) as unknown as TranscriptTurn[];
   return withWorkspaceScope(workspaceId, (tx) =>
     tx.callSession.update({
@@ -367,7 +368,7 @@ export async function setOutcome(
   const current = await withWorkspaceScope(workspaceId, (tx) =>
     tx.callSession.findFirst({ where: { id: sessionId, workspaceId } }),
   );
-  if (!current) throw new Error("Call session not found.");
+  if (!current) throw new NotFoundError("Call session not found.");
   const trail = (current.auditTrail ?? []) as unknown as AuditEntry[];
   return withWorkspaceScope(workspaceId, (tx) =>
     tx.callSession.update({
@@ -399,9 +400,9 @@ export async function attachRecording(
   const current = await withWorkspaceScope(workspaceId, (tx) =>
     tx.callSession.findFirst({ where: { id: sessionId, workspaceId } }),
   );
-  if (!current) throw new Error("Call session not found.");
+  if (!current) throw new NotFoundError("Call session not found.");
   if (!current.recordingConsent)
-    throw new Error(
+    throw new ForbiddenError(
       "Recording consent not granted: cannot attach a recording without the prospect's explicit consent (two-party-consent gating).",
     );
   const trail = (current.auditTrail ?? []) as unknown as AuditEntry[];
@@ -431,7 +432,7 @@ export async function grantRecordingConsent(
   const current = await withWorkspaceScope(workspaceId, (tx) =>
     tx.callSession.findFirst({ where: { id: sessionId, workspaceId } }),
   );
-  if (!current) throw new Error("Call session not found.");
+  if (!current) throw new NotFoundError("Call session not found.");
   const trail = (current.auditTrail ?? []) as unknown as AuditEntry[];
   return withWorkspaceScope(workspaceId, (tx) =>
     tx.callSession.update({

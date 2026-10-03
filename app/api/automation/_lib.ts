@@ -8,6 +8,7 @@
 
 import { getOrCreateWorkspace, requireUser } from "@/lib/session";
 import { requireWorkspaceRole, getMembership, forbidden } from "@/lib/authz";
+import { errorResponse } from "@/lib/api/errors";
 
 export interface AutomationGuard {
   userId: string;
@@ -49,6 +50,5 @@ export function decideError(err: unknown) {
   if (err && typeof err === "object" && "status" in err && typeof (err as { status: unknown }).status === "number") {
     return Response.json({ error: err instanceof Error ? err.message : "Decide failed" }, { status: (err as { status: number }).status });
   }
-  const message = err instanceof Error ? err.message : String(err);
-  return Response.json({ error: message }, { status: 500 });
+  return errorResponse(err);
 }

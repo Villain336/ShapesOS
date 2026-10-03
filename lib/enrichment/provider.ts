@@ -26,6 +26,7 @@
 // change their APIs without notice.
 
 import { createHash } from "node:crypto";
+import { HttpError, ServiceUnavailableError } from "@/lib/api/errors";
 
 export interface EnrichmentCompany {
   name?: string;
@@ -250,13 +251,13 @@ export class ApolloProvider implements EnrichmentProvider {
         body: JSON.stringify(body),
       });
     } catch (err) {
-      throw new Error(`Apollo request failed: ${err instanceof Error ? err.message : err}`);
+      throw new HttpError(502, `Apollo request failed: ${err instanceof Error ? err.message : err}`);
     }
     if (res.status === 401 || res.status === 403) {
-      throw new Error("Apollo rejected the API key (401/403) — check APOLLO_API_KEY.");
+      throw new ServiceUnavailableError("Apollo rejected the API key (401/403) — check APOLLO_API_KEY.");
     }
     if (res.status === 429) {
-      throw new Error("Apollo rate limit hit (429) — back off and retry.");
+      throw new HttpError(429, "Apollo rate limit hit (429) — back off and retry.");
     }
     const json = (await res.json().catch(() => ({}))) as {
       person?: Record<string, unknown> | null;
@@ -340,13 +341,13 @@ export class HunterProvider implements EnrichmentProvider {
     try {
       res = await fetch(`https://api.hunter.io/v2/email-finder?${params.toString()}`);
     } catch (err) {
-      throw new Error(`Hunter request failed: ${err instanceof Error ? err.message : err}`);
+      throw new HttpError(502, `Hunter request failed: ${err instanceof Error ? err.message : err}`);
     }
     if (res.status === 401) {
-      throw new Error("Hunter rejected the API key (401) — check HUNTER_API_KEY.");
+      throw new ServiceUnavailableError("Hunter rejected the API key (401) — check HUNTER_API_KEY.");
     }
     if (res.status === 429) {
-      throw new Error("Hunter rate limit hit (429) — back off and retry.");
+      throw new HttpError(429, "Hunter rate limit hit (429) — back off and retry.");
     }
     const json = (await res.json().catch(() => ({}))) as {
       data?: {
@@ -360,7 +361,7 @@ export class HunterProvider implements EnrichmentProvider {
     };
     if (!res.ok) {
       const detail = json.errors?.[0]?.details ?? `HTTP ${res.status}`;
-      throw new Error(`Hunter API error: ${detail}`);
+      throw new HttpError(502, `Hunter API error: ${detail}`);
     }
     const email = json.data?.email?.trim();
     if (!email) return { hit: false, costCents: 0, raw: { score: json.data?.score ?? null } };
@@ -421,7 +422,7 @@ export function getEnrichmentProviders(
       case "hunter":
         return new HunterProvider(env);
       default:
-        throw new Error(
+        throw new ServiceUnavailableError(
           `Unknown enrichment provider "${n}" (ENRICHMENT_PROVIDERS). Valid: fake, apollo, hunter.`,
         );
     }

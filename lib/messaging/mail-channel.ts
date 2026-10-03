@@ -39,6 +39,7 @@ import {
 } from "@/lib/mail/service";
 import type { MailAddress } from "@/lib/mail/provider";
 import { getMessagingSettings } from "./quiet-hours";
+import { ConflictError, NotFoundError } from "@/lib/api/errors";
 
 // ---------------------------------------------------------------------------
 // Channel + scheduling primitives
@@ -196,7 +197,7 @@ export async function queueMailPiece(input: QueueMailPieceInput): Promise<Queued
     where: { id: leadId, workspaceId },
     select: { id: true, name: true, company: true, email: true, phone: true, customFields: true },
   });
-  if (!lead) throw new Error("Lead not found in workspace");
+  if (!lead) throw new NotFoundError("Lead not found in workspace");
 
   // 1. Consent (default-deny; T1 re-checks per piece at send time too).
   const consent = await getMailConsent(workspaceId, leadId);
@@ -235,9 +236,9 @@ export async function queueMailPiece(input: QueueMailPieceInput): Promise<Queued
     const creative = await prisma.mailCreative.findFirst({
       where: { id: input.creativeId, workspaceId },
     });
-    if (!creative) throw new Error("Studio creative not found in workspace");
+    if (!creative) throw new NotFoundError("Studio creative not found in workspace");
     if (!creative.creativeHash) {
-      throw new Error("Studio creative is not finalized (no creative hash) — finalize it before use");
+      throw new ConflictError("Studio creative is not finalized (no creative hash) — finalize it before use");
     }
     creativeId = creative.id;
   } else {

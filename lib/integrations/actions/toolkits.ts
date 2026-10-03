@@ -22,6 +22,7 @@ import { getToolRouter } from "@/lib/integrations/actions/discovery";
 import { deriveTier } from "@/lib/integrations/actions/derive";
 import { V1_ACTION_CATALOG, V1_COMPOSIO_APPS } from "@/lib/integrations/actions/risk";
 import { listConnections } from "@/lib/integrations/actions/connections";
+import { BadRequestError } from "@/lib/api/errors";
 
 export type ToolkitCategory =
   | "comms"
@@ -139,7 +140,7 @@ export async function setToolkitEnabled(opts: {
 }): Promise<{ toolkitSlug: string; enabled: boolean }> {
   const known = await listKnownToolkits();
   if (!known.includes(opts.toolkitSlug)) {
-    throw new Error(
+    throw new BadRequestError(
       `Unknown toolkit "${opts.toolkitSlug}" — enablement refused (known: ${known.join(", ")})`,
     );
   }

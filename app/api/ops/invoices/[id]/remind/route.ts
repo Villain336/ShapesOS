@@ -13,6 +13,7 @@ import {
   proposeInvoiceReminder,
 } from "@/lib/ops/invoices";
 import { OpsError } from "@/lib/ops/doctype";
+import { errorResponse } from "@/lib/api/errors";
 
 export const dynamic = "force-dynamic";
 
@@ -53,7 +54,6 @@ export async function POST(
     if (err instanceof OpsGateError) {
       return Response.json({ error: err.message, code: err.code }, { status: 422 });
     }
-    const message = err instanceof Error ? err.message : String(err);
-    return Response.json({ error: message }, { status: 500 });
+    return errorResponse(err);
   }
 }

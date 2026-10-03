@@ -24,6 +24,7 @@ import {
   opsPatch,
   type OpsActor,
 } from "@/lib/ops/doctype";
+import { errorResponse } from "@/lib/api/errors";
 
 export const dynamic = "force-dynamic";
 
@@ -45,8 +46,7 @@ function opsError(err: unknown) {
   if (err instanceof OpsGateError) {
     return Response.json({ error: err.message, code: err.code }, { status: 422 });
   }
-  const message = err instanceof Error ? err.message : String(err);
-  return Response.json({ error: message }, { status: 500 });
+  return errorResponse(err);
 }
 
 async function readJson(req: NextRequest): Promise<unknown> {
