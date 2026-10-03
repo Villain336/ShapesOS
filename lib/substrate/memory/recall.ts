@@ -90,6 +90,17 @@ const STORE_SQL: Record<
   },
 };
 
+/**
+ * SQL predicate (constant text, no user input) that drops agent-inferred
+ * learnings until a human accepts them (contextRefs.acceptedAt).
+ */
+export const UNREVIEWED_INFERENCE_FILTER =
+  `NOT (("source" = 'consolidation' OR "context_refs"->>'origin' = 'agent_inferred') AND ("context_refs"->>'acceptedAt') IS NULL)`;
+
+function reviewFilter(store: MemoryStoreKind, acceptedOnly: boolean | undefined): string {
+  return acceptedOnly && store === "learning" ? ` AND ${UNREVIEWED_INFERENCE_FILTER}` : "";
+}
+
 async function fetchCandidates(
   tx: { $queryRawUnsafe: (q: string, ...p: unknown[]) => Promise<unknown> },
   workspaceId: string,
@@ -98,8 +109,10 @@ async function fetchCandidates(
   tsq: string | null,
   vecLiteral: string | null,
   asOf: Date,
+  acceptedOnly?: boolean,
 ): Promise<Candidate[]> {
-  const { table, textExpr, cols, temporalWhere } = STORE_SQL[store];
+  const { table, textExpr, cols } = STORE_SQL[store];
+  const temporalWhere = STORE_SQL[store].temporalWhere + reviewFilter(store, acceptedOnly);
   const byId = new Map<string, Candidate>();
   const asOfIso = asOf.toISOString();
 
@@ -201,14 +214,16 @@ export async function recallRanked(
   return withWorkspaceScope(workspaceId, async (tx) => {
     // Exact-match bypass: IDs / error codes skip vector + rerank.
     if (isExactMatchQuery(query)) {
-      return exactMatchRecall(tx, workspaceId, query, asOf, opts.topK ?? 10);
+      return exactMatchRecall(tx, workspaceId, query, asOf, opts.topK ?? 10, opts.acceptedOnly);
     }
 
     const tsq = buildTsQuery(query);
     const vecLiteral = toVectorLiteral(await embedText(query));
     const all: Candidate[] = [];
     for (const store of ["episode", "fact", "learning"] as MemoryStoreKind[]) {
-      all.push(...(await fetchCandidates(tx, workspaceId, store, query, tsq, vecLiteral, asOf)));
+      all.push(
+        ...(await fetchCandidates(tx, workspaceId, store, query, tsq, vecLiteral, asOf, opts.acceptedOnly)),
+      );
     }
 
     // Temporal filter (bi-temporal for facts; era filter for learnings via
@@ -275,6 +290,7 @@ async function exactMatchRecall(
   query: string,
   asOf: Date,
   topK: number,
+  acceptedOnly?: boolean,
 ): Promise<RecallHit[]> {
   const q = query.trim();
   const phrase = q.replace(/^"|"$/g, "");
@@ -307,7 +323,7 @@ async function exactMatchRecall(
       `SELECT "id" AS ref_id, ${cols} FROM "${table}"
         WHERE "workspace_id" = $1
           AND ("id" = $2 OR ${textExpr} ILIKE $3)
-          AND ${observedCol} <= $4::timestamptz
+          AND ${observedCol} <= $4::timestamptz${reviewFilter(store, acceptedOnly)}
         LIMIT $5`,
       workspaceId,
       q,

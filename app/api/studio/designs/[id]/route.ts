@@ -72,19 +72,23 @@ export async function PUT(req: Request, ctx: { params: Promise<{ id: string }> }
       return Response.json({ error: "Invalid input", issues: parsed.error.issues }, { status: 400 });
     }
 
+    // H1: persist the VALIDATED document (svg bodies allowlist-sanitized),
+    // never the raw client payload.
+    let nextDocument: unknown = undefined;
     if (parsed.data.document !== undefined) {
       const validated = validateDesignDocument(parsed.data.document);
       if (!validated.ok) {
         return Response.json({ error: validated.error }, { status: 400 });
       }
+      nextDocument = validated.doc;
     }
 
     const updated = await prisma.design.update({
       where: { id: existing.id },
       data: {
         ...(parsed.data.name !== undefined ? { name: parsed.data.name } : {}),
-        ...(parsed.data.document !== undefined
-          ? { document: parsed.data.document as unknown as Prisma.InputJsonValue }
+        ...(nextDocument !== undefined
+          ? { document: nextDocument as unknown as Prisma.InputJsonValue }
           : {}),
         ...(parsed.data.thumbnail !== undefined ? { thumbnail: parsed.data.thumbnail } : {}),
       },

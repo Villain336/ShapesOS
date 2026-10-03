@@ -8,6 +8,7 @@ import { requireUser } from "@/lib/session";
 import { notFound, requireProjectAccess } from "@/lib/route-utils";
 import { auditEvent } from "@/lib/auditlog";
 import { readAttachmentBytes } from "@/lib/filesystem/compat";
+import { buildDownloadHeaders } from "@/lib/filesystem/download";
 
 export const dynamic = "force-dynamic";
 
@@ -35,10 +36,11 @@ export async function GET(_req: NextRequest, { params }: Params) {
   });
   if (!bytes) return notFound("File missing from disk");
   const body = new Uint8Array(bytes);
+  // Uploaded bytes are user content: always an attachment, plus nosniff and
+  // a sandbox CSP so a stored HTML/SVG file can never run on this origin.
   return new Response(body, {
-    headers: {
-      "content-type": row.mimeType ?? "application/octet-stream",
-      "content-disposition": `attachment; filename="${row.filename.replace(/["\\]/g, "_")}"`,
-    },
+    headers: buildDownloadHeaders(row.mimeType ?? "application/octet-stream", row.filename, {
+      forceAttachment: true,
+    }),
   });
 }

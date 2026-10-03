@@ -2,7 +2,11 @@
 // GET /r/funding/[token] — serves a shared doc (or the whole room) to an
 //        anonymous viewer. Access rules are enforced at access time:
 //        - unknown token / revoked / expired → 404 (revoked links look gone)
-//        - allowlisted link without a matching ?email= → 403 + email form
+//        - allowlisted link: the viewer's email is VERIFIED, never trusted
+//          from ?email= — entering an allowlisted address emails a 15-min
+//          magic link; opening it sets a path-scoped HttpOnly session
+//          cookie (lib/funding/viewer-verify.ts). Same "check your email"
+//          page whether or not the address is allowlisted (no oracle).
 //        - otherwise the VIEW IS LOGGED FIRST (who opened what, when), then
 //          a minimal viewer page is returned. The file itself streams from
 //          ?dl=1 inside the iframe (the iframe hit logs no second view).
@@ -22,6 +26,15 @@ import {
 import { readFile } from "@/lib/filesystem/service";
 import { buildDownloadHeaders } from "@/lib/filesystem/download";
 import { clientIpFromHeaders } from "@/lib/api/client-ip";
+import nodemailer from "nodemailer";
+import { smtpSettings } from "@/lib/alerts/adapters";
+import {
+  VIEWER_COOKIE,
+  appOriginForLinks,
+  mayResendMagicLink,
+  resolveViewerAccess,
+  viewerSecret,
+} from "@/lib/funding/viewer-verify";
 
 export const dynamic = "force-dynamic";
 
@@ -74,7 +87,7 @@ function gonePage(): Response {
 }
 
 function emailGatePage(params: {
-  failure: ShareAccessFailure;
+  failure: ShareAccessFailure | "link_invalid" | null;
   token: string;
   versionId: string | null;
 }): Response {
@@ -82,15 +95,57 @@ function emailGatePage(params: {
   const hidden = versionId
     ? `<input type="hidden" name="v" value="${esc(versionId)}">`
     : "";
+  const notice =
+    params.failure === "link_invalid"
+      ? `<p>That sign-in link has expired or was already replaced. Enter your email to get a new one.</p>`
+      : "";
   return page(
     "Enter your email",
     `<h1>Enter your email to view</h1>` +
-      `<p>This data room was shared with specific people. Enter the email it was shared with.</p>` +
+      notice +
+      `<p>This data room was shared with specific people. Enter the email it was shared with and we'll email you a sign-in link.</p>` +
       `<form method="get" action="/r/funding/${esc(token)}">${hidden}` +
       `<input type="email" name="email" required placeholder="you@company.com" autocomplete="email">` +
       `<button class="btn" type="submit">View documents</button></form>`,
     403,
   );
+}
+
+function checkEmailPage(): Response {
+  return page(
+    "Check your email",
+    `<h1>Check your email</h1>` +
+      `<p>If that address has access to this data room, we've emailed it a sign-in link. The link works for 15 minutes.</p>`,
+  );
+}
+
+function unavailablePage(): Response {
+  return page(
+    "Verification unavailable",
+    `<h1>Viewer verification is unavailable</h1><p>This server can't verify viewer emails right now. Ask the sender for access.</p>`,
+    503,
+  );
+}
+
+async function sendMagicLink(to: string, url: string): Promise<void> {
+  const smtp = smtpSettings(); // throws when SMTP isn't configured
+  const transporter = nodemailer.createTransport({
+    host: smtp.host,
+    port: smtp.port,
+    secure: smtp.secure,
+    ...(smtp.user ? { auth: { user: smtp.user, pass: smtp.pass ?? "" } } : {}),
+  });
+  await transporter.sendMail({
+    from: smtp.from,
+    to,
+    subject: "Your data room sign-in link",
+    text: `Open this link within 15 minutes to view the shared documents:\n\n${url}\n\nIf you didn't ask for this, ignore this email.`,
+    html: `<p>Open this link within 15 minutes to view the shared documents:</p><p><a href="${esc(url)}">View the data room</a></p><p style="color:#6b7280;font-size:12px">If you didn't ask for this, ignore this email.</p>`,
+  });
+}
+
+function isHttpsRequest(req: NextRequest): boolean {
+  return req.nextUrl.protocol === "https:" || req.headers.get("x-forwarded-proto") === "https";
 }
 
 function viewerHeaders(req: NextRequest): { ip: string | null; userAgent: string | null } {
@@ -109,28 +164,71 @@ export async function GET(req: NextRequest, { params }: Params) {
   const link = await store.getShareLinkByToken(token, now);
   if (!link) return gonePage();
 
-  const emailParam = url.searchParams.get("email");
-  const access = resolveShareLink(
-    {
-      revoked: link.revoked,
-      expiresAt: link.expiresAt,
-      viewerEmails: link.viewerEmails,
-    },
-    { email: emailParam },
+  // Revoked / expired → gone (identical 404).
+  const linkState = resolveShareLink(
+    { revoked: link.revoked, expiresAt: link.expiresAt, viewerEmails: [] },
+    {},
     now,
   );
-  if (!access.ok) {
-    if (
-      access.failure === "link_revoked" ||
-      access.failure === "link_expired"
-    ) {
-      return gonePage();
+  if (!linkState.ok) return gonePage();
+
+  // Viewer identity: verified via magic link + session cookie, never the
+  // self-asserted ?email= (which now only requests a sign-in link).
+  const viewer = resolveViewerAccess({
+    link: { id: link.id, expiresAt: link.expiresAt, viewerEmails: link.viewerEmails },
+    query: { email: url.searchParams.get("email"), verify: url.searchParams.get("verify") },
+    sessionCookie: req.cookies.get(VIEWER_COOKIE)?.value ?? null,
+    now: now.getTime(),
+    secret: viewerSecret(),
+  });
+  const versionParam = url.searchParams.get("v");
+  const cleanPath = `/r/funding/${encodeURIComponent(token)}${
+    versionParam ? `?v=${encodeURIComponent(versionParam)}` : ""
+  }`;
+  let emailParam: string | null = null;
+  switch (viewer.kind) {
+    case "unavailable":
+      return unavailablePage();
+    case "email-form":
+      return emailGatePage({ failure: viewer.notice ?? null, token, versionId: versionParam });
+    case "send-link": {
+      // Emailed links use the CONFIGURED origin, never the Host header (a
+      // spoofed Host would otherwise mail a token to an attacker URL).
+      // Checked before the allowlist branch so the response can't differ.
+      const origin =
+        appOriginForLinks() ?? (process.env.NODE_ENV !== "production" ? url.origin : null);
+      if (!origin) return unavailablePage();
+      if (viewer.magicToken && mayResendMagicLink(link.id, viewer.email, now.getTime())) {
+        const magicUrl = `${origin}${cleanPath}${versionParam ? "&" : "?"}verify=${encodeURIComponent(viewer.magicToken)}`;
+        // Not awaited: response timing must not reveal whether the address
+        // is allowlisted.
+        void sendMagicLink(viewer.email, magicUrl).catch((err) => {
+          console.error(
+            `[funding] data-room sign-in email failed: ${err instanceof Error ? err.message : String(err)}`,
+          );
+        });
+      }
+      return checkEmailPage();
     }
-    return emailGatePage({
-      failure: access.failure,
-      token,
-      versionId: url.searchParams.get("v"),
-    });
+    case "start-session": {
+      const cookie = [
+        `${VIEWER_COOKIE}=${viewer.cookieValue}`,
+        `Path=/r/funding/${encodeURIComponent(token)}`,
+        `Max-Age=${viewer.maxAgeSeconds}`,
+        "HttpOnly",
+        "SameSite=Lax",
+        ...(isHttpsRequest(req) ? ["Secure"] : []),
+      ].join("; ");
+      return new Response(null, {
+        status: 303,
+        headers: { location: cleanPath, "set-cookie": cookie, "cache-control": "no-store" },
+      });
+    }
+    case "granted":
+      emailParam = viewer.email;
+      break;
+    case "open":
+      break;
   }
 
   // Room link without a chosen version → index page (no view logged; views
@@ -139,9 +237,6 @@ export async function GET(req: NextRequest, { params }: Params) {
     const versionId = url.searchParams.get("v");
     if (!versionId) {
       const docs = await store.listDocs(link.workspaceId);
-      const emailQ = emailParam
-        ? `&amp;email=${encodeURIComponent(emailParam)}`
-        : "";
       const items = docs
         .map((d) => {
           const v = d.currentVersion;
@@ -150,7 +245,7 @@ export async function GET(req: NextRequest, { params }: Params) {
             v.sizeBytes >= 1024 * 1024
               ? `${(v.sizeBytes / (1024 * 1024)).toFixed(1)} MB`
               : `${Math.max(1, Math.round(v.sizeBytes / 1024))} KB`;
-          return `<li><div><div class="doctitle">${esc(d.title)}</div><div class="docsub">Version ${v.versionNumber} · ${esc(v.fileName)} · ${size}</div></div><a class="btn" href="/r/funding/${esc(token)}?v=${esc(v.id)}${emailQ}">Open</a></li>`;
+          return `<li><div><div class="doctitle">${esc(d.title)}</div><div class="docsub">Version ${v.versionNumber} · ${esc(v.fileName)} · ${size}</div></div><a class="btn" href="/r/funding/${esc(token)}?v=${esc(v.id)}">Open</a></li>`;
         })
         .join("");
       return page(
@@ -220,7 +315,7 @@ async function serveVersion(
       url.searchParams.get("v")
         ? `&v=${encodeURIComponent(url.searchParams.get("v")!)}`
         : ""
-    }${opts.email ? `&email=${encodeURIComponent(opts.email)}` : ""}`;
+    }`;
     const beaconUrl = `/r/funding/${encodeURIComponent(opts.token)}/views/${encodeURIComponent(view.id)}`;
     const openedAt = Math.round(opts.now.getTime());
     return page(

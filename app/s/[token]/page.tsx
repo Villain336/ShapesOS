@@ -18,6 +18,11 @@ import { umamiSnippetConfig } from "@/lib/integrations/umami";
 
 export const dynamic = "force-dynamic";
 
+/** Exported page SVG → data: URL for an <img> (base64; no inline markup). */
+function svgDataUrl(svg: string): string {
+  return `data:image/svg+xml;base64,${Buffer.from(svg, "utf8").toString("base64")}`;
+}
+
 const STATUS_LABEL: Record<string, { label: string; cls: string }> = {
   draft: { label: "Draft", cls: "bg-stone-100 text-stone-600" },
   in_review: { label: "In review", cls: "bg-amber-100 text-amber-800" },
@@ -144,10 +149,14 @@ export default async function PublicSharePage({
                 <h2 className="mb-2 text-[13px] font-semibold text-stone-700">{p.name}</h2>
                 <div className="overflow-hidden rounded-lg border border-stone-200 bg-white shadow-sm">
                   {res.ok ? (
-                    <div
-                      className="[&_svg]:block [&_svg]:h-auto [&_svg]:w-full"
-                      // Server-rendered from the validated design document.
-                      dangerouslySetInnerHTML={{ __html: res.svg }}
+                    // H1: rendered as an IMAGE, never inline HTML. SVG loaded
+                    // through <img> can't run script or fetch subresources,
+                    // so even a hostile document can't touch this origin.
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={svgDataUrl(res.svg)}
+                      alt={`${share.design.name} — ${p.name}`}
+                      className="block h-auto w-full"
                     />
                   ) : (
                     <p className="p-6 text-[13px] text-stone-500">

@@ -1,7 +1,12 @@
 // Marketr — Phase 11 "Canvas": design document structural validator.
 // Never throws: every structural violation (and any internal surprise) is
 // returned as { ok: false, error }.
+//
+// H1: svg element bodies are untrusted markup. The returned `doc` carries
+// every body run through the strict allowlist sanitizer (svg-sanitize.ts);
+// callers persist/render `validated.doc`, never the raw input.
 
+import { sanitizeSvgFragment } from "./svg-sanitize";
 import {
   DESIGN_SCHEMA_VERSION,
   type DesignDocument,
@@ -134,6 +139,20 @@ function validatePage(page: unknown, index: number): string | null {
   return null;
 }
 
+/** Copy of `doc` with every svg element `body` allowlist-sanitized (H1). */
+function withSanitizedSvgBodies(doc: Record<string, unknown>): Record<string, unknown> {
+  const pages = (doc.pages as unknown[]).map((page) => {
+    const p = page as Record<string, unknown>;
+    const elements = (p.elements as unknown[]).map((el) => {
+      const e = el as Record<string, unknown>;
+      if (e.type !== "svg" || typeof e.body !== "string") return el;
+      return { ...e, body: sanitizeSvgFragment(e.body) };
+    });
+    return { ...p, elements };
+  });
+  return { ...doc, pages };
+}
+
 export function validateDesignDocument(
   doc: unknown,
 ): { ok: true; doc: DesignDocument } | { ok: false; error: string } {
@@ -161,7 +180,7 @@ export function validateDesignDocument(
         ok: false,
         error: `document: serialized size exceeds ${MAX_DESIGN_DOCUMENT_BYTES} bytes`,
       };
-    return { ok: true, doc: doc as unknown as DesignDocument };
+    return { ok: true, doc: withSanitizedSvgBodies(doc) as unknown as DesignDocument };
   } catch (e) {
     return {
       ok: false,

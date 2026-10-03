@@ -5,6 +5,34 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { fetchSitemapEntries, parseSitemapXml } from "../sitemap";
 import { diffSitemap } from "../discovery";
+import { isOnWatchedDomain } from "../polite-fetch";
+
+describe("fetchSitemapEntries allowUrl gate (H8)", () => {
+  it("never fetches or returns off-domain child sitemaps and <loc> URLs", async () => {
+    const fetched: string[] = [];
+    const pages: Record<string, string> = {
+      "https://comp.example/sitemap.xml": `<sitemapindex>
+        <sitemap><loc>https://comp.example/pages.xml</loc></sitemap>
+        <sitemap><loc>http://169.254.169.254/latest/meta-data/</loc></sitemap>
+      </sitemapindex>`,
+      "https://comp.example/pages.xml": `<urlset>
+        <url><loc>https://comp.example/ok</loc></url>
+        <url><loc>http://10.0.0.5/admin</loc></url>
+        <url><loc>https://evil.test/x</loc></url>
+      </urlset>`,
+    };
+    const entries = await fetchSitemapEntries(
+      "https://comp.example/sitemap.xml",
+      async (u) => {
+        fetched.push(u);
+        return { status: pages[u] ? 200 : 404, text: pages[u] ?? "" };
+      },
+      { allowUrl: (u) => isOnWatchedDomain(u, "comp.example") },
+    );
+    assert.deepEqual(entries.map((e) => e.url), ["https://comp.example/ok"]);
+    assert.deepEqual(fetched, ["https://comp.example/sitemap.xml", "https://comp.example/pages.xml"]);
+  });
+});
 
 const URLSET_FIXTURE = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">

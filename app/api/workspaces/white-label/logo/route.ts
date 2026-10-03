@@ -58,6 +58,11 @@ export async function POST(req: NextRequest) {
     return Response.json({ error: reason }, { status });
   };
   if (!check.ok) return reject(check.reason);
+  // The white-label logo is served PUBLICLY on the app origin. SVG is active
+  // content (script, external loads), so only raster formats are accepted.
+  if (check.ext === "svg") {
+    return reject("SVG logos aren't accepted for white-label branding. Upload a PNG, JPEG, GIF or WebP.");
+  }
   const screen = await screenUploadBuffer(buf);
   if (!screen.ok) return reject(screen.reason, screen.status);
 

@@ -6,6 +6,7 @@
 // timeout, identifiable User-Agent. No new npm deps.
 
 import { withWorkspaceScope } from "@/lib/substrate/graph/rls";
+import { safeFetch } from "@/lib/connectors/safe-fetch";
 import { recordApiMeter } from "./meter";
 import { auditApiCall } from "./audit";
 
@@ -28,7 +29,11 @@ const lastFetchAt = new Map<string, number>();
 const robotsCache = new Map<string, { at: number; disallows: string[] }>();
 const ROBOTS_TTL_MS = 24 * 60 * 60 * 1000;
 
-/** SSRF guard: refuse loopback / link-local / private-network hostnames. */
+/**
+ * Cheap name-level pre-check (fails fast, no DNS). The authoritative SSRF
+ * guard is safeFetch in fetchText(): DNS is validated per request against
+ * every special-purpose range and every redirect hop is re-checked.
+ */
 function isPublicHost(hostname: string): boolean {
   const h = hostname.toLowerCase();
   if (h === "localhost" || h.endsWith(".localhost")) return false;
@@ -57,9 +62,8 @@ async function fetchText(url: string): Promise<{ status: number; body: string }>
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
   try {
-    const res = await fetch(url, {
+    const res = await safeFetch(url, {
       headers: { "User-Agent": UA, Accept: "text/html,application/xhtml+xml" },
-      redirect: "follow",
       signal: ctrl.signal,
     });
     const buf = await res.arrayBuffer();

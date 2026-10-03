@@ -37,6 +37,8 @@ export interface BoundDataSource {
   displayName: string;
   projectConfig: Record<string, unknown> | null;
   mcpEndpoint: string | null;
+  /** Connector.config (carries the MCP read-only allow-list). */
+  connectorConfig: unknown;
 }
 
 function truncate(text: string, max: number): string {
@@ -65,6 +67,7 @@ export async function boundDataSources(projectId: string): Promise<BoundDataSour
           ? (b.projectConfig as Record<string, unknown>)
           : null,
       mcpEndpoint: conn.connector?.mcpEndpoint ?? null,
+      connectorConfig: conn.connector?.config ?? null,
     });
   }
   return out;
@@ -97,7 +100,7 @@ export async function connectorToolsSection(projectId: string): Promise<string> 
     try {
       const adapter = await getAdapterForConnection({
         connectorKey: s.connectorKey,
-        connector: { mcpEndpoint: s.mcpEndpoint },
+        connector: { mcpEndpoint: s.mcpEndpoint, config: s.connectorConfig },
       });
       tools = await listAdapterTools(adapter);
     } catch (err) {
@@ -190,7 +193,10 @@ export async function resolveConnectorTool(
   try {
     adapter = await getAdapterForConnection({
       connectorKey: key,
-      connector: { mcpEndpoint: connection.connector?.mcpEndpoint ?? null },
+      connector: {
+        mcpEndpoint: connection.connector?.mcpEndpoint ?? null,
+        config: connection.connector?.config ?? null,
+      },
     });
   } catch (err) {
     return deny(ctx, toolName, `No adapter for connector "${key}": ${err instanceof Error ? err.message : "unknown error"}`);

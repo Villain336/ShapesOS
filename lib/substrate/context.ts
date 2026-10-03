@@ -154,6 +154,9 @@ export async function substrateContext(
       asOf,
       alpha: opts.alpha,
       skipRerank: opts.skipRerank,
+      // The orchestrator feeds this context to models: unaccepted
+      // agent-inferred lessons stay out (memory-poisoning guard).
+      acceptedOnly: true,
     }),
   ]);
 

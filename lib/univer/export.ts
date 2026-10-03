@@ -3,15 +3,12 @@
 // PDF is produced by a small embedded writer (Helvetica family only) with a
 // brand header and page-number footer, paginated onto A4.
 
+import { csvCell } from "@/lib/csv";
 import type { IWorkbookData } from "@univerjs/core";
 import type { IDocumentData } from "@univerjs/core";
 
 // ---------------------------------------------------------------- CSV ----
 
-function csvEscape(value: string): string {
-  if (/[",\r\n]/.test(value)) return `"${value.replace(/"/g, '""')}"`;
-  return value;
-}
 
 function cellText(v: unknown): string {
   if (v === null || v === undefined) return "";
@@ -42,8 +39,10 @@ export function exportSheetCsv(snapshot: IWorkbookData, sheetName?: string): str
     for (const [c, cell] of Object.entries(cols ?? {})) {
       const ci = Number(c);
       if (!Number.isFinite(ci)) continue;
-      const t = cellText((cell as { v?: unknown })?.v);
-      grid.set(`${ri}:${ci}`, t);
+      const raw = (cell as { v?: unknown })?.v;
+      const t = cellText(raw);
+      // Encoded here: numbers stay numbers; text is formula-neutralized.
+      grid.set(`${ri}:${ci}`, typeof raw === "number" ? csvCell(raw) : csvCell(t));
       if (t !== "") {
         if (ri > maxRow) maxRow = ri;
         if (ci > maxCol) maxCol = ci;
@@ -55,7 +54,7 @@ export function exportSheetCsv(snapshot: IWorkbookData, sheetName?: string): str
   const lines: string[] = [];
   for (let r = 0; r <= maxRow; r++) {
     const cols: string[] = [];
-    for (let c = 0; c <= maxCol; c++) cols.push(csvEscape(grid.get(`${r}:${c}`) ?? ""));
+    for (let c = 0; c <= maxCol; c++) cols.push(grid.get(`${r}:${c}`) ?? "");
     lines.push(cols.join(","));
   }
   return lines.join("\r\n") + "\r\n";

@@ -13,6 +13,7 @@
 //   (spec invariant 11): scans are observed events, labeled as such in the
 //   attribution layer — never inflated into deterministic ROAS.
 
+import { assertSafeUrl, type ResolveFn } from "@/lib/safe-url";
 import { createHash } from "node:crypto";
 import { getMediaStore } from "@/lib/media/store";
 import {
@@ -80,12 +81,18 @@ export interface SpotKitResult {
  * errors with a warning (does not block minting — the chain may be
  * geo-gated).
  */
-export async function checkLandingTaps(destinationUrl: string): Promise<{ taps: number; ok: boolean; detail: string }> {
+export async function checkLandingTaps(
+  destinationUrl: string,
+  deps: { fetchImpl?: typeof fetch; resolve?: ResolveFn } = {},
+): Promise<{ taps: number; ok: boolean; detail: string }> {
   let url = destinationUrl;
   let hops = 0;
   try {
     for (; hops < 5; hops++) {
-      const res = await fetch(url, { method: "HEAD", redirect: "manual" });
+      // SSRF guard: every hop is validated (DNS + special-purpose ranges)
+      // before the HEAD request leaves the server.
+      await assertSafeUrl(url, { resolve: deps.resolve });
+      const res = await (deps.fetchImpl ?? fetch)(url, { method: "HEAD", redirect: "manual" });
       const loc = res.headers.get("location");
       if (res.status >= 300 && res.status < 400 && loc) {
         url = new URL(loc, url).toString();

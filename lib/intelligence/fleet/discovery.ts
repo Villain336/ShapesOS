@@ -20,7 +20,7 @@ import type { TxClient } from "@/lib/substrate/graph/rls";
 import type { CompetitorChangeType } from "@prisma/client";
 import type { SitemapDiff, SitemapEntry } from "./types";
 import { fetchSitemapEntries } from "./sitemap";
-import { PoliteFetcher } from "./polite-fetch";
+import { PoliteFetcher, isOnWatchedDomain } from "./polite-fetch";
 
 export interface WatchRow {
   id: string;
@@ -50,6 +50,14 @@ export interface DiscoveryResult {
 
 /** Bound on CompetitorWatch.newUrls (latest added URLs, spec semantics). */
 const NEW_URLS_CAP = 500;
+
+function sameHost(a: string, b: string): boolean {
+  try {
+    return new URL(a).host.toLowerCase() === new URL(b).host.toLowerCase();
+  } catch {
+    return false;
+  }
+}
 
 function defaultSitemapUrl(domain: string): string {
   return `https://${domain.replace(/\/+$/, "")}/sitemap.xml`;
@@ -119,8 +127,16 @@ export async function runDiscoveryForWatch(deps: DiscoveryDeps): Promise<Discove
   let error: string | undefined;
   for (const candidate of candidates) {
     try {
-      entries = await fetchSitemapEntries(candidate, (u) =>
-        fetcher.get(u).then((p) => ({ status: p.status, text: p.text })),
+      entries = await fetchSitemapEntries(
+        candidate,
+        (u) => fetcher.get(u).then((p) => ({ status: p.status, text: p.text })),
+        {
+          // H8: child sitemaps and <loc> URLs must stay on the watched
+          // domain (or the operator-configured sitemap's own host).
+          allowUrl: (u) =>
+            isOnWatchedDomain(u, domain) ||
+            (watch.sitemapUrl ? sameHost(u, watch.sitemapUrl) : false),
+        },
       );
       if (entries.length > 0) {
         usedUrl = candidate;

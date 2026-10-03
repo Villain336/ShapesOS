@@ -3,6 +3,7 @@
 //   → CSV download (url, canonical, title, description, html, noindex,
 //   status, published_url) for WordPress/Webflow/connector import (editor+).
 
+import { csvCell } from "@/lib/csv";
 import { forbidden } from "@/lib/authz";
 import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
@@ -12,10 +13,6 @@ import { tiptapToHtml } from "@/lib/seo/programmatic";
 
 export const dynamic = "force-dynamic";
 
-function csvCell(v: string | null | undefined): string {
-  const s = v ?? "";
-  return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-}
 
 export async function GET(req: NextRequest) {
   const user = await requireUser();

@@ -37,6 +37,8 @@ import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@prisma/client";
 import { withWorkspaceScope } from "@/lib/substrate/memory/rls";
 import { getStorageAdapter } from "@/lib/filesystem/storage";
+import { safeFetch } from "@/lib/connectors/safe-fetch";
+import type { ResolveFn } from "@/lib/safe-url";
 import { queueClipDraftToPostiz } from "@/app/api/clipper/_postiz-choke";
 
 const execFileAsync = promisify(execFile);
@@ -76,8 +78,13 @@ export async function readSourceBytes(source: { fileRef: string | null; sourceUr
 }
 
 /** Bounded direct-URL fetch for url-origin sources. Not a generic browser:
- *  refuses non-http(s), caps bytes, 30s timeout. */
-async function downloadUrlBytes(url: string): Promise<Buffer> {
+ *  refuses non-http(s), caps bytes, 30s timeout, and goes through safeFetch
+ *  (per-request DNS validation, every redirect hop re-checked) so a source
+ *  URL can't reach internal addresses. Exported for tests. */
+export async function downloadUrlBytes(
+  url: string,
+  deps: { fetchImpl?: typeof fetch; resolve?: ResolveFn } = {},
+): Promise<Buffer> {
   let parsed: URL;
   try {
     parsed = new URL(url);
@@ -90,7 +97,11 @@ async function downloadUrlBytes(url: string): Promise<Buffer> {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), 30_000);
   try {
-    const res = await fetch(url, { signal: ctrl.signal, redirect: "follow" });
+    const res = await safeFetch(
+      url,
+      { signal: ctrl.signal },
+      { fetchFn: deps.fetchImpl, resolve: deps.resolve },
+    );
     if (!res.ok) throw new Error(`Source URL returned ${res.status}.`);
     const len = res.headers.get("content-length");
     if (len && Number(len) > CLIPPER_MAX_URL_BYTES) throw new Error("Source file too large.");
