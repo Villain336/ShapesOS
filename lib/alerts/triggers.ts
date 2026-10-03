@@ -125,7 +125,7 @@ export const TRIGGERS: TriggerDef[] = [
   {
     key: "programmatic_publish_failed",
     label: "Programmatic publish failed",
-    description: "A programmatic SEO page failed to push to its publish target (WordPress, Webflow, or a Marketr site).",
+    description: "A programmatic SEO page failed to push to its publish target (WordPress, Webflow, or a ShapesOS site).",
     conditionKeys: ["projectIds"],
     dedupAvailable: true,
     live: true, // milestone 17 push: emitted by the programmatic push service.

@@ -242,7 +242,7 @@ function QueueTab() {
 
       <div className="rounded-lg border border-line bg-canvas px-3 py-2 text-[12px] text-muted">
         Draft-first, always: scanning drafts replies and queues them in the approvals inbox.
-        A human edits and posts natively — Marketr never posts, votes, or messages on your
+        A human edits and posts natively — ShapesOS never posts, votes, or messages on your
         behalf. Drafts failing the taste check never reach the inbox.
       </div>
 
@@ -642,7 +642,7 @@ function SourcesTab() {
           </span>
         </div>
         <div className="mt-2 rounded-lg border border-line bg-canvas px-3 py-2 text-[12px] text-muted">
-          Marketr never scrapes Reddit and never proxies it at platform scale. To enable Reddit
+          ShapesOS never scrapes Reddit and never proxies it at platform scale. To enable Reddit
           opportunities, create a script app at reddit.com/prefs/apps (your own account), then
           supply the client ID, secret, refresh token, and username when running a scan. Read-only
           scope; nothing here posts, votes, or messages — you post natively. Note: Reddit wound

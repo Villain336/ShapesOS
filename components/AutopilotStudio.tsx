@@ -800,7 +800,7 @@ function RuleForm({ projectId, templates, sites, editing, onClose, onSaved }: {
                 <SelectItem value="none">None (queue only)</SelectItem>
                 <SelectItem value="wordpress">WordPress</SelectItem>
                 <SelectItem value="webflow">Webflow</SelectItem>
-                <SelectItem value="marketr-site">Marketr site</SelectItem>
+                <SelectItem value="marketr-site">ShapesOS site</SelectItem>
                 <SelectItem value="csv">CSV export (internal)</SelectItem>
               </SelectContent>
             </Select>

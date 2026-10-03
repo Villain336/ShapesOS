@@ -363,7 +363,7 @@ export class AdomniAdapter extends VendorAdapterBase {
       notes: [
         "Programmatic DOOH CPM $2–$15 (StackAdapt/AdQuick benchmarks). DENOMINATORS DIFFER — impression-multiplier methods vary across vendors; compare with caution.",
         "Adomni: no spend minimums, credit-card signup, self-serve — execute in the client's Adomni account via launch packet.",
-        "Full programmatic execution via a DSP seat (Vistar/Place Exchange supply) is deferred — Marketr prepares PMP-ready plans only.",
+        "Full programmatic execution via a DSP seat (Vistar/Place Exchange supply) is deferred — ShapesOS prepares PMP-ready plans only.",
       ],
     };
   }

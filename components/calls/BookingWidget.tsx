@@ -110,7 +110,7 @@ export function BookingWidget({ token }: { token: string }) {
             </div>
           ) : (
             <>
-              <p className="text-[12px] font-medium text-violet-700">Marketr booking</p>
+              <p className="text-[12px] font-medium text-violet-700">ShapesOS booking</p>
               <h1 className="mt-1 text-[20px] font-semibold tracking-tight text-stone-900">{title}</h1>
               {description && <p className="mt-1 text-[13px] text-stone-500">{description}</p>}
               <p className="mt-1 text-[12.5px] text-stone-400">{durationMin} minutes</p>

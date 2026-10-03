@@ -181,7 +181,7 @@ export function PronunciationApp() {
         <input
           value={newTerm}
           onChange={(e) => setNewTerm(e.target.value)}
-          placeholder="Term (e.g. Marketr)"
+          placeholder="Term (e.g. ShapesOS)"
           className={inputCls}
         />
         <input

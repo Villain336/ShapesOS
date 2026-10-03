@@ -514,7 +514,7 @@ function NewOrderModal({ onClose, onCreated }: { onClose: () => void; onCreated:
             <input className={inputCls} placeholder="e.g. Triad Direct Mail" value={mailhouse} onChange={(e) => setMailhouse(e.target.value)} />
           </Field>
           <Note>
-            There is no USPS EDDM API — your mailhouse executes the drop. Marketr plans it and
+            There is no USPS EDDM API — your mailhouse executes the drop. ShapesOS plans it and
             produces the handoff brief they work from.
           </Note>
           <div className="flex justify-end gap-2">
@@ -839,7 +839,7 @@ function EstimateStep({ order, onSaved, onError }: { order: Order; onSaved: () =
       <Err message={localError} />
       <Note>
         Estimates only — postage is paid at acceptance (EDDM Retail) or via permit imprint (BMEU).
-        No spend is authorized in Marketr.
+        No spend is authorized in ShapesOS.
       </Note>
       <div className="mb-4 grid gap-3 md:grid-cols-2">
         <Field label="Postage entry">

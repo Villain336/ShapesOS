@@ -179,7 +179,7 @@ export function AddSourceDialog({ onClose, onAdded }: { onClose: () => void; onA
         <textarea
           value={text}
           onChange={(e) => setText(e.target.value)}
-          placeholder="Paste the text Marketr should learn from (min 200 characters)…"
+          placeholder="Paste the text ShapesOS should learn from (min 200 characters)…"
           rows={6}
           className={`${inputCls} w-full resize-y py-2.5`}
         />

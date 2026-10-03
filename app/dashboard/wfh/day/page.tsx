@@ -12,7 +12,7 @@ import DayViewPanel from "./_components/DayViewPanel";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "WFH day view — Marketr",
+  title: "WFH day view — ShapesOS",
   description: "Your WFH day at a glance: focus blocks, standup, rituals, digests.",
 };
 

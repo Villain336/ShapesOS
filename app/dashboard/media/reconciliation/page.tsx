@@ -9,7 +9,7 @@ import { getOrCreateWorkspace } from "@/lib/session";
 import { getMediaStore } from "@/lib/media/store";
 import { FakePlatformSpendFeed, reconcileBuy } from "@/lib/media/reconciliation";
 
-export const metadata = { title: "Receipt Reconciliation — Marketr" };
+export const metadata = { title: "Receipt Reconciliation — ShapesOS" };
 export const dynamic = "force-dynamic";
 
 export default async function MediaReconciliationPage({

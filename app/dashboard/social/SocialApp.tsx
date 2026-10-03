@@ -140,7 +140,7 @@ export function SocialApp() {
         <p className="mx-auto mt-1 max-w-md text-[13px] text-stone-500">
           Postiz is a self-hosted publishing sidecar (AGPL-3.0) covering ~30 social channels behind one API.
           Set <span className="font-mono">POSTIZ_URL</span> and <span className="font-mono">POSTIZ_API_KEY</span> in
-          Settings → Providers, then connect your channels inside the Postiz UI — Marketr never sees platform tokens.
+          Settings → Providers, then connect your channels inside the Postiz UI — ShapesOS never sees platform tokens.
         </p>
         <a href="/dashboard/settings/providers" className={`${btnSecondary} mt-3 inline-flex items-center`}>
           <ExternalLink size={14} /> Open Settings → Providers
@@ -274,7 +274,7 @@ export function SocialApp() {
           <div className="border-b border-stone-200 px-3 py-2">
             <span className="text-[13px] font-semibold text-stone-800">Connected channels</span>
             <p className="mt-0.5 text-[12px] text-stone-500">
-              Channels connect inside the Postiz UI (its own OAuth flow). Marketr only reads them back for scheduling.
+              Channels connect inside the Postiz UI (its own OAuth flow). ShapesOS only reads them back for scheduling.
             </p>
           </div>
           {loading ? (

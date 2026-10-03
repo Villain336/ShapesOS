@@ -166,7 +166,7 @@ export default function FilesClient({
         <EmptyState
           icon={<FileText className="size-5" />}
           title="No files yet"
-          description="Upload a brief or reference one from a connected Drive/Notion, then attach it to a Marketr chat."
+          description="Upload a brief or reference one from a connected Drive/Notion, then attach it to a ShapesOS chat."
         />
       ) : (
         <ul className="flex flex-col">

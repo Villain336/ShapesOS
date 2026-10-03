@@ -250,7 +250,7 @@ export default async function DashboardPage() {
             className="aos-press inline-flex h-control items-center gap-2 rounded-full bg-ink px-5.5 text-base font-semibold text-white hover:bg-night-hover"
           >
             <TrendingUp className="size-4" />
-            Ask Marketr
+            Ask ShapesOS
           </Link>
         ) : null}
       </div>

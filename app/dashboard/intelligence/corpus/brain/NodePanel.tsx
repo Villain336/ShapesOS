@@ -89,7 +89,7 @@ export function NodePanel({
       <div className="flex-1 overflow-y-auto p-3">
         <dl className="space-y-2.5">
           {/* 2 · What Marketr learned */}
-          <Section label="What Marketr learned">{node.teaches}</Section>
+          <Section label="What ShapesOS learned">{node.teaches}</Section>
 
           <div className="grid grid-cols-2 gap-2">
             {/* 3 · Chunks */}
@@ -102,7 +102,7 @@ export function NodePanel({
                 ? "Not ingested — cataloged only"
                 : node.mode === "verbatim"
                   ? "Ingested verbatim"
-                  : "Marketr synthesis"}
+                  : "ShapesOS synthesis"}
             </Section>
           </div>
 

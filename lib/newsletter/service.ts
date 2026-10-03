@@ -201,7 +201,7 @@ export async function createList(
   let resendAudienceId: string | null = null;
   if (port) {
     try {
-      resendAudienceId = (await port.createSegment(`Marketr · ${clean}`)).id;
+      resendAudienceId = (await port.createSegment(`ShapesOS · ${clean}`)).id;
     } catch {
       // Segment creation is best-effort here; import/send will retry.
       resendAudienceId = null;
@@ -269,7 +269,7 @@ export async function importSubscribers(
 
   let segmentId = list.resendAudienceId;
   if (port && !segmentId && valid.length) {
-    segmentId = (await port.createSegment(`Marketr · ${list.name}`)).id;
+    segmentId = (await port.createSegment(`ShapesOS · ${list.name}`)).id;
     await db.newsletterList.update({ where: { id: listId }, data: { resendAudienceId: segmentId } });
   }
 

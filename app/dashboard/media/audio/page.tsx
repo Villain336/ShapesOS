@@ -10,7 +10,7 @@ import { AudioApp } from "./AudioApp";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Streaming Audio — Marketr",
+  title: "Streaming Audio — ShapesOS",
   description: "Plan streaming-audio buys: Spotify Ads Manager, Acast, AudioGo. Generated briefs.",
 };
 
@@ -23,7 +23,7 @@ export default async function AudioPage() {
       <div>
         <h1 className="aos-heading text-ink">Streaming Audio</h1>
         <p className="mt-0.5 text-[13px] text-muted">
-          The executable leg — plan in Marketr, launch in the client&apos;s own account. Spotify Ads
+          The executable leg — plan in ShapesOS, launch in the client&apos;s own account. Spotify Ads
           Manager (min €15/day, €250 lifetime) · Acast ($250 min) · AudioGo ($250 min). Fake/test
           mode by default; no real spend without an explicit per-buy approval.
         </p>

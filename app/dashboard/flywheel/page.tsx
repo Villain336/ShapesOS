@@ -19,7 +19,7 @@ const chipNeeds =
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Flywheel — Marketr",
+  title: "Flywheel — ShapesOS",
   description: "Phase 7 flywheel command center: reallocation, creative recycling, Test Lab, CTV, DSP readiness, launch readiness.",
 };
 

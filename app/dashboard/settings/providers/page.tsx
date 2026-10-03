@@ -70,7 +70,7 @@ export default async function ProvidersSettingsPage() {
       <div>
         <h1 className="aos-heading">Providers</h1>
         <p className="mt-0.5 text-[13px] text-muted">
-          {workspace.name} — which external providers Marketr is using. These
+          {workspace.name} — which external providers ShapesOS is using. These
           are configured via environment variables on the host; change them
           there and restart to apply. Key material is never displayed here.
         </p>
@@ -282,7 +282,7 @@ export default async function ProvidersSettingsPage() {
         </dl>
         <p className="mt-3 text-xs text-subtle">
           Placed Pixabay assets are downloaded server-side and served from
-          Marketr’s own storage (cached 24h per the Pixabay API terms) — no
+          ShapesOS’s own storage (cached 24h per the Pixabay API terms) — no
           permanent Pixabay hotlinking. Pixabay does not guarantee model or
           property releases exist for people/logos/trademarks in images.
         </p>
@@ -372,7 +372,7 @@ export default async function ProvidersSettingsPage() {
         </dl>
         <p className="mt-3 text-xs text-subtle">
           Listmonk is a self-hosted AGPL-3.0 email engine sidecar (separate
-          process, own Postgres — see docker/integrations/listmonk.yml). Marketr
+          process, own Postgres — see docker/integrations/listmonk.yml). ShapesOS
           talks to it over its REST API only, with Basic auth (user + token).
         </p>
         {!listmonk.configured && (
@@ -414,7 +414,7 @@ export default async function ProvidersSettingsPage() {
         <p className="mt-3 text-xs text-subtle">
           Postiz is a self-hosted AGPL-3.0 social-publishing sidecar (~30
           channels behind one OAuth surface — see
-          docker/integrations/postiz.yml). Marketr uses its public REST API
+          docker/integrations/postiz.yml). ShapesOS uses its public REST API
           over raw fetch only — never the AGPL <span className="font-mono">@postiz/node</span> SDK.
           Channel OAuth tokens stay inside Postiz.
         </p>
@@ -624,7 +624,7 @@ export default async function ProvidersSettingsPage() {
             <dd>
               {growthbook.sdkConfigured
                 ? "Yes — flags resolve from the sidecar"
-                : "No — Marketr's built-in flag defaults apply"}
+                : "No — ShapesOS's built-in flag defaults apply"}
             </dd>
           </div>
           <div className="md:col-span-2">

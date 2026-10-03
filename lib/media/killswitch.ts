@@ -260,7 +260,7 @@ export function provisionNativeRulesStub(opts: {
     return [
       {
         platform: "meta",
-        description: "Meta automated rule (adrules_library): pause ad set when CPA > 1.5× target and spend > $100 — seatbelt backup for the Marketr sweeper stop-loss.",
+        description: "Meta automated rule (adrules_library): pause ad set when CPA > 1.5× target and spend > $100 — seatbelt backup for the ShapesOS sweeper stop-loss.",
         payload: {
           evaluation: "adrules_library",
           name: `[marketr] stop-loss ${opts.campaignName}`,
@@ -282,7 +282,7 @@ export function provisionNativeRulesStub(opts: {
     return [
       {
         platform: "google",
-        description: "Google Ads automated rule / script: pause campaign on stop-loss; daily budget cap. NOTE: Google has no true account-level monthly cap — the virtual-card limit + Marketr sweeper are the ceiling.",
+        description: "Google Ads automated rule / script: pause campaign on stop-loss; daily budget cap. NOTE: Google has no true account-level monthly cap — the virtual-card limit + ShapesOS sweeper are the ceiling.",
         payload: {
           script: "// [marketr] stop-loss: pause campaign if cost > 1.5× target CPA with spend > $100\n// Deploy as an hourly Google Ads script on the client's account.",
           campaign_name: opts.campaignName,

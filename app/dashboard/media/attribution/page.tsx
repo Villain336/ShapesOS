@@ -21,7 +21,7 @@ import {
 import { FakePlatformSpendFeed, reconcileBuy } from "@/lib/media/reconciliation";
 import { buildReportCard, ATTRIBUTION_CAVEATS } from "@/lib/media/report";
 
-export const metadata = { title: "Offline Attribution — Marketr" };
+export const metadata = { title: "Offline Attribution — ShapesOS" };
 export const dynamic = "force-dynamic";
 
 type Params = {

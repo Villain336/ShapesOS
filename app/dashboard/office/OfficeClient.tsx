@@ -234,7 +234,7 @@ export function OfficeClient({ initialDocs, openId }: { initialDocs: DocSummary[
     <div className="flex flex-col gap-3">
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted">
-          {docs.length} doc{docs.length === 1 ? "" : "s"} — snapshots stored by Marketr, never in a third-party cloud.
+          {docs.length} doc{docs.length === 1 ? "" : "s"} — snapshots stored by ShapesOS, never in a third-party cloud.
         </p>
         <div className="flex items-center gap-2">
           {(["sheet", "doc"] as const).map((kind) => (

@@ -150,7 +150,7 @@ export class GitHubSiteFileProvider implements GitHubConnector {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        message: `Marketr: update ${p}`,
+        message: `ShapesOS: update ${p}`,
         content: Buffer.from(content, "utf8").toString("base64"),
         branch: this.branch,
         ...(sha ? { sha } : {}),
@@ -203,7 +203,7 @@ export class GitHubSiteFileProvider implements GitHubConnector {
       body: JSON.stringify({
         name: clean,
         private: opts?.private ?? true,
-        description: opts?.description ?? "Site managed by Marketr",
+        description: opts?.description ?? "Site managed by ShapesOS",
         auto_init: true,
       }),
     });

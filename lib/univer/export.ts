@@ -180,7 +180,7 @@ interface PdfOpts {
 /** Minimal multi-object PDF builder (catalog/pages/font/contents + xref). */
 export function exportDocPdf(snapshot: IDocumentData, opts: PdfOpts = {}): Uint8Array {
   const brand = opts.brandColor ?? [0.486, 0.227, 0.929]; // #7c3aed
-  const brandName = opts.brandName ?? "Marketr";
+  const brandName = opts.brandName ?? "ShapesOS";
   const title = opts.title ?? "Document";
 
   const lines = paragraphsToLines(docSnapshotToParagraphs(snapshot));

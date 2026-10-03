@@ -441,7 +441,7 @@ export default function ConnectorsManager({
         <h2 className="font-medium text-ink">Custom MCP servers</h2>
         <p className="mt-1 text-sm text-muted">
           Attach a generic MCP server (Streamable HTTP; stdio is allowed on
-          self-hosted installs only). Marketr handshakes and lists its tools.
+          self-hosted installs only). ShapesOS handshakes and lists its tools.
         </p>
         <div className="mt-3 grid gap-2 md:grid-cols-4">
           <label className={labelCls}>

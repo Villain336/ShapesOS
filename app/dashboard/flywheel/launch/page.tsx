@@ -28,7 +28,7 @@ import { CompleteButton, ReopenButton } from "./_components/launch-actions";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Launch readiness — Marketr",
+  title: "Launch readiness — ShapesOS",
   description: "Public-launch readiness checklist: security, legal, community, build. Readiness only — no public flip.",
 };
 

@@ -11,8 +11,8 @@ import { CanvasEditor } from "../editor/CanvasEditor";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Canvas editor — Marketr",
-  description: "Design editor for Marketr Studio designs.",
+  title: "Canvas editor — ShapesOS",
+  description: "Design editor for ShapesOS Studio designs.",
 };
 
 export default async function DesignEditorPage({

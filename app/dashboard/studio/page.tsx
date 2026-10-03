@@ -12,8 +12,8 @@ import { StudioHero } from "@/components/studio/StudioHero";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Creative Studio — Marketr",
-  description: "The central home for all creative and design work across Marketr: mail/print creatives and the asset library.",
+  title: "Creative Studio — ShapesOS",
+  description: "The central home for all creative and design work across ShapesOS: mail/print creatives and the asset library.",
 };
 
 export default async function StudioPage() {

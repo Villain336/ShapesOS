@@ -20,7 +20,7 @@ const EPISODE_TYPES = ["run", "session", "sync", "agent_call"] as const;
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Episodes — Growth Memory — Marketr",
+  title: "Episodes — Growth Memory — ShapesOS",
   description: "The immutable event history everything was distilled from.",
 };
 

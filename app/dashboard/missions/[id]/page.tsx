@@ -7,7 +7,7 @@ import { MissionDetail } from "./MissionDetail";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Mission — Marketr",
+  title: "Mission — ShapesOS",
   description: "Mission detail: goal, event timeline, approval queue, and plan.",
 };
 

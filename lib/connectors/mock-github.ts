@@ -64,7 +64,7 @@ function demoRepo(): Map<string, string> {
   );
   files.set(
     "/README.md",
-    ["# acme-plumbing-site (MOCK)", "", "Demo repo served by Marketr's mock GitHub connector.", ""].join("\n"),
+    ["# acme-plumbing-site (MOCK)", "", "Demo repo served by ShapesOS's mock GitHub connector.", ""].join("\n"),
   );
   return files;
 }

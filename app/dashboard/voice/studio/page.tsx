@@ -7,7 +7,7 @@ import { VoiceoverStudio } from "./VoiceoverStudio";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Voiceover Studio — Marketr",
+  title: "Voiceover Studio — ShapesOS",
   description:
     "TTS narration tracks for clips and video: paste a script, pick a VoiceStudio voice, render, attach to a clip.",
 };

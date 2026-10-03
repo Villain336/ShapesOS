@@ -40,7 +40,7 @@ export const PUBLISHER_RULES: PublisherRule[] = [
     buyPath: "concierge",
     overrides: {
       maxFileSizeGb: 10,
-      notes: "Roku Ads Manager is the self-serve concierge path; Roku historically normalizes to −24 LUFS house-side — Marketr still validates at −23 LUFS and flags the delta",
+      notes: "Roku Ads Manager is the self-serve concierge path; Roku historically normalizes to −24 LUFS house-side — ShapesOS still validates at −23 LUFS and flags the delta",
     },
     verifiedAt: "2026-09-25",
     provenance: "publicly documented; loudness normalization behavior observed in market practice — confirm at IO time",

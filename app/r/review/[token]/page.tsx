@@ -10,7 +10,7 @@ import { checkReviewPageRateLimit } from "@/lib/reviews/rate-limit";
 import { ReviewLandingClient } from "./ReviewLandingClient";
 import { clientIpFromHeaders } from "@/lib/api/client-ip";
 
-export const metadata = { title: "Leave a review — Marketr" };
+export const metadata = { title: "Leave a review — ShapesOS" };
 
 export default async function ReviewLandingPage({
   params,

@@ -22,7 +22,7 @@ export default async function SkillsSettingsPage() {
       <div>
         <h1 className="aos-heading">Skills</h1>
         <p className="mt-0.5 text-[13px] text-muted">
-          {workspace.name} — install skills that teach Marketr how your team
+          {workspace.name} — install skills that teach ShapesOS how your team
           does marketing. Enable them per project in project settings.
         </p>
       </div>

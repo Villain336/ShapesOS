@@ -27,7 +27,7 @@ import {
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Learnings — Growth Memory — Marketr",
+  title: "Learnings — Growth Memory — ShapesOS",
   description: "What worked, what failed, what was inconclusive — with provenance.",
 };
 

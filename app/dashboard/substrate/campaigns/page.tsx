@@ -19,7 +19,7 @@ import {
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Campaigns — Marketr",
+  title: "Campaigns — ShapesOS",
   description: "The cross-channel campaign object: one ID across mail, email, social, ads, CTV, and tests.",
 };
 

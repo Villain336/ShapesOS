@@ -1299,7 +1299,7 @@ function EnvelopesTab() {
       </div>
 
       <div className="rounded-md border border-line bg-canvas px-3 py-2.5 text-xs text-muted">
-        Signing itself happens with the connected vendor (Documenso). Marketr prepares the
+        Signing itself happens with the connected vendor (Documenso). ShapesOS prepares the
         envelope, gates the send on your explicit review, and mirrors the sealed document
         plus a tamper-evident audit trail — it never invents a signature.
       </div>

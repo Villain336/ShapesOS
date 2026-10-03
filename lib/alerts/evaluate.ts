@@ -141,7 +141,7 @@ async function evaluateRule(rule: AlertRule, input: TriggerInput): Promise<EmitO
 
   const links = [...(input.links ?? [])];
   const link = input.link ? absoluteLink(input.link) : undefined;
-  if (link && !links.some((l) => l.url === link)) links.unshift({ label: "Open in Marketr", url: link });
+  if (link && !links.some((l) => l.url === link)) links.unshift({ label: "Open in ShapesOS", url: link });
 
   const qh = (rule.quietHours as { start?: string; end?: string } | null) ?? null;
   const inQuiet = qh?.start && qh?.end ? inQuietHours(qh, now) : false;

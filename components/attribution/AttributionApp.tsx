@@ -364,7 +364,7 @@ export function AttributionApp() {
                 <LinkIcon size={16} className="text-ink" /> Revenue-influenced content
               </h2>
               {content.length === 0 ? (
-                <EmptyState icon={LinkIcon} title="No content touches yet" hint="Pass a contentId (a Marketr page) with a touch to see which pages influence revenue." />
+                <EmptyState icon={LinkIcon} title="No content touches yet" hint="Pass a contentId (a ShapesOS page) with a touch to see which pages influence revenue." />
               ) : (
                 <div className="flex flex-col divide-y divide-line">
                   {content.slice(0, 20).map((c) => (

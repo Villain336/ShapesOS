@@ -727,7 +727,7 @@ export function ActionsClient({
             </tbody>
           </table>
           <div className="border-t border-line bg-paper px-3 py-2 text-[12px] text-muted">
-            OAuth runs on Composio&apos;s hosted flow — Marketr stores only the connection
+            OAuth runs on Composio&apos;s hosted flow — ShapesOS stores only the connection
             reference, never your app tokens.
           </div>
         </div>

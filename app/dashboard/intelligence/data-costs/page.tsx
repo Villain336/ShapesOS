@@ -15,7 +15,7 @@ import { DataCostsClient } from "./DataCostsClient";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Data costs — Marketr",
+  title: "Data costs — ShapesOS",
   description: "API spend, volume-cache hit rate, and SERP vendor routing — the Phase 10 margin dashboard.",
 };
 

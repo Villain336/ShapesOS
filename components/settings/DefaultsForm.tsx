@@ -164,7 +164,7 @@ export default function DefaultsForm({ workspaceId }: { workspaceId: string }) {
               className={`${inputCls} mt-1 w-full font-mono text-xs`}
             />
             <span className="mt-1 block text-xs text-subtle">
-              Which tool namespaces the Marketr agent may use. Leave empty to
+              Which tool namespaces the ShapesOS agent may use. Leave empty to
               allow all.
             </span>
           </label>

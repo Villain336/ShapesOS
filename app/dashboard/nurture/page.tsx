@@ -8,7 +8,7 @@ import { parseNurtureTab } from "./tabs";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Nurture Sequences — Marketr",
+  title: "Nurture Sequences — ShapesOS",
   description: "Approval-gated nurture sequences: builder, enrollments, approval queue, message log, consent.",
 };
 

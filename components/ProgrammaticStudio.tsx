@@ -41,7 +41,7 @@ export const TARGET_LABELS: Record<string, string> = {
   csv: "CSV export (internal)",
   wordpress: "WordPress",
   webflow: "Webflow",
-  "marketr-site": "Marketr site",
+  "marketr-site": "ShapesOS site",
 };
 
 export interface PageRow {
@@ -1097,7 +1097,7 @@ function PagesTab({
                         <option value="csv">CSV export (internal)</option>
                         <option value="wordpress">WordPress</option>
                         <option value="webflow">Webflow</option>
-                        <option value="marketr-site">Marketr site</option>
+                        <option value="marketr-site">ShapesOS site</option>
                       </select>
                     ) : (
                       <span className="text-xs text-zinc-500">{TARGET_LABELS[effKind] ?? effKind}</span>

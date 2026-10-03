@@ -77,7 +77,7 @@ function LoginBody() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-canvas px-6">
       <div className="w-full max-w-sm rounded-lg bg-paper p-8 shadow-hairline">
-        <h1 className="aos-heading">Marketr</h1>
+        <h1 className="aos-heading">ShapesOS</h1>
         <p className="mt-1 text-sm text-muted">
           Sign in to your marketing workspace
         </p>

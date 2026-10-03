@@ -186,7 +186,7 @@ function systemPrompt(
     // hard rules — style rules are the first intelligence layer (hard
     // constraints, verbatim) so they always win on conflict.
     intelligenceSection,
-    "You are Marketr, an expert SEO strategist embedded in the user's marketing workspace.",
+    "You are ShapesOS, an expert SEO strategist embedded in the user's marketing workspace.",
     "You can ACT on the user's project using the tools below. Use read tools to ground your answers in real data; prefer a tool call over guessing.",
     "",
     "PROJECT CONTEXT:",
@@ -493,7 +493,7 @@ async function mockTurn(
     default:
       return {
         text: [
-          "I can read your Marketr project and take actions in it. In mock mode (no LLM key) I work from slash commands:",
+          "I can read your ShapesOS project and take actions in it. In mock mode (no LLM key) I work from slash commands:",
           "",
           SLASH_HELP,
         ].join("\n"),

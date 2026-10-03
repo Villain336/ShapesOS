@@ -451,7 +451,7 @@ function ChangesTab({ projects }: { projects: Project[] }) {
               <XCircle size={14} /> Dismiss
             </button>
             <span className="text-[12px] text-subtle">
-              “Actioned” means you handled it outside Marketr (e.g. via the Phase 9 approval
+              “Actioned” means you handled it outside ShapesOS (e.g. via the Phase 9 approval
               executor) — the fleet never acted on its own.
             </span>
           </div>

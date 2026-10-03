@@ -54,7 +54,7 @@ export const FIX_HINTS: Record<HealthErrorCode, string> = {
   auth_rejected:
     "The provider rejected the stored credentials. Reconnect the integration — you may need to re-authorize it.",
   provider_unreachable:
-    "Marketr could not reach the provider during the check. Check your network and retry — nothing to fix in Marketr.",
+    "ShapesOS could not reach the provider during the check. Check your network and retry — nothing to fix in ShapesOS.",
   config_missing:
     "No credential is stored for this connection. Reconnect the integration to add one.",
   revoked:

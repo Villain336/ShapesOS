@@ -25,7 +25,7 @@ function poolStatusTone(status: string): string {
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Media — Marketr",
+  title: "Media — ShapesOS",
   description: "Media buying command center: budget pools, approvals, kill switches.",
 };
 
@@ -101,7 +101,7 @@ export default async function MediaPage() {
           </div>
           {pools.length === 0 ? (
             <p className="text-sm text-muted">
-              No pools yet. A pool is a cap with a ledger — Marketr never holds client money.
+              No pools yet. A pool is a cap with a ledger — ShapesOS never holds client money.
             </p>
           ) : (
             <div className="overflow-x-auto">

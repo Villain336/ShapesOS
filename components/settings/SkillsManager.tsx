@@ -453,7 +453,7 @@ export default function SkillsManager({ workspaceId }: { workspaceId: string }) 
         <div className={cardCls}>
           <h3 className="font-medium text-ink">Install from a GitHub URL</h3>
           <p className="mt-1 text-sm text-muted">
-            Marketr fetches the repo&apos;s SKILL.md and pins the install to the
+            ShapesOS fetches the repo&apos;s SKILL.md and pins the install to the
             current commit SHA. URL skills are flagged as untrusted until reviewed —
             they never auto-update.
           </p>

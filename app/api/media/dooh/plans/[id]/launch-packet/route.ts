@@ -146,7 +146,7 @@ export async function POST(
       tracking,
       generatedBy: gate.userId,
       origin: new URL(req.url).origin,
-      workspaceName: workspace?.name ?? "Marketr",
+      workspaceName: workspace?.name ?? "ShapesOS",
       version,
     });
   } catch (e) {

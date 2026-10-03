@@ -334,7 +334,7 @@ export class StripeBillingSink implements BillingSink {
           price_data: {
             currency: "usd",
             unit_amount: pack.priceCents,
-            product_data: { name: `Marketr credit top-up — ${pack.credits.toLocaleString()} credits` },
+            product_data: { name: `ShapesOS credit top-up — ${pack.credits.toLocaleString()} credits` },
           },
           quantity: 1,
         },
@@ -627,7 +627,7 @@ export class StripeBillingSink implements BillingSink {
     if (!customerId) {
       const customer = await this.client().customers.create({
         metadata: { workspaceId },
-        description: `Marketr workspace ${workspaceId}`,
+        description: `ShapesOS workspace ${workspaceId}`,
       });
       customerId = customer.id;
       await prisma.billingWorkspace.update({
@@ -959,7 +959,7 @@ export class StripeBillingSink implements BillingSink {
       // Card gate above guarantees a bound customer — never create one here.
       const customerId = bw.stripeCustomerId as string;
       const description =
-        `Marketr overage — ${credits.toLocaleString()} credits @ $0.012/credit ` +
+        `ShapesOS overage — ${credits.toLocaleString()} credits @ $0.012/credit ` +
         `(usage past cap, through ${label})`;
       await this.client().invoiceItems.create(
         { customer: customerId, amount: amountCents, currency: "usd", description },

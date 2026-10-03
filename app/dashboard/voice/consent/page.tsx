@@ -6,7 +6,7 @@ import { ConsentApp } from "./ConsentApp";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Consent — Marketr",
+  title: "Consent — ShapesOS",
   description: "Per-lead, per-channel consent for voice outreach.",
 };
 

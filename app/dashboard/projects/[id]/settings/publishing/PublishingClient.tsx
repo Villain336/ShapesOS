@@ -12,22 +12,22 @@ const CONTROLS = [
   {
     key: "allowWordpressPublish",
     label: "WordPress publish",
-    description: "Marketr may publish posts and pages to the connected WordPress site.",
+    description: "ShapesOS may publish posts and pages to the connected WordPress site.",
   },
   {
     key: "allowWebflowPublish",
     label: "Webflow publish",
-    description: "Marketr may publish to the connected Webflow site.",
+    description: "ShapesOS may publish to the connected Webflow site.",
   },
   {
     key: "allowHostingDeploy",
     label: "Hosting deploy",
-    description: "Marketr may deploy sites and landing pages it builds.",
+    description: "ShapesOS may deploy sites and landing pages it builds.",
   },
   {
     key: "allowNewsletterSend",
     label: "Newsletter send",
-    description: "Marketr may send newsletter broadcasts to subscribers.",
+    description: "ShapesOS may send newsletter broadcasts to subscribers.",
   },
 ] as const;
 

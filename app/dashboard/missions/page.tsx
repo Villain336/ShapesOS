@@ -9,7 +9,7 @@ import { MissionsApp } from "./MissionsApp";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Growth Missions — Marketr",
+  title: "Growth Missions — ShapesOS",
   description: "Durable, goal-shaped growth work: mission templates per business type, structured timelines, approval-gated execution.",
 };
 

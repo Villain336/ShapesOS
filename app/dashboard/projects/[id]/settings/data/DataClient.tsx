@@ -158,7 +158,7 @@ export default function DataClient({
         <EmptyState
           icon={<Link className="size-5" />}
           title="No data sources bound"
-          description="Bind a workspace connection below to give this project — and Marketr — access to it."
+          description="Bind a workspace connection below to give this project — and ShapesOS — access to it."
         />
       ) : (
         <ul className="flex flex-col">

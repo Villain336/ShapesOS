@@ -6,7 +6,7 @@ import { MailApp } from "./MailApp";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Direct Mail — Marketr",
+  title: "Direct Mail — ShapesOS",
   description: "Direct mail campaigns and nurture mail pieces: builder, approvals, verification, tracking.",
 };
 

@@ -112,7 +112,7 @@ export function assetCounts(): Record<CorpusAsset, number> {
   return { main: loadChunks("main").length, "by-sa": loadChunks("by-sa").length };
 }
 
-const MAIN_LICENSE_NOTE = `Marketr expert-corpus — main asset
+const MAIN_LICENSE_NOTE = `ShapesOS expert-corpus — main asset
 ========================================
 This data asset contains marketing-expertise text chunks ingested under the
 clean-sourcing tiers of SPEC-PHASE10.md §M9:
@@ -130,10 +130,10 @@ retrieved_date} provenance. This note is the asset-level summary; chunk
 provenance is authoritative.
 `;
 
-const BY_SA_LICENSE_NOTE = `Marketr expert-corpus — BY-SA segregated asset
+const BY_SA_LICENSE_NOTE = `ShapesOS expert-corpus — BY-SA segregated asset
 ================================================
 This data asset is SEPARATELY LICENSED from the main corpus asset and from
-the Marketr (AGPL) codebase.
+the ShapesOS (AGPL) codebase.
 
 Contents: Wikipedia article text (marketing clusters), © Wikimedia
 contributors, licensed under Creative Commons Attribution-ShareAlike 4.0

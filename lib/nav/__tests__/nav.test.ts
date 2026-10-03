@@ -17,21 +17,14 @@ import { capIdleSection, rankCommands, type CommandItem } from "../../../compone
 
 const ROOT = path.resolve(__dirname, "../../..");
 
-/** Pages another Phase 3 workstream is building; linked ahead of time. */
-const PAGES_IN_FLIGHT = new Set(["/dashboard/runs"]);
-
 function pageFileFor(href: string): string {
   return path.join(ROOT, "app", ...href.split("/").filter(Boolean), "page.tsx");
 }
 
 describe("nav config", () => {
-  it("every nav item resolves to a real app/ page", (t) => {
+  it("every nav item resolves to a real app/ page", () => {
     for (const item of allNavItems()) {
       const file = pageFileFor(item.href);
-      if (PAGES_IN_FLIGHT.has(item.href) && !existsSync(file)) {
-        t.diagnostic(`${item.href}: page not built yet (in-flight workstream)`);
-        continue;
-      }
       assert.ok(existsSync(file), `${item.label} → ${item.href} has no ${path.relative(ROOT, file)}`);
     }
   });

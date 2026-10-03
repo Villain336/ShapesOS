@@ -7,7 +7,7 @@ import { SocialApp } from "./SocialApp";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Social — Marketr",
+  title: "Social — ShapesOS",
   description: "Social publishing: compose, schedule, and publish posts across channels via the Postiz sidecar.",
 };
 

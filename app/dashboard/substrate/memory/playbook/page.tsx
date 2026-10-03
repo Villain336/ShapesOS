@@ -20,7 +20,7 @@ const chipDone =
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Playbook — Growth Memory — Marketr",
+  title: "Playbook — Growth Memory — ShapesOS",
   description: "Anonymized, human-reviewed cross-client patterns. Nothing publishes without review.",
 };
 

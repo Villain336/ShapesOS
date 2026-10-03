@@ -13,7 +13,7 @@ const chip =
   "inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-1.5 py-0.5 text-[10px] font-medium leading-tight bg-canvas text-muted border-line";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Pool — Media — Marketr" };
+export const metadata = { title: "Pool — Media — ShapesOS" };
 
 function money(cents: number, currency = "USD") {
   return new Intl.NumberFormat("en-US", { style: "currency", currency }).format(cents / 100);
@@ -76,7 +76,7 @@ export default async function PoolPage({ params }: { params: Promise<{ id: strin
             <div className="flex justify-between"><dt className="text-muted">Limit</dt><dd className="text-ink">= pool cap ({money(pool.capCents, pool.currency)})</dd></div>
           </dl>
           <p className="mt-2 text-xs text-muted">
-            Issued on the client&apos;s own account. Card declines survive Marketr software bugs —
+            Issued on the client&apos;s own account. Card declines survive ShapesOS software bugs —
             the layer that kills the €7,937/day class. Only the ref is stored; never a PAN.
           </p>
         </section>

@@ -9,7 +9,7 @@ import { InsuranceApp } from "./InsuranceApp";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Insurance — Marketr",
+  title: "Insurance — ShapesOS",
   description: "Policy inventory, renewal alerts, and declarations-page ingestion — governed, coverage-truth only.",
 };
 

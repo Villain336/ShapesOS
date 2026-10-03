@@ -75,7 +75,7 @@ export default function AiChatPanel({ workspaceId }: { workspaceId: string }) {
                       <TrendingUp className="size-6" />
                     </span>
                     <h2 className="mt-4 text-[24px] font-bold tracking-tight text-stone-900">
-                      Ask Marketr to do the work
+                      Ask ShapesOS to do the work
                     </h2>
                     <p className="mt-2 max-w-[52ch] text-[13.5px] leading-relaxed text-ink-2">
                       Rank lookups, keyword research, content drafts, audits, reports, autopilot
@@ -193,13 +193,13 @@ export default function AiChatPanel({ workspaceId }: { workspaceId: string }) {
                   <AttachmentMenu />
                   <PromptBar
                     demo={false}
-                    placeholder="Ask Marketr…  (try /keywords /rankings /alerts /competitors /draft <topic> /help)"
+                    placeholder="Ask ShapesOS…  (try /keywords /rankings /alerts /competitors /draft <topic> /help)"
                     onSend={(text) => void sendMessage(text)}
                   />
                 </div>
               ) : (
                 <div className="rounded-[14px] bg-surface px-4 py-3 text-center text-[13px] text-ink-2 shadow-float-md ring-1 ring-line">
-                  You need the editor role to chat with Marketr.
+                  You need the editor role to chat with ShapesOS.
                 </div>
               )}
               {mockMode && canEdit && (

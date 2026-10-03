@@ -253,7 +253,7 @@ export default function BillingSection({ workspaceId }: { workspaceId: string })
       ) : !data.configured ? (
         <p className="mt-4 rounded-md border border-line bg-canvas px-3 py-2 text-sm text-muted">
           Top-up purchases aren&rsquo;t enabled on this deployment yet — usage is still metered locally
-          against your included credits. Contact your Marketr host to enable billing.
+          against your included credits. Contact your ShapesOS host to enable billing.
         </p>
       ) : (
         <div className="mt-4 flex flex-col gap-6">
@@ -279,7 +279,7 @@ export default function BillingSection({ workspaceId }: { workspaceId: string })
               ))}
             </div>
             <p className="mt-2 text-xs text-muted">
-              Secure checkout by Stripe. Card details never touch Marketr.
+              Secure checkout by Stripe. Card details never touch ShapesOS.
             </p>
           </div>
 

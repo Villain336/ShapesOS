@@ -696,7 +696,7 @@ export async function publishAutopilotItem(
       const first = await db.site.findFirst({ where: { projectId: args.projectId }, orderBy: { createdAt: "asc" }, select: { id: true } });
       site = first ? await ownedSite(args.userId, args.projectId, first.id) : null;
     }
-    if (!site) throw new Error("No site available — connect a Marketr site to publish autopilot refreshes");
+    if (!site) throw new Error("No site available — connect a ShapesOS site to publish autopilot refreshes");
     const url = item.kind === "decay_refresh"
       ? ((await db.contentDecayFinding.findFirst({ where: { id: item.sourceRef }, select: { url: true } }))?.url ?? "/")
       : `/${item.sourceRef}`;

@@ -10,7 +10,7 @@ import { GrapesEditor } from "../GrapesEditor";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Page builder — Marketr",
+  title: "Page builder — ShapesOS",
   description: "GrapesJS page builder for responsive landing pages and email templates.",
 };
 

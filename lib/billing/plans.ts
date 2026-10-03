@@ -74,7 +74,7 @@ export const PLANS: BillingPlan[] = [
   {
     id: "agency",
     name: "Agency",
-    tagline: "For agencies running Marketr for clients.",
+    tagline: "For agencies running ShapesOS for clients.",
     priceCents: 19900,
     stripePriceEnv: "STRIPE_PRICE_AGENCY",
     features: [

@@ -28,7 +28,7 @@ export default async function MediaSettingsPage() {
     ["Backup approvers", "Workspace owners/admins (excluding the creator) — no approval dead-ends"],
     ["Virtual-card provider mode", `${cardMode} — fake default; Brex/Ramp adapters are test-mode-first. Live requires explicit keys AND a human-approved per-buy approval`],
     ["Autopilot purchasing", "STRUCTURALLY DISABLED — the executor requires a human-approved approval; no rung, flag, or exception reaches autopilot"],
-    ["Zero custody", "Marketr never holds/fronts/co-mingles client money — pools are accounting objects only; spend flows from the client's own accounts/cards"],
+    ["Zero custody", "ShapesOS never holds/fronts/co-mingles client money — pools are accounting objects only; spend flows from the client's own accounts/cards"],
     ["The €7,937/day class", "Killed three ways: hard caps at ≥2 independent layers (software encumbrance + virtual-card limit + platform spending limits), budget increases always need fresh approval, sweeper spend-anomaly rule fires before noon-budget-exhaustion becomes a four-day fire"],
   ];
 

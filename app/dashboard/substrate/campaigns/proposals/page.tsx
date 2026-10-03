@@ -16,7 +16,7 @@ import { ProposalActions, RunScanButton } from "../client-actions";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Link proposals — Marketr",
+  title: "Link proposals — ShapesOS",
   description: "Human review queue for backfill link proposals. Zero auto-links — precision over recall.",
 };
 

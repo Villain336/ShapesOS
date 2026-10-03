@@ -369,12 +369,12 @@ export function AppSidebar({
     >
       <div className={cn("flex flex-col gap-3 pt-4", collapsed ? "items-center px-2" : "px-3")}>
         <div className={cn("flex items-center gap-2", collapsed ? "flex-col" : "justify-between")}>
-          <Link href="/dashboard" className="flex items-center gap-2 rounded-sm px-1" aria-label="Marketr home">
+          <Link href="/dashboard" className="flex items-center gap-2 rounded-sm px-1" aria-label="ShapesOS home">
             <span className="flex size-7 items-center justify-center rounded-sm bg-night-raised text-night">
               <TrendingUp className="size-4" />
             </span>
             {collapsed ? null : (
-              <span className="text-[16px] font-semibold tracking-tight text-night">Marketr</span>
+              <span className="text-[16px] font-semibold tracking-tight text-night">ShapesOS</span>
             )}
           </Link>
           <button
@@ -427,11 +427,11 @@ export function MobileNav({
   const pathname = usePathname();
   return (
     <header className="sticky top-0 z-40 flex items-center justify-between border-b border-line bg-paper px-4 py-2.5 md:hidden">
-      <Link href="/dashboard" className="flex items-center gap-2" aria-label="Marketr home">
+      <Link href="/dashboard" className="flex items-center gap-2" aria-label="ShapesOS home">
         <span className="flex size-7 items-center justify-center rounded-sm bg-ink text-paper">
           <TrendingUp className="size-4" />
         </span>
-        <span className="text-[16px] font-semibold tracking-tight text-ink">Marketr</span>
+        <span className="text-[16px] font-semibold tracking-tight text-ink">ShapesOS</span>
       </Link>
       <div className="flex items-center gap-1.5">
         <DropdownMenu>

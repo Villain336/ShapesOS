@@ -175,9 +175,9 @@ export function MarkSentButton({ draftId, journalist, outlet }: { draftId: strin
       <button
         className={btnS}
         disabled={busy}
-        title="Record that YOU sent this pitch from your own email client. Marketr never sends."
+        title="Record that YOU sent this pitch from your own email client. ShapesOS never sends."
         onClick={async () => {
-          if (!await confirmAction(`Record a human-sent pitch to ${journalist} (${outlet})? Marketr does not send — this records that YOU sent it from your own inbox, bound to a pr_send approval.`)) return;
+          if (!await confirmAction(`Record a human-sent pitch to ${journalist} (${outlet})? ShapesOS does not send — this records that YOU sent it from your own inbox, bound to a pr_send approval.`)) return;
           setBusy(true);
           setError(null);
           try {

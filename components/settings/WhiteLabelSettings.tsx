@@ -158,7 +158,7 @@ export default function WhiteLabelSettings({
       setNotice({
         kind: "ok",
         message: next
-          ? "Custom domain saved. Marketr does not manage DNS — point the domain at your Marketr host before using it."
+          ? "Custom domain saved. ShapesOS does not manage DNS — point the domain at your ShapesOS host before using it."
           : "Custom domain cleared.",
       });
     } catch (e) {
@@ -331,8 +331,8 @@ export default function WhiteLabelSettings({
           ) : (
             <>No custom domain set.</>
           )}{" "}
-          Marketr does not manage DNS or SSL for custom domains — point your domain&apos;s DNS at your Marketr host
-          (CNAME/A record + certificate) before using it. Public links keep working on the Marketr URL either way.
+          ShapesOS does not manage DNS or SSL for custom domains — point your domain&apos;s DNS at your ShapesOS host
+          (CNAME/A record + certificate) before using it. Public links keep working on the ShapesOS URL either way.
         </p>
       </section>
 

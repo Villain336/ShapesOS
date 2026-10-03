@@ -15,7 +15,7 @@ const chipNeutral =
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Consolidation — Growth Memory — Marketr",
+  title: "Consolidation — Growth Memory — ShapesOS",
   description: "Async distillation, contradiction detection, and decay-to-floor pruning.",
 };
 

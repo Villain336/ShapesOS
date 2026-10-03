@@ -24,9 +24,9 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Marketr — marketing & SEO workspace",
+  title: "ShapesOS — marketing & SEO workspace",
   description:
-    "Marketr is the open-source marketing and SEO workspace: keyword research, competitor gaps, content engine, and rank tracking.",
+    "ShapesOS is the open-source marketing and SEO workspace: keyword research, competitor gaps, content engine, and rank tracking.",
 };
 
 export default async function RootLayout({ children }: LayoutProps<"/">) {

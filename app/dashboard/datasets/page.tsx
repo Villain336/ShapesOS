@@ -10,7 +10,7 @@ import { DatasetsApp } from "./DatasetsApp";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Datasets — Marketr",
+  title: "Datasets — ShapesOS",
   description:
     "Ingest business knowledge from files, Google Drive, websites, and pasted text — every chunk traced to its source.",
 };

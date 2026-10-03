@@ -69,7 +69,7 @@ export class ProviderNotConfiguredError extends CardProviderError {
 function assertClientAccount(ref: string): void {
   if (!ref || !ref.trim()) {
     throw new CardProviderError(
-      "A client-owned Brex/Ramp account ref is required — Marketr never issues cards on agency accounts.",
+      "A client-owned Brex/Ramp account ref is required — ShapesOS never issues cards on agency accounts.",
     );
   }
 }

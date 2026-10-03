@@ -164,7 +164,7 @@ export function FlagsTable() {
           </div>
           <p className="mt-2 text-[13px] text-stone-500">
             {state.message ?? "No GrowthBook sidecar configured."} Showing the
-            flags Marketr wires natively, with their built-in defaults. Toggles
+            flags ShapesOS wires natively, with their built-in defaults. Toggles
             below still work — they write a per-workspace override, no sidecar
             needed.
           </p>
@@ -272,7 +272,7 @@ export function FlagsTable() {
           global default is never touched, so other tenants are unaffected.
           Reset clears the override back to the GrowthBook (or built-in) default.
         </p>
-        <p className="mt-2 font-medium text-stone-700">Flags Marketr wires today</p>
+        <p className="mt-2 font-medium text-stone-700">Flags ShapesOS wires today</p>
         <ul className="mt-1 list-disc pl-5">
           <li>
             <code className="font-mono text-xs">studio.compact-hero</code> — compact

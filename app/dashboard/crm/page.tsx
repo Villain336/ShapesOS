@@ -6,7 +6,7 @@ import { CrmApp } from "@/components/crm/CrmApp";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "CRM — Marketr",
+  title: "CRM — ShapesOS",
   description: "Lead pipeline CRM: leads, pipeline board, forecast, and capture forms.",
 };
 

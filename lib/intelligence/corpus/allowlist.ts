@@ -737,7 +737,7 @@ export const SEED_SOURCES: readonly SeedSourceDef[] = [
     pendingReason:
       "REFUSED — license incompatible. The Yelp Open Dataset agreement limits use to " +
       "academic/non-commercial purposes and prohibits commercial use and third-party " +
-      "redistribution (https://www.yelp.com/dataset). Incompatible with Marketr's commercial " +
+      "redistribution (https://www.yelp.com/dataset). Incompatible with ShapesOS's commercial " +
       "shipped corpus. Do not ingest without a commercial license; Hugging Face mirrors inherit " +
       "the restriction.",
   },

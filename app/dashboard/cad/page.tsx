@@ -10,7 +10,7 @@ import { CadApp } from "./views/CadApp";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "CAD — Marketr",
+  title: "CAD — ShapesOS",
   description:
     "CAD project and model registry: upload and inspect 3D models in the browser, version history with visual diffs, and expiring share links for collaborators.",
 };

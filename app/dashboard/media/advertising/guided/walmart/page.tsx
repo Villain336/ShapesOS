@@ -28,7 +28,7 @@ import CsvImportForm from "./_components/CsvImportForm";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Walmart Connect guided setup — Marketr",
+  title: "Walmart Connect guided setup — ShapesOS",
   description: "Guided Walmart Connect setup: partner application, placement planning, and CSV spend import.",
 };
 
@@ -68,7 +68,7 @@ export default async function WalmartGuidedPage() {
         </Link>
         <h1 className="aos-heading">Walmart Connect — guided setup</h1>
         <p className="mt-0.5 text-sm text-muted">
-          {workspace.name} — launch in Walmart Ad Center, track everything in Marketr.
+          {workspace.name} — launch in Walmart Ad Center, track everything in ShapesOS.
         </p>
       </div>
 
@@ -80,7 +80,7 @@ export default async function WalmartGuidedPage() {
           <p className="mt-0.5">
             Walmart Connect's ad API is only available to approved Partner Network members (a business
             application, not a self-serve signup), so there is nothing to OAuth here. You launch campaigns in
-            Walmart Ad Center; Marketr tracks spend from the CSV imports below.
+            Walmart Ad Center; ShapesOS tracks spend from the CSV imports below.
           </p>
         </div>
       </div>
@@ -148,7 +148,7 @@ export default async function WalmartGuidedPage() {
         <RegisterCampaignForm accounts={accounts} />
         <p className={note}>
           Registered campaigns appear on the Campaigns tab and give imported spend rows somewhere to land.
-          The status you set is what you report from Ad Center — Marketr can't read it from any API.
+          The status you set is what you report from Ad Center — ShapesOS can't read it from any API.
         </p>
       </section>
 

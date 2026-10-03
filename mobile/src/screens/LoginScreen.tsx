@@ -43,8 +43,8 @@ export function LoginScreen() {
       style={styles.root}
     >
       <View style={styles.card}>
-        <Text style={styles.title}>Marketr Agent</Text>
-        <Text style={styles.subtitle}>Sign in with your Marketr account</Text>
+        <Text style={styles.title}>ShapesOS Agent</Text>
+        <Text style={styles.subtitle}>Sign in with your ShapesOS account</Text>
         <Text style={styles.server}>Server: {baseUrl}</Text>
         <TextInput
           style={styles.input}

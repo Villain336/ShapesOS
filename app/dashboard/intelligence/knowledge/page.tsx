@@ -14,7 +14,7 @@ import { KnowledgeClient } from "./KnowledgeClient";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Knowledge sources — Marketr",
+  title: "Knowledge sources — ShapesOS",
   description:
     "Context.dev web sources: register pages, sitemaps, and brand profiles; crawl them into a provenance-ledgered knowledge base for RAG.",
 };
@@ -44,7 +44,7 @@ export default async function KnowledgePage() {
       <div>
         <h1 className="aos-heading">Knowledge sources</h1>
         <p className="mt-0.5 max-w-2xl text-sm text-muted">
-          Crawl the web into Marketr&apos;s knowledge base with Context.dev. Your
+          Crawl the web into ShapesOS&apos;s knowledge base with Context.dev. Your
           own domains activate instantly; third-party domains need one approval,
           then crawl freely. Every chunk keeps its source URL and fetch time.
         </p>

@@ -156,7 +156,7 @@ async function composeMarketingEmail(
   const token = signUnsubscribeToken({ workspaceId, messageId, leadId: leadId ?? undefined });
   const unsubUrl = `${publicOrigin()}/api/messaging/unsubscribe?token=${token}`;
   const host = unsubUrl.split("://")[1]?.split("/")[0] ?? "localhost";
-  const biz = settings.businessName?.trim() || "Marketr workspace";
+  const biz = settings.businessName?.trim() || "ShapesOS workspace";
   const addr = settings.physicalAddress?.trim() || PHYSICAL_ADDRESS_PLACEHOLDER;
   const html =
     `<div>${escapeHtml(body).replace(/\n/g, "<br>")}</div>` +

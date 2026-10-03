@@ -179,7 +179,7 @@ export function CrmApp() {
       <div className="border-b border-line bg-paper px-5 pb-0 pt-4">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <p className="text-[12px] font-medium text-subtle">Marketr · CRM</p>
+            <p className="text-[12px] font-medium text-subtle">ShapesOS · CRM</p>
             <div className="mt-0.5 flex items-center gap-2">
               <div className="relative">
                 <select

@@ -10,7 +10,7 @@ import { LegalApp } from "./LegalApp";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Legal — Marketr",
+  title: "Legal — ShapesOS",
   description:
     "Your per-business obligation map: licenses, filings, tax registrations, insurance, and permits. General information only — not legal advice.",
 };

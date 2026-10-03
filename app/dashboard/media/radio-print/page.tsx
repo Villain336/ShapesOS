@@ -10,7 +10,7 @@ import { RadioPrintApp } from "./RadioPrintApp";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Radio & Print IOs — Marketr",
+  title: "Radio & Print IOs — ShapesOS",
   description: "IO-brief concierge for broadcast radio and print. Signature tracking and proof-of-run.",
 };
 

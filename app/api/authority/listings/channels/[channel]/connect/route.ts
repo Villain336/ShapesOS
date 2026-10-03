@@ -48,7 +48,7 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
     if (key === "bing") {
       // Connecting = starting the trusted-partner application (sandbox first, then production).
       const app = newBingApplication(gate.workspaceId);
-      config.bingApplication = { ...app, notes: [...app.notes, "Application started via Marketr connect. Email partneronbp@microsoft.com to proceed."] };
+      config.bingApplication = { ...app, notes: [...app.notes, "Application started via ShapesOS connect. Email partneronbp@microsoft.com to proceed."] };
     }
     if (key === "apple") {
       // Guided claim — no automation implied.

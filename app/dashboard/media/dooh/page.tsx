@@ -9,7 +9,7 @@ import { DoohApp } from "./DoohApp";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "DOOH Planner — Marketr",
+  title: "DOOH Planner — ShapesOS",
   description: "Plan digital out-of-home: Blip, Blindspot, Adomni. Estimate ranges, launch packets.",
 };
 

@@ -124,7 +124,7 @@ export const LAUNCH_CHECKLIST_CATALOG: LaunchChecklistItem[] = [
     category: "legal",
     title: "Trademark / AGPLv3 §7 branding note staged",
     doneWhen:
-      "Decision brief staged on protecting the \"Marketr\" brand via AGPLv3 §7 additional permissions " +
+      "Decision brief staged on protecting the \"ShapesOS\" brand via AGPLv3 §7 additional permissions " +
       "(the OnlyOffice 2026 \"Logo Trap\" precedent): white-label boundary without touching the license grant. " +
       "Decision itself deferred with the open-core split.",
     specRef: "§2/F6 (Legal & license), §12.5",

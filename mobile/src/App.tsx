@@ -67,7 +67,7 @@ function AuthedApp() {
       <GenerativeHostNative gate={gate} />
       <SafeAreaView style={styles.root}>
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Marketr Agent</Text>
+          <Text style={styles.headerTitle}>ShapesOS Agent</Text>
           <TouchableOpacity onPress={() => void signOut()} style={styles.signOut}>
             <Text style={styles.signOutText}>Sign out</Text>
           </TouchableOpacity>

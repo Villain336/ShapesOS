@@ -7,7 +7,7 @@ import { PronunciationApp } from "./PronunciationApp";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Pronunciation — Marketr",
+  title: "Pronunciation — ShapesOS",
   description:
     "Per-workspace pronunciation dictionary for voiceovers, seeded from the company knowledge graph.",
 };

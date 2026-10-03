@@ -122,7 +122,7 @@ export function ChatScreen() {
       <View style={styles.composer}>
         <TextInput
           style={styles.input}
-          placeholder="Ask the Marketr agent…"
+          placeholder="Ask the ShapesOS agent…"
           value={input}
           onChangeText={setInput}
           multiline

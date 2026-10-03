@@ -11,7 +11,7 @@ import ApprovalActions from "./_components/ApprovalActions";
 
 export const dynamic = "force-dynamic";
 
-export const metadata = { title: "Approval — Media — Marketr" };
+export const metadata = { title: "Approval — Media — ShapesOS" };
 
 function money(cents: number, currency = "USD") {
   return new Intl.NumberFormat("en-US", { style: "currency", currency }).format(cents / 100);

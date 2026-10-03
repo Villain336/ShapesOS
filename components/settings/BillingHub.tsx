@@ -279,7 +279,7 @@ export default function BillingHub({
               </div>
               <p className="mt-3 text-xs text-muted">
                 Cancellation, invoices, receipts, and card updates happen on Stripe&rsquo;s billing
-                portal — Marketr never stores your card.
+                portal — ShapesOS never stores your card.
               </p>
             </div>
           </section>
@@ -352,7 +352,7 @@ export default function BillingHub({
             <div className="mt-3 rounded-md border border-line bg-canvas px-3 py-2 text-[13px] text-muted">
               <p>
                 Switching plans uses Stripe Checkout — proration is shown before you confirm. Plan
-                names, prices, and features are configured by the Marketr host in{" "}
+                names, prices, and features are configured by the ShapesOS host in{" "}
                 <code className="rounded bg-canvas px-1 font-mono text-xs">lib/billing/plans.ts</code>{" "}
                 (editable defaults, not fetched from Stripe).
               </p>
