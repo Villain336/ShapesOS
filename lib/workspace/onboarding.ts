@@ -211,7 +211,7 @@ export async function saveBusinessProfile(workspaceId: string, profile: Business
       select: { id: true },
     });
     if (existing) {
-      await tx.companyKnowledge.update({ where: { id: existing.id }, data: { body, pinned: true } });
+      await tx.companyKnowledge.update({ where: { id: existing.id, workspaceId }, data: { body, pinned: true } });
     } else {
       await tx.companyKnowledge.create({
         data: { workspaceId, kind: "positioning", title: PROFILE_TITLE, body, pinned: true, confidence: 1 },

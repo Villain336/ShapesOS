@@ -20,6 +20,7 @@ import { prisma } from "@/lib/prisma";
 import { getMembership, roleAtLeast } from "@/lib/authz";
 import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from "@/lib/api/errors";
 import { deploymentMode, initialPlanFor } from "@/lib/billing/trial";
+import { WORKSPACE_GUC } from "@/lib/substrate/memory/rls";
 
 export const MAX_WORKSPACE_NAME = 80;
 /** Workspaces one user may own (abuse ceiling, not a plan entitlement). */
@@ -264,7 +265,7 @@ export async function deleteWorkspace(opts: {
         SELECT "id" FROM "workspaces" WHERE "id" = ${ws.id} FOR UPDATE`;
       if (locked.length === 0) throw new NotFoundError("Workspace not found.");
       // Tenant GUC for the RLS-protected tables cleared explicitly below.
-      await tx.$queryRaw`SELECT set_config('app.workspace_id', ${ws.id}, true)`;
+      await tx.$queryRaw`SELECT set_config(${WORKSPACE_GUC}, ${ws.id}, true)`;
       for (const step of RESTRICT_CHILD_CLEANUP) {
         await tx.$executeRawUnsafe(step.sql, ws.id);
       }

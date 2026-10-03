@@ -93,13 +93,13 @@ Follow-ups found while doing Phase 2 (carried forward)
 
 ## Phase 3 — one product (`claude/phase-3-product`)
 - [ ] Rename to ShapesOS in all user-facing text (web, emails, metadata, MCP consent, mobile)
-- [ ] Trial plan for hosted signups + invite-only env switch; plan entitlements groundwork
-- [ ] Onboarding wizard (business context, rename workspace, first connections, intelligence report)
+- [x] Trial plan for hosted signups (`DEPLOYMENT_MODE=hosted`: 14 days, 500 one-time credits, hard cap; ended trial = read-only for metered actions with an upgrade prompt; lapsed hosted subscriptions land on an ended trial) + invite-only env switch (Phase 1). Plan entitlements themselves stay in Phase 4
+- [x] Onboarding wizard (business context, rename workspace, first connections, intelligence report) — `/dashboard/welcome`, skippable, resumable, shown once
 - [ ] Unified "needs you" approvals inbox across all queues + sidebar badge
 - [ ] Notification center (model, bell, read state) feeding from approvals/alerts
-- [ ] Navigation regrouped Grow / Design / Operate / Agents; orphaned pages linked (SEO, Nurture, Prospects, Voice, Insurance, Runs index, Billing); ⌘K covers every destination; settings grouped
-- [ ] Workspace lifecycle: create, rename, delete; agency client workspaces UI
-- [ ] Invites emailed
+- [ ] Navigation regrouped Grow / Design / Operate / Agents; orphaned pages linked (SEO, Nurture, Prospects, Voice, Insurance, Runs index, Billing); ⌘K covers every destination; settings grouped (done: settings grouped into six sections, Billing in settings + sidebar workspace/account menus)
+- [x] Workspace lifecycle: create, rename, delete (owner-only, typed name, cascade-safe, audited in `workspace_lifecycle_events`); agency clients UI (Settings → Clients)
+- [x] Invites emailed (SMTP, else Resend; copy-link fallback)
 - [ ] CRM actions: email / text / call / enroll in nurture / invoice / delete; unified inbox UI
 - [ ] Reviews links to real approval UI (not raw JSON)
 - [ ] Confirmations on all destructive actions (replace `window.confirm`), shared toast system, undo where cheap
