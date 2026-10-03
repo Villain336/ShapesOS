@@ -54,7 +54,7 @@ export interface ChatGPTLifecycleStore {
   getForLaunch(chatGPTCampaignId: string, workspaceId: string): Promise<ChatGPTLaunchableCampaign | null>;
   markLive(input: { chatGPTCampaignId: string; stackAdaptExternalId: string }): Promise<void>;
   markPaused(input: { chatGPTCampaignId: string; reason: string }): Promise<void>;
-  markApproved(chatGPTCampaignId: string): Promise<void>;
+  markApproved(chatGPTCampaignId: string, workspaceId: string): Promise<void>;
   getTodaySpendCents(paidCampaignId: string): Promise<number>;
 }
 
@@ -96,9 +96,11 @@ export function prismaChatGPTLifecycleStore(): ChatGPTLifecycleStore {
         data: { status: "paused" },
       });
     },
-    async markApproved(chatGPTCampaignId) {
-      await prisma.chatGPTCampaign.update({
-        where: { id: chatGPTCampaignId },
+    async markApproved(chatGPTCampaignId, workspaceId) {
+      // The id comes from the proposal payload: scope it to the proposal's
+      // workspace so a payload can never flip another tenant's campaign.
+      await prisma.chatGPTCampaign.updateMany({
+        where: { id: chatGPTCampaignId, workspaceId },
         data: { status: "approved" },
       });
     },
@@ -206,7 +208,7 @@ export async function onChatGPTProposalApproved(
   const chatGPTCampaignId = payload.chatGPTCampaignId;
   if (typeof chatGPTCampaignId !== "string" || !chatGPTCampaignId) return false;
   const lifecycle = ctx.lifecycle ?? prismaChatGPTLifecycleStore();
-  await lifecycle.markApproved(chatGPTCampaignId);
+  await lifecycle.markApproved(chatGPTCampaignId, proposal.workspaceId);
   return true;
 }
 
@@ -236,7 +238,7 @@ export async function launchChatGPTCampaign(
   }
   assertStatusTransition(campaign.status, "live");
 
-  const proposal = await proposals.get(input.proposalId);
+  const proposal = await proposals.get(input.proposalId, ctx.workspaceId);
   if (!proposal || proposal.workspaceId !== ctx.workspaceId) {
     throw new ChatGPTAdsError("PROPOSAL_NOT_FOUND", "Launch refused: proposal not found.");
   }
@@ -246,7 +248,7 @@ export async function launchChatGPTCampaign(
       `Launch refused: proposal is ${proposal.status}, not approved.`,
     );
   }
-  const approval = await approvals.getByProposalId(proposal.id);
+  const approval = await approvals.getByProposalId(proposal.id, ctx.workspaceId);
   requireFreshApproval(approval);
 
   checkChecklist(campaign, input.checklist);
