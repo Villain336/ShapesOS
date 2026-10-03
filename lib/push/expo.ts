@@ -98,9 +98,10 @@ export async function sendExpoPush(
     } catch (e) {
       throw new ExpoPushRequestError(`expo push request failed: ${e instanceof Error ? e.message : String(e)}`, 0);
     }
-    let body: { data?: unknown; errors?: Array<{ code?: string; message?: string }> } | null = null;
+    type SendBody = { data?: unknown; errors?: Array<{ code?: string; message?: string }> };
+    let body: SendBody | null;
     try {
-      body = (await res.json()) as typeof body;
+      body = (await res.json()) as SendBody;
     } catch {
       body = null;
     }

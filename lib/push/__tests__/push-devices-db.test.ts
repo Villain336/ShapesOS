@@ -44,7 +44,7 @@ const req = (method: string, body?: unknown) =>
   }) as never;
 const devices = () => withWorkspaceScope(WS, (tx) => tx.pushDevice.findMany({ where: { workspaceId: WS }, orderBy: { createdAt: "asc" } }));
 
-const ENV = { PUSH_PROVIDER: "expo", EXPO_ACCESS_TOKEN: "test-access-token" } as NodeJS.ProcessEnv;
+const ENV = { PUSH_PROVIDER: "expo", EXPO_ACCESS_TOKEN: "test-access-token" } as unknown as NodeJS.ProcessEnv;
 
 function note(userId: string, kind: NotificationInput["kind"], id = randomUUID()): NotificationInput {
   return {

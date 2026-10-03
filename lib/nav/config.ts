@@ -33,6 +33,7 @@ import {
   Mail,
   Megaphone,
   MessageSquare,
+  MessagesSquare,
   Mic,
   Network,
   Paintbrush,
@@ -92,6 +93,8 @@ export const NAV_GROUPS: NavGroup[] = [
     title: "Grow",
     items: [
       { href: "/dashboard/crm", label: "CRM", icon: Kanban, description: "Leads, pipeline, invoices", keywords: "contacts pipeline kanban leads deals" },
+      // Phase 4b: per-lead conversation inbox (SMS + email, inbound + outbound).
+      { href: "/dashboard/crm/inbox", label: "Inbox", icon: MessagesSquare, description: "Lead conversations: texts and email", keywords: "conversations messages sms email replies threads unread" },
       { href: "/dashboard/prospects", label: "Prospects", icon: UserSearch, description: "Prospect lists and enrichment", keywords: "prospecting enrichment lists outbound" },
       { href: "/dashboard/nurture", label: "Nurture", icon: Send, description: "Nurture sequences and broadcasts", keywords: "sequences drip email sms broadcasts" },
       { href: "/dashboard/projects", label: "SEO projects", icon: Search, description: "Sites, keywords, rankings, content", keywords: "seo keywords rankings content sites projects" },

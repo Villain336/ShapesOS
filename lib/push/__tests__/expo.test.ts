@@ -29,8 +29,8 @@ describe("isExpoPushToken", () => {
 describe("pushProvider", () => {
   it("is off unless PUSH_PROVIDER=expo", () => {
     assert.equal(pushProvider({} as NodeJS.ProcessEnv), "off");
-    assert.equal(pushProvider({ PUSH_PROVIDER: "fcm" } as NodeJS.ProcessEnv), "off");
-    assert.equal(pushProvider({ PUSH_PROVIDER: " Expo " } as NodeJS.ProcessEnv), "expo");
+    assert.equal(pushProvider({ PUSH_PROVIDER: "fcm" } as unknown as NodeJS.ProcessEnv), "off");
+    assert.equal(pushProvider({ PUSH_PROVIDER: " Expo " } as unknown as NodeJS.ProcessEnv), "expo");
   });
 });
 
@@ -149,7 +149,7 @@ describe("push messages", () => {
   it("only the push kinds are sent", async () => {
     const res = await pushNotifications(
       [{ workspaceId: "ws", userId: "u", kind: "invite_accepted", title: "t" }],
-      { env: { PUSH_PROVIDER: "expo" } as NodeJS.ProcessEnv },
+      { env: { PUSH_PROVIDER: "expo" } as unknown as NodeJS.ProcessEnv },
     );
     assert.equal(res.skipped, "no_kinds");
   });
@@ -158,7 +158,7 @@ describe("push messages", () => {
     const res = await pushNotifications(
       [{ workspaceId: "ws", userId: "u", kind: "approval_needed", title: "t" }],
       {
-        env: { PUSH_PROVIDER: "expo" } as NodeJS.ProcessEnv,
+        env: { PUSH_PROVIDER: "expo" } as unknown as NodeJS.ProcessEnv,
         scope: async () => {
           throw new Error("db down");
         },

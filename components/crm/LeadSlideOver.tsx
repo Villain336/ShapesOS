@@ -4,7 +4,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   X, Star, SquareArrowOutUpRight, Pencil, Phone, Mail,
-  MessageSquareText, Calendar, NotebookPen, Flag,
+  MessageSquareText, MessagesSquare, Calendar, NotebookPen, Flag,
 } from "lucide-react";
 import type { CrmActivity, CrmLead, CrmPipeline, CrmStage } from "./types";
 import { SOURCE_LABELS, formatMoney, timeAgo } from "./types";
@@ -215,6 +215,14 @@ export function LeadSlideOver({
               <Star size={15} fill={lead.starred ? "currentColor" : "none"} className={lead.starred ? "text-ink" : "text-subtle"} />
               <span className="hidden sm:inline text-[12.5px]">{lead.starred ? "Following" : "Follow"}</span>
             </button>
+            <a
+              href={`/dashboard/crm/inbox?lead=${encodeURIComponent(lead.id)}`}
+              className={btnGhostSm}
+              title="Open the conversation with this lead"
+            >
+              <MessagesSquare size={15} />
+              <span className="hidden sm:inline text-[12.5px]">Conversation</span>
+            </a>
             <a
               href={`/dashboard/crm?lead=${lead.id}`}
               className={btnGhostSm}
