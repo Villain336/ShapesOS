@@ -21,6 +21,7 @@ import {
 } from "@/lib/funding/dataroom";
 import { readFile } from "@/lib/filesystem/service";
 import { buildDownloadHeaders } from "@/lib/filesystem/download";
+import { clientIpFromHeaders } from "@/lib/api/client-ip";
 
 export const dynamic = "force-dynamic";
 
@@ -93,9 +94,8 @@ function emailGatePage(params: {
 }
 
 function viewerHeaders(req: NextRequest): { ip: string | null; userAgent: string | null } {
-  const fwd = req.headers.get("x-forwarded-for");
   return {
-    ip: fwd ? fwd.split(",")[0].trim() : null,
+    ip: clientIpFromHeaders(req.headers),
     userAgent: req.headers.get("user-agent"),
   };
 }

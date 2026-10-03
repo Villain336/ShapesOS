@@ -18,6 +18,7 @@ import {
   redeemPromoCode,
   checkRedeemRateLimit,
 } from "@/lib/physical/bundles";
+import { clientIpFromHeaders } from "@/lib/api/client-ip";
 
 const RedeemSchema = z.object({
   code: z.string().trim().min(1).max(32),
@@ -27,11 +28,7 @@ const RedeemSchema = z.object({
 });
 
 function clientIp(req: Request): string {
-  return (
-    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    req.headers.get("x-real-ip")?.trim() ||
-    "unknown"
-  );
+  return clientIpFromHeaders(req.headers) ?? "unknown";
 }
 
 export async function POST(req: Request) {

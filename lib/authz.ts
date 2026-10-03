@@ -199,6 +199,39 @@ export async function requireProjectRole(
   return { project, membership };
 }
 
+/**
+ * Member-management rules (Phase 1). Returns the denial message, or null
+ * when `actorRole` may make the change:
+ *   - nobody grants a role above their own (an admin can't mint owners or
+ *     promote themselves);
+ *   - only owners touch owner rows (role change, removal, invite links) —
+ *     including pending owner invites.
+ * `nextRole` is the role being granted (invite or role change); omit it for
+ * removals and invite-link reissues. `currentRole` is the target row's role
+ * (omit for a brand-new invite).
+ */
+export function memberChangeError(
+  actorRole: WorkspaceRole,
+  change: { currentRole?: WorkspaceRole; nextRole?: WorkspaceRole },
+): string | null {
+  if (change.currentRole === "owner" && actorRole !== "owner")
+    return "Only an owner can change or remove an owner.";
+  if (change.nextRole && ROLE_RANK[change.nextRole] > ROLE_RANK[actorRole])
+    return "You can't grant a role above your own.";
+  return null;
+}
+
+/**
+ * Owners that can actually sign in. Pending owner invites (userId null)
+ * don't count — otherwise an outstanding invite let the last real owner be
+ * demoted or removed.
+ */
+export async function activeOwnerCount(workspaceId: string): Promise<number> {
+  return prisma.workspaceMember.count({
+    where: { workspaceId, role: "owner", userId: { not: null } },
+  });
+}
+
 /** Standard 403 for RBAC denials (distinct from 401 unauthenticated). */
 export function forbidden(message = "Insufficient role for this action.") {
   return Response.json({ error: message }, { status: 403 });
@@ -216,7 +249,7 @@ export function forbidden(message = "Insufficient role for this action.") {
  * | create/delete projects              |        |   ✓*   |   ✓   |   ✓   |
  * | connection credential CRUD          |        |        |   ✓   |   ✓   |
  * | fix-agent settings                  |        |        |   ✓   |   ✓   |
- * | member add / role change / remove   |        |        |   ✓   |   ✓   |
+ * | member add / role change / remove   |        |        |   ✓†  |   ✓   |
  * | workspace deletion                  |        |        |       |   ✓   |
  *
  * M21 permission grants (spec §7) — assigned per user or per role, managed
@@ -227,5 +260,7 @@ export function forbidden(message = "Insufficient role for this action.") {
  * | grants CRUD                                             |            |            | ✓ | ✓ |
  *
  * *project creation: editor+. Project deletion: admin+.
+ * †never above the actor's own role; owner rows/invites are owner-only
+ *  (memberChangeError).
  */
 export const CAPABILITY_MATRIX = "see lib/authz.ts header";

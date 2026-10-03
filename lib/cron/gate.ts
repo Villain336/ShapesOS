@@ -12,6 +12,7 @@
 
 import { requireWorkspaceRole } from "@/lib/authz";
 import { getOrCreateWorkspace, requireUser } from "@/lib/session";
+import { bearerMatches } from "@/lib/security/constant-time";
 
 export interface CronGate {
   isCron: boolean;
@@ -29,7 +30,7 @@ export interface CronGate {
 export async function cronGate(req: Request): Promise<CronGate | Response> {
   const secret = (process.env.CRON_SECRET ?? "").trim();
   const header = req.headers.get("authorization") ?? "";
-  const isCron = !!secret && header === `Bearer ${secret}`;
+  const isCron = bearerMatches(header, secret); // constant-time (Phase 1)
   const user = isCron ? null : await requireUser();
   if (!isCron && !user) return Response.json({ error: "Unauthorized" }, { status: 401 });
   const workspaceId =

@@ -8,6 +8,7 @@ import { notFound } from "next/navigation";
 import { getRequestByToken, markViewedByToken } from "@/lib/reviews/engine";
 import { checkReviewPageRateLimit } from "@/lib/reviews/rate-limit";
 import { ReviewLandingClient } from "./ReviewLandingClient";
+import { clientIpFromHeaders } from "@/lib/api/client-ip";
 
 export const metadata = { title: "Leave a review — Marketr" };
 
@@ -22,10 +23,7 @@ export default async function ReviewLandingPage({
   // next/headers gives us the real client IP behind the proxy.
   const { headers } = await import("next/headers");
   const h = await headers();
-  const ip =
-    h.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    h.get("x-real-ip")?.trim() ||
-    "unknown";
+  const ip = clientIpFromHeaders(h) ?? "unknown";
   if (!checkReviewPageRateLimit(clean, ip)) {
     return (
       <main className="flex min-h-dvh items-center justify-center bg-stone-50 px-6">

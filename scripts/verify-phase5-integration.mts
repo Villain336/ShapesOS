@@ -141,7 +141,7 @@ async function approveWithOtp(
   approverId: string,
   poolId: string | null,
 ): Promise<apprTypes.MediaApproval> {
-  const ch = otpStore.mint();
+  const ch = otpStore.mint({ approvalId, approverId });
   return apprLib.approveApproval(approvalStore, {
     id: approvalId,
     workspaceId: WS,

@@ -39,13 +39,11 @@ import {
   recordLoginFailure,
   recordLoginSuccess,
 } from "./lib/auth/rate-limit";
+import { clientIpFromHeaders } from "./lib/api/client-ip";
+import { INVITE_REQUIRED_PATH, signInAllowed, signupMode } from "./lib/auth/signup";
 
 function clientIp(req: Request | undefined): string | null {
-  const h = req?.headers;
-  if (!h) return null;
-  const fwd = h.get("x-forwarded-for");
-  if (fwd) return fwd.split(",")[0]?.trim() || null;
-  return h.get("x-real-ip")?.trim() || null;
+  return clientIpFromHeaders(req?.headers);
 }
 
 /** Timing-safe string comparison via SHA-256 (handles variable lengths). */
@@ -196,6 +194,18 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           await provisionSsoUser(user.id, user.email, emailVerified);
         } catch (err) {
           console.error("[sso] auto-provisioning failed:", err);
+        }
+      }
+      // Phase 1: SIGNUP_MODE=invite — brand-new users without a membership
+      // or a pending invite get no session (lib/auth/signup.ts). Fails
+      // closed on a DB error; the operator's credentials login never
+      // touches the DB here.
+      if (signupMode() === "invite") {
+        try {
+          if (!(await signInAllowed(user?.id, user?.email))) return INVITE_REQUIRED_PATH;
+        } catch (err) {
+          console.error("[auth] invite-mode sign-in check failed:", err);
+          return INVITE_REQUIRED_PATH;
         }
       }
       return true;

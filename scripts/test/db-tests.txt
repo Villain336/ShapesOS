@@ -8,6 +8,8 @@ lib/agents/runs/__tests__/run-viewer.test.ts
 lib/agents/runs/__tests__/runs-rls.test.ts
 lib/agents/runs/__tests__/trace-fidelity.eval.test.ts
 lib/agents/runs/__tests__/watch.test.ts
+lib/auth/__tests__/member-roles.test.ts
+lib/auth/__tests__/signup-mode.test.ts
 lib/cad/__tests__/cad-slice1.test.ts
 lib/cad/__tests__/cad-slice2.test.ts
 lib/cad/__tests__/cad-slice3.test.ts
@@ -18,6 +20,7 @@ lib/connector/__tests__/connector-slice3.test.ts
 lib/connector/__tests__/connector-slice4.test.ts
 lib/connector/__tests__/connector-slice5.test.ts
 lib/connector/__tests__/connector-slice6.test.ts
+lib/connector/__tests__/intro-actor.test.ts
 lib/funding/__tests__/funding-slice2.test.ts
 lib/funding/__tests__/funding-slice3.test.ts
 lib/funding/__tests__/funding-slice4.test.ts
@@ -25,6 +28,7 @@ lib/funding/__tests__/funding.test.ts
 lib/intelligence/company/__tests__/knowledge-rls.test.ts
 lib/ops/__tests__/ops-rls.test.ts
 lib/ops/__tests__/workflows-rls.test.ts
+lib/mcp/__tests__/mcp-auth-roles.test.ts
 lib/orchestrator/__tests__/orchestrator.test.ts
 lib/phase13b/evals/01-lesson-quality.test.ts
 lib/phase13b/evals/02-preference-precision.test.ts

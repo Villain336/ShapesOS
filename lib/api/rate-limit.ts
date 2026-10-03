@@ -16,6 +16,8 @@
 // Bounded bucket map (oldest evicted past MAX_BUCKETS) so the limiter itself
 // can't be used as a memory-exhaustion vector.
 
+import { clientIpFromHeaders } from "./client-ip";
+
 export type RateLimitTier = "auth" | "read" | "write" | "ai";
 
 export const TIER_LIMITS: Record<RateLimitTier, { limit: number; windowMs: number }> = {
@@ -127,11 +129,12 @@ export function tooManyRequests(retryAfterMs: number): Response {
   );
 }
 
-/** Best-effort client IP from proxy headers. */
+/**
+ * Client IP for rate-limit keys — the trusted-proxy hop, never the
+ * client-written leftmost X-Forwarded-For entry (see lib/api/client-ip.ts).
+ */
 export function clientIp(headers: Headers): string | null {
-  const fwd = headers.get("x-forwarded-for");
-  if (fwd) return fwd.split(",")[0]?.trim() || null;
-  return headers.get("x-real-ip")?.trim() || null;
+  return clientIpFromHeaders(headers);
 }
 
 /** Test hook: clear all limiter state for deterministic tests. */

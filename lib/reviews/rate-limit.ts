@@ -4,6 +4,8 @@
 // as lib/api/rate-limit.ts. The token is the capability; the limiter only
 // blunts enumeration/brute-force against it.
 
+import { clientIpFromHeaders } from "@/lib/api/client-ip";
+
 const BUCKETS = new Map<string, { count: number; resetAt: number }>();
 const LIMIT = 30;
 const WINDOW_MS = 60_000;
@@ -32,9 +34,5 @@ export function resetReviewPageRateLimits(): void {
 }
 
 export function clientIp(req: Request): string {
-  return (
-    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    req.headers.get("x-real-ip")?.trim() ||
-    "unknown"
-  );
+  return clientIpFromHeaders(req.headers) ?? "unknown";
 }

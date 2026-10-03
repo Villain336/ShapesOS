@@ -29,6 +29,11 @@ interface Member {
 const ROLES = ["owner", "admin", "editor", "viewer"] as const;
 
 export default function MembersManager({ myRole }: { myRole: string }) {
+  // Mirrors the server rule (lib/authz.ts memberChangeError): nobody grants
+  // above their own role, and only owners touch owner rows.
+  const myIndex = ROLES.indexOf(myRole as (typeof ROLES)[number]);
+  const grantable = ROLES.filter((_, i) => myIndex >= 0 && i >= myIndex);
+  const isOwner = myRole === "owner";
   const [members, setMembers] = useState<Member[]>([]);
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<(typeof ROLES)[number]>("editor");
@@ -137,7 +142,7 @@ export default function MembersManager({ myRole }: { myRole: string }) {
             onChange={(e) => setRole(e.target.value as (typeof ROLES)[number])}
             className={inputCls}
           >
-            {ROLES.map((r) => (
+            {grantable.map((r) => (
               <option key={r} value={r}>
                 {r}
               </option>
@@ -202,9 +207,10 @@ export default function MembersManager({ myRole }: { myRole: string }) {
                   <select
                     value={m.role}
                     onChange={(e) => changeRole(m.id, e.target.value)}
+                    disabled={m.role === "owner" && !isOwner}
                     className={`${inputCls} py-1`}
                   >
-                    {ROLES.map((r) => (
+                    {ROLES.filter((r) => r === m.role || grantable.includes(r)).map((r) => (
                       <option key={r} value={r}>
                         {r}
                       </option>

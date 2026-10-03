@@ -14,13 +14,10 @@
 //   - scan insert is unique-per-(bundle,ip,day): double-scans collapse.
 
 import { handleVanityRedirect } from "@/lib/physical/bundles";
+import { clientIpFromHeaders } from "@/lib/api/client-ip";
 
 function clientIp(req: Request): string {
-  return (
-    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    req.headers.get("x-real-ip")?.trim() ||
-    "unknown"
-  );
+  return clientIpFromHeaders(req.headers) ?? "unknown";
 }
 
 export async function GET(req: Request, ctx: { params: Promise<{ slug: string }> }) {

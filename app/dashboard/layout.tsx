@@ -7,6 +7,7 @@ import {
   getOrCreateWorkspace,
   requireUser,
 } from "@/lib/session";
+import { INVITE_REQUIRED_PATH, InviteRequiredError } from "@/lib/auth/signup";
 import { AppSidebar, MobileNav } from "@/components/AppSidebar";
 import { DashboardMain } from "@/components/DashboardMain";
 import { ChatProvider } from "@/components/chat/ChatContext";
@@ -32,7 +33,12 @@ export default async function DashboardLayout({
   const user = await requireUser();
   if (!user) redirect("/login");
 
-  const workspace = await getOrCreateWorkspace(user.id, user.email);
+  // SIGNUP_MODE=invite: a signed-in user with no workspace (e.g. an invitee
+  // who hasn't opened their invite link yet) is not auto-provisioned.
+  const workspace = await getOrCreateWorkspace(user.id, user.email).catch((err: unknown) => {
+    if (err instanceof InviteRequiredError) redirect(INVITE_REQUIRED_PATH);
+    throw err;
+  });
   const workspaces = await getAccessibleWorkspaces(user.id);
 
   const sidebarProps = {

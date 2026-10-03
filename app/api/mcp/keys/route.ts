@@ -2,6 +2,7 @@
 //
 // GET  /api/mcp/keys → { enabled, keys: [{ id, name, keyPrefix, scopes, expiresAt, lastUsedAt, revokedAt, createdAt }] }
 // POST /api/mcp/keys { name, scopes, expiresAt? } → { id, name, keyPrefix, scopes, key }
+//        expiresAt defaults to 90 days and may be at most one year away.
 //        The raw key is returned ONCE — it is never stored and never retrievable.
 
 import type { NextRequest } from "next/server";
@@ -14,6 +15,10 @@ import { readUsageSummary } from "@/lib/mcp/metering";
 import { MCP_TOOL_NAMES, scopeForTool } from "@/lib/mcp/scopes";
 
 export const dynamic = "force-dynamic";
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+const MCP_KEY_DEFAULT_TTL_MS = 90 * DAY_MS;
+const MCP_KEY_MAX_TTL_MS = 366 * DAY_MS;
 
 function publicKey(k: {
   id: string;
@@ -98,11 +103,17 @@ export async function POST(req: NextRequest) {
   for (const s of unique) {
     if (!validScopes.has(s)) return Response.json({ error: `unknown scope: ${s}` }, { status: 400 });
   }
-  let expires: Date | null = null;
+  // Phase 1: every key expires — 90 days unless a sooner/later date (max one
+  // year) is given. Keys also stop working once their creator is no longer
+  // an admin of the workspace (re-checked per call in lib/mcp/auth.ts).
+  let expires = new Date(Date.now() + MCP_KEY_DEFAULT_TTL_MS);
   if (expiresAt) {
     expires = new Date(expiresAt);
     if (Number.isNaN(expires.getTime()) || expires.getTime() <= Date.now()) {
       return Response.json({ error: "expiresAt must be a future datetime" }, { status: 400 });
+    }
+    if (expires.getTime() > Date.now() + MCP_KEY_MAX_TTL_MS) {
+      return Response.json({ error: "expiresAt can be at most one year away" }, { status: 400 });
     }
   }
 

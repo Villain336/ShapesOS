@@ -1,6 +1,7 @@
 // Marketr — workspace members API (milestone 11: RBAC; day-1 hardening M5).
 // GET  /api/workspace/members            → { members, myRole } (any member)
-// POST /api/workspace/members { email, role } → invite (admin+). Creates a
+// POST /api/workspace/members { email, role } → invite (admin+; never above
+//   the inviter's own role, so only owners invite owners). Creates a
 //   pending membership with a single-use token; the invitee claims it via the
 //   token link at /invite?token=… (see app/api/workspace/invites/accept).
 // All mutations are audit-logged (workspace-scoped).
@@ -13,6 +14,7 @@ import {
   mintInviteToken,
   requireWorkspaceRole,
   forbidden,
+  memberChangeError,
 } from "@/lib/authz";
 import { readJsonBody } from "@/lib/sitefiles/api";
 import type { WorkspaceRole } from "@prisma/client";
@@ -78,8 +80,8 @@ export async function POST(req: NextRequest) {
   const user = await requireUser();
   if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
   const workspace = await getOrCreateWorkspace(user.id, user.email);
-  if (!(await requireWorkspaceRole(user.id, workspace.id, "admin")))
-    return forbidden("Member management requires the admin role.");
+  const me = await requireWorkspaceRole(user.id, workspace.id, "admin");
+  if (!me) return forbidden("Member management requires the admin role.");
 
   const body = await readJsonBody<{ email?: string; role?: string }>(req);
   const email = (body?.email ?? "").trim().toLowerCase();
@@ -88,6 +90,9 @@ export async function POST(req: NextRequest) {
     return Response.json({ error: "A valid email is required." }, { status: 400 });
   if (!VALID_ROLES.includes(role))
     return Response.json({ error: "Invalid role." }, { status: 400 });
+  // Phase 1: no inviting above your own role (admins can't invite owners).
+  const denial = memberChangeError(me.role, { nextRole: role });
+  if (denial) return forbidden(denial);
 
   const existing = await prisma.workspaceMember.findFirst({
     where: { workspaceId: workspace.id, email },

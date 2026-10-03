@@ -18,6 +18,7 @@ import {
   getPublicFormConfig,
   handlePublicSubmit,
 } from "@/lib/crm/public-form";
+import { clientIpFromHeaders } from "@/lib/api/client-ip";
 
 export async function GET(_req: Request, ctx: { params: Promise<{ token: string }> }) {
   const { token } = await ctx.params;
@@ -36,10 +37,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ token: string 
   } catch {
     return Response.json({ error: "Invalid body" }, { status: 400 });
   }
-  const ip =
-    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    req.headers.get("x-real-ip") ||
-    "unknown";
+  const ip = clientIpFromHeaders(req.headers) ?? "unknown";
   const res = await handlePublicSubmit({ token, rawBody: raw, ip });
   return Response.json(res.json, {
     status: res.status,

@@ -6,7 +6,9 @@
 //      they can still access, else
 //   1. their SSO-provisioned workspace (if SSO auto-provisioning ran), else
 //   2. the first workspace they own or are a member of, else
-//   3. a freshly created personal workspace (with an `owner` membership row).
+//   3. a freshly created personal workspace (with an `owner` membership row)
+//      — unless SIGNUP_MODE=invite, where only the operator gets one and
+//      everyone else gets InviteRequiredError (lib/auth/signup.ts).
 //
 // The cookie preference is honored inside getOrCreateWorkspace so the switch
 // propagates to every page and API route that resolves "the current
@@ -15,6 +17,7 @@
 
 import { auth } from "@/auth";
 import { prisma } from "./prisma";
+import { InviteRequiredError, mayProvisionWorkspace } from "./auth/signup";
 
 /** httpOnly preference cookie naming the user's active workspace. */
 export const ACTIVE_WORKSPACE_COOKIE = "marketr_active_workspace";
@@ -78,6 +81,10 @@ export async function getOrCreateWorkspace(
   }
   const existing = accessible[0];
   if (existing) return existing;
+
+  // Phase 1: SIGNUP_MODE=invite — only the operator gets a workspace
+  // provisioned; everyone else must join through an invite.
+  if (!mayProvisionWorkspace(userId)) throw new InviteRequiredError();
 
   const created = await prisma.workspace.create({
     data: {

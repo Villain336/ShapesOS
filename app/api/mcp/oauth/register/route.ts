@@ -11,11 +11,12 @@
 import type { NextRequest } from "next/server";
 import { registerClient } from "@/lib/mcp/oauth";
 import { checkPreAuthRateLimit } from "@/lib/mcp/rateLimit";
+import { clientIpFromHeaders } from "@/lib/api/client-ip";
 
 export const dynamic = "force-dynamic";
 
 function clientIp(req: NextRequest): string {
-  return req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+  return clientIpFromHeaders(req.headers) ?? "unknown";
 }
 
 export async function POST(req: NextRequest) {

@@ -18,14 +18,13 @@ export default function ApprovalActions({
 }) {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
-  const [otp, setOtp] = useState<string | null>(null);
   const [challengeId, setChallengeId] = useState<string | null>(null);
   const [otpCode, setOtpCode] = useState("");
   const [showOtp, setShowOtp] = useState(false);
   const [revokeReason, setRevokeReason] = useState("");
   const [showRevoke, setShowRevoke] = useState(false);
 
-  async function call(path: string, method: string, body?: unknown) {
+  async function call(path: string, method: string, body?: unknown, reload = true) {
     setBusy(true);
     setMsg(null);
     try {
@@ -36,7 +35,7 @@ export default function ApprovalActions({
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? `${method} failed`);
-      window.location.reload();
+      if (reload) window.location.reload();
       return data;
     } catch (e) {
       setMsg(e instanceof Error ? e.message : String(e));
@@ -47,18 +46,20 @@ export default function ApprovalActions({
   }
 
   async function mintOtp() {
-    const data = await call(`/api/media/approvals/${approvalId}/otp`, "POST", {});
+    // The code is emailed to you (dev servers without SMTP print it to the
+    // server console); it is never returned by the API.
+    const data = await call(`/api/media/approvals/${approvalId}/otp`, "POST", {}, false);
     if (data) {
       setChallengeId(data.challengeId);
-      setOtp(data.code ?? null);
+      setOtpCode("");
       setShowOtp(true);
     }
   }
 
   async function approve() {
     await call(`/api/media/approvals/${approvalId}/approve`, "POST", {
-      method: otp ? "otp" : "sso",
-      ...(otp ? { otpChallengeId: challengeId, otpCode } : {}),
+      method: challengeId ? "otp" : "sso",
+      ...(challengeId ? { otpChallengeId: challengeId, otpCode } : {}),
     });
   }
 
@@ -75,10 +76,10 @@ export default function ApprovalActions({
         {status === "pending" && canAct && (
           <>
             <Button variant="outline" className="rounded-full border border-line bg-paper text-ink shadow-outline hover:bg-hover-paper" onClick={mintOtp} disabled={busy}>
-              Mint OTP
+              Email me a code
             </Button>
             <Button className="bg-done text-white aos-press" onClick={approve} disabled={busy || (showOtp && otpCode.trim().length === 0)}>
-              Approve{showOtp ? " with OTP" : ""}
+              Approve{showOtp ? " with code" : ""}
             </Button>
             <Button variant="destructive" onClick={() => setShowRevoke((v) => !v)} disabled={busy}>
               Revoke
@@ -92,16 +93,18 @@ export default function ApprovalActions({
         )}
       </div>
 
-      {showOtp && otp && (
-        <div className="aos-shape aos-shape--needs aos-shape--edged rounded-lg border border-needs bg-needs-tint p-3 text-xs text-ink">
-          <p className="font-semibold">Test-mode OTP: <span className="font-mono text-base">{otp}</span></p>
+      {showOtp && (
+        <div className="rounded-lg border border-line bg-paper p-3 text-xs text-ink shadow-hairline">
+          <p className="font-semibold">We emailed you a 6-digit approval code.</p>
           <Input
             value={otpCode}
             onChange={(e) => setOtpCode(e.target.value)}
-            placeholder="Enter OTP code"
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            placeholder="Enter the code"
             className="mt-2 rounded-md border border-line bg-paper px-2.5 py-1.5 text-[13px] text-ink placeholder:text-subtle focus:border-focus focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus:outline-none"
           />
-          <p className="mt-1">Production delivers the code out-of-band (authenticator/SMS).</p>
+          <p className="mt-1 text-muted">It works once, for this buy and for you, and expires in 10 minutes.</p>
         </div>
       )}
 

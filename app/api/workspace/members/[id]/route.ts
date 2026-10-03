@@ -1,12 +1,19 @@
 // Marketr — single workspace member API (milestone 11: RBAC).
 // PATCH  /api/workspace/members/[id] { role } → change role (admin+)
 // DELETE /api/workspace/members/[id]          → remove (admin+)
-// The last owner cannot be demoted or removed.
+// Phase 1: nobody grants above their own role, only owners touch owner rows,
+// and the last ACTIVE owner (pending owner invites don't count) cannot be
+// demoted or removed.
 
 import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireUser, getOrCreateWorkspace } from "@/lib/session";
-import { requireWorkspaceRole, forbidden } from "@/lib/authz";
+import {
+  activeOwnerCount,
+  forbidden,
+  memberChangeError,
+  requireWorkspaceRole,
+} from "@/lib/authz";
 import { readJsonBody } from "@/lib/sitefiles/api";
 import type { WorkspaceRole } from "@prisma/client";
 
@@ -31,10 +38,6 @@ async function audit(
   });
 }
 
-async function ownerCount(workspaceId: string) {
-  return prisma.workspaceMember.count({ where: { workspaceId, role: "owner" } });
-}
-
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
@@ -42,8 +45,8 @@ export async function PATCH(
   const user = await requireUser();
   if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
   const workspace = await getOrCreateWorkspace(user.id, user.email);
-  if (!(await requireWorkspaceRole(user.id, workspace.id, "admin")))
-    return forbidden("Member management requires the admin role.");
+  const me = await requireWorkspaceRole(user.id, workspace.id, "admin");
+  if (!me) return forbidden("Member management requires the admin role.");
 
   const { id } = await params;
   const body = await readJsonBody<{ role?: string }>(req);
@@ -56,7 +59,15 @@ export async function PATCH(
   });
   if (!member) return Response.json({ error: "Member not found" }, { status: 404 });
 
-  if (member.role === "owner" && role !== "owner" && (await ownerCount(workspace.id)) <= 1)
+  const denial = memberChangeError(me.role, { currentRole: member.role, nextRole: role });
+  if (denial) return forbidden(denial);
+
+  if (
+    member.role === "owner" &&
+    member.userId &&
+    role !== "owner" &&
+    (await activeOwnerCount(workspace.id)) <= 1
+  )
     return Response.json(
       { error: "Cannot demote the last owner of the workspace." },
       { status: 400 },
@@ -82,8 +93,8 @@ export async function DELETE(
   const user = await requireUser();
   if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
   const workspace = await getOrCreateWorkspace(user.id, user.email);
-  if (!(await requireWorkspaceRole(user.id, workspace.id, "admin")))
-    return forbidden("Member management requires the admin role.");
+  const me = await requireWorkspaceRole(user.id, workspace.id, "admin");
+  if (!me) return forbidden("Member management requires the admin role.");
 
   const { id } = await params;
   const member = await prisma.workspaceMember.findFirst({
@@ -91,7 +102,10 @@ export async function DELETE(
   });
   if (!member) return Response.json({ error: "Member not found" }, { status: 404 });
 
-  if (member.role === "owner" && (await ownerCount(workspace.id)) <= 1)
+  const denial = memberChangeError(me.role, { currentRole: member.role });
+  if (denial) return forbidden(denial);
+
+  if (member.role === "owner" && member.userId && (await activeOwnerCount(workspace.id)) <= 1)
     return Response.json(
       { error: "Cannot remove the last owner of the workspace." },
       { status: 400 },
