@@ -218,9 +218,14 @@ ok("hosting deploy writes audit", has("app/api/websites/[id]/deploy-hosting/rout
 
 // --- 5. Hardening surface ---
 console.log("hardening");
+// Headers are built in lib/security/headers.ts and wired in next.config.ts.
 const nextCfg = readFileSync(join(ROOT, "next.config.ts"), "utf8");
-ok("security headers in next.config.ts", /X-Content-Type-Options/.test(nextCfg) && /X-Frame-Options/.test(nextCfg) && /Strict-Transport-Security/.test(nextCfg));
-ok("HSTS gated on https", /isHttps/.test(nextCfg));
+const headersSrc = readFileSync(join(ROOT, "lib/security/headers.ts"), "utf8");
+ok("security headers wired in next.config.ts", /buildSecurityHeaders/.test(nextCfg) && /headers\(\)/.test(nextCfg));
+ok("security headers defined", /X-Content-Type-Options/.test(headersSrc) && /X-Frame-Options/.test(headersSrc) && /Strict-Transport-Security/.test(headersSrc));
+ok("Content-Security-Policy blocks inline handlers + plugins", /Content-Security-Policy/.test(headersSrc) && /script-src-attr 'none'/.test(headersSrc) && /object-src 'none'/.test(headersSrc));
+ok("HSTS gated on https", /shouldSendHsts/.test(nextCfg) && /startsWith\("http:\/\/"\)/.test(headersSrc));
+ok("X-Powered-By disabled", /poweredByHeader:\s*false/.test(nextCfg));
 const authCfg = readFileSync(join(ROOT, "auth.ts"), "utf8");
 ok("12h session maxAge", /maxAge:\s*12 \* 60 \* 60/.test(authCfg));
 const sso = readFileSync(join(ROOT, "lib/sso.ts"), "utf8");
