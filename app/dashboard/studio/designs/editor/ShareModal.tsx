@@ -17,6 +17,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
+import { confirmAction } from "@/lib/ui/feedback";
 
 interface ShareInfo {
   id: string;
@@ -149,6 +150,13 @@ export function ShareModal({
   };
 
   const revokeShare = async (shareId: string) => {
+    const ok = await confirmAction({
+      title: "Revoke this share link?",
+      description: "Anyone with the link loses access immediately.",
+      confirmLabel: "Revoke",
+      destructive: true,
+    });
+    if (!ok) return;
     try {
       const res = await fetch(`${base}/shares/${shareId}`, { method: "DELETE" });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);

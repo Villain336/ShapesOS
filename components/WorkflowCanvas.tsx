@@ -101,6 +101,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/vault/shadcn/tooltip";
+import { confirmAction } from "@/lib/ui/feedback";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -752,7 +753,7 @@ function CanvasInner({
   };
 
   const deleteWorkflow = async () => {
-    if (!selectedId || !window.confirm("Delete this workflow and its run history?")) return;
+    if (!selectedId || !await confirmAction("Delete this workflow and its run history?")) return;
     const res = await fetch(`/api/workflows/${selectedId}`, { method: "DELETE" });
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));

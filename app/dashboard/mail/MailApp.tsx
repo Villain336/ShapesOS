@@ -25,6 +25,7 @@ import {
   Truck,
   X,
 } from "lucide-react";
+import { toast } from "@/lib/ui/feedback";
 
 type Tab = "campaigns" | "pieces" | "builder";
 
@@ -196,7 +197,7 @@ function CampaignsTab({ onNew }: { onNew: () => void }) {
         `/api/mail/campaigns/${id}/send`,
         { method: "POST" },
       );
-      alert(`Sent ${res.sent} (${res.suppressed} suppressed, ${res.failed} failed) — ${res.renderedOnly ? "test mode, rendered only" : "live"}. Spend ${money(res.spendCents)}.`);
+      toast(`Sent ${res.sent} (${res.suppressed} suppressed, ${res.failed} failed) — ${res.renderedOnly ? "test mode, rendered only" : "live"}. Spend ${money(res.spendCents)}.`);
       await openDetail(id);
       await load();
     } catch (e) {

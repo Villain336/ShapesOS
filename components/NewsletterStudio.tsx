@@ -47,6 +47,7 @@ import {
   type EmailBlockType,
   type EmailTiptapDoc,
 } from "@/lib/newsletter/blocks";
+import { confirmAction } from "@/lib/ui/feedback";
 
 const TemplateEditor = dynamic(() => import("@/components/TemplateEditor"), { ssr: false });
 
@@ -448,7 +449,7 @@ function TemplatesTab({
     onRefresh();
   };
   const remove = async (id: string, name: string) => {
-    if (!confirm(`Delete template "${name}"?`)) return;
+    if (!await confirmAction(`Delete template "${name}"?`)) return;
     setBusy(id);
     const res = await fetch(`/api/newsletter/templates/${id}?projectId=${projectId}`, { method: "DELETE" });
     setNotice(res.ok ? "Deleted." : "Failed.");
@@ -694,7 +695,7 @@ function BroadcastsTab({
     onRefresh();
   };
   const sendNow = async (id: string) => {
-    if (!confirm("Send this broadcast now?")) return;
+    if (!await confirmAction("Send this broadcast now?")) return;
     setBusy(`send-${id}`);
     const res = await fetch(`/api/newsletter/broadcasts/${id}/send`, {
       method: "POST", headers: { "content-type": "application/json" },
@@ -706,7 +707,7 @@ function BroadcastsTab({
     onRefresh();
   };
   const cancel = async (id: string) => {
-    if (!confirm("Cancel this scheduled broadcast?")) return;
+    if (!await confirmAction("Cancel this scheduled broadcast?")) return;
     const res = await fetch(`/api/newsletter/broadcasts/${id}?projectId=${projectId}`, { method: "DELETE" });
     setNotice(res.ok ? "Cancelled." : "Failed.");
     onRefresh();
@@ -896,7 +897,7 @@ function DomainsTab({
     onRefresh();
   };
   const remove = async (id: string, domain: string) => {
-    if (!confirm(`Remove domain ${domain}?`)) return;
+    if (!await confirmAction(`Remove domain ${domain}?`)) return;
     const res = await fetch(`/api/newsletter/domains/${id}?workspaceId=${workspaceId}`, { method: "DELETE" });
     setNotice(res.ok ? "Domain removed." : "Failed.");
     onRefresh();

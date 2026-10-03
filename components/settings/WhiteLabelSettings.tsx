@@ -21,6 +21,7 @@ import { useRouter } from "next/navigation";
 import { Globe, ImagePlus, Loader2, Palette, Trash2 } from "lucide-react";
 import { previewBrandTheme, sanitizeBrandHex, DEFAULT_BRAND_PRIMARY } from "@/lib/brand-theme";
 import { Check } from "lucide-react";
+import { confirmAction } from "@/lib/ui/feedback";
 
 // AOS atoms (local — components/settings/ui.tsx is owned by another slice).
 const cardCls = "rounded-xl border border-line bg-paper p-5";
@@ -124,7 +125,7 @@ export default function WhiteLabelSettings({
 
   async function removeLogo() {
     if (!canEdit || uploading) return;
-    if (!window.confirm("Remove the white-label logo? Public pages will show the default badge again.")) return;
+    if (!await confirmAction("Remove the white-label logo? Public pages will show the default badge again.")) return;
     setUploading(true);
     setNotice(null);
     try {

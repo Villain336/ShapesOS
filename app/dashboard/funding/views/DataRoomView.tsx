@@ -20,6 +20,7 @@ import {
   Upload,
   X,
 } from "lucide-react";
+import { confirmAction } from "@/lib/ui/feedback";
 
 const KIND_LABELS: Record<string, string> = {
   pitch_deck: "Pitch deck",
@@ -213,7 +214,7 @@ export function DataRoomView() {
   };
 
   const deleteDoc = async (id: string) => {
-    if (!window.confirm("Delete this document and its version history?")) return;
+    if (!await confirmAction("Delete this document and its version history?")) return;
     try {
       await api(`/api/funding/data-room/${id}`, { method: "DELETE" });
       setSelectedId(null);

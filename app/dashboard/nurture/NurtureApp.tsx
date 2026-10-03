@@ -44,6 +44,7 @@ import {
   btnSecondary,
   inputCls,
 } from "./ui";
+import { confirmAction } from "@/lib/ui/feedback";
 
 type Tab = "sequences" | "broadcasts" | "enrollments" | "approvals" | "log" | "consent";
 
@@ -153,7 +154,7 @@ export function NurtureApp() {
   };
 
   const archiveSequence = async (id: string) => {
-    if (!confirm("Archive this sequence? Enrollments stop advancing; the message ledger is kept.")) return;
+    if (!await confirmAction("Archive this sequence? Enrollments stop advancing; the message ledger is kept.")) return;
     await api(`/api/nurture/sequences/${id}`, { method: "DELETE" });
     await refreshSequences();
   };

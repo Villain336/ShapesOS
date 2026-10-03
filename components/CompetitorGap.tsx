@@ -6,6 +6,7 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import type { CompetitorKeyword } from "@/lib/providers/types";
+import { confirmAction } from "@/lib/ui/feedback";
 
 type Competitor = {
   id: string;
@@ -84,6 +85,12 @@ export default function CompetitorGap({ projectId }: { projectId: string }) {
   }
 
   async function onRemove(id: string) {
+    const ok = await confirmAction({
+      title: "Remove this competitor?",
+      confirmLabel: "Remove",
+      destructive: true,
+    });
+    if (!ok) return;
     const res = await fetch(`/api/competitors/${id}`, { method: "DELETE" });
     if (res.ok) {
       await loadCompetitors();

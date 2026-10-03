@@ -6,6 +6,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Check, UserPlus, Users } from "lucide-react";
+import { confirmAction } from "@/lib/ui/feedback";
 
 // AOS atoms (local — components/settings/ui.tsx is owned by another slice).
 const cardCls = "rounded-xl border border-line bg-paper p-5";
@@ -146,7 +147,7 @@ export default function PermissionGrantsManager({
   }
 
   async function removeGrant(id: string) {
-    if (!confirm("Remove this permission grant?")) return;
+    if (!await confirmAction("Remove this permission grant?")) return;
     setNotice(null);
     try {
       const r = await fetch(`/api/members/grants/${encodeURIComponent(id)}?${q}`, {

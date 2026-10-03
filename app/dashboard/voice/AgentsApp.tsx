@@ -19,6 +19,7 @@ import {
   VoiceTabs,
   Note,
 } from "./_client";
+import { confirmAction, toastError } from "@/lib/ui/feedback";
 
 interface Agent {
   id: string;
@@ -72,8 +73,21 @@ export function AgentsApp() {
   };
 
   const toggleKill = async (a: Agent) => {
-    const verb = a.killSwitch ? "Release the kill switch for" : "Engage the kill switch for";
-    if (!confirm(`${verb} "${a.name}"?`)) return;
+    const ok = await confirmAction(
+      a.killSwitch
+        ? {
+            title: `Release the kill switch for "${a.name}"?`,
+            description: "The agent can start calling again.",
+            confirmLabel: "Release",
+          }
+        : {
+            title: `Engage the kill switch for "${a.name}"?`,
+            description: "The agent stops placing and taking calls immediately.",
+            confirmLabel: "Engage kill switch",
+            destructive: true,
+          },
+    );
+    if (!ok) return;
     await api(`/api/voice/agents/${a.id}/kill-switch`, {
       method: "POST",
       body: JSON.stringify({ enabled: !a.killSwitch }),
@@ -82,12 +96,12 @@ export function AgentsApp() {
   };
 
   const remove = async (a: Agent) => {
-    if (!confirm(`Delete agent "${a.name}"? Sessions history blocks deletion.`)) return;
+    if (!await confirmAction(`Delete agent "${a.name}"? Sessions history blocks deletion.`)) return;
     try {
       await api(`/api/voice/agents/${a.id}`, { method: "DELETE" });
       await load();
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Delete failed");
+      toastError(e instanceof Error ? e.message : "Delete failed");
     }
   };
 

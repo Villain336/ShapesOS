@@ -17,6 +17,7 @@ import {
   VoiceTabs,
   Note,
 } from "../_client";
+import { confirmAction } from "@/lib/ui/feedback";
 
 interface ConsentRow {
   id: string;
@@ -56,8 +57,14 @@ export function ConsentApp() {
   }, [load]);
 
   const setStatus = async (r: ConsentRow, status: "opted_in" | "opted_out") => {
-    const verb = status === "opted_in" ? "opt in" : "opt OUT";
-    if (!confirm(`${verb} "${r.lead.name}" for ${r.channel}?`)) return;
+    const verb = status === "opted_in" ? "Opt in" : "Opt out";
+    const ok = await confirmAction({
+      title: `${verb} "${r.lead.name}" for ${r.channel}?`,
+      description: "This is recorded as a manual consent review.",
+      confirmLabel: verb,
+      destructive: status === "opted_out",
+    });
+    if (!ok) return;
     setBusyId(r.id);
     try {
       await api("/api/voice/consent", {

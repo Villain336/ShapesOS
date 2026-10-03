@@ -8,6 +8,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import ContentBrowser from "./ContentBrowser";
 import { Plus } from "lucide-react";
+import { confirmAction } from "@/lib/ui/feedback";
 
 interface SiteSummary {
   id: string;
@@ -499,7 +500,7 @@ export default function SitesManager({ projectId }: { projectId: string }) {
   }
 
   async function deleteSite(site: SiteSummary) {
-    if (!confirm(`Delete site "${site.name}"? The working copy is removed too.`)) return;
+    if (!await confirmAction(`Delete site "${site.name}"? The working copy is removed too.`)) return;
     await fetch(`/api/websites/${site.id}?projectId=${projectId}`, { method: "DELETE" });
     await refresh();
   }

@@ -21,6 +21,7 @@ import {
 import { formatMoney } from "../crm/types";
 import { EmptyState } from "../crm/ui";
 import { BundlesSection } from "./BundlesSection";
+import { confirmAction } from "@/lib/ui/feedback";
 
 type Model = "first_touch" | "last_touch" | "linear";
 
@@ -174,7 +175,7 @@ export function AttributionApp() {
   };
 
   const deleteSpend = async (id: string) => {
-    if (!confirm("Delete this spend entry?")) return;
+    if (!await confirmAction("Delete this spend entry?")) return;
     const r = await fetch(`/api/attribution/spend/${id}`, { method: "DELETE" });
     if (r.ok) {
       setSpend((s) => s.filter((x) => x.id !== id));

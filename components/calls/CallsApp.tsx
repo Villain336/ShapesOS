@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { EmptyState } from "../crm/ui";
 import { formatMoney } from "../crm/types";
+import { confirmAction } from "@/lib/ui/feedback";
 
 // ── Agentic OS atoms ─────────────────────────────────────────────────────────
 // Visual migration only: same layout, same behavior. Call/booking statuses
@@ -182,7 +183,7 @@ function NumbersPanel() {
   }
 
   async function release(id: string) {
-    if (!confirm("Release this number? It will stop tracking calls immediately.")) return;
+    if (!await confirmAction("Release this number? It will stop tracking calls immediately.")) return;
     await fetch(`/api/calls/numbers/${id}`, { method: "DELETE" });
     await load();
   }
@@ -426,7 +427,7 @@ function PagesPanel() {
     await load();
   }
   async function remove(id: string) {
-    if (!confirm("Delete this booking page and all its bookings?")) return;
+    if (!await confirmAction("Delete this booking page and all its bookings?")) return;
     await fetch(`/api/calls/booking-pages/${id}`, { method: "DELETE" });
     await load();
   }
@@ -549,7 +550,7 @@ function BookingsPanel() {
   useEffect(() => { load(); }, [load]);
 
   async function cancel(id: string) {
-    if (!confirm("Cancel this booking? Pending reminders will be suppressed.")) return;
+    if (!await confirmAction("Cancel this booking? Pending reminders will be suppressed.")) return;
     await fetch(`/api/calls/bookings/${id}`, {
       method: "PATCH", headers: { "content-type": "application/json" },
       body: JSON.stringify({ status: "cancelled" }),

@@ -7,6 +7,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { CalendarClock, ExternalLink, MailOpen, Plus, Search, Send } from "lucide-react";
 import { Chip, EmptyState, Modal, btnExecute, btnPrimary, btnSecondary, inputCls } from "./ui";
+import { confirmAction, toastError } from "@/lib/ui/feedback";
 
 export interface Broadcast {
   id: number;
@@ -108,7 +109,7 @@ export function BroadcastsTab() {
   const send = async (b: Broadcast, mode: "now" | "scheduled", runAt?: string) => {
     if (mode === "now") {
       if (
-        !confirm(
+        !await confirmAction(
           `Send "${b.name}" to ${b.lists.map((l) => l.name).join(", ")} now? This is an irreversible real email send.`,
         )
       )
@@ -223,7 +224,7 @@ export function BroadcastsTab() {
                               if (!runAt) return;
                               const d = new Date(runAt.replace(" ", "T"));
                               if (!Number.isFinite(d.getTime())) {
-                                alert("Could not parse that date/time.");
+                                toastError("Could not parse that date/time.");
                                 return;
                               }
                               send(b, "scheduled", d.toISOString());

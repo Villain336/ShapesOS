@@ -28,6 +28,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { googleAlertsGuidance } from "@/lib/intelligence/fleet/google-alerts";
+import { confirmAction } from "@/lib/ui/feedback";
 
 // ── Small atoms (same recipe as StudioApp / RadarClient) ─────────────────────
 
@@ -518,6 +519,13 @@ function WatchlistTab({ projects }: { projects: Project[] }) {
 
   const deleteWatch = useCallback(
     async (id: string) => {
+      const ok = await confirmAction({
+        title: "Stop watching this site?",
+        description: "New pages on it will no longer be tracked.",
+        confirmLabel: "Stop watching",
+        destructive: true,
+      });
+      if (!ok) return;
       try {
         await fetch(`/api/intelligence/fleet/watches?id=${encodeURIComponent(id)}`, {
           method: "DELETE",

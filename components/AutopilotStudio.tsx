@@ -46,6 +46,7 @@ import {
   Plus,
   Trash,
 } from "lucide-react";
+import { confirmAction } from "@/lib/ui/feedback";
 
 export interface RuleRow {
   id: string;
@@ -508,7 +509,7 @@ export default function AutopilotStudio({ projectId, canEdit, isAdmin, initialRu
                           size="sm"
                           variant="ghost"
                           className="text-red"
-                          onClick={() => { if (confirm(`Delete rule "${rule.name}"? Items and history stay.`)) doAction(`del-${rule.id}`, () => api(`/api/autopilot/rules/${rule.id}?projectId=${projectId}`, { method: "DELETE" })); }}
+                          onClick={async () => { if (await confirmAction(`Delete rule "${rule.name}"? Items and history stay.`)) doAction(`del-${rule.id}`, () => api(`/api/autopilot/rules/${rule.id}?projectId=${projectId}`, { method: "DELETE" })); }}
                         >
                           <Trash className="h-3.5 w-3.5" /> Delete
                         </Button>

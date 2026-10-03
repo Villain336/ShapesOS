@@ -7,6 +7,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { LayoutTemplate, Database, FileText } from "lucide-react";
+import { confirmAction } from "@/lib/ui/feedback";
 
 export interface TemplateRow {
   id: string;
@@ -426,7 +427,7 @@ function TemplatesTab({
   const datasetColumns = useMemo(() => [...new Set(datasets.flatMap((d) => d.columns))], [datasets]);
 
   async function remove(id: string) {
-    if (!confirm("Delete this template and all its non-published pages?")) return;
+    if (!await confirmAction("Delete this template and all its non-published pages?")) return;
     setDeleting(id);
     setError(null);
     const res = await fetch(`/api/programmatic/templates/${id}?projectId=${projectId}`, { method: "DELETE" });
@@ -567,7 +568,7 @@ function DatasetsTab({
   }
 
   async function remove(id: string) {
-    if (!confirm("Delete this dataset? Generated pages must be deleted first.")) return;
+    if (!await confirmAction("Delete this dataset? Generated pages must be deleted first.")) return;
     const res = await fetch(`/api/programmatic/datasets/${id}?projectId=${projectId}`, { method: "DELETE" });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
@@ -793,7 +794,7 @@ function PagesTab({
 
   async function runGenerate() {
     if (!templateId || !datasetId) return;
-    if (!confirm("Generate pages for all dataset rows? Preview first if you haven't.")) return;
+    if (!await confirmAction("Generate pages for all dataset rows? Preview first if you haven't.")) return;
     setGenerating(true);
     setError(null);
     setGenResult(null);
@@ -825,7 +826,7 @@ function PagesTab({
       return;
     }
     const verb = action === "approve" ? "approve" : "discard";
-    if (!confirm(`${verb} ${selected.size} page(s)? Quality gates run server-side.`)) return;
+    if (!await confirmAction(`${verb} ${selected.size} page(s)? Quality gates run server-side.`)) return;
     setActing(true);
     setActionResult(null);
     const res = await fetch("/api/programmatic/pages", {

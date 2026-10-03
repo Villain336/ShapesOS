@@ -14,6 +14,7 @@ import {
   useState,
 } from "react";
 import type { ChatToolCall } from "@/lib/chat/agent";
+import { confirmAction } from "@/lib/ui/feedback";
 
 export interface ChatThread {
   id: string;
@@ -172,6 +173,13 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
 
   const deleteThread = useCallback(
     async (id: string) => {
+      const ok = await confirmAction({
+        title: "Delete this chat?",
+        description: "Its messages are deleted and can't be recovered.",
+        confirmLabel: "Delete",
+        destructive: true,
+      });
+      if (!ok) return;
       const res = await fetch(`/api/chat/threads/${id}`, { method: "DELETE" });
       if (!res.ok) return;
       setThreads((prev) => {

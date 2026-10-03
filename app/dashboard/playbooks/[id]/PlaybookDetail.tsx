@@ -24,6 +24,7 @@ import {
   X,
   Zap,
 } from "lucide-react";
+import { confirmAction, toastError } from "@/lib/ui/feedback";
 
 type Status = "draft" | "eval" | "review" | "canary" | "production" | "deprecated";
 type Label = "production" | "staging" | "latest";
@@ -197,26 +198,26 @@ export function PlaybookDetail({ playbookId }: { playbookId: string }) {
 
   const transition = async (v: VersionView, to: Status) => {
     const label = to === "deprecated" ? "deprecate" : `promote to ${to}`;
-    if (!confirm(`${label} v${v.version}?${to === "production" ? "\n\nYou are recorded as the human approver." : ""}`)) return;
+    if (!await confirmAction(`${label} v${v.version}?${to === "production" ? "\n\nYou are recorded as the human approver." : ""}`)) return;
     setBusy(`t-${v.id}-${to}`);
     try {
       await post(`/api/playbooks/${playbookId}/versions/${v.id}/transition`, { to });
       await load();
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Transition failed.");
+      toastError(e instanceof Error ? e.message : "Transition failed.");
     } finally {
       setBusy(null);
     }
   };
 
   const rollback = async (v: VersionView) => {
-    if (!confirm(`Roll back the PRODUCTION pointer to v${v.version}? This moves the pointer only — no history is rewritten.`)) return;
+    if (!await confirmAction(`Roll back the PRODUCTION pointer to v${v.version}? This moves the pointer only — no history is rewritten.`)) return;
     setBusy(`r-${v.id}`);
     try {
       await post(`/api/playbooks/${playbookId}/labels`, { label: "production", version: v.version });
       await load();
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Rollback failed.");
+      toastError(e instanceof Error ? e.message : "Rollback failed.");
     } finally {
       setBusy(null);
     }
@@ -229,7 +230,7 @@ export function PlaybookDetail({ playbookId }: { playbookId: string }) {
       setRunResult(j);
       setRunOpen(true);
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Run failed.");
+      toastError(e instanceof Error ? e.message : "Run failed.");
     } finally {
       setRunning(false);
     }

@@ -21,6 +21,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
+import { confirmAction } from "@/lib/ui/feedback";
 
 interface PostizChannel {
   id: string;
@@ -117,7 +118,7 @@ export function SocialApp() {
   useEffect(() => { load(); }, [load]);
 
   const deletePost = async (id: string) => {
-    if (!confirm("Delete this post from the Postiz queue?")) return;
+    if (!await confirmAction("Delete this post from the Postiz queue?")) return;
     setBusy(id);
     setError(null);
     try {
@@ -350,7 +351,7 @@ function ComposeModal({
     setPicked((p) => { const n = new Set(p); if (n.has(id)) n.delete(id); else n.add(id); return n; });
 
   const save = async () => {
-    if (mode === "now" && !confirm(`Publish now to ${picked.size} channel${picked.size === 1 ? "" : "s"}? This posts publicly.`)) return;
+    if (mode === "now" && !await confirmAction(`Publish now to ${picked.size} channel${picked.size === 1 ? "" : "s"}? This posts publicly.`)) return;
     setSaving(true);
     setError(null);
     try {

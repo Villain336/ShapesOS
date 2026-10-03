@@ -6,6 +6,7 @@
 
 import { useEffect, useState } from "react";
 import { Loader2, Plus, AlertTriangle } from "lucide-react";
+import { runUndoable } from "@/lib/ui/feedback";
 
 interface RitualHealth {
   dead: boolean;
@@ -136,19 +137,28 @@ export default function RitualsPanel() {
     }
   }
 
+  // Retiring is soft (active=false; reactivating flips it back), so it runs
+  // immediately and the toast offers Undo instead of a confirm dialog.
   async function retire(r: Ritual) {
-    if (!window.confirm(`Retire "${r.title}"? The team can reactivate it later.`)) return;
-    setBusy(true);
-    try {
+    const setActive = async (active: boolean) => {
       const res = await fetch(`/api/wfh/rituals/${r.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ active: false, wasDead: r.health.dead }),
+        body: JSON.stringify(active ? { active } : { active, wasDead: r.health.dead }),
       });
       if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error ?? "Retire failed");
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error ?? (active ? "Reactivate failed" : "Retire failed"));
       }
+    };
+    setBusy(true);
+    try {
+      await runUndoable({
+        title: `Retired "${r.title}"`,
+        run: () => setActive(false),
+        undo: () => setActive(true),
+        onUndone: () => void reload(),
+      });
       await reload();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Retire failed");

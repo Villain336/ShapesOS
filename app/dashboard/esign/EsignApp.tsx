@@ -34,6 +34,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
+import { confirmAction, toastError } from "@/lib/ui/feedback";
 
 // ── Agentic OS atoms ─────────────────────────────────────────────────────────
 
@@ -830,7 +831,7 @@ function EvidenceCard({ detail, onChanged }: { detail: ApiEnvelopeDetail; onChan
       if (!res.ok) throw new Error(data.error ?? "Action failed.");
       onChanged();
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Action failed.");
+      toastError(e instanceof Error ? e.message : "Action failed.");
     } finally {
       setBusy(false);
     }
@@ -849,7 +850,7 @@ function EvidenceCard({ detail, onChanged }: { detail: ApiEnvelopeDetail; onChan
       a.click();
       URL.revokeObjectURL(a.href);
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Could not build the evidence pack.");
+      toastError(e instanceof Error ? e.message : "Could not build the evidence pack.");
     } finally {
       setBusy(false);
     }
@@ -1656,7 +1657,7 @@ function TemplatesTab({ onOpenEnvelope }: { onOpenEnvelope: (id: string) => void
   }, [load]);
 
   async function remove(id: string) {
-    if (!window.confirm("Delete this template? Existing envelopes keep their copy.")) return;
+    if (!await confirmAction("Delete this template? Existing envelopes keep their copy.")) return;
     setDeleting(id);
     try {
       await fetch(`/api/esign/templates/${id}`, { method: "DELETE" });

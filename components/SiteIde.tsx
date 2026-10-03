@@ -12,6 +12,7 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import { diffLines } from "diff";
 import { Folder, FileText, Plus, Lock, FlaskConical } from "lucide-react";
+import { confirmAction, toastError } from "@/lib/ui/feedback";
 
 const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
   ssr: false,
@@ -425,7 +426,7 @@ export default function SiteIde({
   }
 
   async function deleteConnection(conn: Connection) {
-    if (!confirm(`Remove connection "${conn.label}"?`)) return;
+    if (!await confirmAction(`Remove connection "${conn.label}"?`)) return;
     await fetch(`/api/sites/${conn.id}?projectId=${projectId}`, { method: "DELETE" });
     if (selectedId === conn.id) {
       setSelectedId(null);
@@ -439,7 +440,7 @@ export default function SiteIde({
   const openFile = useCallback(
     async (entry: FileEntry) => {
       if (!fileBase) return;
-      if (dirty && !confirm("Discard unsaved changes?")) return;
+      if (dirty && !await confirmAction("Discard unsaved changes?")) return;
       setFileLoading(true);
       setFileError(null);
       setTruncated(false);
@@ -474,7 +475,7 @@ export default function SiteIde({
       });
       const data = await res.json();
       if (!res.ok) {
-        alert(data.error ?? "Save failed");
+        toastError(data.error ?? "Save failed");
         return;
       }
       setSavedValue(editorValue);
@@ -500,7 +501,7 @@ export default function SiteIde({
     const message = input.trim();
     if (!message || !fileBase || asking) return;
     if (!openPath) {
-      alert("Open a file first so the assistant has context.");
+      toastError("Open a file first so the assistant has context.");
       return;
     }
     setInput("");
@@ -584,7 +585,7 @@ export default function SiteIde({
       });
       const data = await res.json();
       if (!res.ok) {
-        alert(data.error ?? "Apply failed");
+        toastError(data.error ?? "Apply failed");
         setProposals((prev) => prev.map((x) => (x === p ? { ...x, status: "pending" } : x)));
         return;
       }

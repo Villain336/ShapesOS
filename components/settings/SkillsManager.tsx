@@ -7,6 +7,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Check, Link2, PackageCheck, Store, Upload, type LucideIcon } from "lucide-react";
+import { confirmAction } from "@/lib/ui/feedback";
 
 // AOS atoms (local — components/settings/ui.tsx is owned by another slice).
 const cardCls = "rounded-xl border border-line bg-paper p-5";
@@ -249,7 +250,7 @@ export default function SkillsManager({ workspaceId }: { workspaceId: string }) 
   }
 
   async function repin(id: string, name: string) {
-    if (!confirm(`Re-pin "${name}" to the latest commit? This updates its SHA pin.`)) return;
+    if (!await confirmAction(`Re-pin "${name}" to the latest commit? This updates its SHA pin.`)) return;
     setBusy(id);
     setNotice(null);
     try {
@@ -274,7 +275,7 @@ export default function SkillsManager({ workspaceId }: { workspaceId: string }) 
   }
 
   async function removeSkill(id: string, name: string) {
-    if (!confirm(`Delete the "${name}" skill from this workspace?`)) return;
+    if (!await confirmAction(`Delete the "${name}" skill from this workspace?`)) return;
     setBusy(id);
     setNotice(null);
     try {

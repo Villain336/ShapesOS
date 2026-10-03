@@ -9,6 +9,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Pencil, Plus, ShieldAlert, Trash2, X } from "lucide-react";
+import { confirmAction } from "@/lib/ui/feedback";
 // ── AOS atoms (local — app/dashboard/substrate/ui.tsx is owned by another slice) ──
 const inputCls =
   "rounded-md border-[1.5px] border-control bg-paper px-2.5 py-1.5 text-[13px] text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)] focus-visible:outline-none";
@@ -188,6 +189,13 @@ export default function StyleRulesTab({
   }
 
   async function remove(r: StyleRuleView) {
+    const ok = await confirmAction({
+      title: "Delete this style rule?",
+      description: "Agents stop applying it to new content.",
+      confirmLabel: "Delete",
+      destructive: true,
+    });
+    if (!ok) return;
     setBusy(true);
     try {
       const res = await fetch(`/api/intelligence/style-rules/${r.id}?${ws}`, {

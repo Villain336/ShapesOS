@@ -4,6 +4,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { confirmAction } from "@/lib/ui/feedback";
 
 // AOS atoms (local — components/settings/ui.tsx is owned by another slice).
 const inputCls =
@@ -111,7 +112,7 @@ export default function MembersManager({ myRole }: { myRole: string }) {
   }
 
   async function remove(id: string) {
-    if (!confirm("Remove this member from the workspace?")) return;
+    if (!await confirmAction("Remove this member from the workspace?")) return;
     setError(null);
     const r = await fetch(`/api/workspace/members/${id}`, { method: "DELETE" });
     const j = await r.json().catch(() => ({}));

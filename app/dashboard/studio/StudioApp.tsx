@@ -37,6 +37,7 @@ import {
 import { CreativeWizard, ValidationView } from "./CreativeWizard";
 import { QrDesignerTab } from "./QrDesigner";
 import { TEMPLATES } from "@/lib/design/templates";
+import { confirmAction, toastError } from "@/lib/ui/feedback";
 
 // ── Small atoms ──────────────────────────────────────────────────────────────
 
@@ -598,12 +599,12 @@ function DesignsTab() {
 
   const remove = async (d: DesignSummary, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!window.confirm(`Delete “${d.name}”? This cannot be undone.`)) return;
+    if (!await confirmAction(`Delete “${d.name}”? This cannot be undone.`)) return;
     try {
       await api(`/api/studio/designs/${d.id}`, { method: "DELETE" });
       load();
     } catch (err) {
-      window.alert(err instanceof Error ? err.message : "Delete failed.");
+      toastError(err instanceof Error ? err.message : "Delete failed.");
     }
   };
 
@@ -856,12 +857,12 @@ function PagesTab() {
 
   const remove = async (p: PageSummary, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!window.confirm(`Delete “${p.name}”? This cannot be undone.`)) return;
+    if (!await confirmAction(`Delete “${p.name}”? This cannot be undone.`)) return;
     try {
       await api(`/api/studio/pages/${p.id}`, { method: "DELETE" });
       load();
     } catch (err) {
-      window.alert(err instanceof Error ? err.message : "Delete failed.");
+      toastError(err instanceof Error ? err.message : "Delete failed.");
     }
   };
 

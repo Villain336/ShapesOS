@@ -6,6 +6,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Notice, btnCls, cardCls, dangerBtnCls, type NoticeState } from "@/components/settings/ui";
+import { confirmAction } from "@/lib/ui/feedback";
 
 interface SkillRef {
   id: string;
@@ -252,8 +253,8 @@ export default function ScheduleList({
                     <button
                       className={dangerBtnCls}
                       disabled={busy !== null}
-                      onClick={() => {
-                        if (confirm(`Delete this schedule for "${s.skill.name}"? Run history is kept.`)) {
+                      onClick={async () => {
+                        if (await confirmAction(`Delete this schedule for "${s.skill.name}"? Run history is kept.`)) {
                           mutate(s.id, "DELETE");
                         }
                       }}

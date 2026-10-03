@@ -16,6 +16,7 @@ import {
   MAX_GRID_SIZE,
   MIN_GRID_SIZE,
 } from "@/lib/seo/local-cost";
+import { confirmAction } from "@/lib/ui/feedback";
 
 export interface LocalGridRow {
   id: string;
@@ -353,7 +354,7 @@ function GridsPanel({ projectId, canEdit, initialGrids, spend }: Pick<Props, "pr
   }
 
   async function handleDelete(grid: LocalGridRow) {
-    if (!window.confirm(`Delete grid "${grid.name}" and all its run history?`)) return;
+    if (!await confirmAction(`Delete grid "${grid.name}" and all its run history?`)) return;
     setDeleting(grid.id);
     setError(null);
     try {
@@ -647,7 +648,7 @@ function CompetitorsPanel({ projectId, canEdit, initialCompetitors, spend }: Pic
   }
 
   async function handleDelete(c: CompetitorRow) {
-    if (!window.confirm(`Remove competitor "${c.businessName}" and its snapshots?`)) return;
+    if (!await confirmAction(`Remove competitor "${c.businessName}" and its snapshots?`)) return;
     setDeleting(c.id);
     setError(null);
     try {

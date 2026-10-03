@@ -9,6 +9,7 @@
 import { useEffect, useState } from "react";
 import { Check } from "lucide-react";
 import { MCP_TOOL_NAMES, SCOPE_LABELS, scopeForTool, type McpToolName } from "@/lib/mcp/scopes";
+import { confirmAction } from "@/lib/ui/feedback";
 
 // AOS atoms (local — components/settings/ui.tsx is owned by another slice).
 const cardCls = "rounded-xl border border-line bg-paper p-5";
@@ -162,7 +163,7 @@ export default function McpManager() {
   }
 
   async function revoke(id: string) {
-    if (!confirm("Revoke this API key? Calls using it will fail immediately.")) return;
+    if (!await confirmAction("Revoke this API key? Calls using it will fail immediately.")) return;
     const res = await fetch(`/api/mcp/keys/${id}`, { method: "DELETE" });
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
@@ -173,7 +174,7 @@ export default function McpManager() {
   }
 
   async function revokeClient(clientId: string) {
-    if (!confirm("Disconnect this app? All of its tokens stop working immediately.")) return;
+    if (!await confirmAction("Disconnect this app? All of its tokens stop working immediately.")) return;
     const res = await fetch(`/api/mcp/oauth/clients/${encodeURIComponent(clientId)}`, { method: "DELETE" });
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
