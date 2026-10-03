@@ -375,11 +375,14 @@ export function MobileNav({
   workspaces,
   currentWorkspaceId,
   badges,
+  headerActions,
 }: {
   user: SidebarUser;
   workspaces: SidebarWorkspace[];
   currentWorkspaceId: string;
   badges?: SidebarBadges;
+  /** Mobile top-bar slot before the account menu (e.g. the notification bell). */
+  headerActions?: ReactNode;
 }) {
   const pathname = usePathname();
   return (
@@ -405,6 +408,7 @@ export function MobileNav({
             </div>
           </DropdownMenuContent>
         </DropdownMenu>
+        {headerActions}
         <UserMenu user={user} compact />
       </div>
     </header>

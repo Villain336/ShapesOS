@@ -43,10 +43,12 @@ export default async function DashboardLayout({
   });
   const workspaces = await getAccessibleWorkspaces(user.id);
 
-  // Live count pills next to nav rows (see SidebarBadges). `needs-you` is
-  // the Approvals badge slot: mount components/approvals/NeedsYouBadge here,
-  // e.g. { "needs-you": <NeedsYouBadge /> }. Until that component ships the
-  // slot stays empty and the sidebar renders no pill.
+  // Live count pills next to nav rows (see SidebarBadges); the sidebar puts
+  // each one at the end of its row (ml-auto), desktop and mobile.
+  // TODO(phase-3 merge, workstream J): wire the Approvals badge:
+  //   import { NeedsYouBadge } from "@/components/approvals/NeedsYouBadge";
+  //   const sidebarBadges: SidebarBadges = { "needs-you": <NeedsYouBadge /> };
+  // (NeedsYouBadge renders nothing at zero.) Empty until J's branch merges.
   const sidebarBadges: SidebarBadges = {};
 
   const sidebarProps = {
@@ -83,6 +85,10 @@ export default async function DashboardLayout({
         {chatwoot && (
           <ChatwootWidget baseUrl={chatwoot.baseUrl} websiteToken={chatwoot.websiteToken} />
         )}
+        {/* TODO(phase-3 merge, workstream J): J's header bell is desktop-only;
+            mount it on mobile too:
+              import { NotificationBell } from "@/components/notifications/NotificationBell";
+              <MobileNav {...sidebarProps} headerActions={<NotificationBell />} /> */}
         <MobileNav {...sidebarProps} />
         <div className="flex">
           <AppSidebar {...sidebarProps} />
