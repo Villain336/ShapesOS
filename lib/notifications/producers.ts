@@ -9,11 +9,14 @@
 
 import type { Prisma, WorkspaceRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { ROLE_RANK } from "@/lib/authz";
 import { INBOX_SOURCE_LABELS, type InboxSourceKey } from "@/lib/approvals/types";
 import { createNotifications, type NotificationInput } from "./store";
 
 export type ProducerDb = Pick<Prisma.TransactionClient, "notification" | "workspaceMember" | "workspace">;
+
+// Same ranks as lib/authz ROLE_RANK — kept local so lib/authz can import the
+// producers statically without an import cycle.
+const ROLE_RANK: Record<WorkspaceRole, number> = { viewer: 1, editor: 2, admin: 3, owner: 4 };
 
 /** Upper bound on fan-out per event (large workspaces get the most senior first). */
 const MAX_RECIPIENTS = 100;

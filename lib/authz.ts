@@ -15,6 +15,7 @@
 import { prisma } from "./prisma";
 import { randomBytes } from "node:crypto";
 import type { WorkspaceMember, WorkspaceRole } from "@prisma/client";
+import { notifyInviteAccepted } from "./notifications/producers";
 
 export const ROLE_RANK: Record<WorkspaceRole, number> = {
   viewer: 1,
@@ -108,18 +109,12 @@ export async function claimInviteToken(
     },
   });
   // Phase 3 (J): best-effort notification to admins/owners (never throws).
-  // Imported lazily: producers import this module (role ranks).
-  try {
-    const { notifyInviteAccepted } = await import("./notifications/producers");
-    await notifyInviteAccepted({
-      workspaceId: pending.workspaceId,
-      memberUserId: userId,
-      email: normalized,
-      role: pending.role,
-    });
-  } catch {
-    // never fail the claim over a notification
-  }
+  await notifyInviteAccepted({
+    workspaceId: pending.workspaceId,
+    memberUserId: userId,
+    email: normalized,
+    role: pending.role,
+  });
   return { ...pending, userId, inviteToken: null, inviteExpiresAt: null };
 }
 
