@@ -1,7 +1,8 @@
 // Marketr — Wave 2 context.dev slice 1: DB-backed daily budget store.
 //
-// One ContextDevBudget row per workspace per UTC day. checkAndReserve is the
-// gate every Context.dev call passes BEFORE the API is hit. The reserve is
+// One ContextDevBudget row per workspace per UTC day; a new day's row starts
+// with the latest earlier day's cap (a configured cap carries forward).
+// checkAndReserve is the gate every Context.dev call passes BEFORE the API is hit. The reserve is
 // ONE conditional UPDATE (credits_used + cost <= cap_credits): N concurrent
 // calls can never all see headroom and overshoot the cap. Today's row is
 // created first with INSERT … ON CONFLICT DO NOTHING, so concurrent
@@ -22,6 +23,20 @@ export interface DailyBudget {
   capCredits: number;
 }
 
+/**
+ * The cap a day without its own row starts with: the most recent earlier
+ * day's cap (a configured cap carries forward), else the default. Without
+ * this every new UTC day silently reset a configured cap to the default.
+ */
+export async function carriedCap(workspaceId: string, day: string = todayKey()): Promise<number> {
+  const prev = await prisma.contextDevBudget.findFirst({
+    where: { workspaceId, day: { lt: day } },
+    orderBy: { day: "desc" },
+    select: { capCredits: true },
+  });
+  return prev?.capCredits ?? DEFAULT_DAILY_CAP_CREDITS;
+}
+
 export async function getDailyBudget(workspaceId: string, day: string = todayKey()): Promise<DailyBudget> {
   const row = await prisma.contextDevBudget.findUnique({
     where: { workspaceId_day: { workspaceId, day } },
@@ -30,11 +45,11 @@ export async function getDailyBudget(workspaceId: string, day: string = todayKey
   return {
     day,
     usedToday: row?.creditsUsed ?? 0,
-    capCredits: row?.capCredits ?? DEFAULT_DAILY_CAP_CREDITS,
+    capCredits: row ? row.capCredits : await carriedCap(workspaceId, day),
   };
 }
 
-/** Set (or change) the workspace's daily cap. Applies from today forward. */
+/** Set (or change) the workspace's daily cap. Applies from today forward (later days carry it). */
 export async function setDailyCap(workspaceId: string, capCredits: number): Promise<DailyBudget> {
   if (!Number.isInteger(capCredits) || capCredits < 0) {
     throw new Error("contextdev: capCredits must be a non-negative integer");
@@ -74,11 +89,18 @@ export async function checkAndReserve(
       budget: before,
     };
   }
-  // Today's row exists before we reserve against it (same default cap a
-  // missing row reads as in getDailyBudget).
+  // Today's row exists before we reserve against it, seeded with the cap a
+  // missing row reads as in getDailyBudget: the latest earlier day's cap
+  // (carried forward), else the default.
   await prisma.$executeRaw`
     INSERT INTO context_dev_budgets (id, workspace_id, day, credits_used, cap_credits, created_at, updated_at)
-    VALUES (${randomUUID()}, ${workspaceId}, ${day}, 0, ${DEFAULT_DAILY_CAP_CREDITS}, now(), now())
+    SELECT ${randomUUID()}, ${workspaceId}, ${day}, 0,
+           COALESCE(
+             (SELECT prev.cap_credits FROM context_dev_budgets prev
+               WHERE prev.workspace_id = ${workspaceId} AND prev.day < ${day}
+               ORDER BY prev.day DESC LIMIT 1),
+             ${DEFAULT_DAILY_CAP_CREDITS}),
+           now(), now()
     ON CONFLICT (workspace_id, day) DO NOTHING`;
   // The reserve: check and charge in one statement (row-locked by UPDATE).
   const reserved = await prisma.$queryRaw<Array<{ creditsUsed: number; capCredits: number }>>`
