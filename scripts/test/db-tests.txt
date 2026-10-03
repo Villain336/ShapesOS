@@ -38,6 +38,7 @@ lib/messaging/__tests__/dispatch-claim.test.ts
 lib/messaging/__tests__/inbound-sms-workspace.test.ts
 lib/metering/__tests__/credits-integrity-db.test.ts
 lib/metering/__tests__/self-hosted-cap-db.test.ts
+lib/metering/__tests__/trial-db.test.ts
 lib/notifications/__tests__/notifications-db.test.ts
 lib/ops/__tests__/ops-consume-db.test.ts
 lib/ops/__tests__/ops-rls.test.ts
@@ -57,3 +58,4 @@ lib/substrate/memory/__tests__/learning-pass.test.ts
 lib/substrate/memory/__tests__/rls-least-privilege-db.test.ts
 lib/voice/__tests__/pronunciation.test.ts
 lib/voice/__tests__/voiceover.test.ts
+lib/workspace/__tests__/lifecycle-db.test.ts

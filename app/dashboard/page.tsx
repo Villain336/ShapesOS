@@ -18,6 +18,9 @@ import {
 } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { getOrCreateWorkspace, requireUser } from "@/lib/session";
+import { redirect } from "next/navigation";
+import { getMembership } from "@/lib/authz";
+import { needsOnboarding } from "@/lib/workspace/onboarding";
 import { providerStatus } from "@/lib/providers";
 import ProjectCreateForm from "@/components/ProjectCreateForm";
 import { Card, CardBody, CardHeader } from "@/components/vault/Card";
@@ -50,6 +53,9 @@ export default async function DashboardPage() {
   if (!user) return null; // layout already redirects
 
   const workspace = await getOrCreateWorkspace(user.id, user.email);
+  // Phase 3: a brand-new workspace opens on first-run setup, once (admins only).
+  const me = await getMembership(user.id, workspace.id);
+  if (needsOnboarding(workspace, me?.role)) redirect("/dashboard/welcome");
   const projects = await prisma.project.findMany({
     where: { workspaceId: workspace.id },
     orderBy: { createdAt: "desc" },

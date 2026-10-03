@@ -139,6 +139,10 @@ export function creditsFor(action: string): number {
 
 export const TIER_INCLUDED_CREDITS = {
   self_hosted: 0, // self-host = BYO keys; metering records locally, no pool billed
+  // Phase 3: hosted trial (lib/billing/trial.ts). One-time pool ($5) for the
+  // 14-day trial — it does not refill at a month boundary — behind the hard
+  // cap; no auto-overage.
+  trial: 500,
   starter: 2500, // $29/mo
   pro: 10000, // $79/mo
   agency: 30000, // $199/mo

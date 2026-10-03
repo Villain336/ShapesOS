@@ -12,6 +12,8 @@ import { AppSidebar, MobileNav, type SidebarBadges } from "@/components/AppSideb
 import { DashboardMain } from "@/components/DashboardMain";
 // Phase 3 (J): desktop header — "needs you" shortcut + notification bell.
 import { AppTopBar } from "@/components/AppTopBar";
+import { NeedsYouBadge } from "@/components/approvals/NeedsYouBadge";
+import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { ChatProvider } from "@/components/chat/ChatContext";
 import { CommandBar } from "@/components/command-bar/CommandBar";
 // Shared confirm dialog + toast stack (lib/ui/feedback.ts).
@@ -28,6 +30,10 @@ import { growthBookSdkConfig } from "@/lib/integrations/growthbook";
 import { BrandTheme } from "@/components/BrandTheme";
 import { sanitizeBrandHex } from "@/lib/brand-theme";
 import { prisma } from "@/lib/prisma";
+// Phase 3: hosted trial notice + billing reachable from the sidebar.
+import { getMembership, roleAtLeast } from "@/lib/authz";
+import { trialView } from "@/lib/billing/trial";
+import { TrialBanner } from "@/components/workspace/TrialBanner";
 
 export default async function DashboardLayout({
   children,
@@ -43,21 +49,24 @@ export default async function DashboardLayout({
     if (err instanceof InviteRequiredError) redirect(INVITE_REQUIRED_PATH);
     throw err;
   });
-  const workspaces = await getAccessibleWorkspaces(user.id);
+  const [workspaces, membership] = await Promise.all([
+    getAccessibleWorkspaces(user.id),
+    getMembership(user.id, workspace.id),
+  ]);
+  const isAdmin = roleAtLeast(membership?.role, "admin");
+  const trial = trialView(workspace);
 
   // Live count pills next to nav rows (see SidebarBadges); the sidebar puts
   // each one at the end of its row (ml-auto), desktop and mobile.
-  // TODO(phase-3 merge, workstream J): wire the Approvals badge:
-  //   import { NeedsYouBadge } from "@/components/approvals/NeedsYouBadge";
-  //   const sidebarBadges: SidebarBadges = { "needs-you": <NeedsYouBadge /> };
-  // (NeedsYouBadge renders nothing at zero.) Empty until J's branch merges.
-  const sidebarBadges: SidebarBadges = {};
+  // NeedsYouBadge renders nothing at zero.
+  const sidebarBadges: SidebarBadges = { "needs-you": <NeedsYouBadge /> };
 
   const sidebarProps = {
     user: { name: user.name, email: user.email },
     workspaces: workspaces.map((w) => ({ id: w.id, name: w.name })),
     currentWorkspaceId: workspace.id,
     badges: sidebarBadges,
+    canManageBilling: isAdmin,
   };
 
   // Phase 12 (embeds): Chatwoot widget config resolved server-side; the
@@ -87,17 +96,18 @@ export default async function DashboardLayout({
         {chatwoot && (
           <ChatwootWidget baseUrl={chatwoot.baseUrl} websiteToken={chatwoot.websiteToken} />
         )}
-        {/* TODO(phase-3 merge, workstream J): J's header bell is desktop-only;
-            mount it on mobile too:
-              import { NotificationBell } from "@/components/notifications/NotificationBell";
-              <MobileNav {...sidebarProps} headerActions={<NotificationBell />} /> */}
-        <MobileNav {...sidebarProps} />
+        {/* AppTopBar (bell + needs-you) is desktop-only; mobile gets the bell here. */}
+        <MobileNav {...sidebarProps} headerActions={<NotificationBell />} />
         <div className="flex">
           <AppSidebar {...sidebarProps} />
           <div className="min-w-0 flex-1">
             <AppTopBar />
             <GrowthBookProvider config={gbConfig}>
-              <DashboardMain>{children}</DashboardMain>
+              <DashboardMain
+                banner={trial ? <TrialBanner trial={trial} canManageBilling={isAdmin} /> : null}
+              >
+                {children}
+              </DashboardMain>
             </GrowthBookProvider>
           </div>
         </div>

@@ -221,7 +221,7 @@ export default function BillingSection({ workspaceId }: { workspaceId: string })
             <span className="text-muted">Current plan:</span>{" "}
             <strong className="text-ink">
               {planInfo.plans.find((p) => p.id === planInfo.currentPlan)?.name ??
-                (planInfo.currentPlan === "self_hosted" ? "Self-hosted" : planInfo.currentPlan)}
+                (planInfo.currentPlan === "self_hosted" ? "Self-hosted" : planInfo.currentPlan === "trial" ? "Trial" : planInfo.currentPlan)}
             </strong>
             <span className="text-muted">
               {" · "}

@@ -41,13 +41,18 @@ export default function MembersManager({ myRole }: { myRole: string }) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [inviteUrl, setInviteUrl] = useState<string | null>(null);
+  // Phase 3: invites are emailed when the deployment has mail set up.
+  const [inviteEmail, setInviteEmail] = useState(false);
+  const [inviteResult, setInviteResult] = useState<{ emailed: boolean; to: string; note?: string } | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
+  const [resent, setResent] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const r = await fetch("/api/workspace/members");
     if (r.ok) {
       const j = await r.json();
       setMembers(j.members ?? []);
+      setInviteEmail(j.inviteEmail === true);
     }
   }, []);
 
@@ -58,6 +63,7 @@ export default function MembersManager({ myRole }: { myRole: string }) {
   async function invite() {
     setError(null);
     setInviteUrl(null);
+    setInviteResult(null);
     setBusy(true);
     try {
       const r = await fetch("/api/workspace/members", {
@@ -71,6 +77,7 @@ export default function MembersManager({ myRole }: { myRole: string }) {
         return;
       }
       if (j.inviteUrl) setInviteUrl(j.inviteUrl);
+      setInviteResult({ emailed: j.emailed === true, to: email, note: j.emailNote });
       setEmail("");
       await load();
     } finally {
@@ -99,6 +106,26 @@ export default function MembersManager({ myRole }: { myRole: string }) {
     }
   }
 
+  async function emailInviteAgain(id: string) {
+    setError(null);
+    const r = await fetch(`/api/workspace/members/${id}/invite-link`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email: true }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      setError(j.error ?? "Could not send the invite.");
+      return;
+    }
+    if (!j.emailed) {
+      setError(j.emailNote ?? "The invite email didn't go out. Copy the invite link instead.");
+      return;
+    }
+    setResent(id);
+    setTimeout(() => setResent(null), 2000);
+  }
+
   async function changeRole(id: string, newRole: string) {
     setError(null);
     const r = await fetch(`/api/workspace/members/${id}`, {
@@ -125,9 +152,10 @@ export default function MembersManager({ myRole }: { myRole: string }) {
       <div className="rounded-xl border border-line bg-paper p-5">
         <h2 className="text-sm font-medium text-ink">Invite a teammate</h2>
         <p className="mt-1 text-xs text-muted">
-          They join through a single-use invite link (valid 7 days) — no email
-          is sent, so share the link with them directly. Your role:{" "}
-          <span className="font-mono">{myRole}</span>
+          {inviteEmail
+            ? "We email them a single-use invite link (valid 7 days). You can also copy the link and send it yourself."
+            : "They join through a single-use invite link (valid 7 days). Email isn't set up on this deployment, so share the link with them directly."}{" "}
+          Your role: <span className="font-mono">{myRole}</span>
         </p>
         <div className="mt-3 flex flex-wrap gap-2">
           <input
@@ -162,7 +190,9 @@ export default function MembersManager({ myRole }: { myRole: string }) {
         {inviteUrl && (
           <div className="mt-3 rounded-md border border-line bg-canvas p-3">
             <p className="text-xs text-muted">
-              Invite created — share this single-use link with them:
+              {inviteResult?.emailed
+                ? `Invite emailed to ${inviteResult.to}. The same single-use link, if you'd rather send it yourself:`
+                : `${inviteResult?.note ? `${inviteResult.note} ` : ""}Invite created — share this single-use link with them:`}
             </p>
             <div className="mt-2 flex items-center gap-2">
               <code className="min-w-0 flex-1 truncate rounded bg-paper px-2 py-1 font-mono text-xs text-muted">
@@ -221,7 +251,7 @@ export default function MembersManager({ myRole }: { myRole: string }) {
                 <td className="px-4 py-3">
                   {m.pending ? (
                     <span className={chipCls}>
-                      pending — needs invite link
+                      {inviteEmail ? "pending invite" : "pending — needs invite link"}
                     </span>
                   ) : (
                     <span className={chipCls}>active</span>
@@ -229,9 +259,18 @@ export default function MembersManager({ myRole }: { myRole: string }) {
                 </td>
                 <td className="px-4 py-3 text-right">
                   <div className="flex justify-end gap-2">
+                    {m.pending && inviteEmail && m.email && (
+                      <button
+                        onClick={() => emailInviteAgain(m.id)}
+                        className="rounded-full px-3 py-1 text-xs font-semibold text-ink shadow-control hover:bg-hover-paper"
+                      >
+                        {resent === m.id ? "Sent" : "Email invite again"}
+                      </button>
+                    )}
                     {m.pending && (
                       <button
                         onClick={() => copyInviteLink(m.id)}
+                        title="Makes a fresh link. Earlier links, including an emailed one, stop working."
                         className="rounded-md border border-line px-2 py-1 text-xs text-muted hover:bg-hover-paper"
                       >
                         {copied === m.id ? "Copied!" : "Copy invite link"}

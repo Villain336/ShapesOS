@@ -15,6 +15,10 @@ datasource db {
 
 enum Plan {
   self_hosted
+  // Phase 3: hosted signups start here (DEPLOYMENT_MODE=hosted). Billed-plan
+  // behaviour: a small included pool behind a hard cap, read-only for
+  // metered actions once Workspace.trialEndsAt passes (lib/billing/trial.ts).
+  trial
   starter
   pro
   agency
@@ -307,6 +311,13 @@ enum FileChangeAction {
   campaign_link_attached
   campaign_link_detached
   link_proposal_resolved
+  // Phase 3 (accounts): workspace lifecycle + agency client records.
+  // Deletion is recorded in workspace_lifecycle_events (survives the cascade).
+  workspace_created
+  workspace_renamed
+  client_created
+  client_updated
+  client_deleted
 }
 
 // ---------------------------------------------------------------------------
@@ -495,6 +506,16 @@ model Workspace {
   // Phase C (W5): MCP server opt-in. OFF by default — the new attack surface
   // only exists for workspaces whose admin explicitly enables it.
   mcpEnabled Boolean @default(false) @map("mcp_enabled")
+
+  // Phase 3: end of the hosted trial (plan = trial). Past it, metered actions
+  // are refused until the workspace picks a paid plan (lib/billing/trial.ts).
+  trialEndsAt DateTime? @map("trial_ends_at")
+
+  // Phase 3: first-run onboarding wizard. Null completedAt = not finished or
+  // skipped yet (existing workspaces were backfilled as completed);
+  // onboardingStep is the resume point.
+  onboardingStep        String?   @map("onboarding_step")
+  onboardingCompletedAt DateTime? @map("onboarding_completed_at")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -906,6 +927,25 @@ model Workspace {
   notifications             Notification[]
 
   @@map("workspaces")
+}
+
+// Phase 3 (accounts): workspace create / rename / delete audit trail.
+// Deliberately NOT a foreign key to workspaces: a deleted workspace's
+// cascade must not erase the record that it was deleted, by whom, and when.
+// Also the source of truth for "has this user already had a hosted trial".
+model WorkspaceLifecycleEvent {
+  id            String   @id @default(cuid())
+  workspaceId   String   @map("workspace_id")
+  workspaceName String   @map("workspace_name")
+  actorUserId   String   @map("actor_user_id")
+  // created | renamed | deleted
+  action        String
+  detail        Json     @default("{}")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@index([workspaceId, createdAt])
+  @@index([actorUserId, action])
+  @@map("workspace_lifecycle_events")
 }
 
 model Project {

@@ -4,16 +4,19 @@
 // Mints a fresh single-use token (invalidating the previous link) so an
 // admin can re-share an invite without deleting and re-creating the row.
 // Only pending members (userId null) have invite links.
+// Phase 3: POST with { email: true } also emails the fresh link to the
+// invitee when the deployment has mail set up.
 
 import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireUser, getOrCreateWorkspace } from "@/lib/session";
 import { mintInviteToken, requireWorkspaceRole, forbidden, memberChangeError } from "@/lib/authz";
+import { sendInviteEmail } from "@/lib/workspace/invite-mail";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const user = await requireUser();
@@ -38,5 +41,24 @@ export async function POST(
     where: { id: member.id },
     data: { inviteToken, inviteExpiresAt },
   });
-  return Response.json({ ok: true, inviteUrl: `/invite?token=${inviteToken}` });
+  const inviteUrl = `/invite?token=${inviteToken}`;
+  const body = (await req.json().catch(() => null)) as { email?: unknown } | null;
+  if (body?.email === true && member.email) {
+    const mail = await sendInviteEmail({
+      to: member.email,
+      workspaceName: workspace.name,
+      inviterName: user.name || user.email || "A teammate",
+      role: member.role,
+      inviteUrl,
+      expiresAt: inviteExpiresAt,
+      requestOrigin: new URL(req.url).origin,
+    });
+    return Response.json({
+      ok: true,
+      inviteUrl,
+      emailed: mail.sent,
+      ...(mail.sent ? {} : { emailNote: mail.message }),
+    });
+  }
+  return Response.json({ ok: true, inviteUrl });
 }
