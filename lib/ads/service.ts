@@ -205,13 +205,24 @@ async function recordSpend(db: Db, workspaceId: string, cents: number): Promise<
 // Brand constraints (M12 brand kits)
 // ---------------------------------------------------------------------------
 
-export async function getBrandConstraints(db: Db, brandKitId: string | null): Promise<BrandConstraints | null> {
+export async function getBrandConstraints(
+  db: Db,
+  workspaceId: string,
+  brandKitId: string | null,
+): Promise<BrandConstraints | null> {
   if (!brandKitId) return null;
-  const kit = await db.brandKit.findUnique({ where: { id: brandKitId } });
+  const kit = await db.brandKit.findFirst({ where: { id: brandKitId, workspaceId } });
   if (!kit) return null;
   const colors = (kit.colors ?? {}) as Record<string, string>;
   const fonts = (kit.fonts ?? {}) as Record<string, string>;
   return { colors, fonts, tone: kit.tone ?? null, hasLogo: !!kit.logoPath };
+}
+
+/** A campaign may only reference a brand kit from its own workspace. */
+async function assertBrandKitInWorkspace(db: Db, workspaceId: string, brandKitId: string | null | undefined) {
+  if (!brandKitId) return;
+  const kit = await db.brandKit.findFirst({ where: { id: brandKitId, workspaceId }, select: { id: true } });
+  if (!kit) throw new AdGuardError("Brand kit not found in this workspace.");
 }
 
 // ---------------------------------------------------------------------------
@@ -235,6 +246,7 @@ export async function createCampaign(
 ) {
   const name = args.name.trim();
   if (!name) throw new AdGuardError("Campaign name is required.");
+  await assertBrandKitInWorkspace(db, workspaceId, args.brandKitId);
   const campaign = await db.adCampaign.create({
     data: {
       projectId,
@@ -262,7 +274,10 @@ export async function updateCampaign(
     data.name = name;
   }
   if (args.objective !== undefined) data.objective = args.objective?.trim() || null;
-  if (args.brandKitId !== undefined) data.brandKitId = args.brandKitId;
+  if (args.brandKitId !== undefined) {
+    await assertBrandKitInWorkspace(db, workspaceId, args.brandKitId);
+    data.brandKitId = args.brandKitId;
+  }
   if (args.channels !== undefined) data.channels = args.channels;
   const campaign = await db.adCampaign.update({ where: { id: campaignId }, data });
   await auditAds(db, workspaceId, campaign.projectId, "ad_campaign_updated", `Ad campaign updated: ${campaign.name}`, actor);
@@ -329,7 +344,7 @@ export async function generateCreatives(
   const estimate = estimateCostCents(args.type, variants);
   await checkCap(db, workspaceId, estimate);
 
-  const brand = await getBrandConstraints(db, campaign.brandKitId);
+  const brand = await getBrandConstraints(db, workspaceId, campaign.brandKitId);
   if (!brand) throw new AdGuardError("The campaign's brand kit no longer exists — pick another one.");
 
   const modelPath = args.modelPath ?? (args.type === "video" ? DEFAULT_VIDEO_MODEL : DEFAULT_IMAGE_MODEL);
