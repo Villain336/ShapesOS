@@ -66,6 +66,47 @@ describe("validateExpense", () => {
   });
 });
 
+// Phase 2 regression cases (audit 2026-10-03 §5: WFH expense validation).
+describe("validateExpense — strict inputs", () => {
+  const base = {
+    categoryKey: "internet",
+    amountCents: 1000 as unknown,
+    occurredOn: "2026-09-15" as Date | string,
+    allocation: { method: "flat_percent" as const, percent: 50 },
+  };
+  const errs = (patch: Record<string, unknown>) => validateExpense({ ...base, ...patch }).errors;
+
+  it("rejects half-cents, absurd amounts and non-numbers instead of rounding", () => {
+    assert.match(errs({ amountCents: 0.5 }).join(), /whole number/);
+    assert.match(errs({ amountCents: 1e15 }).join(), /at most/);
+    assert.match(errs({ amountCents: 100_000_001 }).join(), /at most/);
+    assert.match(errs({ amountCents: "1000" }).join(), /amountCents/);
+    assert.match(errs({ amountCents: Number.NaN }).join(), /amountCents/);
+    assert.equal(validateExpense({ ...base, amountCents: 100_000_000 }).ok, true);
+  });
+
+  it("rejects impossible calendar dates (no silent roll-over) and implausible years", () => {
+    assert.match(errs({ occurredOn: "2026-02-30" }).join(), /not a real calendar date/);
+    assert.match(errs({ occurredOn: "2026-13-01" }).join(), /not a real calendar date/);
+    assert.match(errs({ occurredOn: "1900-01-01" }).join(), /year must be/);
+    assert.match(errs({ occurredOn: "15/09/2026" }).join(), /YYYY-MM-DD/);
+    assert.match(errs({ occurredOn: new Date("1999-12-31T12:00:00Z") }).join(), /year must be/);
+    const leap = validateExpense({ ...base, occurredOn: "2024-02-29" });
+    assert.equal(leap.ok, true);
+    assert.equal(leap.normalized?.occurredOn.toISOString(), "2024-02-29T12:00:00.000Z");
+    // The UI's full ISO timestamp still validates.
+    assert.equal(validateExpense({ ...base, occurredOn: "2026-09-15T12:00:00.000Z" }).ok, true);
+  });
+
+  it("validates currency as an ISO-4217 string (a number is an error, not a crash)", () => {
+    assert.doesNotThrow(() => validateExpense({ ...base, currency: 840 }));
+    assert.match(errs({ currency: 840 }).join(), /ISO 4217/);
+    assert.match(errs({ currency: "US" }).join(), /ISO 4217/);
+    assert.match(errs({ currency: "ZZZ" }).join(), /ISO 4217/);
+    assert.equal(validateExpense({ ...base, currency: "eur" }).normalized?.currency, "EUR");
+  });
+});
+
 describe("recomputeDeductible / toLedgerEntry", () => {
   it("recomputes after an allocation change", () => {
     assert.equal(recomputeDeductible(10000, 15), 1500);
