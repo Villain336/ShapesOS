@@ -11,8 +11,9 @@
 //   - redirect following is capped (default 5 hops).
 //
 // Redirect semantics: 301/302/303 convert to GET and drop the body (browser
-// behavior — the Authorization header is NOT resent with a body to a new
-// location); 307/308 preserve method and body but only to a validated URL.
+// behavior); 307/308 preserve method and body but only to a validated URL.
+// A hop that changes origin drops Authorization, Cookie and
+// Proxy-Authorization, so a redirect can never carry credentials elsewhere.
 // Non-GET requests never have their body forwarded cross-origin implicitly:
 // the hop is validated first, and only 307/308 keep the body per spec.
 //
@@ -28,6 +29,9 @@ export interface SafeFetchOptions {
 
 const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
 
+/** Credential-bearing headers removed when a redirect changes origin. */
+const CROSS_ORIGIN_STRIPPED_HEADERS = ["authorization", "cookie", "proxy-authorization"];
+
 export async function safeFetch(
   url: string,
   init: RequestInit = {},
@@ -40,7 +44,7 @@ export async function safeFetch(
   await assertSafeUrl(url, { resolve: opts.resolve });
   let current = url;
   let method = (init.method ?? "GET").toUpperCase();
-  let headers = init.headers;
+  let headers: Headers = new Headers(init.headers);
   let body = init.body;
 
   for (let hop = 0; ; hop++) {
@@ -66,6 +70,12 @@ export async function safeFetch(
     // Re-validate EVERY hop: DNS is re-resolved, so a redirect to an
     // internal address (or a rebinding hostname) is rejected here.
     await assertSafeUrl(next, { resolve: opts.resolve });
+    if (new URL(next).origin !== new URL(current).origin) {
+      // Never leak credentials to another origin (fetch spec behavior for
+      // Authorization; Cookie/Proxy-Authorization for good measure).
+      headers = new Headers(headers);
+      for (const h of CROSS_ORIGIN_STRIPPED_HEADERS) headers.delete(h);
+    }
     current = next;
     if (res.status === 301 || res.status === 302 || res.status === 303) {
       // Browser behavior: drop the body, follow as GET.
