@@ -15,7 +15,9 @@
 //         with a fresh nonce (also put on the REQUEST headers, where Next's
 //         renderer reads it and stamps it on its own <script> tags — see
 //         node_modules/next/dist/docs/01-app/02-guides/content-security-policy.md);
-//       /api/*                               → API_CONTENT_SECURITY_POLICY.
+//       /api/*                               → API_CONTENT_SECURITY_POLICY;
+//       user file bytes outside /api (the data-room viewer's ?dl= stream)
+//                                            → USER_FILE_VIEW_CSP (sandboxed).
 //
 // Page policy (script-src) — strict CSP:
 //   'nonce-…' 'strict-dynamic': only scripts Next rendered with the nonce run,
@@ -117,12 +119,39 @@ export const API_CONTENT_SECURITY_POLICY = [
   "sandbox allow-forms allow-popups allow-popups-to-escape-sandbox",
 ].join("; ");
 
-/** Which policy a request path gets (see header comment). */
+/**
+ * CSP for user file bytes served OUTSIDE /api — today the public data-room
+ * viewer's file stream (/r/funding/<token>?dl=1, loaded in the viewer page's
+ * iframe). Same stance as the project-download "sandbox" policy: a
+ * sandboxed (opaque-origin, scriptless, plugin-less, no forms) document that
+ * can show an image or media from itself and may only be framed by our own
+ * pages. Sent by proxy.ts (a route's own CSP header would be dropped in
+ * favour of the proxy's) AND by the route, so both always agree.
+ */
+export const USER_FILE_VIEW_CSP = [
+  "sandbox",
+  "default-src 'none'",
+  "img-src 'self' data:",
+  "media-src 'self'",
+  "style-src 'unsafe-inline'",
+  "frame-ancestors 'self'",
+  "base-uri 'none'",
+  "form-action 'none'",
+].join("; ");
+
+/** Requests outside /api whose response is user file bytes (see USER_FILE_VIEW_CSP). */
+export function isUserFileRequest(pathname: string, search: URLSearchParams | string = ""): boolean {
+  const params = typeof search === "string" ? new URLSearchParams(search) : search;
+  return /^\/r\/funding\/[^/]+\/?$/.test(pathname) && params.has("dl");
+}
+
+/** Which policy a request gets (see header comment). */
 export function contentSecurityPolicyFor(
   pathname: string,
-  opts: { nonce: string; dev?: boolean },
+  opts: { nonce: string; dev?: boolean; search?: URLSearchParams | string },
 ): string {
   if (pathname === "/api" || pathname.startsWith("/api/")) return API_CONTENT_SECURITY_POLICY;
+  if (isUserFileRequest(pathname, opts.search ?? "")) return USER_FILE_VIEW_CSP;
   return buildContentSecurityPolicy(opts);
 }
 

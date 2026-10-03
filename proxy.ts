@@ -4,7 +4,9 @@
 //   a fresh nonce per request; the policy (lib/security/headers.ts, the single
 //   source of truth) goes on the REQUEST headers — Next's renderer parses the
 //   nonce out of it and stamps it on its own scripts — and on the response.
-//   /api/* gets the scriptless API policy instead (no nonce involved).
+//   /api/* gets the scriptless API policy instead (no nonce involved), and
+//   user file bytes outside /api (the data-room viewer's ?dl= stream) get the
+//   sandboxed file policy.
 //
 // API requests only — single choke point for Fix 6 (Phase A hardening):
 //   1. Oversize-body guard: declared Content-Length past the cap → 400
@@ -60,6 +62,9 @@ export async function proxy(req: NextRequest) {
   const csp = contentSecurityPolicyFor(req.nextUrl.pathname, {
     nonce,
     dev: process.env.NODE_ENV === "development",
+    // User file bytes outside /api (data-room ?dl= stream) get the sandboxed
+    // file policy — a route's own CSP header never survives this one.
+    search: req.nextUrl.searchParams,
   });
   const withCsp = <T extends Response>(res: T): T => {
     res.headers.set("Content-Security-Policy", csp);

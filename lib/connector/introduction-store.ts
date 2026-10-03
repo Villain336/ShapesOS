@@ -541,8 +541,12 @@ export class PrismaIntroductionStore {
     const declinedBy = requireHumanActor({ kind: "human", identity: opts.declinedBy }, "tenant_decline");
     const reason = typeof opts.reason === "string" && opts.reason.trim() ? opts.reason.trim() : null;
     const now = new Date();
+    // Expiry is enforced on every proposed-state action, not only sends: a
+    // lapsed proposal is flipped to expired (its terminal state) and the
+    // decline refused with intro_expired (409).
+    await this.expireIfPastWindow(workspaceId, intro, now);
 
-    const updated = await this.transition(workspaceId, intro, { tenantApproved: false }, {
+    const updated = await this.transition(workspaceId, intro, { tenantApproved: false, createdAt: { gt: expiryCutoff(now) } }, {
         status: "declined",
         declinedBy,
         declinedAt: now,
@@ -631,8 +635,9 @@ export class PrismaIntroductionStore {
     const identity = requireHumanActor(actor, "side_a_decline");
     const note = typeof opts.note === "string" && opts.note.trim() ? opts.note.trim() : null;
     const now = new Date();
+    await this.expireIfPastWindow(workspaceId, intro, now);
 
-    const updated = await this.transition(workspaceId, intro, { tenantApproved: true }, {
+    const updated = await this.transition(workspaceId, intro, { tenantApproved: true, createdAt: { gt: expiryCutoff(now) } }, {
         status: "declined",
         sideAAcceptedBy: null,
         declinedBy: identity,
@@ -893,12 +898,17 @@ export class PrismaIntroductionStore {
     assertIntroTransition(intro.status, "withdraw");
     const withdrawnBy = requireHumanActor({ kind: "human", identity: opts.withdrawnBy }, "withdraw");
     const now = new Date();
+    // A lapsed proposal is already over: it becomes expired (not withdrawn)
+    // and the call gets intro_expired (409), like every other action on it.
+    // Only the proposed state expires; later states withdraw as before.
+    await this.expireIfPastWindow(workspaceId, intro, now);
 
-    const updated = await this.transition(workspaceId, intro, {}, {
-        status: "withdrawn",
-        withdrawnBy,
-        withdrawnAt: now,
-    });
+    const updated = await this.transition(
+      workspaceId,
+      intro,
+      intro.status === "proposed" ? { createdAt: { gt: expiryCutoff(now) } } : {},
+      { status: "withdrawn", withdrawnBy, withdrawnAt: now },
+    );
 
     await this.recordEvent(
       workspaceId,

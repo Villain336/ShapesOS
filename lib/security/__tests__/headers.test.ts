@@ -11,8 +11,10 @@ import {
   buildSecurityHeaders,
   contentSecurityPolicyFor,
   generateCspNonce,
+  isUserFileRequest,
   shouldSendHsts,
   USER_CONTENT_CSP,
+  USER_FILE_VIEW_CSP,
 } from "../headers";
 import { brandLogoHeaders } from "../../brand-logo";
 import { buildDownloadHeaders } from "../../filesystem/download";
@@ -117,6 +119,30 @@ describe("API Content-Security-Policy", () => {
     for (const p of ["/", "/dashboard", "/apiary", "/admin", "/r/funding/x", "/s/abc"]) {
       assert.equal(getScriptNonceFromHeader(contentSecurityPolicyFor(p, { nonce: NONCE })), NONCE, p);
     }
+  });
+});
+
+describe("user file view Content-Security-Policy (outside /api)", () => {
+  const d = directives(USER_FILE_VIEW_CSP);
+
+  it("is sandboxed and scriptless, like the project-download policy", () => {
+    assert.equal(d.has("sandbox"), true);
+    assert.equal(d.get("sandbox"), "", "no allow-* tokens: no scripts, forms, popups or same-origin");
+    assert.equal(d.get("default-src"), "'none'");
+    assert.equal(d.has("script-src"), false);
+    assert.equal(d.get("frame-ancestors"), "'self'", "only our own viewer page may frame it");
+    assert.equal(d.get("form-action"), "'none'");
+  });
+
+  it("is chosen only for the data-room file stream", () => {
+    assert.equal(isUserFileRequest("/r/funding/abc", "?dl=1"), true);
+    assert.equal(isUserFileRequest("/r/funding/abc", new URLSearchParams("v=1&dl=1")), true);
+    assert.equal(isUserFileRequest("/r/funding/abc", "?v=1"), false);
+    assert.equal(isUserFileRequest("/r/funding/abc/views/x", "?dl=1"), false);
+    assert.equal(isUserFileRequest("/dashboard", "?dl=1"), false);
+    assert.equal(contentSecurityPolicyFor("/r/funding/abc", { nonce: NONCE, search: "?dl=1" }), USER_FILE_VIEW_CSP);
+    assert.equal(contentSecurityPolicyFor("/api/files/x", { nonce: NONCE, search: "?dl=1" }), API_CONTENT_SECURITY_POLICY);
+    assert.equal(getScriptNonceFromHeader(contentSecurityPolicyFor("/r/funding/abc", { nonce: NONCE })), NONCE);
   });
 });
 

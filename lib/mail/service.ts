@@ -43,7 +43,7 @@ import { FakeMailProvider } from "./fake";
 import { LobProvider } from "./lob";
 import { PostGridProvider } from "./postgrid";
 import { BadRequestError, ConflictError, NotFoundError } from "@/lib/api/errors";
-import { notifyApprovalNeeded } from "@/lib/notifications/producers";
+import { notifyApprovalDecided, notifyApprovalNeeded } from "@/lib/notifications/producers";
 
 export const MAIL_CONSENT_CHANNEL = "mail";
 export const SENDABLE_VERIFICATION = ["valid", "corrected"] as const;
@@ -522,7 +522,7 @@ export async function decideApproval(
 ) {
   const approval = await prisma.mailApproval.findFirst({
     where: { id: approvalId },
-    include: { campaign: { select: { id: true, workspaceId: true, status: true } } },
+    include: { campaign: { select: { id: true, workspaceId: true, status: true, name: true, createdBy: true } } },
   });
   if (!approval || approval.campaign.workspaceId !== workspaceId) {
     throw new NotFoundError("Approval not found");
@@ -543,6 +543,18 @@ export async function decideApproval(
   await prisma.mailCampaign.update({
     where: { id: approval.campaignId },
     data: { status: decision === "approve" ? "approved" : "cancelled" },
+  });
+  // Phase 4a: best-effort "decided" notification (never throws). Until it
+  // is decided, approverId holds the requester (set by requestApproval).
+  await notifyApprovalDecided({
+    workspaceId,
+    source: "mail",
+    sourceId: approval.id,
+    title: `${approval.campaign.name ?? "Direct mail campaign"} · ${approval.pieceCount} pieces`,
+    decision: decision === "approve" ? "approved" : "denied",
+    decidedBy: approverId,
+    requestedBy: approval.approverId ?? approval.campaign.createdBy ?? null,
+    href: "/dashboard/mail",
   });
   return updated;
 }
