@@ -7,6 +7,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { LayoutTemplate, Database, FileText } from "lucide-react";
+import { confirmAction } from "@/lib/ui/feedback";
+import { closeOnEscape } from "@/lib/ui/keyboard";
 
 export interface TemplateRow {
   id: string;
@@ -426,7 +428,7 @@ function TemplatesTab({
   const datasetColumns = useMemo(() => [...new Set(datasets.flatMap((d) => d.columns))], [datasets]);
 
   async function remove(id: string) {
-    if (!confirm("Delete this template and all its non-published pages?")) return;
+    if (!await confirmAction("Delete this template and all its non-published pages?")) return;
     setDeleting(id);
     setError(null);
     const res = await fetch(`/api/programmatic/templates/${id}?projectId=${projectId}`, { method: "DELETE" });
@@ -567,7 +569,7 @@ function DatasetsTab({
   }
 
   async function remove(id: string) {
-    if (!confirm("Delete this dataset? Generated pages must be deleted first.")) return;
+    if (!await confirmAction("Delete this dataset? Generated pages must be deleted first.")) return;
     const res = await fetch(`/api/programmatic/datasets/${id}?projectId=${projectId}`, { method: "DELETE" });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
@@ -793,7 +795,7 @@ function PagesTab({
 
   async function runGenerate() {
     if (!templateId || !datasetId) return;
-    if (!confirm("Generate pages for all dataset rows? Preview first if you haven't.")) return;
+    if (!await confirmAction("Generate pages for all dataset rows? Preview first if you haven't.")) return;
     setGenerating(true);
     setError(null);
     setGenResult(null);
@@ -825,7 +827,7 @@ function PagesTab({
       return;
     }
     const verb = action === "approve" ? "approve" : "discard";
-    if (!confirm(`${verb} ${selected.size} page(s)? Quality gates run server-side.`)) return;
+    if (!await confirmAction(`${verb} ${selected.size} page(s)? Quality gates run server-side.`)) return;
     setActing(true);
     setActionResult(null);
     const res = await fetch("/api/programmatic/pages", {
@@ -1121,7 +1123,7 @@ function PagesTab({
 
       {/* Publish destination summary modal */}
       {pushModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => setPushModal(false)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" role="presentation" onClick={() => setPushModal(false)} onKeyDown={closeOnEscape(() => setPushModal(false))}>
           <div className="w-full max-w-2xl rounded-xl border border-zinc-200 bg-zinc-50 p-6" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-base font-semibold">Publish {selected.size} page(s)</h3>
             <p className="mt-1 text-xs text-zinc-500">
@@ -1210,7 +1212,7 @@ function PagesTab({
 
       {/* Preview drawer */}
       {drawer && (
-        <div className="fixed inset-0 z-50 flex justify-end bg-black/60" onClick={() => setDrawer(null)}>
+        <div className="fixed inset-0 z-50 flex justify-end bg-black/60" role="presentation" onClick={() => setDrawer(null)} onKeyDown={closeOnEscape(() => setDrawer(null))}>
           <div className="h-full w-full max-w-2xl overflow-y-auto bg-zinc-50 p-6" onClick={(e) => e.stopPropagation()}>
             <div className="mb-4 flex items-start justify-between">
               <div>

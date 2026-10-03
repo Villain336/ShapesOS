@@ -20,6 +20,8 @@ import {
   Upload,
   X,
 } from "lucide-react";
+import { confirmAction } from "@/lib/ui/feedback";
+import { activateOnKey } from "@/lib/ui/keyboard";
 
 const KIND_LABELS: Record<string, string> = {
   pitch_deck: "Pitch deck",
@@ -213,7 +215,7 @@ export function DataRoomView() {
   };
 
   const deleteDoc = async (id: string) => {
-    if (!window.confirm("Delete this document and its version history?")) return;
+    if (!await confirmAction("Delete this document and its version history?")) return;
     try {
       await api(`/api/funding/data-room/${id}`, { method: "DELETE" });
       setSelectedId(null);
@@ -371,6 +373,8 @@ export function DataRoomView() {
                 <tr
                   key={d.id}
                   onClick={() => void openDetail(d.id)}
+                  tabIndex={0}
+                  onKeyDown={activateOnKey(() => void openDetail(d.id))}
                   className="cursor-pointer border-b border-line last:border-0 hover:bg-canvas"
                 >
                   <td className="px-4 py-3">

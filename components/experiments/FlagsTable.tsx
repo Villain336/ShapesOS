@@ -10,6 +10,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { FlaskConical, RefreshCw, RotateCcw, TerminalSquare } from "lucide-react";
+import { confirmAction } from "@/lib/ui/feedback";
 
 interface Feature {
   id: string;
@@ -111,6 +112,13 @@ export function FlagsTable() {
   }
 
   async function reset(feature: Feature) {
+    const ok = await confirmAction({
+      title: `Reset "${feature.id}" to its default?`,
+      description: "This workspace's override is deleted.",
+      confirmLabel: "Reset",
+      destructive: true,
+    });
+    if (!ok) return;
     setToggling(feature.id);
     try {
       const res = await fetch(`/api/experiments/flags/${encodeURIComponent(feature.id)}`, {

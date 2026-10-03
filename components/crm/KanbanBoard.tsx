@@ -6,6 +6,7 @@ import type { CrmLead, CrmPipeline } from "./types";
 import { formatMoney } from "./types";
 import { Avatar, EmptyState, ScoreBar, StageBadge, kanbanCardCls, kanbanColCls, kanbanColOverCls } from "./ui";
 import { Kanban } from "lucide-react";
+import { activateOnKey } from "@/lib/ui/keyboard";
 
 export function KanbanBoard({
   leads, pipeline, onOpen, onMove,
@@ -64,6 +65,10 @@ export function KanbanBoard({
                   onDragStart={() => setDragId(l.id)}
                   onDragEnd={() => { setDragId(null); setOverCol(null); }}
                   onClick={() => onOpen(l.id)}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`Open ${l.name}`}
+                  onKeyDown={activateOnKey(() => onOpen(l.id))}
                   style={{ opacity: dragId === l.id ? 0.5 : 1 }}
                 >
                   <div className="flex items-center gap-2">

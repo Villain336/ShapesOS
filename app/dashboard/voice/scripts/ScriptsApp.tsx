@@ -20,6 +20,7 @@ import {
   VoiceTabs,
   Note,
 } from "../_client";
+import { confirmAction } from "@/lib/ui/feedback";
 
 interface ScriptRow {
   id: string;
@@ -65,7 +66,7 @@ export function ScriptsApp() {
       approve: `Approve "${s.name}" v${s.version}? This stamps your user id as the human reviewer.`,
       reject: `Reject "${s.name}" v${s.version}?`,
     };
-    if (!confirm(labels[action])) return;
+    if (!await confirmAction(labels[action])) return;
     setBusyId(s.id);
     try {
       await api(`/api/voice/scripts/${s.id}/approve`, {

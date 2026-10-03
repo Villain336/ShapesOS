@@ -7,6 +7,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Plus } from "lucide-react";
+import { confirmAction } from "@/lib/ui/feedback";
 
 interface ContentItem {
   id: string;
@@ -149,7 +150,7 @@ export default function ContentBrowser({ projectId, siteId, sourceType, isMock }
   }
 
   async function remove(item: ContentItem) {
-    if (!confirm(`Delete “${item.title}”?`)) return;
+    if (!await confirmAction(`Delete “${item.title}”?`)) return;
     try {
       await call("delete", {
         kind: sourceType === "webflow" ? "item" : tab,

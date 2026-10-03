@@ -27,6 +27,7 @@ import {
   X,
   CheckCircle2,
 } from "lucide-react";
+import { confirmAction } from "@/lib/ui/feedback";
 
 interface VersionLite {
   id: string;
@@ -395,6 +396,12 @@ function BomSection({
 
   async function deleteLine(lineId: string) {
     if (!selected) return;
+    const ok = await confirmAction({
+      title: "Delete this BOM line?",
+      confirmLabel: "Delete",
+      destructive: true,
+    });
+    if (!ok) return;
     setBusy(true);
     try {
       await api(`/api/cad/bom-lines/${lineId}`, { method: "DELETE" });
@@ -1138,6 +1145,12 @@ function RateCardSection({ rateCards, onChanged }: { rateCards: RateCard[]; onCh
   }
 
   async function remove(id: string) {
+    const ok = await confirmAction({
+      title: "Delete this rate card?",
+      confirmLabel: "Delete",
+      destructive: true,
+    });
+    if (!ok) return;
     setBusy(true);
     setError(null);
     try {

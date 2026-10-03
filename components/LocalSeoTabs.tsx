@@ -16,6 +16,8 @@ import {
   MAX_GRID_SIZE,
   MIN_GRID_SIZE,
 } from "@/lib/seo/local-cost";
+import { confirmAction } from "@/lib/ui/feedback";
+import { closeOnEscape } from "@/lib/ui/keyboard";
 
 export interface LocalGridRow {
   id: string;
@@ -143,9 +145,13 @@ function Modal({ onClose, children }: { onClose: () => void; children: React.Rea
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+      role="presentation"
       onClick={onClose}
+      onKeyDown={closeOnEscape(onClose)}
     >
       <div
+        role="dialog"
+        aria-modal="true"
         className="w-full max-w-lg rounded-lg border border-zinc-200 bg-white p-6"
         onClick={(e) => e.stopPropagation()}
       >
@@ -353,7 +359,7 @@ function GridsPanel({ projectId, canEdit, initialGrids, spend }: Pick<Props, "pr
   }
 
   async function handleDelete(grid: LocalGridRow) {
-    if (!window.confirm(`Delete grid "${grid.name}" and all its run history?`)) return;
+    if (!await confirmAction(`Delete grid "${grid.name}" and all its run history?`)) return;
     setDeleting(grid.id);
     setError(null);
     try {
@@ -647,7 +653,7 @@ function CompetitorsPanel({ projectId, canEdit, initialCompetitors, spend }: Pic
   }
 
   async function handleDelete(c: CompetitorRow) {
-    if (!window.confirm(`Remove competitor "${c.businessName}" and its snapshots?`)) return;
+    if (!await confirmAction(`Remove competitor "${c.businessName}" and its snapshots?`)) return;
     setDeleting(c.id);
     setError(null);
     try {

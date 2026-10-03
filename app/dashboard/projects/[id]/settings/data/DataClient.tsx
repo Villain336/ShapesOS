@@ -20,6 +20,7 @@ import {
 import { buttonVariants } from "@/components/vault/atoms/button-variants";
 import { cn } from "@/lib/utils";
 import { EmptyState } from "@/components/vault/EmptyState";
+import { confirmAction } from "@/lib/ui/feedback";
 
 export interface BindingRow {
   id: string;
@@ -125,6 +126,13 @@ export default function DataClient({
   }
 
   async function unbind(bindingId: string) {
+    const ok = await confirmAction({
+      title: "Unlink this data source?",
+      description: "The project stops using it. The data source itself is kept.",
+      confirmLabel: "Unlink",
+      destructive: true,
+    });
+    if (!ok) return;
     setBusy(true);
     setError(null);
     try {

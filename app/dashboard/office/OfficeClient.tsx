@@ -15,6 +15,7 @@ import {
   ArrowLeft,
   Download,
 } from "lucide-react";
+import { confirmAction } from "@/lib/ui/feedback";
 
 const UniverEmbed = dynamic(() => import("@/components/office/UniverEmbed"), {
   ssr: false,
@@ -156,7 +157,7 @@ export function OfficeClient({ initialDocs, openId }: { initialDocs: DocSummary[
   }
 
   async function remove(id: string, title: string) {
-    if (!window.confirm(`Delete "${title}"? This cannot be undone.`)) return;
+    if (!await confirmAction(`Delete "${title}"? This cannot be undone.`)) return;
     const res = await fetch(`/api/office/docs/${id}`, { method: "DELETE" });
     if (!res.ok) {
       flash("err", "Delete failed.");

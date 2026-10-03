@@ -204,7 +204,7 @@ export default function ChatComposer({
         <div
           role="presentation"
           onClick={() => inputRef.current?.focus()}
-          className="flex cursor-text flex-col gap-2 rounded-control border border-line bg-field p-2.5 shadow-[0_1px_2px_rgba(0,0,0,0.035)] transition-[border-color,box-shadow] duration-150 focus-within:border-line-strong focus-within:shadow-[0_1px_2px_rgba(0,0,0,0.025)]"
+          className="flex cursor-text flex-col gap-2 rounded-control border border-line bg-field p-2.5 shadow-[0_1px_2px_rgba(0,0,0,0.035)] transition-[border-color,box-shadow] duration-150 focus-within:border-focus focus-within:shadow-[0_0_0_3px_var(--aos-focus-halo)]"
         >
           <input
             ref={inputRef}
@@ -215,6 +215,7 @@ export default function ChatComposer({
             }}
             placeholder={l.placeholder}
             aria-label="Chat prompt"
+            data-focus-ring="container"
             className="min-h-4.5 bg-transparent text-[13px] leading-[1.4] text-ink outline-none placeholder:text-ink-3"
           />
           <div className="flex items-center justify-end">

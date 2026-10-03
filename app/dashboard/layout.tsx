@@ -8,12 +8,14 @@ import {
   requireUser,
 } from "@/lib/session";
 import { INVITE_REQUIRED_PATH, InviteRequiredError } from "@/lib/auth/signup";
-import { AppSidebar, MobileNav } from "@/components/AppSidebar";
+import { AppSidebar, MobileNav, type SidebarBadges } from "@/components/AppSidebar";
 import { DashboardMain } from "@/components/DashboardMain";
 // Phase 3 (J): desktop header — "needs you" shortcut + notification bell.
 import { AppTopBar } from "@/components/AppTopBar";
 import { ChatProvider } from "@/components/chat/ChatContext";
 import { CommandBar } from "@/components/command-bar/CommandBar";
+// Shared confirm dialog + toast stack (lib/ui/feedback.ts).
+import { FeedbackHost } from "@/components/feedback/FeedbackHost";
 // Phase 12 (embeds): Chatwoot live-chat widget. Renders nothing unless the
 // operator opted in via CHATWOOT_WIDGET_ENABLED=true + credentials.
 import { ChatwootWidget } from "@/components/chat/ChatwootWidget";
@@ -43,10 +45,19 @@ export default async function DashboardLayout({
   });
   const workspaces = await getAccessibleWorkspaces(user.id);
 
+  // Live count pills next to nav rows (see SidebarBadges); the sidebar puts
+  // each one at the end of its row (ml-auto), desktop and mobile.
+  // TODO(phase-3 merge, workstream J): wire the Approvals badge:
+  //   import { NeedsYouBadge } from "@/components/approvals/NeedsYouBadge";
+  //   const sidebarBadges: SidebarBadges = { "needs-you": <NeedsYouBadge /> };
+  // (NeedsYouBadge renders nothing at zero.) Empty until J's branch merges.
+  const sidebarBadges: SidebarBadges = {};
+
   const sidebarProps = {
     user: { name: user.name, email: user.email },
     workspaces: workspaces.map((w) => ({ id: w.id, name: w.name })),
     currentWorkspaceId: workspace.id,
+    badges: sidebarBadges,
   };
 
   // Phase 12 (embeds): Chatwoot widget config resolved server-side; the
@@ -72,9 +83,14 @@ export default async function DashboardLayout({
     <BrandTheme primary={brandPrimary}>
       <ChatProvider>
         <CommandBar workspaceId={workspace.id} />
+        <FeedbackHost />
         {chatwoot && (
           <ChatwootWidget baseUrl={chatwoot.baseUrl} websiteToken={chatwoot.websiteToken} />
         )}
+        {/* TODO(phase-3 merge, workstream J): J's header bell is desktop-only;
+            mount it on mobile too:
+              import { NotificationBell } from "@/components/notifications/NotificationBell";
+              <MobileNav {...sidebarProps} headerActions={<NotificationBell />} /> */}
         <MobileNav {...sidebarProps} />
         <div className="flex">
           <AppSidebar {...sidebarProps} />

@@ -28,6 +28,8 @@ import {
   XCircle,
 } from "lucide-react";
 import { googleAlertsGuidance } from "@/lib/intelligence/fleet/google-alerts";
+import { confirmAction } from "@/lib/ui/feedback";
+import { activateOnKey } from "@/lib/ui/keyboard";
 
 // ── Small atoms (same recipe as StudioApp / RadarClient) ─────────────────────
 
@@ -376,6 +378,8 @@ function ChangesTab({ projects }: { projects: Project[] }) {
               <tr
                 key={c.id}
                 onClick={() => setExpandedId(expandedId === c.id ? null : c.id)}
+                tabIndex={0}
+                onKeyDown={activateOnKey(() => setExpandedId(expandedId === c.id ? null : c.id))}
                 className={`cursor-pointer border-b border-line last:border-0 hover:bg-hover-paper ${
                   expandedId === c.id ? "bg-hover-paper" : ""
                 }`}
@@ -518,6 +522,13 @@ function WatchlistTab({ projects }: { projects: Project[] }) {
 
   const deleteWatch = useCallback(
     async (id: string) => {
+      const ok = await confirmAction({
+        title: "Stop watching this site?",
+        description: "New pages on it will no longer be tracked.",
+        confirmLabel: "Stop watching",
+        destructive: true,
+      });
+      if (!ok) return;
       try {
         await fetch(`/api/intelligence/fleet/watches?id=${encodeURIComponent(id)}`, {
           method: "DELETE",

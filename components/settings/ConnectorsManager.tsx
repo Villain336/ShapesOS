@@ -8,6 +8,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Activity, Check, Plug } from "lucide-react";
 import ConnectorHealthTab from "./ConnectorHealthTab";
 import McpReadOnlyToolsEditor from "./McpReadOnlyToolsEditor";
+import { confirmAction } from "@/lib/ui/feedback";
 
 // AOS atoms (local — components/settings/ui.tsx is owned by another slice).
 const cardCls = "rounded-xl border border-line bg-paper p-5";
@@ -208,7 +209,7 @@ export default function ConnectorsManager({
   }
 
   async function disconnect(id: string, label: string) {
-    if (!confirm(`Disconnect "${label}"? The agent will lose access to it.`)) return;
+    if (!await confirmAction(`Disconnect "${label}"? The agent will lose access to it.`)) return;
     setBusy(`disc-${id}`);
     setNotice(null);
     try {
@@ -261,7 +262,7 @@ export default function ConnectorsManager({
 
   async function deleteMcp(connector: Connector) {
     const key = connector.id ?? connector.key;
-    if (!confirm(`Delete the custom MCP server "${connector.displayName}"?`)) return;
+    if (!await confirmAction(`Delete the custom MCP server "${connector.displayName}"?`)) return;
     setBusy(`mcp-${connector.key}`);
     setNotice(null);
     try {

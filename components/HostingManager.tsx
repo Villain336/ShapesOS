@@ -8,6 +8,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { confirmAction } from "@/lib/ui/feedback";
 
 interface HostingConnection {
   id: string;
@@ -208,7 +209,7 @@ export default function HostingManager({ projectId }: { projectId: string }) {
   }
 
   async function deleteConn(id: string, name: string) {
-    if (!confirm(`Remove hosting connection "${name}"? Deployments made through it are kept.`)) return;
+    if (!await confirmAction(`Remove hosting connection "${name}"? Deployments made through it are kept.`)) return;
     await fetch(`/api/hosting/connections/${id}?projectId=${projectId}`, { method: "DELETE" });
     await refresh();
   }

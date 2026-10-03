@@ -5,6 +5,7 @@
 
 import { useEffect, useState } from "react";
 import { previewBrandTheme, sanitizeBrandHex } from "@/lib/brand-theme";
+import { confirmAction } from "@/lib/ui/feedback";
 
 interface BrandKit {
   id: string;
@@ -116,7 +117,7 @@ export default function BrandKitManager({ initial }: { initial: BrandKit[] }) {
   }
 
   async function remove(id: string) {
-    if (!confirm("Delete this brand kit? Templates using it will fall back to the default kit.")) return;
+    if (!await confirmAction("Delete this brand kit? Templates using it will fall back to the default kit.")) return;
     const res = await fetch(`/api/brand-kits/${id}`, { method: "DELETE" });
     if (res.ok) setKits((prev) => prev.filter((k) => k.id !== id));
   }

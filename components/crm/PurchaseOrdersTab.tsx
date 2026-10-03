@@ -11,6 +11,7 @@ import { formatMoney } from "./types";
 import { PODetail } from "./PODetail";
 import { NewPOModal } from "./NewPOModal";
 import { btnPrimary, chipCls, errorBoxCls, inputCls, selectCls, tableCls, tableWrapCls, trClickableCls } from "./ui";
+import { activateOnKey } from "@/lib/ui/keyboard";
 
 export interface OpsPurchaseOrder {
   id: string;
@@ -212,7 +213,7 @@ export function PurchaseOrdersTab() {
               {filtered.map((po) => {
                 const meta = PO_STATUS_META[po.status];
                 return (
-                  <tr key={po.id} onClick={() => setSelectedId(po.id)} className={trClickableCls}>
+                  <tr key={po.id} onClick={() => setSelectedId(po.id)} tabIndex={0} onKeyDown={activateOnKey(() => setSelectedId(po.id))} className={trClickableCls}>
                     <td className="font-semibold text-ink">PO-{shortPOId(po.id)}</td>
                     <td className="text-ink">{supplierLabel(po)}</td>
                     <td>

@@ -34,6 +34,7 @@ import {
   type ParsedDeclarations,
   type RenewalAlertLevel,
 } from "@/lib/insurance/types";
+import { confirmAction } from "@/lib/ui/feedback";
 
 // ── House atoms ──────────────────────────────────────────────────────────────
 
@@ -634,7 +635,7 @@ export function InsuranceApp() {
           ? "This partner will be able to satisfy the bind gate again."
           : "Binding will be blocked (PARTNER_NOT_APPOINTED) until an active partner is on file.";
       if (
-        !window.confirm(
+        !await confirmAction(
           `${status === "active" ? "Reactivate" : status === "suspended" ? "Suspend" : "Revoke"} "${p.name}"?\n\n${consequence}`,
         )
       ) {

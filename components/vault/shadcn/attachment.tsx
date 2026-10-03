@@ -172,7 +172,7 @@ function AttachmentTrigger({
     <Comp
       data-slot="attachment-trigger"
       type={asChild ? undefined : (type ?? "button")}
-      className={cn("absolute inset-0 z-10 outline-none", className)}
+      className={cn("absolute inset-0 z-10 rounded-[inherit] outline-none focus-visible:ring-2 focus-visible:ring-focus", className)}
       {...props}
     />
   )

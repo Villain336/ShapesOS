@@ -36,6 +36,7 @@ import {
   MAX_VARIANTS,
   type AspectRatio,
 } from "@/lib/ads/brief";
+import { confirmAction } from "@/lib/ui/feedback";
 
 export interface StudioBrandKit {
   id: string;
@@ -224,7 +225,7 @@ export default function AdFactory({ projectId, campaigns: initial, brandKits, se
   }
 
   async function deleteCampaign(id: string) {
-    if (!window.confirm("Delete this campaign and all its creatives? This cannot be undone.")) return;
+    if (!await confirmAction("Delete this campaign and all its creatives? This cannot be undone.")) return;
     const data = await mutate(`/api/ads/campaigns/${id}?projectId=${projectId}`, "DELETE");
     if (data?.ok) {
       setNotice("Campaign deleted.");
@@ -353,7 +354,7 @@ export default function AdFactory({ projectId, campaigns: initial, brandKits, se
   }
 
   async function revokeKey() {
-    if (!window.confirm("Revoke the Higgsfield API key? In-flight jobs will stop being polled.")) return;
+    if (!await confirmAction("Revoke the Higgsfield API key? In-flight jobs will stop being polled.")) return;
     const data = await mutate(`/api/ads/settings?projectId=${projectId}`, "DELETE");
     if (data) {
       setNotice("API key revoked.");

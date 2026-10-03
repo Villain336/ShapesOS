@@ -22,6 +22,7 @@ import type {
   ConnectorImportBatchView,
 } from "@/lib/connector/types";
 import type { ImportSourceStatus } from "@/lib/connector/import-engine";
+import { confirmAction } from "@/lib/ui/feedback";
 
 type ShapeKind = "running" | "needs" | "done" | "failed" | "queued";
 
@@ -242,6 +243,13 @@ export function ImportSourcesTab() {
 
   const revokeConsent = useCallback(
     async (source: ImportSourceStatus) => {
+      const ok = await confirmAction({
+        title: "Revoke import consent?",
+        description: "Imports from this source stop until consent is granted again.",
+        confirmLabel: "Revoke",
+        destructive: true,
+      });
+      if (!ok) return;
       setRevoking((m) => ({ ...m, [source.source]: true }));
       setError(null);
       try {
@@ -305,6 +313,13 @@ export function ImportSourcesTab() {
 
   const removeExclusion = useCallback(
     async (id: string) => {
+      const ok = await confirmAction({
+        title: "Remove this exclusion?",
+        description: "Matching people and companies can be imported again.",
+        confirmLabel: "Remove",
+        destructive: true,
+      });
+      if (!ok) return;
       setError(null);
       try {
         const res = await fetch(

@@ -430,46 +430,48 @@ export default function PromptBar({
           />
           {rows.map((row, i) => {
             const source = menu === "at" ? SOURCES.find((s) => s.key === row.key) : undefined;
+            // The row and its Connect toggle are sibling buttons (a button
+            // can't contain another control). The wrapper is unpositioned
+            // so the hover highlight's offsetTop math is unchanged.
             return (
-              <button
-                key={row.key}
-                type="button"
-                ref={(el) => {
-                  rowRefs.current[i] = el;
-                }}
-                onMouseDown={(event) => event.preventDefault()}
-                onMouseEnter={() => {
-                  setActive(i);
-                  setEngaged(true);
-                }}
-                onClick={() => pick(row)}
-                className="relative z-10 flex h-9 w-full items-center gap-2.5 rounded-[6px] px-2 text-left"
-              >
-                {source && (
-                  <span className="flex size-5.5 shrink-0 items-center justify-center text-ink-2">
-                    {source.brand ? BRANDS[source.brand] : <Icon size={15}>{GLYPHS[source.glyph ?? "clip"]}</Icon>}
+              <div key={row.key} className="flex items-center">
+                <button
+                  type="button"
+                  ref={(el) => {
+                    rowRefs.current[i] = el;
+                  }}
+                  onMouseDown={(event) => event.preventDefault()}
+                  onMouseEnter={() => {
+                    setActive(i);
+                    setEngaged(true);
+                  }}
+                  onClick={() => pick(row)}
+                  className="relative z-10 flex h-9 min-w-0 flex-1 items-center gap-2.5 rounded-[6px] px-2 text-left"
+                >
+                  {source && (
+                    <span className="flex size-5.5 shrink-0 items-center justify-center text-ink-2">
+                      {source.brand ? BRANDS[source.brand] : <Icon size={15}>{GLYPHS[source.glyph ?? "clip"]}</Icon>}
+                    </span>
+                  )}
+                  <span className="shrink-0 text-[12.5px] font-medium text-ink">
+                    {row.name}
                   </span>
-                )}
-                <span className="shrink-0 text-[12.5px] font-medium text-ink">
-                  {row.name}
-                </span>
-                <span className="min-w-0 flex-1 truncate text-[12px] text-ink-3">{row.desc}</span>
+                  <span className="min-w-0 flex-1 truncate text-[12px] text-ink-3">{row.desc}</span>
+                </button>
                 {source?.connect && (
-                  <span
-                    role="button"
-                    tabIndex={-1}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      setConnected((current) => !current);
-                    }}
-                    className={`shrink-0 text-[12px] font-medium transition-colors duration-100 ${
+                  <button
+                    type="button"
+                    aria-pressed={connected}
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => setConnected((current) => !current)}
+                    className={`relative z-10 shrink-0 rounded-full px-2 text-[12px] font-medium transition-colors duration-100 ${
                       connected ? "text-green" : "text-accent-ink hover:underline"
                     }`}
                   >
                     {connected ? "Connected" : "Connect"}
-                  </span>
+                  </button>
                 )}
-              </button>
+              </div>
             );
           })}
           {rows.length === 0 && (
@@ -529,7 +531,7 @@ export default function PromptBar({
 
       {/* ── composer ───────────────────────────────────── */}
       <div
-        className={`relative isolate flex flex-col overflow-hidden border border-line bg-surface shadow-card transition-[border-color,border-radius] duration-150 focus-within:border-line-strong ${
+        className={`relative isolate flex flex-col overflow-hidden border border-line bg-surface shadow-card transition-[border-color,border-radius] duration-150 focus-within:border-focus ${
           tall ? "gap-2.5 p-3.5" : "gap-1.5 p-1.5"
         } ${
           pill ? (attachments.length > 0 || wide ? "rounded-[24px]" : "rounded-full") : tall ? "rounded-[22px]" : "rounded-[14px]"
@@ -638,6 +640,7 @@ export default function PromptBar({
             }}
             placeholder={listening ? "Listening…" : placeholder ?? "Write a message…"}
             aria-label="Prompt"
+            data-focus-ring="container"
             className={`${tall ? "min-h-[68px] px-2 py-2 text-[14px] leading-5" : "min-h-7 px-1 py-[5px] text-[13px] leading-[18px]"} min-w-0 w-full resize-none bg-transparent text-ink outline-none [overflow-wrap:anywhere] placeholder:text-ink-3 ${
               wide ? "col-span-full col-start-1 row-start-1" : "col-start-2 row-start-1"
             }`}

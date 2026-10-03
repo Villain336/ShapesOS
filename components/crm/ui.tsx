@@ -34,6 +34,10 @@ export const btnGhostSm =
 export const btnDeny =
   "inline-flex cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-paper px-4 py-[7px] text-[13px] font-semibold text-failed-text aos-press shadow-[inset_0_0_0_1.5px_var(--aos-failed)] hover:bg-failed-tint focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--aos-focus-halo)] disabled:cursor-not-allowed disabled:opacity-40";
 
+/** Small destructive, for inline/dense contexts. */
+export const btnDenySm =
+  "inline-flex cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-paper px-2.5 py-1 text-[12px] font-semibold text-failed-text aos-press shadow-[inset_0_0_0_1.5px_var(--aos-failed)] hover:bg-failed-tint focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--aos-focus-halo)] disabled:cursor-not-allowed disabled:opacity-40";
+
 /** Approves an agent-prepared action: done green (genuine agent state). */
 export const btnApprove =
   "inline-flex cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-done px-4 py-[7px] text-[13px] font-semibold text-white aos-press focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--aos-focus-halo)] disabled:cursor-not-allowed disabled:opacity-40";

@@ -21,27 +21,23 @@ import {
   CheckCircle2,
   Command,
   CornerDownLeft,
-  FileText,
-  LayoutDashboard,
   Loader2,
-  MessageSquare,
   Rocket,
   Search,
-  Settings,
   Sparkles,
-  Users,
   X,
-  Zap,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import FeedbackButtons from "@/components/agents/FeedbackButtons";
+import { navCommands } from "@/lib/nav/config";
 import {
   AsyncBudgetExceeded,
   buildAskAuditPayload,
   buildDoAuditPayload,
   buildGoAuditPayload,
   buildTemplateAuditPayload,
+  capIdleSection,
   groupBySection,
   loadFrecency,
   MISSION_TEMPLATES,
@@ -57,6 +53,8 @@ import {
 
 // Budgets from SPEC-PHASE9.md §P9B / research: LLM suggestions hidden if late.
 const SUGGESTION_BUDGET_MS = 800;
+// Go rows shown before the user types (all destinations are searchable).
+const GO_IDLE_LIMIT = 8;
 
 interface PlaybookSummary {
   id: string;
@@ -79,14 +77,10 @@ type Page =
   | { name: "playbooks"; status: "loading" | "unavailable" | "ready" | "error"; items: PlaybookSummary[] }
   | { name: "ask"; query: string; status: "loading" | "slow" | "done" | "error"; answer?: string; citations?: AskCitation[]; error?: string };
 
-const GO_ITEMS: UICommand[] = [
-  { id: "go:/dashboard", section: "go", title: "Overview", subtitle: "Dashboard home", keywords: "home dashboard main", hotkey: "⌥1", action: "go", href: "/dashboard", icon: LayoutDashboard },
-  { id: "go:/dashboard/studio", section: "go", title: "Studio", subtitle: "Creative studio", keywords: "creative design ads", hotkey: "⌥2", action: "go", href: "/dashboard/studio", icon: Zap },
-  { id: "go:/dashboard/crm", section: "go", title: "CRM", subtitle: "Leads & pipeline", keywords: "contacts pipeline kanban", hotkey: "⌥3", action: "go", href: "/dashboard/crm", icon: Users },
-  { id: "go:/dashboard/reports", section: "go", title: "Reports", subtitle: "Reports & exports", keywords: "analytics report pdf", hotkey: "⌥4", action: "go", href: "/dashboard/reports", icon: FileText },
-  { id: "go:/dashboard/assistant", section: "go", title: "Assistant", subtitle: "AI assistant", keywords: "chat ai help", hotkey: "⌥5", action: "go", href: "/dashboard/assistant", icon: MessageSquare },
-  { id: "go:/dashboard/settings", section: "go", title: "Settings", subtitle: "Workspace settings", keywords: "config preferences", hotkey: "⌥6", action: "go", href: "/dashboard/settings", icon: Settings },
-];
+// Go = every nav destination (lib/nav/config.ts), so ⌘K and the sidebar
+// can't drift. ⌥1–⌥6 keep their original targets (NAV_HOTKEYS).
+const GO_ITEMS: UICommand[] = navCommands();
+const GO_BY_HOTKEY = new Map(GO_ITEMS.filter((g) => g.hotkey).map((g) => [g.hotkey!, g]));
 
 const DO_ITEMS: UICommand[] = [
   { id: "do:missions", section: "do", title: "Start a mission from template…", subtitle: "Growth Missions by business type", keywords: "mission goal launch template growth", hotkey: "⌥M", action: "missions-page", icon: Rocket },
@@ -211,7 +205,9 @@ export function CommandBar({ workspaceId }: { workspaceId: string }) {
     } else {
       base = []; // ask result page shows the answer panel, not a list
     }
-    const ranked = rankCommands(base, q, frec, Date.now());
+    // With no query the Go section shows the most-used destinations only;
+    // typing searches all of them.
+    const ranked = capIdleSection(rankCommands(base, q, frec, Date.now()), q, "go", GO_IDLE_LIMIT);
     if (page.name === "root" && q) {
       ranked.push({
         id: `ask:${q}`,
@@ -483,10 +479,9 @@ export function CommandBar({ workspaceId }: { workspaceId: string }) {
     } else if (e.altKey && e.key.toLowerCase() === "p") {
       e.preventDefault();
       runItem(DO_ITEMS[1]);
-    } else if (e.altKey && /^[1-6]$/.test(e.key)) {
+    } else if (e.altKey && /^[1-9]$/.test(e.key) && GO_BY_HOTKEY.has(`⌥${e.key}`)) {
       e.preventDefault();
-      const go = GO_ITEMS[Number(e.key) - 1];
-      if (go) runGo(go);
+      runGo(GO_BY_HOTKEY.get(`⌥${e.key}`)!);
     }
   };
 
@@ -529,7 +524,7 @@ export function CommandBar({ workspaceId }: { workspaceId: string }) {
             onKeyDown={onPaletteKeyDown}
           >
             {/* Input row */}
-            <div className="flex items-center gap-2 border-b border-line px-3">
+            <div className="flex items-center gap-2 border-b border-line px-3 focus-within:border-focus">
               {isNested && (
                 <button
                   type="button"
@@ -563,6 +558,7 @@ export function CommandBar({ workspaceId }: { workspaceId: string }) {
                 aria-label={pageTitle}
                 autoComplete="off"
                 spellCheck={false}
+                data-focus-ring="container"
                 className="h-12 w-full bg-transparent text-[14px] text-ink outline-none placeholder:text-subtle"
               />
               {isNested && page.name !== "ask" && (

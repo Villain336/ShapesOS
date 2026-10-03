@@ -23,6 +23,7 @@ import {
   Truck,
   X,
 } from "lucide-react";
+import { activateOnKey, closeOnEscape } from "@/lib/ui/keyboard";
 
 // ---------------------------------------------------------------------------
 // Types + tiny API helper
@@ -290,6 +291,8 @@ export function EddmApp() {
                     key={o.id}
                     className="cursor-pointer border-b border-line last:border-0 hover:bg-hover-paper"
                     onClick={() => openOrder(o.id)}
+                    tabIndex={0}
+                    onKeyDown={activateOnKey(() => openOrder(o.id))}
                   >
                     <td className="px-3 py-2 font-medium text-ink">{o.name}</td>
                     <td className="px-3 py-2">
@@ -494,7 +497,7 @@ function NewOrderModal({ onClose, onCreated }: { onClose: () => void; onCreated:
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-ink/30 p-4 pt-[8vh]" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-ink/30 p-4 pt-[8vh]" role="presentation" onClick={onClose} onKeyDown={closeOnEscape(onClose)}>
       <div className="w-full max-w-xl rounded-lg border border-line bg-paper shadow-overlay" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between border-b border-line px-4 py-2.5">
           <h3 className="text-[14px] font-semibold text-ink">New EDDM order</h3>

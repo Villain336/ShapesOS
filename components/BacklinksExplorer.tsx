@@ -5,6 +5,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { closeOnEscape } from "@/lib/ui/keyboard";
 
 interface BacklinkItem {
   id: string;
@@ -330,7 +331,7 @@ export default function BacklinksExplorer({
 
       {/* Refresh modal */}
       {showRefresh && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => !pulling && setShowRefresh(false)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" role="presentation" onClick={() => !pulling && setShowRefresh(false)} onKeyDown={closeOnEscape(() => !pulling && setShowRefresh(false))}>
           <div className="w-full max-w-md rounded-xl border border-zinc-200 bg-white p-6" onClick={(e) => e.stopPropagation()}>
             <h2 className="text-lg font-semibold text-zinc-900">Refresh backlinks</h2>
             <p className="mt-1 text-sm text-zinc-500">

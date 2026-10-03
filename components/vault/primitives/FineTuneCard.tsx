@@ -69,7 +69,7 @@ function ScrubField({
         }}
         className="flex h-full shrink-0 cursor-ew-resize touch-none items-center rounded-[4px]
           px-0.5 text-[12px] text-ink-3 select-none hover:text-ink-2 focus-visible:text-accent-ink
-          focus-visible:outline-none"
+          focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
       >
         {label}
       </span>
@@ -81,7 +81,7 @@ function ScrubField({
           if (!Number.isNaN(n)) onChange(clamp(n));
         }}
         aria-label={`${label} value`}
-        className="min-w-0 flex-1 bg-transparent text-[12px] text-ink tabular-nums outline-none"
+        className="min-w-0 flex-1 rounded-sm bg-transparent text-[12px] text-ink tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-focus"
       />
       {suffix && <span className="shrink-0 pr-0.5 text-[11.5px] text-ink-3">{suffix}</span>}
     </label>
@@ -294,7 +294,7 @@ export default function FineTuneCard({
             aria-expanded={menuOpen}
             onClick={() => setMenuOpen((current) => !current)}
             className="flex h-6.5 w-full items-center justify-between rounded-chip bg-inset py-1 pr-1 pl-2
-              shadow-hairline transition-shadow duration-200 focus-visible:outline-none"
+              shadow-hairline transition-shadow duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
             style={{ boxShadow: menuOpen ? "0 0 0 1px var(--accent)" : undefined }}
           >
             <span className={`text-[12px] ${typeValue !== text.placeholder ? "text-ink" : "text-ink-3"}`}>

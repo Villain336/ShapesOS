@@ -11,6 +11,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { confirmAction } from "@/lib/ui/feedback";
 
 interface SiteRow {
   id: string;
@@ -234,7 +235,7 @@ export default function FixAgentManager({ projectId }: { projectId: string }) {
   }
 
   async function revertRun(runId: string) {
-    if (!confirm("Revert this fix run? Every file it touched will be restored to its pre-run content.")) return;
+    if (!await confirmAction("Revert this fix run? Every file it touched will be restored to its pre-run content.")) return;
     setBusy(true);
     const res = await fetch(`/api/websites/${siteId}/fix-runs/${runId}/revert`, {
       method: "POST",

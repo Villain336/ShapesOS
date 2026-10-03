@@ -646,9 +646,18 @@ export default function RecordsTable({ rows = INITIAL_ROWS, fill = false }: { ro
           <thead>
             <tr>
               <th className={`records-header-cell records-sticky-cell ${prop?.col === "Company" ? "is-colsel" : ""}`}>
-                <div className="records-company-header" style={{ cursor: "pointer" }} onClick={(event) => openProp("Company")(event)}>
+                <div className="records-company-header" style={{ cursor: "pointer" }} role="presentation" onClick={(event) => openProp("Company")(event)}>
                   <Checkbox checked={allSelected} mixed={partiallySelected} onChange={toggleAll} label="Select all companies" />
-                  <span>Company</span>
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      openProp("Company")(event);
+                    }}
+                    className="rounded-sm text-left"
+                  >
+                    Company
+                  </button>
                 </div>
                 <span role="separator" aria-orientation="vertical" aria-label="Resize Company column" className={`records-resize-handle ${resizingColumn === "company" ? "is-resizing" : ""}`} onPointerDown={startColumnResize("company", 180)} />
               </th>

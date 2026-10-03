@@ -5,6 +5,7 @@
 
 import dynamic from "next/dynamic";
 import { useState } from "react";
+import { confirmAction } from "@/lib/ui/feedback";
 
 const TemplateEditor = dynamic(() => import("@/components/TemplateEditor"), { ssr: false });
 
@@ -220,7 +221,7 @@ export default function ReportsManager({ initialTemplates, brandKits, projects }
   }
 
   async function deleteTemplate() {
-    if (!selected || !confirm(`Delete template "${selected.name}"? Generated reports are kept.`)) return;
+    if (!selected || !await confirmAction(`Delete template "${selected.name}"? Generated reports are kept.`)) return;
     const res = await fetch(`/api/report-templates/${selected.id}`, { method: "DELETE" });
     if (res.ok) {
       setTemplates((prev) => prev.filter((t) => t.id !== selected.id));

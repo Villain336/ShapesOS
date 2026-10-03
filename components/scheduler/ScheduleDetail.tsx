@@ -7,6 +7,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Notice, btnCls, cardCls, dangerBtnCls, inputCls, labelCls, primaryBtnCls, type NoticeState } from "@/components/settings/ui";
+import { confirmAction } from "@/lib/ui/feedback";
 
 interface RunRow {
   id: string;
@@ -123,7 +124,7 @@ export default function ScheduleDetail({
   }
 
   async function remove() {
-    if (!confirm(`Delete this schedule for "${schedule.skill.name}"? Run history is kept.`)) return;
+    if (!await confirmAction(`Delete this schedule for "${schedule.skill.name}"? Run history is kept.`)) return;
     setBusy("delete");
     const r = await fetch(`/api/schedules/${schedule.id}?${q}`, { method: "DELETE" });
     setBusy(null);

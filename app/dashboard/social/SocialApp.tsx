@@ -21,6 +21,8 @@ import {
   Trash2,
   X,
 } from "lucide-react";
+import { confirmAction } from "@/lib/ui/feedback";
+import { closeOnEscape } from "@/lib/ui/keyboard";
 
 interface PostizChannel {
   id: string;
@@ -117,7 +119,7 @@ export function SocialApp() {
   useEffect(() => { load(); }, [load]);
 
   const deletePost = async (id: string) => {
-    if (!confirm("Delete this post from the Postiz queue?")) return;
+    if (!await confirmAction("Delete this post from the Postiz queue?")) return;
     setBusy(id);
     setError(null);
     try {
@@ -350,7 +352,7 @@ function ComposeModal({
     setPicked((p) => { const n = new Set(p); if (n.has(id)) n.delete(id); else n.add(id); return n; });
 
   const save = async () => {
-    if (mode === "now" && !confirm(`Publish now to ${picked.size} channel${picked.size === 1 ? "" : "s"}? This posts publicly.`)) return;
+    if (mode === "now" && !await confirmAction(`Publish now to ${picked.size} channel${picked.size === 1 ? "" : "s"}? This posts publicly.`)) return;
     setSaving(true);
     setError(null);
     try {
@@ -377,7 +379,7 @@ function ComposeModal({
   const valid = content.trim().length > 0 && picked.size > 0 && (mode !== "schedule" || when.trim().length > 0);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/30 p-4 pt-[8vh]" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/30 p-4 pt-[8vh]" role="presentation" onClick={onClose} onKeyDown={closeOnEscape(onClose)}>
       <div className="w-full max-w-3xl rounded-xl border border-stone-200 bg-white shadow-xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between border-b border-stone-200 px-4 py-2.5">
           <h3 className="text-[14px] font-semibold text-stone-900">Compose post</h3>

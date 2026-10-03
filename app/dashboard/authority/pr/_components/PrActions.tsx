@@ -9,6 +9,7 @@ import { useRouter } from "next/navigation";
 import { Input } from "@/components/vault/shadcn/input";
 import { Textarea } from "@/components/vault/shadcn/textarea";
 import { Loader2 } from "lucide-react";
+import { confirmAction } from "@/lib/ui/feedback";
 
 // Agentic OS pressables: running = agent-run verbs, done = approve.
 const btnP =
@@ -176,7 +177,7 @@ export function MarkSentButton({ draftId, journalist, outlet }: { draftId: strin
         disabled={busy}
         title="Record that YOU sent this pitch from your own email client. Marketr never sends."
         onClick={async () => {
-          if (!window.confirm(`Record a human-sent pitch to ${journalist} (${outlet})? Marketr does not send — this records that YOU sent it from your own inbox, bound to a pr_send approval.`)) return;
+          if (!await confirmAction(`Record a human-sent pitch to ${journalist} (${outlet})? Marketr does not send — this records that YOU sent it from your own inbox, bound to a pr_send approval.`)) return;
           setBusy(true);
           setError(null);
           try {
