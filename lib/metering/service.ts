@@ -172,8 +172,11 @@ async function lockSpendCap(tx: Tx, workspaceId: string, pool: number): Promise<
       FROM spend_caps WHERE workspace_id = ${workspaceId} FOR UPDATE`;
     if (rows.length > 0) return rows[0];
     try {
+      // Self-hosted = BYO provider keys (credits.ts): usage is recorded, never
+      // blocked. Every other plan starts with the hard cap at its pool.
+      const ws = await tx.workspace.findUnique({ where: { id: workspaceId }, select: { plan: true } });
       await tx.spendCap.create({
-        data: { workspaceId, capCredits: pool, blockAtCap: true, alertAtPct: 80 },
+        data: { workspaceId, capCredits: pool, blockAtCap: ws?.plan !== "self_hosted", alertAtPct: 80 },
       });
     } catch (err) {
       if (isUniqueViolation(err)) continue;
@@ -542,11 +545,19 @@ export async function applyPlanChange(
   return prisma.$transaction(async (tx) => {
     const bal = await lockBalance(tx, workspaceId);
     const cap = await lockSpendCap(tx, workspaceId, bal.includedCredits + bal.purchasedCredits);
+    const prev = await tx.workspace.findUnique({ where: { id: workspaceId }, select: { plan: true } });
     await tx.workspace.update({ where: { id: workspaceId }, data: { plan } });
     const includedCredits = includedCreditsForPlan(plan);
     const capCredits = Math.max(0, cap.capCredits + (includedCredits - bal.includedCredits));
     await tx.creditBalance.update({ where: { workspaceId }, data: { includedCredits } });
-    await tx.spendCap.update({ where: { workspaceId }, data: { capCredits } });
+    // Crossing the self-hosted boundary flips blocking (BYO keys record but
+    // never block; billed plans hard-cap). Otherwise keep the admin's choice.
+    const wasSelfHosted = prev?.plan === "self_hosted";
+    const isSelfHosted = plan === "self_hosted";
+    await tx.spendCap.update({
+      where: { workspaceId },
+      data: { capCredits, ...(wasSelfHosted !== isSelfHosted ? { blockAtCap: !isSelfHosted } : {}) },
+    });
     return { includedCredits, capCredits };
   });
 }

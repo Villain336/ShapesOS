@@ -71,16 +71,25 @@ Follow-ups found while doing Phase 1 (carried forward)
 - [ ] Optional CAPTCHA/step-up after repeated login failures (Phase 4 with 2FA)
 
 ## Phase 2 — integrity (`claude/phase-2-integrity`)
-- [ ] Ops: approval `consume()` (atomic, in-transaction); transition table; guarded restock; total recompute on patch (drafts only); Int32 total bounds; idempotency-key returns existing invoice; overdue sweep guarded; paging validation
-- [ ] Credits: plan change syncs included pool + cap; expiring top-ups lower the cap; Context.dev budget atomic
-- [ ] Messaging: claim-before-send (`queued→sending`), provider idempotency key, meter/reserve before send
-- [ ] E-sign: terminal states (voided/declined/expired) ignore events; monotonic status; guarded completion + link firing; invalid dates; errored envelope recoverable; double-confirm guard
-- [ ] Connector intros: guarded transitions (409), expiry enforced at action time; boundary parser (curly apostrophes, "do not", bans before cadence)
-- [ ] Legal: guarded deadline completion; recurrence anchored to series start
+- [x] Ops: approval `consume()` (atomic, in-transaction); transition table; guarded restock; total recompute on patch (drafts only); Int32 total bounds; idempotency-key returns existing invoice; overdue sweep guarded; paging validation
+- [x] Credits: plan change syncs included pool + cap; expiring top-ups lower the cap; Context.dev budget atomic
+- [x] Messaging: claim-before-send (`queued→sending`), provider idempotency key, meter/reserve before send
+- [x] E-sign: terminal states (voided/declined/expired) ignore events; monotonic status; guarded completion + link firing; invalid dates; errored envelope recoverable; double-confirm guard
+- [x] Connector intros: guarded transitions (409), expiry enforced at action time; boundary parser (curly apostrophes, "do not", bans before cadence)
+- [x] Legal: guarded deadline completion; recurrence anchored to series start
 - [x] Scheduler: per-schedule try/catch + park; 8-year search; cron parser rejects malformed ranges; workflow cron reuses scheduler cron (OR semantics, 0–7 DOW, TZ)
 - [x] Time zones: bookings DST-safe; WFH standups/digests/focus/rituals use IANA TZ + calendar stepping; insurance leap-day term
-- [ ] Validation: WFH expenses (zod, ISO-4217, strict dates); CRM import row numbers + numeric bounds; NaN paging (done: workstream G); CAD NaN STL (done: workstream G)
-- [ ] Tests for each (incl. leap-day/DST/concurrency cases, real ops consume path)
+- [x] Validation: WFH expenses (zod, ISO-4217, strict dates); CRM import row numbers + numeric bounds; NaN paging (done: workstream G); CAD NaN STL (done: workstream G)
+- [x] Tests for each (incl. leap-day/DST/concurrency cases, real ops consume path)
+- [x] Self-hosted metering records but never blocks (BYO keys); plan changes across the self-hosted boundary flip blocking; data migration unblocks untouched self-hosted caps
+- [x] Phase 1 carry-overs done here: CallRail per-workspace webhook secret; Payload schema grants (+ schema created on fresh installs)
+
+Follow-ups found while doing Phase 2 (carried forward)
+- [ ] Daily SMS cap is still check-then-act (make it one conditional update, like the Context.dev budget)
+- [ ] Allocation rules: empty-string percent still reads as 0
+- [ ] Context.dev daily cap resets to default each day (carry the configured cap forward)
+- [ ] Scheduled skills run in UTC (per-schedule IANA timezone; `cronMatchesInZone` exists)
+- [ ] Intros: decline/withdraw don't enforce expiry (only send-type actions do)
 
 ## Phase 3 — one product (`claude/phase-3-product`)
 - [ ] Rename to ShapesOS in all user-facing text (web, emails, metadata, MCP consent, mobile)
