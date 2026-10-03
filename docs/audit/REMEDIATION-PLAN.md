@@ -137,7 +137,9 @@ Follow-ups found while doing Phase 2 (carried forward)
 - [ ] Social loop: media posts, Studio → social, engagement → attribution; analytics home
 - [ ] CRM conversation inbox UI (inbound + outbound per lead)
 - [ ] Mobile: configurable API base URL, EAS config, push notifications, rebrand
-- [ ] CAD derived BOM; datasets slices 3–4
+- [x] CAD derived BOM; datasets slices 3–4
+  - How, CAD: `lib/cad/bom-derive.ts` derives a BOM version from a model version's real mesh (named groups / connected shells → parts, identical bodies → quantity, volume only for closed bodies, mass from a tenant-picked material with a cited density, raw-material cost only from a tenant $/kg; NaN/open/degenerate geometry → null + reason, STEP → 422). Pinned to the version with `origin: "derived"` + derivation lineage (source checksum re-verified). Rollups across revisions (history + part diff), CSV export through `lib/csv.ts`, Prototype-tab UI, `cad.bom_derived` webhook, record search `bom_line`. Migration `20261006400000`.
+  - How, datasets (spec §1 slices 3–4 were built locally; this closes the gaps): staleness alerts actually fire (daily `/api/cron/dataset-health`: notification + `dataset_stale` alert trigger + webhook, once per version); publish any compiled version (rollback/roll-forward, confirmed in the UI); BriefNow is a live MCP pull (`get_dataset_adapter`, needs `api_access`) instead of a local file drop (kept only with `BRIEFNOW_ADAPTERS_ROOT`); "RAG + Feed" now grounds the chat agent and MCP (`ask_business_data`) in published datasets; `dataset.compiled/published/stale` webhooks; record search `dataset`. Migration `20261006400100`.
 
 4c — design system (`claude/phase-4c-design`)
 - [ ] Design-system migration of the remaining legacy files (worst first), then delete the compat block
