@@ -79,21 +79,18 @@ function Switch({ checked, onChange, label, disabled }: { checked: boolean; onCh
   );
 }
 
-/** Delivery state → status shape + label (a delivery is a system job). */
+/** Delivery state → text label. Status shapes are reserved for agent states
+ *  (docs/design/DESIGN.md), and a webhook delivery is a system job, so this
+ *  is text only; failures read in failed-text. */
 function DeliveryStatus({ d }: { d: Delivery }) {
-  const map: Record<Delivery["status"], { shape: string; label: string }> = {
-    succeeded: { shape: "aos-shape--done", label: "Delivered" },
-    dead: { shape: "aos-shape--failed", label: "Failed" },
-    delivering: { shape: "aos-shape--running aos-is-live", label: "Sending" },
-    pending: { shape: "aos-shape--queued", label: d.attempts > 0 ? "Retrying" : "Queued" },
+  const map: Record<Delivery["status"], { cls: string; label: string }> = {
+    succeeded: { cls: "text-ink", label: "Delivered" },
+    dead: { cls: "text-failed-text", label: "Failed" },
+    delivering: { cls: "text-ink", label: "Sending" },
+    pending: { cls: "text-muted", label: d.attempts > 0 ? "Retrying" : "Queued" },
   };
   const s = map[d.status];
-  return (
-    <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-xs font-semibold text-ink">
-      <span className={`aos-shape ${s.shape}`} aria-hidden />
-      {s.label}
-    </span>
-  );
+  return <span className={`whitespace-nowrap text-xs font-semibold ${s.cls}`}>{s.label}</span>;
 }
 
 function when(iso: string | null): string {
