@@ -66,7 +66,7 @@ The dashboard is organized the way the sidebar is (`lib/nav/config.ts`). Everyth
 - Expo mobile app in `mobile/` (agent chat + approvals; still carries the old bundle ids and has no push yet).
 
 **Known gaps** (see [docs/audit/FULL-AUDIT-2026-10-03.md](./docs/audit/FULL-AUDIT-2026-10-03.md) §7 and [docs/audit/REMEDIATION-PLAN.md](./docs/audit/REMEDIATION-PLAN.md)):
-- GA4, Search Console, Google Ads, Meta Ads, Google Drive and Notion connectors are **mock-only**, as are outreach sending and Google Business Profile (`lib/connectors/m21/native/*`, `lib/local/gbp.ts`). This is missing code, not missing keys.
+- GA4, Search Console, Google Ads, Meta Ads, Google Drive, Notion, Google Business Profile and outreach sending (Smartlead / Instantly) have live code (Phase 4b, `lib/connectors/m21/live/*`, `lib/authority/outreach/sending.ts`), tested against recorded fixtures only — no real keys have exercised them yet. Without credentials every one stays in labeled mock mode.
 - No GDPR export, 2FA/passkeys, SCIM, OpenAPI spec, outbound webhooks or `/api/health` yet.
 
 ## Quickstart (local dev)

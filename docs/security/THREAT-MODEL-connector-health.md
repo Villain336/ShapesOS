@@ -43,6 +43,15 @@ than inventing confidence. `safeFetch` (SSRF-safe) exists for WordPress
 operations, but the checker deliberately does not use it — no new request
 surface is added at all.
 
+**Phase 4b addendum (manual check only):** `POST /api/connections/[id]/check`
+may pass `liveCheck` (`lib/connectors/m21/live/probe.ts`), which asks a
+live-wired OAuth adapter for ONE cheap call to its fixed provider endpoint
+(GSC sites list, GA4 account summaries, Drive `about`, Notion `users/me`,
+Meta `/me`, Google Ads `listAccessibleCustomers`, GBP accounts). The host is
+a code constant, never connection data, so this adds no SSRF surface; the
+result is reduced to a closed code before it reaches the checker. The
+scheduled `runHealthChecks()` never passes `liveCheck`.
+
 ### 2. Token/secret leakage into health payloads or error messages
 
 **Threat:** Health results are readable by any workspace viewer. If the
