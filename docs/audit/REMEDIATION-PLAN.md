@@ -92,30 +92,37 @@ Follow-ups found while doing Phase 2 (carried forward)
 - [ ] Intros: decline/withdraw don't enforce expiry (only send-type actions do)
 
 ## Phase 3 — one product (`claude/phase-3-product`)
-- [ ] Rename to ShapesOS in all user-facing text (web, emails, metadata, MCP consent, mobile)
+- [x] Rename to ShapesOS in all user-facing text (web, emails, metadata, MCP consent, mobile)
 - [x] Trial plan for hosted signups (`DEPLOYMENT_MODE=hosted`: 14 days, 500 one-time credits, hard cap; ended trial = read-only for metered actions with an upgrade prompt; lapsed hosted subscriptions land on an ended trial) + invite-only env switch (Phase 1). Plan entitlements themselves stay in Phase 4
 - [x] Onboarding wizard (business context, rename workspace, first connections, intelligence report) — `/dashboard/welcome`, skippable, resumable, shown once
-- [ ] Unified "needs you" approvals inbox across all queues + sidebar badge
-- [ ] Notification center (model, bell, read state) feeding from approvals/alerts
-- [ ] Navigation regrouped Grow / Design / Operate / Agents; orphaned pages linked (SEO, Nurture, Prospects, Voice, Insurance, Runs index, Billing); ⌘K covers every destination; settings grouped (done: settings grouped into six sections, Billing in settings + sidebar workspace/account menus)
+- [x] Unified "needs you" approvals inbox across all queues + sidebar badge
+- [x] Notification center (model, bell, read state) feeding from approvals/alerts
+- [x] Navigation regrouped Grow / Design / Operate / Agents; orphaned pages linked (SEO, Nurture, Prospects, Voice, Insurance, Runs index, Billing); ⌘K covers every destination; settings grouped (done: settings grouped into six sections, Billing in settings + sidebar workspace/account menus)
 - [x] Workspace lifecycle: create, rename, delete (owner-only, typed name, cascade-safe, audited in `workspace_lifecycle_events`); agency clients UI (Settings → Clients)
 - [x] Invites emailed (SMTP, else Resend; copy-link fallback)
-- [ ] CRM actions: email / text / call / enroll in nurture / invoice / delete; unified inbox UI
-- [ ] Reviews links to real approval UI (not raw JSON)
-- [ ] Confirmations on all destructive actions (replace `window.confirm`), shared toast system, undo where cheap
-- [ ] Accessibility fixes (clickable divs, alt text, focus styles)
+- [x] CRM actions: email / text / call / enroll in nurture / invoice / delete (the per-lead conversation inbox UI moved to Phase 4b)
+- [x] Reviews links to real approval UI (not raw JSON)
+- [x] Confirmations on all destructive actions (replace `window.confirm`), shared toast system, undo where cheap
+- [x] Accessibility fixes (clickable divs, alt text, focus styles)
 - [x] Docs: README, COMPLETE-VISION statuses, COMPETITORS; root docs moved under docs/ (specs → `docs/specs/`, threat models → `docs/security/`, past audits/reports/design maps → `docs/history/`, M9 source lists → `docs/research/`, `docs/COMPETITORS.md`; references updated; `docs/quickstart.md` DB steps fixed for the app role)
-- [ ] Repo hygiene: untrack previews/ + training/traces + docs scratch; remove dead vault primitives and duplicate `/api/websites` tree (done: 14 zero-importer files removed from `components/vault/primitives`. Left: `/api/websites` — the "duplicate of `/api/sites`" claim is unverified and `scripts/verify-m11-security.mjs` checks routes under it)
+- [x] Repo hygiene: untrack previews/ + training/traces + docs scratch; remove dead vault primitives and duplicate `/api/websites` tree (done: 14 zero-importer files removed from `components/vault/primitives`. Left: `/api/websites` — the "duplicate of `/api/sites`" claim is unverified and `scripts/verify-m11-security.mjs` checks routes under it)
 
-## Phase 4 — next builds (PRs 4a…)
-- [ ] Observability: `/api/health`, compose app healthcheck, Sentry/OTel hooks, structured logging; backup job
-- [ ] GDPR export + account/workspace deletion
-- [ ] 2FA (TOTP) + passkeys; SCIM
-- [ ] OpenAPI spec + outbound webhooks
-- [ ] Global record search
-- [ ] Plan entitlements enforced (white-label etc.)
-- [ ] Live connector wiring: GA4, GSC, Google Ads, Meta Ads, Drive, Notion; outreach sending adapter; GBP
+## Phase 4 — next builds (PRs 4a → 4b → 4c, stacked on Phase 3)
+4a — platform (`claude/phase-4a-platform`)
+- [ ] Observability: `/api/health` (DB + migrations), compose app healthcheck, structured JSON logging, Sentry/OTel hooks (env-gated, no-op without DSN); backup job (pg_dump + retention) and restore doc
+- [ ] GDPR export (workspace + user) + account deletion; orphaned rows in workspace tables without an FK cleaned on workspace delete
+- [ ] 2FA (TOTP + recovery codes) + passkeys (WebAuthn); SCIM 2.0 users/groups; step-up CAPTCHA after repeated login failures (provider optional)
+- [ ] OpenAPI spec for the public API + outbound webhooks (signed, retried, per-workspace endpoints, delivery log)
+- [ ] Global record search (leads, invoices, docs, files, projects) in ⌘K
+- [ ] Plan entitlements enforced server-side (white-label and other tiered features)
+- [ ] Carried follow-ups: daily SMS cap atomic; allocation empty percent; Context.dev cap carried forward; scheduled skills per-schedule TZ; intro decline/withdraw expiry; decided-notifications for scheduler/CAD/mail/media; data-room file view CSP
+
+4b — product builds (`claude/phase-4b-builds`)
+- [ ] Live connector wiring: GA4, GSC, Google Ads, Meta Ads, Drive, Notion; outreach sending adapter; GBP (real HTTP code, tested against recorded fixtures; keys supplied later)
 - [ ] Social loop: media posts, Studio → social, engagement → attribution; analytics home
+- [ ] CRM conversation inbox UI (inbound + outbound per lead)
 - [ ] Mobile: configurable API base URL, EAS config, push notifications, rebrand
 - [ ] CAD derived BOM; datasets slices 3–4
+
+4c — design system (`claude/phase-4c-design`)
 - [ ] Design-system migration of the remaining legacy files (worst first), then delete the compat block
