@@ -65,8 +65,8 @@ Low
 
 Follow-ups found while doing Phase 1 (carried forward)
 - [ ] Nonce-based CSP via the proxy so `'unsafe-inline'`/`'unsafe-eval'` can be dropped; browser-verify Monaco/Univer/Payload under CSP (Phase 3 UI pass)
-- [ ] Real CallRail webhook still resolves the workspace from `?w=` with one host-wide secret → per-workspace secret (Phase 2)
-- [ ] Payload `payload` schema grants for the least-privilege app role (Phase 2)
+- [x] Real CallRail webhook still resolves the workspace from `?w=` with one host-wide secret → per-workspace secret (Phase 2)
+- [x] Payload `payload` schema grants for the least-privilege app role (Phase 2)
 - [ ] UI: MCP read-only tool allow-list editor; hide corpus/automation-binding controls from non-operators (Phase 3)
 - [ ] Optional CAPTCHA/step-up after repeated login failures (Phase 4 with 2FA)
 
@@ -77,9 +77,9 @@ Follow-ups found while doing Phase 1 (carried forward)
 - [ ] E-sign: terminal states (voided/declined/expired) ignore events; monotonic status; guarded completion + link firing; invalid dates; errored envelope recoverable; double-confirm guard
 - [ ] Connector intros: guarded transitions (409), expiry enforced at action time; boundary parser (curly apostrophes, "do not", bans before cadence)
 - [ ] Legal: guarded deadline completion; recurrence anchored to series start
-- [ ] Scheduler: per-schedule try/catch + park; 8-year search; cron parser rejects malformed ranges; workflow cron reuses scheduler cron (OR semantics, 0–7 DOW, TZ)
-- [ ] Time zones: bookings DST-safe; WFH standups/digests/focus/rituals use IANA TZ + calendar stepping; insurance leap-day term
-- [ ] Validation: WFH expenses (zod, ISO-4217, strict dates); CRM import row numbers + numeric bounds; NaN paging; CAD NaN STL
+- [x] Scheduler: per-schedule try/catch + park; 8-year search; cron parser rejects malformed ranges; workflow cron reuses scheduler cron (OR semantics, 0–7 DOW, TZ)
+- [x] Time zones: bookings DST-safe; WFH standups/digests/focus/rituals use IANA TZ + calendar stepping; insurance leap-day term
+- [ ] Validation: WFH expenses (zod, ISO-4217, strict dates); CRM import row numbers + numeric bounds; NaN paging (done: workstream G); CAD NaN STL (done: workstream G)
 - [ ] Tests for each (incl. leap-day/DST/concurrency cases, real ops consume path)
 
 ## Phase 3 — one product (`claude/phase-3-product`)
