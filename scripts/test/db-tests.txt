@@ -52,5 +52,6 @@ lib/playbooks/__tests__/store.test.ts
 lib/scheduler/__tests__/tick-db.test.ts
 lib/substrate/memory/__tests__/accepted-only.test.ts
 lib/substrate/memory/__tests__/learning-pass.test.ts
+lib/substrate/memory/__tests__/rls-least-privilege-db.test.ts
 lib/voice/__tests__/pronunciation.test.ts
 lib/voice/__tests__/voiceover.test.ts

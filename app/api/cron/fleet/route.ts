@@ -27,17 +27,20 @@ export async function POST(req: NextRequest) {
   if (gate instanceof Response) return gate;
   const { isCron, workspaceId: sessionWorkspaceId } = gate;
 
+  // competitor_watch is FORCE-RLS, so an unscoped cross-tenant read sees zero
+  // rows under the least-privilege app role. Fan out over workspaces (not
+  // RLS) instead; runFleetForWorkspace scopes its own reads.
   const workspaces = isCron
-    ? await prisma.competitorWatch.findMany({
-        select: { workspaceId: true },
-        distinct: ["workspaceId"],
-      })
+    ? (await prisma.workspace.findMany({ select: { id: true } })).map((w) => ({ workspaceId: w.id }))
     : [{ workspaceId: sessionWorkspaceId! }];
 
   const results: Array<Record<string, unknown>> = [];
   for (const { workspaceId } of workspaces) {
     try {
       const fleet = await runFleetForWorkspace(workspaceId);
+      // The sweep visits every workspace; only those with watches get a
+      // digest/alert/audit (same set the pre-RLS watch query selected).
+      if (isCron && fleet.watches === 0) continue;
       const digest = await withWorkspaceScope(workspaceId, (tx) =>
         buildWeeklyDigest(tx, workspaceId),
       );
