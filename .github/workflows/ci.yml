@@ -43,7 +43,9 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          # Pinned (.nvmrc): node:test mock.module behavior differs between
+          # 22.22 and 22.23, which once made a test pass locally and fail here.
+          node-version-file: .nvmrc
           cache: npm
 
       - name: Install
