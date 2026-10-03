@@ -85,11 +85,11 @@ Follow-ups found while doing Phase 1 (carried forward)
 - [x] Phase 1 carry-overs done here: CallRail per-workspace webhook secret; Payload schema grants (+ schema created on fresh installs)
 
 Follow-ups found while doing Phase 2 (carried forward)
-- [ ] Daily SMS cap is still check-then-act (make it one conditional update, like the Context.dev budget)
-- [ ] Allocation rules: empty-string percent still reads as 0
-- [ ] Context.dev daily cap resets to default each day (carry the configured cap forward)
-- [ ] Scheduled skills run in UTC (per-schedule IANA timezone; `cronMatchesInZone` exists)
-- [ ] Intros: decline/withdraw don't enforce expiry (only send-type actions do)
+- [x] Daily SMS cap is still check-then-act (make it one conditional update, like the Context.dev budget) — done in 4a: the claim takes a transaction-scoped advisory lock per workspace-day, then counts sent + in-flight rows and claims (or suppresses "cap") in the same transaction; concurrency DB test (12 parallel candidates, cap 3 → exactly 3 sent; old code sent 9)
+- [x] Allocation rules: empty-string percent still reads as 0 — done in 4a: validator parses raw inputs; blank/whitespace/null/non-numeric = "required" (400), explicit 0 still valid; route no longer pre-coerces with Number(); settings panel refuses a blank field
+- [x] Context.dev daily cap resets to default each day (carry the configured cap forward) — done in 4a: a missing day reads, and is seeded with, the latest earlier day's cap (default only with no history)
+- [x] Scheduled skills run in UTC (per-schedule IANA timezone; `cronMatchesInZone` exists) — done in 4a: `scheduled_skills.timezone` (migration 20261005400000, default UTC), validated on write, `nextRunAfterInZone` (agrees with `cronMatchesInZone`; DST fall-back fires once, spring-forward gap fires shifted forward), tick parks a corrupt zone; timezone field in the schedule wizard (defaults to the creator's zone) and detail editor
+- [x] Intros: decline/withdraw don't enforce expiry (only send-type actions do) — done in 4a: tenant decline, side-A decline and withdraw of a proposed intro flip a lapsed proposal to expired and refuse with intro_expired (409); window also in the guarded update
 
 ## Phase 3 — one product (`claude/phase-3-product`)
 - [x] Rename to ShapesOS in all user-facing text (web, emails, metadata, MCP consent, mobile)
@@ -115,7 +115,7 @@ Follow-ups found while doing Phase 2 (carried forward)
 - [ ] OpenAPI spec for the public API + outbound webhooks (signed, retried, per-workspace endpoints, delivery log)
 - [ ] Global record search (leads, invoices, docs, files, projects) in ⌘K
 - [ ] Plan entitlements enforced server-side (white-label and other tiered features)
-- [ ] Carried follow-ups: daily SMS cap atomic; allocation empty percent; Context.dev cap carried forward; scheduled skills per-schedule TZ; intro decline/withdraw expiry; decided-notifications for scheduler/CAD/mail/media; data-room file view CSP
+- [x] Carried follow-ups: daily SMS cap atomic; allocation empty percent; Context.dev cap carried forward; scheduled skills per-schedule TZ; intro decline/withdraw expiry; decided-notifications for scheduler/CAD/mail/media; data-room file view CSP (done: first five ticked under Phase 2 follow-ups; decided notifications go through `notifyApprovalDecided` after each decision — scheduler runs → schedule creator, CAD proposals, mail approvals, media buys (approved once fully approved; denied when a pending buy is revoked) — DB-tested; data-room `/r/funding/<token>?dl=1` gets the sandboxed `USER_FILE_VIEW_CSP` from proxy.ts (the route's own CSP was being dropped for the page policy — confirmed with `next dev`), route also sets it + nosniff + no-store, header verified on the real response)
 
 4b — product builds (`claude/phase-4b-builds`)
 - [ ] Live connector wiring: GA4, GSC, Google Ads, Meta Ads, Drive, Notion; outreach sending adapter; GBP (real HTTP code, tested against recorded fixtures; keys supplied later)
