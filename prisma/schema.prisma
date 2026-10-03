@@ -948,6 +948,9 @@ model Workspace {
   outreachWebhookEvents       OutreachWebhookEvent[]
   // Phase 3 (J): in-app notification center (per-user rows + read state).
   notifications               Notification[]
+  // Phase 4a (identity): SCIM 2.0 provisioning back-relations.
+  scimTokens                ScimToken[]
+  scimGroups                ScimGroup[]
   // Phase 4a (orphaned rows): tables that had a workspace_id but no FK.
   agentRunEvents              AgentRunEvent[]
   agentRunRecordings          AgentRunRecording[]
@@ -976,9 +979,6 @@ model Workspace {
   sraEnvelopes                SraEnvelope[]
   // Phase 4a: outbound webhook endpoints (deliveries cascade via endpoint).
   webhookEndpoints            WebhookEndpoint[]
-  // Phase 4a (identity): SCIM 2.0 provisioning back-relations.
-  scimTokens                ScimToken[]
-  scimGroups                ScimGroup[]
 
   @@map("workspaces")
 }
@@ -13387,7 +13387,8 @@ model Notification {
   @@map("notifications")
 }
 
-// =====================================================// Phase 4a: outbound webhooks (lib/webhooks). Per-workspace endpoints with an
+// ============================================================
+// Phase 4a: outbound webhooks (lib/webhooks). Per-workspace endpoints with an
 // event filter and an HMAC-SHA256 signing secret (stored as a secrets()
 // envelope, shown once). Every event becomes one durable delivery row per
 // endpoint; /api/cron/webhooks drains due rows with exponential backoff and
@@ -13458,7 +13459,8 @@ model WebhookDelivery {
   @@index([endpointId, createdAt])
   @@index([workspaceId, createdAt])
   @@map("webhook_deliveries")
-=======
+}
+
 // ===========================================================================
 // Phase 4a (identity): two-factor auth, passkeys, SCIM 2.0.
 // User-level tables (user_security, user_recovery_codes, user_passkeys,
