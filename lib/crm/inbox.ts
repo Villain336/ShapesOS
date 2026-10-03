@@ -3,11 +3,11 @@
 // One thread per lead, merged from the messaging ledger (`outbound_message`):
 //   - outbound rows: manual sends, sequences, speed-to-lead, review requests…
 //     (queued behind an approval, sent, delivered, failed or suppressed)
-//   - inbound rows: direction "inbound" — today inbound SMS
-//     (lib/messaging/consent.ts handleInboundSms logs every inbound text to
-//     the same ledger, matched to a lead by phone). Any channel logged with
-//     direction "inbound" threads the same way, so inbound email lands in the
-//     right thread as soon as an inbound-email path writes to the ledger.
+//   - inbound rows: direction "inbound" — inbound SMS
+//     (lib/messaging/consent.ts handleInboundSms, matched to a lead by phone)
+//     and inbound email replies (lib/messaging/inbound-email.ts, matched by
+//     the sender's address). Any channel logged with direction "inbound"
+//     threads the same way.
 // Inbound rows that matched no lead (lead_id NULL) can't be threaded and are
 // only counted (`unmatchedInbound`).
 //

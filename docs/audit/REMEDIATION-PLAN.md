@@ -135,8 +135,16 @@ Follow-ups found while doing Phase 2 (carried forward)
 4b — product builds (`claude/phase-4b-builds`)
 - [ ] Live connector wiring: GA4, GSC, Google Ads, Meta Ads, Drive, Notion; outreach sending adapter; GBP (real HTTP code, tested against recorded fixtures; keys supplied later)
 - [ ] Social loop: media posts, Studio → social, engagement → attribution; analytics home
-- [ ] CRM conversation inbox UI (inbound + outbound per lead)
-- [ ] Mobile: configurable API base URL, EAS config, push notifications, rebrand
+- [x] CRM conversation inbox UI (inbound + outbound per lead)
+  - How: `/dashboard/crm/inbox` (nav: Grow → Inbox; "Conversation" on the lead slide-over). One thread per lead merged from the `outbound_message` ledger (outbound sends + inbound rows), newest first, with channel / unread / assigned (lead owner) / search filters and cursor paging (`lib/crm/inbox.ts`, `GET /api/crm/inbox/threads[/leadId]`). Polls while the tab is visible.
+  - Unread is per user: `conversation_reads` (FORCE RLS) holds each member's last-read time per lead; it only moves forward and acknowledges only messages already shown.
+  - Replies (`POST …/[leadId]/reply`, editor+; viewers read) go through the dispatcher's `queueMessage`, so consent, quiet hours, the daily cap and the approval gate apply; the requester is the replier.
+  - Inbound email now exists: outbound email carries a signed per-workspace Reply-To (`reply+<ws>-<hmac>@MESSAGING_INBOUND_EMAIL_DOMAIN`), `POST /api/messaging/inbound/email` takes Resend's Svix-signed `email.received` webhook (fail closed), fetches the body from Resend's receiving API, strips the quoted original and threads it on the sender's lead. Inbound SMS that matched no lead can't be threaded (the ledger doesn't keep the sender number); the inbox counts them.
+- [x] Mobile: configurable API base URL, EAS config, push notifications, rebrand
+  - How: server URL = in-app Server setting (probed via `/api/health/live`; https except private networks) → `EXPO_PUBLIC_API_BASE_URL` → `app.config.ts` extra → localhost. `app.config.ts` replaces `app.json` (ShapesOS name/scheme, placeholder bundle ids from env, EAS project id, dev/preview suffixes); `eas.json` has development / preview / production profiles with placeholders only.
+  - Push: `push_devices` (FORCE RLS, `expo_token` excluded from GDPR exports by name) + `/api/mobile/push-devices` (own devices only, viewer+). The Phase 3 producers push approval needed / decided and run failed to enabled, un-muted devices (`lib/push/notify.ts`, fire-and-forget, off unless `PUSH_PROVIDER=expo`); `DeviceNotRegistered` deletes the token, 5 consecutive errors delete it too. Settings tab: opt-out and per-kind mutes; sign-out unregisters.
+  - Sign-in now matches Auth.js v5 (CSRF cookie, `X-Auth-Return-Redirect`, server-set cookie names incl. `__Secure-` and chunks; the old flow never sent the CSRF cookie) and supports the Phase 4a second step (TOTP or recovery code through the `two-factor` provider; passkey-only accounts are sent to the web).
+  - Rebrand: ShapesOS name, wordmark splash/loading, Agentic OS tokens (`src/theme.ts`) instead of violet. Not done: no icon/splash artwork (no binary assets), and nothing was booted on a device or simulator (none on this box); flows are tested against mocked servers.
 - [ ] CAD derived BOM; datasets slices 3–4
 
 4c — design system (`claude/phase-4c-design`)

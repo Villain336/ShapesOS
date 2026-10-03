@@ -134,7 +134,9 @@ async function readJson<T>(res: Response, fallback: string): Promise<T> {
 /** Poll fn every ms while the document is visible (and once on becoming visible). */
 function useVisiblePoll(fn: () => void, ms: number, enabled = true) {
   const ref = useRef(fn);
-  ref.current = fn;
+  useEffect(() => {
+    ref.current = fn;
+  });
   useEffect(() => {
     if (!enabled) return;
     const tick = () => {
@@ -180,29 +182,54 @@ export function InboxApp({ canReply, initialLeadId }: { canReply: boolean; initi
     return p;
   }, [channel, unreadOnly, assigned, debounced]);
 
-  const loadList = useCallback(
-    async (quiet = false) => {
-      if (!quiet) setLoadingList(true);
-      try {
-        const res = await fetch(`/api/crm/inbox/threads?${listParams.toString()}`, { cache: "no-store" });
-        const body = await readJson<ThreadList>(res, "Couldn't load conversations.");
-        setList(body);
-        setCursor(body.nextCursor);
-        setListError(null);
-        if (!quiet) setExtra([]);
-      } catch (e) {
-        if (!quiet) setListError(e instanceof Error ? e.message : "Couldn't load conversations.");
-      } finally {
-        if (!quiet) setLoadingList(false);
-      }
-    },
-    [listParams],
-  );
+  const fetchList = useCallback(async (): Promise<ThreadList> => {
+    const res = await fetch(`/api/crm/inbox/threads?${listParams.toString()}`, { cache: "no-store" });
+    return readJson<ThreadList>(res, "Couldn't load conversations.");
+  }, [listParams]);
+
+  // Filters changed: replace the list (first page) and reset paging.
+  const applyFirstPage = useCallback((body: ThreadList) => {
+    setList(body);
+    setCursor(body.nextCursor);
+    setExtra([]);
+    setListError(null);
+  }, []);
 
   useEffect(() => {
-    void loadList();
-  }, [loadList]);
-  useVisiblePoll(() => void loadList(true), LIST_POLL_MS);
+    let cancelled = false;
+    fetchList()
+      .then((body) => {
+        if (!cancelled) applyFirstPage(body);
+      })
+      .catch((e: unknown) => {
+        if (!cancelled) setListError(e instanceof Error ? e.message : "Couldn't load conversations.");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [fetchList, applyFirstPage]);
+
+  /** Background refresh: newest first page, paging left alone, errors silent. */
+  const refreshQuietly = useCallback(() => {
+    fetchList()
+      .then((body) => {
+        setList(body);
+        setListError(null);
+      })
+      .catch(() => {});
+  }, [fetchList]);
+  useVisiblePoll(refreshQuietly, LIST_POLL_MS);
+
+  async function refreshNow() {
+    setLoadingList(true);
+    try {
+      applyFirstPage(await fetchList());
+    } catch (e) {
+      setListError(e instanceof Error ? e.message : "Couldn't load conversations.");
+    } finally {
+      setLoadingList(false);
+    }
+  }
 
   async function loadMore() {
     if (!cursor) return;
@@ -278,7 +305,7 @@ export function InboxApp({ canReply, initialLeadId }: { canReply: boolean; initi
             onChange={(e) => setQuery(e.target.value)}
           />
         </div>
-        <button type="button" className={btnGhostSm} onClick={() => void loadList()} disabled={loadingList} aria-label="Refresh conversations">
+        <button type="button" className={btnGhostSm} onClick={() => void refreshNow()} disabled={loadingList} aria-label="Refresh conversations">
           {loadingList ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
           <span className="hidden sm:inline">Refresh</span>
         </button>
@@ -370,7 +397,7 @@ export function InboxApp({ canReply, initialLeadId }: { canReply: boolean; initi
                 router.replace("/dashboard/crm/inbox", { scroll: false });
               }}
               onRead={() => onThreadRead(selected)}
-              onReplied={() => void loadList(true)}
+              onReplied={refreshQuietly}
             />
           ) : (
             <div className="flex flex-1 flex-col items-center justify-center gap-2 p-8 text-center">
@@ -403,8 +430,9 @@ function ThreadPane({
   const [detail, setDetail] = useState<ThreadDetail | null>(null);
   const [consent, setConsent] = useState<{ sms: ConsentStatus; email: ConsentStatus } | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [replyChannel, setReplyChannel] = useState<"sms" | "email" | null>(null);
-  const [subject, setSubject] = useState("");
+  // null = not chosen yet: follow the thread (derived below).
+  const [pickedChannel, setReplyChannel] = useState<"sms" | "email" | null>(null);
+  const [pickedSubject, setSubject] = useState<string | null>(null);
   const [body, setBody] = useState("");
   const [sending, setSending] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -412,42 +440,56 @@ function ThreadPane({
   const scroller = useRef<HTMLDivElement | null>(null);
   const lastCount = useRef(0);
 
-  const load = useCallback(async () => {
-    try {
-      const qs = channelFilter ? `?channel=${channelFilter}` : "";
-      const res = await fetch(`/api/crm/inbox/threads/${encodeURIComponent(leadId)}${qs}`, { cache: "no-store" });
-      const d = await readJson<{ thread: ThreadDetail; consent: { sms: ConsentStatus; email: ConsentStatus } }>(
-        res,
-        "Couldn't load this conversation.",
-      );
-      setDetail(d.thread);
-      setConsent(d.consent);
-      setError(null);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Couldn't load this conversation.");
-    }
+  type ThreadResponse = { thread: ThreadDetail; consent: { sms: ConsentStatus; email: ConsentStatus } };
+  const fetchThread = useCallback(async (): Promise<ThreadResponse> => {
+    const qs = channelFilter ? `?channel=${channelFilter}` : "";
+    const res = await fetch(`/api/crm/inbox/threads/${encodeURIComponent(leadId)}${qs}`, { cache: "no-store" });
+    return readJson<ThreadResponse>(res, "Couldn't load this conversation.");
   }, [leadId, channelFilter]);
 
+  const apply = useCallback((d: ThreadResponse) => {
+    setDetail(d.thread);
+    setConsent(d.consent);
+    setError(null);
+  }, []);
+
+  const load = useCallback(
+    (): Promise<void> =>
+      fetchThread()
+        .then(apply)
+        .catch((e: unknown) => setError(e instanceof Error ? e.message : "Couldn't load this conversation.")),
+    [fetchThread, apply],
+  );
+
   useEffect(() => {
-    void load();
-  }, [load]);
-  useVisiblePoll(() => void load(), THREAD_POLL_MS);
+    let cancelled = false;
+    fetchThread()
+      .then((d) => {
+        if (!cancelled) apply(d);
+      })
+      .catch((e: unknown) => {
+        if (!cancelled) setError(e instanceof Error ? e.message : "Couldn't load this conversation.");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [fetchThread, apply]);
+  const poll = useCallback(() => void load(), [load]);
+  useVisiblePoll(poll, THREAD_POLL_MS);
 
   const available = useMemo(
     () => ({ sms: !!detail?.lead.phone?.trim(), email: !!detail?.lead.email?.trim() }),
     [detail],
   );
 
-  // Default the composer once per thread.
-  useEffect(() => {
-    if (!detail || replyChannel) return;
-    const c = defaultReplyChannel(detail.messages, available);
-    setReplyChannel(c);
-    if (c === "email" && detail.lastEmailSubject) {
-      const s = detail.lastEmailSubject.trim();
-      setSubject(/^re:/i.test(s) ? s : `Re: ${s}`);
-    }
-  }, [detail, available, replyChannel]);
+  // The composer follows the thread until the user picks a channel / edits the subject.
+  const replyChannel = pickedChannel ?? (detail ? defaultReplyChannel(detail.messages, available) : null);
+  const defaultSubject = detail?.lastEmailSubject?.trim()
+    ? /^re:/i.test(detail.lastEmailSubject.trim())
+      ? detail.lastEmailSubject.trim()
+      : `Re: ${detail.lastEmailSubject.trim()}`
+    : "";
+  const subject = pickedSubject ?? defaultSubject;
 
   // Acknowledge what is on screen (only messages already shown count as read).
   useEffect(() => {
