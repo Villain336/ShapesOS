@@ -51,6 +51,7 @@ import {
   type IntroSendInput,
   type ProposeIntroductionInput,
 } from "./introductions";
+import { notifyApprovalNeeded } from "@/lib/notifications/producers";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -460,6 +461,15 @@ export class PrismaIntroductionStore {
       opts.proposedBy,
       `Proposed intro [mode: ${value.mode}]: ${personA.name} (side A, the ask) → ${personB.name} (side B, the offer).${value.fundingInvestorId && fundingInvestor ? ` Linked investor: ${fundingInvestor.name}${fundingInvestor.firm ? ` (${fundingInvestor.firm})` : ""}.` : ""}${dataRoomShareLinkId ? " Data-room offer attached." : ""} Draft ask: ${value.draftAskMessage}`,
     );
+    // Phase 3 (J): best-effort "needs you" notification (never throws).
+    await notifyApprovalNeeded({
+      workspaceId,
+      source: "intro",
+      sourceId: row.id,
+      title: `Ask ${personA.name} to introduce ${personB.name}`,
+      href: "/dashboard/connector",
+      requestedBy: opts.proposedBy,
+    });
     return toIntroductionView(row);
   }
 

@@ -10,6 +10,7 @@ import { withWorkspaceScope } from "@/lib/substrate/graph/rls";
 import { appendMissionEvent } from "@/lib/orchestrator/audit";
 import { bindingHashOf } from "@/lib/authority/approvals";
 import { createId } from "@/lib/media/ids";
+import { notifyApprovalNeeded } from "@/lib/notifications/producers";
 import type {
   AppendEventInput,
   CreateApprovalInput,
@@ -229,6 +230,15 @@ export function createPrismaMissionStore(): MissionStore {
           },
         }),
       );
+      // Phase 3 (J): best-effort "needs you" notification (never throws).
+      await notifyApprovalNeeded({
+        workspaceId: input.workspaceId,
+        source: "mission",
+        sourceId: r.id,
+        title: input.action.replace(/[_.]+/g, " "),
+        href: input.missionId ? `/dashboard/missions/${encodeURIComponent(input.missionId)}` : undefined,
+        requestedBy: input.createdBy,
+      });
       return toApproval(r as MissionApprovalRow);
     },
 

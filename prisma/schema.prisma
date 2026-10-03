@@ -902,6 +902,8 @@ model Workspace {
   automationFlowBindings    AutomationFlowBinding[]
   // Phase 1: durable idempotency for Smartlead/Instantly webhook events.
   outreachWebhookEvents     OutreachWebhookEvent[]
+  // Phase 3 (J): in-app notification center (per-user rows + read state).
+  notifications             Notification[]
 
   @@map("workspaces")
 }
@@ -13206,4 +13208,42 @@ model OutreachWebhookEvent {
   @@unique([provider, eventId])
   @@index([workspaceId, receivedAt])
   @@map("outreach_webhook_events")
+}
+
+// Phase 3 (J): notification center. One row per recipient, so read state is
+// per user (readAt). Producers (lib/notifications/producers.ts) fan out to
+// the members who should see it and are best-effort: a failed write never
+// fails the action that triggered it. dedupKey makes a producer idempotent
+// per recipient (e.g. "approval_needed:mission:<id>").
+enum NotificationKind {
+  approval_needed
+  approval_decided
+  alert_fired
+  run_failed
+  invite_accepted
+}
+
+model Notification {
+  id          String           @id @default(cuid())
+  workspaceId String           @map("workspace_id")
+  workspace   Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  // Auth.js user id of the recipient.
+  userId      String           @map("user_id")
+  kind        NotificationKind
+  title       String
+  body        String?
+  // Relative dashboard link (always starts with "/dashboard").
+  href        String?
+  // What it is about, e.g. sourceType "mission_approval" + the row id.
+  sourceType  String?          @map("source_type")
+  sourceId    String?          @map("source_id")
+  dedupKey    String?          @map("dedup_key")
+  readAt      DateTime?        @map("read_at")
+  createdAt   DateTime         @default(now()) @map("created_at")
+
+  @@unique([userId, dedupKey])
+  @@index([userId, workspaceId, readAt])
+  @@index([userId, workspaceId, createdAt])
+  @@index([workspaceId, createdAt])
+  @@map("notifications")
 }

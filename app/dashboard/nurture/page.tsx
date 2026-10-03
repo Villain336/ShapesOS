@@ -3,6 +3,13 @@ import { redirect } from "next/navigation";
 import { requireUser, getOrCreateWorkspace } from "@/lib/session";
 import { NurtureApp } from "./NurtureApp";
 
+// Tabs a deep link may open (?tab=approvals from the "needs you" inbox).
+const TABS = ["sequences", "broadcasts", "enrollments", "approvals", "log", "consent"] as const;
+type NurtureTab = (typeof TABS)[number];
+function isNurtureTab(value: unknown): value is NurtureTab {
+  return typeof value === "string" && (TABS as readonly string[]).includes(value);
+}
+
 export const dynamic = "force-dynamic";
 
 export const metadata = {
@@ -10,10 +17,16 @@ export const metadata = {
   description: "Approval-gated nurture sequences: builder, enrollments, approval queue, message log, consent.",
 };
 
-export default async function NurturePage() {
+export default async function NurturePage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const user = await requireUser();
   if (!user) redirect("/login");
   await getOrCreateWorkspace(user.id, user.email);
+  const sp = await searchParams;
+  const rawTab = Array.isArray(sp.tab) ? sp.tab[0] : sp.tab;
   return (
     <div className="flex h-full flex-col gap-4 bg-canvas p-4 md:p-6">
       <div>
@@ -23,7 +36,7 @@ export default async function NurturePage() {
           nothing auto-sends. The Broadcasts tab runs newsletter campaigns through the Listmonk email sidecar.
         </p>
       </div>
-      <NurtureApp />
+      <NurtureApp initialTab={isNurtureTab(rawTab) ? rawTab : undefined} />
     </div>
   );
 }

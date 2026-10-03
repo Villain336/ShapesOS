@@ -31,6 +31,7 @@ import {
   resolveToolkitForTool,
 } from "@/lib/integrations/actions/toolkits";
 import { ConflictError, ForbiddenError, HttpError, NotFoundError } from "@/lib/api/errors";
+import { notifyApprovalDecided, notifyApprovalNeeded } from "@/lib/notifications/producers";
 
 export const APPROVAL_TTL_MS = Number(process.env.ACTION_APPROVAL_TTL_MS ?? 24 * 3600_000);
 
@@ -143,6 +144,18 @@ export async function proposeAction(input: ProposeInput) {
       select: { id: true, status: true, riskTier: true, plainSummary: true, expiresAt: true },
     }),
   );
+  // Phase 3 (J): gated actions land in the "needs you" inbox — tell the
+  // approvers (best-effort, after the write committed).
+  if (!classified.autoExecutable) {
+    await notifyApprovalNeeded({
+      workspaceId: input.workspaceId,
+      source: "integration",
+      sourceId: approval.id,
+      title: approval.plainSummary,
+      href: "/dashboard/actions",
+      requestedBy: input.proposedBy,
+    });
+  }
   return { approval, classified };
 }
 
@@ -216,11 +229,13 @@ export async function decideApproval(input: DecideInput) {
     if (!lite) throw new NotFoundError("Approval not found");
     reclassToolkitSlug = await resolveToolkitForTool(input.workspaceId, lite.toolName);
   }
-  return withWorkspaceScope(input.workspaceId, async (tx) => {
+  let requestedBy: string | null = null;
+  const decided = await withWorkspaceScope(input.workspaceId, async (tx) => {
     const approval = await tx.composioActionApproval.findFirst({
       where: { id: input.approvalId, workspaceId: input.workspaceId },
     });
     if (!approval) throw new NotFoundError("Approval not found");
+    requestedBy = requesterOf(approval.auditTrail);
     if (approval.status !== "pending") {
       throw new ConflictError(`Approval is ${approval.status}, not pending`);
     }
@@ -285,6 +300,17 @@ export async function decideApproval(input: DecideInput) {
     });
     return updated;
   });
+  await notifyApprovalDecided({
+    workspaceId: input.workspaceId,
+    source: "integration",
+    sourceId: decided.id,
+    title: decided.plainSummary,
+    decision: input.decision === "approved" ? "approved" : "denied",
+    decidedBy: input.decidedBy,
+    requestedBy,
+    href: "/dashboard/actions",
+  });
+  return decided;
 }
 
 export async function listApprovals(

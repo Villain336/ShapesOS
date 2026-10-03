@@ -1,0 +1,256 @@
+// ShapesOS — Phase 3 (J): notification producers.
+//
+// Called from the places where something happens (an approval is requested
+// or decided, an alert fires, an agent run fails, an invite is accepted).
+// Every producer is BEST-EFFORT: it resolves recipients from the workspace
+// membership, writes one row per recipient (idempotent through dedupKey),
+// and never throws — a notification failure must never fail the action
+// that triggered it. Call it after the action's own transaction commits.
+
+import type { Prisma, WorkspaceRole } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
+import { INBOX_SOURCE_LABELS, type InboxSourceKey } from "@/lib/approvals/types";
+import { createNotifications, type NotificationInput } from "./store";
+
+export type ProducerDb = Pick<Prisma.TransactionClient, "notification" | "workspaceMember" | "workspace">;
+
+// Same ranks as lib/authz ROLE_RANK — kept local so lib/authz can import the
+// producers statically without an import cycle.
+const ROLE_RANK: Record<WorkspaceRole, number> = { viewer: 1, editor: 2, admin: 3, owner: 4 };
+
+/** Upper bound on fan-out per event (large workspaces get the most senior first). */
+const MAX_RECIPIENTS = 100;
+
+function defaultDb(): ProducerDb {
+  return prisma as unknown as ProducerDb;
+}
+
+function warn(producer: string, err: unknown) {
+  // Best-effort by design: log and move on.
+  console.warn(`[notifications] ${producer} skipped:`, err instanceof Error ? err.message : err);
+}
+
+/** A raw actor string ("<userId>", "<userId> (playbook:…)") → user id candidate. */
+export function actorUserId(actor: string | null | undefined): string | null {
+  if (typeof actor !== "string") return null;
+  const first = actor.trim().split(/\s+/)[0] ?? "";
+  if (!first || first.includes("@") || first.includes(":") || first === "system") return null;
+  return first;
+}
+
+/** Workspace members (claimed, with a user id) at or above `min`, incl. a legacy owner. */
+export async function membersAtLeast(db: ProducerDb, workspaceId: string, min: WorkspaceRole): Promise<string[]> {
+  const [members, ws] = await Promise.all([
+    db.workspaceMember.findMany({
+      where: { workspaceId, userId: { not: null } },
+      select: { userId: true, role: true },
+      take: 1000,
+    }),
+    db.workspace.findUnique({ where: { id: workspaceId }, select: { ownerUserId: true } }),
+  ]);
+  const ranked = new Map<string, number>();
+  for (const m of members) if (m.userId) ranked.set(m.userId, ROLE_RANK[m.role]);
+  if (ws?.ownerUserId && !ranked.has(ws.ownerUserId)) ranked.set(ws.ownerUserId, ROLE_RANK.owner);
+  return [...ranked.entries()]
+    .filter(([, rank]) => rank >= ROLE_RANK[min])
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, MAX_RECIPIENTS)
+    .map(([id]) => id);
+}
+
+/** True when the user id belongs to this workspace (member row or legacy owner). */
+async function isMember(db: ProducerDb, workspaceId: string, userId: string): Promise<boolean> {
+  const m = await db.workspaceMember.findFirst({ where: { workspaceId, userId }, select: { id: true } });
+  if (m) return true;
+  const ws = await db.workspace.findUnique({ where: { id: workspaceId }, select: { ownerUserId: true } });
+  return ws?.ownerUserId === userId;
+}
+
+// ---------------------------------------------------------------------------
+// Approvals
+// ---------------------------------------------------------------------------
+
+export interface ApprovalNeededInput {
+  workspaceId: string;
+  source: InboxSourceKey;
+  sourceId: string;
+  /** What is waiting, e.g. "Send follow-up to Ada". */
+  title: string;
+  /** Deep link; defaults to the unified inbox filtered to this queue. */
+  href?: string;
+  /** Requester (excluded: you don't need to approve your own request). */
+  requestedBy?: string | null;
+  /** Minimum role that can decide this queue (default editor). */
+  decideRole?: WorkspaceRole;
+}
+
+/** "New approval needed" → every member who can decide it, except the requester. */
+export async function notifyApprovalNeeded(input: ApprovalNeededInput, db: ProducerDb = defaultDb()): Promise<number> {
+  try {
+    const requester = actorUserId(input.requestedBy);
+    const recipients = (await membersAtLeast(db, input.workspaceId, input.decideRole ?? "editor")).filter(
+      (id) => id !== requester,
+    );
+    const label = INBOX_SOURCE_LABELS[input.source];
+    return await createNotifications(
+      db,
+      recipients.map<NotificationInput>((userId) => ({
+        workspaceId: input.workspaceId,
+        userId,
+        kind: "approval_needed",
+        title: `${label} needs your approval`,
+        body: input.title,
+        href: input.href ?? `/dashboard/approvals?source=${input.source}`,
+        sourceType: input.source,
+        sourceId: input.sourceId,
+        dedupKey: `approval_needed:${input.source}:${input.sourceId}`,
+      })),
+    );
+  } catch (e) {
+    warn("approval_needed", e);
+    return 0;
+  }
+}
+
+export interface ApprovalDecidedInput {
+  workspaceId: string;
+  source: InboxSourceKey;
+  sourceId: string;
+  title: string;
+  decision: "approved" | "denied";
+  decidedBy?: string | null;
+  requestedBy?: string | null;
+  href?: string;
+}
+
+/** "Approval decided" → the requester (when a member and not the decider). */
+export async function notifyApprovalDecided(input: ApprovalDecidedInput, db: ProducerDb = defaultDb()): Promise<number> {
+  try {
+    const requester = actorUserId(input.requestedBy);
+    if (!requester || requester === actorUserId(input.decidedBy)) return 0;
+    if (!(await isMember(db, input.workspaceId, requester))) return 0;
+    const label = INBOX_SOURCE_LABELS[input.source];
+    return await createNotifications(db, [
+      {
+        workspaceId: input.workspaceId,
+        userId: requester,
+        kind: "approval_decided",
+        title: `${label} ${input.decision === "approved" ? "approved" : "denied"}`,
+        body: input.title,
+        href: input.href ?? "/dashboard/approvals",
+        sourceType: input.source,
+        sourceId: input.sourceId,
+        dedupKey: `approval_decided:${input.source}:${input.sourceId}`,
+      },
+    ]);
+  } catch (e) {
+    warn("approval_decided", e);
+    return 0;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Alerts, runs, invites
+// ---------------------------------------------------------------------------
+
+export interface AlertFiredInput {
+  workspaceId: string;
+  eventId: string;
+  title: string;
+  body?: string | null;
+  /** The alert's dashboard link (absolute links fall back to the alerts page). */
+  link?: string | null;
+}
+
+/** "Alert fired" (lib/alerts) → every member of the workspace. */
+export async function notifyAlertFired(input: AlertFiredInput, db: ProducerDb = defaultDb()): Promise<number> {
+  try {
+    const recipients = await membersAtLeast(db, input.workspaceId, "viewer");
+    const href = input.link && input.link.startsWith("/dashboard") ? input.link : "/dashboard/alerts";
+    return await createNotifications(
+      db,
+      recipients.map<NotificationInput>((userId) => ({
+        workspaceId: input.workspaceId,
+        userId,
+        kind: "alert_fired",
+        title: input.title,
+        body: input.body ?? null,
+        href,
+        sourceType: "alert_event",
+        sourceId: input.eventId,
+        dedupKey: `alert:${input.eventId}`,
+      })),
+    );
+  } catch (e) {
+    warn("alert_fired", e);
+    return 0;
+  }
+}
+
+export interface AgentRunFailedInput {
+  workspaceId: string;
+  runId: string;
+  kind?: string | null;
+  startedBy?: string | null;
+}
+
+/** "Agent run failed" → whoever started it; editors+ when an agent/system started it. */
+export async function notifyAgentRunFailed(input: AgentRunFailedInput, db: ProducerDb = defaultDb()): Promise<number> {
+  try {
+    const starter = actorUserId(input.startedBy);
+    const recipients =
+      starter && (await isMember(db, input.workspaceId, starter))
+        ? [starter]
+        : await membersAtLeast(db, input.workspaceId, "editor");
+    const kind = input.kind ? `${input.kind.replace(/_/g, " ")} run` : "Agent run";
+    return await createNotifications(
+      db,
+      recipients.map<NotificationInput>((userId) => ({
+        workspaceId: input.workspaceId,
+        userId,
+        kind: "run_failed",
+        title: `${kind[0]!.toUpperCase()}${kind.slice(1)} failed`,
+        body: "Open the run to see the timeline and the error.",
+        href: `/dashboard/runs/${encodeURIComponent(input.runId)}`,
+        sourceType: "agent_run",
+        sourceId: input.runId,
+        dedupKey: `run_failed:${input.runId}`,
+      })),
+    );
+  } catch (e) {
+    warn("run_failed", e);
+    return 0;
+  }
+}
+
+export interface InviteAcceptedInput {
+  workspaceId: string;
+  memberUserId: string;
+  email?: string | null;
+  role?: WorkspaceRole | string | null;
+}
+
+/** "Invite accepted" → the workspace's admins and owners (not the new member). */
+export async function notifyInviteAccepted(input: InviteAcceptedInput, db: ProducerDb = defaultDb()): Promise<number> {
+  try {
+    const recipients = (await membersAtLeast(db, input.workspaceId, "admin")).filter((id) => id !== input.memberUserId);
+    const who = input.email?.trim() || "A new member";
+    return await createNotifications(
+      db,
+      recipients.map<NotificationInput>((userId) => ({
+        workspaceId: input.workspaceId,
+        userId,
+        kind: "invite_accepted",
+        title: `${who} joined the workspace`,
+        body: input.role ? `They joined as ${input.role}.` : null,
+        href: "/dashboard/settings/members",
+        sourceType: "workspace_member",
+        sourceId: input.memberUserId,
+        dedupKey: `invite_accepted:${input.workspaceId}:${input.memberUserId}`,
+      })),
+    );
+  } catch (e) {
+    warn("invite_accepted", e);
+    return 0;
+  }
+}

@@ -9,6 +9,7 @@
 
 import { withWorkspaceScope, type TxClient } from "../substrate/graph/rls";
 import { canonicalize, eventHashFor, sha256Hex } from "../authority/approvals";
+import { notifyApprovalDecided } from "../notifications/producers";
 
 export type ApprovalDecision = "approved" | "denied";
 
@@ -34,6 +35,9 @@ export interface DecideOutcome {
   decidedAt: Date;
   eventId: string;
   eventHash: string;
+  /** Who requested it + what (for the decided notification). */
+  requestedBy?: string;
+  action?: string;
 }
 
 export class DecideError extends Error {
@@ -106,6 +110,8 @@ export async function decideApprovalTx(
       status: true,
       expiresAt: true,
       decidedBy: true,
+      createdBy: true,
+      action: true,
     },
   });
   if (!approval) throw new DecideError("Approval not found in this workspace.", 404);
@@ -152,6 +158,8 @@ export async function decideApprovalTx(
     decidedAt,
     eventId: event.id,
     eventHash: event.eventHash,
+    requestedBy: approval.createdBy,
+    action: approval.action,
   };
 }
 
@@ -160,7 +168,19 @@ export async function decideApproval(
   workspaceId: string,
   input: DecideInput,
 ): Promise<DecideOutcome> {
-  return withWorkspaceScope(workspaceId, (tx) =>
+  const outcome = await withWorkspaceScope(workspaceId, (tx) =>
     decideApprovalTx(tx, { ...input, workspaceId }),
   );
+  // Phase 3 (J): tell the requester (best-effort, after the commit).
+  await notifyApprovalDecided({
+    workspaceId,
+    source: "mission",
+    sourceId: outcome.approvalId,
+    title: (outcome.action ?? "Mission action").replace(/[_.]+/g, " "),
+    decision: outcome.status,
+    decidedBy: input.actor,
+    requestedBy: outcome.requestedBy ?? null,
+    href: outcome.missionId ? `/dashboard/missions/${encodeURIComponent(outcome.missionId)}` : undefined,
+  });
+  return outcome;
 }

@@ -30,6 +30,7 @@ import {
   type ParsedDesignRequest,
 } from "./design-proposals";
 import { CadError, type VersionInput } from "./types";
+import { notifyApprovalNeeded } from "@/lib/notifications/producers";
 
 export interface CadActor {
   kind: "human" | "agent";
@@ -207,6 +208,15 @@ export class PrismaCadAiStore extends PrismaCadStore {
         parseConfidence: parse.confidence,
         status: "draft",
       },
+    });
+    // Phase 3 (J): best-effort "needs you" notification (never throws).
+    await notifyApprovalNeeded({
+      workspaceId,
+      source: "cad",
+      sourceId: proposal.id,
+      title: requestedText.trim().slice(0, 160),
+      href: "/dashboard/cad",
+      requestedBy,
     });
     return { proposal, parse };
   }

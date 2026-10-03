@@ -12,6 +12,7 @@ import type { AlertRule } from "@prisma/client";
 import { triggerDef } from "./triggers";
 import { deliverEvent, inQuietHours } from "./dispatch";
 import type { AlertLink } from "./adapters";
+import { notifyAlertFired } from "@/lib/notifications/producers";
 
 export interface RuleConditions {
   projectIds?: string[];
@@ -158,6 +159,17 @@ async function evaluateRule(rule: AlertRule, input: TriggerInput): Promise<EmitO
       status: "queued", // deliverEvent() sets the final status for immediate rules
       queueReason,
     },
+  });
+
+  // Phase 3 (J): in-app notification for every member (best-effort, never
+  // throws). In-app delivery ignores digest/quiet hours — those govern the
+  // external channels only.
+  await notifyAlertFired({
+    workspaceId: rule.workspaceId,
+    eventId: event.id,
+    title: event.title,
+    body: event.body.slice(0, 1000),
+    link: input.link ?? null,
   });
 
   if (queueReason) return outcome("queued", event.id);

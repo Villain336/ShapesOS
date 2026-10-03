@@ -28,13 +28,14 @@ import { notFound } from "next/navigation";
 import { requireUser, getOrCreateWorkspace } from "@/lib/session";
 import { withWorkspaceScope } from "@/lib/substrate/memory/rls";
 import { getAgentRun, listAgentRunEvents } from "@/lib/agents/runs/service";
-import type { AgentRunEventType, AgentRunStatus } from "@/lib/agents/runs/types";
+import type { AgentRunEventType } from "@/lib/agents/runs/types";
 import { LiveWatch } from "./LiveWatch";
+import { RunStatusBadge } from "@/components/runs/RunStatusBadge";
 
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Agent run — Marketr",
+  title: "Agent run — ShapesOS",
   description: "Watch the agent work: event timeline, recording, and trace.",
 };
 
@@ -44,48 +45,6 @@ const EVENT_ICON: Record<AgentRunEventType, LucideIcon> = {
   browser: Monitor,
   note: StickyNote,
 };
-
-// Run statuses are genuine agent states → status color + shape + text label.
-// Cancelled has no status color in the system — it renders as a neutral chip.
-function RunStatusBadge({ status }: { status: AgentRunStatus }) {
-  const base =
-    "inline-flex h-badge items-center gap-1.5 rounded-full px-3 text-sm font-semibold";
-  const shape = (extra: string) => (
-    <span className={`aos-shape ${extra}`} style={{ color: "inherit" }} aria-hidden />
-  );
-  switch (status) {
-    case "running":
-      return (
-        <span className={`${base} bg-running text-white`}>
-          {shape("aos-shape--running aos-is-live")} Running
-        </span>
-      );
-    case "succeeded":
-      return (
-        <span className={`${base} bg-done text-white`}>
-          {shape("aos-shape--done")} Succeeded
-        </span>
-      );
-    case "failed":
-      return (
-        <span className={`${base} bg-failed text-white`}>
-          {shape("aos-shape--failed")} Failed
-        </span>
-      );
-    case "queued":
-      return (
-        <span className={`${base} bg-paper text-ink shadow-outline`}>
-          {shape("aos-shape--queued")} Queued
-        </span>
-      );
-    default:
-      return (
-        <span className="inline-flex h-badge items-center rounded-full bg-paper px-3 text-sm font-semibold text-muted shadow-control">
-          Cancelled
-        </span>
-      );
-  }
-}
 
 // Event types are categories, not agent states — neutral chips.
 function EventTypeChip({ type }: { type: AgentRunEventType }) {
@@ -246,11 +205,11 @@ export default async function RunViewerPage({
   return (
     <div className="flex flex-col gap-6 bg-canvas p-4 md:p-6">
       <Link
-        href="/dashboard"
+        href="/dashboard/runs"
         className="inline-flex items-center gap-1.5 self-start rounded-full px-3 py-2 text-sm font-semibold text-ink aos-press hover:bg-hover"
       >
         <ArrowLeft className="size-3.5" />
-        Dashboard
+        All runs
       </Link>
 
       <div className="flex flex-wrap items-end justify-between gap-3">
