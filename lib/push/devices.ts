@@ -84,12 +84,12 @@ export async function registerDevice(db: Db, input: RegisterInput): Promise<Push
   let row: PushDevice;
   if (existing && existing.userId === input.userId) {
     row = await db.pushDevice.update({
-      where: { id: existing.id },
+      where: { id: existing.id, workspaceId: input.workspaceId },
       data: { platform: input.platform, deviceName, lastSeenAt: now },
     });
   } else if (existing) {
     row = await db.pushDevice.update({
-      where: { id: existing.id },
+      where: { id: existing.id, workspaceId: input.workspaceId },
       data: {
         userId: input.userId,
         platform: input.platform,
@@ -114,7 +114,9 @@ export async function registerDevice(db: Db, input: RegisterInput): Promise<Push
     skip: MAX_DEVICES_PER_USER,
     select: { id: true },
   });
-  if (stale.length) await db.pushDevice.deleteMany({ where: { id: { in: stale.map((s) => s.id) } } });
+  if (stale.length) {
+    await db.pushDevice.deleteMany({ where: { workspaceId: input.workspaceId, id: { in: stale.map((s) => s.id) } } });
+  }
   return toDeviceView(row);
 }
 
@@ -139,7 +141,7 @@ export async function updateDevice(
   const data: Prisma.PushDeviceUpdateInput = {};
   if (typeof opts.enabled === "boolean") data.enabled = opts.enabled;
   if (opts.mutedKinds !== undefined) data.mutedKinds = cleanMuted(opts.mutedKinds);
-  const row = await db.pushDevice.update({ where: { id: existing.id }, data });
+  const row = await db.pushDevice.update({ where: { id: existing.id, workspaceId: opts.workspaceId }, data });
   return toDeviceView(row);
 }
 

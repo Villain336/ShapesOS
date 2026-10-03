@@ -129,7 +129,7 @@ export async function pushNotifications(inputs: NotificationInput[], deps: PushD
         }
         for (const [id, error] of errors) {
           const row = await db.pushDevice.update({
-            where: { id },
+            where: { id, workspaceId },
             data: { failureCount: { increment: 1 }, lastError: error.slice(0, 200) },
             select: { failureCount: true },
           });
