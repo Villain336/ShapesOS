@@ -361,10 +361,12 @@ export async function approveRun(db: Db, runId: string, workspaceId: string, app
   if (run.status !== "awaiting_approval") {
     throw new ScheduleServiceError(`run is not awaiting approval (status ${run.status})`);
   }
-  await db.skillRun.update({
-    where: { id: run.id },
+  // Guarded transition: two concurrent decisions can't both land.
+  const claimed = await db.skillRun.updateMany({
+    where: { id: run.id, workspaceId, status: "awaiting_approval" },
     data: { status: "approved", approvedBy: approverId, approvedAt: new Date() },
   });
+  if (claimed.count !== 1) throw new ScheduleServiceError("run is not awaiting approval (already decided)");
   await schedulerAudit(db, {
     projectId: run.projectId,
     workspaceId,
@@ -389,7 +391,11 @@ export async function rejectRun(db: Db, runId: string, workspaceId: string, appr
   if (run.status !== "awaiting_approval") {
     throw new ScheduleServiceError(`run is not awaiting approval (status ${run.status})`);
   }
-  await db.skillRun.update({ where: { id: run.id }, data: { status: "rejected", finishedAt: new Date(), approvedBy: approverId, approvedAt: new Date() } });
+  const claimed = await db.skillRun.updateMany({
+    where: { id: run.id, workspaceId, status: "awaiting_approval" },
+    data: { status: "rejected", finishedAt: new Date(), approvedBy: approverId, approvedAt: new Date() },
+  });
+  if (claimed.count !== 1) throw new ScheduleServiceError("run is not awaiting approval (already decided)");
   await schedulerAudit(db, {
     projectId: run.projectId,
     workspaceId,

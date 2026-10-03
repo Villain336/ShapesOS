@@ -79,6 +79,17 @@ describe("decided notifications (scheduler, CAD, mail, media)", () => {
     assert.deepEqual(a.map((n) => n.userId), [EDITOR]);
     assert.equal(a[0]!.title, "Scheduled run approved");
     assert.equal((await prisma.skillRun.findUniqueOrThrow({ where: { id: approved.id } })).approvedBy, OWNER);
+
+    // Concurrent decisions on one run: exactly one lands, one notification.
+    const raced = await mkRun();
+    const results = await Promise.allSettled([
+      rejectRun(prisma, raced.id, WS, OWNER),
+      rejectRun(prisma, raced.id, WS, EDITOR),
+      rejectRun(prisma, raced.id, WS, OWNER),
+    ]);
+    assert.equal(results.filter((x) => x.status === "fulfilled").length, 1);
+    assert.equal((await decided("scheduler", raced.id)).length <= 1, true);
+    assert.equal((await prisma.skillRun.findUniqueOrThrow({ where: { id: raced.id } })).status, "rejected");
   });
 
   it("CAD: approving / rejecting a design proposal notifies the requester", async () => {
