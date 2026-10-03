@@ -8,7 +8,7 @@ import {
   requireUser,
 } from "@/lib/session";
 import { INVITE_REQUIRED_PATH, InviteRequiredError } from "@/lib/auth/signup";
-import { AppSidebar, MobileNav } from "@/components/AppSidebar";
+import { AppSidebar, MobileNav, type SidebarBadges } from "@/components/AppSidebar";
 import { DashboardMain } from "@/components/DashboardMain";
 import { ChatProvider } from "@/components/chat/ChatContext";
 import { CommandBar } from "@/components/command-bar/CommandBar";
@@ -41,10 +41,17 @@ export default async function DashboardLayout({
   });
   const workspaces = await getAccessibleWorkspaces(user.id);
 
+  // Live count pills next to nav rows (see SidebarBadges). `needs-you` is
+  // the Approvals badge slot: mount components/approvals/NeedsYouBadge here,
+  // e.g. { "needs-you": <NeedsYouBadge /> }. Until that component ships the
+  // slot stays empty and the sidebar renders no pill.
+  const sidebarBadges: SidebarBadges = {};
+
   const sidebarProps = {
     user: { name: user.name, email: user.email },
     workspaces: workspaces.map((w) => ({ id: w.id, name: w.name })),
     currentWorkspaceId: workspace.id,
+    badges: sidebarBadges,
   };
 
   // Phase 12 (embeds): Chatwoot widget config resolved server-side; the

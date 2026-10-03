@@ -192,6 +192,23 @@ export function rankCommands<T extends CommandItem>(
   return scored.map((s) => s.item);
 }
 
+/**
+ * capIdleSection — with an empty query, keep only the first `limit` items of
+ * `section` (already frecency-ordered by rankCommands) so a long Go list
+ * doesn't push Do/Ask off screen. Any non-empty query returns `items` as-is,
+ * so every item stays reachable by typing.
+ */
+export function capIdleSection<T extends CommandItem>(
+  items: T[],
+  query: string,
+  section: SectionId,
+  limit: number,
+): T[] {
+  if (query.trim()) return items;
+  let seen = 0;
+  return items.filter((i) => i.section !== section || seen++ < limit);
+}
+
 export interface CommandGroup<T extends CommandItem = CommandItem> {
   section: SectionId;
   label: string;

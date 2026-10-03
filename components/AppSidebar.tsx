@@ -11,43 +11,18 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
-import type { ComponentType } from "react";
-import { useState } from "react";
+import type { ReactNode } from "react";
+import { useEffect, useState } from "react";
 import {
-  Mail,
-  Paintbrush,
-  Megaphone,
-  RefreshCw,
-  Brain,
-  Target,
-  BookOpen,
-  Inbox,
-  Share2,
-  LayoutDashboard,
-  Scissors,
-  Briefcase,
-  PenLine,
-  Home,
-  Database,
-  TrendingUp,
-  Kanban,
-  ChartColumn,
-  ChartSpline,
-  ChartLine,
-  Folder,
-  Bell,
   Check,
   ChevronDown,
   ChevronsUpDown,
-  Globe,
-  LogOut,
   List,
-  Phone,
-  Star,
-  Scale,
-  Handshake,
-  Network,
-  Box,
+  LogOut,
+  PanelLeftClose,
+  PanelLeftOpen,
+  RefreshCw,
+  TrendingUp,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import GlideMenu from "@/components/vault/primitives/GlideMenu";
@@ -63,84 +38,23 @@ import {
 import { Avatar, AvatarFallback } from "@/components/vault/shadcn/avatar";
 import { useChat } from "@/components/chat/ChatContext";
 import ThreadListSection from "@/components/chat/ThreadListSection";
+import { activeNavHref, NAV_GROUPS, type NavItem } from "@/lib/nav/config";
 
 export type SidebarUser = { name?: string | null; email?: string | null };
 export type SidebarWorkspace = { id: string; name: string };
 
-/** Nav icon: Lucide. */
-type NavIcon = ComponentType<{ className?: string }>;
+/**
+ * Live count pills keyed by NavItem.badge. The dashboard layout fills
+ * `needs-you` with the approvals count (components/approvals/NeedsYouBadge);
+ * a missing key renders nothing.
+ */
+export type SidebarBadges = Partial<Record<NonNullable<NavItem["badge"]>, ReactNode>>;
 
-const NAV_SECTIONS: {
-  title?: string;
-  items: { href: string; label: string; icon: NavIcon }[];
-}[] = [
-  {
-    items: [
-      { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
-      { href: "/dashboard/assistant", label: "Assistant", icon: TrendingUp },
-      { href: "/dashboard/crm", label: "CRM", icon: Kanban },
-      { href: "/dashboard/attribution", label: "Attribution", icon: ChartSpline },
-      { href: "/dashboard/reviews", label: "Reviews", icon: Star },
-      { href: "/dashboard/calls", label: "Calls", icon: Phone },
-      { href: "/dashboard/reports", label: "Reports", icon: ChartColumn },
-      // Phase 12 (embeds): Umami-backed analytics dashboard.
-      { href: "/dashboard/analytics", label: "Analytics", icon: ChartLine },
-      { href: "/dashboard/files", label: "Files", icon: Folder },
-      { href: "/dashboard/alerts", label: "Alerts", icon: Bell },
-      // Phase 4: Creative Studio (T2, central creative home) + Direct Mail
-      // (R3/T1 mail engine — page lands with that track; nav is wired here).
-      { href: "/dashboard/studio", label: "Studio", icon: Paintbrush },
-      { href: "/dashboard/mail", label: "Direct Mail", icon: Mail },
-      // Phase 12: social publishing via the Postiz sidecar (raw REST).
-      { href: "/dashboard/social", label: "Social", icon: Share2 },
-      // Phase 13C: the clipper — long videos → scored clip drafts → Postiz drafts.
-      { href: "/dashboard/clips", label: "Clips", icon: Scissors },
-      // Phase 5 SAFETY: media buying command center (pools, approvals, kill switches).
-      { href: "/dashboard/media", label: "Media", icon: Megaphone },
-      // Phase 6: authority & relevance command center (outreach, PR, listings,
-      // AEO, review replies, intelligence reports).
-      { href: "/dashboard/authority", label: "Authority", icon: Globe },
-      // Phase 7: the flywheel (reallocation, recycling, Test Lab, CTV, DSP, launch).
-      { href: "/dashboard/flywheel", label: "Flywheel", icon: RefreshCw },
-      // Phase 8: the agentic substrate (Business Graph, Campaigns, Growth Memory).
-      { href: "/dashboard/substrate", label: "Substrate", icon: Brain },
-      // Phase 9: GrowthOS — missions, playbooks, approvals (Chief Strategy Agent).
-      { href: "/dashboard/missions", label: "Missions", icon: Target },
-      { href: "/dashboard/playbooks", label: "Playbooks", icon: BookOpen },
-      { href: "/dashboard/approvals", label: "Approvals", icon: Inbox },
-      // Phase 14: the office surface — sheets/docs/decks stored by Marketr.
-      { href: "/dashboard/office", label: "Office", icon: Briefcase },
-      // Wave 2: E-sign — governed signature envelopes on the Documenso rail.
-      { href: "/dashboard/esign", label: "E-sign", icon: PenLine },
-      // Wave 2: WFH mode — per-user remote-work mode switch.
-      { href: "/dashboard/wfh", label: "WFH mode", icon: Home },
-      // Business OS: Dataset Builder slice 1 — ingest business knowledge
-      // into traceable datasets (Launch pillar on-ramp).
-      { href: "/dashboard/datasets", label: "Datasets", icon: Database },
-      // Business OS: Legal/Compliance slice 1 — per-tenant obligation map
-      // (licenses, filings, tax registrations, insurance, permits).
-      { href: "/dashboard/legal", label: "Legal", icon: Scale },
-      // Business OS: Funding/VC slice 1 — starter network. Boardy AI ships
-      // as the preloaded starter contact in every tenant's funding graph;
-      // the front door is the founder's own raise workflow.
-      { href: "/dashboard/funding", label: "Funding", icon: Handshake },
-      // Connector Agent slice 1: the connector's Network home — people,
-      // companies, relationship warmth, import provenance.
-      { href: "/dashboard/connector", label: "Network", icon: Network },
-      // CAD + Hardware slice 1: CAD viewer + versioning — project/model
-      // registry, in-browser three.js viewer, version diffs, share links.
-      { href: "/dashboard/cad", label: "CAD", icon: Box },
-    ],
-  },
-];
-// Phase 13 A1: the sidebar's separate "Settings" island (alert rules, brand
-// kits, members) was deleted — all 17 settings subpages now live in the single
-// SettingsNav tab strip on every settings page, including the new
-// /dashboard/settings landing.
+// Navigation lives in lib/nav/config.ts (Grow / Design / Operate / Agents +
+// Settings and Billing) so the sidebar and the ⌘K Go section never drift.
+// Settings subpages stay in the SettingsNav tab strip on every settings page.
 
-function isActive(pathname: string, href: string) {
-  return href === "/dashboard" ? pathname === href : pathname.startsWith(href);
-}
+const COLLAPSE_KEY = "shapesos:sidebar:collapsed";
 
 function initials(user: SidebarUser) {
   const src = user.name ?? user.email ?? "?";
@@ -156,57 +70,78 @@ function NavItems({
   pathname,
   onNavigate,
   onNight,
+  collapsed,
+  badges,
 }: {
   pathname: string;
   onNavigate?: () => void;
   onNight?: boolean;
+  collapsed?: boolean;
+  badges?: SidebarBadges;
 }) {
+  const current = activeNavHref(pathname);
   return (
     <div className="flex flex-col gap-4">
-      {NAV_SECTIONS.map((section, i) => (
-        <div key={section.title ?? i}>
-          {section.title ? (
-            <div
-              className={cn(
-                "mb-1 px-3 text-xs font-semibold",
-                onNight ? "text-night-muted" : "text-muted",
-              )}
-            >
-              {section.title}
-            </div>
-          ) : null}
-          <GlideMenu
-            highlightClassName={cn("inset-x-0 rounded-sm", onNight ? "bg-night-hover" : "bg-hover")}
+      {NAV_GROUPS.map((group) => {
+        const headingId = `nav-group-${group.id}${onNight ? "" : "-m"}`;
+        return (
+          <div
+            key={group.id}
+            role="group"
+            aria-labelledby={group.title ? headingId : undefined}
+            aria-label={group.title ? undefined : group.id === "account" ? "Account" : "Home"}
+            className={group.id === "account" ? cn("border-t pt-3", onNight ? "border-night-line" : "border-line") : undefined}
           >
-            {section.items.map((item) => {
-              const active = isActive(pathname, item.href);
-              const Icon = item.icon;
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  data-menu-row
-                  aria-current={active ? "page" : undefined}
-                  onClick={onNavigate}
-                  className={cn(
-                    "relative z-10 mb-0.5 flex h-10 items-center gap-2.5 rounded-sm px-3 text-base transition-[color,background-color] duration-150 ease-aos",
-                    active
-                      ? onNight
-                        ? "bg-paper font-semibold text-ink"
-                        : "bg-ink font-semibold text-paper"
-                      : onNight
-                        ? "text-night-soft hover:text-night"
-                        : "text-ink",
-                  )}
-                >
-                  <Icon className="size-4 shrink-0" />
-                  {item.label}
-                </Link>
-              );
-            })}
-          </GlideMenu>
-        </div>
-      ))}
+            {group.title ? (
+              <div
+                id={headingId}
+                className={cn(
+                  "mb-1 px-3 text-xs font-semibold",
+                  onNight ? "text-night-muted" : "text-muted",
+                  collapsed && "sr-only",
+                )}
+              >
+                {group.title}
+              </div>
+            ) : null}
+            <GlideMenu
+              highlightClassName={cn("inset-x-0 rounded-sm", onNight ? "bg-night-hover" : "bg-hover")}
+            >
+              {group.items.map((item) => {
+                const active = item.href === current;
+                const Icon = item.icon;
+                const badge = item.badge ? badges?.[item.badge] : null;
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    data-menu-row
+                    aria-current={active ? "page" : undefined}
+                    aria-label={collapsed ? item.label : undefined}
+                    title={collapsed ? item.label : undefined}
+                    onClick={onNavigate}
+                    className={cn(
+                      "relative z-10 mb-0.5 flex h-10 items-center gap-2.5 rounded-sm text-base transition-[color,background-color] duration-150 ease-aos",
+                      collapsed ? "justify-center px-0" : "px-3",
+                      active
+                        ? onNight
+                          ? "bg-paper font-semibold text-ink"
+                          : "bg-ink font-semibold text-paper"
+                        : onNight
+                          ? "text-night-soft hover:text-night"
+                          : "text-ink",
+                    )}
+                  >
+                    <Icon aria-hidden className="size-4 shrink-0" />
+                    {collapsed ? null : <span className="min-w-0 flex-1 truncate">{item.label}</span>}
+                    {badge && !collapsed ? <span className="ml-auto shrink-0">{badge}</span> : null}
+                  </Link>
+                );
+              })}
+            </GlideMenu>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -354,30 +289,71 @@ export function AppSidebar({
   user,
   workspaces,
   currentWorkspaceId,
+  badges,
 }: {
   user: SidebarUser;
   workspaces: SidebarWorkspace[];
   currentWorkspaceId: string;
+  badges?: SidebarBadges;
 }) {
   const pathname = usePathname();
   const chat = useChat();
+  // 288px expanded / 80px rail (Agentic OS). The choice is a per-viewer
+  // convenience, so it lives in localStorage and defaults to expanded.
+  const [collapsed, setCollapsed] = useState(false);
+  useEffect(() => {
+    try {
+      setCollapsed(window.localStorage.getItem(COLLAPSE_KEY) === "1");
+    } catch {
+      // storage unavailable: stay expanded
+    }
+  }, []);
+  function toggleCollapsed() {
+    setCollapsed((c) => {
+      try {
+        window.localStorage.setItem(COLLAPSE_KEY, c ? "0" : "1");
+      } catch {
+        // best effort
+      }
+      return !c;
+    });
+  }
   // One sidebar everywhere: on the assistant page it adjusts, gaining a
   // contextual chat-thread section under the main nav (AI tab only).
   const showThreads =
-    pathname === "/dashboard/assistant" && chat.tab === "ai" && chat.session !== null;
+    !collapsed && pathname === "/dashboard/assistant" && chat.tab === "ai" && chat.session !== null;
   return (
-    <aside className="aos-night sticky top-0 hidden h-screen w-72 shrink-0 flex-col border-r border-night-line md:flex">
-      <div className="flex flex-col gap-3 px-3 pt-4">
-        <Link href="/dashboard" className="flex items-center gap-2 px-1" aria-label="Marketr home">
-          <span className="flex size-7 items-center justify-center rounded-sm bg-night-raised text-night">
-            <TrendingUp className="size-4" />
-          </span>
-          <span className="text-[16px] font-semibold tracking-tight text-night">Marketr</span>
-        </Link>
-        <WorkspaceSwitcher workspaces={workspaces} currentId={currentWorkspaceId} />
+    <aside
+      className={cn(
+        "aos-night sticky top-0 hidden h-screen shrink-0 flex-col border-r border-night-line md:flex",
+        collapsed ? "w-20" : "w-72",
+      )}
+    >
+      <div className={cn("flex flex-col gap-3 pt-4", collapsed ? "items-center px-2" : "px-3")}>
+        <div className={cn("flex items-center gap-2", collapsed ? "flex-col" : "justify-between")}>
+          <Link href="/dashboard" className="flex items-center gap-2 rounded-sm px-1" aria-label="Marketr home">
+            <span className="flex size-7 items-center justify-center rounded-sm bg-night-raised text-night">
+              <TrendingUp className="size-4" />
+            </span>
+            {collapsed ? null : (
+              <span className="text-[16px] font-semibold tracking-tight text-night">Marketr</span>
+            )}
+          </Link>
+          <button
+            type="button"
+            onClick={toggleCollapsed}
+            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            aria-expanded={!collapsed}
+            title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            className="flex size-8 items-center justify-center rounded-full text-night-soft transition-[background-color,color] duration-150 hover:bg-night-hover hover:text-night"
+          >
+            {collapsed ? <PanelLeftOpen className="size-4" /> : <PanelLeftClose className="size-4" />}
+          </button>
+        </div>
+        {collapsed ? null : <WorkspaceSwitcher workspaces={workspaces} currentId={currentWorkspaceId} />}
       </div>
       <nav className="flex-1 overflow-y-auto px-2 py-4" aria-label="Dashboard">
-        <NavItems pathname={pathname} onNight />
+        <NavItems pathname={pathname} onNight collapsed={collapsed} badges={badges} />
         {showThreads ? (
           <div className="mt-5 border-t border-night-line pt-3">
             <div className="mb-2 truncate px-3 text-xs font-semibold text-night-muted">
@@ -388,7 +364,7 @@ export function AppSidebar({
         ) : null}
       </nav>
       <div className="border-t border-night-line p-2">
-        <UserMenu user={user} triggerClassName="w-full" onNight />
+        <UserMenu user={user} triggerClassName="w-full" onNight compact={collapsed} />
       </div>
     </aside>
   );
@@ -398,10 +374,12 @@ export function MobileNav({
   user,
   workspaces,
   currentWorkspaceId,
+  badges,
 }: {
   user: SidebarUser;
   workspaces: SidebarWorkspace[];
   currentWorkspaceId: string;
+  badges?: SidebarBadges;
 }) {
   const pathname = usePathname();
   return (
@@ -420,8 +398,8 @@ export function MobileNav({
           >
             <List className="size-4" />
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56 p-2">
-            <NavItems pathname={pathname} />
+          <DropdownMenuContent align="end" className="max-h-[80vh] w-64 overflow-y-auto p-2">
+            <NavItems pathname={pathname} badges={badges} />
             <div className="mt-2 border-t border-line pt-2">
               <WorkspaceSwitcher workspaces={workspaces} currentId={currentWorkspaceId} />
             </div>
