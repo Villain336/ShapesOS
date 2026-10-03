@@ -4,6 +4,7 @@
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import { getOrCreateWorkspace, requireUser } from "@/lib/session";
+import { intQuery, parseQuery, z } from "@/lib/api/validate";
 
 export async function GET(req: Request) {
   const user = await requireUser();
@@ -16,7 +17,9 @@ export async function GET(req: Request) {
   if (pageId) where.pageId = pageId;
   const status = sp.get("status");
   if (status) where.status = status;
-  const limit = Math.min(Math.max(Number(sp.get("limit") ?? 50) || 50, 1), 200);
+  const limitQuery = parseQuery(z.object({ limit: intQuery(50, 1, 200) }), sp);
+  if (!limitQuery.ok) return limitQuery.error;
+  const limit = limitQuery.data.limit;
   const cursor = sp.get("cursor");
 
   const bookings = await prisma.booking.findMany({

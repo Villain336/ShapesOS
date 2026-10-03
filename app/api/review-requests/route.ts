@@ -13,6 +13,7 @@ import {
   ReviewEngineError,
 } from "@/lib/reviews/engine";
 import { publicOrigin } from "@/lib/physical/bundles";
+import { intQuery, parseQuery } from "@/lib/api/validate";
 
 const SendSchema = z.object({
   leadId: z.string().trim().min(1).max(64),
@@ -35,7 +36,9 @@ export async function GET(req: Request) {
   if (g.error) return g.error;
   const url = new URL(req.url);
   const status = url.searchParams.get("status") || undefined;
-  const limit = Math.min(parseInt(url.searchParams.get("limit") || "100", 10) || 100, 500);
+  const limitQuery = parseQuery(z.object({ limit: intQuery(100, 1, 500) }), url.searchParams);
+  if (!limitQuery.ok) return limitQuery.error;
+  const limit = limitQuery.data.limit;
   const [requests, stats] = await Promise.all([
     listReviewRequests(g.workspace!.id, { status, limit }),
     funnelStats(g.workspace!.id),

@@ -8,6 +8,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { dedupKeyFor } from "@/lib/crm/dedup";
 import { guardWorkspace, httpErrorResponse, readJson, HttpError } from "@/lib/enrichment/guard";
+import { intQuery, parseQuery } from "@/lib/api/validate";
 
 const ProspectInput = z.object({
   company: z.string().trim().max(200).optional(),
@@ -111,7 +112,9 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
 
     const url = new URL(req.url);
     const status = url.searchParams.get("status");
-    const limit = Math.min(500, Math.max(1, Number(url.searchParams.get("limit") ?? 200) || 200));
+    const limitQuery = parseQuery(z.object({ limit: intQuery(200, 1, 500) }), url.searchParams);
+    if (!limitQuery.ok) return limitQuery.error;
+    const limit = limitQuery.data.limit;
 
     const prospects = await prisma.prospect.findMany({
       where: {
