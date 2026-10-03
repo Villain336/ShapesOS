@@ -22,6 +22,8 @@
 // recolored/restyled glyph becomes a BY-SA derivative — see survey §5).
 // Emoji needs are covered by Noto Emoji (Apache-2.0) via the `noto` prefix.
 
+import { sanitizeSvgFragment } from "./svg-sanitize";
+
 /**
  * Single configurable constant for the Iconify API host — the self-hosting
  * escape hatch. Point this at a self-hosted Iconify API server (MIT) or a
@@ -225,34 +227,15 @@ export function assertBodySize(body: string): void {
 }
 
 /**
- * Sanitizes an SVG inner body for storage in a design document. Strips:
- * - HTML/XML comments
- * - <script> and <style> elements (and any CSS they carry)
- * - SMIL animation elements (<animate*>, <set>) — stored icons are static
- * - <foreignObject> (can host arbitrary HTML)
- * - event-handler attributes (onclick, onload, …)
- * - inline style="" attributes (keeps the document's fill authoritative)
- * - javascript:/data:text/html hrefs (internal #fragment refs are kept)
+ * Sanitizes an SVG inner body for storage in a design document. Delegates
+ * to the strict ALLOWLIST re-serializer (lib/design/svg-sanitize.ts): only
+ * known SVG shape/paint/gradient/text elements and attributes survive;
+ * script/style/foreignObject/image/animation elements are dropped with their
+ * subtrees, comments are dropped, event handlers and inline style="" never
+ * pass, and href/url() may only reference internal #fragments.
  */
 export function sanitizeSvgBody(dirty: string): string {
-  let out = dirty;
-  out = out.replace(/<!--[\s\S]*?-->/g, "");
-  out = out.replace(/<script\b[\s\S]*?<\/script\s*>/gi, "");
-  out = out.replace(/<style\b[\s\S]*?<\/style\s*>/gi, "");
-  out = out.replace(/<(animate|animateTransform|animateMotion|set)\b[\s\S]*?<\/(animate|animateTransform|animateMotion|set)\s*>/gi, "");
-  out = out.replace(/<(animate|animateTransform|animateMotion|set)\b[^>]*\/>/gi, "");
-  out = out.replace(/<foreignObject\b[\s\S]*?<\/foreignObject\s*>/gi, "");
-  out = out.replace(/\son[a-zA-Z]+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, "");
-  out = out.replace(/\sstyle\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, "");
-  out = out.replace(
-    /\s(xlink:href|href)\s*=\s*("([^"]*)"|'([^']*)'|([^\s>]+))/gi,
-    (m, _attr, _q, v1: string, v2: string, v3: string) => {
-      const v = (v1 ?? v2 ?? v3 ?? "").trim().toLowerCase();
-      if (v.startsWith("javascript:") || v.startsWith("data:text/html")) return "";
-      return m;
-    },
-  );
-  return out.trim();
+  return sanitizeSvgFragment(dirty);
 }
 
 /**
