@@ -54,6 +54,11 @@ import {
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
+/** createdAt must be after this for a proposal to still be actionable. */
+function expiryCutoff(now: Date): Date {
+  return new Date(now.getTime() - DEFAULT_INTRO_EXPIRY_DAYS * DAY_MS);
+}
+
 type PersonRef = { id: string; name: string; handles: string[] };
 
 type FundingInvestorRef = { id: string; name: string; firm: string | null };
@@ -234,6 +239,60 @@ export class PrismaIntroductionStore {
       take: Math.min(Math.max(opts.limit ?? 100, 1), 500),
     });
     return rows.map((r) => toIntroductionView(r as IntroductionRow));
+  }
+
+  /**
+   * Guarded transition. The write lands only while the row is still in the
+   * state this call validated (same status + `guard`); zero rows means a
+   * concurrent request moved it on first → intro_conflict (HTTP 409). Two
+   * concurrent accepts therefore produce one acceptance and one offer.
+   */
+  private async transition(
+    workspaceId: string,
+    intro: IntroductionRow,
+    guard: Prisma.ConnectorIntroductionWhereInput,
+    data: Prisma.ConnectorIntroductionUpdateManyMutationInput,
+  ): Promise<IntroductionRow> {
+    const res = await this.prisma.connectorIntroduction.updateMany({
+      where: { id: intro.id, workspaceId, status: intro.status, ...guard },
+      data,
+    });
+    if (res.count !== 1) {
+      const current = await this.getIntroOrThrow(workspaceId, intro.id);
+      throw new ConnectorError(
+        current.status === "proposed" && isIntroExpired(current.createdAt, new Date(), DEFAULT_INTRO_EXPIRY_DAYS)
+          ? "intro_expired"
+          : "intro_conflict",
+        `This introduction changed while you were acting on it (now ${current.status}). Reload and try again.`,
+      );
+    }
+    return this.getIntroOrThrow(workspaceId, intro.id);
+  }
+
+  /**
+   * Expiry enforced at action time, not only by the cron sweep: a proposal
+   * past its window is flipped to expired (guarded) and the action refused.
+   */
+  private async expireIfPastWindow(workspaceId: string, intro: IntroductionRow, now: Date): Promise<void> {
+    if (intro.status !== "proposed" || !isIntroExpired(intro.createdAt, now, DEFAULT_INTRO_EXPIRY_DAYS)) return;
+    const res = await this.prisma.connectorIntroduction.updateMany({
+      where: { id: intro.id, workspaceId, status: "proposed" },
+      data: { status: "expired", expiredAt: now },
+    });
+    if (res.count === 1) {
+      await this.recordEvent(
+        workspaceId,
+        intro.id,
+        "expired",
+        "system",
+        "action-time-expiry",
+        `Proposal expired after ${DEFAULT_INTRO_EXPIRY_DAYS} days without resolution (caught when acted on).`,
+      );
+    }
+    throw new ConnectorError(
+      "intro_expired",
+      `This introduction proposal expired after ${DEFAULT_INTRO_EXPIRY_DAYS} days. Propose it again if it is still wanted.`,
+    );
   }
 
   private async recordEvent(
@@ -417,6 +476,8 @@ export class PrismaIntroductionStore {
   ): Promise<ConnectorIntroductionView> {
     const intro = await this.getIntroOrThrow(workspaceId, introId);
     assertIntroTransition(intro.status, "tenant_approve");
+    const now = new Date();
+    await this.expireIfPastWindow(workspaceId, intro, now);
     if (intro.tenantApproved) {
       throw new ConnectorError("already_approved", "This introduction was already approved.");
     }
@@ -429,17 +490,11 @@ export class PrismaIntroductionStore {
       );
     }
 
-    const updated = (await this.prisma.connectorIntroduction.update({
-      where: { id: introId },
-      data: {
+    const updated = await this.transition(workspaceId, intro, { tenantApproved: false, createdAt: { gt: expiryCutoff(now) } }, {
         tenantApproved: true,
         tenantApprovedBy: approvedBy,
-        tenantApprovedAt: new Date(),
-      },
-      include: {
-        ...INTRO_INCLUDES,
-      },
-    })) as IntroductionRow;
+        tenantApprovedAt: now,
+    });
 
     await this.recordEvent(
       workspaceId,
@@ -477,18 +532,12 @@ export class PrismaIntroductionStore {
     const reason = typeof opts.reason === "string" && opts.reason.trim() ? opts.reason.trim() : null;
     const now = new Date();
 
-    const updated = (await this.prisma.connectorIntroduction.update({
-      where: { id: introId },
-      data: {
+    const updated = await this.transition(workspaceId, intro, { tenantApproved: false }, {
         status: "declined",
         declinedBy,
         declinedAt: now,
         declineReason: reason,
-      },
-      include: {
-        ...INTRO_INCLUDES,
-      },
-    })) as IntroductionRow;
+    });
 
     await this.recordEvent(
       workspaceId,
@@ -528,18 +577,13 @@ export class PrismaIntroductionStore {
       );
     }
     const now = new Date();
+    await this.expireIfPastWindow(workspaceId, intro, now);
 
-    const updated = (await this.prisma.connectorIntroduction.update({
-      where: { id: introId },
-      data: {
+    const updated = await this.transition(workspaceId, intro, { tenantApproved: true, createdAt: { gt: expiryCutoff(now) } }, {
         status: "side_a_accepted",
         sideAAcceptedBy: identity,
         sideAAcceptedAt: now,
-      },
-      include: {
-        ...INTRO_INCLUDES,
-      },
-    })) as IntroductionRow;
+    });
 
     const note = typeof opts.note === "string" && opts.note.trim() ? ` Note: ${opts.note.trim()}` : "";
     await this.recordEvent(
@@ -578,19 +622,13 @@ export class PrismaIntroductionStore {
     const note = typeof opts.note === "string" && opts.note.trim() ? opts.note.trim() : null;
     const now = new Date();
 
-    const updated = (await this.prisma.connectorIntroduction.update({
-      where: { id: introId },
-      data: {
+    const updated = await this.transition(workspaceId, intro, { tenantApproved: true }, {
         status: "declined",
         sideAAcceptedBy: null,
         declinedBy: identity,
         declinedAt: now,
         declineReason: note ?? "Side A declined the ask.",
-      },
-      include: {
-        ...INTRO_INCLUDES,
-      },
-    })) as IntroductionRow;
+    });
 
     await this.recordEvent(
       workspaceId,
@@ -619,17 +657,11 @@ export class PrismaIntroductionStore {
     const identity = requireHumanActor(actor, "side_b_accept");
     const now = new Date();
 
-    const updated = (await this.prisma.connectorIntroduction.update({
-      where: { id: introId },
-      data: {
+    const updated = await this.transition(workspaceId, intro, {}, {
         status: "side_b_accepted",
         sideBAcceptedBy: identity,
         sideBAcceptedAt: now,
-      },
-      include: {
-        ...INTRO_INCLUDES,
-      },
-    })) as IntroductionRow;
+    });
 
     const note = typeof opts.note === "string" && opts.note.trim() ? ` Note: ${opts.note.trim()}` : "";
     await this.recordEvent(
@@ -655,18 +687,12 @@ export class PrismaIntroductionStore {
     const note = typeof opts.note === "string" && opts.note.trim() ? opts.note.trim() : null;
     const now = new Date();
 
-    const updated = (await this.prisma.connectorIntroduction.update({
-      where: { id: introId },
-      data: {
+    const updated = await this.transition(workspaceId, intro, {}, {
         status: "declined",
         declinedBy: identity,
         declinedAt: now,
         declineReason: note ?? "Side B declined the offer.",
-      },
-      include: {
-        ...INTRO_INCLUDES,
-      },
-    })) as IntroductionRow;
+    });
 
     await this.recordEvent(
       workspaceId,
@@ -703,19 +729,13 @@ export class PrismaIntroductionStore {
     );
     const now = new Date();
 
-    const updated = (await this.prisma.connectorIntroduction.update({
-      where: { id: introId },
-      data: {
+    const updated = await this.transition(workspaceId, intro, {}, {
         status: "made",
         madeMessage: value.message,
         madeSentVia: value.sentVia,
         madeSentBy: sentBy,
         madeSentAt: now,
-      },
-      include: {
-        ...INTRO_INCLUDES,
-      },
-    })) as IntroductionRow;
+    });
 
     await this.recordEvent(
       workspaceId,
@@ -787,16 +807,10 @@ export class PrismaIntroductionStore {
       throw new ConnectorError("invalid_followup", errors.join(" "));
     }
 
-    const updated = (await this.prisma.connectorIntroduction.update({
-      where: { id: introId },
-      data: {
+    const updated = await this.transition(workspaceId, intro, { pendingFollowupDraft: null }, {
         pendingFollowupDraft: value.draft,
         pendingFollowupTo: value.to,
-      },
-      include: {
-        ...INTRO_INCLUDES,
-      },
-    })) as IntroductionRow;
+    });
 
     await this.recordEvent(
       workspaceId,
@@ -838,18 +852,12 @@ export class PrismaIntroductionStore {
           ? intro.personB.name
           : `${intro.personA.name} and ${intro.personB.name}`;
 
-    const updated = (await this.prisma.connectorIntroduction.update({
-      where: { id: introId },
-      data: {
+    const updated = await this.transition(workspaceId, intro, { followupCount: intro.followupCount, pendingFollowupDraft: draft }, {
         status: "followed_up",
         followupCount: intro.followupCount + 1,
         pendingFollowupDraft: null,
         pendingFollowupTo: null,
-      },
-      include: {
-        ...INTRO_INCLUDES,
-      },
-    })) as IntroductionRow;
+    });
 
     await this.recordEvent(
       workspaceId,
@@ -876,17 +884,11 @@ export class PrismaIntroductionStore {
     const withdrawnBy = requireHumanActor({ kind: "human", identity: opts.withdrawnBy }, "withdraw");
     const now = new Date();
 
-    const updated = (await this.prisma.connectorIntroduction.update({
-      where: { id: introId },
-      data: {
+    const updated = await this.transition(workspaceId, intro, {}, {
         status: "withdrawn",
         withdrawnBy,
         withdrawnAt: now,
-      },
-      include: {
-        ...INTRO_INCLUDES,
-      },
-    })) as IntroductionRow;
+    });
 
     await this.recordEvent(
       workspaceId,
@@ -918,11 +920,15 @@ export class PrismaIntroductionStore {
       .filter((c) => isIntroExpired(c.createdAt, now, expiryDays))
       .map((c) => c.id);
 
+    const swept: string[] = [];
     for (const id of expiredIds) {
-      await this.prisma.connectorIntroduction.update({
-        where: { id },
+      // Guarded: an intro accepted/approved since the read is never expired.
+      const res = await this.prisma.connectorIntroduction.updateMany({
+        where: { id, workspaceId, status: "proposed" },
         data: { status: "expired", expiredAt: now },
       });
+      if (res.count !== 1) continue;
+      swept.push(id);
       await this.recordEvent(
         workspaceId,
         id,
@@ -932,6 +938,6 @@ export class PrismaIntroductionStore {
         `Proposal expired after ${expiryDays} days without resolution.`,
       );
     }
-    return { expired: expiredIds.length, ids: expiredIds };
+    return { expired: swept.length, ids: swept };
   }
 }
