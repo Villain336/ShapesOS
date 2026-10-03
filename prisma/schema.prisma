@@ -318,6 +318,8 @@ enum FileChangeAction {
   client_created
   client_updated
   client_deleted
+  // Phase 4a (GDPR): a full workspace data export was downloaded.
+  workspace_exported
 }
 
 // ---------------------------------------------------------------------------

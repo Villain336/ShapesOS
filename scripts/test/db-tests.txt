@@ -29,6 +29,7 @@ lib/funding/__tests__/funding-slice2.test.ts
 lib/funding/__tests__/funding-slice3.test.ts
 lib/funding/__tests__/funding-slice4.test.ts
 lib/funding/__tests__/funding.test.ts
+lib/gdpr/__tests__/gdpr-db.test.ts
 lib/integrations/actions/__tests__/separation-of-duties.test.ts
 lib/integrations/activepieces/__tests__/bindings-db.test.ts
 lib/intelligence/company/__tests__/knowledge-rls.test.ts

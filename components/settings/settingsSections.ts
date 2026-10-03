@@ -28,6 +28,7 @@ import {
   SlidersHorizontal,
   Siren,
   Terminal,
+  UserRound,
   Users,
   Wrench,
   type LucideIcon,
@@ -70,6 +71,7 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
       { href: "/dashboard/settings/clients", label: "Clients", description: "Agency clients: who sees their reports, and how often.", icon: Briefcase },
       { href: "/dashboard/settings/security", label: "Security", description: "Authentication, SSO, and secret-storage posture.", icon: Lock },
       { href: "/dashboard/settings/audit", label: "Audit log", description: "Every consequential action, who did it, and when.", icon: ScrollText },
+      { href: "/dashboard/settings/account", label: "Your account", description: "Download your data or delete your account.", icon: UserRound },
     ],
   },
   {

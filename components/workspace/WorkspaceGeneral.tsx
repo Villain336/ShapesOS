@@ -1,14 +1,15 @@
 // ShapesOS — Settings → General (Phase 3, workstream I).
 // Rename (admin+), plan and trial at a glance with the way to billing,
 // resume first-run setup, create another workspace, and delete this one
-// (owner only, typed-name confirmation). Server rules live in
+// (owner only, typed-name confirmation), and (admin+, Phase 4a) download a
+// full JSON export of the workspace. Server rules live in
 // lib/workspace/lifecycle.ts; this only mirrors them for the UI.
 
 "use client";
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Plus, Trash2 } from "lucide-react";
+import { ArrowRight, Download, Plus, Trash2 } from "lucide-react";
 import { FormError, FormNote } from "./FormError";
 import {
   btnDanger,
@@ -211,6 +212,24 @@ export default function WorkspaceGeneral(props: WorkspaceGeneralProps) {
           </button>
         </form>
       </section>
+
+      {isAdmin && (
+        <section id="ws-export" className={cardCls} aria-labelledby="ws-export-heading">
+          <h2 id="ws-export-heading" className="aos-subheading">Export workspace data</h2>
+          <p className="mt-2 text-base text-muted">
+            Everything {savedName} holds, as one JSON file: projects, content, contacts, reports, members, settings,
+            and history. Passwords, keys and stored credentials are never included. The download is recorded in
+            the audit log.
+          </p>
+          <div className="mt-3">
+            <a href={`/api/workspaces/${workspace.id}/export`} download className={btnSecondary}>
+              <Download size={16} aria-hidden />
+              Download export
+            </a>
+          </div>
+          <p className={helperCls}>Large workspaces can take a minute. Your own account data is in Your account.</p>
+        </section>
+      )}
 
       {isOwner && (
         <section className={cardCls} aria-labelledby="ws-delete">
