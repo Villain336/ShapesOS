@@ -14,6 +14,7 @@ import { workspaceIdFrom, badRequest, requireWorkspaceAccess } from "@/lib/route
 import { validateBody, z } from "@/lib/api/validate";
 import { readJsonBody } from "@/lib/sitefiles/api";
 import { injectEvent } from "@/lib/scheduler/service";
+import { bearerMatches } from "@/lib/security/constant-time";
 
 export const dynamic = "force-dynamic";
 
@@ -25,22 +26,26 @@ const InjectSchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
+  // Phase 1: authenticate BEFORE parsing/validating the body, so anonymous
+  // callers learn nothing about the schema; the secret compare is
+  // constant-time. CRON_SECRET service path (recognized by the M11 scan) or
+  // an editor+ session.
+  const secret = (process.env.CRON_SECRET ?? "").trim();
+  const isService = bearerMatches(req.headers.get("authorization"), secret);
+  const user = isService ? null : await requireUser();
+  if (!isService && !user) return Response.json({ error: "Unauthorized" }, { status: 401 });
+
   const body = await readJsonBody(req);
   const validated = validateBody(InjectSchema, body);
   if (!validated.ok) return validated.error;
   const input = validated.data;
 
-  // CRON_SECRET service path (recognized by the M11 scan) or editor+ session.
-  const secret = (process.env.CRON_SECRET ?? "").trim();
-  const isService = !!secret && req.headers.get("authorization") === `Bearer ${secret}`;
   let workspaceId: string;
   if (isService) {
     workspaceId = input.workspaceId?.trim() || "";
     if (!workspaceId) return badRequest("workspaceId is required");
   } else {
-    const user = await requireUser();
-    if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
-    const access = await requireWorkspaceAccess(user.id, workspaceIdFrom(req, input), "editor");
+    const access = await requireWorkspaceAccess(user!.id, workspaceIdFrom(req, input), "editor");
     if ("error" in access) return access.error;
     workspaceId = access.workspaceId;
   }
