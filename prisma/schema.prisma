@@ -898,6 +898,8 @@ model Workspace {
   playbookVersions          PlaybookVersion[]
   automationSettings        AutomationSetting[]
   commandAudits             CommandAudit[]
+  // Phase 1 (H6): Activepieces flows this workspace may trigger / read.
+  automationFlowBindings    AutomationFlowBinding[]
 
   @@map("workspaces")
 }
@@ -13150,4 +13152,25 @@ model CadTaskComment {
 
   @@index([workspaceId, taskId])
   @@map("cad_task_comments")
+}
+
+// ---------------------------------------------------------------------------
+// Phase 1 (H6): Activepieces tenant binding.
+//
+// The Activepieces engine is one host-wide sidecar, so a flow id alone says
+// nothing about which tenant owns it. A flow can be triggered — and its runs
+// read — only from the workspace it is bound to. flow_id is globally unique:
+// a flow belongs to exactly one workspace. Bindings are created by platform
+// operators (MARKETR_PLATFORM_OPERATORS); see lib/integrations/activepieces/bindings.ts.
+// ---------------------------------------------------------------------------
+model AutomationFlowBinding {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  flowId      String    @unique @map("flow_id")
+  boundBy     String    @map("bound_by")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@index([workspaceId])
+  @@map("automation_flow_bindings")
 }

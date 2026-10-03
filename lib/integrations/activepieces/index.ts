@@ -24,6 +24,15 @@ export {
   type TriggerPreflight,
 } from "./client";
 export {
+  bindFlowToWorkspace,
+  FlowBindingConflictError,
+  FlowNotBoundError,
+  prismaFlowBindingStore,
+  workspaceFlows,
+  type FlowBindingStore,
+  type FlowEngine,
+} from "./bindings";
+export {
   AUTOMATION_RECIPES,
   curatedPiece,
   curatedPieces,
