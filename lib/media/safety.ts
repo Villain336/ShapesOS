@@ -13,6 +13,7 @@
 //      holds, fronts, or co-mingles client money. (See lib/media/pools.ts.)
 
 import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { requireSecret } from "@/lib/env/secrets";
 
 export type LadderRung = "manual" | "supervised" | "scheduled" | "autopilot";
 
@@ -377,9 +378,7 @@ export class OtpChallengeStore {
 }
 
 export function approvalReceiptSecret(env: NodeJS.ProcessEnv = process.env): string {
-  const s = (env.MARKETR_APPROVAL_SECRET ?? "marketr-approval-dev-secret").trim();
-  if (!s) throw new SafetyViolationError("MARKETR_APPROVAL_SECRET must not be empty.");
-  return s;
+  return requireSecret("MARKETR_APPROVAL_SECRET", "marketr-approval-dev-secret", env);
 }
 
 /**

@@ -19,6 +19,7 @@
 //   transcribe() comments for the wiring point.
 
 import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { assertFakeProviderAllowed, requireSecret } from "@/lib/env/secrets";
 
 export type ProviderName = "twilio" | "fake";
 
@@ -214,7 +215,7 @@ export class FakeTelephonyProvider implements TelephonyProvider {
   }
 
   private secret(env: NodeJS.ProcessEnv = process.env): string {
-    return (env.FAKE_TELEPHONY_SECRET ?? "fake-telephony-dev-secret").trim();
+    return requireSecret("FAKE_TELEPHONY_SECRET", "fake-telephony-dev-secret", env);
   }
 
   async purchaseNumber(input: PurchaseNumberInput): Promise<PurchasedNumber> {
@@ -270,6 +271,7 @@ export class FakeTelephonyProvider implements TelephonyProvider {
 export function getProvider(env: NodeJS.ProcessEnv = process.env): TelephonyProvider {
   const name = ((env.CALLS_PROVIDER ?? "fake") as string).trim().toLowerCase();
   if (name === "twilio") return new TwilioProvider(env);
+  assertFakeProviderAllowed("telephony", env);
   return new FakeTelephonyProvider();
 }
 

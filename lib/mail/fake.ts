@@ -15,6 +15,7 @@
 // `Authorization: Bearer <FAKE_MAIL_SECRET>` (constant-time).
 
 import { createHash, createHmac, randomBytes } from "node:crypto";
+import { requireSecret } from "@/lib/env/secrets";
 import {
   safeEqual,
   type CostLineItem,
@@ -32,7 +33,7 @@ import {
 } from "./provider";
 
 export function fakeMailSecret(env: NodeJS.ProcessEnv = process.env): string {
-  return (env.FAKE_MAIL_SECRET ?? "fake-mail-dev-secret").trim();
+  return requireSecret("FAKE_MAIL_SECRET", "fake-mail-dev-secret", env);
 }
 
 export function fakePieceId(seed = ""): string {

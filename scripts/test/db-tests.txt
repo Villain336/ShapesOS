@@ -24,6 +24,7 @@ lib/funding/__tests__/funding-slice3.test.ts
 lib/funding/__tests__/funding-slice4.test.ts
 lib/funding/__tests__/funding.test.ts
 lib/intelligence/company/__tests__/knowledge-rls.test.ts
+lib/messaging/__tests__/inbound-sms-workspace.test.ts
 lib/ops/__tests__/ops-rls.test.ts
 lib/ops/__tests__/workflows-rls.test.ts
 lib/orchestrator/__tests__/orchestrator.test.ts

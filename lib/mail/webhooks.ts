@@ -25,6 +25,7 @@ import { FakeMailProvider, fakeMailSecret, signFakeMailWebhook } from "./fake";
 import { LobProvider } from "./lob";
 import { PostGridProvider, decodeJwtClaimsUnsafe } from "./postgrid";
 import type { MailEvent, MailEventType, MailProviderName } from "./provider";
+import { fakeProvidersAllowed } from "@/lib/env/secrets";
 
 // Piece status rank: only advance, never downgrade. Terminal states stick.
 const STATUS_RANK: Record<string, number> = {
@@ -71,6 +72,12 @@ export interface IngestResult {
 export async function ingestMailWebhook(input: IngestInput): Promise<IngestResult> {
   const { providerName } = input;
   const env = input.env ?? process.env;
+
+  // The fake webhook transport is a shared-secret test path: refused in
+  // production unless the operator opted into fake providers.
+  if (providerName === "fake" && !fakeProvidersAllowed(env)) {
+    return { accepted: false, reason: "fake provider disabled in production" };
+  }
 
   // Candidate rows for this provider with a webhook secret configured.
   const rows = await prisma.mailProvider.findMany({
