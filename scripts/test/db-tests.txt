@@ -60,3 +60,4 @@ lib/substrate/memory/__tests__/rls-least-privilege-db.test.ts
 lib/voice/__tests__/pronunciation.test.ts
 lib/voice/__tests__/voiceover.test.ts
 lib/workspace/__tests__/lifecycle-db.test.ts
+lib/workspace/__tests__/workspace-orphans-db.test.ts

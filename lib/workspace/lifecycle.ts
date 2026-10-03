@@ -55,7 +55,7 @@ export function deleteConfirmationMatches(typed: unknown, workspaceName: string)
 }
 
 /** Subscription states that still bill (or will retry billing) the workspace. */
-const LIVE_SUBSCRIPTION = new Set(["active", "trialing", "past_due", "unpaid", "incomplete"]);
+export const LIVE_SUBSCRIPTION = new Set(["active", "trialing", "past_due", "unpaid", "incomplete"]);
 
 /**
  * Why this delete is refused, or null when it may go ahead. Checked in
@@ -258,29 +258,61 @@ export async function deleteWorkspace(opts: {
     throw new BadRequestError(denial.message);
   }
 
+  await purgeWorkspace({
+    workspaceId: ws.id,
+    workspaceName: ws.name,
+    actorUserId: opts.userId,
+    detail: { plan: ws.plan, role: me.role },
+  });
+  return { deletedId: ws.id, name: ws.name };
+}
+
+/**
+ * Tables with a workspace_id that deliberately survive the workspace's
+ * deletion. Every other such table has a foreign key to workspaces with ON
+ * DELETE CASCADE (migration 20261005100000_phase4a_workspace_orphan_fks);
+ * lib/workspace/__tests__/workspace-orphans-db.test.ts derives the table list
+ * from the catalog and fails on a new table that has neither.
+ */
+export const KEEP_ON_WORKSPACE_DELETE: readonly string[] = [
+  // The audit record of the deletion itself (who, when, which plan).
+  "workspace_lifecycle_events",
+];
+
+/**
+ * The delete itself, once every rule has passed: lock the row, clear the
+ * ON DELETE RESTRICT children, delete the workspace (everything else
+ * cascades) and record it in the lifecycle trail. Shared by deleteWorkspace
+ * and account deletion (lib/account/delete.ts), which checks its own rules.
+ */
+export async function purgeWorkspace(opts: {
+  workspaceId: string;
+  workspaceName: string;
+  actorUserId: string;
+  detail: Prisma.InputJsonObject;
+}): Promise<void> {
   await prisma.$transaction(
     async (tx) => {
       // Lock the row so a concurrent rename/delete can't interleave.
       const locked = await tx.$queryRaw<{ id: string }[]>`
-        SELECT "id" FROM "workspaces" WHERE "id" = ${ws.id} FOR UPDATE`;
+        SELECT "id" FROM "workspaces" WHERE "id" = ${opts.workspaceId} FOR UPDATE`;
       if (locked.length === 0) throw new NotFoundError("Workspace not found.");
       // Tenant GUC for the RLS-protected tables cleared explicitly below.
-      await tx.$queryRaw`SELECT set_config(${WORKSPACE_GUC}, ${ws.id}, true)`;
+      await tx.$queryRaw`SELECT set_config(${WORKSPACE_GUC}, ${opts.workspaceId}, true)`;
       for (const step of RESTRICT_CHILD_CLEANUP) {
-        await tx.$executeRawUnsafe(step.sql, ws.id);
+        await tx.$executeRawUnsafe(step.sql, opts.workspaceId);
       }
-      await tx.workspace.delete({ where: { id: ws.id } });
+      await tx.workspace.delete({ where: { id: opts.workspaceId } });
       await lifecycleEvent(tx, {
-        workspaceId: ws.id,
-        workspaceName: ws.name,
-        actorUserId: opts.userId,
+        workspaceId: opts.workspaceId,
+        workspaceName: opts.workspaceName,
+        actorUserId: opts.actorUserId,
         action: "deleted",
-        detail: { plan: ws.plan, role: me.role },
+        detail: opts.detail,
       });
     },
     { maxWait: 10_000, timeout: 120_000 },
   );
-  return { deletedId: ws.id, name: ws.name };
 }
 
 /**
@@ -289,7 +321,7 @@ export async function deleteWorkspace(opts: {
  * install that never billed it doesn't exist: that (and only that) reads as
  * "no subscription". Any other failure refuses the delete.
  */
-async function readSubscription(
+export async function readSubscription(
   workspaceId: string,
 ): Promise<{ status: string; cancelAtPeriodEnd: boolean } | null> {
   try {
