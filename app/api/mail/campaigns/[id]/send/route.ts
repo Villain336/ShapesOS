@@ -6,8 +6,9 @@
 // (default) renders via the fake provider — nothing is physically mailed.
 
 import type { NextRequest } from "next/server";
-import { mailGuard, badRequest } from "../../../_lib";
+import { mailGuard } from "../../../_lib";
 import { executeCampaign } from "@/lib/mail/service";
+import { HttpError, errorResponse } from "@/lib/api/errors";
 
 export const dynamic = "force-dynamic";
 
@@ -23,10 +24,12 @@ export async function POST(
     const result = await executeCampaign(gate.workspaceId, id);
     return Response.json({ ...result, campaignId: id });
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "Send failed";
-    // Refusals are 422 (the request is valid, the money gate said no);
-    // unexpected failures are 500.
-    const status = msg.startsWith("Refusing to send") ? 422 : 500;
-    return Response.json({ error: msg }, { status });
+    // Money-gate refusals are 422 (the request is valid, the gate said no);
+    // everything else maps through the shared helper (404/409, or a generic
+    // 500 that never echoes the underlying error).
+    if (e instanceof HttpError && e.message.startsWith("Refusing to send")) {
+      return Response.json({ error: e.message }, { status: 422 });
+    }
+    return errorResponse(e, "POST /api/mail/campaigns/[id]/send");
   }
 }

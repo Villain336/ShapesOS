@@ -9,6 +9,7 @@
 import { Prisma, type VoiceAgent, type PrismaClient } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { withWorkspaceScope } from "@/lib/substrate/memory/rls";
+import { BadRequestError } from "@/lib/api/errors";
 
 type TxClient = Prisma.TransactionClient | PrismaClient;
 
@@ -82,11 +83,11 @@ export async function createAgent(
   input: CreateAgentInput,
 ): Promise<VoiceAgent> {
   const name = input.name.trim();
-  if (!name) throw new Error("Agent name is required.");
-  if (!input.voiceId.trim()) throw new Error("voiceId is required.");
+  if (!name) throw new BadRequestError("Agent name is required.");
+  if (!input.voiceId.trim()) throw new BadRequestError("voiceId is required.");
   const purpose = input.purpose ?? "followup";
   if (purpose !== "followup" && purpose !== "voiceover")
-    throw new Error("purpose must be followup or voiceover.");
+    throw new BadRequestError("purpose must be followup or voiceover.");
   return withWorkspaceScope(workspaceId, (tx) =>
     tx.voiceAgent.create({
       data: {

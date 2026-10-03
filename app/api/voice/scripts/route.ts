@@ -16,16 +16,6 @@ import { listScripts, createDraftScript, type ScriptBody } from "@/lib/voice/scr
 
 export const dynamic = "force-dynamic";
 
-// Plain validation Errors from the lib layer surface as 400; HttpErrors keep
-// their own status via httpErrorResponse.
-function asResponse(e: unknown, fallback: string) {
-  if (e instanceof HttpError) return httpErrorResponse(e);
-  return Response.json(
-    { error: e instanceof Error ? e.message : fallback },
-    { status: 400 },
-  );
-}
-
 export async function GET(req: NextRequest) {
   try {
     const { workspace } = await guardWorkspace();
@@ -54,7 +44,7 @@ export async function POST(req: NextRequest) {
       });
       return Response.json({ script }, { status: 201 });
     } catch (e) {
-      return asResponse(e, "Failed to create script");
+      return httpErrorResponse(e);
     }
   } catch (e) {
     return httpErrorResponse(e);

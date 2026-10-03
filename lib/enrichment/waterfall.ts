@@ -18,6 +18,7 @@ import {
   getEnrichmentProviders,
   type EnrichmentProvider,
 } from "./provider";
+import { NotFoundError } from "@/lib/api/errors";
 
 // ---------------------------------------------------------------------------
 // Pricing (estimates — re-verify against each provider's pricing page).
@@ -172,7 +173,7 @@ export async function runWaterfall(
     where: { id: prospectId, workspaceId },
     select: { id: true, email: true, phone: true, company: true, website: true, name: true, enrichmentData: true, score: true },
   });
-  if (!prospect) throw new Error("Prospect not found");
+  if (!prospect) throw new NotFoundError("Prospect not found");
 
   const chain = providers ?? getEnrichmentProviders();
   const runId = randomUUID();

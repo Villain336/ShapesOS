@@ -6,12 +6,23 @@
 // there is no bulk endpoint. Full double-opt-in lifecycle lands in
 // Connector slice 4.
 
+import { z } from "zod";
 import { guardWorkspace, httpErrorResponse, readJson } from "@/lib/enrichment/guard";
 import { prisma } from "@/lib/prisma";
 import { PrismaFundingStore } from "@/lib/funding/prisma-store";
-import { FundingError, type IntroRequestInput } from "@/lib/funding/types";
+import { FundingError } from "@/lib/funding/types";
 
 export const dynamic = "force-dynamic";
+
+// Shape only (types + size caps); the context-required rules (min lengths)
+// stay in validateIntroRequestInput so their messages are unchanged.
+const IntroRequestSchema = z.object({
+  contactId: z.string().max(120),
+  investorId: z.string().max(120),
+  reason: z.string().max(4000),
+  founderAsk: z.string().max(4000),
+  fitNotes: z.string().max(4000).nullable().optional(),
+});
 
 export async function GET() {
   try {
@@ -37,7 +48,7 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const { workspace } = await guardWorkspace({ editor: true });
-    const body = (await readJson(req)) as IntroRequestInput;
+    const body = IntroRequestSchema.parse(await readJson(req));
     const store = new PrismaFundingStore(prisma);
     const created = await store.createIntroRequest(workspace.id, body);
     return Response.json(created, { status: 201 });

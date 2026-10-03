@@ -3,8 +3,9 @@
 //        margin preview. The approval binds maxSpendCents from this.
 
 import type { NextRequest } from "next/server";
-import { mailGuard, badRequest } from "../../../_lib";
+import { mailGuard } from "../../../_lib";
 import { estimateCampaign } from "@/lib/mail/service";
+import { errorResponse } from "@/lib/api/errors";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +21,6 @@ export async function GET(
     const estimate = await estimateCampaign(gate.workspaceId, id);
     return Response.json({ ...estimate, campaignId: id });
   } catch (e) {
-    return badRequest(e instanceof Error ? e.message : "Estimate failed");
+    return errorResponse(e);
   }
 }

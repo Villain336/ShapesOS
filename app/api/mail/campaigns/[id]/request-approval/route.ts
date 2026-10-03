@@ -5,8 +5,9 @@
 // moves to pending_approval.
 
 import type { NextRequest } from "next/server";
-import { mailGuard, badRequest } from "../../../_lib";
+import { mailGuard } from "../../../_lib";
 import { requestApproval } from "@/lib/mail/service";
+import { errorResponse } from "@/lib/api/errors";
 
 export const dynamic = "force-dynamic";
 
@@ -24,6 +25,6 @@ export async function POST(
     });
     return Response.json({ approval, estimate }, { status: 201 });
   } catch (e) {
-    return badRequest(e instanceof Error ? e.message : "Approval request failed");
+    return errorResponse(e);
   }
 }

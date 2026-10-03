@@ -18,16 +18,6 @@ import { listSessions, requestSession } from "@/lib/voice/sessions";
 
 export const dynamic = "force-dynamic";
 
-// Plain validation Errors from the lib layer surface as 400; HttpErrors keep
-// their own status via httpErrorResponse.
-function asResponse(e: unknown, fallback: string) {
-  if (e instanceof HttpError) return httpErrorResponse(e);
-  return Response.json(
-    { error: e instanceof Error ? e.message : fallback },
-    { status: 400 },
-  );
-}
-
 export async function GET(req: NextRequest) {
   try {
     const { workspace } = await guardWorkspace();
@@ -77,7 +67,7 @@ export async function POST(req: NextRequest) {
         { status: result.blocked ? 200 : 201 },
       );
     } catch (e) {
-      return asResponse(e, "Session request failed");
+      return httpErrorResponse(e);
     }
   } catch (e) {
     return httpErrorResponse(e);

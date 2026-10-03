@@ -22,6 +22,7 @@ import {
   includedCreditsForPlan,
   isMeteredAction,
 } from "./credits";
+import { BadRequestError } from "@/lib/api/errors";
 
 // ── Public contract (consumed by the sibling MCP track — keep stable) ────────
 // Phase C gaps (G1) additions — all back-compatible:
@@ -497,7 +498,7 @@ export async function applyTopUp(
   topUp: { creditsAdded: number; expiresAt: Date },
 ): Promise<{ purchasedCredits: number; capCredits: number }> {
   if (!Number.isInteger(topUp.creditsAdded) || topUp.creditsAdded <= 0) {
-    throw new Error("top-up credits must be a positive integer");
+    throw new BadRequestError("top-up credits must be a positive integer");
   }
   return prisma.$transaction(async (tx) => {
     const bal = await lockBalance(tx, workspaceId);
@@ -528,10 +529,10 @@ export async function setSpendCap(
   patch: { capCredits?: number; blockAtCap?: boolean; alertAtPct?: number; autoOverage?: boolean },
 ): Promise<LockedCap> {
   if (patch.capCredits !== undefined && (!Number.isInteger(patch.capCredits) || patch.capCredits < 0)) {
-    throw new Error("capCredits must be a non-negative integer");
+    throw new BadRequestError("capCredits must be a non-negative integer");
   }
   if (patch.alertAtPct !== undefined && (!Number.isInteger(patch.alertAtPct) || patch.alertAtPct < 1 || patch.alertAtPct > 100)) {
-    throw new Error("alertAtPct must be an integer 1–100");
+    throw new BadRequestError("alertAtPct must be an integer 1–100");
   }
   return prisma.$transaction(async (tx) => {
     const bal = await lockBalance(tx, workspaceId);

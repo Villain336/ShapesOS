@@ -7,6 +7,7 @@ import type { NextRequest } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { mailGuard, badRequest } from "../../_lib";
+import { NotFoundError, errorResponse } from "@/lib/api/errors";
 
 export const dynamic = "force-dynamic";
 
@@ -19,7 +20,7 @@ async function getCampaign(workspaceId: string, id: string) {
       approvals: { orderBy: { createdAt: "desc" }, take: 5 },
     },
   });
-  if (!campaign) throw new Error("Mail campaign not found");
+  if (!campaign) throw new NotFoundError("Mail campaign not found");
   return campaign;
 }
 
@@ -48,7 +49,7 @@ export async function GET(
       verification: Object.fromEntries(verificationStatus.map((g) => [g.verificationStatus, g._count])),
     });
   } catch (e) {
-    return Response.json({ error: e instanceof Error ? e.message : "Not found" }, { status: 404 });
+    return errorResponse(e);
   }
 }
 
@@ -102,7 +103,7 @@ export async function PATCH(
     });
     return Response.json({ campaign: updated });
   } catch (e) {
-    return Response.json({ error: e instanceof Error ? e.message : "Not found" }, { status: 404 });
+    return errorResponse(e);
   }
 }
 
@@ -124,6 +125,6 @@ export async function DELETE(
     });
     return Response.json({ campaign: updated });
   } catch (e) {
-    return Response.json({ error: e instanceof Error ? e.message : "Not found" }, { status: 404 });
+    return errorResponse(e);
   }
 }

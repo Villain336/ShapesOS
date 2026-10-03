@@ -17,6 +17,7 @@ import { withWorkspaceScope } from "@/lib/substrate/memory/rls";
 import { creditsFor } from "@/lib/metering/credits";
 import { meter } from "@/lib/metering/service";
 import { emitAlert } from "@/lib/alerts/evaluate";
+import { BadRequestError } from "@/lib/api/errors";
 
 type TxClient = Prisma.TransactionClient | PrismaClient;
 
@@ -248,11 +249,11 @@ export async function setWorkspaceBudget(
     input.alertThresholdPct === undefined ? current.alertThresholdPct : input.alertThresholdPct;
   if (monthlyCallBudget !== null) {
     if (!Number.isInteger(monthlyCallBudget) || monthlyCallBudget < 1) {
-      throw new Error("monthlyCallBudget must be a positive integer or null");
+      throw new BadRequestError("monthlyCallBudget must be a positive integer or null");
     }
   }
   if (!Number.isInteger(alertThresholdPct) || alertThresholdPct < 1 || alertThresholdPct > 100) {
-    throw new Error("alertThresholdPct must be an integer between 1 and 100");
+    throw new BadRequestError("alertThresholdPct must be an integer between 1 and 100");
   }
   const row = await withWorkspaceScope(workspaceId, (tx) =>
     tx.workspaceActionBudget.upsert({

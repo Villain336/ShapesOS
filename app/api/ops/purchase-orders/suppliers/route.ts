@@ -7,6 +7,7 @@ import { requireWorkspaceRole } from "@/lib/authz";
 import { requireUser, getOrCreateWorkspace } from "@/lib/session";
 import { withWorkspaceScope } from "@/lib/substrate/memory/rls";
 import { resolveCustomerNames } from "@/lib/ops/invoices";
+import { errorResponse } from "@/lib/api/errors";
 
 export const dynamic = "force-dynamic";
 
@@ -30,7 +31,6 @@ export async function POST(req: NextRequest) {
     );
     return Response.json({ suppliers });
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    return Response.json({ error: message }, { status: 500 });
+    return errorResponse(err);
   }
 }
