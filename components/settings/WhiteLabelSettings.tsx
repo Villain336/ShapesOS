@@ -257,7 +257,7 @@ export default function WhiteLabelSettings({
             <input
               ref={fileInput}
               type="file"
-              accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml"
+              accept="image/png,image/jpeg,image/gif,image/webp"
               className="hidden"
               disabled={!canEdit || uploading}
               onChange={(e) => void uploadLogo(e.target.files)}
@@ -287,7 +287,7 @@ export default function WhiteLabelSettings({
               </div>
             )}
             <p className="text-xs text-subtle">
-              {logoUrl ? "PNG, JPG, GIF, WebP, or SVG — max 2 MB." : "No logo uploaded — public review pages show the default star badge."}
+              {logoUrl ? "PNG, JPG, GIF or WebP — max 2 MB." : "No logo uploaded — public review pages show the default star badge."}
             </p>
           </div>
         </div>

@@ -4,7 +4,7 @@
 // review landing page. No capability leak: it reveals only the logo the
 // workspace owner chose to publish, keyed by workspace id.
 
-import { loadWhiteLabelLogo } from "@/lib/brand-logo";
+import { brandLogoHeaders, loadWhiteLabelLogo } from "@/lib/brand-logo";
 
 export const dynamic = "force-dynamic";
 
@@ -15,11 +15,9 @@ export async function GET(
   const { id } = await params;
   const file = await loadWhiteLabelLogo(id.trim().slice(0, 120));
   if (!file) return new Response("Not found", { status: 404 });
+  // nosniff + sandbox CSP; legacy SVG logos are served as attachments so
+  // the public URL can never render active SVG on the app origin.
   return new Response(new Uint8Array(file.bytes), {
-    headers: {
-      "Content-Type": file.mime,
-      "Cache-Control": "public, max-age=3600",
-      "Content-Disposition": `inline; filename="${file.filename}"`,
-    },
+    headers: brandLogoHeaders(file, "public, max-age=3600"),
   });
 }
