@@ -119,7 +119,7 @@ ok(
     [...expectedMock].every((k) => MOCK_ONLY_ADAPTER_KEYS.has(k)),
   `headers={${[...expectedMock]}} set={${[...MOCK_ONLY_ADAPTER_KEYS]}}`,
 );
-ok("exactly 7 mock-only adapters", MOCK_ONLY_ADAPTER_KEYS.size === 7);
+ok("exactly 6 mock-only adapters (GSC, GA4, Drive, Notion, Meta Ads, Google Ads)", MOCK_ONLY_ADAPTER_KEYS.size === 6);
 ok(
   "checker source never references safeFetch/probe/test_connection",
   !/safeFetch|test_connection|\.test\(\)/.test(healthSrc),

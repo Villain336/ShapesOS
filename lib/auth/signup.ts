@@ -50,6 +50,18 @@ export function mayProvisionWorkspace(userId: string, env: NodeJS.ProcessEnv = p
   return signupMode(env) === "open" || isOperatorUserId(userId);
 }
 
+/**
+ * May this user create an ADDITIONAL workspace (POST /api/workspaces)?
+ * Open mode: anyone signed in. Invite mode: only people who already belong to
+ * a workspace (or the operator) — a signed-in user with no membership must not
+ * be able to provision their own workspace and sidestep invite-only.
+ */
+export async function mayCreateWorkspace(userId: string, env: NodeJS.ProcessEnv = process.env): Promise<boolean> {
+  if (mayProvisionWorkspace(userId, env)) return true;
+  const member = await prisma.workspaceMember.findFirst({ where: { userId }, select: { id: true } });
+  return member !== null;
+}
+
 /** May this user sign in at all? (Only restricts anything in invite mode.) */
 export async function signInAllowed(
   userId: string | null | undefined,

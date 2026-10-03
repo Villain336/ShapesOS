@@ -8,6 +8,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { requireUser, ACTIVE_WORKSPACE_COOKIE } from "@/lib/session";
 import { errorResponse } from "@/lib/api/errors";
 import { deleteWorkspace, renameWorkspace } from "@/lib/workspace/lifecycle";
+import { forbidden, requireWorkspaceRole } from "@/lib/authz";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +17,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const user = await requireUser();
     if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
     const { id } = await params;
+    // Route-level gate (defense in depth; renameWorkspace re-checks admin+).
+    if (!(await requireWorkspaceRole(user.id, id, "admin"))) return forbidden();
     const body = (await req.json().catch(() => null)) as { name?: unknown } | null;
     if (!body) return Response.json({ error: "Invalid JSON" }, { status: 400 });
     const ws = await renameWorkspace({ userId: user.id, workspaceId: id, name: body.name });
@@ -30,6 +33,8 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     const user = await requireUser();
     if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
     const { id } = await params;
+    // Route-level gate (defense in depth; deleteWorkspace re-checks owner).
+    if (!(await requireWorkspaceRole(user.id, id, "owner"))) return forbidden();
     const body = (await req.json().catch(() => null)) as { confirmName?: unknown } | null;
     const result = await deleteWorkspace({ userId: user.id, workspaceId: id, confirmName: body?.confirmName });
     const res = NextResponse.json({ ok: true, deleted: result });

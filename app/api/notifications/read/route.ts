@@ -7,7 +7,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { getOrCreateWorkspace, requireUser } from "@/lib/session";
-import { getMembership, forbidden } from "@/lib/authz";
+import { forbidden, requireWorkspaceRole } from "@/lib/authz";
 import { validateBody, z } from "@/lib/api/validate";
 import { markAllRead, markRead, unreadCount } from "@/lib/notifications/store";
 
@@ -22,7 +22,7 @@ export async function POST(req: Request) {
   const user = await requireUser();
   if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
   const workspace = await getOrCreateWorkspace(user.id, user.email);
-  if (!(await getMembership(user.id, workspace.id))) return forbidden();
+  if (!(await requireWorkspaceRole(user.id, workspace.id, "viewer"))) return forbidden();
 
   let raw: unknown;
   try {

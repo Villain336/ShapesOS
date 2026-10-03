@@ -9,6 +9,7 @@ import { prisma } from "@/lib/prisma";
 import { requireUser, getAccessibleWorkspaces, getOrCreateWorkspace, ACTIVE_WORKSPACE_COOKIE } from "@/lib/session";
 import { errorResponse } from "@/lib/api/errors";
 import { createWorkspaceForUser } from "@/lib/workspace/lifecycle";
+import { mayCreateWorkspace } from "@/lib/auth/signup";
 
 export const dynamic = "force-dynamic";
 
@@ -40,6 +41,9 @@ export async function POST(req: NextRequest) {
   try {
     const user = await requireUser();
     if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
+    if (!(await mayCreateWorkspace(user.id))) {
+      return Response.json({ error: "An invite is required to create a workspace here." }, { status: 403 });
+    }
     const body = (await req.json().catch(() => null)) as { name?: unknown } | null;
     if (!body) return Response.json({ error: "Invalid JSON" }, { status: 400 });
     const workspace = await createWorkspaceForUser({ userId: user.id, name: body.name });
