@@ -22,7 +22,7 @@ Internet → Caddy (auto-HTTPS reverse proxy) → app:3000 (Next.js standalone)
 - **VPS:** 2 vCPU / 4 GB RAM minimum (Hetzner, DigitalOcean, or equivalent). Ubuntu 24.04.
 - **Domain:** `marketr.launchabl.com` (or similar) → A record to the VPS. Caddy handles TLS.
 - **Cron:** host-level cron `curl` hitting the two scheduled endpoints with `CRON_SECRET` bearer.
-- **Backups:** nightly `pg_dump` to object storage + the `marketr-data` volume snapshotted.
+- **Backups:** the compose `backup` service (daily `pg_dump`, retention, optional S3/MinIO upload; see `docs/ops/BACKUP-RESTORE.md`) + the `marketr-data` volume snapshotted.
 
 ### 1a. Gap to fix before deploy (small code change, spec'd here)
 
@@ -140,7 +140,8 @@ them over via the Secure Vault flow and Z7 writes them server-side.
    - `0 3 1 * * curl -s -X POST -H "Authorization: Bearer $CRON_SECRET" https://marketr.launchabl.com/api/cron/overage-invoicing` (overage invoicing: monthly Stripe invoices for accrued overage on auto-overage workspaces — completed UTC months only, $5.00 minimum (smaller amounts carry forward), replay-safe per workspace per month; no-op when Stripe is unconfigured)
    - `0 3 * * * curl -s -X POST -H "Authorization: Bearer $CRON_SECRET" https://marketr.launchabl.com/api/cron/recording-retention` (Phase 16 slice 8: daily retention sweep — drops videos older than 30 days unless pinned, keeps traces; idempotent per recording)
 9. **Smoke test:** log in, create workspace + project, confirm pages load, no console errors.
-10. **Backups:** nightly `pg_dump` cron → object storage; document restore command.
+10. **Backups:** the compose `backup` service runs `scripts/ops/backup.sh --loop` (daily `pg_dump`, 14-day local retention, optional S3/MinIO upload via `BACKUP_S3_*`). Restore procedure and the recorded drill: `docs/ops/BACKUP-RESTORE.md`.
+11. **Health:** `GET /api/health` (readiness: DB + migrations, 503 when not ready) and `GET /api/health/live` (liveness, no I/O). The compose `app` healthcheck uses the former; point uptime monitors at it too.
 
 ## 4. Live verification checklist (the whole loop, for real)
 

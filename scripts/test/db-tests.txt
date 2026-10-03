@@ -29,6 +29,7 @@ lib/funding/__tests__/funding-slice2.test.ts
 lib/funding/__tests__/funding-slice3.test.ts
 lib/funding/__tests__/funding-slice4.test.ts
 lib/funding/__tests__/funding.test.ts
+lib/gdpr/__tests__/gdpr-db.test.ts
 lib/integrations/actions/__tests__/separation-of-duties.test.ts
 lib/integrations/activepieces/__tests__/bindings-db.test.ts
 lib/intelligence/company/__tests__/knowledge-rls.test.ts
@@ -43,6 +44,7 @@ lib/metering/__tests__/self-hosted-cap-db.test.ts
 lib/metering/__tests__/trial-db.test.ts
 lib/notifications/__tests__/decided-producers-db.test.ts
 lib/notifications/__tests__/notifications-db.test.ts
+lib/observability/__tests__/health-db.test.ts
 lib/ops/__tests__/ops-consume-db.test.ts
 lib/ops/__tests__/ops-rls.test.ts
 lib/ops/__tests__/workflows-rls.test.ts
@@ -62,3 +64,4 @@ lib/substrate/memory/__tests__/rls-least-privilege-db.test.ts
 lib/voice/__tests__/pronunciation.test.ts
 lib/voice/__tests__/voiceover.test.ts
 lib/workspace/__tests__/lifecycle-db.test.ts
+lib/workspace/__tests__/workspace-orphans-db.test.ts

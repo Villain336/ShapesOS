@@ -86,6 +86,7 @@ const AUTHZ_PRIMITIVES = [
   "launchGuard",                                // Phase 7 launch guard (app/api/flywheel/launch/_lib.ts) — requireUser + requireWorkspaceRole(editor) for mutations
   "mayCreateWorkspace",                         // Phase 3 workspace creation gate (lib/auth/signup.ts) — invite-only mode: members/operator only
   "requirePlatformOperator",                    // Phase 1 host-wide resources (lib/auth/require-platform-operator.ts) — MARKETR_PLATFORM_OPERATORS only
+  "requireSelfService",                         // Phase 4a own-account actions (lib/auth/require-self-service.ts) — no target id read from the request; keyed to the session subject
 ];
 // Public by design. Each entry documents WHY — this is a justification list,
 // not a suppression list. Adding an entry requires a code comment in the

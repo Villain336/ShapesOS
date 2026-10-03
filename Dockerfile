@@ -36,11 +36,26 @@ COPY prisma ./prisma
 COPY scripts/db ./scripts/db
 CMD ["sh", "scripts/db/migrate.sh"]
 
+# --- backup --- scheduled pg_dump (compose `backup` service; Phase 4a).
+# Same major version as the db service so pg_dump matches the server. curl
+# signs the optional S3/MinIO upload (SigV4) without an AWS CLI.
+FROM postgres:16-alpine AS backup
+RUN apk add --no-cache curl
+COPY scripts/ops/backup.sh /usr/local/bin/shapesos-backup
+RUN chmod 0755 /usr/local/bin/shapesos-backup \
+ && mkdir -p /backups && chown postgres:postgres /backups && chmod 0700 /backups
+USER postgres
+CMD ["shapesos-backup", "--loop"]
+
 # --- runner ---
 FROM base AS runner
 RUN apk add --no-cache openssl
 WORKDIR /app
 ENV NODE_ENV=production
+# Build commit for GET /api/health and error reports (compose passes it as a
+# build arg: MARKETR_GIT_COMMIT=$(git rev-parse --short HEAD) docker compose build).
+ARG MARKETR_GIT_COMMIT=""
+ENV MARKETR_GIT_COMMIT=$MARKETR_GIT_COMMIT
 RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nextjs
 COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./

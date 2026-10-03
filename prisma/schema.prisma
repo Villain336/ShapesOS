@@ -318,6 +318,8 @@ enum FileChangeAction {
   client_created
   client_updated
   client_deleted
+  // Phase 4a (GDPR): a full workspace data export was downloaded.
+  workspace_exported
 }
 
 // ---------------------------------------------------------------------------
@@ -925,6 +927,32 @@ model Workspace {
   outreachWebhookEvents     OutreachWebhookEvent[]
   // Phase 3 (J): in-app notification center (per-user rows + read state).
   notifications             Notification[]
+  // Phase 4a (orphaned rows): tables that had a workspace_id but no FK.
+  agentRunEvents          AgentRunEvent[]
+  agentRunRecordings      AgentRunRecording[]
+  authorityApprovalEvents AuthorityApprovalEvent[]
+  billingSetupIdempotency BillingSetupIdempotency[]
+  breakerEvents           BreakerEvent[]
+  channelFloors           ChannelFloor[]
+  connectorHealth         ConnectorHealth[]
+  dspAdapters             DspAdapter[]
+  experimentIdeas         ExperimentIdea[]
+  experiments             Experiment[]
+  feeSchedules            FeeSchedule[]
+  flywheelAuditEvents     FlywheelAuditEvent[]
+  mailWebhookEvents       MailWebhookEvent[]
+  marginLedgerRows        MarginLedgerRow[]
+  marginalCurves          MarginalCurve[]
+  mcpApiKeys              McpApiKey[]
+  mcpOAuthClients         McpOAuthClient[]
+  mcpOAuthCodes           McpOAuthCode[]
+  mcpOAuthTokens          McpOAuthToken[]
+  policyDecisions         PolicyDecision[]
+  reallocationProposals   ReallocationProposal[]
+  reallocationRuns        ReallocationRun[]
+  recyclingBriefEvents    RecyclingBriefEvent[]
+  recyclingBriefs         RecyclingBrief[]
+  sraEnvelopes            SraEnvelope[]
 
   @@map("workspaces")
 }
@@ -3092,6 +3120,7 @@ model ConnectorHealth {
   // Denormalized for the workspace summary query (the authorization
   // boundary is still re-checked via ConnectorConnection on every read).
   workspaceId  String              @map("workspace_id")
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade) // Phase 4a: no orphans on workspace delete
 
   status        ConnectorHealthStatus @default(unknown)
   lastCheckAt   DateTime              @map("last_check_at")
@@ -3505,6 +3534,7 @@ model SubagentRun {
 model McpApiKey {
   id          String    @id @default(cuid())
   workspaceId String    @map("workspace_id")
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade) // Phase 4a: no orphans on workspace delete
   userId      String    @map("user_id")
   name        String
   // SHA-256 hex of the raw key. Raw key material is NEVER stored.
@@ -3530,9 +3560,11 @@ model McpOAuthClient {
   userId       String?  @map("user_id")
   // Bound at authorization time: the token's tenant.
   workspaceId  String?  @map("workspace_id")
+  workspace Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade) // Phase 4a: no orphans on workspace delete
   clientName   String?  @map("client_name")
   redirectUris String[] @map("redirect_uris")
   createdAt    DateTime @default(now()) @map("created_at")
+  @@index([workspaceId])
 
   @@map("mcp_oauth_clients")
 }
@@ -3543,6 +3575,7 @@ model McpOAuthCode {
   clientId      String   @map("client_id")
   userId        String   @map("user_id")
   workspaceId   String   @map("workspace_id")
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade) // Phase 4a: no orphans on workspace delete
   redirectUri   String   @map("redirect_uri")
   scopes        String[]
   // S256 code challenge (plain verifier never stored).
@@ -3552,6 +3585,7 @@ model McpOAuthCode {
   createdAt     DateTime @default(now()) @map("created_at")
 
   @@index([clientId])
+  @@index([workspaceId])
   @@map("mcp_oauth_codes")
 }
 
@@ -3562,6 +3596,7 @@ model McpOAuthToken {
   clientId    String   @map("client_id")
   userId      String   @map("user_id")
   workspaceId String   @map("workspace_id")
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade) // Phase 4a: no orphans on workspace delete
   scopes      String[]
   expiresAt   DateTime @map("expires_at")
   createdAt   DateTime @default(now()) @map("created_at")
@@ -3720,8 +3755,10 @@ model BillingOverageInvoice {
 model BillingSetupIdempotency {
   idempotencyKey  String   @id @map("idempotency_key")
   workspaceId     String   @map("workspace_id")
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade) // Phase 4a: no orphans on workspace delete
   stripeSessionId String   @map("stripe_session_id")
   appliedAt       DateTime @default(now()) @map("applied_at")
+  @@index([workspaceId])
 
   @@map("billing_setup_idempotency")
 }
@@ -4957,6 +4994,7 @@ model MailPiece {
 model MailWebhookEvent {
   id          String    @id @default(cuid())
   workspaceId String?   @map("workspace_id")
+  workspace Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade) // Phase 4a: no orphans on workspace delete
   provider    String
   eventId     String    @map("event_id")
   eventType   String    @map("event_type")
@@ -4966,6 +5004,7 @@ model MailWebhookEvent {
 
   @@unique([provider, eventId])
   @@index([provider, processedAt])
+  @@index([workspaceId])
   @@map("mail_webhook_event")
 }
 
@@ -5906,6 +5945,7 @@ model AuthorityApprovalEvent {
   approvalId  String            @map("approval_id")
   approval    AuthorityApproval @relation(fields: [approvalId], references: [id], onDelete: Cascade)
   workspaceId String            @map("workspace_id")
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade) // Phase 4a: no orphans on workspace delete
   ts          DateTime          @default(now()) @map("ts")
   actor       String            @map("actor")
   action      String            @map("action") // created|submitted|approved|approval_rejected|revoked|expired|executed
@@ -5915,6 +5955,7 @@ model AuthorityApprovalEvent {
   detail      Json?             @map("detail")
 
   @@index([approvalId, ts])
+  @@index([workspaceId])
   @@map("authority_approval_events")
 }
 
@@ -6425,6 +6466,7 @@ enum FlywheelAuditKind {
 model SraEnvelope {
   id                      String    @id @default(cuid()) @map("id")
   workspaceId             String    @map("workspace_id")
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade) // Phase 4a: no orphans on workspace delete
   name                    String    @map("name")
   channels                Json      @map("channels") // string[] allowlist — explicit only
   perShiftCapCents        Int       @map("per_shift_cap_cents")
@@ -6455,6 +6497,7 @@ model SraEnvelope {
 model ReallocationProposal {
   id                String           @id @default(cuid()) @map("id")
   workspaceId       String           @map("workspace_id")
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade) // Phase 4a: no orphans on workspace delete
   mode              ReallocationMode @map("mode")
   sraId             String?          @map("sra_id")
   sra               SraEnvelope?     @relation(fields: [sraId], references: [id])
@@ -6483,12 +6526,14 @@ model PolicyDecision {
   proposalId          String               @map("proposal_id")
   proposal            ReallocationProposal @relation(fields: [proposalId], references: [id])
   workspaceId         String               @map("workspace_id")
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade) // Phase 4a: no orphans on workspace delete
   decision            PolicyDecisionKind   @map("decision")
   reasons             Json                 @map("reasons") // string[]
   sraId               String?              @map("sra_id")
   revocationCheckedAt DateTime             @map("revocation_checked_at")
 
   @@index([proposalId])
+  @@index([workspaceId])
   @@map("policy_decisions")
 }
 
@@ -6497,6 +6542,7 @@ model PolicyDecision {
 model MarginalCurve {
   id                     String    @id @default(cuid()) @map("id")
   workspaceId            String    @map("workspace_id")
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade) // Phase 4a: no orphans on workspace delete
   channel                String    @map("channel")
   curveType              CurveType @map("curve_type")
   params                 Json      @map("params")
@@ -6516,6 +6562,7 @@ model MarginalCurve {
 // can't exit learning — the optimizer would optimize noise.
 model ChannelFloor {
   workspaceId               String @map("workspace_id")
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade) // Phase 4a: no orphans on workspace delete
   channel                   String @map("channel")
   learningViableMinCentsDay Int    @map("learning_viable_min_cents_day")
   stabilizationHours        Int    @map("stabilization_hours")
@@ -6528,6 +6575,7 @@ model ChannelFloor {
 model ReallocationRun {
   id                 String           @id @default(cuid()) @map("id")
   workspaceId        String           @map("workspace_id")
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade) // Phase 4a: no orphans on workspace delete
   runAt              DateTime         @default(now()) @map("run_at")
   mode               ReallocationMode @map("mode")
   proposalsCount     Int              @map("proposals_count")
@@ -6545,6 +6593,7 @@ model ReallocationRun {
 model BreakerEvent {
   id             String      @id @default(cuid()) @map("id")
   workspaceId    String      @map("workspace_id")
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade) // Phase 4a: no orphans on workspace delete
   breakerType    BreakerType @map("breaker_type")
   scope          String      @map("scope") // channel ref or "global"
   reason         String      @map("reason")
@@ -6563,6 +6612,7 @@ model BreakerEvent {
 model FlywheelAuditEvent {
   id            String            @id @default(cuid()) @map("id")
   workspaceId   String            @map("workspace_id")
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade) // Phase 4a: no orphans on workspace delete
   correlationId String            @map("correlation_id")
   kind          FlywheelAuditKind @map("kind")
   actor         String            @map("actor")
@@ -6617,6 +6667,7 @@ enum RecyclingAuditAction {
 model RecyclingBrief {
   id                      String               @id @default(cuid()) @map("id")
   workspaceId             String               @map("workspace_id")
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade) // Phase 4a: no orphans on workspace delete
   // Opaque source ref, e.g. "content_item:<id>", "tracking_link:<id>",
   // "mail_campaign:<id>", "aeo:<engine>:<domain>".
   sourceAssetId           String               @map("source_asset_id")
@@ -6653,6 +6704,7 @@ model RecyclingBriefEvent {
   briefId     String               @map("brief_id")
   brief       RecyclingBrief       @relation(fields: [briefId], references: [id], onDelete: Cascade)
   workspaceId String               @map("workspace_id")
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade) // Phase 4a: no orphans on workspace delete
   ts          DateTime             @default(now()) @map("ts")
   actor       String               @map("actor")
   action      RecyclingAuditAction @map("action")
@@ -6682,6 +6734,7 @@ model RecyclingBriefEvent {
 model ExperimentIdea {
   id           String   @id @default(cuid()) @map("id")
   workspaceId  String   @map("workspace_id")
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade) // Phase 4a: no orphans on workspace delete
   title        String   @map("title")
   sourceSignal String?  @map("source_signal") // phase2..6 signal reference
   pieIceScore  Float    @map("pie_ice_score")
@@ -6696,6 +6749,7 @@ model ExperimentIdea {
 model Experiment {
   id                   String    @id @default(cuid()) @map("id")
   workspaceId          String    @map("workspace_id")
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade) // Phase 4a: no orphans on workspace delete
   name                 String    @map("name")
   hypothesis           String    @map("hypothesis") @db.Text
   pieIceScore          Float     @map("pie_ice_score")
@@ -6957,6 +7011,7 @@ enum DspSeatStatus {
 model DspAdapter {
   id          String        @id @default(cuid()) @map("id")
   workspaceId String        @map("workspace_id")
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade) // Phase 4a: no orphans on workspace delete
   dsp         DspKind       @map("dsp")
   seatStatus  DspSeatStatus @default(none) @map("seat_status")
   // Vault reference ONLY (vault://...). Never credential material.
@@ -6977,6 +7032,7 @@ model DspAdapter {
 model FeeSchedule {
   id            String   @id @default(cuid()) @map("id")
   workspaceId   String   @map("workspace_id")
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade) // Phase 4a: no orphans on workspace delete
   dsp           DspKind  @map("dsp")
   version       Int      @map("version")
   feeLinesJson  Json     @map("fee_lines_json")
@@ -6995,6 +7051,7 @@ model FeeSchedule {
 model MarginLedgerRow {
   id                 String   @id @default(cuid()) @map("id")
   workspaceId        String   @map("workspace_id")
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade) // Phase 4a: no orphans on workspace delete
   period             String   @map("period") // YYYY-MM
   dspAdapterId       String   @map("dsp_adapter_id")
   dsp                DspKind  @map("dsp")
@@ -8902,6 +8959,7 @@ model AgentRun {
 model AgentRunRecording {
   id             String    @id @default(cuid()) @map("id")
   workspaceId    String    @map("workspace_id")
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade) // Phase 4a: no orphans on workspace delete
   runId          String    @unique @map("run_id")
   run            AgentRun  @relation(fields: [runId], references: [id], onDelete: Cascade)
   // Host-owned artifact paths (repo-local .run-artifacts/, gitignored).
@@ -8924,6 +8982,7 @@ model AgentRunRecording {
 model AgentRunEvent {
   id          String            @id @default(cuid()) @map("id")
   workspaceId String            @map("workspace_id")
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade) // Phase 4a: no orphans on workspace delete
   runId       String            @map("run_id")
   run         AgentRun          @relation(fields: [runId], references: [id], onDelete: Cascade)
   // Monotonic within the run (assigned atomically by the service).

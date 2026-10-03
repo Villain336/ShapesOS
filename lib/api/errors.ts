@@ -17,7 +17,11 @@
 // its message throws one of the HttpError subclasses below.
 //
 // Dependency-free on purpose (no zod/Prisma/Next imports) so any lib module
-// can throw these without pulling route code in.
+// can throw these without pulling route code in. The observability helpers
+// it uses are dependency-free too.
+
+import { log, requestIdFrom } from "../observability/log";
+import { captureException } from "../observability/sentry";
 
 export interface ErrorDetail {
   path: string;
@@ -173,14 +177,30 @@ export function classifyError(err: unknown): Mapped {
 }
 
 /**
- * Map a thrown value to a JSON Response. 5xx errors are logged with
- * `context` (e.g. "POST /api/eddm/orders"); the response body never carries
- * the underlying message unless it came from an HttpError.
+ * Map a thrown value to a JSON Response. 5xx errors are logged as one
+ * structured JSON line (lib/observability/log.ts: secrets and emails
+ * scrubbed) with `context` (e.g. "POST /api/eddm/orders") and the request id
+ * when `req` is given, and reported to Sentry when SENTRY_DSN is set. The
+ * response body never carries the underlying message unless it came from an
+ * HttpError; a 500 carries the request id so a user can quote it.
  */
-export function errorResponse(err: unknown, context?: string): Response {
+export function errorResponse(err: unknown, context?: string, req?: Request | null): Response {
   const { status, body } = classifyError(err);
   if (status >= 500 && !(err instanceof HttpError && err.expose)) {
-    console.error(`[api]${context ? ` ${context}` : ""} unhandled error:`, err);
+    const requestId = requestIdFrom(req);
+    let method: string | undefined;
+    let path: string | undefined;
+    try {
+      if (req) {
+        method = req.method;
+        path = new URL(req.url).pathname;
+      }
+    } catch {
+      /* relative or missing URL: context still says where */
+    }
+    log.error("unhandled route error", { context, requestId, method, path, err });
+    void captureException(err, { route: context, method, path, requestId, routeType: "route" });
+    if (requestId) body.requestId = requestId;
   }
   return Response.json(body, { status });
 }
@@ -188,6 +208,8 @@ export function errorResponse(err: unknown, context?: string): Response {
 /**
  * Wrap a route handler so anything it throws goes through errorResponse.
  *   export const POST = withErrorHandling(async (req: Request) => { ... }, "POST /api/x");
+ * The first argument, when it is a Request, supplies the request id for the
+ * error log line.
  */
 export function withErrorHandling<A extends unknown[]>(
   handler: (...args: A) => Response | Promise<Response>,
@@ -197,7 +219,8 @@ export function withErrorHandling<A extends unknown[]>(
     try {
       return await handler(...args);
     } catch (err) {
-      return errorResponse(err, context);
+      const first = args[0];
+      return errorResponse(err, context, first instanceof Request ? first : null);
     }
   };
 }

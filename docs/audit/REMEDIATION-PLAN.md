@@ -109,8 +109,23 @@ Follow-ups found while doing Phase 2 (carried forward)
 
 ## Phase 4 — next builds (PRs 4a → 4b → 4c, stacked on Phase 3)
 4a — platform (`claude/phase-4a-platform`)
-- [ ] Observability: `/api/health` (DB + migrations), compose app healthcheck, structured JSON logging, Sentry/OTel hooks (env-gated, no-op without DSN); backup job (pg_dump + retention) and restore doc
-- [ ] GDPR export (workspace + user) + account deletion; orphaned rows in workspace tables without an FK cleaned on workspace delete
+- [x] Observability: `/api/health` (DB + migrations), compose app healthcheck, structured JSON logging, Sentry/OTel hooks (env-gated, no-op without DSN); backup job (pg_dump + retention) and restore doc
+  - How: `GET /api/health` is the readiness check: the DB must answer within 2s, every shipped migration must be applied and none failed. It returns 200 or 503, with counts only. `GET /api/health/live` is the liveness check (no I/O). The compose `app` healthcheck calls `/api/health`.
+  - `lib/observability/log.ts` writes JSON lines, with secrets and emails scrubbed (`redact.ts`). `proxy.ts` sets an `x-request-id` on every request. `errorResponse`/`withErrorHandling` log 500s with the context and the request id.
+  - `instrumentation.ts`: `onRequestError` logs the error and reports it to Sentry. That reporter is dependency-free (`lib/observability/sentry.ts`, envelope POST). `register()` turns on `@vercel/otel` only when `OTEL_EXPORTER_OTLP_ENDPOINT` is set.
+  - `scripts/ops/backup.sh` + the compose `backup` service run `pg_dump -Fc` with a read-back check, a sha256, retention, and an optional S3/MinIO upload via curl SigV4.
+  - `docs/ops/BACKUP-RESTORE.md` has the restore procedure and a recorded drill (dump → restore → drift OK, orphan test green as the app role).
+- [x] GDPR export (workspace + user) + account deletion; orphaned rows in workspace tables without an FK cleaned on workspace delete
+  - How, export: `lib/gdpr/` reads the live catalog, so new tables are covered automatically.
+    - `GET /api/workspaces/[id]/export` (admin+, audited as `workspace_exported`, one export per workspace at a time) streams every workspace-owned table: direct, through foreign keys, and RLS-scoped.
+    - `GET /api/account/export` streams your memberships, invites and authored rows.
+    - Both leave out secret columns and credential tables.
+  - Account deletion: `DELETE /api/account` with the email typed back.
+    - It refuses if you're the sole owner of a workspace that has other members.
+    - Solo workspaces are deleted through `purgeWorkspace`. In shared ones you leave and ownership passes to another owner.
+    - Personal rows are deleted, and person references are pseudonymized (hash-chained, append-only and lifecycle tables are kept as they are). Then you're signed out.
+  - UI: Settings → Your account, and an export card in Settings → General.
+  - Orphans: migration `20261005100000` adds `ON DELETE CASCADE` foreign keys on the 25 unlinked tables (`workspace_lifecycle_events` is kept on purpose). `workspace-orphans-db.test.ts` derives every `workspace_id` table from the catalog, fills each one, deletes the workspace and asserts nothing is left.
 - [ ] 2FA (TOTP + recovery codes) + passkeys (WebAuthn); SCIM 2.0 users/groups; step-up CAPTCHA after repeated login failures (provider optional)
 - [ ] OpenAPI spec for the public API + outbound webhooks (signed, retried, per-workspace endpoints, delivery log)
 - [ ] Global record search (leads, invoices, docs, files, projects) in ⌘K
