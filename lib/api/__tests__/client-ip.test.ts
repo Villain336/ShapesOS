@@ -37,11 +37,11 @@ describe("clientIpFromHeaders", () => {
   });
 
   it("TRUSTED_PROXY_HOPS parsing (default 1, invalid → default)", () => {
-    assert.equal(trustedProxyHops({} as NodeJS.ProcessEnv), 1);
-    assert.equal(trustedProxyHops({ TRUSTED_PROXY_HOPS: "2" } as NodeJS.ProcessEnv), 2);
-    assert.equal(trustedProxyHops({ TRUSTED_PROXY_HOPS: "0" } as NodeJS.ProcessEnv), 0);
-    assert.equal(trustedProxyHops({ TRUSTED_PROXY_HOPS: "-1" } as NodeJS.ProcessEnv), 1);
-    assert.equal(trustedProxyHops({ TRUSTED_PROXY_HOPS: "abc" } as NodeJS.ProcessEnv), 1);
+    assert.equal(trustedProxyHops({} as unknown as NodeJS.ProcessEnv), 1);
+    assert.equal(trustedProxyHops({ TRUSTED_PROXY_HOPS: "2" } as unknown as NodeJS.ProcessEnv), 2);
+    assert.equal(trustedProxyHops({ TRUSTED_PROXY_HOPS: "0" } as unknown as NodeJS.ProcessEnv), 0);
+    assert.equal(trustedProxyHops({ TRUSTED_PROXY_HOPS: "-1" } as unknown as NodeJS.ProcessEnv), 1);
+    assert.equal(trustedProxyHops({ TRUSTED_PROXY_HOPS: "abc" } as unknown as NodeJS.ProcessEnv), 1);
   });
 
   it("env drives the default hop count", () => {

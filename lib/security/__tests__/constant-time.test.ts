@@ -6,6 +6,7 @@
 import { describe, it, mock, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import type { NextRequest } from "next/server";
 import { bearerMatches, safeEqual } from "../constant-time";
 
 mock.module("@/lib/session", {
@@ -85,14 +86,14 @@ describe("cron + scheduler + reminders gates", () => {
 
   it("scheduler/events: an anonymous invalid body gets 401, not a schema error", async () => {
     const route = await import("@/app/api/scheduler/events/route");
-    let r = await route.POST(req(null, { nonsense: true }) as never);
+    let r = (await route.POST(req(null, { nonsense: true }) as unknown as NextRequest))!;
     assert.equal(r.status, 401);
     const text = await r.text();
     assert.doesNotMatch(text, /source|payload|issues/);
-    r = await route.POST(req("Bearer wrong", { nonsense: true }) as never);
+    r = (await route.POST(req("Bearer wrong", { nonsense: true }) as unknown as NextRequest))!;
     assert.equal(r.status, 401);
     // Authenticated service call with a bad body: now validation runs.
-    r = await route.POST(req("Bearer cron-secret-value", { nonsense: true }) as never);
+    r = (await route.POST(req("Bearer cron-secret-value", { nonsense: true }) as unknown as NextRequest))!;
     assert.equal(r.status, 400);
   });
 

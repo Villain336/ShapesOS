@@ -14,6 +14,7 @@ import { describe, it, before, after, mock } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import type { WorkspaceRole } from "@prisma/client";
+import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { capScopesToRole, MCP_TOOL_NAMES, scopeForTool, TOOL_MIN_ROLE } from "@/lib/mcp/scopes";
 
@@ -131,8 +132,9 @@ describe("MCP authorization by current role (DB)", () => {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ name: "ci", scopes: ALL }),
-      }) as never,
+      }) as unknown as NextRequest,
     );
+    assert.ok(res);
     assert.equal(res.status, 201);
     const created = (await res.json()) as { key: string; expiresAt: string | null };
 
@@ -167,8 +169,9 @@ describe("MCP authorization by current role (DB)", () => {
           scopes: ALL,
           expiresAt: new Date(Date.now() + 400 * 86_400_000).toISOString(),
         }),
-      }) as never,
+      }) as unknown as NextRequest,
     );
+    assert.ok(res);
     assert.equal(res.status, 400);
   });
 
