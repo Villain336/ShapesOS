@@ -26,6 +26,7 @@ import {
   markOverdueInvoices,
   proposeInvoiceReminder,
 } from "../invoices";
+import { NotFoundError } from "@/lib/api/errors";
 
 const ACTOR: OpsActor = { workspaceId: "ws_inv2", userId: "user_inv2" };
 const INVOICES = OPS_ENTITY_MAP["invoices"];
@@ -50,7 +51,7 @@ function portWith(
   return {
     propose: async () => ({ id: "ap_1", status: "pending", riskTier: "medium" }),
     getApproval: async (_ws, id) => {
-      if (!approval) throw new Error("Approval not found");
+      if (!approval) throw new NotFoundError("Approval not found");
       return {
         id,
         status: approval.status,

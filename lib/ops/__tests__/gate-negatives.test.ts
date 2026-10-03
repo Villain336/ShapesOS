@@ -21,6 +21,7 @@ import {
   verifyOpsApproval,
   type OpsGatePort,
 } from "../gate";
+import { NotFoundError } from "@/lib/api/errors";
 
 const ACTOR: OpsActor = { workspaceId: "ws_neg", userId: "user_neg" };
 const MUTATION: Record<string, unknown> = { id: "inv_1", status: "sent" };
@@ -46,7 +47,7 @@ function portWith(approval: {
   return {
     propose: async () => ({ id: "ap_1", status: "pending", riskTier: "medium" }),
     getApproval: async (_ws, id) => {
-      if (!approval) throw new Error("Approval not found");
+      if (!approval) throw new NotFoundError("Approval not found");
       return {
         id,
         status: approval.status,

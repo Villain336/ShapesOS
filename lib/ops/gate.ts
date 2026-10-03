@@ -42,6 +42,7 @@ import {
 } from "@/lib/integrations/actions/gate";
 import { redactArgs } from "@/lib/integrations/actions/redact";
 import { OPS_ENTITY_MAP } from "./entities";
+import { NotFoundError } from "@/lib/api/errors";
 
 const TIER_RANK: Record<RiskTier, number> = { low: 0, medium: 1, high: 2 };
 
@@ -214,7 +215,12 @@ export interface OpsGatePort {
     proposedBy: string;
     plainSummary: string;
   }): Promise<OpsGateProposal>;
-  getApproval(workspaceId: string, id: string): Promise<OpsGateApproval>;
+  /**
+   * Load an approval. When `tx` is given (the gated write's open transaction),
+   * read through it: a second pooled connection per concurrent write exhausted
+   * small pools and surfaced as a bogus "not found".
+   */
+  getApproval(workspaceId: string, id: string, tx?: unknown): Promise<OpsGateApproval>;
 }
 
 /** Production port: the real Phase 14 gate. */
@@ -231,8 +237,11 @@ export const phase14GatePort: OpsGatePort = {
     }
     return { id: approval.id, status: approval.status, riskTier: approval.riskTier };
   },
-  async getApproval(workspaceId: string, id: string) {
-    const a = await getApproval(workspaceId, id);
+  async getApproval(workspaceId: string, id: string, tx?: unknown) {
+    const a = tx
+      ? await (tx as ApprovalReadTx).composioActionApproval.findFirst({ where: { id, workspaceId } })
+      : await getApproval(workspaceId, id);
+    if (!a) throw new NotFoundError("Approval not found");
     return {
       id: a.id,
       status: a.status,
@@ -323,6 +332,7 @@ export async function verifyOpsApproval(
     mutation: Record<string, unknown>;
     approvalId: string | null | undefined;
   },
+  tx?: unknown,
 ): Promise<OpsGateApproval> {
   if (!args.approvalId) {
     throw new OpsGateError(
@@ -332,9 +342,14 @@ export async function verifyOpsApproval(
   }
   let approval: OpsGateApproval;
   try {
-    approval = await port.getApproval(args.workspaceId, args.approvalId);
-  } catch {
-    throw new OpsGateError("approval_not_found", `Ops approval ${args.approvalId} not found in workspace`);
+    approval = await port.getApproval(args.workspaceId, args.approvalId, tx);
+  } catch (err) {
+    // Only a genuine miss is "not found"; anything else (pool timeout, DB
+    // outage) must surface as itself, not as a misleading gate verdict.
+    if (err instanceof NotFoundError) {
+      throw new OpsGateError("approval_not_found", `Ops approval ${args.approvalId} not found in workspace`);
+    }
+    throw err;
   }
   if (approval.status === "executed") {
     throw new OpsGateError("approval_replayed", "Approval already executed — replay blocked");
@@ -364,6 +379,18 @@ export async function verifyOpsApproval(
 // ---------------------------------------------------------------------------
 // Consume: the atomic approved → executed claim (replay lock).
 // ---------------------------------------------------------------------------
+
+interface ApprovalReadTx {
+  composioActionApproval: {
+    findFirst(args: { where: { id: string; workspaceId: string } }): Promise<{
+      id: string;
+      status: string;
+      expiresAt: Date;
+      proposedArgs: unknown;
+      auditTrail: unknown;
+    } | null>;
+  };
+}
 
 interface ApprovalClaimTx {
   composioActionApproval: {
@@ -412,7 +439,7 @@ export async function verifyAndConsumeOpsApproval(
   args: Parameters<typeof verifyOpsApproval>[1] & { actor: string },
 ): Promise<OpsGateApproval> {
   const { actor, ...verifyArgs } = args;
-  const approval = await verifyOpsApproval(port, verifyArgs);
+  const approval = await verifyOpsApproval(port, verifyArgs, tx);
   await consumeOpsApproval(tx, { workspaceId: args.workspaceId, approval, actor, slug: args.slug });
   return approval;
 }

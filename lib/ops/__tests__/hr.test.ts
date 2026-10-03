@@ -12,6 +12,7 @@ import { OPS_ENTITY_MAP } from "../entities";
 import { OPS_MONEY_ACTION_MAP, opsBindingFor, type OpsGatePort } from "../gate";
 import { OpsError, opsCreate, opsPatch, type OpsActor } from "../doctype";
 import { assertLegalLeaveTransition } from "../hr";
+import { NotFoundError } from "@/lib/api/errors";
 
 const ACTOR: OpsActor = { workspaceId: "ws_hr5", userId: "user_hr5" };
 const MEMBERS = OPS_ENTITY_MAP["team-members"];
@@ -48,7 +49,7 @@ function portWith(
   return {
     propose: async () => ({ id: "ap_1", status: "pending", riskTier: "medium" }),
     getApproval: async (_ws, id) => {
-      if (!approval) throw new Error("Approval not found");
+      if (!approval) throw new NotFoundError("Approval not found");
       return {
         id,
         status: approval.status,

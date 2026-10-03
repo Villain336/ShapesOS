@@ -37,6 +37,7 @@ import {
   type OpsGatePort,
 } from "../gate";
 import { isLowStock, lowStockProducts } from "../inventory";
+import { NotFoundError } from "@/lib/api/errors";
 
 const ACTOR: OpsActor = { workspaceId: "ws_inv3", userId: "user_inv3" };
 const PRODUCTS = OPS_ENTITY_MAP["products"];
@@ -143,7 +144,7 @@ function stubGatePort(approval?: {
   return {
     propose: async () => ({ id: "ap_stub_1", status: "pending", riskTier: "medium" }),
     getApproval: async (_ws, id) => {
-      if (!approval) throw new Error("Approval not found");
+      if (!approval) throw new NotFoundError("Approval not found");
       return {
         id,
         status: approval.status,
