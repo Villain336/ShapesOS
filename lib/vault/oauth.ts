@@ -22,6 +22,38 @@ export interface OAuthProviderConfig {
   clientSecretEnv: string;
   /** Extra static params merged into the authorize URL (e.g. response_type). */
   extra?: Record<string, string>;
+  /**
+   * How the token endpoint wants the client credentials. "form" (default):
+   * x-www-form-urlencoded body carrying client_id/client_secret (Google,
+   * Meta, Webflow…). "json_basic": JSON body + HTTP Basic client auth
+   * (Notion, verified against developers.notion.com/reference/create-a-token).
+   */
+  tokenRequest?: "form" | "json_basic";
+}
+
+/**
+ * Build the token-endpoint request for an authorization_code or
+ * refresh_token grant, honouring the provider's client-auth style.
+ */
+export function buildTokenRequest(
+  config: Pick<OAuthProviderConfig, "tokenRequest">,
+  params: Record<string, string>,
+  clientId: string,
+  clientSecret: string,
+): RequestInit {
+  if (config.tokenRequest === "json_basic") {
+    const basic = Buffer.from(`${clientId}:${clientSecret}`, "utf8").toString("base64");
+    return {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json", Authorization: `Basic ${basic}` },
+      body: JSON.stringify(params),
+    };
+  }
+  return {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
+    body: new URLSearchParams({ ...params, client_id: clientId, client_secret: clientSecret }),
+  };
 }
 
 const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
@@ -50,10 +82,7 @@ export const OAUTH_CONFIGS: Record<string, OAuthProviderConfig> = {
   "google-drive": {
     authorizeUrl: GOOGLE_AUTH_URL,
     tokenUrl: GOOGLE_TOKEN_URL,
-    scopes: [
-      "https://www.googleapis.com/auth/drive.readonly",
-      "https://www.googleapis.com/auth/drive.file",
-    ],
+    scopes: ["https://www.googleapis.com/auth/drive.readonly"],
     clientIdEnv: GOOGLE_ID_ENV,
     clientSecretEnv: GOOGLE_SECRET_ENV,
     extra: { access_type: "offline", prompt: "consent" },
@@ -80,12 +109,35 @@ export const OAUTH_CONFIGS: Record<string, OAuthProviderConfig> = {
     clientSecretEnv: GOOGLE_SECRET_ENV,
     extra: { access_type: "offline", prompt: "consent" },
   },
+  // Phase 4b: Google Ads (GAQL reporting). adwords is the only Ads scope;
+  // the developer token is an app-level header, not an OAuth grant.
+  "google-ads": {
+    authorizeUrl: GOOGLE_AUTH_URL,
+    tokenUrl: GOOGLE_TOKEN_URL,
+    scopes: ["https://www.googleapis.com/auth/adwords"],
+    clientIdEnv: GOOGLE_ID_ENV,
+    clientSecretEnv: GOOGLE_SECRET_ENV,
+    extra: { access_type: "offline", prompt: "consent" },
+  },
+  // Phase 4b: Google Business Profile (locations, reviews, local posts).
+  "google-business-profile": {
+    authorizeUrl: GOOGLE_AUTH_URL,
+    tokenUrl: GOOGLE_TOKEN_URL,
+    scopes: ["https://www.googleapis.com/auth/business.manage"],
+    clientIdEnv: GOOGLE_ID_ENV,
+    clientSecretEnv: GOOGLE_SECRET_ENV,
+    extra: { access_type: "offline", prompt: "consent" },
+  },
   notion: {
     authorizeUrl: "https://api.notion.com/v1/oauth/authorize",
     tokenUrl: "https://api.notion.com/v1/oauth/token",
     scopes: [],
     clientIdEnv: "NOTION_OAUTH_CLIENT_ID",
     clientSecretEnv: "NOTION_OAUTH_CLIENT_SECRET",
+    // Phase 4b: Notion requires owner=user on authorize and Basic client
+    // auth + JSON on the token endpoint (both grants).
+    extra: { owner: "user" },
+    tokenRequest: "json_basic",
   },
   webflow: {
     authorizeUrl: "https://webflow.com/oauth/authorize",
@@ -101,10 +153,11 @@ export const OAUTH_CONFIGS: Record<string, OAuthProviderConfig> = {
     clientIdEnv: "BUFFER_OAUTH_CLIENT_ID",
     clientSecretEnv: "BUFFER_OAUTH_CLIENT_SECRET",
   },
+  // Phase 4b: same Graph version as the live adapter (v26.0, 2026-07); read-only grant.
   "meta-ads": {
-    authorizeUrl: "https://www.facebook.com/v21.0/dialog/oauth",
-    tokenUrl: "https://graph.facebook.com/v21.0/oauth/access_token",
-    scopes: ["ads_read", "ads_management"],
+    authorizeUrl: "https://www.facebook.com/v26.0/dialog/oauth",
+    tokenUrl: "https://graph.facebook.com/v26.0/oauth/access_token",
+    scopes: ["ads_read"],
     clientIdEnv: "META_OAUTH_CLIENT_ID",
     clientSecretEnv: "META_OAUTH_CLIENT_SECRET",
   },

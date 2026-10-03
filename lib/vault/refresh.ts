@@ -12,7 +12,7 @@
 import { prisma } from "@/lib/prisma";
 import { secrets } from "@/lib/secrets";
 import type { DecryptedCredential } from "@/lib/connectors/m21/types";
-import { getOAuthConfig } from "./oauth";
+import { buildTokenRequest, getOAuthConfig } from "./oauth";
 
 export interface RefreshDeps {
   fetchImpl?: typeof fetch;
@@ -93,17 +93,10 @@ export async function refreshConnection(
 
   try {
     const fetchImpl = deps.fetchImpl ?? fetch;
-    const body = new URLSearchParams({
-      grant_type: "refresh_token",
-      refresh_token: refreshToken,
-      client_id: clientId,
-      client_secret: clientSecret,
-    });
-    const res = await fetchImpl(config.tokenUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
-      body,
-    });
+    const res = await fetchImpl(
+      config.tokenUrl,
+      buildTokenRequest(config, { grant_type: "refresh_token", refresh_token: refreshToken }, clientId, clientSecret),
+    );
     if (!res.ok) {
       await markNeedsReauth(connectionId);
       return "needs_reauth";

@@ -69,10 +69,8 @@ export const BUILT_IN_CONNECTORS: BuiltinConnectorMeta[] = [
     authType: "oauth2",
     description: "Browse and attach Drive files (briefs, brand assets) to chat sessions.",
     oauth: {
-      scopes: [
-        "https://www.googleapis.com/auth/drive.readonly",
-        "https://www.googleapis.com/auth/drive.file",
-      ],
+      // Phase 4b: read-only is the minimal grant — the adapter never writes.
+      scopes: ["https://www.googleapis.com/auth/drive.readonly"],
       envVars: ["GOOGLE_OAUTH_CLIENT_ID", "GOOGLE_OAUTH_CLIENT_SECRET"],
     },
     authNote: "Google OAuth2 (shared Google app credentials).",
@@ -119,7 +117,8 @@ export const BUILT_IN_CONNECTORS: BuiltinConnectorMeta[] = [
     authType: "oauth2",
     description: "Read ad account performance and campaign insights from Meta.",
     oauth: {
-      scopes: ["ads_read", "ads_management"],
+      // Phase 4b: every tool is a read — ads_read is the minimal grant.
+      scopes: ["ads_read"],
       envVars: ["META_OAUTH_CLIENT_ID", "META_OAUTH_CLIENT_SECRET"],
     },
     authNote: "Facebook OAuth (Meta app).",
@@ -133,7 +132,7 @@ export const BUILT_IN_CONNECTORS: BuiltinConnectorMeta[] = [
       scopes: ["https://www.googleapis.com/auth/adwords"],
       envVars: ["GOOGLE_OAUTH_CLIENT_ID", "GOOGLE_OAUTH_CLIENT_SECRET"],
     },
-    authNote: "Google OAuth2 + a developer token (per-user).",
+    authNote: "Google OAuth2 + a developer token (GOOGLE_ADS_DEVELOPER_TOKEN or BYO).",
   },
   // Connector Agent slice 2: Gmail contact import (network bootstrapping).
   // Metadata only (From/To/Cc/Date) — message bodies are never fetched.
@@ -161,6 +160,20 @@ export const BUILT_IN_CONNECTORS: BuiltinConnectorMeta[] = [
       envVars: ["GOOGLE_OAUTH_CLIENT_ID", "GOOGLE_OAUTH_CLIENT_SECRET"],
     },
     authNote: "Google OAuth2 (shared Google app credentials).",
+  },
+  // Phase 4b: Google Business Profile (locations, reviews + replies, local
+  // posts). business.manage is the only GBP scope. Mutating tools are
+  // confirmation-gated; authority flows add their own approval receipts.
+  {
+    key: "google-business-profile",
+    displayName: "Google Business Profile",
+    authType: "oauth2",
+    description: "Locations, reviews and owner replies, and local posts on Google Business Profile.",
+    oauth: {
+      scopes: ["https://www.googleapis.com/auth/business.manage"],
+      envVars: ["GOOGLE_OAUTH_CLIENT_ID", "GOOGLE_OAUTH_CLIENT_SECRET"],
+    },
+    authNote: "Google OAuth2 (shared Google app credentials). Needs Google's Business Profile API approval.",
   },
 ];
 
@@ -220,6 +233,7 @@ import { MetaAdsAdapter } from "./native/meta-ads";
 import { GoogleAdsAdapter } from "./native/google-ads";
 import { GmailAdapter } from "./native/gmail";
 import { GoogleCalendarAdapter } from "./native/google-calendar";
+import { GoogleBusinessProfileAdapter } from "./native/google-business-profile";
 
 const ADAPTER_CLASSES: Record<string, () => ConnectorAdapter> = {
   "google-search-console": () => new GoogleSearchConsoleAdapter(),
@@ -236,6 +250,7 @@ const ADAPTER_CLASSES: Record<string, () => ConnectorAdapter> = {
   // Connector Agent slice 2: live-wired import adapters (NOT mock-only).
   gmail: () => new GmailAdapter(),
   "google-calendar": () => new GoogleCalendarAdapter(),
+  "google-business-profile": () => new GoogleBusinessProfileAdapter(),
 };
 
 /** Resolve a built-in connector key to its native adapter. Throws on unknown key. */
@@ -246,23 +261,18 @@ export function resolveAdapter(key: string): ConnectorAdapter {
 }
 
 // ---------------------------------------------------------------------------
-// Phase B (B3): live-wiring flags for the connector health checker.
+// Phase B (B3) / Phase 4b: live-wiring flags for the connector health checker.
 //
-// The 7 adapters whose headers say "MOCK-ONLY" have no live provider wiring
-// (live OAuth/API handshakes are untested by design — Tico owns that work
-// separately). The health checker MUST report these as `unknown`, never
-// green. Keep this set in sync with the per-adapter file headers.
+// Phase 4b wired the last six mock-only adapters (GSC, GA4, Drive, Notion,
+// Meta Ads, Google Ads) to their live APIs: with a vault credential they
+// call the provider; without one they stay in labeled mock mode. No
+// built-in adapter is mock-only any more, so the set is empty. Keep it in
+// sync with the per-adapter file headers (scripts/verify-connector-health.mts
+// scans them for the MOCK-ONLY marker).
 // ---------------------------------------------------------------------------
 
 /** Built-in keys with NO live provider wiring — health is always `unknown`. */
-export const MOCK_ONLY_ADAPTER_KEYS: ReadonlySet<string> = new Set([
-  "google-search-console",
-  "ga4",
-  "google-drive",
-  "notion",
-  "meta-ads",
-  "google-ads",
-]);
+export const MOCK_ONLY_ADAPTER_KEYS: ReadonlySet<string> = new Set<string>([]);
 
 /** True when the adapter has a real provider path the checker can reason about. */
 export function hasLiveWiring(key: string): boolean {

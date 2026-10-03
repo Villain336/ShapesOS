@@ -8,7 +8,9 @@
 //   4. Declared-tool gating against load_skill-loaded skills
 //   5. Role gate (mutating → editor+, reads → viewer+)
 //   6. Confirmation gate (mutating tools behave like kind "publish")
-//   7. invoke() with the server-side decrypted credential (never in args)
+//   7. invoke() with the server-side decrypted credential (never in args);
+//      live adapters get a vault-backed refresher for 401s (Phase 4b) and a
+//      successful live call is recorded as connector-health evidence.
 //
 // Denials are NEVER silent: the resultSummary explains, and every denial
 // writes a FileChangeLog row (action connector_tool_denied).
@@ -16,7 +18,8 @@
 import { prisma } from "@/lib/prisma";
 import { roleAtLeast } from "@/lib/authz";
 import { auditEvent } from "@/lib/auditlog";
-import { getDecryptedCredential } from "@/lib/vault/refresh";
+import { loadLiveCredential } from "@/lib/connectors/m21/live/credentials";
+import { recordSuccessfulSync } from "@/lib/connectors/health";
 import { getAdapterForConnection } from "@/lib/connectors/m21";
 import type {
   ConnectorAdapter,
@@ -275,7 +278,7 @@ export async function resolveConnectorTool(
   // 7. Execute with the server-side decrypted credential (never from args).
   let summary: string;
   try {
-    const credential = await getDecryptedCredential(connection.id);
+    const { credential, refreshCredential } = await loadLiveCredential(connection.id);
     const result = await adapter.invoke(tool, args, credential, {
       workspaceId: ctx.workspaceId,
       projectId: ctx.projectId,
@@ -283,7 +286,11 @@ export async function resolveConnectorTool(
       projectConfig: binding.projectConfig && typeof binding.projectConfig === "object"
         ? (binding.projectConfig as Record<string, unknown>)
         : undefined,
+      refreshCredential,
     });
+    if (result.ok && result.mock === false) {
+      await recordSuccessfulSync(connection.id).catch(() => undefined);
+    }
     if (result.ok) {
       summary = `${toolName}: ${truncate(JSON.stringify(result.data ?? null), 500)}`;
     } else {

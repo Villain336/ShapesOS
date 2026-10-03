@@ -11,8 +11,13 @@
 //      status, and OAuth token expiry — plus the existing silent-refresh
 //      flow (lib/vault/refresh.ts), which talks only to provider token
 //      endpoints, never to user-configured hosts.
-//   2. The 7 mock-only adapters (no live wiring) report `unknown` with an
-//      honest label — NEVER fake green.
+//   2. Mock-only adapters (no live wiring) report `unknown` with an honest
+//      label — NEVER fake green. (Phase 4b wired the last six; the set in
+//      registry.ts is now empty but the rule stays.)
+//   5. Phase 4b: the MANUAL check (POST /api/connections/[id]/check) may
+//      inject `liveCheck`, which asks the adapter for one cheap call to its
+//      fixed provider endpoint (lib/connectors/m21/live/probe.ts). The
+//      scheduled run never does; this module still makes no network call.
 //   3. API-key adapters cannot be verified offline without a live call
 //      (which would be a paid call or an SSRF probe), so they report
 //      `unknown` until a real successful provider interaction is recorded
@@ -126,7 +131,37 @@ function readQuota(meta: unknown): { used: number | null; limit: number | null }
   return out;
 }
 
-export interface CheckDeps extends RefreshDeps {}
+/** Outcome of an adapter liveness call (closed code only). */
+export interface LiveCheckOutcome {
+  ok: boolean;
+  errorCode?: string;
+}
+
+export interface CheckDeps extends RefreshDeps {
+  /**
+   * Manual checks only: one cheap live call through the adapter. null means
+   * the connector has no live check (the lifecycle verdict stands).
+   */
+  liveCheck?: (connectionId: string) => Promise<LiveCheckOutcome | null>;
+}
+
+/** Map an adapter liveness failure onto the health verdict. */
+export function liveCheckVerdict(errorCode: string | undefined): { status: HealthStatus; code: HealthErrorCode } {
+  switch (errorCode) {
+    case "auth_rejected":
+    case "forbidden":
+      return { status: "needs_reauth", code: "auth_rejected" };
+    case "not_connected":
+    case "config_missing":
+      return { status: "error", code: "config_missing" };
+    case "rate_limited":
+    case "provider_unreachable":
+    case "provider_error":
+      return { status: "degraded", code: "provider_unreachable" };
+    default:
+      return { status: "error", code: "unknown_error" };
+  }
+}
 
 /**
  * Evaluate one connection and upsert its ConnectorHealth row.
@@ -232,16 +267,22 @@ export async function checkConnection(
     if (authType === "oauth2") {
       const expiresAt = connection.credential.expiresAt;
       const expired = expiresAt != null && expiresAt.getTime() <= now.getTime();
-      if (!expired) {
-        // Token lifecycle is clean — no probe needed (and none is made).
-        return finish("healthy", null, { lastSuccessAt: prev?.lastSuccessAt ?? connection.lastRefreshAt });
+      if (expired) {
+        // Expired: attempt the existing silent-refresh flow once.
+        const refreshed = await refreshConnection(connectionId, deps);
+        if (refreshed !== "refreshed") return finish("needs_reauth", "expired_token");
       }
-      // Expired: attempt the existing silent-refresh flow once.
-      const refreshed = await refreshConnection(connectionId, deps);
-      if (refreshed === "refreshed") {
-        return finish("healthy", null, { lastSuccessAt: now });
+      if (deps.liveCheck) {
+        const outcome = await deps.liveCheck(connectionId);
+        if (outcome?.ok) return finish("healthy", null, { lastSuccessAt: now });
+        if (outcome) {
+          const v = liveCheckVerdict(outcome.errorCode);
+          return finish(v.status, v.code);
+        }
       }
-      return finish("needs_reauth", "expired_token");
+      if (expired) return finish("healthy", null, { lastSuccessAt: now });
+      // Token lifecycle is clean — the scheduled run makes no provider call.
+      return finish("healthy", null, { lastSuccessAt: prev?.lastSuccessAt ?? connection.lastRefreshAt });
     }
 
     // api_key: no offline verification exists (probing would be a live,

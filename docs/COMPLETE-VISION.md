@@ -37,10 +37,10 @@
 - Media buying v1 — generalized ladder + media planning; **zero custody of client spend locked** (ShapesOS never holds/touches/transmits client money; planning fees + % of spend only) — ✅ shipped
 
 ### Authority & AI relevance (Phase 6) ✅ / ⚠️
-- Guest-post outreach engine — prospecting, pitch sequences, placement tracking — ⚠️ partial: the sending adapter is mock-only
+- Guest-post outreach engine — prospecting, pitch sequences, placement tracking — ⚠️ partial: the live Smartlead / Instantly sending adapter exists (relay campaigns, Phase 4b) but has only been tested against recorded fixtures
 - Digital PR — newsworthy-angle drafting, journalist lists, pitch tracking — ✅ shipped
 - Answer-engine optimization agent — citation-gap fixes, entity/schema reinforcement for AI answers — ✅ shipped
-- Maps & review-site agent + local listings/citations — ⚠️ partial: Google Business Profile is mock-only (`lib/local/gbp.ts`)
+- Maps & review-site agent + local listings/citations — ⚠️ partial: Google Business Profile has live code (locations, reviews + replies, local posts, profile sync, performance insights; Phase 4b) but needs Google's GBP API approval and has only been tested against recorded fixtures
 - Onboarding Intelligence Report — connect the client's stack → full audit pack → 90-day Growth Plan (the wedge demo) — ✅ shipped
 
 ### Flywheel (Phase 7) ✅
@@ -151,7 +151,7 @@
 - Tiers — Self-hosted free (BYO keys) · Starter $29/mo · Pro $79/mo · Agency White-label $199/mo — ⚠️ partial: plans differ only by credit pool; entitlements (white-label etc.) aren't enforced per tier yet (Phase 4)
 - White-label — client workspaces, custom domain/logo, client viewer logins, scheduled branded PDF reports — ⚠️ partial: agency client workspaces have a UI since Phase 3 (Settings → Clients), but there's no client-viewer role yet (roles are workspace-wide owner/admin/editor/viewer)
 - Workspace lifecycle — create, rename, delete (owner-only, typed confirmation, audited); invites emailed over SMTP or Resend with a copy-link fallback — ✅ shipped (Phase 3)
-- Live connector wiring — GA4, Google Search Console, Google Ads, Meta Ads, Google Drive and Notion adapters in `lib/connectors/m21/native/` — ⚠️ mock-only: the adapters exist but the live API calls aren't written (missing code, not missing keys; Phase 4). Gmail, Google Calendar, WordPress, Webflow, Resend, Buffer and DataForSEO are live.
+- Live connector wiring — GA4, Google Search Console, Google Ads, Meta Ads, Google Drive and Notion adapters in `lib/connectors/m21/native/` — ⚠️ partial: live API calls are written (Phase 4b, `lib/connectors/m21/live/`: refresh-on-401, 429 backoff, pagination, closed error codes) and tested against recorded fixtures; no live account has exercised them yet. Without a stored credential each adapter stays in labeled mock mode. Gmail, Google Calendar, WordPress, Webflow, Resend, Buffer and DataForSEO were already live.
 - License — AGPLv3 core + commercial white-label module (n8n playbook); money-moving modules flagged commercial-only (decision open with Tico) — ✅ decided
 - MCP server + API — 10+ tools, scoped expiring revocable API keys, OAuth 2.1 + PKCE; agents run SEO workflows through ShapesOS — ✅ shipped (no public OpenAPI spec or outbound webhooks yet: Phase 4)
 - Mobile — Expo iPhone/Android app on the same AG-UI backend (agent chat, native approval HITL) — ⚠️ partial: no push notifications or EAS config, still ships the old `ai.marketr.agent` bundle id (Phase 4)
