@@ -925,6 +925,8 @@ model Workspace {
   outreachWebhookEvents     OutreachWebhookEvent[]
   // Phase 3 (J): in-app notification center (per-user rows + read state).
   notifications             Notification[]
+  // Phase 4a: outbound webhook endpoints (deliveries cascade via endpoint).
+  webhookEndpoints          WebhookEndpoint[]
 
   @@map("workspaces")
 }
@@ -13286,4 +13288,78 @@ model Notification {
   @@index([userId, workspaceId, createdAt])
   @@index([workspaceId, createdAt])
   @@map("notifications")
+}
+
+// ============================================================
+// Phase 4a: outbound webhooks (lib/webhooks). Per-workspace endpoints with an
+// event filter and an HMAC-SHA256 signing secret (stored as a secrets()
+// envelope, shown once). Every event becomes one durable delivery row per
+// endpoint; /api/cron/webhooks drains due rows with exponential backoff and
+// dead-letters after the last attempt. Both tables are FORCE RLS on the
+// app.workspace_id GUC (migration 20261005300000_phase4a_webhooks_search).
+// ============================================================
+enum WebhookDeliveryStatus {
+  pending
+  delivering
+  succeeded
+  dead
+}
+
+model WebhookEndpoint {
+  id                  String            @id @default(cuid())
+  workspaceId         String            @map("workspace_id")
+  workspace           Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  url                 String
+  description         String?
+  // Event types this endpoint receives; empty = every event.
+  events              String[]          @default([])
+  // secrets() envelope of the raw signing secret ("whsec_…").
+  secretEnc           String            @map("secret_enc")
+  // Non-sensitive hint for the UI (prefix + last characters).
+  secretHint          String            @map("secret_hint")
+  enabled             Boolean           @default(true)
+  createdBy           String            @map("created_by")
+  consecutiveFailures Int               @default(0) @map("consecutive_failures")
+  lastSuccessAt       DateTime?         @map("last_success_at")
+  lastFailureAt       DateTime?         @map("last_failure_at")
+  createdAt           DateTime          @default(now()) @map("created_at")
+  updatedAt           DateTime          @updatedAt @map("updated_at")
+  deliveries          WebhookDelivery[]
+
+  @@index([workspaceId, enabled])
+  @@map("webhook_endpoints")
+}
+
+model WebhookDelivery {
+  id             String                @id @default(cuid())
+  workspaceId    String                @map("workspace_id")
+  endpointId     String                @map("endpoint_id")
+  endpoint       WebhookEndpoint       @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+  // Shared by every endpoint's copy of the same event ("evt_…").
+  eventId        String                @map("event_id")
+  eventType      String                @map("event_type")
+  // Idempotency per endpoint for producers that may fire twice.
+  dedupKey       String?               @map("dedup_key")
+  // The exact JSON envelope that is signed and POSTed.
+  payload        Json
+  status         WebhookDeliveryStatus @default(pending)
+  attempts       Int                   @default(0)
+  nextAttemptAt  DateTime              @default(now()) @map("next_attempt_at")
+  lastAttemptAt  DateTime?             @map("last_attempt_at")
+  deliveredAt    DateTime?             @map("delivered_at")
+  responseStatus Int?                  @map("response_status")
+  // First 1 KB of the last response body (never request secrets).
+  responseBody   String?               @map("response_body")
+  lastError      String?               @map("last_error")
+  durationMs     Int?                  @map("duration_ms")
+  // Manual redelivery of an earlier delivery row.
+  redeliveryOf   String?               @map("redelivery_of")
+  createdAt      DateTime              @default(now()) @map("created_at")
+  updatedAt      DateTime              @updatedAt @map("updated_at")
+
+  @@unique([endpointId, dedupKey])
+  @@index([workspaceId, status, nextAttemptAt])
+  @@index([endpointId, createdAt])
+  @@index([workspaceId, createdAt])
+  @@map("webhook_deliveries")
 }

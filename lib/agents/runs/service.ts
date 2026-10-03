@@ -20,6 +20,7 @@ import type {
 } from "./types";
 import { TERMINAL_RUN_STATUSES } from "./types";
 import { notifyAgentRunFailed } from "@/lib/notifications/producers";
+import { emitWebhookEvent } from "@/lib/webhooks/emit";
 
 export interface CreateAgentRunInput extends AgentRunLinkage {
   workspaceId: string;
@@ -146,6 +147,19 @@ export async function finishAgentRun(workspaceId: string, runId: string, status:
       data: { status, endedAt: new Date() },
     }),
   );
+  // Phase 4a: agent_run.finished / agent_run.failed webhook (never throws).
+  await emitWebhookEvent({
+    workspaceId,
+    type: status === "failed" ? "agent_run.failed" : "agent_run.finished",
+    data: {
+      id: run.id,
+      kind: run.kind ?? null,
+      status: String(run.status),
+      startedBy: run.startedBy ?? null,
+      endedAt: run.endedAt?.toISOString() ?? null,
+    },
+    dedupKey: `agent_run:${run.id}`,
+  });
   if (status === "failed") {
     // Phase 3 (J): best-effort notification (never throws).
     await notifyAgentRunFailed({

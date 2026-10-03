@@ -26,6 +26,7 @@ import {
 } from "@/lib/ops/doctype";
 import { errorResponse } from "@/lib/api/errors";
 import { intQuery, parseQuery, z } from "@/lib/api/validate";
+import { emitInvoicePaid } from "@/lib/webhooks/emit";
 
 export const dynamic = "force-dynamic";
 
@@ -148,6 +149,12 @@ export async function PATCH(
         },
         { status: 202 },
       );
+    }
+    // Phase 4a: invoice.paid webhook once a patch lands an invoice on paid
+    // (after the scoped transaction commits; best-effort, never throws).
+    const row = result.row as Record<string, unknown> | undefined;
+    if (def.slug === "invoices" && row && row.status === "paid" && (body as Record<string, unknown>)?.status === "paid") {
+      await emitInvoicePaid(gate.workspaceId, row);
     }
     return Response.json({ entity: def.slug, row: result.row });
   } catch (err) {

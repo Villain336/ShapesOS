@@ -5,6 +5,8 @@
 // usage" here, so it's reachable from every settings page.
 
 import {
+  BookOpen,
+  Webhook,
   Bell,
   Bot,
   Brain,
@@ -111,6 +113,9 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
     icon: Terminal,
     pages: [
       { href: "/dashboard/settings/api-mcp", label: "API and MCP", description: "Expose this workspace to MCP clients with scoped keys.", icon: KeyRound },
+      // Phase 4a: API reference (OpenAPI) + outbound webhooks.
+      { href: "/dashboard/settings/developers", label: "API reference", description: "The public API and webhook events, from the OpenAPI spec.", icon: BookOpen },
+      { href: "/dashboard/settings/webhooks", label: "Webhooks", description: "Signed events to your own endpoints, with a delivery log.", icon: Webhook },
       { href: "/dashboard/settings/experiments", label: "Experiments", description: "Feature flags and growth experiments.", icon: FlaskConical },
     ],
   },

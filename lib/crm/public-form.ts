@@ -15,6 +15,7 @@ import { recordCaptureTouch } from "@/lib/attribution/touches";
 import { applyPromoCodeToLead } from "@/lib/physical/bundles";
 import { UtmSchema } from "@/lib/crm/leads";
 import { parseStages } from "@/lib/crm/stages";
+import { emitLeadCreated } from "@/lib/webhooks/emit";
 
 export const PUBLIC_FORM_LIMIT = 10; // submissions per window
 export const PUBLIC_FORM_WINDOW_MS = 60_000;
@@ -157,6 +158,8 @@ export async function handlePublicSubmit(opts: {
       await applyPromoCodeToLead(form.workspaceId, lead.id, d.promoCode);
     }
     await recomputeScore(lead.id, form.workspaceId);
+    // Phase 4a: lead.created webhook (best-effort, never throws).
+    await emitLeadCreated(lead);
   } catch (e) {
     if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
       return { status: 201, json: { ok: true, duplicate: true } };

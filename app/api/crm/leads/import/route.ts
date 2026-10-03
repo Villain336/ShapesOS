@@ -15,6 +15,7 @@ import { parseStages, CLOSED_STAGES } from "@/lib/crm/stages";
 import { recordCaptureTouch } from "@/lib/attribution/touches";
 import { maybeRecordWonRevenue } from "@/lib/attribution/revenue";
 import { parseCsvWithLines, parseLeadValueCents } from "@/lib/crm/csv-import";
+import { emitLeadCreated } from "@/lib/webhooks/emit";
 
 const SOURCES = ["website_form", "phone", "referral", "import", "ad", "ooh", "direct_mail", "other"] as const;
 
@@ -141,6 +142,8 @@ export async function processImportRows(
         actor,
       });
       await recomputeScore(lead.id, workspaceId);
+      // Phase 4a: lead.created webhook (best-effort, never throws).
+      await emitLeadCreated(lead);
       created++;
     } catch (e) {
       if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002" && dedupKey) {
