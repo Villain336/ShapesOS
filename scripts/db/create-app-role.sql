@@ -18,10 +18,13 @@ SELECT format('GRANT USAGE, SELECT, UPDATE ON ALL SEQUENCES IN SCHEMA public TO 
 SELECT format('ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO %I', :'app_role') \gexec
 SELECT format('ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT, UPDATE ON SEQUENCES TO %I', :'app_role') \gexec
 -- Payload CMS keeps its tables in its own `payload` schema (payload.config.ts)
--- and connects with the same DATABASE_URL, i.e. as this role. When that schema
--- exists, grant what Payload needs there: read/write on its tables and
+-- and connects with the same DATABASE_URL, i.e. as this role. Grant what
+-- Payload needs there: read/write on its tables and
 -- sequences, and CREATE so its schema sync can add tables. Payload tables
 -- hold CMS content only (no tenant RLS), so this doesn't widen tenant access.
+-- Create it (owned by the migrator running this script) on fresh installs, so
+-- the grants below always apply and Payload never needs CREATE SCHEMA rights.
+CREATE SCHEMA IF NOT EXISTS payload;
 SELECT format('GRANT USAGE, CREATE ON SCHEMA payload TO %I', :'app_role')
  WHERE EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = 'payload') \gexec
 SELECT format('GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA payload TO %I', :'app_role')
