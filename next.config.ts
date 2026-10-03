@@ -36,7 +36,11 @@ const nextConfig: NextConfig = {
   // points. Externalize it so Node's own resolver picks the `node` condition
   // (readFileSync-based wasm load) instead of Turbopack bundling the
   // Vite-specific `?url` entry and failing the build.
-  serverExternalPackages: ["takumi-pdf"],
+  // ssh2 (lib/sitefiles/sftp.ts) ships an optional native binding
+  // (sshcrypto.node) that Turbopack cannot bundle; when it compiles (normal on
+  // CI/Docker images with build tools) the production build fails. Keep it and
+  // its optional native dep external so Node resolves them at runtime.
+  serverExternalPackages: ["takumi-pdf", "ssh2", "cpu-features"],
   // Phase 12: the standalone trace copies onnxruntime's .node binding but not
   // its companion libonnxruntime.so, so any route touching @xenova/transformers
   // (embeddings — e.g. /dashboard/intelligence/repurpose) 500s at runtime with

@@ -25,13 +25,16 @@ import assert from "node:assert/strict";
 
 import type { PrismaClient } from "@prisma/client";
 import { draftReportSend } from "@/lib/reports/report-gate";
-import { renderReportPdf } from "@/lib/reports/render-service";
+import { renderReportPdf, weasyprintAvailable } from "@/lib/reports/render-service";
 import {
   assertFiguresGrounded,
   evaluateFigures,
   UngroundedFiguresError,
   type ReportFigure,
 } from "@/lib/reports/figures";
+
+/** Real-PDF cases need the WeasyPrint venv (MARKETR_WEASYPRINT_PYTHON); skip, never fail, without it. */
+const NO_WEASYPRINT = weasyprintAvailable() ? false : "WeasyPrint interpreter not installed (set MARKETR_WEASYPRINT_PYTHON)";
 
 // Representative KPI slots of the client-performance template's figure
 // block. The template's <!--FIGURE_BLOCK--> is a free figure list — the
@@ -172,7 +175,7 @@ describe("figure grounding eval: render service never renders invented numbers",
     );
   });
 
-  it("renderReportPdf with every figure grounded produces a real PDF", async () => {
+  it("renderReportPdf with every figure grounded produces a real PDF", { skip: NO_WEASYPRINT }, async () => {
     const result = await renderReportPdf({
       templateName: "client-performance",
       templateVersion: "1.0.0",

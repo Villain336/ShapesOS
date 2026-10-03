@@ -1,4 +1,4 @@
-# Marketr CI — clean-clone confidence.
+# ShapesOS CI — clean-clone confidence.
 #
 # Every step must pass with ZERO private credentials. Provider-backed paths run
 # in mock mode or skip gracefully (explicit skips, never silent). This is the
@@ -16,10 +16,11 @@ on:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 45
     services:
       postgres:
-        image: postgres:16
+        # pgvector is required by the memory/substrate migrations.
+        image: pgvector/pgvector:pg16
         env:
           POSTGRES_USER: marketr
           POSTGRES_PASSWORD: marketr
@@ -30,24 +31,29 @@ jobs:
           --health-cmd "pg_isready -U marketr"
           --health-interval 5s --health-timeout 5s --health-retries 10
     env:
+      # Migrator (schema owner). The app/tests connect as APP_DATABASE_URL — a
+      # non-superuser role, so FORCE RLS policies are actually enforced.
       DATABASE_URL: postgresql://marketr:marketr@localhost:5433/marketr
+      APP_DATABASE_URL: postgresql://marketr_app:marketr_app_ci@localhost:5433/marketr
+      # tsc and `next build`'s type-check step OOM at the default heap.
+      NODE_OPTIONS: --max-old-space-size=8192
       # Everything else intentionally UNSET: batteries must pass in mock mode.
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: Install
         run: npm ci
 
-      - name: Typecheck
-        run: npx tsc --noEmit
-
       - name: Prisma validate
         run: npx prisma validate
+
+      - name: Typecheck (next typegen + tsc)
+        run: npm run typecheck
 
       - name: Secret scan (history)
         run: |
@@ -60,6 +66,23 @@ jobs:
             echo "gitleaks not installed; running fallback pattern scan on HEAD"
             ! git grep -I -E 'sk-(live|test)-[A-Za-z0-9]{10,}|AKIA[0-9A-Z]{16}|-----BEGIN [A-Z ]*PRIVATE KEY-----' HEAD -- . ':!scripts/verify-llm-routing.mts' ':!components/SiteIde.tsx'
           fi
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Migrate a fresh database
+        run: sh scripts/db/migrate.sh
+
+      - name: Schema drift guard (migrations == schema.prisma)
+        run: node scripts/ci/check-schema-drift.mjs
+
+      - name: Create least-privilege app role
+        run: >-
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -v app_role=marketr_app
+          -v app_password=marketr_app_ci -f scripts/db/create-app-role.sql
+
+      - name: DB-backed tests (as non-superuser app role)
+        run: DATABASE_URL="$APP_DATABASE_URL" MARKETR_CREDENTIALS_KEY="$(openssl rand -hex 32)" npm run test:db
 
       - name: Launch-readiness battery (F6)
         run: npx tsx scripts/verify-phase7-launch.mts

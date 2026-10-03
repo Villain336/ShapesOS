@@ -8,6 +8,7 @@
 // getOrCreateWorkspace (lib/session.ts).
 
 import type { NextRequest } from "next/server";
+import { requireWorkspaceRole } from "@/lib/authz";
 import { NextResponse } from "next/server";
 import { requireUser, getAccessibleWorkspaces, ACTIVE_WORKSPACE_COOKIE } from "@/lib/session";
 
@@ -35,6 +36,9 @@ export async function POST(req: NextRequest) {
     // 404 (not 403): no membership information leaks.
     return Response.json({ error: "Workspace not found" }, { status: 404 });
   }
+  // Defense in depth: re-check membership on the chosen workspace.
+  if (!(await requireWorkspaceRole(user.id, target.id, "viewer")))
+    return Response.json({ error: "Forbidden" }, { status: 403 });
 
   const res = NextResponse.json({ ok: true, workspaceId: target.id, name: target.name });
   // NextResponse (not the plain web Response) exposes the cookie jar.

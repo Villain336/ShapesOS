@@ -152,6 +152,13 @@ const PUBLIC_BY_DESIGN = {
   // Phase 8 (G1): business-graph platform webhooks — capability model, see route comments.
   "app/api/substrate/graph/webhooks/[platform]/route.ts":
     "inbound platform webhook (hubspot/shopify/meta/salesforce); per-platform HMAC verified with fail-closed semantics (verifyTierWWebhook in lib/substrate/graph/connectors/tierw.ts) before any parsing/logic; missing secret 503s, forged signature 401s, replayed delivery 409s; only appends graph facts, never returns data",
+  // E-sign (Documenso) + session replay + data-room view beacon (2026-10-03 audit).
+  "app/api/esign/webhooks/documenso/route.ts":
+    "inbound Documenso webhook; shared secret compared timing-safely before any parsing/logic, fails closed (401) when unset or wrong; only advances envelope/signer state, never returns data",
+  "app/api/s/[token]/replay/route.ts":
+    "public session-replay ingest for a shared Studio page; hashed share token is the capability (revoked/expired/opt-in checked), batch-size capped; append-only, never returns data",
+  "app/r/funding/[token]/views/[viewId]/route.ts":
+    "public data-room view-duration beacon; the view row must belong to the link resolved from the unguessable 128-bit token and its workspace; only updates that view's duration",
 };
 const uncovered = [];
 for (const f of routeFiles) {
@@ -175,7 +182,7 @@ const missingAllowList = Object.keys(PUBLIC_BY_DESIGN).filter(k => {
 ok("every public-by-design entry maps to a real route file", missingAllowList.length === 0, missingAllowList.join("; "));
 ok(
   "public-by-design allow-list is documented",
-  Object.keys(PUBLIC_BY_DESIGN).length === 24 &&
+  Object.keys(PUBLIC_BY_DESIGN).length === 27 &&
     Object.values(PUBLIC_BY_DESIGN).every(v => v.length > 20)
 );
 

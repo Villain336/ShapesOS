@@ -50,12 +50,29 @@ services:
       timeout: 5s
       retries: 5
 
+  # One-shot migrator: repairs renamed-migration history, then applies all
+  # pending migrations. The app starts only after it exits successfully.
+  migrate:
+    build:
+      context: .
+      target: migrate
+    restart: "no"
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-marketr}:${POSTGRES_PASSWORD:-marketr}@db:5432/${POSTGRES_DB:-marketr}?schema=public
+
   app:
-    build: .
+    build:
+      context: .
+      target: runner
     restart: unless-stopped
     depends_on:
       db:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
       redis:
         condition: service_healthy
     ports:
@@ -74,7 +91,6 @@ services:
       MARKETR_S3_BUCKET: ${MARKETR_S3_BUCKET:-marketr-files}
       MARKETR_S3_ACCESS_KEY: ${MINIO_ROOT_USER:-marketr}
       MARKETR_S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-marketr-minio-secret}
-    command: sh -c "npx prisma migrate deploy && node server.js"
 
 volumes:
   marketr-db:

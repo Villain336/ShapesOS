@@ -1,0 +1,39 @@
+# Test files that need a live, fully migrated Postgres (DATABASE_URL).
+# Run with: npm run test:db  — CI runs them as a NON-superuser app role so
+# the RLS batteries are meaningful. Everything else runs in: npm test
+lib/agents/agui/__tests__/adapter.test.ts
+lib/agents/runs/__tests__/retention-eval.test.ts
+lib/agents/runs/__tests__/retention-sweep.test.ts
+lib/agents/runs/__tests__/run-viewer.test.ts
+lib/agents/runs/__tests__/runs-rls.test.ts
+lib/agents/runs/__tests__/trace-fidelity.eval.test.ts
+lib/agents/runs/__tests__/watch.test.ts
+lib/cad/__tests__/cad-slice1.test.ts
+lib/cad/__tests__/cad-slice2.test.ts
+lib/cad/__tests__/cad-slice3.test.ts
+lib/cad/__tests__/cad-slice4.test.ts
+lib/connector/__tests__/connector-slice1.test.ts
+lib/connector/__tests__/connector-slice2.test.ts
+lib/connector/__tests__/connector-slice3.test.ts
+lib/connector/__tests__/connector-slice4.test.ts
+lib/connector/__tests__/connector-slice5.test.ts
+lib/connector/__tests__/connector-slice6.test.ts
+lib/funding/__tests__/funding-slice2.test.ts
+lib/funding/__tests__/funding-slice3.test.ts
+lib/funding/__tests__/funding-slice4.test.ts
+lib/funding/__tests__/funding.test.ts
+lib/intelligence/company/__tests__/knowledge-rls.test.ts
+lib/ops/__tests__/ops-rls.test.ts
+lib/ops/__tests__/workflows-rls.test.ts
+lib/orchestrator/__tests__/orchestrator.test.ts
+lib/phase13b/evals/01-lesson-quality.test.ts
+lib/phase13b/evals/02-preference-precision.test.ts
+lib/phase13b/evals/03-style-rule-enforcement.test.ts
+lib/phase13b/evals/04-voice-fidelity.test.ts
+lib/phase13b/evals/05-no-ghost-recall.test.ts
+lib/phase13b/evals/06-stop-asking.test.ts
+lib/phase13b/evals/07-feedback-diff.test.ts
+lib/playbooks/__tests__/store.test.ts
+lib/substrate/memory/__tests__/learning-pass.test.ts
+lib/voice/__tests__/pronunciation.test.ts
+lib/voice/__tests__/voiceover.test.ts

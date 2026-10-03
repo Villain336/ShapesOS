@@ -15,7 +15,7 @@
 // dir (plus data: URIs) — no network, no filesystem escape.
 
 import { execFile } from "node:child_process";
-import { promises as fs } from "node:fs";
+import { accessSync, constants as fsConstants, promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
@@ -30,6 +30,20 @@ const execFileAsync = promisify(execFile);
 const WEASYPRINT_PYTHON =
   process.env.MARKETR_WEASYPRINT_PYTHON ??
   path.join(os.homedir(), "workspace", "biz-os", "report-engine-proof", ".venv", "bin", "python");
+
+/**
+ * True when the WeasyPrint interpreter is present and executable. Lets tests
+ * (and health checks) skip real PDF rendering on hosts without the venv
+ * instead of failing with ENOENT.
+ */
+export function weasyprintAvailable(): boolean {
+  try {
+    accessSync(WEASYPRINT_PYTHON, fsConstants.X_OK);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 export interface RenderReportInput {
   templateName: string;
