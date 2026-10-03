@@ -979,6 +979,9 @@ model Workspace {
   sraEnvelopes                SraEnvelope[]
   // Phase 4a: outbound webhook endpoints (deliveries cascade via endpoint).
   webhookEndpoints            WebhookEndpoint[]
+  // Phase 4b (inbox + mobile): per-user conversation read state, push devices.
+  conversationReads           ConversationRead[]
+  pushDevices                 PushDevice[]
 
   @@map("workspaces")
 }
@@ -3925,6 +3928,8 @@ model Lead {
   convertedProspects  Prospect[]
   // Phase 13D: voice/text agent sessions.
   callSessions        CallSession[]
+  // Phase 4b: per-user conversation-inbox read state.
+  conversationReads   ConversationRead[]
 
   @@unique([workspaceId, dedupKey])
   @@index([workspaceId, pipelineId, stage])
@@ -13586,4 +13591,54 @@ model ScimGroupMember {
   @@index([memberId])
   @@index([workspaceId])
   @@map("scim_group_members")
+}
+
+// ============================================================
+// Phase 4b (4b-INBOX-MOBILE): CRM conversation inbox + mobile push.
+// ============================================================
+
+// Per-user read marker for one lead's conversation thread. A thread is
+// unread for a user when it has an inbound message newer than lastReadAt
+// (or any inbound message and no marker). FORCE RLS on workspace_id.
+model ConversationRead {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  userId      String    @map("user_id")
+  leadId      String    @map("lead_id")
+  lead        Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  lastReadAt  DateTime  @map("last_read_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@unique([workspaceId, userId, leadId])
+  @@index([leadId])
+  @@map("conversation_reads")
+}
+
+// An Expo push token registered by the mobile app for one user in one
+// workspace. enabled=false is the user's opt-out; mutedKinds opts out of
+// single notification kinds. Tokens Expo reports as DeviceNotRegistered are
+// deleted. FORCE RLS on workspace_id. (expo_token matches the GDPR export
+// secret-column rule, so it never leaves the database in an export.)
+model PushDevice {
+  id           String    @id @default(cuid())
+  workspaceId  String    @map("workspace_id")
+  workspace    Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  userId       String    @map("user_id")
+  expoToken    String    @map("expo_token")
+  // "ios" | "android"
+  platform     String
+  deviceName   String?   @map("device_name")
+  enabled      Boolean   @default(true)
+  mutedKinds   String[]  @default([]) @map("muted_kinds")
+  failureCount Int       @default(0) @map("failure_count")
+  lastError    String?   @map("last_error")
+  lastSentAt   DateTime? @map("last_sent_at")
+  lastSeenAt   DateTime  @default(now()) @map("last_seen_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  @@unique([workspaceId, expoToken])
+  @@index([workspaceId, userId])
+  @@map("push_devices")
 }

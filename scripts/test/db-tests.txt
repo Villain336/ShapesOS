@@ -27,6 +27,7 @@ lib/connector/__tests__/connector-slice5.test.ts
 lib/connector/__tests__/connector-slice6.test.ts
 lib/connector/__tests__/intro-actor.test.ts
 lib/connector/__tests__/intro-integrity.test.ts
+lib/crm/__tests__/inbox-db.test.ts
 lib/funding/__tests__/funding-slice2.test.ts
 lib/funding/__tests__/funding-slice3.test.ts
 lib/funding/__tests__/funding-slice4.test.ts
@@ -59,6 +60,7 @@ lib/phase13b/evals/05-no-ghost-recall.test.ts
 lib/phase13b/evals/06-stop-asking.test.ts
 lib/phase13b/evals/07-feedback-diff.test.ts
 lib/playbooks/__tests__/store.test.ts
+lib/push/__tests__/push-devices-db.test.ts
 lib/scheduler/__tests__/tick-db.test.ts
 lib/scim/__tests__/scim-db.test.ts
 lib/search/__tests__/records-db.test.ts
