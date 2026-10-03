@@ -249,7 +249,7 @@ export function shouldPopOnBackspace(query: string, isNested: boolean): boolean 
 /**
  * Canonical rendered prompt for a templated action. The client sends this
  * string; /api/command/audit hashes it via logCommand() and NEVER stores it
- * in full (SPEC-PHASE9.md §P9B).
+ * in full (docs/specs/SPEC-PHASE9.md §P9B).
  */
 export function renderMissionPrompt(templateId: string, goal: string): string {
   return `Start mission from template "${templateId}" with goal "${goal}".`;
@@ -319,7 +319,7 @@ export function withTimeout<T>(promise: Promise<T>, budgetMs: number): Promise<T
 }
 
 // ---------------------------------------------------------------------------
-// Mission template catalog (SPEC-PHASE9.md §P9C — templates by business type)
+// Mission template catalog (docs/specs/SPEC-PHASE9.md §P9C — templates by business type)
 // ---------------------------------------------------------------------------
 
 export interface MissionTemplate {

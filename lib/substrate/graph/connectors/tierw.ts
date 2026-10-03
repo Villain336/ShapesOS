@@ -1,4 +1,4 @@
-// Marketr — Phase 8 G1: Tier-W webhook receivers (SPEC-PHASE8.md §2 G1).
+// Marketr — Phase 8 G1: Tier-W webhook receivers (docs/specs/SPEC-PHASE8.md §2 G1).
 //
 // HubSpot, Shopify, Meta ads, Salesforce (Platform Events/CDC). Flow (B3):
 // signed webhook arrives → signature verified → replay-checked → fact(s)

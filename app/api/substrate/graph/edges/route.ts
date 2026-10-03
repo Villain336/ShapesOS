@@ -1,4 +1,4 @@
-// Marketr — Phase 8 G1: edges API (SPEC-PHASE8.md §5).
+// Marketr — Phase 8 G1: edges API (docs/specs/SPEC-PHASE8.md §5).
 // GET /api/substrate/graph/edges?node_id=&workspaceId=
 // POST /api/substrate/graph/edges — manual relationship assertion, HUMAN ONLY
 // (editor+). The substrate never auto-asserts relationships; agents propose.

@@ -1,6 +1,6 @@
 // Marketr — F6 launch-readiness checklist catalog.
 //
-// The canonical item list derived from SPEC-PHASE7.md §2/F6 and §10 exit
+// The canonical item list derived from docs/specs/SPEC-PHASE7.md §2/F6 and §10 exit
 // gate 9. Rows in the `launch_checklist` table are seeded from this catalog
 // (keyed by `key`, idempotent per workspace). Editing a title here does not
 // rewrite history — rows denormalize the title at seed time.
@@ -18,7 +18,7 @@ export interface LaunchChecklistItem {
   title: string;
   /** What "done" means, concretely. */
   doneWhen: string;
-  /** Spec reference (SPEC-PHASE7.md section). */
+  /** Spec reference (docs/specs/SPEC-PHASE7.md section). */
   specRef: string;
   /** What counts as evidence (commits, docs, CI runs). */
   evidenceHint: string;

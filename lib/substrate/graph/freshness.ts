@@ -1,4 +1,4 @@
-// Marketr — Phase 8 G1: freshness contract (SPEC-PHASE8.md §2 G1).
+// Marketr — Phase 8 G1: freshness contract (docs/specs/SPEC-PHASE8.md §2 G1).
 //
 // "Sync honesty is a product feature." Every surfaced node carries as_of +
 // source; the UI renders staleness honestly ("Competitor prices as of 3 days

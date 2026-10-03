@@ -1,5 +1,5 @@
 // Marketr — Phase 8 G2: the Campaign object engine.
-// (SPEC-PHASE8.md §2 G2, §4; §9 safety invariants 1, 2, 7.)
+// (docs/specs/SPEC-PHASE8.md §2 G2, §4; §9 safety invariants 1, 2, 7.)
 //
 // Campaign CRUD + hierarchy enforcement (≤3 levels, cycle detection), link
 // attach/detach (surgical, auditable), the backfill proposer (precision over

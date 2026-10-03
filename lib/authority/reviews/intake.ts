@@ -1,6 +1,6 @@
 // Marketr — R1 review intake: Pub/Sub webhook handling + sentiment classification.
 //
-// SPEC-PHASE6.md §2/R1, §3/F2.
+// docs/specs/SPEC-PHASE6.md §2/R1, §3/F2.
 // Pipeline: signature-verified webhook payload → idempotency check →
 // sentiment classification (keyword heuristic + fake-LLM confirm) →
 // guardrails (./guardrails.ts) → draft (./drafts.ts, v1 drafts-only).

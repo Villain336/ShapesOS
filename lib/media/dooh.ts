@@ -9,7 +9,7 @@
 // the CLIENT's own operator account (browser-agent convenience path or
 // human with a launch packet).
 //
-// VENDOR ORDER (locked, SPEC-PHASE5.md §B1): Blip first, Blindspot second,
+// VENDOR ORDER (locked, docs/specs/SPEC-PHASE5.md §B1): Blip first, Blindspot second,
 // Adomni optional. AdQuick is PARKED: zero AdQuick code — only the
 // referral deep link ADQUICK_SELF_SERVE_URL (plain outbound link in the
 // planner UI).

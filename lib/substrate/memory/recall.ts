@@ -1,6 +1,6 @@
 // Marketr — Growth Memory retrieval: memory_recall() (Phase 8 G3).
 //
-// The 2026 production recipe, entirely inside Postgres (SPEC-PHASE8.md §2 G3):
+// The 2026 production recipe, entirely inside Postgres (docs/specs/SPEC-PHASE8.md §2 G3):
 //   hybrid tsvector/pg_trgm + pgvector HNSW → convex-combination fusion
 //   (α tuned on the repo's ~40 labeled pairs in fixtures/retrieval-pairs.ts)
 //   → cross-encoder rerank (local model, no external API) → MMR + recency

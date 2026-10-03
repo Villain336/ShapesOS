@@ -4,7 +4,7 @@
 // module declares its rung, escalation triggers, and rollback story.
 //
 // STRUCTURAL INVARIANTS (enforced in code, not config — see also
-// SPEC-PHASE5.md §9):
+// docs/specs/SPEC-PHASE5.md §9):
 //   1. Autopilot NEVER buys media. Buying modules carry neverAutopilot: true
 //      and the executor's requireHumanSupervisedApproval() throws unless a
 //      human-approved approval backs the execution. There is no rung, flag,
@@ -38,7 +38,7 @@ export interface RungAssignment {
   rollback: string;
 }
 
-// Rung assignments (fixed per SPEC-PHASE5.md §2 S1):
+// Rung assignments (fixed per docs/specs/SPEC-PHASE5.md §2 S1):
 // - all media buying = supervised, always
 // - planning / attribution computation / receipt reconciliation = scheduled/autopilot-safe
 // - budget reallocations = supervised (propose; human approves)

@@ -1,6 +1,6 @@
 // Marketr — Expert Constitution Pack v1 (runtime module).
 //
-// Source of truth for the WORDS: ~/workspace/marketr/EXPERT-CONSTITUTION.md
+// Source of truth for the WORDS: docs/specs/EXPERT-CONSTITUTION.md
 // (v1, 2026-09-26). The constitutions and exemplars below are transcribed
 // VERBATIM from that file. If the doc is revised, this module must be
 // re-transcribed and CONSTITUTION_VERSION bumped — never paraphrase.
@@ -18,7 +18,7 @@
 // dataset — same structure, more volume, human-vetted.
 
 export const CONSTITUTION_VERSION = "1";
-export const CONSTITUTION_SOURCE = "EXPERT-CONSTITUTION.md";
+export const CONSTITUTION_SOURCE = "docs/specs/EXPERT-CONSTITUTION.md";
 
 export type ExpertRole =
   | "chief-strategy"
@@ -35,7 +35,7 @@ export const EXPERT_ROLES: readonly ExpertRole[] = [
 
 /**
  * Global hard rules — prepended to EVERY agent constitution, every turn.
- * Non-negotiable. Verbatim from EXPERT-CONSTITUTION.md §"Global hard rules".
+ * Non-negotiable. Verbatim from docs/specs/EXPERT-CONSTITUTION.md §"Global hard rules".
  */
 export const GLOBAL_HARD_RULES = `## Global hard rules
 
@@ -50,7 +50,7 @@ These are non-negotiable and apply to every ShapesOS agent, every turn:
 
 /**
  * Chief Strategy Agent constitution — the top-level strategist.
- * Verbatim from EXPERT-CONSTITUTION.md §1 (constitution only; exemplars
+ * Verbatim from docs/specs/EXPERT-CONSTITUTION.md §1 (constitution only; exemplars
  * live in EXPERT_EXEMPLARS below as the trace-dataset seed rows).
  */
 export const CHIEF_STRATEGY_CONSTITUTION = `## Chief Strategy Agent — the top-level strategist
@@ -79,7 +79,7 @@ You are ShapesOS's Chief Strategy Agent: the strategist above the executors. You
 
 /**
  * Mission planner constitution — turns strategy into Growth Missions.
- * Verbatim from EXPERT-CONSTITUTION.md §2 (constitution only).
+ * Verbatim from docs/specs/EXPERT-CONSTITUTION.md §2 (constitution only).
  */
 export const MISSION_PLANNER_CONSTITUTION = `## Mission planner — turns strategy into Growth Missions
 
@@ -107,7 +107,7 @@ You are ShapesOS's mission planner: you convert the Chief Strategy Agent's strat
 
 /**
  * Playbook generator constitution — builds Agent Playbooks.
- * Verbatim from EXPERT-CONSTITUTION.md §3 (constitution only).
+ * Verbatim from docs/specs/EXPERT-CONSTITUTION.md §3 (constitution only).
  */
 export const PLAYBOOK_GENERATOR_CONSTITUTION = `## Playbook generator — builds Agent Playbooks
 
@@ -133,7 +133,7 @@ You are ShapesOS's playbook generator: you write the versioned procedures that a
 
 /**
  * Content / brief agent constitution — briefs and drafts.
- * Verbatim from EXPERT-CONSTITUTION.md §4 (constitution only).
+ * Verbatim from docs/specs/EXPERT-CONSTITUTION.md §4 (constitution only).
  */
 export const CONTENT_BRIEF_CONSTITUTION = `## Content / brief agent — briefs and drafts
 
@@ -166,7 +166,7 @@ const ROLE_CONSTITUTIONS: Record<ExpertRole, string> = {
 /**
  * A single reasoning exemplar in SFT-ready shape: input situation →
  * reasoning trace → output. Transcribed VERBATIM from
- * EXPERT-CONSTITUTION.md §§1–4 ("Reasoning exemplars"). These rows are the
+ * docs/specs/EXPERT-CONSTITUTION.md §§1–4 ("Reasoning exemplars"). These rows are the
  * seed for the future fine-tune trace dataset: same structure, more
  * volume, human-vetted. Never paraphrase — the trace teaches the style.
  */

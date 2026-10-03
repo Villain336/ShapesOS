@@ -1,4 +1,4 @@
-// Marketr — Phase 9 M6: approval decide logic (SPEC-PHASE9.md §P9E).
+// Marketr — Phase 9 M6: approval decide logic (docs/specs/SPEC-PHASE9.md §P9E).
 //
 // Shared by POST /api/automation/decide (and M4's
 // POST /api/missions/:id/approvals/:approvalId/decide, which must keep this

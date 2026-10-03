@@ -1,6 +1,6 @@
 // Marketr — R1 Apple / Bing behavior (monitor + sync, replies manual).
 //
-// SPEC-PHASE6.md §2/R1, §9 invariant 10 (listings honesty is a UI rule).
+// docs/specs/SPEC-PHASE6.md §2/R1, §9 invariant 10 (listings honesty is a UI rule).
 // Both channels are honestly labeled:
 // - Apple Business Connect: listing sync + read/monitor. Review replies are
 //   NOT programmable — respond on the partner source instead.

@@ -4,7 +4,7 @@
 **Purpose:** Make frontier models reason in Marketr's expert style *now*, without waiting for a fine-tune. Each section is a drop-in system prompt plus few-shot reasoning exemplars for one agent role.
 **Dual purpose:** This pack is also the specification for the future fine-tune trace dataset. Every exemplar below is written in the exact input → reasoning-trace → output shape that supervised fine-tuning consumes. When the trace dataset is built, these exemplars are seed rows: same structure, more volume, human-vetted.
 **Source discipline:** Original synthesis only. Frameworks and ideas from the M9 corpus may be used and attributed in the manner of "in the tradition of Ries and Trout's positioning work." Never reproduce copyrighted text at length; no quotation beyond a short attributed phrase. Tier 1/2 sources may be drawn on freely; Tier 3 (paywalled books/courses) only as learned ideas, never as text.
-**Companion files:** `SPEC.md` (product), `SPEC-PHASE9.md` (agents), `SPEC-PHASE10.md` §M9 (corpus), `M9-CORPUS-SOURCES.md` (source tiers).
+**Companion files:** `docs/specs/SPEC.md` (product), `docs/specs/SPEC-PHASE9.md` (agents), `docs/specs/SPEC-PHASE10.md` §M9 (corpus), `docs/research/M9-CORPUS-SOURCES.md` (source tiers).
 
 ---
 

@@ -1,4 +1,4 @@
-// Marketr — Flywheel command center (Phase 7 root, SPEC-PHASE7.md §6).
+// Marketr — Flywheel command center (Phase 7 root, docs/specs/SPEC-PHASE7.md §6).
 //
 // Six-track overview: reallocation agent (F1), creative recycling (F2),
 // Test Lab (F3), CTV buying path (F4), DSP readiness (F5), launch readiness

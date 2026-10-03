@@ -5,7 +5,7 @@
 // creative hashes, flight dates, and terms via SHA-256 of the canonical
 // binding JSON. Any field change between approval and execution invalidates
 // the hash → the executor HALTs and the buy re-enters approval (TOCTOU kill,
-// SPEC-PHASE5.md §9.3).
+// docs/specs/SPEC-PHASE5.md §9.3).
 //
 // Audit: append-only media_approval_events with a hash chain
 // (event_hash = sha256(prev_hash || canonical(ts, approval_id, actor,

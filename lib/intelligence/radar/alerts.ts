@@ -3,7 +3,7 @@
 // Headline pattern: "Google's August 18 Spam Update hit 3 of your pages."
 // The alert names the event, the affected pages, the queries that moved —
 // and carries a VERIFICATION checklist (never auto-fix prescriptions;
-// attribution is honest about uncertainty — SPEC-PHASE10.md §M2).
+// attribution is honest about uncertainty — docs/specs/SPEC-PHASE10.md §M2).
 //
 // Routing: emits through the Phase 9 alert hub (lib/alerts/evaluate.ts) on
 // the new "platform_rollout" trigger (registered in lib/alerts/triggers.ts).

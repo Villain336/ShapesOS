@@ -1,6 +1,6 @@
 # LIBRARY-MAP-V2.md
 
-**Supersedes `VAULT-COMPONENT-MAP.md` (retained for reference only).**
+**Supersedes `docs/history/VAULT-COMPONENT-MAP.md` (retained for reference only).**
 
 The single source of truth for the Marketr design-v2 rebuild (2026-09-22).
 Every control in the six target surfaces — dashboard, project, automations,
@@ -103,7 +103,7 @@ surfaces; the six target surfaces have their own lean headers).
 | Team chat | `components/TeamChatPanel.tsx` | Same primitives as AI chat, polling transcript |
 | Autopilot | `app/dashboard/projects/[id]/autopilot/page.tsx` + `components/AutopilotStudio.tsx` | Approval cards, queue/rules/activity tabs, kill switch |
 
-## Prohibited (per approved DESIGN-BRIEF.md)
+## Prohibited (per approved docs/history/DESIGN-BRIEF.md)
 
 Hero-metric template · repetitive card grids · ghost cards · gradient text ·
 decorative monospace · tracked caps · emoji icons · page section numbering ·

@@ -1,5 +1,5 @@
 #!/usr/bin/env tsx
-// Marketr — Phase 8 G3 verification battery (SPEC-PHASE8.md §2 G3).
+// Marketr — Phase 8 G3 verification battery (docs/specs/SPEC-PHASE8.md §2 G3).
 //
 // Covers: extensions/indexes/RLS, retrieval quality (nDCG@10 on the ~40
 // labeled pairs — hybrid+rerank must beat BM25-only and vector-only),

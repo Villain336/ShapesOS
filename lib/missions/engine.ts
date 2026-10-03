@@ -1,4 +1,4 @@
-// Marketr — Phase 9 M4: durable mission execution engine (SPEC-PHASE9.md §P9C).
+// Marketr — Phase 9 M4: durable mission execution engine (docs/specs/SPEC-PHASE9.md §P9C).
 //
 // Durable state: mission state is persisted to the store before every human
 // wait; loadMission rehydrates fully (mission + events + approvals + derived

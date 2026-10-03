@@ -87,7 +87,7 @@ Lucide reads generic — replace with **Phosphor Icons** (`@phosphor-icons/react
 - Keep: BeautifulUI atoms/primitives, shadcn-registry (Base UI) components already in `components/vault/`.
 - Add: `@phosphor-icons/react`; `@fontsource/inter` + `@fontsource/newsreader` (or next/font/google — builder's choice, one approach); shadcn chat primitives (Message/MessageScroller/Bubble) from the vault inventory or ported; `motion` (framer-motion successor) for spring physics where CSS can't do it.
 - You may pull any other component from `~/workspace/design-vault/library/LIBRARIES.json` / `COMPONENT-MANIFEST.json` (44 libraries) that serves the brief. Light mode + orange-600 stands.
-- Write `LIBRARY-MAP-V2.md` superseding `VAULT-COMPONENT-MAP.md`: every surface → library/component source.
+- Write `docs/history/LIBRARY-MAP-V2.md` superseding `docs/history/VAULT-COMPONENT-MAP.md`: every surface → library/component source.
 
 ---
 

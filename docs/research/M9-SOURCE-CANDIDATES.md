@@ -1,16 +1,16 @@
 # M9 Source Candidates — awaiting human approval
 
 Standing monthly sweep (directive from Tico, 2026-09-26). Vetted candidates for the M9 expert corpus.
-**Nothing here is ingested until Tico approves.** Never modify `M9-CORPUS-SOURCES.md` from this job.
+**Nothing here is ingested until Tico approves.** Never modify `docs/research/M9-CORPUS-SOURCES.md` from this job.
 
-Tier key (SPEC-PHASE10.md §M9): Tier 1 = official platform (ship only where license permits);
+Tier key (docs/specs/SPEC-PHASE10.md §M9): Tier 1 = official platform (ship only where license permits);
 Tier 1S = learn → original synthesized playbooks; Tier 2 = openly-licensed/PD (shippable w/ attribution);
 Tier 2-adjacent = free practitioner pubs (learn + synthesize; short attributed quotation only);
 Tier 3 = paywalled (private overlay only; never ships).
 
 ---
 
-## Sweep 2026-10-01 (first monthly sweep; corpus baseline = M9-CORPUS-SOURCES.md compiled 2026-09-26)
+## Sweep 2026-10-01 (first monthly sweep; corpus baseline = docs/research/M9-CORPUS-SOURCES.md compiled 2026-09-26)
 
 ### Tier 2 — openly-licensed / public-domain (shippable)
 

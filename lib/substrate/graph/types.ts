@@ -1,4 +1,4 @@
-// Marketr — Phase 8 G1: Business Graph substrate types (SPEC-PHASE8.md §2 G1).
+// Marketr — Phase 8 G1: Business Graph substrate types (docs/specs/SPEC-PHASE8.md §2 G1).
 //
 // The substrate is read/compute only — it never touches spend (§3.1 money
 // rules are structural). Every node/edge carries as_of + source freshness

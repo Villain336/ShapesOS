@@ -1,4 +1,4 @@
-// Marketr — Phase 9 M1: approval executor (SPEC-PHASE9.md §3.3, §P9E).
+// Marketr — Phase 9 M1: approval executor (docs/specs/SPEC-PHASE9.md §3.3, §P9E).
 //
 // PROPOSE/EXECUTE SEPARATION: LLM agents may only DRAFT approval requests.
 // Only this non-LLM service executes, and only with human-signed authority.

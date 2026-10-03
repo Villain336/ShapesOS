@@ -7,7 +7,7 @@
 // Precision = correct / total. Covers BOTH layers: verbatim sources and
 // the Tier 1S synthesized playbooks.
 //
-// "The corpus grows only when precision holds" (SPEC-PHASE10.md §M9): this
+// "The corpus grows only when precision holds" (docs/specs/SPEC-PHASE10.md §M9): this
 // script records precision into the manifest (evalPrecision / evalRunAt) and
 // exits non-zero below 0.60 so CI/build gates can block on it.
 //

@@ -1,7 +1,8 @@
-# Marketr Competitor Landscape & Head-to-Head
+# ShapesOS Competitor Landscape & Head-to-Head
 
 Research compiled 2026-09-26. Prices verified against Sept 2026 sources; [UNVERIFIED] marks single-source items.
-Companion: `SPEC-PHASE10.md` (what we're building), `PHASE13-BRAINSTORM.md` (where we go next).
+**Updated 2026-10-03:** our own column and the "where we lose" list were refreshed against the code (the product is now called ShapesOS, formerly Marketr). Competitor rows were not re-researched. Current module statuses: [COMPLETE-VISION.md](./COMPLETE-VISION.md).
+Companion: `docs/specs/SPEC-PHASE10.md` (what we're building), `docs/history/PHASE13-BRAINSTORM.md` (where we go next).
 
 ## 1. Competitor list by category
 
@@ -62,7 +63,7 @@ Companion: `SPEC-PHASE10.md` (what we're building), `PHASE13-BRAINSTORM.md` (whe
 ### Analytics
 | Product | Positioning | Price (2026) |
 |---|---|---|
-| **PostHog** | MIT open-source product analytics; generous free cloud tier — **Marketr's closest strategic peer / proof of concept** | Free 1M events/mo; usage-based above |
+| **PostHog** | MIT open-source product analytics; generous free cloud tier — **ShapesOS's closest strategic peer / proof of concept** | Free 1M events/mo; usage-based above |
 | **Mixpanel** | Event analytics, funnels/retention; usage pricing explodes past free tier | Free 1M events; then ~$0.00028/event |
 | **GA4** | Default free web analytics (~85% share); satisfaction 6.2/10 | Free (14-mo retention, sampling) |
 
@@ -74,9 +75,9 @@ Companion: `SPEC-PHASE10.md` (what we're building), `PHASE13-BRAINSTORM.md` (whe
 
 ## 2. Comparison matrix
 
-Columns: **Marketr** (Phases 0–9 built, Phase 10 spec'd) vs Semrush, Search Atlas, Frase, Writesonic, GoHighLevel.
+Columns: **ShapesOS** (as of 2026-10-03: Phases 0–18 plus the wave-2 and Business OS modules built; see COMPLETE-VISION.md for partial/mock-only items) vs Semrush, Search Atlas, Frase, Writesonic, GoHighLevel.
 
-| Capability | Marketr | Semrush | Search Atlas | Frase | Writesonic | GoHighLevel |
+| Capability | ShapesOS | Semrush | Search Atlas | Frase | Writesonic | GoHighLevel |
 |---|---|---|---|---|---|---|
 | Keyword research | ✅ Labs + modeled difficulty (M5) | ✅ Deepest corpus | ✅ Suite-grade | ⚠️ Weak, content-side only | ⚠️ Thin | ❌ None |
 | Rank tracking | ✅ GSC-first (M1) + paid SERP | ✅ + AI Overview tab | ✅ | ⚠️ Thin | ⚠️ Thin | ❌ None |
@@ -85,9 +86,9 @@ Columns: **Marketr** (Phases 0–9 built, Phase 10 spec'd) vs Semrush, Search At
 | Community engagement | ✅ M8 draft-first HN/Reddit + approval inbox | ❌ | ❌ | ❌ | ⚠️ Outreach agents pursue mentions | ❌ |
 | Backlink intel | ⚠️ On-demand API + verification fleet; no owned index (never-do) | ✅ Full index | ✅ Suite-grade | ❌ | ❌ | ❌ |
 | Site audits | ✅ Crawler + fix agent w/ trust ladder, snapshots, rollback | ✅ Deepest audit | ✅ OTTO deploys fixes live | ⚠️ Basic audits | ⚠️ SEO Checker w/ auto-fix | ❌ |
-| CRM / pipeline | ❌ Not in scope | ❌ | ❌ | ❌ | ❌ | ✅ Core strength |
-| Paid media mgmt | ❌ Structural invariant: autopilot never buys | ✅ PPC toolkit | ✅ Google Ads automation | ❌ | ❌ | ✅ Ads + funnels |
-| Creative studio | ⚠️ Phase 4 studio; Polotno clone = Phase 12 candidate | ❌ | ❌ | ❌ | ❌ | ⚠️ Basic |
+| CRM / pipeline | ⚠️ Lead CRM (pipelines, forms, scoring, forecast) + nurture, reviews, invoicing; lead-level email/SMS/call/enroll actions still to wire | ❌ | ❌ | ❌ | ❌ | ✅ Core strength |
+| Paid media mgmt | ✅ Proposal → human approval → launch across Amazon Ads, StackAdapt, ChatGPT Ads (guided Walmart/Spotify); autopilot never buys, zero custody of spend. Google/Meta Ads adapters mock-only | ✅ PPC toolkit | ✅ Google Ads automation | ❌ | ❌ | ✅ Ads + funnels |
+| Creative studio | ✅ Native canvas editor (AI generation, magic resize, batch fill, share/approval links) + clips + voiceovers | ❌ | ❌ | ❌ | ❌ | ⚠️ Basic |
 | Automation / approvals | ✅ Orchestrator + Missions + Playbooks + approval inbox + trust ladder | ⚠️ Workflows; stops at insights | ✅ OTTO approval mode + rollback | ⚠️ Agent exists; human-driven loop | ✅ Playbooks + approval tasks | ✅ Agent Studio + workflows |
 | API / extensibility | ✅ MCP server + agent skills first-class | ✅ Ships MCP server | ⚠️ API; MCP unclear | ✅ MCP + CLI on every tier | ⚠️ API; MCP unclear | ⚠️ API, closed |
 | White-label | ✅ Native: $199 tier, client logins, branded reports | ⚠️ Business tier only ($$$) | ✅ Higher tiers | ❌ | ❌ | ✅ SaaS Mode — resell under own brand |
@@ -96,14 +97,14 @@ Columns: **Marketr** (Phases 0–9 built, Phase 10 spec'd) vs Semrush, Search At
 
 ## 3. Where we lose today — brutally honest
 
-1. **Search Atlas already ships our shape.** SEO workspace + executing agents + white-label agency reporting, with real shipping history at $99–999/mo. We are still speccing Phase 10; they are selling it.
+1. **Search Atlas already ships our shape.** SEO workspace + executing agents + white-label agency reporting, with real shipping history at $99–999/mo. We have since built ours, but they are selling theirs and we haven't launched.
 2. **Frase and Writesonic already ship the detect→act loop** — GEO tracking + agents + MCP + approvals at $49–199/mo. The thesis isn't unique; only the openness is. If the race is decided on "who acts on the data," we are behind two shipping products.
 3. **GoHighLevel owns the agency wedge economically.** SaaS Mode lets an agency charge clients $199+/mo for a branded platform while paying $297 flat — a reseller margin machine. Our $199 agency tier competes against an entrenched reseller economy, not just a tool.
 4. **We have no data moat and never will on backlinks.** Ahrefs/Semrush own proprietary crawl indexes; we rent via APIs. DataForSEO raised rates ~20% in July 2026 — the single-supplier risk is real and our cost structure depends on a vendor's pricing mood.
-5. **We structurally refuse paid media.** Autopilot-never-buys is the right invariant, but Enrich Labs Helena, Search Atlas, and GHL all manage ad spend — buyers who want one tool that also runs their ads will not pick us.
-6. **No CRM.** Every agency eval will ask "why not HubSpot/GoHighLevel" and our honest answer is "bolt one on." That's a real friction point in the exact wedge we're targeting.
+5. **Paid media is human-gated, and the biggest two platforms aren't live yet.** *(Updated 2026-10-03; this used to read "we structurally refuse paid media", which is no longer true.)* We now launch and manage spend on Amazon Ads, StackAdapt and ChatGPT Ads, but only through propose → approve → execute: autopilot never buys. Google Ads and Meta Ads adapters are still mock-only. Buyers who want an ads autopilot (Enrich Labs Helena, Search Atlas, GHL) will still find us slower by design.
+6. **The CRM isn't yet the hub.** *(Updated 2026-10-03; this used to read "No CRM", which is no longer true.)* There's a Lead CRM with pipelines, forms, scoring, nurture, reviews and invoicing, but from a lead you can't yet email, text, call, enroll in nurture or invoice, and the unified messaging inbox has no UI. Against HubSpot/GoHighLevel that's still friction in the exact wedge we're targeting.
 7. **Zero public proof.** No stars, no customers, no case studies, no G2. Competitors have funding announcements (Profound $1.8B), named customers, and review scores. Specs don't win deals.
-8. **Spec-to-shipped gap is the risk window.** 11 phases specced, Phase 10 unapproved and unbuilt. Surfer's agents are "soon," Semrush ships continuously — incumbents can close the action-layer gap while we're still building the foundation.
+8. **Breadth ahead of cohesion is the risk window.** *(Updated 2026-10-03.)* The build caught up with the specs (175 pages), but the 2026-10-03 audit found it doesn't hold together yet: features unreachable from navigation, approval queues only just unified, several core connectors (GA4, GSC, Google/Meta Ads, Drive, Notion) mock-only. Incumbents can close the action-layer gap while we make it one product.
 
 ## 4. Where we win / can win — the moat
 
@@ -113,7 +114,7 @@ Columns: **Marketr** (Phases 0–9 built, Phase 10 spec'd) vs Semrush, Search At
 4. **Honest measurement as a feature.** Variance-aware AI visibility (confidence intervals, stability scores, never a single score) vs. competitors' single-score noise; the platform-change radar ("update X → N of your pages") is a genuine greenfield nobody productizes.
 5. **Price sits in the validated band with ~90% gross margins.** Frase's own marketing frames $49 vs a $350+ Semrush stack — the market already believes $29–199 is fair for content+GEO+agents. BYO-key self-host and rented-data discipline hold our margins where incumbents' cost structures can't follow.
 6. **Data independence bends the biggest cost line to ~$0.** GSC-first rank truth, owned difficulty model, Common Crawl graph, cross-user volume cache — the rent gets cut at the root instead of resold.
-7. **MCP-native both directions.** Buffer, Kit, and PostHog all shipped first-party MCP servers in 2026 — the market is moving to agent-operable tools. Marketr is specced to consume their MCPs (Kit for email, Buffer for social) and expose its own, so Growth Missions act *through* best-of-breed tools instead of rebuilding them.
+7. **MCP-native both directions.** Buffer, Kit, and PostHog all shipped first-party MCP servers in 2026 — the market is moving to agent-operable tools. ShapesOS exposes its own MCP server (OAuth 2.1 + PKCE, scoped keys) and is specced to consume theirs (Kit for email, Buffer for social), so Growth Missions act *through* best-of-breed tools instead of rebuilding them.
 8. **Distribution competitors can't copy.** Tico's agency is customer zero and the case-study factory; the public repo is a distribution asset. Closed competitors can copy features — they can't copy an open-source community without becoming one.
 
-**Bottom line:** the single most dangerous competitor is **Search Atlas** (same shape, shipping, agency white-label). The most thesis-adjacent are **Frase** and **Writesonic** (detect→act + agents + MCP, closed). The wedge-owner to displace is **GoHighLevel** (SaaS Mode economics). The strategic peer to study is **PostHog** (open-core playbook). Marketr's winnable fight is not "better data" — it's **open + agentic execution + honest intelligence at flat pricing**, a combination no competitor currently fields.
+**Bottom line:** the single most dangerous competitor is **Search Atlas** (same shape, shipping, agency white-label). The most thesis-adjacent are **Frase** and **Writesonic** (detect→act + agents + MCP, closed). The wedge-owner to displace is **GoHighLevel** (SaaS Mode economics). The strategic peer to study is **PostHog** (open-core playbook). ShapesOS's winnable fight is not "better data" — it's **open + agentic execution + honest intelligence at flat pricing**, a combination no competitor currently fields.

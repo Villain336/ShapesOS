@@ -1,7 +1,7 @@
 // Marketr — Phase B (B3) connector-health adversarial battery.
 // Run: npx tsx scripts/verify-connector-health.mts
 // No DB, no network: pure logic + static source checks.
-// Threat-model coverage (THREAT-MODEL-connector-health.md):
+// Threat-model coverage (docs/security/THREAT-MODEL-connector-health.md):
 //   §1 no SSRF probes · §2 no secret leakage · §3 alert-spam containment
 //   §4 no cross-workspace status access · §5 re-auth CSRF
 import { readFileSync, readdirSync } from "node:fs";

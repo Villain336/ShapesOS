@@ -1,4 +1,4 @@
-// Marketr — Phase 8 G3: episodes log (SPEC-PHASE8.md §6).
+// Marketr — Phase 8 G3: episodes log (docs/specs/SPEC-PHASE8.md §6).
 // Immutable event history: type/actor/since filters, badges top-right.
 
 import { redirect } from "next/navigation";

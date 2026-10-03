@@ -1,6 +1,6 @@
 // Marketr — Growth Memory write path (Phase 8 G3).
 //
-// Write discipline (the 2026 field-guide rules, SPEC-PHASE8.md §2 G3):
+// Write discipline (the 2026 field-guide rules, docs/specs/SPEC-PHASE8.md §2 G3):
 //   - selective writes: decisions, corrections, gotchas + their WHY.
 //     Not the derivable, trivial, or duplicate.
 //   - every write carries provenance (source episode / actor / timestamps).

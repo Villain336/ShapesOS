@@ -1,4 +1,4 @@
-// Marketr — Phase 8 G1: Tier-S scheduled pull framework (SPEC-PHASE8.md §2 G1).
+// Marketr — Phase 8 G1: Tier-S scheduled pull framework (docs/specs/SPEC-PHASE8.md §2 G1).
 //
 // Google Ads (GAQL), Meta Insights (async jobs), TikTok (nightly batched),
 // LinkedIn. Per-platform rate budgets enforced in the job runner; failure →

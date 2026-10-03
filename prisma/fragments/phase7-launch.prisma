@@ -15,7 +15,7 @@
 // evidence URLs only. The launch_checklist table itself is workspace-
 // isolated per the F6 hard constraint.
 //
-// SPEC: SPEC-PHASE7.md §2/F6, §4 (launch_checklist), §5 (routes), §10 (exit
+// SPEC: docs/specs/SPEC-PHASE7.md §2/F6, §4 (launch_checklist), §5 (routes), §10 (exit
 // gate 9). The open-core split is DEFERRED — this table tracks readiness
 // only; no public-flip state lives here.
 

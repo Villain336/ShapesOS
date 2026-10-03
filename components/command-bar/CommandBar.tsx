@@ -51,7 +51,7 @@ import {
   type FrecencyMap,
 } from "./lib";
 
-// Budgets from SPEC-PHASE9.md §P9B / research: LLM suggestions hidden if late.
+// Budgets from docs/specs/SPEC-PHASE9.md §P9B / research: LLM suggestions hidden if late.
 const SUGGESTION_BUDGET_MS = 800;
 // Go rows shown before the user types (all destinations are searchable).
 const GO_IDLE_LIMIT = 8;

@@ -85,7 +85,7 @@ Marketr graduates from "marketing & SEO workspace" to a **Marketing + Design + B
 ## 7. What changes / what doesn't
 
 - **Doesn't change:** 13B→13C→13D queue (they're Grow-pillar modules now); zero-custody-of-spend invariant (extends to commercial actions); vault rule; design lock; in-flight builds.
-- **Changes:** SPEC.md positioning needs a v2; Product Hunt narrative widens; the name question below.
+- **Changes:** docs/specs/SPEC.md positioning needs a v2; Product Hunt narrative widens; the name question below.
 
 ## 8. Decisions
 

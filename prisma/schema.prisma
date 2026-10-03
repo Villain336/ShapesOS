@@ -1,5 +1,5 @@
 // Marketr — Prisma data model (spec §6).
-// Source of truth: SPEC.md. Milestone 1: schema only, no business logic yet.
+// Source of truth: docs/specs/SPEC.md. Milestone 1: schema only, no business logic yet.
 
 generator client {
   provider = "prisma-client-js"
@@ -327,7 +327,7 @@ enum FileChangeAction {
 // media_buy, ctv_campaign, newsletter_broadcast, social_post, experiment,
 // recycling_brief); it never re-models them and never touches their rows.
 // The word "campaign" is overloaded across ten existing tables, so the model
-// is named `growth_campaign` in code (SPEC-PHASE8.md §2 G2).
+// is named `growth_campaign` in code (docs/specs/SPEC-PHASE8.md §2 G2).
 
 enum GrowthCampaignObjective {
   lead_gen
@@ -3032,7 +3032,7 @@ model TeamChatMessage {
 // Milestone 21: user-installable skills, connectors, workspace/project settings.
 // ---------------------------------------------------------------------------
 //
-// Design notes (minor deviations from SPEC-SKILLS-CONNECTORS-SETTINGS.md §6,
+// Design notes (minor deviations from docs/specs/SPEC-SKILLS-CONNECTORS-SETTINGS.md §6,
 // recorded here deliberately):
 // - The 12 built-in connectors are code-defined in
 //   lib/connectors/native/registry.ts (matching the existing provider pattern
@@ -3102,7 +3102,7 @@ model ConnectorHealth {
   quotaUsed     Float?                @map("quota_used")
   quotaLimit    Float?                @map("quota_limit")
 
-  // Alert spam guard: cooldown + escalation state (see THREAT-MODEL-connector-health.md).
+  // Alert spam guard: cooldown + escalation state (see docs/security/THREAT-MODEL-connector-health.md).
   lastAlertAt       DateTime? @map("last_alert_at")
   consecutiveErrors Int       @default(0) @map("consecutive_errors")
 
@@ -5683,7 +5683,7 @@ model MediaSpendEntry {
 }
 
 // ============================================================
-// Phase 6 — Authority & Relevance (SPEC-PHASE6.md §4)
+// Phase 6 — Authority & Relevance (docs/specs/SPEC-PHASE6.md §4)
 // All tables workspace-isolated. No autonomous publishing anywhere:
 // every external action is approval-bound (AuthorityApproval).
 // ============================================================
@@ -7029,7 +7029,7 @@ model MarginLedgerRow {
 // evidence URLs only. The launch_checklist table itself is workspace-
 // isolated per the F6 hard constraint.
 //
-// SPEC: SPEC-PHASE7.md §2/F6, §4 (launch_checklist), §5 (routes), §10 (exit
+// SPEC: docs/specs/SPEC-PHASE7.md §2/F6, §4 (launch_checklist), §5 (routes), §10 (exit
 // gate 9). The open-core split is DEFERRED — this table tracks readiness
 // only; no public-flip state lives here.
 
@@ -7071,7 +7071,7 @@ model LaunchChecklist {
 }
 
 // ============================================================
-// Phase 8 G1 — Business Graph substrate (SPEC-PHASE8.md §2 G1, §4).
+// Phase 8 G1 — Business Graph substrate (docs/specs/SPEC-PHASE8.md §2 G1, §4).
 // Postgres-native graph: append-only graph_facts log, resolved
 // graph_nodes current state, bi-temporal graph_edges (Graphiti-style
 // valid_at/invalid_at + created_at/expired_at), human-gated ER queue,
@@ -7306,7 +7306,7 @@ model GraphSyncJob {
 }
 
 // ============================================================
-// Phase 8 G3 — Growth Memory substrate (SPEC-PHASE8.md §2 G3, §4).
+// Phase 8 G3 — Growth Memory substrate (docs/specs/SPEC-PHASE8.md §2 G3, §4).
 // ============================================================
 // Marketr — Growth Memory: three stores + one retrieval contract.
 // Merged from prisma/fragments/phase8-memory.prisma by the G3 track
@@ -7751,7 +7751,7 @@ model PersonaProfile {
 
 // ============================================================
 // Phase 9 (M1): GrowthOS orchestrator — data + safety core.
-// SPEC-PHASE9.md §5. All workspace-scoped, RLS-isolated (migration
+// docs/specs/SPEC-PHASE9.md §5. All workspace-scoped, RLS-isolated (migration
 // 20260926093000_phase9_growthos_core). Additive only — existing models
 // untouched except Workspace.frozenAt (workspace-freeze kill switch).
 // ============================================================
@@ -8013,7 +8013,7 @@ model CommandAudit {
 }
 
 // ============================================================
-// Phase 10 (SPEC-PHASE10.md §6): intelligence depth — owned data
+// Phase 10 (docs/specs/SPEC-PHASE10.md §6): intelligence depth — owned data
 // assets. M1 rank intelligence, M2 platform-change radar, M3 AI
 // visibility, M4 competitor change fleet, M5 difficulty engine, M6
 // provider abstraction + volume cache, M7 verification battery.

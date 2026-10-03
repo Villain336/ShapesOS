@@ -3,7 +3,7 @@
 **Status:** APPROVED by Tico on 2026-09-21. Milestone order confirmed; build proceeds M12 → M22 in order.
 One approved change: **Canva Connect is the default studio in M22**; building an open-source
 alternative is a later aspiration, not the current M22 default (already reflected below).
-This extends `SPEC.md` (M1–M11, all complete).
+This extends `docs/specs/SPEC.md` (M1–M11, all complete).
 **Origin:** Tico's 2026-09-21 feature directive (17 items).
 **Research:** three parallel verification streams completed 2026-09-21 (ledger: marketr-research-docs,
 marketr-research-growth, marketr-research-seo). Key corrections baked in below.
@@ -133,7 +133,7 @@ templates, export; note: public integrations require Canva review, brand-templat
 Enterprise-oriented). Polotno deprioritized — no commercial license spend. **Future goal: build our
 own open-source Canva alternative** (tracked as a later milestone, not this wave; Tico 2026-09-26:
 named as a Polotno — polotno.com, MIT open-source core — reference implementation that **replaces
-the Canva Connect integration**; Phase 12 candidate per SPEC-PHASE10.md §11). Porkbun
+the Canva Connect integration**; Phase 12 candidate per docs/specs/SPEC-PHASE10.md §11). Porkbun
 integration: availability check + purchase without leaving Marketr (registrant flow + ICANN
 verification handled in UI). Done = Canva-connected workspace creating/exporting an on-brand design;
 test domain checked (real purchase only on Tico's approval).

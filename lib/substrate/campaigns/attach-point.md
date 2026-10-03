@@ -1,6 +1,6 @@
 # "Attach to campaign" — hook point for per-channel builders
 
-Phase 8 G2 (SPEC-PHASE8.md §2 G2, flow B5). The per-channel builders (mail,
+Phase 8 G2 (docs/specs/SPEC-PHASE8.md §2 G2, flow B5). The per-channel builders (mail,
 outreach, media buying, CTV, newsletter, social, Test Lab, recycling) are
 **not rebuilt** — each gains one hook point: offer "Attach to campaign" at
 creation/launch time, and call the engine below.

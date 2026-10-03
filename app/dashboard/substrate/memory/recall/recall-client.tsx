@@ -1,4 +1,4 @@
-// Marketr — Phase 8 G3: recall playground (SPEC-PHASE8.md §6).
+// Marketr — Phase 8 G3: recall playground (docs/specs/SPEC-PHASE8.md §6).
 // Client component: query → POST /api/substrate/memory/recall → ranked hits
 // with provenance + freshness. Exact-match bypass surfaced as a badge.
 

@@ -1,7 +1,7 @@
 # Marketr — SPEC-PHASE9: GrowthOS Orchestrator
 
 **Status:** DRAFT for Tico's approval — do not build until approved.
-**Research basis:** `phase9-research-report.md` (spec-first research, 2026-09-26).
+**Research basis:** `docs/history/phase9-research-report.md` (spec-first research, 2026-09-26).
 **Tico's decisions (2026-09-26):**
 1. Command bar = **sidekick**, not front door.
 2. Growth Missions = **templates for the most common goals per business type**.
