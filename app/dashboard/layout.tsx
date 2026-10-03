@@ -12,6 +12,8 @@ import { AppSidebar, MobileNav, type SidebarBadges } from "@/components/AppSideb
 import { DashboardMain } from "@/components/DashboardMain";
 import { ChatProvider } from "@/components/chat/ChatContext";
 import { CommandBar } from "@/components/command-bar/CommandBar";
+// Shared confirm dialog + toast stack (lib/ui/feedback.ts).
+import { FeedbackHost } from "@/components/feedback/FeedbackHost";
 // Phase 12 (embeds): Chatwoot live-chat widget. Renders nothing unless the
 // operator opted in via CHATWOOT_WIDGET_ENABLED=true + credentials.
 import { ChatwootWidget } from "@/components/chat/ChatwootWidget";
@@ -77,6 +79,7 @@ export default async function DashboardLayout({
     <BrandTheme primary={brandPrimary}>
       <ChatProvider>
         <CommandBar workspaceId={workspace.id} />
+        <FeedbackHost />
         {chatwoot && (
           <ChatwootWidget baseUrl={chatwoot.baseUrl} websiteToken={chatwoot.websiteToken} />
         )}
