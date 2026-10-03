@@ -1,14 +1,14 @@
 // Marketr — CRM CSV export (viewer+; same filters as the list endpoint).
 // GET /api/crm/leads/export?pipelineId=&stage=&...
 
+import { csvCell } from "@/lib/csv";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getOrCreateWorkspace, requireUser } from "@/lib/session";
 
-function esc(v: string | number | null | undefined): string {
-  const s = String(v ?? "");
-  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-}
+// Lead fields come from the PUBLIC lead form: formula-neutralized via the
+// shared encoder (lib/csv.ts).
+const esc = (v: string | number | null | undefined) => csvCell(v);
 
 export interface ExportableLead {
   name: string;
