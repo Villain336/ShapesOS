@@ -21,6 +21,7 @@
 //     get/create/setStatus work fine without a mission.
 
 import { withWorkspaceScope } from "@/lib/substrate/graph/rls";
+import { notifyApprovalNeeded } from "@/lib/notifications/producers";
 import {
   ApprovalError,
   bindingHashOf,
@@ -133,7 +134,7 @@ export function createPrismaMissionApprovalStore(
     },
 
     async create(input) {
-      return scope(input.workspaceId, async (tx) => {
+      const created = await scope(input.workspaceId, async (tx) => {
         const row = await tx.missionApproval.create({
           data: {
             workspaceId: input.workspaceId,
@@ -149,6 +150,15 @@ export function createPrismaMissionApprovalStore(
         });
         return toStored(row);
       });
+      // Phase 3 (J): best-effort "needs you" notification (never throws).
+      await notifyApprovalNeeded({
+        workspaceId: input.workspaceId,
+        source: "mission",
+        sourceId: created.id,
+        title: String(input.action).replace(/[_.]+/g, " "),
+        requestedBy: input.createdBy,
+      });
+      return created;
     },
 
     async setStatus(approvalId, workspaceId, status, patch) {

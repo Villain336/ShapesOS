@@ -43,6 +43,7 @@ import { FakeMailProvider } from "./fake";
 import { LobProvider } from "./lob";
 import { PostGridProvider } from "./postgrid";
 import { BadRequestError, ConflictError, NotFoundError } from "@/lib/api/errors";
+import { notifyApprovalNeeded } from "@/lib/notifications/producers";
 
 export const MAIL_CONSENT_CHANNEL = "mail";
 export const SENDABLE_VERIFICATION = ["valid", "corrected"] as const;
@@ -499,6 +500,15 @@ export async function requestApproval(
   await prisma.mailCampaign.update({
     where: { id: campaign.id },
     data: { status: "pending_approval" },
+  });
+  // Phase 3 (J): best-effort "needs you" notification (never throws).
+  await notifyApprovalNeeded({
+    workspaceId,
+    source: "mail",
+    sourceId: approval.id,
+    title: `${campaign.name ?? "Direct mail campaign"} · ${estimate.sendablePieces} pieces`,
+    href: "/dashboard/mail",
+    requestedBy: opts?.requestedBy ?? null,
   });
   return { approval, estimate };
 }

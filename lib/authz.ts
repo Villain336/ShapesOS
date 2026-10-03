@@ -107,6 +107,19 @@ export async function claimInviteToken(
       approvedBy: userId,
     },
   });
+  // Phase 3 (J): best-effort notification to admins/owners (never throws).
+  // Imported lazily: producers import this module (role ranks).
+  try {
+    const { notifyInviteAccepted } = await import("./notifications/producers");
+    await notifyInviteAccepted({
+      workspaceId: pending.workspaceId,
+      memberUserId: userId,
+      email: normalized,
+      role: pending.role,
+    });
+  } catch {
+    // never fail the claim over a notification
+  }
   return { ...pending, userId, inviteToken: null, inviteExpiresAt: null };
 }
 

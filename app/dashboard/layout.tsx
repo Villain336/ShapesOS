@@ -10,6 +10,8 @@ import {
 import { INVITE_REQUIRED_PATH, InviteRequiredError } from "@/lib/auth/signup";
 import { AppSidebar, MobileNav } from "@/components/AppSidebar";
 import { DashboardMain } from "@/components/DashboardMain";
+// Phase 3 (J): desktop header — "needs you" shortcut + notification bell.
+import { AppTopBar } from "@/components/AppTopBar";
 import { ChatProvider } from "@/components/chat/ChatContext";
 import { CommandBar } from "@/components/command-bar/CommandBar";
 // Phase 12 (embeds): Chatwoot live-chat widget. Renders nothing unless the
@@ -77,6 +79,7 @@ export default async function DashboardLayout({
         <div className="flex">
           <AppSidebar {...sidebarProps} />
           <div className="min-w-0 flex-1">
+            <AppTopBar />
             <GrowthBookProvider config={gbConfig}>
               <DashboardMain>{children}</DashboardMain>
             </GrowthBookProvider>

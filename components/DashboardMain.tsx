@@ -14,7 +14,8 @@ export function DashboardMain({ children }: { children: React.ReactNode }) {
 
   if (fullBleed) {
     return (
-      <main className="h-[calc(100dvh-57px)] md:h-dvh">
+      // 57px = the mobile top bar (MobileNav) and, on desktop, AppTopBar.
+      <main className="h-[calc(100dvh-57px)]">
         {children}
       </main>
     );

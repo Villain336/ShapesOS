@@ -73,8 +73,9 @@ function delayLabel(min: number): string {
   return `${Math.floor(h / 24)}d`;
 }
 
-export function NurtureApp() {
-  const [tab, setTab] = useState<Tab>("sequences");
+/** initialTab: deep links (e.g. the "needs you" inbox) open a tab via ?tab=approvals. */
+export function NurtureApp({ initialTab = "sequences" }: { initialTab?: Tab } = {}) {
+  const [tab, setTab] = useState<Tab>(initialTab);
   const [sequences, setSequences] = useState<NurtureSequence[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);

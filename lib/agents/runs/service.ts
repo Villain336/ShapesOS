@@ -19,6 +19,7 @@ import type {
   AgentRunEventInput,
 } from "./types";
 import { TERMINAL_RUN_STATUSES } from "./types";
+import { notifyAgentRunFailed } from "@/lib/notifications/producers";
 
 export interface CreateAgentRunInput extends AgentRunLinkage {
   workspaceId: string;
@@ -139,12 +140,22 @@ export async function finishAgentRun(workspaceId: string, runId: string, status:
   if (!TERMINAL_RUN_STATUSES.has(status)) {
     throw new Error(`finishAgentRun: ${status} is not a terminal status`);
   }
-  return withWorkspaceScope(workspaceId, (tx) =>
+  const run = await withWorkspaceScope(workspaceId, (tx) =>
     tx.agentRun.update({
       where: { id: runId, workspaceId },
       data: { status, endedAt: new Date() },
     }),
   );
+  if (status === "failed") {
+    // Phase 3 (J): best-effort notification (never throws).
+    await notifyAgentRunFailed({
+      workspaceId,
+      runId: run.id,
+      kind: run.kind,
+      startedBy: run.startedBy,
+    });
+  }
+  return run;
 }
 
 /** Read a run (workspace-scoped; null when outside scope). */

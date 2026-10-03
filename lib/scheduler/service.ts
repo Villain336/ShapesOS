@@ -25,6 +25,7 @@ import {
 } from "./guard";
 import { executeSkillRun } from "./runner";
 import { schedulerAudit } from "./audit";
+import { notifyApprovalNeeded } from "@/lib/notifications/producers";
 
 export { CronParseError };
 
@@ -303,6 +304,19 @@ export async function fireSchedule(db: Db, schedule: ScheduledSkill, opts: FireO
       action: "scheduler_run_proposed",
       summary: `Supervised run proposed: schedule ${schedule.id.slice(0, 8)} (trigger ${opts.trigger}) — waiting for approval`,
       actorUserId: opts.actorId ?? null,
+    });
+    // Phase 3 (J): best-effort "needs you" notification (never throws).
+    // Deciding needs skills.install (admin+ always holds it).
+    await notifyApprovalNeeded({
+      workspaceId: schedule.workspaceId,
+      source: "scheduler",
+      sourceId: run.id,
+      title: `Supervised run (${opts.trigger}) is waiting for approval`,
+      href: schedule.projectId
+        ? `/dashboard/projects/${encodeURIComponent(schedule.projectId)}/automations/schedules/runs/${encodeURIComponent(run.id)}`
+        : undefined,
+      requestedBy: opts.actorId ?? null,
+      decideRole: "admin",
     });
     return { fired: true, runId: run.id, awaitingApproval: true };
   }
