@@ -2,11 +2,36 @@
 // `?limit=1.5` caused 500s; unknown enum filters reached Prisma).
 // Uses node:test mock.module (scripts/test/run.mjs passes the flag).
 
-import { describe, it, mock } from "node:test";
+import { before, describe, it, mock } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { intQuery, parseQuery, z } from "../validate";
+
+// Module mocks are registered at top level, before any route import: mock.module
+// hooks register asynchronously, so registering them inside a describe and then
+// importing lazily raced on slower CI runners (the real session module loaded).
+let lastTake: unknown;
+mock.module("@/lib/session", {
+  namedExports: {
+    requireUser: async () => ({ id: "u1", email: "u@x.test" }),
+    getOrCreateWorkspace: async () => ({ id: "ws1" }),
+  },
+});
+mock.module("@/lib/authz", { namedExports: { requireProjectRole: async () => true } });
+mock.module("@/lib/substrate/graph/rls", {
+  namedExports: {
+    withWorkspaceScope: async (_ws: string, fn: (tx: unknown) => unknown) =>
+      fn({
+        competitorChange: {
+          findMany: async (args: { take: unknown }) => {
+            lastTake = args.take;
+            return [];
+          },
+        },
+      }),
+  },
+});
 
 const ROOT = join(import.meta.dirname, "..", "..", "..");
 const sp = (qs: string) => new URLSearchParams(qs);
@@ -41,30 +66,12 @@ describe("intQuery / parseQuery", () => {
 });
 
 describe("GET /api/intelligence/fleet/changes", () => {
-  let lastTake: unknown;
-  mock.module("@/lib/session", {
-    namedExports: {
-      requireUser: async () => ({ id: "u1", email: "u@x.test" }),
-      getOrCreateWorkspace: async () => ({ id: "ws1" }),
-    },
-  });
-  mock.module("@/lib/authz", { namedExports: { requireProjectRole: async () => true } });
-  mock.module("@/lib/substrate/graph/rls", {
-    namedExports: {
-      withWorkspaceScope: async (_ws: string, fn: (tx: unknown) => unknown) =>
-        fn({
-          competitorChange: {
-            findMany: async (args: { take: unknown }) => {
-              lastTake = args.take;
-              return [];
-            },
-          },
-        }),
-    },
+  let GET: (req: never) => Promise<Response>;
+  before(async () => {
+    ({ GET } = await import("@/app/api/intelligence/fleet/changes/route"));
   });
 
   async function get(qs: string): Promise<Response> {
-    const { GET } = await import("@/app/api/intelligence/fleet/changes/route");
     const url = new URL(`http://localhost/api/intelligence/fleet/changes?${qs}`);
     return GET(Object.assign(new Request(url), { nextUrl: url }) as never);
   }
