@@ -320,6 +320,22 @@ enum FileChangeAction {
   client_deleted
   // Phase 4a (GDPR): a full workspace data export was downloaded.
   workspace_exported
+  // Phase 4a (identity): 2FA/passkey lifecycle, workspace security policy,
+  // SCIM provisioning. Secrets/codes never appear in summaries.
+  security_2fa_enabled
+  security_2fa_disabled
+  security_recovery_codes_regenerated
+  security_recovery_code_used
+  security_passkey_added
+  security_passkey_removed
+  security_policy_updated
+  scim_token_created
+  scim_token_revoked
+  scim_user_provisioned
+  scim_user_updated
+  scim_user_deprovisioned
+  scim_user_deleted
+  scim_group_changed
 }
 
 // ---------------------------------------------------------------------------
@@ -518,6 +534,11 @@ model Workspace {
   // onboardingStep is the resume point.
   onboardingStep        String?   @map("onboarding_step")
   onboardingCompletedAt DateTime? @map("onboarding_completed_at")
+
+  // Phase 4a (identity): owners can require a second factor (TOTP or a
+  // passkey) for every member; enforced at the session guard (lib/authz.ts
+  // getMembership) with a setup redirect in the dashboard shell.
+  requireTwoFactor Boolean @default(false) @map("require_two_factor")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -955,6 +976,9 @@ model Workspace {
   sraEnvelopes                SraEnvelope[]
   // Phase 4a: outbound webhook endpoints (deliveries cascade via endpoint).
   webhookEndpoints            WebhookEndpoint[]
+  // Phase 4a (identity): SCIM 2.0 provisioning back-relations.
+  scimTokens                ScimToken[]
+  scimGroups                ScimGroup[]
 
   @@map("workspaces")
 }
@@ -1615,6 +1639,17 @@ model WorkspaceMember {
   // a single-use token link, never by bare email match. Null once claimed.
   inviteToken     String?       @unique @map("invite_token")
   inviteExpiresAt DateTime?     @map("invite_expires_at")
+
+  // Phase 4a (SCIM 2.0): rows created/managed by the workspace's IdP.
+  // Deprovisioning (active=false) parks the userId in scimSuspendedUserId and
+  // nulls userId, so every userId-keyed access path denies the person while
+  // the SCIM resource keeps existing for the IdP (it can reactivate).
+  scimManaged         Boolean   @default(false) @map("scim_managed")
+  scimExternalId      String?   @map("scim_external_id")
+  scimProfile         Json?     @map("scim_profile")
+  scimDeactivatedAt   DateTime? @map("scim_deactivated_at")
+  scimSuspendedUserId String?   @map("scim_suspended_user_id")
+  scimGroups          ScimGroupMember[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -13352,8 +13387,7 @@ model Notification {
   @@map("notifications")
 }
 
-// ============================================================
-// Phase 4a: outbound webhooks (lib/webhooks). Per-workspace endpoints with an
+// =====================================================// Phase 4a: outbound webhooks (lib/webhooks). Per-workspace endpoints with an
 // event filter and an HMAC-SHA256 signing secret (stored as a secrets()
 // envelope, shown once). Every event becomes one durable delivery row per
 // endpoint; /api/cron/webhooks drains due rows with exponential backoff and
@@ -13424,4 +13458,130 @@ model WebhookDelivery {
   @@index([endpointId, createdAt])
   @@index([workspaceId, createdAt])
   @@map("webhook_deliveries")
+=======
+// ===========================================================================
+// Phase 4a (identity): two-factor auth, passkeys, SCIM 2.0.
+// User-level tables (user_security, user_recovery_codes, user_passkeys,
+// auth_challenges) are keyed by the Auth.js subject and hold no workspace
+// data, so they carry no tenant RLS. SCIM tables are workspace-owned and
+// FORCE RLS (app.workspace_id); the SCIM bearer token names its workspace so
+// the lookup itself runs inside that scope.
+// ===========================================================================
+
+model UserSecurity {
+  // Auth.js subject (token.sub).
+  userId             String    @id @map("user_id")
+  email              String?
+  name               String?
+  // TOTP secret (base32), sealed with the credential envelope (lib/sitefiles/crypto.ts).
+  totpSecretEnc      String?   @map("totp_secret_enc")
+  totpEnabledAt      DateTime? @map("totp_enabled_at")
+  // Replay protection: the last RFC 6238 time step accepted.
+  totpLastStep       BigInt?   @map("totp_last_step")
+  // Enrollment in progress (sealed); promoted on a confirmed code.
+  totpPendingEnc     String?   @map("totp_pending_enc")
+  totpPendingAt      DateTime? @map("totp_pending_at")
+  // Stable random WebAuthn user handle (base64url), never PII.
+  webauthnUserHandle String?   @unique @map("webauthn_user_handle")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  @@map("user_security")
+}
+
+model UserRecoveryCode {
+  id        String    @id @default(cuid())
+  userId    String    @map("user_id")
+  // SHA-256 of the normalized 80-bit code; the code itself is shown once.
+  codeHash  String    @unique @map("code_hash")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@map("user_recovery_codes")
+}
+
+model UserPasskey {
+  id           String    @id @default(cuid())
+  userId       String    @map("user_id")
+  // Snapshot of the account at registration: a usernameless passkey sign-in
+  // restores the session's name/email from here.
+  email        String?
+  userName     String?   @map("user_name")
+  // base64url credential id.
+  credentialId String    @unique @map("credential_id")
+  publicKey    Bytes     @map("public_key")
+  counter      BigInt    @default(0)
+  transports   String[]  @default([])
+  deviceType   String?   @map("device_type")
+  backedUp     Boolean   @default(false) @map("backed_up")
+  aaguid       String?
+  name         String
+  lastUsedAt   DateTime? @map("last_used_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@map("user_passkeys")
+}
+
+// Server-side, single-use, expiring challenges: WebAuthn registration and
+// authentication challenges, and second-factor proofs minted after enrollment.
+model AuthChallenge {
+  id         String    @id @default(cuid())
+  kind       String
+  userId     String?   @map("user_id")
+  challenge  String
+  expiresAt  DateTime  @map("expires_at")
+  consumedAt DateTime? @map("consumed_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  @@index([expiresAt])
+  @@map("auth_challenges")
+}
+
+model ScimToken {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name        String
+  // SHA-256 of the raw token; the raw token is shown once.
+  tokenHash   String    @unique @map("token_hash")
+  tokenPrefix String    @map("token_prefix")
+  createdBy   String    @map("created_by")
+  lastUsedAt  DateTime? @map("last_used_at")
+  revokedAt   DateTime? @map("revoked_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@index([workspaceId])
+  @@map("scim_tokens")
+}
+
+model ScimGroup {
+  id          String            @id @default(cuid())
+  workspaceId String            @map("workspace_id")
+  workspace   Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  displayName String            @map("display_name")
+  externalId  String?           @map("external_id")
+  // The workspace role members of this group get (never owner).
+  role        WorkspaceRole
+  members     ScimGroupMember[]
+  createdAt   DateTime          @default(now()) @map("created_at")
+  updatedAt   DateTime          @updatedAt @map("updated_at")
+
+  @@unique([workspaceId, displayName])
+  @@map("scim_groups")
+}
+
+model ScimGroupMember {
+  groupId     String          @map("group_id")
+  group       ScimGroup       @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  memberId    String          @map("member_id")
+  member      WorkspaceMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  workspaceId String          @map("workspace_id")
+  createdAt   DateTime        @default(now()) @map("created_at")
+
+  @@id([groupId, memberId])
+  @@index([memberId])
+  @@index([workspaceId])
+  @@map("scim_group_members")
 }

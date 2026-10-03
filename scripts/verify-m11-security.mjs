@@ -87,6 +87,8 @@ const AUTHZ_PRIMITIVES = [
   "mayCreateWorkspace",                         // Phase 3 workspace creation gate (lib/auth/signup.ts) — invite-only mode: members/operator only
   "requirePlatformOperator",                    // Phase 1 host-wide resources (lib/auth/require-platform-operator.ts) — MARKETR_PLATFORM_OPERATORS only
   "requireSelfService",                         // Phase 4a own-account actions (lib/auth/require-self-service.ts) — no target id read from the request; keyed to the session subject
+  "requireScimAuth",                            // Phase 4a SCIM 2.0 (lib/scim/auth.ts) — per-workspace hashed bearer token; tenant from the token, RLS-scoped
+  "requireAccountUser",                         // Phase 4a self-service account security (lib/auth/mfa/guard.ts) — acts only on the caller's own factors; destructive changes need re-auth
 ];
 // Public by design. Each entry documents WHY — this is a justification list,
 // not a suppression list. Adding an entry requires a code comment in the
@@ -247,7 +249,7 @@ const authCfg = readFileSync(join(ROOT, "auth.ts"), "utf8");
 ok("12h session maxAge", /maxAge:\s*12 \* 60 \* 60/.test(authCfg));
 const sso = readFileSync(join(ROOT, "lib/sso.ts"), "utf8");
 ok("OIDC provisioning defaults to editor", /SSO_DEFAULT_ROLE/.test(sso));
-const login = readFileSync(join(ROOT, "app/login/page.tsx"), "utf8");
+const login = readFileSync(join(ROOT, "app/login/page.tsx"), "utf8") + readFileSync(join(ROOT, "app/login/LoginClient.tsx"), "utf8");
 ok("SSO buttons conditional on config", /providers\.length/.test(login) || /configured/i.test(login));
 
 // --- 6. Secrets abstraction contract ---

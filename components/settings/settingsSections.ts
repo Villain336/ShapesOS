@@ -15,6 +15,7 @@ import {
   Building2,
   Cloud,
   CreditCard,
+  Fingerprint,
   FlaskConical,
   Gauge,
   Globe,
@@ -71,7 +72,8 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
     pages: [
       { href: "/dashboard/settings/members", label: "Members", description: "Invite teammates and control what they can do.", icon: Users },
       { href: "/dashboard/settings/clients", label: "Clients", description: "Agency clients: who sees their reports, and how often.", icon: Briefcase },
-      { href: "/dashboard/settings/security", label: "Security", description: "Authentication, SSO, and secret-storage posture.", icon: Lock },
+      { href: "/dashboard/settings/security", label: "Security", description: "Workspace sign-in policy, SCIM provisioning, SSO, and secret storage.", icon: Lock },
+      { href: "/dashboard/settings/account-security", label: "Your security", description: "Two-factor sign-in and passkeys for your own account.", icon: Fingerprint },
       { href: "/dashboard/settings/audit", label: "Audit log", description: "Every consequential action, who did it, and when.", icon: ScrollText },
       { href: "/dashboard/settings/account", label: "Your account", description: "Download your data or delete your account.", icon: UserRound },
     ],
