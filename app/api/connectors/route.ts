@@ -1,7 +1,8 @@
 // Marketr — connector catalog + workspace connections (milestone 21).
 // GET /api/connectors?workspaceId= → { connectors: [{
 //   key, displayName, kind: "native"|"mcp", authType, description, custom,
-//   connections: [{ id, userId, status, scopes, meta, connectedAt }]
+//   connections: [{ id, userId, status, scopes, meta, connectedAt }],
+//   readOnlyTools?: string[]   (custom MCP only — the admin allow-list)
 // }] } (viewer+). Credential blobs are never returned.
 
 import type { NextRequest } from "next/server";
@@ -9,6 +10,7 @@ import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
 import { workspaceIdFrom, requireWorkspaceAccess } from "@/lib/route-utils";
 import { listBuiltinConnectors } from "@/lib/connectors/m21/registry";
+import { readOnlyToolsFromConfig } from "@/lib/connectors/m21";
 
 export const dynamic = "force-dynamic";
 
@@ -73,6 +75,7 @@ export async function GET(req: NextRequest) {
       description: typeof config.description === "string" ? config.description : null,
       custom: true,
       connections: (byKey.get(c.key) ?? []).map(publicConnection),
+      readOnlyTools: c.kind === "mcp" ? readOnlyToolsFromConfig(c.config) : [],
     };
   });
 
