@@ -62,6 +62,13 @@ container's writable layer. They survive restarts but are lost on `compose down`
   fallback, and the fake messaging/mail/call providers are refused unless `ALLOW_FAKE_PROVIDERS=1`.
   See `.env.example` for the list (`MARKETR_APPROVAL_SECRET`, `MESSAGING_UNSUBSCRIBE_SECRET`,
   `PAYLOAD_SECRET`, …).
+- **Platform operators.** Host-wide resources — the shared Knowledge corpus (propose/remove/rebuild)
+  and Activepieces flow → workspace bindings — can only be changed by users listed in
+  `MARKETR_PLATFORM_OPERATORS` (user ids preferred, or emails). Unset = nobody. Bind each
+  Activepieces flow to its workspace with `POST /api/integrations/activepieces/bindings
+  { flowId, workspaceId }`; unbound flows cannot be triggered or polled from any workspace.
+- **Credential key rotation.** Move the old `MARKETR_CREDENTIALS_KEY` into
+  `MARKETR_CREDENTIALS_KEY_PREVIOUS` and set a new one; stored credentials keep decrypting.
 
 ## 2. Pre-flight — what Tico provides
 
