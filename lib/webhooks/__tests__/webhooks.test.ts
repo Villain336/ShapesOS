@@ -111,7 +111,7 @@ describe("event catalog", () => {
       assert.ok(isWebhookEventType(t), t);
       assert.ok(SUBSCRIBABLE_EVENT_TYPES.includes(t as never), t);
     }
-    assert.ok(!SUBSCRIBABLE_EVENT_TYPES.includes("webhook.ping"));
+    assert.ok(!(SUBSCRIBABLE_EVENT_TYPES as string[]).includes("webhook.ping"));
     assert.equal(isWebhookEventType("lead.deleted"), false);
     assert.equal(Object.keys(WEBHOOK_EVENT_SCHEMAS).length, WEBHOOK_EVENT_TYPES.length);
   });
