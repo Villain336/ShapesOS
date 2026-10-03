@@ -26,8 +26,12 @@
 //   'self' https: are ignored by CSP3 browsers when 'strict-dynamic' is
 //     present; they are the fallback for CSP2-only browsers.
 //   No 'unsafe-inline'. No 'unsafe-eval' in production (Next/React only eval
-//     in dev, for server-error stack reconstruction; Monaco, Univer and
-//     Payload were browser-verified without it — docs/audit/CSP.md).
+//     in dev, for server-error stack reconstruction). Monaco (CDN AMD loader +
+//     its workers), Univer sheets/docs, Payload admin + Lexical, the Studio
+//     editor and the public share page were browser-verified under this
+//     policy with zero violations (docs/audit/REMEDIATION-PLAN.md, Phase 3 L).
+//   srcdoc iframes inherit this policy: the site-builder preview stamps the
+//     page nonce on its generated <script> tags (components/SiteBuilder.tsx).
 //   script-src-attr 'none' stays as belt-and-braces against handler injection.
 //   NOTE: script-src must stay the FIRST script-src* directive — Next picks the
 //     nonce from the first directive that startsWith("script-src").

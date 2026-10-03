@@ -64,10 +64,10 @@ Low
 - [x] Activepieces piece catalog dynamic-require broken in production build
 
 Follow-ups found while doing Phase 1 (carried forward)
-- [ ] Nonce-based CSP via the proxy so `'unsafe-inline'`/`'unsafe-eval'` can be dropped; browser-verify Monaco/Univer/Payload under CSP (Phase 3 UI pass)
+- [x] Nonce-based CSP via the proxy so `'unsafe-inline'`/`'unsafe-eval'` can be dropped; browser-verify Monaco/Univer/Payload under CSP (Phase 3 UI pass, workstream L). `proxy.ts` sets a per-request policy from `lib/security/headers.ts` (pages: `'nonce-…' 'strict-dynamic'`, eval dev-only; `/api/*`: scriptless sandboxed policy); `next.config.ts` no longer sends a CSP; every page renders per request. Verified in Chromium against a production build with zero CSP violations: login, dashboard home, site IDE (Monaco + workers), site builder srcdoc preview (Tailwind CDN), Office sheet + doc (Univer), Studio + design editor, settings/connectors, settings/providers, Knowledge Brain, Payload `/admin` (first user, login, posts editor), public `/s/[token]` signed out. Nothing needed `'unsafe-eval'`.
 - [x] Real CallRail webhook still resolves the workspace from `?w=` with one host-wide secret → per-workspace secret (Phase 2)
 - [x] Payload `payload` schema grants for the least-privilege app role (Phase 2)
-- [ ] UI: MCP read-only tool allow-list editor; hide corpus/automation-binding controls from non-operators (Phase 3)
+- [x] UI: MCP read-only tool allow-list editor; hide corpus/automation-binding controls from non-operators (Phase 3, workstream L — connectors settings editor; Knowledge Brain manage controls and a new Activepieces flow-bindings panel render only for `MARKETR_PLATFORM_OPERATORS`, browser-verified both ways)
 - [ ] Optional CAPTCHA/step-up after repeated login failures (Phase 4 with 2FA)
 
 ## Phase 2 — integrity (`claude/phase-2-integrity`)
