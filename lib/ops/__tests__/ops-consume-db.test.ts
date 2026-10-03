@@ -150,7 +150,7 @@ describe("ops integrity on the real tables", () => {
     const rs = await Promise.all(
       Array.from({ length: 4 }, () => withWorkspaceScope(WS, (tx) => opsCreate(tx, INVOICES, ACTOR, body))),
     );
-    assert.equal(new Set(rs.map((r) => (r as { row: { id: string } }).row.id)).size, 1);
+    assert.equal(new Set(rs.map((r) => String((r as { row?: Record<string, unknown> }).row?.id))).size, 1);
     const n = await withWorkspaceScope(WS, (tx) => tx.opsInvoice.count({ where: { workspaceId: WS, idempotencyKey: key } }));
     assert.equal(n, 1);
     const again = await withWorkspaceScope(WS, (tx) => opsCreate(tx, INVOICES, ACTOR, body));

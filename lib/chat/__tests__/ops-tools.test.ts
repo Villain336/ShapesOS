@@ -145,11 +145,11 @@ describe("draft creators (free, logged writes)", () => {
 });
 
 describe("money-write tools (propose-only, never execute)", () => {
-  function invoiceTx(calls: string[]) {
+  function invoiceTx(calls: string[], status = "draft") {
     return {
       opsInvoice: {
         findMany: async () => [],
-        findFirst: async () => ({ id: "inv_1", status: "draft", totalCents: 10000 }),
+        findFirst: async () => ({ id: "inv_1", status, totalCents: 10000 }),
         update: async () => {
           calls.push("opsInvoice.update");
           return {};
@@ -174,7 +174,8 @@ describe("money-write tools (propose-only, never execute)", () => {
   it("ops_mark_invoice_paid proposes OPS_INVOICE_MARK_PAID and never updates the row", async () => {
     const calls: string[] = [];
     const captured: { input?: unknown } = {};
-    const r = await markInvoicePaidCore(invoiceTx(calls), ACTOR, { invoiceId: "inv_1" }, stubPort(captured));
+    // Only a sent/overdue invoice can be marked paid (transition table).
+    const r = await markInvoicePaidCore(invoiceTx(calls, "sent"), ACTOR, { invoiceId: "inv_1" }, stubPort(captured));
     assert.equal((r.details as { approvalId: string }).approvalId, "appr_1");
     assert.ok(!calls.includes("opsInvoice.update"), "money write must not execute");
     assert.equal((captured.input as { toolName: string }).toolName, "OPS_INVOICE_MARK_PAID");
