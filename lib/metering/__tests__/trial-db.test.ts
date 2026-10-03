@@ -16,7 +16,7 @@ import { applyPlanChange, checkCap, meter } from "../service";
 import { createWorkspaceForUser } from "@/lib/workspace/lifecycle";
 
 const RUN = randomUUID().slice(0, 8);
-const HOSTED = { DEPLOYMENT_MODE: "hosted" } as NodeJS.ProcessEnv;
+const HOSTED = { DEPLOYMENT_MODE: "hosted" } as unknown as NodeJS.ProcessEnv;
 const SELF = {} as NodeJS.ProcessEnv;
 const users: string[] = [];
 const user = (tag: string) => {

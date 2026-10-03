@@ -8,7 +8,14 @@ import { usePathname } from "next/navigation";
 
 const FULL_BLEED_SUFFIX = ["/chat", "/assistant", "/automations", "/crm"];
 
-export function DashboardMain({ children }: { children: React.ReactNode }) {
+export function DashboardMain({
+  children,
+  banner,
+}: {
+  children: React.ReactNode;
+  /** Workspace-wide notice (e.g. the hosted trial); content pages only. */
+  banner?: React.ReactNode;
+}) {
   const pathname = usePathname();
   const fullBleed = FULL_BLEED_SUFFIX.some((s) => pathname.endsWith(s));
 
@@ -21,6 +28,9 @@ export function DashboardMain({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <main className="w-full px-4 py-6 sm:px-6 sm:py-8 lg:px-10">{children}</main>
+    <main className="w-full px-4 py-6 sm:px-6 sm:py-8 lg:px-10">
+      {banner}
+      {children}
+    </main>
   );
 }

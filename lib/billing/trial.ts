@@ -81,6 +81,16 @@ export function trialDaysLeft(ws: TrialState, now: Date = new Date()): number | 
   return Math.ceil((ws.trialEndsAt!.getTime() - now.getTime()) / DAY_MS);
 }
 
+/** What the UI shows about a trial; null when the workspace isn't on one. */
+export function trialView(ws: TrialState, now: Date = new Date()): { daysLeft: number; endsOn: string | null; expired: boolean } | null {
+  if (ws.plan !== "trial") return null;
+  return {
+    daysLeft: trialDaysLeft(ws, now) ?? 0,
+    endsOn: ws.trialEndsAt ? ws.trialEndsAt.toISOString().slice(0, 10) : null,
+    expired: isTrialExpired(ws, now),
+  };
+}
+
 /** The refusal meter() returns once the trial is over. */
 export function trialExpiredMessage(trialEndsAt: Date | null): string {
   const when = trialEndsAt

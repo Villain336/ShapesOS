@@ -9,7 +9,7 @@
 // black text and aria-current="page". Icons are Lucide only.
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
 import type { ComponentType } from "react";
 import { useState } from "react";
@@ -48,6 +48,9 @@ import {
   Handshake,
   Network,
   Box,
+  CreditCard,
+  Plus,
+  Settings,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import GlideMenu from "@/components/vault/primitives/GlideMenu";
@@ -214,10 +217,13 @@ function NavItems({
 function WorkspaceSwitcher({
   workspaces,
   currentId,
+  canManageBilling,
 }: {
   workspaces: SidebarWorkspace[];
   currentId: string;
+  canManageBilling?: boolean;
 }) {
+  const router = useRouter();
   const current = workspaces.find((w) => w.id === currentId) ?? workspaces[0];
   // Phase 13 Wave A (white-label ops): workspace switching is enabled.
   // Any member may switch — switching is scoping, not privilege; every API
@@ -276,6 +282,22 @@ function WorkspaceSwitcher({
             </DropdownMenuItem>
           );
         })}
+        {/* Phase 3: workspace lifecycle + billing, one click from anywhere. */}
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={() => router.push("/dashboard/settings/workspace#ws-new")}>
+          <Plus />
+          New workspace
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => router.push("/dashboard/settings/workspace")}>
+          <Settings />
+          Workspace settings
+        </DropdownMenuItem>
+        {canManageBilling ? (
+          <DropdownMenuItem onClick={() => router.push("/dashboard/billing")}>
+            <CreditCard />
+            Billing
+          </DropdownMenuItem>
+        ) : null}
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -286,12 +308,15 @@ function UserMenu({
   triggerClassName,
   compact,
   onNight,
+  canManageBilling,
 }: {
   user: SidebarUser;
   triggerClassName?: string;
   compact?: boolean;
   onNight?: boolean;
+  canManageBilling?: boolean;
 }) {
+  const router = useRouter();
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
@@ -341,6 +366,17 @@ function UserMenu({
           ) : null}
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={() => router.push("/dashboard/settings")}>
+          <Settings />
+          Settings
+        </DropdownMenuItem>
+        {canManageBilling ? (
+          <DropdownMenuItem onClick={() => router.push("/dashboard/billing")}>
+            <CreditCard />
+            Billing
+          </DropdownMenuItem>
+        ) : null}
+        <DropdownMenuSeparator />
         <DropdownMenuItem variant="destructive" onClick={() => signOut({ callbackUrl: "/login" })}>
           <LogOut />
           Sign out
@@ -354,10 +390,12 @@ export function AppSidebar({
   user,
   workspaces,
   currentWorkspaceId,
+  canManageBilling,
 }: {
   user: SidebarUser;
   workspaces: SidebarWorkspace[];
   currentWorkspaceId: string;
+  canManageBilling?: boolean;
 }) {
   const pathname = usePathname();
   const chat = useChat();
@@ -374,7 +412,7 @@ export function AppSidebar({
           </span>
           <span className="text-[16px] font-semibold tracking-tight text-night">Marketr</span>
         </Link>
-        <WorkspaceSwitcher workspaces={workspaces} currentId={currentWorkspaceId} />
+        <WorkspaceSwitcher workspaces={workspaces} currentId={currentWorkspaceId} canManageBilling={canManageBilling} />
       </div>
       <nav className="flex-1 overflow-y-auto px-2 py-4" aria-label="Dashboard">
         <NavItems pathname={pathname} onNight />
@@ -388,7 +426,7 @@ export function AppSidebar({
         ) : null}
       </nav>
       <div className="border-t border-night-line p-2">
-        <UserMenu user={user} triggerClassName="w-full" onNight />
+        <UserMenu user={user} triggerClassName="w-full" onNight canManageBilling={canManageBilling} />
       </div>
     </aside>
   );
@@ -398,10 +436,12 @@ export function MobileNav({
   user,
   workspaces,
   currentWorkspaceId,
+  canManageBilling,
 }: {
   user: SidebarUser;
   workspaces: SidebarWorkspace[];
   currentWorkspaceId: string;
+  canManageBilling?: boolean;
 }) {
   const pathname = usePathname();
   return (
@@ -423,11 +463,11 @@ export function MobileNav({
           <DropdownMenuContent align="end" className="w-56 p-2">
             <NavItems pathname={pathname} />
             <div className="mt-2 border-t border-line pt-2">
-              <WorkspaceSwitcher workspaces={workspaces} currentId={currentWorkspaceId} />
+              <WorkspaceSwitcher workspaces={workspaces} currentId={currentWorkspaceId} canManageBilling={canManageBilling} />
             </div>
           </DropdownMenuContent>
         </DropdownMenu>
-        <UserMenu user={user} compact />
+        <UserMenu user={user} compact canManageBilling={canManageBilling} />
       </div>
     </header>
   );

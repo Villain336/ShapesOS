@@ -36,7 +36,6 @@ export function normalizeWorkspaceName(raw: unknown): string {
   if (name.length > MAX_WORKSPACE_NAME) {
     throw new BadRequestError(`Keep the name under ${MAX_WORKSPACE_NAME} characters.`);
   }
-  // eslint-disable-next-line no-control-regex
   if (/[\u0000-\u001f\u007f]/.test(name)) throw new BadRequestError("The name has characters that can't be shown.");
   return name;
 }

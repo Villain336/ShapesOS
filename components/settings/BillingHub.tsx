@@ -94,7 +94,17 @@ function statusBadge(sub: SubData["subscription"]): { text: string } {
   return { text: sub.status };
 }
 
-export default function BillingHub({ workspaceId }: { workspaceId: string }) {
+export default function BillingHub({
+  workspaceId,
+  nav,
+  trial,
+}: {
+  workspaceId: string;
+  /** Phase 3: the grouped settings nav, so billing sits inside settings. */
+  nav?: React.ReactNode;
+  /** Phase 3: hosted trial state (null when not on the trial plan). */
+  trial?: { daysLeft: number; endsOn: string | null; expired: boolean } | null;
+}) {
   const [plans, setPlans] = useState<PlansData | null>(null);
   const [sub, setSub] = useState<SubData | null>(null);
   const [notice, setNotice] = useState<NoticeState | null>(null);
@@ -188,7 +198,11 @@ export default function BillingHub({ workspaceId }: { workspaceId: string }) {
 
   const currentPlanName =
     plans?.plans.find((p) => p.id === plans.currentPlan)?.name ??
-    (plans?.currentPlan === "self_hosted" ? "Self-hosted" : (plans?.currentPlan ?? "…"));
+    (plans?.currentPlan === "self_hosted"
+      ? "Self-hosted"
+      : plans?.currentPlan === "trial"
+        ? "Trial"
+        : (plans?.currentPlan ?? "…"));
 
   const badge = statusBadge(sub?.subscription ?? null);
 
@@ -198,9 +212,25 @@ export default function BillingHub({ workspaceId }: { workspaceId: string }) {
         <h1 className="aos-heading">Billing &amp; plans</h1>
         <p className="mt-0.5 text-sm text-muted">
           Your subscription, plans, and invoices. Payments run through Stripe — card details never
-          touch Marketr.
+          touch ShapesOS.
         </p>
       </div>
+      {nav}
+
+      {trial && (
+        <div role="status" className="rounded-lg bg-paper px-4 py-3 shadow-hairline">
+          <p className="text-base font-semibold text-ink">
+            {trial.expired
+              ? `Your trial ended${trial.endsOn ? ` on ${trial.endsOn}` : ""}.`
+              : `${trial.daysLeft} day${trial.daysLeft === 1 ? "" : "s"} left in your trial${trial.endsOn ? ` (ends ${trial.endsOn})` : ""}.`}
+          </p>
+          <p className="mt-0.5 text-sm text-muted">
+            {trial.expired
+              ? "Credit-using actions are paused until you choose a plan below. Everything you made is still here."
+              : "Choose a plan below any time; everything in the workspace carries over."}
+          </p>
+        </div>
+      )}
 
       {notice && <Notice notice={notice} />}
 

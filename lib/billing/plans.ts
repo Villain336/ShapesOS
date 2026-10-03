@@ -133,3 +133,10 @@ export function planIdForStripePrice(priceId: string | null | undefined): PaidPl
 export function planPriceDisplay(plan: BillingPlan): string {
   return `$${(plan.priceCents / 100).toFixed(plan.priceCents % 100 === 0 ? 0 : 2)}`;
 }
+
+/** Human name for any workspace plan, including the non-purchasable ones. */
+export function planDisplayName(planId: string): string {
+  if (planId === "self_hosted") return "Self-hosted";
+  if (planId === "trial") return "Trial";
+  return PLANS.find((p) => p.id === planId)?.name ?? planId;
+}

@@ -24,6 +24,10 @@ import { growthBookSdkConfig } from "@/lib/integrations/growthbook";
 import { BrandTheme } from "@/components/BrandTheme";
 import { sanitizeBrandHex } from "@/lib/brand-theme";
 import { prisma } from "@/lib/prisma";
+// Phase 3: hosted trial notice + billing reachable from the sidebar.
+import { getMembership, roleAtLeast } from "@/lib/authz";
+import { trialView } from "@/lib/billing/trial";
+import { TrialBanner } from "@/components/workspace/TrialBanner";
 
 export default async function DashboardLayout({
   children,
@@ -39,12 +43,18 @@ export default async function DashboardLayout({
     if (err instanceof InviteRequiredError) redirect(INVITE_REQUIRED_PATH);
     throw err;
   });
-  const workspaces = await getAccessibleWorkspaces(user.id);
+  const [workspaces, membership] = await Promise.all([
+    getAccessibleWorkspaces(user.id),
+    getMembership(user.id, workspace.id),
+  ]);
+  const isAdmin = roleAtLeast(membership?.role, "admin");
+  const trial = trialView(workspace);
 
   const sidebarProps = {
     user: { name: user.name, email: user.email },
     workspaces: workspaces.map((w) => ({ id: w.id, name: w.name })),
     currentWorkspaceId: workspace.id,
+    canManageBilling: isAdmin,
   };
 
   // Phase 12 (embeds): Chatwoot widget config resolved server-side; the
@@ -78,7 +88,11 @@ export default async function DashboardLayout({
           <AppSidebar {...sidebarProps} />
           <div className="min-w-0 flex-1">
             <GrowthBookProvider config={gbConfig}>
-              <DashboardMain>{children}</DashboardMain>
+              <DashboardMain
+                banner={trial ? <TrialBanner trial={trial} canManageBilling={isAdmin} /> : null}
+              >
+                {children}
+              </DashboardMain>
             </GrowthBookProvider>
           </div>
         </div>
