@@ -32,6 +32,11 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   // Required for the self-hosted Docker image (see Dockerfile)
   output: "standalone",
+  // CI runs the full `npm run typecheck` (next typegen + tsc) as its own gating
+  // step, then builds; repeating the type check inside `next build` doubled
+  // peak memory and got the runner killed. Only CI sets SKIP_BUILD_TYPECHECK —
+  // local and Docker builds still type-check. (Next's memory-usage guide.)
+  typescript: { ignoreBuildErrors: process.env.SKIP_BUILD_TYPECHECK === "1" },
   // Milestone 12: takumi-pdf ships a wasm binary with bundler-specific entry
   // points. Externalize it so Node's own resolver picks the `node` condition
   // (readFileSync-based wasm load) instead of Turbopack bundling the

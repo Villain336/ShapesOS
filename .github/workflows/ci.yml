@@ -95,4 +95,8 @@ jobs:
         run: npx tsx scripts/smoke-no-creds.mts
 
       - name: Production build
+        # Types were already gated by the Typecheck step above; skip Next's
+        # duplicate pass so peak memory fits the runner.
+        env:
+          SKIP_BUILD_TYPECHECK: "1"
         run: npm run build
