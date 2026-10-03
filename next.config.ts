@@ -2,10 +2,11 @@ import type { NextConfig } from "next";
 import { withPayload } from "@payloadcms/next/withPayload";
 import { buildSecurityHeaders, shouldSendHsts } from "./lib/security/headers";
 
-// Security headers (Milestone 11 baseline, Phase 1 CSP/HSTS): see
+// Security headers (Milestone 11 baseline, Phase 1 HSTS): see
 // lib/security/headers.ts for the policy and its compatibility notes.
-// - Content-Security-Policy on every response (script-src-attr 'none' blocks
-//   injected event-handler XSS; object/base/frame-ancestors locked down).
+// - Content-Security-Policy is NOT sent from here: it carries a per-request
+//   nonce, so proxy.ts sets it (a static copy here would be a second CSP
+//   header that browsers intersect with the nonce one).
 // - HSTS in production unless NEXTAUTH_URL is explicitly http://.
 // - X-Frame-Options: SAMEORIGIN — the landing-page preview uses a sandboxed
 //   srcDoc iframe, which is unaffected by frame-ancestor policy.

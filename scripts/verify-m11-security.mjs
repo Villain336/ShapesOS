@@ -224,6 +224,21 @@ const headersSrc = readFileSync(join(ROOT, "lib/security/headers.ts"), "utf8");
 ok("security headers wired in next.config.ts", /buildSecurityHeaders/.test(nextCfg) && /headers\(\)/.test(nextCfg));
 ok("security headers defined", /X-Content-Type-Options/.test(headersSrc) && /X-Frame-Options/.test(headersSrc) && /Strict-Transport-Security/.test(headersSrc));
 ok("Content-Security-Policy blocks inline handlers + plugins", /Content-Security-Policy/.test(headersSrc) && /script-src-attr 'none'/.test(headersSrc) && /object-src 'none'/.test(headersSrc));
+// Phase 3: CSP is per-request (nonce) and set by proxy.ts, not next.config.
+const proxySrc = readFileSync(join(ROOT, "proxy.ts"), "utf8");
+const scriptSrcLine = (headersSrc.match(/const scriptSrc = \[([\s\S]*?)\]/) ?? [])[1] ?? "";
+ok("CSP script-src is nonce-based (strict-dynamic, no 'unsafe-inline', eval dev-only)",
+  /'nonce-\$\{opts\.nonce\}'/.test(scriptSrcLine) && /'strict-dynamic'/.test(scriptSrcLine) &&
+  !/unsafe-inline/.test(scriptSrcLine) && /opts\.dev \? \["'unsafe-eval'"/.test(scriptSrcLine));
+ok("CSP nonce from a CSPRNG", /crypto\.getRandomValues/.test(headersSrc));
+ok("proxy sets the per-request CSP on request + response",
+  /generateCspNonce\(\)/.test(proxySrc) && /contentSecurityPolicyFor\(/.test(proxySrc) &&
+  /requestHeaders\.set\("content-security-policy"/.test(proxySrc) && /headers\.set\("Content-Security-Policy"/.test(proxySrc));
+ok("proxy matcher covers pages and every API route", /"\/api\/:path\*"/.test(proxySrc) && /_next\/static/.test(proxySrc));
+ok("no second (static) CSP header from next.config",
+  !/"Content-Security-Policy"|buildContentSecurityPolicy|contentSecurityPolicyFor/.test(nextCfg) &&
+  !/key: "Content-Security-Policy"/.test(headersSrc.slice(headersSrc.indexOf("export function buildSecurityHeaders"))));
+ok("pages render per request (nonce reaches the HTML)", /await connection\(\)/.test(readFileSync(join(ROOT, "app/layout.tsx"), "utf8")));
 ok("HSTS gated on https", /shouldSendHsts/.test(nextCfg) && /startsWith\("http:\/\/"\)/.test(headersSrc));
 ok("X-Powered-By disabled", /poweredByHeader:\s*false/.test(nextCfg));
 const authCfg = readFileSync(join(ROOT, "auth.ts"), "utf8");

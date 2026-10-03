@@ -9,6 +9,20 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
+/**
+ * A srcdoc iframe inherits this page's CSP (proxy.ts nonce policy), so the
+ * generated page's own <script> tags (Tailwind CDN) would be blocked. Stamp
+ * them with this page's nonce: the frame is sandboxed without
+ * allow-same-origin (opaque origin), so its scripts can never reach the app.
+ * Inline on* handlers in the preview stay blocked (script-src-attr 'none').
+ */
+function withPreviewNonce(html: string): string {
+  if (typeof document === "undefined") return html;
+  const nonce = document.querySelector<HTMLScriptElement>("script[nonce]")?.nonce;
+  if (!nonce) return html;
+  return html.replace(/<script\b/gi, `<script nonce="${nonce}"`);
+}
+
 interface Brief {
   id: string;
   label: string;
@@ -179,7 +193,7 @@ export default function SiteBuilder({
           </div>
           <iframe
             title="Landing page preview"
-            srcDoc={html}
+            srcDoc={withPreviewNonce(html)}
             sandbox="allow-scripts"
             className="h-[640px] w-full rounded-md border border-zinc-200 bg-white"
           />
