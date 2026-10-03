@@ -10,7 +10,10 @@
 import type { Prisma, WorkspaceRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { INBOX_SOURCE_LABELS, type InboxSourceKey } from "@/lib/approvals/types";
-import { createNotifications, type NotificationInput } from "./store";
+import { createNotifications, safeHref, type NotificationInput } from "./store";
+// Phase 4a: outbound webhooks hang off the same producer seam (best-effort,
+// never throws — see lib/webhooks/emit.ts).
+import { emitWebhookEvent } from "@/lib/webhooks/emit";
 
 export type ProducerDb = Pick<Prisma.TransactionClient, "notification" | "workspaceMember" | "workspace">;
 
@@ -36,6 +39,34 @@ export function actorUserId(actor: string | null | undefined): string | null {
   const first = actor.trim().split(/\s+/)[0] ?? "";
   if (!first || first.includes("@") || first.includes(":") || first === "system") return null;
   return first;
+}
+
+/**
+ * Insert notifications, then emit one `notification.created` webhook per
+ * recipient row (Phase 4a). The webhook dedupe key follows the
+ * notification's own, so a duplicate notification never re-fires.
+ */
+async function createAndEmit(db: ProducerDb, inputs: NotificationInput[]): Promise<number> {
+  const created = await createNotifications(db, inputs);
+  if (created > 0) {
+    for (const n of inputs) {
+      await emitWebhookEvent({
+        workspaceId: n.workspaceId,
+        type: "notification.created",
+        data: {
+          kind: n.kind,
+          userId: n.userId,
+          title: n.title,
+          body: n.body ?? null,
+          href: safeHref(n.href),
+          sourceType: n.sourceType ?? null,
+          sourceId: n.sourceId ?? null,
+        },
+        dedupKey: n.dedupKey ? `notification:${n.userId}:${n.dedupKey}` : null,
+      });
+    }
+  }
+  return created;
 }
 
 /** Workspace members (claimed, with a user id) at or above `min`, incl. a legacy owner. */
@@ -86,13 +117,26 @@ export interface ApprovalNeededInput {
 
 /** "New approval needed" → every member who can decide it, except the requester. */
 export async function notifyApprovalNeeded(input: ApprovalNeededInput, db: ProducerDb = defaultDb()): Promise<number> {
+  // Phase 4a: approval.needed webhook (once per approval, never throws).
+  await emitWebhookEvent({
+    workspaceId: input.workspaceId,
+    type: "approval.needed",
+    data: {
+      source: input.source,
+      sourceId: input.sourceId,
+      title: input.title,
+      href: safeHref(input.href ?? `/dashboard/approvals?source=${input.source}`),
+      requestedBy: input.requestedBy ?? null,
+    },
+    dedupKey: `approval.needed:${input.source}:${input.sourceId}`,
+  });
   try {
     const requester = actorUserId(input.requestedBy);
     const recipients = (await membersAtLeast(db, input.workspaceId, input.decideRole ?? "editor")).filter(
       (id) => id !== requester,
     );
     const label = INBOX_SOURCE_LABELS[input.source];
-    return await createNotifications(
+    return await createAndEmit(
       db,
       recipients.map<NotificationInput>((userId) => ({
         workspaceId: input.workspaceId,
@@ -125,12 +169,25 @@ export interface ApprovalDecidedInput {
 
 /** "Approval decided" → the requester (when a member and not the decider). */
 export async function notifyApprovalDecided(input: ApprovalDecidedInput, db: ProducerDb = defaultDb()): Promise<number> {
+  // Phase 4a: approval.decided webhook — fires even when nobody is notified.
+  await emitWebhookEvent({
+    workspaceId: input.workspaceId,
+    type: "approval.decided",
+    data: {
+      source: input.source,
+      sourceId: input.sourceId,
+      title: input.title,
+      decision: input.decision,
+      decidedBy: input.decidedBy ?? null,
+    },
+    dedupKey: `approval.decided:${input.source}:${input.sourceId}`,
+  });
   try {
     const requester = actorUserId(input.requestedBy);
     if (!requester || requester === actorUserId(input.decidedBy)) return 0;
     if (!(await isMember(db, input.workspaceId, requester))) return 0;
     const label = INBOX_SOURCE_LABELS[input.source];
-    return await createNotifications(db, [
+    return await createAndEmit(db, [
       {
         workspaceId: input.workspaceId,
         userId: requester,
@@ -167,7 +224,7 @@ export async function notifyAlertFired(input: AlertFiredInput, db: ProducerDb = 
   try {
     const recipients = await membersAtLeast(db, input.workspaceId, "viewer");
     const href = input.link && input.link.startsWith("/dashboard") ? input.link : "/dashboard/alerts";
-    return await createNotifications(
+    return await createAndEmit(
       db,
       recipients.map<NotificationInput>((userId) => ({
         workspaceId: input.workspaceId,
@@ -203,7 +260,7 @@ export async function notifyAgentRunFailed(input: AgentRunFailedInput, db: Produ
         ? [starter]
         : await membersAtLeast(db, input.workspaceId, "editor");
     const kind = input.kind ? `${input.kind.replace(/_/g, " ")} run` : "Agent run";
-    return await createNotifications(
+    return await createAndEmit(
       db,
       recipients.map<NotificationInput>((userId) => ({
         workspaceId: input.workspaceId,
@@ -235,7 +292,7 @@ export async function notifyInviteAccepted(input: InviteAcceptedInput, db: Produ
   try {
     const recipients = (await membersAtLeast(db, input.workspaceId, "admin")).filter((id) => id !== input.memberUserId);
     const who = input.email?.trim() || "A new member";
-    return await createNotifications(
+    return await createAndEmit(
       db,
       recipients.map<NotificationInput>((userId) => ({
         workspaceId: input.workspaceId,

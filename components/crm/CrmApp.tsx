@@ -120,8 +120,12 @@ export function CrmApp() {
   useEffect(() => {
     loadPipelines(true).then((list) => {
       // Deep link: ?lead=<id>
-      const m = new URLSearchParams(window.location.search).get("lead");
+      const params = new URLSearchParams(window.location.search);
+      const m = params.get("lead");
       if (m) setSelectedLeadId(m);
+      // Phase 4a (⌘K records): ?tab=<tab id>, e.g. tab=invoicing&invoice=<id>.
+      const t = params.get("tab");
+      if (t && TABS.some((x) => x.id === t)) setTab(t as Tab);
     });
   }, [loadPipelines]);
 

@@ -15,6 +15,7 @@ import { exportPageToSvg } from "@/lib/design/export-svg";
 import { RrwebRecorder } from "@/components/replay/RrwebRecorder";
 import { UmamiTracker } from "@/components/analytics/UmamiTracker";
 import { umamiSnippetConfig } from "@/lib/integrations/umami";
+import { effectiveWhiteLabel } from "@/lib/billing/entitlements";
 
 export const dynamic = "force-dynamic";
 
@@ -51,6 +52,7 @@ async function loadShare(token: string) {
           workspace: {
             select: {
               id: true,
+              plan: true,
               whiteLabelBrandColor: true,
               whiteLabelLogoUrl: true,
               whiteLabelCustomDomain: true,
@@ -96,12 +98,13 @@ export default async function PublicSharePage({
 
   // White-label read path: logo + brand color + custom domain for this
   // design's workspace. Missing/empty fields fall back to the defaults.
-  const wl = share.design.workspace;
-  const brandAccent = wl.whiteLabelBrandColor?.trim() || "#7c3aed";
-  const wlLogoUrl = wl.whiteLabelLogoUrl
-    ? `/api/public/workspaces/${wl.id}/logo`
+  // Phase 4a: only on plans that include white-label (effectiveWhiteLabel).
+  const wl = effectiveWhiteLabel(share.design.workspace);
+  const brandAccent = wl.brandColor?.trim() || "#7c3aed";
+  const wlLogoUrl = wl.logoUrl
+    ? `/api/public/workspaces/${share.design.workspace.id}/logo`
     : null;
-  const wlDomain = wl.whiteLabelCustomDomain?.trim() || null;
+  const wlDomain = wl.customDomain?.trim() || null;
 
   return (
     <div className="min-h-screen bg-[#FAFAF7] px-4 py-8 md:px-8">

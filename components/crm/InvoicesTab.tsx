@@ -62,6 +62,12 @@ export function InvoicesTab() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showNew, setShowNew] = useState(false);
 
+  // Phase 4a (⌘K records): ?invoice=<id> opens that invoice.
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get("invoice");
+    if (id) setSelectedId(id);
+  }, []);
+
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);

@@ -6,6 +6,8 @@ import { requireUser, getOrCreateWorkspace } from "@/lib/session";
 import { requireWorkspaceRole } from "@/lib/authz";
 import SettingsNav from "@/components/settings/SettingsNav";
 import WhiteLabelSettings from "@/components/settings/WhiteLabelSettings";
+import { UpgradeNotice } from "@/components/billing/UpgradeNotice";
+import { featureUpgradeMessage, planHasFeature } from "@/lib/billing/entitlements";
 
 export const dynamic = "force-dynamic";
 
@@ -13,7 +15,11 @@ export default async function WhiteLabelSettingsPage() {
   const user = await requireUser();
   if (!user) redirect("/login");
   const workspace = await getOrCreateWorkspace(user.id, user.email);
-  const canEdit = (await requireWorkspaceRole(user.id, workspace.id, "admin")) !== null;
+  const isAdmin = (await requireWorkspaceRole(user.id, workspace.id, "admin")) !== null;
+  // Phase 4a: white-label is a plan entitlement; without it the settings are
+  // read-only and public pages render ShapesOS defaults.
+  const entitled = planHasFeature(workspace.plan, "white_label");
+  const canEdit = isAdmin && entitled;
 
   return (
     <div className="flex flex-col gap-6">
@@ -24,6 +30,12 @@ export default async function WhiteLabelSettingsPage() {
         </p>
       </div>
       <SettingsNav />
+      {!entitled && (
+        <UpgradeNotice message={featureUpgradeMessage("white_label")} canManageBilling={isAdmin} />
+      )}
+      {entitled && !planHasFeature(workspace.plan, "custom_domain") && (
+        <UpgradeNotice message={featureUpgradeMessage("custom_domain")} canManageBilling={isAdmin} />
+      )}
       <WhiteLabelSettings
         workspaceId={workspace.id}
         initial={{

@@ -58,10 +58,12 @@ lib/phase13b/evals/06-stop-asking.test.ts
 lib/phase13b/evals/07-feedback-diff.test.ts
 lib/playbooks/__tests__/store.test.ts
 lib/scheduler/__tests__/tick-db.test.ts
+lib/search/__tests__/records-db.test.ts
 lib/substrate/memory/__tests__/accepted-only.test.ts
 lib/substrate/memory/__tests__/learning-pass.test.ts
 lib/substrate/memory/__tests__/rls-least-privilege-db.test.ts
 lib/voice/__tests__/pronunciation.test.ts
 lib/voice/__tests__/voiceover.test.ts
+lib/webhooks/__tests__/webhooks-db.test.ts
 lib/workspace/__tests__/lifecycle-db.test.ts
 lib/workspace/__tests__/workspace-orphans-db.test.ts

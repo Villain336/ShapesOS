@@ -34,6 +34,7 @@ import { prisma } from "@/lib/prisma";
 import { getMembership, roleAtLeast } from "@/lib/authz";
 import { trialView } from "@/lib/billing/trial";
 import { TrialBanner } from "@/components/workspace/TrialBanner";
+import { planHasFeature } from "@/lib/billing/entitlements";
 
 export default async function DashboardLayout({
   children,
@@ -80,10 +81,14 @@ export default async function DashboardLayout({
   // primary accent. Null = the Agentic OS default: black primary actions
   // (globals.css :root maps --brand-600/700 to black). Scoped to the
   // BrandTheme root below so it can never leak across workspaces.
-  const defaultKit = await prisma.brandKit.findFirst({
-    where: { workspaceId: workspace.id, isDefault: true },
-    select: { colors: true },
-  });
+  // Phase 4a: re-tinting the dashboard is the custom_branding entitlement;
+  // plans without it keep the Agentic OS default.
+  const defaultKit = planHasFeature(workspace.plan, "custom_branding")
+    ? await prisma.brandKit.findFirst({
+        where: { workspaceId: workspace.id, isDefault: true },
+        select: { colors: true },
+      })
+    : null;
   const brandPrimary = sanitizeBrandHex(
     (defaultKit?.colors as Record<string, string> | null)?.primary,
   );
