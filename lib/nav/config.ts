@@ -104,7 +104,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: "/dashboard/flywheel", label: "Flywheel", icon: RefreshCw, description: "Reallocation, recycling, test lab", keywords: "reallocation recycling ctv dsp tests" },
       { href: "/dashboard/calls", label: "Calls", icon: Phone, description: "Call tracking and bookings", keywords: "phone tracking numbers bookings" },
       { href: "/dashboard/attribution", label: "Attribution", icon: ChartSpline, description: "What drove revenue", keywords: "roi spend channels" },
-      { href: "/dashboard/analytics", label: "Analytics", icon: ChartLine, description: "Site traffic", keywords: "pageviews umami traffic" },
+      { href: "/dashboard/analytics", label: "Analytics", icon: ChartLine, description: "Traffic, social and revenue", keywords: "pageviews umami traffic ga4 search console engagement overview" },
       { href: "/dashboard/reports", label: "Reports", icon: ChartColumn, description: "Reports and exports", keywords: "analytics report pdf" },
     ],
   },
