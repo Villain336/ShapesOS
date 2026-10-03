@@ -103,8 +103,8 @@ describe("helpers", () => {
   });
 
   it("emailed links use the configured origin, never a request Host", () => {
-    assert.equal(appOriginForLinks({ NEXTAUTH_URL: "https://app.shapes.example/x" } as NodeJS.ProcessEnv), "https://app.shapes.example");
-    assert.equal(appOriginForLinks({} as NodeJS.ProcessEnv), null);
+    assert.equal(appOriginForLinks({ NEXTAUTH_URL: "https://app.shapes.example/x" }), "https://app.shapes.example");
+    assert.equal(appOriginForLinks({}), null);
   });
 
   it("the public route no longer forwards ?email= into links, and the beacon honours expiry", () => {

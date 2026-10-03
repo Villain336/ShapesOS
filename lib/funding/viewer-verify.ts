@@ -37,7 +37,7 @@ interface TokenPayload {
 }
 
 /** Secret for viewer tokens; null when unconfigured (fail closed). */
-export function viewerSecret(env: NodeJS.ProcessEnv = process.env): string | null {
+export function viewerSecret(env: Record<string, string | undefined> = process.env): string | null {
   const s = env.AUTH_SECRET?.trim() || env.NEXTAUTH_SECRET?.trim();
   return s || null;
 }
@@ -173,7 +173,7 @@ export function mayResendMagicLink(linkId: string, email: string, now: number): 
 }
 
 /** Absolute app origin for emailed links — configured, never the Host header. */
-export function appOriginForLinks(env: NodeJS.ProcessEnv = process.env): string | null {
+export function appOriginForLinks(env: Record<string, string | undefined> = process.env): string | null {
   const raw = (env.MARKETR_BASE_URL ?? "").trim() || (env.NEXTAUTH_URL ?? "").trim() || (env.AUTH_URL ?? "").trim();
   if (!raw) return null;
   try {
