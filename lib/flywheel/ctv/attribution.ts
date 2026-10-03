@@ -14,6 +14,7 @@
 // asserts this structurally.
 
 import { createHmac } from "node:crypto";
+import { requireSecret } from "@/lib/env/secrets";
 
 /** Layers, in the order the UI presents them. */
 export const ATTRIBUTION_LAYERS = [
@@ -42,6 +43,11 @@ const PIXEL_GIF_BASE64 = "R0lGODlhAQABAIAAAP///////yH5BAEKAAEALAAAAAABAAEAAAICTA
 
 export function pixelGifBuffer(): Buffer {
   return Buffer.from(PIXEL_GIF_BASE64, "base64");
+}
+
+/** Pixel signing secret. Production must set PIXEL_SIGNING_SECRET (fails closed). */
+export function pixelSigningSecret(env: NodeJS.ProcessEnv = process.env): string {
+  return requireSecret("PIXEL_SIGNING_SECRET", "dev-only-pixel-secret", env);
 }
 
 /** Campaign-scoped token: verifiable against the pixel's campaign id. */

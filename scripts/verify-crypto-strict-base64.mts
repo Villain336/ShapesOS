@@ -63,11 +63,11 @@ async function main() {
   for (const [i, pt] of plaintexts.entries()) {
     const env = encryptSecret(pt);
     check(`round-trip plaintext #${i}`, decryptSecret(env) === pt);
-    // Envelope shape unchanged: v1 + 3 canonical base64 parts
+    // Envelope shape: v2 + key id + 3 canonical base64 parts
     // (ciphertext may be empty for an empty plaintext).
     check(
       `envelope shape plaintext #${i}`,
-      /^v1:[A-Za-z0-9+/]+={0,2}:[A-Za-z0-9+/]*={0,2}:[A-Za-z0-9+/]+={0,2}$/.test(
+      /^v2:[0-9a-f]{8}:[A-Za-z0-9+/]+={0,2}:[A-Za-z0-9+/]*={0,2}:[A-Za-z0-9+/]+={0,2}$/.test(
         env,
       ),
     );
@@ -89,7 +89,9 @@ async function main() {
 
   // ------------------------------------------------- corruption / tamper cases
   const valid = encryptSecret("do-not-tamper");
-  const [ver, ivB64, ctB64, tagB64] = valid.split(":");
+  // v2 envelopes carry a key id: "v2:<kid>:iv:ct:tag" (Phase 1 rotation).
+  const [v, kid, ivB64, ctB64, tagB64] = valid.split(":");
+  const ver = `${v}:${kid}`;
 
   rejects("truncated envelope", () => decryptSecret(valid.slice(0, -6)));
   rejects("truncated tag part", () =>
@@ -126,7 +128,7 @@ async function main() {
     decryptSecret(`${ver}:${ivB64.slice(0, 4)}==${ivB64.slice(4)}:${ctB64}:${tagB64}`),
   );
   rejects("wrong version", () =>
-    decryptSecret(`v2:${ivB64}:${ctB64}:${tagB64}`),
+    decryptSecret(`v9:${kid}:${ivB64}:${ctB64}:${tagB64}`),
   );
   rejects("three parts only", () => decryptSecret(`${ver}:${ivB64}:${ctB64}`));
   rejects("five parts (trailing junk)", () =>

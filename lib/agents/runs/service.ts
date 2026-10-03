@@ -113,7 +113,7 @@ export async function attachAgentRunRecording(
 ) {
   return withWorkspaceScope(workspaceId, (tx) =>
     tx.agentRunRecording.upsert({
-      where: { runId },
+      where: { runId, workspaceId },
       create: {
         workspaceId,
         runId,

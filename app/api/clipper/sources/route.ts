@@ -50,6 +50,7 @@ export async function GET() {
     const { workspace } = await guardWorkspace();
     const sources = await withWorkspaceScope(workspace.id, (tx) =>
       tx.clipSource.findMany({
+        where: { workspaceId: workspace.id },
         orderBy: { createdAt: "desc" },
         take: 100,
         select: sourceSelect,

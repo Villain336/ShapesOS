@@ -121,7 +121,7 @@ export async function supersedeFact(
   replacement: FactInput,
 ): Promise<{ oldId: string; newId: string }> {
   return withWorkspaceScope(workspaceId, async (tx) => {
-    const old = await tx.memoryFact.findUnique({ where: { id: oldFactId } });
+    const old = await tx.memoryFact.findFirst({ where: { id: oldFactId, workspaceId } });
     if (!old || old.workspaceId !== workspaceId) throw new Error("Fact not found in workspace.");
     if (old.invalidAt) throw new Error("Fact is already superseded.");
     const now = new Date();
@@ -139,7 +139,7 @@ export async function supersedeFact(
       select: { id: true },
     });
     await tx.memoryFact.update({
-      where: { id: oldFactId },
+      where: { id: oldFactId, workspaceId },
       data: { invalidAt: now, expiredAt: now, supersededById: created.id },
     });
     await setEmbedding(
@@ -195,10 +195,10 @@ export async function invalidateLearning(
   assertWriteWorthy("invalidation.reason", reason);
   const scrubbed = scrubSecrets(reason);
   await withWorkspaceScope(workspaceId, async (tx) => {
-    const row = await tx.memoryLearning.findUnique({ where: { id: learningId } });
+    const row = await tx.memoryLearning.findFirst({ where: { id: learningId, workspaceId } });
     if (!row || row.workspaceId !== workspaceId) throw new Error("Learning not found in workspace.");
     await tx.memoryLearning.update({
-      where: { id: learningId },
+      where: { id: learningId, workspaceId },
       data: {
         invalidatedAt: new Date(),
         contextRefs: {
@@ -243,7 +243,7 @@ export function updateEpisode(): never {
 
 export async function getEpisode(workspaceId: string, id: string) {
   return withWorkspaceScope(workspaceId, async (tx) =>
-    tx.memoryEpisode.findUnique({ where: { id } }),
+    tx.memoryEpisode.findFirst({ where: { id, workspaceId } }),
   );
 }
 

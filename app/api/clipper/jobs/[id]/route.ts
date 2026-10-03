@@ -12,7 +12,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
     const { workspace } = await guardWorkspace();
     const { id } = await ctx.params;
     const job = await withWorkspaceScope(workspace.id, (tx) =>
-      tx.clipJob.findUnique({ where: { id } }),
+      tx.clipJob.findUnique({ where: { id, workspaceId: workspace.id } }),
     );
     if (!job) return Response.json({ error: "Job not found." }, { status: 404 });
     return Response.json({ job });

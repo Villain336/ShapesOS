@@ -120,7 +120,7 @@ export async function decideApprovalTx(
   }
   if (approval.expiresAt && approval.expiresAt.getTime() <= Date.now()) {
     await tx.missionApproval.update({
-      where: { id: approval.id },
+      where: { id: approval.id, workspaceId },
       data: { status: "expired" },
     });
     await appendApprovalEvent(tx, {
@@ -135,7 +135,7 @@ export async function decideApprovalTx(
 
   const decidedAt = new Date();
   await tx.missionApproval.update({
-    where: { id: approval.id },
+    where: { id: approval.id, workspaceId },
     data: { status: decision, decidedBy: actor, decidedAt },
   });
   const event = await appendApprovalEvent(tx, {

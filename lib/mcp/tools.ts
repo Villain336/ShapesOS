@@ -19,10 +19,9 @@ import { analyzeSerpUnmetered, ActionError } from "@/lib/serp/analyze";
 import { researchKeywordsUnmetered } from "@/lib/keywords/research";
 /* INTEGRATION:activepieces */
 import {
-  getFlowRun,
+  FlowNotBoundError,
   isActivepiecesConfigured,
-  latestFlowRun,
-  triggerFlow,
+  workspaceFlows,
 } from "@/lib/integrations/activepieces";
 /* END */
 
@@ -360,7 +359,6 @@ const tools: ToolDef[] = [
     inputJsonSchema: {"type":"object","properties":{"flowId":{"type":"string"},"payload":{"type":"object"}},"required":["flowId"],"additionalProperties":false},
     handler: async (ctx, args) => {
       const { flowId, payload } = args as { flowId: string; payload?: Record<string, unknown> };
-      void ctx;
       if (!isActivepiecesConfigured()) {
         throw new ToolError(
           "automation_not_connected",
@@ -368,7 +366,8 @@ const tools: ToolDef[] = [
         );
       }
       try {
-        const result = await triggerFlow(flowId, payload ?? {});
+        // Only flows bound to the token's workspace can fire (H6).
+        const result = await workspaceFlows(ctx.workspaceId).trigger(flowId, payload ?? {});
         return {
           data: {
             accepted: result.accepted,
@@ -380,6 +379,7 @@ const tools: ToolDef[] = [
           },
         };
       } catch (e) {
+        if (e instanceof FlowNotBoundError) throw new ToolError("flow_not_found", e.message);
         throw new ToolError("automation_trigger_failed", e instanceof Error ? e.message : String(e));
       }
     },
@@ -398,7 +398,7 @@ const tools: ToolDef[] = [
     inputJsonSchema: {"type":"object","properties":{"runId":{"type":"string"},"flowId":{"type":"string"}},"required":[],"additionalProperties":false},
     handler: async (ctx, args) => {
       const { runId, flowId } = args as { runId?: string; flowId?: string };
-      void ctx;
+      const flows = workspaceFlows(ctx.workspaceId);
       if (!isActivepiecesConfigured()) {
         throw new ToolError(
           "automation_not_connected",
@@ -407,10 +407,10 @@ const tools: ToolDef[] = [
       }
       try {
         if (runId) {
-          const run = await getFlowRun(runId);
+          const run = await flows.run(runId);
           return { data: { run } };
         }
-        const run = await latestFlowRun(flowId as string);
+        const run = await flows.latestRun(flowId as string);
         return {
           data: {
             run,
@@ -418,6 +418,7 @@ const tools: ToolDef[] = [
           },
         };
       } catch (e) {
+        if (e instanceof FlowNotBoundError) throw new ToolError("flow_not_found", e.message);
         throw new ToolError("automation_status_failed", e instanceof Error ? e.message : String(e));
       }
     },

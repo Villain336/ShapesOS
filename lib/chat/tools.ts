@@ -885,7 +885,7 @@ const trigger_automation_flow: ToolDef = {
     const flowId = str(args.flowId);
     if (!flowId) throw new Error("flowId is required");
     if (!hasRole(ctx, "editor")) throw new Error("editor role required");
-    const { isActivepiecesConfigured, triggerFlow } = await import("@/lib/integrations/activepieces");
+    const { isActivepiecesConfigured, workspaceFlows } = await import("@/lib/integrations/activepieces");
     if (!isActivepiecesConfigured()) {
       throw new Error(
         "Activepieces is not connected: set ACTIVEPIECES_URL and ACTIVEPIECES_API_KEY on the host (Settings → Providers). No flow was triggered.",
@@ -903,7 +903,8 @@ const trigger_automation_flow: ToolDef = {
         throw new Error(`payload must be valid JSON: ${e instanceof Error ? e.message : String(e)}`);
       }
     }
-    const result = await triggerFlow(flowId, payload);
+    // Only flows bound to this workspace can fire (H6).
+    const result = await workspaceFlows(ctx.workspaceId).trigger(flowId, payload);
     // Ledger the trigger (0-credit visibility event, brandfetch precedent).
     await meter({
       workspaceId: ctx.workspaceId,
@@ -935,17 +936,18 @@ const automation_flow_status: ToolDef = {
     },
   },
   async execute(ctx, args) {
-    void ctx;
     const runId = str(args.runId);
     const flowId = str(args.flowId);
     if (!runId && !flowId) throw new Error("runId or flowId is required");
-    const { isActivepiecesConfigured, getFlowRun, latestFlowRun } = await import("@/lib/integrations/activepieces");
+    const { isActivepiecesConfigured, workspaceFlows } = await import("@/lib/integrations/activepieces");
     if (!isActivepiecesConfigured()) {
       throw new Error(
         "Activepieces is not connected: set ACTIVEPIECES_URL and ACTIVEPIECES_API_KEY on the host (Settings → Providers).",
       );
     }
-    const run = runId ? await getFlowRun(runId) : await latestFlowRun(flowId as string);
+    // Runs/flows outside this workspace read as not found (H6).
+    const flows = workspaceFlows(ctx.workspaceId);
+    const run = runId ? await flows.run(runId) : await flows.latestRun(flowId as string);
     if (!run) {
       return { summary: `No runs recorded for flow "${flowId}" yet.`, details: { run: null } };
     }

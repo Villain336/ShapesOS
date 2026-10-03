@@ -36,7 +36,7 @@ export async function resolveErItem(
 
     if (decision === "approved") {
       await tx.graphNode.update({
-        where: { id: second.id },
+        where: { id: second.id, workspaceId },
         data: { mergedIntoId: first.id, lastSeen: new Date() },
       });
       await tx.graphEdge.create({
@@ -72,7 +72,7 @@ export async function resolveErItem(
     }
 
     await tx.graphErQueue.update({
-      where: { id: item.id },
+      where: { id: item.id, workspaceId },
       data: { status: decision, decidedBy, decidedAt: new Date() },
     });
     await auditEvent({
@@ -121,7 +121,7 @@ export async function revertMerge(
       },
     });
     await tx.graphNode.update({
-      where: { id: absorbedNodeId },
+      where: { id: absorbedNodeId, workspaceId },
       data: { mergedIntoId: null, lastSeen: now },
     });
     await auditEvent({

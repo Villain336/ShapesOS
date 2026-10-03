@@ -1,6 +1,7 @@
 # Test files that need a live, fully migrated Postgres (DATABASE_URL).
 # Run with: npm run test:db  — CI runs them as a NON-superuser app role so
 # the RLS batteries are meaningful. Everything else runs in: npm test
+lib/adplatforms/__tests__/spend-store-scope.test.ts
 lib/agents/agui/__tests__/adapter.test.ts
 lib/agents/runs/__tests__/retention-eval.test.ts
 lib/agents/runs/__tests__/retention-sweep.test.ts
@@ -10,6 +11,7 @@ lib/agents/runs/__tests__/trace-fidelity.eval.test.ts
 lib/agents/runs/__tests__/watch.test.ts
 lib/auth/__tests__/member-roles.test.ts
 lib/auth/__tests__/signup-mode.test.ts
+lib/authority/outreach/__tests__/webhook-tenant-db.test.ts
 lib/cad/__tests__/cad-slice1.test.ts
 lib/cad/__tests__/cad-slice2.test.ts
 lib/cad/__tests__/cad-slice3.test.ts
@@ -25,10 +27,13 @@ lib/funding/__tests__/funding-slice2.test.ts
 lib/funding/__tests__/funding-slice3.test.ts
 lib/funding/__tests__/funding-slice4.test.ts
 lib/funding/__tests__/funding.test.ts
+lib/integrations/actions/__tests__/separation-of-duties.test.ts
+lib/integrations/activepieces/__tests__/bindings-db.test.ts
 lib/intelligence/company/__tests__/knowledge-rls.test.ts
+lib/mcp/__tests__/mcp-auth-roles.test.ts
+lib/messaging/__tests__/inbound-sms-workspace.test.ts
 lib/ops/__tests__/ops-rls.test.ts
 lib/ops/__tests__/workflows-rls.test.ts
-lib/mcp/__tests__/mcp-auth-roles.test.ts
 lib/orchestrator/__tests__/orchestrator.test.ts
 lib/phase13b/evals/01-lesson-quality.test.ts
 lib/phase13b/evals/02-preference-precision.test.ts

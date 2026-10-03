@@ -150,8 +150,8 @@ function b64urlDecode(s: string): string {
 const B64_STD_RE = /^[A-Za-z0-9+/]*={0,2}$/;
 
 /**
- * Strict structural validation of a lib/secrets envelope ("v1:iv:ct:tag")
- * BEFORE decrypting.
+ * Strict structural validation of a lib/secrets envelope
+ * ("v2:kid:iv:ct:tag", or legacy "v1:iv:ct:tag") BEFORE decrypting.
  *
  * Why: Node's base64 decoder is lenient — bytes outside the base64 alphabet
  * are silently dropped. A corruption that lands in the tag's trailing
@@ -166,8 +166,9 @@ function assertValidEnvelope(envelope: string): void {
     throw new Error("Invalid OAuth state: malformed envelope");
   };
   const parts = envelope.split(":");
-  if (parts.length !== 4 || parts[0] !== "v1") fail();
-  const [, ivB64, ctB64, tagB64] = parts;
+  const v2 = parts.length === 5 && parts[0] === "v2" && /^[0-9a-f]{8}$/.test(parts[1]);
+  if (!v2 && (parts.length !== 4 || parts[0] !== "v1")) fail();
+  const [ivB64, ctB64, tagB64] = parts.slice(v2 ? 2 : 1);
   for (const p of [ivB64, ctB64, tagB64]) {
     if (!p || p.length % 4 !== 0 || !B64_STD_RE.test(p)) fail();
   }

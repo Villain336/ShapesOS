@@ -1,6 +1,16 @@
 # --- Marketr self-host: one command to run everything ---
 # Usage: copy .env.example to .env, fill in keys, then `docker compose up -d`
-# App: http://localhost:3000 | Postgres: localhost:5432 | Redis: localhost:6379
+# App: http://127.0.0.1:3000 (put a TLS reverse proxy in front; see DEPLOY.md).
+# Postgres and Redis are not published; MinIO binds to 127.0.0.1 only.
+#
+# Required in .env (compose refuses to start without them — no literal
+# defaults ship): POSTGRES_PASSWORD, APP_DB_PASSWORD, MINIO_ROOT_PASSWORD.
+# Use hex values (`openssl rand -hex 32`) — they are embedded in URLs.
+#
+# Roles: `migrate` connects as POSTGRES_USER (the superuser that owns the
+# schema), applies migrations and creates the runtime role APP_DB_USER
+# (NOSUPERUSER NOBYPASSRLS, scripts/db/create-app-role.sql). The app connects
+# ONLY as that role, so tenant row-level security is actually enforced.
 
 services:
   db:
@@ -8,7 +18,7 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-marketr}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-marketr}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env (openssl rand -hex 32)}
       POSTGRES_DB: ${POSTGRES_DB:-marketr}
     volumes:
       - marketr-db:/var/lib/postgresql/data
@@ -38,10 +48,10 @@ services:
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-marketr}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-marketr-minio-secret}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD in .env (openssl rand -hex 32)}
     ports:
-      - "${MINIO_PORT:-9000}:9000"
-      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+      - "127.0.0.1:${MINIO_PORT:-9000}:9000"
+      - "127.0.0.1:${MINIO_CONSOLE_PORT:-9001}:9001"
     volumes:
       - marketr-minio:/data
     healthcheck:
@@ -50,8 +60,9 @@ services:
       timeout: 5s
       retries: 5
 
-  # One-shot migrator: repairs renamed-migration history, then applies all
-  # pending migrations. The app starts only after it exits successfully.
+  # One-shot migrator: repairs renamed-migration history, applies all pending
+  # migrations, then creates/refreshes the least-privilege app role. The app
+  # starts only after it exits successfully.
   migrate:
     build:
       context: .
@@ -61,7 +72,9 @@ services:
       db:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-marketr}:${POSTGRES_PASSWORD:-marketr}@db:5432/${POSTGRES_DB:-marketr}?schema=public
+      DATABASE_URL: postgresql://${POSTGRES_USER:-marketr}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@db:5432/${POSTGRES_DB:-marketr}?schema=public
+      APP_DB_USER: ${APP_DB_USER:-marketr_app}
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD:?set APP_DB_PASSWORD in .env (openssl rand -hex 32)}
 
   app:
     build:
@@ -76,12 +89,15 @@ services:
       redis:
         condition: service_healthy
     ports:
-      - "${APP_PORT:-3000}:3000"
+      # Loopback only: a host reverse proxy (Caddy) terminates TLS in front.
+      # Set APP_BIND_ADDR=0.0.0.0 to expose the app port directly.
+      - "${APP_BIND_ADDR:-127.0.0.1}:${APP_PORT:-3000}:3000"
     env_file:
       - .env
     environment:
-      # Compose-provided defaults; override in .env if needed
-      DATABASE_URL: postgresql://${POSTGRES_USER:-marketr}:${POSTGRES_PASSWORD:-marketr}@db:5432/${POSTGRES_DB:-marketr}?schema=public
+      # Compose-provided; override in .env if needed. The runtime role, never
+      # the superuser (superusers bypass FORCE ROW LEVEL SECURITY).
+      DATABASE_URL: postgresql://${APP_DB_USER:-marketr_app}:${APP_DB_PASSWORD:?set APP_DB_PASSWORD in .env}@db:5432/${POSTGRES_DB:-marketr}?schema=public
       REDIS_URL: redis://redis:6379
       # Phase B (W3) filesystem: local disk by default; set MARKETR_STORAGE=s3
       # to use the MinIO service above (multi-instance deployments must).
@@ -90,7 +106,7 @@ services:
       MARKETR_S3_REGION: ${MARKETR_S3_REGION:-us-east-1}
       MARKETR_S3_BUCKET: ${MARKETR_S3_BUCKET:-marketr-files}
       MARKETR_S3_ACCESS_KEY: ${MINIO_ROOT_USER:-marketr}
-      MARKETR_S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-marketr-minio-secret}
+      MARKETR_S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD in .env}
 
 volumes:
   marketr-db:

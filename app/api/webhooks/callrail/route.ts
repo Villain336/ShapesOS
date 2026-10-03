@@ -18,6 +18,7 @@ import {
   FakeCallRailProvider,
   RealCallRailProvider,
 } from "@/lib/media/callrail";
+import { fakeProvidersAllowed } from "@/lib/env/secrets";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -29,6 +30,9 @@ export async function POST(req: NextRequest) {
   const workspaceId = req.nextUrl.searchParams.get("w");
 
   const providerName = (process.env.CALLRAIL_PROVIDER ?? "fake").toLowerCase();
+  if (providerName !== "callrail" && !fakeProvidersAllowed()) {
+    return Response.json({ error: "CallRail provider not configured" }, { status: 503 });
+  }
   const provider =
     providerName === "callrail"
       ? new RealCallRailProvider({

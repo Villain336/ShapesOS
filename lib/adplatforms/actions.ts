@@ -91,7 +91,13 @@ export async function runAdsAction(
       });
     }
     case "approve_spend":
-      return approveSpendAction(ctx.proposals, ctx.approvals, args.proposalId as string, ctx.actor);
+      return approveSpendAction(
+        ctx.proposals,
+        ctx.approvals,
+        ctx.workspaceId,
+        args.proposalId as string,
+        ctx.actor,
+      );
     case "launch":
     case "pause":
     case "adjust_budget": {

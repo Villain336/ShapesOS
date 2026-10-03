@@ -52,11 +52,11 @@ export async function getBudgetStatus(workspaceId: string, period = currentPerio
   const [spend, configs] = await Promise.all([
     withWorkspaceScope(workspaceId, (tx) =>
       tx.apiMeterEntry.aggregate({
-        where: { period },
+        where: { workspaceId, period },
         _sum: { costUsd: true },
       }),
     ),
-    withWorkspaceScope(workspaceId, (tx) => tx.serpVendorConfig.findMany()),
+    withWorkspaceScope(workspaceId, (tx) => tx.serpVendorConfig.findMany({ where: { workspaceId } })),
   ]);
   const spendCents = Math.round(Number(spend._sum.costUsd ?? 0) * 100);
   const caps = configs.map((c) => c.monthlyBudgetCapCents).filter((c): c is number => c != null);
@@ -140,7 +140,7 @@ export async function getDataCostSummary(
 ): Promise<DataCostSummary> {
   const entries = await withWorkspaceScope(workspaceId, (tx) =>
     tx.apiMeterEntry.findMany({
-      where: { period },
+      where: { workspaceId, period },
       select: { vendor: true, meter: true, quantity: true, costUsd: true },
     }),
   );

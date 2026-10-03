@@ -154,7 +154,7 @@ export async function revokeConnection(workspaceId: string, id: string) {
     const existing = await tx.composioConnection.findFirst({ where: { id, workspaceId } });
     if (!existing) throw new NotFoundError("Connection not found");
     return tx.composioConnection.update({
-      where: { id },
+      where: { id, workspaceId },
       data: { status: "revoked", lastError: null },
       select: { id: true, status: true },
     });

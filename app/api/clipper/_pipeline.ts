@@ -177,20 +177,20 @@ const jobSelect = {
 
 async function setJobProgress(workspaceId: string, jobId: string, progress: number) {
   await withWorkspaceScope(workspaceId, (tx) =>
-    tx.clipJob.update({ where: { id: jobId }, data: { progress } }),
+    tx.clipJob.update({ where: { id: jobId, workspaceId }, data: { progress } }),
   );
 }
 
 async function finishJob(workspaceId: string, jobId: string, progress = 1) {
   await withWorkspaceScope(workspaceId, (tx) =>
-    tx.clipJob.update({ where: { id: jobId }, data: { status: "done", progress } }),
+    tx.clipJob.update({ where: { id: jobId, workspaceId }, data: { status: "done", progress } }),
   );
 }
 
 async function failJob(workspaceId: string, jobId: string, message: string) {
   await withWorkspaceScope(workspaceId, (tx) =>
     tx.clipJob.update({
-      where: { id: jobId },
+      where: { id: jobId, workspaceId },
       data: { status: "failed", error: message.slice(0, 2000) },
     }),
   );
@@ -214,13 +214,13 @@ export async function claimNextPendingJob(workspaceId: string): Promise<ClaimedJ
       SET "status" = 'processing', "progress" = 0, "updated_at" = NOW()
       WHERE "id" = (
         SELECT sub."id" FROM "clip_jobs" AS sub
-        WHERE sub."status" = 'pending'
+        WHERE sub."status" = 'pending' AND sub."workspace_id" = $1
         ORDER BY sub."created_at" ASC
         FOR UPDATE SKIP LOCKED
         LIMIT 1
       )
       RETURNING "id", "workspace_id" AS "workspaceId", "source_id" AS "sourceId",
-                "kind", "payload"`);
+                "kind", "payload"`, workspaceId);
   });
   return rows[0] ?? null;
 }
@@ -231,11 +231,11 @@ async function executeTranscribe(job: ClaimedJob) {
   const ws = job.workspaceId;
   await setJobProgress(ws, job.id, 0.1);
   const source = await withWorkspaceScope(ws, (tx) =>
-    tx.clipSource.findUnique({ where: { id: job.sourceId ?? "" } }),
+    tx.clipSource.findUnique({ where: { id: job.sourceId ?? "", workspaceId: ws } }),
   );
   if (!source) throw new Error("Source not found for transcribe job.");
   await withWorkspaceScope(ws, (tx) =>
-    tx.clipSource.update({ where: { id: source.id }, data: { transcriptStatus: "processing" } }),
+    tx.clipSource.update({ where: { id: source.id, workspaceId: ws }, data: { transcriptStatus: "processing" } }),
   );
 
   const bytes = await readSourceBytes(source);
@@ -258,7 +258,7 @@ async function executeTranscribe(job: ClaimedJob) {
 
     await withWorkspaceScope(ws, (tx) =>
       tx.clipSource.update({
-        where: { id: source.id },
+        where: { id: source.id, workspaceId: ws },
         data: {
           transcriptStatus: "ready",
           transcript: { words, text } as unknown as Prisma.InputJsonValue,
@@ -276,7 +276,7 @@ async function executeGenerate(job: ClaimedJob) {
   await setJobProgress(ws, job.id, 0.1);
   const source = await withWorkspaceScope(ws, (tx) =>
     tx.clipSource.findUnique({
-      where: { id: job.sourceId ?? "" },
+      where: { id: job.sourceId ?? "", workspaceId: ws },
       select: { id: true, title: true, transcriptStatus: true, transcript: true },
     }),
   );
@@ -319,7 +319,7 @@ async function executeRender(job: ClaimedJob) {
   if (!payload.clipId) throw new Error("Render job is missing clipId.");
   const clip = await withWorkspaceScope(ws, (tx) =>
     tx.clip.findUnique({
-      where: { id: payload.clipId },
+      where: { id: payload.clipId, workspaceId: ws },
       include: { source: { select: { fileRef: true, sourceUrl: true, transcript: true } } },
     }),
   );
@@ -328,7 +328,7 @@ async function executeRender(job: ClaimedJob) {
     throw new Error(`Clip must be draft or approved to render (was ${clip.status}).`);
   }
   await withWorkspaceScope(ws, (tx) =>
-    tx.clip.update({ where: { id: clip.id }, data: { renderStatus: "processing" } }),
+    tx.clip.update({ where: { id: clip.id, workspaceId: ws }, data: { renderStatus: "processing" } }),
   );
 
   const transcript = clip.source.transcript as unknown as WordTimedTranscript | null;
@@ -374,7 +374,7 @@ async function executeRender(job: ClaimedJob) {
 
     await withWorkspaceScope(ws, (tx) =>
       tx.clip.update({
-        where: { id: clip.id },
+        where: { id: clip.id, workspaceId: ws },
         data: {
           outputRef: key,
           renderStatus: "ready",
@@ -387,7 +387,7 @@ async function executeRender(job: ClaimedJob) {
     );
   } catch (e) {
     await withWorkspaceScope(ws, (tx) =>
-      tx.clip.update({ where: { id: clip.id }, data: { renderStatus: "failed" } }),
+      tx.clip.update({ where: { id: clip.id, workspaceId: ws }, data: { renderStatus: "failed" } }),
     );
     throw e;
   } finally {
@@ -410,7 +410,7 @@ export async function executeClaimedJob(job: ClaimedJob): Promise<void> {
     if (job.kind === "transcribe" && job.sourceId) {
       await withWorkspaceScope(job.workspaceId, (tx) =>
         tx.clipSource.update({
-          where: { id: job.sourceId as string },
+          where: { id: job.sourceId as string, workspaceId: job.workspaceId },
           data: { transcriptStatus: "failed" },
         }),
       ).catch(() => {});

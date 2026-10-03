@@ -8,3 +8,4 @@ export * from "./suppression";
 export * from "./deliverability";
 export * from "./placement";
 export * from "./webhooks";
+export * from "./webhook-events";

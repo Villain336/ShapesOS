@@ -95,7 +95,7 @@ export async function getUniverDoc(
   id: string,
 ): Promise<UniverDocRecord | null> {
   const row = await withWorkspaceScope(workspaceId, (tx) =>
-    tx.univerDoc.findUnique({ where: { id } }),
+    tx.univerDoc.findFirst({ where: { id, workspaceId } }),
   );
   return row ? toRecord(row) : null;
 }
@@ -149,7 +149,7 @@ export async function saveUniverDocSnapshot(
   }
   const row = await withWorkspaceScope(workspaceId, (tx) =>
     tx.univerDoc.update({
-      where: { id },
+      where: { id, workspaceId },
       data: { snapshot: snapshot as object, version: { increment: 1 } },
     }),
   );
@@ -167,7 +167,7 @@ export async function renameUniverDoc(
   const existing = await getUniverDoc(workspaceId, id);
   if (!existing) throw new NotFoundError("doc not found");
   const row = await withWorkspaceScope(workspaceId, (tx) =>
-    tx.univerDoc.update({ where: { id }, data: { title: clean } }),
+    tx.univerDoc.update({ where: { id, workspaceId }, data: { title: clean } }),
   );
   return toRecord(row);
 }
@@ -175,5 +175,5 @@ export async function renameUniverDoc(
 export async function deleteUniverDoc(workspaceId: string, id: string): Promise<void> {
   const existing = await getUniverDoc(workspaceId, id);
   if (!existing) throw new NotFoundError("doc not found");
-  await withWorkspaceScope(workspaceId, (tx) => tx.univerDoc.delete({ where: { id } }));
+  await withWorkspaceScope(workspaceId, (tx) => tx.univerDoc.delete({ where: { id, workspaceId } }));
 }

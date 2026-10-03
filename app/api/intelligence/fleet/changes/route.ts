@@ -94,7 +94,7 @@ export async function PATCH(req: NextRequest) {
     if (!existing) return null;
     if (!(await requireProjectRole(user.id, existing.watch.projectId, "editor"))) return "forbidden";
     return tx.competitorChange.update({
-      where: { id: body.id },
+      where: { id: body.id, workspaceId },
       data: { status: body.status as CompetitorChangeStatus },
       select: { id: true, status: true },
     });

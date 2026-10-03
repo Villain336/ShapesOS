@@ -94,6 +94,7 @@ export async function listGscProjects(workspaceId: string): Promise<GscProject[]
 export async function listWorkspaceProjects(workspaceId: string): Promise<GscProject[]> {
   return withWorkspaceScope(workspaceId, async (tx) => {
     const projects = await tx.project.findMany({
+      where: { workspaceId },
       select: { id: true, domain: true },
       orderBy: { createdAt: "asc" },
     });

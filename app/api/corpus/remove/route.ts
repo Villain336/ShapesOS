@@ -1,13 +1,17 @@
 // Marketr — Knowledge Brain: removal-flag management.
 // GET    /api/corpus/remove          → current removal flags (viewer+)
-// POST   /api/corpus/remove          → flag a source for removal (editor+)
+// POST   /api/corpus/remove          → flag a source for removal (platform operators)
 //   { sourceId, reason } — marks only; ingested data is NEVER deleted here.
 //   Flags take effect on the next corpus rebuild (the ingest script honors
 //   data/corpus/removals.json).
-// DELETE /api/corpus/remove?sourceId=… → clear a flag (editor+)
+// DELETE /api/corpus/remove?sourceId=… → clear a flag (platform operators)
+//
+// The corpus is SHARED by every tenant on the install, so mutations are not
+// a workspace role: only MARKETR_PLATFORM_OPERATORS may change it (Phase 1).
 
 import { requireUser, getOrCreateWorkspace } from "@/lib/session";
 import { requireWorkspaceRole, forbidden } from "@/lib/authz";
+import { requirePlatformOperator } from "@/lib/auth/require-platform-operator";
 import {
   listRemovals,
   flagRemoval,
@@ -17,7 +21,7 @@ import {
 
 export const dynamic = "force-dynamic";
 
-async function authed(min: "viewer" | "editor") {
+async function authed(min: "viewer") {
   const user = await requireUser();
   if (!user) return { err: Response.json({ error: "Unauthorized" }, { status: 401 }) };
   const workspace = await getOrCreateWorkspace(user.id, user.email);
@@ -33,9 +37,8 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  const a = await authed("editor");
-  if (a.err) return a.err;
-  const user = a.user!;
+  const user = await requirePlatformOperator();
+  if (user instanceof Response) return user;
 
   let body: Record<string, unknown>;
   try {
@@ -53,8 +56,8 @@ export async function POST(req: Request) {
 }
 
 export async function DELETE(req: Request) {
-  const a = await authed("editor");
-  if (a.err) return a.err;
+  const op = await requirePlatformOperator();
+  if (op instanceof Response) return op;
   const sourceId = sanitizeId(new URL(req.url).searchParams.get("sourceId"));
   if (!sourceId) return Response.json({ error: "sourceId is required" }, { status: 400 });
   if (!unflagRemoval(sourceId)) return Response.json({ error: "flag not found" }, { status: 404 });

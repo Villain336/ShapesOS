@@ -227,7 +227,7 @@ export default async function RunViewerPage({
   const pendingApprovals = run.missionId
     ? await withWorkspaceScope(workspace.id, (tx) =>
         tx.missionApproval.findMany({
-          where: { missionId: run.missionId, status: "pending" },
+          where: { missionId: run.missionId, workspaceId: workspace.id, status: "pending" },
           orderBy: { createdAt: "desc" },
           take: 25,
           select: { id: true, action: true, tier: true, createdAt: true },

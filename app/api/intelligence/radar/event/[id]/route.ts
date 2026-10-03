@@ -16,8 +16,8 @@ export async function GET(
   const { id } = await params;
 
   const event = await withWorkspaceScope(workspace.id, async (tx) =>
-    tx.platformEvent.findUnique({
-      where: { id },
+    tx.platformEvent.findFirst({
+      where: { id, workspaceId: workspace.id },
       include: { _count: { select: { pageImpacts: true } } },
     }),
   );

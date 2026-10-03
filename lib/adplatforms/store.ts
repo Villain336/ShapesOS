@@ -6,6 +6,7 @@
 
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { AdsGateError } from "./gate";
 import type {
   SpendApproval,
   SpendApprovalStore,
@@ -85,19 +86,22 @@ export function prismaProposalStore(): SpendProposalStore {
       });
       return toProposal(row);
     },
-    async get(id) {
-      const row = await prisma.spendProposal.findFirst({ where: { id } });
+    // spend_proposals has no RLS: every read and write carries workspaceId.
+    async get(id, workspaceId) {
+      const row = await prisma.spendProposal.findFirst({ where: { id, workspaceId } });
       return row ? toProposal(row) : null;
     },
-    async setStatus(id, status, decidedBy) {
-      const row = await prisma.spendProposal.update({
-        where: { id },
+    async setStatus(id, workspaceId, status, decidedBy) {
+      const { count } = await prisma.spendProposal.updateMany({
+        where: { id, workspaceId },
         data: {
           status,
           decidedBy: decidedBy ?? null,
           decidedAt: decidedBy ? new Date() : null,
         },
       });
+      const row = count === 1 ? await prisma.spendProposal.findFirst({ where: { id, workspaceId } }) : null;
+      if (!row) throw new AdsGateError("PROPOSAL_NOT_FOUND", `Proposal ${id} not found`);
       return toProposal(row);
     },
   };
@@ -116,8 +120,8 @@ export function prismaApprovalStore(): SpendApprovalStore {
       });
       return toApproval(row);
     },
-    async getByProposalId(proposalId) {
-      const row = await prisma.spendApproval.findUnique({ where: { proposalId } });
+    async getByProposalId(proposalId, workspaceId) {
+      const row = await prisma.spendApproval.findFirst({ where: { proposalId, workspaceId } });
       return row ? toApproval(row) : null;
     },
   };

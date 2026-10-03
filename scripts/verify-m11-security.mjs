@@ -84,6 +84,7 @@ const AUTHZ_PRIMITIVES = [
   "flywheelGuard",                              // Phase 7 flywheel guard (app/api/flywheel/_lib.ts) — requireUser + requireWorkspaceRole(editor) for mutations
   "dspGuard",                                   // Phase 7 DSP guard (app/api/flywheel/dsp/_lib.ts) — requireUser + requireWorkspaceRole(editor) for mutations
   "launchGuard",                                // Phase 7 launch guard (app/api/flywheel/launch/_lib.ts) — requireUser + requireWorkspaceRole(editor) for mutations
+  "requirePlatformOperator",                    // Phase 1 host-wide resources (lib/auth/require-platform-operator.ts) — MARKETR_PLATFORM_OPERATORS only
 ];
 // Public by design. Each entry documents WHY — this is a justification list,
 // not a suppression list. Adding an entry requires a code comment in the

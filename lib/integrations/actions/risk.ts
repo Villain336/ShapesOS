@@ -74,20 +74,19 @@ export function deriveTierFromName(toolName: string): RiskTier {
 
 // Tools whose ONLY effect is a draft artifact the human must send/approve
 // in the native app. Medium tier, auto-executable, reviewable.
-const DRAFT_CREATOR_PATTERNS = ["DRAFT", "_PROPOSAL", "PROPOSE_"];
-
-// Explicit draft-creator slugs that don't match the patterns above.
-const DRAFT_CREATOR_SLUGS = new Set([
+//
+// EXACT allow-list (Phase 1): substring patterns ("DRAFT" anywhere) made
+// GMAIL_SEND_DRAFT — which SENDS — auto-executable. A slug is a
+// draft-creator only when it is listed here verbatim; anything else that
+// merely mentions a draft goes through the normal approval queue.
+export const DRAFT_CREATOR_SLUGS: ReadonlySet<string> = new Set([
   "GMAIL_CREATE_DRAFT",
+  "GMAIL_CREATE_EMAIL_DRAFT", // Composio's Gmail slug for the same action
   "NOTION_CREATE_PAGE", // pages start as private drafts in the workspace
 ]);
 
 export function isDraftCreator(toolName: string): boolean {
-  const upper = toolName.toUpperCase();
-  return (
-    DRAFT_CREATOR_SLUGS.has(upper) ||
-    DRAFT_CREATOR_PATTERNS.some((p) => upper.includes(p))
-  );
+  return DRAFT_CREATOR_SLUGS.has(toolName.trim().toUpperCase());
 }
 
 export interface ClassifyOptions {

@@ -69,7 +69,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
   const updated = await withWorkspaceScope(access.workspaceId, (tx) =>
     tx.companyKnowledge.update({
-      where: { id: existing.id },
+      where: { id: existing.id, workspaceId: access.workspaceId },
       data: {
         ...(body.title?.trim() ? { title: body.title.trim().slice(0, 300) } : {}),
         ...(nextBody !== undefined ? { body: nextBody } : {}),
@@ -105,7 +105,7 @@ export async function DELETE(req: NextRequest, { params }: Params) {
   if (!existing) return notFound("Knowledge entry not found");
 
   await withWorkspaceScope(access.workspaceId, (tx) =>
-    tx.companyKnowledge.delete({ where: { id: existing.id } }),
+    tx.companyKnowledge.delete({ where: { id: existing.id, workspaceId: access.workspaceId } }),
   );
   return Response.json({ deleted: true });
 }

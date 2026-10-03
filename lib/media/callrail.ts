@@ -25,6 +25,7 @@
 import { createHmac, createHash } from "node:crypto";
 import type { MediaStore, CallNumber } from "./store";
 import { safeEqual } from "../mail/provider";
+import { requireSecret } from "@/lib/env/secrets";
 
 export type CallRailProviderName = "fake" | "callrail";
 
@@ -69,7 +70,7 @@ const CALL_RANK: Record<CallEventType, number> = {
 };
 
 export function fakeCallRailSecret(env: NodeJS.ProcessEnv = process.env): string {
-  return (env.FAKE_CALLRAIL_SECRET ?? "fake-callrail-dev-secret").trim();
+  return requireSecret("FAKE_CALLRAIL_SECRET", "fake-callrail-dev-secret", env);
 }
 
 export class FakeCallRailProvider implements CallRailProvider {

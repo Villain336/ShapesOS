@@ -5,14 +5,24 @@
 // circuit-breaker quarantine, unsubscribe -> instant global suppression.
 // No session guard — webhooks authenticate by signature.
 //
-// Workspace resolution: provider payloads don't carry our workspace id, so
-// the workspace is resolved from the referenced sequence (global id lookup).
-// Provider-level events without a sequence id (e.g. a bare unsubscribe)
-// fall back to the ?workspaceId= query param; without either, the event is
-// rejected with 422 rather than guessing a tenant.
+// Order: verify the HMAC first, then resolve the tenant from SIGNED data
+// only — the referenced sequence's own workspace (global id lookup), or a
+// workspaceId field inside the signed body for provider-level events without
+// a sequence (e.g. a bare unsubscribe). The ?workspaceId= query param is NOT
+// covered by the signature and is ignored (Phase 1: a captured event could
+// otherwise be replayed into another tenant). Without a signed workspace the
+// event is rejected with 422 rather than guessing a tenant. Idempotency is
+// durable (outreach_webhook_events).
 
 import { authorityTablesReady } from "@/lib/authority/db";
-import { handleProviderWebhook, type WebhookProvider } from "@/lib/authority/outreach";
+import {
+  handleProviderWebhook,
+  parseWebhookPayload,
+  prismaWebhookEventStore,
+  resolveWebhookWorkspace,
+  verifyWebhookSignature,
+  type WebhookProvider,
+} from "@/lib/authority/outreach";
 import { outreachStores } from "@/app/api/authority/outreach/_stores";
 import { prisma } from "@/lib/prisma";
 
@@ -30,27 +40,13 @@ function mapWebhookError(err: unknown): Response {
   return Response.json({ error: message }, { status: 422 });
 }
 
-async function resolveWorkspaceId(req: Request, rawBody: string): Promise<string | null> {
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(rawBody);
-  } catch {
-    return null;
-  }
-  const sequenceId =
-    parsed && typeof parsed === "object" && "sequenceId" in parsed
-      ? String((parsed as { sequenceId?: unknown }).sequenceId ?? "")
-      : "";
-  if (sequenceId) {
-    // Global id lookup -> the sequence's own workspace (tenant never guessed).
-    const seq = await prisma.outreachSequence.findUnique({
-      where: { id: sequenceId },
-      select: { workspaceId: true },
-    });
-    if (seq) return seq.workspaceId;
-  }
-  const qp = new URL(req.url).searchParams.get("workspaceId");
-  return qp && qp.trim() ? qp.trim() : null;
+/** Global id lookup -> the sequence's own workspace (tenant never guessed). */
+async function sequenceWorkspace(sequenceId: string): Promise<string | null> {
+  const seq = await prisma.outreachSequence.findUnique({
+    where: { id: sequenceId },
+    select: { workspaceId: true },
+  });
+  return seq?.workspaceId ?? null;
 }
 
 export async function handleProviderEvent(req: Request, provider: WebhookProvider): Promise<Response> {
@@ -60,10 +56,16 @@ export async function handleProviderEvent(req: Request, provider: WebhookProvide
   const rawBody = await req.text();
   const signature = req.headers.get("x-marketr-signature") ?? req.headers.get("x-webhook-signature");
 
-  const workspaceId = await resolveWorkspaceId(req, rawBody);
+  let workspaceId: string | null;
+  try {
+    verifyWebhookSignature(provider, rawBody, signature);
+    workspaceId = await resolveWebhookWorkspace(parseWebhookPayload(rawBody), sequenceWorkspace);
+  } catch (err) {
+    return mapWebhookError(err);
+  }
   if (!workspaceId) {
     return Response.json(
-      { error: "Cannot resolve workspace: payload has no sequenceId and no ?workspaceId= was provided." },
+      { error: "Cannot resolve workspace: the signed payload has no known sequenceId or workspaceId." },
       { status: 422 },
     );
   }
@@ -76,6 +78,7 @@ export async function handleProviderEvent(req: Request, provider: WebhookProvide
         prospects: stores.prospects,
         campaigns: stores.campaigns,
         suppression: stores.suppression,
+        events: prismaWebhookEventStore(),
       },
       { provider, rawBody, signature, workspaceId },
     );

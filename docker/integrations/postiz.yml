@@ -21,6 +21,9 @@
 # Up:   docker compose -f docker/integrations/postiz.yml --profile postiz up -d
 # Down: docker compose -f docker/integrations/postiz.yml --profile postiz down
 #
+# Required: POSTIZ_DB_PASSWORD, POSTIZ_JWT_SECRET (no defaults ship). The UI
+# binds to 127.0.0.1 only — reverse-proxy it for remote access.
+#
 # Postiz app: official `ghcr.io/gitroomhq/postiz-app:latest` from the
 # project maintainers. Default UI: http://localhost:5000
 # API base for Marketr: POSTIZ_URL=http://localhost:5000 (the Marketr
@@ -36,7 +39,7 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTIZ_DB_USER:-postiz}
-      POSTGRES_PASSWORD: ${POSTIZ_DB_PASSWORD:-postiz}
+      POSTGRES_PASSWORD: ${POSTIZ_DB_PASSWORD:?set POSTIZ_DB_PASSWORD (openssl rand -hex 32)}
       POSTGRES_DB: ${POSTIZ_DB_NAME:-postiz}
     volumes:
       - postiz-pgdata:/var/lib/postgresql/data
@@ -68,15 +71,15 @@ services:
       FRONTEND_URL: ${POSTIZ_FRONTEND_URL:-http://localhost:5000}
       NEXT_PUBLIC_BACKEND_URL: ${POSTIZ_BACKEND_URL:-http://localhost:5000/api}
       # JWT signing secret for the self-hosted instance.
-      JWT_SECRET: ${POSTIZ_JWT_SECRET:-change-me-to-a-long-random-string}
-      DATABASE_URL: postgresql://${POSTIZ_DB_USER:-postiz}:${POSTIZ_DB_PASSWORD:-postiz}@postiz-postgres:5432/${POSTIZ_DB_NAME:-postiz}?schema=public
+      JWT_SECRET: ${POSTIZ_JWT_SECRET:?set POSTIZ_JWT_SECRET (openssl rand -hex 32)}
+      DATABASE_URL: postgresql://${POSTIZ_DB_USER:-postiz}:${POSTIZ_DB_PASSWORD:?set POSTIZ_DB_PASSWORD}@postiz-postgres:5432/${POSTIZ_DB_NAME:-postiz}?schema=public
       REDIS_URL: redis://postiz-redis:6379
       # Scheduling requires Temporal (Postiz v2.12+). Defaults assume a
       # locally running Temporal on its standard port; override via .env.
       TEMPORAL_ADDRESS: ${TEMPORAL_ADDRESS:-localhost:7233}
       TEMPORAL_NAMESPACE: ${TEMPORAL_NAMESPACE:-default}
     ports:
-      - "${POSTIZ_PORT:-5000}:5000"
+      - "127.0.0.1:${POSTIZ_PORT:-5000}:5000"
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:5000/api/public/v1/is-connected"]
       interval: 30s

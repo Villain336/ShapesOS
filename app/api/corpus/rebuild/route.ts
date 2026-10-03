@@ -1,13 +1,16 @@
 // Marketr — Knowledge Brain: corpus rebuild job.
 // GET  /api/corpus/rebuild → { status, logTail } (viewer+)
 // POST /api/corpus/rebuild → start scripts/ingest-corpus.mts as a detached
-//   background job (admin+). One job at a time; status + log tail pollable.
+//   background job (platform operators — the corpus is shared by every
+//   tenant and the job spawns a process; Phase 1). One job at a time;
+//   status + log tail pollable.
 //   The job rewrites data/corpus/* and bumps the manifest version.
 
 import { spawn } from "node:child_process";
 import fs from "node:fs";
 import { requireUser, getOrCreateWorkspace } from "@/lib/session";
 import { requireWorkspaceRole, forbidden } from "@/lib/authz";
+import { requirePlatformOperator } from "@/lib/auth/require-platform-operator";
 import {
   readRebuildStatus,
   writeRebuildStatus,
@@ -17,7 +20,7 @@ import {
 
 export const dynamic = "force-dynamic";
 
-async function authed(min: "viewer" | "admin") {
+async function authed(min: "viewer") {
   const user = await requireUser();
   if (!user) return { err: Response.json({ error: "Unauthorized" }, { status: 401 }) };
   const workspace = await getOrCreateWorkspace(user.id, user.email);
@@ -33,8 +36,8 @@ export async function GET() {
 }
 
 export async function POST() {
-  const a = await authed("admin");
-  if (a.err) return a.err;
+  const op = await requirePlatformOperator();
+  if (op instanceof Response) return op;
 
   const current = readRebuildStatus();
   if (current.state === "running") {

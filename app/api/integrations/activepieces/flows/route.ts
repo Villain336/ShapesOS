@@ -1,7 +1,11 @@
 // Marketr — GET /api/integrations/activepieces/flows (Phase 12, Worker 3).
-// List flows on the Activepieces engine. Honest 503 when not connected.
+// List the flows bound to the caller's workspace (Phase 1, H6 — the engine is
+// host-wide). Platform operators may pass ?scope=engine to see every engine
+// flow with its binding, so they can bind new ones. Honest 503 when not connected.
 
-import { listFlows } from "@/lib/integrations/activepieces";
+import { listFlows, prismaFlowBindingStore, workspaceFlows } from "@/lib/integrations/activepieces";
+import { isPlatformOperator } from "@/lib/auth/platform-operator";
+import { requireUser } from "@/lib/session";
 import { integrationsGuard, engineError } from "../_lib";
 
 export const dynamic = "force-dynamic";
@@ -12,8 +16,13 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   const limit = Math.max(1, Math.min(Number(url.searchParams.get("limit")) || 50, 100));
   const cursor = url.searchParams.get("cursor");
+  const engineScope = url.searchParams.get("scope") === "engine";
+  if (engineScope && !isPlatformOperator(await requireUser())) {
+    return Response.json({ error: "Platform operators only." }, { status: 403 });
+  }
   try {
-    const page = await listFlows({ limit, ...(cursor ? { cursor } : {}) });
+    const opts = { limit, ...(cursor ? { cursor } : {}) };
+    const page = engineScope ? await listFlows(opts) : await workspaceFlows(gate.workspaceId).list(opts);
     if (!page.configured) {
       return Response.json(
         {
@@ -25,6 +34,13 @@ export async function GET(req: Request) {
         },
         { status: 503 },
       );
+    }
+    if (engineScope) {
+      const store = prismaFlowBindingStore();
+      const flows = await Promise.all(
+        page.flows.map(async (f) => ({ ...f, boundWorkspaceId: await store.ownerOf(f.id) })),
+      );
+      return Response.json({ configured: true, flows, nextCursor: page.nextCursor });
     }
     return Response.json({ configured: true, flows: page.flows, nextCursor: page.nextCursor });
   } catch (e) {

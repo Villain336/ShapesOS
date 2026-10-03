@@ -29,7 +29,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     }
     const clip = await withWorkspaceScope(workspace.id, (tx) =>
       tx.clip.findUnique({
-        where: { id },
+        where: { id, workspaceId: workspace.id },
         select: { id: true, status: true, captionStyle: true, captions: true },
       }),
     );
@@ -63,7 +63,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     }
 
     const updated = await withWorkspaceScope(workspace.id, (tx) =>
-      tx.clip.update({ where: { id }, data }),
+      tx.clip.update({ where: { id, workspaceId: workspace.id }, data }),
     );
     return Response.json({ clip: updated });
   } catch (e) {

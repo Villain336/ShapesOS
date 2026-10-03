@@ -26,6 +26,7 @@
 
 import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { Resend } from "resend";
+import { assertFakeProviderAllowed, requireSecret } from "@/lib/env/secrets";
 
 export type SmsProviderName = "twilio" | "fake";
 export type EmailProviderName = "resend" | "fake";
@@ -232,7 +233,7 @@ export function fakeMessageSid(prefix: "FAKESM" | "FAKEEM", seed = ""): string {
 }
 
 export function fakeMessagingSecret(env: NodeJS.ProcessEnv = process.env): string {
-  return (env.FAKE_MESSAGING_SECRET ?? "fake-messaging-dev-secret").trim();
+  return requireSecret("FAKE_MESSAGING_SECRET", "fake-messaging-dev-secret", env);
 }
 
 export class FakeMessagingProvider implements MessagingProvider {
@@ -291,6 +292,7 @@ export class FakeMessagingProvider implements MessagingProvider {
 export function getSmsProvider(env: NodeJS.ProcessEnv = process.env): MessagingProvider {
   const name = ((env.MESSAGING_SMS_PROVIDER ?? "fake") as string).trim().toLowerCase();
   if (name === "twilio") return new TwilioMessagingProvider(env);
+  assertFakeProviderAllowed("SMS", env);
   return new FakeMessagingProvider();
 }
 
@@ -299,6 +301,7 @@ export function getSmsProvider(env: NodeJS.ProcessEnv = process.env): MessagingP
 export function getEmailProvider(env: NodeJS.ProcessEnv = process.env): MessagingProvider {
   const name = ((env.MESSAGING_EMAIL_PROVIDER ?? "fake") as string).trim().toLowerCase();
   if (name === "resend") return new ResendEmailProvider(env);
+  assertFakeProviderAllowed("email", env);
   return new FakeMessagingProvider();
 }
 

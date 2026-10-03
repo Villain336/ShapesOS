@@ -323,7 +323,7 @@ export async function transitionSession(
   });
   return withWorkspaceScope(workspaceId, (tx) =>
     tx.callSession.update({
-      where: { id: sessionId },
+      where: { id: sessionId, workspaceId },
       data: {
         status: to,
         auditTrail: json(auditTrail),
@@ -347,7 +347,7 @@ export async function appendTranscriptTurn(
   const transcript = (current.transcript ?? []) as unknown as TranscriptTurn[];
   return withWorkspaceScope(workspaceId, (tx) =>
     tx.callSession.update({
-      where: { id: sessionId },
+      where: { id: sessionId, workspaceId },
       data: {
         transcript: json([
           ...transcript,
@@ -372,7 +372,7 @@ export async function setOutcome(
   const trail = (current.auditTrail ?? []) as unknown as AuditEntry[];
   return withWorkspaceScope(workspaceId, (tx) =>
     tx.callSession.update({
-      where: { id: sessionId },
+      where: { id: sessionId, workspaceId },
       data: {
         outcome,
         auditTrail: json(
@@ -408,7 +408,7 @@ export async function attachRecording(
   const trail = (current.auditTrail ?? []) as unknown as AuditEntry[];
   return withWorkspaceScope(workspaceId, (tx) =>
     tx.callSession.update({
-      where: { id: sessionId },
+      where: { id: sessionId, workspaceId },
       data: {
         recordingRef,
         auditTrail: json(
@@ -436,7 +436,7 @@ export async function grantRecordingConsent(
   const trail = (current.auditTrail ?? []) as unknown as AuditEntry[];
   return withWorkspaceScope(workspaceId, (tx) =>
     tx.callSession.update({
-      where: { id: sessionId },
+      where: { id: sessionId, workspaceId },
       data: {
         recordingConsent: true,
         auditTrail: json(

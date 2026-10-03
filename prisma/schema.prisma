@@ -898,6 +898,10 @@ model Workspace {
   playbookVersions          PlaybookVersion[]
   automationSettings        AutomationSetting[]
   commandAudits             CommandAudit[]
+  // Phase 1 (H6): Activepieces flows this workspace may trigger / read.
+  automationFlowBindings    AutomationFlowBinding[]
+  // Phase 1: durable idempotency for Smartlead/Instantly webhook events.
+  outreachWebhookEvents     OutreachWebhookEvent[]
 
   @@map("workspaces")
 }
@@ -13150,4 +13154,43 @@ model CadTaskComment {
 
   @@index([workspaceId, taskId])
   @@map("cad_task_comments")
+}
+
+// ---------------------------------------------------------------------------
+// Phase 1 (H6): Activepieces tenant binding.
+//
+// The Activepieces engine is one host-wide sidecar, so a flow id alone says
+// nothing about which tenant owns it. A flow can be triggered — and its runs
+// read — only from the workspace it is bound to. flow_id is globally unique:
+// a flow belongs to exactly one workspace. Bindings are created by platform
+// operators (MARKETR_PLATFORM_OPERATORS); see lib/integrations/activepieces/bindings.ts.
+// ---------------------------------------------------------------------------
+model AutomationFlowBinding {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  flowId      String    @unique @map("flow_id")
+  boundBy     String    @map("bound_by")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@index([workspaceId])
+  @@map("automation_flow_bindings")
+}
+
+// Phase 1: durable idempotency for outreach provider webhooks (Smartlead /
+// Instantly). One row per (provider, provider event id), claimed before the
+// event is processed — redeliveries and replays across instances and
+// restarts collapse to a no-op. Replaces the in-process Set.
+model OutreachWebhookEvent {
+  id          String    @id @default(cuid())
+  provider    String
+  eventId     String    @map("event_id")
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  type        String
+  receivedAt  DateTime  @default(now()) @map("received_at")
+
+  @@unique([provider, eventId])
+  @@index([workspaceId, receivedAt])
+  @@map("outreach_webhook_events")
 }
