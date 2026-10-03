@@ -1,23 +1,24 @@
-// Marketr — M21 Meta Ads adapter.
+// ShapesOS — M21 Meta Ads adapter.
 //
-// LIVE WIRING (not yet implemented): this adapter is MOCK-ONLY today. The
-// live pass must call the Meta Marketing API (Graph API v19+):
-//   GET  https://graph.facebook.com/v21.0/me/adaccounts?fields=name,account_id,account_status
-//     → list_ad_accounts()
-//   GET  https://graph.facebook.com/v21.0/act_{accountId}/insights?date_preset=last_30d&fields=spend,impressions,clicks,ctr,actions
+// LIVE WIRING (Phase 4b): with a vault credential this adapter calls the
+// Meta Marketing API on a versioned Graph URL (default v26.0,
+// META_GRAPH_API_VERSION overrides; lib/connectors/m21/live/meta-ads.ts):
+//   GET /me/adaccounts?fields=id,name,account_id,account_status,currency
+//     → list_ad_accounts() (cursor paging)
+//   GET /act_{id}/insights?level=account&date_preset=…&fields=spend,impressions,clicks,ctr,cpc,actions
 //     → account_insights()
-//   GET  https://graph.facebook.com/v21.0/act_{accountId}/campaigns?fields=name,status,objective,effective_status
-//     → list_campaigns()
-//   GET  https://graph.facebook.com/v21.0/{campaignId}/insights?fields=spend,impressions,clicks,ctr,actions&breakdowns=...
-//     → campaign_insights()
-// Auth: OAuth2 Bearer access_token (scopes ads_read, ads_management via
-// Facebook Login); refresh via lib/vault/refresh.ts. Note: Marketr already
-// has a Meta ADS data path in lib/ads (M21 part A); the live pass should
-// reuse that code rather than duplicating Graph calls. Docs:
-// https://developers.facebook.com/docs/marketing-api
+//   GET /act_{id}/campaigns?fields=id,name,status,effective_status,objective
+//     → list_campaigns() (cursor paging, max 500)
+//   GET /{campaignId}/insights → campaign_insights()
+//   GET /me?fields=id → health check
+// Auth: Facebook Login user token (scope ads_read) as Bearer, plus
+// appsecret_proof when the app secret is known. Meta issues no refresh
+// tokens: an invalid token (error 190) flips the connection to
+// needs_reauth. Throttling codes (4/17/32/613/80000-80014) back off and retry.
+// Docs: https://developers.facebook.com/docs/marketing-api/insights
 //
-// MOCK MODE: deterministic demo ad account data; every row flagged
-// mock: true, names carry "(MOCK)". No network calls.
+// MOCK MODE (no credential): deterministic demo ad account data; every row
+// flagged mock: true, names carry "(MOCK)". No network calls.
 
 import type {
   ConnectorAdapter,
@@ -26,7 +27,19 @@ import type {
   InvokeContext,
   InvokeResult,
 } from "../types";
-import { strProp, mockOk, fail } from "../types";
+import { strProp, mockOk, liveOk, fail } from "../types";
+import { liveFailure, tokenSourceFrom, type LiveDeps } from "../live/http";
+import {
+  metaAccountInsights,
+  metaCampaignInsights,
+  metaListAdAccounts,
+  metaListCampaigns,
+  metaPing,
+  normalizeAdAccountId,
+  normalizeDatePreset,
+  normalizeGraphId,
+  type MetaAuth,
+} from "../live/meta-ads";
 
 export class MetaAdsAdapter implements ConnectorAdapter {
   readonly key = "meta-ads";
@@ -41,6 +54,8 @@ export class MetaAdsAdapter implements ConnectorAdapter {
       },
     },
   };
+
+  constructor(private readonly deps: LiveDeps = {}) {}
 
   listTools(): ConnectorToolDef[] {
     return [
@@ -79,19 +94,80 @@ export class MetaAdsAdapter implements ConnectorAdapter {
         mutating: false,
         argsSchema: {
           type: "object",
-          properties: { campaignId: strProp("Meta campaign id.") },
+          properties: {
+            campaignId: strProp("Meta campaign id."),
+            datePreset: strProp("e.g. last_30d (default), last_7d, this_month."),
+          },
           required: ["campaignId"],
         },
       },
     ];
   }
 
+  private metaAuth(credential: DecryptedCredential | null, ctx: InvokeContext): MetaAuth | null {
+    const base = tokenSourceFrom(credential, ctx);
+    if (!base) return null;
+    const fromPayload = credential?.payload.client_secret;
+    const appSecret =
+      typeof fromPayload === "string" && fromPayload
+        ? fromPayload
+        : (process.env.META_OAUTH_CLIENT_SECRET ?? "").trim() || undefined;
+    return { ...base, ...(appSecret ? { appSecret } : {}) };
+  }
+
   async invoke(
     tool: string,
     args: Record<string, unknown>,
-    _credential: DecryptedCredential | null,
+    credential: DecryptedCredential | null,
     ctx: InvokeContext,
   ): Promise<InvokeResult> {
+    const auth = this.metaAuth(credential, ctx);
+    if (!auth) return this.mockInvoke(tool, args, ctx);
+    try {
+      switch (tool) {
+        case "list_ad_accounts":
+          return liveOk(await metaListAdAccounts(auth, this.deps));
+        case "account_insights":
+          return liveOk(
+            await metaAccountInsights(
+              auth,
+              normalizeAdAccountId(args.adAccountId ?? ctx.projectConfig?.adAccountId),
+              normalizeDatePreset(args.datePreset),
+              this.deps,
+            ),
+          );
+        case "list_campaigns": {
+          const adAccountId = normalizeAdAccountId(args.adAccountId ?? ctx.projectConfig?.adAccountId);
+          return liveOk({ adAccountId, campaigns: await metaListCampaigns(auth, adAccountId, this.deps) });
+        }
+        case "campaign_insights":
+          return liveOk(
+            await metaCampaignInsights(
+              auth,
+              normalizeGraphId(args.campaignId, "campaignId"),
+              normalizeDatePreset(args.datePreset),
+              this.deps,
+            ),
+          );
+        default:
+          return fail(`Unknown tool "${tool}" for connector ${this.key}`);
+      }
+    } catch (err) {
+      return liveFailure(err, this.displayName);
+    }
+  }
+
+  async healthCheck(credential: DecryptedCredential, ctx: InvokeContext): Promise<InvokeResult> {
+    const auth = this.metaAuth(credential, ctx);
+    if (!auth) return { ok: false, error: "No access token stored.", errorCode: "not_connected" };
+    try {
+      return liveOk(await metaPing(auth, this.deps));
+    } catch (err) {
+      return liveFailure(err, this.displayName);
+    }
+  }
+
+  private mockInvoke(tool: string, args: Record<string, unknown>, ctx: InvokeContext): InvokeResult {
     const adAccountId =
       (args.adAccountId as string | undefined) ??
       (ctx.projectConfig?.adAccountId as string | undefined) ??

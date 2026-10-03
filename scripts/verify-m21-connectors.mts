@@ -56,10 +56,12 @@ async function main() {
   const { isStdioAllowed, mcpToolToDef } = await import("@/lib/connectors/m21/mcp");
 
   const metas = listBuiltinConnectors();
-  check("11 built-in connectors registered", metas.length === 11);
+  // 11 original + Gmail/Calendar (Connector Agent slice 2) + Google Business Profile (Phase 4b).
+  check("14 built-in connectors registered", metas.length === 14);
   const expectedKeys = [
     "google-search-console", "ga4", "wordpress", "webflow", "google-drive",
     "notion", "buffer", "resend", "dataforseo", "meta-ads", "google-ads",
+    "gmail", "google-calendar", "google-business-profile",
   ];
   for (const k of expectedKeys) {
     check(`registry has ${k}`, metas.some((m) => m.key === k));
@@ -72,6 +74,7 @@ async function main() {
     webflow: ["publish_site"],
     buffer: ["create_post", "schedule_post", "delete_post"],
     resend: ["send_test_email"],
+    "google-business-profile": ["reply_to_review", "create_post"],
   };
   const adapters: Record<string, { listTools(): unknown[]; key: string; authType: string }> = {};
 
