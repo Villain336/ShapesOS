@@ -37,6 +37,9 @@ import { OPS_TOOLS } from "./ops-tools";
 // Wave 2 context.dev slice 3: agent-facing research tool (spend-kind,
 // confirmation-gated, budget-gated before the vendor is hit).
 import { research_question } from "@/lib/knowledge/contextdev/research-tool";
+// Phase 4b: answers grounded in the tenant's published datasets.
+import { PrismaDatasetBuilderStore } from "@/lib/datasetbuilder/prisma-store";
+import { askPublishedDatasets } from "@/lib/datasetbuilder/activate";
 
 export type ToolKind = "safe" | "destructive" | "publish" | "spend";
 
@@ -959,6 +962,38 @@ const automation_flow_status: ToolDef = {
   },
 };
 
+// Phase 4b (Dataset Builder slice 4 "Activate"): the OS RAG layer. Answers
+// only from datasets the tenant published to RAG + Feed, with citations;
+// refuses to guess when nothing matches.
+const ask_business_data: ToolDef = {
+  name: "ask_business_data",
+  description:
+    "Answer a question about the business (FAQs, products, policies, SOPs, company facts, pricing) strictly from the datasets this workspace published to RAG + Feed. Returns the best-matching passage plus Source → Document → Chunk citations; says so when nothing matches. Use it before answering factual questions about the tenant's own business.",
+  kind: "safe",
+  minRole: "viewer",
+  argsSchema: {
+    type: "object",
+    properties: {
+      question: { type: "string", description: "The question, in the user's words." },
+    },
+    required: ["question"],
+  },
+  async execute(ctx, args) {
+    const question = str(args.question);
+    if (!question) return { summary: "A question is required." };
+    const store = new PrismaDatasetBuilderStore(prisma);
+    const res = await askPublishedDatasets(store, ctx.workspaceId, question.slice(0, 2000));
+    if (!res.grounded) return { summary: res.answer, details: { searched: res.searched } };
+    const cites = res.citations
+      .map((c) => `${c.datasetLabel} v${c.datasetVersion}: ${c.sourceName} → ${c.documentName}`)
+      .join("; ");
+    return {
+      summary: `${res.answer.slice(0, 600)}${res.answer.length > 600 ? "…" : ""} (sources: ${cites})`,
+      details: res,
+    };
+  },
+};
+
 export const TOOLS: ToolDef[] = [
   get_keywords,
   get_rankings,
@@ -979,6 +1014,8 @@ export const TOOLS: ToolDef[] = [
   automation_flow_status,
   // Wave 2 context.dev slice 3: research a question (spend-kind).
   research_question,
+  // Phase 4b: grounded answers from published datasets.
+  ask_business_data,
   // Phase 17: business operations (invoices, inventory, POs, projects, HR,
   // workflows) — propose-only money writes.
   ...OPS_TOOLS,

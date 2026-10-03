@@ -114,7 +114,7 @@ describe("publish: rollback and roll-forward (db)", () => {
   it("rejects unknown versions and foreign datasets", async () => {
     assert.equal(
       await code(publishDataset(store, { workspaceId: WS, datasetId: pricingId, target: "rag", version: 9 })),
-      "UNKNOWN_VERSION",
+      "UNKNOWN_DATASET_VERSION",
     );
     assert.equal(await code(publishDataset(store, { workspaceId: OTHER, datasetId: pricingId, target: "rag" })), "UNKNOWN_DATASET");
   });

@@ -23,6 +23,9 @@ export const MCP_TOOL_NAMES = [
   "automation_trigger_flow",
   "automation_flow_status",
   /* END */
+  // Phase 4b: Dataset Builder activation (BriefNow live pull + OS grounding).
+  "ask_business_data",
+  "get_dataset_adapter",
 ] as const;
 
 export type McpToolName = (typeof MCP_TOOL_NAMES)[number];
@@ -61,6 +64,8 @@ export const TOOL_MIN_ROLE: Record<McpToolName, WorkspaceRole> = {
   automation_trigger_flow: "editor",
   automation_flow_status: "viewer",
   /* END */
+  ask_business_data: "viewer",
+  get_dataset_adapter: "viewer",
 };
 
 const ROLE_ORDER: Record<WorkspaceRole, number> = { viewer: 1, editor: 2, admin: 3, owner: 4 };
@@ -99,6 +104,8 @@ export const TOOL_CREDIT_PASSTHROUGH: Record<McpToolName, { action: string; cred
   automation_trigger_flow: { action: "automation_flow_trigger", credits: 0 },
   automation_flow_status: { action: "automation_flow_status", credits: 0 },
   /* END */
+  ask_business_data: { action: "dataset_ask", credits: 0 },
+  get_dataset_adapter: { action: "dataset_adapter_pull", credits: 0 },
 };
 
 /** Human-readable scope labels for the consent screen and key UI. */
@@ -153,4 +160,12 @@ export const SCOPE_LABELS: Record<McpToolName, { title: string; description: str
     description: "Read the status of an Activepieces flow run (read-only, free).",
   },
   /* END */
+  ask_business_data: {
+    title: "Ask business data",
+    description: "Answer a question from the datasets this workspace published to RAG + Feed, with source citations (read-only, free).",
+  },
+  get_dataset_adapter: {
+    title: "Dataset adapter (BriefNow)",
+    description: "Read the live BriefNow adapter package for a published dataset — every entry with its source lineage (read-only, free).",
+  },
 };

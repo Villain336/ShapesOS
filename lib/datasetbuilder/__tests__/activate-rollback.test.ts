@@ -78,13 +78,14 @@ describe("rollback / roll-forward (in-memory store mirrors Postgres)", () => {
   });
 
   it("env parsing: adapters root and staleness threshold", () => {
-    assert.equal(briefNowAdaptersRoot({}), null);
-    assert.equal(briefNowAdaptersRoot({ BRIEFNOW_ADAPTERS_ROOT: "  " }), null);
-    assert.ok(briefNowAdaptersRoot({ BRIEFNOW_ADAPTERS_ROOT: "/srv/briefnow" })!.endsWith("briefnow"));
-    assert.equal(staleAfterDaysFromEnv({}), 90);
-    assert.equal(staleAfterDaysFromEnv({ DATASET_STALE_AFTER_DAYS: "30" }), 30);
-    assert.equal(staleAfterDaysFromEnv({ DATASET_STALE_AFTER_DAYS: "-1" }), 90);
-    assert.equal(staleAfterDaysFromEnv({ DATASET_STALE_AFTER_DAYS: "abc" }), 90);
+    const env = (e: Record<string, string>) => e as unknown as NodeJS.ProcessEnv;
+    assert.equal(briefNowAdaptersRoot(env({})), null);
+    assert.equal(briefNowAdaptersRoot(env({ BRIEFNOW_ADAPTERS_ROOT: "  " })), null);
+    assert.ok(briefNowAdaptersRoot(env({ BRIEFNOW_ADAPTERS_ROOT: "/srv/briefnow" }))!.endsWith("briefnow"));
+    assert.equal(staleAfterDaysFromEnv(env({})), 90);
+    assert.equal(staleAfterDaysFromEnv(env({ DATASET_STALE_AFTER_DAYS: "30" })), 30);
+    assert.equal(staleAfterDaysFromEnv(env({ DATASET_STALE_AFTER_DAYS: "-1" })), 90);
+    assert.equal(staleAfterDaysFromEnv(env({ DATASET_STALE_AFTER_DAYS: "abc" })), 90);
   });
 });
 
