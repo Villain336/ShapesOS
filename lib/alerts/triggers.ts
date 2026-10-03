@@ -267,6 +267,15 @@ export const TRIGGERS: TriggerDef[] = [
     dedupAvailable: true,
     live: true, // Funding slice 2: emitted by the funding follow-up sweep cron.
   },
+  {
+    key: "dataset_stale",
+    label: "Dataset gone stale",
+    description:
+      "A compiled business dataset's newest data is older than the staleness threshold (default 90 days), e.g. \"Your pricing dataset is 120 days old\". Fires once per compiled version. Emitted by the dataset health sweep.",
+    conditionKeys: [],
+    dedupAvailable: true,
+    live: true, // Phase 4b: emitted by /api/cron/dataset-health.
+  },
 ];
 
 export function triggerDef(key: string): TriggerDef | undefined {

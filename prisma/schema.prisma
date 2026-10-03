@@ -11039,6 +11039,11 @@ model Dataset {
   // Human label, e.g. "Pricing".
   name String
 
+  // Phase 4b: staleness-alert dedupe — the compiled version the last
+  // "dataset is stale" alert fired for (re-arms after a recompile).
+  staleAlertedVersion Int?      @map("stale_alerted_version")
+  staleAlertedAt      DateTime? @map("stale_alerted_at")
+
   versions DatasetVersion[]
 
   // Slice 4: publish records — which version is live on which target.
@@ -12993,6 +12998,13 @@ model CadBomVersion {
   bomNumber Int     @map("bom_number")
   notes     String?
 
+  // Phase 4b: "manual" (tenant-entered) | "derived" (generated from the
+  // pinned version's real mesh geometry by lib/cad/bom-derive.ts).
+  origin     String @default("manual")
+  // Derived BOMs only: method + version, source file checksum, unit
+  // assumption, body split, material + density source, warnings.
+  derivation Json?
+
   createdBy String   @map("created_by")
   createdAt DateTime @default(now()) @map("created_at")
 
@@ -13019,9 +13031,18 @@ model CadBomLine {
   supplier     String?
   // USD per unit. Null = unknown: contributes $0, flagged in the rollup.
   unitCostUsd  Float?  @map("unit_cost_usd")
-  // "manual" | "derived:<method>". v1 rejects any derived: source.
+  // "manual" | "derived:<method>". Derived lines are written only by the
+  // derive path (lib/cad/bom-derive.ts), never entered by hand.
   source       String  @default("manual")
   sortOrder    Int     @default(0) @map("sort_order")
+
+  // Phase 4b: per-unit geometry for derived lines (mm³ / grams; mesh units
+  // assumed mm). Null = not computable (open/degenerate mesh, no material)
+  // or a manual line — never zero-filled.
+  volumeMm3   Float? @map("volume_mm3")
+  massG       Float? @map("mass_g")
+  // The measurement the line cites (triangles, closed?, bbox, status).
+  measurement Json?
 
   // Slice 4: optional link into the tenant's parts inventory. When set and
   // the line's unit cost was not entered manually, the preferred supplier's

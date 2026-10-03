@@ -311,3 +311,40 @@ export async function notifyInviteAccepted(input: InviteAcceptedInput, db: Produ
     return 0;
   }
 }
+
+// ---------------------------------------------------------------------------
+// Phase 4b: Dataset Builder staleness
+// ---------------------------------------------------------------------------
+
+export interface DatasetStaleInput {
+  workspaceId: string;
+  datasetId: string;
+  version: number;
+  /** e.g. "Your pricing dataset is 120 days old". */
+  title: string;
+  body?: string | null;
+}
+
+/** "Dataset is stale" → editors and up (they can re-ingest and recompile). */
+export async function notifyDatasetStale(input: DatasetStaleInput, db: ProducerDb = defaultDb()): Promise<number> {
+  try {
+    const recipients = await membersAtLeast(db, input.workspaceId, "editor");
+    return await createAndEmit(
+      db,
+      recipients.map<NotificationInput>((userId) => ({
+        workspaceId: input.workspaceId,
+        userId,
+        kind: "alert_fired",
+        title: input.title,
+        body: input.body ?? null,
+        href: "/dashboard/datasets?tab=build",
+        sourceType: "dataset",
+        sourceId: input.datasetId,
+        dedupKey: `dataset_stale:${input.datasetId}:v${input.version}`,
+      })),
+    );
+  } catch (e) {
+    warn("dataset_stale", e);
+    return 0;
+  }
+}
