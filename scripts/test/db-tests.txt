@@ -62,6 +62,7 @@ lib/playbooks/__tests__/store.test.ts
 lib/scheduler/__tests__/tick-db.test.ts
 lib/scim/__tests__/scim-db.test.ts
 lib/search/__tests__/records-db.test.ts
+lib/social/__tests__/social-db.test.ts
 lib/substrate/memory/__tests__/accepted-only.test.ts
 lib/substrate/memory/__tests__/learning-pass.test.ts
 lib/substrate/memory/__tests__/rls-least-privilege-db.test.ts

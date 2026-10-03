@@ -40,6 +40,9 @@ async function seed(ws: string, tag: string) {
         budgetCaps: {}, termination: {}, createdBy: OWNER,
       },
     });
+    await tx.socialPublication.create({
+      data: { workspaceId: ws, createdBy: OWNER, content: `Zephyrine launch\n  day ${tag}`, status: "draft" },
+    });
   });
 }
 
@@ -60,7 +63,7 @@ describe("record search (DB)", () => {
   it("finds every record type in the current workspace only", async () => {
     const hits = await searchRecords(WS, "viewer", "zephyrine", { perKind: 10 });
     const kinds = new Set(hits.map((h) => h.kind));
-    for (const k of ["lead", "invoice", "doc", "file", "project", "ops_project", "mission", "cad_project", "client"]) {
+    for (const k of ["lead", "invoice", "doc", "file", "project", "ops_project", "mission", "cad_project", "client", "social_post"]) {
       assert.ok(kinds.has(k as never), `missing ${k}: ${[...kinds].join(",")}`);
     }
     assert.ok(hits.every((h) => !JSON.stringify(h).includes("theirs")), "no cross-workspace results");
@@ -72,6 +75,9 @@ describe("record search (DB)", () => {
     assert.match(invoice.subtitle ?? "", /\$123\.45/);
     assert.match(hits.find((h) => h.kind === "doc")!.href, /^\/dashboard\/office\?open=/);
     assert.match(hits.find((h) => h.kind === "mission")!.title, /Zephyrine growth mine/);
+    const social = hits.find((h) => h.kind === "social_post")!;
+    assert.equal(social.title, "Zephyrine launch day mine", "whitespace collapsed");
+    assert.match(social.href, /^\/dashboard\/social\?post=/);
   });
 
   it("matches email, company and partial words; hides trashed files", async () => {
@@ -94,6 +100,6 @@ describe("record search (DB)", () => {
     assert.deepEqual(await searchRecords(WS, null, "zephyrine"), []);
     const onlyLeads = await searchRecords(WS, "viewer", "zephyrine", { kinds: ["lead"] });
     assert.ok(onlyLeads.length > 0 && onlyLeads.every((h) => h.kind === "lead"));
-    assert.equal(RECORD_KINDS.length, 11);
+    assert.equal(RECORD_KINDS.length, 12);
   });
 });

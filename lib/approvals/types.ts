@@ -21,6 +21,7 @@ export const INBOX_SOURCES = [
   "integration",
   "media",
   "mail",
+  "social",
 ] as const;
 
 export type InboxSourceKey = (typeof INBOX_SOURCES)[number];
@@ -41,6 +42,7 @@ export const INBOX_SOURCE_LABELS: Record<InboxSourceKey, string> = {
   integration: "Tool action",
   media: "Media buy",
   mail: "Direct mail",
+  social: "Social post",
 };
 
 export function isInboxSource(value: unknown): value is InboxSourceKey {

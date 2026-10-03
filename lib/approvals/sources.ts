@@ -768,6 +768,66 @@ const mail: InboxSource = {
   },
 };
 
+/**
+ * Social posts (Phase 4b) — RLS table; decided via /api/social/posts/[id]/decision.
+ * Editor+, and not your own submission while another approver exists.
+ */
+const social: InboxSource = {
+  key: "social",
+  viewRole: "viewer",
+  async load(ctx) {
+    const rows = await ctx.scoped((tx) =>
+      tx.socialPublication.findMany({
+        where: { workspaceId: ctx.viewer.workspaceId, status: "pending_approval" },
+        orderBy: { requestedAt: "desc" },
+        take: ctx.limit,
+        select: {
+          id: true,
+          content: true,
+          media: true,
+          channels: true,
+          publishMode: true,
+          scheduledFor: true,
+          requestedBy: true,
+          requestedAt: true,
+          createdAt: true,
+        },
+      }),
+    );
+    return rows.map((r) => {
+      const channels = Array.isArray(r.channels) ? (r.channels as Array<{ name?: unknown }>) : [];
+      const mediaCount = Array.isArray(r.media) ? r.media.length : 0;
+      const own = !!r.requestedBy && r.requestedBy === ctx.viewer.userId;
+      const blockedBySoD = own && ctx.viewer.hasOtherApprover;
+      const text = r.content.replace(/\s+/g, " ").trim();
+      const when =
+        r.publishMode === "schedule" && r.scheduledFor
+          ? `scheduled ${r.scheduledFor.toISOString().slice(0, 16).replace("T", " ")} UTC`
+          : "publishes on approval";
+      return makeItem({
+        id: r.id,
+        source: "social",
+        typeLabel: mediaCount ? "Social post · media" : "Social post",
+        title: text || `Media post (${mediaCount})`,
+        detail: [
+          channels.map((c) => (typeof c.name === "string" ? c.name : null)).filter(Boolean).join(", ") || null,
+          when,
+        ]
+          .filter(Boolean)
+          .join(" · "),
+        requestedBy: r.requestedBy,
+        createdAt: r.requestedAt ?? r.createdAt,
+        risk: "medium",
+        href: `/dashboard/social?post=${enc(r.id)}`,
+        canDecide: isEditor(ctx.viewer) && !blockedBySoD,
+        blockedReason: blockedBySoD ? "Someone else approves posts you submit." : EDITOR_REASON,
+        approve: post(`/api/social/posts/${enc(r.id)}/decision`, { decision: "approve" }),
+        deny: post(`/api/social/posts/${enc(r.id)}/decision`, { decision: "deny" }),
+      });
+    });
+  },
+};
+
 export const INBOX_SOURCE_DEFS: readonly InboxSource[] = [
   mission,
   spend,
@@ -783,4 +843,5 @@ export const INBOX_SOURCE_DEFS: readonly InboxSource[] = [
   integration,
   media,
   mail,
+  social,
 ];

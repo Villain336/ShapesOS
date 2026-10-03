@@ -107,6 +107,7 @@ describe("event catalog", () => {
       "agent_run.finished",
       "agent_run.failed",
       "notification.created",
+      "social_post.published",
     ]) {
       assert.ok(isWebhookEventType(t), t);
       assert.ok(SUBSCRIBABLE_EVENT_TYPES.includes(t as never), t);

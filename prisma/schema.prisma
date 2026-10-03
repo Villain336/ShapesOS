@@ -979,6 +979,9 @@ model Workspace {
   sraEnvelopes                SraEnvelope[]
   // Phase 4a: outbound webhook endpoints (deliveries cascade via endpoint).
   webhookEndpoints            WebhookEndpoint[]
+  // Phase 4b: social loop (media posts, approvals, engagement).
+  socialPublications          SocialPublication[]
+  socialPostMetrics           SocialPostMetric[]
 
   @@map("workspaces")
 }
@@ -13586,4 +13589,90 @@ model ScimGroupMember {
   @@index([memberId])
   @@index([workspaceId])
   @@map("scim_group_members")
+}
+
+// ---------------------------------------------------------------------------
+// Phase 4b: social loop. A SocialPublication is a ShapesOS-owned post record
+// (text + media + UTM-tagged link) that goes draft → pending_approval →
+// approved → scheduled/published through the social provider (Postiz, or the
+// mock provider without credentials). SocialPostMetric holds engagement per
+// post per channel per day, ingested from the provider and fed into
+// Attribution. Both tables are FORCE RLS on app.workspace_id.
+// ---------------------------------------------------------------------------
+
+enum SocialPublicationStatus {
+  draft
+  pending_approval
+  approved
+  scheduled
+  published
+  failed
+  cancelled
+}
+
+model SocialPublication {
+  id            String                  @id @default(cuid())
+  workspaceId   String                  @map("workspace_id")
+  workspace     Workspace               @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdBy     String                  @map("created_by")
+  content       String
+  // Outbound link; UTM-tagged per channel at dispatch time.
+  link          String?
+  utmCampaign   String?                 @map("utm_campaign")
+  // [{ id, identifier, name }] — provider channel (integration) targets.
+  channels      Json                    @default("[]")
+  // [{ fileId, filename, mimeType, kind, sizeBytes, width?, height? }]
+  media         Json                    @default("[]")
+  // "now" or "schedule" (the requested publish timing).
+  publishMode   String                  @default("now") @map("publish_mode")
+  scheduledFor  DateTime?               @map("scheduled_for")
+  status        SocialPublicationStatus @default(draft)
+  // Where the draft came from: compose | studio | ads.
+  source        String                  @default("compose")
+  sourceRef     String?                 @map("source_ref")
+  // postiz | mock — set when dispatched.
+  provider      String?
+  // [{ postId, integrationId, platform, releaseUrl?, state? }]
+  providerRefs  Json                    @default("[]") @map("provider_refs")
+  requestedBy   String?                 @map("requested_by")
+  requestedAt   DateTime?               @map("requested_at")
+  decidedBy     String?                 @map("decided_by")
+  decidedAt     DateTime?               @map("decided_at")
+  decisionNote  String?                 @map("decision_note")
+  publishedAt   DateTime?               @map("published_at")
+  error         String?
+  metricsSyncedAt DateTime?             @map("metrics_synced_at")
+  createdAt     DateTime                @default(now()) @map("created_at")
+  updatedAt     DateTime                @updatedAt @map("updated_at")
+  metrics       SocialPostMetric[]
+
+  @@index([workspaceId, status])
+  @@index([workspaceId, scheduledFor])
+  @@index([workspaceId, createdAt])
+  @@map("social_publications")
+}
+
+model SocialPostMetric {
+  id            String            @id @default(cuid())
+  workspaceId   String            @map("workspace_id")
+  workspace     Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  publicationId String            @map("publication_id")
+  publication   SocialPublication @relation(fields: [publicationId], references: [id], onDelete: Cascade)
+  // Provider channel (integration) id and normalized platform key.
+  integrationId String            @map("integration_id")
+  platform      String
+  day           DateTime          @db.Date
+  impressions   Int               @default(0)
+  likes         Int               @default(0)
+  comments      Int               @default(0)
+  shares        Int               @default(0)
+  clicks        Int               @default(0)
+  // postiz | mock (mock rows are sample data, labelled in the UI).
+  source        String            @default("postiz")
+  createdAt     DateTime          @default(now()) @map("created_at")
+  updatedAt     DateTime          @updatedAt @map("updated_at")
+
+  @@unique([publicationId, integrationId, day])
+  @@index([workspaceId, day])
+  @@map("social_post_metrics")
 }
