@@ -900,6 +900,8 @@ model Workspace {
   commandAudits             CommandAudit[]
   // Phase 1 (H6): Activepieces flows this workspace may trigger / read.
   automationFlowBindings    AutomationFlowBinding[]
+  // Phase 1: durable idempotency for Smartlead/Instantly webhook events.
+  outreachWebhookEvents     OutreachWebhookEvent[]
 
   @@map("workspaces")
 }
@@ -13173,4 +13175,22 @@ model AutomationFlowBinding {
 
   @@index([workspaceId])
   @@map("automation_flow_bindings")
+}
+
+// Phase 1: durable idempotency for outreach provider webhooks (Smartlead /
+// Instantly). One row per (provider, provider event id), claimed before the
+// event is processed — redeliveries and replays across instances and
+// restarts collapse to a no-op. Replaces the in-process Set.
+model OutreachWebhookEvent {
+  id          String    @id @default(cuid())
+  provider    String
+  eventId     String    @map("event_id")
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  type        String
+  receivedAt  DateTime  @default(now()) @map("received_at")
+
+  @@unique([provider, eventId])
+  @@index([workspaceId, receivedAt])
+  @@map("outreach_webhook_events")
 }
