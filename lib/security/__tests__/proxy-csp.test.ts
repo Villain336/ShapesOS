@@ -7,7 +7,7 @@ import { NextRequest } from "next/server";
 import { getScriptNonceFromHeader } from "next/dist/server/app-render/get-script-nonce-from-header";
 
 import { proxy, config } from "../../../proxy";
-import { API_CONTENT_SECURITY_POLICY } from "../headers";
+import { API_CONTENT_SECURITY_POLICY, USER_FILE_VIEW_CSP } from "../headers";
 
 const req = (path: string, init?: ConstructorParameters<typeof NextRequest>[1]) =>
   new NextRequest(new URL(path, "http://localhost:3000"), init);
@@ -36,6 +36,21 @@ describe("proxy CSP", () => {
     const big = await proxy(req("/api/projects", { method: "POST", headers: { "content-length": String(11 * 1024 * 1024) } }));
     assert.equal(big.status, 400);
     assert.equal(big.headers.get("content-security-policy"), API_CONTENT_SECURITY_POLICY);
+  });
+
+  // Phase 4a follow-up: the data-room file stream (/r/funding/<token>?dl=1)
+  // used to get the PAGE policy — the route's own sandbox CSP was dropped in
+  // favour of the proxy's header. It now gets the sandboxed file policy here.
+  it("data-room file stream gets the sandboxed file policy; the viewer page keeps its nonce policy", async () => {
+    for (const path of ["/r/funding/tok123?dl=1", "/r/funding/tok123?v=ver_1&dl=1", "/r/funding/tok123/?dl"]) {
+      const res = await proxy(req(path));
+      assert.equal(res.headers.get("content-security-policy"), USER_FILE_VIEW_CSP, path);
+      assert.equal(getScriptNonceFromHeader(res.headers.get("content-security-policy")!), undefined, path);
+    }
+    for (const path of ["/r/funding/tok123", "/r/funding/tok123?v=ver_1", "/r/funding/tok123/views/v1?dl=1"]) {
+      const res = await proxy(req(path));
+      assert.ok(getScriptNonceFromHeader(res.headers.get("content-security-policy")!), path);
+    }
   });
 
   it("matcher covers every API route and pages, skips build output and public assets", () => {
