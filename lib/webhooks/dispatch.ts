@@ -159,7 +159,7 @@ async function attempt(workspaceId: string, deliveryId: string, deps: DispatchDe
         : afterFailure(attempts, now, deps.rand);
     await withWorkspaceScope(workspaceId, async (tx) => {
       await tx.webhookDelivery.update({
-        where: { id: delivery.id },
+        where: { id: delivery.id, workspaceId },
         data: {
           status: next.status,
           attempts,

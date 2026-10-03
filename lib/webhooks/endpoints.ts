@@ -175,7 +175,7 @@ export async function updateEndpoint(
   const row = await withWorkspaceScope(workspaceId, async (tx) => {
     const existing = await tx.webhookEndpoint.findFirst({ where: { id, workspaceId }, select: { id: true } });
     if (!existing) throw new NotFoundError("Webhook endpoint not found.");
-    return tx.webhookEndpoint.update({ where: { id }, data });
+    return tx.webhookEndpoint.update({ where: { id, workspaceId }, data });
   });
   return { endpoint: toEndpointView(row), secret };
 }
