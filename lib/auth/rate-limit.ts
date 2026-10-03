@@ -122,6 +122,22 @@ export function loginLockedOut(ip: string | null, email: string, now: number = D
 }
 
 /**
+ * Phase 4a step-up: failures recorded in the current window for this IP and
+ * account (a locked or expired record counts as its live failures only while
+ * its window or lock is still running). lib/auth/captcha.ts asks for a
+ * CAPTCHA once either reaches LOGIN_CAPTCHA_AFTER_FAILURES.
+ */
+export function loginFailureCounts(
+  ip: string | null,
+  email: string,
+  now: number = Date.now(),
+): { ip: number; account: number } {
+  const live = (rec: AttemptState | undefined): number =>
+    rec && (now - rec.firstAt <= LOGIN_WINDOW_MS || rec.lockedUntil > now) ? rec.failures : 0;
+  return { ip: live(ipAttempts.get(ipKey(ip))), account: live(accountAttempts.get(accountKey(email))) };
+}
+
+/**
  * Test hook: clear all limiter state. Fixtures call this for deterministic
  * brute-force tests (the limiter is time-based otherwise).
  */

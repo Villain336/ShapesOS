@@ -19,6 +19,19 @@
 // added to that workspace (SSO_DEFAULT_ROLE, default "editor").
 //
 // Session hardening (milestone 11): absolute 12h JWT lifetime.
+//
+// Phase 4a (identity):
+//   - Second factor: users with TOTP or a passkey get a PENDING token after
+//     the first factor (no token.sub → every guard reads "signed out") until
+//     the "two-factor" or "passkey" credentials provider finishes sign-in
+//     (lib/auth/mfa/session-token.ts has the state machine).
+//   - Passkeys: usernameless sign-in through the "passkey" provider.
+//   - Stable OAuth subjects: without a database adapter Auth.js mints a
+//     RANDOM user id on every OAuth/OIDC/SAML sign-in, so the same person got
+//     a new identity (and memberships, 2FA, passkeys keyed on it never
+//     matched) each time. The subject is now "<provider>:<providerAccountId>".
+//   - CAPTCHA step-up on the credentials login after repeated failures
+//     (lib/auth/captcha.ts; no-op unless a provider is configured).
 
 import NextAuth from "next-auth";
 import Google from "next-auth/providers/google";
@@ -41,6 +54,32 @@ import {
 } from "./lib/auth/rate-limit";
 import { clientIpFromHeaders } from "./lib/api/client-ip";
 import { INVITE_REQUIRED_PATH, signInAllowed, signupMode } from "./lib/auth/signup";
+import { CredentialsSignin, type Session } from "next-auth";
+import { captchaRequired, verifyCaptchaToken } from "./lib/auth/captcha";
+import { authorizePasskey, authorizeTwoFactor, type MfaSignInMarker } from "./lib/auth/mfa/authorize";
+import {
+  PASSKEY_PROVIDER_ID,
+  TWO_FACTOR_PROVIDER_ID,
+  applySignIn,
+  sessionView,
+  type FactorSummary,
+} from "./lib/auth/mfa/session-token";
+import { factorSummary } from "./lib/auth/mfa/store";
+import { linkScimMembersOnSsoLogin } from "./lib/scim/link";
+
+/** The CAPTCHA step-up is due and the attempt carried no valid token. */
+class CaptchaRequiredError extends CredentialsSignin {
+  code = "captcha_required";
+}
+
+/** Account types whose user id Auth.js would otherwise randomize per sign-in. */
+const OAUTH_LIKE = new Set(["oauth", "oidc"]);
+
+/** "provider:providerAccountId", the stable subject for OAuth/OIDC/SAML users. */
+function stableOauthSubject(account: { provider: string; providerAccountId: string; type: string }): string | null {
+  if (!OAUTH_LIKE.has(account.type) || !account.providerAccountId) return null;
+  return account.provider + ":" + account.providerAccountId;
+}
 
 function clientIp(req: Request | undefined): string | null {
   return clientIpFromHeaders(req?.headers);
@@ -133,6 +172,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       credentials: {
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
+        // Phase 4a: CAPTCHA step-up token (only checked once it's due).
+        captchaToken: { label: "CAPTCHA", type: "hidden" },
       },
       async authorize(credentials, req) {
         const email = String(credentials?.email ?? "")
@@ -149,6 +190,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         if (loginLockedOut(ip, email || "unknown")) {
           console.warn(`[auth] login blocked (rate limit): ${email || "unknown"} from ${ip ?? "unknown ip"}`);
           return null;
+        }
+        // Phase 4a step-up: after N failures a CAPTCHA must pass first
+        // (no-op without CAPTCHA_PROVIDER; see lib/auth/captcha.ts).
+        if (captchaRequired(ip, email || "unknown")) {
+          const captchaToken = typeof credentials?.captchaToken === "string" ? credentials.captchaToken : "";
+          if (!(await verifyCaptchaToken(captchaToken, ip))) throw new CaptchaRequiredError();
         }
         if (!adminEmail || !adminPassword || !email) {
           if (email) {
@@ -174,10 +221,33 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         return null;
       },
     }),
+    // Phase 4a: second step of a pending sign-in (TOTP / recovery code /
+    // enrollment proof). The subject comes from the caller's own pending
+    // session cookie, never from the form.
+    Credentials({
+      id: TWO_FACTOR_PROVIDER_ID,
+      name: "Two-factor",
+      credentials: { code: { label: "Code", type: "text" }, proof: { label: "Proof", type: "text" } },
+      authorize: (credentials, req) => authorizeTwoFactor(credentials ?? {}, req as Request),
+    }),
+    // Phase 4a: passkey (WebAuthn) sign-in: usernameless, also completes a
+    // pending sign-in or re-authenticates.
+    Credentials({
+      id: PASSKEY_PROVIDER_ID,
+      name: "Passkey",
+      credentials: { challengeId: { label: "Challenge", type: "text" }, response: { label: "Response", type: "text" } },
+      authorize: (credentials, req) => authorizePasskey(credentials ?? {}, req as Request),
+    }),
     ...extraProviders,
   ],
   callbacks: {
     async signIn({ user, account, profile }) {
+      // Phase 4a: pin OAuth/OIDC/SAML users to a stable subject BEFORE anything
+      // keys on user.id (Auth.js hands this same object to the jwt callback).
+      if (user && account) {
+        const stable = stableOauthSubject(account);
+        if (stable) user.id = stable;
+      }
       // SSO provisioning: optional domain-based workspace auto-provisioning.
       // Runs at login time only, and only with a VERIFIED email claim
       // (day-1 hardening, M4) — a lax IdP asserting someone else's address
@@ -192,6 +262,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           const emailVerified =
             (profile as { email_verified?: unknown } | null)?.email_verified === true;
           await provisionSsoUser(user.id, user.email, emailVerified);
+          // Phase 4a: SCIM-provisioned members of any workspace are linked to
+          // this SSO identity (verified email only; see lib/scim/link.ts).
+          await linkScimMembersOnSsoLogin(user.id, user.email, emailVerified);
         } catch (err) {
           console.error("[sso] auto-provisioning failed:", err);
         }
@@ -210,15 +283,42 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       }
       return true;
     },
-    async jwt({ token, user }) {
-      if (user?.id) token.sub = user.id;
-      return token;
+    async jwt({ token, user, account }) {
+      if (!user?.id || !account) return token;
+      // A sign-in just completed. Decide full vs pending (second factor).
+      const marker = (user as { mfa?: MfaSignInMarker }).mfa;
+      let factors: FactorSummary = { totp: false, passkeys: 0 };
+      if (account.provider !== PASSKEY_PROVIDER_ID && account.provider !== TWO_FACTOR_PROVIDER_ID) {
+        try {
+          factors = await factorSummary(user.id);
+        } catch (err) {
+          // Fail CLOSED: if we can't tell whether a second factor is required,
+          // the session stays pending (and can't be completed until the DB is
+          // back) rather than skipping 2FA for someone who enrolled.
+          console.error("[auth] second-factor lookup failed; session left pending:", err);
+          factors = { totp: true, passkeys: 0 };
+        }
+      }
+      return applySignIn(token, {
+        userId: user.id,
+        provider: account.provider,
+        factors,
+        nowSec: Math.floor(Date.now() / 1000),
+        secondFactor: marker?.secondFactor,
+        firstFactor: marker?.firstFactor,
+      });
     },
     async session({ session, token }) {
-      if (session.user && token.sub) {
-        session.user.id = token.sub;
+      const view = sessionView(token, Math.floor(Date.now() / 1000));
+      if (view.user && session.user) {
+        session.user.id = view.user.id;
+        session.user.twoFactor = view.user.twoFactor;
+        session.user.mfaAt = view.user.mfaAt;
+        return session;
       }
-      return session;
+      // Pending second factor (or no subject): expose NO user, so every guard
+      // (requireUser, pages checking session.user) treats it as signed out.
+      return { expires: session.expires, mfa: view.mfa } as unknown as Session;
     },
   },
   pages: { signIn: "/login" },

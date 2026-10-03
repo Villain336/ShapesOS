@@ -8,6 +8,7 @@ import {
   requireUser,
 } from "@/lib/session";
 import { INVITE_REQUIRED_PATH, InviteRequiredError } from "@/lib/auth/signup";
+import { TWO_FACTOR_SETUP_PATH } from "@/lib/auth/mfa/policy";
 import { AppSidebar, MobileNav, type SidebarBadges } from "@/components/AppSidebar";
 import { DashboardMain } from "@/components/DashboardMain";
 // Phase 3 (J): desktop header — "needs you" shortcut + notification bell.
@@ -49,6 +50,9 @@ export default async function DashboardLayout({
     if (err instanceof InviteRequiredError) redirect(INVITE_REQUIRED_PATH);
     throw err;
   });
+  // Phase 4a: the workspace requires a second factor and this session hasn't
+  // passed one → set one up first (lib/auth/mfa/policy.ts).
+  if (workspace.requireTwoFactor && !user.twoFactor) redirect(TWO_FACTOR_SETUP_PATH);
   const [workspaces, membership] = await Promise.all([
     getAccessibleWorkspaces(user.id),
     getMembership(user.id, workspace.id),

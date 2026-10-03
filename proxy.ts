@@ -25,7 +25,8 @@
 
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { getToken } from "next-auth/jwt";
+import { hasSessionCookie, readSessionToken } from "./lib/auth/mfa/token";
+import { pendingSubject } from "./lib/auth/mfa/session-token";
 import {
   classifyTier,
   checkRateLimit,
@@ -52,6 +53,11 @@ function isApiPath(pathname: string): boolean {
   return pathname === "/api" || pathname.startsWith("/api/");
 }
 
+/** Signed-in app surfaces a pending second-factor session is bounced from. */
+function isAppShellPath(pathname: string): boolean {
+  return pathname === "/dashboard" || pathname.startsWith("/dashboard/") || pathname === "/security/setup";
+}
+
 export async function proxy(req: NextRequest) {
   // 0. Content-Security-Policy. The policy rides on the forwarded request
   //    (Next reads the nonce from it; server components can read x-nonce)
@@ -72,7 +78,20 @@ export async function proxy(req: NextRequest) {
     return withCsp(NextResponse.next({ request: { headers: requestHeaders } }));
   };
 
-  if (!isApiPath(req.nextUrl.pathname)) return pass();
+  if (!isApiPath(req.nextUrl.pathname)) {
+    // Phase 4a: a sign-in waiting on its second factor never reaches the app
+    // shell — send it back to /login to finish (the session itself already
+    // exposes no user, so every server guard denies it regardless).
+    if (isAppShellPath(req.nextUrl.pathname) && hasSessionCookie(req.headers.get("cookie"))) {
+      const token = await readSessionToken(req).catch(() => null);
+      if (pendingSubject(token, Math.floor(Date.now() / 1000))) {
+        const url = new URL("/login", req.nextUrl);
+        url.searchParams.set("next", `${req.nextUrl.pathname}${req.nextUrl.search}`);
+        return withCsp(NextResponse.redirect(url));
+      }
+    }
+    return pass();
+  }
 
   // 1. Oversize-body guard (declared length only; chunked streams are bounded
   //    per-route by body readers).
@@ -96,10 +115,9 @@ export async function proxy(req: NextRequest) {
   let userId: string | null = null;
   if (tier !== "auth") {
     try {
-      const token = await getToken({
-        req,
-        secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET,
-      });
+      // Phase 4a: reads either session cookie name (https deployments use the
+      // __Secure- prefix); a pending second-factor token has no sub → IP key.
+      const token = await readSessionToken(req);
       userId = typeof token?.sub === "string" && token.sub ? token.sub : null;
     } catch {
       userId = null;
