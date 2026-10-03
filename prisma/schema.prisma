@@ -4233,6 +4233,9 @@ model OutboundMessage {
   scheduledFor      DateTime? @map("scheduled_for")
   sentAt            DateTime? @map("sent_at")
   deliveredAt       DateTime? @map("delivered_at")
+  // When a dispatcher claimed the row (queued → sending). A "sending" row
+  // older than the stale window is recovered by dispatchDue.
+  claimedAt         DateTime? @map("claimed_at")
   error             String?
   costCents         Int       @default(0) @map("cost_cents")
   // ApprovalItem id that authorized this send (C3 ladder).
@@ -11185,6 +11188,10 @@ model LegalDeadline {
   // Null = the tenant has not confirmed a date yet ("date needed").
   dueDate    DateTime?          @map("due_date")
   recurrence DeadlineRecurrence @default(none)
+  // The series' original due date. Each next occurrence is anchor + n×cadence
+  // (never prev + cadence), so Jan 31 monthly stays end-of-month. Null =
+  // this row's own dueDate is the anchor (first occurrence / tenant re-dated).
+  recurrenceAnchor DateTime? @map("recurrence_anchor")
   source     DeadlineSource     @default(tenant_set)
   status     DeadlineStatus     @default(open)
 

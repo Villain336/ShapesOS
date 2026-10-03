@@ -298,7 +298,12 @@ export async function sweepExpirations(
   });
   const ids: string[] = [];
   for (const env of stale) {
-    await db.esignEnvelope.update({ where: { id: env.id }, data: { status: "expired" } });
+    // Guarded: an envelope completed/voided since the read is never expired.
+    const res = await db.esignEnvelope.updateMany({
+      where: { id: env.id, status: { in: ["sent", "partially-signed"] } },
+      data: { status: "expired" },
+    });
+    if (res.count !== 1) continue;
     await appendAuditEvent(db, {
       envelopeId: env.id,
       event: "expired",
