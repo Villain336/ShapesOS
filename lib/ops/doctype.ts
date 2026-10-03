@@ -23,6 +23,7 @@
 import type { Prisma } from "@prisma/client";
 import {
   OPS_ENTITY_MAP,
+  OPS_MAX_CENTS,
   type OpsEntityDef,
 } from "./entities";
 import {
@@ -31,7 +32,7 @@ import {
   opsBindingFor,
   phase14GatePort,
   requestOpsApproval,
-  verifyOpsApproval,
+  verifyAndConsumeOpsApproval,
   type OpsGatePort,
   type OpsGateProposal,
   type OpsWriteClassification,
@@ -85,6 +86,8 @@ interface Delegate {
   findFirst(args: unknown): Promise<Record<string, unknown> | null>;
   create(args: unknown): Promise<Record<string, unknown>>;
   update(args: unknown): Promise<Record<string, unknown>>;
+  updateMany(args: unknown): Promise<{ count: number }>;
+  upsert(args: unknown): Promise<Record<string, unknown>>;
 }
 
 function delegateFor(tx: Tx, def: OpsEntityDef): Delegate {
@@ -125,11 +128,22 @@ interface LineItem {
   priceCents: number;
 }
 
-/** Totals are server-computed from line items — never trusted from the client. */
+/**
+ * Totals are server-computed from line items — never trusted from the
+ * client. The money columns are int4: a total past OPS_MAX_CENTS is a 400
+ * here, never a raw Prisma range error.
+ */
 function totalsFor(lineItems: LineItem[], taxCents: number) {
   const subtotalCents = lineItems.reduce((s, li) => s + li.qty * li.priceCents, 0);
-  return { subtotalCents, taxCents, totalCents: subtotalCents + taxCents };
+  const totalCents = subtotalCents + taxCents;
+  if (totalCents > OPS_MAX_CENTS) {
+    throw new OpsError(400, `Total exceeds the maximum of ${OPS_MAX_CENTS} cents`);
+  }
+  return { subtotalCents, taxCents, totalCents };
 }
+
+/** Max rows per list page. */
+export const OPS_LIST_MAX = 200;
 
 // ---------------------------------------------------------------------------
 // GET — list. Reads run freely (logged): one audit row per request.
@@ -141,7 +155,13 @@ export async function opsList(
   actor: OpsActor,
   query: OpsListQuery = {},
 ): Promise<{ entity: string; rows: Array<Record<string, unknown>> }> {
-  const limit = Math.min(Math.max(query.limit ?? 50, 1), 200);
+  // Paging is validated, never passed through: ?limit=1.5 / NaN would reach
+  // Prisma's `take` and 500.
+  const rawLimit = query.limit ?? 50;
+  if (!Number.isInteger(rawLimit) || rawLimit < 1) {
+    throw new OpsError(400, `Invalid limit: must be an integer between 1 and ${OPS_LIST_MAX}`);
+  }
+  const limit = Math.min(rawLimit, OPS_LIST_MAX);
   const where: Record<string, unknown> = { workspaceId: actor.workspaceId };
   for (const f of def.filterable) {
     const v = query.filters?.[f];
@@ -206,18 +226,34 @@ export async function opsCreate(
       await auditOpsEvent(tx, def, actor, "gate_proposed", null, `${classification.label} proposed (approval ${approval.id})`);
       return { outcome: "approval_required", approval, classification };
     }
-    await verifyOpsApproval(port, {
+    // Verify, then claim approved → executed in THIS transaction before
+    // writing: one approval = one execution (replays fail closed).
+    await verifyAndConsumeOpsApproval(port, tx, {
       workspaceId: actor.workspaceId,
       slug: classification.slug!,
       entity: def.slug,
       mutation,
       approvalId,
+      actor: actor.userId,
     });
     const rows = await createRows(tx, def, actor, body);
     for (const row of rows) {
       await auditOpsEvent(tx, def, actor, "gate_executed", String(row.id), `${classification.label} (approval ${approvalId}): ${def.summarize(row)}`);
     }
     return { outcome: "done", row: rows.length === 1 ? rows[0]! : toJson({ rows }), action: "gate_executed" };
+  }
+
+  // Invoice idempotency key: a retry returns the ORIGINAL invoice (200),
+  // never a unique-violation error. (createRows upserts on the key too, so
+  // a concurrent duplicate also resolves to the one row.)
+  if (def.slug === "invoices" && typeof body.idempotencyKey === "string") {
+    const prior = await delegateFor(tx, def).findFirst({
+      where: { workspaceId: actor.workspaceId, idempotencyKey: body.idempotencyKey },
+    });
+    if (prior) {
+      await auditOpsEvent(tx, def, actor, "idempotent_replay", String(prior.id), `idempotency key reused: ${def.summarize(prior)}`);
+      return { outcome: "done", row: prior, action: "idempotent_replay" };
+    }
   }
 
   const rows = await createRows(tx, def, actor, body);
@@ -307,31 +343,41 @@ async function createRows(
         }
         dueAt = parsed;
       }
-      return [
-        await d.create({
-          data: {
-            ...base,
-            // Initial statuses are set explicitly (not left to DB defaults)
-            // so the service's contract is visible in code and in stubs.
-            status: "draft",
-            lineItems: toJson(lineItems),
-            taxCents,
-            totalCents,
-            // subtotalCents exists on orders + purchase-orders, not invoices.
-            ...(def.slug === "invoices" ? {} : { subtotalCents }),
-            ...(def.slug === "purchase-orders"
-              ? {
-                  supplierId: (body.supplierId as string) ?? null,
-                  supplierName: (body.supplierName as string) ?? null,
-                }
-              : { customerId: body.customerId ?? null }),
-            ...(def.slug === "invoices" && body.idempotencyKey
-              ? { idempotencyKey: body.idempotencyKey }
-              : {}),
-            ...(def.slug === "invoices" && dueAt ? { dueAt } : {}),
-          },
-        }),
-      ];
+      const data = {
+        ...base,
+        // Initial statuses are set explicitly (not left to DB defaults)
+        // so the service's contract is visible in code and in stubs.
+        status: "draft",
+        lineItems: toJson(lineItems),
+        taxCents,
+        totalCents,
+        // subtotalCents exists on orders + purchase-orders, not invoices.
+        ...(def.slug === "invoices" ? {} : { subtotalCents }),
+        ...(def.slug === "purchase-orders"
+          ? {
+              supplierId: (body.supplierId as string) ?? null,
+              supplierName: (body.supplierName as string) ?? null,
+            }
+          : { customerId: body.customerId ?? null }),
+        ...(def.slug === "invoices" && body.idempotencyKey
+          ? { idempotencyKey: body.idempotencyKey }
+          : {}),
+        ...(def.slug === "invoices" && dueAt ? { dueAt } : {}),
+      };
+      if (def.slug === "invoices" && typeof body.idempotencyKey === "string") {
+        // Atomic on the (workspaceId, idempotencyKey) unique: a concurrent
+        // duplicate resolves to the existing row instead of a P2002.
+        return [
+          await d.upsert({
+            where: {
+              workspaceId_idempotencyKey: { workspaceId: actor.workspaceId, idempotencyKey: body.idempotencyKey },
+            },
+            create: data,
+            update: { idempotencyKey: body.idempotencyKey },
+          }),
+        ];
+      }
+      return [await d.create({ data })];
     }
     case "payments": {
       // Bulk refund batch → N rows in one transaction.
@@ -454,6 +500,8 @@ export async function opsPatch(
   // 404 for "not your workspace's row" (RLS + explicit scope).
   const existing = await d.findFirst({ where: { id, workspaceId: actor.workspaceId } });
   if (!existing) throw new OpsNotFoundError(def.slug, id);
+  // Illegal moves fail before anything is proposed or written.
+  assertOpsPatchAllowed(def, existing, patch);
 
   if (classification.mode === "gated") {
     const approvalId = body.approvalId as string | undefined;
@@ -471,13 +519,14 @@ export async function opsPatch(
       await auditOpsEvent(tx, def, actor, "gate_proposed", id, `${classification.label} proposed (approval ${approval.id})`);
       return { outcome: "approval_required", approval, classification };
     }
-    await verifyOpsApproval(port, {
+    await verifyAndConsumeOpsApproval(port, tx, {
       workspaceId: actor.workspaceId,
       slug: classification.slug!,
       entity: def.slug,
       entityId: id,
       mutation,
       approvalId,
+      actor: actor.userId,
     });
     const row = await applyPatch(tx, def, actor, id, patch, existing);
     await auditOpsEvent(tx, def, actor, "gate_executed", id, `${classification.label} (approval ${approvalId}): ${def.summarize(row)}`);
@@ -487,6 +536,31 @@ export async function opsPatch(
   const row = await applyPatch(tx, def, actor, id, patch, existing);
   await auditOpsEvent(tx, def, actor, "update", id, `updated ${def.summarize(row)}`);
   return { outcome: "done", row, action: "update" };
+}
+
+/**
+ * Status machine + draft-only money edits for entities that declare
+ * statusTransitions (invoices, orders, purchase orders). 409 on an illegal
+ * move (e.g. draft → overdue, paid → overdue, draft PO → received) or on a
+ * tax/line edit to a non-draft document.
+ */
+export function assertOpsPatchAllowed(
+  def: OpsEntityDef,
+  existing: Record<string, unknown>,
+  patch: Record<string, unknown>,
+): void {
+  const table = def.statusTransitions;
+  if (!table) return;
+  const from = String(existing.status);
+  if (typeof patch.status === "string") {
+    const allowed = table[from] ?? [];
+    if (!allowed.includes(patch.status)) {
+      throw new OpsError(409, `${def.label} cannot move from ${from} to ${patch.status}`);
+    }
+  }
+  if ((patch.taxCents !== undefined || patch.lineItems !== undefined) && from !== "draft") {
+    throw new OpsError(409, `${def.label} totals can only be edited while draft (it is ${from})`);
+  }
 }
 
 /** Apply the patch: entity-specific rules (compensation append, sentAt). */
@@ -534,15 +608,34 @@ async function applyPatch(
       data.decidedAt = new Date();
     }
   }
-  if (def.slug === "purchase-orders") {
-    // Slice 3: PO lifecycle. Send is gated (OPS_PO_SEND); receive is a free
-    // fulfillment write that atomically books restock txns for line items
-    // carrying a productId. Idempotent: restock only on the transition.
-    if (patch.status === "sent" && !existing.sentAt) {
-      data.sentAt = new Date();
+  if (def.statusTransitions) {
+    // Draft edits to tax/lines recompute the stored totals (never stale).
+    if (patch.taxCents !== undefined || patch.lineItems !== undefined) {
+      const lineItems = (patch.lineItems ?? existing.lineItems ?? []) as LineItem[];
+      const totals = totalsFor(lineItems, (patch.taxCents as number | undefined) ?? Number(existing.taxCents ?? 0));
+      data.taxCents = totals.taxCents;
+      data.totalCents = totals.totalCents;
+      if (def.slug !== "invoices") data.subtotalCents = totals.subtotalCents;
+      if (patch.lineItems !== undefined) data.lineItems = toJson(patch.lineItems);
     }
-    if (patch.status === "received" && existing.status !== "received") {
-      data.receivedAt = new Date();
+    if (def.slug === "purchase-orders") {
+      // Slice 3: PO lifecycle. Send is gated (OPS_PO_SEND); receive is a free
+      // fulfillment write that books restock txns for line items carrying a
+      // productId — only on the sent → received move (transition table).
+      if (patch.status === "sent" && !existing.sentAt) data.sentAt = new Date();
+      if (patch.status === "received") data.receivedAt = new Date();
+    }
+    // Status-guarded write: lands only if the row is still in the status we
+    // validated against. A racing transition (double receive, sweep vs
+    // mark-paid) matches 0 rows → 409, and nothing below it runs.
+    const claimed = await d.updateMany({
+      where: { id, workspaceId: actor.workspaceId, status: existing.status },
+      data,
+    });
+    if (claimed.count !== 1) {
+      throw new OpsError(409, `${def.label} changed concurrently (no longer ${String(existing.status)}) — reload and retry`);
+    }
+    if (def.slug === "purchase-orders" && patch.status === "received") {
       const items = (existing.lineItems ?? []) as Array<{
         productId?: string;
         qty: number;
@@ -559,10 +652,11 @@ async function applyPatch(
         });
         restocked += 1;
       }
-      const row = await d.update({ where: { id, workspaceId: actor.workspaceId }, data });
+      const row = await d.findFirst({ where: { id, workspaceId: actor.workspaceId } });
       // Non-persisted metadata for the caller (the route passes it through).
       return { ...row, restocked };
     }
+    return (await d.findFirst({ where: { id, workspaceId: actor.workspaceId } }))!;
   }
   return d.update({ where: { id, workspaceId: actor.workspaceId }, data });
 }

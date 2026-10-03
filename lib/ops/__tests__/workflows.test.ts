@@ -23,6 +23,7 @@ import {
 } from "../workflows";
 import { OpsError, type OpsActor } from "../doctype";
 import { OpsGateError } from "../gate";
+import { approvalClaimDelegate } from "./approval-claims";
 
 const actor: OpsActor = { userId: "u_wf", workspaceId: "ws_wf" };
 
@@ -110,6 +111,7 @@ function makeStubTx() {
         return q.data;
       },
     },
+    composioActionApproval: approvalClaimDelegate(),
   };
   return { tx, runs, audit };
 }

@@ -21,6 +21,13 @@
 // approval, and binding mismatch (the approval's bound mutation must equal
 // the mutation being executed — canonical JSON compare, so "approve $100,
 // execute $10,000" is impossible).
+//
+// consumeOpsApproval() is the replay lock: after verification, the write
+// path claims the approval approved → executed with a status-guarded
+// updateMany IN THE SAME TRANSACTION as the mutation. Exactly one caller
+// can win the claim (count === 1); a replay or a concurrent second request
+// gets count 0 and fails closed — and if the write itself fails, the
+// transaction rolls the claim back so the approval is not burned.
 
 import { canonicalize } from "@/lib/authority/approvals";
 import {
@@ -194,6 +201,8 @@ export interface OpsGateApproval {
   status: string;
   expiresAt: Date;
   proposedArgs: unknown;
+  /** Phase 14 append-only trail (the claim appends an execution entry). */
+  auditTrail?: unknown;
 }
 
 export interface OpsGatePort {
@@ -224,7 +233,13 @@ export const phase14GatePort: OpsGatePort = {
   },
   async getApproval(workspaceId: string, id: string) {
     const a = await getApproval(workspaceId, id);
-    return { id: a.id, status: a.status, expiresAt: a.expiresAt, proposedArgs: a.proposedArgs };
+    return {
+      id: a.id,
+      status: a.status,
+      expiresAt: a.expiresAt,
+      proposedArgs: a.proposedArgs,
+      auditTrail: a.auditTrail,
+    };
   },
 };
 
@@ -343,5 +358,61 @@ export async function verifyOpsApproval(
       "Approval binding does not match this mutation — execution HALTED",
     );
   }
+  return approval;
+}
+
+// ---------------------------------------------------------------------------
+// Consume: the atomic approved → executed claim (replay lock).
+// ---------------------------------------------------------------------------
+
+interface ApprovalClaimTx {
+  composioActionApproval: {
+    updateMany(args: unknown): Promise<{ count: number }>;
+  };
+}
+
+/**
+ * Claim a verified approval for execution. MUST run inside the transaction
+ * that performs the gated write, BEFORE the write: the status-guarded
+ * updateMany row-locks the approval, so a concurrent second request blocks
+ * until the first commits and then matches 0 rows. count !== 1 → the
+ * approval was already executed (or expired/revoked in between) — fail
+ * closed, nothing is written.
+ */
+export async function consumeOpsApproval(
+  tx: unknown,
+  args: { workspaceId: string; approval: OpsGateApproval; actor: string; slug: string },
+): Promise<void> {
+  const now = new Date();
+  const prior = Array.isArray(args.approval.auditTrail) ? args.approval.auditTrail : [];
+  const claimed = await (tx as ApprovalClaimTx).composioActionApproval.updateMany({
+    where: {
+      id: args.approval.id,
+      workspaceId: args.workspaceId,
+      status: "approved",
+      expiresAt: { gt: now },
+    },
+    data: {
+      status: "executed",
+      auditTrail: [
+        ...prior,
+        { at: now.toISOString(), actor: args.actor, event: "execution_claimed", detail: `ops ${args.slug}` },
+      ],
+    },
+  });
+  if (claimed.count !== 1) {
+    throw new OpsGateError("approval_replayed", "Approval already executed — replay blocked");
+  }
+}
+
+/** verifyOpsApproval + consumeOpsApproval: the only way a gated ops write may proceed. */
+export async function verifyAndConsumeOpsApproval(
+  port: OpsGatePort,
+  tx: unknown,
+  args: Parameters<typeof verifyOpsApproval>[1] & { actor: string },
+): Promise<OpsGateApproval> {
+  const { actor, ...verifyArgs } = args;
+  const approval = await verifyOpsApproval(port, verifyArgs);
+  await consumeOpsApproval(tx, { workspaceId: args.workspaceId, approval, actor, slug: args.slug });
   return approval;
 }

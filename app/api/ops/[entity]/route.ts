@@ -68,14 +68,16 @@ export async function GET(
     const { entity } = await params;
     const def = opsEntityDef(entity);
     const q = req.nextUrl.searchParams;
-    const limit = Number(q.get("limit") ?? "50");
+    // Validated in opsList (integer 1..200) — garbage is a 400, not a 500.
+    const rawLimit = q.get("limit");
+    const limit = rawLimit === null || rawLimit === "" ? undefined : Number(rawLimit);
     const filters: Record<string, string> = {};
     for (const f of def.filterable) {
       const v = q.get(f);
       if (v) filters[f] = v;
     }
     const result = await withWorkspaceScope(gate.workspaceId, (tx) =>
-      opsList(tx, def, gate, { limit: Number.isFinite(limit) ? limit : 50, filters }),
+      opsList(tx, def, gate, { limit, filters }),
     );
     return Response.json(result);
   } catch (err) {
@@ -110,7 +112,11 @@ export async function POST(
         { status: 202 },
       );
     }
-    return Response.json({ entity: def.slug, row: result.row }, { status: 201 });
+    // A reused invoice idempotency key returns the original row (200).
+    return Response.json(
+      { entity: def.slug, row: result.row },
+      { status: result.action === "idempotent_replay" ? 200 : 201 },
+    );
   } catch (err) {
     return opsError(err);
   }

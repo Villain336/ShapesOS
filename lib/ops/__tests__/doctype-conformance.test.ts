@@ -14,6 +14,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import type { Prisma } from "@prisma/client";
+import { approvalClaimDelegate } from "./approval-claims";
 
 import { OPS_ENTITIES, OPS_ENTITY_MAP } from "../entities";
 import {
@@ -44,6 +45,7 @@ interface StubCalls {
 function makeStubTx() {
   const store: Record<string, Array<Record<string, unknown>>> = {};
   const calls: StubCalls = { audits: [], creates: [], updates: [] };
+  const claims = approvalClaimDelegate();
 
   const delegate = (name: string) => ({
     findMany: async (args: { where?: Record<string, unknown> }) => {
@@ -66,6 +68,15 @@ function makeStubTx() {
       (store[name] ??= []).push(row);
       calls.creates.push({ delegate: name, data: args.data });
       return row;
+    },
+    updateMany: async (args: { where: Record<string, unknown>; data: Record<string, unknown> }) => {
+      // Status-guarded writes (transition table): every where key must match.
+      const rows = (store[name] ?? []).filter((r) =>
+        Object.entries(args.where).every(([k, v]) => r[k] === v),
+      );
+      for (const row of rows) Object.assign(row, args.data);
+      if (rows.length) calls.updates.push({ delegate: name, where: args.where, data: args.data });
+      return { count: rows.length };
     },
     update: async (args: { where: Record<string, unknown>; data: Record<string, unknown> }) => {
       const rows = store[name] ?? [];
@@ -94,6 +105,7 @@ function makeStubTx() {
     {},
     {
       get(_t, prop: string) {
+        if (prop === "composioActionApproval") return claims;
         if (prop === "opsAuditEvent") {
           return {
             create: async (args: { data: Record<string, unknown> }) => {

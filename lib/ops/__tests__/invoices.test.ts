@@ -6,6 +6,7 @@
 import { describe, it, before, after } from "node:test";
 import assert from "node:assert/strict";
 import type { Prisma } from "@prisma/client";
+import { approvalClaimDelegate } from "./approval-claims";
 
 import { OPS_ENTITY_MAP } from "../entities";
 import {
@@ -77,10 +78,15 @@ function makeStubTx(existing: Record<string, unknown>, opts: { createdId?: strin
   const created: Array<Record<string, unknown>> = [];
   const audits: Array<Record<string, unknown>> = [];
   let updated = 0;
+  const claims = approvalClaimDelegate();
+  // Mutable copy: guarded writes (updateMany) land here and findFirst
+  // re-reads them, the way the database would.
+  const state: Record<string, unknown> = { ...existing };
   const tx = new Proxy(
     {},
     {
       get(_t, prop: string) {
+        if (prop === "composioActionApproval") return claims;
         if (prop === "opsAuditEvent") {
           return {
             create: async (a: { data: Record<string, unknown> }) => {
@@ -95,12 +101,18 @@ function makeStubTx(existing: Record<string, unknown>, opts: { createdId?: strin
           };
         }
         return {
-          findFirst: async () => ({ ...existing }),
-          findMany: async () => [{ ...existing }],
+          findFirst: async () => ({ ...state }),
+          findMany: async () => [{ ...state }],
           create: async (a: { data: Record<string, unknown> }) => {
             const row = { ...a.data, id: opts.createdId ?? "inv_new" };
             created.push(row);
             return row;
+          },
+          updateMany: async (args: { where: Record<string, unknown>; data: Record<string, unknown> }) => {
+            if (!Object.entries(args.where).every(([k, v]) => state[k] === v)) return { count: 0 };
+            updated += 1;
+            Object.assign(state, args.data);
+            return { count: 1 };
           },
           update: async (args: { data: Record<string, unknown> }) => {
             updated += 1;
@@ -333,9 +345,13 @@ describe("overdue sweep", () => {
                 })
                 .map((r) => ({ ...r }));
             },
-            update: async (args: { where: { id: string } }) => {
+            // Guarded like Prisma: only rows still matching the where move.
+            updateMany: async (args: { where: { id: string; status?: string } }) => {
+              const row = rows.find((r) => r["id"] === args.where.id);
+              if (!row || (args.where.status && row["status"] !== args.where.status)) return { count: 0 };
+              row["status"] = "overdue";
               updated.push(args.where.id);
-              return { id: args.where.id, status: "overdue" };
+              return { count: 1 };
             },
           };
         },

@@ -6,6 +6,7 @@
 import { describe, it, before, after } from "node:test";
 import assert from "node:assert/strict";
 import type { Prisma } from "@prisma/client";
+import { approvalClaimDelegate } from "./approval-claims";
 
 import { OPS_ENTITY_MAP } from "../entities";
 import { OPS_MONEY_ACTION_MAP, opsBindingFor, type OpsGatePort } from "../gate";
@@ -74,10 +75,12 @@ function approvedLeavePort(): OpsGatePort {
 function makeStubTx(existing: Record<string, unknown>, opts: { createdId?: string } = {}) {
   const created: Array<Record<string, unknown>> = [];
   const audits: Array<Record<string, unknown>> = [];
+  const claims = approvalClaimDelegate();
   const tx = new Proxy(
     {},
     {
       get(_t, prop: string) {
+        if (prop === "composioActionApproval") return claims;
         if (prop === "opsAuditEvent") {
           return {
             create: async (a: { data: Record<string, unknown> }) => {

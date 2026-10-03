@@ -20,6 +20,7 @@
 import { describe, it, before, after } from "node:test";
 import assert from "node:assert/strict";
 import type { Prisma } from "@prisma/client";
+import { approvalClaimDelegate } from "./approval-claims";
 
 import { OPS_ENTITY_MAP } from "../entities";
 import {
@@ -57,6 +58,7 @@ function makeStubTx(seed: Record<string, Array<Record<string, unknown>>> = {}) {
   const store: Record<string, Array<Record<string, unknown>>> = {};
   for (const [k, rows] of Object.entries(seed)) store[k] = rows.map((r) => ({ ...r }));
   const calls: StubCalls = { audits: [], creates: [], updates: [] };
+  const claims = approvalClaimDelegate();
 
   const delegate = (name: string) => ({
     findMany: async (args: { where?: Record<string, unknown> }) => {
@@ -79,6 +81,15 @@ function makeStubTx(seed: Record<string, Array<Record<string, unknown>>> = {}) {
       (store[name] ??= []).push(row);
       calls.creates.push({ delegate: name, data: args.data });
       return row;
+    },
+    updateMany: async (args: { where: Record<string, unknown>; data: Record<string, unknown> }) => {
+      // Status-guarded writes (transition table): every where key must match.
+      const rows = (store[name] ?? []).filter((r) =>
+        Object.entries(args.where).every(([k, v]) => r[k] === v),
+      );
+      for (const row of rows) Object.assign(row, args.data);
+      if (rows.length) calls.updates.push({ delegate: name, where: args.where, data: args.data });
+      return { count: rows.length };
     },
     update: async (args: { where: Record<string, unknown>; data: Record<string, unknown> }) => {
       const rows = store[name] ?? [];
@@ -107,6 +118,7 @@ function makeStubTx(seed: Record<string, Array<Record<string, unknown>>> = {}) {
     {},
     {
       get(_t, prop: string) {
+        if (prop === "composioActionApproval") return claims;
         if (prop === "opsAuditEvent") {
           return {
             create: async (args: { data: Record<string, unknown> }) => {
@@ -523,19 +535,16 @@ describe("purchase-order receive (stub tx)", () => {
     assert.deepEqual(prodUpdates[0]!.data, { stockQty: { increment: 5 } });
   });
 
-  it("is idempotent: a second receive books nothing", async () => {
+  it("is idempotent: a second receive is refused (409) and books nothing", async () => {
     const { tx, calls } = makeStubTx({
       opsPurchaseOrder: [{ ...DRAFT_PO, status: "received", receivedAt: new Date() }],
       opsProduct: [trackedProduct({ stockQty: 15 })],
     });
-    const res = await opsPatch(
-      tx,
-      POS,
-      ACTOR,
-      { id: "po_1", status: "received" },
-      { gatePort: stubGatePort() },
+    await assert.rejects(
+      opsPatch(tx, POS, ACTOR, { id: "po_1", status: "received" }, { gatePort: stubGatePort() }),
+      (e: unknown) => e instanceof OpsError && e.status === 409,
+      "received → received is not a transition",
     );
-    assert.equal(res.outcome, "done");
     assert.equal(
       calls.creates.filter((c) => c.delegate === "opsInventoryTxn").length,
       0,

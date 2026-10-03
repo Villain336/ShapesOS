@@ -38,8 +38,9 @@
 // mid-rollback — a rollback that waits on a human is not a rollback.
 // `runKey` is an idempotency key (unique per workspace): the same approved
 // plan can never execute twice, so a replayed approval cannot double-charge.
-// The Phase 14 approval itself is left "approved" (the ops convention from
-// slices 1–5); the runKey uniqueness is the replay lock for workflow runs.
+// The runKey uniqueness is the replay lock for workflow runs, and the
+// Phase 14 approval is additionally consumed (approved → executed) in the
+// run's transaction, like every other gated ops write.
 
 import type { Prisma } from "@prisma/client";
 import {
@@ -54,6 +55,7 @@ import {
   OpsGateError,
   phase14GatePort,
   requestOpsApproval,
+  consumeOpsApproval,
   verifyOpsApproval,
   type OpsGatePort,
 } from "./gate";
@@ -354,7 +356,7 @@ export async function runWorkflow(
 
   // The single gate check for the whole run: step executions and
   // compensations below run UNDER this approval (pre-authorized rollback).
-  await verifyOpsApproval(port, {
+  const approval = await verifyOpsApproval(port, {
     workspaceId: actor.workspaceId,
     slug: "OPS_WORKFLOW_RUN",
     entity: "workflow-runs",
@@ -371,6 +373,12 @@ export async function runWorkflow(
   if (existing) {
     throw new OpsError(409, `Workflow run "${args.runKey}" already executed — replay blocked`);
   }
+  await consumeOpsApproval(tx, {
+    workspaceId: actor.workspaceId,
+    approval,
+    actor: actor.userId,
+    slug: "OPS_WORKFLOW_RUN",
+  });
 
   // Create the run record (draft-creator → free, logged).
   const created = await opsCreate(tx, WF_DEF, actor, {

@@ -41,12 +41,43 @@ export interface OpsEntityDef {
   /** Query-param filters allowed on GET (beyond limit). */
   filterable: string[];
   gatedTransitions: OpsGatedTransition[];
+  /**
+   * Allowed status moves (from → to[]). When set, every PATCH that changes
+   * status must be listed here (409 otherwise) and is applied with a
+   * status-guarded write, so two racing transitions can't both land.
+   * Money fields (taxCents/lineItems) are editable only while "draft".
+   */
+  statusTransitions?: Record<string, string[]>;
   summarize: (row: Record<string, unknown>) => string;
 }
 
 // ---------------------------------------------------------------------------
 // Shared shapes
 // ---------------------------------------------------------------------------
+
+/** Money columns are Postgres int4 — totals beyond this would 500 at insert. */
+export const OPS_MAX_CENTS = 2_147_483_647;
+
+const centsSchema = z.number().int().min(0).max(OPS_MAX_CENTS);
+
+/** Server-computed total (Σ qty × price + tax). */
+export function opsTotalCents(lineItems: Array<{ qty: number; priceCents: number }>, taxCents: number): number {
+  return lineItems.reduce((s, li) => s + li.qty * li.priceCents, 0) + taxCents;
+}
+
+/** The total must fit the int4 column (validated, never a raw Prisma 500). */
+function totalFitsInt4(
+  body: { lineItems: Array<{ qty: number; priceCents: number }>; taxCents?: number },
+  ctx: z.RefinementCtx,
+) {
+  if (opsTotalCents(body.lineItems, body.taxCents ?? 0) > OPS_MAX_CENTS) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["lineItems"],
+      message: `total exceeds the maximum of ${OPS_MAX_CENTS} cents`,
+    });
+  }
+}
 
 const lineItemSchema = z.object({
   name: z.string().min(1).max(200),
@@ -91,8 +122,8 @@ const productDef: OpsEntityDef = {
   createSchema: z.object({
     name: z.string().min(1).max(200),
     sku: z.string().min(1).max(64),
-    priceCents: z.number().int().min(0),
-    stockQty: z.number().int().min(0).default(0),
+    priceCents: centsSchema,
+    stockQty: z.number().int().min(0).max(OPS_MAX_CENTS).default(0),
     trackInventory: z.boolean().default(true),
   }),
   // NOTE: stockQty is deliberately NOT patchable — stock moves only through
@@ -107,7 +138,7 @@ const productDef: OpsEntityDef = {
   patchSchema: z.object({
     name: z.string().min(1).max(200).optional(),
     sku: z.string().min(1).max(64).optional(),
-    priceCents: z.number().int().min(0).optional(),
+    priceCents: centsSchema.optional(),
     trackInventory: z.boolean().optional(),
     lowStockThreshold: z.number().int().min(0).optional(),
   }).strict(),
@@ -124,11 +155,12 @@ const orderDef: OpsEntityDef = {
   createSchema: z.object({
     customerId: z.string().min(1).max(64).optional(),
     lineItems: z.array(lineItemSchema).min(1).max(200),
-    taxCents: z.number().int().min(0).default(0),
-  }),
+    taxCents: centsSchema.default(0),
+  }).superRefine(totalFitsInt4),
   patchSchema: z.object({
     customerId: z.string().min(1).max(64).optional(),
-    taxCents: z.number().int().min(0).optional(),
+    lineItems: z.array(lineItemSchema).min(1).max(200).optional(),
+    taxCents: centsSchema.optional(),
     status: z.enum(["confirmed", "fulfilled", "cancelled"]).optional(),
   }),
   patchable: true,
@@ -147,6 +179,12 @@ const orderDef: OpsEntityDef = {
       label: "Fulfill order",
     },
   ],
+  statusTransitions: {
+    draft: ["confirmed", "cancelled"],
+    confirmed: ["fulfilled", "cancelled"],
+    fulfilled: [],
+    cancelled: [],
+  },
   summarize: (r) => `order ${r.id} → ${r.status} (${r.totalCents}c)`,
 };
 
@@ -161,7 +199,7 @@ const paymentDef: OpsEntityDef = {
     z.object({
       orderId: z.string().min(1).max(64).optional(),
       kind: z.enum(["charge", "refund"]).default("charge"),
-      amountCents: z.number().int().positive(),
+      amountCents: z.number().int().positive().max(OPS_MAX_CENTS),
       provider: z.string().max(32).default("stripe"),
       providerRef: z.string().max(128).optional(),
       status: z.enum(["pending", "succeeded", "failed"]).default("pending"),
@@ -172,7 +210,7 @@ const paymentDef: OpsEntityDef = {
         .array(
           z.object({
             orderId: z.string().min(1).max(64).optional(),
-            amountCents: z.number().int().positive(),
+            amountCents: z.number().int().positive().max(OPS_MAX_CENTS),
             providerRef: z.string().max(128).optional(),
           }),
         )
@@ -217,15 +255,16 @@ const invoiceDef: OpsEntityDef = {
   createSchema: z.object({
     customerId: z.string().min(1).max(64).optional(),
     lineItems: z.array(invoiceLineSchema).min(1).max(200),
-    taxCents: z.number().int().min(0).default(0),
-    idempotencyKey: z.string().max(128).optional(),
+    taxCents: centsSchema.default(0),
+    idempotencyKey: z.string().min(1).max(128).optional(),
     // ISO-8601 payment due date (optional — defaults to sentAt + 30 days
     // when the invoice is sent). Slice 2.
     dueAt: z.string().max(64).optional(),
-  }),
+  }).superRefine(totalFitsInt4),
   patchSchema: z.object({
     customerId: z.string().min(1).max(64).optional(),
-    taxCents: z.number().int().min(0).optional(),
+    lineItems: z.array(invoiceLineSchema).min(1).max(200).optional(),
+    taxCents: centsSchema.optional(),
     status: z.enum(["sent", "paid", "overdue", "cancelled"]).optional(),
   }),
   patchable: true,
@@ -237,6 +276,15 @@ const invoiceDef: OpsEntityDef = {
     { field: "status", to: ["paid"], slug: "OPS_INVOICE_MARK_PAID", label: "Mark invoice paid" },
     { field: "status", to: ["cancelled"], slug: "OPS_RECORD_DELETE", label: "Void invoice" },
   ],
+  // Overdue only follows a sent invoice (the sweep's move); paid and
+  // cancelled are terminal — a paid invoice can never flip to overdue.
+  statusTransitions: {
+    draft: ["sent", "cancelled"],
+    sent: ["paid", "overdue", "cancelled"],
+    overdue: ["paid", "cancelled"],
+    paid: [],
+    cancelled: [],
+  },
   summarize: (r) => `invoice ${r.id} → ${r.status} (${r.totalCents}c)`,
 };
 
@@ -281,12 +329,13 @@ const purchaseOrderDef: OpsEntityDef = {
     supplierId: z.string().min(1).max(64).optional(),
     supplierName: z.string().max(200).optional(),
     lineItems: z.array(poLineItemSchema).min(1).max(200),
-    taxCents: z.number().int().min(0).default(0),
-  }),
+    taxCents: centsSchema.default(0),
+  }).superRefine(totalFitsInt4),
   patchSchema: z.object({
     supplierId: z.string().min(1).max(64).optional(),
     supplierName: z.string().max(200).optional(),
-    taxCents: z.number().int().min(0).optional(),
+    lineItems: z.array(poLineItemSchema).min(1).max(200).optional(),
+    taxCents: centsSchema.optional(),
     status: z.enum(["sent", "received", "cancelled"]).optional(),
   }),
   patchable: true,
@@ -298,6 +347,13 @@ const purchaseOrderDef: OpsEntityDef = {
     { field: "status", to: ["sent"], slug: "OPS_PO_SEND", label: "Send purchase order" },
     { field: "status", to: ["cancelled"], slug: "OPS_RECORD_DELETE", label: "Cancel purchase order" },
   ],
+  // Received only after sent (restock books exactly once, on that move).
+  statusTransitions: {
+    draft: ["sent", "cancelled"],
+    sent: ["received", "cancelled"],
+    received: [],
+    cancelled: [],
+  },
   summarize: (r) => `purchase order ${r.id} → ${r.status} (${r.totalCents}c)`,
 };
 

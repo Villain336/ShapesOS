@@ -22,7 +22,7 @@ import {
 import {
   OpsGateError,
   requestOpsApproval,
-  verifyOpsApproval,
+  verifyAndConsumeOpsApproval,
   type OpsGatePort,
   type OpsGateProposal,
   phase14GatePort,
@@ -146,7 +146,7 @@ export async function markOverdueInvoices(tx: Tx, actor: OpsActor): Promise<Over
     tx as unknown as {
       opsInvoice: {
         findMany(a: unknown): Promise<OpsInvoiceRow[]>;
-        update(a: unknown): Promise<OpsInvoiceRow>;
+        updateMany(a: unknown): Promise<{ count: number }>;
       };
     }
   ).opsInvoice;
@@ -160,7 +160,13 @@ export async function markOverdueInvoices(tx: Tx, actor: OpsActor): Promise<Over
   });
   const ids: string[] = [];
   for (const inv of pastDue) {
-    await delegate.update({ where: { id: inv.id }, data: { status: "overdue" } });
+    // Guarded on status "sent": an invoice marked paid (or cancelled)
+    // between the read above and this write is left alone.
+    const moved = await delegate.updateMany({
+      where: { id: inv.id, workspaceId: actor.workspaceId, status: "sent" },
+      data: { status: "overdue" },
+    });
+    if (moved.count !== 1) continue;
     await audit(
       tx,
       actor,
@@ -231,13 +237,15 @@ export async function executeInvoiceReminder(
     throw new OpsError(422, `Only sent or overdue invoices can be reminded (invoice is ${inv.status})`);
   }
   const port = opts.gatePort ?? phase14GatePort;
-  await verifyOpsApproval(port, {
+  // One approval = one reminder: claimed approved → executed in this tx.
+  await verifyAndConsumeOpsApproval(port, tx, {
     workspaceId: actor.workspaceId,
     slug: "OPS_INVOICE_REMIND",
     entity: "invoices",
     entityId: invoiceId,
     mutation: reminderBinding(invoiceId, clean),
     approvalId,
+    actor: actor.userId,
   });
   // Dispatch record: the reminder text is logged in the audit trail with
   // the approving approval id. Actual email/SMS delivery is a later slice —
