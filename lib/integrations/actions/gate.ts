@@ -145,6 +145,49 @@ export async function proposeAction(input: ProposeInput) {
   return { approval, classified };
 }
 
+/**
+ * Who requested an approval: the actor of its server-written "proposed"
+ * audit event (proposeAction sets it from the session user or the agent
+ * identity — never from the client body).
+ */
+export function requesterOf(auditTrail: unknown): string | null {
+  const arr = Array.isArray(auditTrail) ? (auditTrail as AuditEvent[]) : [];
+  return arr.find((e) => e?.event === "proposed")?.actor ?? null;
+}
+
+/** True when `userId` is the requester (also "<userId> (playbook:…)" forms). */
+export function isRequester(requester: string | null, userId: string): boolean {
+  if (!requester || !userId) return false;
+  return requester === userId || requester.startsWith(`${userId} `);
+}
+
+/**
+ * Separation of duties: is there an editor+ member other than the requester
+ * who could approve instead? A solo workspace (nobody else can approve) may
+ * self-approve — recorded as such in the audit trail.
+ */
+async function hasOtherApprover(tx: Prisma.TransactionClient, workspaceId: string, requesterId: string) {
+  const ws = await tx.workspace.findUnique({ where: { id: workspaceId }, select: { ownerUserId: true } });
+  if (ws?.ownerUserId && ws.ownerUserId !== requesterId) return true;
+  const other = await tx.workspaceMember.findFirst({
+    where: {
+      workspaceId,
+      userId: { not: null, notIn: [requesterId] },
+      role: { in: ["editor", "admin", "owner"] },
+    },
+    select: { id: true },
+  });
+  return other !== null;
+}
+
+export class SeparationOfDutiesError extends Error {
+  readonly status = 403;
+  constructor() {
+    super("You requested this action, so another editor must approve it (separation of duties).");
+    this.name = "SeparationOfDutiesError";
+  }
+}
+
 export interface DecideInput {
   workspaceId: string;
   approvalId: string;
@@ -191,6 +234,14 @@ export async function decideApproval(input: DecideInput) {
       });
       throw new Error("Approval expired before decision");
     }
+    // Separation of duties (Phase 1): the requester cannot approve their own
+    // action unless nobody else in the workspace can. Denying (withdrawing)
+    // your own request is always allowed.
+    let selfApproved = false;
+    if (input.decision === "approved" && isRequester(requesterOf(approval.auditTrail), input.decidedBy)) {
+      if (await hasOtherApprover(tx, input.workspaceId, input.decidedBy)) throw new SeparationOfDutiesError();
+      selfApproved = true;
+    }
     const redacted = input.editedArgs ? redactArgs(input.editedArgs) : undefined;
     // Edit-before-approve reclassifies with FRESH overrides (slice 5): the
     // tier is re-derived so an edit can't silently change the action's risk
@@ -218,10 +269,15 @@ export async function decideApproval(input: DecideInput) {
           actor: input.decidedBy,
           event: input.decision,
           detail:
-            input.reason?.trim() ||
-            (redacted
-              ? `args edited before approve${tierChanged ? ` — tier ${approval.riskTier} -> ${(reclassified as { tier: RiskTier }).tier}` : ""}`
-              : undefined),
+            [
+              input.reason?.trim() ||
+                (redacted
+                  ? `args edited before approve${tierChanged ? ` — tier ${approval.riskTier} -> ${(reclassified as { tier: RiskTier }).tier}` : ""}`
+                  : undefined),
+              selfApproved ? "self-approved: no other approver in this workspace" : undefined,
+            ]
+              .filter(Boolean)
+              .join(" — ") || undefined,
         })),
       },
       select: { id: true, status: true, riskTier: true, plainSummary: true },
