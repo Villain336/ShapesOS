@@ -7,7 +7,8 @@
 // tenants (defense in depth, T8).
 
 import type { PrismaClient, ScheduledSkill } from "@prisma/client";
-import { parseCron, nextRunAfter, CronParseError } from "./cron";
+import { parseCron, nextRunAfterInZone, CronParseError } from "./cron";
+import { DEFAULT_TIME_ZONE, isValidTimeZone } from "@/lib/time/zoned";
 import {
   isEventSource,
   validateEventPayload,
@@ -37,6 +38,8 @@ export interface CreateScheduleInput {
   skillId: string;
   triggerType: "cron" | "event";
   cronExpr?: string | null;
+  /** IANA zone the cron is read in (default UTC). Validated. */
+  timezone?: string | null;
   eventSource?: string | null;
   eventConfig?: Record<string, unknown> | null;
   createdBy: string;
@@ -50,6 +53,18 @@ export class ScheduleServiceError extends Error {
     super(message);
     this.name = "ScheduleServiceError";
   }
+}
+
+/** Validate a schedule's IANA timezone; blank/absent → UTC. */
+export function normalizeScheduleTimezone(tz: unknown): string {
+  if (tz == null || (typeof tz === "string" && tz.trim() === "")) return DEFAULT_TIME_ZONE;
+  const trimmed = typeof tz === "string" ? tz.trim() : tz;
+  if (!isValidTimeZone(trimmed)) {
+    throw new ScheduleServiceError(
+      `unknown timezone "${String(tz).slice(0, 64)}" (use an IANA name like America/New_York)`,
+    );
+  }
+  return trimmed;
 }
 
 async function loadScheduleForWorkspace(db: Db, id: string, workspaceId: string) {
@@ -86,11 +101,12 @@ export async function createSchedule(db: Db, input: CreateScheduleInput, now = n
   let eventSource: string | null = null;
   let eventConfigJson: Record<string, unknown> | null = null;
   let nextRunAt: Date | null = null;
+  const timezone = normalizeScheduleTimezone(input.timezone); // throws → 400
 
   if (input.triggerType === "cron") {
     const parsed = parseCron(input.cronExpr ?? ""); // throws CronParseError → 400
     cronExpr = parsed.expr;
-    nextRunAt = nextRunAfter(parsed, now);
+    nextRunAt = nextRunAfterInZone(parsed, now, timezone);
   } else if (input.triggerType === "event") {
     if (!isEventSource(input.eventSource)) {
       throw new ScheduleServiceError(`unknown event source: ${String(input.eventSource)}`);
@@ -116,6 +132,7 @@ export async function createSchedule(db: Db, input: CreateScheduleInput, now = n
       skillId: skill.id,
       triggerType: input.triggerType,
       cronExpr,
+      timezone,
       eventSource,
       eventConfigJson: eventConfigJson ? (JSON.parse(JSON.stringify(eventConfigJson)) as never) : undefined,
       createdBy: input.createdBy,
@@ -130,7 +147,7 @@ export async function createSchedule(db: Db, input: CreateScheduleInput, now = n
     projectId,
     workspaceId: input.workspaceId,
     action: "schedule_created",
-    summary: `Schedule created: "${skill.name}" (${input.triggerType}${cronExpr ? ` ${cronExpr}` : ""}${eventSource ? ` ${eventSource}` : ""}, ${approvalMode})`,
+    summary: `Schedule created: "${skill.name}" (${input.triggerType}${cronExpr ? ` ${cronExpr} ${timezone}` : ""}${eventSource ? ` ${eventSource}` : ""}, ${approvalMode})`,
     actorUserId: input.createdBy,
   });
   return schedule;
@@ -138,6 +155,8 @@ export async function createSchedule(db: Db, input: CreateScheduleInput, now = n
 
 export interface UpdateScheduleInput {
   cronExpr?: string | null;
+  /** IANA zone (cron schedules); null/blank resets to UTC. */
+  timezone?: string | null;
   eventSource?: string | null;
   eventConfig?: Record<string, unknown> | null;
   approvalMode?: "supervised" | "scheduled" | "autopilot";
@@ -158,13 +177,20 @@ export async function updateSchedule(
   const data: Record<string, unknown> = {};
   let statusChanged = false;
 
-  if (patch.cronExpr !== undefined) {
+  if (patch.cronExpr !== undefined || patch.timezone !== undefined) {
     if (schedule.triggerType !== "cron") {
-      throw new ScheduleServiceError("cannot set cronExpr on an event schedule");
+      throw new ScheduleServiceError(
+        patch.cronExpr !== undefined
+          ? "cannot set cronExpr on an event schedule"
+          : "cannot set timezone on an event schedule",
+      );
     }
-    const parsed = parseCron(patch.cronExpr ?? "");
+    const timezone =
+      patch.timezone !== undefined ? normalizeScheduleTimezone(patch.timezone) : schedule.timezone;
+    const parsed = parseCron(patch.cronExpr !== undefined ? (patch.cronExpr ?? "") : (schedule.cronExpr ?? ""));
     data.cronExpr = parsed.expr;
-    data.nextRunAt = nextRunAfter(parsed, now);
+    data.timezone = timezone;
+    data.nextRunAt = nextRunAfterInZone(parsed, now, timezone);
   }
   if (patch.eventSource !== undefined || patch.eventConfig !== undefined) {
     if (schedule.triggerType !== "event") {

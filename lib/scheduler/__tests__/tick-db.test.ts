@@ -9,10 +9,12 @@ import { after, before, describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { prisma } from "@/lib/prisma";
 import { runSchedulerTick } from "../tick";
+import { createSchedule, updateSchedule, ScheduleServiceError } from "../service";
 import { nextOccurrence } from "@/lib/wfh/rituals";
 
 const WS = "p2g-tick-ws";
 const OTHER_WS = "p2g-tick-ws-2";
+const TZ_WS = "p4fix-tick-tz-ws";
 const NOW = new Date("2028-02-29T00:00:30Z");
 
 async function createWorkspace(id: string) {
@@ -21,14 +23,14 @@ async function createWorkspace(id: string) {
 }
 
 before(async () => {
-  for (const id of [WS, OTHER_WS]) {
+  for (const id of [WS, OTHER_WS, TZ_WS]) {
     await prisma.$executeRaw`DELETE FROM workspaces WHERE id = ${id}`;
     await createWorkspace(id);
   }
 });
 
 after(async () => {
-  for (const id of [WS, OTHER_WS]) await prisma.$executeRaw`DELETE FROM workspaces WHERE id = ${id}`;
+  for (const id of [WS, OTHER_WS, TZ_WS]) await prisma.$executeRaw`DELETE FROM workspaces WHERE id = ${id}`;
   await prisma.$disconnect();
 });
 
@@ -124,5 +126,42 @@ describe("runSchedulerTick (database)", () => {
       SELECT column_default AS tz FROM information_schema.columns
       WHERE table_name = 'workflows' AND column_name = 'timezone'`;
     assert.match(tz, /'UTC'/);
+  });
+
+  // Phase 4a follow-up: scheduled skills used to run on UTC wall time only.
+  it("a schedule's IANA timezone is validated, stored, and drives nextRunAt (create, update, tick)", async () => {
+    const skill = await skillFor(TZ_WS);
+    const base = { workspaceId: TZ_WS, skillId: skill.id, triggerType: "cron" as const, createdBy: "test" };
+    const from = new Date("2026-10-03T00:00:00Z");
+
+    const legacy = await createSchedule(prisma, { ...base, cronExpr: "0 9 * * 1" }, from);
+    assert.equal(legacy.timezone, "UTC", "default stays UTC");
+    assert.equal(legacy.nextRunAt?.toISOString(), "2026-10-05T09:00:00.000Z");
+
+    const ny = await createSchedule(prisma, { ...base, cronExpr: "0 9 * * 1", timezone: "America/New_York" }, from);
+    assert.equal(ny.timezone, "America/New_York");
+    assert.equal(ny.nextRunAt?.toISOString(), "2026-10-05T13:00:00.000Z", "Mon 09:00 EDT");
+
+    await assert.rejects(
+      createSchedule(prisma, { ...base, cronExpr: "0 9 * * 1", timezone: "Mars/Olympus" }, from),
+      (e: unknown) => e instanceof ScheduleServiceError && /unknown timezone/.test(e.message),
+    );
+
+    // Changing only the zone recomputes nextRunAt from the stored cron.
+    const moved = await updateSchedule(prisma, ny.id, TZ_WS, { timezone: "Asia/Tokyo" }, "test", from);
+    assert.equal(moved.timezone, "Asia/Tokyo");
+    assert.equal(moved.nextRunAt?.toISOString(), "2026-10-05T00:00:00.000Z", "Mon 09:00 JST");
+    await assert.rejects(updateSchedule(prisma, ny.id, TZ_WS, { timezone: "nope" }, "test", from), ScheduleServiceError);
+
+    // The tick advances in the schedule's zone: across New York's fall-back,
+    // a 09:00 local daily schedule moves from 13:00Z to 14:00Z.
+    const daily = await createSchedule(prisma, { ...base, cronExpr: "0 9 * * *", timezone: "America/New_York", approvalMode: "supervised" }, new Date("2026-10-31T12:00:00Z"));
+    assert.equal(daily.nextRunAt?.toISOString(), "2026-10-31T13:00:00.000Z");
+    await runSchedulerTick(prisma, new Date("2026-10-31T13:00:20Z"), {
+      workspaceId: TZ_WS,
+      fire: (async () => ({ fired: true })) as never,
+    });
+    const after = await prisma.scheduledSkill.findUniqueOrThrow({ where: { id: daily.id } });
+    assert.equal(after.nextRunAt?.toISOString(), "2026-11-01T14:00:00.000Z", "still 09:00 local (EST)");
   });
 });

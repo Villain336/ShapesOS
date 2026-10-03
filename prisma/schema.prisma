@@ -3416,6 +3416,9 @@ model ScheduledSkill {
   triggerType      ScheduleTriggerType  @map("trigger_type")
   // Strict 5-field cron ("0 9 * * 1"). Null for event schedules.
   cronExpr         String?              @map("cron_expr")
+  // IANA zone the cron is read in as wall-clock time (Phase 4a). Validated
+  // on write; default UTC (the behaviour before this column existed).
+  timezone         String               @default("UTC")
   // Event bus source key, e.g. "rank_drop". Null for cron schedules.
   eventSource      String?              @map("event_source")
   // Per-source config, e.g. { "dropThreshold": 3 } for rank_drop.

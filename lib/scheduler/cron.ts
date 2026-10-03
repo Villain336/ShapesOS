@@ -6,7 +6,7 @@
 // no regex built from the raw string. Anything else → CronParseError → 400
 // at the API layer, never persisted.
 
-import { zonedParts } from "@/lib/time/zoned";
+import { zonedParts, zonedTimeToUtc } from "@/lib/time/zoned";
 
 export class CronParseError extends Error {
   constructor(message: string) {
@@ -224,4 +224,65 @@ export function nextRunAfter(s: CronSchedule, from: Date): Date {
  */
 export function nextFutureRunAfter(s: CronSchedule, from: Date, now: Date): Date {
   return nextRunAfter(s, from.getTime() > now.getTime() ? from : now);
+}
+
+/** True for the zones where wall-clock time is UTC (no DST, no offset). */
+function isUtcZone(tz: string): boolean {
+  return tz === "UTC" || tz === "Etc/UTC" || tz === "Etc/GMT" || tz === "GMT";
+}
+
+/** Wall-clock slack (minutes) covering any real DST/offset change within a day. */
+const DST_SLACK_MIN = 180;
+
+/**
+ * Next firing time strictly after `from`, reading the schedule as wall-clock
+ * time in IANA zone `tz` (Phase 4a: per-schedule timezone). Every slot it
+ * returns is a minute cronMatchesInZone(s, slot, tz) accepts, except across
+ * DST transitions, which follow the same "compatible" rules as
+ * lib/time/zoned.ts zonedTimeToUtc:
+ *   - fall back (wall time occurs twice): fires once, at the earlier instant;
+ *   - spring forward (wall time never occurs): fires once, shifted forward by
+ *     the gap (02:30 → 03:30 in New York) instead of silently skipping a day.
+ * Walks local calendar days (≤ eight years, like nextRunAfter) and converts
+ * only candidate wall times on matching days. UTC delegates to nextRunAfter.
+ */
+export function nextRunAfterInZone(s: CronSchedule, from: Date, tz: string): Date {
+  if (isUtcZone(tz)) return nextRunAfter(s, from);
+  const start = Math.floor(from.getTime() / MINUTE_MS) * MINUTE_MS + MINUTE_MS;
+  const local = zonedParts(new Date(start), tz);
+  const hours = [...s.hour].sort((a, b) => a - b);
+  const minutes = [...s.minute].sort((a, b) => a - b);
+  for (let i = 0; i < SEARCH_LIMIT_DAYS; i++) {
+    // Local calendar date i days after the start's local date (UTC math on a
+    // date-only value: no offsets involved).
+    const d = new Date(Date.UTC(local.year, local.month - 1, local.day + i));
+    const year = d.getUTCFullYear();
+    const month = d.getUTCMonth() + 1;
+    const day = d.getUTCDate();
+    if (!dayMatches(s, { day, month, weekday: d.getUTCDay() })) continue;
+    // Wall times far before the start on its own day are long past.
+    const minWall = i === 0 ? local.minutes - DST_SLACK_MIN : -1;
+    let best: number | null = null;
+    let bestWall = Number.POSITIVE_INFINITY;
+    scan: for (const h of hours) {
+      for (const m of minutes) {
+        const wall = h * 60 + m;
+        if (wall < minWall) continue;
+        // A wall time this much later can't map to an earlier instant.
+        if (wall > bestWall + DST_SLACK_MIN) break scan;
+        const t = zonedTimeToUtc(year, month, day, wall, tz).date.getTime();
+        if (t >= start && (best === null || t < best)) {
+          best = t;
+          bestWall = wall;
+        }
+      }
+    }
+    if (best !== null) return new Date(best);
+  }
+  throw new CronParseError("cron expression has no firing time within eight years");
+}
+
+/** nextFutureRunAfter, read in IANA zone `tz` (see nextRunAfterInZone). */
+export function nextFutureRunAfterInZone(s: CronSchedule, from: Date, now: Date, tz: string): Date {
+  return nextRunAfterInZone(s, from.getTime() > now.getTime() ? from : now, tz);
 }

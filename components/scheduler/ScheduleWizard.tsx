@@ -7,6 +7,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Notice, btnCls, cardCls, inputCls, labelCls, primaryBtnCls, type NoticeState } from "@/components/settings/ui";
+import TimezoneField, { useBrowserTimeZone } from "./TimezoneField";
 
 interface SkillOption {
   id: string;
@@ -49,6 +50,10 @@ export default function ScheduleWizard({
   const [triggerType, setTriggerType] = useState<"cron" | "event">("cron");
   const [preset, setPreset] = useState<string>("daily");
   const [customExpr, setCustomExpr] = useState("");
+  // Presets say "9:00 AM": default to the creator's own zone (null = untouched).
+  const detectedZone = useBrowserTimeZone();
+  const [timezoneChoice, setTimezoneChoice] = useState<string | null>(null);
+  const timezone = timezoneChoice ?? detectedZone;
   const [eventSource, setEventSource] = useState<string>("rank_drop");
   const [dropThreshold, setDropThreshold] = useState(3);
   const [minDropPct, setMinDropPct] = useState(20);
@@ -106,6 +111,7 @@ export default function ScheduleWizard({
         return;
       }
       body.cronExpr = cronExpr;
+      body.timezone = timezone.trim() || "UTC";
     } else {
       body.eventSource = eventSource;
       body.eventConfig = eventConfig();
@@ -193,6 +199,7 @@ export default function ScheduleWizard({
                 Expression: <span className="text-zinc-800">{cronExpr}</span>
               </p>
             )}
+            <TimezoneField value={timezone} onChange={setTimezoneChoice} />
             <p className="text-xs text-zinc-500">
               If the scheduler restarts and misses a window, the run fires once and is marked missed — missed windows are never replayed in bulk.
             </p>

@@ -19,6 +19,7 @@ interface ScheduleRow {
   projectId: string | null;
   triggerType: string;
   cronExpr: string | null;
+  timezone?: string;
   eventSource: string | null;
   approvalMode: string;
   concurrencyLimit: number;
@@ -37,7 +38,7 @@ interface PendingRun {
 }
 
 function triggerLabel(s: ScheduleRow): string {
-  if (s.triggerType === "cron") return `Cron · ${s.cronExpr ?? "—"}`;
+  if (s.triggerType === "cron") return `Cron · ${s.cronExpr ?? "—"} · ${s.timezone || "UTC"}`;
   return `Event · ${s.eventSource ?? "—"}`;
 }
 

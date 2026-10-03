@@ -8,6 +8,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Notice, btnCls, cardCls, dangerBtnCls, inputCls, labelCls, primaryBtnCls, type NoticeState } from "@/components/settings/ui";
 import { confirmAction } from "@/lib/ui/feedback";
+import TimezoneField from "./TimezoneField";
 
 interface RunRow {
   id: string;
@@ -24,6 +25,7 @@ interface ScheduleInfo {
   id: string;
   triggerType: string;
   cronExpr: string | null;
+  timezone: string;
   eventSource: string | null;
   eventConfig: Record<string, unknown> | null;
   approvalMode: string;
@@ -53,6 +55,7 @@ export default function ScheduleDetail({
   const [approvalMode, setApprovalMode] = useState(schedule.approvalMode);
   const [concurrencyLimit, setConcurrencyLimit] = useState(schedule.concurrencyLimit);
   const [cronExpr, setCronExpr] = useState(schedule.cronExpr ?? "");
+  const [timezone, setTimezone] = useState(schedule.timezone || "UTC");
   const [editing, setEditing] = useState(false);
 
   const q = `workspaceId=${encodeURIComponent(workspaceId)}`;
@@ -145,7 +148,7 @@ export default function ScheduleDetail({
           <div>
             <h2 className="text-lg font-semibold text-zinc-900">{schedule.skill.name}</h2>
             <p className="mt-1 text-sm text-zinc-600">
-              {schedule.triggerType === "cron" ? `Cron · ${schedule.cronExpr}` : `Event · ${schedule.eventSource}`}
+              {schedule.triggerType === "cron" ? `Cron · ${schedule.cronExpr} · ${schedule.timezone || "UTC"}` : `Event · ${schedule.eventSource}`}
               {" · "}
               <span className={schedule.status === "active" ? "text-emerald-700" : "text-zinc-500"}>{schedule.status}</span>
             </p>
@@ -187,14 +190,17 @@ export default function ScheduleDetail({
                   </label>
                 </div>
                 {schedule.triggerType === "cron" && (
-                  <label className={labelCls}>
-                    Cron expression (5 fields)
-                    <input className={`${inputCls} mt-1 w-64 font-mono`} value={cronExpr} onChange={(e) => setCronExpr(e.target.value)} />
-                  </label>
+                  <div className="flex flex-wrap gap-4">
+                    <label className={labelCls}>
+                      Cron expression (5 fields)
+                      <input className={`${inputCls} mt-1 w-64 font-mono`} value={cronExpr} onChange={(e) => setCronExpr(e.target.value)} />
+                    </label>
+                    <TimezoneField value={timezone} onChange={setTimezone} />
+                  </div>
                 )}
                 <div className="flex gap-2">
                   <button className={primaryBtnCls} disabled={busy !== null}
-                    onClick={() => patch({ approvalMode, concurrencyLimit, ...(schedule.triggerType === "cron" ? { cronExpr } : {}) }).then((ok) => ok && window.location.reload())}>
+                    onClick={() => patch({ approvalMode, concurrencyLimit, ...(schedule.triggerType === "cron" ? { cronExpr, timezone: timezone.trim() || "UTC" } : {}) }).then((ok) => ok && window.location.reload())}>
                     Save
                   </button>
                   <button className={btnCls} onClick={() => setEditing(false)}>Cancel</button>

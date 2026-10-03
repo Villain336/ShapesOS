@@ -50,6 +50,7 @@ export default async function ScheduleDetailPage({
           id: schedule.id,
           triggerType: schedule.triggerType,
           cronExpr: schedule.cronExpr,
+          timezone: schedule.timezone,
           eventSource: schedule.eventSource,
           eventConfig: (schedule.eventConfigJson ?? null) as Record<string, unknown> | null,
           approvalMode: schedule.approvalMode,
