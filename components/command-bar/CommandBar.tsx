@@ -18,16 +18,28 @@ import {
   AlertCircle,
   ArrowLeft,
   BookOpen,
+  Box,
+  Briefcase,
   CheckCircle2,
   Command,
   CornerDownLeft,
+  File as FileIcon,
+  FileText,
+  FolderKanban,
+  Globe,
   Loader2,
+  PenLine,
+  ReceiptText,
   Rocket,
+  Scale,
   Search,
   Sparkles,
+  Target,
+  Users,
   X,
   type LucideIcon,
 } from "lucide-react";
+import { RECORD_KIND_LABELS } from "@/lib/search/kinds";
 import { cn } from "@/lib/utils";
 import FeedbackButtons from "@/components/agents/FeedbackButtons";
 import { navCommands } from "@/lib/nav/config";
@@ -41,12 +53,17 @@ import {
   groupBySection,
   loadFrecency,
   MISSION_TEMPLATES,
+  mergeBySection,
   moveSelection,
   rankCommands,
+  RECORD_SEARCH_DEBOUNCE_MS,
+  recordCommandItems,
   recordUse,
   saveFrecency,
   shouldPopOnBackspace,
+  shouldSearchRecords,
   type AuditPayload,
+  type RecordResult,
   type CommandItem,
   type FrecencyMap,
 } from "./lib";
@@ -81,6 +98,21 @@ type Page =
 // can't drift. ⌥1–⌥6 keep their original targets (NAV_HOTKEYS).
 const GO_ITEMS: UICommand[] = navCommands();
 const GO_BY_HOTKEY = new Map(GO_ITEMS.filter((g) => g.hotkey).map((g) => [g.hotkey!, g]));
+
+// Phase 4a: icons for the Records section (by record kind).
+const RECORD_ICONS: Record<string, LucideIcon> = {
+  lead: Users,
+  invoice: ReceiptText,
+  doc: FileText,
+  file: FileIcon,
+  project: Globe,
+  ops_project: FolderKanban,
+  mission: Target,
+  cad_project: Box,
+  envelope: PenLine,
+  legal_document: Scale,
+  client: Briefcase,
+};
 
 const DO_ITEMS: UICommand[] = [
   { id: "do:missions", section: "do", title: "Start a mission from template…", subtitle: "Growth Missions by business type", keywords: "mission goal launch template growth", hotkey: "⌥M", action: "missions-page", icon: Rocket },
@@ -122,6 +154,12 @@ export function CommandBar({ workspaceId }: { workspaceId: string }) {
   const [frec, setFrec] = useState<FrecencyMap>({});
   const [notice, setNotice] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
   const [announcement, setAnnouncement] = useState("");
+  // Phase 4a: workspace records matching the query (server search, debounced).
+  const [records, setRecords] = useState<{ query: string; items: UICommand[]; loading: boolean }>({
+    query: "",
+    items: [],
+    loading: false,
+  });
   const inputRef = useRef<HTMLInputElement>(null);
   const lastFocusedRef = useRef<Element | null>(null);
   const openRef = useRef(open);
@@ -179,6 +217,36 @@ export function CommandBar({ workspaceId }: { workspaceId: string }) {
     });
   }, []);
 
+  // ---- records (Phase 4a) -------------------------------------------------
+
+  useEffect(() => {
+    const q = query.trim();
+    if (!open || !shouldSearchRecords(q, page.name === "root")) {
+      setRecords((r) => (r.items.length || r.loading ? { query: "", items: [], loading: false } : r));
+      return;
+    }
+    const ctrl = new AbortController();
+    setRecords((r) => ({ ...r, loading: true }));
+    const t = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/search/records?q=${encodeURIComponent(q)}`, { signal: ctrl.signal });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = (await res.json()) as { results?: RecordResult[] };
+        const items = recordCommandItems(data.results ?? [], RECORD_KIND_LABELS).map((item) => ({
+          ...item,
+          icon: RECORD_ICONS[item.id.split(":")[1] ?? ""] ?? Search,
+        }));
+        setRecords({ query: q, items, loading: false });
+      } catch {
+        if (!ctrl.signal.aborted) setRecords({ query: q, items: [], loading: false });
+      }
+    }, RECORD_SEARCH_DEBOUNCE_MS);
+    return () => {
+      clearTimeout(t);
+      ctrl.abort();
+    };
+  }, [open, query, page.name]);
+
   // ---- items ------------------------------------------------------------
 
   const items: UICommand[] = useMemo(() => {
@@ -207,7 +275,11 @@ export function CommandBar({ workspaceId }: { workspaceId: string }) {
     }
     // With no query the Go section shows the most-used destinations only;
     // typing searches all of them.
-    const ranked = capIdleSection(rankCommands(base, q, frec, Date.now()), q, "go", GO_IDLE_LIMIT);
+    let ranked = capIdleSection(rankCommands(base, q, frec, Date.now()), q, "go", GO_IDLE_LIMIT);
+    // Records only for the query they were fetched for (no stale flashes).
+    if (page.name === "root" && q && records.query === q && records.items.length > 0) {
+      ranked = mergeBySection(ranked, records.items);
+    }
     if (page.name === "root" && q) {
       ranked.push({
         id: `ask:${q}`,
@@ -220,7 +292,7 @@ export function CommandBar({ workspaceId }: { workspaceId: string }) {
       });
     }
     return ranked;
-  }, [page, query, frec]);
+  }, [page, query, frec, records]);
 
   const groups = useMemo(() => groupBySection(items), [items]);
 
@@ -718,6 +790,12 @@ export function CommandBar({ workspaceId }: { workspaceId: string }) {
                   ))}
                   {items.length === 0 && page.name !== "playbooks" && (
                     <p className="px-3 py-6 text-center text-[13px] text-subtle">No matching commands.</p>
+                  )}
+                  {page.name === "root" && records.loading && query.trim().length >= 2 && (
+                    <p className="flex items-center gap-1.5 px-3 py-2 text-[12px] text-subtle" role="status">
+                      <Loader2 className="h-3.5 w-3.5 aos-spin" aria-hidden />
+                      Searching records…
+                    </p>
                   )}
                   {page.name === "root" && !query.trim() && (
                     <div className="mt-1 border-t border-line px-3 py-2">

@@ -3,12 +3,14 @@
 // React/DOM-free on purpose: every function here is unit-testable via
 // `npx tsx --test` without a browser. CommandBar.tsx wires these up to UI.
 
-export type SectionId = "go" | "do" | "ask";
+// Phase 4a: "records" = workspace records found by /api/search/records.
+export type SectionId = "go" | "records" | "do" | "ask";
 
-export const SECTION_ORDER: SectionId[] = ["go", "do", "ask"];
+export const SECTION_ORDER: SectionId[] = ["go", "records", "do", "ask"];
 
 export const SECTION_LABELS: Record<SectionId, string> = {
   go: "Go",
+  records: "Records",
   do: "Do",
   ask: "Ask",
 };
@@ -213,6 +215,64 @@ export interface CommandGroup<T extends CommandItem = CommandItem> {
   section: SectionId;
   label: string;
   items: T[];
+}
+
+// ---------------------------------------------------------------------------
+// Records (Phase 4a): server-side record search merged into the palette
+// ---------------------------------------------------------------------------
+
+/** Wait this long after the last keystroke before searching records. */
+export const RECORD_SEARCH_DEBOUNCE_MS = 200;
+/** Same floor as lib/search/records.ts MIN_QUERY_LENGTH. */
+export const RECORD_MIN_QUERY = 2;
+
+export function shouldSearchRecords(query: string, isRootPage: boolean): boolean {
+  return isRootPage && query.trim().length >= RECORD_MIN_QUERY;
+}
+
+export interface RecordResult {
+  kind: string;
+  id: string;
+  title: string;
+  subtitle: string | null;
+  href: string;
+}
+
+/** Same-app dashboard links only (results come from our API, but be strict). */
+function safeRecordHref(href: string): string | null {
+  return href.startsWith("/dashboard") && !href.startsWith("//") && !href.includes("\\") ? href : null;
+}
+
+/** Search results → palette items ("go" actions in the Records section). */
+export function recordCommandItems(results: RecordResult[], kindLabels: Record<string, string> = {}): CommandItem[] {
+  const out: CommandItem[] = [];
+  for (const r of results) {
+    const href = safeRecordHref(r.href);
+    if (!href) continue;
+    const label = kindLabels[r.kind] ?? r.kind;
+    out.push({
+      id: `record:${r.kind}:${r.id}`,
+      section: "records",
+      title: r.title,
+      subtitle: r.subtitle ? `${label} · ${r.subtitle}` : label,
+      keywords: label,
+      action: "go",
+      href,
+    });
+  }
+  return out;
+}
+
+/**
+ * Merge extra items (records) into an already-ranked list so the flat order
+ * matches the visual section order (keyboard ↑/↓ walks what you see).
+ * Stable: order inside each section is preserved.
+ */
+export function mergeBySection<T extends CommandItem>(ranked: T[], extra: T[]): T[] {
+  return [...ranked, ...extra]
+    .map((item, i) => ({ item, i }))
+    .sort((a, b) => SECTION_ORDER.indexOf(a.item.section) - SECTION_ORDER.indexOf(b.item.section) || a.i - b.i)
+    .map((x) => x.item);
 }
 
 /** Group an already-ranked list into Go/Do/Ask sections, dropping empties. */
