@@ -35,6 +35,7 @@ lib/legal/__tests__/deadline-done.test.ts
 lib/mcp/__tests__/mcp-auth-roles.test.ts
 lib/messaging/__tests__/dispatch-claim.test.ts
 lib/messaging/__tests__/inbound-sms-workspace.test.ts
+lib/metering/__tests__/billing-least-privilege-db.test.ts
 lib/metering/__tests__/credits-integrity-db.test.ts
 lib/metering/__tests__/self-hosted-cap-db.test.ts
 lib/ops/__tests__/ops-consume-db.test.ts

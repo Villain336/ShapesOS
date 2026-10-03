@@ -159,8 +159,15 @@ CREATE TABLE IF NOT EXISTS billing_topup_idempotency (
 let idempotencyReady = false;
 async function ensureIdempotencyTable(): Promise<void> {
   if (idempotencyReady) return;
-  await prisma.$executeRawUnsafe(IDEMPOTENCY_DDL);
+  // Migrations create the table; the runtime app role has no CREATE right on
+  // the schema, so only fall back to DDL when it is genuinely missing.
+  if (!(await tableExists("billing_topup_idempotency"))) await prisma.$executeRawUnsafe(IDEMPOTENCY_DDL);
   idempotencyReady = true;
+}
+
+async function tableExists(name: string): Promise<boolean> {
+  const rows = await prisma.$queryRaw<Array<{ ok: boolean }>>`SELECT to_regclass(${"public." + name}) IS NOT NULL AS ok`;
+  return rows[0]?.ok === true;
 }
 
 function isUniqueViolation(e: unknown): boolean {
@@ -1284,7 +1291,7 @@ export interface PortalSessionRequest {
 }
 
 // Same CREATE TABLE IF NOT EXISTS safety-net pattern as the top-up
-// idempotency table above: no migration coordination needed.
+// idempotency table above (now also created by a migration).
 const SUBSCRIPTIONS_DDL = `
 CREATE TABLE IF NOT EXISTS billing_subscriptions (
   workspace_id               TEXT PRIMARY KEY REFERENCES workspaces(id) ON DELETE CASCADE,
@@ -1302,7 +1309,8 @@ CREATE TABLE IF NOT EXISTS billing_subscriptions (
 let subscriptionsReady = false;
 async function ensureSubscriptionsTable(): Promise<void> {
   if (subscriptionsReady) return;
-  await prisma.$executeRawUnsafe(SUBSCRIPTIONS_DDL);
+  // Created by migration 20261003120000; DDL only as a fallback (see above).
+  if (!(await tableExists("billing_subscriptions"))) await prisma.$executeRawUnsafe(SUBSCRIPTIONS_DDL);
   subscriptionsReady = true;
 }
 
