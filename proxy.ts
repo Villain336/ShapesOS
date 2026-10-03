@@ -5,6 +5,8 @@
 //   source of truth) goes on the REQUEST headers — Next's renderer parses the
 //   nonce out of it and stamps it on its own scripts — and on the response.
 //   /api/* gets the scriptless API policy instead (no nonce involved).
+//   Every request also gets an x-request-id (Phase 4a), echoed on the
+//   response and used by the structured error log (lib/observability/log.ts).
 //
 // API requests only — single choke point for Fix 6 (Phase A hardening):
 //   1. Oversize-body guard: declared Content-Length past the cap → 400
@@ -34,6 +36,7 @@ import {
   clientIp,
 } from "./lib/api/rate-limit";
 import { contentSecurityPolicyFor, generateCspNonce } from "./lib/security/headers";
+import { REQUEST_ID_HEADER, newRequestId, sanitizeRequestId } from "./lib/observability/log";
 
 export const config = {
   matcher: [
@@ -61,12 +64,18 @@ export async function proxy(req: NextRequest) {
     nonce,
     dev: process.env.NODE_ENV === "development",
   });
+  // Request id (Phase 4a observability): a well-formed inbound id (from a
+  // load balancer) is kept, anything else replaced. It rides on the forwarded
+  // request (route handlers log it) and comes back on the response.
+  const requestId = sanitizeRequestId(req.headers.get(REQUEST_ID_HEADER)) ?? newRequestId();
   const withCsp = <T extends Response>(res: T): T => {
     res.headers.set("Content-Security-Policy", csp);
+    res.headers.set(REQUEST_ID_HEADER, requestId);
     return res;
   };
   const pass = () => {
     const requestHeaders = new Headers(req.headers);
+    requestHeaders.set(REQUEST_ID_HEADER, requestId);
     requestHeaders.set("x-nonce", nonce);
     requestHeaders.set("content-security-policy", csp);
     return withCsp(NextResponse.next({ request: { headers: requestHeaders } }));

@@ -80,7 +80,18 @@ services:
     build:
       context: .
       target: runner
+      args:
+        # Shown by GET /api/health and on error reports; optional.
+        MARKETR_GIT_COMMIT: ${MARKETR_GIT_COMMIT:-}
     restart: unless-stopped
+    # Phase 4a: readiness = database reachable + every migration applied
+    # (GET /api/health, 503 otherwise). Liveness alone is /api/health/live.
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
     depends_on:
       db:
         condition: service_healthy
@@ -108,7 +119,38 @@ services:
       MARKETR_S3_ACCESS_KEY: ${MINIO_ROOT_USER:-marketr}
       MARKETR_S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD in .env}
 
+  # Phase 4a: scheduled database backups (scripts/ops/backup.sh --loop).
+  # pg_dump custom format into the marketr-backups volume every
+  # BACKUP_INTERVAL_SECONDS (default daily), local copies pruned after
+  # BACKUP_RETENTION_DAYS (default 14), optional upload to S3/MinIO when
+  # BACKUP_S3_BUCKET is set. Dumps as the schema owner: the app role can't
+  # see FORCE-RLS rows. Restore: docs/ops/BACKUP-RESTORE.md.
+  backup:
+    build:
+      context: .
+      target: backup
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      BACKUP_DATABASE_URL: postgresql://${POSTGRES_USER:-marketr}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@db:5432/${POSTGRES_DB:-marketr}
+      BACKUP_DIR: /backups
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-14}
+      BACKUP_INTERVAL_SECONDS: ${BACKUP_INTERVAL_SECONDS:-86400}
+      BACKUP_S3_BUCKET: ${BACKUP_S3_BUCKET:-}
+      BACKUP_S3_ENDPOINT: ${BACKUP_S3_ENDPOINT:-}
+      BACKUP_S3_REGION: ${BACKUP_S3_REGION:-us-east-1}
+      BACKUP_S3_PREFIX: ${BACKUP_S3_PREFIX:-backups/}
+      BACKUP_S3_ACCESS_KEY: ${BACKUP_S3_ACCESS_KEY:-}
+      BACKUP_S3_SECRET_KEY: ${BACKUP_S3_SECRET_KEY:-}
+    volumes:
+      - marketr-backups:/backups
+
 volumes:
   marketr-db:
   marketr-redis:
   marketr-minio:
+  marketr-backups:
