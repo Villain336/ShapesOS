@@ -258,7 +258,7 @@ export async function acknowledgeDrift(
 ): Promise<DriftReport> {
   const row = await withWorkspaceScope(workspaceId, (tx) =>
     tx.composioCatalogDrift.update({
-      where: { id: driftId },
+      where: { id: driftId, workspaceId },
       data: { acknowledgedAt: new Date() },
       select: {
         id: true,

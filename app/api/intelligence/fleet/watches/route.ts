@@ -74,7 +74,7 @@ export async function POST(req: NextRequest) {
   const workspaceId = (await getOrCreateWorkspace(user.id, user.email)).id;
   const watch = await withWorkspaceScope(workspaceId, (tx) =>
     tx.competitorWatch.upsert({
-      where: { projectId_competitorDomain: { projectId: body.projectId!, competitorDomain: domain } },
+      where: { projectId_competitorDomain: { projectId: body.projectId!, competitorDomain: domain }, workspaceId },
       create: {
         workspaceId,
         projectId: body.projectId!,
@@ -104,7 +104,7 @@ export async function DELETE(req: NextRequest) {
     });
     if (!existing) return null;
     if (!(await requireProjectRole(user.id, existing.projectId, "editor"))) return "forbidden";
-    await tx.competitorWatch.delete({ where: { id } });
+    await tx.competitorWatch.delete({ where: { id, workspaceId } });
     return true;
   });
 

@@ -134,7 +134,7 @@ export async function writeImpacts(
     const projectIds = [...new Set(impacts.map((i) => i.projectId))];
     if (projectIds.length > 0) {
       await tx.pageImpact.deleteMany({
-        where: { platformEventId, projectId: { in: projectIds } },
+        where: { workspaceId, platformEventId, projectId: { in: projectIds } },
       });
     }
     if (impacts.length === 0) return 0;
@@ -159,7 +159,7 @@ export async function writeImpacts(
 export async function readImpacts(workspaceId: string, platformEventId: string) {
   return withWorkspaceScope(workspaceId, async (tx) =>
     tx.pageImpact.findMany({
-      where: { platformEventId },
+      where: { workspaceId, platformEventId },
       orderBy: [{ impactScore: "desc" }],
       include: { project: { select: { domain: true } } },
     }),

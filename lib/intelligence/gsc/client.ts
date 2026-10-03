@@ -317,6 +317,7 @@ export async function pullSnapshots(
             windowEnd: chunk.end,
             granularity,
           },
+          workspaceId,
         },
         create: {
           workspaceId,

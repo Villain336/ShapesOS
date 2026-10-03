@@ -110,7 +110,7 @@ export async function updateAgent(
 ): Promise<VoiceAgent> {
   return withWorkspaceScope(workspaceId, (tx) =>
     tx.voiceAgent.update({
-      where: { id: agentId },
+      where: { id: agentId, workspaceId },
       data: {
         ...(patch.name !== undefined ? { name: patch.name.trim() } : {}),
         ...(patch.voiceId !== undefined ? { voiceId: patch.voiceId.trim() } : {}),
@@ -135,7 +135,7 @@ export async function setKillSwitch(
 ): Promise<VoiceAgent> {
   const agent = await withWorkspaceScope(workspaceId, (tx) =>
     tx.voiceAgent.update({
-      where: { id: agentId },
+      where: { id: agentId, workspaceId },
       data: { killSwitch: enabled },
     }),
   );
@@ -152,7 +152,7 @@ export async function deleteAgent(
 ): Promise<void> {
   // RESTRICT on call_sessions: deleting an agent with session history throws.
   await withWorkspaceScope(workspaceId, (tx: TxClient) =>
-    tx.voiceAgent.delete({ where: { id: agentId } }),
+    tx.voiceAgent.delete({ where: { id: agentId, workspaceId } }),
   );
 }
 

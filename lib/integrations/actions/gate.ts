@@ -182,7 +182,7 @@ export async function decideApproval(input: DecideInput) {
     }
     if (approval.expiresAt.getTime() < Date.now()) {
       const expired = await tx.composioActionApproval.update({
-        where: { id: approval.id },
+        where: { id: approval.id, workspaceId: input.workspaceId },
         data: {
           status: "expired",
           auditTrail: toJson(trail(approval.auditTrail, { at: nowIso(), actor: "system", event: "expired" })),
@@ -200,7 +200,7 @@ export async function decideApproval(input: DecideInput) {
       : null;
     const tierChanged = reclassified !== null && reclassified.tier !== approval.riskTier;
     const updated = await tx.composioActionApproval.update({
-      where: { id: approval.id },
+      where: { id: approval.id, workspaceId: input.workspaceId },
       data: {
         status: input.decision === "approved" ? "approved" : "denied",
         decidedBy: input.decidedBy,
@@ -281,7 +281,7 @@ export async function expireStaleApprovals(workspaceId?: string) {
       });
       for (const row of stale) {
         await tx.composioActionApproval.update({
-          where: { id: row.id },
+          where: { id: row.id, workspaceId: wsId },
           data: {
             status: "expired",
             auditTrail: toJson(trail(row.auditTrail, { at: nowIso(), actor: "system", event: "expired" })),

@@ -23,12 +23,12 @@ export async function GET(req: Request) {
     }
     // Verify the source belongs to this workspace (RLS also enforces it).
     const source = await withWorkspaceScope(workspace.id, (tx) =>
-      tx.clipSource.findUnique({ where: { id: sourceId }, select: { id: true } }),
+      tx.clipSource.findUnique({ where: { id: sourceId, workspaceId: workspace.id }, select: { id: true } }),
     );
     if (!source) return Response.json({ error: "Source not found." }, { status: 404 });
     const clips = await withWorkspaceScope(workspace.id, (tx) =>
       tx.clip.findMany({
-        where: { sourceId },
+        where: { sourceId, workspaceId: workspace.id },
         orderBy: [{ viralityScore: "desc" }, { createdAt: "asc" }],
         take: 200,
         select: clipSelect,

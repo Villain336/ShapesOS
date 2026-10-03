@@ -43,7 +43,7 @@ export interface ApprovalTx {
       where: { id: string; workspaceId: string };
     }): Promise<ApprovalRow | null>;
     update(args: {
-      where: { id: string };
+      where: { id: string; workspaceId: string };
       data: Record<string, unknown>;
     }): Promise<ApprovalRow>;
   };
@@ -155,7 +155,7 @@ export function createPrismaMissionApprovalStore(
       return scope(workspaceId, async (tx) => {
         const row = await scoped(tx, approvalId, workspaceId);
         const updated = await tx.missionApproval.update({
-          where: { id: row.id },
+          where: { id: row.id, workspaceId },
           data: {
             status,
             ...(patch?.decidedAt ? { decidedAt: patch.decidedAt } : {}),

@@ -158,8 +158,8 @@ async function loadEvent(
   id: string,
 ): Promise<{ title: string; startedAt: Date | null; endedAt: Date | null; url: string | null } | null> {
   return withWorkspaceScope(workspaceId, async (tx) =>
-    tx.platformEvent.findUnique({
-      where: { id },
+    tx.platformEvent.findFirst({
+      where: { id, workspaceId },
       select: { title: true, startedAt: true, endedAt: true, url: true },
     }),
   );

@@ -227,7 +227,7 @@ export async function upsertEvents(
       let existing: { id: string; eventType: PlatformEventType } | null = null;
       if (ev.url) {
         existing = await tx.platformEvent.findFirst({
-          where: { source, url: ev.url },
+          where: { workspaceId, source, url: ev.url },
           select: { id: true, eventType: true },
         });
       }
@@ -236,6 +236,7 @@ export async function upsertEvents(
         const hi = ev.startedAt ? new Date(ev.startedAt.getTime() + 12 * 3600_000) : null;
         existing = await tx.platformEvent.findFirst({
           where: {
+            workspaceId,
             source,
             title: ev.title,
             ...(lo && hi ? { startedAt: { gte: lo, lte: hi } } : {}),
@@ -247,7 +248,7 @@ export async function upsertEvents(
         // Never downgrade a human- or LLM-confirmed rollout to docs_change on
         // re-ingest; refresh timestamps + confidence only.
         await tx.platformEvent.update({
-          where: { id: existing.id },
+          where: { id: existing.id, workspaceId },
           data: {
             startedAt: ev.startedAt ?? undefined,
             endedAt: ev.endedAt ?? undefined,
@@ -286,6 +287,7 @@ export async function listEvents(
   return withWorkspaceScope(workspaceId, async (tx) =>
     tx.platformEvent.findMany({
       where: {
+        workspaceId,
         ...(opts.type ? { eventType: opts.type } : {}),
         ...(opts.source ? { source: opts.source } : {}),
       },

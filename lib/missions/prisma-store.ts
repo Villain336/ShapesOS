@@ -170,7 +170,7 @@ export function createPrismaMissionStore(): MissionStore {
       const r = await withWorkspaceScope(workspaceId, async (tx) => {
         const existing = await tx.mission.findFirst({ where: { id: missionId, workspaceId } });
         if (!existing) throw new Error("Mission not found in workspace.");
-        return tx.mission.update({ where: { id: missionId }, data });
+        return tx.mission.update({ where: { id: missionId, workspaceId }, data });
       });
       return toMission(r as MissionRow);
     },
@@ -254,7 +254,7 @@ export function createPrismaMissionStore(): MissionStore {
         const existing = await tx.missionApproval.findFirst({ where: { id: approvalId, workspaceId } });
         if (!existing) throw new Error("Approval not found in workspace.");
         return tx.missionApproval.update({
-          where: { id: approvalId },
+          where: { id: approvalId, workspaceId },
           data: { status: decision, decidedBy, decidedAt },
         });
       });
@@ -265,7 +265,7 @@ export function createPrismaMissionStore(): MissionStore {
       const r = await withWorkspaceScope(workspaceId, async (tx) => {
         const existing = await tx.missionApproval.findFirst({ where: { id: approvalId, workspaceId } });
         if (!existing) throw new Error("Approval not found in workspace.");
-        return tx.missionApproval.update({ where: { id: approvalId }, data: { status: "expired" } });
+        return tx.missionApproval.update({ where: { id: approvalId, workspaceId }, data: { status: "expired" } });
       });
       return toApproval(r as MissionApprovalRow);
     },

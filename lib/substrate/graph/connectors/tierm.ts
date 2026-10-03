@@ -54,7 +54,7 @@ export async function pollWooCommerce(opts: {
       });
     }
     await tx.graphSyncJob.update({
-      where: { id: job.id },
+      where: { id: job.id, workspaceId },
       data: { status: "running", lastRunAt: now },
     });
 
@@ -89,13 +89,13 @@ export async function pollWooCommerce(opts: {
         ingested++;
       }
       await tx.graphSyncJob.update({
-        where: { id: job.id },
+        where: { id: job.id, workspaceId },
         data: { status: "succeeded", lastSuccessAt: now, errorCount: 0, backoffUntil: null },
       });
       return { ran: true, rowsIngested: ingested, detail: `${ingested} row(s) (fake mode: ${reason})` };
     } catch (e) {
       await tx.graphSyncJob.update({
-        where: { id: job.id },
+        where: { id: job.id, workspaceId },
         data: { status: "failed", errorCount: { increment: 1 } },
       });
       return { ran: true, rowsIngested: 0, detail: `poll failed honestly: ${(e as Error).message}` };

@@ -41,7 +41,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
 
     const clip = await withWorkspaceScope(workspace.id, (tx) =>
       tx.clip.findUnique({
-        where: { id },
+        where: { id, workspaceId: workspace.id },
         include: { source: { select: { title: true } } },
       }),
     );
@@ -73,7 +73,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
 
     const updated = await withWorkspaceScope(workspace.id, (tx) =>
       tx.clip.update({
-        where: { id },
+        where: { id, workspaceId: workspace.id },
         data: { status: "queued", postizRef: queued.postizRef },
       }),
     );

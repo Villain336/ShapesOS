@@ -24,7 +24,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     }
     const source = await withWorkspaceScope(workspace.id, (tx) =>
       tx.clipSource.findUnique({
-        where: { id },
+        where: { id, workspaceId: workspace.id },
         select: { id: true, transcriptStatus: true },
       }),
     );

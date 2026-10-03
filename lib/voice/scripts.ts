@@ -174,7 +174,7 @@ export async function updateDraftScript(
     throw new Error("Only draft scripts can be edited — create a new version instead.");
   return withWorkspaceScope(workspaceId, (tx) =>
     tx.callScript.update({
-      where: { id: scriptId },
+      where: { id: scriptId, workspaceId },
       data: {
         ...(patch.name !== undefined ? { name: patch.name.trim() } : {}),
         ...(patch.body !== undefined ? { body: json(toScriptBody(patch.body)) } : {}),
@@ -196,7 +196,7 @@ export async function submitForReview(
     throw new Error(`Cannot submit a ${current.status} script for review.`);
   return withWorkspaceScope(workspaceId, (tx) =>
     tx.callScript.update({
-      where: { id: scriptId },
+      where: { id: scriptId, workspaceId },
       data: { status: "in_review" },
     }),
   );
@@ -222,7 +222,7 @@ export async function approveScript(
     throw new Error(`Cannot approve a ${current.status} script.`);
   return withWorkspaceScope(workspaceId, (tx) =>
     tx.callScript.update({
-      where: { id: scriptId },
+      where: { id: scriptId, workspaceId },
       data: {
         status: "approved",
         approvedBy: approvedBy.trim(),
@@ -246,7 +246,7 @@ export async function rejectScript(
   void reason;
   return withWorkspaceScope(workspaceId, (tx) =>
     tx.callScript.update({
-      where: { id: scriptId },
+      where: { id: scriptId, workspaceId },
       data: { status: "rejected", approvedBy: null, approvedAt: null },
     }),
   );
@@ -269,7 +269,7 @@ export async function newScriptVersion(
   return withWorkspaceScope(workspaceId, async (tx) => {
     // Already inside the scope transaction — no nested $transaction.
     await tx.callScript.update({
-      where: { id: scriptId },
+      where: { id: scriptId, workspaceId },
       data: { status: "archived" },
     });
     return tx.callScript.create({
