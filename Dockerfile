@@ -27,7 +27,8 @@ RUN npm run build
 # --- migrate --- one-shot migrator (compose `migrate` service). Carries the
 # full dependency tree so the Prisma CLI is available; the slim runner is not.
 FROM base AS migrate
-RUN apk add --no-cache openssl
+# psql runs scripts/db/create-app-role.sql (\gexec / psql variables).
+RUN apk add --no-cache openssl postgresql-client
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY package.json prisma.config.ts ./

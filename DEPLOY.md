@@ -36,6 +36,33 @@ container's writable layer. They survive restarts but are lost on `compose down`
    `REPORT_STORAGE_DIR=/app/.data/reports`, and `SITEMAP_STORAGE_DIR=/app/.data/sitemaps` in `.env`.
 3. Rebuild and confirm a site working copy survives `docker compose down && docker compose up -d`.
 
+### 1b. Database role, required secrets, and bound ports (Phase 1 hardening)
+
+- **The app never connects as the superuser.** Superusers bypass even `FORCE ROW LEVEL SECURITY`,
+  which silently disables tenant isolation. The one-shot `migrate` service connects as
+  `POSTGRES_USER`, applies migrations, then runs `scripts/db/create-app-role.sql` to create (or
+  refresh grants for) `APP_DB_USER` (default `marketr_app`, `NOSUPERUSER NOBYPASSRLS`). The `app`
+  service's `DATABASE_URL` uses that role. Verify after boot:
+  `docker compose exec db psql -U marketr -c "select rolname, rolsuper, rolbypassrls from pg_roles where rolname = 'marketr_app'"`
+  must show `f | f`.
+- **No literal secret defaults.** `docker compose` refuses to start until `.env` sets
+  `POSTGRES_PASSWORD`, `APP_DB_PASSWORD` and `MINIO_ROOT_PASSWORD` (use `openssl rand -hex 32`; the
+  values are embedded in URLs, so stick to hex). The optional sidecars do the same:
+  Postiz (`POSTIZ_DB_PASSWORD`, `POSTIZ_JWT_SECRET`), Listmonk (`LISTMONK_DB_PASSWORD`,
+  `LISTMONK_ADMIN_PASSWORD`), Umami (`UMAMI_POSTGRES_PASSWORD`, `UMAMI_APP_SECRET`) and
+  Activepieces (`AP_POSTGRES_PASSWORD`, `AP_ENCRYPTION_KEY`, `AP_JWT_SECRET`).
+- **Ports bind to 127.0.0.1.** The app (`APP_BIND_ADDR`, default `127.0.0.1`), MinIO 9000/9001 and
+  every sidecar UI (Postiz, Listmonk, Umami, GrowthBook, Activepieces + its DB/Redis) publish on
+  loopback only. Postgres and Redis are not published at all. Put Caddy in front for remote access.
+- **Upgrading an existing install** that ran the app as `POSTGRES_USER`: add `APP_DB_PASSWORD` to
+  `.env` and `docker compose up -d --build`; the `migrate` service creates the role and grants on
+  every table, and the app reconnects as it.
+- **Production fails closed on missing secrets.** With `NODE_ENV=production` (the runner image),
+  features whose signing/encryption secret is unset refuse to run instead of using a built-in
+  fallback, and the fake messaging/mail/call providers are refused unless `ALLOW_FAKE_PROVIDERS=1`.
+  See `.env.example` for the list (`MARKETR_APPROVAL_SECRET`, `MESSAGING_UNSUBSCRIBE_SECRET`,
+  `PAYLOAD_SECRET`, …).
+
 ## 2. Pre-flight — what Tico provides
 
 | # | Item | Notes |
@@ -60,8 +87,9 @@ them over via the Secure Vault flow and Z7 writes them server-side.
 3. **Code:** `git clone` the vault repo to `/opt/marketr` (local-only remote — this stays private;
    no GitHub remote is created).
 4. **Env:** copy `.env.example` → `.env`, fill §2 items 3–9. `chmod 600 .env`.
-5. **Data volume fix:** apply §1a, then `docker compose up -d --build`.
-6. **Migrations:** watch boot logs — `npx prisma migrate deploy` must apply all 19 migrations cleanly
+5. **Data volume fix:** apply §1a, set the §1b secrets, then `docker compose up -d --build`.
+6. **Migrations:** watch the `migrate` service logs — `npx prisma migrate deploy` must apply all migrations cleanly
+   and the app role must be created (§1b)
    (`..._init` → `..._studio_domains`). The M15 (`..._backlinks_internal_links`), M16
    (`..._local_seo`), M17 (`..._programmatic_seo`), M18 (`..._content_autopilot`), M19
    (`..._newsletter_builder`), M20 (`..._social_scheduling`), and M22
