@@ -133,6 +133,9 @@ const PUBLIC_BY_DESIGN = {
   // Phase 3 (R3): messaging webhook + unsubscribe — capability model, see route comments.
   "app/api/messaging/inbound/sms/route.ts":
     "inbound Twilio SMS webhook; HMAC-SHA1 verified with TWILIO_AUTH_TOKEN before any parsing/logic (provider.validateWebhookSignature); invalid signature 401s; STOP/HELP/START only mutate consent state, no PII returned",
+  // Phase 4b: inbound email replies for the CRM inbox — capability model, see route comments.
+  "app/api/messaging/inbound/email/route.ts":
+    "inbound Resend email.received webhook; Svix signature (RESEND_INBOUND_WEBHOOK_SECRET) verified over the raw body before any parsing/logic, fail closed (503 without a secret, 401 on a bad signature); tenant only from the HMAC-signed reply+<workspace>-<sig> address; appends one inbound ledger row, idempotent per email id, returns no data",
   "app/api/messaging/unsubscribe/route.ts":
     "public one-click unsubscribe; HMAC-signed token (workspaceId+messageId+leadId) is the capability; invalid/expired token 404s; only sets opt_out, never returns data",
   // Phase 3 (R4): review QR completion — capability model, see route comments.
@@ -187,7 +190,7 @@ const missingAllowList = Object.keys(PUBLIC_BY_DESIGN).filter(k => {
 ok("every public-by-design entry maps to a real route file", missingAllowList.length === 0, missingAllowList.join("; "));
 ok(
   "public-by-design allow-list is documented",
-  Object.keys(PUBLIC_BY_DESIGN).length === 27 &&
+  Object.keys(PUBLIC_BY_DESIGN).length === 28 &&
     Object.values(PUBLIC_BY_DESIGN).every(v => v.length > 20)
 );
 

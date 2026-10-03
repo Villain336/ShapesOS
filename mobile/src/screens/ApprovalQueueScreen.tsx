@@ -9,6 +9,7 @@ import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, Toucha
 import { useSession } from "../session-context";
 import { fetchApprovalQueue, GateApiError, type GateItem } from "../api/gate";
 import { NativeApprovalCard } from "../components/NativeApprovalCard";
+import { color } from "../theme";
 
 const STATUSES = ["pending", "approved", "rejected"] as const;
 
@@ -76,7 +77,7 @@ export function ApprovalQueueScreen({ projectId }: { projectId: string | null })
         </View>
       ) : loading && !refreshing ? (
         <View style={styles.center}>
-          <ActivityIndicator color="#7c3aed" />
+          <ActivityIndicator color={color.ink} />
           <Text style={styles.muted}>Loading approvals…</Text>
         </View>
       ) : error ? (
@@ -112,17 +113,17 @@ export function ApprovalQueueScreen({ projectId }: { projectId: string | null })
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: "#FAFAF7" },
-  tabs: { flexDirection: "row", padding: 12, gap: 8, backgroundColor: "#fff", borderBottomWidth: 1, borderBottomColor: "#e7e5e4" },
-  tab: { paddingVertical: 8, paddingHorizontal: 14, borderRadius: 999, backgroundColor: "#f5f5f4" },
-  tabActive: { backgroundColor: "#7c3aed" },
-  tabText: { fontSize: 13, fontWeight: "600", color: "#57534e", textTransform: "capitalize" },
-  tabTextActive: { color: "#fff" },
+  root: { flex: 1, backgroundColor: color.canvas },
+  tabs: { flexDirection: "row", padding: 12, gap: 8, backgroundColor: color.paper, borderBottomWidth: 1, borderBottomColor: color.line },
+  tab: { paddingVertical: 8, paddingHorizontal: 14, borderRadius: 999, backgroundColor: color.canvas },
+  tabActive: { backgroundColor: color.ink },
+  tabText: { fontSize: 13, fontWeight: "600", color: color.muted, textTransform: "capitalize" },
+  tabTextActive: { color: color.paper },
   scroll: { flex: 1 },
   scrollContent: { padding: 12 },
   center: { flex: 1, alignItems: "center", justifyContent: "center", padding: 24, gap: 8 },
-  muted: { fontSize: 13, color: "#a8a29e", textAlign: "center" },
-  error: { fontSize: 13, color: "#b91c1c", textAlign: "center" },
-  retry: { marginTop: 8, backgroundColor: "#f5f5f4", borderRadius: 8, paddingVertical: 8, paddingHorizontal: 16 },
-  retryText: { color: "#44403c", fontWeight: "600", fontSize: 13 },
+  muted: { fontSize: 13, color: color.subtle, textAlign: "center" },
+  error: { fontSize: 13, color: color.failedText, textAlign: "center" },
+  retry: { marginTop: 8, backgroundColor: color.canvas, borderRadius: 8, paddingVertical: 8, paddingHorizontal: 16 },
+  retryText: { color: color.muted, fontWeight: "600", fontSize: 13 },
 });

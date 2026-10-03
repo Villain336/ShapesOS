@@ -28,6 +28,7 @@ lib/connector/__tests__/connector-slice5.test.ts
 lib/connector/__tests__/connector-slice6.test.ts
 lib/connector/__tests__/intro-actor.test.ts
 lib/connector/__tests__/intro-integrity.test.ts
+lib/crm/__tests__/inbox-db.test.ts
 lib/datasetbuilder/__tests__/datasets-activate-db.test.ts
 lib/funding/__tests__/funding-slice2.test.ts
 lib/funding/__tests__/funding-slice3.test.ts
@@ -40,6 +41,7 @@ lib/intelligence/company/__tests__/knowledge-rls.test.ts
 lib/legal/__tests__/deadline-done.test.ts
 lib/mcp/__tests__/mcp-auth-roles.test.ts
 lib/messaging/__tests__/dispatch-claim.test.ts
+lib/messaging/__tests__/inbound-email-db.test.ts
 lib/messaging/__tests__/inbound-sms-workspace.test.ts
 lib/messaging/__tests__/mail-cap-db.test.ts
 lib/metering/__tests__/billing-least-privilege-db.test.ts
@@ -61,6 +63,7 @@ lib/phase13b/evals/05-no-ghost-recall.test.ts
 lib/phase13b/evals/06-stop-asking.test.ts
 lib/phase13b/evals/07-feedback-diff.test.ts
 lib/playbooks/__tests__/store.test.ts
+lib/push/__tests__/push-devices-db.test.ts
 lib/scheduler/__tests__/tick-db.test.ts
 lib/scim/__tests__/scim-db.test.ts
 lib/search/__tests__/records-db.test.ts

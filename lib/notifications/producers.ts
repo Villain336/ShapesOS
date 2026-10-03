@@ -14,6 +14,9 @@ import { createNotifications, safeHref, type NotificationInput } from "./store";
 // Phase 4a: outbound webhooks hang off the same producer seam (best-effort,
 // never throws — see lib/webhooks/emit.ts).
 import { emitWebhookEvent } from "@/lib/webhooks/emit";
+// Phase 4b: mobile push for the push kinds (fire-and-forget, no-op unless
+// PUSH_PROVIDER=expo — see lib/push/notify.ts).
+import { queuePushForNotifications } from "@/lib/push/notify";
 
 export type ProducerDb = Pick<Prisma.TransactionClient, "notification" | "workspaceMember" | "workspace">;
 
@@ -49,6 +52,7 @@ export function actorUserId(actor: string | null | undefined): string | null {
 async function createAndEmit(db: ProducerDb, inputs: NotificationInput[]): Promise<number> {
   const created = await createNotifications(db, inputs);
   if (created > 0) {
+    queuePushForNotifications(inputs);
     for (const n of inputs) {
       await emitWebhookEvent({
         workspaceId: n.workspaceId,

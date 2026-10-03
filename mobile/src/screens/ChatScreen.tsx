@@ -24,6 +24,7 @@ import type { Message } from "@copilotkit/react-native";
 import { useSession } from "../session-context";
 import { MessageList } from "../components/MessageList";
 import { MissionProgressWidget, type MissionProgress } from "../components/MissionProgressWidget";
+import { color } from "../theme";
 
 function makeId(): string {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
@@ -113,7 +114,7 @@ export function ChatScreen() {
         <MessageList messages={messages} gate={gate} />
         {running ? (
           <View style={styles.thinking}>
-            <ActivityIndicator color="#7c3aed" size="small" />
+            <ActivityIndicator color={color.ink} size="small" />
             <Text style={styles.thinkingText}>Agent is working…</Text>
           </View>
         ) : null}
@@ -130,7 +131,7 @@ export function ChatScreen() {
           onSubmitEditing={() => void send()}
         />
         <TouchableOpacity style={styles.send} onPress={() => void send()} disabled={running || !input.trim()}>
-          <Send size={18} color="#fff" />
+          <Send size={18} color={color.paper} />
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
@@ -138,13 +139,13 @@ export function ChatScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: "#FAFAF7" },
+  root: { flex: 1, backgroundColor: color.canvas },
   scroll: { flex: 1 },
   scrollContent: { padding: 12, paddingBottom: 24 },
   thinking: { flexDirection: "row", alignItems: "center", gap: 8, marginVertical: 8 },
-  thinkingText: { fontSize: 13, color: "#78716c", fontStyle: "italic" },
-  error: { color: "#b91c1c", fontSize: 13, marginVertical: 8 },
-  composer: { flexDirection: "row", alignItems: "flex-end", gap: 8, padding: 12, backgroundColor: "#fff", borderTopWidth: 1, borderTopColor: "#e7e5e4" },
-  input: { flex: 1, borderWidth: 1, borderColor: "#e7e5e4", borderRadius: 20, paddingHorizontal: 16, paddingVertical: 10, fontSize: 15, maxHeight: 120, color: "#1c1917" },
-  send: { backgroundColor: "#7c3aed", borderRadius: 999, width: 44, height: 44, alignItems: "center", justifyContent: "center" },
+  thinkingText: { fontSize: 13, color: color.muted, fontStyle: "italic" },
+  error: { color: color.failedText, fontSize: 13, marginVertical: 8 },
+  composer: { flexDirection: "row", alignItems: "flex-end", gap: 8, padding: 12, backgroundColor: color.paper, borderTopWidth: 1, borderTopColor: color.line },
+  input: { flex: 1, borderWidth: 1, borderColor: color.line, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 10, fontSize: 15, maxHeight: 120, color: color.ink },
+  send: { backgroundColor: color.ink, borderRadius: 999, width: 44, height: 44, alignItems: "center", justifyContent: "center" },
 });
