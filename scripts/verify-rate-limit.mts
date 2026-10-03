@@ -135,9 +135,10 @@ __resetRateLimits();
   ok("429 body has error message", typeof body.error === "string" && body.error.length > 0);
 }
 {
-  // clientIp parsing.
+  // clientIp parsing: the trusted-proxy hop (TRUSTED_PROXY_HOPS, default 1),
+  // never the client-written leftmost entry.
   const h = new Headers({ "x-forwarded-for": "5.6.7.8, 9.9.9.9" });
-  ok("x-forwarded-for first IP", clientIp(h) === "5.6.7.8");
+  ok("x-forwarded-for trusted (rightmost) IP", clientIp(h) === "9.9.9.9");
   ok("missing headers → null", clientIp(new Headers()) === null);
 }
 await noThrow("limiter under adversarial key churn", () => {

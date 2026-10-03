@@ -39,13 +39,10 @@ import {
   recordLoginFailure,
   recordLoginSuccess,
 } from "./lib/auth/rate-limit";
+import { clientIpFromHeaders } from "./lib/api/client-ip";
 
 function clientIp(req: Request | undefined): string | null {
-  const h = req?.headers;
-  if (!h) return null;
-  const fwd = h.get("x-forwarded-for");
-  if (fwd) return fwd.split(",")[0]?.trim() || null;
-  return h.get("x-real-ip")?.trim() || null;
+  return clientIpFromHeaders(req?.headers);
 }
 
 /** Timing-safe string comparison via SHA-256 (handles variable lengths). */
