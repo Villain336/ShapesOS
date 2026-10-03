@@ -6,6 +6,7 @@
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { mailGuard, badRequest } from "../_lib";
+import { intQuery, parseQuery } from "@/lib/api/validate";
 
 export const dynamic = "force-dynamic";
 
@@ -14,7 +15,9 @@ export async function GET(req: Request) {
   if (gate instanceof Response) return gate;
 
   const q = new URL(req.url).searchParams;
-  const limit = Math.min(Math.max(Number(q.get("limit") ?? 50) || 50, 1), 200);
+  const limitQuery = parseQuery(z.object({ limit: intQuery(50, 1, 200) }), q);
+  if (!limitQuery.ok) return limitQuery.error;
+  const limit = limitQuery.data.limit;
   const status = q.get("status")?.trim();
 
   const campaigns = await prisma.mailCampaign.findMany({

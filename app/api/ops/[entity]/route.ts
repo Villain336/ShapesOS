@@ -25,6 +25,7 @@ import {
   type OpsActor,
 } from "@/lib/ops/doctype";
 import { errorResponse } from "@/lib/api/errors";
+import { intQuery, parseQuery, z } from "@/lib/api/validate";
 
 export const dynamic = "force-dynamic";
 
@@ -68,9 +69,9 @@ export async function GET(
     const { entity } = await params;
     const def = opsEntityDef(entity);
     const q = req.nextUrl.searchParams;
-    // Validated in opsList (integer 1..200) — garbage is a 400, not a 500.
-    const rawLimit = q.get("limit");
-    const limit = rawLimit === null || rawLimit === "" ? undefined : Number(rawLimit);
+    const limitQuery = parseQuery(z.object({ limit: intQuery(50, 1, 200) }), q);
+    if (!limitQuery.ok) return limitQuery.error;
+    const limit = limitQuery.data.limit;
     const filters: Record<string, string> = {};
     for (const f of def.filterable) {
       const v = q.get(f);

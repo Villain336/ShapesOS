@@ -21,6 +21,7 @@
 // bind (idempotent) → persist policy → mark quote bound → handoff → audit
 // stamp. Any step throwing aborts the bind with a named error code.
 
+import { addMonthsClamped } from "@/lib/time/zoned";
 import { InsuranceError, validatePolicyInput, type InsuranceLineOfBusiness } from "./types";
 import { assertQuoteTransition } from "./quoting";
 import {
@@ -268,6 +269,27 @@ export function extractRenewalOfPolicyId(rawPayload: unknown): string | null {
 }
 
 /** Idempotency key for a bind execution: derived from (quoteId, approvalId). */
+/**
+ * Conventional 12-month term end: same calendar day next year, clamped to
+ * the month's length (2028-02-29 → 2029-02-28, not 2029-03-01 — a
+ * setUTCFullYear(+1) rolls the leap day over and makes the term a day too
+ * long). Time of day is kept.
+ */
+export function policyTermEnd(effectiveAt: Date): Date {
+  const t = addMonthsClamped(
+    effectiveAt.getUTCFullYear(),
+    effectiveAt.getUTCMonth() + 1,
+    effectiveAt.getUTCDate(),
+    12,
+  );
+  const msIntoDay = effectiveAt.getTime() - Date.UTC(
+    effectiveAt.getUTCFullYear(),
+    effectiveAt.getUTCMonth(),
+    effectiveAt.getUTCDate(),
+  );
+  return new Date(Date.UTC(t.year, t.month - 1, t.day) + msIntoDay);
+}
+
 export function bindIdempotencyKey(quoteId: string, approvalId: string): string {
   return `bind:${quoteId}:${approvalId}`;
 }
@@ -881,8 +903,7 @@ export async function executeBind(
   // conventionally 12 months. The assumption is flagged in rawPayload
   // (termEndAssumed) and must be corrected when the carrier's declarations
   // pages arrive — it is never presented as confirmed carrier data.
-  const expiresAt = new Date(effectiveAt);
-  expiresAt.setUTCFullYear(expiresAt.getUTCFullYear() + 1);
+  const expiresAt = policyTermEnd(effectiveAt);
 
   // (e) Persist the policy — from VENDOR data only. The v1 bind response
   // carries no limits, so limits read "not confirmed" (null) until the

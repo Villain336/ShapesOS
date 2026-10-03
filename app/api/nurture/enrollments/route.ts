@@ -3,6 +3,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { nurtureCtx } from "../_lib";
+import { intQuery, parseQuery, z } from "@/lib/api/validate";
 
 export const dynamic = "force-dynamic";
 
@@ -28,7 +29,9 @@ export async function GET(req: Request) {
       ],
     };
   }
-  const limit = Math.min(200, Math.max(1, Number(sp.get("limit") ?? "100") || 100));
+  const limitQuery = parseQuery(z.object({ limit: intQuery(100, 1, 200) }), sp);
+  if (!limitQuery.ok) return limitQuery.error;
+  const limit = limitQuery.data.limit;
 
   const [enrollments, total] = await Promise.all([
     prisma.sequenceEnrollment.findMany({

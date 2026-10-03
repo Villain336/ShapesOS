@@ -10,6 +10,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { nurtureCtx, requireNurtureEditor, readJson } from "../_lib";
 import { setConsent } from "@/lib/messaging/consent";
+import { intQuery, parseQuery } from "@/lib/api/validate";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +23,9 @@ export async function GET(req: Request) {
   const sp = new URL(req.url).searchParams;
 
   const q = sp.get("q")?.trim();
-  const limit = Math.min(200, Math.max(1, Number(sp.get("limit") ?? "100") || 100));
+  const limitQuery = parseQuery(z.object({ limit: intQuery(100, 1, 200) }), sp);
+  if (!limitQuery.ok) return limitQuery.error;
+  const limit = limitQuery.data.limit;
   const leadWhere: Record<string, unknown> = { workspaceId: ctx.workspaceId };
   if (q) {
     leadWhere.OR = [

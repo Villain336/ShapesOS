@@ -69,6 +69,16 @@ container's writable layer. They survive restarts but are lost on `compose down`
   { flowId, workspaceId }`; unbound flows cannot be triggered or polled from any workspace.
 - **Credential key rotation.** Move the old `MARKETR_CREDENTIALS_KEY` into
   `MARKETR_CREDENTIALS_KEY_PREVIOUS` and set a new one; stored credentials keep decrypting.
+- **CallRail webhooks are signed per workspace.** `CALLRAIL_WEBHOOK_SECRET` is now a host secret
+  from which each workspace's own webhook secret is derived; the `?w=<workspaceId>` in the
+  webhook URL only selects which secret must verify, so it can't move events between tenants.
+  Print a workspace's URL + secret with
+  `CALLRAIL_WEBHOOK_SECRET=… npx tsx scripts/callrail-webhook-secret.mts <workspaceId>`.
+  **Migrating an existing install** whose CallRail webhooks sign with the host secret itself:
+  set `CALLRAIL_WEBHOOK_ACCEPT_SHARED_SECRET=1` (old signatures keep verifying, each one logs a
+  warning), switch every workspace's CallRail webhook to its per-workspace secret, then unset the
+  flag. Keep `CALLRAIL_WEBHOOK_SECRET` unchanged during the switch — rotating it rotates every
+  workspace's secret.
 
 ## 2. Pre-flight — what Tico provides
 

@@ -13,6 +13,8 @@
 //          gate. Without either, enforcement fails closed with NO_CALENDAR /
 //          CONSENT_REQUIRED — never silently declines.
 
+import { DEFAULT_TIME_ZONE, resolveTimeZone, zonedParts, zonedTimeToUtc } from "@/lib/time/zoned";
+
 export type FocusProtection = "soft" | "hard";
 export type FocusSource = "user" | "os_suggested" | "ritual";
 export type FocusStatus = "scheduled" | "protected" | "overridden" | "completed" | "cancelled";
@@ -178,9 +180,12 @@ export function suggestReschedules(
   block: { startAt: Date; endAt: Date },
   conflicts: Conflict[],
   events: CalendarEventLike[],
+  timeZone: string = DEFAULT_TIME_ZONE,
 ): SuggestedReschedule[] {
-  const dayEnd = new Date(block.startAt);
-  dayEnd.setHours(23, 59, 59, 999);
+  // End of the block's local day in the user's timezone.
+  const tz = resolveTimeZone(timeZone);
+  const p = zonedParts(block.startAt, tz);
+  const dayEnd = new Date(zonedTimeToUtc(p.year, p.month, p.day + 1, 0, tz).date.getTime() - 1);
   return conflicts.map((c) => {
     const original = events.find((e) => e.id === c.eventId);
     const durationMs = original
@@ -236,6 +241,7 @@ export async function enforceFocusBlock(
   block: { id: string; startAt: Date; endAt: Date; protection: FocusProtection },
   adapter: CalendarAdapter | null,
   connection: CalendarConnectionState | null,
+  timeZone: string = DEFAULT_TIME_ZONE,
 ): Promise<EnforcementResult> {
   const events = adapter ? await adapter.listEvents(block.startAt, block.endAt) : [];
   const conflicts = findConflicts(block, events);
@@ -245,7 +251,7 @@ export async function enforceFocusBlock(
       protection: "soft",
       newStatus: "protected",
       conflicts,
-      suggestions: suggestReschedules(block, conflicts, events),
+      suggestions: suggestReschedules(block, conflicts, events, timeZone),
       autoDeclined: [],
       note:
         conflicts.length === 0
@@ -300,23 +306,28 @@ export function transitionStatus(from: FocusStatus, to: FocusStatus): void {
 
 /**
  * Expand a recurring block into occurrences over the next `days` days.
- * Pure — the caller persists whichever occurrences it wants.
+ * Steps by calendar date in the user's timezone: every occurrence starts at
+ * the block's local start time (09:00 stays 09:00 across DST), each one
+ * converted to an instant on its own. Pure — the caller persists whichever
+ * occurrences it wants.
  */
 export function expandRecurrence(
   block: { startAt: Date; endAt: Date; recurrence: FocusRecurrence },
   days: number,
+  timeZone: string = DEFAULT_TIME_ZONE,
 ): { startAt: Date; endAt: Date }[] {
   if (block.recurrence === "none" || days <= 0) {
     return [{ startAt: block.startAt, endAt: block.endAt }];
   }
+  const tz = resolveTimeZone(timeZone);
   const out: { startAt: Date; endAt: Date }[] = [];
   const durationMs = block.endAt.getTime() - block.startAt.getTime();
+  const start = zonedParts(block.startAt, tz);
   for (let d = 0; d < days; d++) {
-    const day = new Date(block.startAt);
-    day.setDate(day.getDate() + d);
-    const dow = day.getDay();
-    if (block.recurrence === "weekdays" && (dow === 0 || dow === 6)) continue;
     if (block.recurrence === "weekly" && d % 7 !== 0) continue;
+    const dow = (start.weekday + d) % 7;
+    if (block.recurrence === "weekdays" && (dow === 0 || dow === 6)) continue;
+    const day = d === 0 ? block.startAt : zonedTimeToUtc(start.year, start.month, start.day + d, start.minutes, tz).date;
     out.push({ startAt: day, endAt: new Date(day.getTime() + durationMs) });
   }
   return out;

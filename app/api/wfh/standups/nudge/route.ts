@@ -7,11 +7,14 @@ import { NextResponse } from "next/server";
 import { requireUser, getOrCreateWorkspace } from "@/lib/session";
 import { requireWorkspaceRole } from "@/lib/authz";
 import { prisma } from "@/lib/prisma";
-import { isStandupDue, isStandupLate, nudgeCopy, type StandupCadence } from "@/lib/wfh/standups";
-
-function todayNoonUTC(d: Date): Date {
-  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 12, 0, 0));
-}
+import {
+  isStandupDue,
+  isStandupLate,
+  nudgeCopy,
+  standupDateFor,
+  type StandupCadence,
+} from "@/lib/wfh/standups";
+import { resolveTimeZone } from "@/lib/time/zoned";
 
 export async function GET() {
   const user = await requireUser();
@@ -25,17 +28,18 @@ export async function GET() {
     where: { workspaceId_userId: { workspaceId: workspace.id, userId: user.id } },
   });
   const cadence = (mode?.standupCadence ?? "daily") as StandupCadence;
+  const tz = resolveTimeZone(mode?.timezone);
 
   const today = await prisma.wfhStandup.findFirst({
     where: {
       workspaceId: workspace.id,
       userId: user.id,
-      date: todayNoonUTC(now),
+      date: standupDateFor(now, tz),
     },
     select: { id: true },
   });
 
-  const due = isStandupDue(cadence, now, !!today);
-  const late = due && isStandupLate(now);
+  const due = isStandupDue(cadence, now, !!today, tz);
+  const late = due && isStandupLate(now, 10, tz);
   return NextResponse.json({ due, late, copy: nudgeCopy(due, late), cadence });
 }

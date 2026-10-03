@@ -79,7 +79,11 @@ export default function RitualsPanel() {
       const res = await fetch("/api/wfh/rituals", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type: newType, cadence: newCadence }),
+        body: JSON.stringify({
+          type: newType,
+          cadence: newCadence,
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        }),
       });
       const data = await res.json();
       if (!res.ok) {

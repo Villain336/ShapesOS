@@ -7,6 +7,7 @@ import { listFlows, prismaFlowBindingStore, workspaceFlows } from "@/lib/integra
 import { isPlatformOperator } from "@/lib/auth/platform-operator";
 import { requireUser } from "@/lib/session";
 import { integrationsGuard, engineError } from "../_lib";
+import { intQuery, parseQuery, z } from "@/lib/api/validate";
 
 export const dynamic = "force-dynamic";
 
@@ -14,7 +15,9 @@ export async function GET(req: Request) {
   const gate = await integrationsGuard("viewer");
   if (gate instanceof Response) return gate;
   const url = new URL(req.url);
-  const limit = Math.max(1, Math.min(Number(url.searchParams.get("limit")) || 50, 100));
+  const limitQuery = parseQuery(z.object({ limit: intQuery(50, 1, 100) }), url.searchParams);
+  if (!limitQuery.ok) return limitQuery.error;
+  const limit = limitQuery.data.limit;
   const cursor = url.searchParams.get("cursor");
   const engineScope = url.searchParams.get("scope") === "engine";
   if (engineScope && !isPlatformOperator(await requireUser())) {

@@ -2818,6 +2818,8 @@ model Workflow {
   status      WorkflowStatus @default(draft)
   // Cron expression for the schedule trigger; null = manual-only workflow.
   schedule    String?
+  // IANA timezone the schedule is read in (never the server's local zone).
+  timezone    String         @default("UTC")
   enabled     Boolean        @default(true)
   createdBy   String?        @map("created_by")
   lastRunAt   DateTime?      @map("last_run_at")
@@ -10001,6 +10003,8 @@ model WfhWorkMode {
   notificationProfile WfhNotificationProfile @default(batched) @map("notification_profile")
   // Digest window times (minutes since midnight local). Empty = 09:00 + 16:00 defaults.
   digestTimesMin      Int[]                  @default([]) @map("digest_times_min")
+  // IANA timezone for the user's local day: standups, digests, focus hours.
+  timezone            String                 @default("UTC")
   // Mandatory first-enable setup interstitial completed at (wfh days, focus
   // hours, standup cadence). Enabling wfh/hybrid without this fails closed.
   setupCompletedAt    DateTime?              @map("setup_completed_at")
@@ -10192,6 +10196,8 @@ model WfhRitual {
   // daily | weekly | biweekly | monthly
   cadence     String   @default("weekly")
   anchorDate  DateTime @map("anchor_date")
+  // IANA timezone the cadence steps in (weekly = same local time across DST).
+  timezone    String   @default("UTC")
   active      Boolean  @default(true)
 
   subscriptions  WfhRitualSubscription[]

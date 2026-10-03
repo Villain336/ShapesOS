@@ -4,6 +4,7 @@
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
 import { ownedProject } from "../../../_lib";
+import { intQuery, parseQuery, z } from "@/lib/api/validate";
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await requireUser();
@@ -17,7 +18,9 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
 
   const status = sp.get("status");
   const q = (sp.get("q") ?? "").trim();
-  const take = Math.min(Math.max(parseInt(sp.get("take") ?? "50", 10) || 50, 1), 200);
+  const takeQuery = parseQuery(z.object({ take: intQuery(50, 1, 200) }), sp);
+  if (!takeQuery.ok) return takeQuery.error;
+  const take = takeQuery.data.take;
   const where: Record<string, unknown> = { listId: id };
   if (status && ["subscribed", "unsubscribed", "bounced", "complained"].includes(status)) where.status = status;
   if (q) where.OR = [{ email: { contains: q, mode: "insensitive" } }, { name: { contains: q, mode: "insensitive" } }];

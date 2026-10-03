@@ -26,7 +26,7 @@ export async function GET() {
 
   const due = subs
     .map((s) => {
-      const next = nextOccurrence(s.ritual.anchorDate, s.ritual.cadence as RitualCadence, now);
+      const next = nextOccurrence(s.ritual.anchorDate, s.ritual.cadence as RitualCadence, now, s.ritual.timezone);
       return {
         ritualId: s.ritual.id,
         type: s.ritual.type,
