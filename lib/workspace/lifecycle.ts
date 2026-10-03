@@ -123,7 +123,7 @@ export async function createWorkspaceForUser(opts: {
   const now = opts.now ?? new Date();
   const mode = deploymentMode(opts.env);
   return prisma.$transaction(async (tx) => {
-    await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`workspace-create:${opts.userId}`}))`;
+    await tx.$queryRaw`SELECT 1 AS locked FROM pg_advisory_xact_lock(hashtext(${`workspace-create:${opts.userId}`}))`;
     if (opts.ifNoneExists) {
       const existing = await tx.workspace.findFirst({
         where: { OR: [{ ownerUserId: opts.userId }, { members: { some: { userId: opts.userId } } }] },

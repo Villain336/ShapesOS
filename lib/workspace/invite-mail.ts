@@ -109,7 +109,9 @@ export async function sendInviteEmail(
     else await createResendPort((env.RESEND_API_KEY ?? "").trim()).sendEmail(msg);
     return { sent: true, channel };
   } catch (err) {
-    console.error("[invite-mail] delivery failed:", err instanceof Error ? err.message.slice(0, 200) : "unknown error");
+    // Code/name only: provider error text can echo the message body (and so the token).
+    const code = (err as { code?: unknown; name?: unknown })?.code ?? (err as { name?: unknown })?.name ?? "unknown";
+    console.error(`[invite-mail] ${channel} delivery failed (${String(code).slice(0, 60)})`);
     return { sent: false, reason: "send_failed", message: "The invite email didn't go out. Copy the invite link and send it yourself." };
   }
 }
