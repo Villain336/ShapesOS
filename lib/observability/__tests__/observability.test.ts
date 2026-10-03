@@ -102,8 +102,8 @@ describe("JSON logger", () => {
   });
 
   it("falls back to info for unknown levels", () => {
-    assert.equal(configuredLevel({ LOG_LEVEL: "loud" } as NodeJS.ProcessEnv), "info");
-    assert.equal(configuredLevel({} as NodeJS.ProcessEnv), "info");
+    assert.equal(configuredLevel({ LOG_LEVEL: "loud" } as unknown as NodeJS.ProcessEnv), "info");
+    assert.equal(configuredLevel({} as unknown as NodeJS.ProcessEnv), "info");
   });
 });
 
@@ -136,7 +136,7 @@ describe("Sentry reporter", () => {
     for (const bad of ["", "not a url", "https://o42.ingest.sentry.io/7", "https://k@host/notanumber", "ftp://k@h/1"]) {
       assert.equal(parseDsn(bad), null, bad);
     }
-    assert.equal(sentryEnabled({} as NodeJS.ProcessEnv), false);
+    assert.equal(sentryEnabled({} as unknown as NodeJS.ProcessEnv), false);
   });
 
   it("builds an event without headers, query strings, emails or secrets", () => {
@@ -144,7 +144,7 @@ describe("Sentry reporter", () => {
     const ev = buildEvent(
       err,
       { route: "POST /api/x", method: "post", path: "/api/x?key=SECRET&email=a@b.co", requestId: "req-12345678" },
-      { NODE_ENV: "production", MARKETR_GIT_COMMIT: "abc1234" } as NodeJS.ProcessEnv,
+      { NODE_ENV: "production", MARKETR_GIT_COMMIT: "abc1234" } as unknown as NodeJS.ProcessEnv,
     );
     const json = JSON.stringify(ev);
     assert.doesNotMatch(json, /ana@example\.com|abc123secret|SECRET|a@b\.co/);
@@ -176,7 +176,7 @@ describe("Sentry reporter", () => {
       called++;
       return new Response(null);
     }) as typeof fetch;
-    assert.equal(await captureException(new Error("x"), {}, { env: {} as NodeJS.ProcessEnv, fetchImpl }), false);
+    assert.equal(await captureException(new Error("x"), {}, { env: {} as unknown as NodeJS.ProcessEnv, fetchImpl }), false);
     assert.equal(called, 0);
   });
 
@@ -186,7 +186,7 @@ describe("Sentry reporter", () => {
       calls.push({ url, init });
       return new Response(null, { status: 200 });
     }) as unknown as typeof fetch;
-    const env = { SENTRY_DSN: "https://pubkey@sentry.example.com/9" } as NodeJS.ProcessEnv;
+    const env = { SENTRY_DSN: "https://pubkey@sentry.example.com/9" } as unknown as NodeJS.ProcessEnv;
     const err = new Error("boom");
     assert.equal(await captureException(err, { route: "GET /x" }, { env, fetchImpl }), true);
     assert.equal(await captureException(err, { route: "GET /x" }, { env, fetchImpl }), false, "same error reported once");
@@ -204,17 +204,17 @@ describe("Sentry reporter", () => {
 
 describe("OpenTelemetry switch", () => {
   it("is off without an endpoint or when disabled", () => {
-    assert.equal(otelOptions({} as NodeJS.ProcessEnv), null);
-    assert.equal(otelOptions({ OTEL_EXPORTER_OTLP_ENDPOINT: "http://c:4318", OTEL_SDK_DISABLED: "true" } as NodeJS.ProcessEnv), null);
+    assert.equal(otelOptions({} as unknown as NodeJS.ProcessEnv), null);
+    assert.equal(otelOptions({ OTEL_EXPORTER_OTLP_ENDPOINT: "http://c:4318", OTEL_SDK_DISABLED: "true" } as unknown as NodeJS.ProcessEnv), null);
   });
   it("names the service and keeps its own telemetry out of the traces", () => {
     const o = otelOptions({
       OTEL_EXPORTER_OTLP_ENDPOINT: "http://collector:4318",
       SENTRY_DSN: "https://k@sentry.example.com/3",
-    } as NodeJS.ProcessEnv);
+    } as unknown as NodeJS.ProcessEnv);
     assert.equal(o?.serviceName, "shapesos");
     assert.deepEqual(o?.instrumentationConfig.fetch.ignoreUrls, ["http://collector:4318", "https://sentry.example.com"]);
-    assert.equal(otelOptions({ OTEL_EXPORTER_OTLP_ENDPOINT: "x", OTEL_SERVICE_NAME: "acme" } as NodeJS.ProcessEnv)?.serviceName, "acme");
+    assert.equal(otelOptions({ OTEL_EXPORTER_OTLP_ENDPOINT: "x", OTEL_SERVICE_NAME: "acme" } as unknown as NodeJS.ProcessEnv)?.serviceName, "acme");
   });
 });
 
@@ -246,9 +246,9 @@ describe("health rules", () => {
     );
   });
   it("commit must look like a git sha", () => {
-    assert.equal(buildCommit({ MARKETR_GIT_COMMIT: "0123456789abcdef0123" } as NodeJS.ProcessEnv), "0123456789ab");
-    assert.equal(buildCommit({ MARKETR_GIT_COMMIT: "secret value" } as NodeJS.ProcessEnv), null);
-    assert.equal(buildCommit({} as NodeJS.ProcessEnv), null);
+    assert.equal(buildCommit({ MARKETR_GIT_COMMIT: "0123456789abcdef0123" } as unknown as NodeJS.ProcessEnv), "0123456789ab");
+    assert.equal(buildCommit({ MARKETR_GIT_COMMIT: "secret value" } as unknown as NodeJS.ProcessEnv), null);
+    assert.equal(buildCommit({} as unknown as NodeJS.ProcessEnv), null);
   });
   it("lists only folders that hold a migration.sql", () => {
     const dir = mkdtempSync(join(tmpdir(), "mig-"));
