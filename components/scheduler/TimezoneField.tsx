@@ -59,7 +59,7 @@ export default function TimezoneField({
   className?: string;
 }) {
   const listId = useId();
-  const zones = useMemo(zoneList, []);
+  const zones = useMemo(() => zoneList(), []);
   return (
     <label className={labelCls}>
       Timezone

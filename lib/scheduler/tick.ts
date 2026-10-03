@@ -88,7 +88,7 @@ async function tickOne(
   // the schedule like a corrupt cron expression.
   const timezone = schedule.timezone || "UTC";
   if (!isValidTimeZone(timezone)) {
-    throw new CronParseError(`unknown schedule timezone "${timezone.slice(0, 64)}"`);
+    throw new CronParseError(`unknown schedule timezone "${String(timezone).slice(0, 64)}"`);
   }
   const advanced = nextFutureRunAfterInZone(parsed, previousNext, now, timezone);
 
