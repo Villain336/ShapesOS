@@ -16,6 +16,7 @@ import { Prisma, type BillingOverageInvoice, type Plan } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { applyPlanChange, applyTopUp, setSpendCap } from "./service";
 import { TOPUP_PACKS, OVERAGE_CREDITS_PER_CENT } from "./credits";
+import { deploymentMode, lapsedPlanFor } from "@/lib/billing/trial";
 import {
   PLANS,
   planById,
@@ -1454,7 +1455,9 @@ export async function syncSubscriptionFromStripe(
   });
 
   if (ended) {
-    await setWorkspacePlan(workspaceId, "self_hosted" as Plan, `subscription ${sub.id} ended (${sub.status})`);
+    // Phase 3: on a hosted deployment a lapsed subscription becomes an ended
+    // trial (read-only for metered actions), never unbilled self_hosted.
+    await setWorkspacePlan(workspaceId, lapsedPlanFor(deploymentMode()), `subscription ${sub.id} ended (${sub.status})`);
   } else if (planId) {
     const ws = await prisma.workspace.findUnique({ where: { id: workspaceId }, select: { plan: true } });
     if (ws && ws.plan !== planId) {

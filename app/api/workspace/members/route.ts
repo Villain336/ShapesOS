@@ -18,6 +18,7 @@ import {
 } from "@/lib/authz";
 import { readJsonBody } from "@/lib/sitefiles/api";
 import type { WorkspaceRole } from "@prisma/client";
+import { inviteMailChannel, sendInviteEmail } from "@/lib/workspace/invite-mail";
 
 const VALID_ROLES: WorkspaceRole[] = ["owner", "admin", "editor", "viewer"];
 
@@ -72,6 +73,8 @@ export async function GET() {
   return Response.json({
     workspace: { id: workspace.id, name: workspace.name },
     myRole: me.role,
+    // Phase 3: whether invites go out by email on this deployment.
+    inviteEmail: inviteMailChannel() !== null,
     members: members.map(publicMember),
   });
 }
@@ -110,7 +113,23 @@ export async function POST(req: NextRequest) {
     `${user.email ?? user.id} invited ${email} as ${role}`,
   );
   // Day-1 hardening (M5): invites are claimed via a single-use token link,
-  // never by bare email match. Share this link with the invitee directly.
+  // never by bare email match. Phase 3: the link is emailed when the
+  // deployment has mail set up; the admin can always copy it as a fallback.
   const inviteUrl = `/invite?token=${member.inviteToken}`;
-  return Response.json({ ok: true, member: publicMember(member), inviteUrl });
+  const mail = await sendInviteEmail({
+    to: email,
+    workspaceName: workspace.name,
+    inviterName: user.name || user.email || "A teammate",
+    role,
+    inviteUrl,
+    expiresAt: member.inviteExpiresAt ?? new Date(Date.now() + 7 * 86_400_000),
+    requestOrigin: new URL(req.url).origin,
+  });
+  return Response.json({
+    ok: true,
+    member: publicMember(member),
+    inviteUrl,
+    emailed: mail.sent,
+    ...(mail.sent ? {} : { emailNote: mail.message }),
+  });
 }
