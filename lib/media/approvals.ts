@@ -342,7 +342,14 @@ export async function approveApproval(store: ApprovalStore, input: ApproveInput)
         `High-value buy ($${(a.maxSpendCents / 100).toFixed(2)}): OTP confirmation required.`,
       );
     }
-    if (!input.otpStore.verify(input.otpChallengeId, input.otpCode, now)) {
+    if (
+      !input.otpStore.verify(
+        input.otpChallengeId,
+        input.otpCode,
+        { approvalId: a.id, approverId: input.approverId },
+        now,
+      )
+    ) {
       await logApprovalEvent(store, a.id, a.workspaceId, input.approverId, "approval_rejected", {
         reason: "otp_failed",
       });

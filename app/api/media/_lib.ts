@@ -9,6 +9,8 @@ import { mediaRoleForWorkspaceRole, type MediaRole } from "@/lib/media/safety";
 
 export interface MediaGuard {
   userId: string;
+  /** Sign-in email (approval OTP delivery). */
+  email: string | null;
   workspaceId: string;
   /** Media role for Phase 5 SAFETY (owner/media_buyer/viewer). Resolved from
    *  the workspace membership; defaults to "viewer" when no membership row
@@ -30,6 +32,7 @@ export async function mediaGuard(
   const membership = await getMembership(user.id, workspace.id);
   return {
     userId: user.id,
+    email: user.email ?? null,
     workspaceId: workspace.id,
     mediaRole: mediaRoleForWorkspaceRole(membership?.role ?? "viewer"),
   };
