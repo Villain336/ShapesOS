@@ -606,6 +606,9 @@ model Workspace {
   // Phase 16 slice 9: branded report engine back-relation.
   reportSendApprovals         ReportSendApproval[]
   // Phase 10 (ops-core) back-relations.
+  opsSlaPolicies              OpsSlaPolicy[]
+  opsTickets                  OpsTicket[]
+  opsTicketMessages           OpsTicketMessage[]
   opsTasks                    OpsTask[]
   opsCompanies                OpsCompany[]
   opsContacts                 OpsContact[]
@@ -9430,7 +9433,8 @@ model OpsContact {
   createdAt   DateTime    @default(now()) @map("created_at")
   updatedAt   DateTime    @updatedAt @map("updated_at")
 
-  deals OpsDeal[]
+  deals   OpsDeal[]
+  tickets OpsTicket[]
 
   @@unique([workspaceId, email])
   @@unique([workspaceId, leadId])
@@ -9524,6 +9528,121 @@ model OpsTask {
   @@index([workspaceId, projectId, stage])
   @@index([workspaceId, assigneeId, stage])
   @@map("ops_tasks")
+}
+
+// ============================================================================
+// Phase 10 (ops-core) — helpdesk: tickets, ticket messages, SLA policies.
+// Inbound email reaches tickets through the EXISTING signed inbound route
+// (app/api/messaging/inbound/email): mail to the workspace's signed support
+// address — or an unknown sender replying to its reply address — opens or
+// threads onto a ticket. Replies go out through the messaging email
+// provider (lib/messaging/provider.ts).
+// ============================================================================
+
+enum OpsTicketStatus {
+  new
+  open
+  pending
+  solved
+  closed
+}
+
+enum OpsTicketPriority {
+  low
+  normal
+  high
+  urgent
+}
+
+enum OpsTicketChannel {
+  email
+  web
+  phone
+  chat
+  agent
+}
+
+enum OpsTicketMessageDirection {
+  inbound
+  outbound
+  note
+}
+
+model OpsSlaPolicy {
+  id                   String            @id @default(cuid())
+  workspaceId          String            @map("workspace_id")
+  workspace            Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  priority             OpsTicketPriority
+  // Calendar minutes from ticket creation.
+  firstResponseMinutes Int               @map("first_response_minutes")
+  resolutionMinutes    Int               @map("resolution_minutes")
+  active               Boolean           @default(true)
+  createdAt            DateTime          @default(now()) @map("created_at")
+  updatedAt            DateTime          @updatedAt @map("updated_at")
+
+  @@unique([workspaceId, priority])
+  @@map("ops_sla_policies")
+}
+
+model OpsTicket {
+  id                 String            @id @default(cuid())
+  workspaceId        String            @map("workspace_id")
+  workspace          Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  // Per-workspace sequence shown as "#123" (threads replies by subject).
+  number             Int
+  subject            String
+  status             OpsTicketStatus   @default(new)
+  priority           OpsTicketPriority @default(normal)
+  channel            OpsTicketChannel  @default(web)
+  requesterEmail     String?           @map("requester_email")
+  requesterName      String?           @map("requester_name")
+  contactId          String?           @map("contact_id")
+  contact            OpsContact?       @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  // Workspace member (Auth.js subject id).
+  assigneeId         String?           @map("assignee_id")
+  firstResponseDueAt DateTime?         @map("first_response_due_at")
+  resolutionDueAt    DateTime?         @map("resolution_due_at")
+  firstRespondedAt   DateTime?         @map("first_responded_at")
+  solvedAt           DateTime?         @map("solved_at")
+  closedAt           DateTime?         @map("closed_at")
+  // Set once by the SLA sweep when a target is missed (notifies once).
+  slaBreachedAt      DateTime?         @map("sla_breached_at")
+  slaBreachKind      String?           @map("sla_breach_kind")
+  lastMessageAt      DateTime          @default(now()) @map("last_message_at")
+  createdBy          String?           @map("created_by")
+  createdAt          DateTime          @default(now()) @map("created_at")
+  updatedAt          DateTime          @updatedAt @map("updated_at")
+
+  messages OpsTicketMessage[]
+
+  @@unique([workspaceId, number])
+  @@index([workspaceId, status, priority])
+  @@index([workspaceId, assigneeId, status])
+  @@index([workspaceId, requesterEmail])
+  @@map("ops_tickets")
+}
+
+model OpsTicketMessage {
+  id             String                    @id @default(cuid())
+  workspaceId    String                    @map("workspace_id")
+  workspace      Workspace                 @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  ticketId       String                    @map("ticket_id")
+  ticket         OpsTicket                 @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  direction      OpsTicketMessageDirection
+  authorUserId   String?                   @map("author_user_id")
+  fromEmail      String?                   @map("from_email")
+  toEmail        String?                   @map("to_email")
+  body           String                    @db.Text
+  // Inbound: the Resend email id (idempotency). Outbound: provider sid.
+  providerSid    String?                   @map("provider_sid")
+  // Outbound delivery: queued | sent | failed.
+  deliveryStatus String?                   @map("delivery_status")
+  error          String?
+  createdAt      DateTime                  @default(now()) @map("created_at")
+
+  @@unique([workspaceId, providerSid])
+  @@index([workspaceId, ticketId, createdAt])
+  @@map("ops_ticket_messages")
 }
 
 // ============================================================================

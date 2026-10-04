@@ -130,6 +130,15 @@ export const CRON_JOBS: readonly CronJob[] = [
 
   // --- Hourly -------------------------------------------------------------
   { key: "gsc-pull", path: "/api/cron/gsc-pull", cron: "5 * * * *", source: "deploy", timeoutMs: LONG },
+  // Phase 10 (ops-core): helpdesk SLA breaches → notify once per ticket.
+  {
+    key: "ops-helpdesk-sla",
+    path: "/api/cron/ops-helpdesk-sla",
+    cron: "*/10 * * * *",
+    source: "picked",
+    note: "New in Phase 10. The tightest default SLA is a 60-minute first response; a 10-minute sweep flags a breach within 10 minutes and notifies once.",
+    timeoutMs: SHORT,
+  },
   // Phase 10 (ops-core): min/max reorder rules → draft purchase orders.
   {
     key: "ops-reorder",

@@ -789,6 +789,71 @@ const taskDef: OpsEntityDef = {
   },
 };
 
+// ---------------------------------------------------------------------------
+// Phase 10 (ops-core): helpdesk — tickets + SLA policies (rules, inbound
+// email threading and replies in lib/ops/helpdesk.ts).
+// ---------------------------------------------------------------------------
+
+const ticketPriority = z.enum(["low", "normal", "high", "urgent"]);
+
+const ticketDef: OpsEntityDef = {
+  slug: "tickets",
+  label: "Ticket",
+  delegate: "opsTicket",
+  createSchema: z.object({
+    subject: z.string().trim().min(1).max(300),
+    body: z.string().max(50_000).optional(),
+    priority: ticketPriority.default("normal"),
+    channel: z.enum(["web", "phone", "chat", "agent", "email"]).default("web"),
+    requesterEmail: z.string().max(320).optional(),
+    requesterName: z.string().max(200).optional(),
+    contactId: z.string().min(1).max(64).optional(),
+    assigneeId: z.string().min(1).max(128).optional(),
+  }),
+  patchSchema: z.object({
+    subject: z.string().trim().min(1).max(300).optional(),
+    status: z.enum(["open", "pending", "solved", "closed"]).optional(),
+    priority: ticketPriority.optional(),
+    assigneeId: z.string().min(1).max(128).nullable().optional(),
+    contactId: z.string().min(1).max(64).nullable().optional(),
+  }).strict(),
+  patchable: true,
+  filterable: ["status", "priority", "assigneeId", "contactId", "requesterEmail"],
+  gatedTransitions: [],
+  statusTransitions: {
+    new: ["open", "pending", "solved", "closed"],
+    open: ["pending", "solved", "closed"],
+    pending: ["open", "solved", "closed"],
+    solved: ["open", "closed"],
+    closed: [],
+  },
+  summarize: (r) => `ticket #${r.number ?? "?"} "${r.subject}" → ${r.status}`,
+  hooks: {
+    create: async (tx, a, b) => (await import("./helpdesk")).createTicketRow(tx, a, b),
+    patch: async (tx, a, id, p, e) => (await import("./helpdesk")).patchTicketRow(tx, a, id, p, e),
+  },
+};
+
+const slaPolicyDef: OpsEntityDef = {
+  slug: "sla-policies",
+  label: "SLA policy",
+  delegate: "opsSlaPolicy",
+  createSchema: z.object({
+    priority: ticketPriority,
+    firstResponseMinutes: z.number().int().min(1).max(525_600),
+    resolutionMinutes: z.number().int().min(1).max(525_600),
+  }).refine((b) => b.resolutionMinutes >= b.firstResponseMinutes, { message: "resolution target must be at least the first-response target" }),
+  patchSchema: z.object({
+    firstResponseMinutes: z.number().int().min(1).max(525_600).optional(),
+    resolutionMinutes: z.number().int().min(1).max(525_600).optional(),
+    active: z.boolean().optional(),
+  }).strict(),
+  patchable: true,
+  filterable: ["priority"],
+  gatedTransitions: [],
+  summarize: (r) => `SLA ${r.priority}: first response ${r.firstResponseMinutes}m, resolution ${r.resolutionMinutes}m`,
+};
+
 export const OPS_ENTITIES: OpsEntityDef[] = [
   productDef,
   orderDef,
@@ -802,6 +867,8 @@ export const OPS_ENTITIES: OpsEntityDef[] = [
   teamMemberDef,
   leaveRequestDef,
   // Phase 10 (ops-core)
+  ticketDef,
+  slaPolicyDef,
   taskDef,
   companyDef,
   contactDef,

@@ -33,6 +33,7 @@ export const OPS_SECTIONS: OpsSection[] = [
   s("inventory", "Products & inventory", "inventory", "Products, variants, warehouses, stock by location"),
   s("purchasing", "Purchasing", "purchasing", "Purchase orders and reorder rules"),
   s("projects", "Projects", "projects", "Projects, tasks, timesheets"),
+  s("helpdesk", "Helpdesk", "helpdesk", "Support tickets and SLAs"),
   s("team", "Team", "team", "People, departments, leave, recruiting"),
   s("workflows", "Workflows", "workflows", "Multi-step operations with rollback"),
   s("accounting", "Accounting", "accounting", "Chart of accounts, journal, reports", "finance"),

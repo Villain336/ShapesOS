@@ -96,3 +96,4 @@ lib/apps/__tests__/apps-db.test.ts
 lib/ops/__tests__/p10-inventory-db.test.ts
 lib/ops/__tests__/p10-crm-db.test.ts
 lib/ops/__tests__/p10-projects-db.test.ts
+lib/ops/__tests__/p10-helpdesk-db.test.ts

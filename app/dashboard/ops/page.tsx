@@ -34,6 +34,9 @@ export default async function OpsOverviewPage() {
         { label: "Overdue invoices", value: String(o.overdueInvoices), href: "/dashboard/ops/invoices" },
         { label: "Low-stock products", value: String(o.lowStockCount), href: "/dashboard/ops/inventory" },
         { label: "Active projects", value: String(o.activeProjects), href: "/dashboard/ops/projects" },
+        { label: "Open tasks", value: String(o.openTasks), href: "/dashboard/ops/projects?view=tasks" },
+        { label: "Open tickets", value: String(o.openTickets), href: "/dashboard/ops/helpdesk" },
+        { label: "Tickets past SLA", value: String(o.breachedTickets), href: "/dashboard/ops/helpdesk" },
         { label: "Payments, last 30 days", value: money(o.paymentsLast30dCents), href: "/dashboard/ops/payments" },
         { label: "Waiting for your approval", value: String(o.pendingOpsApprovals), href: "/dashboard/approvals" },
       ]
@@ -42,7 +45,7 @@ export default async function OpsOverviewPage() {
   return (
     <div className="flex flex-col gap-6">
       {o ? (
-        <section aria-label="Key numbers" className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-7">
+        <section aria-label="Key numbers" className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-5">
           {kpis.map((k) => (
             <Link
               key={k.label}

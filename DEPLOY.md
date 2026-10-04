@@ -181,6 +181,7 @@ them over via the Secure Vault flow and Z7 writes them server-side.
    - `0 8 * * * curl -s -X POST -H "Authorization: Bearer $CRON_SECRET" https://marketr.launchabl.com/api/cron/visibility-score` (milestone 14: daily composite score + visibility_delta alerts)
    - `5 * * * * curl -s -X POST -H "Authorization: Bearer $CRON_SECRET" https://marketr.launchabl.com/api/cron/gsc-pull` (Phase 10 M1: hourly GSC Search Analytics pull — last 3h of HOURLY_ALL per GSC-bound project into gsc_snapshot; feeds the delta engine + M2 radar)
    - `20 * * * * curl -s -X POST -H "Authorization: Bearer $CRON_SECRET" https://marketr.launchabl.com/api/cron/ops-reorder` (Phase 10 ops-core: min/max reorder rules draft purchase orders — drafts only, one per breach)
+   - `*/10 * * * * curl -s -X POST -H "Authorization: Bearer $CRON_SECRET" https://marketr.launchabl.com/api/cron/ops-helpdesk-sla` (Phase 10 ops-core: helpdesk SLA breaches — recorded once per ticket, assignee + editors notified)
    - `*/15 * * * * curl -s -X POST -H "Authorization: Bearer $CRON_SECRET" https://marketr.launchabl.com/api/cron/gsc-inspection` (Phase 10 M1: URL Inspection queue drain — priority-ordered, fair-share across projects, 2,000 QPD/site hard wall; never sweeps)
    - `0 9 * * 1 curl -s -X POST -H "Authorization: Bearer $CRON_SECRET" https://marketr.launchabl.com/api/cron/decay` (milestone 14: weekly content-decay detection)
    - `30 9 * * 1 curl -s -X POST -H "Authorization: Bearer $CRON_SECRET" https://marketr.launchabl.com/api/cron/radar` (milestone 14: weekly competitor radar)

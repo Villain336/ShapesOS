@@ -12,13 +12,17 @@ export interface OpsOverview extends OpsSummary {
   openOrders: number;
   activeProjects: number;
   paymentsLast30dCents: number;
+  openTickets: number;
+  breachedTickets: number;
+  openTasks: number;
 }
 
 type Tx = Prisma.TransactionClient;
 
 export async function getOpsOverview(tx: Tx, workspaceId: string): Promise<OpsOverview> {
   const since = new Date(Date.now() - 30 * 24 * 3600_000);
-  const [summary, openOrders, activeProjects, payments] = await Promise.all([
+  const active = { in: ["new", "open", "pending"] as Array<"new" | "open" | "pending"> };
+  const [summary, openOrders, activeProjects, payments, openTickets, breachedTickets, openTasks] = await Promise.all([
     getOpsSummary(tx as unknown as OpsSummaryTx, workspaceId),
     tx.opsOrder.count({ where: { workspaceId, status: { in: ["draft", "confirmed"] } } }),
     tx.opsProject.count({ where: { workspaceId, status: { in: ["planning", "active"] } } }),
@@ -27,7 +31,10 @@ export async function getOpsOverview(tx: Tx, workspaceId: string): Promise<OpsOv
       select: { kind: true, amountCents: true },
       take: 5000,
     }),
+    tx.opsTicket.count({ where: { workspaceId, status: active } }),
+    tx.opsTicket.count({ where: { workspaceId, status: active, slaBreachedAt: { not: null } } }),
+    tx.opsTask.count({ where: { workspaceId, stage: { notIn: ["done", "cancelled"] } } }),
   ]);
   const paymentsLast30dCents = payments.reduce((s, p) => s + (p.kind === "refund" ? -p.amountCents : p.amountCents), 0);
-  return { ...summary, openOrders, activeProjects, paymentsLast30dCents };
+  return { ...summary, openOrders, activeProjects, paymentsLast30dCents, openTickets, breachedTickets, openTasks };
 }
