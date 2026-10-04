@@ -190,7 +190,7 @@ export function NewTaskDialog() {
         <Dialog.Backdrop className="fixed inset-0 z-50 bg-ink/30" />
         <Dialog.Popup
           aria-describedby={undefined}
-          className="fixed top-[12%] left-1/2 z-50 w-[calc(100%-2rem)] max-w-xl -translate-x-1/2 outline-none"
+          className="fixed top-[12%] left-1/2 z-50 w-[calc(100%-2rem)] max-w-xl -translate-x-1/2"
         >
           <Dialog.Title className="sr-only">New task</Dialog.Title>
           <TaskComposer
