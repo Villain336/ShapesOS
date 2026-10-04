@@ -149,13 +149,17 @@ async function gitIn(sb: Sandbox, ctx: ShipToolContext, dir: string, ...args: st
 /** Start a static file server for `dir` on `port` (background; survives the exec). */
 export function staticServerCommand(dir: string, port: number): string {
   const log = `/tmp/shapes-site-preview-${port}.log`;
+  const pid = `/tmp/shapes-site-preview-${port}.pid`;
   const d = shq(dir);
   return [
     `cd ${d} || exit 1`,
+    // A server this tool started on the port before (an earlier checkout) is replaced.
+    `if [ -f ${pid} ]; then kill "$(cat ${pid})" 2>/dev/null; sleep 0.3; fi`,
     `if command -v python3 >/dev/null 2>&1; then nohup python3 -m http.server ${port} --bind 0.0.0.0 >${log} 2>&1 &`,
     `elif command -v busybox >/dev/null 2>&1; then nohup busybox httpd -f -p ${port} -h ${d} >${log} 2>&1 &`,
     `else nohup npx --yes http-server ${d} -p ${port} -s -c-1 >${log} 2>&1 &`,
     "fi",
+    `echo $! > ${pid}`,
     "sleep 1",
     "echo started",
   ].join("\n");
@@ -369,8 +373,14 @@ export function createSiteTools(deps: SiteToolDeps = defaultSiteToolDeps): ToolD
       let changed: NumstatEntry[] = [];
       if (checkout.baseline) {
         await gitIn(sb, ctx, checkout.dir, "add", "-A", "-N");
+        // The diff covers exactly what the draft holds (left-out files excluded).
+        const exclude = skipped.slice(0, 500).map((f) => `:(exclude,literal)${f.path.replace(/^\//, "")}`);
         const common = ["diff", "--no-color", "--no-ext-diff", "--find-renames", "HEAD"];
-        const [p, n] = await Promise.all([gitIn(sb, ctx, checkout.dir, ...common), gitIn(sb, ctx, checkout.dir, ...common, "--numstat")]);
+        const tail = ["--", ".", ...exclude];
+        const [p, n] = await Promise.all([
+          gitIn(sb, ctx, checkout.dir, ...common, ...tail),
+          gitIn(sb, ctx, checkout.dir, ...common, "--numstat", ...tail),
+        ]);
         if (p.exitCode === 0) {
           const capped = capPatch(p.stdout);
           patch = capped.patch;
