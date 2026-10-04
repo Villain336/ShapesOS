@@ -8,6 +8,7 @@ import { mockScanFindings } from "./mock";
 import { meter } from "@/lib/metering/service";
 import { crawlSite, type LiveCrawlOptions, type LiveCrawlSummary } from "./live";
 import type { Prisma } from "@prisma/client";
+import { fetchCoreWebVitals, vitalsFindings, type VitalsOptions, type VitalsResult } from "@/lib/seo/pagespeed";
 
 export interface AuditInput {
   siteId: string;
@@ -21,7 +22,11 @@ export interface AuditInput {
   skipMetering?: boolean;
   /** Phase 11 (seotools): crawl the live URLs instead of the working copy
    *  (lib/audit/live.ts). Ignored when mock is true. */
-  live?: Omit<LiveCrawlOptions, "startUrl"> & { url: string };
+  live?: Omit<LiveCrawlOptions, "startUrl"> & {
+    url: string;
+    /** Core Web Vitals for the start page via PageSpeed Insights (default on; false = skip). */
+    vitals?: VitalsOptions | false;
+  };
 }
 
 /** Phase 11: live findings carry a URL as their "file"; files findings a path. */
@@ -44,14 +49,22 @@ export async function runAudit(input: AuditInput) {
 
   try {
     let crawl: LiveCrawlSummary | null = null;
+    let vitals: VitalsResult | null = null;
     let findings: ScanFinding[];
     if (mock || (!provider && !liveMode)) {
       findings = mockScanFindings(siteName);
     } else if (liveMode) {
-      const { url, ...rest } = input.live!;
+      const { url, vitals: vitalsOpts, ...rest } = input.live!;
       const res = await crawlSite({ ...rest, startUrl: url });
       findings = res.findings;
       crawl = res.crawl;
+      // Phase 11: Core Web Vitals for the start page (lab + CrUX field data).
+      if (vitalsOpts !== false) {
+        const start = res.crawl.pages[0];
+        const target = start?.finalUrl ?? res.crawl.startUrl;
+        vitals = await fetchCoreWebVitals(target, { resolve: rest.resolve, ...(vitalsOpts ?? {}) });
+        findings.push(...vitalsFindings(vitals));
+      }
     } else {
       findings = await scanSite(provider!);
     }
@@ -101,6 +114,7 @@ export async function runAudit(input: AuditInput) {
         openIssues: rows.length,
         errorIssues,
         ...(crawl ? { crawl: crawl as unknown as Prisma.InputJsonValue } : {}),
+        ...(vitals ? { vitals: vitals as unknown as Prisma.InputJsonValue } : {}),
       },
     });
 

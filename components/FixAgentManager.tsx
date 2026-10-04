@@ -33,6 +33,65 @@ interface LiveCrawl {
   externalChecked: number;
 }
 
+// Phase 11 (seotools): Core Web Vitals (lib/seo/pagespeed.ts). Ratings are
+// measurement data, not agent states — shown as text, never status colours.
+interface VitalsMetric {
+  value: number;
+  rating: "good" | "needs-improvement" | "poor";
+}
+interface StrategyVitals {
+  strategy: "mobile" | "desktop";
+  field: { scope: "url" | "origin"; lcp: VitalsMetric | null; inp: VitalsMetric | null; cls: VitalsMetric | null } | null;
+  lab: { performanceScore: number | null; lcp: VitalsMetric | null; cls: VitalsMetric | null; tbt: VitalsMetric | null };
+}
+type Vitals =
+  | { unavailable: true; reason: string; url: string; measuredAt: string }
+  | { unavailable?: false; url: string; measuredAt: string; keyed: boolean; strategies: StrategyVitals[]; errors: { strategy: string; reason: string }[] };
+
+const RATING_LABEL: Record<VitalsMetric["rating"], string> = { good: "good", "needs-improvement": "needs work", poor: "poor" };
+
+function metricText(m: VitalsMetric | null, kind: "ms" | "cls"): string {
+  if (!m) return "—";
+  return `${kind === "cls" ? m.value.toFixed(2) : `${Math.round(m.value)} ms`} (${RATING_LABEL[m.rating]})`;
+}
+
+function VitalsSummary({ vitals }: { vitals: Vitals }) {
+  if (vitals.unavailable) {
+    return <p className="mt-2 text-xs text-muted">Core Web Vitals not measured: {vitals.reason}</p>;
+  }
+  return (
+    <div className="mt-3 space-y-3">
+      {vitals.strategies.map((s) => (
+        <div key={s.strategy} className="text-xs">
+          <p className="font-semibold text-ink">
+            {s.strategy === "mobile" ? "Mobile" : "Desktop"} · performance {s.lab.performanceScore ?? "—"}
+          </p>
+          <dl className="mt-1 grid grid-cols-[auto_1fr_1fr] gap-x-2 gap-y-0.5 text-muted">
+            <dt />
+            <dd>{s.field ? `Real users (${s.field.scope === "origin" ? "site-wide" : "this page"})` : "Real users"}</dd>
+            <dd>Lab</dd>
+            <dt>LCP</dt>
+            <dd className="text-ink">{s.field ? metricText(s.field.lcp, "ms") : "no data"}</dd>
+            <dd className="text-ink">{metricText(s.lab.lcp, "ms")}</dd>
+            <dt>INP / TBT</dt>
+            <dd className="text-ink">{s.field ? metricText(s.field.inp, "ms") : "no data"}</dd>
+            <dd className="text-ink">{metricText(s.lab.tbt, "ms")}</dd>
+            <dt>CLS</dt>
+            <dd className="text-ink">{s.field ? metricText(s.field.cls, "cls") : "no data"}</dd>
+            <dd className="text-ink">{metricText(s.lab.cls, "cls")}</dd>
+          </dl>
+        </div>
+      ))}
+      {vitals.errors.map((e) => (
+        <p key={e.strategy} className="text-xs text-muted">{e.strategy}: {e.reason}</p>
+      ))}
+      <p className="text-[11px] text-muted">
+        PageSpeed Insights · {new Date(vitals.measuredAt).toLocaleString()}{vitals.keyed ? "" : " · keyless quota"}
+      </p>
+    </div>
+  );
+}
+
 interface LiveAudit {
   id: string;
   status: string;
@@ -41,7 +100,7 @@ interface LiveAudit {
   errorIssues: number;
   createdAt: string;
   crawl: LiveCrawl | null;
-  vitals: unknown;
+  vitals: Vitals | null;
 }
 
 interface Settings {
@@ -408,7 +467,7 @@ export default function FixAgentManager({ projectId }: { projectId: string }) {
             <div className="mt-4 border-t border-line pt-4">
               <h3 className="text-sm font-semibold">Live site</h3>
               <p className="mt-1 text-xs text-muted">
-                Crawls the published pages: status codes, redirects, canonical, hreflang, noindex, structured data, robots.txt and sitemap.
+                Crawls the published pages: status codes, redirects, canonical, hreflang, noindex, structured data, robots.txt and sitemap — and measures Core Web Vitals for the start page.
               </p>
               <input
                 type="url"
@@ -432,6 +491,12 @@ export default function FixAgentManager({ projectId }: { projectId: string }) {
                   <div><dt className="sr-only">Rendering</dt><dd>{liveAudit.crawl.rendering === "js" ? "JavaScript-rendered" : "Static HTML"} — {liveAudit.crawl.renderingNote}</dd></div>
                   <div><dd>{liveAudit.totalIssues} issues · {new Date(liveAudit.createdAt).toLocaleString()}</dd></div>
                 </dl>
+              )}
+              {liveAudit?.vitals && (
+                <div className="mt-3 border-t border-line pt-3">
+                  <h4 className="text-xs font-semibold text-ink">Core Web Vitals</h4>
+                  <VitalsSummary vitals={liveAudit.vitals} />
+                </div>
               )}
             </div>
           </div>

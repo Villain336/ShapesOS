@@ -629,6 +629,8 @@ const run_seo_audit: ToolDef = {
         mock: useMock,
         mode: live ? "live" : "files",
         crawl,
+        // Phase 11: Core Web Vitals (PageSpeed Insights) or { unavailable, reason }.
+        vitals: (result.audit as { vitals?: unknown }).vitals ?? null,
         topIssues: result.issues.slice(0, 10).map((i) => ({
           category: i.category,
           severity: i.severity,

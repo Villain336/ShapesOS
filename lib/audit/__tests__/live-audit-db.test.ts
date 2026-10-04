@@ -3,7 +3,8 @@
 // SiteAudit with its crawl summary and URL findings; a live audit and a
 // files audit supersede only their own kind of issue; the inbox returns the
 // latest live audit; the start URL resolves from real deployments, never
-// mock ones; the fix agent never picks up a live finding.
+// mock ones; Core Web Vitals (stubbed PSI) are stored on the audit; the fix
+// agent never picks up a live finding.
 // Listed in scripts/test/db-tests.txt.
 // Run: DATABASE_URL=… npx tsx --test lib/audit/__tests__/live-audit-db.test.ts
 
@@ -33,6 +34,20 @@ const fetcher: LiveFetcher = {
     return { url, status: text ? 200 : 404, text: text ?? "", contentType: text ? "text/html" : "text/plain", redirects: [], headers: {} };
   },
 };
+
+// PageSpeed Insights stub (labelled mock): lab-only, poor LCP.
+const psiStub = (async () =>
+  new Response(
+    JSON.stringify({
+      loadingExperience: {},
+      lighthouseResult: {
+        lighthouseVersion: "12.2.0",
+        categories: { performance: { score: 0.42 } },
+        audits: { "largest-contentful-paint": { numericValue: 5100 }, "cumulative-layout-shift": { numericValue: 0.02 }, "total-blocking-time": { numericValue: 120 } },
+      },
+    }),
+    { status: 200, headers: { "content-type": "application/json" } },
+  )) as unknown as typeof fetch;
 
 before(async () => {
   await prisma.workspace.create({ data: { id: WS, name: "P11 audit", ownerUserId: USER } });
@@ -74,9 +89,15 @@ describe("live audit storage", () => {
       provider: null,
       mock: false,
       skipMetering: true,
-      live: { url: "https://live.example/", fetcher, resolve: publicDns, maxExternalChecks: 0 },
+      live: { url: "https://live.example/", fetcher, resolve: publicDns, maxExternalChecks: 0, vitals: { fetchImpl: psiStub, strategies: ["mobile"] } },
     });
     assert.equal(live.audit.mode, "live");
+    // Core Web Vitals stored on the audit, and the poor lab LCP became a finding.
+    const vitals = live.audit.vitals as { source: string; strategies: { strategy: string; lab: { performanceScore: number; lcp: { value: number; rating: string } } }[] };
+    assert.equal(vitals.source, "pagespeed-insights");
+    assert.equal(vitals.strategies[0].lab.performanceScore, 42);
+    assert.deepEqual(vitals.strategies[0].lab.lcp, { value: 5100, rating: "poor" });
+    assert.ok(live.issues.some((i) => i.category === "poor-core-web-vitals" && i.filePath === "https://live.example/"));
     assert.equal(live.audit.targetUrl, "https://live.example/");
     assert.equal(live.audit.status, "completed");
     const crawl = live.audit.crawl as { pagesCrawled: number; rendering: string; statusCounts: Record<string, number> };
@@ -101,8 +122,9 @@ describe("live audit storage", () => {
       provider: null,
       mock: false,
       skipMetering: true,
-      live: { url: "https://live.example/", fetcher, resolve: publicDns, maxExternalChecks: 0 },
+      live: { url: "https://live.example/", fetcher, resolve: publicDns, maxExternalChecks: 0, vitals: false },
     });
+    assert.equal(again.audit.vitals, null, "vitals: false never stores a measurement");
     assert.equal(await prisma.siteIssue.count({ where: { auditId: live.audit.id, status: "open" } }), 0);
     assert.equal(await prisma.siteIssue.count({ where: { auditId: files.audit.id, status: "open" } }), filesOpen);
     assert.equal(await prisma.siteIssue.count({ where: { auditId: again.audit.id, status: "open" } }), again.issues.length);
@@ -117,7 +139,7 @@ describe("live audit storage", () => {
 
   it("marks the audit failed when the start URL is refused", async () => {
     await assert.rejects(
-      runAudit({ siteId, projectId, siteName: "Live site", provider: null, mock: false, skipMetering: true, live: { url: "http://10.0.0.1/", fetcher } }),
+      runAudit({ siteId, projectId, siteName: "Live site", provider: null, mock: false, skipMetering: true, live: { url: "http://10.0.0.1/", fetcher, vitals: false } }),
       /Can't audit that URL/,
     );
     const last = await prisma.siteAudit.findFirstOrThrow({ where: { siteId }, orderBy: { createdAt: "desc" } });
