@@ -206,7 +206,8 @@ export const ROWS: ParityRow[] = [
     model: [model("OpsQuote", /^model OpsQuote\w*\s*\{/m)],
     route: [anyFile("/api/ops/quotes", /^app\/api\/ops\/quotes?[^]*route\.ts$/), { label: "entity quotes", ok: (c) => c.entitySlugs.has("quotes") || c.files.some((f) => /^app\/api\/ops\/quotes/.test(f)) }],
     page: [page("quotes")],
-    test: [anyFile("*quote*.test.ts", /^lib\/ops\/__tests__\/[^/]*quote[^/]*\.test\.ts$/i)],
+    // Quotes are covered by the finance invoicing suite (send, PDF, convert).
+    test: [anyFile("*quote*|finance-invoicing-db.test.ts", /^lib\/ops\/__tests__\/([^/]*quote[^/]*|finance-invoicing-db)\.test\.ts$/i)],
   },
   {
     app: "Vendors & bills",
@@ -215,7 +216,8 @@ export const ROWS: ParityRow[] = [
     model: [model("OpsVendor", /^model OpsVendor\w*\s*\{/m), model("Ops*Bill", /^model Ops\w*Bill\w*\s*\{/m)],
     route: [{ label: "/api/ops/vendors|bills", ok: (c) => ["vendors", "bills", "vendor-bills"].some((s) => c.entitySlugs.has(s)) || c.files.some((f) => /^app\/api\/ops\/(vendors|bills|vendor-bills)/.test(f)) }],
     page: [page("vendors")],
-    test: [anyFile("*vendor|bill*.test.ts", /^lib\/ops\/__tests__\/[^/]*(vendor|bill)[^/]*\.test\.ts$/i)],
+    // Vendors, receipts and bills are covered by the finance purchasing suite.
+    test: [anyFile("*vendor|bill*|finance-purchasing-db.test.ts", /^lib\/ops\/__tests__\/([^/]*(vendor|bill)[^/]*|finance-purchasing-db)\.test\.ts$/i)],
   },
   {
     app: "Expenses",

@@ -26,9 +26,16 @@ describe("odoo parity", () => {
     const regs = regressions(committed, evaluate(broken));
     assert.equal(regs.length, 1);
     assert.match(regs[0]!, /^Helpdesk .*was ✅, now ⚠️ — missing model OpsTicket/);
-    const finance = now.find((e) => e.row.app === "Quotes")!;
-    assert.notEqual(finance.status, "✅");
-    assert.deepEqual(regressions(new Map([["Quotes", "❌"]]), now), []);
+    // A finance row whose files are missing is not ✅, and a row committed
+    // as ❌ never counts as a regression.
+    const noQuotes: Ctx = {
+      schema: ctx.schema.replace(/^model OpsQuote\s*\{/m, "model OpsQuoteGone {"),
+      entitySlugs: new Set([...ctx.entitySlugs].filter((x) => x !== "quotes")),
+      files: ctx.files.filter((f) => !/quote/i.test(f) && !/finance-invoicing-db/.test(f)),
+    };
+    const missing = evaluate(noQuotes);
+    assert.notEqual(missing.find((e) => e.row.app === "Quotes")!.status, "✅");
+    assert.deepEqual(regressions(new Map([["Quotes", "❌"]]), missing), []);
   });
 
   it("finance rows light up from name patterns once their files exist", () => {
