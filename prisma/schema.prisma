@@ -962,6 +962,7 @@ model Workspace {
   // Phase 4a (orphaned rows): tables that had a workspace_id but no FK.
   agentRunEvents              AgentRunEvent[]
   agentRunRecordings          AgentRunRecording[]
+  agentRunSandboxes           AgentRunSandbox[] // Phase 8: one code sandbox per agent run
   authorityApprovalEvents     AuthorityApprovalEvent[]
   billingSetupIdempotency     BillingSetupIdempotency[]
   breakerEvents               BreakerEvent[]
@@ -9074,12 +9075,39 @@ model AgentRun {
 
   recording AgentRunRecording?
   events    AgentRunEvent[]
+  // Phase 8: the code sandbox this run works in (lib/sandbox).
+  sandbox   AgentRunSandbox?
 
   @@index([workspaceId, status, createdAt])
   @@index([workspaceId, threadId])
   @@index([workspaceId, missionId])
   @@index([workspaceId, parentRunId])
   @@map("agent_runs")
+}
+
+// Phase 8: the code sandbox an agent run works in (lib/sandbox). One row per
+// run (run_id unique): the provider ("docker" | "e2b" | "daytona"), the
+// provider's sandbox id, the ports exposed for previews, and when it was
+// destroyed (run finished, Stop, idle timeout noticed). The sandbox itself
+// lives in the provider; this row is how a run finds it again and how the
+// restore / preview routes check it is still alive. FORCE RLS.
+model AgentRunSandbox {
+  id           String    @id @default(cuid()) @map("id")
+  workspaceId  String    @map("workspace_id")
+  workspace    Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  runId        String    @unique @map("run_id")
+  run          AgentRun  @relation(fields: [runId], references: [id], onDelete: Cascade)
+  provider     String    @map("provider")
+  sandboxId    String    @map("sandbox_id")
+  // "active" | "destroyed"
+  status       String    @default("active") @map("status")
+  exposedPorts Int[]     @default([]) @map("exposed_ports")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  lastUsedAt   DateTime  @default(now()) @map("last_used_at")
+  destroyedAt  DateTime? @map("destroyed_at")
+
+  @@index([workspaceId, status])
+  @@map("agent_run_sandboxes")
 }
 
 model AgentRunRecording {
