@@ -182,7 +182,16 @@ function isTier3(kind: string, description: string): boolean {
   return TIER3_PATTERNS.some((re) => re.test(hay));
 }
 
+/**
+ * Exact kinds that are Tier 0 although their verb isn't an observation:
+ * Phase 8 edits to files inside an isolated code sandbox — local to it,
+ * checkpointed and restorable, nothing leaves the sandbox. (Commands in the
+ * sandbox, run_sandbox_command, stay Tier 2.)
+ */
+const TIER0_EXACT_KINDS: ReadonlySet<string> = new Set(["edit sandbox files"]);
+
 function isTier0Kind(kind: string): boolean {
+  if (TIER0_EXACT_KINDS.has(normalizeForTier(kind))) return true;
   const k = normalizeForTier(kind).split(" ")[0] ?? "";
   return TIER0_KIND_PREFIXES.some((p) => k === p || k.startsWith(p));
 }

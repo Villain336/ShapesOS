@@ -67,8 +67,27 @@ export const TOOL_GROUP_LABELS: Readonly<Record<ToolGroup, string>> = {
   ship: "Push and pull requests",
 };
 
-/** Groups that have no tools yet — offered in the UI as unavailable, never faked. */
-export const UNAVAILABLE_GROUPS: ReadonlySet<ToolGroup> = new Set<ToolGroup>(["code"]);
+/**
+ * Phase 8: groups whose tools need infrastructure that may not be there.
+ * "code" works exactly when a sandbox provider reports available
+ * (lib/sandbox sandboxAvailability(), read server-side and passed in — this
+ * module stays pure). Unknown availability counts as unavailable: offered
+ * in the UI as unavailable with the reason, never faked.
+ */
+export interface GroupAvailability {
+  code?: { ok: true } | { ok: false; reason: string } | null;
+}
+
+export const CODE_UNAVAILABLE_DEFAULT = "No code sandbox is available on this server.";
+
+/** The groups that can't be used right now, each with the reason. PURE. */
+export function unavailableGroups(availability?: GroupAvailability | null): ReadonlyMap<ToolGroup, string> {
+  const out = new Map<ToolGroup, string>();
+  const code = availability?.code;
+  if (!code) out.set("code", CODE_UNAVAILABLE_DEFAULT);
+  else if (!code.ok) out.set("code", code.reason || CODE_UNAVAILABLE_DEFAULT);
+  return out;
+}
 
 /** Every task may read its own workspace (it's how an agent grounds itself). */
 export const ALWAYS_GRANTED: readonly ToolGroup[] = ["workspace"];

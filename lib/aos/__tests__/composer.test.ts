@@ -60,9 +60,19 @@ describe("taskThreadOptions / chipUnavailable (Phase 5)", () => {
     });
   });
 
-  it("offers the code runner as unavailable, never as working", () => {
-    assert.match(chipUnavailable("lead", "code") ?? "", /Not available yet/);
+  it("offers the code runner as unavailable (with the reason) until a sandbox provider answers", () => {
+    assert.match(chipUnavailable("lead", "code") ?? "", /^Not available — No code sandbox/);
     assert.deepEqual(taskThreadOptions({ agent: "lead", prompt: "x", tools: ["code"] }).tools, []);
+    const down = { code: { ok: false as const, reason: "The Docker daemon did not answer." } };
+    assert.equal(chipUnavailable("lead", "code", down), "Not available — The Docker daemon did not answer.");
+  });
+
+  it("Phase 8: the Code chip lights up when a sandbox provider is available", () => {
+    const up = { code: { ok: true as const } };
+    assert.equal(chipUnavailable("lead", "code", up), null);
+    assert.equal(chipUnavailable("actor", "code", up), null);
+    assert.equal(chipUnavailable("planner", "code", up), "Planner doesn't use this tool.");
+    assert.deepEqual(taskThreadOptions({ agent: "lead", prompt: "x", tools: ["code", "web"] }, up).tools, ["code", "web"]);
   });
 
   it("explains a chip beyond the agent's tools", () => {

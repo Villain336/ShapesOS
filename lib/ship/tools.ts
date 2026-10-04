@@ -54,27 +54,15 @@ import {
 
 export type ShipToolContext = ToolContext & { threadId?: string };
 export type GetSandbox = (ctx: ShipToolContext) => Promise<Sandbox>;
-type SandboxForRun = (ctx: ShipToolContext) => Promise<Sandbox>;
 
-export class NoSandboxError extends Error {
-  constructor(reason = "no sandbox provider is available — code tools are off on this server") {
-    super(reason);
-    this.name = "NoSandboxError";
-  }
-}
-
-/** Default getSandbox: the sandbox workstream's sandboxForRun(), loaded lazily. */
+/**
+ * Default getSandbox: the run's sandbox (lib/sandbox — the run's own, its
+ * root run's, or the newest live one on the same chat thread, so an approved
+ * push in a later turn finds the clone). Loaded lazily: the providers are
+ * only needed once a ship tool actually runs.
+ */
 export const defaultGetSandbox: GetSandbox = async (ctx) => {
-  let sandboxForRun: SandboxForRun | null = null;
-  try {
-    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-ignore -- lib/sandbox/index.ts (sandboxForRun) belongs to the sandbox workstream; absent until it merges.
-    const mod = (await import("@/lib/sandbox/index")) as { sandboxForRun?: unknown };
-    if (typeof mod.sandboxForRun === "function") sandboxForRun = mod.sandboxForRun as SandboxForRun;
-  } catch {
-    sandboxForRun = null;
-  }
-  if (!sandboxForRun) throw new NoSandboxError();
+  const { sandboxForRun } = await import("@/lib/sandbox/index");
   return sandboxForRun(ctx);
 };
 

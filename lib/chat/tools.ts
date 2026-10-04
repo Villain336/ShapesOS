@@ -1089,6 +1089,15 @@ export const TOOL_GROUP: Readonly<Record<string, ToolGroup>> = {
   browser_open: "web",
   browser_extract: "web",
   browser_act: "web",
+  // Phase 8: code tools, registered by lib/sandbox/tools.ts (run in the
+  // agent run's sandbox, never on the host).
+  read_file: "code",
+  glob: "code",
+  grep: "code",
+  write_file: "code",
+  edit_file: "code",
+  bash: "code",
+  run_tests: "code",
 };
 
 /**
@@ -1120,6 +1129,12 @@ export const TOOL_ACTION: Readonly<Record<string, string>> = {
   git_push_branch: "push_branch",
   open_pull_request: "open_pr",
   browser_act: "browser_act",
+  // Phase 8: sandbox edits are Tier 0 (local to an isolated, checkpointed
+  // sandbox — a per-agent auto rule may apply); commands are Tier 2 (ask).
+  write_file: "edit_sandbox_files",
+  edit_file: "edit_sandbox_files",
+  bash: "run_sandbox_command",
+  run_tests: "run_sandbox_command",
 };
 
 /** The group a tool belongs to. Unknown tools fall in "connectors" (fail closed). */

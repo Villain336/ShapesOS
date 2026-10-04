@@ -37,6 +37,8 @@ export const KNOWN_ACTION_DEFS: ReadonlyArray<{ action: string; label: string; d
   { action: "push_branch", label: "Push a branch", description: "Push the run's commits to its own shapes/<run> branch on GitHub. Always asks." },
   { action: "open_pr", label: "Open a pull request", description: "Open or update the run's pull request on GitHub. Always asks." },
   { action: "browser_act", label: "Act in a browser", description: "Click, fill and submit on a web page in a recorded browser. Always asks." },
+  { action: "edit_sandbox_files", label: "Edit files in the code sandbox", description: "Write or change files inside the run's isolated sandbox (checkpointed; nothing leaves it)." },
+  { action: "run_sandbox_command", label: "Run a command in the code sandbox", description: "Run a shell command or the tests inside the run's isolated sandbox (always asks)." },
 ];
 
 

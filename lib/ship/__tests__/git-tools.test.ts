@@ -7,7 +7,7 @@ import { describe, it, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
 import * as path from "node:path";
-import { createShipTools, defaultGetSandbox, NoSandboxError, type ShipDeps } from "../tools";
+import { createShipTools, defaultGetSandbox, type ShipDeps } from "../tools";
 import type { ShipState } from "../state";
 import type { RepoAccess } from "../access";
 import type { AgentRunEventInput } from "@/lib/agents/runs/types";
@@ -265,8 +265,11 @@ describe("git tools (real git, fake sandbox, no network)", () => {
     assert.doesNotMatch(evil.stdout, new RegExp(TOKEN));
   });
 
-  it("without a sandbox provider the default getSandbox refuses (never fakes)", async () => {
-    if (existsSync(path.join(process.cwd(), "lib/sandbox/index.ts"))) return; // provider merged: covered by its own suite
-    await assert.rejects(() => defaultGetSandbox(ctx()), (err: unknown) => err instanceof NoSandboxError && /no sandbox provider/.test(String(err)));
+  it("the default getSandbox is lib/sandbox's sandboxForRun — it refuses outside a run (never fakes)", async () => {
+    const { SandboxUnavailableError } = await import("@/lib/sandbox/index");
+    await assert.rejects(
+      () => defaultGetSandbox({ ...ctx(), runId: undefined }),
+      (err: unknown) => err instanceof SandboxUnavailableError && /inside an agent run/.test(String(err)),
+    );
   });
 });
