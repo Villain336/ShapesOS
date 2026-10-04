@@ -11,6 +11,10 @@
 // Artifacts stream through the scoped API route — the page only ever
 // builds route URLs, never filesystem paths. Approvals are decided in
 // /dashboard/approvals; this page links out.
+// Phase 8 (ship): a Changes section shows the run's diff (the newest patch a
+// git tool stored on a run event — never the client's) with Approve (the
+// pending push / PR runs through the chat confirmation path), Reject and
+// stop, and Ask for changes (a note into the run's thread).
 
 import Link from "next/link";
 import { ArrowLeft, Download, Video } from "lucide-react";
@@ -27,7 +31,9 @@ import { clockTime, runAgentName, runPrompt, runTimeline, runTitle, upcomingPlan
 import { TOOL_GROUP_LABELS, isToolGroup } from "@/lib/agents/grants";
 import { humanize } from "@/lib/approvals/format";
 import { isUsageEvent, runUsageFacts, runUsageTotals } from "@/lib/agents/runs/usage";
+import { loadRunReview } from "@/lib/ship/review";
 import { LiveWatch } from "./LiveWatch";
+import { ChangesReview } from "./ChangesReview";
 import { RunTimelinePanel } from "./RunTimelinePanel";
 
 export const dynamic = "force-dynamic";
@@ -185,6 +191,17 @@ export default async function RunViewerPage({ params }: { params: Promise<{ runI
   ]);
   const tools = run.allowedTools.filter(isToolGroup).filter((g) => g !== "workspace" && g !== "delegate");
 
+  // Phase 8 (ship): the run's diff, branch / PR and any push or PR waiting on a person.
+  const review = await loadRunReview(workspace.id, run.id);
+  const threadOwner = review?.threadId
+    ? (await prisma.aiChatThread.findFirst({ where: { id: review.threadId }, select: { userId: true } }))?.userId ?? null
+    : null;
+  const ownsThread = threadOwner === user.id;
+  const showChanges = !!review && (review.changes !== null || review.ship !== null || review.pending !== null);
+  const sourceLabel = review?.changes
+    ? `from ${review.changes.source.tool.replace(/_/g, " ")} at ${clockTime(review.changes.source.at)}${review.changes.source.runId !== run.id ? " in an earlier step" : ""}`
+    : "no diff recorded yet";
+
   const recording = run.recording;
   const videoUrl = recording?.videoPath ? `/api/agent-runs/${run.id}/recording/video` : null;
   const traceUrl = recording?.tracePath ? `/api/agent-runs/${run.id}/recording/trace` : null;
@@ -232,6 +249,32 @@ export default async function RunViewerPage({ params }: { params: Promise<{ runI
           {/* Slice 7: live watch — mounted ONLY while the run is running.
               Finished runs show the recorded video instead. */}
           {run.status === "running" ? <LiveWatch runId={run.id} /> : null}
+
+          {showChanges && review ? (
+            <ChangesReview
+              runId={run.id}
+              files={review.changes?.files ?? []}
+              truncated={review.changes?.truncated ?? false}
+              additions={review.changes?.additions ?? 0}
+              deletions={review.changes?.deletions ?? 0}
+              sourceLabel={sourceLabel}
+              ship={
+                review.ship
+                  ? {
+                      repo: review.ship.repo,
+                      branch: review.ship.branch,
+                      branchUrl: review.ship.branchUrl,
+                      prUrl: review.ship.prUrl,
+                      prNumber: review.ship.prNumber,
+                    }
+                  : null
+              }
+              pendingTool={review.pending?.tool ?? null}
+              canApprove={canControl && ownsThread}
+              canAsk={canControl && ownsThread && !!review.threadId}
+              canReject={!!review.threadId && (canControl || run.startedBy === user.id) && (review.pending !== null || live)}
+            />
+          ) : null}
         </div>
 
         <div className="flex min-w-0 flex-col gap-5">
