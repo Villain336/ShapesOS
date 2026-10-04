@@ -63,6 +63,7 @@ export const KNOWN_ACTION_DEFS: ReadonlyArray<{ action: string; label: string; d
   { action: "draft_structured_data", label: "Draft structured data", description: "Add schema.org JSON-LD to a site as a draft revision (a person applies it)." },
   { action: "draft_document", label: "Create a Word document", description: "Write a .docx and save it to the workspace files." },
   { action: "draft_spreadsheet", label: "Create a spreadsheet", description: "Write an .xlsx and save it to the workspace files." },
+  { action: "fetch_web_pages", label: "Read web pages", description: "Scrape or crawl web pages as markdown via Context.dev (metered, daily budget)." },
 ];
 
 

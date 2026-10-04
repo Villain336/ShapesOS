@@ -121,6 +121,8 @@ import "@/lib/seo/tools";
 import "@/lib/documents/tools";
 // Phase 11 (seotools): analyze_data (group "code", runs in the sandbox).
 import "@/lib/sandbox/analyze-tool";
+// Phase 11 (seotools): web_scrape / web_crawl (group "web", Context.dev).
+import "@/lib/knowledge/contextdev/web-tools";
 // Phase 10 M9: Expert Constitution Pack v1 — the Chief Strategy Agent's
 // system-prompt layer (global hard rules + CSA constitution), wired in
 // front of all project context and retrieval grounding.
