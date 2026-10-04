@@ -81,6 +81,8 @@ export type { LoopContext } from "@/lib/chat/tool-exec";
 
 // ── limits ──────────────────────────────────────────────────────────────────
 
+type EnvLike = Record<string, string | undefined>;
+
 export interface AgentLoopLimits {
   /** Model calls per run. */
   maxSteps: number;
@@ -113,7 +115,7 @@ function posInt(v: string | undefined): number | null {
  *   AGENT_MAX_RUN_COST_MICRO_USD (10000000 = $10) ·
  *   AGENT_COMPACT_AT_TOKENS (150000) · AGENT_TOOL_RESULT_MAX_CHARS (20000)
  */
-export function loopLimitsFromEnv(env: NodeJS.ProcessEnv = process.env): AgentLoopLimits {
+export function loopLimitsFromEnv(env: EnvLike = process.env): AgentLoopLimits {
   const minutes = posInt(env.AGENT_MAX_RUN_MINUTES);
   return {
     maxSteps: posInt(env.AGENT_MAX_STEPS) ?? DEFAULT_LOOP_LIMITS.maxSteps,

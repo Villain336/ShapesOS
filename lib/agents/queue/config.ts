@@ -20,6 +20,9 @@
 
 export type AgentWorkerMode = "internal" | "external" | "off";
 
+/** process.env or any plain map (tests). */
+export type EnvLike = Record<string, string | undefined>;
+
 function num(v: string | undefined): number | null {
   const t = (v ?? "").trim();
   if (!t) return null;
@@ -27,14 +30,14 @@ function num(v: string | undefined): number | null {
   return Number.isFinite(n) && n >= 0 ? n : null;
 }
 
-export function agentWorkerMode(env: NodeJS.ProcessEnv = process.env): AgentWorkerMode {
+export function agentWorkerMode(env: EnvLike = process.env): AgentWorkerMode {
   const m = (env.AGENT_WORKER ?? "").trim().toLowerCase();
   if (m === "external" || m === "off") return m;
   return "internal";
 }
 
 /** Inline time a chat turn gets before it hands off (ms); null = never hand off. */
-export function inlineBudgetMs(env: NodeJS.ProcessEnv = process.env): number | null {
+export function inlineBudgetMs(env: EnvLike = process.env): number | null {
   if (agentWorkerMode(env) === "off") return null;
   const s = num(env.AGENT_INLINE_BUDGET_SECONDS);
   return Math.round((s ?? 45) * 1000);
@@ -48,7 +51,7 @@ export interface AgentWorkerConfig {
   maxAttempts: number;
 }
 
-export function agentWorkerConfig(env: NodeJS.ProcessEnv = process.env): AgentWorkerConfig {
+export function agentWorkerConfig(env: EnvLike = process.env): AgentWorkerConfig {
   const leaseMs = Math.max(5_000, Math.round((num(env.AGENT_JOB_LEASE_SECONDS) ?? 60) * 1000));
   const heartbeatMs = Math.max(1_000, Math.round((num(env.AGENT_JOB_HEARTBEAT_SECONDS) ?? 10) * 1000));
   return {
@@ -67,7 +70,7 @@ export interface WorkerStartDecision {
 }
 
 /** Should this process run the in-app worker loop? (instrumentation.ts) */
-export function inAppWorkerDecision(env: NodeJS.ProcessEnv = process.env): WorkerStartDecision {
+export function inAppWorkerDecision(env: EnvLike = process.env): WorkerStartDecision {
   if (env.NEXT_RUNTIME && env.NEXT_RUNTIME !== "nodejs") return { start: false, reason: "not the Node.js runtime" };
   if (env.NEXT_PHASE === "phase-production-build") return { start: false, reason: "next build" };
   if (env.NODE_ENV === "test" || env.NODE_TEST_CONTEXT) return { start: false, reason: "test run" };
