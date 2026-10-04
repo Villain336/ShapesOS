@@ -37,7 +37,7 @@ export default async function ContentDetailPage({
     <div className="flex flex-col gap-6">
       <Link
         href={`/dashboard/projects/${project.id}/content`}
-        className="text-sm text-zinc-500 hover:text-zinc-600"
+        className="text-sm text-muted hover:text-ink"
       >
         ← Content engine · {project.domain}
       </Link>
