@@ -334,9 +334,13 @@ describe("mini-app agent tools (DB, through executeTool)", () => {
   }
 
   it("writes and deletes wait for a person; deletes ask even with an auto-approve rule", async () => {
-    await withWorkspaceScope(WS_A, (tx) =>
-      tx.automationSetting.create({ data: { workspaceId: WS_A, agentKey: "*", action: "delete_app_record", behavior: "auto" } }),
-    ).catch(() => undefined);
+    // A (misconfigured) every-agent "auto" row for deletes and for writes:
+    // neither may let the call run without a person.
+    await withWorkspaceScope(WS_A, async (tx) => {
+      for (const action of ["delete_app_record", "write_app_record"]) {
+        await tx.automationSetting.create({ data: { workspaceId: WS_A, agentKey: "*", action, behavior: "auto", updatedBy: OWNER } });
+      }
+    });
     const up = call("app_upsert_record", { app: "facilities", entity: "tickets", data: JSON.stringify({ title: "Agent", status: "Open", priority: "Low" }) });
     await executeTool(ctx(), "app_upsert_record", up.args, up);
     assert.equal(up.status, "pending_confirmation");

@@ -13,6 +13,7 @@
 
 import type { LucideIcon } from "lucide-react";
 import {
+  AppWindow,
   BookOpen,
   Bell,
   Box,
@@ -133,6 +134,8 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: "/dashboard/funding", label: "Funding", icon: Handshake, description: "Raise, investors, data room", keywords: "vc investors raise data room" },
       { href: "/dashboard/connector", label: "Network", icon: Network, description: "People, companies, intros", keywords: "connector relationships intros contacts" },
       { href: "/dashboard/datasets", label: "Datasets", icon: Database, description: "Business knowledge datasets", keywords: "data ingest knowledge" },
+      // Phase 9 (apps): internal mini-apps built from a spec (lib/apps).
+      { href: "/dashboard/apps", label: "Apps", icon: AppWindow, description: "Internal mini-apps: lists, forms, boards", keywords: "mini apps internal tools builder forms kanban tracker custom" },
       { href: "/dashboard/wfh", label: "WFH mode", icon: Home, description: "Remote-work mode", keywords: "remote standups focus rituals expenses" },
       { href: "/dashboard/alerts", label: "Alerts", icon: Bell, description: "Alert history", keywords: "notifications incidents" },
     ],
