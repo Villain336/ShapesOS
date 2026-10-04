@@ -10,6 +10,12 @@
 //   Body: { startDate, endDate, dimensions, dataState, rowLimit, startRow, ... }
 //   Response rows: { keys: [query, page, country, device], clicks, impressions, ctr, position }
 //
+// HTTP: Phase 6 consolidated the Search Console transport into ./api.ts
+// (shared with the M21 connector adapter), which goes through the live
+// connector layer (refresh-on-401, 429/5xx backoff, closed error codes,
+// scrubbed messages, safeFetch). This module keeps what is cron-specific:
+// the token lookup, the QPM throttle, metering and snapshot storage.
+//
 // Caps honored (documented in README.md):
 //   - ~50,000 rows/day/search-type/property: paginated via startRow/rowLimit,
 //     hard-stop at 50k with a `truncated` flag on the snapshot run.
@@ -21,28 +27,26 @@ import { withWorkspaceScope } from "@/lib/substrate/graph/rls";
 import { getDecryptedCredential, refreshConnection } from "@/lib/vault/refresh";
 import { recordApiMeter } from "@/lib/intelligence/providers";
 import type { DateWindow, GscGranularity, GscSnapshotRow } from "./types";
+import { gscSearchAnalyticsPage, GSC_PAGE_SIZE, type GscQueryBody } from "./api";
+import type { LiveDeps } from "@/lib/connectors/m21/live/http";
 
-const GSC_API = "https://www.googleapis.com/webmasters/v3/sites";
 export const GSC_CONNECTOR_KEY = "google-search-console";
 
 /** Hard caps from the GSC API docs. */
 export const GSC_MAX_ROWS_PER_DAY = 50_000;
 export const GSC_QPM = 1_200;
-const PAGE_SIZE = 25_000;
-
-/** Backoff for 429/5xx: base 1s, doubling, up to 4 retries, small jitter. */
-const BACKOFF_BASE_MS = 1_000;
-const MAX_RETRIES = 4;
+const PAGE_SIZE = GSC_PAGE_SIZE;
 
 export interface GscToken {
   accessToken: string;
   /** The SC property bound to the project, e.g. "sc-domain:example.com". */
   property: string;
+  /** One-shot refresher used when Google answers 401 (persists via the vault). */
+  refresh?: () => Promise<string | null>;
 }
 
-export interface ClientDeps {
-  fetchImpl?: typeof fetch;
-}
+/** Transport deps (fetchImpl / resolve / sleep / retry tuning) — see LiveDeps. */
+export type ClientDeps = LiveDeps;
 
 function ymd(d: Date): string {
   return d.toISOString().slice(0, 10);
@@ -109,7 +113,14 @@ export async function getGscToken(
   const property =
     (binding.projectConfig as { property?: string } | null)?.property ??
     "sc-domain:unknown";
-  return { accessToken, property };
+  const connectionId = binding.connection.id;
+  const refresh = async (): Promise<string | null> => {
+    if ((await refreshConnection(connectionId)) !== "refreshed") return null;
+    const next = await getDecryptedCredential(connectionId);
+    const t = next?.payload?.access_token;
+    return typeof t === "string" && t ? t : null;
+  };
+  return { accessToken, property, refresh };
 }
 
 // ── Search Analytics query ───────────────────────────────────────────────────
@@ -142,58 +153,31 @@ async function meterGscCall(workspaceId: string, quantity: number): Promise<void
   await recordApiMeter(workspaceId, "google_gsc", "serp_call", quantity, 0);
 }
 
-function isRetryable(status: number): boolean {
-  return status === 429 || (status >= 500 && status < 600);
-}
-
+/** One throttled + metered searchAnalytics page through the shared client. */
 async function postQuery(
   params: SearchAnalyticsParams,
-  body: Record<string, unknown>,
+  body: GscQueryBody,
   deps: ClientDeps,
   workspaceId: string,
 ): Promise<{ rows: GscApiRow[]; callCount: number }> {
-  const fetchImpl = deps.fetchImpl ?? fetch;
-  const url = `${GSC_API}/${encodeURIComponent(params.token.property)}/searchAnalytics/query`;
-  let lastError: Error | null = null;
-  let calls = 0;
-  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-    await throttleQpm();
-    calls++;
-    let res: Response;
-    try {
-      res = await fetchImpl(url, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${params.token.accessToken}`,
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
-        body: JSON.stringify(body),
-      });
-    } catch (e) {
-      lastError = e as Error;
-      await sleep(BACKOFF_BASE_MS * 2 ** attempt);
-      continue;
-    }
-    if (res.ok) {
-      const json = (await res.json()) as { rows?: GscApiRow[] };
-      const rows = json.rows ?? [];
-      await meterGscCall(workspaceId, rows.length);
-      return { rows, callCount: calls };
-    }
-    if (isRetryable(res.status) && attempt < MAX_RETRIES) {
-      const retryAfter = res.headers.get("retry-after");
-      const waitMs = retryAfter
-        ? Number(retryAfter) * 1000
-        : BACKOFF_BASE_MS * 2 ** attempt + Math.floor(Math.random() * 250);
-      await sleep(waitMs);
-      continue;
-    }
-    const text = await res.text().catch(() => "");
-    lastError = new Error(`GSC API ${res.status}: ${text.slice(0, 300)}`);
-    break;
-  }
-  throw lastError ?? new Error("GSC API call failed");
+  await throttleQpm();
+  const rows = await gscSearchAnalyticsPage(
+    { token: params.token.accessToken, refresh: params.token.refresh },
+    params.token.property,
+    body,
+    deps,
+  );
+  await meterGscCall(workspaceId, rows.length);
+  return {
+    rows: rows.map((r) => ({
+      keys: r.keys ?? [],
+      clicks: r.clicks ?? 0,
+      impressions: r.impressions ?? 0,
+      ctr: r.ctr ?? 0,
+      position: r.position ?? 0,
+    })),
+    callCount: 1,
+  };
 }
 
 /**
@@ -212,7 +196,7 @@ export async function querySearchAnalytics(
   let startRow = 0;
 
   for (;;) {
-    const body = {
+    const body: GscQueryBody = {
       startDate: ymd(params.window.start),
       endDate: ymd(params.window.end),
       dimensions: params.dimensions,
