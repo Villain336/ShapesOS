@@ -165,7 +165,7 @@ export function NotificationBell({ className }: { className?: string }) {
                   onClick={() => void openItem(n)}
                   className="flex min-h-11 w-full items-start gap-3 rounded-sm px-3 py-2 text-left hover:bg-hover"
                 >
-                  <NotificationIcon kind={n.kind} />
+                  <NotificationIcon kind={n.kind} title={n.title} />
                   <span className="min-w-0 flex-1">
                     <span className={cn("block truncate text-sm text-ink", !n.readAt && "font-semibold")}>
                       {n.title}
