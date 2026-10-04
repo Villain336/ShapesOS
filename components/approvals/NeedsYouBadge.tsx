@@ -23,6 +23,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
+import { sharedJson } from "@/lib/ui/shared-fetch";
 
 const REFRESH_EVENT = "shapes:needs-you-refresh";
 const DEFAULT_POLL_MS = 60_000;
@@ -44,11 +45,13 @@ export function refreshNeedsYouCount() {
 export function useNeedsYouCount(pollMs: number = DEFAULT_POLL_MS): NeedsYouCount {
   const [state, setState] = useState({ actionable: 0, total: 0, loading: true });
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (fresh = false) => {
     try {
-      const res = await fetch("/api/approvals/count", { cache: "no-store" });
+      // Shared with every other mounted badge/hook: one request per page,
+      // not one per component (the per-user read rate limit counts each).
+      const res = await sharedJson("/api/approvals/count", { fresh });
       if (!res.ok) throw new Error(String(res.status));
-      const body = (await res.json()) as { actionable?: number; total?: number };
+      const body = (res.body ?? {}) as { actionable?: number; total?: number };
       setState({
         actionable: Number(body.actionable) || 0,
         total: Number(body.total) || 0,
@@ -61,7 +64,8 @@ export function useNeedsYouCount(pollMs: number = DEFAULT_POLL_MS): NeedsYouCoun
 
   useEffect(() => {
     void refresh();
-    const onRefresh = () => void refresh();
+    // An explicit refresh (an approval was just decided) skips the reuse window.
+    const onRefresh = () => void refresh(true);
     const onVisible = () => {
       if (document.visibilityState === "visible") void refresh();
     };
@@ -77,7 +81,7 @@ export function useNeedsYouCount(pollMs: number = DEFAULT_POLL_MS): NeedsYouCoun
     };
   }, [refresh, pollMs]);
 
-  return { ...state, refresh: () => void refresh() };
+  return { ...state, refresh: () => void refresh(true) };
 }
 
 /** Presentational pill — use this when you already have the number. */
