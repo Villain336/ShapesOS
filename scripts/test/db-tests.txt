@@ -112,3 +112,4 @@ lib/portal/__tests__/portal-isolation-db.test.ts
 # Phase 11 (conncore)
 lib/slack/__tests__/slack-db.test.ts
 lib/hubspot/__tests__/hubspot-sync-db.test.ts
+lib/webhooks/__tests__/ops-events-db.test.ts

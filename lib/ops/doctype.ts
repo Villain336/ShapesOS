@@ -20,6 +20,7 @@
 // All writes carry workspaceId explicitly AND run inside withWorkspaceScope
 // (RLS fail-closed). Reads filter by workspaceId; cross-workspace ids 404.
 
+import { emitOpsWriteEvents } from "@/lib/webhooks/ops-events";
 import type { Prisma } from "@prisma/client";
 import {
   OPS_ENTITY_MAP,
@@ -261,6 +262,8 @@ export async function opsCreate(
     const rows = await materialize(tx, def, actor, body);
     for (const row of rows) {
       await auditOpsEvent(tx, def, actor, "gate_executed", String(row.id), `${classification.label} (approval ${approvalId}): ${def.summarize(row)}`);
+      // Phase 11 (conncore): outbound webhook events, in this transaction.
+      await emitOpsWriteEvents(tx, actor.workspaceId, def.slug, null, row);
     }
     return { outcome: "done", row: rows.length === 1 ? rows[0]! : toJson({ rows }), action: "gate_executed" };
   }
@@ -281,6 +284,8 @@ export async function opsCreate(
   const rows = await materialize(tx, def, actor, body);
   for (const row of rows) {
     await auditOpsEvent(tx, def, actor, "create", String(row.id), `created ${def.summarize(row)}`);
+    // Phase 11 (conncore): outbound webhook events, in this transaction.
+    await emitOpsWriteEvents(tx, actor.workspaceId, def.slug, null, row);
   }
   return { outcome: "done", row: rows.length === 1 ? rows[0]! : toJson({ rows }), action: "create" };
 }
@@ -578,11 +583,15 @@ export async function opsPatch(
     });
     const row = await applyPatch(tx, def, actor, id, await preparePatch(tx, def, actor, patch, existing), existing);
     await auditOpsEvent(tx, def, actor, "gate_executed", id, `${classification.label} (approval ${approvalId}): ${def.summarize(row)}`);
+    await emitOpsWriteEvents(tx, actor.workspaceId, def.slug, existing, row);
     return { outcome: "done", row, action: "gate_executed" };
   }
 
   const row = await applyPatch(tx, def, actor, id, await preparePatch(tx, def, actor, patch, existing), existing);
   await auditOpsEvent(tx, def, actor, "update", id, `updated ${def.summarize(row)}`);
+  // Phase 11 (conncore): outbound webhook events (invoice sent/paid, deal
+  // moved/won/lost, ticket solved…) in this transaction.
+  await emitOpsWriteEvents(tx, actor.workspaceId, def.slug, existing, row);
   return { outcome: "done", row, action: "update" };
 }
 
