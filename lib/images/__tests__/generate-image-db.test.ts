@@ -210,7 +210,7 @@ describe("collectImageBatch (stubbed Batch API)", () => {
     assert.equal(again.saved.length, 0);
     assert.equal(again.alreadySaved.length, 2);
     const events = await prisma.usageEvent.findMany({
-      where: { workspaceId: WS, idempotencyKey: { startsWith: "imagebatch:batch_done:" } },
+      where: { workspaceId: WS, idempotencyKey: { startsWith: `imagebatch:${WS}:batch_done:` } },
     });
     assert.equal(events.length, 2, "no second charge");
   });

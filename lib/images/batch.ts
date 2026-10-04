@@ -270,7 +270,9 @@ export async function collectImageBatch(
         actorId: args.userId,
         action: "image_generation",
         credits: imageGenerationCredits({ quality, size: parsed.size, batch: true }),
-        idempotencyKey: `imagebatch:${args.batchId}:${customId}:${i}`,
+        // Workspace-scoped: the metering ledger keys are global, and one batch
+        // id must never charge (or block) another workspace.
+        idempotencyKey: `imagebatch:${args.workspaceId}:${args.batchId}:${customId}:${i}`,
         evidenceRef: `image-batch:${args.batchId}:${customId}`,
       });
       result.saved.push({
