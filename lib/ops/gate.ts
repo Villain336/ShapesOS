@@ -90,6 +90,16 @@ export const OPS_MONEY_ACTIONS: OpsMoneyAction[] = [
   // slugs as high (conservative floor), which meets the medium pin.
   { slug: "OPS_WORKFLOW_RUN", label: "Run operations workflow", expectedTier: "medium" },
   { slug: "OPS_RECORD_DELETE", label: "Delete operations record", expectedTier: "medium" },
+  // Phase 10 (finance): posting to / reversing the ledger, credit notes,
+  // quote sends, vendor bill payments and expense approvals/reimbursements.
+  // Phase 14 derives unknown OPS_* slugs as high, which meets the pins.
+  { slug: "OPS_JOURNAL_POST", label: "Post journal entry", expectedTier: "medium" },
+  { slug: "OPS_JOURNAL_REVERSE", label: "Reverse journal entry", expectedTier: "medium" },
+  { slug: "OPS_CREDIT_NOTE_ISSUE", label: "Issue credit note", expectedTier: "medium" },
+  { slug: "OPS_QUOTE_SEND", label: "Send quote", expectedTier: "medium" },
+  { slug: "OPS_BILL_PAY", label: "Pay vendor bill", expectedTier: "medium" },
+  { slug: "OPS_EXPENSE_APPROVE", label: "Approve expense claim", expectedTier: "medium" },
+  { slug: "OPS_EXPENSE_REIMBURSE", label: "Reimburse expense claim", expectedTier: "medium" },
 ];
 
 export const OPS_MONEY_ACTION_MAP: Record<string, OpsMoneyAction> =
@@ -152,6 +162,9 @@ export function classifyOpsWrite(input: ClassifyOpsWriteInput): OpsWriteClassifi
       if (kind === "refund") return gated("OPS_PAYMENT_REFUND", "Refund payment — gated write");
       return gated("OPS_PAYMENT_RECORD_CHARGE", "Record charge — gated write");
     }
+    // Phase 10 (finance): entities whose create moves the books (manual
+    // journal entries) declare their gate.
+    if (def.createGate) return gated(def.createGate, `Create ${def.label} — gated write`);
     return free(`Draft-creator: create ${def.label} runs freely, logged`);
   }
 

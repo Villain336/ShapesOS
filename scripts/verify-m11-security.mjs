@@ -89,6 +89,7 @@ const AUTHZ_PRIMITIVES = [
   "requireSelfService",                         // Phase 4a own-account actions (lib/auth/require-self-service.ts) — no target id read from the request; keyed to the session subject
   "requireScimAuth",                            // Phase 4a SCIM 2.0 (lib/scim/auth.ts) — per-workspace hashed bearer token; tenant from the token, RLS-scoped
   "requireAccountUser",                         // Phase 4a self-service account security (lib/auth/mfa/guard.ts) — acts only on the caller's own factors; destructive changes need re-auth
+  "financeGuard",                               // Phase 10 (finance) ops guard (lib/ops/finance/http.ts) — requireUser + requireWorkspaceRole(editor|admin) for mutations
 ];
 // Public by design. Each entry documents WHY — this is a justification list,
 // not a suppression list. Adding an entry requires a code comment in the

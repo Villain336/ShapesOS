@@ -622,6 +622,20 @@ model Workspace {
   // Phase 17 slice 5: HR essentials back-relations.
   opsTeamMembers              OpsTeamMember[]
   opsLeaveRequests            OpsLeaveRequest[]
+  // Phase 10 (finance): accounting, invoicing, quotes, purchasing, expenses.
+  opsAccounts                 OpsAccount[]
+  opsJournalEntries           OpsJournalEntry[]
+  opsJournalLines             OpsJournalLine[]
+  opsTaxRates                 OpsTaxRate[]
+  opsNumberSequences          OpsNumberSequence[]
+  opsFinanceSettings          OpsFinanceSettings?
+  opsRecurringInvoices        OpsRecurringInvoice[]
+  opsQuotes                   OpsQuote[]
+  opsVendors                  OpsVendor[]
+  opsPurchaseReceipts         OpsPurchaseReceipt[]
+  opsVendorBills              OpsVendorBill[]
+  opsExpenseClaims            OpsExpenseClaim[]
+  opsExpenseLines             OpsExpenseLine[]
   // Phase 18 slice 1: ad-platforms ontology back-relations.
   adPlatforms                 AdPlatform[]
   adAccounts                  AdAccount[]
@@ -9391,6 +9405,8 @@ enum OpsOrderStatus {
 enum OpsPaymentKind {
   charge
   refund
+  // Phase 10 (finance): money paid OUT to a vendor against a bill.
+  payout
 }
 
 enum OpsPaymentStatus {
@@ -9405,6 +9421,10 @@ enum OpsPurchaseOrderStatus {
   sent
   received
   cancelled
+  // Phase 10 (finance): RFQ stage before the PO, and partial receipts.
+  rfq
+  rfq_sent
+  partially_received
 }
 
 enum OpsInvoiceStatus {
@@ -9495,6 +9515,8 @@ model OpsOrder {
   subtotalCents Int            @map("subtotal_cents")
   taxCents      Int            @default(0) @map("tax_cents")
   totalCents    Int            @map("total_cents")
+  // Phase 10 (finance): the quote this order was converted from.
+  quoteId       String?        @map("quote_id")
   createdAt     DateTime       @default(now()) @map("created_at")
   updatedAt     DateTime       @updatedAt @map("updated_at")
 
@@ -9521,8 +9543,17 @@ model OpsPayment {
   status      OpsPaymentStatus @default(pending)
   // Provider-side reference (Stripe payment intent / charge id).
   providerRef String?          @map("provider_ref")
+  // Phase 10 (finance): a customer payment applied to an invoice (partial
+  // payments: many rows per invoice), or a payout against a vendor bill.
+  invoiceId   String?          @map("invoice_id")
+  invoice     OpsInvoice?      @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+  billId      String?          @map("bill_id")
+  bill        OpsVendorBill?   @relation(fields: [billId], references: [id], onDelete: SetNull)
+  note        String?          @db.Text
   createdAt   DateTime         @default(now()) @map("created_at")
 
+  @@index([workspaceId, invoiceId])
+  @@index([workspaceId, billId])
   @@index([workspaceId, orderId, createdAt])
   @@index([workspaceId, kind, status])
   @@map("ops_payments")
@@ -9550,28 +9581,55 @@ model OpsPromotion {
 // Invoice: draft → sent → paid (overdue derived by age). Sending is a
 // gated write (medium, approval required — money is a red lane).
 model OpsInvoice {
-  id             String           @id @default(cuid())
-  workspaceId    String           @map("workspace_id")
-  workspace      Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  id              String           @id @default(cuid())
+  workspaceId     String           @map("workspace_id")
+  workspace       Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   // CRM adjacency: the lead-turned-customer being billed.
-  customerId     String?          @map("customer_id")
+  customerId      String?          @map("customer_id")
   // [{ description, qty, priceCents }]
-  lineItems      Json             @map("line_items")
-  taxCents       Int              @default(0) @map("tax_cents")
-  totalCents     Int              @map("total_cents")
-  status         OpsInvoiceStatus @default(draft)
-  sentAt         DateTime?        @map("sent_at")
+  lineItems       Json             @map("line_items")
+  taxCents        Int              @default(0) @map("tax_cents")
+  totalCents      Int              @map("total_cents")
+  status          OpsInvoiceStatus @default(draft)
+  sentAt          DateTime?        @map("sent_at")
   // Payment due date. Set explicitly at draft time or defaulted to
   // sentAt + 30 days when the invoice is sent. Drives the overdue sweep.
-  dueAt          DateTime?        @map("due_at")
+  dueAt           DateTime?        @map("due_at")
   // Idempotency / dedupe key for agent retries (nullable = not set).
-  idempotencyKey String?          @map("idempotency_key")
-  createdAt      DateTime         @default(now()) @map("created_at")
-  updatedAt      DateTime         @updatedAt @map("updated_at")
+  idempotencyKey  String?          @map("idempotency_key")
+  // ---- Phase 10 (finance) ----
+  // invoice | credit_note (a credit note is a negative document linked to
+  // the invoice it credits; amounts are stored positive, kind is the sign).
+  kind            OpsInvoiceKind   @default(invoice)
+  // Gap-free per-workspace number (INV-0001 / CN-0001), assigned on send.
+  number          String?
+  // Applied customer payments and credit notes; balance due =
+  // totalCents - paidCents - creditedCents. Paid when the balance is 0.
+  paidCents       Int              @default(0) @map("paid_cents")
+  creditedCents   Int              @default(0) @map("credited_cents")
+  creditNoteOfId  String?          @map("credit_note_of_id")
+  creditNoteOf    OpsInvoice?      @relation("OpsCreditNotes", fields: [creditNoteOfId], references: [id], onDelete: SetNull)
+  creditNotes     OpsInvoice[]     @relation("OpsCreditNotes")
+  quoteId         String?          @map("quote_id")
+  recurringId     String?          @map("recurring_id")
+  // Recipient override (else the CRM lead's email).
+  customerEmail   String?          @map("customer_email")
+  // Last email delivery: sent | fake | not_configured | no_recipient | failed.
+  deliveryStatus  String?          @map("delivery_status")
+  deliveredAt     DateTime?        @map("delivered_at")
+  // Tenant Stripe Checkout (never the platform billing key).
+  paymentLinkUrl  String?          @map("payment_link_url") @db.Text
+  stripeSessionId String?          @map("stripe_session_id")
+  createdAt       DateTime         @default(now()) @map("created_at")
+  updatedAt       DateTime         @updatedAt @map("updated_at")
+
+  payments OpsPayment[]
 
   @@unique([workspaceId, idempotencyKey])
+  @@unique([workspaceId, number])
   @@index([workspaceId, status, createdAt])
   @@index([workspaceId, customerId])
+  @@index([workspaceId, creditNoteOfId])
   @@map("ops_invoices")
 }
 
@@ -9616,11 +9674,20 @@ model OpsPurchaseOrder {
   status        OpsPurchaseOrderStatus @default(draft)
   sentAt        DateTime?              @map("sent_at")
   receivedAt    DateTime?              @map("received_at")
+  // Phase 10 (finance): the vendor record (supplierId/supplierName stay
+  // readable for older rows; the migration linked them to vendors).
+  vendorId      String?                @map("vendor_id")
+  vendor        OpsVendor?             @relation(fields: [vendorId], references: [id], onDelete: SetNull)
+  rfqSentAt     DateTime?              @map("rfq_sent_at")
   createdAt     DateTime               @default(now()) @map("created_at")
   updatedAt     DateTime               @updatedAt @map("updated_at")
 
+  receipts OpsPurchaseReceipt[]
+  bills    OpsVendorBill[]
+
   @@index([workspaceId, status, createdAt])
   @@index([workspaceId, supplierId])
+  @@index([workspaceId, vendorId])
   @@map("ops_purchase_orders")
 }
 
@@ -9762,6 +9829,378 @@ model OpsAuditEvent {
   @@index([workspaceId, entity, createdAt])
   @@index([workspaceId, entityId])
   @@map("ops_audit_events")
+}
+
+// ============================================================================
+// Phase 10 (finance): accounting core, invoicing upgrades, quotes,
+// purchasing (vendors, RFQ, receipts, bills) and company expenses.
+// Extends the Ops layer (lib/ops/*). Money is integer cents; every ledger is
+// append-only (journal entries/lines: DB triggers reject UPDATE/DELETE, and a
+// deferred constraint trigger rejects any unbalanced entry at commit).
+// All tables carry workspace_id with FORCE RLS on app.workspace_id.
+// ============================================================================
+
+enum OpsAccountType {
+  asset
+  liability
+  equity
+  income
+  expense
+}
+
+enum OpsInvoiceKind {
+  invoice
+  credit_note
+}
+
+enum OpsRecurrenceCadence {
+  weekly
+  monthly
+  quarterly
+  yearly
+}
+
+enum OpsQuoteStatus {
+  draft
+  sent
+  accepted
+  declined
+  expired
+}
+
+enum OpsVendorBillStatus {
+  draft
+  open
+  paid
+  cancelled
+}
+
+enum OpsExpenseClaimStatus {
+  draft
+  submitted
+  approved
+  rejected
+  reimbursed
+}
+
+// Chart of accounts. A standard small-business chart is seeded per
+// workspace on first use (lib/ops/accounting/chart.ts). systemKey marks the
+// accounts the posting rules use (ar, ap, cash, sales, tax_payable, ...).
+model OpsAccount {
+  id          String         @id @default(cuid())
+  workspaceId String         @map("workspace_id")
+  workspace   Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  code        String
+  name        String
+  type        OpsAccountType
+  parentId    String?        @map("parent_id")
+  parent      OpsAccount?    @relation("OpsAccountTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children    OpsAccount[]   @relation("OpsAccountTree")
+  systemKey   String?        @map("system_key")
+  active      Boolean        @default(true)
+  createdAt   DateTime       @default(now()) @map("created_at")
+  updatedAt   DateTime       @updatedAt @map("updated_at")
+
+  lines OpsJournalLine[]
+
+  @@unique([workspaceId, code])
+  @@unique([workspaceId, systemKey])
+  @@index([workspaceId, type])
+  @@map("ops_accounts")
+}
+
+// Double-entry journal. Append-only: corrections are reversal entries
+// (reversalOfId), never edits. sourceKey makes posting idempotent: one entry
+// per source event ("invoice:<id>:issue", "payment:<id>", ...).
+model OpsJournalEntry {
+  id           String           @id @default(cuid())
+  workspaceId  String           @map("workspace_id")
+  workspace    Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  entryDate    DateTime         @map("entry_date")
+  memo         String?          @db.Text
+  // manual | invoice | credit_note | payment | bill | bill_payment | expense | reversal
+  sourceType   String           @default("manual") @map("source_type")
+  sourceId     String?          @map("source_id")
+  sourceKey    String?          @map("source_key")
+  reversalOfId String?          @unique @map("reversal_of_id")
+  reversalOf   OpsJournalEntry? @relation("OpsJournalReversal", fields: [reversalOfId], references: [id], onDelete: NoAction)
+  reversedBy   OpsJournalEntry? @relation("OpsJournalReversal")
+  // Σ debits (= Σ credits) for lists.
+  totalCents   Int              @map("total_cents")
+  createdBy    String           @map("created_by")
+  createdAt    DateTime         @default(now()) @map("created_at")
+
+  lines OpsJournalLine[]
+
+  @@unique([workspaceId, sourceKey])
+  @@index([workspaceId, entryDate])
+  @@index([workspaceId, sourceType, sourceId])
+  @@map("ops_journal_entries")
+}
+
+// One side of a journal entry: exactly one of debit/credit is non-zero (DB
+// CHECK). entryDate is denormalized from the entry for report ranges.
+model OpsJournalLine {
+  id          String          @id @default(cuid())
+  workspaceId String          @map("workspace_id")
+  workspace   Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  entryId     String          @map("entry_id")
+  entry       OpsJournalEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  accountId   String          @map("account_id")
+  account     OpsAccount      @relation(fields: [accountId], references: [id], onDelete: NoAction)
+  entryDate   DateTime        @map("entry_date")
+  debitCents  Int             @default(0) @map("debit_cents")
+  creditCents Int             @default(0) @map("credit_cents")
+  memo        String?
+  createdAt   DateTime        @default(now()) @map("created_at")
+
+  @@index([workspaceId, accountId, entryDate])
+  @@index([entryId])
+  @@map("ops_journal_lines")
+}
+
+// Tax rate in basis points (825 = 8.25%). salesAccountId is the output-tax
+// liability; purchaseAccountId the input-tax asset (defaults: the chart's
+// tax_payable / tax_receivable accounts).
+model OpsTaxRate {
+  id                String    @id @default(cuid())
+  workspaceId       String    @map("workspace_id")
+  workspace         Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name              String
+  rateBps           Int       @map("rate_bps")
+  salesAccountId    String?   @map("sales_account_id")
+  purchaseAccountId String?   @map("purchase_account_id")
+  active            Boolean   @default(true)
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  @@unique([workspaceId, name])
+  @@map("ops_tax_rates")
+}
+
+// Gap-free document numbers per workspace and kind (invoice, credit_note,
+// quote, bill, expense). Incremented with a row-locking upsert inside the
+// transaction that issues the document, so a rollback returns the number.
+model OpsNumberSequence {
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  kind        String
+  prefix      String
+  nextValue   Int       @default(1) @map("next_value")
+  padding     Int       @default(4)
+  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at")
+
+  @@id([workspaceId, kind])
+  @@map("ops_number_sequences")
+}
+
+// Per-workspace finance settings: invoice sender name/footer and the
+// TENANT's own Stripe keys (encrypted with lib/secrets; never the platform's
+// billing key, never sent to clients — only a hint is shown).
+model OpsFinanceSettings {
+  workspaceId            String    @id @map("workspace_id")
+  workspace              Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  currency               String    @default("USD")
+  invoiceFromName        String?   @map("invoice_from_name")
+  invoiceFooter          String?   @map("invoice_footer") @db.Text
+  stripeSecretEnc        String?   @map("stripe_secret_enc") @db.Text
+  stripeSecretHint       String?   @map("stripe_secret_hint")
+  stripeWebhookSecretEnc String?   @map("stripe_webhook_secret_enc") @db.Text
+  updatedBy              String?   @map("updated_by")
+  updatedAt              DateTime  @updatedAt @map("updated_at")
+
+  @@map("ops_finance_settings")
+}
+
+// Recurring invoice schedule: a template + cadence. The finance cron drafts
+// the next invoice when nextRunAt passes (drafts only — sending still asks).
+model OpsRecurringInvoice {
+  id            String               @id @default(cuid())
+  workspaceId   String               @map("workspace_id")
+  workspace     Workspace            @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  customerId    String?              @map("customer_id")
+  // [{ description, qty, priceCents, taxRateId? }]
+  lineItems     Json                 @map("line_items")
+  taxCents      Int                  @default(0) @map("tax_cents")
+  cadence       OpsRecurrenceCadence
+  intervalCount Int                  @default(1) @map("interval_count")
+  nextRunAt     DateTime             @map("next_run_at")
+  endAt         DateTime?            @map("end_at")
+  dueDays       Int                  @default(30) @map("due_days")
+  active        Boolean              @default(true)
+  runCount      Int                  @default(0) @map("run_count")
+  lastInvoiceId String?              @map("last_invoice_id")
+  lastRunAt     DateTime?            @map("last_run_at")
+  createdAt     DateTime             @default(now()) @map("created_at")
+  updatedAt     DateTime             @updatedAt @map("updated_at")
+
+  @@index([workspaceId, active, nextRunAt])
+  @@map("ops_recurring_invoices")
+}
+
+// Quote / estimate: draft → sent → accepted | declined | expired. Converts
+// to an OpsOrder or OpsInvoice (lines copied, links both ways).
+model OpsQuote {
+  id                 String         @id @default(cuid())
+  workspaceId        String         @map("workspace_id")
+  workspace          Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  number             String?
+  customerId         String?        @map("customer_id")
+  customerEmail      String?        @map("customer_email")
+  // [{ description, qty, priceCents, taxRateId?, taxCents? }]
+  lineItems          Json           @map("line_items")
+  subtotalCents      Int            @map("subtotal_cents")
+  taxCents           Int            @default(0) @map("tax_cents")
+  totalCents         Int            @map("total_cents")
+  status             OpsQuoteStatus @default(draft)
+  validUntil         DateTime?      @map("valid_until")
+  notes              String?        @db.Text
+  sentAt             DateTime?      @map("sent_at")
+  decidedAt          DateTime?      @map("decided_at")
+  deliveryStatus     String?        @map("delivery_status")
+  convertedOrderId   String?        @map("converted_order_id")
+  convertedInvoiceId String?        @map("converted_invoice_id")
+  createdAt          DateTime       @default(now()) @map("created_at")
+  updatedAt          DateTime       @updatedAt @map("updated_at")
+
+  @@unique([workspaceId, number])
+  @@index([workspaceId, status, createdAt])
+  @@index([workspaceId, customerId])
+  @@map("ops_quotes")
+}
+
+// Vendor master record (replaces the lead / free-text supplier on POs).
+model OpsVendor {
+  id               String    @id @default(cuid())
+  workspaceId      String    @map("workspace_id")
+  workspace        Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name             String
+  email            String?
+  phone            String?
+  taxId            String?   @map("tax_id")
+  address          String?   @db.Text
+  paymentTermsDays Int       @default(30) @map("payment_terms_days")
+  // Default expense account for this vendor's bill lines.
+  defaultAccountId String?   @map("default_account_id")
+  // Legacy link: the CRM lead that used to stand in for this supplier.
+  leadId           String?   @map("lead_id")
+  active           Boolean   @default(true)
+  notes            String?   @db.Text
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  purchaseOrders OpsPurchaseOrder[]
+  bills          OpsVendorBill[]
+
+  @@unique([workspaceId, name])
+  @@index([workspaceId, leadId])
+  @@map("ops_vendors")
+}
+
+// One receipt against a PO (partial receipts). Append-only; each receipt
+// books restock inventory txns for the received quantity in the same tx.
+model OpsPurchaseReceipt {
+  id              String           @id @default(cuid())
+  workspaceId     String           @map("workspace_id")
+  workspace       Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  purchaseOrderId String           @map("purchase_order_id")
+  purchaseOrder   OpsPurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  // [{ index, productId?, name, qty }]
+  lines           Json
+  note            String?          @db.Text
+  actor           String
+  receivedAt      DateTime         @default(now()) @map("received_at")
+  createdAt       DateTime         @default(now()) @map("created_at")
+
+  @@index([workspaceId, purchaseOrderId])
+  @@map("ops_purchase_receipts")
+}
+
+// Vendor bill: draft → open (posted to AP) → paid. Paying is gated.
+model OpsVendorBill {
+  id              String              @id @default(cuid())
+  workspaceId     String              @map("workspace_id")
+  workspace       Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  number          String?
+  vendorId        String?             @map("vendor_id")
+  vendor          OpsVendor?          @relation(fields: [vendorId], references: [id], onDelete: SetNull)
+  purchaseOrderId String?             @map("purchase_order_id")
+  purchaseOrder   OpsPurchaseOrder?   @relation(fields: [purchaseOrderId], references: [id], onDelete: SetNull)
+  // The vendor's own invoice number.
+  vendorRef       String?             @map("vendor_ref")
+  // [{ description, qty, priceCents, taxRateId?, taxCents?, accountId? }]
+  lineItems       Json                @map("line_items")
+  subtotalCents   Int                 @map("subtotal_cents")
+  taxCents        Int                 @default(0) @map("tax_cents")
+  totalCents      Int                 @map("total_cents")
+  paidCents       Int                 @default(0) @map("paid_cents")
+  status          OpsVendorBillStatus @default(draft)
+  billDate        DateTime            @default(now()) @map("bill_date")
+  dueAt           DateTime?           @map("due_at")
+  postedAt        DateTime?           @map("posted_at")
+  paidAt          DateTime?           @map("paid_at")
+  notes           String?             @db.Text
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime            @updatedAt @map("updated_at")
+
+  payments OpsPayment[]
+
+  @@unique([workspaceId, number])
+  @@index([workspaceId, status, dueAt])
+  @@index([workspaceId, vendorId])
+  @@map("ops_vendor_bills")
+}
+
+// Company expense claim (NOT the personal WFH deduction tracker):
+// draft → submitted (approval proposed) → approved (posted) → reimbursed.
+model OpsExpenseClaim {
+  id             String                @id @default(cuid())
+  workspaceId    String                @map("workspace_id")
+  workspace      Workspace             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  number         String?
+  // The member claiming (user id) + display name at claim time.
+  claimantId     String                @map("claimant_id")
+  claimantName   String?               @map("claimant_name")
+  title          String
+  status         OpsExpenseClaimStatus @default(draft)
+  totalCents     Int                   @default(0) @map("total_cents")
+  notes          String?               @db.Text
+  submittedAt    DateTime?             @map("submitted_at")
+  approvalId     String?               @map("approval_id")
+  decidedBy      String?               @map("decided_by")
+  decidedAt      DateTime?             @map("decided_at")
+  rejectedReason String?               @map("rejected_reason")
+  reimbursedAt   DateTime?             @map("reimbursed_at")
+  createdAt      DateTime              @default(now()) @map("created_at")
+  updatedAt      DateTime              @updatedAt @map("updated_at")
+
+  lines OpsExpenseLine[]
+
+  @@unique([workspaceId, number])
+  @@index([workspaceId, status, createdAt])
+  @@index([workspaceId, claimantId])
+  @@map("ops_expense_claims")
+}
+
+model OpsExpenseLine {
+  id            String          @id @default(cuid())
+  workspaceId   String          @map("workspace_id")
+  workspace     Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  claimId       String          @map("claim_id")
+  claim         OpsExpenseClaim @relation(fields: [claimId], references: [id], onDelete: Cascade)
+  spentAt       DateTime        @map("spent_at")
+  description   String
+  // travel | meals | software | office | other … (maps to an expense account)
+  category      String
+  accountId     String?         @map("account_id")
+  amountCents   Int             @map("amount_cents")
+  taxCents      Int             @default(0) @map("tax_cents")
+  // WorkspaceFile id of the uploaded receipt (POST /api/files).
+  receiptFileId String?         @map("receipt_file_id")
+  createdAt     DateTime        @default(now()) @map("created_at")
+
+  @@index([workspaceId, claimId])
+  @@map("ops_expense_lines")
 }
 
 // ============================================================================

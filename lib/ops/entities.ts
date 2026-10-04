@@ -18,6 +18,8 @@
 // server-computed from line items, never trusted from the client.
 
 import { z } from "zod";
+// Phase 10 (finance): accounting, quotes, purchasing and expense entities.
+import { FINANCE_ENTITIES } from "./finance/entities";
 
 export interface OpsGatedTransition {
   /** The PATCH field whose move to one of `to` is a gated write. */
@@ -49,6 +51,11 @@ export interface OpsEntityDef {
    */
   statusTransitions?: Record<string, string[]>;
   summarize: (row: Record<string, unknown>) => string;
+  // ---- Phase 10 (finance) ----
+  /** Create is a gated write under this money-action slug (default: a free draft-creator). */
+  createGate?: string;
+  /** Statuses in which money fields (taxCents/lineItems) may still change (default ["draft"]). */
+  editableStatuses?: string[];
 }
 
 // ---------------------------------------------------------------------------
@@ -477,6 +484,8 @@ export const OPS_ENTITIES: OpsEntityDef[] = [
   workflowRunDef,
   teamMemberDef,
   leaveRequestDef,
+  // Phase 10 (finance)
+  ...FINANCE_ENTITIES,
 ];
 
 export const OPS_ENTITY_MAP: Record<string, OpsEntityDef> = Object.fromEntries(
