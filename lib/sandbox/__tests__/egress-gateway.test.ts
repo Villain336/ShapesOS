@@ -79,7 +79,7 @@ before(async () => {
   upPort = (upstream.address() as AddressInfo).port;
   gw = spawn(process.execPath, ["-e", GATEWAY_SOURCE], {
     env: {
-      PATH: process.env.PATH,
+      ...process.env,
       ALLOW: "localhost,*.allowed.test",
       ALLOW_PORTS: `80,443,${upPort}`,
       GATEWAY_TOKEN: TOKEN,

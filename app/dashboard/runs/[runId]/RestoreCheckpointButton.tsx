@@ -8,14 +8,20 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { RotateCcw } from "lucide-react";
 import { aosButton } from "@/components/aos";
-import { toast, toastError } from "@/lib/ui/feedback";
+import { confirmAction, toast, toastError } from "@/lib/ui/feedback";
 
 export function RestoreCheckpointButton({ runId, snapshotId }: { runId: string; snapshotId: string }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
 
   async function restore() {
-    if (!window.confirm("Put the sandbox back to this checkpoint? Changes made since are lost.")) return;
+    const ok = await confirmAction({
+      title: "Restore this checkpoint?",
+      description: "The sandbox files go back to this point. Changes made since are lost.",
+      confirmLabel: "Restore",
+      destructive: true,
+    });
+    if (!ok) return;
     setBusy(true);
     try {
       const res = await fetch(`/api/agent-runs/${encodeURIComponent(runId)}/restore`, {

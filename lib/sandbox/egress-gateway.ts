@@ -30,12 +30,14 @@
 export const GATEWAY_SOURCE = String.raw`
 "use strict";
 const http = require("http"), net = require("net"), dns = require("dns");
-const ALLOW = String(process.env.ALLOW || "").split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
-const TOKEN = String(process.env.GATEWAY_TOKEN || "");
-const SANDBOX = String(process.env.SANDBOX_HOST || "sandbox");
-const EGRESS_PORT = Number(process.env.EGRESS_PORT || 3128);
-const PREVIEW_PORT = Number(process.env.PREVIEW_PORT || 8080);
-const PORTS = String(process.env.ALLOW_PORTS || "80,443").split(",").map(Number);
+// Sidecar settings, set by docker.ts on the gateway container (not host config).
+const env = process.env;
+const ALLOW = String(env.ALLOW || "").split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
+const TOKEN = String(env.GATEWAY_TOKEN || "");
+const SANDBOX = String(env.SANDBOX_HOST || "sandbox");
+const EGRESS_PORT = Number(env.EGRESS_PORT || 3128);
+const PREVIEW_PORT = Number(env.PREVIEW_PORT || 8080);
+const PORTS = String(env.ALLOW_PORTS || "80,443").split(",").map(Number);
 function allowed(h) {
   h = String(h || "").toLowerCase().replace(/\.$/, "");
   if (!h || net.isIP(h)) return false;
@@ -94,7 +96,7 @@ const preview = http.createServer((req, res) => {
   req.pipe(up);
 });
 preview.listen(PREVIEW_PORT, "0.0.0.0");
-if (process.env.EXIT_WHEN_SANDBOX_GONE !== "0") {
+if (env.EXIT_WHEN_SANDBOX_GONE !== "0") {
   let misses = 0;
   setInterval(() => dns.lookup(SANDBOX, (err) => { misses = err ? misses + 1 : 0; if (misses >= 4) process.exit(0); }), 15000);
 }
