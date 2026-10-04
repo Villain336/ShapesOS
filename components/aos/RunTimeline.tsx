@@ -7,30 +7,15 @@
 // tool-call block in JetBrains Mono, and a "will ask you before …" chip on
 // steps that stop for approval. Step states come from lib/aos/run-steps.
 
-import { Pause, Square } from "lucide-react";
+import type { ReactNode } from "react";
+import { Pause, Play, Square } from "lucide-react";
 import type { AosStatus } from "@/lib/aos/status";
-import { deriveRunSteps, ofCaption, progressFraction, type RunStepInput } from "@/lib/aos/run-steps";
+import { deriveRunSteps, ofCaption, progressFraction, type TimelineStep, type ToolCall } from "@/lib/aos/run-steps";
 import { cn } from "@/lib/utils";
 import { StatusBadge } from "./StatusBadge";
 import { StatusShape } from "./StatusShape";
 
-export interface ToolCall {
-  /** Tool name in mono, e.g. "web.search". */
-  name: string;
-  /** "0.8 s" */
-  duration?: string;
-  args?: Array<[string, string]>;
-  /** Result line after the arrow. */
-  result?: string;
-}
-
-export interface TimelineStep extends RunStepInput {
-  tool?: ToolCall;
-  /** Progress inside the current step ("7 of 12"). */
-  progress?: { done: number; total: number };
-  /** Text for the asks-first chip (default "Will ask you before sending"). */
-  asksFirstLabel?: string;
-}
+export type { ToolCall, TimelineStep };
 
 export function ToolCallBlock({ call, className }: { call: ToolCall; className?: string }) {
   return (
@@ -72,7 +57,15 @@ export function RunTimeline({
   steps,
   completed,
   onPause,
+  onResume,
   onStop,
+  pauseLabel = "Pause run",
+  resumeLabel = "Resume run",
+  busy,
+  badge,
+  headingLevel = "h3",
+  emptyText = "No steps yet.",
+  footer,
   className,
 }: {
   title: string;
@@ -82,42 +75,61 @@ export function RunTimeline({
   /** Steps finished so far. */
   completed: number;
   onPause?: () => void;
+  /** Paused work: a Resume control (running fill, per the action table). */
+  onResume?: () => void;
   onStop?: () => void;
+  pauseLabel?: string;
+  resumeLabel?: string;
+  /** Disables the controls while a pause / resume / stop is in flight. */
+  busy?: boolean;
+  /** Replaces the status badge (e.g. a neutral "Cancelled" chip). */
+  badge?: ReactNode;
+  /** "h1" when the timeline is the page's main heading. */
+  headingLevel?: "h1" | "h2" | "h3";
+  emptyText?: string;
+  /** Extra content under the steps (links, notes). */
+  footer?: ReactNode;
   className?: string;
 }) {
   const derived = deriveRunSteps(steps, { completed, status });
+  const Heading = headingLevel;
+  const ctl =
+    "aos-press flex size-10 shrink-0 items-center justify-center rounded-full disabled:pointer-events-none disabled:bg-disabled disabled:text-disabled-fg disabled:shadow-none";
   return (
     <section className={cn("overflow-hidden rounded-lg bg-paper shadow-hairline", className)} aria-label={title}>
-      <header className="flex items-start gap-3 border-b border-line px-6 py-5">
-        <div className="min-w-0 flex-1">
-          <h3 className="text-lg leading-snug font-bold stretch-heading tracking-heading text-ink">{title}</h3>
+      <header className="flex flex-wrap items-start gap-3 border-b border-line px-5 py-5 sm:flex-nowrap sm:px-6">
+        <div className="min-w-0 flex-1 basis-full sm:basis-auto">
+          <Heading
+            className={cn(
+              "leading-snug font-bold stretch-heading tracking-heading text-ink",
+              headingLevel === "h1" ? "text-xl" : "text-lg",
+            )}
+          >
+            {title}
+          </Heading>
           {subtitle ? <p className="mt-0.5 text-sm text-muted">{subtitle}</p> : null}
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          <StatusBadge status={status} />
+          {badge ?? <StatusBadge status={status} />}
           {onPause ? (
-            <button
-              type="button"
-              onClick={onPause}
-              aria-label="Pause run"
-              className="aos-press flex size-10 items-center justify-center rounded-full bg-paper text-ink shadow-outline"
-            >
+            <button type="button" onClick={onPause} disabled={busy} aria-label={pauseLabel} title={pauseLabel} className={cn(ctl, "bg-paper text-ink shadow-outline")}>
               <Pause className="size-4" aria-hidden />
             </button>
           ) : null}
+          {onResume ? (
+            <button type="button" onClick={onResume} disabled={busy} aria-label={resumeLabel} title={resumeLabel} className={cn(ctl, "bg-running text-paper")}>
+              <Play className="size-4 fill-current" aria-hidden />
+            </button>
+          ) : null}
           {onStop ? (
-            <button
-              type="button"
-              onClick={onStop}
-              aria-label="Stop run"
-              className="aos-press flex size-10 items-center justify-center rounded-full bg-failed text-paper"
-            >
+            <button type="button" onClick={onStop} disabled={busy} aria-label="Stop run" title="Stop run" className={cn(ctl, "bg-failed text-paper")}>
               <Square className="size-3.5 fill-current" aria-hidden />
             </button>
           ) : null}
         </div>
       </header>
-      <ol className="px-6 py-5">
+      {derived.length === 0 ? <p className="px-5 py-5 text-md text-muted sm:px-6">{emptyText}</p> : null}
+      <ol className={cn("px-5 py-5 sm:px-6", derived.length === 0 && "hidden")}>
         {derived.map((step, i) => {
           const src = steps[i]!;
           const last = i === derived.length - 1;
@@ -163,6 +175,7 @@ export function RunTimeline({
           );
         })}
       </ol>
+      {footer ? <div className="border-t border-line px-5 py-3.5 sm:px-6">{footer}</div> : null}
     </section>
   );
 }

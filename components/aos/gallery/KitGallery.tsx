@@ -20,6 +20,7 @@ import {
   Play,
   Plus,
   Search,
+  Siren,
   Trash2,
   Wrench,
   X,
@@ -40,6 +41,7 @@ import {
   CountBadge,
   CroppedShape,
   Field,
+  FilterPill,
   KeyCap,
   LeadAgentCard,
   LiveActivity,
@@ -267,6 +269,58 @@ function AgentBlocks() {
           ))}
         </div>
       </div>
+      <div>
+        <Label>Variants the inbox, runs and missions use</Label>
+        <div className="grid gap-5 lg:grid-cols-2">
+          <div className="flex flex-col gap-5">
+            <ApprovalCard
+              mode="review"
+              agent="Connector"
+              title="Ask Dana to introduce Priya"
+              meta="Introduction · 2h ago · Medium risk"
+              body="The queue's own screen holds the draft and the send channel."
+              editLabel="Edit draft"
+              reviewHref="#"
+            />
+            <ApprovalCard
+              mode="blocked"
+              agent="Writer"
+              title="Send 14 renewal emails"
+              meta="Mission · 5m ago · Medium risk"
+              blockedReason="Needs an editor or above to decide."
+              openHref="#"
+            />
+          </div>
+          <div className="flex flex-col gap-5">
+            <RunTimeline
+              title="Slow-season offer"
+              subtitle="Strategist started this mission at 9:00"
+              status="paused"
+              steps={DEMO_STEPS}
+              completed={2}
+              resumeLabel="Resume mission"
+              onResume={() => feedback.toast({ title: "Resumed", status: "running" })}
+            />
+            <div className="flex flex-wrap gap-2">
+              <FilterPill selected onClick={() => {}} count={12}>All</FilterPill>
+              <FilterPill selected={false} status="needs" count={2} onClick={() => {}}>Needs you</FilterPill>
+              <FilterPill selected={false} status="running" count={3} onClick={() => {}}>Running</FilterPill>
+              <FilterPill selected={false} status="failed" count={1} onClick={() => {}}>Failed</FilterPill>
+              <FilterPill selected={false} count={4} onClick={() => {}}>Ad spend</FilterPill>
+            </div>
+            <div className="rounded-lg bg-paper p-3 shadow-hairline">
+              <Label>Approvals hung under the sub-agent waiting on them</Label>
+              <AgentTree
+                lead={{ ...lead.lead, status: "needs", line: "2 approvals waiting on you across 1 mission" }}
+                branches={lead.branches.slice(0, 1).map((b) => ({ ...b, name: "Writer", status: "needs" as const, line: "October renewal emails · 2 approvals waiting" }))}
+                renderBranchContent={() => (
+                  <div className="rounded-md bg-needs-tint px-3.5 py-3 text-md text-ink">Approval cards render here.</div>
+                )}
+              />
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -316,6 +370,7 @@ function ToastsAndBanners() {
           <ToastView status="running" title="Researcher is reading sources" progress={{ done: 7, total: 12 }} action={{ label: "Open run", href: "#" }} onDismiss={() => {}} />
           <ToastView status="failed" title="Operator couldn't sync your calendar" description="Calendar access expired. Reconnect to resume 3 scheduled runs." action={{ label: "Reconnect", href: "#" }} onDismiss={() => {}} />
           <ToastView variant="undo" title={"Agent “Scout” deleted"} action={{ label: "Undo", onClick: () => {} }} onDismiss={() => {}} />
+          <ToastView status={null} icon={Siren} title="Traffic dropped 30% on /pricing" description="Not an agent state: a neutral icon leads, never a status color." meta="Alerts · 2h ago" action={{ label: "Open", href: "#" }} onDismiss={() => {}} />
           <button
             type="button"
             className={aosButton({ variant: "primary", size: "sm", className: "mt-2 self-start" })}
