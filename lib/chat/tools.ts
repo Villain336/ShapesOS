@@ -1102,6 +1102,8 @@ export const TOOL_GROUP: Readonly<Record<string, ToolGroup>> = {
   // (lib/sites/tools.ts). Drafts only — applying and deploying stay human.
   site_checkout: "site",
   site_publish_draft: "site",
+  // Phase 9 (repos): lint / typecheck / test / build from the repo profile.
+  run_checks: "code",
 };
 
 /**
@@ -1139,6 +1141,8 @@ export const TOOL_ACTION: Readonly<Record<string, string>> = {
   edit_file: "edit_sandbox_files",
   bash: "run_sandbox_command",
   run_tests: "run_sandbox_command",
+  // Phase 9 (repos): runs repository code like run_tests — Tier 2, asks.
+  run_checks: "run_sandbox_command",
 };
 
 /** The group a tool belongs to. Unknown tools fall in "connectors" (fail closed). */

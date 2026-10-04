@@ -20,6 +20,9 @@ const ALLOW = new Map<string, string>([
   ["lib/intelligence/gsc/window-score.ts:gscSnapshot.findMany", "projectId-scoped tx helper; callers resolve the project inside the workspace"],
   ["lib/intelligence/gsc/deltas.ts:gscSnapshot.findMany", "projectId-scoped tx helper; callers resolve the project inside the workspace"],
   ["app/api/cron/fleet/route.ts:competitorWatch.findMany", "cron-only fan-out that lists workspaces, outside any scope"],
+  // Phase 9 (repos): GitHub delivery routing / poller discovery — the one cross-workspace read, through the SELECT-only app.github_route policy; returns ids only, every write is tenant-scoped.
+  ["lib/ship/pr-routing.ts:agentPullRequest.findFirst", "routePullRequest: maps (repository, branch | PR) to its workspace via the SELECT-only app.github_route policy"],
+  ["lib/ship/pr-routing.ts:agentPullRequest.findMany", "discoverOpenPullRequests: poller fan-out across workspaces via the SELECT-only app.github_route policy (ids only)"],
 ]);
 
 const SCOPE_MARKERS = ["withWorkspaceScope", "withWorkspace(", "withCampaignScope", "setWorkspaceGuc", "app.workspace_id"];

@@ -5,6 +5,8 @@
 //               (lib/chat/agent.ts continueTrackedAgentTurn).
 //   mission   — a mission launch: runMission with each executor step run as a
 //               sub-agent loop (lib/agents/mission-runtime.ts).
+//   pr_feedback — Phase 9 (repos): GitHub feedback on an agent PR continues
+//               the run's chat thread on the same branch (lib/ship/continue.ts).
 //
 // Handlers are imported lazily so the worker module stays light (and tests
 // can pass their own handler table).
@@ -32,5 +34,12 @@ export const defaultAgentJobHandlers: Record<string, AgentJobHandler> = {
     const payload = job.payload as import("@/lib/agents/mission-runtime").MissionJobPayload;
     if (payload.workspaceId !== job.workspaceId) throw new Error("mission payload belongs to another workspace");
     return runMissionJob(payload, { signal: ctx.signal, runId: job.runId });
+  },
+  // Phase 9 (repos): continue from PR review feedback (queues a chat_turn).
+  async pr_feedback(job) {
+    const { continueFromPrFeedback } = await import("@/lib/ship/continue");
+    const payload = job.payload as import("@/lib/ship/pull-requests").PrFeedbackJobPayload;
+    if (payload.workspaceId !== job.workspaceId) throw new Error("pr_feedback payload belongs to another workspace");
+    return continueFromPrFeedback(payload);
   },
 };

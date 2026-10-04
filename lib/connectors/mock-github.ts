@@ -21,6 +21,7 @@ import type {
   GitHubPullRequest,
   GitHubRepoSummary,
   GitHubReview,
+  GitHubIssueComment,
   GitHubReviewComment,
   OpenPullRequestInput,
   PushResult,
@@ -335,6 +336,7 @@ export class MockGitHubConnector implements GitHubConnector {
         url: `https://github.com/demo-user/acme-plumbing-site/pull/${number}#discussion_r1`,
         createdAt: new Date(0).toISOString(),
         inReplyTo: null,
+        authorAssociation: "COLLABORATOR",
         mock: true,
       },
     ];
@@ -350,6 +352,22 @@ export class MockGitHubConnector implements GitHubConnector {
         body: "One small change, then good to go. (MOCK)",
         url: `https://github.com/demo-user/acme-plumbing-site/pull/${number}#pullrequestreview-1`,
         submittedAt: new Date(0).toISOString(),
+        authorAssociation: "COLLABORATOR",
+        mock: true,
+      },
+    ];
+  }
+
+  async listIssueComments(number: number): Promise<GitHubIssueComment[]> {
+    this.pull(number);
+    return [
+      {
+        id: 1,
+        body: "Thanks — please also update the README. (MOCK)",
+        author: "demo-reviewer",
+        authorAssociation: "COLLABORATOR",
+        url: `https://github.com/demo-user/acme-plumbing-site/pull/${number}#issuecomment-1`,
+        createdAt: new Date(0).toISOString(),
         mock: true,
       },
     ];

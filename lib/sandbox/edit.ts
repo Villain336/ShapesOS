@@ -5,7 +5,7 @@
 //                    fail with a message that says what to do
 //   globToRegExp     glob → RegExp (**, *, ?, {a,b}, [abc])
 //   numberLines      read_file's `cat -n` view of a line range
-//   detectRepoProfile which test / lint command a checkout uses
+// (Which commands run_tests / run_checks run: lib/sandbox/repo-profile.ts.)
 
 export type EditOutcome = { ok: true; content: string; replacements: number } | { ok: false; error: string };
 
@@ -100,57 +100,4 @@ export function numberLines(text: string, offset = 1, limit = 2000, maxLineChars
     out.push(`${String(n).padStart(width, " ")}\t${l}`);
   }
   return { view: out.join("\n"), totalLines: lines.length, shown: [start, end] };
-}
-
-export interface RepoProfile {
-  testCommand: string | null;
-  lintCommand: string | null;
-  /** Where the answer came from (shown to the agent). */
-  source: string;
-}
-
-/**
- * Work out the test command from the files at a checkout's root. A
- * `.shapes/profile.json` ({ "testCommand": …, "lintCommand": … }) wins —
- * that is the repo profile the GitHub work saves; otherwise conventions.
- */
-export function detectRepoProfile(input: {
-  files: readonly string[];
-  profileJson?: string | null;
-  packageJson?: string | null;
-}): RepoProfile {
-  if (input.profileJson) {
-    try {
-      const p = JSON.parse(input.profileJson) as { testCommand?: unknown; lintCommand?: unknown };
-      if (typeof p.testCommand === "string" && p.testCommand.trim()) {
-        return {
-          testCommand: p.testCommand.trim(),
-          lintCommand: typeof p.lintCommand === "string" && p.lintCommand.trim() ? p.lintCommand.trim() : null,
-          source: ".shapes/profile.json",
-        };
-      }
-    } catch {
-      /* fall through to conventions */
-    }
-  }
-  const has = (f: string) => input.files.includes(f);
-  if (input.packageJson) {
-    try {
-      const pkg = JSON.parse(input.packageJson) as { scripts?: Record<string, string> };
-      const s = pkg.scripts ?? {};
-      const pm = has("pnpm-lock.yaml") ? "pnpm" : has("yarn.lock") ? "yarn" : "npm";
-      const test = s.test && !/no test specified/.test(s.test) ? `${pm} test` : null;
-      const lint = s.lint ? `${pm} run lint` : null;
-      if (test || lint) return { testCommand: test, lintCommand: lint, source: "package.json scripts" };
-    } catch {
-      /* not JSON */
-    }
-  }
-  if (has("pyproject.toml") || has("pytest.ini") || has("setup.cfg") || has("tox.ini")) {
-    return { testCommand: "python3 -m pytest -q", lintCommand: null, source: "Python project files" };
-  }
-  if (has("go.mod")) return { testCommand: "go test ./...", lintCommand: "go vet ./...", source: "go.mod" };
-  if (has("Cargo.toml")) return { testCommand: "cargo test", lintCommand: null, source: "Cargo.toml" };
-  if (has("Makefile")) return { testCommand: "make test", lintCommand: null, source: "Makefile" };
-  return { testCommand: null, lintCommand: null, source: "nothing recognised" };
 }

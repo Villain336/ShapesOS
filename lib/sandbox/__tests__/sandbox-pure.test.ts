@@ -5,7 +5,8 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { resolveSandboxPath, SandboxPathError, shq } from "../paths";
-import { applyExactEdit, countOccurrences, detectRepoProfile, globToRegExp, numberLines } from "../edit";
+import { applyExactEdit, countOccurrences, globToRegExp, numberLines } from "../edit";
+import { parseProfileOverride } from "../repo-profile";
 import { firstFileInTar, readTar, tarSingleFile } from "../tar";
 import { DEFAULT_EGRESS_ALLOW, SANDBOX_DEFAULT_IMAGE, dockerSocketPath, hostAllowed, normalizeEgressHost, sandboxConfig } from "../config";
 import { DockerDemuxer, OutputCollector, dockerFrame } from "../output";
@@ -92,13 +93,13 @@ describe("glob / numberLines / repo profile", () => {
     assert.equal(view, "2\tb\n3\tc");
   });
 
-  it("detectRepoProfile: profile file wins, then conventions", () => {
-    assert.equal(detectRepoProfile({ files: ["package.json"], profileJson: '{"testCommand":"make check"}', packageJson: '{"scripts":{"test":"vitest"}}' }).testCommand, "make check");
-    assert.equal(detectRepoProfile({ files: ["package.json", "pnpm-lock.yaml"], packageJson: '{"scripts":{"test":"vitest","lint":"eslint ."}}' }).testCommand, "pnpm test");
-    assert.equal(detectRepoProfile({ files: ["package.json"], packageJson: '{"scripts":{"test":"echo \\"Error: no test specified\\" && exit 1"}}' }).testCommand, null);
-    assert.equal(detectRepoProfile({ files: ["pyproject.toml"] }).testCommand, "python3 -m pytest -q");
-    assert.equal(detectRepoProfile({ files: ["go.mod"] }).testCommand, "go test ./...");
-    assert.equal(detectRepoProfile({ files: [] }).testCommand, null);
+  it("parseProfileOverride: .shapes/profile.json, both shapes (detection itself: repo-profile.test.ts)", () => {
+    assert.deepEqual(parseProfileOverride('{"testCommand":"make check","lintCommand":" ruff . "}'), { test: "make check", lint: "ruff ." });
+    assert.deepEqual(parseProfileOverride('{"commands":{"typecheck":"tsc -p .","build":"make"},"testCommand":"t"}'), { test: "t", build: "make", typecheck: "tsc -p ." });
+    assert.equal(parseProfileOverride('{"testCommand":"   "}'), null);
+    assert.equal(parseProfileOverride("not json"), null);
+    assert.equal(parseProfileOverride("[1]"), null);
+    assert.equal(parseProfileOverride(null), null);
   });
 });
 

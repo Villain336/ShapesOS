@@ -12,6 +12,10 @@ import { memoryTranscriptStore } from "@/lib/agents/runs/transcript";
 import {
   MAX_TOKENS_NOTE,
   STOPPED_TEXT,
+  DEFAULT_LOOP_LIMITS,
+  fixCyclePolicy,
+  handBackText,
+  loopLimitsFromEnv,
   initialLoopState,
   runAgentLoop,
   type AgentLoopInput,
@@ -371,7 +375,7 @@ describe("agent loop: native tool protocol", () => {
     assert.equal(provider.chatCalls.length, 1);
   });
 
-  it("build mode runs on the code workload and escalates after two failing test cycles", async () => {
+  it("build mode runs on the code workload and escalates after AGENT_FIX_CYCLES (here 2) failing test cycles", async () => {
     const workloads: LlmWorkload[] = [];
     let i = 0;
     const provider = new MockLlmProvider({
@@ -382,6 +386,7 @@ describe("agent loop: native tool protocol", () => {
       system: "s",
       messages: [{ role: "user", content: "fix the build" }],
       mode: "build",
+      limits: { fixCycles: 2 },
       deps: {
         provider: (w) => {
           workloads.push(w);
@@ -394,6 +399,36 @@ describe("agent loop: native tool protocol", () => {
     assert.equal(res.finalText, "green");
     assert.deepEqual(workloads, ["code", "code", "code_max"]);
     assert.equal(res.state.escalated, true);
+  });
+
+  it("Phase 9: fix cycles — default 5 from AGENT_FIX_CYCLES; escalate at N, hand back at 2N", async () => {
+    assert.equal(DEFAULT_LOOP_LIMITS.fixCycles, 5);
+    assert.equal(loopLimitsFromEnv({}).fixCycles, 5);
+    assert.equal(loopLimitsFromEnv({ AGENT_FIX_CYCLES: "3" }).fixCycles, 3);
+    assert.equal(loopLimitsFromEnv({ AGENT_FIX_CYCLES: "zero" }).fixCycles, 5);
+    const st = (over: Partial<LoopState>) => ({ mode: "build" as const, workload: "code" as const, escalated: false, testFailCycles: 0, ...over });
+    assert.equal(fixCyclePolicy(st({ testFailCycles: 4 }), 5), "continue");
+    assert.equal(fixCyclePolicy(st({ testFailCycles: 5 }), 5), "escalate");
+    assert.equal(fixCyclePolicy(st({ testFailCycles: 9, workload: "code_max", escalated: true }), 5), "continue");
+    assert.equal(fixCyclePolicy(st({ testFailCycles: 10, workload: "code_max", escalated: true }), 5), "hand_back");
+    assert.equal(fixCyclePolicy({ ...st({ testFailCycles: 50 }), mode: "default" }, 5), "continue", "only build mode");
+
+    // End to end: 2 cycles → code_max, 2 more → stop and hand back (no 5th call).
+    const workloads: LlmWorkload[] = [];
+    let i = 0;
+    const provider = new MockLlmProvider({ chatScript: [() => ({ content: [toolUse("t_tests", {}, `f${i++}`)] })] });
+    const res = await runAgentLoop({
+      ctx: ctx({ agentKey: "actor", grant: null }),
+      system: "s",
+      messages: [{ role: "user", content: "fix it" }],
+      mode: "build",
+      limits: { fixCycles: 2 },
+      deps: { provider: (w) => (workloads.push(w), provider), store: memoryTranscriptStore(), persistEvents: false },
+    });
+    assert.deepEqual(workloads, ["code", "code", "code_max", "code_max"]);
+    assert.equal(res.status, "done");
+    assert.equal(res.state.testFailCycles, 4);
+    assert.ok(res.finalText.endsWith(handBackText(4)));
   });
 
   it("an extra stop check (mission kill switch) ends the run", async () => {

@@ -67,7 +67,7 @@ import {
   type AgentKey,
   type ToolGroup,
 } from "@/lib/agents/grants";
-import { subAgentSystemPrompt } from "@/lib/agents/roles";
+import { buildModeSystemPrompt, subAgentSystemPrompt } from "@/lib/agents/roles";
 import { registerCodeTools } from "@/lib/sandbox/tools";
 import { sandboxAvailability } from "@/lib/sandbox/index";
 import {
@@ -98,6 +98,7 @@ import {
   loopLimitsFromEnv,
   runAgentLoop,
   STOPPED_TEXT,
+  testsFailed,
   toolResultFor,
   type AgentLoopResult,
   type LoopState,
@@ -279,6 +280,8 @@ function systemPrompt(
     grant
       ? `This task may only use these tool groups: ${grant.map((g) => TOOL_GROUP_LABELS[g]).join(", ")}. Calls outside them are refused.`
       : "",
+    // Phase 9 (repos): the Operator in build mode follows the test-fix loop.
+    turnMode(agentKey, grant) === "build" ? buildModeSystemPrompt(loopLimitsFromEnv().fixCycles) : "",
     "",
     "PROJECT CONTEXT:",
     projectContext,
@@ -707,7 +710,13 @@ async function continuationState(
       ),
     },
   ];
-  return initialLoopState({ system: saved.system, messages, mode: saved.mode, workload: saved.workload });
+  const next = initialLoopState({ system: saved.system, messages, mode: saved.mode, workload: saved.workload });
+  // Phase 9: the fix-cycle count survives an approval (run_checks / run_tests
+  // ask first, so every cycle passes through here) — a confirmed failing
+  // check is one more cycle.
+  next.testFailCycles = (saved.testFailCycles ?? 0) + (done.some((d) => testsFailed(d.result ?? null)) ? 1 : 0);
+  next.escalated = saved.escalated === true;
+  return next;
 }
 
 export async function runAgentTurn(input: AgentTurnInput): Promise<AgentTurnOutput> {

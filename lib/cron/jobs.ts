@@ -99,6 +99,15 @@ export const CRON_JOBS: readonly CronJob[] = [
     timeoutMs: SHORT,
     secretEnv: "REMINDERS_CRON_SECRET",
   },
+  {
+    // Phase 9 (repos): webhook fallback for agent PR feedback; a no-op unless GITHUB_PR_POLL=on.
+    key: "github-prs",
+    path: "/api/cron/github-prs",
+    cron: "*/5 * * * *",
+    source: "picked",
+    note: "Phase 9 webhook fallback (opt-in, GITHUB_PR_POLL=on): review feedback is picked up within ~5 minutes; each pass reads at most 50 PRs, 4 GitHub calls each.",
+    timeoutMs: SHORT,
+  },
   { key: "alerts", path: "/api/cron/alerts", cron: "*/15 * * * *", source: "deploy", timeoutMs: SHORT },
   { key: "gsc-inspection", path: "/api/cron/gsc-inspection", cron: "*/15 * * * *", source: "deploy", timeoutMs: SHORT },
   { key: "social-engagement", path: "/api/cron/social-engagement", cron: "*/15 * * * *", source: "deploy", timeoutMs: SHORT },

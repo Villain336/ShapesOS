@@ -138,6 +138,8 @@ export interface GitHubReviewComment {
   createdAt: string;
   inReplyTo: number | null;
   diffHunk?: string;
+  /** Phase 9: OWNER | MEMBER | COLLABORATOR | CONTRIBUTOR | NONE … (GitHub's author_association). */
+  authorAssociation?: string;
   mock?: boolean;
 }
 
@@ -149,6 +151,20 @@ export interface GitHubReview {
   body: string;
   url: string;
   submittedAt: string | null;
+  /** Phase 9: GitHub's author_association. */
+  authorAssociation?: string;
+  mock?: boolean;
+}
+
+/** Phase 9: a comment on the pull request's conversation (an issue comment). */
+export interface GitHubIssueComment {
+  id: number;
+  body: string;
+  author: string;
+  /** GitHub's author_association. */
+  authorAssociation?: string;
+  url: string;
+  createdAt: string;
   mock?: boolean;
 }
 
@@ -171,6 +187,8 @@ export interface GitHubShipOps {
   getPullRequestStatus(number: number): Promise<GitHubPrStatus>;
   listReviewComments(number: number): Promise<GitHubReviewComment[]>;
   listReviews(number: number): Promise<GitHubReview[]>;
+  /** Phase 9: the PR conversation's comments (not attached to a line). */
+  listIssueComments(number: number): Promise<GitHubIssueComment[]>;
 }
 
 /** GitHub file connector: SiteFileProvider + repo operations. */

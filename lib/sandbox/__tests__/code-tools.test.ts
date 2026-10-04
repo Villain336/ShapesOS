@@ -13,7 +13,8 @@ import { allTools, getTool, TOOL_ACTION, TOOL_GROUP, toolCatalogForPrompt, toolG
 import { isToolGroup, unavailableGroups, computeGrant } from "@/lib/agents/grants";
 import { evaluateTier } from "@/lib/orchestrator/authority";
 import { decideAutoApproval, KNOWN_ACTIONS } from "@/lib/automation/policy";
-import { CODE_TOOLS, CODE_TOOL_NAMES, registerCodeTools, setCodeToolEventsForTests, setCodeToolSandboxForTests, OutputStreamer, forgetCheckpoints, CHECKPOINT_MIN_INTERVAL_MS } from "../tools";
+import { CODE_TOOLS, CODE_TOOL_NAMES, registerCodeTools, setCodeToolEventsForTests, setCodeToolSandboxForTests, setRepoCommandDepsForTests, OutputStreamer, forgetCheckpoints, CHECKPOINT_MIN_INTERVAL_MS, type CheckResult } from "../tools";
+import type { DetectedRepoProfile, RepoProfile } from "../repo-profile";
 import { sandboxAvailability, setSandboxProviderForTests, SandboxUnavailableError } from "../index";
 import { toolGroupAvailability } from "../availability";
 import { FakeProvider, LocalDirSandbox } from "./fakes";
@@ -35,8 +36,11 @@ async function call(name: string, args: Record<string, unknown>, c = ctx()) {
 before(() => {
   registerCodeTools();
   setCodeToolEventsForTests((summary, payload) => notes.push({ summary, payload }));
+  // No database here: no cloned repository unless a test says so.
+  setRepoCommandDepsForTests({ shipRepo: async () => null });
 });
 after(() => {
+  setRepoCommandDepsForTests(null);
   setCodeToolSandboxForTests(null);
   setCodeToolEventsForTests(null);
   setSandboxProviderForTests(undefined);
@@ -67,12 +71,14 @@ describe("tool groups, actions and tiers", () => {
         ["edit_file", "spend"],
         ["bash", "spend"],
         ["run_tests", "spend"],
+        ["run_checks", "spend"],
       ],
     );
     assert.equal(TOOL_ACTION.write_file, "edit_sandbox_files");
     assert.equal(TOOL_ACTION.edit_file, "edit_sandbox_files");
     assert.equal(TOOL_ACTION.bash, "run_sandbox_command");
     assert.equal(TOOL_ACTION.run_tests, "run_sandbox_command");
+    assert.equal(TOOL_ACTION.run_checks, "run_sandbox_command");
     for (const a of ["edit_sandbox_files", "run_sandbox_command"]) assert.ok(KNOWN_ACTIONS.some((k) => k.action === a), `${a} in the automation catalog`);
   });
 
@@ -204,7 +210,7 @@ describe("the tools on a sandbox", () => {
   it("run_tests: repo profile command; testsFailed on failure", async () => {
     writeFileSync(join(sb.workdir, "package.json"), JSON.stringify({ scripts: { test: "node -e \"process.exit(1)\"" } }));
     const fail = await call("run_tests", {});
-    assert.match(fail.summary, /Tests FAILED \(exit 1\): npm test \(from package\.json scripts\)/);
+    assert.match(fail.summary, /Tests FAILED \(exit 1\): npm test \(detected from package\.json\)/);
     assert.equal((fail.details as { testsFailed: boolean }).testsFailed, true);
     mkdirSync(join(sb.workdir, ".shapes"), { recursive: true });
     writeFileSync(join(sb.workdir, ".shapes/profile.json"), JSON.stringify({ testCommand: "echo all good" }));
@@ -214,6 +220,109 @@ describe("the tools on a sandbox", () => {
     const none = new LocalDirSandbox();
     setCodeToolSandboxForTests(async () => none);
     assert.match((await call("run_tests", {})).summary, /No test command found/);
+  });
+});
+
+describe("Phase 9: the saved repo profile drives run_tests / run_checks", () => {
+  const profiles = new Map<string, RepoProfile>();
+  const saved: Array<{ repo: string; profile: DetectedRepoProfile }> = [];
+  const asProfile = (repo: string, commands: RepoProfile["commands"]): RepoProfile => ({
+    workspaceId: "ws",
+    repoFullName: repo,
+    packageManager: "npm",
+    language: "javascript",
+    commands,
+    detectedFrom: ["package.json"],
+    updatedAt: new Date(),
+  });
+  let cloneDir = "";
+
+  beforeEach(() => {
+    profiles.clear();
+    saved.length = 0;
+    cloneDir = join(sb.workdir, "site");
+    mkdirSync(cloneDir, { recursive: true });
+    setRepoCommandDepsForTests({
+      shipRepo: async () => ({ repo: "acme/site", dir: cloneDir }),
+      getProfile: async (_ws, repo) => profiles.get(repo) ?? null,
+      saveProfile: async (_ws, repo, profile) => {
+        saved.push({ repo, profile });
+      },
+    });
+  });
+  after(() => setRepoCommandDepsForTests({ shipRepo: async () => null }));
+
+  it("run_tests runs the saved profile's command in the cloned repository", async () => {
+    profiles.set("acme/site", asProfile("acme/site", { test: "pwd && echo saved-ok" }));
+    const r = await call("run_tests", {});
+    assert.match(r.summary, /Tests passed: pwd && echo saved-ok \(from the saved profile of acme\/site\)/);
+    assert.ok(r.summary.includes(cloneDir), "ran in the clone, not the workdir");
+  });
+
+  it("no saved profile yet: detected in the clone and saved for the repository", async () => {
+    writeFileSync(join(cloneDir, "package.json"), JSON.stringify({ scripts: { test: "node -e 0", lint: "node -e 0" } }));
+    const r = await call("run_checks", { checks: "lint,test" });
+    assert.match(r.summary, /All 2 checks passed/);
+    assert.equal(saved.length, 1);
+    assert.equal(saved[0]!.repo, "acme/site");
+    assert.deepEqual(saved[0]!.profile.commands.test, "npm test");
+    assert.match(r.summary, /detected now and saved for acme\/site/);
+  });
+
+  it("run_checks runs every check in order, reports each, flags testsFailed and keeps going after a failure", async () => {
+    profiles.set(
+      "acme/site",
+      asProfile("acme/site", {
+        lint: "echo lint-ok",
+        typecheck: "echo 'src/a.ts(3,1): error TS2322' >&2; exit 2",
+        test: "echo tests-ok",
+        build: "echo built",
+        install: "echo installed",
+      }),
+    );
+    const r = await call("run_checks", {});
+    const d = r.details as { testsFailed: boolean; checks: CheckResult[]; failed: string[] };
+    assert.equal(d.testsFailed, true);
+    assert.deepEqual(d.checks.map((c) => [c.check, c.passed]), [["lint", true], ["typecheck", false], ["test", true], ["build", true]]);
+    assert.deepEqual(d.failed, ["typecheck"]);
+    assert.match(r.summary, /^Checks FAILED: typecheck \(3 of 4 passed\)/);
+    assert.match(r.summary, /--- typecheck output ---\n[\s\S]*error TS2322/);
+    assert.ok(!/installed/.test(r.summary), "install only on request");
+    const ev = notes.find((n) => n.payload.kind === "sandbox.checks");
+    assert.ok(ev, "a timeline note summarises the checks");
+
+    profiles.set("acme/site", asProfile("acme/site", { test: "echo ok", install: "exit 7" }));
+    const inst = await call("run_checks", { install: true });
+    const di = inst.details as { checks: CheckResult[]; testsFailed: boolean };
+    assert.deepEqual(di.checks.map((c) => [c.check, c.passed]), [["install", false]], "nothing runs after a failed install");
+    assert.equal(di.testsFailed, true);
+  });
+
+  it(".shapes/profile.json overrides the saved profile per command; a subset can be asked for", async () => {
+    profiles.set("acme/site", asProfile("acme/site", { test: "exit 1", lint: "echo saved-lint" }));
+    mkdirSync(join(cloneDir, ".shapes"), { recursive: true });
+    writeFileSync(join(cloneDir, ".shapes/profile.json"), JSON.stringify({ commands: { test: "echo override-test" } }));
+    const r = await call("run_checks", { checks: "test,lint" });
+    const d = r.details as { checks: CheckResult[]; testsFailed: boolean };
+    assert.deepEqual(d.checks.map((c) => [c.check, c.command, c.source]), [
+      ["lint", "echo saved-lint", "from the saved profile of acme/site"],
+      ["test", "echo override-test", "from .shapes/profile.json"],
+    ]);
+    assert.equal(d.testsFailed, false);
+  });
+
+  it("nothing to run: a plain answer, never a fake pass", async () => {
+    const r = await call("run_checks", {});
+    assert.match(r.summary, /No lint \/ typecheck \/ test \/ build command found/);
+    assert.equal((r.details as { testsFailed?: boolean }).testsFailed, undefined);
+  });
+
+  it("an explicit path is used as given (detection there, not the saved profile)", async () => {
+    profiles.set("acme/site", asProfile("acme/site", { test: "echo saved" }));
+    mkdirSync(join(sb.workdir, "other"), { recursive: true });
+    writeFileSync(join(sb.workdir, "other/Makefile"), "test:\n\techo other-tests\n");
+    const r = await call("run_tests", { path: "other" });
+    assert.match(r.summary, /Tests passed: make test \(detected from Makefile\)/);
   });
 });
 
