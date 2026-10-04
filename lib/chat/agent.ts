@@ -189,7 +189,7 @@ export const SLASH_HELP = [
 async function buildProjectContext(projectId: string, workspaceId: string): Promise<string> {
   const [project, keywordCount, trackedCount, topKeywords, openIssues, recentReports, workflows] =
     await Promise.all([
-      prisma.project.findUnique({ where: { id: projectId }, select: { domain: true, locale: true } }),
+      prisma.project.findFirst({ where: { id: projectId, workspaceId }, select: { domain: true, locale: true } }),
       prisma.keyword.count({ where: { projectId } }),
       prisma.keyword.count({ where: { projectId, tracked: true } }),
       prisma.keyword.findMany({
