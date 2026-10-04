@@ -16,6 +16,8 @@ import { AppTopBar } from "@/components/AppTopBar";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { ChatProvider } from "@/components/chat/ChatContext";
 import { CommandBar } from "@/components/command-bar/CommandBar";
+// Phase 4d: New task composer (sidebar pill, Overview, ⌘K, ⌘N).
+import { NewTaskDialog } from "@/components/command-bar/NewTaskDialog";
 // Shared confirm dialog + toast stack (lib/ui/feedback.ts).
 import { FeedbackHost } from "@/components/feedback/FeedbackHost";
 // Phase 12 (embeds): Chatwoot live-chat widget. Renders nothing unless the
@@ -102,6 +104,7 @@ export default async function DashboardLayout({
     <BrandTheme primary={brandPrimary}>
       <ChatProvider>
         <CommandBar workspaceId={workspace.id} />
+        <NewTaskDialog />
         <FeedbackHost />
         {chatwoot && (
           <ChatwootWidget baseUrl={chatwoot.baseUrl} websiteToken={chatwoot.websiteToken} />
