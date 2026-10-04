@@ -109,3 +109,5 @@ lib/ops/__tests__/p10-store-db.test.ts
 # Phase 10 (portal): client portal sign-in, scoping, routes; portal session never grants workspace access.
 lib/portal/__tests__/portal-db.test.ts
 lib/portal/__tests__/portal-isolation-db.test.ts
+# Phase 11 (seotools): live-URL audit storage, supersede-by-kind, live start URL, fix-agent exclusion.
+lib/audit/__tests__/live-audit-db.test.ts

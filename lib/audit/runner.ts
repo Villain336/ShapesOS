@@ -69,11 +69,14 @@ export async function loadSnapshot(runId: string): Promise<Record<string, string
 }
 
 export function isIssueEligible(
-  issue: { status: string; category: string; autoFixable: boolean; destructive: boolean },
+  issue: { status: string; category: string; autoFixable: boolean; destructive: boolean; filePath?: string },
   settings: { enabled: boolean; allowedCategories: string[] },
 ): boolean {
   if (!settings.enabled) return false;
   if (!issue.autoFixable) return false;
+  // Phase 11 (seotools): live-crawl findings point at URLs, never at
+  // working-copy files — the fix agent must not write a file named "https://…".
+  if (issue.filePath && /^https?:\/\//i.test(issue.filePath)) return false;
   if (issue.status === "approved") return true; // explicit per-issue approval always counts
   if (issue.status !== "open") return false;
   if (issue.destructive) return false; // destructive needs per-issue approval, always

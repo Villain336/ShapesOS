@@ -19,6 +19,31 @@ interface SiteRow {
   sourceType: string;
 }
 
+// Phase 11 (seotools): live-URL crawl summary (lib/audit/live.ts).
+interface LiveCrawl {
+  startUrl: string;
+  rendering: "static" | "js";
+  renderingNote: string;
+  pagesCrawled: number;
+  pagesBlockedByRobots: number;
+  truncated: boolean;
+  statusCounts: Record<string, number>;
+  robots: { found: boolean };
+  sitemap: { found: boolean; urlCount: number };
+  externalChecked: number;
+}
+
+interface LiveAudit {
+  id: string;
+  status: string;
+  targetUrl: string | null;
+  totalIssues: number;
+  errorIssues: number;
+  createdAt: string;
+  crawl: LiveCrawl | null;
+  vitals: unknown;
+}
+
 interface Settings {
   enabled: boolean;
   allowedCategories: string[];
@@ -110,6 +135,8 @@ export default function FixAgentManager({ projectId }: { projectId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [showPreview, setShowPreview] = useState<string | null>(null);
+  const [liveAudit, setLiveAudit] = useState<LiveAudit | null>(null);
+  const [liveUrl, setLiveUrl] = useState("");
 
   const loadSites = useCallback(async () => {
     const res = await fetch(`/api/websites?projectId=${projectId}`);
@@ -133,6 +160,8 @@ export default function FixAgentManager({ projectId }: { projectId: string }) {
     }
     setSettings(data.settings);
     setAudit(data.latestAudit);
+    setLiveAudit(data.latestLiveAudit ?? null);
+    setLiveUrl((prev) => prev || data.latestLiveAudit?.targetUrl || data.site?.liveUrl || "");
     setIssues(data.issues ?? []);
     setRuns(data.fixRuns ?? []);
   }, [siteId, projectId]);
@@ -192,6 +221,25 @@ export default function FixAgentManager({ projectId }: { projectId: string }) {
     if (!res.ok) setError(data.error ?? "Audit failed");
     else {
       setNotice(`Audit complete — ${data.issueCount} issue${data.issueCount === 1 ? "" : "s"} found${data.mock ? " (mock data)" : ""}.`);
+      loadInbox();
+    }
+  }
+
+  async function runLiveAudit() {
+    if (!siteId) return;
+    setBusy(true);
+    setError(null);
+    setNotice(null);
+    const res = await fetch(`/api/websites/${siteId}/audit`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ projectId, mode: "live", url: liveUrl.trim() || undefined }),
+    });
+    const data = await res.json();
+    setBusy(false);
+    if (!res.ok) setError(data.error ?? "Live audit failed");
+    else {
+      setNotice(`Live crawl complete — ${data.issueCount} issue${data.issueCount === 1 ? "" : "s"} found.`);
       loadInbox();
     }
   }
@@ -355,6 +403,37 @@ export default function FixAgentManager({ projectId }: { projectId: string }) {
                 {audit.mock ? " — mock data" : ""} · {new Date(audit.createdAt).toLocaleString()}
               </p>
             )}
+
+            {/* Phase 11 (seotools): crawl the live site */}
+            <div className="mt-4 border-t border-line pt-4">
+              <h3 className="text-sm font-semibold">Live site</h3>
+              <p className="mt-1 text-xs text-muted">
+                Crawls the published pages: status codes, redirects, canonical, hreflang, noindex, structured data, robots.txt and sitemap.
+              </p>
+              <input
+                type="url"
+                value={liveUrl}
+                onChange={(e) => setLiveUrl(e.target.value)}
+                placeholder="https://example.com"
+                aria-label="Live site URL"
+                className="mt-2 w-full rounded-md border-[1.5px] border-control bg-paper px-3 py-1.5 font-mono text-xs"
+              />
+              <button onClick={runLiveAudit} disabled={busy}
+                className="mt-2 rounded-full bg-paper px-3 py-1.5 text-sm font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper disabled:opacity-50">
+                {busy ? "Working…" : "Crawl live site"}
+              </button>
+              {liveAudit?.crawl && (
+                <dl className="mt-3 space-y-1 text-xs text-muted">
+                  <div className="flex justify-between gap-2"><dt>Pages crawled</dt><dd className="text-ink">{liveAudit.crawl.pagesCrawled}{liveAudit.crawl.truncated ? " (budget reached)" : ""}</dd></div>
+                  <div className="flex justify-between gap-2"><dt>Status codes</dt><dd className="font-mono text-ink">{Object.entries(liveAudit.crawl.statusCounts).map(([k, v]) => `${k} ${v}`).join(" · ") || "—"}</dd></div>
+                  <div className="flex justify-between gap-2"><dt>robots.txt / sitemap</dt><dd className="text-ink">{liveAudit.crawl.robots.found ? "found" : "missing"} / {liveAudit.crawl.sitemap.found ? `${liveAudit.crawl.sitemap.urlCount} URLs` : "missing"}</dd></div>
+                  {liveAudit.crawl.pagesBlockedByRobots > 0 && <div className="flex justify-between gap-2"><dt>Skipped (robots.txt)</dt><dd className="text-ink">{liveAudit.crawl.pagesBlockedByRobots}</dd></div>}
+                  <div className="flex justify-between gap-2"><dt>Outbound links checked</dt><dd className="text-ink">{liveAudit.crawl.externalChecked}</dd></div>
+                  <div><dt className="sr-only">Rendering</dt><dd>{liveAudit.crawl.rendering === "js" ? "JavaScript-rendered" : "Static HTML"} — {liveAudit.crawl.renderingNote}</dd></div>
+                  <div><dd>{liveAudit.totalIssues} issues · {new Date(liveAudit.createdAt).toLocaleString()}</dd></div>
+                </dl>
+              )}
+            </div>
           </div>
 
           {/* Inbox */}

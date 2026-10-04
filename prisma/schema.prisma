@@ -1544,6 +1544,17 @@ model SiteAudit {
   openIssues  Int @default(0) @map("open_issues")
   errorIssues Int @default(0) @map("error_issues")
 
+  // Phase 11 (seotools): "files" = working-copy scan; "live" = crawl of the
+  // live URLs (lib/audit/live.ts). targetUrl is the crawl's start URL.
+  mode      String  @default("files")
+  targetUrl String? @map("target_url")
+  // Live crawl summary (pages, status codes, redirects, robots/sitemap,
+  // static vs JS rendering). Null for files audits.
+  crawl     Json?
+  // Core Web Vitals from PageSpeed Insights (lab + CrUX field data, per
+  // strategy) or { unavailable: reason }. Null = not measured. Never invented.
+  vitals    Json?
+
   issues SiteIssue[]
 
   createdAt DateTime @default(now()) @map("created_at")

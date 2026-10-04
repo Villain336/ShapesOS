@@ -586,28 +586,49 @@ const create_content_draft: ToolDef = {
 const run_seo_audit: ToolDef = {
   name: "run_seo_audit",
   description:
-    "Run an SEO audit scan over a site in this project. Writes a SiteAudit row plus SiteIssue findings into the audit inbox — it never edits site files. Heavy job: scan the whole file tree.",
+    "Run an SEO audit scan over a site in this project. Writes a SiteAudit row plus SiteIssue findings into the audit inbox — it never edits site files. Heavy job: scan the whole file tree. With live=true it crawls the live site instead (status codes, redirects, canonical, hreflang, noindex, structured data, robots/sitemap, a sample of outbound links).",
   kind: "spend",
   minRole: "editor",
   argsSchema: {
     type: "object",
     properties: {
       siteId: { type: "string", description: "Site id to audit (optional — defaults to the project's first auditable site)." },
+      // Phase 11 (seotools): live-URL crawl (lib/audit/live.ts).
+      live: { type: "boolean", description: "Crawl the live URLs instead of the site files (optional)." },
+      url: { type: "string", description: "Live crawl start URL (optional — defaults to the newest deployment or the project domain)." },
+      maxPages: { type: "number", description: "Live crawl page budget (optional, default 20, max 50)." },
+      renderJs: { type: "boolean", description: "Live crawl: render pages with headless Chromium in the code sandbox when one is available (optional)." },
     },
   },
   async execute(ctx, args) {
     if (!hasRole(ctx, "editor")) throw new Error("editor role required");
+    // Phase 11 (seotools): live mode, optionally JS-rendered in the sandbox.
+    const live = args.live === true || args.live === "true" || !!str(args.url);
+    let renderer: import("@/lib/audit/live").PageRenderer | null = null;
+    if (live && (args.renderJs === true || args.renderJs === "true") && ctx.runId) {
+      try {
+        const { sandboxForRun } = await import("@/lib/sandbox");
+        const { sandboxChromiumRenderer } = await import("@/lib/audit/render-sandbox");
+        renderer = sandboxChromiumRenderer(await sandboxForRun(ctx));
+      } catch {
+        renderer = null; // no sandbox: static fetch, labelled in the crawl summary
+      }
+    }
     // Phase 6: shared with the MCP run_seo_audit tool (lib/audit/project-audit).
     const { site, mock: useMock, result } = await auditProjectSite({
       projectId: ctx.projectId,
       siteId: str(args.siteId) || null,
+      live: live ? { url: str(args.url) ?? null, maxPages: Math.min(Math.max(1, num(args.maxPages) ?? 20), 50), renderer } : null,
     });
+    const crawl = (result.audit as { crawl?: { pagesCrawled?: number; rendering?: string; renderingNote?: string } | null }).crawl ?? null;
     return {
-      summary: `SEO audit finished on "${site.name}"${useMock ? " (mock scan)" : ""}: ${result.issues.length} issue${result.issues.length === 1 ? "" : "s"} in the inbox — nothing was auto-fixed`,
+      summary: `SEO audit finished on "${site.name}"${useMock ? " (mock scan)" : ""}${crawl ? ` (live crawl of ${crawl.pagesCrawled} page${crawl.pagesCrawled === 1 ? "" : "s"}, ${crawl.rendering} rendering)` : ""}: ${result.issues.length} issue${result.issues.length === 1 ? "" : "s"} in the inbox — nothing was auto-fixed`,
       details: {
         auditId: result.audit.id,
         issueCount: result.issues.length,
         mock: useMock,
+        mode: live ? "live" : "files",
+        crawl,
         topIssues: result.issues.slice(0, 10).map((i) => ({
           category: i.category,
           severity: i.severity,

@@ -66,6 +66,17 @@ export interface FetchedPage {
   status: number;
   text: string;
   contentType: string | null;
+  /** Phase 11 (seotools): where the request ended after redirects. */
+  finalUrl?: string;
+  /** Phase 11 (seotools): every redirect hop followed, in order. */
+  redirects?: { from: string; to: string; status: number }[];
+  /** Phase 11 (seotools): response headers (lower-case names). */
+  headers?: Record<string, string>;
+}
+
+export interface PoliteGetOptions {
+  /** Phase 11 (seotools): stop reading the body after this many characters. */
+  maxChars?: number;
 }
 
 const DEFAULT_SLEEP = (ms: number) =>
@@ -105,7 +116,7 @@ export class PoliteFetcher {
   }
 
   /** GET a URL politely. Throws on network error / timeout / bad URL. */
-  async get(url: string): Promise<FetchedPage> {
+  async get(url: string, getOpts: PoliteGetOptions = {}): Promise<FetchedPage> {
     let host: string;
     try {
       host = new URL(url).hostname.toLowerCase();
@@ -120,6 +131,7 @@ export class PoliteFetcher {
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), this.timeoutMs);
+    const redirects: { from: string; to: string; status: number }[] = [];
     try {
       const res = await safeFetch(
         url,
@@ -130,14 +142,22 @@ export class PoliteFetcher {
           },
           signal: controller.signal,
         },
-        { fetchFn: this.fetchImpl, resolve: this.resolve },
+        { fetchFn: this.fetchImpl, resolve: this.resolve, onRedirect: (h) => redirects.push(h) },
       );
-      const text = await res.text();
+      const full = await res.text();
+      const text = getOpts.maxChars !== undefined ? full.slice(0, getOpts.maxChars) : full;
+      const headers: Record<string, string> = {};
+      res.headers.forEach((v, k) => {
+        headers[k.toLowerCase()] = v;
+      });
       return {
         url,
         status: res.status,
         text,
         contentType: res.headers.get("content-type"),
+        finalUrl: redirects.length ? redirects[redirects.length - 1].to : url,
+        redirects,
+        headers,
       };
     } catch (err) {
       if (controller.signal.aborted || (err instanceof Error && err.name === "AbortError")) {
