@@ -3,6 +3,12 @@
 // React/DOM-free on purpose: every function here is unit-testable via
 // `npx tsx --test` without a browser. CommandBar.tsx wires these up to UI.
 
+/**
+ * Window event that opens the palette from anywhere (the sidebar's search
+ * button): `window.dispatchEvent(new Event(OPEN_COMMAND_BAR_EVENT))`.
+ */
+export const OPEN_COMMAND_BAR_EVENT = "shapes:command-bar-open";
+
 // Phase 4a: "records" = workspace records found by /api/search/records.
 export type SectionId = "go" | "records" | "do" | "ask";
 

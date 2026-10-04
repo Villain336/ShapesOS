@@ -9,11 +9,10 @@ import {
 } from "@/lib/session";
 import { INVITE_REQUIRED_PATH, InviteRequiredError } from "@/lib/auth/signup";
 import { TWO_FACTOR_SETUP_PATH } from "@/lib/auth/mfa/policy";
-import { AppSidebar, MobileNav, type SidebarBadges } from "@/components/AppSidebar";
+import { AppSidebar, MobileNav } from "@/components/AppSidebar";
 import { DashboardMain } from "@/components/DashboardMain";
 // Phase 3 (J): desktop header — "needs you" shortcut + notification bell.
 import { AppTopBar } from "@/components/AppTopBar";
-import { NeedsYouBadge } from "@/components/approvals/NeedsYouBadge";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { ChatProvider } from "@/components/chat/ChatContext";
 import { CommandBar } from "@/components/command-bar/CommandBar";
@@ -36,6 +35,8 @@ import { getMembership, roleAtLeast } from "@/lib/authz";
 import { trialView } from "@/lib/billing/trial";
 import { TrialBanner } from "@/components/workspace/TrialBanner";
 import { planHasFeature } from "@/lib/billing/entitlements";
+// Phase 4d: sidebar "Running now" (lead agent → sub-agents) + usage meter.
+import { safeAgentActivity, safeUsageMeter } from "@/lib/aos/activity.server";
 
 export default async function DashboardLayout({
   children,
@@ -54,24 +55,24 @@ export default async function DashboardLayout({
   // Phase 4a: the workspace requires a second factor and this session hasn't
   // passed one → set one up first (lib/auth/mfa/policy.ts).
   if (workspace.requireTwoFactor && !user.twoFactor) redirect(TWO_FACTOR_SETUP_PATH);
-  const [workspaces, membership] = await Promise.all([
+  const [workspaces, membership, activity, usage] = await Promise.all([
     getAccessibleWorkspaces(user.id),
     getMembership(user.id, workspace.id),
+    safeAgentActivity(workspace.id),
+    safeUsageMeter(workspace.id),
   ]);
   const isAdmin = roleAtLeast(membership?.role, "admin");
   const trial = trialView(workspace);
-
-  // Live count pills next to nav rows (see SidebarBadges); the sidebar puts
-  // each one at the end of its row (ml-auto), desktop and mobile.
-  // NeedsYouBadge renders nothing at zero.
-  const sidebarBadges: SidebarBadges = { "needs-you": <NeedsYouBadge /> };
 
   const sidebarProps = {
     user: { name: user.name, email: user.email },
     workspaces: workspaces.map((w) => ({ id: w.id, name: w.name })),
     currentWorkspaceId: workspace.id,
-    badges: sidebarBadges,
     canManageBilling: isAdmin,
+    plan: workspace.plan,
+    // The needs-you count and this tree refresh client-side (polled).
+    initialTree: activity?.tree ? { lead: activity.tree.lead, branches: activity.tree.branches } : null,
+    initialUsage: usage,
   };
 
   // Phase 12 (embeds): Chatwoot widget config resolved server-side; the
