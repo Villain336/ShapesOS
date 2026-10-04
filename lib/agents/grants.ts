@@ -188,6 +188,17 @@ export function connectorGroup(connectorKey: string): ToolGroup {
       return "web";
     case "hubspot": // Phase 11 (conncore): CRM sync is business operations
       return "ops";
+    // Phase 11 (devtools): issue trackers are project operations ("code" is
+    // the sandbox runner and is unavailable without one).
+    case "linear":
+    case "jira":
+      return "ops";
+    case "airtable": // Phase 11 (devtools): bases are working documents (like Notion databases)
+      return "files";
+    case "supabase": // Phase 11 (devtools): read-only SQL is analysis
+      return "data";
+    case "netlify": // Phase 11 (devtools): hosting for your own sites
+      return "site";
     case "google-search-console":
     case "ga4":
     case "google-ads":
@@ -226,6 +237,21 @@ export function connectorAction(connectorKey: string, tool: string): string {
     // Phase 11 (conncore): a HubSpot pull writes your CRM records.
     case "hubspot.sync_from_hubspot":
       return "write_crm_record";
+    // Phase 11 (devtools): issue writes are project records — Tier 2, always asks.
+    case "linear.create_issue":
+    case "linear.update_issue":
+    case "linear.add_comment":
+    case "jira.create_issue":
+    case "jira.transition_issue":
+    case "jira.add_comment":
+      return "write_project_record";
+    // Phase 11 (devtools): Airtable record writes — Tier 2, always asks.
+    case "airtable.create_records":
+    case "airtable.update_records":
+      return "connector_write";
+    // Phase 11 (devtools): deploying your own site, like webflow.publish_site.
+    case "netlify.trigger_deploy":
+      return "publish_owned";
     default:
       return "connector_write";
   }

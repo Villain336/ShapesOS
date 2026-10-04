@@ -9,9 +9,11 @@
 // All functions take explicit params — no Next.js imports — so route
 // handlers stay thin. Tokens are never logged.
 
-import { randomBytes } from "crypto";
+import { createHash, randomBytes } from "crypto";
 import { secrets } from "@/lib/secrets";
 import { getBuiltinMeta, HUBSPOT_SCOPES, MICROSOFT_CALENDAR_SCOPES, MICROSOFT_MAIL_SCOPES, SLACK_BOT_SCOPES } from "@/lib/connectors/m21/registry";
+// Phase 11 (devtools): work-tool connector scopes.
+import { AIRTABLE_SCOPES, JIRA_SCOPES, LINEAR_SCOPES } from "@/lib/connectors/m21/registry";
 
 export interface OAuthProviderConfig {
   authorizeUrl: string;
@@ -27,8 +29,17 @@ export interface OAuthProviderConfig {
    * x-www-form-urlencoded body carrying client_id/client_secret (Google,
    * Meta, Webflow…). "json_basic": JSON body + HTTP Basic client auth
    * (Notion, verified against developers.notion.com/reference/create-a-token).
+   * Phase 11 (devtools): "json": JSON body carrying client_id/client_secret
+   * (Atlassian). "form_basic": x-www-form-urlencoded body + HTTP Basic client
+   * auth, no secret in the body (Airtable).
    */
-  tokenRequest?: "form" | "json_basic";
+  tokenRequest?: "form" | "json_basic" | "json" | "form_basic";
+  /**
+   * Phase 11 (devtools): RFC 7636 PKCE (S256). The code verifier rides inside
+   * the AES-GCM state envelope (never readable by the browser or provider)
+   * and is sent as code_verifier on the code exchange. Airtable requires it.
+   */
+  pkce?: boolean;
   /** Phase 11 (conncore): scope separator on the authorize URL (Slack: ","). Default " ". */
   scopeSeparator?: string;
   /**
@@ -49,6 +60,23 @@ export function buildTokenRequest(
   clientId: string,
   clientSecret: string,
 ): RequestInit {
+  // Phase 11 (devtools): JSON body with the client credentials (Atlassian).
+  if (config.tokenRequest === "json") {
+    return {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({ ...params, client_id: clientId, client_secret: clientSecret }),
+    };
+  }
+  // Phase 11 (devtools): form body + Basic client auth (Airtable).
+  if (config.tokenRequest === "form_basic") {
+    const basic = Buffer.from(`${clientId}:${clientSecret}`, "utf8").toString("base64");
+    return {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json", Authorization: `Basic ${basic}` },
+      body: new URLSearchParams(params),
+    };
+  }
   if (config.tokenRequest === "json_basic") {
     const basic = Buffer.from(`${clientId}:${clientSecret}`, "utf8").toString("base64");
     return {
@@ -245,6 +273,47 @@ export const OAUTH_CONFIGS: Record<string, OAuthProviderConfig> = {
     clientIdEnv: "HUBSPOT_CLIENT_ID",
     clientSecretEnv: "HUBSPOT_CLIENT_SECRET",
   },
+  // Phase 11 (devtools): Linear OAuth2 app. Scopes are comma-separated on the
+  // authorize URL; the token endpoint takes the client credentials in the
+  // form body (both grants). Newer Linear apps get expiring access tokens
+  // with rotating refresh tokens (lib/vault/refresh.ts keeps the newest). Verified against linear.app/developers/oauth-2-0-authentication.
+  linear: {
+    authorizeUrl: "https://linear.app/oauth/authorize",
+    tokenUrl: "https://api.linear.app/oauth/token",
+    scopes: LINEAR_SCOPES,
+    clientIdEnv: "LINEAR_OAUTH_CLIENT_ID",
+    clientSecretEnv: "LINEAR_OAUTH_CLIENT_SECRET",
+    scopeSeparator: ",",
+    extra: { prompt: "consent" },
+  },
+  // Phase 11 (devtools): Jira Cloud via Atlassian OAuth 2.0 (3LO).
+  // audience=api.atlassian.com + prompt=consent on authorize; the token
+  // endpoint takes JSON with the client credentials (both grants) and
+  // rotates refresh tokens (lib/vault/refresh.ts keeps the newest). Verified
+  // against developer.atlassian.com/cloud/jira/platform/oauth-2-3lo-apps.
+  jira: {
+    authorizeUrl: "https://auth.atlassian.com/authorize",
+    tokenUrl: "https://auth.atlassian.com/oauth/token",
+    scopes: JIRA_SCOPES,
+    clientIdEnv: "ATLASSIAN_OAUTH_CLIENT_ID",
+    clientSecretEnv: "ATLASSIAN_OAUTH_CLIENT_SECRET",
+    extra: { audience: "api.atlassian.com", prompt: "consent" },
+    tokenRequest: "json",
+  },
+  // Phase 11 (devtools): Airtable OAuth — authorization code with PKCE
+  // (S256, required). A confidential integration authenticates to the token
+  // endpoint with HTTP Basic (client_id:client_secret) and a form body (both
+  // grants). Access tokens live 60 minutes; refresh tokens rotate (the vault
+  // keeps the newest). Verified against airtable.com/developers/web/api/oauth-reference.
+  airtable: {
+    authorizeUrl: "https://airtable.com/oauth2/v1/authorize",
+    tokenUrl: "https://airtable.com/oauth2/v1/token",
+    scopes: AIRTABLE_SCOPES,
+    clientIdEnv: "AIRTABLE_OAUTH_CLIENT_ID",
+    clientSecretEnv: "AIRTABLE_OAUTH_CLIENT_SECRET",
+    tokenRequest: "form_basic",
+    pkce: true,
+  },
   // NOTE (Phase 18 slice 4, outcome B): Walmart Connect is NOT registered
   // here and never will be as an OAuth connector. Research 2026-10-01
   // (docs/phases/PHASE18-SLICE4-WALMART.md) established there is no public
@@ -260,6 +329,13 @@ export interface OAuthState {
   connectorKey: string;
   exp: number;
   nonce: string;
+  /** Phase 11 (devtools): PKCE code verifier (only for pkce providers; encrypted with the state). */
+  cv?: string;
+}
+
+/** Phase 11 (devtools): RFC 7636 S256 code challenge for a verifier. PURE. */
+export function pkceChallenge(verifier: string): string {
+  return createHash("sha256").update(verifier, "ascii").digest("base64url");
 }
 
 const STATE_TTL_MS = 10 * 60 * 1000;
@@ -327,7 +403,8 @@ export function parseOAuthState(state: string): OAuthState {
     typeof parsed.userId !== "string" ||
     typeof parsed.workspaceId !== "string" ||
     typeof parsed.connectorKey !== "string" ||
-    typeof parsed.exp !== "number"
+    typeof parsed.exp !== "number" ||
+    (parsed.cv !== undefined && typeof parsed.cv !== "string")
   ) {
     throw new Error("Invalid OAuth state: missing fields");
   }
@@ -361,12 +438,15 @@ export function startOAuthFlow(
     );
   }
 
+  // Phase 11 (devtools): PKCE — 32 random bytes → a 43-char base64url verifier.
+  const verifier = config.pkce ? randomBytes(32).toString("base64url") : undefined;
   const state = signOAuthState({
     userId,
     workspaceId,
     connectorKey,
     exp: Date.now() + STATE_TTL_MS,
     nonce: randomBytes(16).toString("hex"),
+    ...(verifier ? { cv: verifier } : {}),
   });
 
   const redirectUri = `${redirectBase.replace(/\/+$/, "")}/api/oauth/callback`;
@@ -377,6 +457,7 @@ export function startOAuthFlow(
     state,
     ...(config.scopes.length ? { scope: config.scopes.join(config.scopeSeparator ?? " ") } : {}),
     ...(config.extra ?? {}),
+    ...(verifier ? { code_challenge: pkceChallenge(verifier), code_challenge_method: "S256" } : {}),
   });
   return { url: `${config.authorizeUrl}?${params.toString()}`, state };
 }

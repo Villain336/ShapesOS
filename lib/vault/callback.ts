@@ -37,6 +37,8 @@ export async function exchangeCodeForTokens(
   code: string,
   redirectUri: string,
   fetchImpl: typeof fetch = fetch,
+  /** Phase 11 (devtools): PKCE code verifier from the signed state. */
+  codeVerifier?: string,
 ): Promise<OAuthTokenResponse> {
   const clientId = (process.env[config.clientIdEnv] ?? "").trim();
   const clientSecret = (process.env[config.clientSecretEnv] ?? "").trim();
@@ -49,7 +51,12 @@ export async function exchangeCodeForTokens(
     config.tokenUrl,
     buildTokenRequest(
       config,
-      { grant_type: "authorization_code", code, redirect_uri: redirectUri },
+      {
+        grant_type: "authorization_code",
+        code,
+        redirect_uri: redirectUri,
+        ...(codeVerifier ? { code_verifier: codeVerifier } : {}),
+      },
       clientId,
       clientSecret,
     ),
@@ -151,12 +158,17 @@ export async function handleOAuthCallback(
   if (!config) {
     throw new Error(`Connector "${parsed.connectorKey}" does not support OAuth2`);
   }
+  // Phase 11 (devtools): a PKCE provider needs the verifier minted at start.
+  if (config.pkce && !parsed.cv) {
+    throw new Error(`Invalid OAuth state: missing PKCE verifier for "${parsed.connectorKey}"`);
+  }
   const token = await exchangeCodeForTokens(
     config,
     parsed.connectorKey,
     code,
     redirectUri,
     deps.fetchImpl ?? fetch,
+    config.pkce ? parsed.cv : undefined,
   );
   const connection = await storeOAuthTokens({
     userId: parsed.userId,
