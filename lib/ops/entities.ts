@@ -430,15 +430,20 @@ const teamMemberDef: OpsEntityDef = {
     email: z.string().email().max(320).optional(),
     // ISO-8601 date; parsed to a Date in createRows (validated there).
     startDate: z.string().max(64).optional(),
+    // Phase 10 (ops-core): workspace-user link + department.
+    userId: z.string().min(1).max(128).optional(),
+    departmentId: z.string().min(1).max(64).optional(),
   }),
   patchSchema: z.object({
     title: z.string().max(200).nullable().optional(),
     email: z.string().email().max(320).nullable().optional(),
     startDate: z.string().max(64).nullable().optional(),
     status: z.enum(["active", "inactive"]).optional(),
+    userId: z.string().min(1).max(128).nullable().optional(),
+    departmentId: z.string().min(1).max(64).nullable().optional(),
   }),
   patchable: true,
-  filterable: ["status"],
+  filterable: ["status", "departmentId", "userId"],
   gatedTransitions: [],
   summarize: (r) => `team member "${r.name}"${r.title ? ` (${r.title})` : ""} → ${r.status}`,
 };
@@ -854,6 +859,127 @@ const slaPolicyDef: OpsEntityDef = {
   summarize: (r) => `SLA ${r.priority}: first response ${r.firstResponseMinutes}m, resolution ${r.resolutionMinutes}m`,
 };
 
+// ---------------------------------------------------------------------------
+// Phase 10 (ops-core): HR — departments, leave policies + ledger
+// adjustments, recruiting (rules in lib/ops/leave.ts and lib/ops/hr.ts).
+// ---------------------------------------------------------------------------
+
+const leaveType = z.enum(["vacation", "sick", "personal"]);
+
+const departmentDef: OpsEntityDef = {
+  slug: "departments",
+  label: "Department",
+  delegate: "opsDepartment",
+  createSchema: z.object({
+    name: z.string().trim().min(1).max(200),
+    managerMemberId: z.string().min(1).max(64).optional(),
+  }),
+  patchSchema: z.object({
+    name: z.string().trim().min(1).max(200).optional(),
+    managerMemberId: z.string().min(1).max(64).nullable().optional(),
+  }).strict(),
+  patchable: true,
+  filterable: [],
+  gatedTransitions: [],
+  summarize: (r) => `department "${r.name}"`,
+};
+
+const leavePolicyDef: OpsEntityDef = {
+  slug: "leave-policies",
+  label: "Leave policy",
+  delegate: "opsLeavePolicy",
+  createSchema: z.object({
+    type: leaveType,
+    yearlyDays: z.number().int().min(0).max(366),
+    carryOverCapDays: z.number().int().min(0).max(366).default(0),
+  }),
+  patchSchema: z.object({
+    yearlyDays: z.number().int().min(0).max(366).optional(),
+    carryOverCapDays: z.number().int().min(0).max(366).optional(),
+    active: z.boolean().optional(),
+  }).strict(),
+  patchable: true,
+  filterable: ["type"],
+  gatedTransitions: [],
+  summarize: (r) => `leave policy ${r.type}: ${r.yearlyDays} days/yr, carry ${r.carryOverCapDays}`,
+};
+
+const leaveAdjustmentDef: OpsEntityDef = {
+  slug: "leave-ledger",
+  label: "Leave ledger entry",
+  delegate: "opsLeaveLedger",
+  // Only manual ADJUSTMENTS are created here ("taken" rows come from
+  // approving leave). Append-only: corrections are new signed rows.
+  createSchema: z.object({
+    memberId: z.string().min(1).max(64),
+    type: leaveType,
+    year: z.number().int().min(2000).max(2100),
+    days: z.number().refine((d) => Number.isFinite(d) && d !== 0 && Math.abs(d) <= 366 && Math.round(d * 100) === d * 100, { message: "days must be non-zero with at most two decimals" }),
+    note: z.string().max(500).optional(),
+  }).transform((b) => ({ memberId: b.memberId, type: b.type, year: b.year, kind: "adjustment" as const, centidays: Math.round(b.days * 100), note: b.note })),
+  patchSchema: z.object({}),
+  patchable: false,
+  filterable: ["memberId", "type", "kind"],
+  gatedTransitions: [],
+  summarize: (r) => `leave ${r.kind} ${r.type} ${Number(r.centidays) / 100}d (${r.year})`,
+};
+
+const jobOpeningDef: OpsEntityDef = {
+  slug: "job-openings",
+  label: "Job opening",
+  delegate: "opsJobOpening",
+  createSchema: z.object({
+    title: z.string().trim().min(1).max(200),
+    departmentId: z.string().min(1).max(64).optional(),
+    location: z.string().max(200).optional(),
+    description: z.string().max(20_000).optional(),
+  }),
+  patchSchema: z.object({
+    title: z.string().trim().min(1).max(200).optional(),
+    departmentId: z.string().min(1).max(64).nullable().optional(),
+    location: z.string().max(200).nullable().optional(),
+    description: z.string().max(20_000).nullable().optional(),
+    status: z.enum(["open", "paused", "closed"]).optional(),
+  }).strict(),
+  patchable: true,
+  filterable: ["status", "departmentId"],
+  gatedTransitions: [],
+  summarize: (r) => `job opening "${r.title}" → ${r.status}`,
+};
+
+const applicantStage = z.enum(["applied", "screening", "interview", "offer", "hired", "rejected"]);
+
+const applicantDef: OpsEntityDef = {
+  slug: "applicants",
+  label: "Applicant",
+  delegate: "opsApplicant",
+  createSchema: z.object({
+    openingId: z.string().min(1).max(64),
+    name: z.string().trim().min(1).max(200),
+    email: z.string().email().max(320).optional(),
+    phone: z.string().max(64).optional(),
+    source: z.string().max(120).optional(),
+    stage: applicantStage.default("applied"),
+    rating: z.number().int().min(1).max(5).optional(),
+    notes: z.string().max(20_000).optional(),
+  }),
+  patchSchema: z.object({
+    stage: applicantStage.optional(),
+    rating: z.number().int().min(1).max(5).nullable().optional(),
+    notes: z.string().max(20_000).nullable().optional(),
+    email: z.string().email().max(320).nullable().optional(),
+    phone: z.string().max(64).nullable().optional(),
+  }).strict(),
+  patchable: true,
+  filterable: ["openingId", "stage"],
+  gatedTransitions: [],
+  summarize: (r) => `applicant "${r.name}" → ${r.stage}`,
+  hooks: {
+    create: async (tx, a, b) => (await import("./hr")).createApplicantRow(tx, a, b),
+    patch: async (tx, a, id, p, e) => (await import("./hr")).patchApplicantRow(tx, a, id, p, e),
+  },
+};
+
 export const OPS_ENTITIES: OpsEntityDef[] = [
   productDef,
   orderDef,
@@ -867,6 +993,11 @@ export const OPS_ENTITIES: OpsEntityDef[] = [
   teamMemberDef,
   leaveRequestDef,
   // Phase 10 (ops-core)
+  departmentDef,
+  leavePolicyDef,
+  leaveAdjustmentDef,
+  jobOpeningDef,
+  applicantDef,
   ticketDef,
   slaPolicyDef,
   taskDef,

@@ -447,6 +447,11 @@ async function createRows(
       // the model stores a Date.
       const data: Record<string, unknown> = { ...base, ...stripInternal(body) };
       if (body.startDate != null) data.startDate = parseDate(body.startDate, "startDate");
+      // Phase 10 (ops-core): an optional workspace-user link must be a member.
+      if (typeof body.userId === "string") {
+        const { assertWorkspaceUser } = await import("./people");
+        await assertWorkspaceUser(tx, actor.workspaceId, body.userId);
+      }
       return [await d.create({ data })];
     }
     case "leave-requests": {
@@ -608,6 +613,12 @@ async function applyPatch(
       data.dueAt = new Date(sentAt.getTime() + 30 * 24 * 3600_000);
     }
   }
+  // Phase 10 (ops-core): team-member user links must be workspace members.
+  if (def.slug === "team-members" && typeof patch.userId === "string") {
+    const { assertWorkspaceUser } = await import("./people");
+    await assertWorkspaceUser(tx, actor.workspaceId, patch.userId);
+  }
+  if (def.slug === "team-members" && patch.startDate != null) data.startDate = parseDate(patch.startDate, "startDate");
   if (def.slug === "projects" && typeof patch.status === "string") {
     // Slice 4: guard the status flow — planning → active → on_hold /
     // completed / cancelled. Terminal states have no exits. Non-status
@@ -624,6 +635,12 @@ async function applyPatch(
     if (patch.status === "approved" || patch.status === "denied") {
       data.decidedBy = actor.userId;
       data.decidedAt = new Date();
+    }
+    // Phase 10 (ops-core): approving deducts the leave balance (one ledger
+    // row per request; refuses to overdraw a policy-tracked balance).
+    if (patch.status === "approved") {
+      const { deductApprovedLeave } = await import("./leave");
+      await deductApprovedLeave(tx, actor, existing);
     }
   }
   if (def.statusTransitions) {

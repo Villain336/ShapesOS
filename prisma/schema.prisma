@@ -606,6 +606,11 @@ model Workspace {
   // Phase 16 slice 9: branded report engine back-relation.
   reportSendApprovals         ReportSendApproval[]
   // Phase 10 (ops-core) back-relations.
+  opsDepartments              OpsDepartment[]
+  opsLeavePolicies            OpsLeavePolicy[]
+  opsLeaveLedger              OpsLeaveLedger[]
+  opsJobOpenings              OpsJobOpening[]
+  opsApplicants               OpsApplicant[]
   opsSlaPolicies              OpsSlaPolicy[]
   opsTickets                  OpsTicket[]
   opsTicketMessages           OpsTicketMessage[]
@@ -9646,6 +9651,129 @@ model OpsTicketMessage {
 }
 
 // ============================================================================
+// Phase 10 (ops-core) — HR: departments, team members linked to workspace
+// users, leave policies + an append-only leave ledger (balances are COMPUTED
+// from policy accrual, carry-over cap and the ledger), recruiting pipeline.
+// ============================================================================
+
+enum OpsLeaveLedgerKind {
+  taken
+  adjustment
+}
+
+enum OpsJobOpeningStatus {
+  open
+  paused
+  closed
+}
+
+enum OpsApplicantStage {
+  applied
+  screening
+  interview
+  offer
+  hired
+  rejected
+}
+
+model OpsDepartment {
+  id              String         @id @default(cuid())
+  workspaceId     String         @map("workspace_id")
+  workspace       Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name            String
+  managerMemberId String?        @map("manager_member_id")
+  manager         OpsTeamMember? @relation("OpsDepartmentManager", fields: [managerMemberId], references: [id], onDelete: SetNull)
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
+
+  members  OpsTeamMember[] @relation("OpsDepartmentMembers")
+  openings OpsJobOpening[]
+
+  @@unique([workspaceId, name])
+  @@map("ops_departments")
+}
+
+// Yearly entitlement per leave type, accrued pro rata by month; unused days
+// carry into the next year up to the cap.
+model OpsLeavePolicy {
+  id               String       @id @default(cuid())
+  workspaceId      String       @map("workspace_id")
+  workspace        Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  type             OpsLeaveType
+  yearlyDays       Int          @map("yearly_days")
+  carryOverCapDays Int          @default(0) @map("carry_over_cap_days")
+  active           Boolean      @default(true)
+  createdAt        DateTime     @default(now()) @map("created_at")
+  updatedAt        DateTime     @updatedAt @map("updated_at")
+
+  @@unique([workspaceId, type])
+  @@map("ops_leave_policies")
+}
+
+// Append-only: approved leave posts one "taken" row (once per request);
+// corrections are signed adjustments. Amounts in hundredths of a day.
+model OpsLeaveLedger {
+  id             String             @id @default(cuid())
+  workspaceId    String             @map("workspace_id")
+  workspace      Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  memberId       String             @map("member_id")
+  member         OpsTeamMember      @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  type           OpsLeaveType
+  year           Int
+  kind           OpsLeaveLedgerKind
+  centidays      Int
+  leaveRequestId String?            @unique @map("leave_request_id")
+  note           String?
+  actor          String?
+  createdAt      DateTime           @default(now()) @map("created_at")
+
+  @@index([workspaceId, memberId, type, year])
+  @@map("ops_leave_ledger")
+}
+
+model OpsJobOpening {
+  id           String              @id @default(cuid())
+  workspaceId  String              @map("workspace_id")
+  workspace    Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  title        String
+  departmentId String?             @map("department_id")
+  department   OpsDepartment?      @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  location     String?
+  description  String?             @db.Text
+  status       OpsJobOpeningStatus @default(open)
+  createdAt    DateTime            @default(now()) @map("created_at")
+  updatedAt    DateTime            @updatedAt @map("updated_at")
+
+  applicants OpsApplicant[]
+
+  @@index([workspaceId, status])
+  @@map("ops_job_openings")
+}
+
+model OpsApplicant {
+  id           String            @id @default(cuid())
+  workspaceId  String            @map("workspace_id")
+  workspace    Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  openingId    String            @map("opening_id")
+  opening      OpsJobOpening     @relation(fields: [openingId], references: [id], onDelete: Cascade)
+  name         String
+  email        String?
+  phone        String?
+  source       String?
+  stage        OpsApplicantStage @default(applied)
+  // 1–5, optional.
+  rating       Int?
+  notes        String?           @db.Text
+  // Set when hired: the team member created for them.
+  hiredMemberId String?          @map("hired_member_id")
+  createdAt    DateTime          @default(now()) @map("created_at")
+  updatedAt    DateTime          @updatedAt @map("updated_at")
+
+  @@index([workspaceId, openingId, stage])
+  @@map("ops_applicants")
+}
+
+// ============================================================================
 // Phase 10 (ops-core) — inventory: warehouses, locations, variants,
 // transfers, reorder rules. Extends the Phase 17 Ops layer (same RLS
 // pattern, same append-only stock ledger). Phase 13's digital twin binds
@@ -10163,11 +10291,20 @@ model OpsTeamMember {
   email       String?
   startDate   DateTime?           @map("start_date")
   status      OpsTeamMemberStatus @default(active)
+  // Phase 10 (ops-core): the workspace user this person signs in as
+  // (Auth.js subject; optional) and their department.
+  userId       String?            @map("user_id")
+  departmentId String?            @map("department_id")
+  department   OpsDepartment?     @relation("OpsDepartmentMembers", fields: [departmentId], references: [id], onDelete: SetNull)
   createdAt   DateTime            @default(now()) @map("created_at")
   updatedAt   DateTime            @updatedAt @map("updated_at")
 
   leaveRequests OpsLeaveRequest[]
+  // Phase 10 (ops-core)
+  managedDepartments OpsDepartment[] @relation("OpsDepartmentManager")
+  leaveLedger        OpsLeaveLedger[]
 
+  @@unique([workspaceId, userId])
   @@index([workspaceId, status, createdAt])
   @@index([workspaceId, name])
   @@map("ops_team_members")
