@@ -8,6 +8,13 @@
 #
 # The app is started with E2E_MOCK_OAUTH=1, which registers the test-only
 # mock OAuth provider and fixture routes. NEVER set that flag in production.
+#
+# CI (.github/workflows/ci.yml, job e2e) runs this same script with:
+#   E2E_DATABASE_URL      the schema owner (migrations + seed)
+#   E2E_APP_DATABASE_URL  the least-privilege app role the server runs as
+#                         (create it first: scripts/db/create-app-role.sql).
+#                         Unset = the server uses E2E_DATABASE_URL (local runs).
+#   E2E_SKIP_BUILD=1      reuse an existing .next build.
 
 set -euo pipefail
 cd "$(dirname "$0")/../.."
@@ -15,6 +22,7 @@ cd "$(dirname "$0")/../.."
 export E2E_BASE_URL="${E2E_BASE_URL:-http://localhost:3000}"
 export E2E_PORT="${E2E_PORT:-3000}"
 export DATABASE_URL="${E2E_DATABASE_URL:-postgresql://marketr:marketr@localhost:5432/marketr_e2e?schema=public}"
+APP_DATABASE_URL="${E2E_APP_DATABASE_URL:-$DATABASE_URL}"
 export E2E_ADMIN_EMAIL="${E2E_ADMIN_EMAIL:-e2e-admin@example.com}"
 export E2E_ADMIN_PASSWORD="${E2E_ADMIN_PASSWORD:-e2e-admin-password}"
 export E2E_EDITOR_EMAIL="${E2E_EDITOR_EMAIL:-e2e-editor@example.com}"
@@ -29,17 +37,21 @@ export E2E_MOCK_OAUTH_CLIENT_SECRET="${E2E_MOCK_OAUTH_CLIENT_SECRET:-e2e-mock-se
 export LLM_API_KEY="${LLM_API_KEY:-e2e-no-llm}"
 export LLM_MODEL="${LLM_MODEL:-e2e-no-model}"
 
-echo "==> [e2e] prisma migrate deploy"
-npx prisma migrate deploy
+echo "==> [e2e] migrate (scripts/db/migrate.sh)"
+sh scripts/db/migrate.sh
 
-echo "==> [e2e] building production bundle (next build)"
-npm run build
+if [ "${E2E_SKIP_BUILD:-}" = "1" ]; then
+  echo "==> [e2e] E2E_SKIP_BUILD=1 — reusing the existing .next build"
+else
+  echo "==> [e2e] building production bundle (next build)"
+  npm run build
+fi
 
 echo "==> [e2e] seeding"
 npx tsx scripts/e2e/seed.mts
 
 echo "==> [e2e] starting next start -p $E2E_PORT"
-npx next start -p "$E2E_PORT" > /tmp/marketr-e2e-server.log 2>&1 &
+DATABASE_URL="$APP_DATABASE_URL" npx next start -p "$E2E_PORT" > /tmp/marketr-e2e-server.log 2>&1 &
 SERVER_PID=$!
 trap 'kill $SERVER_PID 2>/dev/null || true' EXIT
 
