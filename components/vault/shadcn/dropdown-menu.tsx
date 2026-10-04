@@ -55,15 +55,21 @@ function DropdownMenuGroup({ ...props }: MenuPrimitive.Group.Props) {
   return <MenuPrimitive.Group data-slot="dropdown-menu-group" {...props} />
 }
 
+// Base UI's Menu.GroupLabel throws (production error #31) unless it sits
+// inside a Menu.Group, and every caller uses this label as a plain heading
+// (workspace switcher, user menu, assistant project switcher, attachment
+// menu). So it renders a presentational heading; to name a group for
+// assistive tech, put aria-label on DropdownMenuGroup.
 function DropdownMenuLabel({
   className,
   inset,
   ...props
-}: MenuPrimitive.GroupLabel.Props & {
+}: React.ComponentProps<"div"> & {
   inset?: boolean
 }) {
   return (
-    <MenuPrimitive.GroupLabel
+    <div
+      role="presentation"
       data-slot="dropdown-menu-label"
       data-inset={inset}
       className={cn(

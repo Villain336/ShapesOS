@@ -28,6 +28,8 @@ export function PermissionSegmented({
   onChange,
   label,
   disabled,
+  options,
+  locked,
   className,
 }: {
   value: Permission;
@@ -35,18 +37,27 @@ export function PermissionSegmented({
   /** Accessible name, e.g. "Email permission". */
   label: string;
   disabled?: boolean;
+  /**
+   * The choices the underlying setting supports, in kit order (default: all
+   * three). A read-only allow-list has no "Off", so it passes ["ask", "auto"].
+   */
+  options?: readonly Permission[];
+  /** Choices shown but not selectable, with the reason (title + sr text). */
+  locked?: Partial<Record<Permission, string>>;
   className?: string;
 }) {
   const refs = useRef<Array<HTMLButtonElement | null>>([]);
-  const idx = PERMISSION_OPTIONS.findIndex((o) => o.value === value);
+  const shown = PERMISSION_OPTIONS.filter((o) => !options || options.includes(o.value));
+  const selectable = shown.filter((o) => !locked?.[o.value]);
   function onKey(e: KeyboardEvent<HTMLDivElement>) {
     if (!onChange || disabled) return;
     const delta = e.key === "ArrowRight" || e.key === "ArrowDown" ? 1 : e.key === "ArrowLeft" || e.key === "ArrowUp" ? -1 : 0;
-    if (!delta) return;
+    if (!delta || selectable.length === 0) return;
     e.preventDefault();
-    const next = (idx + delta + PERMISSION_OPTIONS.length) % PERMISSION_OPTIONS.length;
-    onChange(PERMISSION_OPTIONS[next]!.value);
-    refs.current[next]?.focus();
+    const at = Math.max(0, selectable.findIndex((o) => o.value === value));
+    const next = selectable[(at + delta + selectable.length) % selectable.length]!;
+    onChange(next.value);
+    refs.current[shown.indexOf(next)]?.focus();
   }
   return (
     <div
@@ -55,8 +66,9 @@ export function PermissionSegmented({
       onKeyDown={onKey}
       className={cn("inline-flex shrink-0 items-center gap-0.5 rounded-full bg-canvas p-1", disabled && "opacity-60", className)}
     >
-      {PERMISSION_OPTIONS.map((o, i) => {
+      {shown.map((o, i) => {
         const on = o.value === value;
+        const why = locked?.[o.value];
         return (
           <button
             key={o.value}
@@ -66,15 +78,20 @@ export function PermissionSegmented({
             type="button"
             role="radio"
             aria-checked={on}
+            aria-disabled={why ? true : undefined}
             tabIndex={on ? 0 : -1}
             disabled={disabled}
-            onClick={() => onChange?.(o.value)}
+            title={why}
+            onClick={() => {
+              if (!why && !on) onChange?.(o.value);
+            }}
             className={cn(
               "h-8 rounded-full px-3 text-sm font-semibold whitespace-nowrap transition-[background-color,color] duration-150",
-              on ? o.selected : "text-ink hover:bg-hover",
+              on ? o.selected : why ? "cursor-not-allowed text-disabled-fg" : "text-ink hover:bg-hover",
             )}
           >
             {o.label}
+            {why ? <span className="sr-only"> ({why})</span> : null}
           </button>
         );
       })}
@@ -174,32 +191,69 @@ export function SwitchRow({
 // Field
 // ---------------------------------------------------------------------------
 
+/**
+ * Helper or error line under a control. Errors carry the red square (shape +
+ * color + text); pair it with aria-invalid + aria-describedby={id} on the
+ * control it belongs to.
+ */
+export function FieldMessage({
+  id,
+  helper,
+  error,
+  className,
+}: {
+  id: string;
+  helper?: ReactNode;
+  error?: string | null;
+  className?: string;
+}) {
+  if (error) {
+    return (
+      <p id={id} role="alert" className={cn("flex items-center gap-2 text-sm font-semibold text-failed-text", className)}>
+        <span aria-hidden className="size-2 shrink-0 bg-failed" />
+        {error}
+      </p>
+    );
+  }
+  if (helper) {
+    return (
+      <p id={id} className={cn("text-sm text-muted", className)}>
+        {helper}
+      </p>
+    );
+  }
+  return null;
+}
+
 export function Field({
   label,
   helper,
   error,
   leading,
   trailing,
+  hideLabel,
   className,
   inputClassName,
   ...input
 }: {
-  label: string;
-  helper?: string;
+  label: ReactNode;
+  helper?: ReactNode;
   error?: string | null;
   /** Icon or prefix inside the field ("$", a clock icon). */
   leading?: ReactNode;
   /** Suffix inside the field ("USD"). */
   trailing?: ReactNode;
+  /** Keep the label for screen readers only (a section heading already names the field). */
+  hideLabel?: boolean;
   className?: string;
   inputClassName?: string;
-} & Omit<React.InputHTMLAttributes<HTMLInputElement>, "className">) {
+} & Omit<React.InputHTMLAttributes<HTMLInputElement>, "className" | "id">) {
   const id = useId();
   const msgId = `${id}-msg`;
   const invalid = !!error;
   return (
     <div className={cn("flex flex-col gap-2", className)}>
-      <label htmlFor={id} className="text-md font-semibold text-ink">
+      <label htmlFor={id} className={cn("text-md font-semibold text-ink", hideLabel && "sr-only")}>
         {label}
       </label>
       <div
@@ -208,6 +262,7 @@ export function Field({
           invalid
             ? "border-failed focus-within:shadow-[0_0_0_3px_var(--aos-failed-tint)]"
             : "border-control focus-within:border-focus focus-within:shadow-[0_0_0_3px_var(--aos-focus-halo)]",
+          input.disabled && "bg-canvas",
         )}
       >
         {leading ? <span className="flex shrink-0 items-center text-muted">{leading}</span> : null}
@@ -216,21 +271,15 @@ export function Field({
           data-focus-ring="container"
           aria-invalid={invalid || undefined}
           aria-describedby={helper || error ? msgId : undefined}
-          className={cn("h-full min-w-0 flex-1 bg-transparent text-base text-ink outline-none placeholder:text-subtle", inputClassName)}
+          className={cn(
+            "h-full min-w-0 flex-1 bg-transparent text-base text-ink outline-none placeholder:text-subtle disabled:text-muted",
+            inputClassName,
+          )}
           {...input}
         />
         {trailing ? <span className="shrink-0 text-sm font-semibold text-muted">{trailing}</span> : null}
       </div>
-      {error ? (
-        <p id={msgId} className="flex items-center gap-2 text-sm font-semibold text-failed-text">
-          <span aria-hidden className="size-2 shrink-0 bg-failed" />
-          {error}
-        </p>
-      ) : helper ? (
-        <p id={msgId} className="text-sm text-muted">
-          {helper}
-        </p>
-      ) : null}
+      <FieldMessage id={msgId} helper={helper} error={error} />
     </div>
   );
 }

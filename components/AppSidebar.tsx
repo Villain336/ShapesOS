@@ -46,6 +46,7 @@ import { useChat } from "@/components/chat/ChatContext";
 import ThreadListSection from "@/components/chat/ThreadListSection";
 import { useNeedsYouCount } from "@/components/approvals/NeedsYouBadge";
 import { OPEN_COMMAND_BAR_EVENT } from "@/components/command-bar/lib";
+import { openNewTask } from "@/components/command-bar/NewTaskDialog";
 import { LogoMark } from "@/components/aos/LogoMark";
 import { AgentTree } from "@/components/aos/AgentTree";
 import { CountBadge } from "@/components/aos/AgentAvatar";
@@ -61,7 +62,6 @@ export type SidebarUsage = { used: number; cap: number; pct: number } | null;
 
 const COLLAPSE_KEY = "shapesos:sidebar:collapsed";
 const ACTIVITY_POLL_MS = 45_000;
-const NEW_TASK_HREF = "/dashboard/assistant";
 const MAX_RUNNING_ROWS = 4;
 
 function initials(user: SidebarUser) {
@@ -538,26 +538,35 @@ export function SidebarPanel({
             ) : null}
           </div>
           {collapsed ? (
-            <RailTip label="New task">
-              <Link
-                href={NEW_TASK_HREF}
-                onClick={onNavigate}
+            <RailTip label="New task (⌘N)">
+              <button
+                type="button"
+                onClick={() => {
+                  onNavigate?.();
+                  openNewTask();
+                }}
                 aria-label="New task"
+                aria-haspopup="dialog"
                 className="aos-press flex size-11 items-center justify-center rounded-full bg-paper text-ink"
               >
                 <Plus className="size-5" aria-hidden />
-              </Link>
+              </button>
             </RailTip>
           ) : (
             <div className="flex items-center gap-2">
-              <Link
-                href={NEW_TASK_HREF}
-                onClick={onNavigate}
+              <button
+                type="button"
+                onClick={() => {
+                  onNavigate?.();
+                  openNewTask();
+                }}
+                aria-haspopup="dialog"
+                title="New task (⌘N)"
                 className="aos-press flex h-11 flex-1 items-center justify-center gap-2 rounded-full bg-paper text-base font-semibold text-ink"
               >
                 <Plus className="size-4" aria-hidden />
                 New task
-              </Link>
+              </button>
               <button
                 type="button"
                 onClick={() => {

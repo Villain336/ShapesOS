@@ -17,7 +17,6 @@ import {
   Kanban,
   Key,
   Crosshair,
-  Plus,
   Rocket,
   ShieldCheck,
   TrendingUp,
@@ -40,10 +39,9 @@ import { stepCounter } from "@/lib/aos/run-steps";
 import { byStatusThenRecent } from "@/lib/aos/status";
 import { loadInbox, resolveInboxViewer } from "@/lib/approvals/inbox";
 import { AgentCard, Banner, LeadAgentCard, LiveActivity, LogoMark, aosButton, type LiveChip, type LiveRun } from "@/components/aos";
+import { NewTaskButton } from "@/components/command-bar/NewTaskButton";
 
 export const dynamic = "force-dynamic";
-
-const NEW_TASK_HREF = "/dashboard/assistant";
 
 const relFmt = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
 function timeAgo(d: Date): string {
@@ -383,10 +381,7 @@ export default async function DashboardPage() {
             ) : null}
           </p>
         </div>
-        <Link href={NEW_TASK_HREF} className={aosButton({ variant: "primary" })}>
-          <Plus className="size-4" aria-hidden />
-          New task
-        </Link>
+        <NewTaskButton />
       </div>
 
       {/* Status banners: only when something needs the user. */}
@@ -444,10 +439,7 @@ export default async function DashboardPage() {
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Link href={NEW_TASK_HREF} className={aosButton({ variant: "primary" })}>
-              <Plus className="size-4" aria-hidden />
-              New task
-            </Link>
+            <NewTaskButton />
             <Link href="/dashboard/missions" className={aosButton({ variant: "secondary" })}>
               <BookOpen className="size-4" aria-hidden />
               Mission templates

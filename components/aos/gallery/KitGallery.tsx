@@ -63,6 +63,8 @@ import {
   type Permission,
 } from "@/components/aos";
 import { DEMO_STEPS, demoTree, demoTreesByState } from "./demo-data";
+import { TaskComposer } from "@/components/aos/Composer";
+import { COMPOSER_TOOLS, composerAgents, formatBytes } from "@/lib/aos/composer";
 
 // ---------------------------------------------------------------------------
 // Layout helpers
@@ -542,36 +544,26 @@ function PaletteMock() {
 }
 
 function Composer() {
-  const [tools, setTools] = useState({ Web: true, Email: false, Code: true });
+  const [agent, setAgent] = useState<string>("researcher");
+  const [prompt, setPrompt] = useState("Compare our Q3 numbers with the top three competitors and draft a one-page brief.");
+  const [tools, setTools] = useState<Record<string, boolean>>({ web: true, email: false, code: true });
+  const [files, setFiles] = useState([{ id: "f1", name: "q3-metrics.csv", size: "48 KB" }]);
   return (
-    <div className="rounded-xl bg-paper p-4 shadow-raised">
-      <div className="flex items-center justify-between gap-3">
-        <button type="button" className="inline-flex h-9 items-center gap-2 rounded-full bg-canvas pr-3 pl-1.5 text-sm font-semibold">
-          <AgentAvatar name="Researcher" size="sm" className="rounded-full" />
-          Researcher
-          <ChevronDown className="size-4" aria-hidden />
-        </button>
-        <span className="text-xs text-muted">Usually takes 3–5 min</span>
-      </div>
-      <p className="mt-4 min-h-16 text-base text-ink">Compare our Q3 numbers with the top three competitors and draft a one-page brief.</p>
-      <span className="mt-3 inline-flex h-9 items-center gap-2 rounded-md bg-canvas px-3 text-sm">
-        <FileText className="size-4" aria-hidden />
-        <span className="aos-mono">q3-metrics.csv</span>
-        <span className="text-xs text-muted">48 KB</span>
-        <X className="size-3.5 text-muted" aria-hidden />
-      </span>
-      <div className="mt-3 flex items-center gap-2 border-t border-line pt-3">
-        <button type="button" aria-label="Attach a file" className="flex size-9 items-center justify-center rounded-full hover:bg-hover-paper">
-          <Paperclip className="size-4" aria-hidden />
-        </button>
-        {(Object.keys(tools) as Array<keyof typeof tools>).map((k) => (
-          <ToolChip key={k} name={k} pressed={tools[k]} onClick={() => setTools((s) => ({ ...s, [k]: !s[k] }))} />
-        ))}
-        <button type="button" aria-label="Send" className="aos-press ml-auto flex size-10 items-center justify-center rounded-full bg-ink text-paper">
-          <ArrowUp className="size-5" aria-hidden />
-        </button>
-      </div>
-    </div>
+    <TaskComposer
+      agents={composerAgents()}
+      agent={agent}
+      onAgentChange={setAgent}
+      hint="Usually takes 3–5 min"
+      prompt={prompt}
+      onPromptChange={setPrompt}
+      error={prompt.trim() ? null : "Describe the task first."}
+      files={files}
+      onAddFiles={(list) => setFiles((f) => [...f, ...list.map((x, i) => ({ id: `${x.name}-${i}-${f.length}`, name: x.name, size: formatBytes(x.size) }))])}
+      onRemoveFile={(id) => setFiles((f) => f.filter((x) => x.id !== id))}
+      tools={COMPOSER_TOOLS.map((t) => ({ key: t.key, label: t.label, pressed: !!tools[t.key] }))}
+      onToggleTool={(k) => setTools((s) => ({ ...s, [k]: !s[k] }))}
+      onSend={() => feedback.toast({ title: "Composer demo", description: "In the app this hands the task to the picked agent." })}
+    />
   );
 }
 
@@ -629,6 +621,22 @@ function CommandAndInputs() {
                 <PermissionSegmented label={`${r.name} permission`} value={perms[r.name]!} onChange={(v) => setPerms((p) => ({ ...p, [r.name]: v }))} />
               </div>
             ))}
+          </div>
+          <p className="mt-4 mb-2 text-xs font-semibold text-muted">Variants: allow-list (no Off) and a locked choice</p>
+          <div className="divide-y divide-line rounded-lg bg-paper shadow-hairline">
+            <div className="flex flex-wrap items-center gap-3 px-4 py-3">
+              <span className="aos-mono min-w-0 flex-1 truncate text-sm">search_docs</span>
+              <PermissionSegmented label="search_docs permission" value={perms.search_docs ?? "auto"} options={["ask", "auto"]} onChange={(v) => setPerms((p) => ({ ...p, search_docs: v }))} />
+            </div>
+            <div className="flex flex-wrap items-center gap-3 px-4 py-3">
+              <span className="min-w-0 flex-1 truncate text-md font-semibold">Move money</span>
+              <PermissionSegmented
+                label="Move money permission"
+                value={perms.money ?? "off"}
+                locked={{ auto: "Tier 3 actions can never run automatically." }}
+                onChange={(v) => setPerms((p) => ({ ...p, money: v }))}
+              />
+            </div>
           </div>
         </div>
         <div>

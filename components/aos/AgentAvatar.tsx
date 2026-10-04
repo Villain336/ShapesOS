@@ -118,3 +118,18 @@ export function KeyCap({ children, className }: { children: React.ReactNode; cla
     </kbd>
   );
 }
+
+/**
+ * A shortcut as keycaps: ["⌘", "N"], ["G", "I"] (a sequence), ["⌥", "1"].
+ * The combo is announced once ("Shortcut ⌘ N"); the caps themselves are hidden.
+ */
+export function KeyCaps({ keys, className }: { keys: readonly string[]; className?: string }) {
+  if (keys.length === 0) return null;
+  return (
+    <span className={cn("inline-flex shrink-0 items-center gap-1", className)} role="img" aria-label={`Shortcut ${keys.join(" ")}`}>
+      {keys.map((k, i) => (
+        <KeyCap key={`${k}-${i}`}>{k}</KeyCap>
+      ))}
+    </span>
+  );
+}

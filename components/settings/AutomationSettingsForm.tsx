@@ -6,6 +6,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { Field, PermissionSegmented, Switch, type Permission } from "@/components/aos/Controls";
 import {
   BellRing,
   Bot,
@@ -116,87 +117,34 @@ function EffectBadge({ effect }: { effect: "require_approval" | "notify" }) {
   );
 }
 
-// Permission segmented control: pill group on a neutral track.
-// Ask = needs + black text, Auto = running, Never = ink.
+// Permission segmented control (kit PermissionSegmented): Ask first / Auto-run
+// / Off map 1:1 onto the stored behaviors ask / auto / never. Tier 3 can never
+// auto-run, so Auto-run is shown locked there (the safety core enforces it).
+const TO_PERMISSION: Record<Behavior, Permission> = { ask: "ask", auto: "auto", never: "off" };
+const TO_BEHAVIOR: Record<Permission, Behavior> = { ask: "ask", auto: "auto", off: "never" };
+const TIER3_LOCK = { auto: "Tier 3 actions can never run automatically. This is un-overridable." } as const;
+
 function BehaviorControl({
   value,
   tier,
+  label,
   onChange,
   disabled,
 }: {
   value: Behavior;
   tier: Tier;
+  label: string;
   onChange: (b: Behavior) => void;
   disabled?: boolean;
 }) {
-  const options: Behavior[] = ["auto", "ask", "never"];
   return (
-    <div
-      className="inline-flex rounded-full border border-line bg-canvas p-0.5"
-      role="radiogroup"
-      aria-label="Automation behavior"
-    >
-      {options.map((opt) => {
-        const locked = tier === 3 && opt === "auto";
-        const active = value === opt;
-        const activeCls =
-          opt === "ask"
-            ? "bg-needs text-ink"
-            : opt === "auto"
-              ? "bg-running text-white"
-              : "bg-ink text-white";
-        return (
-          <button
-            key={opt}
-            type="button"
-            role="radio"
-            aria-checked={active}
-            disabled={disabled || locked}
-            title={locked ? "Tier 3 actions can never run automatically — this is un-overridable." : undefined}
-            onClick={() => onChange(opt)}
-            className={`h-7 min-w-[52px] rounded-full px-2 text-xs font-medium capitalize transition disabled:opacity-40 ${
-              active
-                ? activeCls
-                : locked
-                  ? "cursor-not-allowed text-subtle"
-                  : "text-muted hover:text-ink"
-            }`}
-          >
-            {opt}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
-function Switch({
-  checked,
-  onChange,
-  label,
-}: {
-  checked: boolean;
-  onChange: (v: boolean) => void;
-  label: string;
-}) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      aria-label={label}
-      onClick={() => onChange(!checked)}
-      className={`relative h-[26px] w-[44px] shrink-0 rounded-full transition-colors ${
-        checked ? "bg-ink" : "bg-disabled-fg"
-      }`}
-    >
-      <span
-        aria-hidden="true"
-        className={`absolute top-[3px] h-5 w-5 rounded-full bg-white shadow transition-all ${
-          checked ? "left-[21px]" : "left-[3px]"
-        }`}
-      />
-    </button>
+    <PermissionSegmented
+      label={`${label} permission`}
+      value={TO_PERMISSION[value]}
+      onChange={(p) => onChange(TO_BEHAVIOR[p])}
+      locked={tier === 3 ? TIER3_LOCK : undefined}
+      disabled={disabled}
+    />
   );
 }
 
@@ -211,6 +159,7 @@ export default function AutomationSettingsForm() {
   const [rules, setRules] = useState<EscalationRule[] | null>(null);
   const [tab, setTab] = useState<"policy" | "rules">("policy");
   const [thresholdInput, setThresholdInput] = useState("");
+  const [thresholdError, setThresholdError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -276,10 +225,11 @@ export default function AutomationSettingsForm() {
 
   async function saveThreshold() {
     const dollars = Number(thresholdInput);
-    if (!Number.isFinite(dollars) || dollars < 0 || dollars > 100000) {
-      setError("Threshold must be a non-negative dollar amount.");
+    if (!thresholdInput.trim() || !Number.isFinite(dollars) || dollars < 0 || dollars > 100000) {
+      setThresholdError("Enter $0 to $100,000.");
       return;
     }
+    setThresholdError(null);
     await putSetting("*", "ask", Math.round(dollars * 100));
   }
 
@@ -358,7 +308,7 @@ export default function AutomationSettingsForm() {
           <span className="font-semibold text-ink">How automation works:</span>{" "}
           <span className="font-medium">Tier 0</span> actions (reads, drafts, analysis) always run.{" "}
           <span className="font-medium">Tier 1</span> small actions run on their own only where you
-          set <span className="font-medium">Auto</span> — everything else asks you first.{" "}
+          set <span className="font-medium">Auto-run</span> — everything else asks you first.{" "}
           <span className="font-medium">Tier 2</span> always asks, every time.{" "}
           <span className="font-medium">Tier 3</span> (moving money, signing contracts, deleting
           data) can never run automatically — no toggle, no prompt, no exception. The agent cannot
@@ -415,22 +365,26 @@ export default function AutomationSettingsForm() {
             <div className="min-w-[220px] flex-1">
               <div className="text-[13px] font-semibold text-ink">Small-action threshold</div>
               <div className="text-[12px] text-muted">
-                Tier 1 actions at or under this amount may run automatically when set to Auto.
+                Tier 1 actions at or under this amount may run automatically when set to Auto-run.
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="flex items-center rounded-md border border-line bg-canvas px-2 focus-within:border-focus focus-within:ring-[3px] focus-within:ring-[var(--aos-focus-halo)]">
-                <span className="text-[13px] text-subtle">$</span>
-                <input
-                  value={thresholdInput}
-                  onChange={(e) => setThresholdInput(e.target.value)}
-                  inputMode="decimal"
-                  aria-label="Small-action threshold in dollars"
-                  data-focus-ring="container"
-                  className="w-20 bg-transparent px-1 py-1.5 text-[13px] text-ink outline-none"
-                />
-              </div>
-              <button onClick={saveThreshold} disabled={saving} className={btnPrimary}>
+            <div className="flex items-start gap-2">
+              <Field
+                label="Small-action threshold in dollars"
+                hideLabel
+                value={thresholdInput}
+                onChange={(e) => {
+                  setThresholdInput(e.target.value);
+                  if (thresholdError) setThresholdError(null);
+                }}
+                inputMode="decimal"
+                leading={<span className="text-base">$</span>}
+                trailing="USD"
+                inputClassName="aos-mono"
+                error={thresholdError}
+                className="w-60"
+              />
+              <button onClick={saveThreshold} disabled={saving} className={`${btnPrimary} mt-1`}>
                 <Save size={14} />
                 Save
               </button>
@@ -470,6 +424,7 @@ export default function AutomationSettingsForm() {
                         <BehaviorControl
                           value={behavior}
                           tier={a.tier}
+                          label={a.label}
                           disabled={saving}
                           onChange={(b) =>
                             putSetting(a.action, b, row?.thresholdCents ?? null)
@@ -510,7 +465,7 @@ export default function AutomationSettingsForm() {
           </div>
           <p className="text-[12px] text-muted">
             Leave a threshold blank to use the workspace default ({fmtDollars(data.thresholdCents)}).
-            Tier 3 rows always show Never — that setting is locked by the safety core, not by this page.
+            Tier 3 rows can never be set to Auto-run. That lock lives in the safety core, not on this page.
           </p>
         </div>
       )}
@@ -520,7 +475,7 @@ export default function AutomationSettingsForm() {
           <p className="text-[13px] text-muted">
             Escalation rules stop the system on defined conditions instead of asking you about
             everything. Any rule with effect <span className="font-medium">Require approval</span>{" "}
-            forces the action to Tier 2, even if its toggle is set to Auto.
+            forces the action to Tier 2, even if it is set to Auto-run.
           </p>
 
           <div className="overflow-x-auto rounded-lg border border-line bg-paper">
@@ -548,6 +503,7 @@ export default function AutomationSettingsForm() {
                     <td className="px-3 py-2.5">
                       <Switch
                         checked={rule.enabled}
+                        disabled={saving}
                         onChange={(v) =>
                           putRules(rules.map((r) => (r.id === rule.id ? { ...r, enabled: v } : r)))
                         }

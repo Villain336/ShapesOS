@@ -67,6 +67,18 @@ interface ChatContextValue {
   addPendingAttachment: (a: PendingAttachment) => void;
   removePendingAttachment: (id: string) => void;
   clearPendingAttachments: () => void;
+  /**
+   * Phase 4d: queue a task from the New task composer. The assistant page
+   * sends it as the first message of a new thread once `projectId` is open.
+   */
+  queueTask: (task: QueuedTask) => void;
+}
+
+/** A composed task waiting for the assistant page to open its project. */
+export interface QueuedTask {
+  projectId: string;
+  content: string;
+  attachmentIds: string[];
 }
 
 const ChatContext = createContext<ChatContextValue | null>(null);
@@ -86,6 +98,11 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
   const [sending, setSending] = useState(false);
   const [loadingThreads, setLoadingThreads] = useState(false);
   const [pendingAttachments, setPendingAttachments] = useState<PendingAttachment[]>([]);
+  // Phase 4d: a task handed off from the New task composer, sent as the first
+  // message of a fresh thread once the assistant has loaded that project.
+  const [queuedTask, setQueuedTask] = useState<QueuedTask | null>(null);
+  const [loadedProjectId, setLoadedProjectId] = useState<string | null>(null);
+  const sendingRef = useRef(false);
   const sessionRef = useRef<ChatSession | null>(null);
   sessionRef.current = session;
   const pendingRef = useRef<PendingAttachment[]>([]);
@@ -116,6 +133,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     setMessages([]);
     setSending(false);
     setPendingAttachments([]);
+    setLoadedProjectId(null);
     if (!session) {
       setLoadingThreads(false);
       return;
@@ -139,7 +157,10 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
           if (!cancelled) setMessages(tData.messages ?? []);
         }
       } finally {
-        if (!cancelled) setLoadingThreads(false);
+        if (!cancelled) {
+          setLoadingThreads(false);
+          setLoadedProjectId(session.projectId);
+        }
       }
     })();
     return () => {
@@ -197,35 +218,40 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     [activeId, openThread],
   );
 
-  const sendMessage = useCallback(
-    async (raw: string) => {
+  /**
+   * Send `text` into `threadId` (null = a fresh thread on the current
+   * project). `staged` = the attachments came from the staged tray and are
+   * cleared once the server accepts them.
+   */
+  const deliver = useCallback(
+    async (threadIdIn: string | null, text: string, attachmentIds: string[], staged: boolean) => {
       const s = sessionRef.current;
-      const text = raw.trim();
-      if (!text || sending || !s || !s.canEdit) return;
-      const attachmentIds = pendingRef.current.map((a) => a.id);
-      let threadId = activeId;
-      if (!threadId) {
-        const res = await fetch("/api/chat/threads", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ projectId: s.projectId }),
-        });
-        if (!res.ok) return;
-        const data = await res.json();
-        threadId = data.thread.id as string;
-        setThreads((prev) => [data.thread, ...prev]);
-        setActiveId(threadId);
-      }
-      const optimistic: ChatMessage = {
-        id: `tmp-${Date.now()}`,
-        role: "user",
-        content: text,
-        toolCalls: null,
-        createdAt: new Date().toISOString(),
-      };
-      setMessages((prev) => [...prev, optimistic]);
-      setSending(true);
+      if (!text || sendingRef.current || !s || !s.canEdit) return;
+      sendingRef.current = true;
+      let threadId = threadIdIn;
       try {
+        if (!threadId) {
+          const res = await fetch("/api/chat/threads", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ projectId: s.projectId }),
+          });
+          if (!res.ok) return;
+          const data = await res.json();
+          threadId = data.thread.id as string;
+          setThreads((prev) => [data.thread, ...prev]);
+          setActiveId(threadId);
+          if (!threadIdIn) setMessages([]);
+        }
+        const optimistic: ChatMessage = {
+          id: `tmp-${Date.now()}`,
+          role: "user",
+          content: text,
+          toolCalls: null,
+          createdAt: new Date().toISOString(),
+        };
+        setMessages((prev) => [...prev, optimistic]);
+        setSending(true);
         const res = await fetch(`/api/chat/threads/${threadId}/messages`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -249,7 +275,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
           return;
         }
         // Attachments were accepted — clear the staged tray.
-        if (attachmentIds.length > 0) setPendingAttachments([]);
+        if (staged && attachmentIds.length > 0) setPendingAttachments([]);
         // Re-fetch the thread for the authoritative message list (includes tool rows).
         const threadRes = await fetch(`/api/chat/threads/${threadId}`);
         if (threadRes.ok) {
@@ -262,11 +288,36 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
           );
         }
       } finally {
+        sendingRef.current = false;
         setSending(false);
       }
     },
-    [activeId, sending],
+    [],
   );
+
+  const sendMessage = useCallback(
+    async (raw: string) => {
+      const text = raw.trim();
+      if (!text || sending) return;
+      await deliver(activeId, text, pendingRef.current.map((a) => a.id), true);
+    },
+    [activeId, sending, deliver],
+  );
+
+  const queueTask = useCallback((task: QueuedTask) => {
+    setQueuedTask(task);
+  }, []);
+
+  // Phase 4d: the composer's task goes out once its project's threads have
+  // loaded (so the load can't overwrite the new thread). Viewers can't post;
+  // their queued task is dropped and the page stays read-only as before.
+  useEffect(() => {
+    const q = queuedTask;
+    if (!q || !session || session.projectId !== q.projectId || loadedProjectId !== q.projectId) return;
+    setQueuedTask(null);
+    if (!session.canEdit) return;
+    void deliver(null, q.content.trim(), q.attachmentIds, false);
+  }, [queuedTask, session, loadedProjectId, deliver]);
 
   return (
     <ChatContext.Provider
@@ -288,6 +339,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         addPendingAttachment,
         removePendingAttachment,
         clearPendingAttachments,
+        queueTask,
       }}
     >
       {children}
