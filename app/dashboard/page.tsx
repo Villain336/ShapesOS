@@ -1,9 +1,15 @@
-// Marketr — dashboard home: attention queue, project vitals, and the
-// shortest path from "what's happening" to "what to do next".
+// ShapesOS — the agent home (Overview). Top to bottom: status banners when
+// something needs the user (approvals waiting → yellow "Review all"; work
+// that stopped → red "Reconnect" / "Open"), the lead agent's card with its
+// sub-agents branching beneath it (one lead per workspace — DESIGN.md
+// "Agents: one lead, many sub-agents"), live activity, the missions and
+// schedules in flight as status-band cards, then the attention queue and
+// projects. An empty workspace gets an invitation to hand over a first task.
 
 import Link from "next/link";
 import {
   Bell,
+  BookOpen,
   ChevronRight,
   CheckCircle,
   Clock,
@@ -11,6 +17,7 @@ import {
   Kanban,
   Key,
   Crosshair,
+  Plus,
   Rocket,
   ShieldCheck,
   TrendingUp,
@@ -26,8 +33,17 @@ import ProjectCreateForm from "@/components/ProjectCreateForm";
 import { Card, CardBody, CardHeader } from "@/components/vault/Card";
 import { EmptyState } from "@/components/vault/EmptyState";
 import { ValuePill } from "@/components/vault/atoms/ValuePill";
+import { safeAgentActivity, type ScheduleWork } from "@/lib/aos/activity.server";
+import { deriveBanners, failedWorkFromTree, type FailedWork } from "@/lib/aos/home";
+import { SUB_AGENTS, type AgentTree, type MissionView } from "@/lib/aos/agents";
+import { stepCounter } from "@/lib/aos/run-steps";
+import { byStatusThenRecent } from "@/lib/aos/status";
+import { loadInbox, resolveInboxViewer } from "@/lib/approvals/inbox";
+import { AgentCard, Banner, LeadAgentCard, LiveActivity, LogoMark, aosButton, type LiveChip, type LiveRun } from "@/components/aos";
 
 export const dynamic = "force-dynamic";
+
+const NEW_TASK_HREF = "/dashboard/assistant";
 
 const relFmt = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
 function timeAgo(d: Date): string {
@@ -48,6 +64,105 @@ type AttentionRow = {
   cta: string;
 };
 
+/** Approvals waiting on this member, grouped by queue (best effort). */
+async function approvalsSummary(userId: string, workspaceId: string) {
+  try {
+    const viewer = await resolveInboxViewer(userId, workspaceId);
+    if (!viewer) return { actionable: 0, sources: [] as string[] };
+    const inbox = await loadInbox(viewer, { limitPerSource: 25 });
+    return {
+      actionable: inbox.actionable,
+      sources: inbox.sources.filter((s) => s.actionable > 0).map((s) => s.label),
+    };
+  } catch {
+    return { actionable: 0, sources: [] as string[] };
+  }
+}
+
+// ── Work cards (missions + schedules) ──────────────────────────────────────
+
+function missionTools(m: MissionView): string[] {
+  const seen = new Set<string>();
+  for (const b of m.branches) {
+    const key = b.key as keyof typeof SUB_AGENTS;
+    for (const t of SUB_AGENTS[key]?.tools ?? []) seen.add(t);
+  }
+  return [...seen].slice(0, 3);
+}
+
+function missionCard(m: MissionView) {
+  const team = m.branches.map((b) => b.name);
+  const action =
+    m.status === "needs"
+      ? { label: "Review", href: "/dashboard/approvals" }
+      : m.status === "failed" && m.runId
+        ? { label: "Open run", href: `/dashboard/runs/${m.runId}` }
+        : { label: "Open mission", href: m.href };
+  return (
+    <AgentCard
+      key={`m:${m.id}`}
+      status={m.status}
+      title={m.name}
+      eyebrow={team.length ? `Mission · Strategist → ${team.join(", ")}` : "Mission · Strategist"}
+      description={m.line}
+      tools={missionTools(m)}
+      meta={m.progress ? stepCounter(m.progress.done, m.progress.total) : `Updated ${timeAgo(new Date(m.updatedAt))}`}
+      action={action}
+    />
+  );
+}
+
+function scheduleCard(s: ScheduleWork) {
+  const meta =
+    s.status === "failed"
+      ? `Stopped ${timeAgo(new Date(s.updatedAt))}`
+      : s.status === "running"
+        ? "Running now"
+        : s.status === "needs"
+          ? "Waiting for your approval"
+          : s.status === "queued"
+            ? "Queued"
+            : `Ran ${timeAgo(new Date(s.updatedAt))}`;
+  const action = s.status === "needs" ? { label: "Review", href: "/dashboard/approvals" } : { label: "Open run", href: s.href };
+  return (
+    <AgentCard
+      key={`s:${s.id}`}
+      status={s.status}
+      title={s.name}
+      eyebrow="Schedule"
+      description={s.status === "failed" && s.error ? s.error : s.description}
+      tools={s.tools}
+      meta={meta}
+      action={action}
+    />
+  );
+}
+
+function liveRunFor(tree: AgentTree): { run: LiveRun | null; chips: LiveChip[] } {
+  const running = tree.branches.find((b) => b.status === "running");
+  const mission = running?.missionId ? tree.missions.find((m) => m.id === running.missionId) : tree.missions.find((m) => m.status === "running");
+  const run: LiveRun | null = running
+    ? {
+        title: `${running.name}: ${running.line}`,
+        subtitle: running.missionName ?? undefined,
+        progress: mission?.progress ?? null,
+        href: running.href ?? undefined,
+      }
+    : mission
+      ? { title: mission.name, subtitle: mission.line, progress: mission.progress, href: mission.href }
+      : null;
+  const chips: LiveChip[] = tree.branches
+    .filter((b) => b.status === "needs" || b.status === "failed")
+    .slice(0, 4)
+    .map((b) => ({
+      key: b.key,
+      status: b.status,
+      label: `${b.name} ${b.status === "needs" ? "needs you" : "failed"}`,
+      href: b.status === "needs" ? "/dashboard/approvals" : (b.href ?? undefined),
+    }));
+  return { run, chips };
+}
+
 export default async function DashboardPage() {
   const user = await requireUser();
   if (!user) return null; // layout already redirects
@@ -56,13 +171,17 @@ export default async function DashboardPage() {
   // Phase 3: a brand-new workspace opens on first-run setup, once (admins only).
   const me = await getMembership(user.id, workspace.id);
   if (needsOnboarding(workspace, me?.role)) redirect("/dashboard/welcome");
-  const projects = await prisma.project.findMany({
-    where: { workspaceId: workspace.id },
-    orderBy: { createdAt: "desc" },
-    include: {
-      _count: { select: { keywords: true, contentItems: true, workflows: true } },
-    },
-  });
+  const [projects, activity, approvals] = await Promise.all([
+    prisma.project.findMany({
+      where: { workspaceId: workspace.id },
+      orderBy: { createdAt: "desc" },
+      include: {
+        _count: { select: { keywords: true, contentItems: true, workflows: true } },
+      },
+    }),
+    safeAgentActivity(workspace.id),
+    approvalsSummary(user.id, workspace.id),
+  ]);
   const projectIds = projects.map((p) => p.id);
   const provider = providerStatus();
 
@@ -127,6 +246,30 @@ export default async function DashboardPage() {
   const scoreByProject = new Map(latestScores.map((s) => [s.projectId, s.score]));
   const totalKeywords = projects.reduce((s, p) => s + p._count.keywords, 0);
   const totalContent = projects.reduce((s, p) => s + p._count.contentItems, 0);
+
+  // ── agents: lead → sub-agents, work cards, banners ───────
+  const tree = activity?.tree ?? null;
+  const schedules = activity?.schedules ?? [];
+  const failedSchedules: FailedWork[] = schedules
+    .filter((s) => s.status === "failed")
+    .map((s) => ({ key: `schedule:${s.id}`, name: s.name, detail: s.error ?? "The last scheduled run failed", href: s.href }));
+  const banners = deriveBanners({ approvals, failed: [...failedWorkFromTree(tree), ...failedSchedules] });
+  // Missions and schedules in flight, most urgent first (needs > failed > running > …).
+  const workCards = [
+    ...(tree?.missions ?? []).slice(0, 8).map((m) => ({ status: m.status, updatedAt: m.updatedAt, el: missionCard(m) })),
+    ...schedules.slice(0, 6).map((s) => ({ status: s.status, updatedAt: s.updatedAt, el: scheduleCard(s) })),
+  ]
+    .sort(byStatusThenRecent)
+    .map((w) => w.el);
+  const live = tree ? liveRunFor(tree) : null;
+  const hasAgentWork = !!tree || schedules.length > 0;
+  const leadAction = tree
+    ? tree.lead.status === "needs"
+      ? { label: "Review all", href: "/dashboard/approvals" }
+      : tree.lead.href
+        ? { label: "Open mission", href: tree.lead.href }
+        : null
+    : null;
 
   // ── attention queue ──────────────────────────────────────
   const attention: AttentionRow[] = [];
@@ -221,18 +364,14 @@ export default async function DashboardPage() {
     <div className="flex flex-col gap-6">
       {/* Page headline */}
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="aos-heading">
-            {workspace.name}
-          </h1>
+        <div className="min-w-0">
+          <h1 className="aos-heading">{workspace.name}</h1>
           <p className="mt-2 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-muted">
             <span>Plan</span>
             <ValuePill>{workspace.plan}</ValuePill>
             <span aria-hidden className="text-subtle">·</span>
             <span>Data</span>
-            <ValuePill>
-              {provider.isLive ? "DataForSEO (live)" : "Mock"}
-            </ValuePill>
+            <ValuePill>{provider.isLive ? "DataForSEO (live)" : "Mock"}</ValuePill>
             {lastRun ? (
               <>
                 <span aria-hidden className="text-subtle">·</span>
@@ -244,16 +383,78 @@ export default async function DashboardPage() {
             ) : null}
           </p>
         </div>
-        {projects.length > 0 ? (
-          <Link
-            href={`/dashboard/assistant?project=${projects[0]!.id}`}
-            className="aos-press inline-flex h-control items-center gap-2 rounded-full bg-ink px-5.5 text-base font-semibold text-white hover:bg-night-hover"
-          >
-            <TrendingUp className="size-4" />
-            Ask ShapesOS
-          </Link>
-        ) : null}
+        <Link href={NEW_TASK_HREF} className={aosButton({ variant: "primary" })}>
+          <Plus className="size-4" aria-hidden />
+          New task
+        </Link>
       </div>
+
+      {/* Status banners: only when something needs the user. */}
+      {banners.length ? (
+        <div className="flex flex-col gap-2.5" aria-label="Needs your attention">
+          {banners.map((b) => (
+            <Banner
+              key={b.key}
+              status={b.status as "needs" | "failed"}
+              title={b.title}
+              description={b.description}
+              action={b.action}
+            />
+          ))}
+        </div>
+      ) : null}
+
+      {hasAgentWork ? (
+        <>
+          <section aria-labelledby="agents-h" className="flex flex-col gap-3">
+            <div className="flex items-baseline justify-between">
+              <h2 id="agents-h" className="aos-subheading">
+                Your agents
+              </h2>
+              <Link href="/dashboard/runs" className="text-sm font-semibold text-ink hover:underline">
+                All runs
+              </Link>
+            </div>
+            <div className="grid gap-4 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
+              {tree ? <LeadAgentCard tree={tree} action={leadAction} /> : null}
+              <div className="flex min-w-0 flex-col gap-4">
+                {tree ? <LiveActivity counts={tree.counts} run={live?.run} chips={live?.chips} /> : null}
+                {/* The most urgent piece of work sits beside the lead. */}
+                {workCards[0] ?? null}
+              </div>
+            </div>
+            {workCards.length > 1 ? (
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{workCards.slice(1)}</div>
+            ) : null}
+          </section>
+        </>
+      ) : (
+        <section
+          aria-labelledby="empty-agents-h"
+          className="flex flex-col items-start gap-4 rounded-lg bg-paper p-6 shadow-hairline sm:flex-row sm:items-center sm:p-8"
+        >
+          <LogoMark size={56} />
+          <div className="min-w-0 flex-1">
+            <h2 id="empty-agents-h" className="text-2xl leading-tight font-extrabold stretch-display tracking-display text-ink">
+              Hand your first goal to an agent
+            </h2>
+            <p className="mt-2 max-w-[60ch] text-md text-muted">
+              Describe what you want done. The lead agent plans it, hands each step to a sub-agent, and asks you before
+              anything goes out. Live work shows up here and under Running now.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Link href={NEW_TASK_HREF} className={aosButton({ variant: "primary" })}>
+              <Plus className="size-4" aria-hidden />
+              New task
+            </Link>
+            <Link href="/dashboard/missions" className={aosButton({ variant: "secondary" })}>
+              <BookOpen className="size-4" aria-hidden />
+              Mission templates
+            </Link>
+          </div>
+        </section>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
         {/* Main column */}
