@@ -20,6 +20,10 @@ const Body = z.object({
   sessionId: z.string().min(1).max(64),
   amountCents: z.number().int().positive().max(2_147_483_647),
   clientOrderId: z.string().regex(CLIENT_ORDER_ID_RE),
+  // The till's try count for this sale: a retry after a declined/cancelled
+  // card is a NEW payment (a fresh Stripe idempotency key); a resent request
+  // of the same try is the same payment.
+  attempt: z.number().int().min(1).max(100).default(1),
 });
 
 function notConnected() {
@@ -33,7 +37,7 @@ export async function POST(req: Request) {
     const raw = await readJsonBody(req);
     const parsed = Body.safeParse(raw);
     if (!raw || !parsed.success) return Response.json({ error: parsed.error?.issues[0]?.message ?? "Invalid card payment" }, { status: 400 });
-    const { sessionId, amountCents, clientOrderId } = parsed.data;
+    const { sessionId, amountCents, clientOrderId, attempt } = parsed.data;
     const ctx = await withWorkspaceScope(actor.workspaceId, async (tx) => {
       const s = await tx.opsPosSession.findFirst({ where: { id: sessionId, workspaceId: actor.workspaceId }, include: { register: { select: { terminalReaderId: true } } } });
       return { session: s, keys: await tenantKeys(tx, actor.workspaceId) };
@@ -46,7 +50,7 @@ export async function POST(req: Request) {
       amountCents,
       currency: ctx.keys.currency,
       readerId: ctx.session.register.terminalReaderId,
-      idempotencyKey: `${clientOrderId}-${amountCents}`,
+      idempotencyKey: `${clientOrderId}-${amountCents}-${attempt}`,
       metadata: { workspace_id: actor.workspaceId, pos_session_id: sessionId, client_order_id: clientOrderId },
     });
     return Response.json({ paymentIntentId: p.id, status: p.status, amountCents: p.amountCents, mode: adapter.mode });

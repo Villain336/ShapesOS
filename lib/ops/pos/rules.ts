@@ -148,3 +148,18 @@ function cryptoRandom(): number {
   if (c?.getRandomValues) return c.getRandomValues(new Uint32Array(1))[0]! / 2 ** 32;
   return Math.random();
 }
+
+// ---------------------------------------------------------------------------
+// Offline estimate (client side, no promotions): the same arithmetic as the
+// storefront's priceCart for a sale without a code — subtotal, then tax at
+// the register's rate on it, rounded half-up once. Used only when the till
+// can't reach the server; the queued sale is re-priced on replay and refused
+// (reported to the cashier) if the server's total differs.
+// ---------------------------------------------------------------------------
+
+export function estimateOffline(lines: Array<{ qty: number; unitPriceCents: number }>, taxRateBps: number): { subtotalCents: number; taxCents: number; totalCents: number } {
+  const subtotalCents = lines.reduce((s, l) => s + l.qty * l.unitPriceCents, 0);
+  const bps = Number.isInteger(taxRateBps) && taxRateBps > 0 ? taxRateBps : 0;
+  const taxCents = bps && subtotalCents > 0 ? Math.floor((2 * subtotalCents * bps + 10_000) / 20_000) : 0;
+  return { subtotalCents, taxCents, totalCents: subtotalCents + taxCents };
+}

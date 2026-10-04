@@ -11,6 +11,7 @@ import {
   canMoveSession,
   cashDifferenceCents,
   describeDifference,
+  estimateOffline,
   expectedCashCents,
   newClientOrderId,
   sessionTotals,
@@ -21,6 +22,7 @@ import { classifySend, enqueue, readQueue, replayQueue, type KeyValueStore, type
 import { mockTerminal, stripeTerminalRest, terminalAdapter, TerminalError } from "../pos/terminal";
 import { assertBalanced, posSessionCloseLines, type DraftLine } from "../accounting/rules";
 import { OPS_ENTITY_MAP } from "../entities";
+import { priceCart } from "../store/pricing";
 import { classifyOpsWrite } from "../gate";
 
 function memStore(): KeyValueStore & { data: Map<string, string> } {
@@ -235,5 +237,26 @@ describe("Stripe Terminal adapter (UNVERIFIED-LIVE: fake fetch)", () => {
     assert.match(p.id, /^mock_pi_777_[0-9a-f]{16}$/);
     assert.deepEqual(await mockTerminal().getPayment(p.id), { id: p.id, status: "succeeded", amountCents: 777, currency: "usd" });
     await assert.rejects(mockTerminal().getPayment("pi_real"), TerminalError, "the mock never vouches for a real reference");
+  });
+});
+
+describe("offline estimate", () => {
+  it("matches the server's priceCart for a sale without a code", () => {
+    for (const [lines, bps] of [
+      [[{ qty: 2, unitPriceCents: 1000 }], 800],
+      [[{ qty: 3, unitPriceCents: 333 }, { qty: 1, unitPriceCents: 1 }], 825],
+      [[{ qty: 1, unitPriceCents: 5 }], 1250],
+      [[{ qty: 7, unitPriceCents: 199 }], 0],
+    ] as Array<[Array<{ qty: number; unitPriceCents: number }>, number]>) {
+      const catalog = new Map(
+        lines.map((l, i) => [
+          `p${i}|`,
+          { productId: `p${i}`, variantId: `pvd_p${i}`, publicVariantId: null, listingId: "", listingSlug: "", name: "x", sku: "x", productSku: "x", unitPriceCents: l.unitPriceCents, trackInventory: false, available: null, sellable: true },
+        ]),
+      );
+      const server = priceCart({ lines: lines.map((l, i) => ({ productId: `p${i}`, variantId: null, qty: l.qty })), catalog, promoCode: null, promotion: null, taxRateBps: bps });
+      const est = estimateOffline(lines, bps);
+      assert.deepEqual(est, { subtotalCents: server.subtotalCents, taxCents: server.taxCents, totalCents: server.totalCents });
+    }
   });
 });
