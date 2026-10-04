@@ -18,6 +18,7 @@
 // server-computed from line items, never trusted from the client.
 
 import { z } from "zod";
+import type { Prisma } from "@prisma/client";
 
 export interface OpsGatedTransition {
   /** The PATCH field whose move to one of `to` is a gated write. */
@@ -49,6 +50,29 @@ export interface OpsEntityDef {
    */
   statusTransitions?: Record<string, string[]>;
   summarize: (row: Record<string, unknown>) => string;
+  /**
+   * Phase 10 (ops-core): entity-specific create/patch rules. When set, the
+   * DocType service (lib/ops/doctype.ts) calls them instead of the generic
+   * insert/update — validation, audit, gating and status-transition checks
+   * still run around them. Implementations live in lib/ops/* and are
+   * imported lazily (they import the service themselves).
+   */
+  hooks?: OpsEntityHooks;
+}
+
+export interface OpsEntityHooks {
+  create?: (
+    tx: Prisma.TransactionClient,
+    actor: { workspaceId: string; userId: string },
+    body: Record<string, unknown>,
+  ) => Promise<Record<string, unknown>>;
+  patch?: (
+    tx: Prisma.TransactionClient,
+    actor: { workspaceId: string; userId: string },
+    id: string,
+    patch: Record<string, unknown>,
+    existing: Record<string, unknown>,
+  ) => Promise<Record<string, unknown>>;
 }
 
 // ---------------------------------------------------------------------------
@@ -300,13 +324,16 @@ const inventoryTxnDef: OpsEntityDef = {
     reason: z.enum(["sale", "restock", "adjustment"]),
     actor: z.string().max(128).optional(),
     note: z.string().max(2000).optional(),
+    // Phase 10 (ops-core): variant (default variant when omitted) + location.
+    variantId: z.string().min(1).max(64).optional(),
+    locationId: z.string().min(1).max(64).optional(),
   }),
   patchSchema: z.object({}),
   // Immutable ledger — PATCH returns 405.
   patchable: false,
   // Slice 3: productId filterable so the UI can show per-product history
   // through the generic route.
-  filterable: ["reason", "productId"],
+  filterable: ["reason", "productId", "locationId", "variantId", "transferId"],
   gatedTransitions: [],
   summarize: (r) => `inventory ${r.reason} ${r.delta} on ${r.productId}`,
 };
@@ -319,6 +346,9 @@ const poLineItemSchema = z.object({
   sku: z.string().max(64).optional(),
   qty: z.number().int().min(1).max(100_000),
   priceCents: z.number().int().min(0).max(1_000_000_000),
+  // Phase 10 (ops-core): receive into this variant / location.
+  variantId: z.string().min(1).max(64).optional(),
+  locationId: z.string().min(1).max(64).optional(),
 });
 
 const purchaseOrderDef: OpsEntityDef = {
@@ -465,6 +495,147 @@ const workflowRunDef: OpsEntityDef = {
   summarize: (r) => `workflow "${r.workflowName}" → ${r.status}`,
 };
 
+// ---------------------------------------------------------------------------
+// Phase 10 (ops-core): inventory — warehouses, locations, variants,
+// transfers, reorder rules (rules in lib/ops/stock.ts).
+// ---------------------------------------------------------------------------
+
+const lazyStock = () => import("./stock");
+
+const warehouseDef: OpsEntityDef = {
+  slug: "warehouses",
+  label: "Warehouse",
+  delegate: "opsWarehouse",
+  createSchema: z.object({
+    name: z.string().min(1).max(200),
+    code: z.string().trim().min(1).max(32).regex(/^[A-Za-z0-9._-]+$/, "code may use letters, digits, . _ -"),
+    address: z.string().max(2000).optional(),
+  }),
+  // Codes are immutable (locations' paths and the digital twin key on them).
+  patchSchema: z.object({
+    name: z.string().min(1).max(200).optional(),
+    address: z.string().max(2000).nullable().optional(),
+    active: z.boolean().optional(),
+  }).strict(),
+  patchable: true,
+  filterable: [],
+  gatedTransitions: [],
+  summarize: (r) => `warehouse ${r.code} "${r.name}"`,
+};
+
+const locationDef: OpsEntityDef = {
+  slug: "locations",
+  label: "Location",
+  delegate: "opsLocation",
+  createSchema: z.object({
+    warehouseId: z.string().min(1).max(64),
+    parentId: z.string().min(1).max(64).optional(),
+    kind: z.enum(["zone", "aisle", "rack", "shelf", "bin", "dock"]),
+    code: z.string().trim().min(1).max(64).regex(/^[A-Za-z0-9._-]+$/, "code may use letters, digits, . _ -"),
+    name: z.string().max(200).optional(),
+  }),
+  patchSchema: z.object({
+    name: z.string().max(200).nullable().optional(),
+    active: z.boolean().optional(),
+  }).strict(),
+  patchable: true,
+  filterable: ["warehouseId", "parentId", "kind"],
+  gatedTransitions: [],
+  summarize: (r) => `location ${r.path ?? r.code} (${r.kind})`,
+  hooks: { create: async (tx, a, b) => (await lazyStock()).createLocationRow(tx, a, b) },
+};
+
+const productVariantDef: OpsEntityDef = {
+  slug: "product-variants",
+  label: "Product variant",
+  delegate: "opsProductVariant",
+  createSchema: z.object({
+    productId: z.string().min(1).max(64),
+    sku: z.string().trim().min(1).max(64),
+    name: z.string().trim().min(1).max(200),
+    attributes: z.record(z.string().max(64), z.string().max(200)).default({}),
+    priceCents: centsSchema.optional(),
+  }),
+  patchSchema: z.object({
+    name: z.string().trim().min(1).max(200).optional(),
+    attributes: z.record(z.string().max(64), z.string().max(200)).optional(),
+    priceCents: centsSchema.nullable().optional(),
+    active: z.boolean().optional(),
+  }).strict(),
+  patchable: true,
+  filterable: ["productId"],
+  gatedTransitions: [],
+  summarize: (r) => `variant ${r.sku} "${r.name}"`,
+  hooks: { create: async (tx, a, b) => (await lazyStock()).createVariantRow(tx, a, b) },
+};
+
+const transferDef: OpsEntityDef = {
+  slug: "transfers",
+  label: "Transfer",
+  delegate: "opsTransfer",
+  createSchema: z.object({
+    fromLocationId: z.string().min(1).max(64),
+    toLocationId: z.string().min(1).max(64),
+    lines: z
+      .array(
+        z.object({
+          productId: z.string().min(1).max(64),
+          variantId: z.string().min(1).max(64).optional(),
+          qty: z.number().int().min(1).max(1_000_000),
+        }),
+      )
+      .min(1)
+      .max(200),
+    note: z.string().max(2000).optional(),
+  }),
+  patchSchema: z.object({
+    status: z.enum(["done", "cancelled"]).optional(),
+    note: z.string().max(2000).nullable().optional(),
+  }).strict(),
+  patchable: true,
+  filterable: ["status", "fromLocationId", "toLocationId"],
+  gatedTransitions: [],
+  // Done books the paired ledger legs exactly once (status-guarded claim).
+  statusTransitions: { draft: ["done", "cancelled"], done: [], cancelled: [] },
+  summarize: (r) => `transfer ${r.id} → ${r.status}`,
+  hooks: {
+    create: async (tx, a, b) => (await lazyStock()).createTransferRow(tx, a, b),
+    patch: async (tx, a, id, p, e) => (await lazyStock()).patchTransfer(tx, a, id, p, e),
+  },
+};
+
+const reorderRuleDef: OpsEntityDef = {
+  slug: "reorder-rules",
+  label: "Reorder rule",
+  delegate: "opsReorderRule",
+  createSchema: z.object({
+    productId: z.string().min(1).max(64),
+    variantId: z.string().min(1).max(64).optional(),
+    warehouseId: z.string().min(1).max(64),
+    receiveLocationId: z.string().min(1).max(64).optional(),
+    minQty: z.number().int().min(0).max(10_000_000),
+    maxQty: z.number().int().min(1).max(10_000_000),
+    supplierName: z.string().max(200).optional(),
+    unitCostCents: centsSchema.optional(),
+  }),
+  patchSchema: z.object({
+    minQty: z.number().int().min(0).max(10_000_000).optional(),
+    maxQty: z.number().int().min(1).max(10_000_000).optional(),
+    receiveLocationId: z.string().min(1).max(64).nullable().optional(),
+    supplierName: z.string().max(200).nullable().optional(),
+    unitCostCents: centsSchema.nullable().optional(),
+    active: z.boolean().optional(),
+  }).strict(),
+  patchable: true,
+  filterable: ["productId", "warehouseId"],
+  gatedTransitions: [],
+  summarize: (r) => `reorder rule ${r.id}: min ${r.minQty} / max ${r.maxQty}`,
+  hooks: {
+    create: async (tx, a, b) => (await lazyStock()).createReorderRuleRow(tx, a, b),
+    patch: async (tx, a, id, p, e) => (await lazyStock()).patchReorderRule(tx, a, id, p, e),
+  },
+};
+
 export const OPS_ENTITIES: OpsEntityDef[] = [
   productDef,
   orderDef,
@@ -477,6 +648,12 @@ export const OPS_ENTITIES: OpsEntityDef[] = [
   workflowRunDef,
   teamMemberDef,
   leaveRequestDef,
+  // Phase 10 (ops-core)
+  warehouseDef,
+  locationDef,
+  productVariantDef,
+  transferDef,
+  reorderRuleDef,
 ];
 
 export const OPS_ENTITY_MAP: Record<string, OpsEntityDef> = Object.fromEntries(

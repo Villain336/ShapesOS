@@ -274,10 +274,15 @@ export async function recordInventoryTxn(
   args: {
     productId: string;
     delta: number;
-    reason: "sale" | "restock" | "adjustment";
+    reason: "sale" | "restock" | "adjustment" | "transfer";
     note?: string | null;
     /** Defaults to the acting user — callers may pass "agent:<surface>". */
     actorName?: string | null;
+    // Phase 10 (ops-core): which variant (default variant when omitted) and
+    // where (null = unlocated); transferId links the two legs of a transfer.
+    variantId?: string | null;
+    locationId?: string | null;
+    transferId?: string | null;
   },
 ): Promise<Record<string, unknown>> {
   if (!Number.isInteger(args.delta) || args.delta === 0) {
@@ -292,6 +297,10 @@ export async function recordInventoryTxn(
   if (!product.trackInventory) {
     throw new OpsError(422, `Product "${args.productId}" does not track inventory`);
   }
+  // Phase 10 (ops-core): resolve variant + location (lazy import: stock.ts
+  // imports this module).
+  const { resolveStockTarget } = await import("./stock");
+  const target = await resolveStockTarget(tx, actor, args.productId, args.variantId, args.locationId);
   const txn = await txns.create({
     data: {
       workspaceId: actor.workspaceId,
@@ -300,6 +309,9 @@ export async function recordInventoryTxn(
       reason: args.reason,
       actor: args.actorName ?? actor.userId,
       note: args.note ?? null,
+      variantId: target.variantId,
+      locationId: target.locationId,
+      ...(args.transferId ? { transferId: args.transferId } : {}),
     },
   });
   await products.update({
@@ -327,6 +339,8 @@ async function createRows(
 ): Promise<Array<Record<string, unknown>>> {
   const d = delegateFor(tx, def);
   const base = { workspaceId: actor.workspaceId };
+  // Phase 10 (ops-core): entities with their own create rules.
+  if (def.hooks?.create) return [await def.hooks.create(tx, actor, body)];
 
   switch (def.slug) {
     case "orders":
@@ -423,6 +437,8 @@ async function createRows(
         reason: body.reason as "sale" | "restock" | "adjustment",
         note: (body.note as string) ?? null,
         actorName: (body.actor as string) ?? null,
+        variantId: (body.variantId as string) ?? null,
+        locationId: (body.locationId as string) ?? null,
       });
       return [txn];
     }
@@ -573,6 +589,8 @@ async function applyPatch(
   existing: Record<string, unknown>,
 ): Promise<Record<string, unknown>> {
   const d = delegateFor(tx, def);
+  // Phase 10 (ops-core): entities with their own patch rules.
+  if (def.hooks?.patch) return def.hooks.patch(tx, actor, id, patch, existing);
   const data: Record<string, unknown> = { ...patch };
 
   if (def.slug === "workflow-runs" && patch.compensationAppend) {
@@ -640,6 +658,8 @@ async function applyPatch(
         productId?: string;
         qty: number;
         name: string;
+        variantId?: string;
+        locationId?: string;
       }>;
       let restocked = 0;
       for (const it of items) {
@@ -649,6 +669,9 @@ async function applyPatch(
           delta: it.qty,
           reason: "restock",
           note: `purchase order ${id}`,
+          // Phase 10 (ops-core): receive into the line's location/variant.
+          variantId: it.variantId ?? null,
+          locationId: it.locationId ?? null,
         });
         restocked += 1;
       }

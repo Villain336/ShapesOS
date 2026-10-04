@@ -130,6 +130,15 @@ export const CRON_JOBS: readonly CronJob[] = [
 
   // --- Hourly -------------------------------------------------------------
   { key: "gsc-pull", path: "/api/cron/gsc-pull", cron: "5 * * * *", source: "deploy", timeoutMs: LONG },
+  // Phase 10 (ops-core): min/max reorder rules → draft purchase orders.
+  {
+    key: "ops-reorder",
+    path: "/api/cron/ops-reorder",
+    cron: "20 * * * *",
+    source: "picked",
+    note: "New in Phase 10. Drafts only (sending stays gated) and one draft per breach, so hourly is safe and keeps reorders same-day.",
+    timeoutMs: SHORT,
+  },
 
   // --- Daily --------------------------------------------------------------
   {

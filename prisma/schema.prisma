@@ -605,6 +605,12 @@ model Workspace {
   agentRunTranscripts         AgentRunTranscript[]
   // Phase 16 slice 9: branded report engine back-relation.
   reportSendApprovals         ReportSendApproval[]
+  // Phase 10 (ops-core) back-relations.
+  opsWarehouses               OpsWarehouse[]
+  opsLocations                OpsLocation[]
+  opsProductVariants          OpsProductVariant[]
+  opsTransfers                OpsTransfer[]
+  opsReorderRules             OpsReorderRule[]
   // Phase 17 slice 1: Business Operations back-relations (DocType entities).
   opsProducts                 OpsProduct[]
   opsOrders                   OpsOrder[]
@@ -9364,6 +9370,168 @@ model ReportSendApproval {
 }
 
 // ============================================================================
+// Phase 10 (ops-core) — inventory: warehouses, locations, variants,
+// transfers, reorder rules. Extends the Phase 17 Ops layer (same RLS
+// pattern, same append-only stock ledger). Phase 13's digital twin binds
+// racks/bins/docks to OpsLocation rows — keep the hierarchy clean:
+// warehouse → zone → aisle → rack → shelf → bin (docks sit under the
+// warehouse or a zone). Per-location stock is DERIVED from the ledger
+// (OpsInventoryTxn.locationId/variantId), never stored separately.
+// ============================================================================
+
+enum OpsLocationKind {
+  zone
+  aisle
+  rack
+  shelf
+  bin
+  dock
+}
+
+enum OpsTransferStatus {
+  draft
+  done
+  cancelled
+}
+
+model OpsWarehouse {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name        String
+  // Short code shown everywhere, e.g. "WH-01". Unique per workspace.
+  code        String
+  address     String?   @db.Text
+  active      Boolean   @default(true)
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  locations    OpsLocation[]
+  reorderRules OpsReorderRule[]
+
+  @@unique([workspaceId, code])
+  @@map("ops_warehouses")
+}
+
+model OpsLocation {
+  id          String          @id @default(cuid())
+  workspaceId String          @map("workspace_id")
+  workspace   Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  warehouseId String          @map("warehouse_id")
+  warehouse   OpsWarehouse    @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+  // Null = directly under the warehouse.
+  parentId    String?         @map("parent_id")
+  parent      OpsLocation?    @relation("OpsLocationTree", fields: [parentId], references: [id], onDelete: NoAction)
+  children    OpsLocation[]   @relation("OpsLocationTree")
+  kind        OpsLocationKind
+  // Code unique within the warehouse, e.g. "A", "A-03", "A-03-2-B".
+  code        String
+  name        String?
+  // Denormalized display path "WH-01/A/A-03/A-03-2-B" (set on create;
+  // codes are immutable so it never goes stale).
+  path        String
+  active      Boolean         @default(true)
+  createdAt   DateTime        @default(now()) @map("created_at")
+  updatedAt   DateTime        @updatedAt @map("updated_at")
+
+  inventoryTxns    OpsInventoryTxn[]
+  transfersOut     OpsTransfer[]     @relation("OpsTransferFrom")
+  transfersIn      OpsTransfer[]     @relation("OpsTransferTo")
+  reorderReceiving OpsReorderRule[]
+
+  @@unique([warehouseId, code])
+  @@index([workspaceId, warehouseId, parentId])
+  @@map("ops_locations")
+}
+
+// A sellable variant of a product with its own SKU/attributes. Products
+// without explicit variants get ONE default variant (isDefault) — created
+// by the migration for existing products and lazily for new ones on their
+// first stock move — so stockQty users keep working (stockQty stays the
+// product total).
+model OpsProductVariant {
+  id          String     @id @default(cuid())
+  workspaceId String     @map("workspace_id")
+  workspace   Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  productId   String     @map("product_id")
+  product     OpsProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+  sku         String
+  name        String
+  // { color: "red", size: "L" }
+  attributes  Json       @default("{}")
+  // Null = the product's price.
+  priceCents  Int?       @map("price_cents")
+  isDefault   Boolean    @default(false) @map("is_default")
+  active      Boolean    @default(true)
+  createdAt   DateTime   @default(now()) @map("created_at")
+  updatedAt   DateTime   @updatedAt @map("updated_at")
+
+  inventoryTxns OpsInventoryTxn[]
+  reorderRules  OpsReorderRule[]
+
+  @@unique([workspaceId, sku])
+  @@index([workspaceId, productId])
+  @@map("ops_product_variants")
+}
+
+// Stock transfer between two locations: draft → done (books a paired
+// -qty/+qty txn per line in ONE transaction; product totals unchanged) or
+// cancelled. lines: [{ productId, variantId?, qty }].
+model OpsTransfer {
+  id             String            @id @default(cuid())
+  workspaceId    String            @map("workspace_id")
+  workspace      Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  fromLocationId String            @map("from_location_id")
+  fromLocation   OpsLocation       @relation("OpsTransferFrom", fields: [fromLocationId], references: [id], onDelete: NoAction)
+  toLocationId   String            @map("to_location_id")
+  toLocation     OpsLocation       @relation("OpsTransferTo", fields: [toLocationId], references: [id], onDelete: NoAction)
+  lines          Json
+  status         OpsTransferStatus @default(draft)
+  note           String?           @db.Text
+  createdBy      String?           @map("created_by")
+  doneAt         DateTime?         @map("done_at")
+  createdAt      DateTime          @default(now()) @map("created_at")
+  updatedAt      DateTime          @updatedAt @map("updated_at")
+
+  inventoryTxns OpsInventoryTxn[]
+
+  @@index([workspaceId, status, createdAt])
+  @@map("ops_transfers")
+}
+
+// Min/max reorder rule per product (+ optional variant) and warehouse.
+// The reorder cron drafts ONE OpsPurchaseOrder per breach (never sends —
+// sending stays gated): openPurchaseOrderId holds the draft until it is
+// received or cancelled, so a breach never drafts twice.
+model OpsReorderRule {
+  id                  String             @id @default(cuid())
+  workspaceId         String             @map("workspace_id")
+  workspace           Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  productId           String             @map("product_id")
+  product             OpsProduct         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variantId           String?            @map("variant_id")
+  variant             OpsProductVariant? @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  warehouseId         String             @map("warehouse_id")
+  warehouse           OpsWarehouse       @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+  // Where receipts land (must be inside the warehouse); null = unlocated.
+  receiveLocationId   String?            @map("receive_location_id")
+  receiveLocation     OpsLocation?       @relation(fields: [receiveLocationId], references: [id], onDelete: SetNull)
+  minQty              Int                @map("min_qty")
+  maxQty              Int                @map("max_qty")
+  supplierName        String?            @map("supplier_name")
+  unitCostCents       Int?               @map("unit_cost_cents")
+  active              Boolean            @default(true)
+  openPurchaseOrderId String?            @map("open_purchase_order_id")
+  lastTriggeredAt     DateTime?          @map("last_triggered_at")
+  createdAt           DateTime           @default(now()) @map("created_at")
+  updatedAt           DateTime           @updatedAt @map("updated_at")
+
+  @@unique([workspaceId, productId, warehouseId, variantId])
+  @@index([workspaceId, active])
+  @@map("ops_reorder_rules")
+}
+
+// ============================================================================
 // Phase 17 slice 1 — Business Operations: DocType-style entity convention.
 //
 // Every Operations entity is tenant-scoped (workspace_id FK, ON DELETE
@@ -9419,6 +9587,8 @@ enum OpsInventoryReason {
   sale
   restock
   adjustment
+  // Phase 10 (ops-core): one leg of a location-to-location transfer.
+  transfer
 }
 
 enum OpsProjectStatus {
@@ -9474,6 +9644,9 @@ model OpsProduct {
   updatedAt         DateTime  @updatedAt @map("updated_at")
 
   inventoryTxns OpsInventoryTxn[]
+  // Phase 10 (ops-core)
+  variants      OpsProductVariant[]
+  reorderRules  OpsReorderRule[]
 
   @@unique([workspaceId, sku])
   @@index([workspaceId, name])
@@ -9590,10 +9763,20 @@ model OpsInventoryTxn {
   // Who/what moved the stock: user id or "agent:<surface>".
   actor       String?
   note        String?            @db.Text
+  // Phase 10 (ops-core): where and which variant. Null location =
+  // unlocated stock (pre-location history); variant backfilled to the
+  // product's default variant.
+  variantId   String?            @map("variant_id")
+  variant     OpsProductVariant? @relation(fields: [variantId], references: [id], onDelete: NoAction)
+  locationId  String?            @map("location_id")
+  location    OpsLocation?       @relation(fields: [locationId], references: [id], onDelete: NoAction)
+  transferId  String?            @map("transfer_id")
+  transfer    OpsTransfer?       @relation(fields: [transferId], references: [id], onDelete: NoAction)
   createdAt   DateTime           @default(now()) @map("created_at")
 
   @@index([workspaceId, productId, createdAt])
   @@index([workspaceId, reason, createdAt])
+  @@index([workspaceId, locationId, productId])
   @@map("ops_inventory_txns")
 }
 
