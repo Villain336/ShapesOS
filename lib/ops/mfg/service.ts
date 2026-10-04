@@ -192,6 +192,37 @@ export async function productBom(tx: Tx, workspaceId: string, productId: string)
 }
 
 // ---------------------------------------------------------------------------
+// CAD ↔ Ops link: which Ops product a CAD part IS
+// ---------------------------------------------------------------------------
+
+/** Link (or unlink with null) a CAD part to the Ops product it is stocked as. Audited. */
+export async function linkCadPart(tx: Tx, actor: OpsActor, cadPartId: string, productId: string | null): Promise<Row> {
+  const part = await tx.cadPart.findFirst({ where: { id: cadPartId, workspaceId: actor.workspaceId } });
+  if (!part) throw new OpsNotFoundError("cad-parts", cadPartId);
+  if (productId) await mustProduct(tx, actor, productId);
+  const updated = await tx.cadPart.update({ where: { id: cadPartId }, data: { opsProductId: productId } });
+  await auditOpsEvent(tx, def("routings"), actor, "link_cad_part", cadPartId, `CAD part "${part.name}" ${productId ? `linked to product ${productId}` : "unlinked from its product"}`);
+  return { id: updated.id, name: updated.name, sku: updated.sku, opsProductId: updated.opsProductId };
+}
+
+/** CAD parts (with their product link) and BOM revisions, for the manufacturing page. */
+export async function cadCatalog(tx: Tx, workspaceId: string) {
+  const [parts, boms] = await Promise.all([
+    tx.cadPart.findMany({ where: { workspaceId }, orderBy: { name: "asc" }, take: 500, select: { id: true, name: true, sku: true, opsProductId: true } }),
+    tx.cadBomVersion.findMany({
+      where: { workspaceId },
+      orderBy: { createdAt: "desc" },
+      take: 200,
+      select: { id: true, bomNumber: true, createdAt: true, model: { select: { name: true } }, _count: { select: { lines: true } } },
+    }),
+  ]);
+  return {
+    parts,
+    bomVersions: boms.map((b) => ({ id: b.id, label: `${b.model.name} — BOM ${b.bomNumber}`, lineCount: b._count.lines, createdAt: b.createdAt })),
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Manufacturing orders
 // ---------------------------------------------------------------------------
 
