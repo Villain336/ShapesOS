@@ -62,8 +62,10 @@ describe("PKCE", () => {
   });
 
   it("the code exchange sends code_verifier", async () => {
-    process.env.PKCE_TEST_CLIENT_ID = "cid";
-    process.env.PKCE_TEST_CLIENT_SECRET = "csecret";
+    // Test-only env names (bracket access: they are not app config).
+    const env = process.env as Record<string, string | undefined>;
+    env[PKCE_CFG.clientIdEnv] = "cid";
+    env[PKCE_CFG.clientSecretEnv] = "csecret";
     const f = scriptedFetch([jsonResponse(200, { access_token: "at", refresh_token: "rt", expires_in: 3600 })]);
     const tok = await exchangeCodeForTokens(PKCE_CFG, "pkce-test", "the-code", "https://app.example.com/cb", f.fetchImpl, "verifier-123");
     assert.equal(tok.access_token, "at");
