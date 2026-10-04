@@ -86,6 +86,15 @@ describe("mockInventory", () => {
     assert.equal(by(blank, "images").mode, "off");
   });
 
+  it("images report the image model, and an off-list LLM_IMAGE_MODEL is off (the service refuses it)", () => {
+    const live = mockInventory({ OPENAI_API_KEY: "x" }, { llm: allMockLlm, contextDevConnected: false });
+    assert.equal(by(live, "images").mode, "live");
+    assert.match(by(live, "images").detail, /gpt-image-2/);
+    const offList = mockInventory({ OPENAI_API_KEY: "x", LLM_IMAGE_MODEL: "dall-e-3" }, { llm: allMockLlm, contextDevConnected: false });
+    assert.equal(by(offList, "images").mode, "off");
+    assert.match(by(offList, "images").detail, /not on the OpenAI image allow-list/);
+  });
+
   it("DataForSEO needs both login and password", () => {
     const inv = mockInventory({ DATAFORSEO_LOGIN: "l" }, { llm: allMockLlm, contextDevConnected: false });
     assert.equal(by(inv, "seo-data").mode, "mock");
