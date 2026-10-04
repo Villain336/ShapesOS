@@ -150,7 +150,7 @@ export async function failAgentJob(
     const retry = opts.retryable !== false && job.attempts < job.maxAttempts;
     const backoff = opts.backoffMs ?? Math.min(5 * 60_000, 2_000 * 2 ** Math.max(0, job.attempts - 1));
     await tx.agentJob.update({
-      where: { id: jobId },
+      where: { id: jobId, workspaceId },
       data: retry
         ? { status: "queued", lastError: error.slice(0, 2000), lockedBy: null, leaseUntil: null, runAfter: new Date(Date.now() + backoff) }
         : { status: "dead", lastError: error.slice(0, 2000), leaseUntil: null, finishedAt: new Date() },

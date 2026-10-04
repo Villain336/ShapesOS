@@ -29,7 +29,7 @@ export const prismaTranscriptStore: TranscriptStore = {
     const json = state as Prisma.InputJsonValue;
     await withWorkspaceScope(workspaceId, (tx) =>
       tx.agentRunTranscript.upsert({
-        where: { runId },
+        where: { runId, workspaceId },
         create: { runId, workspaceId, state: json, step },
         update: { state: json, step },
       }),
