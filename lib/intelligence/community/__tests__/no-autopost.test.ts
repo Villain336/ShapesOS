@@ -142,6 +142,9 @@ describe("no-autopost invariant (behavioral)", () => {
       {
         fetchImpl,
         approvalStore: store,
+        // Pinned clock: ranking decays with thread age, so a wall clock would
+        // age the fixture out (it did, on 2026-10-04).
+        clock: () => new Date("2026-09-27T10:00:00.000Z"),
         loadProfile: async () => PROFILE,
         generate: async () =>
           "We do keyword research with a brief-first workflow. Happy to share the template.",
