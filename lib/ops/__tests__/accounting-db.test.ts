@@ -76,7 +76,7 @@ describe("chart of accounts", () => {
   it("seeds the standard chart once, even when first use races", async () => {
     await Promise.all(Array.from({ length: 4 }, () => withWorkspaceScope(WS_A, (tx) => ensureChartOfAccounts(tx, WS_A))));
     const n = await withWorkspaceScope(WS_A, (tx) => tx.opsAccount.count({ where: { workspaceId: WS_A } }));
-    assert.equal(n, 25);
+    assert.equal(n, 31); // Phase 12 (people): + 6 payroll accounts
   });
 });
 

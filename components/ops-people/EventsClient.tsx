@@ -11,6 +11,7 @@ import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
 import { aosButton } from "@/components/aos";
 import { Dialog, ErrorLine, Note, inputCls, labelCls, parseMoneyInput } from "@/components/ops-finance/kit";
+import { confirmAction } from "@/lib/ui/feedback";
 import { jsonPost } from "@/components/ops-finance/useGated";
 
 async function readErr(r: Response): Promise<string> {
@@ -147,25 +148,29 @@ export function NewEventButton() {
 export function EventStatusActions({ id, status, title }: { id: string; status: string; title: string }) {
   const router = useRouter();
   const s = useSubmit();
-  const move = (to: string) => {
-    if (to === "cancelled" && !window.confirm(`Cancel "${title}"? Registration closes and tickets stop working. Refunds for paid tickets are issued in Stripe.`)) return;
+  const move = async (to: string) => {
+    if (
+      to === "cancelled" &&
+      !(await confirmAction({ title: `Cancel "${title}"?`, description: "Registration closes and tickets stop working. Refunds for paid tickets are issued in Stripe.", confirmLabel: "Cancel event", cancelLabel: "Keep event", destructive: true }))
+    )
+      return;
     void s.run(() => jsonPost("/api/ops/events", { id, status: to }, "PATCH"), () => router.refresh());
   };
   return (
     <div className="flex flex-col items-end gap-2">
       <div className="flex flex-wrap justify-end gap-2">
         {status === "draft" ? (
-          <button type="button" className={aosButton({ variant: "primary", size: "sm" })} disabled={s.busy} onClick={() => move("published")}>
+          <button type="button" className={aosButton({ variant: "primary", size: "sm" })} disabled={s.busy} onClick={() => void move("published")}>
             Publish
           </button>
         ) : null}
         {status === "published" ? (
-          <button type="button" className={aosButton({ variant: "secondary", size: "sm" })} disabled={s.busy} onClick={() => move("draft")}>
+          <button type="button" className={aosButton({ variant: "secondary", size: "sm" })} disabled={s.busy} onClick={() => void move("draft")}>
             Unpublish
           </button>
         ) : null}
         {status !== "cancelled" ? (
-          <button type="button" className={aosButton({ variant: "deny", size: "sm" })} disabled={s.busy} onClick={() => move("cancelled")}>
+          <button type="button" className={aosButton({ variant: "deny", size: "sm" })} disabled={s.busy} onClick={() => void move("cancelled")}>
             Cancel event
           </button>
         ) : null}
@@ -498,8 +503,15 @@ export function CancelRegistrationButton({ id, label, paid }: { id: string; labe
         type="button"
         className={aosButton({ variant: "quiet", size: "xs" })}
         disabled={s.busy}
-        onClick={() => {
-          if (!window.confirm(`Cancel ${label}? The seats are released and its tickets stop working.${paid ? " The refund is yours to issue in Stripe." : ""}`)) return;
+        onClick={async () => {
+          const ok = await confirmAction({
+            title: `Cancel ${label}?`,
+            description: `The seats are released and its tickets stop working.${paid ? " The refund is yours to issue in Stripe." : ""}`,
+            confirmLabel: "Cancel registration",
+            cancelLabel: "Keep it",
+            destructive: true,
+          });
+          if (!ok) return;
           void s.run(() => jsonPost("/api/ops/event-registrations", { id, status: "cancelled" }, "PATCH"), () => router.refresh());
         }}
       >

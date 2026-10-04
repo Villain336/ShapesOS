@@ -12,6 +12,7 @@ import { useRouter } from "next/navigation";
 import { Plus, Trash2 } from "lucide-react";
 import { aosButton } from "@/components/aos";
 import { Dialog, ErrorLine, Note, denseInputCls, inputCls, labelCls, parseMoneyInput } from "@/components/ops-finance/kit";
+import { confirmAction } from "@/lib/ui/feedback";
 import { jsonPost, useGated } from "@/components/ops-finance/useGated";
 
 async function readErr(r: Response): Promise<string> {
@@ -448,7 +449,7 @@ export function PayRunActions({ id, label, status, summary }: { id: string; labe
   const [busy, setBusy] = useState(false);
 
   async function plain(action: "compute" | "cancel") {
-    if (action === "cancel" && !window.confirm(`Cancel pay run ${label}? Nothing has been posted.`)) return;
+    if (action === "cancel" && !(await confirmAction({ title: `Cancel pay run ${label}?`, description: "Nothing has been posted. Its people can be paid in a new run.", confirmLabel: "Cancel run", cancelLabel: "Keep it", destructive: true }))) return;
     setBusy(true);
     gated.setError(null);
     const r = await jsonPost(`/api/ops/pay-runs/${id}/${action}`, {});
