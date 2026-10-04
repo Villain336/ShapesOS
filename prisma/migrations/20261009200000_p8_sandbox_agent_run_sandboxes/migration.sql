@@ -12,6 +12,7 @@ CREATE TABLE "agent_run_sandboxes" (
     "sandbox_id" TEXT NOT NULL,
     "status" TEXT NOT NULL DEFAULT 'active',
     "exposed_ports" INTEGER[] DEFAULT ARRAY[]::INTEGER[],
+    "secret_enc" TEXT,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "last_used_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "destroyed_at" TIMESTAMP(3),

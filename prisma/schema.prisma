@@ -9102,6 +9102,9 @@ model AgentRunSandbox {
   // "active" | "destroyed"
   status       String    @default("active") @map("status")
   exposedPorts Int[]     @default([]) @map("exposed_ports")
+  // Provider access material a different process needs to reattach (E2B's
+  // traffic token for previews), as a secrets() envelope. Never sent out.
+  secretEnc    String?   @map("secret_enc")
   createdAt    DateTime  @default(now()) @map("created_at")
   lastUsedAt   DateTime  @default(now()) @map("last_used_at")
   destroyedAt  DateTime? @map("destroyed_at")
