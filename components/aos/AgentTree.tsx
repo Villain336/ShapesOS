@@ -49,17 +49,32 @@ function MiniProgress({ done, total, night }: { done: number; total: number; nig
 }
 
 /** One branch row: connector elbow, shape, name, one-line state. */
-function Branch({ node, tone, last, onNavigate }: { node: AgentNode; tone: "paper" | "night"; last: boolean; onNavigate?: () => void }) {
+function Branch({
+  node,
+  tone,
+  last,
+  onNavigate,
+  content,
+}: {
+  node: AgentNode;
+  tone: "paper" | "night";
+  last: boolean;
+  onNavigate?: () => void;
+  /** Rendered under the row, inside the branch (e.g. the approvals it is waiting on). */
+  content?: React.ReactNode;
+}) {
   const night = tone === "night";
   const meta = STATUS_META[node.status];
+  // The elbow meets the row's middle: rows are 48px (night) / 56px (paper).
+  const elbow = night ? "top-6" : "top-7";
   return (
     <li className="relative pl-6">
       {/* Vertical trunk (stops at this row's middle on the last branch) + elbow. */}
       <span
         aria-hidden
-        className={cn("absolute left-0 w-0.5", night ? "bg-night-line" : "bg-line", last ? "top-0 h-1/2" : "inset-y-0")}
+        className={cn("absolute left-0 w-0.5", night ? "bg-night-line" : "bg-line", last ? (night ? "top-0 h-6" : "top-0 h-7") : "inset-y-0")}
       />
-      <span aria-hidden className={cn("absolute top-1/2 left-0 h-0.5 w-4", night ? "bg-night-line" : "bg-line")} />
+      <span aria-hidden className={cn("absolute left-0 h-0.5 w-4", elbow, night ? "bg-night-line" : "bg-line")} />
       <MaybeLink
         href={node.href}
         onNavigate={onNavigate}
@@ -85,6 +100,7 @@ function Branch({ node, tone, last, onNavigate }: { node: AgentNode; tone: "pape
           </span>
         )}
       </MaybeLink>
+      {content ? <div className="pt-1 pb-3 pl-2.5">{content}</div> : null}
     </li>
   );
 }
@@ -97,6 +113,7 @@ export function AgentTree({
   maxBranches,
   trunkOffset,
   onNavigate,
+  renderBranchContent,
   className,
 }: {
   lead: AgentNode;
@@ -109,6 +126,8 @@ export function AgentTree({
   trunkOffset?: number;
   /** Called when a row link is followed (closes the mobile drawer). */
   onNavigate?: () => void;
+  /** Content hung under a branch (paper tone): e.g. the approvals that sub-agent is waiting on. */
+  renderBranchContent?: (node: AgentNode) => React.ReactNode;
   className?: string;
 }) {
   const night = tone === "night";
@@ -147,7 +166,7 @@ export function AgentTree({
       {shown.length ? (
         <ul aria-label={`Sub-agents under ${lead.name}`} style={{ marginLeft: trunkOffset ?? (night ? 13 : 25) }}>
           {shown.map((b, i) => (
-            <Branch key={b.key} node={b} tone={tone} last={i === shown.length - 1 && hidden <= 0} onNavigate={onNavigate} />
+            <Branch key={b.key} node={b} tone={tone} last={i === shown.length - 1 && hidden <= 0} onNavigate={onNavigate} content={renderBranchContent?.(b)} />
           ))}
           {hidden > 0 ? (
             <li className="relative pl-6">

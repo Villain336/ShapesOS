@@ -17,6 +17,26 @@ export interface RunStepInput {
   asksFirst?: boolean;
 }
 
+/** A tool call drawn as a JetBrains Mono block under its step. */
+export interface ToolCall {
+  /** Tool name in mono, e.g. "web.search". */
+  name: string;
+  /** "0.8 s" */
+  duration?: string;
+  args?: Array<[string, string]>;
+  /** Result line after the arrow. */
+  result?: string;
+}
+
+/** One step as RunTimeline draws it. */
+export interface TimelineStep extends RunStepInput {
+  tool?: ToolCall;
+  /** Progress inside the current step ("7 of 12"). */
+  progress?: { done: number; total: number };
+  /** Text for the asks-first chip (default "Will ask you before sending"). */
+  asksFirstLabel?: string;
+}
+
 export interface DerivedRunStep extends RunStepInput {
   index: number;
   state: AosStatus;
