@@ -195,6 +195,8 @@ export function connectorGroup(connectorKey: string): ToolGroup {
       return "ops";
     case "airtable": // Phase 11 (devtools): bases are working documents (like Notion databases)
       return "files";
+    case "supabase": // Phase 11 (devtools): read-only SQL is analysis
+      return "data";
     case "google-search-console":
     case "ga4":
     case "google-ads":
