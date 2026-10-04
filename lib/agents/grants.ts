@@ -39,6 +39,7 @@ export const TOOL_GROUPS = [
   "connectors", // custom MCP servers and other connected apps
   "delegate", // hand work to a sub-agent (lead only)
   "code", // code runner (arrives with the sandbox, Phase 8)
+  "ship", // push branches and open pull requests — leaves the sandbox (Phase 8)
 ] as const;
 
 export type ToolGroup = (typeof TOOL_GROUPS)[number];
@@ -63,6 +64,7 @@ export const TOOL_GROUP_LABELS: Readonly<Record<ToolGroup, string>> = {
   connectors: "Connected apps",
   delegate: "Hand off to sub-agents",
   code: "Code runner",
+  ship: "Push and pull requests",
 };
 
 /** Groups that have no tools yet — offered in the UI as unavailable, never faked. */
@@ -84,7 +86,9 @@ export const AGENT_MAX_GROUPS: Readonly<Record<AgentKey, readonly ToolGroup[]>> 
   analyst: ["workspace", "data", "web", "files", "code"],
   scheduler: ["workspace", "calendar", "automation"],
   // media: images for the social posts and site pages the Operator ships.
-  actor: ["workspace", "email", "calendar", "site", "social", "media", "automation", "ops", "connectors", "files", "code"],
+  // ship: the Operator takes code from a branch to a pull request (the lead
+  // has every group). Never always-granted: it must be asked for.
+  actor: ["workspace", "email", "calendar", "site", "social", "media", "automation", "ops", "connectors", "files", "code", "ship"],
 };
 
 export interface GrantInput {

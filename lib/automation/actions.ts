@@ -32,6 +32,11 @@ export const KNOWN_ACTION_DEFS: ReadonlyArray<{ action: string; label: string; d
   { action: "draft_image", label: "Generate an image", description: "Generate an image with OpenAI's image model and save it to the project's files (metered)." },
   { action: "draft_invoice", label: "Draft an invoice", description: "Create a draft invoice (sending always asks)." },
   { action: "draft_purchase_order", label: "Draft a purchase order", description: "Create a draft PO (sending always asks)." },
+  // Phase 8 (ship + browser): anything that leaves the sandbox. Tier 2 —
+  // these always ask, whatever a rule says.
+  { action: "push_branch", label: "Push a branch", description: "Push the run's commits to its own shapes/<run> branch on GitHub. Always asks." },
+  { action: "open_pr", label: "Open a pull request", description: "Open or update the run's pull request on GitHub. Always asks." },
+  { action: "browser_act", label: "Act in a browser", description: "Click, fill and submit on a web page in a recorded browser. Always asks." },
 ];
 
 

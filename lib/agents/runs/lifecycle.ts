@@ -17,6 +17,7 @@ import {
   recordingRetentionUntil,
   type BrowserLauncher,
   type RecorderPage,
+  type RequestGuard,
 } from "./recorder";
 import {
   createAgentRun,
@@ -44,6 +45,8 @@ export interface BrowserRunRequest extends AgentRunLinkage {
   watch?: boolean;
   /** CoAgents snapshot at run start (optional). */
   agentState?: Record<string, unknown>;
+  /** Phase 8: SSRF guard for every request the browser makes. */
+  guardRequest?: RequestGuard;
 }
 
 export interface BrowserRunDeps {
@@ -57,6 +60,10 @@ export interface BrowserRunDeps {
   execute: (ctx: {
     page: RecorderPage;
     recordAction: (summary: string, payload?: Record<string, unknown>) => Promise<void>;
+    /** Phase 8: the run's artifact directory (screenshots are kept beside the trace). */
+    artifactDir: string;
+    /** Phase 8: the browser run's id (the tool links the calling run to it). */
+    runId: string;
   }) => Promise<BrowserRunOutcome>;
 }
 
@@ -67,6 +74,8 @@ export interface BrowserRunResult {
   tracePath: string;
   stepCount: number;
   sizeBytes: number;
+  /** Phase 8: the structured result the execute callback returned. */
+  result: Record<string, unknown>;
 }
 
 /**
@@ -91,6 +100,9 @@ export async function executeBrowserRun(
     threadId: request.threadId,
     missionId: request.missionId,
     agentState: request.agentState,
+    // Phase 8: a browser tool's run hangs under the agent run that called it.
+    agentKey: request.agentKey,
+    parentRunId: request.parentRunId,
   });
   const { workspaceId, id: runId } = { workspaceId: request.workspaceId, id: run.id };
 
@@ -106,6 +118,7 @@ export async function executeBrowserRun(
     launcher: deps.launcher,
     headless: request.headless,
     watch: request.watch ?? false,
+    guardRequest: request.guardRequest,
     onTimelineEvent: (event) => {
       void appendAgentRunEvent(workspaceId, runId, event);
     },
@@ -115,7 +128,7 @@ export async function executeBrowserRun(
     const { page } = await recorder.start(request.startUrl);
     const recordAction = (summary: string, payload?: Record<string, unknown>) =>
       recorder.recordAction(summary, payload);
-    const outcome = await deps.execute({ page, recordAction });
+    const outcome = await deps.execute({ page, recordAction, artifactDir: recorder.artifactDir, runId });
     const stopped = await recorder.stop();
     await attachAgentRunRecording(workspaceId, runId, {
       videoPath: stopped.videoPath,
@@ -137,6 +150,7 @@ export async function executeBrowserRun(
       tracePath: stopped.tracePath,
       stepCount: stopped.stepCount,
       sizeBytes: stopped.sizeBytes,
+      result: outcome.result,
     };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

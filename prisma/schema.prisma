@@ -996,6 +996,8 @@ model Workspace {
   // Phase 4b (inbox + mobile): per-user conversation read state, push devices.
   conversationReads           ConversationRead[]
   pushDevices                 PushDevice[]
+  // Phase 8 (ship): detected stack per cloned repository.
+  repoProfiles                RepoProfile[]
 
   @@map("workspaces")
 }
@@ -14019,4 +14021,28 @@ model RateLimitBucket {
 
   @@index([expiresAt])
   @@map("rate_limit_buckets")
+}
+
+// Phase 8 (ship): what a repository is built with, detected on its first
+// clone into a run's sandbox (lockfiles → package manager; package.json
+// scripts / pyproject / Makefile → test, lint, build commands) and reused by
+// later runs (lib/sandbox/repo-profile.ts; the sandbox's run_tests reads it).
+// One row per repository per workspace; FORCE RLS on app.workspace_id.
+model RepoProfile {
+  id             String    @id @default(cuid())
+  workspaceId    String    @map("workspace_id")
+  workspace      Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  // "owner/name", lower-cased.
+  repoFullName   String    @map("repo_full_name")
+  packageManager String?   @map("package_manager")
+  language       String?
+  // { install?, test?, lint?, build?, typecheck? } — shell commands.
+  commands       Json      @default("{}")
+  // Files the detection read (package.json, pnpm-lock.yaml, Makefile, …).
+  detectedFrom   String[]  @default([]) @map("detected_from")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  @@unique([workspaceId, repoFullName])
+  @@map("repo_profiles")
 }

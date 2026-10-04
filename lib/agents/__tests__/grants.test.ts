@@ -6,6 +6,7 @@ import assert from "node:assert/strict";
 import {
   AGENT_KEYS,
   AGENT_MAX_GROUPS,
+  ALWAYS_GRANTED,
   TOOL_GROUPS,
   computeGrant,
   connectorAction,
@@ -63,6 +64,21 @@ describe("computeGrant", () => {
     }
     assert.deepEqual(computeGrant({ agentKey: "drafter", requested: ["media"] }).groups, ["workspace", "media"]);
     assert.deepEqual(computeGrant({ agentKey: "researcher", requested: ["media"] }).dropped, ["media"]);
+  });
+
+  it("ship (push, pull requests): the lead and the Operator only, never always granted", () => {
+    assert.ok(TOOL_GROUPS.includes("ship"));
+    assert.ok(!ALWAYS_GRANTED.includes("ship"));
+    for (const k of ["lead", "actor"] as const) assert.ok(AGENT_MAX_GROUPS[k].includes("ship"), `${k} may ship`);
+    for (const k of ["researcher", "planner", "drafter", "analyst", "scheduler"] as const) {
+      assert.ok(!AGENT_MAX_GROUPS[k].includes("ship"), `${k} must not ship`);
+    }
+    assert.deepEqual(computeGrant({ agentKey: "actor", requested: ["ship"] }).groups, ["workspace", "ship"]);
+    assert.deepEqual(computeGrant({ agentKey: "actor", requested: ["code"] }).groups, ["workspace", "code"], "code without ship can't push");
+    assert.deepEqual(computeGrant({ agentKey: "analyst", requested: ["ship"] }).dropped, ["ship"]);
+    // A narrowed parent without ship never hands it down.
+    const parent = computeGrant({ agentKey: "lead", requested: ["code"] }).groups;
+    assert.ok(!computeGrant({ agentKey: "actor", requested: ["ship"], parentGrant: parent }).groups.includes("ship"));
   });
 
   it("a null grant means role checks only (legacy callers)", () => {

@@ -32,7 +32,11 @@ export function isUsageEvent(e: EventLike): boolean {
 
 /** Phase 8: streamed text chunks — replayed live by the SSE route, not timeline steps. */
 export function isStreamEvent(e: EventLike): boolean {
-  return e.type === "text";
+  if (e.type === "text") return true;
+  // A tool result whose tool already wrote its own (richer) timeline event —
+  // the ship and browser tools — is kept for the live stream only.
+  const p = e.payload as { kind?: unknown; recorded?: unknown } | null | undefined;
+  return !!p && p.kind === "tool_result" && p.recorded === true;
 }
 
 const int = (v: unknown) => (typeof v === "number" && Number.isFinite(v) && v >= 0 ? Math.round(v) : 0);

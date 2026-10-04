@@ -104,6 +104,10 @@ import {
 import { prismaTranscriptStore } from "@/lib/agents/runs/transcript";
 import { cancelAgentJobsForRun, enqueueAgentJob } from "@/lib/agents/queue/store";
 import { inlineBudgetMs } from "@/lib/agents/queue/config";
+// Phase 8: ship tools (git in the sandbox → push → PR) and recorded browser
+// tools register themselves with the tool registry on import.
+import "@/lib/ship/tools";
+import "@/lib/agents/runs/browser-tools";
 // Phase 10 M9: Expert Constitution Pack v1 — the Chief Strategy Agent's
 // system-prompt layer (global hard rules + CSA constitution), wired in
 // front of all project context and retrieval grounding.
@@ -469,7 +473,7 @@ async function saveMessage(
   return msg.id;
 }
 
-async function pendingProposal(threadId: string): Promise<ChatToolCall[] | null> {
+export async function pendingProposal(threadId: string): Promise<ChatToolCall[] | null> {
   const lastAssistant = await prisma.aiChatMessage.findFirst({
     where: { threadId, role: "assistant" },
     orderBy: { createdAt: "desc" },

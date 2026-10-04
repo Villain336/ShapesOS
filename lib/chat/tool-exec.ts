@@ -22,6 +22,7 @@ import { roleAtLeast } from "@/lib/authz";
 import {
   allTools,
   getTool,
+  TOOL_RECORDED_EVENT,
   toolAction,
   toolGranted,
   toolGroup,
@@ -124,6 +125,11 @@ export async function stopRequested(ctx: ToolContext): Promise<boolean> {
   const asked = await isAgentRunCancelRequested(ctx.workspaceId, ctx.runId).catch(() => false);
   if (asked) abortRun(ctx.runId);
   return asked;
+}
+
+function recordedOwnEvent(result: ToolResult): boolean {
+  const d = result.details as Record<string, unknown> | undefined;
+  return !!d && d[TOOL_RECORDED_EVENT] === true;
 }
 
 /** Keep the approval a tool raised on the run timeline (so Stop can expire it). */
@@ -236,6 +242,9 @@ export async function executeTool(
       ...ids,
       ...(autoReason ? { autoApproved: autoReason } : {}),
       ...approvalRef(result),
+      // Phase 8: the tool recorded its own timeline event (ship / browser
+      // tools); this one only feeds the live stream (isStreamEvent hides it).
+      ...(recordedOwnEvent(result) ? { recorded: true } : {}),
     });
     return result;
   } catch (err) {
