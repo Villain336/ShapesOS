@@ -10,6 +10,7 @@ import { useEffect, useState } from "react";
 import { Check } from "lucide-react";
 import { MCP_TOOL_NAMES, SCOPE_LABELS, scopeForTool, type McpToolName } from "@/lib/mcp/scopes";
 import { confirmAction } from "@/lib/ui/feedback";
+import { SwitchRow } from "@/components/aos/Controls";
 
 // AOS atoms (local — components/settings/ui.tsx is owned by another slice).
 const cardCls = "rounded-xl border border-line bg-paper p-5";
@@ -24,36 +25,6 @@ const btnDeny =
   "inline-flex h-control-sm items-center gap-1.5 rounded-full bg-paper px-4 text-sm font-semibold text-failed-text shadow-[inset_0_0_0_1.5px_var(--aos-failed)] aos-press hover:bg-failed-tint disabled:opacity-40";
 const chipCls =
   "inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-paper px-2 py-0.5 text-xs font-medium text-muted shadow-control";
-
-function Switch({
-  checked,
-  onChange,
-  label,
-}: {
-  checked: boolean;
-  onChange: (v: boolean) => void;
-  label: string;
-}) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      aria-label={label}
-      onClick={() => onChange(!checked)}
-      className={`relative h-[26px] w-[44px] shrink-0 rounded-full transition-colors ${
-        checked ? "bg-ink" : "bg-disabled-fg"
-      }`}
-    >
-      <span
-        aria-hidden="true"
-        className={`absolute top-[3px] h-5 w-5 rounded-full bg-white shadow transition-all ${
-          checked ? "left-[21px]" : "left-[3px]"
-        }`}
-      />
-    </button>
-  );
-}
 
 interface ApiKey {
   id: string;
@@ -219,16 +190,17 @@ export default function McpManager() {
           at <code className="rounded bg-canvas px-1 font-mono">/mcp</code>. Disabled by default — enabling
           opens a new authenticated API surface for this workspace.
         </p>
-        <div className="mt-4 flex items-center gap-3">
-          <Switch
+        <div className="mt-4 rounded-lg border border-line">
+          <SwitchRow
+            title="Enable MCP server for this workspace"
+            description={entitled ? "Off by default. Turn it on before creating keys" : "Not included in your plan"}
             checked={enabled === true}
+            disabled={!entitled && enabled !== true}
             onChange={(v) => {
               if (v && !entitled) return;
               void toggleEnabled(v);
             }}
-            label="Enable MCP server for this workspace"
           />
-          <span className="text-sm font-medium text-ink">Enable MCP server for this workspace</span>
         </div>
       </section>
 
