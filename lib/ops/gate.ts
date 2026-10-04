@@ -109,6 +109,11 @@ export const OPS_MONEY_ACTIONS: OpsMoneyAction[] = [
   { slug: "OPS_MO_COMPLETE", label: "Complete manufacturing order", expectedTier: "medium" },
   { slug: "OPS_SCRAP_POST", label: "Scrap stock", expectedTier: "medium" },
   { slug: "OPS_POS_SESSION_CLOSE", label: "Close till session", expectedTier: "medium" },
+  // Phase 12 (people): approving a computed pay run (what every person is
+  // paid) and posting it to the books. Never automated (Tier 3 kinds
+  // approve_pay_run / post_pay_run); both bind the run's compute digest.
+  { slug: "OPS_PAYROLL_APPROVE", label: "Approve pay run", expectedTier: "high" },
+  { slug: "OPS_PAYROLL_POST", label: "Post pay run to the books", expectedTier: "medium" },
 ];
 
 export const OPS_MONEY_ACTION_MAP: Record<string, OpsMoneyAction> =

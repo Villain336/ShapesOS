@@ -23,6 +23,9 @@ import { FINANCE_ENTITIES } from "./finance/entities";
 // Phase 12 (mfgpos): manufacturing and point-of-sale entities.
 import { MFG_ENTITIES } from "./mfg/entities";
 import { POS_ENTITIES } from "./pos/entities";
+// Phase 12 (people): payroll and events entities.
+import { PAYROLL_ENTITIES } from "./payroll/entities";
+import { EVENT_ENTITIES } from "./events/entities";
 import type { Prisma } from "@prisma/client";
 
 export interface OpsGatedTransition {
@@ -68,6 +71,14 @@ export interface OpsEntityDef {
    * imported lazily (they import the service themselves).
    */
   hooks?: OpsEntityHooks;
+  // ---- Phase 12 (people) ----
+  /**
+   * Minimum workspace role for the generic GET / POST+PATCH routes (default
+   * viewer / editor). Payroll entities (salaries, tax profiles, payslips)
+   * are admin-only.
+   */
+  readRole?: "viewer" | "editor" | "admin";
+  writeRole?: "editor" | "admin";
 }
 
 export interface OpsEntityHooks {
@@ -1148,6 +1159,9 @@ export const OPS_ENTITIES: OpsEntityDef[] = [
   // Phase 12 (mfgpos)
   ...MFG_ENTITIES,
   ...POS_ENTITIES,
+  // Phase 12 (people)
+  ...PAYROLL_ENTITIES,
+  ...EVENT_ENTITIES,
 ];
 
 export const OPS_ENTITY_MAP: Record<string, OpsEntityDef> = Object.fromEntries(

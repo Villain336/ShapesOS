@@ -293,13 +293,29 @@ export const ROWS: ParityRow[] = [
     test: [test("lib/ops/__tests__/p12-pos.test.ts"), test("lib/ops/__tests__/p12-pos-db.test.ts")],
     note: "Sales are OpsOrders (source pos) priced by the storefront's priceCart; offline queue keyed by client order id; session close posts one balanced entry (gated). Stripe Terminal unverified live (REST adapter + labelled mock).",
   },
-  // --- Not built yet (owner decision: Phase 12 / later) ---
-  ...(
-    [
-      ["Payroll", "Payroll", "phase 12"],
-      ["Events", "Events", "phase 12"],
-    ] as const
-  ).map(([app, odoo, owner]): ParityRow => ({ app, odoo, owner, model: [], route: [], page: [], test: [], note: "Planned — not started in this codebase." })),
+  // --- Phase 12 (people): payroll + events ---
+  {
+    app: "Payroll",
+    odoo: "Payroll",
+    owner: "phase 12",
+    model: [model("OpsSalaryStructure"), model("OpsSalaryAssignment"), model("OpsPayRun"), model("OpsPayslip")],
+    route: [entity("salary-structures"), entity("salary-assignments"), entity("pay-runs"), file("app/api/ops/pay-runs/[id]/[action]/route.ts"), file("app/api/ops/payslips/[id]/pdf/route.ts")],
+    page: [page("payroll"), file("app/dashboard/ops/payroll/[id]/page.tsx")],
+    test: [test("lib/ops/__tests__/p12-payroll.test.ts"), test("lib/ops/__tests__/p12-payroll-db.test.ts")],
+    note: "US federal 2026 + flat state tax tables (pluggable per country; verify with an accountant). Approve and post are Tier 3; money transfer stays with the payroll provider.",
+  },
+  {
+    app: "Events",
+    odoo: "Events",
+    owner: "phase 12",
+    model: [model("OpsEvent"), model("OpsEventSession"), model("OpsEventTicketType"), model("OpsEventRegistration"), model("OpsEventAttendee")],
+    route: [entity("events"), entity("event-ticket-types"), entity("event-registrations"), file("app/api/events/[slug]/register/route.ts"), file("app/api/ops/events/check-in/route.ts")],
+    page: [page("events"), file("app/dashboard/ops/events/[id]/check-in/page.tsx"), file("app/events/[slug]/page.tsx")],
+    test: [test("lib/ops/__tests__/p12-events.test.ts"), test("lib/ops/__tests__/p12-events-db.test.ts")],
+    note: "Paid tickets through the workspace's own Stripe, confirmed only by its webhook (live Stripe unverified in CI); QR tickets; once-only check-in.",
+  },
+  // Phase 12 built the last planned apps (manufacturing, point of sale,
+  // payroll, events): nothing is "not started" any more.
 ];
 
 // ---------------------------------------------------------------------------

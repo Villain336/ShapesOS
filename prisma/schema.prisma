@@ -658,6 +658,16 @@ model Workspace {
   // Phase 10 (store): public storefront + its product listings.
   opsStores                   OpsStore[]
   opsStoreListings            OpsStoreListing[]
+  // Phase 12 (people): payroll + events.
+  opsSalaryStructures         OpsSalaryStructure[]
+  opsSalaryAssignments        OpsSalaryAssignment[]
+  opsPayRuns                  OpsPayRun[]
+  opsPayslips                 OpsPayslip[]
+  opsEvents                   OpsEvent[]
+  opsEventSessions            OpsEventSession[]
+  opsEventTicketTypes         OpsEventTicketType[]
+  opsEventRegistrations       OpsEventRegistration[]
+  opsEventAttendees           OpsEventAttendee[]
   // Phase 18 slice 1: ad-platforms ontology back-relations.
   adPlatforms                 AdPlatform[]
   adAccounts                  AdAccount[]
@@ -4716,6 +4726,8 @@ model NurtureSequence {
   updatedAt      DateTime  @updatedAt @map("updated_at")
 
   enrollments SequenceEnrollment[]
+  // Phase 12 (people): events whose attendees get this sequence as reminders.
+  opsEvents   OpsEvent[]
 
   @@index([workspaceId, status])
   @@map("nurture_sequence")
@@ -9591,6 +9603,9 @@ model OpsContact {
 
   deals   OpsDeal[]
   tickets OpsTicket[]
+  // Phase 12 (people): event registrations + attendees.
+  eventRegistrations OpsEventRegistration[]
+  eventAttendees     OpsEventAttendee[]
 
   @@unique([workspaceId, email])
   @@unique([workspaceId, leadId])
@@ -10541,7 +10556,7 @@ model OpsTimeEntry {
 }
 
 // HR essentials (Phase 17 slice 5, clean-room): team directory + leave
-// requests. v1 only — full HR (leave balances, payroll) waits for v2.
+// requests. Leave balances arrived in Phase 10; payroll in Phase 12 (people).
 model OpsTeamMember {
   id          String              @id @default(cuid())
   workspaceId String              @map("workspace_id")
@@ -10563,6 +10578,9 @@ model OpsTeamMember {
   // Phase 10 (ops-core)
   managedDepartments OpsDepartment[] @relation("OpsDepartmentManager")
   leaveLedger        OpsLeaveLedger[]
+  // Phase 12 (people): payroll.
+  salaryAssignments  OpsSalaryAssignment[]
+  payslips           OpsPayslip[]
 
   @@unique([workspaceId, userId])
   @@index([workspaceId, status, createdAt])
@@ -15616,6 +15634,353 @@ model OpsStoreListing {
   @@unique([storeId, slug])
   @@index([workspaceId, storeId, listed, position])
   @@map("ops_store_listings")
+}
+
+// ============================================================================
+// Phase 12 (people) — payroll. A salary structure is a small rules engine
+// (base salary or hourly pay from APPROVED timesheets, a weekly overtime
+// rule, allowances, pre-/post-tax deductions, employer contributions — see
+// lib/ops/payroll/rules.ts); team members get effective-dated assignments
+// carrying their tax profile. A pay run moves draft → computed → approved →
+// posted: approving and posting are gated Tier-3 money writes (never
+// automated) and posting writes ONE balanced entry through the Phase 10
+// journal. Tax tables are per-country plugins (lib/ops/payroll/tax/*). All
+// tables are FORCE RLS and cascade from workspaces.
+// ============================================================================
+
+enum OpsPayRunStatus {
+  draft
+  computed
+  approved
+  posted
+  cancelled
+}
+
+model OpsSalaryStructure {
+  id                       String    @id @default(cuid())
+  workspaceId              String    @map("workspace_id")
+  workspace                Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name                     String
+  // "salary" (annual base, prorated per period) | "hourly" (approved time × rate).
+  payType                  String    @default("salary") @map("pay_type")
+  // weekly | biweekly | semimonthly | monthly
+  payFrequency             String    @default("biweekly") @map("pay_frequency")
+  annualSalaryCents        Int?      @map("annual_salary_cents")
+  hourlyRateCents          Int?      @map("hourly_rate_cents")
+  // Weekly overtime: minutes past the threshold in a workweek × multiplier.
+  overtimeEnabled          Boolean   @default(true) @map("overtime_enabled")
+  overtimeThresholdMinutes Int       @default(2400) @map("overtime_threshold_minutes")
+  overtimeMultiplierBps    Int       @default(15000) @map("overtime_multiplier_bps")
+  // Allowances / deductions / employer contributions (PayComponent[]).
+  components               Json      @default("[]")
+  // Tax-table country (lib/ops/payroll/tax registry).
+  country                  String    @default("US")
+  active                   Boolean   @default(true)
+  createdAt                DateTime  @default(now()) @map("created_at")
+  updatedAt                DateTime  @updatedAt @map("updated_at")
+
+  assignments OpsSalaryAssignment[]
+
+  @@unique([workspaceId, name])
+  @@map("ops_salary_structures")
+}
+
+// A structure assigned to a team member from effectiveFrom (inclusive) to
+// effectiveTo (inclusive, null = open). Ranges never overlap per member
+// (checked under an advisory lock). Tax profile = the 2020+ Form W-4 fields
+// plus the work state.
+model OpsSalaryAssignment {
+  id                    String             @id @default(cuid())
+  workspaceId           String             @map("workspace_id")
+  workspace             Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  memberId              String             @map("member_id")
+  member                OpsTeamMember      @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  structureId           String             @map("structure_id")
+  structure             OpsSalaryStructure @relation(fields: [structureId], references: [id], onDelete: NoAction)
+  effectiveFrom         DateTime           @map("effective_from") @db.Date
+  effectiveTo           DateTime?          @map("effective_to") @db.Date
+  // Per-person pay (overrides the structure's).
+  annualSalaryCents     Int?               @map("annual_salary_cents")
+  hourlyRateCents       Int?               @map("hourly_rate_cents")
+  // single | married_jointly | head_of_household
+  filingStatus          String             @default("single") @map("filing_status")
+  w4Step2               Boolean            @default(false) @map("w4_step2")
+  // W-4 step 3 (annual), 4a (annual), 4b (annual), 4c (per period).
+  dependentsCreditCents Int                @default(0) @map("dependents_credit_cents")
+  otherIncomeCents      Int                @default(0) @map("other_income_cents")
+  deductionsCents       Int                @default(0) @map("deductions_cents")
+  extraWithholdingCents Int                @default(0) @map("extra_withholding_cents")
+  // Two-letter work state; stateRateBps overrides the flat-rate table.
+  stateCode             String?            @map("state_code")
+  stateRateBps          Int?               @map("state_rate_bps")
+  createdBy             String             @map("created_by")
+  createdAt             DateTime           @default(now()) @map("created_at")
+  updatedAt             DateTime           @updatedAt @map("updated_at")
+
+  @@index([workspaceId, memberId, effectiveFrom])
+  @@index([workspaceId, structureId])
+  @@map("ops_salary_assignments")
+}
+
+model OpsPayRun {
+  id                   String          @id @default(cuid())
+  workspaceId          String          @map("workspace_id")
+  workspace            Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  // PAY-0001, assigned when the run is computed.
+  number               String?
+  periodStart          DateTime        @map("period_start") @db.Date
+  periodEnd            DateTime        @map("period_end") @db.Date
+  payDate              DateTime        @map("pay_date") @db.Date
+  status               OpsPayRunStatus @default(draft)
+  grossCents           Int             @default(0) @map("gross_cents")
+  employeeTaxCents     Int             @default(0) @map("employee_tax_cents")
+  deductionCents       Int             @default(0) @map("deduction_cents")
+  netCents             Int             @default(0) @map("net_cents")
+  employerTaxCents     Int             @default(0) @map("employer_tax_cents")
+  employerContribCents Int             @default(0) @map("employer_contrib_cents")
+  payslipCount         Int             @default(0) @map("payslip_count")
+  // sha256 over the computed payslips — bound into the approval, so a
+  // recompute after approval was requested invalidates it.
+  computeDigest        String?         @map("compute_digest")
+  computedAt           DateTime?       @map("computed_at")
+  approvalId           String?         @map("approval_id")
+  approvedBy           String?         @map("approved_by")
+  approvedAt           DateTime?       @map("approved_at")
+  postedAt             DateTime?       @map("posted_at")
+  journalEntryId       String?         @map("journal_entry_id")
+  notes                String?         @db.Text
+  createdBy            String          @map("created_by")
+  createdAt            DateTime        @default(now()) @map("created_at")
+  updatedAt            DateTime        @updatedAt @map("updated_at")
+
+  payslips OpsPayslip[]
+
+  @@unique([workspaceId, number])
+  @@index([workspaceId, status, periodEnd])
+  @@map("ops_pay_runs")
+}
+
+// One member's pay for one run. Line items are a snapshot (lines JSON);
+// net = gross − pre-tax − employee taxes − post-tax (DB-checked).
+model OpsPayslip {
+  id                    String        @id @default(cuid())
+  workspaceId           String        @map("workspace_id")
+  workspace             Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  payRunId              String        @map("pay_run_id")
+  payRun                OpsPayRun     @relation(fields: [payRunId], references: [id], onDelete: Cascade)
+  memberId              String        @map("member_id")
+  member                OpsTeamMember @relation(fields: [memberId], references: [id], onDelete: NoAction)
+  memberName            String        @map("member_name")
+  assignmentId          String?       @map("assignment_id")
+  structureName         String        @map("structure_name")
+  payType               String        @map("pay_type")
+  regularMinutes        Int           @default(0) @map("regular_minutes")
+  overtimeMinutes       Int           @default(0) @map("overtime_minutes")
+  grossCents            Int           @map("gross_cents")
+  preTaxDeductionCents  Int           @map("pre_tax_deduction_cents")
+  taxableWagesCents     Int           @map("taxable_wages_cents")
+  employeeTaxCents      Int           @map("employee_tax_cents")
+  postTaxDeductionCents Int           @map("post_tax_deduction_cents")
+  netCents              Int           @map("net_cents")
+  employerTaxCents      Int           @map("employer_tax_cents")
+  employerContribCents  Int           @map("employer_contrib_cents")
+  // Wage bases this period (YTD caps: Social Security, Medicare surtax, FUTA).
+  ssWagesCents          Int           @default(0) @map("ss_wages_cents")
+  medicareWagesCents    Int           @default(0) @map("medicare_wages_cents")
+  futaWagesCents        Int           @default(0) @map("futa_wages_cents")
+  // PayslipLine[]: { code, label, kind, amountCents, liability?, detail? }
+  lines                 Json
+  // Tax table id + source year, e.g. "us-federal-2026+us-state-flat-2026".
+  taxTable              String        @map("tax_table")
+  warnings              Json          @default("[]")
+  createdAt             DateTime      @default(now()) @map("created_at")
+
+  @@unique([payRunId, memberId])
+  @@index([workspaceId, memberId, createdAt])
+  @@map("ops_payslips")
+}
+
+// ============================================================================
+// Phase 12 (people) — events. An event has sessions (venue or webinar URL,
+// time, optional capacity) and ticket types (free or paid, quantity, sales
+// window, optionally scoped to one session). Registrations come from the
+// public page /events/<slug> (or staff); each creates attendees linked to an
+// OpsContact (matched by email or created). Paid tickets pay through the
+// workspace's own Stripe Checkout and stay PENDING until the signed webhook
+// confirms them. Capacity is reserved with row-locked conditional counter
+// updates and DB CHECKs (never oversold); unpaid holds expire and release.
+// Attendees carry a signed QR ticket; check-in happens once. FORCE RLS;
+// published events are readable by slug through a SELECT-only routing policy.
+// ============================================================================
+
+enum OpsEventStatus {
+  draft
+  published
+  cancelled
+}
+
+enum OpsEventRegistrationStatus {
+  pending
+  confirmed
+  cancelled
+  expired
+}
+
+model OpsEvent {
+  id                 String           @id @default(cuid())
+  workspaceId        String           @map("workspace_id")
+  workspace          Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  title              String
+  // Public page /events/<slug> — globally unique.
+  slug               String           @unique
+  description        String?          @db.Text
+  venue              String?
+  webinarUrl         String?          @map("webinar_url")
+  timezone           String           @default("UTC")
+  startsAt           DateTime         @map("starts_at")
+  endsAt             DateTime         @map("ends_at")
+  // Whole-event cap on attendees (null = only ticket/session caps).
+  capacity           Int?
+  reservedCount      Int              @default(0) @map("reserved_count")
+  status             OpsEventStatus   @default(draft)
+  currency           String           @default("USD")
+  // Confirmed attendees are enrolled into this nurture sequence (reminders).
+  reminderSequenceId String?          @map("reminder_sequence_id")
+  reminderSequence   NurtureSequence? @relation(fields: [reminderSequenceId], references: [id], onDelete: SetNull)
+  createdBy          String           @map("created_by")
+  createdAt          DateTime         @default(now()) @map("created_at")
+  updatedAt          DateTime         @updatedAt @map("updated_at")
+
+  sessions      OpsEventSession[]
+  ticketTypes   OpsEventTicketType[]
+  registrations OpsEventRegistration[]
+  attendees     OpsEventAttendee[]
+
+  @@index([workspaceId, startsAt])
+  @@index([workspaceId, status])
+  @@map("ops_events")
+}
+
+model OpsEventSession {
+  id            String    @id @default(cuid())
+  workspaceId   String    @map("workspace_id")
+  workspace     Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  eventId       String    @map("event_id")
+  event         OpsEvent  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  title         String
+  venue         String?
+  webinarUrl    String?   @map("webinar_url")
+  startsAt      DateTime  @map("starts_at")
+  endsAt        DateTime  @map("ends_at")
+  // Cap on attendees holding a ticket scoped to this session.
+  capacity      Int?
+  reservedCount Int       @default(0) @map("reserved_count")
+  position      Int       @default(0)
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  ticketTypes OpsEventTicketType[]
+
+  @@index([workspaceId, eventId, startsAt])
+  @@map("ops_event_sessions")
+}
+
+model OpsEventTicketType {
+  id           String           @id @default(cuid())
+  workspaceId  String           @map("workspace_id")
+  workspace    Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  eventId      String           @map("event_id")
+  event        OpsEvent         @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  // Null = the whole event; set = admits to that session only.
+  sessionId    String?          @map("session_id")
+  session      OpsEventSession? @relation(fields: [sessionId], references: [id], onDelete: NoAction)
+  name         String
+  description  String?
+  // 0 = free.
+  priceCents   Int              @default(0) @map("price_cents")
+  // Null = unlimited (event/session caps still apply).
+  quantity     Int?
+  // Held by pending + confirmed registrations.
+  soldCount    Int              @default(0) @map("sold_count")
+  salesStartAt DateTime?        @map("sales_start_at")
+  salesEndAt   DateTime?        @map("sales_end_at")
+  maxPerOrder  Int              @default(10) @map("max_per_order")
+  active       Boolean          @default(true)
+  position     Int              @default(0)
+  createdAt    DateTime         @default(now()) @map("created_at")
+  updatedAt    DateTime         @updatedAt @map("updated_at")
+
+  registrations OpsEventRegistration[]
+  attendees     OpsEventAttendee[]
+
+  @@index([workspaceId, eventId])
+  @@map("ops_event_ticket_types")
+}
+
+model OpsEventRegistration {
+  id                  String                     @id @default(cuid())
+  workspaceId         String                     @map("workspace_id")
+  workspace           Workspace                  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  eventId             String                     @map("event_id")
+  event               OpsEvent                   @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  ticketTypeId        String                     @map("ticket_type_id")
+  ticketType          OpsEventTicketType         @relation(fields: [ticketTypeId], references: [id], onDelete: NoAction)
+  contactId           String?                    @map("contact_id")
+  contact             OpsContact?                @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  name                String
+  // Lower-cased.
+  email               String
+  quantity            Int
+  unitPriceCents      Int                        @map("unit_price_cents")
+  amountCents         Int                        @map("amount_cents")
+  currency            String                     @default("USD")
+  status              OpsEventRegistrationStatus @default(pending)
+  // public | staff | agent
+  source              String                     @default("public")
+  stripeSessionId     String?                    @unique @map("stripe_session_id")
+  paymentRef          String?                    @map("payment_ref")
+  paidAt              DateTime?                  @map("paid_at")
+  confirmedAt         DateTime?                  @map("confirmed_at")
+  cancelledAt         DateTime?                  @map("cancelled_at")
+  // Unpaid holds release after this (checkout expiry).
+  expiresAt           DateTime?                  @map("expires_at")
+  remindersEnrolledAt DateTime?                  @map("reminders_enrolled_at")
+  createdBy           String                     @map("created_by")
+  createdAt           DateTime                   @default(now()) @map("created_at")
+  updatedAt           DateTime                   @updatedAt @map("updated_at")
+
+  attendees OpsEventAttendee[]
+
+  @@index([workspaceId, eventId, status])
+  @@index([workspaceId, status, expiresAt])
+  @@map("ops_event_registrations")
+}
+
+model OpsEventAttendee {
+  id             String                     @id @default(cuid())
+  workspaceId    String                     @map("workspace_id")
+  workspace      Workspace                  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  eventId        String                     @map("event_id")
+  event          OpsEvent                   @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  registrationId String                     @map("registration_id")
+  registration   OpsEventRegistration       @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+  ticketTypeId   String                     @map("ticket_type_id")
+  ticketType     OpsEventTicketType         @relation(fields: [ticketTypeId], references: [id], onDelete: NoAction)
+  contactId      String?                    @map("contact_id")
+  contact        OpsContact?                @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  name           String
+  email          String?
+  // Random secret behind the signed QR ticket (lib/ops/events/tickets.ts).
+  ticketCode     String                     @unique @map("ticket_code")
+  status         OpsEventRegistrationStatus @default(pending)
+  checkedInAt    DateTime?                  @map("checked_in_at")
+  checkedInBy    String?                    @map("checked_in_by")
+  createdAt      DateTime                   @default(now()) @map("created_at")
+  updatedAt      DateTime                   @updatedAt @map("updated_at")
+
+  @@index([workspaceId, eventId, status])
+  @@index([workspaceId, registrationId])
+  @@map("ops_event_attendees")
 }
 
 // ============================================================================

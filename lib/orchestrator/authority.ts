@@ -184,6 +184,7 @@ export function normalizeForTier(text: string): string {
 // Phase 11 (bizsync): + posting the books to QuickBooks / Xero.
 // Phase 12 (mfgpos): + completing a manufacturing order (stock + costing to
 // the books) and closing a till session (the takings to the books).
+// Phase 12 (people): + approving and posting payroll.
 const TIER3_EXACT_KINDS: ReadonlySet<string> = new Set([
   "record payment",
   "post journal entry",
@@ -192,6 +193,8 @@ const TIER3_EXACT_KINDS: ReadonlySet<string> = new Set([
   "post to accounting",
   "complete manufacturing order",
   "close pos session",
+  "approve pay run",
+  "post pay run",
 ]);
 
 function isTier3(kind: string, description: string): boolean {

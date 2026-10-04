@@ -41,6 +41,9 @@ import {
   // Phase 12 (mfgpos)
   Factory,
   Calculator,
+  // Phase 12 (people)
+  Banknote,
+  CalendarDays,
   type LucideIcon,
 } from "lucide-react";
 
@@ -78,6 +81,9 @@ const ICONS: Record<string, LucideIcon> = {
   // Phase 12 (mfgpos)
   manufacturing: Factory,
   pos: Calculator,
+  // Phase 12 (people)
+  payroll: Banknote,
+  events: CalendarDays,
 };
 
 export interface SectionNavItem {

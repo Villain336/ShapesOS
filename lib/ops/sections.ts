@@ -13,7 +13,7 @@ export interface OpsSection {
   /** SectionNav icon key (app/dashboard/_components/SectionNav.tsx). */
   icon: string;
   description: string;
-  owner: "opscore" | "finance" | "store" | "mfgpos";
+  owner: "opscore" | "finance" | "store" | "mfgpos" | "people";
 }
 
 const s = (
@@ -40,6 +40,9 @@ export const OPS_SECTIONS: OpsSection[] = [
   s("projects", "Projects", "projects", "Projects, tasks, timesheets"),
   s("helpdesk", "Helpdesk", "helpdesk", "Support tickets and SLAs"),
   s("team", "Team", "team", "People, departments, leave, recruiting"),
+  // Phase 12 (people)
+  s("payroll", "Payroll", "payroll", "Salary structures, pay runs and payslips", "people"),
+  s("events", "Events", "events", "Events, tickets, registrations and check-in", "people"),
   s("workflows", "Workflows", "workflows", "Multi-step operations with rollback"),
   s("accounting", "Accounting", "accounting", "Chart of accounts, journal, reports", "finance"),
   s("quotes", "Quotes", "quotes", "Estimates that convert to orders or invoices", "finance"),

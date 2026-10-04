@@ -78,9 +78,10 @@ describe("chart of accounts", () => {
     await Promise.all(Array.from({ length: 4 }, () => withWorkspaceScope(WS_A, (tx) => ensureChartOfAccounts(tx, WS_A))));
     const n = await withWorkspaceScope(WS_A, (tx) => tx.opsAccount.count({ where: { workspaceId: WS_A } }));
     // 25 standard accounts + Phase 12 (mfgpos): card clearing, finished goods,
-    // work in progress, labour absorbed, scrap, cash over/short.
+    // work in progress, labour absorbed, scrap, cash over/short + Phase 12
+    // (people): 6 payroll accounts.
     assert.equal(n, STANDARD_CHART.length);
-    assert.equal(n, 31);
+    assert.equal(n, 37);
   });
 });
 

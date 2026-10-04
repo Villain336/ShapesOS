@@ -230,7 +230,8 @@ export async function invoiceAccount(tx: Tx, workspaceId: string, invoiceId: str
 // PDF + delivery
 // ---------------------------------------------------------------------------
 
-async function financeSettings(tx: Tx, workspaceId: string) {
+// Phase 12 (people): exported for payslip PDFs (employer name, currency).
+export async function financeSettings(tx: Tx, workspaceId: string) {
   const [s, ws] = await Promise.all([
     tx.opsFinanceSettings.findUnique({ where: { workspaceId } }),
     tx.workspace.findUnique({ where: { id: workspaceId }, select: { name: true } }),

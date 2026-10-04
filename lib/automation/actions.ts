@@ -74,6 +74,11 @@ export const KNOWN_ACTION_DEFS: ReadonlyArray<{ action: string; label: string; d
   { action: "log_work_order_time", label: "Log time on a work order", description: "Add minutes worked to a manufacturing work order. Always asks." },
   { action: "complete_manufacturing_order", label: "Complete a manufacturing order", description: "Propose completing a manufacturing order: stock moves and costing in the books. Never automated." },
   { action: "close_pos_session", label: "Close a till session", description: "Propose posting a till session's takings to the books. Never automated." },
+  // Phase 12 (people): payroll + events (lib/chat/ops-people-tools.ts).
+  { action: "draft_pay_run", label: "Draft a pay run", description: "Create and compute a pay run (approving and posting it are a person's job)." },
+  { action: "approve_pay_run", label: "Approve a pay run", description: "Propose approving payroll. Never automated." },
+  { action: "post_pay_run", label: "Post a pay run", description: "Propose posting payroll to the books. Never automated." },
+  { action: "write_event", label: "Change events", description: "Create draft events and register people for events. Always asks." },
 ];
 
 

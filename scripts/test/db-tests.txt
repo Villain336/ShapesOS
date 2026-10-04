@@ -137,3 +137,7 @@ lib/bizsync/__tests__/xero-db.test.ts
 lib/ops/__tests__/p12-mfg-db.test.ts
 # Phase 12 (mfgpos): point of sale — one open session per register, till sales priced server-side (promo + tax), client-order-id replay no-op (incl. concurrent), single-use card refs, cash count, gated close posts ONE balanced entry, receipt PDF, FORCE RLS.
 lib/ops/__tests__/p12-pos-db.test.ts
+# Phase 12 (people): payroll — compute from salary + approved time, Tier-3 approve/post through the real Phase 14 gate, DB lifecycle guards, one balanced journal entry, YTD bases, FORCE RLS.
+lib/ops/__tests__/p12-payroll-db.test.ts
+# Phase 12 (people): events — published-only routing, free/paid registration (paid pending until the signed Stripe webhook), concurrent capacity, once-only QR check-in, reminders, FORCE RLS.
+lib/ops/__tests__/p12-events-db.test.ts
