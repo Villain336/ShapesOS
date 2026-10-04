@@ -19,7 +19,7 @@ export default async function AudioPage() {
   if (!user) redirect("/login");
   await getOrCreateWorkspace(user.id, user.email);
   return (
-    <div className="flex h-full flex-col gap-4 bg-[#FAFAF7] p-4 md:p-6">
+    <div className="flex h-full flex-col gap-4 bg-canvas p-4 md:p-6">
       <div>
         <h1 className="aos-heading text-ink">Streaming Audio</h1>
         <p className="mt-0.5 text-[13px] text-muted">
