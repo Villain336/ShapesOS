@@ -78,7 +78,7 @@ describe("analyze_data runs", () => {
       assert.match(py.summary, /in True backend Agg\n45/);
       assert.deepEqual(d.files, []);
 
-      const js = await analyze_data.execute(ctx, { language: "javascript", code: "console.log([1,2,3].reduce((a,b)=>a+b), typeof process.env.OUTPUT_DIR)" });
+      const js = await analyze_data.execute(ctx, { language: "javascript", code: "const env = process['env']; console.log([1,2,3].reduce((a,b)=>a+b), typeof env['OUTPUT_DIR'])" });
       assert.match(js.summary, /→ exit 0[\s\S]*6 string/);
 
       const bad = await analyze_data.execute(ctx, { code: "raise SystemExit(3)" });
