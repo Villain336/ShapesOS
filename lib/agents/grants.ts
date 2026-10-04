@@ -28,6 +28,7 @@ export const TOOL_GROUPS = [
   "web", // look things up on the web (SERP data, research answers)
   "data", // analytics sources (Search Console, GA4, ad accounts)
   "content", // draft content, reports, QR codes
+  "media", // generate images (OpenAI image model; metered)
   "site", // site audits, CMS saves and publishes
   "email", // email accounts and senders
   "calendar", // calendars
@@ -51,6 +52,7 @@ export const TOOL_GROUP_LABELS: Readonly<Record<ToolGroup, string>> = {
   web: "Web",
   data: "Analytics",
   content: "Content",
+  media: "Images",
   site: "Website",
   email: "Email",
   calendar: "Calendar",
@@ -78,10 +80,11 @@ export const AGENT_MAX_GROUPS: Readonly<Record<AgentKey, readonly ToolGroup[]>> 
   lead: TOOL_GROUPS,
   researcher: ["workspace", "web", "data", "files"],
   planner: ["workspace", "calendar", "files"],
-  drafter: ["workspace", "content", "email", "files", "calendar"],
+  drafter: ["workspace", "content", "media", "email", "files", "calendar"],
   analyst: ["workspace", "data", "web", "files", "code"],
   scheduler: ["workspace", "calendar", "automation"],
-  actor: ["workspace", "email", "calendar", "site", "social", "automation", "ops", "connectors", "files", "code"],
+  // media: images for the social posts and site pages the Operator ships.
+  actor: ["workspace", "email", "calendar", "site", "social", "media", "automation", "ops", "connectors", "files", "code"],
 };
 
 export interface GrantInput {

@@ -53,6 +53,18 @@ describe("computeGrant", () => {
     }
   });
 
+  it("media (image generation): the lead, the Writer and the Operator only", () => {
+    assert.ok(TOOL_GROUPS.includes("media"));
+    for (const k of ["lead", "drafter", "actor"] as const) {
+      assert.ok(AGENT_MAX_GROUPS[k].includes("media"), `${k} should be able to generate images`);
+    }
+    for (const k of ["researcher", "planner", "analyst", "scheduler"] as const) {
+      assert.ok(!AGENT_MAX_GROUPS[k].includes("media"), `${k} should not generate images`);
+    }
+    assert.deepEqual(computeGrant({ agentKey: "drafter", requested: ["media"] }).groups, ["workspace", "media"]);
+    assert.deepEqual(computeGrant({ agentKey: "researcher", requested: ["media"] }).dropped, ["media"]);
+  });
+
   it("a null grant means role checks only (legacy callers)", () => {
     assert.equal(isGroupGranted(null, "ops"), true);
     assert.equal(isGroupGranted(["workspace"], "ops"), false);

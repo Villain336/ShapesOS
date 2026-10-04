@@ -185,6 +185,38 @@ export const OPENAI_ZDR_MODELS = [
   "gpt-5.5",
 ] as const;
 
+/** OpenAI image models (Images API, /v1/images/*) that may be used. Kept
+ *  SEPARATE from the text allow-lists: images skip text routing entirely
+ *  (lib/images/openai.ts is the only caller), and an image model can never
+ *  be selected for a text workload (familyOf() says "openai", but it is not
+ *  on OPENAI_ZDR_MODELS). Source: OpenAI "Your data" guide, /v1/images —
+ *  "Image generation is Zero Data Retention compatible when using
+ *  gpt-image-2.5-sunburst, gpt-image-2.5-sunburst-2026-09-08,
+ *  gpt-image-2.5-flare, gpt-image-2.5-flare-2026-09-08, gpt-image-2,
+ *  gpt-image-1.5, gpt-image-1, and gpt-image-1-mini" (checked 2026-10-04).
+ *  The dated gpt-image-2-2026-04-21 snapshot is not named there, so it is
+ *  not listed. */
+export const OPENAI_IMAGE_ZDR_MODELS = [
+  "gpt-image-2",
+  "gpt-image-2.5-sunburst",
+  "gpt-image-2.5-sunburst-2026-09-08",
+  "gpt-image-2.5-flare",
+  "gpt-image-2.5-flare-2026-09-08",
+  "gpt-image-1.5",
+  "gpt-image-1",
+  "gpt-image-1-mini",
+] as const;
+
+/** The image model used when LLM_IMAGE_MODEL is unset (owner decision
+ *  2026-10-04: ChatGPT's image model across the OS). */
+export const DEFAULT_IMAGE_MODEL = "gpt-image-2";
+
+/** True when an image model passes the block-list and the image allow-list. */
+export function isAllowedImageModel(model: string): boolean {
+  if (BLOCKED_MODEL_PATTERN.test(model) || SELF_HOST_MODEL_PATTERN.test(model)) return false;
+  return (OPENAI_IMAGE_ZDR_MODELS as readonly string[]).includes(model);
+}
+
 /** Unconditionally blocked model families (T1). Checked before provider
  *  mapping; a match always falls back to mock, loudly. */
 const BLOCKED_MODEL_PATTERN = /deepseek|gemini/i;
@@ -245,9 +277,23 @@ function firstSet(...values: Array<string | undefined>): string {
   return "";
 }
 
+type EnvLike = Record<string, string | undefined>;
+
+/** The OpenAI key, resolved the one way every OpenAI caller uses (text
+ *  routing, images): LLM_API_KEY when non-empty, else OPENAI_API_KEY.
+ *  Returns "" when neither is set. Never log the result. */
+export function openAiApiKey(env: EnvLike = process.env): string {
+  return firstSet(env.LLM_API_KEY, env.OPENAI_API_KEY);
+}
+
+/** The OpenAI(-compatible) base URL, without a trailing slash. */
+export function openAiBaseUrl(env: EnvLike = process.env): string {
+  return firstSet(env.OPENAI_BASE_URL, env.LLM_BASE_URL, "https://api.openai.com/v1").replace(/\/+$/, "");
+}
+
 function readKeys(): Record<LlmFamily, string> {
   return {
-    openai: firstSet(process.env.LLM_API_KEY, process.env.OPENAI_API_KEY),
+    openai: openAiApiKey(),
     anthropic: firstSet(process.env.ANTHROPIC_API_KEY),
   };
 }
@@ -289,12 +335,7 @@ function openAiCompatible(
   model: string,
   chat: ChatDefaults,
 ): OpenAiCompatibleLlmProvider {
-  const baseUrl = firstSet(
-    process.env.OPENAI_BASE_URL,
-    process.env.LLM_BASE_URL,
-    "https://api.openai.com/v1",
-  );
-  return new OpenAiCompatibleLlmProvider(apiKey, model, baseUrl, {
+  return new OpenAiCompatibleLlmProvider(apiKey, model, openAiBaseUrl(), {
     selfHost: isSelfHost(),
     timeoutMs: openAiTimeoutOverride(),
     workload: chat.workload,
