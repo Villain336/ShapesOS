@@ -1,6 +1,6 @@
 // Marketr — M21 built-in connector registry (spec §7, §11).
 //
-// DESIGN DECISION (recorded in prisma/schema.prisma): the 15 built-in
+// DESIGN DECISION (recorded in prisma/schema.prisma): the 16 built-in
 // connectors are CODE-defined here, not DB rows. (The count is pinned by
 // lib/connectors/m21/__tests__/registry.test.ts — update both together.) `Connector` rows exist
 // ONLY for workspace-custom MCP servers (kind=mcp). Do not create DB rows
@@ -30,6 +30,11 @@ export const MICROSOFT_MAIL_SCOPES = [
   "https://graph.microsoft.com/User.Read",
   "https://graph.microsoft.com/Mail.Read",
   "https://graph.microsoft.com/Mail.Send",
+];
+export const MICROSOFT_CALENDAR_SCOPES = [
+  "offline_access",
+  "https://graph.microsoft.com/User.Read",
+  "https://graph.microsoft.com/Calendars.ReadWrite",
 ];
 
 export const BUILT_IN_CONNECTORS: BuiltinConnectorMeta[] = [
@@ -165,9 +170,10 @@ export const BUILT_IN_CONNECTORS: BuiltinConnectorMeta[] = [
     displayName: "Google Calendar",
     authType: "oauth2",
     description:
-      "Import your meeting network: event attendees and organizers become contact-graph nodes. Event details are never read.",
+      "Import your meeting network (attendees and organizers become contact-graph nodes), list events, and create or update events after you confirm.",
     oauth: {
-      scopes: ["https://www.googleapis.com/auth/calendar.readonly"],
+      // Phase 11 (conncore): + calendar.events for list/create/update events.
+      scopes: ["https://www.googleapis.com/auth/calendar.readonly", "https://www.googleapis.com/auth/calendar.events"],
       envVars: ["GOOGLE_OAUTH_CLIENT_ID", "GOOGLE_OAUTH_CLIENT_SECRET"],
     },
     authNote: "Google OAuth2 (shared Google app credentials).",
@@ -194,6 +200,18 @@ export const BUILT_IN_CONNECTORS: BuiltinConnectorMeta[] = [
     description: "Read Outlook mail, and send or reply in-thread after you confirm (Microsoft Graph).",
     oauth: {
       scopes: MICROSOFT_MAIL_SCOPES,
+      envVars: ["MICROSOFT_OAUTH_CLIENT_ID", "MICROSOFT_OAUTH_CLIENT_SECRET"],
+    },
+    authNote: "Microsoft identity platform OAuth2 (work, school or personal Microsoft account).",
+  },
+  // Phase 11 (conncore): Outlook calendar via Microsoft Graph (gated writes).
+  {
+    key: "outlook-calendar",
+    displayName: "Outlook Calendar",
+    authType: "oauth2",
+    description: "List Outlook calendar events, and create or update events after you confirm (Microsoft Graph).",
+    oauth: {
+      scopes: MICROSOFT_CALENDAR_SCOPES,
       envVars: ["MICROSOFT_OAUTH_CLIENT_ID", "MICROSOFT_OAUTH_CLIENT_SECRET"],
     },
     authNote: "Microsoft identity platform OAuth2 (work, school or personal Microsoft account).",
@@ -260,6 +278,7 @@ import { GmailAdapter } from "./native/gmail";
 import { GoogleCalendarAdapter } from "./native/google-calendar";
 import { GoogleBusinessProfileAdapter } from "./native/google-business-profile";
 import { OutlookAdapter } from "./native/outlook";
+import { OutlookCalendarAdapter } from "./native/outlook-calendar";
 
 const ADAPTER_CLASSES: Record<string, () => ConnectorAdapter> = {
   "google-search-console": () => new GoogleSearchConsoleAdapter(),
@@ -279,6 +298,7 @@ const ADAPTER_CLASSES: Record<string, () => ConnectorAdapter> = {
   "google-business-profile": () => new GoogleBusinessProfileAdapter(),
   // Phase 11 (conncore).
   outlook: () => new OutlookAdapter(),
+  "outlook-calendar": () => new OutlookCalendarAdapter(),
 };
 
 /** Resolve a built-in connector key to its native adapter. Throws on unknown key. */
@@ -294,7 +314,7 @@ export function resolveAdapter(key: string): ConnectorAdapter {
 //
 // Phase 4b wired the last six mock-only adapters (GSC, GA4, Drive, Notion,
 // Meta Ads, Google Ads) to their live APIs: with a vault credential they
-// call the provider; without one they stay in labeled mock mode. All 15
+// call the provider; without one they stay in labeled mock mode. All 16
 // built-in adapters have live wiring, so the set is empty (0 mock-only;
 // pinned by lib/connectors/m21/__tests__/registry.test.ts). Keep it in
 // sync with the per-adapter file headers (scripts/verify-connector-health.mts

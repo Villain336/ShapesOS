@@ -11,7 +11,7 @@
 
 import { randomBytes } from "crypto";
 import { secrets } from "@/lib/secrets";
-import { getBuiltinMeta, MICROSOFT_MAIL_SCOPES } from "@/lib/connectors/m21/registry";
+import { getBuiltinMeta, MICROSOFT_CALENDAR_SCOPES, MICROSOFT_MAIL_SCOPES } from "@/lib/connectors/m21/registry";
 
 export interface OAuthProviderConfig {
   authorizeUrl: string;
@@ -111,7 +111,8 @@ export const OAUTH_CONFIGS: Record<string, OAuthProviderConfig> = {
   "google-calendar": {
     authorizeUrl: GOOGLE_AUTH_URL,
     tokenUrl: GOOGLE_TOKEN_URL,
-    scopes: ["https://www.googleapis.com/auth/calendar.readonly"],
+    // Phase 11 (conncore): + calendar.events for list/create/update events.
+    scopes: ["https://www.googleapis.com/auth/calendar.readonly", "https://www.googleapis.com/auth/calendar.events"],
     clientIdEnv: GOOGLE_ID_ENV,
     clientSecretEnv: GOOGLE_SECRET_ENV,
     extra: { access_type: "offline", prompt: "consent" },
@@ -188,6 +189,14 @@ export const OAUTH_CONFIGS: Record<string, OAuthProviderConfig> = {
     authorizeUrl: MICROSOFT_AUTH_URL,
     tokenUrl: MICROSOFT_TOKEN_URL,
     scopes: MICROSOFT_MAIL_SCOPES,
+    clientIdEnv: MICROSOFT_ID_ENV,
+    clientSecretEnv: MICROSOFT_SECRET_ENV,
+    extra: { response_mode: "query" },
+  },
+  "outlook-calendar": {
+    authorizeUrl: MICROSOFT_AUTH_URL,
+    tokenUrl: MICROSOFT_TOKEN_URL,
+    scopes: MICROSOFT_CALENDAR_SCOPES,
     clientIdEnv: MICROSOFT_ID_ENV,
     clientSecretEnv: MICROSOFT_SECRET_ENV,
     extra: { response_mode: "query" },
