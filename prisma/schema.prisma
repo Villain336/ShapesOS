@@ -1082,6 +1082,11 @@ model Workspace {
   opsScraps                   OpsScrap[]
   opsPosRegisters             OpsPosRegister[]
   opsPosSessions              OpsPosSession[]
+  // Phase 13 (twincore): digital twin sites, their layout objects and the
+  // dock bookings (the one genuinely new operational record).
+  opsSites                    OpsSite[]
+  opsSiteObjects              OpsSiteObject[]
+  opsDockBookings             OpsDockBooking[]
 
   @@map("workspaces")
 }
@@ -9980,6 +9985,8 @@ model OpsWarehouse {
 
   locations    OpsLocation[]
   reorderRules OpsReorderRule[]
+  // Phase 13 (twincore): the digital twin layout over this warehouse (one).
+  twinSite     OpsSite?
 
   @@unique([workspaceId, code])
   @@map("ops_warehouses")
@@ -10016,6 +10023,9 @@ model OpsLocation {
   moFinishedTo     OpsManufacturingOrder[] @relation("OpsMoFinishedLocation")
   scrapsFrom       OpsScrap[]
   posRegisters     OpsPosRegister[]
+  // Phase 13 (twincore): dock bookings at this dock; equipment tasks here.
+  dockBookings     OpsDockBooking[]
+  equipmentTasks   OpsSiteObject[]
 
   @@unique([warehouseId, code])
   @@index([workspaceId, warehouseId, parentId])
@@ -10072,6 +10082,8 @@ model OpsTransfer {
   updatedAt      DateTime          @updatedAt @map("updated_at")
 
   inventoryTxns OpsInventoryTxn[]
+  // Phase 13 (twincore): trucks booked to carry this stock move.
+  dockBookings  OpsDockBooking[]
 
   @@index([workspaceId, status, createdAt])
   @@map("ops_transfers")
@@ -10296,6 +10308,8 @@ model OpsOrder {
   updatedAt     DateTime       @updatedAt @map("updated_at")
 
   payments OpsPayment[]
+  // Phase 13 (twincore): the outbound trucks booked for this order.
+  dockBookings OpsDockBooking[]
 
   @@unique([workspaceId, clientOrderId])
   @@index([workspaceId, posSessionId])
@@ -10479,6 +10493,8 @@ model OpsPurchaseOrder {
 
   receipts OpsPurchaseReceipt[]
   bills    OpsVendorBill[]
+  // Phase 13 (twincore): the inbound trucks booked for this order.
+  dockBookings OpsDockBooking[]
 
   @@index([workspaceId, status, createdAt])
   @@index([workspaceId, supplierId])
@@ -16496,4 +16512,177 @@ model OpsPosSession {
   @@unique([workspaceId, number])
   @@index([workspaceId, registerId, status])
   @@map("ops_pos_sessions")
+}
+
+// ============================================================================
+// Phase 13 (twincore): DIGITAL TWIN — a site is a LAYOUT LAYER over an
+// existing OpsWarehouse. Racks, bins, shelves and dock doors bind to
+// OpsLocation rows, work centres to OpsWorkCenter, registers to
+// OpsPosRegister. LIVE STATE IS DERIVED, NOT STORED: lib/twin/state.ts reads
+// the bound records (stock ledger, work orders, till sessions, dock
+// bookings) at request time — the only exception is equipment (forklifts,
+// carts), whose small status lives on its object because nothing else
+// records it. All three tables are FORCE RLS on app.workspace_id and cascade
+// from workspaces.
+// ============================================================================
+
+enum OpsSiteKind {
+  warehouse
+  factory
+  store
+}
+
+enum OpsSiteStatus {
+  draft
+  published
+}
+
+enum OpsSiteObjectKind {
+  building
+  dock_door
+  rack
+  bin_zone
+  yard_slot
+  work_center
+  register
+  shelf
+  path
+  equipment
+}
+
+enum OpsSiteBindingType {
+  location
+  work_center
+  register
+  product
+}
+
+enum OpsEquipmentStatus {
+  available
+  busy
+  charging
+}
+
+enum OpsDockDirection {
+  inbound
+  outbound
+}
+
+enum OpsDockBookingStatus {
+  booked
+  arrived
+  loading
+  unloading
+  done
+  cancelled
+}
+
+// One isometric site. Publishing (draft → published) is a gated step a
+// person approves (OPS_TWIN_SITE_PUBLISH); agents only draft.
+model OpsSite {
+  id          String        @id @default(cuid())
+  workspaceId String        @map("workspace_id")
+  workspace   Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  kind        OpsSiteKind
+  status      OpsSiteStatus @default(draft)
+  name        String
+  // Short code, e.g. "WH-04". Unique per workspace.
+  code        String
+  // Grid size in cells (1 cell = 1 metre).
+  gridW       Int           @map("grid_w")
+  gridD       Int           @map("grid_d")
+  // The warehouse this site lays out (one site per warehouse).
+  warehouseId String        @unique @map("warehouse_id")
+  warehouse   OpsWarehouse  @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+  notes       String?       @db.Text
+  createdBy   String?       @map("created_by")
+  publishedAt DateTime?     @map("published_at")
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
+
+  objects      OpsSiteObject[]
+  dockBookings OpsDockBooking[]
+
+  @@unique([workspaceId, code])
+  @@index([workspaceId, status])
+  @@map("ops_sites")
+}
+
+// A laid-out object on the site grid. x/z/w/d are grid cells (w along x,
+// d along z — axis-aligned extents whatever the rotation; rotation is the
+// model's facing). bindingType + bindingId point at the record the object
+// shows (validated in the same workspace on write; no FK because the target
+// table depends on the type). Live state is derived from that record — the
+// equipment* columns are the one stored state (equipment only).
+model OpsSiteObject {
+  id              String              @id @default(cuid())
+  workspaceId     String              @map("workspace_id")
+  workspace       Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  siteId          String              @map("site_id")
+  site            OpsSite             @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  kind            OpsSiteObjectKind
+  label           String
+  x               Int
+  z               Int
+  w               Int                 @default(1)
+  d               Int                 @default(1)
+  h               Int                 @default(1)
+  rotation        Int                 @default(0)
+  bindingType     OpsSiteBindingType? @map("binding_type")
+  bindingId       String?             @map("binding_id")
+  // ---- equipment only (forklifts, carts): nothing else records them ----
+  equipmentStatus OpsEquipmentStatus? @map("equipment_status")
+  taskLocationId  String?             @map("task_location_id")
+  taskLocation    OpsLocation?        @relation(fields: [taskLocationId], references: [id], onDelete: SetNull)
+  taskNote        String?             @map("task_note")
+  taskAssignedAt  DateTime?           @map("task_assigned_at")
+  homeX           Int?                @map("home_x")
+  homeZ           Int?                @map("home_z")
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime            @updatedAt @map("updated_at")
+
+  @@index([workspaceId, siteId])
+  @@index([workspaceId, bindingType, bindingId])
+  @@map("ops_site_objects")
+}
+
+// A truck booked at a dock door: what it serves (at most one of a purchase
+// order, a sales order or a stock move), its ETA and its progress
+// booked → arrived → loading | unloading → done (any active → cancelled).
+// A dock never holds two overlapping active bookings: enforced in code
+// (lib/twin/service.ts) AND by an exclusion constraint on
+// [eta, eta + duration) (migration 20261014100000).
+model OpsDockBooking {
+  id              String               @id @default(cuid())
+  workspaceId     String               @map("workspace_id")
+  workspace       Workspace            @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  siteId          String               @map("site_id")
+  site            OpsSite              @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  dockLocationId  String               @map("dock_location_id")
+  dockLocation    OpsLocation          @relation(fields: [dockLocationId], references: [id], onDelete: Cascade)
+  direction       OpsDockDirection
+  carrier         String?
+  truckRef        String?              @map("truck_ref")
+  purchaseOrderId String?              @map("purchase_order_id")
+  purchaseOrder   OpsPurchaseOrder?    @relation(fields: [purchaseOrderId], references: [id], onDelete: SetNull)
+  orderId         String?              @map("order_id")
+  order           OpsOrder?            @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  transferId      String?              @map("transfer_id")
+  transfer        OpsTransfer?         @relation(fields: [transferId], references: [id], onDelete: SetNull)
+  eta             DateTime
+  // The dock slot the booking holds, from the ETA.
+  durationMinutes Int                  @default(60) @map("duration_minutes")
+  status          OpsDockBookingStatus @default(booked)
+  arrivedAt       DateTime?            @map("arrived_at")
+  startedAt       DateTime?            @map("started_at")
+  doneAt          DateTime?            @map("done_at")
+  cancelledAt     DateTime?            @map("cancelled_at")
+  notes           String?              @db.Text
+  createdBy       String?              @map("created_by")
+  createdAt       DateTime             @default(now()) @map("created_at")
+  updatedAt       DateTime             @updatedAt @map("updated_at")
+
+  @@index([workspaceId, siteId, status])
+  @@index([workspaceId, dockLocationId, eta])
+  @@map("ops_dock_bookings")
 }
