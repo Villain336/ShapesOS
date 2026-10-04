@@ -178,3 +178,46 @@ describe("scrubbing + helpers", () => {
     }
   });
 });
+
+describe("transport: safeFetch + literal secret redaction", () => {
+  it("refuses a provider host that resolves to a private address (no request sent)", async () => {
+    const f = scriptedFetch([]);
+    const { deps } = liveDeps(f.fetchImpl);
+    await assert.rejects(
+      liveRequest({ provider: "X", url: URL_, auth: { token: "t" } }, { ...deps, resolve: async () => ["169.254.169.254"], maxRetries: 0 }),
+      (e: unknown) => e instanceof ConnectorApiError && e.code === "provider_unreachable",
+    );
+    assert.equal(f.calls.length, 0);
+  });
+
+  it("follows a cross-origin redirect manually and drops the bearer token", async () => {
+    const f = scriptedFetch([
+      new Response(null, { status: 302, headers: { location: "https://cdn.example.test/file" } }),
+      jsonResponse(200, { ok: true }),
+    ]);
+    const { deps } = liveDeps(f.fetchImpl);
+    const out = await liveRequest<{ ok: boolean }>({ provider: "X", url: URL_, auth: { token: "tok-secret" } }, deps);
+    assert.deepEqual(out, { ok: true });
+    assert.equal(f.calls[0].headers.authorization, "Bearer tok-secret");
+    assert.equal(f.calls[1].url.host, "cdn.example.test");
+    assert.equal(f.calls[1].headers.authorization, undefined);
+  });
+
+  it("redacts the literal token and credential headers even when echoed bare", async () => {
+    const f = scriptedFetch([
+      jsonResponse(400, { error: { message: "token plain-token-value and dev devtok-12345 are invalid" } }),
+    ]);
+    const { deps } = liveDeps(f.fetchImpl);
+    await assert.rejects(
+      liveRequest(
+        { provider: "X", url: URL_, auth: { token: "plain-token-value" }, headers: { "developer-token": "devtok-12345" } },
+        deps,
+      ),
+      (e: unknown) =>
+        e instanceof ConnectorApiError &&
+        !e.message.includes("plain-token-value") &&
+        !e.message.includes("devtok-12345") &&
+        /\[redacted\]/.test(e.message),
+    );
+  });
+});

@@ -17,6 +17,12 @@ const state = {
   connection: { connectorKey: "ga4", workspaceId: "ws", userId: "u" } as Record<string, string> | null,
 };
 
+// probeConnection builds the adapter with default deps, so safeFetch's
+// address check would do a real DNS lookup: answer with a public address.
+mock.module("node:dns/promises", {
+  namedExports: { lookup: async () => [{ address: "142.250.80.10", family: 4 }] },
+});
+
 mock.module("@/lib/prisma", {
   namedExports: {
     prisma: {

@@ -55,11 +55,19 @@ export function scriptedFetch(script: Scripted[]) {
   return { fetchImpl, calls, remaining: () => queue.length };
 }
 
-/** Deps with an instant, recorded sleep. */
+/** Fake DNS for safeFetch's address check: every provider host is public. */
+export const publicResolve = async (_host: string) => ["142.250.80.10"];
+
+/** Deps with an instant, recorded sleep and fake public DNS. */
 export function liveDeps(fetchImpl: typeof fetch) {
   const sleeps: number[] = [];
   return {
-    deps: { fetchImpl, sleep: async (ms: number) => void sleeps.push(ms), baseDelayMs: 100 },
+    deps: {
+      fetchImpl,
+      resolve: publicResolve,
+      sleep: async (ms: number) => void sleeps.push(ms),
+      baseDelayMs: 100,
+    },
     sleeps,
   };
 }
