@@ -44,6 +44,8 @@ export async function createTaskRow(tx: Tx, actor: OpsActor, body: Record<string
       dueAt: body.dueAt ? new Date(String(body.dueAt)) : null,
       estimateMinutes: (body.estimateMinutes as number | undefined) ?? null,
       completedAt: stage === "done" ? new Date() : null,
+      // Phase 10 (portal)
+      clientVisible: body.clientVisible === true,
       createdBy: actor.userId,
     },
   }) as unknown as Promise<Record<string, unknown>>;

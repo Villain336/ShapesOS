@@ -5,7 +5,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { CheckCircle2, Clock, FolderKanban, KanbanSquare, Loader2, Plus, ReceiptText, XCircle } from "lucide-react";
+import { CheckCircle2, Clock, Eye, EyeOff, FolderKanban, KanbanSquare, Loader2, Plus, ReceiptText, XCircle } from "lucide-react";
 import { ProjectsTab } from "@/components/crm/ProjectsTab";
 import {
   Avatar,
@@ -41,6 +41,8 @@ interface TaskRow {
   priority: string;
   assigneeId: string | null;
   dueAt: string | null;
+  // Phase 10 (portal): shown to linked clients in the client portal.
+  clientVisible?: boolean;
 }
 interface EntryRow {
   id: string;
@@ -119,6 +121,19 @@ export function TasksView() {
   const list = (local ?? tasks.rows).filter((t) => t.stage !== "cancelled");
   const P = new Map(projects.rows.map((p) => [p.id, p]));
 
+  // Phase 10 (portal): show / hide a task in the client portal.
+  const toggleClient = async (id: string, clientVisible: boolean) => {
+    const before = local ?? tasks.rows;
+    setLocal(before.map((t) => (t.id === id ? { ...t, clientVisible } : t)));
+    try {
+      await opsJson("/api/ops/tasks", "PATCH", { id, clientVisible });
+      setError(null);
+    } catch (e) {
+      setLocal(before);
+      setError(e instanceof Error ? e.message : "Couldn't change client visibility.");
+    }
+  };
+
   const move = async (id: string, stage: string) => {
     const before = local ?? tasks.rows;
     setLocal(before.map((t) => (t.id === id ? { ...t, stage } : t)));
@@ -185,6 +200,16 @@ export function TasksView() {
                 </span>
                 {t.priority !== "normal" && <span className={chipCls}>{sentence(t.priority)}</span>}
               </div>
+              <button
+                type="button"
+                className={`${btnGhostSm} mt-2`}
+                aria-pressed={!!t.clientVisible}
+                title={t.clientVisible ? "Shown in the client portal. Hide it." : "Hidden from clients. Show it in the client portal."}
+                onClick={() => toggleClient(t.id, !t.clientVisible)}
+              >
+                {t.clientVisible ? <Eye size={13} aria-hidden /> : <EyeOff size={13} aria-hidden />}
+                {t.clientVisible ? "Client can see" : "Internal"}
+              </button>
             </>
           )}
         />
@@ -208,7 +233,7 @@ function NewTaskModal({
   onCreated: () => void;
 }) {
   const open = projects.filter((p) => p.status !== "completed" && p.status !== "cancelled");
-  const [f, setF] = useState({ projectId: defaultProjectId || open[0]?.id || "", title: "", assigneeId: "", priority: "normal", dueAt: "", stage: "todo" });
+  const [f, setF] = useState({ projectId: defaultProjectId || open[0]?.id || "", title: "", assigneeId: "", priority: "normal", dueAt: "", stage: "todo", clientVisible: false });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   async function submit() {
@@ -222,6 +247,7 @@ function NewTaskModal({
         priority: f.priority,
         ...(f.assigneeId ? { assigneeId: f.assigneeId } : {}),
         ...(f.dueAt ? { dueAt: new Date(f.dueAt).toISOString() } : {}),
+        ...(f.clientVisible ? { clientVisible: true } : {}),
       });
       onCreated();
       onClose();
@@ -285,6 +311,11 @@ function NewTaskModal({
             <input type="date" className={`${inputCls} w-full`} value={f.dueAt} onChange={(e) => setF({ ...f, dueAt: e.target.value })} />
           </label>
         </div>
+        {/* Phase 10 (portal) */}
+        <label className="flex items-center gap-2 text-[13px] text-ink">
+          <input type="checkbox" checked={f.clientVisible} onChange={(e) => setF({ ...f, clientVisible: e.target.checked })} />
+          Show this task to the client in the client portal
+        </label>
         {error && <div className={errorBoxCls}>{error}</div>}
         <div className="flex justify-end gap-2">
           <button type="button" className={btnGhost} onClick={onClose}>

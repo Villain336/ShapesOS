@@ -70,6 +70,8 @@ export interface NewTicketInput {
   assigneeId?: string | null;
   /** Inbound email id when the ticket comes from mail (idempotency). */
   providerSid?: string | null;
+  /** Phase 10 (portal): the customer wrote the first message (client portal), not staff. */
+  fromCustomer?: boolean;
 }
 
 export async function createTicket(tx: Tx, actor: OpsActor, input: NewTicketInput) {
@@ -102,13 +104,15 @@ export async function createTicket(tx: Tx, actor: OpsActor, input: NewTicketInpu
     },
   });
   if (input.body?.trim()) {
+    // Phase 10 (portal): a customer-written first message is inbound, like mail.
+    const fromCustomer = input.channel === "email" || input.fromCustomer === true;
     await tx.opsTicketMessage.create({
       data: {
         workspaceId: actor.workspaceId,
         ticketId: ticket.id,
-        direction: input.channel === "email" ? "inbound" : "note",
-        authorUserId: input.channel === "email" ? null : actor.userId,
-        fromEmail: input.channel === "email" ? email : null,
+        direction: fromCustomer ? "inbound" : "note",
+        authorUserId: fromCustomer ? null : actor.userId,
+        fromEmail: fromCustomer ? email : null,
         body: input.body.trim().slice(0, 50_000),
         providerSid: input.providerSid ?? null,
       },
@@ -279,6 +283,33 @@ export async function sendTicketReply(
   });
 }
 
+/**
+ * Thread a customer's message onto a ticket (inbound email, or a reply from
+ * the client portal — Phase 10 portal): an inbound message row, lastMessageAt,
+ * and a customer reply re-opens a pending/solved ticket. Closed tickets are
+ * the caller's to refuse.
+ */
+export async function appendCustomerMessage(
+  tx: Tx,
+  workspaceId: string,
+  ticket: { id: string; status: string },
+  input: { fromEmail: string | null; body: string; providerSid?: string | null; now?: Date },
+) {
+  const now = input.now ?? new Date();
+  const message = await tx.opsTicketMessage.create({
+    data: { workspaceId, ticketId: ticket.id, direction: "inbound", fromEmail: input.fromEmail, body: input.body.slice(0, 50_000), providerSid: input.providerSid ?? null, createdAt: now },
+  });
+  await tx.opsTicket.update({
+    where: { id: ticket.id, workspaceId },
+    data: {
+      lastMessageAt: now,
+      // A customer reply re-opens a pending/solved ticket.
+      ...(ticket.status === "pending" || ticket.status === "solved" ? { status: "open", solvedAt: null } : {}),
+    },
+  });
+  return message;
+}
+
 // ---------------------------------------------------------------------------
 // Inbound email → ticket (called by lib/messaging/inbound-email.ts)
 // ---------------------------------------------------------------------------
@@ -324,17 +355,7 @@ export async function routeInboundEmailToTicket(workspaceId: string, mail: Inbou
       target = candidates.find((c) => subjectKey && normalizeSubject(c.subject) === subjectKey) ?? null;
     }
     if (target) {
-      await tx.opsTicketMessage.create({
-        data: { workspaceId, ticketId: target.id, direction: "inbound", fromEmail: from, body: (mail.text || "(no text)").slice(0, 50_000), providerSid: mail.emailId },
-      });
-      await tx.opsTicket.update({
-        where: { id: target.id, workspaceId },
-        data: {
-          lastMessageAt: now,
-          // A customer reply re-opens a pending/solved ticket.
-          ...(target.status === "pending" || target.status === "solved" ? { status: "open", solvedAt: null } : {}),
-        },
-      });
+      await appendCustomerMessage(tx, workspaceId, target, { fromEmail: from, body: mail.text || "(no text)", providerSid: mail.emailId, now });
       await auditOpsEvent(tx, OPS_ENTITY_MAP["tickets"]!, actor, "inbound_threaded", target.id, `email from ${from} threaded onto #${target.number}`);
       return { action: "ticket_threaded", ticketId: target.id, number: target.number } as const;
     }
