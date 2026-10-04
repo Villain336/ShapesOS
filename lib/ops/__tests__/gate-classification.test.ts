@@ -26,8 +26,10 @@ import {
 const RANK: Record<RiskTier, number> = { low: 0, medium: 1, high: 2 };
 
 describe("ops gate classification", () => {
-  it("pins 12 money actions with medium-minimum tiers (bulk refund high)", () => {
-    assert.equal(OPS_MONEY_ACTIONS.length, 12);
+  it("pins 19 money actions with medium-minimum tiers (bulk refund high)", () => {
+    // 12 + Phase 10 (finance): journal post/reverse, credit note, quote send,
+    // bill pay, expense approve/reimburse.
+    assert.equal(OPS_MONEY_ACTIONS.length, 19);
     const pins: Record<string, RiskTier> = {
       OPS_INVOICE_SEND: "medium",
       OPS_INVOICE_MARK_PAID: "medium",
@@ -47,6 +49,14 @@ describe("ops gate classification", () => {
       // pre-authorized approval covers the step plan + rollback plan).
       OPS_WORKFLOW_RUN: "medium",
       OPS_RECORD_DELETE: "medium",
+      // Phase 10 (finance)
+      OPS_JOURNAL_POST: "medium",
+      OPS_JOURNAL_REVERSE: "medium",
+      OPS_CREDIT_NOTE_ISSUE: "medium",
+      OPS_QUOTE_SEND: "medium",
+      OPS_BILL_PAY: "medium",
+      OPS_EXPENSE_APPROVE: "medium",
+      OPS_EXPENSE_REIMBURSE: "medium",
     };
     for (const [slug, tier] of Object.entries(pins)) {
       assert.equal(OPS_MONEY_ACTION_MAP[slug]?.expectedTier, tier, slug);
@@ -59,7 +69,7 @@ describe("ops gate classification", () => {
 
   it("Phase 14 derivation meets or exceeds every ops pin (no drift)", () => {
     const rows = assertPhase14TierMeetsPin();
-    assert.equal(rows.length, 12);
+    assert.equal(rows.length, 19); // 12 + 7 Phase 10 (finance)
     for (const r of rows) {
       assert.ok(
         RANK[r.derived] >= RANK[r.expected],

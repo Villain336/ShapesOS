@@ -27,6 +27,8 @@ import {
 import { errorResponse } from "@/lib/api/errors";
 import { intQuery, parseQuery, z } from "@/lib/api/validate";
 import { emitInvoicePaid } from "@/lib/webhooks/emit";
+// Phase 10 (finance): post-commit email delivery of sent invoices / quotes.
+import { deliverAfterSend } from "@/lib/ops/finance/after-commit";
 
 export const dynamic = "force-dynamic";
 
@@ -156,7 +158,10 @@ export async function PATCH(
     if (def.slug === "invoices" && row && row.status === "paid" && (body as Record<string, unknown>)?.status === "paid") {
       await emitInvoicePaid(gate.workspaceId, row);
     }
-    return Response.json({ entity: def.slug, row: result.row });
+    // Phase 10 (finance): an approved send emails the document with its PDF
+    // AFTER the send committed (best-effort; the outcome is recorded on it).
+    const delivery = await deliverAfterSend(gate, def.slug, row, body);
+    return Response.json({ entity: def.slug, row: result.row, ...(delivery ? { delivery } : {}) });
   } catch (err) {
     return opsError(err);
   }

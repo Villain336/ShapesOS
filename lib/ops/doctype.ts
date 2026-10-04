@@ -145,6 +145,28 @@ function totalsFor(lineItems: LineItem[], taxCents: number) {
 /** Max rows per list page. */
 export const OPS_LIST_MAX = 200;
 
+// Phase 10 (finance): per-entity server hooks (lib/ops/finance/hooks.ts),
+// loaded lazily — the finance modules import this file.
+type EntityHooks = import("./finance/hooks").OpsEntityHooks;
+async function entityHooks(slug: string): Promise<EntityHooks | undefined> {
+  const { FINANCE_ENTITY_HOOKS } = await import("./finance/hooks");
+  return FINANCE_ENTITY_HOOKS[slug];
+}
+
+/** createRows, with the entity's prepare/create hooks when it has them. */
+async function materialize(
+  tx: Tx,
+  def: OpsEntityDef,
+  actor: OpsActor,
+  body: Record<string, unknown>,
+): Promise<Array<Record<string, unknown>>> {
+  const hooks = await entityHooks(def.slug);
+  const prepared = hooks?.prepare ? await hooks.prepare(tx, actor, body, null) : body;
+  // A create hook may decline (null) and leave the generic insert to run.
+  const rows = hooks?.create ? await hooks.create(tx, actor, prepared) : null;
+  return rows ?? createRows(tx, def, actor, prepared);
+}
+
 // ---------------------------------------------------------------------------
 // GET — list. Reads run freely (logged): one audit row per request.
 // ---------------------------------------------------------------------------
@@ -236,7 +258,7 @@ export async function opsCreate(
       approvalId,
       actor: actor.userId,
     });
-    const rows = await createRows(tx, def, actor, body);
+    const rows = await materialize(tx, def, actor, body);
     for (const row of rows) {
       await auditOpsEvent(tx, def, actor, "gate_executed", String(row.id), `${classification.label} (approval ${approvalId}): ${def.summarize(row)}`);
     }
@@ -256,7 +278,7 @@ export async function opsCreate(
     }
   }
 
-  const rows = await createRows(tx, def, actor, body);
+  const rows = await materialize(tx, def, actor, body);
   for (const row of rows) {
     await auditOpsEvent(tx, def, actor, "create", String(row.id), `created ${def.summarize(row)}`);
   }
@@ -357,12 +379,17 @@ async function createRows(
           ? {
               supplierId: (body.supplierId as string) ?? null,
               supplierName: (body.supplierName as string) ?? null,
+              // Phase 10 (finance): vendor link + RFQ stage.
+              vendorId: (body.vendorId as string) ?? null,
+              ...(body.rfq === true ? { status: "rfq" } : {}),
             }
           : { customerId: body.customerId ?? null }),
         ...(def.slug === "invoices" && body.idempotencyKey
           ? { idempotencyKey: body.idempotencyKey }
           : {}),
         ...(def.slug === "invoices" && dueAt ? { dueAt } : {}),
+        // Phase 10 (finance): recipient override for invoice delivery.
+        ...(def.slug === "invoices" && typeof body.customerEmail === "string" ? { customerEmail: body.customerEmail } : {}),
       };
       if (def.slug === "invoices" && typeof body.idempotencyKey === "string") {
         // Atomic on the (workspaceId, idempotencyKey) unique: a concurrent
@@ -528,14 +555,26 @@ export async function opsPatch(
       approvalId,
       actor: actor.userId,
     });
-    const row = await applyPatch(tx, def, actor, id, patch, existing);
+    const row = await applyPatch(tx, def, actor, id, await preparePatch(tx, def, actor, patch, existing), existing);
     await auditOpsEvent(tx, def, actor, "gate_executed", id, `${classification.label} (approval ${approvalId}): ${def.summarize(row)}`);
     return { outcome: "done", row, action: "gate_executed" };
   }
 
-  const row = await applyPatch(tx, def, actor, id, patch, existing);
+  const row = await applyPatch(tx, def, actor, id, await preparePatch(tx, def, actor, patch, existing), existing);
   await auditOpsEvent(tx, def, actor, "update", id, `updated ${def.summarize(row)}`);
   return { outcome: "done", row, action: "update" };
+}
+
+/** Phase 10 (finance): run the entity's prepare hook on a validated patch. */
+async function preparePatch(
+  tx: Tx,
+  def: OpsEntityDef,
+  actor: OpsActor,
+  patch: Record<string, unknown>,
+  existing: Record<string, unknown>,
+): Promise<Record<string, unknown>> {
+  const hooks = await entityHooks(def.slug);
+  return hooks?.prepare ? hooks.prepare(tx, actor, patch, existing) : patch;
 }
 
 /**
@@ -558,7 +597,9 @@ export function assertOpsPatchAllowed(
       throw new OpsError(409, `${def.label} cannot move from ${from} to ${patch.status}`);
     }
   }
-  if ((patch.taxCents !== undefined || patch.lineItems !== undefined) && from !== "draft") {
+  // Phase 10 (finance): RFQ-stage POs stay editable (editableStatuses).
+  const editable = def.editableStatuses ?? ["draft"];
+  if ((patch.taxCents !== undefined || patch.lineItems !== undefined) && !editable.includes(from)) {
     throw new OpsError(409, `${def.label} totals can only be edited while draft (it is ${from})`);
   }
 }
@@ -625,6 +666,16 @@ async function applyPatch(
       if (patch.status === "sent" && !existing.sentAt) data.sentAt = new Date();
       if (patch.status === "received") data.receivedAt = new Date();
     }
+    // Phase 10 (finance): extra columns written with the move (e.g. the
+    // invoice number) — inside the same guarded write.
+    const hooks = await entityHooks(def.slug);
+    const moving = typeof patch.status === "string" && patch.status !== existing.status;
+    const transition = moving
+      ? { id, from: String(existing.status), to: String(patch.status), existing, patch }
+      : null;
+    if (transition && hooks?.beforeTransition) {
+      Object.assign(data, (await hooks.beforeTransition(tx, actor, transition)) ?? {});
+    }
     // Status-guarded write: lands only if the row is still in the status we
     // validated against. A racing transition (double receive, sweep vs
     // mark-paid) matches 0 rows → 409, and nothing below it runs.
@@ -635,28 +686,17 @@ async function applyPatch(
     if (claimed.count !== 1) {
       throw new OpsError(409, `${def.label} changed concurrently (no longer ${String(existing.status)}) — reload and retry`);
     }
-    if (def.slug === "purchase-orders" && patch.status === "received") {
-      const items = (existing.lineItems ?? []) as Array<{
-        productId?: string;
-        qty: number;
-        name: string;
-      }>;
-      let restocked = 0;
-      for (const it of items) {
-        if (!it.productId) continue;
-        await recordInventoryTxn(tx, actor, {
-          productId: it.productId,
-          delta: it.qty,
-          reason: "restock",
-          note: `purchase order ${id}`,
-        });
-        restocked += 1;
-      }
-      const row = await d.findFirst({ where: { id, workspaceId: actor.workspaceId } });
-      // Non-persisted metadata for the caller (the route passes it through).
-      return { ...row, restocked };
+    // Phase 10 (finance): receiving (restock of the still-outstanding
+    // quantities, with a receipt record) moved to the purchase-orders
+    // afterTransition hook (lib/ops/finance/hooks.ts) so partial receipts are
+    // never restocked twice; it still returns { restocked } metadata.
+    const moved = (await d.findFirst({ where: { id, workspaceId: actor.workspaceId } }))!;
+    // Phase 10 (finance): posting / payments / receipts in the same tx.
+    if (transition && hooks?.afterTransition) {
+      const meta = await hooks.afterTransition(tx, actor, { ...transition, row: moved });
+      if (meta) return { ...(await d.findFirst({ where: { id, workspaceId: actor.workspaceId } }))!, ...meta };
     }
-    return (await d.findFirst({ where: { id, workspaceId: actor.workspaceId } }))!;
+    return moved;
   }
   return d.update({ where: { id, workspaceId: actor.workspaceId }, data });
 }

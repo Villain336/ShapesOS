@@ -18,6 +18,8 @@
 // server-computed from line items, never trusted from the client.
 
 import { z } from "zod";
+// Phase 10 (finance): accounting, quotes, purchasing and expense entities.
+import { FINANCE_ENTITIES } from "./finance/entities";
 
 export interface OpsGatedTransition {
   /** The PATCH field whose move to one of `to` is a gated write. */
@@ -49,6 +51,11 @@ export interface OpsEntityDef {
    */
   statusTransitions?: Record<string, string[]>;
   summarize: (row: Record<string, unknown>) => string;
+  // ---- Phase 10 (finance) ----
+  /** Create is a gated write under this money-action slug (default: a free draft-creator). */
+  createGate?: string;
+  /** Statuses in which money fields (taxCents/lineItems) may still change (default ["draft"]). */
+  editableStatuses?: string[];
 }
 
 // ---------------------------------------------------------------------------
@@ -90,6 +97,9 @@ const invoiceLineSchema = z.object({
   description: z.string().min(1).max(500),
   qty: z.number().int().min(1).max(100_000),
   priceCents: z.number().int().min(0).max(1_000_000_000),
+  // Phase 10 (finance): line-level tax — the server computes the line's
+  // taxCents from the rate (lib/ops/finance/money.ts); client values are ignored.
+  taxRateId: z.string().min(1).max(64).optional(),
 });
 
 const milestoneSchema = z.object({
@@ -203,6 +213,9 @@ const paymentDef: OpsEntityDef = {
       provider: z.string().max(32).default("stripe"),
       providerRef: z.string().max(128).optional(),
       status: z.enum(["pending", "succeeded", "failed"]).default("pending"),
+      // Phase 10 (finance): a (partial) payment against an invoice.
+      invoiceId: z.string().min(1).max(64).optional(),
+      note: z.string().max(2000).optional(),
     }),
     z.object({
       kind: z.literal("refund"),
@@ -260,15 +273,20 @@ const invoiceDef: OpsEntityDef = {
     // ISO-8601 payment due date (optional — defaults to sentAt + 30 days
     // when the invoice is sent). Slice 2.
     dueAt: z.string().max(64).optional(),
+    // Phase 10 (finance): recipient override (else the CRM lead's email).
+    customerEmail: z.string().email().max(320).optional(),
   }).superRefine(totalFitsInt4),
   patchSchema: z.object({
     customerId: z.string().min(1).max(64).optional(),
     lineItems: z.array(invoiceLineSchema).min(1).max(200).optional(),
     taxCents: centsSchema.optional(),
     status: z.enum(["sent", "paid", "overdue", "cancelled"]).optional(),
+    // Phase 10 (finance)
+    customerEmail: z.string().email().max(320).nullable().optional(),
   }),
   patchable: true,
-  filterable: ["status"],
+  // Phase 10 (finance): kind = invoice | credit_note.
+  filterable: ["status", "kind"],
   gatedTransitions: [
     // Sending an invoice is a gated write (medium, approval required —
     // money is a red lane). Same for marking paid and voiding.
@@ -330,13 +348,19 @@ const purchaseOrderDef: OpsEntityDef = {
     supplierName: z.string().max(200).optional(),
     lineItems: z.array(poLineItemSchema).min(1).max(200),
     taxCents: centsSchema.default(0),
+    // Phase 10 (finance): the vendor record, and start as an RFQ.
+    vendorId: z.string().min(1).max(64).optional(),
+    rfq: z.boolean().optional(),
   }).superRefine(totalFitsInt4),
   patchSchema: z.object({
     supplierId: z.string().min(1).max(64).optional(),
     supplierName: z.string().max(200).optional(),
     lineItems: z.array(poLineItemSchema).min(1).max(200).optional(),
     taxCents: centsSchema.optional(),
-    status: z.enum(["sent", "received", "cancelled"]).optional(),
+    // Phase 10 (finance): rfq_sent / draft are the RFQ moves; partial
+    // receipts go through POST /api/ops/purchase-orders/[id]/receipts.
+    status: z.enum(["rfq_sent", "draft", "sent", "received", "cancelled"]).optional(),
+    vendorId: z.string().min(1).max(64).nullable().optional(),
   }),
   patchable: true,
   filterable: ["status"],
@@ -348,12 +372,17 @@ const purchaseOrderDef: OpsEntityDef = {
     { field: "status", to: ["cancelled"], slug: "OPS_RECORD_DELETE", label: "Cancel purchase order" },
   ],
   // Received only after sent (restock books exactly once, on that move).
+  // Phase 10 (finance): RFQ stage first; partial receipts in between.
   statusTransitions: {
+    rfq: ["rfq_sent", "draft", "cancelled"],
+    rfq_sent: ["draft", "cancelled"],
     draft: ["sent", "cancelled"],
     sent: ["received", "cancelled"],
+    partially_received: ["received", "cancelled"],
     received: [],
     cancelled: [],
   },
+  editableStatuses: ["draft", "rfq", "rfq_sent"],
   summarize: (r) => `purchase order ${r.id} → ${r.status} (${r.totalCents}c)`,
 };
 
@@ -477,6 +506,8 @@ export const OPS_ENTITIES: OpsEntityDef[] = [
   workflowRunDef,
   teamMemberDef,
   leaveRequestDef,
+  // Phase 10 (finance)
+  ...FINANCE_ENTITIES,
 ];
 
 export const OPS_ENTITY_MAP: Record<string, OpsEntityDef> = Object.fromEntries(

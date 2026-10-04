@@ -176,7 +176,15 @@ export function normalizeForTier(text: string): string {
   return s;
 }
 
+/**
+ * Phase 10 (finance): exact kinds that move money or the books without a
+ * Tier-3 verb in their name — recording a customer payment and posting /
+ * reversing journal entries. Never automated, whatever a rule says.
+ */
+const TIER3_EXACT_KINDS: ReadonlySet<string> = new Set(["record payment", "post journal entry", "reverse journal entry", "pay vendor bill"]);
+
 function isTier3(kind: string, description: string): boolean {
+  if (TIER3_EXACT_KINDS.has(normalizeForTier(kind))) return true;
   const hay = `${normalizeForTier(kind)} ${normalizeForTier(description)}`.trim();
   if (!hay) return false;
   return TIER3_PATTERNS.some((re) => re.test(hay));

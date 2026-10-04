@@ -18,6 +18,7 @@ import {
   sendInvoiceCore,
 } from "../ops-tools";
 import type { OpsGatePort } from "@/lib/ops/gate";
+import { FINANCE_OPS_TOOLS } from "../ops-finance-tools";
 
 const ACTOR = { userId: "u_1", workspaceId: "ws_1" };
 
@@ -43,8 +44,10 @@ function auditStub(calls: string[]) {
 }
 
 describe("OPS_TOOLS registration contract", () => {
-  it("exposes the full ops tool surface (15 tools)", () => {
-    const names = OPS_TOOLS.map((t) => t.name).sort();
+  it("exposes the full ops tool surface (15 tools + the Phase 10 finance tools)", () => {
+    // Phase 10 (finance) tools are pinned in ops-finance-tools.test.ts.
+    const finance = new Set(FINANCE_OPS_TOOLS.map((t) => t.name));
+    const names = OPS_TOOLS.map((t) => t.name).filter((n) => !finance.has(n)).sort();
     assert.deepEqual(names, [
       "ops_approve_leave",
       "ops_create_project",

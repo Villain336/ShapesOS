@@ -35,6 +35,9 @@ import { getOpsSummary } from "@/lib/ops/summary";
 import { phase14GatePort, type OpsGatePort } from "@/lib/ops/gate";
 import { proposeWorkflowRun, workflowDef } from "@/lib/ops/workflows";
 import type { ToolContext, ToolDef, ToolResult } from "./tools";
+// Phase 10 (finance): quotes, payments, vendor bills, expense claims,
+// accounting reports and journal entries (lib/chat/ops-finance-tools.ts).
+import { FINANCE_OPS_TOOLS } from "./ops-finance-tools";
 
 type Tx = Prisma.TransactionClient;
 
@@ -49,7 +52,8 @@ export function __setOpsToolsTestGatePort(p: OpsGatePort | null): void {
   testGatePort = p;
 }
 
-function gatePort(): OpsGatePort {
+/** Exported for the Phase 10 finance tools (same test override). */
+export function gatePort(): OpsGatePort {
   return testGatePort ?? phase14GatePort;
 }
 
@@ -136,7 +140,8 @@ export function moneyWriteResult(r: OpsWriteResult): ToolResult {
   return approvalRequiredResult(r.classification.label, r.approval);
 }
 
-async function runOps<T>(
+/** Exported for the Phase 10 finance tools. */
+export async function runOps<T>(
   ctx: ToolContext,
   fn: (tx: Tx, actor: OpsActor) => Promise<T>,
 ): Promise<T> {
@@ -605,4 +610,6 @@ export const OPS_TOOLS: ToolDef[] = [
       return runOps(ctx, (tx, actor) => launchWorkflowCore(tx, actor, args));
     },
   },
+  // Phase 10 (finance)
+  ...FINANCE_OPS_TOOLS,
 ];
