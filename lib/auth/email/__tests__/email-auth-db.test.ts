@@ -246,13 +246,17 @@ describe("magic links", () => {
 
 describe("password sign-in lockout", () => {
   it("locks the address after repeated wrong passwords (even the right one is then refused)", async () => {
+    await prisma.$executeRaw`DELETE FROM "rate_limit_buckets" WHERE "key" LIKE 'login:%'`;
     await prisma.emailAccount.create({ data: { userId: emailUserId(addr("lock")), email: addr("lock"), emailVerifiedAt: new Date() } });
     await resetPasswordDirect(addr("lock"), PW);
     for (let i = 0; i < 5; i++) {
       assert.equal(await authorizeEmailPassword({ email: addr("lock"), password: "wrong-password-" + i }, req(`192.0.2.${i + 1}`)), null);
     }
     await assert.rejects(() => authorizeEmailPassword({ email: addr("lock"), password: PW }, req("192.0.2.99")), EmailLockedError);
+    // The lockout is shared in Postgres (Phase 6, rate_limit_buckets): clear
+    // both the in-memory and the shared counters to simulate it expiring.
     __resetLoginAttempts();
+    await prisma.$executeRaw`DELETE FROM "rate_limit_buckets" WHERE "key" LIKE 'login:%'`;
     const user = await authorizeEmailPassword({ email: addr("lock"), password: PW }, req("192.0.2.99"));
     assert.equal(user?.id, emailUserId(addr("lock")));
   });

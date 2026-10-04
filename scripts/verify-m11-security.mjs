@@ -281,8 +281,9 @@ const emailMail = readFileSync(join(ROOT, "lib/auth/email/mail.ts"), "utf8");
 ok("no Auth.js database adapter (stateless JWT)", !/adapter\s*:/.test(authCfg) && /strategy:\s*"jwt"/.test(authCfg));
 ok("email providers registered in auth.ts", /EMAIL_PASSWORD_PROVIDER_ID/.test(authCfg) && /EMAIL_LINK_PROVIDER_ID/.test(authCfg) && /authorizeEmailPassword/.test(authCfg) && /authorizeEmailLink/.test(authCfg));
 ok("email password login reuses lockout + CAPTCHA step-up + audit",
-  /loginLockedOut\(/.test(emailAuthorize) && /recordLoginFailure\(/.test(emailAuthorize) && /recordLoginSuccess\(/.test(emailAuthorize) &&
-  /captchaRequired\(/.test(emailAuthorize) && /verifyCaptchaToken\(/.test(emailAuthorize) && /auth_login_failed/.test(emailAuthorize));
+  // Phase 6: the shared (Postgres-backed) *Async variants are what sign-in calls.
+  /loginLockedOut(Async)?\(/.test(emailAuthorize) && /recordLoginFailure(Async)?\(/.test(emailAuthorize) && /recordLoginSuccess(Async)?\(/.test(emailAuthorize) &&
+  /captchaRequired(Async)?\(/.test(emailAuthorize) && /verifyCaptchaToken\(/.test(emailAuthorize) && /auth_login_failed/.test(emailAuthorize));
 ok("unverified accounts can't use a password", /status: "unverified"/.test(emailStore) && /EmailUnverifiedError/.test(emailAuthorize));
 ok("signup honours SIGNUP_MODE=invite (signInAllowed)", /signupMode\(deps\.env\) === "invite" && !\(await signInAllowed\(/.test(emailStore));
 ok("links are single use (guarded UPDATE on used_at/expires_at)", /usedAt: null, expiresAt: \{ gt: now \}/.test(emailStore) && /res\.count !== 1/.test(emailStore));
