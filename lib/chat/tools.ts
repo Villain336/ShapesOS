@@ -1075,6 +1075,14 @@ export const TOOL_GROUP: Readonly<Record<string, ToolGroup>> = {
   ops_mark_invoice_paid: "ops",
   ops_approve_leave: "ops",
   ops_launch_workflow: "ops",
+  // Phase 10 (finance): reports are reads; the rest are ops writes.
+  ops_accounting_report: "workspace",
+  ops_draft_quote: "ops",
+  ops_convert_quote: "ops",
+  ops_record_payment: "ops",
+  ops_draft_vendor_bill: "ops",
+  ops_submit_expense_claim: "ops",
+  ops_post_journal_entry: "ops",
   delegate_to_subagent: "delegate",
   // Phase 8 (ship): local git work in the run's sandbox is "code"; anything
   // that leaves the sandbox is "ship" (lib/ship/tools.ts).
@@ -1137,6 +1145,15 @@ export const TOOL_ACTION: Readonly<Record<string, string>> = {
   ops_mark_invoice_paid: "mark_invoice_paid",
   ops_approve_leave: "approve_leave",
   ops_launch_workflow: "launch_workflow",
+  // Phase 10 (finance): drafts are Tier 0; converting and submitting are
+  // Tier 2; recording payments and posting journal entries are Tier 3
+  // (lib/orchestrator/authority.ts) — never automated.
+  ops_draft_quote: "draft_quote",
+  ops_convert_quote: "convert_quote",
+  ops_record_payment: "record_payment",
+  ops_draft_vendor_bill: "draft_vendor_bill",
+  ops_submit_expense_claim: "submit_expense_claim",
+  ops_post_journal_entry: "post_journal_entry",
   // Phase 8: Tier 2 — always asks (lib/automation/actions.ts).
   git_push_branch: "push_branch",
   open_pull_request: "open_pr",

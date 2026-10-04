@@ -43,6 +43,13 @@ export const KNOWN_ACTION_DEFS: ReadonlyArray<{ action: string; label: string; d
   { action: "draft_app_spec", label: "Draft a mini-app", description: "Write or change a mini-app's draft spec (an admin publishes it)." },
   { action: "write_app_record", label: "Write a mini-app record", description: "Add or change a record in a published mini-app. Always asks." },
   { action: "delete_app_record", label: "Delete a mini-app record", description: "Delete a record from a published mini-app. Never automated." },
+  // Phase 10 (finance): ops finance tools (lib/chat/ops-finance-tools.ts).
+  { action: "draft_quote", label: "Draft a quote", description: "Create a draft quote (sending always asks)." },
+  { action: "draft_vendor_bill", label: "Draft a vendor bill", description: "Create a draft vendor bill (posting and paying are a person's job)." },
+  { action: "convert_quote", label: "Convert a quote", description: "Turn a quote into a draft invoice or order. Always asks." },
+  { action: "submit_expense_claim", label: "Submit an expense claim", description: "Create and submit an expense claim for approval. Always asks." },
+  { action: "record_payment", label: "Record a payment", description: "Propose recording a customer payment on an invoice. Never automated." },
+  { action: "post_journal_entry", label: "Post a journal entry", description: "Propose a manual entry in the books. Never automated." },
 ];
 
 
