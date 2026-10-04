@@ -1104,6 +1104,12 @@ export const TOOL_GROUP: Readonly<Record<string, ToolGroup>> = {
   site_publish_draft: "site",
   // Phase 9 (repos): lint / typecheck / test / build from the repo profile.
   run_checks: "code",
+  // Phase 9 (apps): mini-app tools, registered by lib/apps/tools.ts. Reads
+  // are workspace; writes are ops (same split as the ops tools).
+  app_list_records: "workspace",
+  app_create_spec: "ops",
+  app_upsert_record: "ops",
+  app_delete_record: "ops",
 };
 
 /**
@@ -1143,6 +1149,12 @@ export const TOOL_ACTION: Readonly<Record<string, string>> = {
   run_tests: "run_sandbox_command",
   // Phase 9 (repos): runs repository code like run_tests — Tier 2, asks.
   run_checks: "run_sandbox_command",
+  // Phase 9 (apps): drafting a spec is Tier 0 (a draft; publishing is a
+  // person's job); record writes are Tier 2 and deletes Tier 3 — both
+  // always ask (lib/automation/actions.ts).
+  app_create_spec: "draft_app_spec",
+  app_upsert_record: "write_app_record",
+  app_delete_record: "delete_app_record",
 };
 
 /** The group a tool belongs to. Unknown tools fall in "connectors" (fail closed). */

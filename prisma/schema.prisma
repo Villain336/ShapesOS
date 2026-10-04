@@ -1004,6 +1004,10 @@ model Workspace {
   // Phase 9 (repos): agent pull requests + the GitHub deliveries about them.
   agentPullRequests           AgentPullRequest[]
   githubWebhookDeliveries     GitHubWebhookDelivery[]
+  // Phase 9 (apps): internal mini-apps (spec + versions + JSONB records).
+  miniApps                    MiniApp[]
+  miniAppVersions             MiniAppVersion[]
+  miniAppRecords              MiniAppRecord[]
 
   @@map("workspaces")
 }
@@ -14206,4 +14210,82 @@ model GitHubWebhookDelivery {
   @@index([workspaceId, receivedAt])
   @@index([pullRequestId, continuedRunId])
   @@map("github_webhook_deliveries")
+}
+
+// ---------------------------------------------------------------------------
+// Phase 9 (apps): internal mini-apps. A zod-validated spec (lib/apps/spec.ts:
+// entities + fields, views, actions with a tier, per-view/action min role)
+// rendered at /dashboard/apps/[slug]; records live in a scoped JSONB store
+// validated server-side against the spec (lib/apps/records.ts). Agents can
+// only write the DRAFT spec; publishing (admin) copies it to `spec`, bumps
+// `version` and snapshots it in mini_app_versions, so records written under
+// an older version stay readable. All three tables FORCE RLS on
+// app.workspace_id and cascade from workspaces.
+// ---------------------------------------------------------------------------
+model MiniApp {
+  id             String    @id @default(cuid())
+  workspaceId    String    @map("workspace_id")
+  workspace      Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  // URL segment (/dashboard/apps/<slug>); fixed at creation.
+  slug           String
+  name           String
+  description    String?
+  // The live spec (null until the first publish) and its version (0 = never published).
+  spec           Json?
+  version        Int       @default(0)
+  // False = hidden from the runtime (records kept); true once published.
+  published      Boolean   @default(false)
+  // The working draft: builder and agent edits land here, never on `spec`.
+  draftSpec      Json      @map("draft_spec")
+  draftUpdatedBy String?   @map("draft_updated_by")
+  createdBy      String    @map("created_by")
+  publishedBy    String?   @map("published_by")
+  publishedAt    DateTime? @map("published_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  versions MiniAppVersion[]
+  records  MiniAppRecord[]
+
+  @@unique([workspaceId, slug])
+  @@map("mini_apps")
+}
+
+// One immutable snapshot per published version (old records render with it).
+model MiniAppVersion {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  appId       String    @map("app_id")
+  app         MiniApp   @relation(fields: [appId], references: [id], onDelete: Cascade)
+  version     Int
+  spec        Json
+  publishedBy String    @map("published_by")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@unique([appId, version])
+  @@index([workspaceId])
+  @@map("mini_app_versions")
+}
+
+// A record of one entity of one app. `data` is validated against the spec
+// version current at write time (`specVersion`).
+model MiniAppRecord {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  appId       String    @map("app_id")
+  app         MiniApp   @relation(fields: [appId], references: [id], onDelete: Cascade)
+  // Entity key from the spec ("tickets", "vendors", ...).
+  entity      String
+  data        Json      @default("{}")
+  specVersion Int       @map("spec_version")
+  createdBy   String    @map("created_by")
+  updatedBy   String?   @map("updated_by")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@index([workspaceId, appId, entity, createdAt])
+  @@index([appId, entity])
+  @@map("mini_app_records")
 }

@@ -92,3 +92,4 @@ lib/sandbox/__tests__/sandbox-db.test.ts
 lib/sites/__tests__/site-revisions-db.test.ts
 # Phase 9 (repos): GitHub PR feedback → agent job → same thread / branch.
 lib/ship/__tests__/pr-feedback-db.test.ts
+lib/apps/__tests__/apps-db.test.ts
