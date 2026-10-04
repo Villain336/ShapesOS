@@ -159,8 +159,8 @@ export function truckPlacement(fp: TwinFootprint, grid: SiteGrid, length = 10): 
 // ---------------------------------------------------------------------------
 
 /** Units drawn as one pallet (or one shelf box) — a display scale, not a record. */
-export const UNITS_PER_PALLET = 40;
-export const UNITS_PER_BOX = 6;
+export const UNITS_PER_PALLET = 12;
+export const UNITS_PER_BOX = 4;
 
 /** How many pallets to draw for an on-hand quantity: 0 when empty, ≥1 when any, capped. */
 export function palletCount(onHand: number, capacity: number, unitsPer = UNITS_PER_PALLET): number {

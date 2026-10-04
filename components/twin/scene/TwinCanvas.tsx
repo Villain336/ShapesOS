@@ -38,7 +38,7 @@ import { agentsByObject } from "@/lib/twin/view-model";
 import type { TwinCameraApi } from "../camera-api";
 import { TwinSceneContext, type SceneCtx } from "./context";
 import { ObjectShell } from "./ObjectShell";
-import { ObjectMarkers } from "./Markers";
+import { FocusLabel, ObjectMarkers } from "./Markers";
 
 export interface TwinCanvasProps {
   snapshot: TwinSnapshot;
@@ -271,6 +271,15 @@ export function TwinCanvas(props: TwinCanvasProps) {
   const [quadrant, setQuadrant] = useState<0 | 1 | 2 | 3>(0);
   const [ghost, setGhost] = useState<{ x: number; z: number } | null>(null);
   const agents = useMemo(() => agentsByObject(snapshot), [snapshot]);
+  // R3F forces a context loss when the canvas unmounts (view switch): that is
+  // not a GPU failure, so the handler ignores it.
+  const unmounting = useRef(false);
+  useEffect(() => {
+    unmounting.current = false;
+    return () => {
+      unmounting.current = true;
+    };
+  }, []);
 
   // Buildings that contain another object's centre are drawn cut-away.
   const hollowBuildings = useMemo(() => {
@@ -328,7 +337,13 @@ export function TwinCanvas(props: TwinCanvasProps) {
       camera={{ position: [start.x, start.y, start.z], zoom: fit0, near: 1, far: 2000 }}
       gl={{ antialias: true, alpha: true, powerPreference: "high-performance" }}
       onCreated={({ gl }) => {
-        gl.domElement.addEventListener("webglcontextlost", () => onFail("The 3D view lost its graphics context."), { once: true });
+        gl.domElement.addEventListener(
+          "webglcontextlost",
+          () => {
+            if (!unmounting.current) onFail("The 3D view lost its graphics context.");
+          },
+          { once: true },
+        );
         requestAnimationFrame(() => onReady());
       }}
       onPointerMissed={() => !editing && onSelect(null)}
@@ -355,9 +370,12 @@ export function TwinCanvas(props: TwinCanvasProps) {
         {snapshot.objects.map((o) => (
           <ObjectShell key={o.id} o={o} />
         ))}
-        {snapshot.objects.map((o) => (
-          <ObjectMarkers key={`m-${o.id}`} o={o} agents={agents.get(o.id) ?? []} />
-        ))}
+        {snapshot.objects
+          .filter((o) => agents.has(o.id) || o.alert)
+          .map((o) => (
+            <ObjectMarkers key={`m-${o.id}`} o={o} agents={agents.get(o.id) ?? []} />
+          ))}
+        <FocusLabel objects={snapshot.objects} />
         {editing && placing && ghost && <Ghost cell={ghost} size={placing} grid={grid} />}
         <OrbitControls
           ref={controls}

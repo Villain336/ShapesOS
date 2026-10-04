@@ -193,7 +193,7 @@ describe("scene kit: grid ↔ world and rotation", () => {
     assert.equal(palletCount(0, 10), 0);
     assert.equal(palletCount(-5, 10), 0);
     assert.equal(palletCount(1, 10), 1);
-    assert.equal(palletCount(81, 10), 3);
+    assert.equal(palletCount(25, 10), 3, "12 units a pallet");
     assert.equal(palletCount(1_000_000, 10), 10);
     const slots = rackSlots(10, 1, 5);
     assert.equal(slots.length, 8 * 4, "8 bays × 4 levels");

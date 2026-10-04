@@ -22,3 +22,13 @@ The "Marketr UI house pattern" above (violet --brand-600, StudioApp.tsx referenc
 - `npm test` = unit suites (DATABASE_URL is unset on purpose). `npm run test:db` = suites listed in `scripts/test/db-tests.txt`; a new suite that touches Postgres MUST be added there.
 - Migrations: `npm run db:migrate` (`scripts/db/migrate.sh`, repairs renamed-migration history first). Every new model/enum in `schema.prisma` needs a migration — CI runs `scripts/ci/check-schema-drift.mjs` and fails on drift. Never reuse/rename a migration timestamp so it sorts before its dependencies.
 - The runtime app must connect as a non-superuser role (`scripts/db/create-app-role.sql`) — superusers bypass FORCE RLS.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->
