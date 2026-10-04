@@ -20,6 +20,7 @@ import { countWithoutScope, withWorkspaceScope } from "@/lib/substrate/memory/rl
 import { createAgentRun, listAgentRunEvents } from "@/lib/agents/runs/service";
 import { isStreamEvent } from "@/lib/agents/runs/usage";
 import { getRepoProfile, saveRepoProfile } from "@/lib/sandbox/repo-profile";
+import { setSandboxProviderForTests } from "@/lib/sandbox/index";
 import { MockGitHubConnector } from "@/lib/connectors/mock-github";
 import { createShipTools, defaultShipDeps, type ShipDeps } from "../tools";
 import { loadShipState, readShipState } from "../state";
@@ -55,6 +56,11 @@ const access: RepoAccess = {
 before(async () => {
   for (const k of ENV_KEYS) savedEnv[k] = process.env[k];
   for (const k of ENV_KEYS) delete process.env[k];
+  // No real sandbox provider, whatever the host has (CI runners have a
+  // Docker socket): the ship tools get the fake sandbox through their deps,
+  // and the follow-up turns stay inline instead of build mode's hand-off to
+  // the worker.
+  setSandboxProviderForTests(null);
   sb = createFakeSandbox();
   bare = await seedRemote(sb, "acme", "site", {
     "package.json": JSON.stringify({ name: "site", scripts: { test: "vitest run", lint: "eslint ." } }),
@@ -69,6 +75,7 @@ before(async () => {
 });
 
 after(async () => {
+  setSandboxProviderForTests(undefined);
   Object.assign(defaultShipDeps, savedDeps);
   for (const k of ENV_KEYS) {
     if (savedEnv[k] === undefined) delete process.env[k];
