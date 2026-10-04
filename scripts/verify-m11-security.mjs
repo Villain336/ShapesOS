@@ -185,6 +185,9 @@ const PUBLIC_BY_DESIGN = {
   "app/api/hooks/workflows/[id]/route.ts":
     "inbound workflow-trigger webhook; ShapesOS-Signature HMAC-SHA256 (lib/webhooks/signing.ts verifyWebhookSignature, per-workflow whsec_ secret stored as a secrets() envelope) verified before any parsing/logic with a 5-minute window; exact replays 409 via unique receipt; unknown workflow/no secret/no webhook trigger 404 alike; per-workflow rate limit + 64 KiB body cap; only starts a run through startWorkflowRun (kill switch honoured), returns run id + status only",
   // Phase 9 (repos): GitHub PR feedback webhook — capability model, see route comments.
+  // Phase 10 (finance): tenant Stripe Checkout webhook — capability model, see route comments.
+  "app/api/ops/stripe/webhook/[workspaceId]/route.ts":
+    "inbound tenant Stripe webhook; Stripe-Signature verified with THAT workspace's own webhook secret (lib/secrets envelope, stripe.webhooks.constructEvent with timestamp tolerance) before any parsing/logic (unset secret 503, bad signature 400); only checkout.session.completed carrying this workspace's invoice metadata is applied, once per payment intent (advisory lock + lookup), under the tenant's RLS scope; 1 MiB body cap; returns ids only",
   "app/api/hooks/github/route.ts":
     "inbound GitHub webhook; X-Hub-Signature-256 HMAC-SHA256 with GITHUB_WEBHOOK_SECRET verified in constant time over the raw body before parsing (unset secret → 503); delivery id is the primary key of github_webhook_deliveries so redeliveries are no-ops; bots, non-collaborators, non shapes/<runId> branches and forks ignored; routed to its workspace via a SELECT-only policy on agent_pull_requests, every write under that tenant's GUC; only queues a pr_feedback agent job (pushes still need a person's OK); 1 MiB body cap, per-IP limit in proxy.ts; returns counts only",
 };

@@ -12,12 +12,13 @@
 // Every hook runs inside the caller's withWorkspaceScope transaction.
 
 import type { Prisma } from "@prisma/client";
-import { OpsError, type OpsActor } from "../doctype";
+import { OpsError, recordInventoryTxn, type OpsActor } from "../doctype";
 import { findEntryBySource, postEntry, reverseEntry, type DraftLine } from "../accounting";
 import { applyInvoicePayment } from "./invoicing";
 import { balanceDueCents, computeDocumentTotals, MoneyError, type MoneyLine } from "./money";
 import { hasFinanceLedger, nextDocumentNumber } from "./numbering";
-import { activeRateBps, postInvoiceIssued, postInvoicePayment } from "./posting";
+import { activeRateBps, postInvoiceIssued, postInvoicePayment, postVendorBill } from "./posting";
+import { receiveRemaining, type PoLine } from "./purchasing";
 
 type Tx = Prisma.TransactionClient;
 type Row = Record<string, unknown>;
@@ -260,8 +261,132 @@ const quoteHooks: OpsEntityHooks = {
   },
 };
 
+// ---------------------------------------------------------------------------
+// Purchasing: vendors, purchase orders (RFQ + receiving), vendor bills.
+// ---------------------------------------------------------------------------
+
+async function assertVendor(tx: Tx, workspaceId: string, vendorId: unknown) {
+  if (typeof vendorId !== "string" || !vendorId) return null;
+  const v = await tx.opsVendor.findFirst({ where: { id: vendorId, workspaceId } });
+  if (!v) throw new OpsError(400, "Unknown vendor: pick a vendor from this workspace");
+  return v;
+}
+
+const vendorHooks: OpsEntityHooks = {
+  async prepare(tx, actor, body) {
+    await assertAccountsInWorkspace(tx, actor.workspaceId, [body.defaultAccountId as string | undefined]);
+    return body;
+  },
+};
+
+const purchaseOrderHooks: OpsEntityHooks = {
+  async prepare(tx, actor, body) {
+    const v = await assertVendor(tx, actor.workspaceId, body.vendorId);
+    // Keep the legacy supplier name readable on new POs too.
+    if (v && !body.supplierName) return { ...body, supplierName: v.name };
+    return body;
+  },
+  async beforeTransition(_tx, _actor, t) {
+    if (t.to === "rfq_sent") return { rfqSentAt: new Date() };
+  },
+  async afterTransition(tx, actor, t) {
+    if (t.to !== "received") return;
+    const before = (Array.isArray(t.existing.lineItems) ? t.existing.lineItems : []) as PoLine[];
+    if (hasFinanceLedger(tx)) return receiveRemaining(tx, actor, t.id, before);
+    // Pre-Phase-10 stub transactions (unit tests): the original restock of
+    // every product line, without receipt records.
+    let restocked = 0;
+    for (const it of before) {
+      if (!it.productId) continue;
+      await recordInventoryTxn(tx, actor, { productId: it.productId, delta: it.qty, reason: "restock", note: `purchase order ${t.id}` });
+      restocked += 1;
+    }
+    return { restocked };
+  },
+};
+
+const vendorBillHooks: OpsEntityHooks = {
+  async prepare(tx, actor, body, existing) {
+    const out = await withLineTax(tx, actor.workspaceId, body, existing);
+    await assertVendor(tx, actor.workspaceId, out.vendorId);
+    const lines = (out.lineItems ?? []) as Array<{ accountId?: string }>;
+    await assertAccountsInWorkspace(tx, actor.workspaceId, lines.map((l) => l.accountId));
+    for (const f of ["billDate", "dueAt"]) {
+      if (out[f] !== undefined && out[f] !== null) out[f] = parseIsoDate(out[f], f);
+    }
+    return out;
+  },
+  async create(tx, actor, body) {
+    const lines = body.lineItems as MoneyLine[];
+    const subtotalCents = lines.reduce((s, l) => s + l.qty * l.priceCents, 0);
+    const taxCents = Number(body.taxCents ?? 0);
+    const totalCents = subtotalCents + taxCents;
+    if (totalCents > 2_147_483_647) throw new OpsError(400, "Total exceeds the maximum of 2147483647 cents");
+    const vendor = await assertVendor(tx, actor.workspaceId, body.vendorId);
+    if (typeof body.purchaseOrderId === "string") {
+      const po = await tx.opsPurchaseOrder.count({ where: { id: body.purchaseOrderId, workspaceId: actor.workspaceId } });
+      if (!po) throw new OpsError(400, "Unknown purchase order");
+    }
+    const billDate = (body.billDate as Date | undefined) ?? new Date();
+    const row = await tx.opsVendorBill.create({
+      data: {
+        workspaceId: actor.workspaceId,
+        vendorId: vendor?.id ?? null,
+        purchaseOrderId: (body.purchaseOrderId as string) ?? null,
+        vendorRef: (body.vendorRef as string) ?? null,
+        lineItems: lines as unknown as Prisma.InputJsonValue,
+        subtotalCents,
+        taxCents,
+        totalCents,
+        billDate,
+        dueAt: (body.dueAt as Date | undefined) ?? new Date(billDate.getTime() + (vendor?.paymentTermsDays ?? 30) * 86_400_000),
+        notes: (body.notes as string) ?? null,
+        status: "draft",
+      },
+    });
+    return [row as unknown as Row];
+  },
+  async beforeTransition(tx, actor, t) {
+    if (t.to === "open") {
+      return {
+        postedAt: new Date(),
+        ...(!t.existing.number && hasFinanceLedger(tx) ? { number: await nextDocumentNumber(tx, actor.workspaceId, "bill") } : {}),
+      };
+    }
+  },
+  async afterTransition(tx, actor, t) {
+    if (!hasFinanceLedger(tx)) return;
+    if (t.to === "open") {
+      const vendor = t.row.vendorId ? await tx.opsVendor.findFirst({ where: { id: String(t.row.vendorId), workspaceId: actor.workspaceId } }) : null;
+      await postVendorBill(
+        tx,
+        actor,
+        {
+          id: t.id,
+          number: t.row.number as string | null,
+          totalCents: Number(t.row.totalCents),
+          taxCents: Number(t.row.taxCents),
+          lineItems: t.row.lineItems,
+          billDate: t.row.billDate as Date,
+        },
+        vendor?.defaultAccountId,
+      );
+    } else if (t.to === "cancelled" && t.from === "open") {
+      if (Number(t.existing.paidCents ?? 0) > 0) throw new OpsError(409, "This bill has payments recorded and can't be cancelled");
+      const posted = await findEntryBySource(tx, actor.workspaceId, `bill:${t.id}:post`);
+      if (posted) {
+        const { entry } = await reverseEntry(tx, actor, posted.id, { memo: `Cancel of vendor bill ${(t.row.number as string) ?? t.id}` });
+        return { reversalEntryId: entry.id };
+      }
+    }
+  },
+};
+
 export const FINANCE_ENTITY_HOOKS: Record<string, OpsEntityHooks> = {
   quotes: quoteHooks,
+  vendors: vendorHooks,
+  "purchase-orders": purchaseOrderHooks,
+  "vendor-bills": vendorBillHooks,
   accounts: accountHooks,
   "tax-rates": taxRateHooks,
   "journal-entries": journalEntryHooks,

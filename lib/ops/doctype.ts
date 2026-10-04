@@ -379,6 +379,9 @@ async function createRows(
           ? {
               supplierId: (body.supplierId as string) ?? null,
               supplierName: (body.supplierName as string) ?? null,
+              // Phase 10 (finance): vendor link + RFQ stage.
+              vendorId: (body.vendorId as string) ?? null,
+              ...(body.rfq === true ? { status: "rfq" } : {}),
             }
           : { customerId: body.customerId ?? null }),
         ...(def.slug === "invoices" && body.idempotencyKey
@@ -683,27 +686,10 @@ async function applyPatch(
     if (claimed.count !== 1) {
       throw new OpsError(409, `${def.label} changed concurrently (no longer ${String(existing.status)}) — reload and retry`);
     }
-    if (def.slug === "purchase-orders" && patch.status === "received") {
-      const items = (existing.lineItems ?? []) as Array<{
-        productId?: string;
-        qty: number;
-        name: string;
-      }>;
-      let restocked = 0;
-      for (const it of items) {
-        if (!it.productId) continue;
-        await recordInventoryTxn(tx, actor, {
-          productId: it.productId,
-          delta: it.qty,
-          reason: "restock",
-          note: `purchase order ${id}`,
-        });
-        restocked += 1;
-      }
-      const row = await d.findFirst({ where: { id, workspaceId: actor.workspaceId } });
-      // Non-persisted metadata for the caller (the route passes it through).
-      return { ...row, restocked };
-    }
+    // Phase 10 (finance): receiving (restock of the still-outstanding
+    // quantities, with a receipt record) moved to the purchase-orders
+    // afterTransition hook (lib/ops/finance/hooks.ts) so partial receipts are
+    // never restocked twice; it still returns { restocked } metadata.
     const moved = (await d.findFirst({ where: { id, workspaceId: actor.workspaceId } }))!;
     // Phase 10 (finance): posting / payments / receipts in the same tx.
     if (transition && hooks?.afterTransition) {

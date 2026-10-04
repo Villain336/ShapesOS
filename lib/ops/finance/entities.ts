@@ -173,4 +173,82 @@ export const quoteDef: OpsEntityDef = {
   summarize: (r) => `quote ${r.number ?? r.id ?? "(new)"} → ${r.status ?? "draft"} (${r.totalCents ?? "?"}c)`,
 };
 
-export const FINANCE_ENTITIES: OpsEntityDef[] = [accountDef, taxRateDef, journalEntryDef, recurringInvoiceDef, quoteDef];
+export const vendorDef: OpsEntityDef = {
+  slug: "vendors",
+  label: "Vendor",
+  delegate: "opsVendor",
+  createSchema: z.object({
+    name: z.string().min(1).max(200),
+    email: z.string().email().max(320).optional(),
+    phone: z.string().max(64).optional(),
+    taxId: z.string().max(64).optional(),
+    address: z.string().max(2000).optional(),
+    paymentTermsDays: z.number().int().min(0).max(365).default(30),
+    defaultAccountId: id.optional(),
+    leadId: id.optional(),
+    notes: z.string().max(4000).optional(),
+  }),
+  patchSchema: z.object({
+    name: z.string().min(1).max(200).optional(),
+    email: z.string().email().max(320).nullable().optional(),
+    phone: z.string().max(64).nullable().optional(),
+    taxId: z.string().max(64).nullable().optional(),
+    address: z.string().max(2000).nullable().optional(),
+    paymentTermsDays: z.number().int().min(0).max(365).optional(),
+    defaultAccountId: id.nullable().optional(),
+    notes: z.string().max(4000).nullable().optional(),
+    active: z.boolean().optional(),
+  }),
+  patchable: true,
+  filterable: [],
+  gatedTransitions: [],
+  summarize: (r) => `vendor "${r.name}"`,
+};
+
+const billLine = docLine.extend({ accountId: id.optional() });
+
+export const vendorBillDef: OpsEntityDef = {
+  slug: "vendor-bills",
+  label: "Vendor bill",
+  delegate: "opsVendorBill",
+  createSchema: z.object({
+    vendorId: id.optional(),
+    purchaseOrderId: id.optional(),
+    vendorRef: z.string().max(100).optional(),
+    lineItems: z.array(billLine).min(1).max(200),
+    taxCents: cents.default(0),
+    billDate: isoDate.optional(),
+    dueAt: isoDate.optional(),
+    notes: z.string().max(4000).optional(),
+  }),
+  patchSchema: z.object({
+    vendorId: id.nullable().optional(),
+    vendorRef: z.string().max(100).nullable().optional(),
+    lineItems: z.array(billLine).min(1).max(200).optional(),
+    taxCents: cents.optional(),
+    dueAt: isoDate.nullable().optional(),
+    notes: z.string().max(4000).nullable().optional(),
+    // open = post to accounts payable; paying goes through /pay (gated).
+    status: z.enum(["open", "cancelled"]).optional(),
+  }),
+  patchable: true,
+  filterable: ["status", "vendorId", "purchaseOrderId"],
+  gatedTransitions: [{ field: "status", to: ["cancelled"], slug: "OPS_RECORD_DELETE", label: "Cancel vendor bill" }],
+  statusTransitions: {
+    draft: ["open", "cancelled"],
+    open: ["cancelled"],
+    paid: [],
+    cancelled: [],
+  },
+  summarize: (r) => `vendor bill ${r.number ?? r.id ?? "(new)"} → ${r.status ?? "draft"} (${r.totalCents ?? "?"}c)`,
+};
+
+export const FINANCE_ENTITIES: OpsEntityDef[] = [
+  accountDef,
+  taxRateDef,
+  journalEntryDef,
+  recurringInvoiceDef,
+  quoteDef,
+  vendorDef,
+  vendorBillDef,
+];

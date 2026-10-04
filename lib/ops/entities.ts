@@ -348,13 +348,19 @@ const purchaseOrderDef: OpsEntityDef = {
     supplierName: z.string().max(200).optional(),
     lineItems: z.array(poLineItemSchema).min(1).max(200),
     taxCents: centsSchema.default(0),
+    // Phase 10 (finance): the vendor record, and start as an RFQ.
+    vendorId: z.string().min(1).max(64).optional(),
+    rfq: z.boolean().optional(),
   }).superRefine(totalFitsInt4),
   patchSchema: z.object({
     supplierId: z.string().min(1).max(64).optional(),
     supplierName: z.string().max(200).optional(),
     lineItems: z.array(poLineItemSchema).min(1).max(200).optional(),
     taxCents: centsSchema.optional(),
-    status: z.enum(["sent", "received", "cancelled"]).optional(),
+    // Phase 10 (finance): rfq_sent / draft are the RFQ moves; partial
+    // receipts go through POST /api/ops/purchase-orders/[id]/receipts.
+    status: z.enum(["rfq_sent", "draft", "sent", "received", "cancelled"]).optional(),
+    vendorId: z.string().min(1).max(64).nullable().optional(),
   }),
   patchable: true,
   filterable: ["status"],
@@ -366,12 +372,17 @@ const purchaseOrderDef: OpsEntityDef = {
     { field: "status", to: ["cancelled"], slug: "OPS_RECORD_DELETE", label: "Cancel purchase order" },
   ],
   // Received only after sent (restock books exactly once, on that move).
+  // Phase 10 (finance): RFQ stage first; partial receipts in between.
   statusTransitions: {
+    rfq: ["rfq_sent", "draft", "cancelled"],
+    rfq_sent: ["draft", "cancelled"],
     draft: ["sent", "cancelled"],
     sent: ["received", "cancelled"],
+    partially_received: ["received", "cancelled"],
     received: [],
     cancelled: [],
   },
+  editableStatuses: ["draft", "rfq", "rfq_sent"],
   summarize: (r) => `purchase order ${r.id} → ${r.status} (${r.totalCents}c)`,
 };
 
