@@ -133,3 +133,7 @@ lib/bizsync/__tests__/shopify-sync-db.test.ts
 lib/bizsync/__tests__/accounting-db.test.ts
 # Phase 11 (bizsync): Xero (fake Xero honouring Idempotency-Key): tenant discovery/selection, mapping shared with QuickBooks, export once, contacts (customer/supplier), ledger untouched, FORCE RLS.
 lib/bizsync/__tests__/xero-db.test.ts
+# Phase 12 (mfgpos): manufacturing — CAD BOM via part↔product link, gated confirm/complete, completion consumes/produces/scraps through the ledger once (ledger balances, second completion no-op), WIP/finish entries balance, gated scrap, work-order timer + capacity, FORCE RLS.
+lib/ops/__tests__/p12-mfg-db.test.ts
+# Phase 12 (mfgpos): point of sale — one open session per register, till sales priced server-side (promo + tax), client-order-id replay no-op (incl. concurrent), single-use card refs, cash count, gated close posts ONE balanced entry, receipt PDF, FORCE RLS.
+lib/ops/__tests__/p12-pos-db.test.ts
