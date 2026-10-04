@@ -5,7 +5,6 @@
 
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { applyTwinPatch, parsePointer } from "../patch";
 import {
   clampFootprint,
   cellToWorld,
@@ -40,6 +39,7 @@ import {
   type TwinSnapshot,
 } from "../types";
 import {
+  applyLivePatch,
   agentsByObject,
   formatKpiValue,
   inspectorFacts,
@@ -55,86 +55,59 @@ import { isAosStatus } from "@/lib/aos/status";
 import { diffSnapshots, footprintProblem, overlapWith } from "../derive";
 
 // ---------------------------------------------------------------------------
-// patch.ts
+// live patches: derive.applyTwinPatch behind view-model applyLivePatch
 // ---------------------------------------------------------------------------
 
-describe("applyTwinPatch (RFC 6902 subset)", () => {
-  const doc = { a: 1, list: [{ id: "x", v: 1 }, { id: "y", v: 2 }], nested: { "s/l": 1, "t~d": 2 } };
+describe("applyLivePatch (the data side's applier, guarded)", () => {
+  const dockIdx = WAREHOUSE_FIXTURE.objects.findIndex((o) => o.id === "o_w_dock_3");
 
-  it("replaces a value deep in an array by index, without mutating the input", () => {
-    const r = applyTwinPatch(doc, [{ op: "replace", path: "/list/1/v", value: 9 }]);
-    assert.ok(r.ok);
-    assert.equal(r.value.list[1]!.v, 9);
-    assert.equal(doc.list[1]!.v, 2, "input untouched");
-    assert.equal(r.value.list[0], doc.list[0], "untouched siblings are shared");
-    assert.notEqual(r.value.list, doc.list);
-  });
-
-  it("adds to an object, inserts into an array and appends with -", () => {
-    const r = applyTwinPatch(doc, [
-      { op: "add", path: "/b", value: "new" },
-      { op: "add", path: "/list/0", value: { id: "w", v: 0 } },
-      { op: "add", path: "/list/-", value: { id: "z", v: 3 } },
-    ]);
-    assert.ok(r.ok);
-    assert.equal((r.value as Record<string, unknown>).b, "new");
-    assert.deepEqual(r.value.list.map((x) => x.id), ["w", "x", "y", "z"]);
-  });
-
-  it("removes object members and array items", () => {
-    const r = applyTwinPatch(doc, [
-      { op: "remove", path: "/a" },
-      { op: "remove", path: "/list/0" },
-    ]);
-    assert.ok(r.ok);
-    assert.equal("a" in r.value, false);
-    assert.deepEqual(r.value.list.map((x) => x.id), ["y"]);
-  });
-
-  it("unescapes ~1 and ~0 in pointers", () => {
-    assert.deepEqual(parsePointer("/nested/s~1l"), ["nested", "s/l"]);
-    const r = applyTwinPatch(doc, [{ op: "replace", path: "/nested/t~0d", value: 5 }]);
-    assert.ok(r.ok);
-    assert.equal(r.value.nested["t~d"], 5);
-  });
-
-  it("an unknown path is a resync signal and nothing partial leaks", () => {
-    const ops: TwinPatchOp[] = [
-      { op: "replace", path: "/a", value: 2 },
-      { op: "replace", path: "/list/7/v", value: 1 },
-    ];
-    const r = applyTwinPatch(doc, ops);
-    assert.equal(r.ok, false);
-    assert.equal(!r.ok && r.opIndex, 1);
-    for (const bad of ["/missing", "/list/x", "/list/01", "no-slash", "/a/b"]) {
-      assert.equal(applyTwinPatch(doc, [{ op: "replace", path: bad, value: 1 }]).ok, false, bad);
-    }
-    assert.equal(applyTwinPatch(doc, [{ op: "remove", path: "/list/2" }]).ok, false);
-    assert.equal(applyTwinPatch(doc, [{ op: "move", path: "/a" } as unknown as TwinPatchOp]).ok, false);
-  });
-
-  it("applies a realistic snapshot patch (a dock booking arrives)", () => {
-    const i = WAREHOUSE_FIXTURE.objects.findIndex((o) => o.id === "o_w_dock_3");
-    const r = applyTwinPatch(WAREHOUSE_FIXTURE, [
-      { op: "replace", path: `/objects/${i}/state/status`, value: "occupied" },
-      { op: "replace", path: `/objects/${i}/pill`, value: "Loading" },
-      { op: "replace", path: "/kpis/1/value", value: 2 },
+  it("applies a realistic patch without mutating the input", () => {
+    const changed = { ...WAREHOUSE_FIXTURE.objects[dockIdx]!, pill: "Loading" };
+    const next = applyLivePatch(WAREHOUSE_FIXTURE, [
+      { op: "replace", path: `/objects/${dockIdx}`, value: changed },
+      { op: "replace", path: "/kpis", value: [{ ...WAREHOUSE_FIXTURE.kpis[0]!, value: 5000 }] },
       { op: "replace", path: "/generatedAt", value: "2026-10-04T09:34:00.000Z" },
     ]);
-    assert.ok(r.ok);
-    const o = r.value.objects[i]!;
-    assert.equal(o.state.kind === "dock_door" && o.state.status, "occupied");
-    assert.equal(o.pill, "Loading");
-    assert.equal(r.value.kpis[1]!.value, 2);
-    assert.equal(r.value.objects[0], WAREHOUSE_FIXTURE.objects[0], "other objects shared");
+    assert.ok(next);
+    assert.equal(next.objects[dockIdx]!.pill, "Loading");
+    assert.equal(WAREHOUSE_FIXTURE.objects[dockIdx]!.pill, "Booked 10:05", "input untouched");
+    assert.equal(next.objects[0], WAREHOUSE_FIXTURE.objects[0], "untouched objects are shared");
+    assert.equal(next.kpis[0]!.value, 5000);
   });
 
-  it("applies the data side's siteDiff output exactly (wire compatibility)", () => {
+  it("adds and removes objects by index", () => {
+    const n = WAREHOUSE_FIXTURE.objects.length;
+    const next = applyLivePatch(WAREHOUSE_FIXTURE, [
+      { op: "remove", path: "/objects/0" },
+      { op: "add", path: `/objects/${n - 1}`, value: { ...WAREHOUSE_FIXTURE.objects[0]!, id: "o_zz" } },
+    ]);
+    assert.ok(next);
+    assert.equal(next.objects.length, n);
+    assert.equal(next.objects[n - 1]!.id, "o_zz");
+  });
+
+  it("anything that doesn't fit our copy is a resync signal (null), never a holey snapshot", () => {
+    const n = WAREHOUSE_FIXTURE.objects.length;
+    const bad: TwinPatchOp[][] = [
+      [{ op: "replace", path: `/objects/${n}`, value: {} }],
+      [{ op: "remove", path: `/objects/${n + 3}` }],
+      [{ op: "add", path: `/objects/${n + 1}`, value: {} }],
+      [{ op: "replace", path: "/objects/01", value: {} }],
+      [{ op: "replace", path: "/objects/2/state/status", value: "x" }],
+      [{ op: "replace", path: "/nope", value: 1 }],
+      [{ op: "replace", path: "objects", value: 1 }],
+      [{ op: "move", path: "/site" } as unknown as TwinPatchOp],
+      // a remove shrinks the array for the ops after it
+      [{ op: "remove", path: `/objects/${n - 1}` }, { op: "replace", path: `/objects/${n - 1}`, value: {} }],
+    ];
+    for (const ops of bad) assert.equal(applyLivePatch(WAREHOUSE_FIXTURE, ops), null, JSON.stringify(ops));
+    assert.equal(applyLivePatch(WAREHOUSE_FIXTURE, null as unknown as TwinPatchOp[]), null);
+  });
+
+  it("applies the data side's diff exactly (wire compatibility)", () => {
     const prev = WAREHOUSE_FIXTURE;
-    // a value change, a layout change (object removed + added), KPI and time moves
     const next = structuredClone(prev);
-    const dock = next.objects.find((o) => o.id === "o_w_dock_1")!;
-    dock.pill = "Booked 11:00";
+    next.objects.find((o) => o.id === "o_w_dock_1")!.pill = "Booked 11:00";
     next.objects = next.objects.filter((o) => o.id !== "o_w_yard_3");
     next.objects.push({ ...structuredClone(prev.objects[0]!), id: "o_w_zz_new", label: "New rack" });
     next.objects.sort((a, b) => (a.id < b.id ? -1 : 1));
@@ -145,17 +118,10 @@ describe("applyTwinPatch (RFC 6902 subset)", () => {
       [next, prev],
       [prev, prev],
     ] as const) {
-      const ops = diffSnapshots(a, b);
-      const r = applyTwinPatch(a, ops);
-      assert.ok(r.ok, !r.ok ? r.reason : "");
-      assert.deepEqual(r.value, b);
+      const r = applyLivePatch(a, diffSnapshots(a, b));
+      assert.ok(r, "resolves");
+      assert.deepEqual(r, b);
     }
-  });
-
-  it("a root replace swaps the whole document", () => {
-    const r = applyTwinPatch(doc, [{ op: "replace", path: "", value: { a: 2 } }]);
-    assert.ok(r.ok);
-    assert.deepEqual(r.value, { a: 2 });
   });
 });
 

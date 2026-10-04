@@ -96,18 +96,6 @@ export interface OpsEntityHooks {
     patch: Record<string, unknown>,
     existing: Record<string, unknown>,
   ) => Promise<Record<string, unknown>>;
-  /**
-   * Phase 13 (twinui): DELETE /api/ops/{entity}?id=… is allowed ONLY for
-   * entities that declare this hook (layout records like twin objects);
-   * everything else answers 405 — business records are cancelled/voided via
-   * PATCH, never deleted. Returns the removed row.
-   */
-  remove?: (
-    tx: Prisma.TransactionClient,
-    actor: { workspaceId: string; userId: string },
-    id: string,
-    existing: Record<string, unknown>,
-  ) => Promise<Record<string, unknown>>;
 }
 
 // ---------------------------------------------------------------------------

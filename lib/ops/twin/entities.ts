@@ -118,8 +118,6 @@ export const twinObjectDef: OpsEntityDef = {
   hooks: {
     create: async (tx, a, b) => (await svc()).createObjectRow(tx, a, b),
     patch: async (tx, a, i, p, e) => (await svc()).patchObjectRow(tx, a, i, p, e),
-    // Phase 13 (twinui): the layout editor's Delete (generic DELETE route).
-    remove: async (tx, a, i, e) => (await import("./remove")).removeObjectRow(tx, a, i, e),
   },
 };
 

@@ -1,7 +1,8 @@
 // ShapesOS — Phase 13 (twinui): keeps a twin snapshot live.
 //
 // Subscribes to TWIN_API.live (EventSource): `snapshot` frames replace the
-// state, `patch` frames are RFC 6902 ops applied with lib/twin/patch.ts — a
+// state, `patch` frames are RFC 6902 ops applied with the data side's applier
+// (lib/twin/derive.ts, guarded by view-model applyLivePatch) — a
 // patch that doesn't resolve triggers a resync from TWIN_API.state. When the
 // stream errors repeatedly it falls back to polling TWIN_API.state through
 // sharedJson every TWIN_LIVE_POLL_MS, and retries the stream every minute.
@@ -10,7 +11,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { applyTwinPatch } from "@/lib/twin/patch";
+import { applyLivePatch } from "@/lib/twin/view-model";
 import { TWIN_API, TWIN_LIVE_POLL_MS, type TwinPatchOp, type TwinSnapshot } from "@/lib/twin/types";
 import { sharedJson } from "@/lib/ui/shared-fetch";
 
@@ -96,8 +97,8 @@ export function useTwinLive(initial: TwinSnapshot, opts: { enabled?: boolean } =
       es.addEventListener("patch", (ev) => {
         try {
           const ops = JSON.parse((ev as MessageEvent).data) as TwinPatchOp[];
-          const r = applyTwinPatch(snapRef.current, Array.isArray(ops) ? ops : []);
-          if (r.ok) setSnapshot(r.value);
+          const next = applyLivePatch(snapRef.current, ops);
+          if (next) setSnapshot(next);
           else void resync();
         } catch {
           void resync();

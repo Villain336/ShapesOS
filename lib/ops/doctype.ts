@@ -597,22 +597,6 @@ export async function opsPatch(
   return { outcome: "done", row, action: "update" };
 }
 
-/**
- * Phase 13 (twinui): remove a row — only for entities that opt in with
- * `hooks.remove` (layout records); 405 otherwise. Workspace-scoped 404,
- * audited in the same transaction. No money gate: nothing that can be
- * removed this way carries money (business records are voided by PATCH).
- */
-export async function opsRemove(tx: Tx, def: OpsEntityDef, actor: OpsActor, id: unknown): Promise<Record<string, unknown>> {
-  if (!def.hooks?.remove) throw new OpsError(405, `${def.label} records can't be removed — change their status instead`);
-  if (typeof id !== "string" || !id) throw new OpsError(400, "DELETE requires an \"id\"");
-  const existing = await delegateFor(tx, def).findFirst({ where: { id, workspaceId: actor.workspaceId } });
-  if (!existing) throw new OpsNotFoundError(def.slug, id);
-  const row = await def.hooks.remove(tx, actor, id, existing);
-  await auditOpsEvent(tx, def, actor, "remove", id, `removed ${def.summarize(existing)}`);
-  return row;
-}
-
 /** Phase 10 (finance): run the entity's prepare hook on a validated patch. */
 async function preparePatch(
   tx: Tx,

@@ -3,8 +3,10 @@
 // the inspector's facts, KPI formatting and record links. No React, no DOM,
 // no prisma: unit-tested in lib/twin/__tests__/twin-ui.test.ts.
 
+import { applyTwinPatch } from "./derive";
 import type {
   TwinAgentMarker,
+  TwinPatchOp,
   TwinBindingType,
   TwinKpi,
   TwinObject,
@@ -526,4 +528,45 @@ export function inspectorFacts(o: TwinObject): TwinFact[] {
   const s = o.footprint;
   facts.push({ label: "Footprint", value: `${s.w} × ${s.d} m at ${s.x}, ${s.z}${s.rotation ? ` · ${s.rotation}°` : ""}` });
   return facts;
+}
+
+// ---------------------------------------------------------------------------
+// Live patches: the data side's applier (lib/twin/derive.ts applyTwinPatch),
+// guarded so a frame that doesn't fit our copy becomes a RESYNC, never a
+// half-applied or holey snapshot.
+// ---------------------------------------------------------------------------
+
+const SNAPSHOT_KEYS = new Set(["site", "objects", "kpis", "shipments", "agents", "generatedAt"]);
+
+/** The patched snapshot, or null when the ops don't resolve against `snap` (the caller resyncs). */
+export function applyLivePatch(snap: TwinSnapshot, ops: readonly TwinPatchOp[]): TwinSnapshot | null {
+  if (!Array.isArray(ops)) return null;
+  let len = snap.objects.length;
+  for (const op of ops) {
+    if (!op || typeof op.path !== "string" || !["replace", "add", "remove"].includes(op.op)) return null;
+    const parts = op.path.split("/").slice(1);
+    if (op.path[0] !== "/" || parts.length === 0 || parts.length > 2) return null;
+    if (parts.length === 1) {
+      if (!SNAPSHOT_KEYS.has(parts[0]!)) return null;
+      if (parts[0] === "objects") {
+        if (op.op === "remove" || !Array.isArray((op as { value?: unknown }).value)) return null;
+        len = ((op as { value: unknown[] }).value).length;
+      }
+      continue;
+    }
+    if (parts[0] !== "objects" || !/^(0|[1-9]\d*)$/.test(parts[1]!)) return null;
+    const i = Number(parts[1]);
+    if (op.op === "add") {
+      if (i > len) return null;
+      len += 1;
+    } else {
+      if (i >= len) return null;
+      if (op.op === "remove") len -= 1;
+    }
+  }
+  try {
+    return applyTwinPatch(snap, ops);
+  } catch {
+    return null;
+  }
 }
