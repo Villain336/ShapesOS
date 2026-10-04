@@ -35,7 +35,7 @@ export default async function Page({ params }: { params: Promise<{ sessionId: st
   if (!data) notFound();
   // A closed session has nothing left to sell or count.
   if (data.summary.status === "closed") redirect("/dashboard/ops/pos");
-  const items: TillItem[] = data.products.flatMap((p) =>
+  const items: TillItem[] = data.products.flatMap((p): TillItem[] =>
     p.variants.length
       ? p.variants.map((v) => ({ key: `${p.id}|${v.id}`, productId: p.id, variantId: v.id, name: `${p.name} — ${v.name}`, sku: v.sku, priceCents: v.priceCents ?? p.priceCents }))
       : [{ key: `${p.id}|`, productId: p.id, variantId: null, name: p.name, sku: p.sku, priceCents: p.priceCents }],
