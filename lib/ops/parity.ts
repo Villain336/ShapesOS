@@ -284,9 +284,12 @@ function walk(dir: string, out: string[] = []): string[] {
 
 export function loadCtx(root = ROOT): Ctx {
   const schema = readFileSync(join(root, "prisma/schema.prisma"), "utf8");
-  const entities = readFileSync(join(root, "lib/ops/entities.ts"), "utf8");
-  const entitySlugs = new Set([...entities.matchAll(/^\s*slug:\s*"([a-z0-9-]+)"/gm)].map((m) => m[1]!));
   const files = ["app", "lib", "components", "tests"].flatMap((d) => walk(join(root, d)));
+  // Phase 12 (mfgpos): entity defs also live in lib/ops/<area>/entities.ts
+  // (spread into OPS_ENTITIES), so every registry file is read.
+  const registries = ["lib/ops/entities.ts", ...files.filter((f) => /^lib\/ops\/[a-z-]+\/entities\.ts$/.test(f))];
+  const entities = registries.map((f) => readFileSync(join(root, f), "utf8")).join("\n");
+  const entitySlugs = new Set([...entities.matchAll(/^\s*slug:\s*"([a-z0-9-]+)"/gm)].map((m) => m[1]!));
   return { schema, entitySlugs, files };
 }
 
