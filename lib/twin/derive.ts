@@ -427,6 +427,8 @@ export interface WorkOrderRow {
   status: "pending" | "in_progress" | "paused" | "done" | "cancelled";
   runningSince: Date | null;
   mo: { id: string; number: string | null; status: string; plannedStart: Date | null };
+  /** False when an earlier step of the same MO is still open (this one waits upstream). Default true. */
+  ready?: boolean;
 }
 
 export interface TimeLogRow {
@@ -467,8 +469,9 @@ export interface DerivedWorkCenter {
 
 /**
  * running = a work order's timer runs here; paused = one is paused; stopped
- * = work is waiting (a pending step of an open MO) but nothing runs; idle =
- * no open work. late = the shown work order's MO is past its planned start
+ * = work is ready here (the next open step of a confirmed / in-progress MO)
+ * but nothing runs; idle = no work ready (steps waiting upstream don't
+ * count). late = the shown work order's MO is past its planned start
  * and not done.
  */
 export function deriveWorkCenter(
@@ -477,7 +480,7 @@ export function deriveWorkCenter(
   logs: readonly TimeLogRow[],
   now: Date,
 ): DerivedWorkCenter {
-  const open = workOrders.filter((w) => w.status === "in_progress" || w.status === "paused" || (w.status === "pending" && OPEN_MO.has(w.mo.status)));
+  const open = workOrders.filter((w) => w.status === "in_progress" || w.status === "paused" || (w.status === "pending" && OPEN_MO.has(w.mo.status) && w.ready !== false));
   const by = (s: WorkOrderRow["status"]) => open.filter((w) => w.status === s);
   const running = by("in_progress").sort((a, b) => (b.runningSince?.getTime() ?? 0) - (a.runningSince?.getTime() ?? 0));
   const paused = by("paused");

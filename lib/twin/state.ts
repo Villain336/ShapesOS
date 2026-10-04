@@ -169,6 +169,16 @@ export async function siteSnapshotTx(tx: Tx, workspaceId: string, siteId: string
         })
       ).map((w) => ({ id: w.id, workCenterId: w.workCenterId, name: w.name, sequence: w.sequence, status: w.status, runningSince: w.runningSince, mo: w.mo }))
     : [];
+  // A pending step is ready only when it is its MO's lowest open step.
+  if (wos.some((w) => w.status === "pending")) {
+    const openSteps = await tx.opsWorkOrder.findMany({
+      where: { workspaceId, moId: { in: [...new Set(wos.map((w) => w.mo.id))] }, status: { in: ["pending", "in_progress", "paused"] } },
+      select: { moId: true, sequence: true },
+    });
+    const first = new Map<string, number>();
+    for (const s of openSteps) first.set(s.moId, Math.min(first.get(s.moId) ?? Infinity, s.sequence));
+    for (const w of wos) if (w.status === "pending") w.ready = first.get(w.mo.id) === w.sequence;
+  }
   const windowStart = new Date(now.getTime() - UTILISATION_WINDOW_DAYS * 86_400_000);
   const logs: TimeLogRow[] = wcIds.length
     ? (

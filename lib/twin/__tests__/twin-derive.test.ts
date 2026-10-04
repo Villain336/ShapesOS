@@ -207,6 +207,7 @@ describe("derived state per kind", () => {
     assert.equal(onTime.state.late, false);
     assert.equal(onTime.alert, null);
     assert.equal(deriveWorkCenter([wo({ mo: { id: "mo3", number: null, status: "draft", plannedStart: null } })], 1, [], NOW).state.status, "idle", "a draft MO's step is not open work");
+    assert.equal(deriveWorkCenter([wo({ ready: false })], 1, [], NOW).state.status, "idle", "a step waiting on an earlier one is not stopped");
     // 7 days × 8 h × capacity 1 = 3360 min; 336 min logged = 10 %.
     assert.equal(utilisationPct(1, [{ startedAt: ago(2 * H), endedAt: ago(H), seconds: 336 * 60 }], [], NOW), 10);
     assert.equal(utilisationPct(2, [{ startedAt: ago(2 * H), endedAt: ago(H), seconds: 336 * 60 }], [], NOW), 5, "capacity divides");
