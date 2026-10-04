@@ -21,12 +21,18 @@ type TxClient = Prisma.TransactionClient | PrismaClient;
 export async function withWorkspaceScope<T>(
   workspaceId: string,
   fn: (tx: TxClient) => Promise<T>,
+  // Phase 13 (twincore): long seeding work (the twin sample site) may ask
+  // for more than Prisma's default 5 s interactive-transaction timeout.
+  opts?: { timeoutMs?: number },
 ): Promise<T> {
   if (!workspaceId) throw new Error("withWorkspaceScope: workspaceId is required");
-  return prisma.$transaction(async (tx) => {
-    await tx.$executeRawUnsafe(`SET LOCAL ${WORKSPACE_GUC} = '${escapeLiteral(workspaceId)}'`);
-    return fn(tx);
-  });
+  return prisma.$transaction(
+    async (tx) => {
+      await tx.$executeRawUnsafe(`SET LOCAL ${WORKSPACE_GUC} = '${escapeLiteral(workspaceId)}'`);
+      return fn(tx);
+    },
+    opts?.timeoutMs ? { timeout: opts.timeoutMs } : undefined,
+  );
 }
 
 /**
