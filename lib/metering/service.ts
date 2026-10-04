@@ -159,20 +159,14 @@ async function lockBalance(tx: Tx, workspaceId: string): Promise<LockedBalance> 
     if (rows.length > 0) return rows[0];
     const ws = await tx.workspace.findUnique({ where: { id: workspaceId }, select: { plan: true } });
     if (!ws) throw new Error(`metering: unknown workspace ${workspaceId}`);
-    try {
-      await tx.creditBalance.create({
-        data: {
-          workspaceId,
-          includedCredits: includedCreditsForPlan(ws.plan),
-          purchasedCredits: 0,
-          usedCredits: 0,
-          periodStart: monthStart(new Date()),
-        },
-      });
-    } catch (err) {
-      if (isUniqueViolation(err)) continue; // lost the create race — re-lock
-      throw err;
-    }
+    // ON CONFLICT DO NOTHING, not create + catch: in Postgres a unique
+    // violation aborts the whole transaction, so a caught P2002 could never be
+    // retried (every later statement fails "current transaction is aborted").
+    // Losing the create race is now a no-op and the loop re-locks the winner's row.
+    await tx.$executeRaw`
+      INSERT INTO credit_balances (workspace_id, included_credits, purchased_credits, used_credits, period_start)
+      VALUES (${workspaceId}, ${includedCreditsForPlan(ws.plan)}, 0, 0, ${monthStart(new Date())})
+      ON CONFLICT (workspace_id) DO NOTHING`;
   }
   throw new Error("metering: could not lock credit balance");
 }
@@ -185,17 +179,14 @@ async function lockSpendCap(tx: Tx, workspaceId: string, pool: number): Promise<
              auto_overage AS "autoOverage"
       FROM spend_caps WHERE workspace_id = ${workspaceId} FOR UPDATE`;
     if (rows.length > 0) return rows[0];
-    try {
-      // Self-hosted = BYO provider keys (credits.ts): usage is recorded, never
-      // blocked. Every other plan starts with the hard cap at its pool.
-      const ws = await tx.workspace.findUnique({ where: { id: workspaceId }, select: { plan: true } });
-      await tx.spendCap.create({
-        data: { workspaceId, capCredits: pool, blockAtCap: ws?.plan !== "self_hosted", alertAtPct: 80 },
-      });
-    } catch (err) {
-      if (isUniqueViolation(err)) continue;
-      throw err;
-    }
+    // Self-hosted = BYO provider keys (credits.ts): usage is recorded, never
+    // blocked. Every other plan starts with the hard cap at its pool.
+    // ON CONFLICT DO NOTHING for the same reason as lockBalance.
+    const ws = await tx.workspace.findUnique({ where: { id: workspaceId }, select: { plan: true } });
+    await tx.$executeRaw`
+      INSERT INTO spend_caps (workspace_id, cap_credits, block_at_cap, alert_at_pct, auto_overage)
+      VALUES (${workspaceId}, ${pool}, ${ws?.plan !== "self_hosted"}, 80, false)
+      ON CONFLICT (workspace_id) DO NOTHING`;
   }
   throw new Error("metering: could not lock spend cap");
 }
