@@ -1,6 +1,6 @@
 # Backup and restore
 
-ShapesOS keeps everything that matters in Postgres: workspaces, content, contacts, the usage ledger, the encrypted credential vault and the audit trails. Files live in the `marketr-data` volume (local storage) or in S3/MinIO (`MARKETR_STORAGE=s3`), and those need their own snapshot or bucket versioning. This page covers the database.
+ShapesOS keeps everything that matters in Postgres: workspaces, content, contacts, the usage ledger, the encrypted credential vault and the audit trails. Uploaded files live in the bundled MinIO's `marketr-minio` volume by default (`MARKETR_STORAGE=s3`), or in your own S3 bucket, or in the `marketr-data` volume with `MARKETR_STORAGE=local`. Other on-disk state (report PDFs, logos, site working copies) is in `marketr-data`, agent run recordings in `marketr-run-artifacts` and the knowledge corpus in `marketr-corpus`. Those need their own snapshot or bucket versioning. This page covers the database (it also holds the `rate_limit_buckets` counters, which need no backup).
 
 ## What runs
 

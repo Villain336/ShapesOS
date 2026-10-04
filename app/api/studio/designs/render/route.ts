@@ -31,7 +31,7 @@ import {
   MAX_RENDER_SCALE,
   renderDocumentToPng,
 } from "@/lib/design/render-server";
-import { checkRateLimit, tooManyRequests } from "@/lib/api/rate-limit";
+import { checkRateLimitAsync, tooManyRequests } from "@/lib/api/rate-limit";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -109,7 +109,7 @@ export async function POST(req: Request) {
     const { workspace } = await guardWorkspace();
     // Per-tenant automation protection: expensive renders get the "ai"
     // tier (20/min) keyed by workspace, on top of the proxy's write tier.
-    const rl = checkRateLimit(`render:ws:${workspace.id}`, "ai");
+    const rl = await checkRateLimitAsync(`render:ws:${workspace.id}`, "ai");
     if (!rl.allowed) return tooManyRequests(rl.retryAfterMs);
 
     const url = new URL(req.url);
@@ -136,7 +136,7 @@ export async function POST(req: Request) {
 export async function GET(req: Request) {
   try {
     const { workspace } = await guardWorkspace();
-    const rl = checkRateLimit(`render:ws:${workspace.id}`, "ai");
+    const rl = await checkRateLimitAsync(`render:ws:${workspace.id}`, "ai");
     if (!rl.allowed) return tooManyRequests(rl.retryAfterMs);
 
     const url = new URL(req.url);

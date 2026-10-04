@@ -8,7 +8,7 @@ import { z } from "zod";
 import { validateBody } from "@/lib/api/validate";
 import { sendDesignToSocial } from "@/lib/social/studio";
 import { MAX_RENDER_SCALE } from "@/lib/design/render-server";
-import { checkRateLimit, tooManyRequests } from "@/lib/api/rate-limit";
+import { checkRateLimitAsync, tooManyRequests } from "@/lib/api/rate-limit";
 import { guardWorkspace, readJson, socialError } from "@/app/api/social/_lib";
 
 export const dynamic = "force-dynamic";
@@ -23,7 +23,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   try {
     const { user, workspace } = await guardWorkspace({ editor: true });
     // Rendering is expensive compute: same "ai" tier as the render route.
-    const rl = checkRateLimit(`studio-render:ws:${workspace.id}`, "ai");
+    const rl = await checkRateLimitAsync(`studio-render:ws:${workspace.id}`, "ai");
     if (!rl.allowed) return tooManyRequests(rl.retryAfterMs);
     const raw = req.headers.get("content-length") === "0" ? {} : await readJson(req).catch(() => ({}));
     const v = validateBody(Body, raw ?? {});

@@ -81,3 +81,4 @@ lib/workspace/__tests__/workspace-orphans-db.test.ts
 lib/chat/__tests__/agent-controls-db.test.ts
 lib/cron/__tests__/runner-db.test.ts
 lib/workflow/__tests__/webhook-trigger-db.test.ts
+lib/api/__tests__/rate-limit-store-db.test.ts
