@@ -28,12 +28,16 @@ const BodySchema = z.object({
 });
 
 function imageConfig(): { apiKey: string; baseUrl: string; model: string } {
-  const apiKey = (process.env.LLM_API_KEY ?? process.env.OPENAI_API_KEY ?? "").trim();
+  // First NON-EMPTY value wins: an empty LLM_API_KEY="" (as copied from
+  // .env.example) must not mask OPENAI_API_KEY (Phase 6 single-key mode;
+  // mirrored by lib/providers/mock-inventory.ts).
+  const apiKey =
+    process.env.LLM_API_KEY?.trim() || process.env.OPENAI_API_KEY?.trim() || "";
   const baseUrl = (
-    process.env.OPENAI_BASE_URL ??
-    process.env.LLM_BASE_URL ??
+    process.env.OPENAI_BASE_URL?.trim() ||
+    process.env.LLM_BASE_URL?.trim() ||
     "https://api.openai.com/v1"
-  ).trim().replace(/\/+$/, "");
+  ).replace(/\/+$/, "");
   const model = (process.env.LLM_IMAGE_MODEL ?? "gpt-image-1").trim();
   return { apiKey, baseUrl, model };
 }

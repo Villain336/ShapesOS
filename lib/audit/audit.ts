@@ -13,6 +13,10 @@ export interface AuditInput {
   siteName: string;
   provider: SiteFileProvider | null; // null when mocking
   mock: boolean;
+  /** Skip the site_audit ledger entry: only for callers that already
+   *  charged this exact action before running (the MCP runner meters
+   *  site_audit per call — charging here too would bill twice, T14). */
+  skipMetering?: boolean;
 }
 
 export async function runAudit(input: AuditInput) {
@@ -74,7 +78,7 @@ export async function runAudit(input: AuditInput) {
       where: { id: projectId },
       select: { workspaceId: true },
     });
-    if (proj) {
+    if (proj && !input.skipMetering) {
       await meter({
         workspaceId: proj.workspaceId,
         projectId,

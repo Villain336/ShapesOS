@@ -14,7 +14,7 @@
 // lib/chat/agent.ts holds them behind the confirmation gate.
 
 import { prisma } from "@/lib/prisma";
-import type { SiteSourceType, WorkspaceRole } from "@prisma/client";
+import type { WorkspaceRole } from "@prisma/client";
 import { roleAtLeast } from "@/lib/authz";
 import { getSeoProvider } from "@/lib/providers";
 import { recordUsage } from "@/lib/usage";
@@ -25,8 +25,7 @@ import { buildDraftPrompt } from "@/lib/content/draft";
 import { wordCount, type ContentBrief } from "@/lib/content/brief";
 import { inferIntent } from "@/lib/keywords/intent";
 import { getLlmProviderFor } from "@/lib/llm";
-import { runAudit } from "@/lib/audit/audit";
-import { getSiteIdeProvider, siteIsMock } from "@/lib/connectors/source";
+import { auditProjectSite } from "@/lib/audit/project-audit";
 import { generateReport } from "@/lib/pdf/generate";
 import { approveAutopilotItem } from "@/lib/seo/autopilot-service";
 import { designQr, printLockQr, QrDesignerError } from "@/lib/studio/qr-designer";
@@ -589,29 +588,10 @@ const run_seo_audit: ToolDef = {
   },
   async execute(ctx, args) {
     if (!hasRole(ctx, "editor")) throw new Error("editor role required");
-    const CONTENT_ONLY: SiteSourceType[] = ["wordpress", "webflow"];
-    let site = str(args.siteId)
-      ? await prisma.site.findFirst({
-          where: { id: str(args.siteId), projectId: ctx.projectId },
-          include: { sftpConnection: true },
-        })
-      : await prisma.site.findFirst({
-          where: { projectId: ctx.projectId, sourceType: { notIn: CONTENT_ONLY } },
-          orderBy: { createdAt: "asc" },
-          include: { sftpConnection: true },
-        });
-    if (!site) throw new Error("No auditable site found in this project");
-    if (CONTENT_ONLY.includes(site.sourceType)) {
-      throw new Error("Audits scan site files — this site is a content-level source with no file tree");
-    }
-    const useMock = siteIsMock(site as never);
-    const provider = useMock ? null : await getSiteIdeProvider(site as never);
-    const result = await runAudit({
-      siteId: site.id,
+    // Phase 6: shared with the MCP run_seo_audit tool (lib/audit/project-audit).
+    const { site, mock: useMock, result } = await auditProjectSite({
       projectId: ctx.projectId,
-      siteName: site.name,
-      provider,
-      mock: useMock,
+      siteId: str(args.siteId) || null,
     });
     return {
       summary: `SEO audit finished on "${site.name}"${useMock ? " (mock scan)" : ""}: ${result.issues.length} issue${result.issues.length === 1 ? "" : "s"} in the inbox — nothing was auto-fixed`,

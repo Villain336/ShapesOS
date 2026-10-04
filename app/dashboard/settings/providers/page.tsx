@@ -7,6 +7,9 @@ import { requireUser, getOrCreateWorkspace } from "@/lib/session";
 import { requireWorkspaceRole } from "@/lib/authz";
 import { providerStatus } from "@/lib/providers";
 import { llmStatus } from "@/lib/llm";
+import { prisma } from "@/lib/prisma";
+import { CONTEXTDEV_CONNECTOR_KEY } from "@/lib/knowledge/contextdev/keys";
+import { mockInventory, notLive, type FeatureMode } from "@/lib/providers/mock-inventory";
 import { unsplashStatus } from "@/lib/design/unsplash";
 /* PROVIDER:pexels */ import { pexelsStatus } from "@/lib/design/pexels"; /* END */
 /* PROVIDER:pixabay */ import { pixabayStatus } from "@/lib/design/pixabay"; /* END */
@@ -27,6 +30,32 @@ import { documensoStatus } from "@/lib/integrations/documenso";
 
 export const dynamic = "force-dynamic";
 
+const LLM_WORKLOADS = [
+  ["copy", "Client-facing copy"],
+  ["bulk", "Agent loop, skills, summaries"],
+  ["background", "Background jobs"],
+] as const;
+
+const MODE_LABEL: Record<FeatureMode, string> = {
+  live: "Live",
+  mock: "Mock data",
+  off: "Off",
+};
+
+// Mocked/off is configuration, not an agent state — neutral chips only,
+// never the running/needs/done/failed colours.
+function ModeChip({ mode }: { mode: FeatureMode }) {
+  return (
+    <span
+      className={`inline-flex items-center whitespace-nowrap rounded-full bg-paper px-2 py-0.5 text-xs font-semibold shadow-control ${
+        mode === "live" ? "text-ink" : "text-muted"
+      }`}
+    >
+      {MODE_LABEL[mode]}
+    </span>
+  );
+}
+
 // Provider health states are provider states, not agent states — neutral chips.
 function StatusBadge({ ok, label }: { ok: boolean; label: string }) {
   return (
@@ -45,6 +74,17 @@ export default async function ProvidersSettingsPage() {
 
   const seo = providerStatus();
   const llm = llmStatus();
+  // Context.dev keys live in the workspace vault, not the environment.
+  const contextDevConnected = await prisma.connectorConnection
+    .findFirst({
+      where: { workspaceId: workspace.id, connectorKey: CONTEXTDEV_CONNECTOR_KEY, status: "active" },
+      select: { id: true },
+    })
+    .then((c) => c !== null)
+    .catch(() => null);
+  const inventory = mockInventory(process.env, { llm: llm.routing, contextDevConnected });
+  const mocked = notLive(inventory);
+  const live = inventory.filter((f) => f.mode === "live");
   const unsplash = unsplashStatus();
   /* PROVIDER:brandfetch */
   const brandfetch = brandfetchStatus();
@@ -77,6 +117,54 @@ export default async function ProvidersSettingsPage() {
       </div>
       <SettingsNav />
 
+      <section
+        className="rounded-lg bg-paper p-5 shadow-hairline"
+        aria-labelledby="providers-mocked"
+      >
+        <h2 id="providers-mocked" className="aos-subheading">
+          What&apos;s running on mock data
+        </h2>
+        <p className="mt-1 text-sm text-muted">
+          Read from this host&apos;s environment right now.{" "}
+          {mocked.length === 0
+            ? "Everything listed below is live."
+            : `${mocked.length} of ${inventory.length} features are not live. Mock features run on labelled sample data; off features say so and do nothing.`}
+        </p>
+        {mocked.length > 0 && (
+          <div className="mt-3 overflow-x-auto">
+            <table className="w-full min-w-[560px] text-left text-sm">
+              <thead>
+                <tr className="border-b border-line text-xs font-semibold text-muted">
+                  <th scope="col" className="py-2 pr-3 font-semibold">Feature</th>
+                  <th scope="col" className="py-2 pr-3 font-semibold">Mode</th>
+                  <th scope="col" className="py-2 pr-3 font-semibold">What happens now</th>
+                  <th scope="col" className="py-2 font-semibold">To go live, set</th>
+                </tr>
+              </thead>
+              <tbody>
+                {mocked.map((f) => (
+                  <tr key={f.key} className="border-b border-line align-top last:border-0">
+                    <td className="py-2 pr-3 text-xs font-semibold text-ink">{f.label}</td>
+                    <td className="py-2 pr-3">
+                      <ModeChip mode={f.mode} />
+                    </td>
+                    <td className="py-2 pr-3 text-xs text-muted">{f.detail}</td>
+                    <td className="py-2 font-mono text-xs text-ink">
+                      {f.envVars.length ? f.envVars.join(", ") : "a workspace key"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        {live.length > 0 && (
+          <p className="mt-3 text-xs text-subtle">
+            Live: {live.map((f) => f.label).join(", ")}.
+          </p>
+        )}
+      </section>
+
       <div className="rounded-lg border border-line bg-paper/60 p-5">
         <div className="flex items-center justify-between gap-2">
           <h2 className="font-medium">SEO data provider</h2>
@@ -107,41 +195,88 @@ export default async function ProvidersSettingsPage() {
         )}
       </div>
 
-      <div className="rounded-lg border border-line bg-paper/60 p-5">
+      <section
+        className="rounded-lg border border-line bg-paper/60 p-5"
+        aria-labelledby="providers-llm"
+      >
         <div className="flex items-center justify-between gap-2">
-          <h2 className="font-medium">LLM provider</h2>
+          <h2 id="providers-llm" className="font-medium">LLM routing</h2>
           <StatusBadge
-            ok={llm.configured}
-            label={llm.configured ? "configured" : "not configured"}
+            ok={llm.isLive}
+            label={`${LLM_WORKLOADS.filter(([w]) => llm.routing[w].isLive).length} of ${LLM_WORKLOADS.length} workloads live`}
           />
         </div>
-        <dl className="mt-3 grid gap-2 text-sm md:grid-cols-2">
+        <p className="mt-1 text-xs text-subtle">
+          Each workload routes to one model. With only one provider key, the
+          workloads that default to the other provider switch to this
+          provider&apos;s default (single-key mode); a model you set
+          explicitly is never swapped. When both keys are set, a rate limit
+          or outage fails over to the other provider.
+        </p>
+        <div className="mt-3 overflow-x-auto">
+          <table className="w-full min-w-[560px] text-left text-sm">
+            <thead>
+              <tr className="border-b border-line text-xs font-semibold text-muted">
+                <th scope="col" className="py-2 pr-3 font-semibold">Workload</th>
+                <th scope="col" className="py-2 pr-3 font-semibold">Model</th>
+                <th scope="col" className="py-2 pr-3 font-semibold">Mode</th>
+                <th scope="col" className="py-2 font-semibold">Why</th>
+              </tr>
+            </thead>
+            <tbody>
+              {LLM_WORKLOADS.map(([w, label]) => {
+                const r = llm.routing[w];
+                return (
+                  <tr key={w} className="border-b border-line align-top last:border-0">
+                    <td className="py-2 pr-3 text-xs text-ink">{label}</td>
+                    <td className="py-2 pr-3 font-mono text-xs text-ink">{r.model}</td>
+                    <td className="py-2 pr-3">
+                      <ModeChip mode={r.isLive ? "live" : "mock"} />
+                    </td>
+                    <td className="py-2 text-xs text-muted">
+                      {r.isLive ? (
+                        <>
+                          {r.source === "env"
+                            ? "Set explicitly by environment."
+                            : r.source === "legacy"
+                              ? "Set by the deprecated LLM_MODEL variable."
+                              : "Default model."}
+                          {r.singleKey ? <> {r.singleKey}</> : null}{" "}
+                          {r.failover ? (
+                            <>
+                              Fails over to <span className="font-mono">{r.failover}</span>.
+                            </>
+                          ) : (
+                            "No failover configured."
+                          )}
+                        </>
+                      ) : (
+                        <>Labelled mock drafts: {r.fallback ?? "no provider configured"}.</>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        <dl className="mt-3 grid gap-2 text-sm">
           <div>
-            <dt className="text-xs text-subtle">Provider</dt>
-            <dd className="font-mono text-xs">{llm.name}</dd>
-          </div>
-          <div>
-            <dt className="text-xs text-subtle">Live model</dt>
-            <dd>{llm.isLive ? "Yes" : "No — using the built-in mock"}</dd>
-          </div>
-          <div>
-            <dt className="text-xs text-subtle">Model</dt>
-            <dd className="font-mono text-xs">{llm.model ?? "—"}</dd>
-          </div>
-          <div className="md:col-span-2">
             <dt className="text-xs text-subtle">Environment variables</dt>
             <dd className="font-mono text-xs">
-              LLM_API_KEY (falls back to OPENAI_API_KEY), LLM_MODEL, LLM_BASE_URL
+              ANTHROPIC_API_KEY, OPENAI_API_KEY (or LLM_API_KEY),
+              LLM_MODEL_COPY, LLM_MODEL_BULK, LLM_MODEL_BACKGROUND,
+              LLM_FAILOVER, LLM_SELF_HOST, LLM_BASE_URL
             </dd>
           </div>
         </dl>
-        {!llm.configured && (
+        {!llm.isLive && (
           <p className="mt-3 text-xs text-subtle">
-            Set LLM_API_KEY (or OPENAI_API_KEY) on the host to use a live
-            OpenAI-compatible endpoint instead of the mock.
+            Set ANTHROPIC_API_KEY or OPENAI_API_KEY on the host. One key is
+            enough: every workload then runs live on that provider.
           </p>
         )}
-      </div>
+      </section>
 
       <div className="rounded-lg border border-line bg-paper/60 p-5">
         <div className="flex items-center justify-between gap-2">
