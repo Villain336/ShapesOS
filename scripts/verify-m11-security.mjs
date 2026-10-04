@@ -90,6 +90,7 @@ const AUTHZ_PRIMITIVES = [
   "requireScimAuth",                            // Phase 4a SCIM 2.0 (lib/scim/auth.ts) — per-workspace hashed bearer token; tenant from the token, RLS-scoped
   "requireAccountUser",                         // Phase 4a self-service account security (lib/auth/mfa/guard.ts) — acts only on the caller's own factors; destructive changes need re-auth
   "financeGuard",                               // Phase 10 (finance) ops guard (lib/ops/finance/http.ts) — requireUser + requireWorkspaceRole(editor|admin) for mutations
+  "portalGuard",                                // Phase 10 (portal) client-portal guard (lib/portal/http.ts) — portal session cookie (never a workspace session), CSRF, Client.viewerRole section/action gate; data scoped to (workspace, client links) under RLS
 ];
 // Public by design. Each entry documents WHY — this is a justification list,
 // not a suppression list. Adding an entry requires a code comment in the
@@ -193,6 +194,11 @@ const PUBLIC_BY_DESIGN = {
     "public storefront cart (buyers have no account); only a PUBLISHED store resolves (SELECT-only app.store_route policy), unknown/unpublished 404; the cart is an HMAC-SHA256-signed cookie bound to that store that names products and quantities only — every price, stock level and promotion is re-read from the database; adding a product the store doesn't list and sell is refused; writes nothing to the database; per-store+IP rate limit + proxy IP limit, 4 KiB body cap",
   "app/api/shop/[storeSlug]/checkout/route.ts":
     "public storefront checkout; only a PUBLISHED store resolves (unknown/unpublished 404); price, stock and promotion re-validated server-side from the database (never client prices) before a DRAFT web order and a Stripe Checkout Session are created with the WORKSPACE'S OWN Stripe key (no key → 409, never a fake success); nothing is paid here — payment is recorded only by the Stripe-signed tenant webhook; per-store+IP limit (10/10 min) + CAPTCHA step-up (lib/auth/captcha.ts) from the second attempt when configured, 4 KiB body cap; returns the Checkout URL only",
+  // Phase 10 (portal): client-portal sign-in — capability model, see route comments.
+  "app/api/portal/login/route.ts":
+    "Phase 10 client-portal sign-in request; always the same 200; emails a single-use 15-minute link (SHA-256 at rest, FORCE RLS) only to a client whose portal is on; login lockout, CAPTCHA step-up, per-address send limit shared with workspace sign-in mail, JSON only, proxy auth tier",
+  "app/api/portal/link/route.ts":
+    "Phase 10 client-portal link redemption; the single-use link token is the capability, consumed by one guarded UPDATE (used_at IS NULL AND expires_at > now) under the token's workspace RLS scope; client must still have the portal on and the same sign-in email; issues a PORTAL session cookie (Path=/portal + /api/portal), never a workspace session; same-Origin + JSON only, per-IP lockout, proxy auth tier",
   "app/api/hooks/github/route.ts":
     "inbound GitHub webhook; X-Hub-Signature-256 HMAC-SHA256 with GITHUB_WEBHOOK_SECRET verified in constant time over the raw body before parsing (unset secret → 503); delivery id is the primary key of github_webhook_deliveries so redeliveries are no-ops; bots, non-collaborators, non shapes/<runId> branches and forks ignored; routed to its workspace via a SELECT-only policy on agent_pull_requests, every write under that tenant's GUC; only queues a pr_feedback agent job (pushes still need a person's OK); 1 MiB body cap, per-IP limit in proxy.ts; returns counts only",
 };
@@ -219,7 +225,7 @@ const missingAllowList = Object.keys(PUBLIC_BY_DESIGN).filter(k => {
 ok("every public-by-design entry maps to a real route file", missingAllowList.length === 0, missingAllowList.join("; "));
 ok(
   "public-by-design allow-list is documented",
-  Object.keys(PUBLIC_BY_DESIGN).length === 38 && // Phase 9 (repos): +1 app/api/hooks/github; Phase 10 (finance): +1 tenant Stripe webhook; Phase 10 (store): +2 storefront cart + checkout
+  Object.keys(PUBLIC_BY_DESIGN).length === 40 && // Phase 9 (repos): +1 app/api/hooks/github; Phase 10 (finance): +1 tenant Stripe webhook; Phase 10 (store): +2 storefront cart + checkout; Phase 10 (portal): +2 portal sign-in
     Object.values(PUBLIC_BY_DESIGN).every(v => v.length > 20)
 );
 
@@ -316,6 +322,25 @@ ok("scrypt with explicit parameters + timingSafeEqual", /SCRYPT_PARAMS = \{ N: 2
 ok("console link fallback is development-only", /isProduction\(env\) \? null : "console"/.test(emailMail));
 ok("production links never use the request Host", /appBaseUrl\(env, null\) \?\? \(isProduction\(env\) \? null :/.test(emailMail));
 ok("account deletion removes email accounts + links", /"email_accounts"/.test(readFileSync(join(ROOT, "lib/gdpr/account-delete.ts"), "utf8")) && /DELETE FROM "email_auth_tokens"/.test(readFileSync(join(ROOT, "lib/gdpr/account-delete.ts"), "utf8")));
+
+// --- 5c. Client portal (Phase 10 portal): a separate credential, never a workspace session ---
+console.log("client portal");
+const portalCore = readFileSync(join(ROOT, "lib/portal/core.ts"), "utf8");
+const portalStore = readFileSync(join(ROOT, "lib/portal/store.ts"), "utf8");
+const portalHttp = readFileSync(join(ROOT, "lib/portal/http.ts"), "utf8");
+ok("portal cookie is scoped to /portal + /api/portal, httpOnly, SameSite=Lax",
+  /PORTAL_COOKIE_PATHS = \["\/portal", "\/api\/portal"\] as const/.test(portalCore) && /"HttpOnly"/.test(portalCore) && /"SameSite=Lax"/.test(portalCore));
+ok("workspace session code never reads the portal cookie",
+  !/shapes_portal|lib\/portal/.test(readFileSync(join(ROOT, "lib/session.ts"), "utf8") + authCfg + readFileSync(join(ROOT, "lib/authz.ts"), "utf8") + proxySrc));
+ok("portal code never resolves a workspace session",
+  ["core.ts", "store.ts", "http.ts", "data.ts", "page.ts"].every((f) => !/from "@\/auth"|from "@\/lib\/session"|from "next-auth/.test(readFileSync(join(ROOT, "lib/portal", f), "utf8"))));
+ok("portalGuard checks CSRF before the session, then the viewerRole gate",
+  /checkPortalCsrf\(req/.test(portalHttp) && /portalSees\(principal\.role/.test(portalHttp) && /portalCan\(principal\.role/.test(portalHttp));
+ok("portal links are single use + hash-only, sessions hash-only",
+  /usedAt: null, expiresAt: \{ gt: now \}/.test(portalStore) && /used\.count !== 1/.test(portalStore) && /tokenHash: hash,/.test(portalStore) && /tokenHash: session\.hash/.test(portalStore));
+const portalRoutes = routeFiles.map((f) => f.replace(ROOT + "/", "")).filter((r) => r.startsWith("app/api/portal/"));
+const unguardedPortal = portalRoutes.filter((r) => !PUBLIC_BY_DESIGN[r] && !readFileSync(join(ROOT, r), "utf8").includes("portalGuard("));
+ok(`every /api/portal route (${portalRoutes.length}) is portalGuard-ed or a documented sign-in route`, portalRoutes.length > 0 && unguardedPortal.length === 0, unguardedPortal.join("; "));
 
 // --- 6. Secrets abstraction contract ---
 console.log("secrets");

@@ -821,6 +821,8 @@ const taskDef: OpsEntityDef = {
     assigneeId: z.string().min(1).max(128).optional(),
     dueAt: isoDate.optional(),
     estimateMinutes: z.number().int().min(1).max(100_000).optional(),
+    // Phase 10 (portal): shown to linked clients in the client portal.
+    clientVisible: z.boolean().optional(),
   }),
   patchSchema: z.object({
     title: z.string().trim().min(1).max(300).optional(),
@@ -830,6 +832,8 @@ const taskDef: OpsEntityDef = {
     assigneeId: z.string().min(1).max(128).nullable().optional(),
     dueAt: isoDate.nullable().optional(),
     estimateMinutes: z.number().int().min(1).max(100_000).nullable().optional(),
+    // Phase 10 (portal)
+    clientVisible: z.boolean().optional(),
   }).strict(),
   patchable: true,
   filterable: ["projectId", "stage", "assigneeId", "priority"],

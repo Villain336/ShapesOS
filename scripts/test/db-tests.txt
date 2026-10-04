@@ -106,3 +106,6 @@ lib/ops/__tests__/p10-hr-db.test.ts
 lib/chat/__tests__/p10-ops-tools-db.test.ts
 # Phase 10 (store): storefront — published-only routing, RLS, checkout, paid webhook once.
 lib/ops/__tests__/p10-store-db.test.ts
+# Phase 10 (portal): client portal sign-in, scoping, routes; portal session never grants workspace access.
+lib/portal/__tests__/portal-db.test.ts
+lib/portal/__tests__/portal-isolation-db.test.ts

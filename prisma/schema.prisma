@@ -1043,6 +1043,9 @@ model Workspace {
   miniApps                    MiniApp[]
   miniAppVersions             MiniAppVersion[]
   miniAppRecords              MiniAppRecord[]
+  // Phase 10 (portal): client portal magic links + sessions.
+  portalLoginLinks            PortalLoginLink[]
+  portalSessions              PortalSession[]
 
   @@map("workspaces")
 }
@@ -1261,8 +1264,71 @@ model Client {
   // Phase 1 (R1): pipelines serving this white-label client.
   pipelines Pipeline[]
 
+  // Phase 10 (portal): client portal (magic-link login at /portal). Off until
+  // an admin turns it on. A client sees ONLY records linked here: invoices,
+  // quotes and projects whose customer is one of these CRM leads (or the
+  // lead a linked contact was converted from), tickets whose contact is a
+  // linked contact (or a contact of a linked company). Plain id arrays:
+  // every portal query ALSO filters by workspace_id under FORCE RLS, so a
+  // stale or foreign id matches nothing.
+  portalEnabled    Boolean           @default(false) @map("portal_enabled")
+  portalCompanyIds String[]          @default([]) @map("portal_company_ids")
+  portalContactIds String[]          @default([]) @map("portal_contact_ids")
+  portalLeadIds    String[]          @default([]) @map("portal_lead_ids")
+  portalLoginLinks PortalLoginLink[]
+  portalSessions   PortalSession[]
+
   @@unique([workspaceId, loginEmail])
   @@map("clients")
+}
+
+// ============================================================================
+// Phase 10 (portal) — client portal auth. A SEPARATE credential from the
+// workspace (Auth.js) session: a portal session names one (workspace,
+// client) pair, rides in its own cookie scoped to /portal and /api/portal,
+// and is only ever read by lib/portal (never by requireUser / auth()).
+// Only SHA-256 hashes of link and session tokens are stored. Both tables
+// are FORCE RLS on app.workspace_id; the raw tokens carry the workspace id
+// only to pick that RLS scope (the SCIM token pattern).
+// ============================================================================
+
+model PortalLoginLink {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  clientId    String    @map("client_id")
+  client      Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  tokenHash   String    @unique @map("token_hash")
+  // Normalized address the link was sent to; must still be the client's
+  // loginEmail when the link is used.
+  email       String
+  expiresAt   DateTime  @map("expires_at")
+  usedAt      DateTime? @map("used_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@index([workspaceId, clientId, createdAt])
+  @@map("portal_login_links")
+}
+
+model PortalSession {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  clientId    String    @map("client_id")
+  client      Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  tokenHash   String    @unique @map("token_hash")
+  expiresAt   DateTime  @map("expires_at")
+  revokedAt   DateTime? @map("revoked_at")
+  // "client" (sign out), a workspace user id (Settings → Clients), or
+  // "system" (portal turned off / sign-in email changed).
+  revokedBy   String?   @map("revoked_by")
+  lastSeenAt  DateTime? @map("last_seen_at")
+  ip          String?
+  userAgent   String?   @map("user_agent")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@index([workspaceId, clientId, createdAt])
+  @@map("portal_sessions")
 }
 
 model Report {
@@ -9541,6 +9607,8 @@ model OpsTask {
   dueAt           DateTime?       @map("due_at")
   estimateMinutes Int?            @map("estimate_minutes")
   completedAt     DateTime?       @map("completed_at")
+  // Phase 10 (portal): shown to linked clients in the client portal.
+  clientVisible   Boolean         @default(false) @map("client_visible")
   createdBy       String?         @map("created_by")
   createdAt       DateTime        @default(now()) @map("created_at")
   updatedAt       DateTime        @updatedAt @map("updated_at")

@@ -33,7 +33,7 @@ interface Probe {
 export interface ParityRow {
   app: string;
   odoo: string;
-  owner: "ops-core" | "finance" | "store" | "phase 12" | "phase 4b" | "earlier";
+  owner: "ops-core" | "finance" | "store" | "portal" | "phase 12" | "phase 4b" | "earlier";
   model: Probe[];
   route: Probe[];
   page: Probe[];
@@ -160,7 +160,7 @@ export const ROWS: ParityRow[] = [
     route: [entity("tickets"), entity("sla-policies"), file("app/api/ops/tickets/[id]/reply/route.ts"), file("app/api/messaging/inbound/email/route.ts"), file("app/api/cron/ops-helpdesk-sla/route.ts")],
     page: [page("helpdesk")],
     test: [test("lib/ops/__tests__/p10-helpdesk.test.ts"), test("lib/ops/__tests__/p10-helpdesk-db.test.ts")],
-    note: "Ticket view in a client portal: later (no client login yet).",
+    note: "Clients see and reply to their tickets in the client portal (/portal/tickets).",
   },
   {
     app: "Employees — directory, departments, leave balances",
@@ -239,6 +239,23 @@ export const ROWS: ParityRow[] = [
     test: [test("lib/ops/__tests__/p10-store.test.ts"), test("lib/ops/__tests__/p10-store-db.test.ts")],
     note: "Payments through the workspace's own Stripe (FINANCE integration); live Stripe unverified in CI.",
   },
+  // --- Phase 10 (portal) workstream ---
+  {
+    app: "Client portal — magic-link login, invoices, quotes, projects, tickets, documents",
+    odoo: "Portal",
+    owner: "portal",
+    model: [model("PortalSession"), model("PortalLoginLink")],
+    route: [
+      file("app/api/portal/login/route.ts"),
+      file("app/api/portal/link/route.ts"),
+      file("app/api/portal/tickets/route.ts"),
+      file("app/api/portal/quotes/[id]/decision/route.ts"),
+      file("app/api/workspace/clients/[id]/portal/route.ts"),
+    ],
+    page: [file("app/portal/(app)/page.tsx"), file("app/portal/(auth)/login/page.tsx"), file("app/dashboard/settings/clients/[id]/page.tsx")],
+    test: [test("lib/portal/__tests__/portal-core.test.ts"), test("lib/portal/__tests__/portal-db.test.ts"), test("lib/portal/__tests__/portal-isolation-db.test.ts")],
+    note: "Separate portal session (cookie on /portal + /api/portal); a client sees only the CRM records linked in Settings → Clients.",
+  },
   // --- Not built yet (owner decision: Phase 12 / later) ---
   ...(
     [
@@ -246,7 +263,6 @@ export const ROWS: ParityRow[] = [
       ["Point of sale", "Point of Sale", "phase 12"],
       ["Payroll", "Payroll", "phase 12"],
       ["Events", "Events", "phase 12"],
-      ["Client portal", "Portal", "phase 12"],
     ] as const
   ).map(([app, odoo, owner]): ParityRow => ({ app, odoo, owner, model: [], route: [], page: [], test: [], note: "Planned — not started in this codebase." })),
 ];
