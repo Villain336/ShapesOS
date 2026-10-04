@@ -276,3 +276,17 @@ export function expenseReimburseLines(totalCents: number): DraftLine[] {
 export function reversalLines<T extends { debitCents: number; creditCents: number }>(lines: T[]): T[] {
   return lines.map((l) => ({ ...l, debitCents: l.creditCents, creditCents: l.debitCents }));
 }
+
+// ---------------------------------------------------------------------------
+// Phase 10 (store): a paid storefront order is a cash sale — no invoice, no
+// receivable. Sales are booked net of the promotion discount.
+//   web order paid   Dr Cash (total)   Cr Sales (total − tax) + Cr Tax payable
+// ---------------------------------------------------------------------------
+
+export function webOrderSaleLines(order: { totalCents: number; taxCents: number }, taxAccount: AccountRef = { key: "tax_payable" }): DraftLine[] {
+  return compactLines([
+    dr({ key: "cash" }, order.totalCents, "Storefront payment"),
+    cr({ key: "sales" }, order.totalCents - order.taxCents, "Sales (storefront)"),
+    cr(taxAccount, order.taxCents, "Sales tax"),
+  ]);
+}

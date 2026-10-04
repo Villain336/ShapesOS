@@ -19,6 +19,9 @@ export interface PromotionLike {
   active: boolean;
   usageLimit: number | null;
   usedCount: number;
+  // Phase 10 (store): optional validity window (null/undefined = open).
+  startsAt?: Date | string | null;
+  endsAt?: Date | string | null;
 }
 
 export interface PromoLine {
@@ -44,8 +47,15 @@ export function parsePromotionRules(raw: unknown): PromotionRules {
   return out;
 }
 
-export function evaluatePromotion(promo: PromotionLike, lines: PromoLine[]): PromotionVerdict {
+export function evaluatePromotion(promo: PromotionLike, lines: PromoLine[], now: Date = new Date()): PromotionVerdict {
   if (!promo.active) return { ok: false, reason: `Code ${promo.code} is inactive` };
+  // Phase 10 (store): the active window.
+  if (promo.startsAt && new Date(promo.startsAt).getTime() > now.getTime()) {
+    return { ok: false, reason: `Code ${promo.code} isn't active yet` };
+  }
+  if (promo.endsAt && new Date(promo.endsAt).getTime() <= now.getTime()) {
+    return { ok: false, reason: `Code ${promo.code} has expired` };
+  }
   if (promo.usageLimit != null && promo.usedCount >= promo.usageLimit) {
     return { ok: false, reason: `Code ${promo.code} has reached its usage limit` };
   }

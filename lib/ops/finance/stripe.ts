@@ -121,7 +121,8 @@ export async function saveFinanceSettings(tx: Tx, actor: OpsActor, input: Financ
   return getFinanceSettingsView(tx, actor.workspaceId);
 }
 
-async function tenantKeys(tx: Tx, workspaceId: string): Promise<{ secretKey: string | null; webhookSecret: string | null; currency: string }> {
+// Phase 10 (store): exported for the storefront checkout (lib/ops/store/checkout.ts).
+export async function tenantKeys(tx: Tx, workspaceId: string): Promise<{ secretKey: string | null; webhookSecret: string | null; currency: string }> {
   const s = await tx.opsFinanceSettings.findUnique({ where: { workspaceId } });
   return {
     secretKey: s?.stripeSecretEnc ? secrets().decrypt(s.stripeSecretEnc) : null,
@@ -216,6 +217,10 @@ export async function handleStripeWebhook(
   } catch {
     return { status: 400, body: { error: "Invalid signature" } };
   }
+  // Phase 10 (store): storefront Checkout Sessions (metadata.order_id) —
+  // paid / expired — are applied by the store module (lazy: no import cycle).
+  const store = await import("../store/orders");
+  if (store.isStoreCheckoutEvent(event)) return store.handleStoreCheckoutEvent(workspaceId, event);
   if (event.type !== "checkout.session.completed") return { status: 200, body: { received: true, ignored: event.type } };
   const session = event.data.object as {
     id: string;

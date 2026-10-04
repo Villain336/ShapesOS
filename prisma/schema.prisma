@@ -10566,7 +10566,7 @@ model OpsJournalEntry {
   workspace    Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   entryDate    DateTime         @map("entry_date")
   memo         String?          @db.Text
-  // manual | invoice | credit_note | payment | bill | bill_payment | expense | reversal
+  // manual | invoice | credit_note | payment | bill | bill_payment | expense | reversal | web_order (Phase 10 store)
   sourceType   String           @default("manual") @map("source_type")
   sourceId     String?          @map("source_id")
   sourceKey    String?          @map("source_key")

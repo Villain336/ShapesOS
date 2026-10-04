@@ -5,7 +5,8 @@
 // Stripe-Signature header verifies against THAT workspace's webhook signing
 // secret (stored with lib/secrets; stripe.webhooks.constructEvent, timestamp
 // tolerance included) — no secret → 503, bad signature → 400. Only
-// checkout.session.completed for an invoice of this workspace is acted on;
+// checkout.session.completed for an invoice of this workspace is acted on
+// (Phase 10 store: plus storefront order sessions — paid / expired);
 // the payment is applied once per payment intent (idempotent) and posted.
 // Returns counts/ids only, never invoice data. 1 MiB body cap.
 
