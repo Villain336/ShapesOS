@@ -16,7 +16,7 @@ import { errorResponse } from "@/lib/api/errors";
 
 export const dynamic = "force-dynamic";
 
-function errorResponse(err: unknown) {
+function failure(err: unknown) {
   if (err instanceof JsonLdDraftError) {
     return Response.json({ error: err.message, code: err.code, issues: err.issues }, { status: err.code === "invalid_block" ? 422 : 400 });
   }
@@ -36,7 +36,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     const plan = await planJsonLd({ workspaceId: project.workspaceId, projectId: site.projectId, siteId: site.id });
     return Response.json({ ok: true, origin: plan.identity.origin, pages: plan.pages });
   } catch (err) {
-    return errorResponse(err);
+    return failure(err);
   }
 }
 
@@ -67,6 +67,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       origin: res.origin,
     });
   } catch (err) {
-    return errorResponse(err);
+    return failure(err);
   }
 }
