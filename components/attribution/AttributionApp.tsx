@@ -213,7 +213,7 @@ export function AttributionApp() {
       <div className="border-b border-line bg-white px-5 pb-0 pt-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h1 className="aos-heading">Revenue Attribution</h1>
+            <h1 className="aos-heading">Revenue attribution</h1>
           </div>
           <div className="flex items-center gap-2 pb-3">
             <select
