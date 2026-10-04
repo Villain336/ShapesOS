@@ -139,6 +139,15 @@ export const CRON_JOBS: readonly CronJob[] = [
     note: "New in Phase 10. The tightest default SLA is a 60-minute first response; a 10-minute sweep flags a breach within 10 minutes and notifies once.",
     timeoutMs: SHORT,
   },
+  // Phase 13 (twincore): digital twin conditions → alerts + editor notifications.
+  {
+    key: "twin-alerts",
+    path: "/api/cron/twin-alerts",
+    cron: "*/5 * * * *",
+    source: "picked",
+    note: "New in Phase 13. The tightest twin threshold is a truck 30 minutes past its ETA; a 5-minute sweep flags it within 5 minutes, and each condition alerts once (dedup keys), so the cadence never repeats an alert.",
+    timeoutMs: SHORT,
+  },
   // Phase 10 (ops-core): min/max reorder rules → draft purchase orders.
   {
     key: "ops-reorder",

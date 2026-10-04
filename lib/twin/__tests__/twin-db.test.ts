@@ -21,6 +21,7 @@ import { applyTwinPatch } from "../derive";
 import type { TwinPatchOp, TwinSnapshot } from "../types";
 import { twinAssignEquipmentCore, twinBookDockCore, twinDraftLayout, twinFindCore, twinSiteStateCore } from "@/lib/chat/ops-twin-tools";
 import type { ToolContext } from "@/lib/chat/tools";
+import { sweepTwinAlerts } from "../alerts";
 
 const WS = "p13twin-ws-a";
 const WS_B = "p13twin-ws-b";
@@ -55,6 +56,7 @@ let po = "";
 
 before(async () => {
   for (const id of [WS, WS_B]) {
+    await prisma.$executeRaw`DELETE FROM notifications WHERE workspace_id = ${id}`;
     await prisma.$executeRaw`DELETE FROM workspaces WHERE id = ${id}`;
     await prisma.$executeRaw`INSERT INTO workspaces (id, name, owner_user_id, updated_at) VALUES (${id}, ${id}, ${"test:" + id}, now())`;
   }
@@ -72,7 +74,10 @@ before(async () => {
 });
 
 after(async () => {
-  for (const id of [WS, WS_B]) await prisma.$executeRaw`DELETE FROM workspaces WHERE id = ${id}`;
+  for (const id of [WS, WS_B]) {
+    await prisma.$executeRaw`DELETE FROM notifications WHERE workspace_id = ${id}`;
+    await prisma.$executeRaw`DELETE FROM workspaces WHERE id = ${id}`;
+  }
   await prisma.$disconnect();
 });
 
@@ -336,6 +341,21 @@ describe("p13 twin agent tools (real Postgres, app role)", () => {
     assert.equal(snap.site.status, "draft");
     assert.equal(snap.objects.filter((o) => o.bindingBroken).length, 0);
     if (!live) assert.deepEqual(snap.objects.filter((o) => o.binding).map((o) => o.binding!.label).sort(), ["TW-OVF/OD1", "TW-OVF/Z/Z-01"]);
+  });
+});
+
+describe("p13 twin alerts (real Postgres, app role)", () => {
+  it("the sweep notifies editors once per condition (bin low on Rack A-01)", async () => {
+    const first = await sweepTwinAlerts(WS);
+    assert.deepEqual(first.errors, []);
+    assert.ok(first.raised >= 1);
+    const rows = await prisma.notification.findMany({ where: { workspaceId: WS, sourceType: "twin_object", sourceId: rackObj } });
+    assert.equal(rows.length, 1, "one recipient (the workspace owner), one notification");
+    assert.match(String(rows[0]!.dedupKey), /^twin\.bin_low:/);
+    assert.equal(rows[0]!.href, `/dashboard/ops/twin/${siteId}?object=${rackObj}`);
+    const second = await sweepTwinAlerts(WS);
+    assert.equal(second.raised, 0, "a persisting condition doesn't alert again");
+    assert.equal(second.alreadyRaised, first.raised);
   });
 });
 
