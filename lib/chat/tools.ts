@@ -1167,6 +1167,9 @@ export const TOOL_GROUP: Readonly<Record<string, ToolGroup>> = {
   add_structured_data: "site",
   validate_structured_data: "site",
   submit_sitemap: "site",
+  // Phase 11 (seotools): document output (lib/documents/tools.ts).
+  create_document: "content",
+  create_spreadsheet: "content",
 };
 
 /**
@@ -1241,6 +1244,9 @@ export const TOOL_ACTION: Readonly<Record<string, string>> = {
   // Phase 11 (seotools): pinging search engines about your own site — the
   // existing Tier 1 "refresh owned page" kind (asks unless automation is on).
   submit_sitemap: "refresh_owned_page",
+  // Phase 11 (seotools): files saved to the workspace — Tier 0 drafts.
+  create_document: "draft_document",
+  create_spreadsheet: "draft_spreadsheet",
 };
 
 /** The group a tool belongs to. Unknown tools fall in "connectors" (fail closed). */

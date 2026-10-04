@@ -115,3 +115,5 @@ lib/audit/__tests__/live-audit-db.test.ts
 lib/seo/__tests__/jsonld-draft-db.test.ts
 # Phase 11 (seotools): site sitemaps (rebuild on apply, hand-written kept), submissions recorded with real status + RLS.
 lib/seo/__tests__/sitemap-db.test.ts
+# Phase 11 (seotools): create_document / create_spreadsheet save real WorkspaceFiles, workspace-scoped.
+lib/documents/__tests__/document-tools-db.test.ts
