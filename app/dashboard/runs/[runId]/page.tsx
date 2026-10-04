@@ -26,6 +26,7 @@ import { needsReconnect } from "@/lib/aos/home";
 import { clockTime, runAgentName, runPrompt, runTimeline, runTitle, upcomingPlanSteps, type PlanStepInput } from "@/lib/aos/runs";
 import { TOOL_GROUP_LABELS, isToolGroup } from "@/lib/agents/grants";
 import { humanize } from "@/lib/approvals/format";
+import { isUsageEvent, runUsageFacts, runUsageTotals } from "@/lib/agents/runs/usage";
 import { LiveWatch } from "./LiveWatch";
 import { RunTimelinePanel } from "./RunTimelinePanel";
 
@@ -108,7 +109,11 @@ export default async function RunViewerPage({ params }: { params: Promise<{ runI
   const run = await getAgentRun(workspace.id, runId);
   if (!run) notFound();
 
-  const [events, membership] = await Promise.all([listAgentRunEvents(workspace.id, runId), getMembership(user.id, workspace.id)]);
+  const [allEvents, membership] = await Promise.all([listAgentRunEvents(workspace.id, runId), getMembership(user.id, workspace.id)]);
+  // Phase 7: model-call usage events are bookkeeping (cost per run), not
+  // steps — they are summed into the facts below and kept off the timeline.
+  const usage = runUsageTotals(allEvents);
+  const events = allEvents.filter((e) => !isUsageEvent(e));
 
   // The run's mission: its name, state, plan (steps still to come) and the
   // approvals waiting on a person. Read-only here; decisions happen in the inbox.
@@ -198,6 +203,7 @@ export default async function RunViewerPage({ params }: { params: Promise<{ runI
     ["Started", fmtTime(run.createdAt)],
     ["Ended", run.endedAt ? fmtTime(run.endedAt) : "Still going"],
     ["Duration", fmtDuration(durationMs)],
+    ...runUsageFacts(usage),
     ["Steps recorded", String(events.length)],
     ["Browser steps", String(recording?.stepCount ?? 0)],
     ["Artifacts", fmtBytes(recording?.sizeBytes ?? 0)],
