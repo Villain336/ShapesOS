@@ -1,6 +1,6 @@
 // Marketr — M21 built-in connector registry (spec §7, §11).
 //
-// DESIGN DECISION (recorded in prisma/schema.prisma): the 14 built-in
+// DESIGN DECISION (recorded in prisma/schema.prisma): the 15 built-in
 // connectors are CODE-defined here, not DB rows. (The count is pinned by
 // lib/connectors/m21/__tests__/registry.test.ts — update both together.) `Connector` rows exist
 // ONLY for workspace-custom MCP servers (kind=mcp). Do not create DB rows
@@ -22,6 +22,15 @@ export interface BuiltinConnectorMeta {
   /** Human-readable note about auth expectations. */
   authNote: string;
 }
+
+// Phase 11 (conncore): Microsoft Graph delegated scopes (offline_access for
+// a refresh token, User.Read for the liveness check). Shared with lib/vault/oauth.ts.
+export const MICROSOFT_MAIL_SCOPES = [
+  "offline_access",
+  "https://graph.microsoft.com/User.Read",
+  "https://graph.microsoft.com/Mail.Read",
+  "https://graph.microsoft.com/Mail.Send",
+];
 
 export const BUILT_IN_CONNECTORS: BuiltinConnectorMeta[] = [
   {
@@ -142,9 +151,10 @@ export const BUILT_IN_CONNECTORS: BuiltinConnectorMeta[] = [
     displayName: "Gmail",
     authType: "oauth2",
     description:
-      "Import your email network: message metadata (who you email, how often, how recently) becomes contact-graph signal. Bodies are never read.",
+      "Import your email network (message metadata only — bodies are never read), and send or reply in-thread after you confirm.",
     oauth: {
-      scopes: ["https://www.googleapis.com/auth/gmail.readonly"],
+      // Phase 11 (conncore): gmail.send for the gated send / reply tools.
+      scopes: ["https://www.googleapis.com/auth/gmail.readonly", "https://www.googleapis.com/auth/gmail.send"],
       envVars: ["GOOGLE_OAUTH_CLIENT_ID", "GOOGLE_OAUTH_CLIENT_SECRET"],
     },
     authNote: "Google OAuth2 (shared Google app credentials).",
@@ -175,6 +185,18 @@ export const BUILT_IN_CONNECTORS: BuiltinConnectorMeta[] = [
       envVars: ["GOOGLE_OAUTH_CLIENT_ID", "GOOGLE_OAUTH_CLIENT_SECRET"],
     },
     authNote: "Google OAuth2 (shared Google app credentials). Needs Google's Business Profile API approval.",
+  },
+  // Phase 11 (conncore): Outlook mail via Microsoft Graph (read + gated send).
+  {
+    key: "outlook",
+    displayName: "Outlook",
+    authType: "oauth2",
+    description: "Read Outlook mail, and send or reply in-thread after you confirm (Microsoft Graph).",
+    oauth: {
+      scopes: MICROSOFT_MAIL_SCOPES,
+      envVars: ["MICROSOFT_OAUTH_CLIENT_ID", "MICROSOFT_OAUTH_CLIENT_SECRET"],
+    },
+    authNote: "Microsoft identity platform OAuth2 (work, school or personal Microsoft account).",
   },
 ];
 
@@ -237,6 +259,7 @@ import { GoogleAdsAdapter } from "./native/google-ads";
 import { GmailAdapter } from "./native/gmail";
 import { GoogleCalendarAdapter } from "./native/google-calendar";
 import { GoogleBusinessProfileAdapter } from "./native/google-business-profile";
+import { OutlookAdapter } from "./native/outlook";
 
 const ADAPTER_CLASSES: Record<string, () => ConnectorAdapter> = {
   "google-search-console": () => new GoogleSearchConsoleAdapter(),
@@ -254,6 +277,8 @@ const ADAPTER_CLASSES: Record<string, () => ConnectorAdapter> = {
   gmail: () => new GmailAdapter(),
   "google-calendar": () => new GoogleCalendarAdapter(),
   "google-business-profile": () => new GoogleBusinessProfileAdapter(),
+  // Phase 11 (conncore).
+  outlook: () => new OutlookAdapter(),
 };
 
 /** Resolve a built-in connector key to its native adapter. Throws on unknown key. */
@@ -269,7 +294,7 @@ export function resolveAdapter(key: string): ConnectorAdapter {
 //
 // Phase 4b wired the last six mock-only adapters (GSC, GA4, Drive, Notion,
 // Meta Ads, Google Ads) to their live APIs: with a vault credential they
-// call the provider; without one they stay in labeled mock mode. All 14
+// call the provider; without one they stay in labeled mock mode. All 15
 // built-in adapters have live wiring, so the set is empty (0 mock-only;
 // pinned by lib/connectors/m21/__tests__/registry.test.ts). Keep it in
 // sync with the per-adapter file headers (scripts/verify-connector-health.mts

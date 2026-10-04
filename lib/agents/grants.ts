@@ -171,8 +171,10 @@ export function connectorGroup(connectorKey: string): ToolGroup {
   switch (connectorKey) {
     case "gmail":
     case "resend":
+    case "outlook": // Phase 11 (conncore)
       return "email";
     case "google-calendar":
+    case "outlook-calendar": // Phase 11 (conncore)
       return "calendar";
     case "google-drive":
     case "notion":
@@ -213,6 +215,12 @@ export function connectorAction(connectorKey: string, tool: string): string {
       return "publish_owned";
     case "resend.send_test_email":
       return "send_internal_note";
+    // Phase 11 (conncore): email to anyone is external — Tier 2, always asks.
+    case "gmail.send_email":
+    case "gmail.reply_to_message":
+    case "outlook.send_email":
+    case "outlook.reply_to_message":
+      return "send_outreach_email";
     default:
       return "connector_write";
   }

@@ -11,7 +11,7 @@
 
 import { randomBytes } from "crypto";
 import { secrets } from "@/lib/secrets";
-import { getBuiltinMeta } from "@/lib/connectors/m21/registry";
+import { getBuiltinMeta, MICROSOFT_MAIL_SCOPES } from "@/lib/connectors/m21/registry";
 
 export interface OAuthProviderConfig {
   authorizeUrl: string;
@@ -61,6 +61,12 @@ const GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
 const GOOGLE_ID_ENV = "GOOGLE_OAUTH_CLIENT_ID";
 const GOOGLE_SECRET_ENV = "GOOGLE_OAUTH_CLIENT_SECRET";
 
+// Phase 11 (conncore): Microsoft identity platform v2.0 (multi-tenant "common").
+const MICROSOFT_AUTH_URL = "https://login.microsoftonline.com/common/oauth2/v2.0/authorize";
+const MICROSOFT_TOKEN_URL = "https://login.microsoftonline.com/common/oauth2/v2.0/token";
+const MICROSOFT_ID_ENV = "MICROSOFT_OAUTH_CLIENT_ID";
+const MICROSOFT_SECRET_ENV = "MICROSOFT_OAUTH_CLIENT_SECRET";
+
 /** OAuth config per built-in connector that uses OAuth2. Non-OAuth keys are absent. */
 export const OAUTH_CONFIGS: Record<string, OAuthProviderConfig> = {
   "google-search-console": {
@@ -94,7 +100,8 @@ export const OAUTH_CONFIGS: Record<string, OAuthProviderConfig> = {
   gmail: {
     authorizeUrl: GOOGLE_AUTH_URL,
     tokenUrl: GOOGLE_TOKEN_URL,
-    scopes: ["https://www.googleapis.com/auth/gmail.readonly"],
+    // Phase 11 (conncore): + gmail.send for the gated send / reply tools.
+    scopes: ["https://www.googleapis.com/auth/gmail.readonly", "https://www.googleapis.com/auth/gmail.send"],
     clientIdEnv: GOOGLE_ID_ENV,
     clientSecretEnv: GOOGLE_SECRET_ENV,
     extra: { access_type: "offline", prompt: "consent" },
@@ -172,6 +179,18 @@ export const OAUTH_CONFIGS: Record<string, OAuthProviderConfig> = {
     scopes: ["advertising::campaign_management"],
     clientIdEnv: "AMAZON_ADS_CLIENT_ID",
     clientSecretEnv: "AMAZON_ADS_CLIENT_SECRET",
+  },
+  // Phase 11 (conncore): Outlook mail through Microsoft Graph. The "common"
+  // tenant accepts work/school and personal accounts; client credentials go
+  // in the form body (both grants). Verified against
+  // learn.microsoft.com/entra/identity-platform/v2-oauth2-auth-code-flow.
+  outlook: {
+    authorizeUrl: MICROSOFT_AUTH_URL,
+    tokenUrl: MICROSOFT_TOKEN_URL,
+    scopes: MICROSOFT_MAIL_SCOPES,
+    clientIdEnv: MICROSOFT_ID_ENV,
+    clientSecretEnv: MICROSOFT_SECRET_ENV,
+    extra: { response_mode: "query" },
   },
   // NOTE (Phase 18 slice 4, outcome B): Walmart Connect is NOT registered
   // here and never will be as an OAuth connector. Research 2026-10-01
