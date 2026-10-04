@@ -87,7 +87,12 @@ function scalar(v: unknown): string | null {
 }
 
 const TOOL_KEYS = ["tool", "toolName", "action"] as const;
-const META_KEYS = new Set<string>([...TOOL_KEYS, "result", "durationMs", "progress", "step", "error", "detail", "note"]);
+const META_KEYS = new Set<string>([
+  ...TOOL_KEYS, "result", "durationMs", "progress", "step", "error", "detail", "note",
+  // Phase 8 plumbing, not arguments: the loop's event kind / call id, the
+  // live-stream marker, and a ship diff (drawn by the Changes review instead).
+  "kind", "toolUseId", "recorded", "patch",
+]);
 
 /** "0.8 s", "12 s", "2 min" */
 export function durationLabel(ms: unknown): string | undefined {
