@@ -1,6 +1,6 @@
 // Marketr — M21 built-in connector registry (spec §7, §11).
 //
-// DESIGN DECISION (recorded in prisma/schema.prisma): the 19 built-in
+// DESIGN DECISION (recorded in prisma/schema.prisma): the 20 built-in
 // connectors are CODE-defined here, not DB rows. (The count is pinned by
 // lib/connectors/m21/__tests__/registry.test.ts — update both together.) `Connector` rows exist
 // ONLY for workspace-custom MCP servers (kind=mcp). Do not create DB rows
@@ -60,6 +60,8 @@ export const MICROSOFT_CALENDAR_SCOPES = [
 // Phase 11 (devtools): work-tool connector scopes. Shared with lib/vault/oauth.ts.
 // Linear: read + write (issue create/update and comments need write).
 export const LINEAR_SCOPES = ["read", "write"];
+// Jira Cloud (Atlassian 3LO classic scopes; offline_access → refresh token).
+export const JIRA_SCOPES = ["read:jira-work", "write:jira-work", "read:jira-user", "offline_access"];
 
 export const BUILT_IN_CONNECTORS: BuiltinConnectorMeta[] = [
   {
@@ -276,6 +278,18 @@ export const BUILT_IN_CONNECTORS: BuiltinConnectorMeta[] = [
     },
     authNote: "Linear OAuth2 application (Settings → API → OAuth applications).",
   },
+  // Phase 11 (devtools): Jira Cloud projects, JQL search, gated issue writes.
+  {
+    key: "jira",
+    displayName: "Jira",
+    authType: "oauth2",
+    description: "List Jira projects and search issues with JQL; create, transition or comment on issues after you confirm.",
+    oauth: {
+      scopes: JIRA_SCOPES,
+      envVars: ["ATLASSIAN_OAUTH_CLIENT_ID", "ATLASSIAN_OAUTH_CLIENT_SECRET"],
+    },
+    authNote: "Atlassian OAuth 2.0 (3LO) app with the Jira API (developer.atlassian.com → Developer console).",
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -343,6 +357,7 @@ import { SlackAdapter } from "./native/slack";
 import { HubspotAdapter } from "./native/hubspot";
 // Phase 11 (devtools).
 import { LinearAdapter } from "./native/linear";
+import { JiraAdapter } from "./native/jira";
 
 const ADAPTER_CLASSES: Record<string, () => ConnectorAdapter> = {
   "google-search-console": () => new GoogleSearchConsoleAdapter(),
@@ -367,6 +382,7 @@ const ADAPTER_CLASSES: Record<string, () => ConnectorAdapter> = {
   hubspot: () => new HubspotAdapter(),
   // Phase 11 (devtools).
   linear: () => new LinearAdapter(),
+  jira: () => new JiraAdapter(),
 };
 
 /** Resolve a built-in connector key to its native adapter. Throws on unknown key. */
@@ -382,7 +398,7 @@ export function resolveAdapter(key: string): ConnectorAdapter {
 //
 // Phase 4b wired the last six mock-only adapters (GSC, GA4, Drive, Notion,
 // Meta Ads, Google Ads) to their live APIs: with a vault credential they
-// call the provider; without one they stay in labeled mock mode. All 19
+// call the provider; without one they stay in labeled mock mode. All 20
 // built-in adapters have live wiring, so the set is empty (0 mock-only;
 // pinned by lib/connectors/m21/__tests__/registry.test.ts). Keep it in
 // sync with the per-adapter file headers (scripts/verify-connector-health.mts

@@ -13,7 +13,7 @@ import { createHash, randomBytes } from "crypto";
 import { secrets } from "@/lib/secrets";
 import { getBuiltinMeta, HUBSPOT_SCOPES, MICROSOFT_CALENDAR_SCOPES, MICROSOFT_MAIL_SCOPES, SLACK_BOT_SCOPES } from "@/lib/connectors/m21/registry";
 // Phase 11 (devtools): work-tool connector scopes.
-import { LINEAR_SCOPES } from "@/lib/connectors/m21/registry";
+import { JIRA_SCOPES, LINEAR_SCOPES } from "@/lib/connectors/m21/registry";
 
 export interface OAuthProviderConfig {
   authorizeUrl: string;
@@ -285,6 +285,20 @@ export const OAUTH_CONFIGS: Record<string, OAuthProviderConfig> = {
     clientSecretEnv: "LINEAR_OAUTH_CLIENT_SECRET",
     scopeSeparator: ",",
     extra: { prompt: "consent" },
+  },
+  // Phase 11 (devtools): Jira Cloud via Atlassian OAuth 2.0 (3LO).
+  // audience=api.atlassian.com + prompt=consent on authorize; the token
+  // endpoint takes JSON with the client credentials (both grants) and
+  // rotates refresh tokens (lib/vault/refresh.ts keeps the newest). Verified
+  // against developer.atlassian.com/cloud/jira/platform/oauth-2-3lo-apps.
+  jira: {
+    authorizeUrl: "https://auth.atlassian.com/authorize",
+    tokenUrl: "https://auth.atlassian.com/oauth/token",
+    scopes: JIRA_SCOPES,
+    clientIdEnv: "ATLASSIAN_OAUTH_CLIENT_ID",
+    clientSecretEnv: "ATLASSIAN_OAUTH_CLIENT_SECRET",
+    extra: { audience: "api.atlassian.com", prompt: "consent" },
+    tokenRequest: "json",
   },
   // NOTE (Phase 18 slice 4, outcome B): Walmart Connect is NOT registered
   // here and never will be as an OAuth connector. Research 2026-10-01

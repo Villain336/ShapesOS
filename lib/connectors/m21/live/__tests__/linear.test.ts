@@ -122,6 +122,19 @@ describe("Linear reads", () => {
     assert.equal(ctx.refreshCalls(), 1);
     assert.equal(f.calls[1].headers.authorization, "Bearer tok-2");
   });
+
+  it("a token refreshed on page 1 is reused for page 2 (refresh is one-shot)", async () => {
+    const { a, f } = adapter([
+      jsonResponse(401, { errors: [{ message: "Authentication required", extensions: { code: "AUTHENTICATION_ERROR" } }] }),
+      jsonResponse(200, { data: { issues: { nodes: [issueNode(1)], pageInfo: { hasNextPage: true, endCursor: "c1" } } } }),
+      jsonResponse(200, { data: { issues: { nodes: [issueNode(2)], pageInfo: { hasNextPage: false, endCursor: null } } } }),
+    ]);
+    const ctx = refreshingCtx();
+    const r = await a.invoke("list_issues", { limit: 10 }, oauthCred("old"), ctx);
+    assert.equal(r.ok, true, r.error);
+    assert.equal(ctx.refreshCalls(), 1);
+    assert.deepEqual(f.calls.map((c) => c.headers.authorization), ["Bearer old", "Bearer tok-2", "Bearer tok-2"]);
+  });
 });
 
 describe("Linear writes (never retried)", () => {

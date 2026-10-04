@@ -191,6 +191,7 @@ export function connectorGroup(connectorKey: string): ToolGroup {
     // Phase 11 (devtools): issue trackers are project operations ("code" is
     // the sandbox runner and is unavailable without one).
     case "linear":
+    case "jira":
       return "ops";
     case "google-search-console":
     case "ga4":
@@ -234,6 +235,9 @@ export function connectorAction(connectorKey: string, tool: string): string {
     case "linear.create_issue":
     case "linear.update_issue":
     case "linear.add_comment":
+    case "jira.create_issue":
+    case "jira.transition_issue":
+    case "jira.add_comment":
       return "write_project_record";
     default:
       return "connector_write";

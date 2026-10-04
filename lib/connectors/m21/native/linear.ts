@@ -37,6 +37,7 @@ import {
   linearUpdateIssue,
   linearViewer,
 } from "../live/linear";
+import { stickyAuth } from "../live/sticky-auth";
 import { inputFailure } from "./outlook";
 
 export class LinearAdapter implements ConnectorAdapter {
@@ -140,8 +141,10 @@ export class LinearAdapter implements ConnectorAdapter {
     credential: DecryptedCredential | null,
     ctx: InvokeContext,
   ): Promise<InvokeResult> {
-    const auth = tokenSourceFrom(credential, ctx);
-    if (!auth) return this.mock(tool, args);
+    const source = tokenSourceFrom(credential, ctx);
+    if (!source) return this.mock(tool, args);
+    // Pagination makes several requests: keep a refreshed token for the rest.
+    const auth = stickyAuth(source);
     try {
       switch (tool) {
         case "list_teams":
