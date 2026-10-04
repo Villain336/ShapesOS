@@ -13,6 +13,7 @@
 
 import type { Prisma } from "@prisma/client";
 import { withWorkspaceScope } from "@/lib/substrate/memory/rls";
+import { syncPullRequestFromShip } from "./pull-requests";
 
 export interface ShipState {
   /** owner/name */
@@ -86,7 +87,7 @@ export async function loadShipState(q: ShipLookup): Promise<ShipState | null> {
 /** Write the ship state onto a run (merged into its agentState). */
 export async function saveShipState(workspaceId: string, runId: string, state: ShipState): Promise<void> {
   await withWorkspaceScope(workspaceId, async (tx) => {
-    const run = await tx.agentRun.findFirst({ where: { id: runId, workspaceId }, select: { agentState: true } });
+    const run = await tx.agentRun.findFirst({ where: { id: runId, workspaceId }, select: { agentState: true, threadId: true } });
     if (!run) throw new Error("Run not found");
     const base =
       run.agentState && typeof run.agentState === "object" && !Array.isArray(run.agentState)
@@ -96,5 +97,7 @@ export async function saveShipState(workspaceId: string, runId: string, state: S
       where: { id: runId, workspaceId },
       data: { agentState: { ...base, ship: { ...state } } as unknown as Prisma.InputJsonValue },
     });
+    // Phase 9 (repos): pushed work is indexed for GitHub feedback routing.
+    await syncPullRequestFromShip(tx, workspaceId, run.threadId, state);
   });
 }

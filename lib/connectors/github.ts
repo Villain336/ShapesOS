@@ -28,6 +28,7 @@ import type {
   GitHubRepoSummary,
   GitHubReview,
   GitHubReviewComment,
+  GitHubIssueComment,
   OpenPullRequestInput,
   PushResult,
   UpdatePullRequestInput,
@@ -486,6 +487,7 @@ export class GitHubSiteFileProvider implements GitHubConnector {
         created_at: string;
         in_reply_to_id?: number;
         diff_hunk?: string;
+        author_association?: string;
       }[]
     >(`${this.repoPath}/pulls/${prNumber(number)}/comments?per_page=100&sort=created&direction=asc`);
     return rows.map((c) => ({
@@ -498,12 +500,21 @@ export class GitHubSiteFileProvider implements GitHubConnector {
       createdAt: c.created_at,
       inReplyTo: c.in_reply_to_id ?? null,
       ...(c.diff_hunk ? { diffHunk: c.diff_hunk } : {}),
+      ...(c.author_association ? { authorAssociation: c.author_association } : {}),
     }));
   }
 
   async listReviews(number: number): Promise<GitHubReview[]> {
     const rows = await this.ghJson<
-      { id: number; user: { login: string } | null; body: string | null; state: string; html_url: string; submitted_at?: string | null }[]
+      {
+        id: number;
+        user: { login: string } | null;
+        body: string | null;
+        state: string;
+        html_url: string;
+        submitted_at?: string | null;
+        author_association?: string;
+      }[]
     >(`${this.repoPath}/pulls/${prNumber(number)}/reviews?per_page=100`);
     return rows.map((r) => ({
       id: r.id,
@@ -512,6 +523,22 @@ export class GitHubSiteFileProvider implements GitHubConnector {
       body: r.body ?? "",
       url: r.html_url,
       submittedAt: r.submitted_at ?? null,
+      ...(r.author_association ? { authorAssociation: r.author_association } : {}),
+    }));
+  }
+
+  /** Phase 9: the PR conversation's comments (GitHub stores them as issue comments). */
+  async listIssueComments(number: number): Promise<GitHubIssueComment[]> {
+    const rows = await this.ghJson<
+      { id: number; body: string | null; user: { login: string } | null; html_url: string; created_at: string; author_association?: string }[]
+    >(`${this.repoPath}/issues/${prNumber(number)}/comments?per_page=100`);
+    return rows.map((c) => ({
+      id: c.id,
+      body: c.body ?? "",
+      author: c.user?.login ?? "unknown",
+      url: c.html_url,
+      createdAt: c.created_at,
+      ...(c.author_association ? { authorAssociation: c.author_association } : {}),
     }));
   }
 }

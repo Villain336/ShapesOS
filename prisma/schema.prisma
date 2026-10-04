@@ -999,6 +999,9 @@ model Workspace {
   pushDevices                 PushDevice[]
   // Phase 8 (ship): detected stack per cloned repository.
   repoProfiles                RepoProfile[]
+  // Phase 9 (repos): agent pull requests + the GitHub deliveries about them.
+  agentPullRequests           AgentPullRequest[]
+  githubWebhookDeliveries     GitHubWebhookDelivery[]
 
   @@map("workspaces")
 }
@@ -14076,4 +14079,74 @@ model RepoProfile {
 
   @@unique([workspaceId, repoFullName])
   @@map("repo_profiles")
+}
+
+// Phase 9 (repos): every branch an agent pushed (shapes/<runId>) and its pull
+// request, one row per (repository, branch). Written by saveShipState when a
+// push or a PR lands on a run's ship state (lib/ship/pull-requests.ts). It is
+// how a GitHub webhook (or the opt-in poller) finds the workspace, run and
+// chat thread a PR belongs to, and what the Repositories view lists.
+// FORCE RLS on app.workspace_id, plus ONE SELECT-only routing policy
+// (app.github_route = 'lookup') used to map an incoming delivery to its
+// workspace — every write runs under the row's own tenant GUC.
+model AgentPullRequest {
+  id                 String    @id @default(cuid())
+  workspaceId        String    @map("workspace_id")
+  workspace          Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  // "owner/name", lower-cased.
+  repoFullName       String    @map("repo_full_name")
+  // shapes/<runId> — the only branch this work pushes.
+  branch             String
+  // The run whose id names the branch (ShipState.cloneRunId).
+  runId              String    @map("run_id")
+  threadId           String?   @map("thread_id")
+  prNumber           Int?      @map("pr_number")
+  prUrl              String?   @map("pr_url")
+  // pushed (no PR yet) | open | closed | merged
+  state              String    @default("pushed")
+  // success | failure | pending | none (rolled-up checks on the head commit)
+  checks             String?
+  lastFeedbackAt     DateTime? @map("last_feedback_at")
+  lastFeedback       String?   @map("last_feedback")
+  lastFeedbackUrl    String?   @map("last_feedback_url")
+  // A continuation job is queued (later feedback coalesces into it).
+  pendingSince       DateTime? @map("pending_since")
+  continuations      Int       @default(0)
+  lastContinuedAt    DateTime? @map("last_continued_at")
+  lastContinuedRunId String?   @map("last_continued_run_id")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  deliveries GitHubWebhookDelivery[]
+
+  @@unique([repoFullName, branch])
+  @@index([workspaceId, state, updatedAt])
+  @@map("agent_pull_requests")
+}
+
+// Phase 9 (repos): GitHub feedback received for an agent pull request — one
+// row per webhook delivery (X-GitHub-Delivery) or per item the poller saw
+// ("poll:<kind>:<id>"); the primary key is the dedupe. A continuation turn
+// consumes the rows it was started for (continued_run_id).
+// FORCE RLS on app.workspace_id; cascades from the workspace and the PR row.
+model GitHubWebhookDelivery {
+  deliveryId     String           @id @map("delivery_id")
+  workspaceId    String           @map("workspace_id")
+  workspace      Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  pullRequestId  String           @map("pull_request_id")
+  pullRequest    AgentPullRequest @relation(fields: [pullRequestId], references: [id], onDelete: Cascade)
+  // webhook event name (pull_request_review, issue_comment, …) or "poll"
+  event          String
+  action         String?
+  // feedback (continues the work) | info (recorded only)
+  kind           String
+  author         String?
+  summary        String
+  url            String?
+  continuedRunId String?          @map("continued_run_id")
+  receivedAt     DateTime         @default(now()) @map("received_at")
+
+  @@index([workspaceId, receivedAt])
+  @@index([pullRequestId, continuedRunId])
+  @@map("github_webhook_deliveries")
 }
