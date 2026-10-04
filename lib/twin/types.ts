@@ -220,4 +220,6 @@ export const TWIN_API = {
   sites: "/api/ops/twin-sites",
   objects: "/api/ops/twin-objects",
   dockBookings: "/api/ops/dock-bookings",
+  /** DELETE one layout object (editor+; the generic ops route has no DELETE). */
+  object: (id: string) => `/api/twin/objects/${encodeURIComponent(id)}`,
 } as const;

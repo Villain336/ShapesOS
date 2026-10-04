@@ -17,7 +17,7 @@
 // Rule failures are OpsError (the generic route maps them to HTTP).
 
 import type { Prisma } from "@prisma/client";
-import { OpsError, OpsNotFoundError, type OpsActor } from "../doctype";
+import { OpsError, OpsNotFoundError, auditOpsEvent, type OpsActor } from "../doctype";
 import {
   DEFAULT_DOCK_SLOT_MINUTES,
   TwinRuleError,
@@ -408,4 +408,40 @@ export async function patchBookingRow(tx: Tx, actor: OpsActor, id: string, patch
     throw e;
   }
   return (await tx.opsDockBooking.findFirst({ where: { id, workspaceId: actor.workspaceId } })) as unknown as Row;
+}
+
+// ---------------------------------------------------------------------------
+// Object delete (DELETE /api/twin/objects/[id] — the layout editor)
+// ---------------------------------------------------------------------------
+
+/**
+ * Remove ONE layout object. Layout edits are not money, so drafts and
+ * published sites alike; refused (409) for equipment that is busy on a task
+ * and for a dock door whose dock has an active booking. Audited like every
+ * ops write (entity twin-objects, action "delete"). Nothing it is bound to
+ * is touched — the record stays, only its drawing goes.
+ */
+export async function deleteObjectRow(tx: Tx, actor: OpsActor, id: string): Promise<Row> {
+  const existing = await tx.opsSiteObject.findFirst({ where: { id, workspaceId: actor.workspaceId } });
+  if (!existing) throw new OpsNotFoundError("twin-objects", id);
+  if (existing.kind === "equipment" && existing.equipmentStatus === "busy") {
+    throw new OpsError(409, `"${existing.label}" is busy on a task${existing.taskNote ? ` (${existing.taskNote})` : ""} — free it before removing it`);
+  }
+  if (existing.kind === "dock_door" && existing.bindingType === "location" && existing.bindingId) {
+    const active = await tx.opsDockBooking.findFirst({
+      where: { workspaceId: actor.workspaceId, dockLocationId: existing.bindingId, status: { in: ["booked", "arrived", "loading", "unloading"] } },
+      orderBy: { eta: "asc" },
+    });
+    if (active) {
+      throw new OpsError(
+        409,
+        `"${existing.label}" has an active booking (${active.truckRef ?? active.carrier ?? active.id}, ${active.status}, ETA ${active.eta.toISOString()}) — finish or cancel it before removing the dock door`,
+      );
+    }
+  }
+  const removed = await tx.opsSiteObject.deleteMany({ where: { id, workspaceId: actor.workspaceId } });
+  if (removed.count !== 1) throw new OpsNotFoundError("twin-objects", id);
+  const { twinObjectDef } = await import("./entities");
+  await auditOpsEvent(tx, twinObjectDef, actor, "delete", id, `removed ${twinObjectDef.summarize(existing as unknown as Row)} from site ${existing.siteId}`);
+  return existing as unknown as Row;
 }
