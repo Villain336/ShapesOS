@@ -38,6 +38,9 @@ import {
   Receipt,
   // Phase 10 (store)
   ShoppingBag,
+  // Phase 12 (people)
+  Banknote,
+  CalendarDays,
   type LucideIcon,
 } from "lucide-react";
 
@@ -72,6 +75,9 @@ const ICONS: Record<string, LucideIcon> = {
   expenses: Receipt,
   // Phase 10 (store)
   store: ShoppingBag,
+  // Phase 12 (people)
+  payroll: Banknote,
+  events: CalendarDays,
 };
 
 export interface SectionNavItem {

@@ -24,6 +24,9 @@ const SOURCE_LABEL: Record<string, string> = {
   reversal: "Reversal",
   // Phase 10 (store)
   web_order: "Web order",
+  // Phase 12 (people)
+  pay_run: "Pay run",
+  event_registration: "Event ticket",
 };
 
 export default async function JournalPage() {

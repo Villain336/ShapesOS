@@ -11,6 +11,8 @@ import type { OpsActor } from "../doctype";
 import {
   billPaymentLines,
   billPostLines,
+  eventTicketSaleLines,
+  payRunPostLines,
   creditNoteLines,
   expenseApproveLines,
   expenseReimburseLines,
@@ -193,5 +195,55 @@ export async function postWebOrderSale(
     sourceId: order.id,
     sourceKey: `web_order:${order.id}:paid`,
     lines: webOrderSaleLines(order, taxAccount),
+  });
+}
+
+// Phase 12 (people): a posted pay run — ONE balanced entry for the whole run
+// (wages, employer taxes and contributions vs. the liabilities they create),
+// keyed pay_run:<id>:post so a retried post is a no-op.
+export async function postPayRunEntry(
+  tx: Tx,
+  actor: OpsActor,
+  run: {
+    id: string;
+    number?: string | null;
+    payDate: Date;
+    periodStart: Date;
+    periodEnd: Date;
+    grossCents: number;
+    preTaxDeductionCents: number;
+    employeeTaxCents: number;
+    postTaxDeductionCents: number;
+    netCents: number;
+    employerTaxCents: number;
+    employerContribCents: number;
+  },
+): Promise<PostResult> {
+  const day = (d: Date) => d.toISOString().slice(0, 10);
+  return postEntry(tx, actor, {
+    entryDate: run.payDate,
+    memo: `Pay run ${run.number ?? run.id} (${day(run.periodStart)} to ${day(run.periodEnd)})`,
+    sourceType: "pay_run",
+    sourceId: run.id,
+    sourceKey: `pay_run:${run.id}:post`,
+    lines: payRunPostLines(run),
+  });
+}
+
+// Phase 12 (people): a paid event registration (tenant Stripe Checkout).
+export async function postEventTicketSale(
+  tx: Tx,
+  actor: OpsActor,
+  reg: { id: string; amountCents: number; paidAt?: Date | string | null },
+  label?: string,
+): Promise<PostResult | null> {
+  if (reg.amountCents <= 0) return null;
+  return postEntry(tx, actor, {
+    entryDate: dayOf(reg.paidAt),
+    memo: `Event registration ${label ?? reg.id} paid`,
+    sourceType: "event_registration",
+    sourceId: reg.id,
+    sourceKey: `event_registration:${reg.id}:paid`,
+    lines: eventTicketSaleLines(reg.amountCents),
   });
 }

@@ -256,13 +256,32 @@ export const ROWS: ParityRow[] = [
     test: [test("lib/portal/__tests__/portal-core.test.ts"), test("lib/portal/__tests__/portal-db.test.ts"), test("lib/portal/__tests__/portal-isolation-db.test.ts")],
     note: "Separate portal session (cookie on /portal + /api/portal); a client sees only the CRM records linked in Settings → Clients.",
   },
+  // --- Phase 12 (people): payroll + events ---
+  {
+    app: "Payroll",
+    odoo: "Payroll",
+    owner: "phase 12",
+    model: [model("OpsSalaryStructure"), model("OpsSalaryAssignment"), model("OpsPayRun"), model("OpsPayslip")],
+    route: [entity("salary-structures"), entity("salary-assignments"), entity("pay-runs"), file("app/api/ops/pay-runs/[id]/[action]/route.ts"), file("app/api/ops/payslips/[id]/pdf/route.ts")],
+    page: [page("payroll"), file("app/dashboard/ops/payroll/[id]/page.tsx")],
+    test: [test("lib/ops/__tests__/p12-payroll.test.ts"), test("lib/ops/__tests__/p12-payroll-db.test.ts")],
+    note: "US federal 2026 + flat state tax tables (pluggable per country; verify with an accountant). Approve and post are Tier 3; money transfer stays with the payroll provider.",
+  },
+  {
+    app: "Events",
+    odoo: "Events",
+    owner: "phase 12",
+    model: [model("OpsEvent"), model("OpsEventSession"), model("OpsEventTicketType"), model("OpsEventRegistration"), model("OpsEventAttendee")],
+    route: [entity("events"), entity("event-ticket-types"), entity("event-registrations"), file("app/api/events/[slug]/register/route.ts"), file("app/api/ops/events/check-in/route.ts")],
+    page: [page("events"), file("app/dashboard/ops/events/[id]/check-in/page.tsx"), file("app/events/[slug]/page.tsx")],
+    test: [test("lib/ops/__tests__/p12-events.test.ts"), test("lib/ops/__tests__/p12-events-db.test.ts")],
+    note: "Paid tickets through the workspace's own Stripe, confirmed only by its webhook (live Stripe unverified in CI); QR tickets; once-only check-in.",
+  },
   // --- Not built yet (owner decision: Phase 12 / later) ---
   ...(
     [
       ["Manufacturing", "Manufacturing", "phase 12"],
       ["Point of sale", "Point of Sale", "phase 12"],
-      ["Payroll", "Payroll", "phase 12"],
-      ["Events", "Events", "phase 12"],
     ] as const
   ).map(([app, odoo, owner]): ParityRow => ({ app, odoo, owner, model: [], route: [], page: [], test: [], note: "Planned — not started in this codebase." })),
 ];
@@ -284,7 +303,9 @@ function walk(dir: string, out: string[] = []): string[] {
 
 export function loadCtx(root = ROOT): Ctx {
   const schema = readFileSync(join(root, "prisma/schema.prisma"), "utf8");
-  const entities = readFileSync(join(root, "lib/ops/entities.ts"), "utf8");
+  // Phase 12 (people): entity defs also live in lib/ops/<app>/entities.ts.
+  const entityFiles = ["lib/ops/entities.ts", ...readdirSync(join(root, "lib/ops")).map((d) => `lib/ops/${d}/entities.ts`)].filter((f) => existsSync(join(root, f)));
+  const entities = entityFiles.map((f) => readFileSync(join(root, f), "utf8")).join("\n");
   const entitySlugs = new Set([...entities.matchAll(/^\s*slug:\s*"([a-z0-9-]+)"/gm)].map((m) => m[1]!));
   const files = ["app", "lib", "components", "tests"].flatMap((d) => walk(join(root, d)));
   return { schema, entitySlugs, files };

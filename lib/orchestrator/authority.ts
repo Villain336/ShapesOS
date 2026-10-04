@@ -182,7 +182,8 @@ export function normalizeForTier(text: string): string {
  * reversing journal entries. Never automated, whatever a rule says.
  */
 // Phase 11 (bizsync): + posting the books to QuickBooks / Xero.
-const TIER3_EXACT_KINDS: ReadonlySet<string> = new Set(["record payment", "post journal entry", "reverse journal entry", "pay vendor bill", "post to accounting"]);
+// Phase 12 (people): + approving and posting payroll.
+const TIER3_EXACT_KINDS: ReadonlySet<string> = new Set(["record payment", "post journal entry", "reverse journal entry", "pay vendor bill", "post to accounting", "approve pay run", "post pay run"]);
 
 function isTier3(kind: string, description: string): boolean {
   if (TIER3_EXACT_KINDS.has(normalizeForTier(kind))) return true;

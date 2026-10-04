@@ -217,6 +217,10 @@ export async function handleStripeWebhook(
   } catch {
     return { status: 400, body: { error: "Invalid signature" } };
   }
+  // Phase 12 (people): event registrations (metadata.event_registration_id)
+  // — paid → confirmed + payment + journal once; expired → seats released.
+  const events = await import("../events/registrations");
+  if (events.isEventCheckoutEvent(event)) return events.handleEventCheckoutEvent(workspaceId, event);
   // Phase 10 (store): storefront Checkout Sessions (metadata.order_id) —
   // paid / expired — are applied by the store module (lazy: no import cycle).
   const store = await import("../store/orders");

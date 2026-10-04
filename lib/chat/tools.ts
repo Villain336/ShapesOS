@@ -1127,6 +1127,14 @@ export const TOOL_GROUP: Readonly<Record<string, ToolGroup>> = {
   // Phase 10 (store): the overview is a read; listing products is an ops write.
   ops_store_overview: "workspace",
   ops_store_list_product: "ops",
+  // Phase 12 (people): payroll + events (reads are workspace, writes ops).
+  ops_payroll_overview: "workspace",
+  ops_payroll_draft_run: "ops",
+  ops_payroll_request_approval: "ops",
+  ops_payroll_request_posting: "ops",
+  ops_events_overview: "workspace",
+  ops_events_create_event: "ops",
+  ops_events_register: "ops",
   delegate_to_subagent: "delegate",
   // Phase 8 (ship): local git work in the run's sandbox is "code"; anything
   // that leaves the sandbox is "ship" (lib/ship/tools.ts).
@@ -1227,6 +1235,13 @@ export const TOOL_ACTION: Readonly<Record<string, string>> = {
   ops_set_reorder_rule: "set_reorder_rule",
   // Phase 10 (store): Tier 2 — always asks (lib/automation/actions.ts).
   ops_store_list_product: "write_store_listing",
+  // Phase 12 (people): drafting a pay run is Tier 0; approving and posting
+  // payroll are Tier 3 (never automated); event writes are Tier 2.
+  ops_payroll_draft_run: "draft_pay_run",
+  ops_payroll_request_approval: "approve_pay_run",
+  ops_payroll_request_posting: "post_pay_run",
+  ops_events_create_event: "write_event",
+  ops_events_register: "write_event",
   // Phase 8: Tier 2 — always asks (lib/automation/actions.ts).
   git_push_branch: "push_branch",
   open_pull_request: "open_pr",
