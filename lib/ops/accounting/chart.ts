@@ -29,6 +29,10 @@ export const STANDARD_CHART: readonly ChartSeed[] = [
   { code: "2000", name: "Accounts payable", type: "liability", systemKey: "ap" },
   { code: "2100", name: "Sales tax payable", type: "liability", systemKey: "tax_payable" },
   { code: "2200", name: "Reimbursements payable", type: "liability", systemKey: "reimbursements_payable" },
+  // Phase 12 (people): payroll liabilities.
+  { code: "2300", name: "Payroll taxes payable", type: "liability", systemKey: "payroll_tax_payable" },
+  { code: "2310", name: "Net pay payable", type: "liability", systemKey: "wages_payable" },
+  { code: "2320", name: "Payroll deductions payable", type: "liability", systemKey: "payroll_deductions_payable" },
   { code: "2500", name: "Loans payable", type: "liability" },
   { code: "3000", name: "Owner's equity", type: "equity", systemKey: "owner_equity" },
   { code: "3900", name: "Retained earnings", type: "equity", systemKey: "retained_earnings" },
@@ -45,6 +49,10 @@ export const STANDARD_CHART: readonly ChartSeed[] = [
   { code: "6400", name: "Office supplies", type: "expense", systemKey: "expense_office" },
   { code: "6500", name: "Professional fees", type: "expense", systemKey: "expense_professional" },
   { code: "6600", name: "Advertising and marketing", type: "expense", systemKey: "expense_advertising" },
+  // Phase 12 (people): payroll expenses.
+  { code: "6700", name: "Salaries and wages", type: "expense", systemKey: "payroll_wages" },
+  { code: "6710", name: "Employer payroll taxes", type: "expense", systemKey: "payroll_taxes" },
+  { code: "6720", name: "Employee benefits", type: "expense", systemKey: "payroll_benefits" },
   { code: "6900", name: "Bank fees", type: "expense", systemKey: "expense_bank_fees" },
 ];
 
