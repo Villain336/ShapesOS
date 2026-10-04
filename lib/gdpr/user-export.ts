@@ -14,7 +14,8 @@
 // workspace-owned at all. Workspace rows are read under that workspace's RLS
 // scope. Secrets are left out exactly as in the workspace export. There is
 // no user table (sign-in is Auth.js JWT), so the account block is what the
-// session knows.
+// session knows; an email account's record (Phase 6, email_accounts) comes
+// through "authored" by its user_id, without password_hash (a secret column).
 
 import { prisma } from "@/lib/prisma";
 import {
