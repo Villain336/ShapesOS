@@ -280,8 +280,34 @@ const vendorHooks: OpsEntityHooks = {
   },
 };
 
+/**
+ * A PO created with only the legacy supplier (a CRM lead id and/or a
+ * free-text name) is linked to a vendor record — found by name or created —
+ * so every caller (the CRM modal, agents, the API) ends up on OpsVendor.
+ */
+async function linkLegacySupplier(tx: Tx, workspaceId: string, body: Row): Promise<Row> {
+  if (body.vendorId || !hasFinanceLedger(tx)) return body;
+  let name = typeof body.supplierName === "string" ? body.supplierName.trim() : "";
+  let leadId: string | null = null;
+  if (typeof body.supplierId === "string" && body.supplierId) {
+    const lead = await tx.lead.findFirst({ where: { id: body.supplierId, workspaceId }, select: { id: true, name: true } });
+    if (lead) {
+      leadId = lead.id;
+      name = name || lead.name.trim();
+    }
+  }
+  if (!name) return body;
+  const vendor = await tx.opsVendor.upsert({
+    where: { workspaceId_name: { workspaceId, name: name.slice(0, 200) } },
+    create: { workspaceId, name: name.slice(0, 200), leadId },
+    update: {},
+  });
+  return { ...body, vendorId: vendor.id };
+}
+
 const purchaseOrderHooks: OpsEntityHooks = {
-  async prepare(tx, actor, body) {
+  async prepare(tx, actor, input, existing) {
+    const body = existing ? input : await linkLegacySupplier(tx, actor.workspaceId, input);
     const v = await assertVendor(tx, actor.workspaceId, body.vendorId);
     // Keep the legacy supplier name readable on new POs too.
     if (v && !body.supplierName) return { ...body, supplierName: v.name };

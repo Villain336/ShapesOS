@@ -66,6 +66,16 @@ async function sentPo(qty = 10): Promise<string> {
   return id;
 }
 
+describe("vendor linking", () => {
+  it("a PO with only a free-text supplier is linked to a (found or created) vendor", async () => {
+    const a = rowOf(await withWorkspaceScope(WS, (tx) => opsCreate(tx, POS, ACTOR, { supplierName: "Bolt Supply", lineItems: [{ name: "Bolts", qty: 1, priceCents: 100 }] })));
+    const b = rowOf(await withWorkspaceScope(WS, (tx) => opsCreate(tx, POS, ACTOR, { supplierName: "Bolt Supply", lineItems: [{ name: "Nuts", qty: 1, priceCents: 100 }] })));
+    assert.ok(a.vendorId);
+    assert.equal(a.vendorId, b.vendorId, "same name → same vendor");
+    assert.equal(a.supplierName, "Bolt Supply", "legacy field stays readable");
+  });
+});
+
 describe("RFQ and partial receipts", () => {
   it("receipts restock exactly what arrived; 'received' restocks only the rest", async () => {
     const id = await sentPo(10);
