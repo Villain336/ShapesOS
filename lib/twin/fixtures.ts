@@ -96,7 +96,6 @@ const bookingOverdue: TwinDockBookingSummary = {
 export const WAREHOUSE_FIXTURE: TwinSnapshot = {
   site: { id: "site_wh04", kind: "warehouse", status: "published", name: "Riverside warehouse", code: "WH-04", gridW: 48, gridD: 40, warehouseId: "wh_riverside" },
   objects: [
-    obj("o_w_building_hall", "building", "Main hall", fp(2, 2, 30, 20, 7), plain("building")),
     obj("o_w_building_office", "building", "Office", fp(35, 2, 10, 7, 4), plain("building")),
     obj(
       "o_w_dock_1",
@@ -153,11 +152,11 @@ export const WAREHOUSE_FIXTURE: TwinSnapshot = {
       },
     ),
     obj("o_w_bins_returns", "bin_zone", "Returns", fp(18, 14, 6, 3, 1), stock("bin_zone", 38, 7), { binding: loc("loc_bins_ret", "WH-04/RET"), pill: "38 on hand" }),
-    obj("o_w_path_main", "path", "Main aisle", fp(3, 12, 28, 1, 0), plain("path")),
-    obj("o_w_path_dock", "path", "Dock lane", fp(3, 19, 28, 2, 0), plain("path")),
-    obj("o_w_yard_1", "yard_slot", "Yard 1", fp(30, 26, 4, 10, 0), plain("yard_slot"), { pill: "Empty" }),
-    obj("o_w_yard_2", "yard_slot", "Yard 2", fp(35, 26, 4, 10, 0), plain("yard_slot"), { pill: "Empty" }),
-    obj("o_w_yard_3", "yard_slot", "Yard 3", fp(40, 26, 4, 10, 0), plain("yard_slot"), { pill: "Empty" }),
+    obj("o_w_path_main", "path", "Main aisle", fp(3, 12, 28, 1, 1), plain("path")),
+    obj("o_w_path_dock", "path", "Dock lane", fp(3, 19, 28, 2, 1), plain("path")),
+    obj("o_w_yard_1", "yard_slot", "Yard 1", fp(30, 26, 4, 10, 1), plain("yard_slot"), { pill: "Empty" }),
+    obj("o_w_yard_2", "yard_slot", "Yard 2", fp(35, 26, 4, 10, 1), plain("yard_slot"), { pill: "Empty" }),
+    obj("o_w_yard_3", "yard_slot", "Yard 3", fp(40, 26, 4, 10, 1), plain("yard_slot"), { pill: "Empty" }),
     obj(
       "o_w_fork_1",
       "equipment",
@@ -263,9 +262,9 @@ export const WAREHOUSE_FIXTURE: TwinSnapshot = {
 // ---------------------------------------------------------------------------
 
 export const FACTORY_FIXTURE: TwinSnapshot = {
-  site: { id: "site_pl01", kind: "factory", status: "published", name: "Eastside plant", code: "PL-01", gridW: 44, gridD: 32, warehouseId: "wh_eastside" },
+  site: { id: "site_pl01", kind: "factory", status: "published", name: "Eastside plant", code: "PL-01", gridW: 44, gridD: 40, warehouseId: "wh_eastside" },
   objects: [
-    obj("o_f_building_hall", "building", "Production hall", fp(2, 2, 34, 22, 8), plain("building")),
+    obj("o_f_building_office", "building", "Office", fp(35, 2, 7, 6, 4), plain("building")),
     obj(
       "o_f_wc_cut",
       "work_center",
@@ -336,7 +335,7 @@ export const FACTORY_FIXTURE: TwinSnapshot = {
     ),
     obj("o_f_rack_raw", "rack", "Raw materials", fp(29, 5, 2, 12, 5, 0), stock("rack", 3400, 14), { binding: loc("loc_f_raw", "PL-01/RAW"), pill: "3,400 on hand" }),
     obj("o_f_bins_parts", "bin_zone", "Small parts", fp(22, 13, 5, 3, 1), stock("bin_zone", 5200, 40, 1), { binding: loc("loc_f_parts", "PL-01/PARTS"), pill: "1 low" }),
-    obj("o_f_path", "path", "Line aisle", fp(3, 10, 32, 2, 0), plain("path")),
+    obj("o_f_path", "path", "Line aisle", fp(3, 10, 32, 2, 1), plain("path")),
     obj(
       "o_f_dock_out",
       "dock_door",
@@ -376,9 +375,9 @@ export const FACTORY_FIXTURE: TwinSnapshot = {
 // ---------------------------------------------------------------------------
 
 export const STORE_FIXTURE: TwinSnapshot = {
-  site: { id: "site_st02", kind: "store", status: "draft", name: "Market Street store", code: "ST-02", gridW: 32, gridD: 26, warehouseId: "wh_market" },
+  site: { id: "site_st02", kind: "store", status: "draft", name: "Market Street store", code: "ST-02", gridW: 44, gridD: 26, warehouseId: "wh_market" },
   objects: [
-    obj("o_s_building", "building", "Sales floor", fp(2, 2, 26, 18, 5), plain("building")),
+    obj("o_s_building", "building", "Staff room", fp(2, 18, 8, 5, 3), plain("building")),
     obj("o_s_shelf_1", "shelf", "Aisle 1", fp(5, 5, 8, 1, 2), stock("shelf", 240, 30), { binding: loc("loc_s_a1", "ST-02/A1"), pill: "240 on hand" }),
     obj("o_s_shelf_2", "shelf", "Aisle 2", fp(5, 8, 8, 1, 2), stock("shelf", 120, 22, 4), { binding: loc("loc_s_a2", "ST-02/A2"), pill: "4 low" }),
     obj("o_s_shelf_3", "shelf", "Aisle 3", fp(5, 11, 8, 1, 2), stock("shelf", 310, 28), { binding: loc("loc_s_a3", "ST-02/A3"), pill: "310 on hand" }),
@@ -419,14 +418,13 @@ export const STORE_FIXTURE: TwinSnapshot = {
       },
     ),
     obj("o_s_backroom", "bin_zone", "Backroom", fp(20, 4, 6, 4, 1), stock("bin_zone", 900, 60), { binding: loc("loc_s_back", "ST-02/BACK"), pill: "900 on hand" }),
-    obj("o_s_path", "path", "Entrance", fp(14, 17, 4, 3, 0), plain("path")),
+    obj("o_s_path", "path", "Entrance", fp(14, 17, 4, 3, 1), plain("path")),
     obj(
       "o_s_dock",
       "dock_door",
       "Receiving",
-      // w/d are the unrotated door (3 wide, 1 deep); turned 90° it faces east
-      // and occupies 1 × 3 cells on the grid.
-      fp(28, 5, 3, 1, 3, 90),
+      // w/d are the grid extent (1 × 3 cells); turned 90° the door faces east.
+      fp(28, 5, 1, 3, 3, 90),
       { kind: "dock_door", status: "free", booking: null, upcoming: 0 },
       { binding: loc("loc_s_dock", "ST-02/RCV"), pill: "Free" },
     ),

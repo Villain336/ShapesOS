@@ -4,7 +4,8 @@
 // side's entity schemas (lib/ops/twin/entities.ts). PURE builders + tiny
 // fetch helpers (client).
 
-import { TWIN_API, type TwinBindingType, type TwinFootprint, type TwinObjectKind, type TwinSiteKind } from "./types";
+import { TWIN_API, type TwinBindingType, type TwinDockBookingStatus, type TwinFootprint, type TwinObjectKind, type TwinSiteKind } from "./types";
+import { BOOKING_TRANSITIONS } from "./derive";
 
 /** "/api/ops/twin-objects" → "twin-objects" (the generic route's entity slug). */
 export function opsSlug(path: string): string {
@@ -64,6 +65,7 @@ export function createSiteBody(input: { kind: TwinSiteKind; name: string; code: 
 }
 
 export function bookDockBody(input: {
+  siteId: string;
   dockObjectId: string;
   direction: "inbound" | "outbound";
   carrier: string;
@@ -71,6 +73,7 @@ export function bookDockBody(input: {
   eta: string;
 }): Record<string, unknown> {
   return {
+    siteId: input.siteId,
     dockObjectId: input.dockObjectId,
     direction: input.direction,
     carrier: input.carrier.trim() || undefined,
@@ -79,19 +82,12 @@ export function bookDockBody(input: {
   };
 }
 
-/** The booking's next step: booked → arrived → (un)loading → done. */
-export function nextBookingStatus(status: string, direction: "inbound" | "outbound"): string | null {
-  switch (status) {
-    case "booked":
-      return "arrived";
-    case "arrived":
-      return direction === "inbound" ? "unloading" : "loading";
-    case "loading":
-    case "unloading":
-      return "done";
-    default:
-      return null;
-  }
+/** The booking's next forward step (booked → arrived → loading | unloading → done), from the data side's BOOKING_TRANSITIONS. */
+export function nextBookingStatus(status: string, direction: "inbound" | "outbound"): TwinDockBookingStatus | null {
+  const moves = (BOOKING_TRANSITIONS[status as TwinDockBookingStatus] ?? []).filter((s) => s !== "cancelled");
+  if (moves.length === 0) return null;
+  const preferred = direction === "inbound" ? "unloading" : "loading";
+  return moves.includes(preferred) ? preferred : moves[0]!;
 }
 
 /** Error text from a failed JSON response (server validation messages shown inline). */
@@ -101,7 +97,7 @@ export async function errorText(res: Response, fallback: string): Promise<string
   return fallback;
 }
 
-/** Remove a layout object. */
+/** Remove a layout object (DELETE on the generic ops route; twin objects opt in with hooks.remove). */
 export async function deleteObject(id: string): Promise<void> {
   const res = await fetch(`${TWIN_API.objects}?id=${encodeURIComponent(id)}`, { method: "DELETE" });
   if (!res.ok) throw new Error(await errorText(res, "Could not delete the object."));

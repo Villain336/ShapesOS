@@ -49,7 +49,7 @@ function inAnHour(): string {
   return new Date(d.getTime() - off * 60_000).toISOString().slice(0, 16);
 }
 
-function DockActions({ o, onChanged }: { o: TwinObject; onChanged: () => void }) {
+function DockActions({ o, siteId, onChanged }: { o: TwinObject; siteId: string; onChanged: () => void }) {
   const st = o.state.kind === "dock_door" ? o.state : null;
   const create = useGatedWrite(TWIN_SLUGS.dockBookings, "POST", onChanged);
   const patch = useGatedPatch(TWIN_SLUGS.dockBookings, onChanged);
@@ -87,7 +87,7 @@ function DockActions({ o, onChanged }: { o: TwinObject; onChanged: () => void })
               return;
             }
             void create.request(
-              bookDockBody({ dockObjectId: o.id, direction: form.direction, carrier: form.carrier, truckRef: form.truckRef, eta: eta.toISOString() }),
+              bookDockBody({ siteId, dockObjectId: o.id, direction: form.direction, carrier: form.carrier, truckRef: form.truckRef, eta: eta.toISOString() }),
               `${o.label}: ${form.direction} ${form.truckRef || "truck"} at ${form.eta.replace("T", " ")}`,
             );
           }}
@@ -299,7 +299,7 @@ export function TwinInspector({
         ) : null}
         {canEdit && (
           <div className="mt-4">
-            {o.kind === "dock_door" && <DockActions key={o.id} o={o} onChanged={done} />}
+            {o.kind === "dock_door" && <DockActions key={o.id} o={o} siteId={snapshot.site.id} onChanged={done} />}
             {o.kind === "equipment" && <EquipmentActions key={o.id} o={o} snapshot={snapshot} onChanged={done} />}
             {o.kind === "work_center" && <WorkCentreActions key={o.id} o={o} onChanged={done} />}
           </div>

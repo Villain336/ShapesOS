@@ -31,7 +31,8 @@ import {
 import type { TwinBindingType, TwinFootprint, TwinObject, TwinObjectKind, TwinSnapshot } from "@/lib/twin/types";
 import { TWIN_BINDABLE, TWIN_OBJECT_KINDS } from "@/lib/twin/types";
 import { BINDING_LABEL, KIND_LABEL } from "@/lib/twin/view-model";
-import { clampFootprint, footprintsOverlap, rotateFootprint } from "@/lib/twin/scene-kit";
+import { clampFootprint, rotateFootprint } from "@/lib/twin/scene-kit";
+import { LOCATION_KINDS_FOR, overlapWith } from "@/lib/twin/derive";
 import { TWIN_SLUGS, createObjectBody, deleteObject, patchObjectBody } from "@/lib/twin/client-api";
 import { useGatedWrite } from "@/components/ops/shared";
 import { OpsApprovalCard } from "@/components/crm/OpsApprovalCard";
@@ -57,11 +58,11 @@ export const DEFAULT_SIZE: Record<TwinObjectKind, { w: number; d: number; h: num
   dock_door: { w: 4, d: 1, h: 4 },
   rack: { w: 8, d: 1, h: 5 },
   bin_zone: { w: 4, d: 3, h: 1 },
-  yard_slot: { w: 4, d: 10, h: 0 },
+  yard_slot: { w: 4, d: 10, h: 1 },
   work_center: { w: 4, d: 4, h: 3 },
   register: { w: 2, d: 1, h: 1 },
   shelf: { w: 6, d: 1, h: 2 },
-  path: { w: 10, d: 2, h: 0 },
+  path: { w: 10, d: 2, h: 1 },
   equipment: { w: 1, d: 2, h: 2 },
 };
 
@@ -149,13 +150,6 @@ interface Candidate {
   hint: string;
 }
 
-const LOCATION_KINDS: Partial<Record<TwinObjectKind, string[]>> = {
-  dock_door: ["dock"],
-  rack: ["rack", "aisle", "zone"],
-  bin_zone: ["bin", "zone"],
-  shelf: ["shelf", "bin"],
-};
-
 async function loadCandidates(type: TwinBindingType, kind: TwinObjectKind, warehouseId: string): Promise<Candidate[]> {
   const get = async (url: string) => {
     const r = await fetch(url);
@@ -167,7 +161,7 @@ async function loadCandidates(type: TwinBindingType, kind: TwinObjectKind, wareh
   switch (type) {
     case "location": {
       const rows = await get(`/api/ops/locations?limit=200&warehouseId=${encodeURIComponent(warehouseId)}`);
-      const kinds = LOCATION_KINDS[kind];
+      const kinds = LOCATION_KINDS_FOR[kind];
       return rows
         .filter((r) => !kinds || kinds.includes(s(r.kind)))
         .map((r) => ({ id: s(r.id), label: s(r.path) || s(r.code), hint: [s(r.kind), s(r.name)].filter(Boolean).join(" · ") }));
@@ -281,9 +275,8 @@ function ObjectForm({ o, snapshot, writes, onDeleted }: { o: TwinObject; snapsho
     setFp(o.footprint);
   }, [o.label, o.footprint]);
   const clamped = clampFootprint(fp, snapshot.site);
-  const clash = snapshot.objects.find(
-    (x) => x.id !== o.id && !["building", "path", "yard_slot", "equipment"].includes(x.kind) && !["building", "path", "yard_slot", "equipment"].includes(o.kind) && footprintsOverlap(x.footprint, clamped),
-  );
+  // Same rule the server applies (lib/twin/derive.ts): only paths and equipment may overlap.
+  const clash = overlapWith({ id: o.id, kind: o.kind, label: o.label, footprint: clamped }, snapshot.objects);
   const dirty = label.trim() !== o.label || JSON.stringify(clamped) !== JSON.stringify(o.footprint);
   const set = (k: keyof TwinFootprint) => (n: number) => setFp({ ...fp, [k]: n });
   const gate = writes.patch;
@@ -302,7 +295,7 @@ function ObjectForm({ o, snapshot, writes, onDeleted }: { o: TwinObject; snapsho
       <div className="grid grid-cols-3 gap-2">
         <NumberField label="X (m)" value={fp.x} onChange={set("x")} />
         <NumberField label="Z (m)" value={fp.z} onChange={set("z")} />
-        <NumberField label="Height" value={fp.h} onChange={set("h")} />
+        <NumberField label="Height" value={fp.h} onChange={set("h")} min={1} />
         <NumberField label="Width" value={fp.w} onChange={set("w")} min={1} />
         <NumberField label="Depth" value={fp.d} onChange={set("d")} min={1} />
         <div className="flex flex-col">

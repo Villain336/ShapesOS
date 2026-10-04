@@ -162,6 +162,7 @@ const LIVE_LABEL: Record<TwinLiveStatus, string> = {
   live: "Live",
   reconnecting: "Reconnecting",
   polling: "Polling",
+  off: "Snapshot",
 };
 
 function LiveIndicator({ status, generatedAt }: { status: TwinLiveStatus; generatedAt: string }) {
@@ -178,7 +179,7 @@ function LiveIndicator({ status, generatedAt }: { status: TwinLiveStatus; genera
       className="flex h-11 items-center gap-2 rounded-full bg-paper px-3.5 shadow-hairline"
       role="status"
       aria-live="polite"
-      title={`Updated ${Number.isNaN(updated.getTime()) ? "—" : updated.toLocaleTimeString("en-GB")}`}
+      title={`${status === "off" ? "Live updates need the editor role. " : ""}Updated ${Number.isNaN(updated.getTime()) ? "—" : updated.toLocaleTimeString("en-GB")}`}
     >
       <span
         aria-hidden

@@ -5,7 +5,7 @@
 // patch that doesn't resolve triggers a resync from TWIN_API.state. When the
 // stream errors repeatedly it falls back to polling TWIN_API.state through
 // sharedJson every TWIN_LIVE_POLL_MS, and retries the stream every minute.
-// Status for the top bar: "live" | "reconnecting" | "polling".
+// Status for the top bar: "live" | "reconnecting" | "polling" ("off" when disabled).
 
 "use client";
 
@@ -14,7 +14,8 @@ import { applyTwinPatch } from "@/lib/twin/patch";
 import { TWIN_API, TWIN_LIVE_POLL_MS, type TwinPatchOp, type TwinSnapshot } from "@/lib/twin/types";
 import { sharedJson } from "@/lib/ui/shared-fetch";
 
-export type TwinLiveStatus = "live" | "reconnecting" | "polling";
+/** "off": not subscribed (viewers — the live and state routes need the editor role). */
+export type TwinLiveStatus = "live" | "reconnecting" | "polling" | "off";
 
 function looksLikeSnapshot(v: unknown): v is TwinSnapshot {
   const s = v as TwinSnapshot | null;
@@ -129,5 +130,5 @@ export function useTwinLive(initial: TwinSnapshot, opts: { enabled?: boolean } =
     };
   }, [enabled, siteId, resync]);
 
-  return { snapshot, status: enabled ? status : ("polling" as TwinLiveStatus), resync, setSnapshot };
+  return { snapshot, status: enabled ? status : ("off" as TwinLiveStatus), resync, setSnapshot };
 }

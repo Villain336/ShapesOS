@@ -53,5 +53,7 @@ export default async function Page({
     .filter((s) => canEdit || s.status === "published")
     .map(({ id, kind, status, name, code }) => ({ id, kind, status, name, code }));
 
-  return <TwinClient key={snapshot.site.id} initial={snapshot} sites={switcher} canEdit={canEdit} startEditing={sp.edit === "1"} />;
+  // The live stream and state routes are editor+ (operator role): viewers get
+  // this server snapshot, refreshed on reload.
+  return <TwinClient key={snapshot.site.id} initial={snapshot} sites={switcher} canEdit={canEdit} live={canEdit} startEditing={sp.edit === "1"} />;
 }

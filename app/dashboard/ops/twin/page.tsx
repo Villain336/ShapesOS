@@ -13,6 +13,8 @@ export const metadata = { title: "Digital twin — ShapesOS", description: "Ware
 export default async function Page() {
   const { userId, workspaceId } = await requireOpsViewer();
   const canEdit = !!(await requireWorkspaceRole(userId, workspaceId, "editor"));
+  // Sample sites write many records at once: the sample route is admin+.
+  const canAddSample = !!(await requireWorkspaceRole(userId, workspaceId, "admin"));
   let sites: TwinSiteRow[] = [];
   let loadError: string | null = null;
   try {
@@ -23,5 +25,5 @@ export default async function Page() {
   }
   // Drafts are for the people who can edit them.
   const visible = canEdit ? sites : sites.filter((s) => s.status === "published");
-  return <TwinSitesList sites={visible} canEdit={canEdit} loadError={loadError} />;
+  return <TwinSitesList sites={visible} canEdit={canEdit} canAddSample={canAddSample} loadError={loadError} />;
 }

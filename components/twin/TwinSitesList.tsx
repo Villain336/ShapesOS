@@ -170,7 +170,7 @@ function NewSiteDialog({ onClose }: { onClose: () => void }) {
   );
 }
 
-export function TwinSitesList({ sites, canEdit, loadError }: { sites: TwinSiteRow[]; canEdit: boolean; loadError?: string | null }) {
+export function TwinSitesList({ sites, canEdit, canAddSample = false, loadError }: { sites: TwinSiteRow[]; canEdit: boolean; canAddSample?: boolean; loadError?: string | null }) {
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   return (
@@ -182,7 +182,7 @@ export function TwinSitesList({ sites, canEdit, loadError }: { sites: TwinSiteRo
         </div>
         {canEdit && (
           <div className="flex flex-wrap items-center gap-2">
-            <SampleMenu onError={setError} />
+            {canAddSample ? <SampleMenu onError={setError} /> : null}
             <button type="button" className={aosButton({ size: "sm" })} onClick={() => setCreating(true)}>
               <Plus size={15} /> New site
             </button>
@@ -194,7 +194,7 @@ export function TwinSitesList({ sites, canEdit, loadError }: { sites: TwinSiteRo
         <EmptyBlock
           icon={MapIcon}
           title="No sites yet"
-          hint={canEdit ? "Add a sample site to see a warehouse, factory or store in 3D, or start a new one from a warehouse." : "An editor can add the first site."}
+          hint={canAddSample ? "Add a sample site to see a warehouse, factory or store in 3D, or start a new one from a warehouse." : canEdit ? "Start a new site from one of your warehouses." : "An editor can add the first site."}
         />
       ) : (
         <div className={tableWrapCls}>

@@ -10,14 +10,19 @@
 // Grid maths and layout helpers are PURE (unit-tested); the THREE caches are
 // created lazily on the client.
 //
-// Footprint convention (lib/twin/types.ts TwinFootprint): x/z is the minimum
-// corner of the cells the object OCCUPIES; w/d are the object's own
-// (unrotated) width and depth; a 90°/270° rotation swaps the occupied extent.
-// Rotation turns the object's front: 0 faces south (+z), 90 east (+x),
-// 180 north (−z), 270 west (−x).
+// Footprint convention (lib/twin/types.ts TwinFootprint, as validated by the
+// data side in lib/twin/derive.ts): x/z is the minimum corner and w/d the
+// AXIS-ALIGNED extent of the cells the object occupies (w along x, d along z)
+// whatever the rotation. Rotation only turns the model inside that box: its
+// front faces 0 south (+z), 90 east (+x), 180 north (−z), 270 west (−x); a
+// model turned 90°/270° is built with its own width/depth swapped (localSize).
 
 import * as THREE from "three";
 import type { TwinFootprint, TwinRotation, TwinSnapshot } from "./types";
+// The data side's pure layout rules are the one source of truth (no duplicates).
+import { TWIN_ROTATIONS, footprintsOverlap } from "./derive";
+
+export { TWIN_ROTATIONS, footprintsOverlap };
 
 // ---------------------------------------------------------------------------
 // Clay palette (tokens only)
@@ -63,10 +68,13 @@ export function clayVar(key: ClayKey): string {
 
 export type SiteGrid = Pick<TwinSnapshot["site"], "gridW" | "gridD">;
 
-export const TWIN_ROTATIONS: readonly TwinRotation[] = [0, 90, 180, 270];
-
-/** The extent an object occupies on the grid (rotation 90/270 swaps w and d). */
+/** The extent an object occupies on the grid: w along x, d along z (rotation never changes it). */
 export function occupiedSize(fp: Pick<TwinFootprint, "w" | "d" | "rotation">): { w: number; d: number } {
+  return { w: fp.w, d: fp.d };
+}
+
+/** The model's own width/depth before it is turned (a 90°/270° turn swaps them back onto the grid extent). */
+export function localSize(fp: Pick<TwinFootprint, "w" | "d" | "rotation">): { w: number; d: number } {
   return fp.rotation === 90 || fp.rotation === 270 ? { w: fp.d, d: fp.w } : { w: fp.w, d: fp.d };
 }
 
@@ -119,29 +127,19 @@ export function nextRotation(rot: TwinRotation): TwinRotation {
 
 /** Keep a footprint inside the site (snapped to whole cells, min 1 × 1). */
 export function clampFootprint(fp: TwinFootprint, grid: SiteGrid): TwinFootprint {
-  const w = Math.max(1, Math.round(fp.w));
-  const d = Math.max(1, Math.round(fp.d));
-  const s = occupiedSize({ w, d, rotation: fp.rotation });
-  const x = Math.min(Math.max(0, Math.round(fp.x)), Math.max(0, grid.gridW - s.w));
-  const z = Math.min(Math.max(0, Math.round(fp.z)), Math.max(0, grid.gridD - s.d));
-  return { ...fp, x, z, w, d, h: Math.max(0, fp.h) };
+  const w = Math.min(grid.gridW, Math.max(1, Math.round(fp.w)));
+  const d = Math.min(grid.gridD, Math.max(1, Math.round(fp.d)));
+  const x = Math.min(Math.max(0, Math.round(fp.x)), Math.max(0, grid.gridW - w));
+  const z = Math.min(Math.max(0, Math.round(fp.z)), Math.max(0, grid.gridD - d));
+  return { ...fp, x, z, w, d, h: Math.max(1, Math.round(fp.h)) };
 }
 
-/** Do two occupied rectangles overlap (touching edges don't)? */
-export function footprintsOverlap(a: TwinFootprint, b: TwinFootprint): boolean {
-  const ra = occupiedRect(a);
-  const rb = occupiedRect(b);
-  return ra.x0 < rb.x1 && rb.x0 < ra.x1 && ra.z0 < rb.z1 && rb.z0 < ra.z1;
-}
-
-/** Rotate in place around the occupied centre (the editor's "Rotate 90°"). */
+/** Turn 90° in place around the occupied centre (the editor's "Rotate 90°"): the grid extent swaps. */
 export function rotateFootprint(fp: TwinFootprint, grid: SiteGrid): TwinFootprint {
-  const before = occupiedSize(fp);
   const rotation = nextRotation(fp.rotation);
-  const after = occupiedSize({ ...fp, rotation });
-  const cx = fp.x + before.w / 2;
-  const cz = fp.z + before.d / 2;
-  return clampFootprint({ ...fp, rotation, x: Math.round(cx - after.w / 2), z: Math.round(cz - after.d / 2) }, grid);
+  const cx = fp.x + fp.w / 2;
+  const cz = fp.z + fp.d / 2;
+  return clampFootprint({ ...fp, rotation, w: fp.d, d: fp.w, x: Math.round(cx - fp.d / 2), z: Math.round(cz - fp.w / 2) }, grid);
 }
 
 /**
@@ -151,7 +149,7 @@ export function rotateFootprint(fp: TwinFootprint, grid: SiteGrid): TwinFootprin
 export function truckPlacement(fp: TwinFootprint, grid: SiteGrid, length = 10): { x: number; z: number; rotY: number } {
   const c = footprintCenter(fp, grid);
   const f = frontDirection(fp.rotation);
-  const depth = fp.d; // the door's own depth along its front
+  const depth = localSize(fp).d; // the door's own depth along its front
   const off = depth / 2 + length / 2 + 0.3;
   return { x: c.x + f.x * off, z: c.z + f.z * off, rotY: rotationY(fp.rotation) };
 }

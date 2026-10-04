@@ -15,6 +15,7 @@ import {
   cellToWorld,
   clampFootprint,
   footprintCenter,
+  localSize,
   resolveToken,
   rotationY,
   worldToGrid,
@@ -34,10 +35,18 @@ function edgeMaterial(token: string) {
 }
 
 /** Local bounding box of an object (for selection edges and drag hit area). */
+/** Local (unturned) bounding box of an object — for selection edges and labels. */
 export function objectBounds(o: TwinObject): { w: number; h: number; d: number } {
   if (o.kind === "equipment") return { w: 1.3, h: 2.3, d: 2.6 };
   const h = o.kind === "path" || o.kind === "yard_slot" ? 0.1 : o.kind === "bin_zone" ? 0.7 : Math.max(0.3, o.footprint.h);
-  return { w: o.footprint.w, h, d: o.footprint.d };
+  const s = localSize(o.footprint);
+  return { w: s.w, h, d: s.d };
+}
+
+/** The object as its kind component sees it: footprint w/d in LOCAL (unturned) space. */
+function localObject(o: TwinObject, fp: TwinFootprint): TwinObject {
+  const s = localSize(fp);
+  return { ...o, footprint: { ...fp, w: s.w, d: s.d } };
 }
 
 const GROUND = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
@@ -136,7 +145,7 @@ export function ObjectShell({ o }: { o: TwinObject }) {
       }}
     >
       <Suspense fallback={null}>
-        <Kind o={draft ? { ...o, footprint: draft } : o} />
+        <Kind o={localObject(o, fp)} />
       </Suspense>
       {(selected || hovered) && (
         <lineSegments

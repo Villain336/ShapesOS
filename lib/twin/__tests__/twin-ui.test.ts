@@ -19,6 +19,7 @@ import {
   nextRotation,
   occupiedRect,
   occupiedSize,
+  localSize,
   palletCount,
   rackSlots,
   rotateFootprint,
@@ -51,6 +52,7 @@ import {
 } from "../view-model";
 import { bookDockBody, createObjectBody, nextBookingStatus, opsSlug, patchObjectBody, TWIN_SLUGS } from "../client-api";
 import { isAosStatus } from "@/lib/aos/status";
+import { diffSnapshots, footprintProblem, overlapWith } from "../derive";
 
 // ---------------------------------------------------------------------------
 // patch.ts
@@ -127,6 +129,29 @@ describe("applyTwinPatch (RFC 6902 subset)", () => {
     assert.equal(r.value.objects[0], WAREHOUSE_FIXTURE.objects[0], "other objects shared");
   });
 
+  it("applies the data side's siteDiff output exactly (wire compatibility)", () => {
+    const prev = WAREHOUSE_FIXTURE;
+    // a value change, a layout change (object removed + added), KPI and time moves
+    const next = structuredClone(prev);
+    const dock = next.objects.find((o) => o.id === "o_w_dock_1")!;
+    dock.pill = "Booked 11:00";
+    next.objects = next.objects.filter((o) => o.id !== "o_w_yard_3");
+    next.objects.push({ ...structuredClone(prev.objects[0]!), id: "o_w_zz_new", label: "New rack" });
+    next.objects.sort((a, b) => (a.id < b.id ? -1 : 1));
+    next.kpis[0]!.value += 40;
+    next.generatedAt = "2026-10-04T09:34:00.000Z";
+    for (const [a, b] of [
+      [prev, next],
+      [next, prev],
+      [prev, prev],
+    ] as const) {
+      const ops = diffSnapshots(a, b);
+      const r = applyTwinPatch(a, ops);
+      assert.ok(r.ok, !r.ok ? r.reason : "");
+      assert.deepEqual(r.value, b);
+    }
+  });
+
   it("a root replace swaps the whole document", () => {
     const r = applyTwinPatch(doc, [{ op: "replace", path: "", value: { a: 2 } }]);
     assert.ok(r.ok);
@@ -149,12 +174,13 @@ describe("scene kit: grid ↔ world and rotation", () => {
     assert.deepEqual(worldToCell(500, -500, grid), { x: 39, z: 0 }, "clamped inside the site");
   });
 
-  it("rotation 90/270 swaps the occupied extent; 0/180 keep it", () => {
+  it("w/d are the grid extent whatever the rotation; the model's local size swaps at 90/270", () => {
     const fp = { x: 2, z: 3, w: 4, d: 1, h: 3, rotation: 0 as const };
     assert.deepEqual(occupiedSize(fp), { w: 4, d: 1 });
-    assert.deepEqual(occupiedSize({ ...fp, rotation: 90 }), { w: 1, d: 4 });
-    assert.deepEqual(occupiedSize({ ...fp, rotation: 180 }), { w: 4, d: 1 });
-    assert.deepEqual(occupiedRect({ ...fp, rotation: 270 }), { x0: 2, z0: 3, x1: 3, z1: 7 });
+    assert.deepEqual(occupiedSize({ ...fp, rotation: 90 }), { w: 4, d: 1 }, "same contract as lib/twin/derive.ts footprintProblem");
+    assert.deepEqual(localSize({ ...fp, rotation: 90 }), { w: 1, d: 4 });
+    assert.deepEqual(localSize({ ...fp, rotation: 180 }), { w: 4, d: 1 });
+    assert.deepEqual(occupiedRect({ ...fp, rotation: 270 }), { x0: 2, z0: 3, x1: 6, z1: 4 });
     assert.deepEqual(footprintCenter(fp, grid), { x: 4 - 20, z: 3.5 - 15 });
   });
 
@@ -170,18 +196,18 @@ describe("scene kit: grid ↔ world and rotation", () => {
 
   it("rotating keeps the object centred and inside the site", () => {
     const r = rotateFootprint({ x: 10, z: 10, w: 6, d: 2, h: 1, rotation: 0 }, grid);
-    assert.deepEqual(r, { x: 12, z: 8, w: 6, d: 2, h: 1, rotation: 90 });
+    assert.deepEqual(r, { x: 12, z: 8, w: 2, d: 6, h: 1, rotation: 90 }, "the grid extent swaps around the centre");
     const edge = rotateFootprint({ x: 0, z: 28, w: 6, d: 2, h: 1, rotation: 0 }, grid);
     const rect = occupiedRect(edge);
     assert.ok(rect.x0 >= 0 && rect.z0 >= 0 && rect.x1 <= 40 && rect.z1 <= 30, JSON.stringify(edge));
   });
 
   it("clamps and snaps footprints; detects overlaps (touching edges are fine)", () => {
-    assert.deepEqual(clampFootprint({ x: 38.6, z: -2, w: 4.2, d: 0, h: -1, rotation: 0 }, grid), { x: 36, z: 0, w: 4, d: 1, h: 0, rotation: 0 });
+    assert.deepEqual(clampFootprint({ x: 38.6, z: -2, w: 4.2, d: 0, h: -1, rotation: 0 }, grid), { x: 36, z: 0, w: 4, d: 1, h: 1, rotation: 0 });
     const a = { x: 0, z: 0, w: 4, d: 2, h: 1, rotation: 0 as const };
     assert.equal(footprintsOverlap(a, { ...a, x: 4 }), false);
     assert.equal(footprintsOverlap(a, { ...a, x: 3 }), true);
-    assert.equal(footprintsOverlap(a, { x: 2, z: 1, w: 1, d: 4, h: 1, rotation: 90 }), true);
+    assert.equal(footprintsOverlap(a, { x: 2, z: 1, w: 1, d: 4 }), true);
   });
 
   it("parks a truck outside the dock door, along its front", () => {
@@ -190,8 +216,11 @@ describe("scene kit: grid ↔ world and rotation", () => {
     const c = footprintCenter(door, { gridW: 48, gridD: 40 });
     assert.equal(t.x, c.x);
     assert.ok(t.z > c.z + 5, "south of the door");
-    const east = truckPlacement({ ...door, rotation: 90 }, { gridW: 48, gridD: 40 }, 10);
-    assert.ok(east.x > footprintCenter({ ...door, rotation: 90 }, { gridW: 48, gridD: 40 }).x + 5);
+    const eastDoor = { x: 30, z: 10, w: 1, d: 4, h: 4, rotation: 90 as const };
+    const east = truckPlacement(eastDoor, { gridW: 48, gridD: 40 }, 10);
+    const ec = footprintCenter(eastDoor, { gridW: 48, gridD: 40 });
+    assert.equal(east.z, ec.z);
+    assert.equal(east.x, ec.x + 0.5 + 5 + 0.3, "nose against the door's 1 m depth");
   });
 
   it("pallet counts: 0 when empty, ≥1 when any, capped by rack slots", () => {
@@ -242,7 +271,8 @@ function checkSnapshot(s: TwinSnapshot): string[] {
     const ok = st === o.kind || (st === "rack" && o.kind === "rack");
     if (!ok) push(`${o.id} state kind ${st} ≠ ${o.kind}`);
     const f = o.footprint;
-    if (!(f.w >= 1 && f.d >= 1 && f.h >= 0)) push(`${o.id} footprint size`);
+    if (!(f.w >= 1 && f.d >= 1 && f.h >= 1)) push(`${o.id} footprint size`);
+    if (![f.x, f.z, f.w, f.d, f.h].every(Number.isInteger)) push(`${o.id} footprint must be whole cells`);
     if (![0, 90, 180, 270].includes(f.rotation)) push(`${o.id} rotation`);
     const r = occupiedRect(f);
     if (r.x0 < 0 || r.z0 < 0 || r.x1 > s.site.gridW || r.z1 > s.site.gridD) push(`${o.id} outside the site`);
@@ -252,12 +282,12 @@ function checkSnapshot(s: TwinSnapshot): string[] {
     }
     if (o.state.kind === "equipment" && o.state.positionIsEstimated !== true) push(`${o.id} position must be estimated`);
   }
-  // Solid objects never overlap (paths, yard slots and buildings are floors/shells).
-  const solid = s.objects.filter((o) => !["building", "path", "yard_slot", "equipment"].includes(o.kind));
-  for (let i = 0; i < solid.length; i++) {
-    for (let j = i + 1; j < solid.length; j++) {
-      if (footprintsOverlap(solid[i]!.footprint, solid[j]!.footprint)) push(`${solid[i]!.id} overlaps ${solid[j]!.id}`);
-    }
+  // The data side's own layout rules (lib/twin/derive.ts) accept every object.
+  for (const o of s.objects) {
+    const problem = footprintProblem(o.footprint, s.site);
+    if (problem) push(`${o.id} ${problem}`);
+    const clash = overlapWith(o, s.objects);
+    if (clash) push(`${o.id} overlaps ${clash.id}`);
   }
   for (const sh of s.shipments) {
     if (sh.dockObjectId && !ids.includes(sh.dockObjectId)) push(`shipment ${sh.id} dock missing`);
@@ -409,6 +439,6 @@ describe("client request bodies", () => {
     assert.equal(nextBookingStatus("arrived", "outbound"), "loading");
     assert.equal(nextBookingStatus("loading", "outbound"), "done");
     assert.equal(nextBookingStatus("done", "outbound"), null);
-    assert.equal(bookDockBody({ dockObjectId: "d", direction: "inbound", carrier: " ", truckRef: "T1", eta: "2026-10-04T10:00:00Z" }).carrier, undefined);
+    assert.equal(bookDockBody({ siteId: "s", dockObjectId: "d", direction: "inbound", carrier: " ", truckRef: "T1", eta: "2026-10-04T10:00:00Z" }).carrier, undefined);
   });
 });

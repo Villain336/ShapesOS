@@ -22,6 +22,7 @@ import {
   opsEntityDef,
   opsList,
   opsPatch,
+  opsRemove,
   type OpsActor,
 } from "@/lib/ops/doctype";
 import { errorResponse } from "@/lib/api/errors";
@@ -175,6 +176,26 @@ export async function PATCH(
     // AFTER the send committed (best-effort; the outcome is recorded on it).
     const delivery = await deliverAfterSend(gate, def.slug, row, body);
     return Response.json({ entity: def.slug, row: result.row, ...(delivery ? { delivery } : {}) });
+  } catch (err) {
+    return opsError(err);
+  }
+}
+
+// Phase 13 (twinui): DELETE /api/ops/{entity}?id=… — only entities that opt
+// in with hooks.remove (twin layout objects); every other entity is 405.
+// Same write role as POST/PATCH (editor+ unless the entity raises it).
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: Promise<{ entity: string }> },
+) {
+  const { entity } = await params;
+  const gate = await opsGuard(roleFor(entity, "write"));
+  if (gate instanceof Response) return gate;
+  try {
+    const def = opsEntityDef(entity);
+    const id = req.nextUrl.searchParams.get("id");
+    const row = await withWorkspaceScope(gate.workspaceId, (tx) => opsRemove(tx, def, gate, id));
+    return Response.json({ entity: def.slug, row, removed: true });
   } catch (err) {
     return opsError(err);
   }
