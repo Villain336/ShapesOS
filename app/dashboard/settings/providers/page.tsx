@@ -35,6 +35,11 @@ const LLM_WORKLOADS = [
   ["copy", "Client-facing copy"],
   ["bulk", "Agent loop, skills, summaries"],
   ["background", "Background jobs"],
+  // Phase 7: the agent runtime's workloads (chat() with native tools).
+  ["lead", "Lead agent and planner"],
+  ["subagent", "Sub-agents"],
+  ["code", "Code agent"],
+  ["code_max", "Code agent, escalation"],
 ] as const;
 
 const MODE_LABEL: Record<FeatureMode, string> = {
@@ -212,7 +217,9 @@ export default async function ProvidersSettingsPage() {
           workloads that default to the other provider switch to this
           provider&apos;s default (single-key mode); a model you set
           explicitly is never swapped. When both keys are set, a rate limit
-          or outage fails over to the other provider.
+          or outage fails over to the other provider. The four agent
+          workloads serve the agent runtime; Claude Fable 5.1 needs 30-day
+          data retention, so it runs only with LLM_ALLOW_RETENTION_MODELS=1.
         </p>
         <div className="mt-3 overflow-x-auto">
           <table className="w-full min-w-[560px] text-left text-sm">
@@ -230,7 +237,10 @@ export default async function ProvidersSettingsPage() {
                 return (
                   <tr key={w} className="border-b border-line align-top last:border-0">
                     <td className="py-2 pr-3 text-xs text-ink">{label}</td>
-                    <td className="py-2 pr-3 font-mono text-xs text-ink">{r.model}</td>
+                    <td className="py-2 pr-3 text-xs text-ink">
+                      <span className="font-mono">{r.model}</span>
+                      {r.effort ? <span className="block text-muted">Effort {r.effort}</span> : null}
+                    </td>
                     <td className="py-2 pr-3">
                       <ModeChip mode={r.isLive ? "live" : "mock"} />
                     </td>
@@ -242,7 +252,8 @@ export default async function ProvidersSettingsPage() {
                             : r.source === "legacy"
                               ? "Set by the deprecated LLM_MODEL variable."
                               : "Default model."}
-                          {r.singleKey ? <> {r.singleKey}</> : null}{" "}
+                          {r.singleKey ? <> {r.singleKey}</> : null}
+                          {r.retention ? <> {r.retention}</> : null}{" "}
                           {r.failover ? (
                             <>
                               Fails over to <span className="font-mono">{r.failover}</span>.
@@ -267,6 +278,8 @@ export default async function ProvidersSettingsPage() {
             <dd className="font-mono text-xs">
               ANTHROPIC_API_KEY, OPENAI_API_KEY (or LLM_API_KEY),
               LLM_MODEL_COPY, LLM_MODEL_BULK, LLM_MODEL_BACKGROUND,
+              LLM_MODEL_LEAD, LLM_MODEL_SUBAGENT, LLM_MODEL_CODE,
+              LLM_MODEL_CODE_MAX, LLM_ALLOW_RETENTION_MODELS,
               LLM_FAILOVER, LLM_SELF_HOST, LLM_BASE_URL
             </dd>
           </div>

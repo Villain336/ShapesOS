@@ -27,6 +27,21 @@
 //      family's key is set — on retryable errors only (429/5xx/timeout/
 //      network), never on abort or other 4xx. The fallback passes the same
 //      block-list + ZDR allow-list. Off with LLM_FAILOVER=0 or self-host.
+//   7. Agent workloads (Phase 7) — the models the agent runtime uses:
+//        LLM_MODEL_LEAD       (default "claude-opus-5-5", effort medium) — lead agent, planner
+//        LLM_MODEL_SUBAGENT   (default "claude-sonnet-5-5")              — other sub-agents
+//        LLM_MODEL_CODE       (default "claude-opus-5-5", effort high)   — code agent
+//        LLM_MODEL_CODE_MAX   (default "claude-fable-5-1")               — code agent escalation
+//      Single-key OpenAI-only runs all four on gpt-5.5; failover goes to
+//      gpt-5.5 (or claude-sonnet-5-5 the other way). AGENT_WORKLOADS maps
+//      agent keys (lib/agents/grants.ts) to workloads.
+//   8. Covered (30-day-retention) models (Phase 7): Anthropic's Fable 5.x
+//      requires 30-day retention — a ZDR org gets HTTP 400 on every request —
+//      so it is NOT on the ZDR allow-list. It routes only when the operator
+//      opts in with LLM_ALLOW_RETENTION_MODELS=1 (accepting that retention).
+//      Without the opt-in, a DEFAULT choice of it is swapped for the
+//      strongest ZDR-eligible model (claude-opus-5-5 at effort max) and the
+//      swap is shown in status; an explicit env choice falls back to mock.
 //
 // Legacy: plain LLM_MODEL / LLM_API_KEY / LLM_BASE_URL are still honored as a
 // bulk-workload override (with a deprecation warning) when none of the
@@ -36,14 +51,31 @@ import { AnthropicLlmProvider } from "./anthropic";
 import { OpenAiCompatibleLlmProvider } from "./openai";
 import { MockLlmProvider } from "./mock";
 import { FailoverLlmProvider } from "./failover";
-import type { LlmProvider } from "./types";
+import type { ChatEffort, LlmProvider } from "./types";
+import type { AgentKey } from "@/lib/agents/grants";
 
-export type LlmWorkload = "copy" | "bulk" | "background";
+export type LlmWorkload = "copy" | "bulk" | "background" | "lead" | "subagent" | "code" | "code_max";
+
+/** Every workload, in display order (Settings → Providers). */
+export const LLM_WORKLOADS: readonly LlmWorkload[] = ["copy", "bulk", "background", "lead", "subagent", "code", "code_max"];
+
+/** The Phase 7 agent-runtime workloads. */
+export const AGENT_LLM_WORKLOADS: readonly LlmWorkload[] = ["lead", "subagent", "code", "code_max"];
 
 export const WORKLOAD_DEFAULTS: Record<LlmWorkload, string> = {
   copy: "claude-haiku-4-5",
   bulk: "gpt-5-nano",
   background: "gpt-5-nano:flex",
+  lead: "claude-opus-5-5",
+  subagent: "claude-sonnet-5-5",
+  code: "claude-opus-5-5",
+  code_max: "claude-fable-5-1",
+};
+
+/** Effort applied to chat() calls that name none. Unset = the model's default. */
+export const WORKLOAD_EFFORT: Readonly<Partial<Record<LlmWorkload, ChatEffort>>> = {
+  lead: "medium",
+  code: "high",
 };
 
 export type LlmFamily = "anthropic" | "openai";
@@ -56,11 +88,21 @@ export const FAMILY_WORKLOAD_DEFAULTS: Record<LlmFamily, Record<LlmWorkload, str
     copy: "claude-haiku-4-5",
     bulk: "claude-haiku-4-5",
     background: "claude-haiku-4-5",
+    // Agent workloads already default to Anthropic; these entries are what an
+    // OpenAI primary (an LLM_MODEL_* override) fails over to.
+    lead: "claude-sonnet-5-5",
+    subagent: "claude-sonnet-5-5",
+    code: "claude-sonnet-5-5",
+    code_max: "claude-sonnet-5-5",
   },
   openai: {
     copy: "gpt-5.4-nano",
     bulk: "gpt-5-nano",
     background: "gpt-5-nano:flex",
+    lead: "gpt-5.5",
+    subagent: "gpt-5.5",
+    code: "gpt-5.5",
+    code_max: "gpt-5.5",
   },
 };
 
@@ -69,10 +111,14 @@ const FAMILY_KEY_ENV: Record<LlmFamily, string> = {
   openai: "LLM_API_KEY/OPENAI_API_KEY",
 };
 
-const WORKLOAD_ENV: Record<LlmWorkload, string> = {
+export const WORKLOAD_ENV: Record<LlmWorkload, string> = {
   copy: "LLM_MODEL_COPY",
   bulk: "LLM_MODEL_BULK",
   background: "LLM_MODEL_BACKGROUND",
+  lead: "LLM_MODEL_LEAD",
+  subagent: "LLM_MODEL_SUBAGENT",
+  code: "LLM_MODEL_CODE",
+  code_max: "LLM_MODEL_CODE_MAX",
 };
 
 /** Suggested output-token ceilings per workload (T4 cost-blowout guard). */
@@ -80,7 +126,32 @@ export const WORKLOAD_MAX_TOKENS: Record<LlmWorkload, number> = {
   copy: 4096,
   bulk: 2048,
   background: 2048,
+  lead: 16384,
+  subagent: 8192,
+  code: 32768,
+  code_max: 65536,
 };
+
+/**
+ * Which workload each agent runs on (Phase 8 consumes this). The lead and the
+ * planner plan (lead); the operator ("actor") in build mode writes code
+ * (code); every other sub-agent is a subagent. code_max is reached only by an
+ * explicit escalation from the code workload, never by an agent key.
+ */
+export const AGENT_WORKLOADS: Readonly<Record<AgentKey, LlmWorkload>> = {
+  lead: "lead",
+  planner: "lead",
+  researcher: "subagent",
+  drafter: "subagent",
+  analyst: "subagent",
+  scheduler: "subagent",
+  actor: "subagent",
+};
+
+export function workloadForAgent(agentKey: AgentKey, opts: { mode?: "build" | "default" } = {}): LlmWorkload {
+  if (agentKey === "actor" && opts.mode === "build") return "code";
+  return AGENT_WORKLOADS[agentKey];
+}
 
 /** ZDR-eligible models per provider. OpenAI ZDR itself is a process step
  *  (approval for Tico), but only ZDR-eligible models are routable — code can
@@ -89,12 +160,29 @@ export const ANTHROPIC_ZDR_MODELS = [
   "claude-haiku-4-5",
   "claude-sonnet-5",
   "claude-opus-5",
+  // Phase 7. Not "covered" models (only Fable/Mythos mandate retention), per
+  // the Claude API docs (models.md) as read 2026-10-04.
+  "claude-opus-5-5",
+  "claude-sonnet-5-5",
 ] as const;
+
+/** Anthropic "covered" models: 30-day retention is REQUIRED (ZDR orgs get
+ *  HTTP 400). Routable only with LLM_ALLOW_RETENTION_MODELS=1. */
+export const ANTHROPIC_RETENTION_MODELS = ["claude-fable-5-1"] as const;
+
+/** A default choice of a retention model, without the opt-in, runs here instead. */
+const RETENTION_SUBSTITUTES: Readonly<Record<string, { model: string; effort: ChatEffort }>> = {
+  "claude-fable-5-1": { model: "claude-opus-5-5", effort: "max" },
+};
 
 export const OPENAI_ZDR_MODELS = [
   "gpt-5-nano",
   "gpt-5.4-nano",
   "gpt-5-nano:flex",
+  // Phase 7 failover / single-key model for the agent workloads. ZDR
+  // eligibility per the Phase 7 plan (third-party sources; re-check with
+  // OpenAI when the ZDR request is filed — SELF-HOST.md).
+  "gpt-5.5",
 ] as const;
 
 /** Unconditionally blocked model families (T1). Checked before provider
@@ -132,6 +220,21 @@ function failoverEnabled(): boolean {
   return (process.env.LLM_FAILOVER ?? "").trim() !== "0";
 }
 
+/** LLM_ALLOW_RETENTION_MODELS=1: the operator accepts 30-day retention. */
+export function retentionModelsAllowed(): boolean {
+  return (process.env.LLM_ALLOW_RETENTION_MODELS ?? "").trim() === "1";
+}
+
+function isRetentionModel(model: string): boolean {
+  return (ANTHROPIC_RETENTION_MODELS as readonly string[]).includes(model);
+}
+
+function isAllowedAnthropicModel(model: string): boolean {
+  return (
+    (ANTHROPIC_ZDR_MODELS as readonly string[]).includes(model) || (isRetentionModel(model) && retentionModelsAllowed())
+  );
+}
+
 /** First non-empty trimmed value. An empty LLM_API_KEY="" (as copied from
  *  .env.example) must not mask OPENAI_API_KEY — `??` did exactly that. */
 function firstSet(...values: Array<string | undefined>): string {
@@ -165,7 +268,7 @@ function otherFamily(f: LlmFamily): LlmFamily {
 export function isRoutableHostedModel(model: string): boolean {
   if (BLOCKED_MODEL_PATTERN.test(model) || SELF_HOST_MODEL_PATTERN.test(model)) return false;
   const fam = familyOf(model);
-  if (fam === "anthropic") return (ANTHROPIC_ZDR_MODELS as readonly string[]).includes(model);
+  if (fam === "anthropic") return isAllowedAnthropicModel(model);
   if (fam === "openai") return (OPENAI_ZDR_MODELS as readonly string[]).includes(model);
   return false;
 }
@@ -176,9 +279,15 @@ function openAiTimeoutOverride(): number | undefined {
   return Number.isFinite(n) && n > 0 ? Math.round(n) : undefined;
 }
 
+interface ChatDefaults {
+  workload: LlmWorkload;
+  defaultEffort: ChatEffort | null;
+}
+
 function openAiCompatible(
   apiKey: string,
   model: string,
+  chat: ChatDefaults,
 ): OpenAiCompatibleLlmProvider {
   const baseUrl = firstSet(
     process.env.OPENAI_BASE_URL,
@@ -188,15 +297,17 @@ function openAiCompatible(
   return new OpenAiCompatibleLlmProvider(apiKey, model, baseUrl, {
     selfHost: isSelfHost(),
     timeoutMs: openAiTimeoutOverride(),
+    workload: chat.workload,
+    defaultEffort: chat.defaultEffort,
   });
 }
 
 /** Build the live provider for an allow-listed hosted model (failover use). */
-function hostedProvider(model: string, keys: Record<LlmFamily, string>): LlmProvider | null {
+function hostedProvider(model: string, keys: Record<LlmFamily, string>, chat: ChatDefaults): LlmProvider | null {
   if (!isRoutableHostedModel(model)) return null;
   const fam = familyOf(model);
-  if (fam === "anthropic" && keys.anthropic) return new AnthropicLlmProvider(keys.anthropic, model);
-  if (fam === "openai" && keys.openai) return openAiCompatible(keys.openai, model);
+  if (fam === "anthropic" && keys.anthropic) return new AnthropicLlmProvider(keys.anthropic, model, chat);
+  if (fam === "openai" && keys.openai) return openAiCompatible(keys.openai, model, chat);
   return null;
 }
 
@@ -215,6 +326,11 @@ export interface ResolvedWorkload {
   singleKey: { from: string; reason: string } | null;
   /** The configured failover model (other family), when one is armed. */
   failoverModel: string | null;
+  /** Effort applied to chat() calls that name none (null = model default). */
+  effort: ChatEffort | null;
+  /** Covered-model swap: the 30-day-retention default and why it was not
+   *  used. Null when not applied. */
+  retention: { from: string; reason: string } | null;
 }
 
 function toMock(
@@ -236,6 +352,8 @@ function toMock(
     fallbackReason: reason,
     singleKey,
     failoverModel: null,
+    effort: WORKLOAD_EFFORT[workload] ?? null,
+    retention: null,
   };
 }
 
@@ -245,6 +363,8 @@ function resolvePrimary(workload: LlmWorkload, keys: Record<LlmFamily, string>):
   const source = resolved.source;
   let model = resolved.model;
   let singleKey: ResolvedWorkload["singleKey"] = null;
+  let retention: ResolvedWorkload["retention"] = null;
+  let effort: ChatEffort | null = WORKLOAD_EFFORT[workload] ?? null;
   const openAiKey = keys.openai;
   const anthropicKey = keys.anthropic;
 
@@ -263,6 +383,26 @@ function resolvePrimary(workload: LlmWorkload, keys: Record<LlmFamily, string>):
         };
         model = substitute;
       }
+    }
+  }
+
+  // Covered (30-day-retention) models need the explicit opt-in (T1/T6).
+  if (isRetentionModel(model) && !retentionModelsAllowed()) {
+    const sub = RETENTION_SUBSTITUTES[model];
+    if (source === "default" && sub) {
+      retention = {
+        from: model,
+        reason: `${model} requires 30-day data retention (not zero-retention); set LLM_ALLOW_RETENTION_MODELS=1 to use it`,
+      };
+      model = sub.model;
+      effort = sub.effort;
+    } else {
+      return toMock(
+        workload,
+        model,
+        source,
+        "requires 30-day data retention (a covered model, not zero-retention); set LLM_ALLOW_RETENTION_MODELS=1 to accept that, or choose a ZDR-eligible model",
+      );
     }
   }
 
@@ -300,10 +440,7 @@ function resolvePrimary(workload: LlmWorkload, keys: Record<LlmFamily, string>):
 
   // Anthropic family → native Messages API adapter (never a base-URL swap).
   if (/^claude-/i.test(model)) {
-    if (
-      !grandfathered &&
-      !(ANTHROPIC_ZDR_MODELS as readonly string[]).includes(model)
-    ) {
+    if (!grandfathered && !isAllowedAnthropicModel(model)) {
       return toMock(
         workload,
         model,
@@ -312,16 +449,18 @@ function resolvePrimary(workload: LlmWorkload, keys: Record<LlmFamily, string>):
       );
     }
     if (!anthropicKey) {
-      return toMock(workload, model, source, "ANTHROPIC_API_KEY is not set");
+      return { ...toMock(workload, model, source, "ANTHROPIC_API_KEY is not set"), retention, effort };
     }
     return {
       workload,
       requestedModel: model,
       source,
-      provider: new AnthropicLlmProvider(anthropicKey, model),
+      provider: new AnthropicLlmProvider(anthropicKey, model, { workload, defaultEffort: effort }),
       fallbackReason: null,
       singleKey,
       failoverModel: null,
+      effort,
+      retention,
     };
   }
 
@@ -352,10 +491,12 @@ function resolvePrimary(workload: LlmWorkload, keys: Record<LlmFamily, string>):
       workload,
       requestedModel: model,
       source,
-      provider: openAiCompatible(openAiKey, model),
+      provider: openAiCompatible(openAiKey, model, { workload, defaultEffort: effort }),
       fallbackReason: null,
       singleKey,
       failoverModel: null,
+      effort,
+      retention,
     };
   }
 
@@ -388,7 +529,9 @@ export function resolveWorkload(workload: LlmWorkload): ResolvedWorkload {
   const primary = resolvePrimary(workload, keys);
   if (!primary.provider.isLive) return primary;
   const fbModel = failoverModelFor(workload, primary.requestedModel);
-  const fallback = fbModel ? hostedProvider(fbModel, keys) : null;
+  const fallback = fbModel
+    ? hostedProvider(fbModel, keys, { workload, defaultEffort: WORKLOAD_EFFORT[workload] ?? null })
+    : null;
   if (!fbModel || !fallback) return primary;
   return {
     ...primary,
@@ -419,13 +562,17 @@ export interface LlmWorkloadStatus {
   singleKey: string | null;
   /** Configured failover model (other family); null when none is armed. */
   failover: string | null;
+  /** Effort applied to chat() calls that name none; null = model default. */
+  effort: ChatEffort | null;
+  /** Covered-model swap explanation; null when not applied. */
+  retention: string | null;
 }
 
 /** Per-workload status for Settings → Providers and API responses.
  *  Never includes key material — only booleans and model names (T3). */
 export function llmRoutingStatus(): Record<LlmWorkload, LlmWorkloadStatus> {
   const out = {} as Record<LlmWorkload, LlmWorkloadStatus>;
-  for (const w of ["copy", "bulk", "background"] as const) {
+  for (const w of LLM_WORKLOADS) {
     const r = resolveWorkload(w);
     out[w] = {
       name: r.provider.name,
@@ -438,6 +585,8 @@ export function llmRoutingStatus(): Record<LlmWorkload, LlmWorkloadStatus> {
         ? `Default "${r.singleKey.from}" swapped: ${r.singleKey.reason}.`
         : null,
       failover: r.failoverModel,
+      effort: r.effort,
+      retention: r.retention ? `Default "${r.retention.from}" swapped: ${r.retention.reason}.` : null,
     };
   }
   return out;

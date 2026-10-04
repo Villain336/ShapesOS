@@ -50,7 +50,7 @@ export type EnvLike = Record<string, string | undefined>;
 
 export interface InventoryFacts {
   /** llmRoutingStatus() — the router decides; this module only reports. */
-  llm: Record<LlmWorkload, Pick<LlmWorkloadStatus, "isLive" | "model" | "fallback" | "singleKey" | "failover">>;
+  llm: Record<LlmWorkload, Pick<LlmWorkloadStatus, "isLive" | "model" | "fallback" | "singleKey" | "failover"> & Partial<Pick<LlmWorkloadStatus, "retention">>>;
   /** Whether this workspace has an active Context.dev key in the vault;
    *  null when it could not be checked. */
   contextDevConnected: boolean | null;
@@ -63,6 +63,10 @@ const WORKLOAD_LABEL: Record<LlmWorkload, string> = {
   copy: "AI writing (client-facing copy)",
   bulk: "AI agent loop, skills and summaries",
   background: "AI background jobs (digests, decay checks)",
+  lead: "AI lead agent and planner",
+  subagent: "AI sub-agents (research, writing, analysis)",
+  code: "AI code agent",
+  code_max: "AI code agent escalation",
 };
 
 function llmEntry(w: LlmWorkload, s: InventoryFacts["llm"][LlmWorkload]): FeatureStatus {
@@ -70,6 +74,7 @@ function llmEntry(w: LlmWorkload, s: InventoryFacts["llm"][LlmWorkload]): Featur
   if (s.isLive) {
     parts.push(`Live on ${s.model}.`);
     if (s.singleKey) parts.push(s.singleKey);
+    if (s.retention) parts.push(s.retention);
     parts.push(s.failover ? `Fails over to ${s.failover} on rate limits and outages.` : "No failover model configured.");
   } else {
     parts.push(`Labelled mock drafts — ${s.fallback ?? "no provider configured"}.`);
@@ -96,7 +101,7 @@ function selected(env: EnvLike, k: string, fallback: string): string {
 export function mockInventory(env: EnvLike, facts: InventoryFacts): FeatureStatus[] {
   const out: FeatureStatus[] = [];
 
-  for (const w of ["copy", "bulk", "background"] as const) out.push(llmEntry(w, facts.llm[w]));
+  for (const w of Object.keys(WORKLOAD_LABEL) as LlmWorkload[]) out.push(llmEntry(w, facts.llm[w]));
 
   // Images: same BYO OpenAI key as text (LLM_API_KEY, else OPENAI_API_KEY).
   const imageKey = firstSet(env, "LLM_API_KEY", "OPENAI_API_KEY");
