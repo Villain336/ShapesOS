@@ -1101,6 +1101,9 @@ export const TOOL_GROUP: Readonly<Record<string, ToolGroup>> = {
   ops_close_ticket: "ops",
   ops_create_transfer: "ops",
   ops_set_reorder_rule: "ops",
+  // Phase 10 (store): the overview is a read; listing products is an ops write.
+  ops_store_overview: "workspace",
+  ops_store_list_product: "ops",
   delegate_to_subagent: "delegate",
   // Phase 8 (ship): local git work in the run's sandbox is "code"; anything
   // that leaves the sandbox is "ship" (lib/ship/tools.ts).
@@ -1185,6 +1188,8 @@ export const TOOL_ACTION: Readonly<Record<string, string>> = {
   ops_reply_ticket: "send_ticket_reply",
   ops_create_transfer: "move_stock",
   ops_set_reorder_rule: "set_reorder_rule",
+  // Phase 10 (store): Tier 2 — always asks (lib/automation/actions.ts).
+  ops_store_list_product: "write_store_listing",
   // Phase 8: Tier 2 — always asks (lib/automation/actions.ts).
   git_push_branch: "push_branch",
   open_pull_request: "open_pr",

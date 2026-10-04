@@ -20,6 +20,7 @@ import { prisma } from "@/lib/prisma";
 import { withWorkspaceScope } from "@/lib/substrate/memory/rls";
 import { defaultVariantId } from "../stock";
 import type { Cart } from "./cart";
+import { orderLabel } from "./view";
 import { itemKey, priceCart, type CatalogItem, type PricedCart, type PromotionRow } from "./pricing";
 
 type Tx = Prisma.TransactionClient;
@@ -190,7 +191,7 @@ async function buildListings(tx: Tx, store: PublicStore, rows: Awaited<ReturnTyp
       productId: p.id,
       sku: p.sku,
       trackInventory: p.trackInventory,
-      variants: vs.map(({ variantId: _omit, ...pub }) => pub),
+      variants: vs.map((v) => ({ id: v.id, name: v.name, sku: v.sku, attributes: v.attributes, priceCents: v.priceCents, available: v.available })),
       fromPriceCents: Math.min(...vs.map((v) => v.priceCents)),
       available: p.trackInventory ? vs.reduce((s, v) => s + (v.available ?? 0), 0) : null,
       updatedAt: r.updatedAt,
@@ -265,4 +266,40 @@ export async function priceCartFor(tx: Tx, store: PublicStore, cart: Cart, now: 
     now,
   });
   return { priced, catalog };
+}
+
+/**
+ * The thank-you page's view of an order, by its Checkout Session id (an
+ * unguessable capability Stripe appends to the success URL). Label, state
+ * and total only — never buyer details.
+ */
+export async function orderForSession(store: PublicStore, sessionId: string): Promise<{ label: string; status: string; totalCents: number } | null> {
+  if (!/^cs_[A-Za-z0-9_]{6,255}$/.test(sessionId)) return null;
+  const o = await withWorkspaceScope(store.workspaceId, (tx) =>
+    tx.opsOrder.findFirst({
+      where: { workspaceId: store.workspaceId, storeId: store.id, source: "web", stripeSessionId: sessionId },
+      select: { id: true, status: true, totalCents: true },
+    }),
+  );
+  return o ? { label: orderLabel(o.id), status: o.status, totalCents: o.totalCents } : null;
+}
+
+/** A listing's image file (for the public image route): id + workspace only. */
+export async function listingImage(store: PublicStore, listingId: string): Promise<string | null> {
+  if (!/^[A-Za-z0-9_-]{1,64}$/.test(listingId)) return null;
+  const l = await withWorkspaceScope(store.workspaceId, (tx) =>
+    tx.opsStoreListing.findFirst({
+      where: { id: listingId, workspaceId: store.workspaceId, storeId: store.id, listed: true, product: { active: true } },
+      select: { imageFileId: true },
+    }),
+  );
+  return l?.imageFileId ?? null;
+}
+
+/** Can this store take payments (the workspace has its own Stripe key)? */
+export async function storePaymentsReady(store: PublicStore): Promise<boolean> {
+  const s = await withWorkspaceScope(store.workspaceId, (tx) =>
+    tx.opsFinanceSettings.findUnique({ where: { workspaceId: store.workspaceId }, select: { stripeSecretEnc: true } }),
+  );
+  return Boolean(s?.stripeSecretEnc);
 }

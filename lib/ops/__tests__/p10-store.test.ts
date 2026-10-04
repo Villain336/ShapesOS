@@ -236,3 +236,20 @@ describe("web order posting + slugs", () => {
     assert.equal(slugify("***"), "item");
   });
 });
+
+describe("agent tools", () => {
+  it("store tools are in OPS_TOOLS (no new registry) with a group and an always-ask action", async () => {
+    const { OPS_TOOLS } = await import("@/lib/chat/ops-tools");
+    const { toolGroup, toolAction } = await import("@/lib/chat/tools");
+    const { KNOWN_ACTION_DEFS } = await import("@/lib/automation/actions");
+    const overview = OPS_TOOLS.find((t) => t.name === "ops_store_overview");
+    const list = OPS_TOOLS.find((t) => t.name === "ops_store_list_product");
+    assert.equal(overview?.kind, "safe");
+    assert.equal(list?.kind, "publish");
+    assert.equal(list?.minRole, "editor");
+    assert.equal(toolGroup("ops_store_overview"), "workspace");
+    assert.equal(toolGroup("ops_store_list_product"), "ops");
+    assert.equal(toolAction("ops_store_list_product"), "write_store_listing");
+    assert.ok(KNOWN_ACTION_DEFS.some((d) => d.action === "write_store_listing"));
+  });
+});

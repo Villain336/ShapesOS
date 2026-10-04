@@ -25,6 +25,7 @@ import { withWorkspaceScope } from "@/lib/substrate/memory/rls";
 import type { Cart } from "./cart";
 import { priceCartFor, type PublicStore } from "./catalog";
 import { checkoutBlocker } from "./pricing";
+import { orderLabel } from "./view";
 
 /** Checkout Sessions expire after an hour; the expiry webhook cancels the draft. */
 export const CHECKOUT_TTL_S = 60 * 60;
@@ -39,9 +40,7 @@ export class StoreNotConnectedError extends OpsError {
   }
 }
 
-export function orderLabel(orderId: string): string {
-  return `SO-${orderId.slice(-6).toUpperCase()}`;
-}
+export { orderLabel };
 
 interface StripeLineItem {
   quantity: number;

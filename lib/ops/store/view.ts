@@ -77,3 +77,8 @@ export function fmtPrice(cents: number, currency: string): string {
 export function availabilityUrl(available: number | null): string {
   return available === null || available > 0 ? "https://schema.org/InStock" : "https://schema.org/OutOfStock";
 }
+
+/** Same label the Orders view shows (components/ops/shared.tsx shortId). */
+export function orderLabel(orderId: string): string {
+  return `SO-${orderId.length > 12 ? orderId.slice(-8).toUpperCase() : orderId.toUpperCase()}`;
+}

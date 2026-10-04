@@ -51,6 +51,13 @@ export interface OpsOrderRow {
   taxCents: number;
   totalCents: number;
   createdAt: string;
+  // Phase 10 (store): web orders come from the storefront checkout.
+  source?: string;
+  discountCents?: number;
+  promotionCode?: string | null;
+  customerEmail?: string | null;
+  customerName?: string | null;
+  paidAt?: string | null;
 }
 
 interface PaymentRow {
@@ -66,11 +73,14 @@ const STATUSES = ["all", "draft", "confirmed", "fulfilled", "cancelled"] as cons
 
 export function OrdersView() {
   const [status, setStatus] = useState<(typeof STATUSES)[number]>("all");
+  // Phase 10 (store): filter by where the order came from.
+  const [source, setSource] = useState<"all" | "web" | "manual">("all");
   const [q, setQ] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showNew, setShowNew] = useState(false);
   const { rows, loading, error, reload } = useOpsList<OpsOrderRow>("orders", {
     status: status === "all" ? undefined : status,
+    source: source === "all" ? undefined : source,
   });
 
   const filtered = useMemo(() => {
@@ -95,6 +105,11 @@ export function OrdersView() {
               {s === "all" ? "All statuses" : sentence(s)}
             </option>
           ))}
+        </select>
+        <select className={selectCls} value={source} onChange={(e) => setSource(e.target.value as typeof source)} aria-label="Filter by source">
+          <option value="all">All sources</option>
+          <option value="web">Web store</option>
+          <option value="manual">Manual</option>
         </select>
         <div className="relative">
           <Search size={15} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-subtle" />
@@ -124,7 +139,10 @@ export function OrdersView() {
             <tbody>
               {filtered.map((o) => (
                 <tr key={o.id} className={trClickableCls} tabIndex={0} onClick={() => setSelectedId(o.id)} onKeyDown={activateOnKey(() => setSelectedId(o.id))}>
-                  <td className={`${tdCls} font-semibold`}>SO-{shortId(o.id)}</td>
+                  <td className={`${tdCls} font-semibold`}>
+                    SO-{shortId(o.id)}
+                    {o.source === "web" && <span className={`${chipCls} ml-1.5`}>Web</span>}
+                  </td>
                   <td className={`${tdCls} text-muted`}>
                     {o.lineItems.length} line{o.lineItems.length === 1 ? "" : "s"} · {o.lineItems[0]?.name ?? ""}
                   </td>
@@ -162,7 +180,7 @@ function OrderDetail({ order, onClose, onChanged }: { order: OpsOrderRow; onClos
           SO-{shortId(order.id)} <span className={chipCls}>{sentence(order.status)}</span>
         </>
       }
-      meta={`${fmtCents(order.totalCents)} · created ${fmtDate(order.createdAt)}`}
+      meta={`${fmtCents(order.totalCents)} · created ${fmtDate(order.createdAt)}${order.source === "web" ? ` · web store${order.customerEmail ? ` · ${order.customerEmail}` : ""}${order.paidAt ? ` · paid ${fmtDate(order.paidAt)}` : ""}` : ""}`}
       onClose={onClose}
     >
       {gate.error && <div className={`${errorBoxCls} mb-3`}>{gate.error}</div>}
@@ -223,6 +241,12 @@ function OrderDetail({ order, onClose, onChanged }: { order: OpsOrderRow; onClos
       <dl className="mt-3 grid grid-cols-[1fr_auto] gap-y-1 text-[13px]">
         <dt className="text-muted">Subtotal</dt>
         <dd className="text-right tabular-nums">{fmtCents(order.subtotalCents)}</dd>
+        {(order.discountCents ?? 0) > 0 && (
+          <>
+            <dt className="text-muted">Discount{order.promotionCode ? ` (${order.promotionCode})` : ""}</dt>
+            <dd className="text-right tabular-nums">−{fmtCents(order.discountCents ?? 0)}</dd>
+          </>
+        )}
         <dt className="text-muted">Tax</dt>
         <dd className="text-right tabular-nums">{fmtCents(order.taxCents)}</dd>
         <dt className="font-bold text-ink">Total</dt>

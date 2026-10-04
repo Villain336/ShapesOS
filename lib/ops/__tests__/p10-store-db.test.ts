@@ -30,6 +30,7 @@ import { addToCart, emptyCart, setCartPromo, type Cart } from "../store/cart";
 import { catalogForCart, loadPublicListing, loadPublicListings, priceCartFor, resolvePublishedStore, type PublicStore } from "../store/catalog";
 import { createStoreCheckout, StoreNotConnectedError } from "../store/checkout";
 import { storeOverview } from "../store/admin";
+import { storeListProductCore, storeOverviewCore } from "@/lib/chat/ops-store-tools";
 
 const WS_A = "p10store-ws-a";
 const WS_B = "p10store-ws-b";
@@ -302,3 +303,17 @@ describe("unapplied money and expiry", () => {
     assert.equal((await order(out.orderId)).status, "draft");
   });
 });
+
+describe("agent tools (ops_store_*)", () => {
+  it("overview reads the store; list_product hides and re-shows a product", async () => {
+    const ov = await withWorkspaceScope(WS_A, (tx) => storeOverviewCore(tx, A));
+    assert.match(ov.summary, /published/);
+    const hide = await withWorkspaceScope(WS_A, (tx) => storeListProductCore(tx, A, { productId: ids.svc, listed: "false" }));
+    assert.match(hide.summary, /hidden/);
+    assert.equal((await loadPublicListings(storeA)).some((l) => l.productId === ids.svc), false);
+    await withWorkspaceScope(WS_A, (tx) => storeListProductCore(tx, A, { productId: ids.svc, title: "Setup call (1h)" }));
+    assert.equal((await loadPublicListings(storeA)).find((l) => l.productId === ids.svc)?.title, "Setup call (1h)");
+    await assert.rejects(withWorkspaceScope(WS_A, (tx) => storeListProductCore(tx, A, { productId: ids.bProduct })), (e: unknown) => e instanceof OpsError && e.status === 404);
+  });
+});
+

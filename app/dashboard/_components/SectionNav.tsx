@@ -36,6 +36,8 @@ import {
   FileText,
   Store,
   Receipt,
+  // Phase 10 (store)
+  ShoppingBag,
   type LucideIcon,
 } from "lucide-react";
 
@@ -68,6 +70,8 @@ const ICONS: Record<string, LucideIcon> = {
   quotes: FileText,
   vendors: Store,
   expenses: Receipt,
+  // Phase 10 (store)
+  store: ShoppingBag,
 };
 
 export interface SectionNavItem {

@@ -32,7 +32,7 @@ import { OPS_ENTITY_MAP } from "../entities";
 import { auditOpsEvent, recordInventoryTxn, type OpsActor } from "../doctype";
 import { defaultVariantId } from "../stock";
 import { postWebOrderSale } from "../finance/posting";
-import { orderLabel } from "./checkout";
+import { orderLabel } from "./view";
 
 type Tx = Prisma.TransactionClient;
 

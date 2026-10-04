@@ -57,6 +57,8 @@ export const KNOWN_ACTION_DEFS: ReadonlyArray<{ action: string; label: string; d
   { action: "send_ticket_reply", label: "Reply to a ticket", description: "Email a customer from a helpdesk ticket. Always asks." },
   { action: "move_stock", label: "Draft a stock move", description: "Create a draft move between stock locations (a person books it). Always asks." },
   { action: "set_reorder_rule", label: "Set a reorder rule", description: "Create or change a min/max reorder rule. Always asks." },
+  // Phase 10 (store): storefront listings (lib/chat/ops-store-tools.ts).
+  { action: "write_store_listing", label: "Change the online store", description: "Show, hide or edit a product in the public online store. Always asks." },
 ];
 
 

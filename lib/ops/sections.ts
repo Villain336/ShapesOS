@@ -13,7 +13,7 @@ export interface OpsSection {
   /** SectionNav icon key (app/dashboard/_components/SectionNav.tsx). */
   icon: string;
   description: string;
-  owner: "opscore" | "finance";
+  owner: "opscore" | "finance" | "store";
 }
 
 const s = (
@@ -29,6 +29,8 @@ export const OPS_SECTIONS: OpsSection[] = [
   s("orders", "Orders", "orders", "Sales orders: draft, confirm, fulfil"),
   s("payments", "Payments", "payments", "Charge and refund records"),
   s("promotions", "Promotions", "promotions", "Discount codes and their rules"),
+  // Phase 10 (store)
+  s("store", "Online store", "store", "Public storefront, listed products and web orders", "store"),
   s("invoices", "Invoices", "invoices", "Draft, send and collect invoices"),
   s("inventory", "Products & inventory", "inventory", "Products, variants, warehouses, stock by location"),
   s("purchasing", "Purchasing", "purchasing", "Purchase orders and reorder rules"),
