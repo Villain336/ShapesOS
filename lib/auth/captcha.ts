@@ -19,7 +19,7 @@
 // user-supplied URL), with a 5 s timeout. Network errors fail CLOSED for
 // that attempt (no token accepted) — the user can retry the challenge.
 
-import { loginFailureCounts } from "./rate-limit";
+import { loginFailureCounts, loginFailureCountsAsync } from "./rate-limit";
 
 export type CaptchaProvider = "turnstile" | "hcaptcha";
 
@@ -75,6 +75,22 @@ export function captchaRequired(
   const cfg = captchaConfig(opts.env);
   if (!cfg) return false;
   const counts = loginFailureCounts(ip, email, opts.now);
+  return counts.account >= cfg.afterFailures || counts.ip >= cfg.afterFailures;
+}
+
+/**
+ * Same decision over the shared (multi-replica) failure counts — what the
+ * sign-in path calls (Phase 6). Falls back to the in-memory counts when the
+ * shared store fails.
+ */
+export async function captchaRequiredAsync(
+  ip: string | null,
+  email: string,
+  opts: { env?: NodeJS.ProcessEnv; now?: number } = {},
+): Promise<boolean> {
+  const cfg = captchaConfig(opts.env);
+  if (!cfg) return false;
+  const counts = await loginFailureCountsAsync(ip, email, opts.now);
   return counts.account >= cfg.afterFailures || counts.ip >= cfg.afterFailures;
 }
 

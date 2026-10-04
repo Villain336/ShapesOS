@@ -13,7 +13,7 @@ import {
   schedulePostizPost,
   type PostizPostType,
 } from "@/lib/integrations/postiz";
-import { checkRateLimit, tooManyRequests } from "@/lib/api/rate-limit";
+import { checkRateLimitAsync, tooManyRequests } from "@/lib/api/rate-limit";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -46,7 +46,7 @@ export async function POST(req: Request) {
     const { workspace } = await guardWorkspace({ editor: true });
     // Publish protection: per-workspace write-tier limit on top of the
     // proxy's write tier — publishing is real-world and costs platform quota.
-    const rl = checkRateLimit(`postiz-post:ws:${workspace.id}`, "write");
+    const rl = await checkRateLimitAsync(`postiz-post:ws:${workspace.id}`, "write");
     if (!rl.allowed) return tooManyRequests(rl.retryAfterMs);
 
     const parsed = PostSchema.safeParse(await readJson(req));

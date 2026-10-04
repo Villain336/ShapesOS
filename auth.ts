@@ -45,17 +45,18 @@ import { provisionSsoUser } from "./lib/sso";
 // ---------------------------------------------------------------------------
 // Day-1 hardening (H1/M8): brute-force protection on the credentials login.
 // See lib/auth/rate-limit.ts — two independent dimensions (per-IP across
-// accounts, per-account across IPs), in-memory, single-instance by design.
+// accounts, per-account across IPs), shared across replicas in Postgres with
+// the in-memory lockout as the fallback (Phase 6; never fails open).
 // ---------------------------------------------------------------------------
 import {
-  loginLockedOut,
-  recordLoginFailure,
-  recordLoginSuccess,
+  loginLockedOutAsync,
+  recordLoginFailureAsync,
+  recordLoginSuccessAsync,
 } from "./lib/auth/rate-limit";
 import { clientIpFromHeaders } from "./lib/api/client-ip";
 import { INVITE_REQUIRED_PATH, signInAllowed, signupMode } from "./lib/auth/signup";
 import { CredentialsSignin, type Session } from "next-auth";
-import { captchaRequired, verifyCaptchaToken } from "./lib/auth/captcha";
+import { captchaRequiredAsync, verifyCaptchaToken } from "./lib/auth/captcha";
 import { authorizePasskey, authorizeTwoFactor, type MfaSignInMarker } from "./lib/auth/mfa/authorize";
 import {
   PASSKEY_PROVIDER_ID,
@@ -187,25 +188,25 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const ip = clientIp(req as Request | undefined);
 
         // Fail closed under lockout: don't even compare the password.
-        if (loginLockedOut(ip, email || "unknown")) {
+        if (await loginLockedOutAsync(ip, email || "unknown")) {
           console.warn(`[auth] login blocked (rate limit): ${email || "unknown"} from ${ip ?? "unknown ip"}`);
           return null;
         }
         // Phase 4a step-up: after N failures a CAPTCHA must pass first
         // (no-op without CAPTCHA_PROVIDER; see lib/auth/captcha.ts).
-        if (captchaRequired(ip, email || "unknown")) {
+        if (await captchaRequiredAsync(ip, email || "unknown")) {
           const captchaToken = typeof credentials?.captchaToken === "string" ? credentials.captchaToken : "";
           if (!(await verifyCaptchaToken(captchaToken, ip))) throw new CaptchaRequiredError();
         }
         if (!adminEmail || !adminPassword || !email) {
           if (email) {
-            recordLoginFailure(ip, email);
+            await recordLoginFailureAsync(ip, email);
             await auditAuthEvent("auth_login_failed", `login failed for ${email} (no admin credential configured)`);
           }
           return null;
         }
         if (safeEqual(email, adminEmail) && safeEqual(password, adminPassword)) {
-          recordLoginSuccess(ip, email);
+          await recordLoginSuccessAsync(ip, email);
           await auditAuthEvent("auth_login_succeeded", `admin login succeeded for ${email} from ${ip ?? "unknown ip"}`);
           return {
             id: `admin:${adminEmail}`,
@@ -213,7 +214,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             email: adminEmail,
           };
         }
-        recordLoginFailure(ip, email);
+        await recordLoginFailureAsync(ip, email);
         await auditAuthEvent(
           "auth_login_failed",
           `login failed for ${email} from ${ip ?? "unknown ip"}`,

@@ -13781,3 +13781,21 @@ model SocialPostMetric {
   @@index([workspaceId, day])
   @@map("social_post_metrics")
 }
+
+// Phase 6 (infra): shared rate-limit + login-lockout counters, so limits hold
+// across app replicas (lib/api/rate-limit-store.ts, RATE_LIMIT_STORE).
+// GLOBAL table, deliberately no workspace_id and no RLS: keys are opaque
+// limiter keys ("write:user:<id>", "login:ip:<ip>", ...) used BEFORE a tenant
+// is resolved (pre-auth login, the proxy). Rows hold counters and timestamps
+// only — never tenant content — and only the limiter module touches it.
+// Times are epoch milliseconds (BIGINT) so the window math is integer math.
+model RateLimitBucket {
+  key         String  @id
+  windowStart BigInt  @map("window_start")
+  count       Int
+  lockedUntil BigInt? @map("locked_until")
+  expiresAt   BigInt  @map("expires_at")
+
+  @@index([expiresAt])
+  @@map("rate_limit_buckets")
+}

@@ -6,7 +6,7 @@
 
 import { storeSocialMedia } from "@/lib/social/publications";
 import { socialMaxUploadBytes } from "@/lib/social/platforms";
-import { checkRateLimit, tooManyRequests } from "@/lib/api/rate-limit";
+import { checkRateLimitAsync, tooManyRequests } from "@/lib/api/rate-limit";
 import { BadRequestError, HttpError } from "@/lib/api/errors";
 import { guardWorkspace, socialError } from "../_lib";
 
@@ -16,7 +16,7 @@ export const runtime = "nodejs";
 export async function POST(req: Request) {
   try {
     const { user, workspace } = await guardWorkspace({ editor: true });
-    const rl = checkRateLimit(`social-media:ws:${workspace.id}`, "write");
+    const rl = await checkRateLimitAsync(`social-media:ws:${workspace.id}`, "write");
     if (!rl.allowed) return tooManyRequests(rl.retryAfterMs);
     const cap = socialMaxUploadBytes();
     const declared = Number(req.headers.get("content-length") ?? "0");
