@@ -21,7 +21,7 @@ Internet → Caddy (auto-HTTPS reverse proxy) → app:3000 (Next.js standalone)
 
 - **VPS:** 2 vCPU / 4 GB RAM minimum (Hetzner, DigitalOcean, or equivalent). Ubuntu 24.04.
 - **Domain:** `marketr.launchabl.com` (or similar) → A record to the VPS. Caddy handles TLS.
-- **Cron:** host-level cron `curl` hitting the two scheduled endpoints with `CRON_SECRET` bearer.
+- **Cron:** the in-app cron runner (Phase 6, `lib/cron/runner.ts`) — on by default in the production server/compose (`CRON_RUNNER=internal`), needs only `CRON_SECRET`. Set `CRON_RUNNER=external` to drive the routes from a host crontab instead (§3.8).
 - **Backups:** the compose `backup` service (daily `pg_dump`, retention, optional S3/MinIO upload; see `docs/ops/BACKUP-RESTORE.md`) + the `marketr-data` volume snapshotted.
 
 ### 1a. Gap to fix before deploy (small code change, spec'd here)
@@ -115,7 +115,34 @@ them over via the Secure Vault flow and Z7 writes them server-side.
    them carefully before deploy.
    Verify with `docker compose exec db psql -U marketr -c "\dt"`.
 7. **Caddy:** reverse-proxy `marketr.launchabl.com` → `localhost:3000`, auto-TLS. Confirm HTTPS.
-8. **Cron (host crontab):**
+8. **Cron.** Every scheduled sweep is listed, with its cadence, in `lib/cron/jobs.ts`
+   (the single source of truth; a unit test fails when a cron route has no entry).
+   - **Default — in-app runner (`CRON_RUNNER=internal`):** the app server runs the table
+     itself. Only `CRON_SECRET` is needed (`openssl rand -hex 32`); without it the runner
+     logs one warning and stays off. Every replica ticks every 15 s, but a Postgres
+     advisory lock (`pg_try_advisory_xact_lock`, held for the claim only) lets exactly one
+     replica claim each due slot; claims are rows in `cron_runs`, so a restart or failover
+     never re-fires a slot and a job never overlaps itself. Each run POSTs to
+     `http://127.0.0.1:$PORT/<route>` with the `CRON_SECRET` bearer (override the origin
+     with `CRON_RUNNER_ORIGIN` if the server doesn't listen on loopback), with a start
+     jitter (≤5 s for every-minute jobs, ≤30 s otherwise) and a per-job timeout (10 or 30
+     min). Results (ok / failed / timed out, HTTP status, duration, error excerpt) are kept
+     7 days in `cron_runs` and shown to platform operators on Settings → Providers →
+     Scheduled jobs. Times are UTC. Off by default under `next dev` (set
+     `CRON_RUNNER=internal` to try it), never during `next build` or tests.
+   - **External scheduler (`CRON_RUNNER=external`):** keep the host crontab below (or a
+     Kubernetes CronJob / PaaS cron — serverless hosts have no long-lived process and must
+     use this). Don't run both: the routes are idempotent, but daily sweeps would run twice.
+   - Cadences picked in Phase 6 for routes that had none documented (reasons in
+     `lib/cron/jobs.ts`): `* * * * *` `/api/cron/workflows` and `/api/scheduler/tick`;
+     `*/5` `/api/cron/messaging`, `/api/cron/nurture`; `*/10` `/api/cron/connector-refresh`,
+     `/api/calls/reminders/run` (bearer `REMINDERS_CRON_SECRET`, skipped when unset);
+     `*/15` `/api/cron/actions`, `/api/cron/contextdev-monitors`; daily `0 2`
+     `/api/cron/learning-consolidate`, `15 4` `/api/cron/connector-intro-expiry`, `30 4`
+     `/api/cron/connector-paths`, `45 4` `/api/cron/dataset-health`, `0 6`
+     `/api/cron/funding-followups`, `15 6` `/api/cron/legal-deadlines`.
+
+   **Host crontab (only with `CRON_RUNNER=external`):**
    - `0 6 * * * curl -s -X POST -H "Authorization: Bearer $CRON_SECRET" https://marketr.launchabl.com/api/rankings/check -d '{"scope":"all"}'`
    - `30 6 * * * curl -s -X POST -H "Authorization: Bearer $CRON_SECRET" https://marketr.launchabl.com/api/cron/fix-agent`
    - `0 7 * * * curl -s -X POST -H "Authorization: Bearer $CRON_SECRET" https://marketr.launchabl.com/api/cron/reports`
@@ -163,7 +190,7 @@ Run in order; each step must pass before the next.
 - [ ] **RBAC:** invite a second user as `viewer` — confirm read-only; promote to `editor` — confirm no member management; demote/remove.
 - [ ] **Audit log review:** confirm credential changes, deploys, fix-agent runs, and role changes all appear.
 - [ ] **Newsletter (live Resend, BYO key):** add a workspace Resend key, add a sending domain, copy the SPF/DKIM/DMARC records into DNS, verify the domain, import a 3-address CSV list, build a template from a starter, send a test email, then send a real broadcast to the test list; confirm the unsubscribe link works, the webhook flips a bounced address, and the audit log + alert fire on a forced failure.
-- [ ] **Cron:** trigger both cron endpoints manually with `CRON_SECRET`, confirm 200s and expected side effects.
+- [ ] **Cron:** with the in-app runner on, confirm the startup log line `in-app cron runner started` and, after a few minutes, `ok` rows on Settings → Providers → Scheduled jobs (platform operator). With `CRON_RUNNER=external`, trigger the cron endpoints manually with `CRON_SECRET` and confirm 200s and expected side effects.
 - [ ] **Studio (Porkbun domains, sandbox only):** with sandbox/dry-run keys, save
   keys, search availability, view TLD pricing, save a registrant, preview a
   purchase, confirm it with the terms checkbox — confirm the domain row lands

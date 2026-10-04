@@ -17,6 +17,7 @@ import { unsplashStatus } from "@/lib/design/unsplash";
 /* PROVIDER:brandfetch */ import { brandfetchStatus } from "@/lib/design/brandfetch"; /* END */
 import SettingsNav from "@/components/settings/SettingsNav";
 import { isPlatformOperator } from "@/lib/auth/platform-operator";
+import ScheduledJobsStatus from "@/components/settings/ScheduledJobsStatus";
 /* INTEGRATION:activepieces */ import ActivepiecesFlowBindings from "@/components/settings/ActivepiecesFlowBindings"; /* END */
 // Phase 12 (embeds): integration status helpers.
 import { umamiStatus } from "@/lib/integrations/umami";
@@ -815,6 +816,9 @@ export default async function ProvidersSettingsPage() {
         </p>
       </div>
       {/* END */}
+
+      {/* Phase 6: in-app cron runner — host-wide, platform operators only. */}
+      {operator && <ScheduledJobsStatus />}
     </div>
   );
 }

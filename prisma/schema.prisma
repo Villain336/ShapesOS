@@ -2951,9 +2951,47 @@ model Workflow {
   nodes WorkflowNode[]
   edges WorkflowEdge[]
   runs  WorkflowRun[]
+  // Phase 6: signing secret for the webhook trigger's inbound URL (1:1).
+  webhook         WorkflowWebhook?
+  webhookReceipts WorkflowWebhookReceipt[]
 
   @@index([projectId, status])
   @@map("workflows")
+}
+
+// Phase 6 (runtime): the webhook trigger's signing secret. One per workflow,
+// minted on demand from the canvas, shown once, stored only as a secrets()
+// envelope (same convention as webhook_endpoints.secret_enc). Kept out of the
+// workflows row so GET /api/workflows/[id] never carries it.
+model WorkflowWebhook {
+  workflowId     String    @id @map("workflow_id")
+  workflow       Workflow  @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  secretEnc      String    @map("secret_enc")
+  secretHint     String    @map("secret_hint")
+  createdBy      String?   @map("created_by")
+  lastReceivedAt DateTime? @map("last_received_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  @@map("workflow_webhooks")
+}
+
+// Phase 6 (runtime): replay guard for the inbound workflow webhook. Each
+// accepted signature is recorded once per workflow; the same signed request
+// inside the 5-minute window is refused. Rows older than the window are
+// pruned on the next receipt.
+model WorkflowWebhookReceipt {
+  id         String   @id @default(cuid())
+  workflowId String   @map("workflow_id")
+  workflow   Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  // The v1 HMAC (hex) that verified — unique per signed request.
+  signature  String
+  runId      String?  @map("run_id")
+  receivedAt DateTime @default(now()) @map("received_at")
+
+  @@unique([workflowId, signature])
+  @@index([workflowId, receivedAt])
+  @@map("workflow_webhook_receipts")
 }
 
 model WorkflowNode {
@@ -13835,4 +13873,36 @@ model SocialPostMetric {
   @@unique([publicationId, integrationId, day])
   @@index([workspaceId, day])
   @@map("social_post_metrics")
+}
+
+// ---------------------------------------------------------------------------
+// Phase 6 (runtime): in-app cron runner (lib/cron/runner.ts). One row per job
+// run, written by whichever replica claimed the run under the per-tick
+// advisory lock. Host-wide (no workspace) — read only by platform operators.
+// Pruned after CRON_RUN_RETENTION_DAYS (lib/cron/store.ts).
+// ---------------------------------------------------------------------------
+
+enum CronRunStatus {
+  running
+  ok
+  failed
+  timeout
+}
+
+model CronRun {
+  id           String        @id @default(cuid())
+  // Job key from lib/cron/jobs.ts (e.g. "webhooks", "scheduler-tick").
+  job          String
+  // The schedule slot this run covers (UTC minute).
+  scheduledFor DateTime      @map("scheduled_for")
+  startedAt    DateTime      @default(now()) @map("started_at")
+  finishedAt   DateTime?     @map("finished_at")
+  status       CronRunStatus @default(running)
+  httpStatus   Int?          @map("http_status")
+  durationMs   Int?          @map("duration_ms")
+  error        String?
+
+  @@index([job, startedAt])
+  @@index([startedAt])
+  @@map("cron_runs")
 }

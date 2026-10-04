@@ -110,6 +110,10 @@ services:
       # the superuser (superusers bypass FORCE ROW LEVEL SECURITY).
       DATABASE_URL: postgresql://${APP_DB_USER:-marketr_app}:${APP_DB_PASSWORD:?set APP_DB_PASSWORD in .env}@db:5432/${POSTGRES_DB:-marketr}?schema=public
       REDIS_URL: redis://redis:6379
+      # Phase 6: the app runs its own scheduled sweeps (lib/cron/runner.ts;
+      # needs CRON_SECRET in .env). Set CRON_RUNNER=external in .env to use a
+      # host crontab instead (DEPLOY.md §3.8).
+      CRON_RUNNER: ${CRON_RUNNER:-internal}
       # Phase B (W3) filesystem: local disk by default; set MARKETR_STORAGE=s3
       # to use the MinIO service above (multi-instance deployments must).
       MARKETR_STORAGE: ${MARKETR_STORAGE:-local}

@@ -180,6 +180,9 @@ const PUBLIC_BY_DESIGN = {
     "Phase 6 password reset request; always the same 200; emails a single-use 1-hour reset link (SHA-256 at rest) only when an email account exists; lockout, CAPTCHA step-up, per-address send limit",
   "app/api/auth/email/password/reset/route.ts":
     "Phase 6 password reset; the single-use reset token is the capability, consumed by one guarded UPDATE (used_at IS NULL AND expires_at > now) after the password policy passes; voids every other link for the address",
+  // Phase 6 (runtime): workflow canvas webhook trigger — capability model, see route comments.
+  "app/api/hooks/workflows/[id]/route.ts":
+    "inbound workflow-trigger webhook; ShapesOS-Signature HMAC-SHA256 (lib/webhooks/signing.ts verifyWebhookSignature, per-workflow whsec_ secret stored as a secrets() envelope) verified before any parsing/logic with a 5-minute window; exact replays 409 via unique receipt; unknown workflow/no secret/no webhook trigger 404 alike; per-workflow rate limit + 64 KiB body cap; only starts a run through startWorkflowRun (kill switch honoured), returns run id + status only",
 };
 const uncovered = [];
 for (const f of routeFiles) {
@@ -204,7 +207,7 @@ const missingAllowList = Object.keys(PUBLIC_BY_DESIGN).filter(k => {
 ok("every public-by-design entry maps to a real route file", missingAllowList.length === 0, missingAllowList.join("; "));
 ok(
   "public-by-design allow-list is documented",
-  Object.keys(PUBLIC_BY_DESIGN).length === 33 &&
+  Object.keys(PUBLIC_BY_DESIGN).length === 34 &&
     Object.values(PUBLIC_BY_DESIGN).every(v => v.length > 20)
 );
 
