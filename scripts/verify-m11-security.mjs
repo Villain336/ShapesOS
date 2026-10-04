@@ -225,6 +225,18 @@ ok("member management = admin+", has("app/api/workspace/members/route.ts", /requ
 ok("deploy writes = editor+", has("app/api/websites/[id]/deploy/route.ts", /"editor"/));
 ok("audit writes = editor+", has("app/api/websites/[id]/audit/route.ts", /requireProjectRole\(user\.id, site\.projectId, "editor"\)/));
 ok("issue approval = editor+", has("app/api/websites/[id]/issues/approve-all/route.ts", /"editor"/));
+// Phase 8: sandbox checkpoint restore + previews (lib/sandbox).
+ok("agent-run restore = editor+ or the run's starter", has("app/api/agent-runs/[runId]/restore/route.ts", /!isStarter && !\(await requireWorkspaceRole\(user\.id, workspace\.id, "editor"\)\)/));
+ok("agent-run stop = editor+ or the run's starter", has("app/api/agent-runs/[runId]/cancel/route.ts", /!isStarter && !\(await requireWorkspaceRole\(user\.id, workspace\.id, "editor"\)\)/));
+ok("sandbox preview: members only, writes editor+ or starter, exposed ports only, no app cookies upstream",
+  has("app/api/agent-runs/[runId]/preview/[port]/[[...path]]/route.ts", /requireRole: requireWorkspaceRole/) &&
+  has("lib/sandbox/preview-proxy.ts", /requireRole\(userId, workspaceId, "viewer"\)/) &&
+  has("lib/sandbox/preview-proxy.ts", /run\.startedBy !== userId && !\(await requireRole\(userId, workspaceId, "editor"\)\)/) &&
+  has("lib/sandbox/preview-proxy.ts", /exposedPorts\.includes\(port\)/) &&
+  has("lib/sandbox/preview.ts", /"cookie",\s*"authorization"/));
+ok("sandbox preview CSP is an opaque-origin sandbox (no allow-same-origin)",
+  /export const SANDBOX_PREVIEW_CSP = \[\s*"sandbox allow-scripts allow-forms allow-modals allow-downloads",/.test(readFileSync(join(ROOT, "lib/security/headers.ts"), "utf8")) &&
+  !/allow-same-origin|allow-top-navigation|allow-popups/.test((readFileSync(join(ROOT, "lib/security/headers.ts"), "utf8").match(/export const SANDBOX_PREVIEW_CSP = \[([\s\S]*?)\]/) ?? [])[1] ?? "x allow-same-origin"));
 ok("rankings check session path = editor+", has("app/api/rankings/check/route.ts", /requireProjectRole\(user!\.id, projectId, "editor"\)/));
 ok("cron fix-agent session path filters by role", has("app/api/cron/fix-agent/route.ts", /requireProjectRole\(user\.id, s\.projectId, "editor"\)/));
 

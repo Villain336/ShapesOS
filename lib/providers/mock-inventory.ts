@@ -19,6 +19,7 @@
 //   Stripe         lib/metering/billing.ts isBillingConfigured()
 //   Composio       lib/integrations/actions/discovery.ts getToolRouter()
 //   Activepieces   lib/integrations/activepieces/config.ts
+//   Code sandbox   lib/sandbox/index.ts sandboxAvailability() (passed in)
 //
 // A mocked feature is configuration, not an agent state: the UI renders
 // these as neutral chips, never with the agent status colours.
@@ -55,6 +56,12 @@ export interface InventoryFacts {
   /** Whether this workspace has an active Context.dev key in the vault;
    *  null when it could not be checked. */
   contextDevConnected: boolean | null;
+  /**
+   * Phase 8: sandboxAvailability() — whether the agent code tools have a
+   * sandbox provider (Docker / E2B / Daytona) right now. Omitted = not
+   * checked (the entry is left out).
+   */
+  sandbox?: { ok: boolean; provider: string | null; reason?: string } | null;
 }
 
 const set = (env: EnvLike, k: string) => Boolean((env[k] ?? "").trim());
@@ -242,6 +249,21 @@ export function mockInventory(env: EnvLike, facts: InventoryFacts): FeatureStatu
       : "Off — automation actions report \"not connected\"; nothing is triggered.",
     envVars: ["ACTIVEPIECES_URL", "ACTIVEPIECES_API_KEY"],
   });
+
+  // Code sandbox: never mocked — without a provider the code tools are off
+  // and say why (lib/sandbox/tools.ts).
+  if (facts.sandbox !== undefined) {
+    const sb = facts.sandbox;
+    out.push({
+      key: "sandbox",
+      label: "Code sandbox (agent code tools)",
+      mode: sb?.ok ? "live" : "off",
+      detail: sb?.ok
+        ? `Live on ${sb.provider === "e2b" ? "E2B" : sb.provider === "daytona" ? "Daytona" : "Docker"} — agents read, write and run code in an isolated sandbox per run.`
+        : `Off — ${sb?.reason ?? "the sandbox provider could not be checked."} Code tools say so and do nothing.`,
+      envVars: ["SANDBOX_PROVIDER", "DOCKER_HOST", "E2B_API_KEY", "DAYTONA_API_KEY"],
+    });
+  }
 
   return out;
 }
