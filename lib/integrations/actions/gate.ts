@@ -451,6 +451,12 @@ export async function executeApproved(input: ExecuteApprovedInput) {
     }),
   );
   if (!approval) throw new NotFoundError("Approval not found");
+  // Phase 9 (sites): a hosting rollback is approved here but runs from the
+  // site's deployment list (lib/deploy/rollback.ts) — it is not a Composio
+  // tool. Refuse BEFORE the claim so the approval stays usable there.
+  if (approval.appKey === "hosting") {
+    throw new ConflictError("Cannot execute here: run this rollback from the site's deployment list (Sites → Hosting).");
+  }
   if (approval.status === "executed") {
     throw new ConflictError("Cannot execute: approval already executed (replay blocked)");
   }

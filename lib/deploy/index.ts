@@ -1,4 +1,5 @@
-// Marketr — hosting connection resolution (milestone 9).
+// Marketr — hosting connection resolution (milestone 9; Phase 9 adds Netlify
+// and one place that picks the provider class: buildDeployTarget).
 //
 // HostingConnections live per project (token AES-256-GCM encrypted, same
 // crypto as milestones 6–8) and are decrypted server-side only — never sent
@@ -13,13 +14,59 @@ import { VercelDeployTarget } from "./vercel";
 import { CloudflarePagesDeployTarget } from "./cloudflare";
 import { MockVercelDeployTarget } from "./mock-vercel";
 import { MockCloudflarePagesDeployTarget } from "./mock-cloudflare";
+import { NetlifyDeployTarget } from "./netlify";
+import { MockNetlifyDeployTarget } from "./mock-netlify";
 import type {
   CloudflareConfig,
   DeployFile,
   DeployTarget,
   DeployTargetKind,
+  NetlifyConfig,
   VercelConfig,
 } from "./types";
+
+/** Every hosting provider, in the order the UI lists them (Phase 9: + Netlify). */
+export const DEPLOY_TARGET_KINDS: readonly DeployTargetKind[] = ["vercel", "cloudflare-pages", "netlify"];
+
+const KIND_LABEL: Record<DeployTargetKind, string> = {
+  vercel: "Vercel",
+  "cloudflare-pages": "Cloudflare Pages",
+  netlify: "Netlify",
+};
+
+/** The API slug for a stored target (Prisma enum name or slug). */
+export function deployTargetSlug(target: string): DeployTargetKind {
+  if (target === "vercel") return "vercel";
+  if (target === "netlify") return "netlify";
+  if (target === "cloudflare_pages" || target === "cloudflare-pages") return "cloudflare-pages";
+  throw new Error(`Unknown deploy target "${target}".`);
+}
+
+/** The Prisma enum value for an API slug (throws for an unknown one). */
+export function deployTargetEnum(slug: string): "vercel" | "cloudflare_pages" | "netlify" {
+  const k = deployTargetSlug(slug);
+  return k === "cloudflare-pages" ? "cloudflare_pages" : k;
+}
+
+/**
+ * Build the deploy target for a decrypted config blob (live, or the labeled
+ * mock when demo is set). The one place the provider classes are chosen —
+ * connection create/test routes and stored connections all go through it.
+ */
+export function buildDeployTarget(kind: DeployTargetKind, raw: Record<string, unknown>): DeployTarget {
+  const demo = raw.demo === true;
+  const s = (k: string) => String(raw[k] ?? "").trim();
+  if (kind === "vercel") {
+    const vcfg: VercelConfig = { token: s("token"), projectId: s("projectId"), teamId: s("teamId"), demo };
+    return demo ? new MockVercelDeployTarget(vcfg) : new VercelDeployTarget(vcfg);
+  }
+  if (kind === "netlify") {
+    const ncfg: NetlifyConfig = { token: s("token"), siteId: s("siteId"), demo };
+    return demo ? new MockNetlifyDeployTarget(ncfg) : new NetlifyDeployTarget(ncfg);
+  }
+  const ccfg: CloudflareConfig = { token: s("token"), accountId: s("accountId"), projectName: s("projectName"), demo };
+  return demo ? new MockCloudflarePagesDeployTarget(ccfg) : new CloudflarePagesDeployTarget(ccfg);
+}
 
 /** Parse + decrypt a hosting connection's config blob. */
 export function decryptHostingConfig(conn: { configEnc: string }): Record<string, unknown> {
@@ -44,38 +91,16 @@ export async function ownedHostingConnection(userId: string, projectId: unknown,
   });
 }
 
-export function hostingConnectorFor(conn: HostingConnection): DeployTarget {
-  const cfg = decryptHostingConfig(conn) as {
-    token?: string;
-    projectId?: string;
-    teamId?: string;
-    accountId?: string;
-    projectName?: string;
-    demo?: boolean;
-  };
-  const demo = cfg.demo === true;
-  if (conn.target === "vercel") {
-    const vcfg: VercelConfig = {
-      token: String(cfg.token ?? ""),
-      projectId: String(cfg.projectId ?? ""),
-      teamId: String(cfg.teamId ?? ""),
-      demo,
-    };
-    return demo ? new MockVercelDeployTarget(vcfg) : new VercelDeployTarget(vcfg);
-  }
-  const ccfg: CloudflareConfig = {
-    token: String(cfg.token ?? ""),
-    accountId: String(cfg.accountId ?? ""),
-    projectName: String(cfg.projectName ?? ""),
-    demo,
-  };
-  return demo
-    ? new MockCloudflarePagesDeployTarget(ccfg)
-    : new CloudflarePagesDeployTarget(ccfg);
+export function hostingConnectorFor(conn: Pick<HostingConnection, "target" | "configEnc">): DeployTarget {
+  return buildDeployTarget(deployTargetSlug(conn.target), decryptHostingConfig(conn));
 }
 
 export function hostingKindLabel(target: DeployTargetKind | string): string {
-  return target === "vercel" ? "Vercel" : "Cloudflare Pages";
+  try {
+    return KIND_LABEL[deployTargetSlug(target)];
+  } catch {
+    return target;
+  }
 }
 
 /** Masked token hint for the UI (never the raw token). */

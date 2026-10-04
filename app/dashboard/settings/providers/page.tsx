@@ -13,6 +13,7 @@ import { mockInventory, notLive, type FeatureMode } from "@/lib/providers/mock-i
 import { unsplashStatus } from "@/lib/design/unsplash";
 import { sandboxAvailability } from "@/lib/sandbox";
 import { sandboxConfig } from "@/lib/sandbox/config";
+import { decryptHostingConfig, hostingKindLabel } from "@/lib/deploy";
 /* PROVIDER:pexels */ import { pexelsStatus } from "@/lib/design/pexels"; /* END */
 /* PROVIDER:pixabay */ import { pixabayStatus } from "@/lib/design/pixabay"; /* END */
 /* PROVIDER:cloudinary */ import { cloudinaryStatus } from "@/lib/design/cloudinary"; /* END */
@@ -93,7 +94,16 @@ export default async function ProvidersSettingsPage() {
   // Phase 8: the code sandbox provider (cheap check, cached 30 s).
   const sandbox = await sandboxAvailability().catch(() => null);
   const sandboxCfg = sandboxConfig();
-  const inventory = mockInventory(process.env, { llm: llm.routing, contextDevConnected, sandbox });
+  // Phase 9: hosting connections (per connection, demo flag in the encrypted blob).
+  const hosting = await prisma.hostingConnection
+    .findMany({ where: { project: { workspaceId: workspace.id } }, select: { target: true, configEnc: true } })
+    .then((rows) => {
+      const out = { live: [] as string[], demo: [] as string[] };
+      for (const r of rows) (decryptHostingConfig(r).demo === true ? out.demo : out.live).push(hostingKindLabel(r.target));
+      return out;
+    })
+    .catch(() => null);
+  const inventory = mockInventory(process.env, { llm: llm.routing, contextDevConnected, sandbox, hosting });
   const mocked = notLive(inventory);
   const live = inventory.filter((f) => f.mode === "live");
   const unsplash = unsplashStatus();
