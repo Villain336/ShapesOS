@@ -197,6 +197,8 @@ export function connectorGroup(connectorKey: string): ToolGroup {
       return "files";
     case "supabase": // Phase 11 (devtools): read-only SQL is analysis
       return "data";
+    case "netlify": // Phase 11 (devtools): hosting for your own sites
+      return "site";
     case "google-search-console":
     case "ga4":
     case "google-ads":
@@ -247,6 +249,9 @@ export function connectorAction(connectorKey: string, tool: string): string {
     case "airtable.create_records":
     case "airtable.update_records":
       return "connector_write";
+    // Phase 11 (devtools): deploying your own site, like webflow.publish_site.
+    case "netlify.trigger_deploy":
+      return "publish_owned";
     default:
       return "connector_write";
   }

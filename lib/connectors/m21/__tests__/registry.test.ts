@@ -41,6 +41,7 @@ const EXPECTED_KEYS = [
   "jira",
   "airtable",
   "supabase",
+  "netlify",
 ];
 
 const ROOT = join(__dirname, "..", "..", "..", "..");
@@ -53,7 +54,7 @@ describe("built-in connector registry", () => {
       BUILT_IN_CONNECTORS.map((c) => c.key),
       EXPECTED_KEYS,
     );
-    assert.equal(BUILT_IN_CONNECTORS.length, 22);
+    assert.equal(BUILT_IN_CONNECTORS.length, 23);
   });
 
   it("every key resolves to an adapter with the same key, auth type and at least one tool", () => {

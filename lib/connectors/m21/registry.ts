@@ -1,6 +1,6 @@
 // Marketr — M21 built-in connector registry (spec §7, §11).
 //
-// DESIGN DECISION (recorded in prisma/schema.prisma): the 22 built-in
+// DESIGN DECISION (recorded in prisma/schema.prisma): the 23 built-in
 // connectors are CODE-defined here, not DB rows. (The count is pinned by
 // lib/connectors/m21/__tests__/registry.test.ts — update both together.) `Connector` rows exist
 // ONLY for workspace-custom MCP servers (kind=mcp). Do not create DB rows
@@ -312,6 +312,15 @@ export const BUILT_IN_CONNECTORS: BuiltinConnectorMeta[] = [
     description: "List Supabase projects and storage buckets, and run read-only SQL queries (anything that writes is refused).",
     authNote: "Supabase personal access token (sbp_…, Dashboard → Account → Access tokens). Read-only: no writes in v1.",
   },
+  // Phase 11 (devtools): Netlify sites and deploys through the Phase 9 deploy
+  // adapter (lib/deploy/netlify.ts) and its hosting-connection credentials.
+  {
+    key: "netlify",
+    displayName: "Netlify",
+    authType: "api_key",
+    description: "List Netlify sites and deploys, and start a new deploy from the linked repository after you confirm.",
+    authNote: "Reuse a project's Netlify hosting connection (Sites → Hosting → Use for agents), or a Netlify personal access token.",
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -382,6 +391,7 @@ import { LinearAdapter } from "./native/linear";
 import { JiraAdapter } from "./native/jira";
 import { AirtableAdapter } from "./native/airtable";
 import { SupabaseAdapter } from "./native/supabase";
+import { NetlifyM21Adapter } from "./native/netlify";
 
 const ADAPTER_CLASSES: Record<string, () => ConnectorAdapter> = {
   "google-search-console": () => new GoogleSearchConsoleAdapter(),
@@ -409,6 +419,7 @@ const ADAPTER_CLASSES: Record<string, () => ConnectorAdapter> = {
   jira: () => new JiraAdapter(),
   airtable: () => new AirtableAdapter(),
   supabase: () => new SupabaseAdapter(),
+  netlify: () => new NetlifyM21Adapter(),
 };
 
 /** Resolve a built-in connector key to its native adapter. Throws on unknown key. */
@@ -424,7 +435,7 @@ export function resolveAdapter(key: string): ConnectorAdapter {
 //
 // Phase 4b wired the last six mock-only adapters (GSC, GA4, Drive, Notion,
 // Meta Ads, Google Ads) to their live APIs: with a vault credential they
-// call the provider; without one they stay in labeled mock mode. All 22
+// call the provider; without one they stay in labeled mock mode. All 23
 // built-in adapters have live wiring, so the set is empty (0 mock-only;
 // pinned by lib/connectors/m21/__tests__/registry.test.ts). Keep it in
 // sync with the per-adapter file headers (scripts/verify-connector-health.mts
