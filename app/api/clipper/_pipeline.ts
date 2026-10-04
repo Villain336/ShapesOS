@@ -33,8 +33,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 
-import { prisma } from "@/lib/prisma";
-import type { Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
+import { claimRows } from "@/lib/jobs/claim";
 import { withWorkspaceScope } from "@/lib/substrate/memory/rls";
 import { getStorageAdapter } from "@/lib/filesystem/storage";
 import { safeFetch } from "@/lib/connectors/safe-fetch";
@@ -50,10 +50,6 @@ export interface WordTimedTranscript { words: TimedWord[]; text: string }
 export interface ClipCandidate {
   startSec: number; endSec: number; viralityScore: number;
   scoreReasons: unknown[]; hookText: string;
-}
-
-function escapeLiteral(s: string): string {
-  return s.replace(/'/g, "''");
 }
 
 // ── Storage + temp helpers ────────────────────────────────────────────────
@@ -200,6 +196,8 @@ async function failJob(workspaceId: string, jobId: string, message: string) {
 // Single UPDATE ... WHERE id = (SELECT ... FOR UPDATE SKIP LOCKED) in one
 // transaction with the workspace GUC set: exactly one claimer wins per row,
 // even with concurrent processors. Returns null when nothing is pending.
+// Phase 8: the statement is the shared claim helper (lib/jobs/claim.ts),
+// which the agent job queue uses too.
 
 interface ClaimedJob {
   id: string; workspaceId: string; sourceId: string | null; kind: string;
@@ -207,20 +205,13 @@ interface ClaimedJob {
 }
 
 export async function claimNextPendingJob(workspaceId: string): Promise<ClaimedJob | null> {
-  const rows = await prisma.$transaction(async (tx) => {
-    await tx.$executeRawUnsafe(`SET LOCAL app.workspace_id = '${escapeLiteral(workspaceId)}'`);
-    return tx.$queryRawUnsafe<ClaimedJob[]>(`
-      UPDATE "clip_jobs"
-      SET "status" = 'processing', "progress" = 0, "updated_at" = NOW()
-      WHERE "id" = (
-        SELECT sub."id" FROM "clip_jobs" AS sub
-        WHERE sub."status" = 'pending' AND sub."workspace_id" = $1
-        ORDER BY sub."created_at" ASC
-        FOR UPDATE SKIP LOCKED
-        LIMIT 1
-      )
-      RETURNING "id", "workspace_id" AS "workspaceId", "source_id" AS "sourceId",
-                "kind", "payload"`, workspaceId);
+  const rows = await claimRows<ClaimedJob>({
+    workspaceId,
+    table: "clip_jobs",
+    where: Prisma.sql`sub."status" = 'pending'`,
+    orderBy: Prisma.sql`sub."created_at" ASC`,
+    set: Prisma.sql`"status" = 'processing', "progress" = 0, "updated_at" = NOW()`,
+    returning: Prisma.sql`"id", "workspace_id" AS "workspaceId", "source_id" AS "sourceId", "kind", "payload"`,
   });
   return rows[0] ?? null;
 }

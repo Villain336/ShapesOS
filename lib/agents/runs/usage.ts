@@ -30,6 +30,11 @@ export function isUsageEvent(e: EventLike): boolean {
   return e.type === "usage";
 }
 
+/** Phase 8: streamed text chunks — replayed live by the SSE route, not timeline steps. */
+export function isStreamEvent(e: EventLike): boolean {
+  return e.type === "text";
+}
+
 const int = (v: unknown) => (typeof v === "number" && Number.isFinite(v) && v >= 0 ? Math.round(v) : 0);
 
 export function runUsageTotals(events: readonly EventLike[]): RunUsageTotals {

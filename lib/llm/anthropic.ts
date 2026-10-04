@@ -107,6 +107,8 @@ export interface AnthropicModelCaps {
   forcedToolChoice: boolean;
   /** Accepts web_search_20260209 / web_fetch_20260209. */
   serverTools: boolean;
+  /** Phase 8: server-side compaction (beta compact-2026-01-12 / compact_20260112). */
+  compaction?: boolean;
 }
 
 /** Per-model API surface, from the Claude API docs (models.md, error-codes.md,
@@ -114,13 +116,19 @@ export interface AnthropicModelCaps {
 export function anthropicModelCaps(model: string): AnthropicModelCaps {
   switch (model) {
     case "claude-opus-5-5":
-    case "claude-fable-5-1":
       // Thinking always on; effort is the only depth control; forced tool_choice 400s.
+      // Compaction beta: listed for Opus 5.5 (typescript/claude-api/README.md → Compaction).
+      return { adaptiveThinking: true, thinkingOff: "impossible", effort: true, forcedToolChoice: false, serverTools: true, compaction: true };
+    case "claude-fable-5-1":
+      // As Opus 5.5. The compaction beta is documented for "Fable 5", not
+      // named for 5.1 — not assumed (the loop compacts client-side instead).
       return { adaptiveThinking: true, thinkingOff: "impossible", effort: true, forcedToolChoice: false, serverTools: true };
     case "claude-sonnet-5-5":
       // disabled 400s; between_tools at effort <= high turns it off; forced 400s.
       return { adaptiveThinking: true, thinkingOff: "between_tools", effort: true, forcedToolChoice: false, serverTools: true };
     case "claude-opus-5":
+      // Adaptive by default; disabled only at effort high or lower. Compaction beta listed.
+      return { adaptiveThinking: true, thinkingOff: "disabled", effort: true, forcedToolChoice: true, serverTools: true, compaction: true };
     case "claude-sonnet-5":
       // Adaptive by default; disabled only at effort high or lower.
       return { adaptiveThinking: true, thinkingOff: "disabled", effort: true, forcedToolChoice: true, serverTools: true };
@@ -143,7 +151,13 @@ export interface BuiltAnthropicRequest {
   params: Anthropic.Messages.MessageCreateParamsNonStreaming;
   notes: string[];
   serverToolsSent: ChatServerTool[];
+  /** Phase 8: the request uses the compaction beta (send via client.beta.messages). */
+  compaction: boolean;
 }
+
+/** Phase 8: the documented compaction beta (typescript/claude-api/README.md). */
+export const COMPACTION_BETA = "compact-2026-01-12";
+export const COMPACTION_EDIT = "compact_20260112";
 
 function toAnthropicContent(
   blocks: ChatContentBlock[],
@@ -188,7 +202,7 @@ function toAnthropicContent(
 export function buildAnthropicParams(
   model: string,
   req: ChatRequest,
-  opts: { stream: boolean; defaultEffort?: ChatEffort | null },
+  opts: { stream: boolean; defaultEffort?: ChatEffort | null; betaAvailable?: boolean },
 ): BuiltAnthropicRequest {
   if (!Number.isInteger(req.maxTokens) || req.maxTokens < 1) {
     throw new LlmProviderError({ provider: "anthropic", kind: "client", detail: "maxTokens must be a positive integer" });
@@ -313,10 +327,23 @@ export function buildAnthropicParams(
     }
   }
 
+  // Compaction (Phase 8): server-side summarize-and-continue, beta.
+  let compaction = false;
+  if (req.compaction) {
+    if (caps.compaction && opts.betaAvailable !== false) {
+      params.betas = [COMPACTION_BETA];
+      params.context_management = { edits: [{ type: COMPACTION_EDIT }] };
+      compaction = true;
+    } else {
+      notes.push(`Server-side compaction is not available on ${model}; not sent.`);
+    }
+  }
+
   return {
     params: params as unknown as Anthropic.Messages.MessageCreateParamsNonStreaming,
     notes,
     serverToolsSent,
+    compaction,
   };
 }
 
@@ -418,15 +445,19 @@ interface MessageStreamLike extends AsyncIterable<Anthropic.Messages.RawMessageS
   abort?(): void;
 }
 
+interface MessagesLike {
+  create(
+    params: Anthropic.Messages.MessageCreateParamsNonStreaming,
+    options?: { signal?: AbortSignal },
+  ): PromiseLike<Anthropic.Messages.Message>;
+  stream(params: Anthropic.Messages.MessageStreamParams, options?: { signal?: AbortSignal }): MessageStreamLike;
+}
+
 /** The slice of the SDK client this adapter uses (a test seam). */
 export interface AnthropicClientLike {
-  messages: {
-    create(
-      params: Anthropic.Messages.MessageCreateParamsNonStreaming,
-      options?: { signal?: AbortSignal },
-    ): PromiseLike<Anthropic.Messages.Message>;
-    stream(params: Anthropic.Messages.MessageStreamParams, options?: { signal?: AbortSignal }): MessageStreamLike;
-  };
+  messages: MessagesLike;
+  /** Phase 8: beta endpoints (compaction). Same shapes; `betas` rides in params. */
+  beta?: { messages: MessagesLike };
 }
 
 export interface AnthropicProviderOptions {
@@ -525,29 +556,43 @@ export class AnthropicLlmProvider implements LlmProvider {
     });
   }
 
+  /** The endpoint a built request goes to (beta when it uses compaction). */
+  private endpoint(built: BuiltAnthropicRequest): MessagesLike {
+    return built.compaction && this.client.beta ? this.client.beta.messages : this.client.messages;
+  }
+
   async chat(req: ChatRequest): Promise<ChatResponse> {
-    const built = buildAnthropicParams(this.model, req, { stream: false, defaultEffort: this.defaultEffort });
+    const built = buildAnthropicParams(this.model, req, {
+      stream: false,
+      defaultEffort: this.defaultEffort,
+      betaAvailable: Boolean(this.client.beta),
+    });
     let msg: Anthropic.Messages.Message;
     try {
-      msg = await this.client.messages.create(built.params, req.signal ? { signal: req.signal } : undefined);
+      msg = await this.endpoint(built).create(built.params, req.signal ? { signal: req.signal } : undefined);
     } catch (err) {
       if (req.signal?.aborted) throw req.signal.reason ?? err;
       throw classifyAnthropicError(err);
     }
     const res = mapAnthropicMessage(msg, { model: this.model, req, notes: built.notes, serverToolsSent: built.serverToolsSent });
+    if (built.compaction) res.meta.compaction = "server";
     await this.record(req, res);
     return res;
   }
 
   async *chatStream(req: ChatRequest): AsyncGenerator<ChatStreamEvent> {
-    const built = buildAnthropicParams(this.model, req, { stream: true, defaultEffort: this.defaultEffort });
+    const built = buildAnthropicParams(this.model, req, {
+      stream: true,
+      defaultEffort: this.defaultEffort,
+      betaAvailable: Boolean(this.client.beta),
+    });
     const toolJson = new Map<number, string>();
     const toolMeta = new Map<number, { id: string; name: string }>();
     let stream: MessageStreamLike | null = null;
     let msg: Anthropic.Messages.Message | null = null;
     try {
       try {
-        stream = this.client.messages.stream(
+        stream = this.endpoint(built).stream(
           built.params as unknown as Anthropic.Messages.MessageStreamParams,
           req.signal ? { signal: req.signal } : undefined,
         );
@@ -604,6 +649,7 @@ export class AnthropicLlmProvider implements LlmProvider {
       serverToolsSent: built.serverToolsSent,
       toolJson,
     });
+    if (built.compaction) res.meta.compaction = "server";
     await this.record(req, res);
     yield { type: "message_stop", stopReason: res.stopReason, usage: res.usage };
     yield { type: "final", response: res };

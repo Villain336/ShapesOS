@@ -600,6 +600,9 @@ model Workspace {
   composioToolCatalog         ComposioToolCatalog[]
   // Phase 16 slice 5: viewable agent runs back-relation.
   agentRuns                   AgentRun[]
+  // Phase 8: durable agent work queue + per-run transcripts (resume).
+  agentJobs                   AgentJob[]
+  agentRunTranscripts         AgentRunTranscript[]
   // Phase 16 slice 9: branded report engine back-relation.
   reportSendApprovals         ReportSendApproval[]
   // Phase 17 slice 1: Business Operations back-relations (DocType entities).
@@ -9040,6 +9043,9 @@ enum AgentRunEventType {
   note
   // Phase 7: one model call's tokens + estimated cost (lib/llm/usage.ts).
   usage
+  // Phase 8: streamed model text (chunks of deltas, lib/agents/loop.ts) —
+  // what the AG-UI SSE route replays live; not a timeline step.
+  text
 
   @@map("AgentRunEventType")
 }
@@ -9074,6 +9080,10 @@ model AgentRun {
 
   recording AgentRunRecording?
   events    AgentRunEvent[]
+  // Phase 8: the loop's saved transcript (resume after a crash) and the
+  // queue jobs that worked on this run.
+  transcript AgentRunTranscript?
+  jobs       AgentJob[]
 
   @@index([workspaceId, status, createdAt])
   @@index([workspaceId, threadId])
@@ -9122,6 +9132,78 @@ model AgentRunEvent {
   @@unique([runId, seq])
   @@index([workspaceId, runId, seq])
   @@map("agent_run_events")
+}
+
+// ============================================================================
+// Phase 8: agent runtime — durable queue + resumable transcripts.
+//
+// agent_jobs: one row per unit of background agent work (a chat turn handed
+// off by the request, a mission launch). Workers claim rows with
+// FOR UPDATE SKIP LOCKED (lib/jobs/claim.ts), hold a lease they extend on a
+// heartbeat, and a row whose lease expired is claimed again until
+// max_attempts, then it is `dead`. FORCE RLS on app.workspace_id like
+// agent_runs; a worker finds WHICH workspaces have due work through a
+// SELECT-only discovery policy keyed on app.agent_worker='discover'
+// (migration 20261009100000).
+// agent_run_transcripts: the agent loop's state (messages, tool results,
+// step / cost counters) saved after every step, so a requeued job resumes
+// from the last step and never re-runs a tool whose result was saved.
+// ============================================================================
+
+enum AgentJobStatus {
+  queued
+  running
+  succeeded
+  failed
+  cancelled
+  dead
+
+  @@map("AgentJobStatus")
+}
+
+model AgentJob {
+  id          String         @id @default(cuid()) @map("id")
+  workspaceId String         @map("workspace_id")
+  workspace   Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  // Handler key (lib/agents/queue/handlers.ts): chat_turn | mission | …
+  kind        String         @map("kind")
+  payload     Json           @map("payload")
+  status      AgentJobStatus @default(queued) @map("status")
+  attempts    Int            @default(0) @map("attempts")
+  maxAttempts Int            @default(3) @map("max_attempts")
+  // Not claimable before this (retry backoff).
+  runAfter    DateTime       @default(now()) @map("run_after")
+  heartbeatAt DateTime?      @map("heartbeat_at")
+  // A running row whose lease passed is presumed orphaned (worker died).
+  leaseUntil  DateTime?      @map("lease_until")
+  lockedBy    String?        @map("locked_by")
+  // The AgentRun this job works on (the run carries the transcript).
+  runId       String?        @map("run_id")
+  run         AgentRun?      @relation(fields: [runId], references: [id], onDelete: SetNull)
+  lastError   String?        @map("last_error")
+  result      Json?          @map("result")
+  createdAt   DateTime       @default(now()) @map("created_at")
+  updatedAt   DateTime       @updatedAt @map("updated_at")
+  finishedAt  DateTime?      @map("finished_at")
+
+  @@index([status, runAfter])
+  @@index([workspaceId, status, runAfter])
+  @@index([workspaceId, runId])
+  @@map("agent_jobs")
+}
+
+model AgentRunTranscript {
+  runId       String    @id @map("run_id")
+  run         AgentRun  @relation(fields: [runId], references: [id], onDelete: Cascade)
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  // lib/agents/loop.ts LoopState (versioned JSON).
+  state       Json      @map("state")
+  step        Int       @default(0) @map("step")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@index([workspaceId])
+  @@map("agent_run_transcripts")
 }
 
 // ============================================================================

@@ -26,7 +26,7 @@ import { needsReconnect } from "@/lib/aos/home";
 import { clockTime, runAgentName, runPrompt, runTimeline, runTitle, upcomingPlanSteps, type PlanStepInput } from "@/lib/aos/runs";
 import { TOOL_GROUP_LABELS, isToolGroup } from "@/lib/agents/grants";
 import { humanize } from "@/lib/approvals/format";
-import { isUsageEvent, runUsageFacts, runUsageTotals } from "@/lib/agents/runs/usage";
+import { isStreamEvent, isUsageEvent, runUsageFacts, runUsageTotals } from "@/lib/agents/runs/usage";
 import { LiveWatch } from "./LiveWatch";
 import { RunTimelinePanel } from "./RunTimelinePanel";
 
@@ -113,7 +113,7 @@ export default async function RunViewerPage({ params }: { params: Promise<{ runI
   // Phase 7: model-call usage events are bookkeeping (cost per run), not
   // steps — they are summed into the facts below and kept off the timeline.
   const usage = runUsageTotals(allEvents);
-  const events = allEvents.filter((e) => !isUsageEvent(e));
+  const events = allEvents.filter((e) => !isUsageEvent(e) && !isStreamEvent(e));
 
   // The run's mission: its name, state, plan (steps still to come) and the
   // approvals waiting on a person. Read-only here; decisions happen in the inbox.

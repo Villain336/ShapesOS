@@ -195,6 +195,22 @@ export async function listAgentRunEvents(workspaceId: string, runId: string) {
   );
 }
 
+/**
+ * Phase 8: the run's events after a sequence number, in order (bounded) —
+ * how the AG-UI SSE route tails a run as it works, in this process or on a
+ * worker.
+ */
+export async function listAgentRunEventsAfter(workspaceId: string, runId: string, afterSeq: number, limit = 500) {
+  return withWorkspaceScope(workspaceId, (tx) =>
+    tx.agentRunEvent.findMany({
+      where: { runId, workspaceId, seq: { gt: afterSeq } },
+      orderBy: { seq: "asc" },
+      take: Math.min(Math.max(limit, 1), 2000),
+      select: { seq: true, type: true, summary: true, payload: true },
+    }),
+  );
+}
+
 /** List runs for a workspace, newest first (bounded). */
 export async function listAgentRuns(workspaceId: string, limit = 50) {
   return withWorkspaceScope(workspaceId, (tx) =>
