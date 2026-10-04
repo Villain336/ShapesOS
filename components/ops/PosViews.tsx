@@ -385,6 +385,8 @@ export function PosTill({ session: initial, items, taxRateBps, cardMode }: { ses
   const [promo, setPromo] = useState("");
   const [appliedPromo, setAppliedPromo] = useState<string | null>(null);
   const [quote, setQuote] = useState<Quote | null>(null);
+  // True when the last quote request couldn't reach the server (offline pricing).
+  const [quoteUnreachable, setQuoteUnreachable] = useState(false);
   const [online, setOnline] = useState(true);
   const [queued, setQueued] = useState(0);
   const [syncNote, setSyncNote] = useState<string | null>(null);
@@ -459,9 +461,15 @@ export function PosTill({ session: initial, items, taxRateBps, cardMode }: { ses
           body: JSON.stringify({ lines: cart.map((l) => ({ productId: l.item.productId, variantId: l.item.variantId, qty: l.qty })), promoCode: appliedPromo }),
         });
         const d = (await r.json()) as { quote?: Quote; error?: string };
-        if (live) setQuote(r.ok && d.quote ? d.quote : null);
+        if (live) {
+          setQuote(r.ok && d.quote ? d.quote : null);
+          setQuoteUnreachable(false);
+        }
       } catch {
-        if (live) setQuote(null);
+        if (live) {
+          setQuote(null);
+          setQuoteUnreachable(true);
+        }
       }
     }, 150);
     return () => {
@@ -471,7 +479,9 @@ export function PosTill({ session: initial, items, taxRateBps, cardMode }: { ses
   }, [cart, appliedPromo, initial.id]);
 
   const totals = quote ?? { ...offlineEstimate, discountCents: 0, promo: null, blocker: null };
-  const offlinePricing = !quote && cart.length > 0;
+  const offlinePricing = !quote && cart.length > 0 && (quoteUnreachable || !online);
+  // Online and the server's price isn't back yet: wait before taking money.
+  const pricing = cart.length > 0 && !quote && !offlinePricing;
   const shown = items.filter((i) => !query.trim() || `${i.name} ${i.sku}`.toLowerCase().includes(query.trim().toLowerCase()));
 
   const add = (item: TillItem) => setCart((c) => (c.some((l) => l.item.key === item.key) ? c.map((l) => (l.item.key === item.key ? { ...l, qty: l.qty + 1 } : l)) : [...c, { item, qty: 1 }]));
@@ -566,9 +576,9 @@ export function PosTill({ session: initial, items, taxRateBps, cardMode }: { ses
                   onClick={() => add(i)}
                   className="aos-press flex min-h-[96px] flex-col justify-between rounded-lg bg-paper p-3 text-left shadow-hairline hover:shadow-outline focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--aos-focus-halo)] disabled:opacity-40"
                 >
-                  <span className="text-[15px] font-semibold text-ink">{i.name}</span>
-                  <span className="flex items-end justify-between gap-2">
-                    <span className="font-mono text-[12px] text-muted">{i.sku}</span>
+                  <span className="line-clamp-2 text-[15px] font-semibold text-ink">{i.name}</span>
+                  <span className="mt-2 flex flex-col gap-0.5">
+                    <span className="truncate font-mono text-[12px] text-muted">{i.sku}</span>
                     <span className="text-[15px] font-semibold tabular-nums text-ink">{fmtCents(i.priceCents)}</span>
                   </span>
                 </button>
@@ -641,7 +651,7 @@ export function PosTill({ session: initial, items, taxRateBps, cardMode }: { ses
             <button
               type="button"
               className={`${btnPrimary} h-control-lg text-[15px]`}
-              disabled={!sellable || cart.length === 0 || Boolean(totals.blocker) || totals.totalCents <= 0 || (offlinePricing && Boolean(appliedPromo))}
+              disabled={!sellable || cart.length === 0 || pricing || Boolean(totals.blocker) || totals.totalCents <= 0 || (offlinePricing && Boolean(appliedPromo))}
               onClick={() => setPay("cash")}
             >
               <Banknote size={16} /> Cash
@@ -649,7 +659,7 @@ export function PosTill({ session: initial, items, taxRateBps, cardMode }: { ses
             <button
               type="button"
               className={`${btnGhost} h-control-lg text-[15px]`}
-              disabled={!sellable || cart.length === 0 || Boolean(totals.blocker) || !online || !cardMode || totals.totalCents <= 0}
+              disabled={!sellable || cart.length === 0 || pricing || offlinePricing || Boolean(totals.blocker) || !online || !cardMode || totals.totalCents <= 0}
               onClick={() => setPay("card")}
               title={!cardMode ? "Connect Stripe in Finance settings to take cards" : undefined}
             >

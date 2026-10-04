@@ -451,7 +451,7 @@ function MoDetail({ mo, product, onClose, onChanged }: { mo: MoRow; product?: Pr
           </button>
         )}
       </div>
-      {completing && (
+      {completing && (mo.status === "confirmed" || mo.status === "in_progress") && (
         <div className={`${noteBoxCls} mb-4 flex flex-col gap-3`}>
           <p className="text-[13px] text-ink">
             Completing uses up the components for every unit made or scrapped, adds the good units to stock and posts the cost of components and labour to the books.
