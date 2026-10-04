@@ -282,7 +282,7 @@ describe("OAuth + adapter wiring", () => {
       assert.equal(u.pathname, "/admin/oauth/authorize");
       assert.equal(u.searchParams.get("scope"), "read_products,read_inventory,write_inventory,read_locations,read_orders,read_customers");
       assert.equal(parseOAuthState(state).shop, "my-store.myshopify.com");
-      assert.deepEqual(getOAuthConfig("shopify")!.callbackMeta!({}, parseOAuthState(state)), { shop: "my-store.myshopify.com" });
+      assert.deepEqual(getOAuthConfig("shopify")!.callbackMeta!({}, parseOAuthState(state)), { shop: "my-store.myshopify.com", label: "my-store.myshopify.com" });
     } finally {
       delete process.env.SHOPIFY_CLIENT_ID;
     }

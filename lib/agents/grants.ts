@@ -189,6 +189,7 @@ export function connectorGroup(connectorKey: string): ToolGroup {
     case "hubspot": // Phase 11 (conncore): CRM sync is business operations
     case "shopify": // Phase 11 (bizsync): commerce + accounting sync is business operations
     case "quickbooks":
+    case "xero":
       return "ops";
     case "google-search-console":
     case "ga4":
@@ -237,8 +238,10 @@ export function connectorAction(connectorKey: string, tool: string): string {
     // Phase 11 (bizsync): accounting — contacts are CRM writes (Tier 2);
     // posting the books is Tier 3 (never automated, always asks).
     case "quickbooks.import_contacts":
+    case "xero.import_contacts":
       return "write_crm_record";
     case "quickbooks.post_to_quickbooks":
+    case "xero.post_to_xero":
       return "post_to_accounting";
     default:
       return "connector_write";

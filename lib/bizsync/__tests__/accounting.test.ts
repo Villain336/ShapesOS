@@ -201,7 +201,7 @@ describe("gating + OAuth wiring", () => {
     const cfg = getOAuthConfig("quickbooks")!;
     assert.equal(cfg.tokenRequest, "form_basic");
     assert.deepEqual(cfg.scopes, ["com.intuit.quickbooks.accounting"]);
-    assert.deepEqual(cfg.callbackMeta!({ realmId: "9130350000000000" }, {} as never), { realmId: "9130350000000000" });
+    assert.deepEqual(cfg.callbackMeta!({ realmId: "9130350000000000" }, {} as never), { realmId: "9130350000000000", label: "QuickBooks company 9130350000000000" });
     assert.deepEqual(cfg.callbackMeta!({ realmId: "../x" }, {} as never), {});
   });
 });

@@ -293,7 +293,7 @@ export const OAUTH_CONFIGS: Record<string, OAuthProviderConfig> = {
     clientSecretEnv: "SHOPIFY_CLIENT_SECRET",
     scopeSeparator: ",",
     perShop: true,
-    callbackMeta: (_q, state): Record<string, string> => (state.shop ? { shop: state.shop } : {}),
+    callbackMeta: (_q, state): Record<string, string> => (state.shop ? { shop: state.shop, label: state.shop } : {}),
   },
   // Phase 11 (bizsync): QuickBooks Online (Intuit OAuth 2.0). The company id
   // (realmId) arrives as a callback query param, not in the token response.
@@ -307,7 +307,7 @@ export const OAUTH_CONFIGS: Record<string, OAuthProviderConfig> = {
     clientIdEnv: "QUICKBOOKS_CLIENT_ID",
     clientSecretEnv: "QUICKBOOKS_CLIENT_SECRET",
     tokenRequest: "form_basic",
-    callbackMeta: (q): Record<string, string> => (/^\d{1,32}$/.test(q.realmId ?? "") ? { realmId: q.realmId } : {}),
+    callbackMeta: (q): Record<string, string> => (/^\d{1,32}$/.test(q.realmId ?? "") ? { realmId: q.realmId, label: `QuickBooks company ${q.realmId}` } : {}),
   },
   // Phase 11 (bizsync): Xero (OAuth 2.0 code flow). The organisation (tenant)
   // is chosen after the token exchange from GET https://api.xero.com/connections

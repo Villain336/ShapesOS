@@ -1,6 +1,6 @@
 // Marketr — M21 built-in connector registry (spec §7, §11).
 //
-// DESIGN DECISION (recorded in prisma/schema.prisma): the 20 built-in
+// DESIGN DECISION (recorded in prisma/schema.prisma): the 21 built-in
 // connectors are CODE-defined here, not DB rows. (The count is pinned by
 // lib/connectors/m21/__tests__/registry.test.ts — update both together.) `Connector` rows exist
 // ONLY for workspace-custom MCP servers (kind=mcp). Do not create DB rows
@@ -300,6 +300,18 @@ export const BUILT_IN_CONNECTORS: BuiltinConnectorMeta[] = [
     },
     authNote: "Intuit OAuth 2.0 (one QuickBooks company per connection). QUICKBOOKS_ENVIRONMENT=sandbox for Intuit's sandbox.",
   },
+  // Phase 11 (bizsync): Xero ↔ the Ops accounting core (same shape as QuickBooks).
+  {
+    key: "xero",
+    displayName: "Xero",
+    authType: "oauth2",
+    description: "Pick your Xero organisation, map your chart of accounts, import contacts, and post invoices, bills, payments and manual journals after you confirm.",
+    oauth: {
+      scopes: XERO_SCOPES,
+      envVars: ["XERO_CLIENT_ID", "XERO_CLIENT_SECRET"],
+    },
+    authNote: "Xero OAuth 2.0; after connecting, choose the organisation in Settings → Connectors → Business sync.",
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -367,6 +379,7 @@ import { SlackAdapter } from "./native/slack";
 import { HubspotAdapter } from "./native/hubspot";
 import { ShopifyAdapter } from "./native/shopify"; // Phase 11 (bizsync)
 import { QuickbooksAdapter } from "./native/quickbooks"; // Phase 11 (bizsync)
+import { XeroAdapter } from "./native/xero"; // Phase 11 (bizsync)
 
 const ADAPTER_CLASSES: Record<string, () => ConnectorAdapter> = {
   "google-search-console": () => new GoogleSearchConsoleAdapter(),
@@ -392,6 +405,7 @@ const ADAPTER_CLASSES: Record<string, () => ConnectorAdapter> = {
   // Phase 11 (bizsync).
   shopify: () => new ShopifyAdapter(),
   quickbooks: () => new QuickbooksAdapter(),
+  xero: () => new XeroAdapter(),
 };
 
 /** Resolve a built-in connector key to its native adapter. Throws on unknown key. */
@@ -407,7 +421,7 @@ export function resolveAdapter(key: string): ConnectorAdapter {
 //
 // Phase 4b wired the last six mock-only adapters (GSC, GA4, Drive, Notion,
 // Meta Ads, Google Ads) to their live APIs: with a vault credential they
-// call the provider; without one they stay in labeled mock mode. All 20
+// call the provider; without one they stay in labeled mock mode. All 21
 // built-in adapters have live wiring, so the set is empty (0 mock-only;
 // pinned by lib/connectors/m21/__tests__/registry.test.ts). Keep it in
 // sync with the per-adapter file headers (scripts/verify-connector-health.mts

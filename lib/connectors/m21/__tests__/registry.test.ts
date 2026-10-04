@@ -38,6 +38,7 @@ const EXPECTED_KEYS = [
   "hubspot",
   "shopify", // Phase 11 (bizsync)
   "quickbooks", // Phase 11 (bizsync)
+  "xero", // Phase 11 (bizsync)
 ];
 
 const ROOT = join(__dirname, "..", "..", "..", "..");
@@ -50,7 +51,7 @@ describe("built-in connector registry", () => {
       BUILT_IN_CONNECTORS.map((c) => c.key),
       EXPECTED_KEYS,
     );
-    assert.equal(BUILT_IN_CONNECTORS.length, 20); // Phase 11 (bizsync): +2 shopify, quickbooks
+    assert.equal(BUILT_IN_CONNECTORS.length, 21); // Phase 11 (bizsync): +3 shopify, quickbooks, xero
   });
 
   it("every key resolves to an adapter with the same key, auth type and at least one tool", () => {

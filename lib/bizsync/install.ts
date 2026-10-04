@@ -27,4 +27,8 @@ export async function onBizsyncConnected(input: { connectorKey: string; connecti
     );
     return;
   }
+  if (input.connectorKey === "xero") {
+    const { recordXeroTenants } = await import("./xero/tenants");
+    await recordXeroTenants(connection, input.fetchImpl ? { fetchImpl: input.fetchImpl } : {});
+  }
 }
