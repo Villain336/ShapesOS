@@ -13,6 +13,7 @@ import { cache } from "react";
 import { withWorkspaceScope } from "@/lib/substrate/memory/rls";
 import { checkCap } from "@/lib/metering/service";
 import { deriveAgentTree, type AgentRunInput, type AgentTree, type MissionInput } from "./agents";
+import { runPrompt } from "./runs";
 import { fromSkillRunStatus, type AosStatus } from "./status";
 
 const DAY_MS = 86_400_000;
@@ -120,7 +121,7 @@ export async function loadAgentActivity(workspaceId: string, now = new Date()): 
         },
         orderBy: { createdAt: "desc" },
         take: MAX_RUNS,
-        select: { id: true, kind: true, status: true, missionId: true, createdAt: true, endedAt: true },
+        select: { id: true, kind: true, status: true, missionId: true, createdAt: true, endedAt: true, agentKey: true, agentState: true },
       }),
       tx.skillRun.findMany({
         where: {
@@ -168,6 +169,8 @@ export async function loadAgentActivity(workspaceId: string, now = new Date()): 
       missionId: r.missionId,
       createdAt: r.createdAt.toISOString(),
       endedAt: iso(r.endedAt),
+      agentKey: r.agentKey,
+      task: runPrompt(r.agentState),
     }));
 
     // One card per schedule: its latest run.
