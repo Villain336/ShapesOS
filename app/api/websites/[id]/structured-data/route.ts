@@ -12,6 +12,7 @@ import { prisma } from "@/lib/prisma";
 import { readJsonBody } from "@/lib/sitefiles/api";
 import { ownedSite } from "@/lib/connectors/source";
 import { createJsonLdDraft, JsonLdDraftError, planJsonLd } from "@/lib/seo/jsonld-draft";
+import { errorResponse } from "@/lib/api/errors";
 
 export const dynamic = "force-dynamic";
 
@@ -19,7 +20,7 @@ function errorResponse(err: unknown) {
   if (err instanceof JsonLdDraftError) {
     return Response.json({ error: err.message, code: err.code, issues: err.issues }, { status: err.code === "invalid_block" ? 422 : 400 });
   }
-  return Response.json({ error: err instanceof Error ? err.message : "Structured data failed" }, { status: 500 });
+  return errorResponse(err, "structured-data");
 }
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {

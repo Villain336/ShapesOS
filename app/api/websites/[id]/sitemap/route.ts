@@ -15,6 +15,7 @@ import { readJsonBody } from "@/lib/sitefiles/api";
 import { getSiteIdeProvider, ownedSite } from "@/lib/connectors/source";
 import { refreshSiteSitemap } from "@/lib/seo/sitemap";
 import { listSitemapSubmissions, submitSiteSitemap, SitemapSubmitError, type SubmitTarget } from "@/lib/seo/sitemap-submit";
+import { errorResponse } from "@/lib/api/errors";
 
 export const dynamic = "force-dynamic";
 
@@ -76,7 +77,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       return Response.json({ ok: true, ...out });
     } catch (err) {
       if (err instanceof SitemapSubmitError) return Response.json({ error: err.message, code: err.code }, { status: 400 });
-      return Response.json({ error: err instanceof Error ? err.message : "Submission failed" }, { status: 502 });
+      return errorResponse(err, "sitemap-submit");
     }
   }
   return Response.json({ error: 'action must be "rebuild" or "submit"' }, { status: 400 });
