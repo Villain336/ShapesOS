@@ -61,6 +61,7 @@ import {
   type ToolGroup,
 } from "@/lib/agents/grants";
 import { subAgentSystemPrompt } from "@/lib/agents/roles";
+import { registerCodeTools } from "@/lib/sandbox/tools";
 import { autoApprovalFor } from "@/lib/automation/policy";
 import {
   appendAgentRunEvent,
@@ -1136,6 +1137,8 @@ const delegate_to_subagent: ToolDef = {
 };
 
 registerExtraTool(delegate_to_subagent);
+// Phase 8: the code tools (group "code"), run in the run's sandbox.
+registerCodeTools();
 
 // ---------------------------------------------------------------------------
 // Phase 5: tracked turns — every assistant turn is an AgentRun.
