@@ -18,6 +18,7 @@ import { prisma } from "@/lib/prisma";
 import { ownedSite } from "@/lib/connectors/source";
 import { getSiteRevision } from "@/lib/sites/revisions";
 import { SiteRevisionError, applySiteRevision, discardSiteRevision } from "@/lib/sites/apply";
+import { errorResponse } from "@/lib/api/errors";
 
 export const dynamic = "force-dynamic";
 
@@ -83,6 +84,6 @@ export async function POST(
     return Response.json({ error: 'action must be "apply" or "discard"' }, { status: 400 });
   } catch (err) {
     if (err instanceof SiteRevisionError) return Response.json({ error: err.message, code: err.code }, { status: err.status });
-    return Response.json({ error: err instanceof Error ? err.message : "Failed" }, { status: 500 });
+    return errorResponse(err, "site revision", req);
   }
 }

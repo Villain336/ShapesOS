@@ -13,6 +13,7 @@ import { requireUser } from "@/lib/session";
 import { readJsonBody } from "@/lib/sitefiles/api";
 import { prisma } from "@/lib/prisma";
 import { ownedSite } from "@/lib/connectors/source";
+import { errorResponse } from "@/lib/api/errors";
 import { hostingConnectorFor, hostingKindLabel } from "@/lib/deploy";
 import {
   RollbackError,
@@ -26,10 +27,9 @@ import {
 
 export const dynamic = "force-dynamic";
 
-function fail(err: unknown) {
+function fail(err: unknown, req: NextRequest) {
   if (err instanceof RollbackError) return Response.json({ error: err.message, code: err.code }, { status: err.status });
-  const status = typeof (err as { status?: unknown })?.status === "number" ? (err as { status: number }).status : 500;
-  return Response.json({ error: err instanceof Error ? err.message : "Rollback failed" }, { status });
+  return errorResponse(err, "deploy rollback", req);
 }
 
 export async function POST(
@@ -116,6 +116,6 @@ export async function POST(
       recordId: record.id,
     });
   } catch (err) {
-    return fail(err);
+    return fail(err, req);
   }
 }
