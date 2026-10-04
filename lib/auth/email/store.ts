@@ -31,8 +31,8 @@
 import type { EmailAccount, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { BadRequestError, HttpError } from "@/lib/api/errors";
-import { loginLockedOut, recordLoginSuccess } from "@/lib/auth/rate-limit";
-import { captchaConfig, captchaRequired, verifyCaptchaToken } from "@/lib/auth/captcha";
+import { loginLockedOutAsync, recordLoginSuccessAsync } from "@/lib/auth/rate-limit";
+import { captchaConfig, captchaRequiredAsync, verifyCaptchaToken } from "@/lib/auth/captcha";
 import { InviteRequiredError, signInAllowed, signupMode } from "@/lib/auth/signup";
 import {
   EMAIL_SEND_LIMIT,
@@ -117,7 +117,7 @@ function requireEmail(raw: unknown): string {
 
 /** CAPTCHA: `always` for signup (when a provider is configured), else the login step-up. */
 async function checkCaptcha(ip: string | null, email: string, token: unknown, always: boolean, env?: NodeJS.ProcessEnv) {
-  const due = always ? captchaConfig(env) !== null : captchaRequired(ip, email, { env });
+  const due = always ? captchaConfig(env) !== null : await captchaRequiredAsync(ip, email, { env });
   if (!due) return;
   if (!(await verifyCaptchaToken(typeof token === "string" ? token : "", ip, { env }))) throw new CaptchaRequiredHttpError();
 }
@@ -230,7 +230,7 @@ export async function signUpWithEmail(input: SignUpInput, deps: FlowDeps = {}): 
   if (!name) throw new BadRequestError("Enter your name.", { code: "invalid_name" });
   const policy = passwordPolicyError(input.password, { email, name });
   if (policy) throw new BadRequestError(policy, { code: "weak_password" });
-  if (loginLockedOut(input.ip, email)) throw new EmailAuthLockedError();
+  if (await loginLockedOutAsync(input.ip, email)) throw new EmailAuthLockedError();
   await checkCaptcha(input.ip, email, input.captchaToken, true, deps.env);
   // SIGNUP_MODE=invite: the same check the Auth.js signIn callback runs
   // (membership or a pending, unexpired invite for this address). It never
@@ -265,7 +265,7 @@ export async function requestMagicLink(
 ): Promise<{ ok: true; message: string }> {
   requireEnabled(deps);
   const email = requireEmail(input.email);
-  if (loginLockedOut(input.ip, email)) throw new EmailAuthLockedError();
+  if (await loginLockedOutAsync(input.ip, email)) throw new EmailAuthLockedError();
   await checkCaptcha(input.ip, email, input.captchaToken, false, deps.env);
   const account = await prisma.emailAccount.findUnique({ where: { email }, select: { id: true } });
   if (account) {
@@ -288,7 +288,7 @@ export async function requestPasswordReset(
 ): Promise<{ ok: true; message: string }> {
   requireEnabled(deps);
   const email = requireEmail(input.email);
-  if (loginLockedOut(input.ip, email)) throw new EmailAuthLockedError();
+  if (await loginLockedOutAsync(input.ip, email)) throw new EmailAuthLockedError();
   await checkCaptcha(input.ip, email, input.captchaToken, false, deps.env);
   const account = await prisma.emailAccount.findUnique({ where: { email }, select: { id: true } });
   if (account) await sendLink(email, "reset", "reset", deps);
@@ -328,7 +328,7 @@ export async function resetPassword(
     return row.email;
   });
   if (!email) throw invalid();
-  recordLoginSuccess(input.ip, email);
+  await recordLoginSuccessAsync(input.ip, email);
   await audit("auth_password_reset", `password reset for ${email} from ${input.ip ?? "unknown ip"}`, emailUserId(email));
   return { ok: true, email };
 }

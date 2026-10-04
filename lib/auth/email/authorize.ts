@@ -18,8 +18,8 @@
 import { CredentialsSignin, type User } from "next-auth";
 import { prisma } from "@/lib/prisma";
 import { clientIpFromHeaders } from "@/lib/api/client-ip";
-import { loginLockedOut, recordLoginFailure, recordLoginSuccess } from "@/lib/auth/rate-limit";
-import { captchaRequired, verifyCaptchaToken } from "@/lib/auth/captcha";
+import { loginLockedOutAsync, recordLoginFailureAsync, recordLoginSuccessAsync } from "@/lib/auth/rate-limit";
+import { captchaRequiredAsync, verifyCaptchaToken } from "@/lib/auth/captcha";
 import { normalizeEmail } from "./tokens";
 import { checkEmailPassword, consumeSignInLink } from "./store";
 
@@ -71,21 +71,21 @@ export async function authorizeEmailPassword(
   const key = email || "unknown";
 
   // Fail closed under lockout: don't even compare the password.
-  if (loginLockedOut(ip, key)) {
+  if (await loginLockedOutAsync(ip, key)) {
     console.warn(`[auth] email login blocked (rate limit): ${key} from ${ip ?? "unknown ip"}`);
     throw new EmailLockedError();
   }
-  if (captchaRequired(ip, key)) {
+  if (await captchaRequiredAsync(ip, key)) {
     const token = typeof credentials?.captchaToken === "string" ? credentials.captchaToken : "";
     if (!(await verifyCaptchaToken(token, ip))) throw new EmailCaptchaRequiredError();
   }
   if (!email || !password) {
-    recordLoginFailure(ip, key);
+    await recordLoginFailureAsync(ip, key);
     return null;
   }
   const result = await checkEmailPassword(email, password);
   if (result.status === "invalid") {
-    recordLoginFailure(ip, email);
+    await recordLoginFailureAsync(ip, email);
     await audit("auth_login_failed", `email login failed for ${email} from ${ip ?? "unknown ip"}`);
     return null;
   }
@@ -94,7 +94,7 @@ export async function authorizeEmailPassword(
     await audit("auth_login_failed", `email login refused for ${email} (address not verified) from ${ip ?? "unknown ip"}`);
     throw new EmailUnverifiedError();
   }
-  recordLoginSuccess(ip, email);
+  await recordLoginSuccessAsync(ip, email);
   await audit("auth_login_succeeded", `email login succeeded for ${email} from ${ip ?? "unknown ip"}`);
   return { id: result.account.userId, email: result.account.email, name: result.account.name ?? result.account.email };
 }
@@ -105,16 +105,16 @@ export async function authorizeEmailLink(
 ): Promise<User | null> {
   const ip = clientIpFromHeaders(request?.headers);
   const key = linkKey(ip);
-  if (loginLockedOut(ip, key)) throw new EmailLockedError();
+  if (await loginLockedOutAsync(ip, key)) throw new EmailLockedError();
   const result = await consumeSignInLink(credentials?.token);
   if (result.status !== "ok") {
-    recordLoginFailure(ip, key);
+    await recordLoginFailureAsync(ip, key);
     await audit("auth_login_failed", `email link sign-in ${result.status === "refused" ? "refused (invite required)" : "failed (invalid or used link)"} from ${ip ?? "unknown ip"}`);
     if (result.status === "invalid") throw new EmailLinkInvalidError();
     throw new EmailInviteRequiredError();
   }
-  recordLoginSuccess(ip, key);
-  recordLoginSuccess(ip, result.account.email);
+  await recordLoginSuccessAsync(ip, key);
+  await recordLoginSuccessAsync(ip, result.account.email);
   await audit("auth_login_succeeded", `email link sign-in for ${result.account.email} from ${ip ?? "unknown ip"}`);
   return { id: result.account.userId, email: result.account.email, name: result.account.name ?? result.account.email };
 }
