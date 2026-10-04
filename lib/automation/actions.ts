@@ -43,6 +43,13 @@ export const KNOWN_ACTION_DEFS: ReadonlyArray<{ action: string; label: string; d
   { action: "draft_app_spec", label: "Draft a mini-app", description: "Write or change a mini-app's draft spec (an admin publishes it)." },
   { action: "write_app_record", label: "Write a mini-app record", description: "Add or change a record in a published mini-app. Always asks." },
   { action: "delete_app_record", label: "Delete a mini-app record", description: "Delete a record from a published mini-app. Never automated." },
+  // Phase 10 (ops-core): CRM, projects, helpdesk, inventory agent tools.
+  { action: "write_crm_record", label: "Write CRM records", description: "Create contacts, companies and deals, move deal stages, convert leads. Always asks." },
+  { action: "write_project_record", label: "Write project records", description: "Create tasks and log time on projects. Always asks." },
+  { action: "write_ticket", label: "Open or close tickets", description: "Open helpdesk tickets or mark them solved/closed. Always asks." },
+  { action: "send_ticket_reply", label: "Reply to a ticket", description: "Email a customer from a helpdesk ticket. Always asks." },
+  { action: "move_stock", label: "Draft a stock move", description: "Create a draft move between stock locations (a person books it). Always asks." },
+  { action: "set_reorder_rule", label: "Set a reorder rule", description: "Create or change a min/max reorder rule. Always asks." },
 ];
 
 
