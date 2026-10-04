@@ -43,6 +43,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       description?: unknown;
       actor?: unknown;
       occurredAt?: unknown;
+      userId?: unknown;
+      rateCents?: unknown;
+      taskId?: unknown;
+      billable?: unknown;
     };
     const actor = { workspaceId: workspace.id, userId: user.id };
     const entry = await withWorkspaceScope(workspace.id, (tx) =>
@@ -51,6 +55,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         description: typeof body.description === "string" ? body.description : undefined,
         actor: typeof body.actor === "string" ? body.actor : undefined,
         occurredAt: typeof body.occurredAt === "string" ? body.occurredAt : undefined,
+        // Phase 10 (ops-core): user-linked, rated, task-linked time.
+        userId: typeof body.userId === "string" ? body.userId : undefined,
+        rateCents: typeof body.rateCents === "number" ? body.rateCents : undefined,
+        taskId: typeof body.taskId === "string" ? body.taskId : undefined,
+        billable: typeof body.billable === "boolean" ? body.billable : undefined,
       }),
     );
     return Response.json({ entry });

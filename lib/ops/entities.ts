@@ -398,6 +398,8 @@ const projectDef: OpsEntityDef = {
     status: z.enum(["planning", "active", "on_hold", "completed", "cancelled"]).default("planning"),
     leadId: z.string().max(64).optional(),
     dealId: z.string().max(64).optional(),
+    // Phase 10 (ops-core): default billing rate for logged time.
+    hourlyRateCents: centsSchema.optional(),
   }),
   patchSchema: z.object({
     name: z.string().min(1).max(200).optional(),
@@ -405,6 +407,7 @@ const projectDef: OpsEntityDef = {
     status: z.enum(["planning", "active", "on_hold", "completed", "cancelled"]).optional(),
     leadId: z.string().max(64).nullable().optional(),
     dealId: z.string().max(64).nullable().optional(),
+    hourlyRateCents: centsSchema.nullable().optional(),
   }),
   patchable: true,
   filterable: ["status"],
@@ -746,6 +749,46 @@ const dealDef: OpsEntityDef = {
   },
 };
 
+// ---------------------------------------------------------------------------
+// Phase 10 (ops-core): project tasks (rules in lib/ops/timesheets.ts).
+// ---------------------------------------------------------------------------
+
+const taskStage = z.enum(["backlog", "todo", "in_progress", "review", "done", "cancelled"]);
+const taskPriority = z.enum(["low", "normal", "high", "urgent"]);
+
+const taskDef: OpsEntityDef = {
+  slug: "tasks",
+  label: "Task",
+  delegate: "opsTask",
+  createSchema: z.object({
+    projectId: z.string().min(1).max(64),
+    title: z.string().trim().min(1).max(300),
+    description: z.string().max(10_000).optional(),
+    stage: taskStage.default("todo"),
+    priority: taskPriority.default("normal"),
+    assigneeId: z.string().min(1).max(128).optional(),
+    dueAt: isoDate.optional(),
+    estimateMinutes: z.number().int().min(1).max(100_000).optional(),
+  }),
+  patchSchema: z.object({
+    title: z.string().trim().min(1).max(300).optional(),
+    description: z.string().max(10_000).nullable().optional(),
+    stage: taskStage.optional(),
+    priority: taskPriority.optional(),
+    assigneeId: z.string().min(1).max(128).nullable().optional(),
+    dueAt: isoDate.nullable().optional(),
+    estimateMinutes: z.number().int().min(1).max(100_000).nullable().optional(),
+  }).strict(),
+  patchable: true,
+  filterable: ["projectId", "stage", "assigneeId", "priority"],
+  gatedTransitions: [],
+  summarize: (r) => `task "${r.title}" → ${r.stage}`,
+  hooks: {
+    create: async (tx, a, b) => (await import("./timesheets")).createTaskRow(tx, a, b),
+    patch: async (tx, a, id, p, e) => (await import("./timesheets")).patchTaskRow(tx, a, id, p, e),
+  },
+};
+
 export const OPS_ENTITIES: OpsEntityDef[] = [
   productDef,
   orderDef,
@@ -759,6 +802,7 @@ export const OPS_ENTITIES: OpsEntityDef[] = [
   teamMemberDef,
   leaveRequestDef,
   // Phase 10 (ops-core)
+  taskDef,
   companyDef,
   contactDef,
   dealDef,

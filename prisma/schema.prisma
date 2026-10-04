@@ -606,6 +606,7 @@ model Workspace {
   // Phase 16 slice 9: branded report engine back-relation.
   reportSendApprovals         ReportSendApproval[]
   // Phase 10 (ops-core) back-relations.
+  opsTasks                    OpsTask[]
   opsCompanies                OpsCompany[]
   opsContacts                 OpsContact[]
   opsDeals                    OpsDeal[]
@@ -9473,6 +9474,59 @@ model OpsDeal {
 }
 
 // ============================================================================
+// Phase 10 (ops-core) — projects: tasks (kanban), user-linked timesheets
+// with approval and rates, billing approved time onto draft invoices.
+// ============================================================================
+
+enum OpsTaskStage {
+  backlog
+  todo
+  in_progress
+  review
+  done
+  cancelled
+}
+
+enum OpsTaskPriority {
+  low
+  normal
+  high
+  urgent
+}
+
+enum OpsTimesheetStatus {
+  pending
+  approved
+  rejected
+}
+
+model OpsTask {
+  id              String          @id @default(cuid())
+  workspaceId     String          @map("workspace_id")
+  workspace       Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  projectId       String          @map("project_id")
+  project         OpsProject      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  title           String
+  description     String?         @db.Text
+  stage           OpsTaskStage    @default(todo)
+  priority        OpsTaskPriority @default(normal)
+  // Workspace member (Auth.js subject id), validated on write.
+  assigneeId      String?         @map("assignee_id")
+  dueAt           DateTime?       @map("due_at")
+  estimateMinutes Int?            @map("estimate_minutes")
+  completedAt     DateTime?       @map("completed_at")
+  createdBy       String?         @map("created_by")
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
+
+  timeEntries OpsTimeEntry[]
+
+  @@index([workspaceId, projectId, stage])
+  @@index([workspaceId, assigneeId, stage])
+  @@map("ops_tasks")
+}
+
+// ============================================================================
 // Phase 10 (ops-core) — inventory: warehouses, locations, variants,
 // transfers, reorder rules. Extends the Phase 17 Ops layer (same RLS
 // pattern, same append-only stock ledger). Phase 13's digital twin binds
@@ -9925,10 +9979,13 @@ model OpsProject {
   // Phase 10 (ops-core): a real relation (was a dangling string).
   dealId      String?          @map("deal_id")
   deal        OpsDeal?         @relation(fields: [dealId], references: [id], onDelete: SetNull)
+  // Phase 10 (ops-core): default hourly rate for billing time (cents/hour).
+  hourlyRateCents Int?         @map("hourly_rate_cents")
   createdAt   DateTime         @default(now()) @map("created_at")
   updatedAt   DateTime         @updatedAt @map("updated_at")
 
   timeEntries OpsTimeEntry[]
+  tasks       OpsTask[]
 
   @@index([workspaceId, status, createdAt])
   @@index([workspaceId, leadId])
@@ -9953,10 +10010,26 @@ model OpsTimeEntry {
   actor       String?
   occurredAt  DateTime   @default(now()) @map("occurred_at")
   billed      Boolean    @default(false)
+  // Phase 10 (ops-core): whose time (workspace member subject id), the
+  // billing rate (cents/hour; null = the project's rate), the task, the
+  // approval decision, and the invoice the time was billed on. Minutes and
+  // rate stay immutable — only approval/billing metadata moves.
+  userId         String?            @map("user_id")
+  rateCents      Int?               @map("rate_cents")
+  billable       Boolean            @default(true)
+  taskId         String?            @map("task_id")
+  task           OpsTask?           @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  approvalStatus OpsTimesheetStatus @default(pending) @map("approval_status")
+  approvedBy     String?            @map("approved_by")
+  approvedAt     DateTime?          @map("approved_at")
+  // ops_invoices.id the entry was billed on (set exactly once).
+  invoiceId      String?            @map("invoice_id")
   createdAt   DateTime   @default(now()) @map("created_at")
 
   @@index([workspaceId, projectId, occurredAt])
   @@index([workspaceId, projectId, billed])
+  @@index([workspaceId, approvalStatus, userId])
+  @@index([workspaceId, invoiceId])
   @@map("ops_time_entries")
 }
 

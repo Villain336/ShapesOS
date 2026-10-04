@@ -208,9 +208,34 @@ export async function logTimeEntry(
   tx: Tx,
   actor: OpsActor,
   projectId: string,
-  input: { minutes: number; description?: string; actor?: string; occurredAt?: string },
+  input: {
+    minutes: number;
+    description?: string;
+    actor?: string;
+    occurredAt?: string;
+    // Phase 10 (ops-core): whose time (defaults to the acting user), the
+    // billing rate in cents/hour (null = project rate), task, billable flag.
+    userId?: string;
+    rateCents?: number;
+    taskId?: string;
+    billable?: boolean;
+  },
 ): Promise<OpsTimeEntryRow> {
   const project = await getProject(tx, actor, projectId);
+  const userId = input.userId ?? (actor.userId.startsWith("agent:") ? undefined : actor.userId);
+  if (input.userId && input.userId !== actor.userId) {
+    const { assertWorkspaceUser } = await import("./people");
+    await assertWorkspaceUser(tx, actor.workspaceId, input.userId);
+  }
+  if (input.rateCents !== undefined && (!Number.isInteger(input.rateCents) || input.rateCents < 0 || input.rateCents > 100_000_000)) {
+    throw new OpsError(400, "rateCents must be a non-negative integer (cents per hour)");
+  }
+  if (input.taskId) {
+    const task = await (tx as unknown as { opsTask: { findFirst(a: unknown): Promise<{ id: string } | null> } }).opsTask.findFirst({
+      where: { id: input.taskId, projectId, workspaceId: actor.workspaceId },
+    });
+    if (!task) throw new OpsNotFoundError("tasks", input.taskId);
+  }
   if (!Number.isInteger(input.minutes) || input.minutes <= 0 || input.minutes > 24 * 60 * 31) {
     throw new OpsError(400, "minutes must be a positive integer (max: one month)");
   }
@@ -230,6 +255,10 @@ export async function logTimeEntry(
       description,
       actor: (input.actor ?? actor.userId).slice(0, 200),
       ...(occurredAt ? { occurredAt } : {}),
+      ...(userId ? { userId } : {}),
+      ...(input.rateCents !== undefined ? { rateCents: input.rateCents } : {}),
+      ...(input.taskId ? { taskId: input.taskId } : {}),
+      ...(input.billable !== undefined ? { billable: input.billable } : {}),
     },
   });
   await audit(
