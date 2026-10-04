@@ -4,6 +4,11 @@
 // endpoint (LLM_BASE_URL), so OpenAI, Anthropic-via-proxy, Ollama, etc.
 // work without touching callers. MockLlmProvider fills in when no key is set.
 
+export interface LlmGenerateOptions {
+  maxTokens?: number;
+  signal?: AbortSignal;
+}
+
 export interface LlmProvider {
   /** Stable provider key, e.g. "openai-compatible" | "mock". */
   readonly name: string;
@@ -16,6 +21,7 @@ export interface LlmProvider {
    * opts.maxTokens caps output tokens (cost-blowout guard, T4). Adapters
    * apply their own default when omitted; the router publishes suggested
    * ceilings per workload (WORKLOAD_MAX_TOKENS).
+   * opts.signal (Phase 5) aborts an in-flight request when a run is stopped.
    */
-  generate(prompt: string, opts?: { maxTokens?: number }): Promise<string>;
+  generate(prompt: string, opts?: LlmGenerateOptions): Promise<string>;
 }

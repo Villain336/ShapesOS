@@ -5,7 +5,9 @@
 // this wrapper adds the controls the run supports: a mission run can be
 // paused and resumed through its mission's kill switch (POST
 // /api/missions/:id/pause | resume, editor+ — the route re-checks the role
-// and re-verifies staleness on resume). Runs have no stop API, so no Stop.
+// and re-verifies staleness on resume). Phase 5: a live run can be stopped
+// (POST /api/agent-runs/:id/cancel — the run and every sub-agent run under
+// it stop before their next step; pending approvals they raised expire).
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -21,6 +23,7 @@ export function RunTimelinePanel({
   steps,
   completed,
   control,
+  stopRunId,
 }: {
   title: string;
   subtitle: string;
@@ -31,6 +34,8 @@ export function RunTimelinePanel({
   completed: number;
   /** Present when the viewer may pause/resume this run's mission. */
   control: { missionId: string; can: "pause" | "resume" } | null;
+  /** Phase 5: present when the viewer may stop this live run. */
+  stopRunId?: string | null;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -58,6 +63,26 @@ export function RunTimelinePanel({
     }
   }
 
+  async function stopRun() {
+    if (!stopRunId) return;
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/agent-runs/${encodeURIComponent(stopRunId)}/cancel`, { method: "POST" });
+      const body = (await res.json().catch(() => ({}))) as { error?: string; stopped?: string[] };
+      if (!res.ok) throw new Error(body.error ?? `Request failed (${res.status}).`);
+      toast({
+        title: body.stopped?.length ? "Stopping" : "Already finished",
+        description: body.stopped?.length ? "The agent stops before its next step." : "This run had already finished.",
+        status: "done",
+      });
+      router.refresh();
+    } catch (e) {
+      toastError("Couldn't stop the run", e instanceof Error ? e.message : undefined);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <RunTimeline
       headingLevel="h1"
@@ -78,6 +103,7 @@ export function RunTimelinePanel({
       resumeLabel="Resume this mission"
       onPause={control?.can === "pause" ? () => void act("pause") : undefined}
       onResume={control?.can === "resume" ? () => void act("resume") : undefined}
+      onStop={stopRunId ? () => void stopRun() : undefined}
       emptyText="No steps recorded yet."
     />
   );

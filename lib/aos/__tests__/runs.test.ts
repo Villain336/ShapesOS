@@ -39,6 +39,12 @@ describe("names", () => {
     assert.equal(runAgentName("mission"), "Strategist");
     assert.equal(runAgentName("browser"), "Browser agent");
     assert.equal(runAgentName("weird"), "Agent");
+    // Phase 5: the run's own agent wins over its kind.
+    assert.equal(runAgentName("chat", "drafter"), "Writer");
+    assert.equal(runAgentName("chat", "lead"), "Strategist");
+    assert.equal(runAgentName("chat", null), "Strategist");
+    assert.equal(runTitle("chat", null, "Draft the renewal email.  Then schedule it"), "Draft the renewal email");
+    assert.equal(runTitle("chat", null, null), "Task");
     assert.equal(runTitle("mission", "Weekly competitor brief"), "Weekly competitor brief");
     assert.equal(runTitle("browser", null), "Browser run");
   });

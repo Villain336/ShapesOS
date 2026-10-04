@@ -110,7 +110,8 @@ export function chunkTextFixed(text: string, size = DEFAULT_CONTENT_CHUNK_SIZE):
 function defaultRunTurn(input: AgentTurnInput): Promise<AgentTurnOutput> {
   // Lazy import so loading the adapter never loads the agent (and its
   // prisma/LLM graph) — keeps the contract tests fast and side-effect free.
-  return import("@/lib/chat/agent").then((m) => m.runAgentTurnWithCapture(input));
+  // Phase 5: tracked — the turn is an AgentRun (agent, tool grant, Stop).
+  return import("@/lib/chat/agent").then((m) => m.runTrackedAgentTurn(input));
 }
 
 function defaultLoadSharedState(ctx: SharedStateContext): Promise<SharedAgentState> {

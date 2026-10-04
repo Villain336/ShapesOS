@@ -7,6 +7,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Field, PermissionSegmented, Switch, type Permission } from "@/components/aos/Controls";
+import { AGENT_KEYS, agentDisplayName } from "@/lib/agents/grants";
 import {
   BellRing,
   Bot,
@@ -23,6 +24,8 @@ type Behavior = "auto" | "ask" | "never";
 type Tier = 0 | 1 | 2 | 3;
 
 interface SettingRow {
+  /** Phase 5: "*" = every agent, else one agent's key. */
+  agentKey?: string;
   action: string;
   behavior: Behavior;
   thresholdCents: number | null;
@@ -163,6 +166,8 @@ export default function AutomationSettingsForm() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  // Phase 5: whose rules the table shows ("*" = every agent).
+  const [agentScope, setAgentScope] = useState<string>("*");
 
   // New-rule form
   const [newName, setNewName] = useState("");
@@ -191,13 +196,20 @@ export default function AutomationSettingsForm() {
     load();
   }, [load]);
 
+  // Every-agent rules, and the rules of the agent being viewed.
   const byAction = useMemo(() => {
     const m = new Map<string, SettingRow>();
-    for (const s of data?.settings ?? []) m.set(s.action, s);
+    for (const s of data?.settings ?? []) if ((s.agentKey ?? "*") === "*") m.set(s.action, s);
     return m;
   }, [data]);
+  const agentRows = useMemo(() => {
+    const m = new Map<string, SettingRow>();
+    if (agentScope === "*") return m;
+    for (const s of data?.settings ?? []) if (s.agentKey === agentScope) m.set(s.action, s);
+    return m;
+  }, [data, agentScope]);
 
-  async function putSetting(action: string, behavior: Behavior, thresholdCents: number | null) {
+  async function putSetting(action: string, behavior: Behavior, thresholdCents: number | null, agentKey = "*") {
     setSaving(true);
     setError(null);
     setNotice(null);
@@ -205,17 +217,19 @@ export default function AutomationSettingsForm() {
       const res = await fetch("/api/automation/settings", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action, behavior, thresholdCents }),
+        body: JSON.stringify({ action, behavior, thresholdCents, agentKey }),
       });
       const body = await res.json();
       if (!res.ok) throw new Error(body.error ?? "Save failed.");
       setData((prev) => {
         if (!prev) return prev;
-        const settings = prev.settings.filter((s) => s.action !== action);
-        settings.push({ action, behavior: body.setting.behavior, thresholdCents: body.setting.thresholdCents });
+        const settings = prev.settings.filter((s) => !(s.action === action && (s.agentKey ?? "*") === agentKey));
+        settings.push({ agentKey, action, behavior: body.setting.behavior, thresholdCents: body.setting.thresholdCents });
         return { ...prev, settings };
       });
-      setNotice(`Saved: ${action} → ${behavior}.`);
+      setNotice(
+        `Saved: ${action} → ${behavior}${agentKey === "*" ? "" : ` for ${agentDisplayName(agentKey as (typeof AGENT_KEYS)[number])}`}.`,
+      );
     } catch (e) {
       setError(e instanceof Error ? e.message : "Save failed.");
     } finally {
@@ -306,7 +320,9 @@ export default function AutomationSettingsForm() {
         <Info size={16} className="mt-0.5 shrink-0 text-subtle" />
         <p className="text-[13px] leading-relaxed text-muted">
           <span className="font-semibold text-ink">How automation works:</span>{" "}
-          <span className="font-medium">Tier 0</span> actions (reads, drafts, analysis) always run.{" "}
+          <span className="font-medium">Tier 0</span> actions (reads, drafts, analysis) run inside
+          missions; agent tools that cost money (drafts, audits, research) still ask until you set{" "}
+          <span className="font-medium">Auto-run</span>.{" "}
           <span className="font-medium">Tier 1</span> small actions run on their own only where you
           set <span className="font-medium">Auto-run</span> — everything else asks you first.{" "}
           <span className="font-medium">Tier 2</span> always asks, every time.{" "}
@@ -391,6 +407,35 @@ export default function AutomationSettingsForm() {
             </div>
           </div>
 
+          {/* Phase 5: per-agent rules. "Every agent" is the workspace rule;
+              an agent's own rule wins over it. */}
+          <div className="flex flex-wrap items-center gap-3 rounded-lg border border-line bg-paper p-3">
+            <div className="min-w-[220px] flex-1">
+              <div className="text-[13px] font-semibold text-ink">Rules for</div>
+              <div className="text-[12px] text-muted">
+                Set a rule for one agent (e.g. let Writer draft content without asking). An agent&apos;s own
+                rule wins over the every-agent rule. Tier 2 and Tier 3 still ask or stay off.
+              </div>
+            </div>
+            <label className="sr-only" htmlFor="automation-agent-scope">
+              Agent
+            </label>
+            <select
+              id="automation-agent-scope"
+              value={agentScope}
+              onChange={(e) => setAgentScope(e.target.value)}
+              className={`${inputCls} min-w-44`}
+            >
+              <option value="*">Every agent</option>
+              {AGENT_KEYS.map((k) => (
+                <option key={k} value={k}>
+                  {agentDisplayName(k)}
+                  {k === "lead" ? " (lead)" : ""}
+                </option>
+              ))}
+            </select>
+          </div>
+
           {/* Per-action table */}
           <div className="overflow-x-auto rounded-lg border border-line bg-paper">
             <table className="min-w-[720px] w-full text-left text-[13px]">
@@ -404,12 +449,15 @@ export default function AutomationSettingsForm() {
               </thead>
               <tbody>
                 {data.defaults.knownActions.map((a) => {
-                  const row = byAction.get(a.action);
+                  const everyRow = byAction.get(a.action);
+                  const ownRow = agentRows.get(a.action);
+                  const row = agentScope === "*" ? everyRow : ownRow;
                   const behavior: Behavior =
-                    row?.behavior ?? data.defaults.behaviors[a.action] ?? "ask";
+                    ownRow?.behavior ?? everyRow?.behavior ?? data.defaults.behaviors[a.action] ?? "ask";
+                  const inherited = agentScope !== "*" && !ownRow;
                   return (
                     <tr
-                      key={a.action}
+                      key={`${agentScope}:${a.action}`}
                       className="border-b border-line last:border-0 hover:bg-hover-paper"
                     >
                       <td className="px-3 py-2.5">
@@ -427,9 +475,12 @@ export default function AutomationSettingsForm() {
                           label={a.label}
                           disabled={saving}
                           onChange={(b) =>
-                            putSetting(a.action, b, row?.thresholdCents ?? null)
+                            putSetting(a.action, b, row?.thresholdCents ?? null, agentScope)
                           }
                         />
+                        {inherited ? (
+                          <div className="mt-1 text-[11px] text-subtle">From every agent</div>
+                        ) : null}
                       </td>
                       <td className="px-3 py-2.5 align-top">
                         {a.tier === 1 ? (
@@ -446,7 +497,7 @@ export default function AutomationSettingsForm() {
                                   v === "" ? null : Math.round(Number(v) * 100);
                                 if (v !== "" && (!Number.isFinite(Number(v)) || Number(v) < 0)) return;
                                 if (next !== (row?.thresholdCents ?? null)) {
-                                  putSetting(a.action, behavior, next);
+                                  putSetting(a.action, behavior, next, agentScope);
                                 }
                               }}
                               data-focus-ring="container"

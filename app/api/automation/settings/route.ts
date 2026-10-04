@@ -4,11 +4,15 @@
 //   settings: the workspace's automation_setting rows (workspace × action)
 //   defaults: code defaults (per-action default behavior + Tier-1 kinds)
 //   thresholdCents: effective workspace default small-action threshold
-// PUT  → { action, behavior, thresholdCents? } upsert.
+// PUT  → { action, behavior, thresholdCents?, agentKey? } upsert.
 //   Rejects behavior=auto for Tier 3 kinds with 400 (un-overridable).
+//   Phase 5: agentKey ("*" = every agent, default) makes a per-agent rule
+//   ("Let Writer post to your own channels without asking").
 
 import { withWorkspaceScope } from "@/lib/substrate/graph/rls";
+import { isAgentKey } from "@/lib/agents/grants";
 import {
+  ALL_AGENTS,
   DEFAULT_SMALL_ACTION_THRESHOLD_CENTS,
   KNOWN_ACTIONS,
   TIER1_KINDS,
@@ -41,6 +45,7 @@ export async function GET() {
 
   return Response.json({
     settings: rows.map((r) => ({
+      agentKey: r.agentKey ?? ALL_AGENTS,
       action: r.action,
       behavior: r.behavior,
       thresholdCents: r.thresholdCents,
@@ -56,10 +61,18 @@ export async function PUT(req: Request) {
 
   const body = await readJson(req);
   const { action, behavior, thresholdCents } = body;
+  const agentKey = body.agentKey === undefined || body.agentKey === null ? ALL_AGENTS : body.agentKey;
+  if (agentKey !== ALL_AGENTS && !isAgentKey(agentKey)) {
+    return badRequest('agentKey must be "*" or an agent key (lead, researcher, planner, drafter, analyst, scheduler, actor).');
+  }
 
   const validationError = validateBehaviorForAction(action, behavior, thresholdCents);
   if (validationError) return badRequest(validationError);
+  if (agentKey !== ALL_AGENTS && action === WORKSPACE_DEFAULT_ACTION) {
+    return badRequest("The workspace threshold row is not per agent; use agentKey \"*\".");
+  }
 
+  const ag = agentKey as string;
   const a = action as string;
   const b = behavior as "auto" | "ask" | "never";
   const t = typeof thresholdCents === "number" ? thresholdCents : null;
@@ -67,23 +80,25 @@ export async function PUT(req: Request) {
   const saved = await withWorkspaceScope(access.workspaceId, (tx) =>
     tx.automationSetting.upsert({
       where: {
-        workspaceId_action: { workspaceId: access.workspaceId, action: a },
+        workspaceId_agentKey_action: { workspaceId: access.workspaceId, agentKey: ag, action: a },
       },
       create: {
         workspaceId: access.workspaceId,
+        agentKey: ag,
         action: a,
         behavior: b,
         thresholdCents: t,
         updatedBy: access.userId,
       },
       update: { behavior: b, thresholdCents: t, updatedBy: access.userId },
-      select: { action: true, behavior: true, thresholdCents: true },
+      select: { agentKey: true, action: true, behavior: true, thresholdCents: true },
     }),
   );
 
   const resolved = resolveAutomationFromRows(
     await listAutomationRows(access.workspaceId),
     a,
+    ag,
   );
 
   return Response.json({

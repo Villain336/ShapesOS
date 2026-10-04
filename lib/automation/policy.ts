@@ -19,6 +19,7 @@
 //  - Unknown action shape → Tier 2 (fail closed, per authority.ts).
 
 import { withWorkspaceScope } from "../substrate/graph/rls";
+import { KNOWN_ACTION_DEFS } from "./actions";
 import {
   DEFAULT_SMALL_ACTION_THRESHOLD_CENTS,
   TIER1_KINDS,
@@ -36,7 +37,12 @@ export type AutomationBehaviorName = "auto" | "ask" | "never";
  */
 export const WORKSPACE_DEFAULT_ACTION = "*";
 
+/** Phase 5: the agent key of a rule that applies to every agent. */
+export const ALL_AGENTS = "*";
+
 export interface AutomationRowLike {
+  /** Phase 5: "*" (every agent) or one agent's key. Missing = "*". */
+  agentKey?: string;
   action: string;
   behavior: AutomationBehaviorName;
   thresholdCents: number | null;
@@ -48,7 +54,10 @@ export interface ResolvedAutomation {
   behavior: AutomationBehaviorName;
   /** Effective threshold: per-action override → workspace default → $100. */
   thresholdCents: number;
-  source: "row" | "default";
+  /** "row" = the every-agent rule; "agent" = a rule for this one agent. */
+  source: "row" | "agent" | "default";
+  /** The agent the deciding rule belongs to ("*" = every agent). */
+  ruleAgentKey?: string;
 }
 
 /** Intrinsic tier of an action when the automation toggle is ON. Used to
@@ -72,18 +81,31 @@ function intrinsicTier(action: string): 0 | 1 | 2 | 3 {
 export function resolveAutomationFromRows(
   rows: AutomationRowLike[],
   action: string,
+  agentKey: string = ALL_AGENTS,
 ): ResolvedAutomation {
-  const byAction = new Map(rows.map((r) => [r.action, r]));
-  const row = byAction.get(action);
-  const defaultRow = byAction.get(WORKSPACE_DEFAULT_ACTION);
+  // Phase 5: the most specific rule wins — this agent's rule for the
+  // action, then the every-agent rule. The "*" action row (workspace
+  // threshold) is only ever read for its threshold.
+  const keyOf = (r: AutomationRowLike) => r.agentKey ?? ALL_AGENTS;
+  const everyAgent = new Map(rows.filter((r) => keyOf(r) === ALL_AGENTS).map((r) => [r.action, r]));
+  const agentRow =
+    agentKey !== ALL_AGENTS
+      ? rows.find((r) => keyOf(r) === agentKey && r.action === action)
+      : undefined;
+  const row = everyAgent.get(action);
+  const defaultRow = everyAgent.get(WORKSPACE_DEFAULT_ACTION);
 
   const thresholdCents =
+    agentRow?.thresholdCents ??
     row?.thresholdCents ??
     defaultRow?.thresholdCents ??
     DEFAULT_SMALL_ACTION_THRESHOLD_CENTS;
 
+  if (agentRow) {
+    return { action, behavior: agentRow.behavior, thresholdCents, source: "agent", ruleAgentKey: agentKey };
+  }
   if (row) {
-    return { action, behavior: row.behavior, thresholdCents, source: "row" };
+    return { action, behavior: row.behavior, thresholdCents, source: "row", ruleAgentKey: ALL_AGENTS };
   }
 
   // No row → code defaults. Tier 3 kinds default to "never" (sticky);
@@ -150,7 +172,7 @@ export async function listAutomationRows(
   return withWorkspaceScope(workspaceId, (tx) =>
     tx.automationSetting.findMany({
       where: { workspaceId },
-      select: { action: true, behavior: true, thresholdCents: true },
+      select: { agentKey: true, action: true, behavior: true, thresholdCents: true },
     }),
   );
 }
@@ -159,9 +181,76 @@ export async function listAutomationRows(
 export async function resolveAutomation(
   workspaceId: string,
   action: string,
+  agentKey: string = ALL_AGENTS,
 ): Promise<ResolvedAutomation> {
   const rows = await listAutomationRows(workspaceId);
-  return resolveAutomationFromRows(rows, action);
+  return resolveAutomationFromRows(rows, action, agentKey);
+}
+
+// ---------------------------------------------------------------------------
+// Phase 5: auto-approve — may this agent run this action without asking?
+// ---------------------------------------------------------------------------
+
+export interface AutoApprovalInput {
+  agentKey: string;
+  /** The automation action the call stands for (ToolDef.action, connectorAction). */
+  action: string;
+  /** What the call does, scanned for Tier-3 wording (money, signing, deleting). */
+  description?: string;
+  /** Destructive tools never run without asking, whatever the rule says. */
+  destructive?: boolean;
+  amountCents?: number;
+}
+
+export interface AutoApprovalDecision {
+  auto: boolean;
+  tier: 0 | 1 | 2 | 3;
+  resolved: ResolvedAutomation;
+  /** Plain reason (shown in the run timeline / audit log). */
+  reason: string;
+}
+
+/**
+ * decideAutoApproval — PURE. Runs without asking ONLY when all hold:
+ *   - a rule explicitly says "auto" for this agent (or every agent),
+ *   - the call is not destructive,
+ *   - the DoA evaluator puts it at Tier 0 or Tier 1 with that rule applied.
+ * Tier 2 (external audiences, above the threshold) and Tier 3 (money,
+ * contracts, deletion) always ask — the rule can never widen them.
+ */
+export function decideAutoApproval(
+  rows: AutomationRowLike[],
+  input: AutoApprovalInput,
+): AutoApprovalDecision {
+  const resolved = resolveAutomationFromRows(rows, input.action, input.agentKey);
+  const tier = evaluateTier(
+    { kind: input.action, description: input.description, amountCents: input.amountCents },
+    toTierSettings(resolved),
+  );
+  const who = resolved.ruleAgentKey === ALL_AGENTS ? "every agent" : `agent ${resolved.ruleAgentKey}`;
+  if (input.destructive) {
+    return { auto: false, tier, resolved, reason: "destructive actions always ask" };
+  }
+  if (resolved.behavior !== "auto") {
+    return { auto: false, tier, resolved, reason: `no auto-approve rule for ${input.action}` };
+  }
+  if (tier >= 2) {
+    return {
+      auto: false,
+      tier,
+      resolved,
+      reason: tier === 3 ? "Tier 3 actions can never run automatically" : "Tier 2 actions always ask",
+    };
+  }
+  return { auto: true, tier, resolved, reason: `auto-approved by the ${input.action} rule for ${who}` };
+}
+
+/** DB-backed decideAutoApproval. */
+export async function autoApprovalFor(
+  workspaceId: string,
+  input: AutoApprovalInput,
+): Promise<AutoApprovalDecision> {
+  return decideAutoApproval(await listAutomationRows(workspaceId), input);
 }
 
 /** DB-backed: the workspace's effective small-action threshold in cents. */
@@ -184,26 +273,6 @@ export interface KnownAction {
   description: string;
   tier: 0 | 1 | 2 | 3;
 }
-
-const KNOWN_ACTION_DEFS: Array<Omit<KnownAction, "tier">> = [
-  // Tier 1: low-blast-radius by nature (owned channels, internal notes).
-  { action: "publish_owned", label: "Publish to owned channels", description: "Publish drafted content to channels you own (site, blog)." },
-  { action: "post_owned_social", label: "Post to owned social", description: "Post to your own connected social accounts." },
-  { action: "schedule_owned_content", label: "Schedule owned content", description: "Queue content for your owned channels." },
-  { action: "update_listing", label: "Update listing", description: "Small edits to business listings (hours, photos)." },
-  { action: "send_internal_note", label: "Send internal note", description: "Notes to your own team, never external." },
-  { action: "refresh_owned_page", label: "Refresh owned page", description: "Re-crawl / refresh a page you own." },
-  // Tier 2: significant — external audience or above the threshold.
-  { action: "publish_external", label: "Publish externally", description: "Publish to audiences you don't own. Always asks." },
-  { action: "send_outreach_email", label: "Send outreach email", description: "Cold or campaign email to external recipients." },
-  { action: "schedule_social_external", label: "Schedule external social", description: "Schedule posts to public social audiences." },
-  { action: "update_campaign_budget", label: "Update campaign budget", description: "Change a campaign's budget (non-custodial pool)." },
-  // Tier 3: never — hard deny, un-overridable.
-  { action: "buy_media", label: "Buy media", description: "Spend money on ads. Never automated — autopilot never buys." },
-  { action: "sign_contract", label: "Sign contract", description: "Sign or execute any contract or agreement." },
-  { action: "delete_campaign_data", label: "Delete campaign data", description: "Delete or purge campaign data." },
-  { action: "issue_refund", label: "Issue refund", description: "Move money back to a customer." },
-];
 
 export const KNOWN_ACTIONS: KnownAction[] = KNOWN_ACTION_DEFS.map((d) => ({
   ...d,

@@ -9,7 +9,7 @@
 //     reached yet. Steps that stop for a human carry the asks-first chip.
 // Tool calls recorded on an event become a JetBrains Mono block.
 
-import { SUB_AGENTS, isSubAgentKey, oneLine, type MissionEventInput } from "./agents";
+import { LEAD_AGENT, SUB_AGENTS, isSubAgentKey, oneLine, type MissionEventInput } from "./agents";
 import { fromAgentRunStatus, type AosStatus } from "./status";
 import type { TimelineStep, ToolCall } from "./run-steps";
 
@@ -23,9 +23,13 @@ const RUN_AGENTS: Record<string, string> = {
   browser: "Browser agent",
   playbook: "Playbook agent",
   follow_up: "Follow-up agent",
+  chat: "Strategist",
 };
 
-export function runAgentName(kind: string): string {
+/** Phase 5: a run records which agent ran it; that name wins over the kind's. */
+export function runAgentName(kind: string, agentKey?: string | null): string {
+  if (agentKey === "lead") return LEAD_AGENT.name;
+  if (isSubAgentKey(agentKey)) return SUB_AGENTS[agentKey].name;
   return RUN_AGENTS[kind] ?? "Agent";
 }
 
@@ -34,11 +38,21 @@ const KIND_TITLES: Record<string, string> = {
   browser: "Browser run",
   playbook: "Playbook run",
   follow_up: "Follow-up run",
+  chat: "Task",
 };
 
-/** A run's title: the mission it serves, else what kind of run it is. */
-export function runTitle(kind: string, missionName?: string | null): string {
-  return missionName?.trim() || KIND_TITLES[kind] || "Agent run";
+/** A run's title: the mission it serves, else the task's prompt, else what kind of run it is. */
+export function runTitle(kind: string, missionName?: string | null, prompt?: string | null): string {
+  const p = prompt ? oneLine(prompt) : "";
+  return missionName?.trim() || (p ? (p.length > 80 ? `${p.slice(0, 79)}…` : p) : "") || KIND_TITLES[kind] || "Agent run";
+}
+
+/** Phase 5: the prompt/task a chat run was started with (agentState), if any. */
+export function runPrompt(agentState: unknown): string | null {
+  if (!agentState || typeof agentState !== "object") return null;
+  const o = agentState as { prompt?: unknown; task?: unknown };
+  const v = typeof o.task === "string" ? o.task : typeof o.prompt === "string" ? o.prompt : null;
+  return v && v.trim() ? v.trim() : null;
 }
 
 /** "9:05" — local wall-clock time, 24h, no leading zero on the hour. */

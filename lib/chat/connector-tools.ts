@@ -2,12 +2,15 @@
 //
 // Dynamic tool resolution for `connector.<connectorKey>.<toolName>` calls
 // the agent emits. Every invocation goes through, in order:
+//   0. Task grant (Phase 5): the connector's tool group must be granted
 //   1. Agent allow-list (WorkspaceSettings.agentAllowList)
 //   2. Project data-source binding + active connection
 //   3. Adapter resolution + known-tool check
 //   4. Declared-tool gating against load_skill-loaded skills
 //   5. Role gate (mutating → editor+, reads → viewer+)
-//   6. Confirmation gate (mutating tools behave like kind "publish")
+//   6. Confirmation gate (mutating tools behave like kind "publish"); a
+//      per-agent auto-approve rule may let Tier 0/1 writes (your own
+//      channels) run without asking — Tier 2/3 always ask (Phase 5)
 //   7. invoke() with the server-side decrypted credential (never in args);
 //      live adapters get a vault-backed refresher for 401s (Phase 4b) and a
 //      successful live call is recorded as connector-health evidence.
@@ -26,10 +29,14 @@ import type {
   ConnectorToolDef,
 } from "@/lib/connectors/m21/types";
 import type { ToolContext } from "./tools";
+import { connectorAction, connectorGroup, isGroupGranted, TOOL_GROUP_LABELS } from "@/lib/agents/grants";
+import { autoApprovalFor } from "@/lib/automation/policy";
 
 export interface ConnectorToolOutcome {
-  status: "executed" | "pending_confirmation" | "error" | "skipped_role";
+  status: "executed" | "pending_confirmation" | "error" | "skipped_role" | "denied";
   resultSummary: string;
+  /** Phase 5: the action a per-agent auto-approve rule could cover (Tier 0/1). */
+  autoAction?: string;
 }
 
 export interface BoundDataSource {
@@ -91,9 +98,15 @@ async function listAdapterTools(adapter: ConnectorAdapter): Promise<ConnectorToo
  * `connector.<key>.<toolName>: <description>` line per tool of every
  * enabled project data source (active connections only).
  */
-export async function connectorToolsSection(projectId: string): Promise<string> {
+export async function connectorToolsSection(
+  projectId: string,
+  grant?: readonly string[] | null,
+): Promise<string> {
   const header = "## CONNECTOR TOOLS";
-  const sources = await boundDataSources(projectId);
+  // Phase 5: connectors outside the task's grant are not listed at all.
+  const sources = (await boundDataSources(projectId)).filter((s) =>
+    isGroupGranted(grant, connectorGroup(s.connectorKey)),
+  );
   if (sources.length === 0) {
     return `${header}\n\nNo connector data sources are bound to this project.`;
   }
@@ -158,6 +171,20 @@ export async function resolveConnectorTool(
     };
   }
   const { key, tool } = parsed;
+
+  // 0. Task grant (Phase 5): checked first, so a refused tool can't be
+  //    reached through any connector alias.
+  const group = connectorGroup(key);
+  if (!isGroupGranted(ctx.grant, group)) {
+    return {
+      ...(await deny(
+        ctx,
+        toolName,
+        `This task isn't allowed to use ${TOOL_GROUP_LABELS[group]} tools (${toolName}) — refusing.`,
+      )),
+      status: "denied",
+    };
+  }
 
   // 1. Agent allow-list.
   const settings = await prisma.workspaceSettings.findUnique({
@@ -267,12 +294,23 @@ export async function resolveConnectorTool(
     };
   }
 
-  // 6. Confirmation gate: mutating tools behave like kind "publish".
+  // 6. Confirmation gate: mutating tools behave like kind "publish" — unless
+  //    a per-agent auto-approve rule covers this write (Tier 0/1 only).
+  let autoReason: string | null = null;
   if (toolDef.mutating && !ctx.confirmed) {
-    return {
-      status: "pending_confirmation",
-      resultSummary: `Proposed ${toolName} (mutating) — awaiting confirmation`,
-    };
+    const decision = await autoApprovalFor(ctx.workspaceId, {
+      agentKey: ctx.agentKey ?? "lead",
+      action: connectorAction(key, tool),
+      description: `${toolDef.name}: ${toolDef.description}`,
+    }).catch(() => null);
+    if (!decision?.auto) {
+      return {
+        status: "pending_confirmation",
+        resultSummary: `Proposed ${toolName} (mutating) — awaiting confirmation`,
+        ...(decision && decision.tier <= 1 ? { autoAction: connectorAction(key, tool) } : {}),
+      };
+    }
+    autoReason = decision.reason;
   }
 
   // 7. Execute with the server-side decrypted credential (never from args).
@@ -304,8 +342,8 @@ export async function resolveConnectorTool(
     projectId: ctx.projectId,
     workspaceId: ctx.workspaceId,
     actor: "ai",
-    action: ctx.confirmed ? "ai_applied" : "ai_proposal",
-    summary: `[connector] ${summary}`,
+    action: ctx.confirmed || autoReason ? "ai_applied" : "ai_proposal",
+    summary: `[connector] ${summary}${autoReason ? ` (${autoReason})` : ""}`.slice(0, 500),
   });
   return ok
     ? { status: "executed", resultSummary: summary }

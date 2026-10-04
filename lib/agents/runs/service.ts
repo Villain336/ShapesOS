@@ -49,6 +49,9 @@ export async function createAgentRun(input: CreateAgentRunInput) {
         startedBy: input.startedBy,
         threadId: input.threadId ?? null,
         missionId: input.missionId ?? null,
+        agentKey: input.agentKey ?? null,
+        parentRunId: input.parentRunId ?? null,
+        allowedTools: input.allowedTools ? [...input.allowedTools] : [],
         agentState: (input.agentState ?? undefined) as Prisma.InputJsonValue | undefined,
       },
     }),
@@ -200,6 +203,90 @@ export async function listAgentRuns(workspaceId: string, limit = 50) {
       orderBy: { createdAt: "desc" },
       take: Math.min(Math.max(limit, 1), 200),
       include: { recording: true },
+    }),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Phase 5: a real Stop. Cancellation is cooperative: the request is recorded
+// here (and cascades to every run the stopped run handed work to); the agent
+// loop checks isAgentRunCancelRequested() before every model call and every
+// tool call, and an in-flight model call in this process is aborted through
+// lib/agents/runs/abort.ts. The loop then finishes the run as `cancelled`.
+// ---------------------------------------------------------------------------
+
+export interface CancelRequestResult {
+  /** Runs that were asked to stop (the run itself and its live descendants). */
+  runIds: string[];
+  /** False when the run had already finished — nothing to stop. */
+  stopped: boolean;
+}
+
+/**
+ * Ask a run (and its sub-agent runs) to stop. Idempotent: asking twice keeps
+ * the first request time. Already-finished runs are left alone. Returns the
+ * ids that were asked; null when the run is not in this workspace.
+ */
+export async function requestAgentRunCancel(
+  workspaceId: string,
+  runId: string,
+  userId: string,
+): Promise<CancelRequestResult | null> {
+  return withWorkspaceScope(workspaceId, async (tx) => {
+    const root = await tx.agentRun.findFirst({
+      where: { id: runId, workspaceId },
+      select: { id: true, status: true },
+    });
+    if (!root) return null;
+    // Walk the sub-agent tree (bounded: delegation is one level deep today,
+    // the bound keeps a malformed tree from looping).
+    const ids = [root.id];
+    let frontier = [root.id];
+    for (let depth = 0; depth < 8 && frontier.length > 0; depth++) {
+      const kids = await tx.agentRun.findMany({
+        where: { workspaceId, parentRunId: { in: frontier } },
+        select: { id: true },
+      });
+      frontier = kids.map((k) => k.id).filter((id) => !ids.includes(id));
+      ids.push(...frontier);
+    }
+    const now = new Date();
+    const live = await tx.agentRun.findMany({
+      where: { workspaceId, id: { in: ids }, status: { in: ["queued", "running"] } },
+      select: { id: true },
+    });
+    if (live.length === 0) return { runIds: [], stopped: false };
+    await tx.agentRun.updateMany({
+      where: { workspaceId, id: { in: live.map((r) => r.id) }, cancelRequestedAt: null },
+      data: { cancelRequestedAt: now, cancelRequestedBy: userId },
+    });
+    // A queued run never started: it is cancelled right away.
+    await tx.agentRun.updateMany({
+      where: { workspaceId, id: { in: live.map((r) => r.id) }, status: "queued" },
+      data: { status: "cancelled", endedAt: now },
+    });
+    return { runIds: live.map((r) => r.id), stopped: true };
+  });
+}
+
+/** Has anyone asked this run to stop? (cheap; called between steps). */
+export async function isAgentRunCancelRequested(workspaceId: string, runId: string): Promise<boolean> {
+  const row = await withWorkspaceScope(workspaceId, (tx) =>
+    tx.agentRun.findFirst({
+      where: { id: runId, workspaceId },
+      select: { cancelRequestedAt: true, status: true },
+    }),
+  );
+  return !!row && (row.cancelRequestedAt !== null || row.status === "cancelled");
+}
+
+/** The live (queued/running) runs of a chat thread, newest first. */
+export async function listLiveThreadRuns(workspaceId: string, threadId: string) {
+  return withWorkspaceScope(workspaceId, (tx) =>
+    tx.agentRun.findMany({
+      where: { workspaceId, threadId, status: { in: ["queued", "running"] } },
+      orderBy: { createdAt: "desc" },
+      select: { id: true, agentKey: true, parentRunId: true },
     }),
   );
 }

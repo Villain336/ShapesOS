@@ -10,7 +10,7 @@
 // host with ANTHROPIC_API_KEY in .env before trusting it.
 
 import Anthropic from "@anthropic-ai/sdk";
-import type { LlmProvider } from "./types";
+import type { LlmGenerateOptions, LlmProvider } from "./types";
 
 export class AnthropicLlmProvider implements LlmProvider {
   readonly name = "anthropic";
@@ -34,16 +34,21 @@ export class AnthropicLlmProvider implements LlmProvider {
     return this.model;
   }
 
-  async generate(prompt: string, opts?: { maxTokens?: number }): Promise<string> {
+  async generate(prompt: string, opts?: LlmGenerateOptions): Promise<string> {
     const maxTokens = opts?.maxTokens ?? 4096;
     let res: Anthropic.Messages.Message;
     try {
-      res = await this.client.messages.create({
-        model: this.model,
-        max_tokens: maxTokens,
-        messages: [{ role: "user", content: prompt }],
-      });
+      res = await this.client.messages.create(
+        {
+          model: this.model,
+          max_tokens: maxTokens,
+          messages: [{ role: "user", content: prompt }],
+        },
+        opts?.signal ? { signal: opts.signal } : undefined,
+      );
     } catch (err) {
+      // Phase 5: a stopped run surfaces as the abort, not a provider failure.
+      if (opts?.signal?.aborted) throw opts.signal.reason ?? err;
       // Never include key material: report the provider and a sanitized cause.
       const cause =
         err instanceof Anthropic.APIError

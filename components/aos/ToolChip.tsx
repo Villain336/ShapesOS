@@ -39,6 +39,8 @@ export function ToolChip({
   variant = "toggle",
   pressed,
   onClick,
+  disabled,
+  title,
   className,
 }: {
   name: string;
@@ -46,6 +48,9 @@ export function ToolChip({
   /** Toggle chips only: aria-pressed state (black when true). */
   pressed?: boolean;
   onClick?: () => void;
+  /** Toggle chips only: offered but not pickable (title says why). */
+  disabled?: boolean;
+  title?: string;
   className?: string;
 }) {
   const Icon = TOOL_ICONS[name.trim().toLowerCase()] ?? Wrench;
@@ -65,6 +70,7 @@ export function ToolChip({
   const cls = cn(
     "inline-flex h-chip shrink-0 items-center gap-1.5 rounded-full px-3.5 text-sm font-semibold whitespace-nowrap transition-[background-color,box-shadow] duration-150",
     pressed ? "bg-ink text-paper" : "bg-paper text-ink shadow-control hover:shadow-outline",
+    disabled && "cursor-not-allowed bg-disabled text-disabled-fg shadow-none hover:shadow-none",
     className,
   );
   if (!onClick && pressed === undefined) {
@@ -76,7 +82,14 @@ export function ToolChip({
     );
   }
   return (
-    <button type="button" aria-pressed={!!pressed} onClick={onClick} className={cls}>
+    <button
+      type="button"
+      aria-pressed={!!pressed}
+      onClick={disabled ? undefined : onClick}
+      aria-disabled={disabled || undefined}
+      title={title}
+      className={cls}
+    >
       <Icon className="size-4" aria-hidden />
       {name}
     </button>

@@ -7,7 +7,9 @@ import {
   TASK_MAX_CHARS,
   TASK_MAX_FILES,
   attachmentError,
+  chipUnavailable,
   composeTaskMessage,
+  taskThreadOptions,
   composerAgents,
   formatBytes,
   isComposerAgentKey,
@@ -40,9 +42,32 @@ describe("composeTaskMessage", () => {
     assert.equal(composeTaskMessage({ agent: "lead", prompt: "  Draft the brief  ", tools: [] }), "Draft the brief");
   });
 
-  it("spells out a sub-agent hand-off and the chosen tools, in kit order", () => {
+  it("Phase 5: sends only the prompt — the agent and tools travel as thread options the server enforces", () => {
     const msg = composeTaskMessage({ agent: "researcher", prompt: "Compare Q3", tools: ["code", "web"] });
-    assert.equal(msg, "Hand this task to the Researcher sub-agent.\n\nCompare Q3\n\nTools to use: Web search, Code runner.");
+    assert.equal(msg, "Compare Q3");
+  });
+});
+
+describe("taskThreadOptions / chipUnavailable (Phase 5)", () => {
+  it("maps chips to tool groups and drops chips the agent can't use", () => {
+    assert.deepEqual(taskThreadOptions({ agent: "researcher", prompt: "x", tools: ["web", "email"] }), {
+      agentKey: "researcher",
+      tools: ["web"],
+    });
+    assert.deepEqual(taskThreadOptions({ agent: "drafter", prompt: "x", tools: ["email"] }), {
+      agentKey: "drafter",
+      tools: ["email"],
+    });
+  });
+
+  it("offers the code runner as unavailable, never as working", () => {
+    assert.match(chipUnavailable("lead", "code") ?? "", /Not available yet/);
+    assert.deepEqual(taskThreadOptions({ agent: "lead", prompt: "x", tools: ["code"] }).tools, []);
+  });
+
+  it("explains a chip beyond the agent's tools", () => {
+    assert.equal(chipUnavailable("planner", "web"), "Planner doesn't use this tool.");
+    assert.equal(chipUnavailable("lead", "web"), null);
   });
 });
 
@@ -55,8 +80,8 @@ describe("taskPromptError", () => {
   it("counts the whole message against the chat limit", () => {
     const prompt = "x".repeat(TASK_MAX_CHARS);
     assert.equal(taskPromptError({ agent: "lead", prompt, tools: [] }), null);
-    const err = taskPromptError({ agent: "drafter", prompt, tools: [] });
-    assert.match(err ?? "", /^Shorten the task by \d+ characters\.$/);
+    const err = taskPromptError({ agent: "drafter", prompt: `${prompt}xxxxx`, tools: [] });
+    assert.equal(err, "Shorten the task by 5 characters.");
   });
 });
 

@@ -5,7 +5,7 @@
 // has no LLM credentials and restricted egress. It must be exercised on a
 // real host with keys in .env before being trusted.
 
-import type { LlmProvider } from "./types";
+import type { LlmGenerateOptions, LlmProvider } from "./types";
 
 export class OpenAiCompatibleLlmProvider implements LlmProvider {
   readonly name = "openai-compatible";
@@ -25,7 +25,7 @@ export class OpenAiCompatibleLlmProvider implements LlmProvider {
     return this.model;
   }
 
-  async generate(prompt: string, opts?: { maxTokens?: number }): Promise<string> {
+  async generate(prompt: string, opts?: LlmGenerateOptions): Promise<string> {
     if (!this.isConfigured()) {
       throw new Error(
         "LLM credentials are not configured. Set LLM_API_KEY (or OPENAI_API_KEY) and LLM_MODEL.",
@@ -44,6 +44,7 @@ export class OpenAiCompatibleLlmProvider implements LlmProvider {
         temperature: 0.7,
         ...(opts?.maxTokens ? { max_tokens: opts.maxTokens } : {}),
       }),
+      ...(opts?.signal ? { signal: opts.signal } : {}),
     });
 
     if (!res.ok) {

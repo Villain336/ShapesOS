@@ -19,7 +19,7 @@ import { withWorkspaceScope } from "@/lib/substrate/memory/rls";
 import type { AgentRunStatus } from "@/lib/agents/runs/types";
 import { AgentAvatar, FilterPill, StatusBadge } from "@/components/aos";
 import { missionDisplayName } from "@/lib/aos/missions";
-import { clockTime, runAgentName, runStatus, runTitle } from "@/lib/aos/runs";
+import { clockTime, runAgentName, runPrompt, runStatus, runTitle } from "@/lib/aos/runs";
 import type { AosStatus } from "@/lib/aos/status";
 
 export const dynamic = "force-dynamic";
@@ -91,6 +91,9 @@ export default async function RunsIndexPage({
         threadId: true,
         createdAt: true,
         endedAt: true,
+        agentKey: true,
+        parentRunId: true,
+        agentState: true,
         recording: { select: { stepCount: true, videoPath: true } },
         _count: { select: { events: true } },
       },
@@ -188,7 +191,7 @@ export default async function RunsIndexPage({
               const pendingCount = r.missionId ? (pendingBy.get(r.missionId) ?? 0) : 0;
               const aos = runStatus(r.status, pendingCount);
               const mName = r.missionId ? (missionName.get(r.missionId) ?? null) : null;
-              const agent = runAgentName(r.kind);
+              const agent = runAgentName(r.kind, r.agentKey);
               const ended = r.endedAt?.getTime() ?? (r.status === "running" || r.status === "queued" ? now : null);
               const duration = ended === null ? "—" : fmtDuration(ended - r.createdAt.getTime());
               return (
@@ -208,7 +211,7 @@ export default async function RunsIndexPage({
                           href={`/dashboard/runs/${r.id}`}
                           className="block truncate text-base leading-5 font-semibold text-ink after:absolute after:inset-0 after:content-['']"
                         >
-                          {runTitle(r.kind, mName)}
+                          {runTitle(r.kind, mName, runPrompt(r.agentState))}
                         </Link>
                         <p className="truncate text-sm text-muted">
                           {agent}
@@ -222,6 +225,8 @@ export default async function RunsIndexPage({
                                 Mission
                               </Link>
                             </>
+                          ) : r.parentRunId ? (
+                            " · Handed off by the lead"
                           ) : r.threadId ? (
                             " · Chat thread"
                           ) : null}

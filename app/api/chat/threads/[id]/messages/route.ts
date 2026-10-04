@@ -8,7 +8,7 @@ import { accessibleWorkspaceWhere, getMembership, requireProjectRole, forbidden 
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
 import { validateBody, z, boundedString } from "@/lib/api/validate";
-import { runAgentTurnWithCapture, maybeAutoTitle, type ChatToolCall } from "@/lib/chat/agent";
+import { runTrackedAgentTurn, maybeAutoTitle, type ChatToolCall } from "@/lib/chat/agent";
 import { errorResponse } from "@/lib/api/errors";
 
 export const dynamic = "force-dynamic";
@@ -64,11 +64,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     data: { threadId: thread.id, role: "user", content },
   });
 
-  let turn: { assistantText: string; toolCalls: ChatToolCall[] };
+  let turn: { assistantText: string; toolCalls: ChatToolCall[]; runId: string; cancelled?: boolean };
   try {
-    // Phase 13B: the capture wrapper records one agent_call episode per turn
-    // (fail-soft — capture never breaks the turn).
-    turn = await runAgentTurnWithCapture({
+    // Phase 5: the turn is recorded as an AgentRun running as the thread's
+    // agent inside its tool grant (Stop targets it). Phase 13B: the capture
+    // wrapper inside still records one agent_call episode per turn.
+    turn = await runTrackedAgentTurn({
       projectId: thread.projectId,
       workspaceId: thread.project.workspaceId,
       userId: user.id,
@@ -102,5 +103,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       : null,
     toolCalls: turn.toolCalls,
     threadTitle,
+    runId: turn.runId,
+    cancelled: turn.cancelled === true,
   });
 }

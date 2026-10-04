@@ -3046,6 +3046,10 @@ model AiChatThread {
   project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
   userId    String  @map("user_id")
   title     String  @default("New chat")
+  // Phase 5: the task's agent ("lead" or a sub-agent key) and the tool groups
+  // it may use (server-computed grant; empty = the agent's defaults).
+  agentKey     String   @default("lead") @map("agent_key")
+  allowedTools String[] @default([]) @map("allowed_tools")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -8083,13 +8087,16 @@ model AutomationSetting {
   id             String             @id @default(cuid()) @map("id")
   workspaceId    String             @map("workspace_id")
   workspace      Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  // Phase 5: "*" = every agent; otherwise a rule for one agent ("lead" or a
+  // sub-agent key). The most specific rule wins (lib/automation/policy.ts).
+  agentKey       String             @default("*") @map("agent_key")
   action         String             @map("action")
   behavior       AutomationBehavior @map("behavior")
   thresholdCents Int?               @map("threshold_cents")
   updatedBy      String             @map("updated_by")
   updatedAt      DateTime           @updatedAt @map("updated_at")
 
-  @@unique([workspaceId, action])
+  @@unique([workspaceId, agentKey, action])
   @@map("automation_settings")
 }
 
@@ -8955,6 +8962,8 @@ enum AgentRunKind {
   playbook
   browser
   follow_up
+  // Phase 5: one assistant/task turn (lead agent or a sub-agent).
+  chat
 
   @@map("AgentRunKind")
 }
@@ -8994,6 +9003,17 @@ model AgentRun {
   nextSeq     Int            @default(0) @map("next_seq")
   createdAt   DateTime       @default(now()) @map("created_at")
   endedAt     DateTime?      @map("ended_at")
+  // Phase 5: which agent ran this ("lead" or a sub-agent key from
+  // lib/agents/grants.ts), the sub-agent tree (a delegated run points at the
+  // run that handed it off), the tool groups it was granted (server-computed,
+  // never widened by a child), and a cooperative cancel request.
+  agentKey          String?   @map("agent_key")
+  parentRunId       String?   @map("parent_run_id")
+  parentRun         AgentRun? @relation("AgentRunTree", fields: [parentRunId], references: [id], onDelete: SetNull)
+  childRuns         AgentRun[] @relation("AgentRunTree")
+  allowedTools      String[]  @default([]) @map("allowed_tools")
+  cancelRequestedAt DateTime? @map("cancel_requested_at")
+  cancelRequestedBy String?   @map("cancel_requested_by")
 
   recording AgentRunRecording?
   events    AgentRunEvent[]
@@ -9001,6 +9021,7 @@ model AgentRun {
   @@index([workspaceId, status, createdAt])
   @@index([workspaceId, threadId])
   @@index([workspaceId, missionId])
+  @@index([workspaceId, parentRunId])
   @@map("agent_runs")
 }
 

@@ -23,7 +23,8 @@ import { prisma } from "@/lib/prisma";
 import { Banner, aosButton } from "@/components/aos";
 import { missionDisplayName } from "@/lib/aos/missions";
 import { needsReconnect } from "@/lib/aos/home";
-import { clockTime, runAgentName, runTimeline, runTitle, upcomingPlanSteps, type PlanStepInput } from "@/lib/aos/runs";
+import { clockTime, runAgentName, runPrompt, runTimeline, runTitle, upcomingPlanSteps, type PlanStepInput } from "@/lib/aos/runs";
+import { TOOL_GROUP_LABELS, isToolGroup } from "@/lib/agents/grants";
 import { humanize } from "@/lib/approvals/format";
 import { LiveWatch } from "./LiveWatch";
 import { RunTimelinePanel } from "./RunTimelinePanel";
@@ -133,7 +134,9 @@ export default async function RunViewerPage({ params }: { params: Promise<{ runI
   const pendingApprovals = mission?.approvals ?? [];
 
   // Who started it: mission runs are the lead's; otherwise the member, else the run's agent.
-  let starter = runAgentName(run.kind);
+  let starter = runAgentName(run.kind, run.agentKey);
+  const agentName = runAgentName(run.kind, run.agentKey);
+  const prompt = runPrompt(run.agentState);
   if (run.kind !== "mission" && run.startedBy && !run.startedBy.includes(":")) {
     const member = await prisma.workspaceMember.findFirst({
       where: { workspaceId: workspace.id, userId: run.startedBy },
@@ -163,6 +166,20 @@ export default async function RunViewerPage({ params }: { params: Promise<{ runI
       ? { missionId: mission.id, can: mission.status === "paused" ? ("resume" as const) : ("pause" as const) }
       : null;
 
+  // Phase 5: Stop — editors, or whoever started the run (the route re-checks).
+  const stopRunId = live && (canControl || run.startedBy === user.id) ? run.id : null;
+  const [parentRun, childRuns] = await Promise.all([
+    run.parentRunId ? getAgentRun(workspace.id, run.parentRunId) : Promise.resolve(null),
+    withWorkspaceScope(workspace.id, (tx) =>
+      tx.agentRun.findMany({
+        where: { workspaceId: workspace.id, parentRunId: run.id },
+        orderBy: { createdAt: "asc" },
+        select: { id: true, agentKey: true, kind: true, status: true },
+      }),
+    ),
+  ]);
+  const tools = run.allowedTools.filter(isToolGroup).filter((g) => g !== "workspace" && g !== "delegate");
+
   const recording = run.recording;
   const videoUrl = recording?.videoPath ? `/api/agent-runs/${run.id}/recording/video` : null;
   const traceUrl = recording?.tracePath ? `/api/agent-runs/${run.id}/recording/trace` : null;
@@ -176,6 +193,8 @@ export default async function RunViewerPage({ params }: { params: Promise<{ runI
   const failure = typeof lastError === "string" && lastError.trim() ? lastError.trim() : (lastEvent?.summary ?? null);
 
   const facts: Array<[string, string]> = [
+    ["Agent", run.parentRunId ? `${agentName} (sub-agent)` : agentName],
+    ...(run.allowedTools.length ? ([["Tools", tools.length ? tools.map((g) => TOOL_GROUP_LABELS[g]).join(", ") : "Workspace data only"]] as Array<[string, string]>) : []),
     ["Started", fmtTime(run.createdAt)],
     ["Ended", run.endedAt ? fmtTime(run.endedAt) : "Still going"],
     ["Duration", fmtDuration(durationMs)],
@@ -194,13 +213,14 @@ export default async function RunViewerPage({ params }: { params: Promise<{ runI
       <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
         <div className="flex min-w-0 flex-col gap-5">
           <RunTimelinePanel
-            title={runTitle(run.kind, mission?.name)}
+            title={runTitle(run.kind, mission?.name, prompt)}
             subtitle={`${starter} started this run at ${clockTime(run.createdAt)}${mission && run.kind !== "mission" ? ` · ${mission.name}` : ""}`}
             status={timeline.status}
             neutral={timeline.neutral}
             steps={timeline.steps}
             completed={timeline.completed}
             control={control}
+            stopRunId={stopRunId}
           />
 
           {/* Slice 7: live watch — mounted ONLY while the run is running.
@@ -212,7 +232,7 @@ export default async function RunViewerPage({ params }: { params: Promise<{ runI
           {run.status === "failed" && failure ? (
             <Banner
               status="failed"
-              title={`${runTitle(run.kind, mission?.name)} stopped`}
+              title={`${runTitle(run.kind, mission?.name, prompt)} stopped`}
               description={needsReconnect(failure) ? `${failure.replace(/[.\s]+$/, "")}. Reconnect to resume.` : failure}
               action={needsReconnect(failure) ? { label: "Reconnect", href: "/dashboard/settings/connectors" } : null}
             />
@@ -278,6 +298,31 @@ export default async function RunViewerPage({ params }: { params: Promise<{ runI
               </p>
             ) : null}
           </Section>
+
+          {/* Phase 5: the sub-agent tree — who handed this run its work, and
+              the sub-agents it handed work to. */}
+          {parentRun || childRuns.length > 0 ? (
+            <Section title="Sub-agents" description={parentRun ? "This run was handed off by the lead" : "Work this run handed off"} bodyClassName="px-5 py-2">
+              <ul className="divide-y divide-line">
+                {parentRun ? (
+                  <li className="flex items-center justify-between gap-3 py-2.5 text-md">
+                    <span className="text-muted">Handed off by</span>
+                    <Link href={`/dashboard/runs/${parentRun.id}`} className="font-semibold text-ink underline-offset-4 hover:underline">
+                      {runAgentName(parentRun.kind, parentRun.agentKey)}
+                    </Link>
+                  </li>
+                ) : null}
+                {childRuns.map((c) => (
+                  <li key={c.id} className="flex items-center justify-between gap-3 py-2.5 text-md">
+                    <Link href={`/dashboard/runs/${c.id}`} className="font-semibold text-ink underline-offset-4 hover:underline">
+                      {runAgentName(c.kind, c.agentKey)}
+                    </Link>
+                    <span className="text-sm text-muted capitalize">{c.status}</span>
+                  </li>
+                ))}
+              </ul>
+            </Section>
+          ) : null}
 
           {/* Recording: video + trace download. Bytes stream through the
               workspace-scoped API route; no filesystem paths reach the client. */}

@@ -4,11 +4,15 @@
 // Strategy Agent the assistant chat runs as) or straight to one of its
 // sub-agents. It reuses the existing task path — an assistant chat thread
 // (POST /api/chat/threads, then /messages with attachmentIds) — so every
-// approval gate stays exactly where it was: write tools still propose and
-// wait for the human's confirmation. Agent choice and tool chips travel as
-// plain instructions in the message; they never widen what the agent may do.
+// approval gate stays exactly where it was.
+//
+// Phase 5: the agent and the tool chips are real. The thread is created with
+// { agentKey, tools } and the SERVER enforces them (lib/agents/grants.ts):
+// the turn runs as that agent, the model only sees the granted tools, and a
+// call outside them is refused. Nothing the client sends can widen a grant.
 
 import { LEAD_AGENT, SUB_AGENTS, isSubAgentKey, type SubAgentKey } from "./agents";
+import { AGENT_MAX_GROUPS, COMPOSER_TOOL_GROUPS, UNAVAILABLE_GROUPS, type ToolGroup } from "@/lib/agents/grants";
 
 /** Same bound as the chat messages route (MAX_CONTENT). */
 export const TASK_MAX_CHARS = 4000;
@@ -56,18 +60,37 @@ export interface TaskDraft {
 }
 
 /**
- * The chat message the task becomes. The lead gets the prompt as typed; a
- * sub-agent hand-off and the chosen tools are spelled out for the lead to
- * follow (the lead still routes and every gate still applies).
+ * The chat message the task becomes: the prompt as typed. The agent and the
+ * tools travel separately (taskThreadOptions) and are enforced server-side.
  */
 export function composeTaskMessage(draft: TaskDraft): string {
-  const prompt = draft.prompt.trim();
-  const parts: string[] = [];
-  if (draft.agent !== "lead") parts.push(`Hand this task to the ${SUB_AGENTS[draft.agent].name} sub-agent.`);
-  parts.push(prompt);
-  const tools = COMPOSER_TOOLS.filter((t) => draft.tools.includes(t.key)).map((t) => t.tool);
-  if (tools.length) parts.push(`Tools to use: ${tools.join(", ")}.`);
-  return parts.join("\n\n");
+  return draft.prompt.trim();
+}
+
+/** The tool group each chip grants. */
+export function chipGroup(key: ComposerToolKey): ToolGroup {
+  return COMPOSER_TOOL_GROUPS[key];
+}
+
+/**
+ * Why a chip can't be picked for this agent (null = it can). Unavailable
+ * groups (the code runner before the sandbox ships) and groups beyond the
+ * agent's maximum are offered but disabled — never faked.
+ */
+export function chipUnavailable(agent: ComposerAgentKey, key: ComposerToolKey): string | null {
+  const group = chipGroup(key);
+  if (UNAVAILABLE_GROUPS.has(group)) return "Not available yet — the code runner arrives with the sandbox.";
+  if (!AGENT_MAX_GROUPS[agent].includes(group)) {
+    const name = agent === "lead" ? LEAD_AGENT.name : SUB_AGENTS[agent].name;
+    return `${name} doesn't use this tool.`;
+  }
+  return null;
+}
+
+/** Thread-creation options for a task (POST /api/chat/threads). */
+export function taskThreadOptions(draft: TaskDraft): { agentKey: ComposerAgentKey; tools: ToolGroup[] } {
+  const tools = draft.tools.filter((k) => !chipUnavailable(draft.agent, k)).map(chipGroup);
+  return { agentKey: draft.agent, tools };
 }
 
 /** Field error for the prompt, or null when it can be sent. */

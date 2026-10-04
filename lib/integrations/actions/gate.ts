@@ -386,6 +386,38 @@ export async function expireStaleApprovals(workspaceId?: string) {
   return total;
 }
 
+/**
+ * Phase 5: expire the still-pending approvals a stopped agent run raised.
+ * Only `pending` rows move (an approval a human already decided is left
+ * alone); each gets an "expired" audit entry naming the stop. Returns the
+ * count expired.
+ */
+export async function expireApprovalsForStoppedRun(
+  workspaceId: string,
+  approvalIds: readonly string[],
+  stoppedBy: string,
+): Promise<number> {
+  if (approvalIds.length === 0) return 0;
+  return withWorkspaceScope(workspaceId, async (tx) => {
+    const rows = await tx.composioActionApproval.findMany({
+      where: { workspaceId, id: { in: [...approvalIds] }, status: "pending" },
+      select: { id: true, auditTrail: true },
+    });
+    for (const row of rows) {
+      await tx.composioActionApproval.updateMany({
+        where: { id: row.id, workspaceId, status: "pending" },
+        data: {
+          status: "expired",
+          auditTrail: toJson(
+            trail(row.auditTrail, { at: nowIso(), actor: stoppedBy, event: "expired", detail: "the agent run that asked was stopped" }),
+          ),
+        },
+      });
+    }
+    return rows.length;
+  });
+}
+
 export interface ExecuteApprovedInput {
   workspaceId: string;
   approvalId: string;

@@ -76,3 +76,4 @@ lib/voice/__tests__/voiceover.test.ts
 lib/webhooks/__tests__/webhooks-db.test.ts
 lib/workspace/__tests__/lifecycle-db.test.ts
 lib/workspace/__tests__/workspace-orphans-db.test.ts
+lib/chat/__tests__/agent-controls-db.test.ts

@@ -6,7 +6,7 @@
 // markdown is labeled at the top and the UI shows the provider banner, so it
 // can never be mistaken for a real draft. Never ship it as real output.
 
-import type { LlmProvider } from "./types";
+import type { LlmGenerateOptions, LlmProvider } from "./types";
 
 export class MockLlmProvider implements LlmProvider {
   readonly name = "mock";
@@ -16,7 +16,7 @@ export class MockLlmProvider implements LlmProvider {
     return true;
   }
 
-  async generate(prompt: string, _opts?: { maxTokens?: number }): Promise<string> {
+  async generate(prompt: string, _opts?: LlmGenerateOptions): Promise<string> {
     // Pull the target keyword out of the prompt so the sample draft reads
     // plausibly. Everything else is fixed sample copy, clearly labeled.
     const m = prompt.match(/targeting the keyword:\s*"([^"]+)"/i);

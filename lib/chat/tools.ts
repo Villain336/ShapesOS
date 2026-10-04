@@ -40,6 +40,8 @@ import { research_question } from "@/lib/knowledge/contextdev/research-tool";
 // Phase 4b: answers grounded in the tenant's published datasets.
 import { PrismaDatasetBuilderStore } from "@/lib/datasetbuilder/prisma-store";
 import { askPublishedDatasets } from "@/lib/datasetbuilder/activate";
+// Phase 5: tool groups (per-task tool grants).
+import { isGroupGranted, type AgentKey, type ToolGroup } from "@/lib/agents/grants";
 
 export type ToolKind = "safe" | "destructive" | "publish" | "spend";
 
@@ -56,6 +58,17 @@ export interface ToolContext {
    * lib/chat/connector-tools.ts reads this.
    */
   loadedSkills?: Set<string>;
+  /**
+   * Phase 5: the agent running this turn ("lead" or a sub-agent key) and the
+   * tool groups the task was granted (lib/agents/grants.ts). A missing grant
+   * means "no task grant" (legacy callers): the role checks alone apply.
+   */
+  agentKey?: AgentKey;
+  grant?: readonly ToolGroup[] | null;
+  /** Phase 5: the AgentRun this turn belongs to (timeline + Stop). */
+  runId?: string;
+  /** Phase 5: aborted when the run is stopped. */
+  signal?: AbortSignal;
 }
 
 export interface ToolResult {
@@ -1022,12 +1035,120 @@ export const TOOLS: ToolDef[] = [
 ];
 
 export function getTool(name: string): ToolDef | undefined {
-  return TOOLS.find((t) => t.name === name);
+  return TOOLS.find((t) => t.name === name) ?? EXTRA_TOOLS.get(name);
 }
 
-/** One-line safety legend for the agent system prompt. */
-export function toolCatalogForPrompt(): string {
-  return TOOLS.map((t) => {
+// ---------------------------------------------------------------------------
+// Phase 5: tool groups + automation actions.
+//
+// Every tool belongs to exactly one group (what a task's grant is made of)
+// and every non-safe tool names the automation action it stands for (what a
+// per-agent auto-approve rule is keyed by; lib/automation/policy.ts). Kept
+// as one table so a new tool can't silently skip either — the tools test
+// asserts every registered tool has a group.
+// ---------------------------------------------------------------------------
+
+export const TOOL_GROUP: Readonly<Record<string, ToolGroup>> = {
+  get_keywords: "workspace",
+  get_rankings: "workspace",
+  get_competitors: "workspace",
+  get_content: "workspace",
+  get_alerts: "workspace",
+  get_visibility_score: "workspace",
+  get_workflows: "workspace",
+  load_skill: "workspace",
+  ask_business_data: "workspace",
+  automation_flow_status: "workspace",
+  research_keywords: "web",
+  research_question: "web",
+  create_content_draft: "content",
+  create_report: "content",
+  design_qr_code: "content",
+  run_seo_audit: "site",
+  run_workflow: "automation",
+  approve_autopilot_item: "automation",
+  trigger_automation_flow: "automation",
+  ops_operations_summary: "workspace",
+  ops_list_invoices: "workspace",
+  ops_list_products: "workspace",
+  ops_list_purchase_orders: "workspace",
+  ops_list_projects: "workspace",
+  ops_list_team: "workspace",
+  ops_list_workflow_runs: "workspace",
+  ops_draft_invoice: "ops",
+  ops_draft_purchase_order: "ops",
+  ops_create_project: "ops",
+  ops_request_leave: "ops",
+  ops_send_invoice: "ops",
+  ops_mark_invoice_paid: "ops",
+  ops_approve_leave: "ops",
+  ops_launch_workflow: "ops",
+  delegate_to_subagent: "delegate",
+};
+
+/**
+ * The automation action each non-safe tool stands for. Tier-0 kinds (draft_,
+ * audit_, report_, search_) may be switched to auto per agent; everything
+ * else here evaluates Tier 2+ in lib/orchestrator/authority.ts and so always
+ * asks, whatever a rule says.
+ */
+export const TOOL_ACTION: Readonly<Record<string, string>> = {
+  research_keywords: "search_keywords",
+  research_question: "search_web",
+  create_content_draft: "draft_content",
+  create_report: "report_generate",
+  design_qr_code: "draft_qr_code",
+  run_seo_audit: "audit_site",
+  run_workflow: "run_workflow",
+  approve_autopilot_item: "approve_autopilot_item",
+  trigger_automation_flow: "trigger_automation_flow",
+  ops_draft_invoice: "draft_invoice",
+  ops_draft_purchase_order: "draft_purchase_order",
+  ops_create_project: "create_project",
+  ops_request_leave: "request_leave",
+  ops_send_invoice: "send_invoice",
+  ops_mark_invoice_paid: "mark_invoice_paid",
+  ops_approve_leave: "approve_leave",
+  ops_launch_workflow: "launch_workflow",
+};
+
+/** The group a tool belongs to. Unknown tools fall in "connectors" (fail closed). */
+export function toolGroup(name: string): ToolGroup {
+  return TOOL_GROUP[name] ?? "connectors";
+}
+
+/** The automation action a tool stands for (unknown = a Tier-2 kind that always asks). */
+export function toolAction(name: string): string {
+  return TOOL_ACTION[name] ?? `tool_${name}`;
+}
+
+/** Is this tool inside the task's grant? */
+export function toolGranted(name: string, grant: readonly string[] | null | undefined): boolean {
+  return isGroupGranted(grant, toolGroup(name));
+}
+
+/**
+ * Tools registered at runtime by the agent loop (delegate_to_subagent lives
+ * in lib/chat/agent.ts because it runs the loop itself). Same ToolDef
+ * contract, same gates.
+ */
+const EXTRA_TOOLS = new Map<string, ToolDef>();
+
+export function registerExtraTool(tool: ToolDef): void {
+  EXTRA_TOOLS.set(tool.name, tool);
+}
+
+export function allTools(): ToolDef[] {
+  return [...TOOLS, ...EXTRA_TOOLS.values()];
+}
+
+/**
+ * One-line safety legend for the agent system prompt. Phase 5: with a grant,
+ * only the tools inside it are listed — the model never sees the rest (and
+ * executeTool refuses them anyway).
+ */
+export function toolCatalogForPrompt(grant?: readonly string[] | null): string {
+  return allTools().filter((t) => toolGranted(t.name, grant)).map((t) => {
     const props = Object.entries(t.argsSchema.properties)
       .map(([k, v]) => `${k}: ${v.type}${t.argsSchema.required?.includes(k) ? " (required)" : ""} — ${v.description}`)
       .join("\n    ");
