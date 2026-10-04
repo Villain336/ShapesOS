@@ -999,6 +999,8 @@ model Workspace {
   pushDevices                 PushDevice[]
   // Phase 8 (ship): detected stack per cloned repository.
   repoProfiles                RepoProfile[]
+  // Phase 9 (sites): agent-made draft revisions of SiteBuilder sites.
+  siteRevisions               SiteRevision[]
 
   @@map("workspaces")
 }
@@ -1573,11 +1575,58 @@ model Site {
   audits           SiteAudit[]
   issues           SiteIssue[]
   fixRuns          FixRun[]
+  // Phase 9 (sites): draft revisions (agent drafts + pre-apply backups).
+  revisions        SiteRevision[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("sites")
+}
+
+// ShapesOS Phase 9 (sites): a full snapshot of a site's working copy that is
+// NOT the live one. An agent's site_publish_draft writes a "draft" (source
+// agent) from its sandbox; a person applies it to the working copy (the
+// apply first saves the current files as a "backup" revision, so applying
+// that backup is the revert). Deploy / publish stay separate, gated actions.
+// files = [{ path, content }] (text only, capped in lib/sites/revisions.ts).
+// FORCE RLS on app.workspace_id; cascades from workspaces and sites.
+model SiteRevision {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  siteId      String    @map("site_id")
+  site        Site      @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  /// Per-site sequence (#1, #2 …).
+  number          Int
+  /// draft | applied | discarded | backup
+  status          String    @default("draft")
+  /// agent | backup
+  source          String    @default("agent")
+  /// The agent run that produced it (agent drafts).
+  runId           String?   @map("run_id")
+  summary         String?
+  files           Json      @default("[]")
+  fileCount       Int       @default(0) @map("file_count")
+  bytes           Int       @default(0)
+  /// Unified diff against the files the agent checked out (capped).
+  patch           String?   @db.Text
+  patchTruncated  Boolean   @default(false) @map("patch_truncated")
+  /// Fingerprint of the working copy the draft started from (conflict check).
+  baseFingerprint String?   @map("base_fingerprint")
+  createdBy       String?   @map("created_by")
+  appliedAt       DateTime? @map("applied_at")
+  appliedBy       String?   @map("applied_by")
+  /// For applied drafts: the backup revision saved just before applying.
+  backupId        String?   @map("backup_id")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([siteId, number])
+  @@index([workspaceId, siteId, createdAt])
+  @@map("site_revisions")
 }
 
 // Marketr — hosting deploy targets (milestone 9). Tokens encrypted in
@@ -1586,6 +1635,8 @@ model Site {
 enum DeployTargetType {
   vercel
   cloudflare_pages @map("cloudflare-pages")
+  // Phase 9 (sites): Netlify file-digest deploys.
+  netlify
 }
 
 model HostingConnection {
@@ -1625,6 +1676,12 @@ model Deployment {
   deploymentId String?          @map("deployment_id")
   status       String           @default("queued")
   mock         Boolean          @default(false)
+  // Phase 9 (sites): the provider-side project the deploy went to (Vercel
+  // project id, Cloudflare Pages project name, Netlify site id) — needed to
+  // roll back and to deploy the next version into the same place.
+  providerProject String?       @map("provider_project")
+  // Phase 9 (sites): set on a rollback row — the Deployment row restored.
+  rollbackOf      String?       @map("rollback_of")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
