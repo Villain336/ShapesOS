@@ -526,9 +526,10 @@ model Workspace {
   whiteLabelCustomDomain String? @map("white_label_custom_domain")
   whiteLabelBrandColor   String? @map("white_label_brand_color")
 
-  // Phase C (W5): MCP server opt-in. OFF by default — the new attack surface
-  // only exists for workspaces whose admin explicitly enables it.
-  mcpEnabled Boolean @default(false) @map("mcp_enabled")
+  // Phase C (W5): MCP server switch. Phase 11 (conncore): null = the plan
+  // default (ON for paid plans with API access — Pro, Agency — OFF otherwise;
+  // lib/mcp/enabled.ts); an explicit false is the workspace off switch.
+  mcpEnabled Boolean? @map("mcp_enabled")
 
   // Phase 3: end of the hosted trial (plan = trial). Past it, metered actions
   // are refused until the workspace picks a paid plan (lib/billing/trial.ts).
