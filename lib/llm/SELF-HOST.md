@@ -51,10 +51,24 @@ attempt times out after 120 s; CPU-only servers are slower — set
 `LLM_TIMEOUT_MS` (e.g. `600000`). Timeouts, 429 and 5xx get one retry with
 backoff.
 
+## chat() on self-host (Phase 7)
+
+`chat()` / `chatStream()` on the OpenAI-compatible adapter use the Responses
+API (`{LLM_BASE_URL}/responses`, function tools). Recent vLLM and Ollama
+releases serve it, but that path is UNVERIFIED here — test tool calling
+against your endpoint before pointing an agent workload
+(`LLM_MODEL_LEAD` / `SUBAGENT` / `CODE` / `CODE_MAX`) at it. Effort and
+Anthropic server tools are not sent to self-hosted models.
+
 ## ZDR posture
 
 - Code routes hosted traffic **only** to ZDR-eligible models
   (`lib/llm/router.ts`: `ANTHROPIC_ZDR_MODELS`, `OPENAI_ZDR_MODELS`).
+- Exception, opt-in only: `LLM_ALLOW_RETENTION_MODELS=1` also allows
+  Anthropic's covered model `claude-fable-5-1`, which REQUIRES 30-day
+  retention (a ZDR org gets HTTP 400 on every request). Leave it off for a
+  zero-retention deployment; the code-escalation workload then runs on
+  `claude-opus-5-5` at effort max.
 - "ZDR-eligible" ≠ "ZDR active". OpenAI ZDR requires an approved ZDR request
   on the API org — **that is a process step for Tico, not code.** Anthropic
   ZDR requires a qualified commercial org. Until those approvals land, API

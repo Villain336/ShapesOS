@@ -3744,6 +3744,18 @@ model UsageEvent {
   // meter() in-transaction; the invoice cron sums this per month. 0 for
   // in-cap charges and zero-cost actions. See SEAM.md "Overage accrual".
   overageCredits Int       @default(0) @map("overage_credits")
+  // Phase 7: LLM token usage (action "llm_tokens", written by lib/llm/usage.ts
+  // through meter()). Null on every other action. Token counts per class —
+  // inputTokens is the uncached remainder — plus the estimated vendor cost in
+  // micro-USD (lib/llm/pricing.ts; null when a price is unknown, never guessed).
+  llmProvider         String? @map("llm_provider")
+  llmModel            String? @map("llm_model")
+  llmWorkload         String? @map("llm_workload")
+  llmInputTokens      Int?    @map("llm_input_tokens")
+  llmOutputTokens     Int?    @map("llm_output_tokens")
+  llmCacheReadTokens  Int?    @map("llm_cache_read_tokens")
+  llmCacheWriteTokens Int?    @map("llm_cache_write_tokens")
+  llmCostMicroUsd     BigInt? @map("llm_cost_micro_usd")
 
   @@index([workspaceId, occurredAt])
   @@index([workspaceId, action])
@@ -9026,6 +9038,8 @@ enum AgentRunEventType {
   gate
   browser
   note
+  // Phase 7: one model call's tokens + estimated cost (lib/llm/usage.ts).
+  usage
 
   @@map("AgentRunEventType")
 }

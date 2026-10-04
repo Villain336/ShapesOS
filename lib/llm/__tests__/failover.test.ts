@@ -5,11 +5,13 @@ import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { FailoverLlmProvider, lastFailover, __resetFailoverLog } from "../failover";
 import { LlmProviderError, type LlmErrorKind } from "../errors";
-import type { LlmGenerateOptions, LlmProvider } from "../types";
+import type { ChatRequest, LlmGenerateOptions, LlmProvider } from "../types";
+import { MockLlmProvider } from "../mock";
 
 class FakeProvider implements LlmProvider {
   readonly isLive = true;
   calls = 0;
+  private readonly mock = new MockLlmProvider();
   constructor(
     readonly name: string,
     private readonly behaviour: () => Promise<string>,
@@ -20,6 +22,12 @@ class FakeProvider implements LlmProvider {
   async generate(_prompt: string, _opts?: LlmGenerateOptions) {
     this.calls++;
     return this.behaviour();
+  }
+  chat(req: ChatRequest) {
+    return this.mock.chat(req);
+  }
+  chatStream(req: ChatRequest) {
+    return this.mock.chatStream(req);
   }
 }
 

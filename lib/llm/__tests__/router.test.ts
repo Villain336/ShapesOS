@@ -5,6 +5,11 @@
 import { describe, it, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import {
+  AGENT_WORKLOADS,
+  ANTHROPIC_RETENTION_MODELS,
+  LLM_WORKLOADS,
+  WORKLOAD_EFFORT,
+  workloadForAgent,
   ANTHROPIC_ZDR_MODELS,
   FAMILY_WORKLOAD_DEFAULTS,
   OPENAI_ZDR_MODELS,
@@ -15,11 +20,19 @@ import {
   resolveWorkload,
 } from "../router";
 import { FailoverLlmProvider } from "../failover";
+import { AnthropicLlmProvider } from "../anthropic";
+import { OpenAiCompatibleLlmProvider } from "../openai";
+import { AGENT_KEYS } from "@/lib/agents/grants";
 
 const VARS = [
   "LLM_MODEL_COPY",
   "LLM_MODEL_BULK",
   "LLM_MODEL_BACKGROUND",
+  "LLM_MODEL_LEAD",
+  "LLM_MODEL_SUBAGENT",
+  "LLM_MODEL_CODE",
+  "LLM_MODEL_CODE_MAX",
+  "LLM_ALLOW_RETENTION_MODELS",
   "LLM_MODEL",
   "LLM_API_KEY",
   "OPENAI_API_KEY",
@@ -271,6 +284,126 @@ describe("end to end through the router (stubbed fetch)", () => {
       await assert.rejects(getLlmProviderFor("bulk").generate("hello"), /HTTP 400/);
       assert.equal(hits.length, 1);
       assert.ok(hits[0].includes("/chat/completions"));
+    } finally {
+      globalThis.fetch = realFetch;
+    }
+  });
+});
+
+describe("Phase 7: allow-lists and agent workloads", () => {
+  it("allow-lists carry the new models; Fable 5.1 is a covered model, not ZDR", () => {
+    for (const m of ["claude-opus-5-5", "claude-sonnet-5-5"]) assert.ok((ANTHROPIC_ZDR_MODELS as readonly string[]).includes(m), m);
+    assert.ok((OPENAI_ZDR_MODELS as readonly string[]).includes("gpt-5.5"));
+    assert.deepEqual([...ANTHROPIC_RETENTION_MODELS], ["claude-fable-5-1"]);
+    assert.equal(isRoutableHostedModel("claude-fable-5-1"), false);
+    process.env.LLM_ALLOW_RETENTION_MODELS = "1";
+    assert.equal(isRoutableHostedModel("claude-fable-5-1"), true);
+    assert.equal(isRoutableHostedModel("claude-fable-5"), false, "the opt-in names one list, it does not open covered models in general");
+  });
+
+  it("both keys: agent workloads on their defaults with effort and failover to gpt-5.5", () => {
+    process.env.OPENAI_API_KEY = OAI;
+    process.env.ANTHROPIC_API_KEY = ANT;
+    const st = llmRoutingStatus();
+    assert.deepEqual(Object.keys(st), [...LLM_WORKLOADS]);
+    assert.deepEqual(
+      { lead: st.lead.model, subagent: st.subagent.model, code: st.code.model },
+      { lead: "claude-opus-5-5", subagent: "claude-sonnet-5-5", code: "claude-opus-5-5" },
+    );
+    assert.equal(st.lead.effort, "medium");
+    assert.equal(st.code.effort, "high");
+    assert.equal(st.subagent.effort, null);
+    for (const w of ["lead", "subagent", "code", "code_max"] as const) assert.equal(st[w].failover, "gpt-5.5", w);
+    const lead = resolveWorkload("lead");
+    assert.ok(lead.provider instanceof FailoverLlmProvider);
+    const primary = (lead.provider as FailoverLlmProvider).primary as AnthropicLlmProvider;
+    assert.equal(primary.getDefaultEffort(), "medium", "the workload effort reaches the adapter");
+    const fb = (lead.provider as FailoverLlmProvider).fallback as OpenAiCompatibleLlmProvider;
+    assert.equal(fb.getModel(), "gpt-5.5");
+    assert.equal(fb.getDefaultEffort(), "medium", "and its fallback");
+  });
+
+  it("an OpenAI agent primary fails over to claude-sonnet-5-5", () => {
+    process.env.OPENAI_API_KEY = OAI;
+    process.env.ANTHROPIC_API_KEY = ANT;
+    process.env.LLM_MODEL_CODE = "gpt-5.5";
+    assert.equal(resolveWorkload("code").failoverModel, "claude-sonnet-5-5");
+  });
+
+  it("single-key OpenAI-only: lead/subagent/code/code_max all run on gpt-5.5", () => {
+    process.env.OPENAI_API_KEY = OAI;
+    for (const w of ["lead", "subagent", "code", "code_max"] as const) {
+      const r = resolveWorkload(w);
+      assert.equal(r.requestedModel, "gpt-5.5", w);
+      assert.equal(r.provider.name, "openai-compatible", w);
+      assert.match(r.singleKey!.reason, /ANTHROPIC_API_KEY is not set/);
+    }
+    assert.equal(resolveWorkload("code_max").retention, null, "single-key wins before the covered-model check");
+  });
+
+  it("covered model: a default is swapped to claude-opus-5-5 at effort max; env choice mocks; opt-in routes", () => {
+    process.env.ANTHROPIC_API_KEY = ANT;
+    const swapped = resolveWorkload("code_max");
+    assert.equal(swapped.requestedModel, "claude-opus-5-5");
+    assert.equal(swapped.effort, "max");
+    assert.equal(swapped.provider.name, "anthropic");
+    assert.equal((swapped.provider as AnthropicLlmProvider).getDefaultEffort(), "max");
+    assert.match(llmRoutingStatus().code_max.retention ?? "", /Default "claude-fable-5-1" swapped: .*30-day data retention/);
+
+    process.env.LLM_MODEL_CODE_MAX = "claude-fable-5-1";
+    const env = resolveWorkload("code_max");
+    assert.equal(env.provider.name, "mock");
+    assert.match(env.fallbackReason ?? "", /LLM_ALLOW_RETENTION_MODELS=1/);
+
+    process.env.LLM_ALLOW_RETENTION_MODELS = "1";
+    const ok = resolveWorkload("code_max");
+    assert.equal(ok.requestedModel, "claude-fable-5-1");
+    assert.equal(ok.provider.name, "anthropic");
+    assert.equal(ok.retention, null);
+  });
+
+  it("agent keys map to workloads (lead/planner → lead, actor in build mode → code, others → subagent)", () => {
+    for (const k of AGENT_KEYS) assert.ok(LLM_WORKLOADS.includes(AGENT_WORKLOADS[k]), k);
+    assert.equal(workloadForAgent("lead"), "lead");
+    assert.equal(workloadForAgent("planner"), "lead");
+    assert.equal(workloadForAgent("actor", { mode: "build" }), "code");
+    assert.equal(workloadForAgent("actor"), "subagent");
+    for (const k of ["researcher", "drafter", "analyst", "scheduler"] as const) assert.equal(workloadForAgent(k), "subagent");
+    assert.equal(workloadForAgent("planner", { mode: "build" }), "lead", "build mode only changes the operator");
+    assert.deepEqual(WORKLOAD_EFFORT, { lead: "medium", code: "high" });
+  });
+
+  it("chat() failover end to end: Anthropic 529 → OpenAI Responses, through the real adapters", async () => {
+    process.env.OPENAI_API_KEY = OAI;
+    process.env.ANTHROPIC_API_KEY = ANT;
+    const realFetch = globalThis.fetch;
+    const hits: string[] = [];
+    globalThis.fetch = (async (input: string | URL | Request) => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+      hits.push(url);
+      if (url.includes("/v1/messages")) {
+        return new Response(JSON.stringify({ type: "error", error: { type: "overloaded_error", message: "x" } }), {
+          status: 529,
+          headers: { "content-type": "application/json" },
+        });
+      }
+      return new Response(
+        JSON.stringify({
+          id: "resp_e2e",
+          status: "completed",
+          output: [{ type: "message", content: [{ type: "output_text", text: "fallback answer" }] }],
+          usage: { input_tokens: 10, output_tokens: 5 },
+        }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      );
+    }) as typeof fetch;
+    try {
+      const res = await getLlmProviderFor("lead").chat({ messages: [{ role: "user", content: "hi" }], maxTokens: 64 });
+      assert.deepEqual(res.content, [{ type: "text", text: "fallback answer" }]);
+      assert.equal(res.model, "gpt-5.5");
+      assert.match(res.meta.notes[0], /after "claude-opus-5-5" failed \(server \(HTTP 529\)\)/);
+      assert.equal(hits.filter((h) => h.includes("/v1/messages")).length, 2, "SDK retried once");
+      assert.equal(hits.filter((h) => h.includes("/responses")).length, 1);
     } finally {
       globalThis.fetch = realFetch;
     }

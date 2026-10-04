@@ -18,7 +18,11 @@ export type LlmErrorKind =
   | "timeout" // our own request timeout fired
   | "network" // connection refused / reset / DNS
   | "client" // any other 4xx — not retryable
-  | "empty"; // 2xx with no text (e.g. token budget spent on reasoning)
+  | "empty" // 2xx with no text (e.g. token budget spent on reasoning)
+  // Phase 7: a streamed tool input the SDK could not parse at all. The
+  // tool_use block never completed, so there is no id to answer with an
+  // error result: the caller re-issues the turn (capped). Never a failover.
+  | "tool_input";
 
 const RETRYABLE: ReadonlySet<LlmErrorKind> = new Set(["rate_limit", "server", "timeout", "network"]);
 

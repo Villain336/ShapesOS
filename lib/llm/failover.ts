@@ -15,9 +15,15 @@
 //   - non-LlmProviderError failures (programming errors).
 // Every failover is logged with the workload, both models and the reason
 // (never key material), and the last one is kept for status/ops.
+//
+// Phase 7: chat() follows the same rules. chatStream() fails over only while
+// nothing has been yielded yet (the usual case: a 429 / 5xx / connection
+// failure arrives before the first event); once events have reached the
+// caller, a failure surfaces as is — replaying the turn on another model
+// would duplicate output the caller already showed.
 
 import { isRetryableLlmError, LlmProviderError } from "./errors";
-import type { LlmGenerateOptions, LlmProvider } from "./types";
+import type { ChatRequest, ChatResponse, ChatStreamEvent, LlmGenerateOptions, LlmProvider } from "./types";
 
 export interface FailoverEvent {
   workload: string;
@@ -67,41 +73,99 @@ export class FailoverLlmProvider implements LlmProvider {
     return this.meta.fallbackModel;
   }
 
+  /** Log + remember a failover; returns the human reason. */
+  private noteFailover(e: LlmProviderError): string {
+    const reason = `${e.kind}${e.status ? ` (HTTP ${e.status})` : ""}`;
+    const event: FailoverEvent = {
+      workload: this.meta.workload,
+      primaryModel: this.meta.primaryModel,
+      fallbackModel: this.meta.fallbackModel,
+      reason,
+      at: new Date().toISOString(),
+    };
+    lastFailovers.set(this.meta.workload, event);
+    (this.meta.log ?? console.warn)(
+      `[llm-router] workload=${event.workload} model="${event.primaryModel}" failed: ${reason} → failing over to "${event.fallbackModel}"`,
+    );
+    return reason;
+  }
+
+  /** Keep the fallback's classification; name both failures. */
+  private wrapFallbackError(fallbackErr: unknown, reason: string): unknown {
+    if (fallbackErr instanceof LlmProviderError) {
+      return new LlmProviderError({
+        provider: fallbackErr.provider,
+        kind: fallbackErr.kind,
+        status: fallbackErr.status,
+        retryAfterMs: fallbackErr.retryAfterMs,
+        detail: `${fallbackErr.message.replace(/^LLM request failed \[[^\]]+\]: /, "")} (after failover from "${this.meta.primaryModel}": ${reason})`,
+      });
+    }
+    return fallbackErr;
+  }
+
   async generate(prompt: string, opts?: LlmGenerateOptions): Promise<string> {
     try {
       return await this.primary.generate(prompt, opts);
     } catch (err) {
       if (opts?.signal?.aborted) throw err; // Stop is never a failover
       if (!isRetryableLlmError(err)) throw err; // 4xx / unknown: surface as is
-      const e = err as LlmProviderError;
-      const reason = `${e.kind}${e.status ? ` (HTTP ${e.status})` : ""}`;
-      const event: FailoverEvent = {
-        workload: this.meta.workload,
-        primaryModel: this.meta.primaryModel,
-        fallbackModel: this.meta.fallbackModel,
-        reason,
-        at: new Date().toISOString(),
-      };
-      lastFailovers.set(this.meta.workload, event);
-      (this.meta.log ?? console.warn)(
-        `[llm-router] workload=${event.workload} model="${event.primaryModel}" failed: ${reason} → failing over to "${event.fallbackModel}"`,
-      );
+      const reason = this.noteFailover(err as LlmProviderError);
       try {
         return await this.fallback.generate(prompt, opts);
       } catch (fallbackErr) {
         if (opts?.signal?.aborted) throw fallbackErr;
-        if (fallbackErr instanceof LlmProviderError) {
-          // Keep the fallback's classification; name both failures.
-          throw new LlmProviderError({
-            provider: fallbackErr.provider,
-            kind: fallbackErr.kind,
-            status: fallbackErr.status,
-            retryAfterMs: fallbackErr.retryAfterMs,
-            detail: `${fallbackErr.message.replace(/^LLM request failed \[[^\]]+\]: /, "")} (after failover from "${event.primaryModel}": ${reason})`,
-          });
-        }
-        throw fallbackErr;
+        throw this.wrapFallbackError(fallbackErr, reason);
       }
     }
   }
+
+  async chat(req: ChatRequest): Promise<ChatResponse> {
+    try {
+      return await this.primary.chat(req);
+    } catch (err) {
+      if (req.signal?.aborted) throw err; // Stop is never a failover
+      if (!isRetryableLlmError(err)) throw err; // 4xx / unknown: surface as is
+      const reason = this.noteFailover(err as LlmProviderError);
+      try {
+        const res = await this.fallback.chat(req);
+        return withFailoverNote(res, this.meta.primaryModel, reason);
+      } catch (fallbackErr) {
+        if (req.signal?.aborted) throw fallbackErr;
+        throw this.wrapFallbackError(fallbackErr, reason);
+      }
+    }
+  }
+
+  async *chatStream(req: ChatRequest): AsyncGenerator<ChatStreamEvent> {
+    let yielded = false;
+    let reason: string;
+    try {
+      for await (const ev of this.primary.chatStream(req)) {
+        yielded = true;
+        yield ev;
+      }
+      return;
+    } catch (err) {
+      if (yielded) throw err; // output already reached the caller
+      if (req.signal?.aborted) throw err;
+      if (!isRetryableLlmError(err)) throw err;
+      reason = this.noteFailover(err as LlmProviderError);
+    }
+    try {
+      for await (const ev of this.fallback.chatStream(req)) {
+        yield ev.type === "final" ? { type: "final", response: withFailoverNote(ev.response, this.meta.primaryModel, reason) } : ev;
+      }
+    } catch (fallbackErr) {
+      if (req.signal?.aborted) throw fallbackErr;
+      throw this.wrapFallbackError(fallbackErr, reason);
+    }
+  }
+}
+
+function withFailoverNote(res: ChatResponse, primaryModel: string, reason: string): ChatResponse {
+  return {
+    ...res,
+    meta: { ...res.meta, notes: [`Served by ${res.model} after "${primaryModel}" failed (${reason}).`, ...res.meta.notes] },
+  };
 }
