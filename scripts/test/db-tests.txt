@@ -127,3 +127,5 @@ lib/sandbox/__tests__/analyze-tool-db.test.ts
 lib/knowledge/contextdev/__tests__/web-tools-db.test.ts
 # Phase 11 (bizsync): Shopify ↔ Ops (fake Shopify GraphQL): catalogue/inventory/orders/customers idempotent, conflict rules, gated stock push, webhook apply, journal untouched, FORCE RLS.
 lib/bizsync/__tests__/shopify-sync-db.test.ts
+# Phase 11 (bizsync): QuickBooks (fake QBO honouring requestid): mapping confirm, export once per source (re-export no-op, interrupted → same key, concurrent → once, 400 → new attempt), contacts import, ledger untouched, FORCE RLS.
+lib/bizsync/__tests__/accounting-db.test.ts

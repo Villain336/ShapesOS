@@ -1059,6 +1059,9 @@ model Workspace {
   // Phase 11 (bizsync): Shopify / QuickBooks / Xero id mapping + sync run log.
   bizSyncLinks                BizSyncLink[]
   bizSyncRuns                 BizSyncRun[]
+  // Phase 11 (bizsync): chart ↔ QuickBooks/Xero account map + export ledger.
+  opsAccountingLinks          OpsAccountingLink[]
+  opsAccountingExports        OpsAccountingExport[]
 
   @@map("workspaces")
 }
@@ -10673,6 +10676,8 @@ model OpsAccount {
   updatedAt   DateTime       @updatedAt @map("updated_at")
 
   lines OpsJournalLine[]
+  // Phase 11 (bizsync): the QuickBooks / Xero account this one maps to.
+  accountingLinks OpsAccountingLink[]
 
   @@unique([workspaceId, code])
   @@unique([workspaceId, systemKey])
@@ -15728,4 +15733,74 @@ model BizSyncRun {
 
   @@index([workspaceId, provider, startedAt])
   @@map("biz_sync_runs")
+}
+
+// ============================================================================
+// Phase 11 (bizsync) — accounting connectors (QuickBooks Online, Xero).
+// One account-mapping model shared by both providers (keyed by provider):
+// each local chart account → one remote account, "suggested" by code /
+// system role / name, "confirmed" by a person in Settings → Connectors →
+// Business sync. Exports only use confirmed rows.
+// ops_accounting_exports is the export ledger: ONE row per (provider,
+// source document) — journal:<entry> | invoice:<id> | credit_note:<id> |
+// bill:<id> | payment:<id> | bill_payment:<id> — claimed BEFORE the remote
+// call, so a second export is a no-op and a crashed one is retried with the
+// SAME provider idempotency key (QuickBooks requestid / Xero Idempotency-Key,
+// derived from source key + attempt). Exports read the append-only journal;
+// nothing here ever writes it.
+// ============================================================================
+
+model OpsAccountingLink {
+  id              String     @id @default(cuid())
+  workspaceId     String     @map("workspace_id")
+  workspace       Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  // quickbooks | xero
+  provider        String
+  accountId       String     @map("account_id")
+  account         OpsAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  remoteAccountId String     @map("remote_account_id")
+  remoteCode      String?    @map("remote_code")
+  remoteName      String     @map("remote_name")
+  remoteType      String?    @map("remote_type")
+  // suggested | confirmed
+  status          String     @default("suggested")
+  // code | system | name | type (why it was suggested)
+  matchReason     String?    @map("match_reason")
+  confirmedBy     String?    @map("confirmed_by")
+  confirmedAt     DateTime?  @map("confirmed_at")
+  createdAt       DateTime   @default(now()) @map("created_at")
+  updatedAt       DateTime   @updatedAt @map("updated_at")
+
+  @@unique([workspaceId, provider, accountId])
+  @@index([workspaceId, provider, remoteAccountId])
+  @@map("ops_accounting_links")
+}
+
+model OpsAccountingExport {
+  id           String    @id @default(cuid())
+  workspaceId  String    @map("workspace_id")
+  workspace    Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  provider     String
+  sourceKey    String    @map("source_key")
+  // journal_entry | invoice | credit_note | bill | payment | bill_payment
+  docType      String    @map("doc_type")
+  localId      String    @map("local_id")
+  // The journal entry the document was posted with (what was exported).
+  entryId      String?   @map("entry_id")
+  // pending (claimed; remote call in flight or interrupted) | exported | failed
+  status       String    @default("pending")
+  remoteId     String?   @map("remote_id")
+  remoteNumber String?   @map("remote_number")
+  // Bumped only after a definitive refusal; ambiguous failures keep it, so
+  // the retry reuses the same provider idempotency key.
+  attempt      Int       @default(1)
+  lastError    String?   @map("last_error")
+  exportedAt   DateTime? @map("exported_at")
+  createdBy    String    @map("created_by")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  @@unique([workspaceId, provider, sourceKey])
+  @@index([workspaceId, provider, status])
+  @@map("ops_accounting_exports")
 }

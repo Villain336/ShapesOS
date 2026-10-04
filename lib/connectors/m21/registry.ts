@@ -1,6 +1,6 @@
 // Marketr — M21 built-in connector registry (spec §7, §11).
 //
-// DESIGN DECISION (recorded in prisma/schema.prisma): the 19 built-in
+// DESIGN DECISION (recorded in prisma/schema.prisma): the 20 built-in
 // connectors are CODE-defined here, not DB rows. (The count is pinned by
 // lib/connectors/m21/__tests__/registry.test.ts — update both together.) `Connector` rows exist
 // ONLY for workspace-custom MCP servers (kind=mcp). Do not create DB rows
@@ -288,6 +288,18 @@ export const BUILT_IN_CONNECTORS: BuiltinConnectorMeta[] = [
     },
     authNote: "Shopify app install (OAuth per store — enter your *.myshopify.com domain). Webhooks are signed with the app secret.",
   },
+  // Phase 11 (bizsync): QuickBooks Online ↔ the Ops accounting core.
+  {
+    key: "quickbooks",
+    displayName: "QuickBooks",
+    authType: "oauth2",
+    description: "Map your chart of accounts, import customers and vendors, and post invoices, bills, payments and journals to QuickBooks Online after you confirm.",
+    oauth: {
+      scopes: QUICKBOOKS_SCOPES,
+      envVars: ["QUICKBOOKS_CLIENT_ID", "QUICKBOOKS_CLIENT_SECRET"],
+    },
+    authNote: "Intuit OAuth 2.0 (one QuickBooks company per connection). QUICKBOOKS_ENVIRONMENT=sandbox for Intuit's sandbox.",
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -354,6 +366,7 @@ import { OutlookCalendarAdapter } from "./native/outlook-calendar";
 import { SlackAdapter } from "./native/slack";
 import { HubspotAdapter } from "./native/hubspot";
 import { ShopifyAdapter } from "./native/shopify"; // Phase 11 (bizsync)
+import { QuickbooksAdapter } from "./native/quickbooks"; // Phase 11 (bizsync)
 
 const ADAPTER_CLASSES: Record<string, () => ConnectorAdapter> = {
   "google-search-console": () => new GoogleSearchConsoleAdapter(),
@@ -378,6 +391,7 @@ const ADAPTER_CLASSES: Record<string, () => ConnectorAdapter> = {
   hubspot: () => new HubspotAdapter(),
   // Phase 11 (bizsync).
   shopify: () => new ShopifyAdapter(),
+  quickbooks: () => new QuickbooksAdapter(),
 };
 
 /** Resolve a built-in connector key to its native adapter. Throws on unknown key. */
@@ -393,7 +407,7 @@ export function resolveAdapter(key: string): ConnectorAdapter {
 //
 // Phase 4b wired the last six mock-only adapters (GSC, GA4, Drive, Notion,
 // Meta Ads, Google Ads) to their live APIs: with a vault credential they
-// call the provider; without one they stay in labeled mock mode. All 19
+// call the provider; without one they stay in labeled mock mode. All 20
 // built-in adapters have live wiring, so the set is empty (0 mock-only;
 // pinned by lib/connectors/m21/__tests__/registry.test.ts). Keep it in
 // sync with the per-adapter file headers (scripts/verify-connector-health.mts

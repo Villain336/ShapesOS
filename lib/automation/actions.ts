@@ -67,6 +67,7 @@ export const KNOWN_ACTION_DEFS: ReadonlyArray<{ action: string; label: string; d
   // Phase 11 (bizsync): commerce + accounting connectors.
   { action: "import_commerce_data", label: "Import store data", description: "Pull products, stock, orders and customers from a connected store into Ops. Always asks." },
   { action: "update_store_inventory", label: "Update store stock", description: "Set stock levels on a connected online store. Always asks." },
+  { action: "post_to_accounting", label: "Post to accounting software", description: "Export invoices, bills, payments and journals to QuickBooks or Xero. Never automated." },
 ];
 
 
