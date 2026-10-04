@@ -205,7 +205,7 @@ export async function continueFromPrFeedback(
       data: { continuedRunId: turn.runId },
     });
     await tx.agentPullRequest.update({
-      where: { id: pr.id },
+      where: { id: pr.id, workspaceId },
       data: { continuations: { increment: 1 }, lastContinuedAt: deps.now(), lastContinuedRunId: turn.runId },
     });
   });

@@ -15,15 +15,15 @@
 //     feedback coalesces into the queued job (pending_since) instead of
 //     starting another turn.
 //
-// Cross-workspace reads happen in exactly one place, routePullRequest(): it
+// Cross-workspace reads happen in exactly one place, ./pr-routing.ts: it
 // sets app.github_route = 'lookup' (a SELECT-only RLS policy on this table)
 // to map a delivery to its workspace. Every write runs under the row's own
 // tenant GUC (withWorkspaceScope).
 
 import type { Prisma } from "@prisma/client";
-import { prisma } from "@/lib/prisma";
 import { withWorkspaceScope } from "@/lib/substrate/memory/rls";
 import { agentWorkerMode } from "@/lib/agents/queue/config";
+import { normalizeRepo } from "./pr-routing";
 import type { ShipState } from "./state";
 
 export type PullRequestState = "pushed" | "open" | "closed" | "merged";
@@ -35,9 +35,6 @@ export const FEEDBACK_DEBOUNCE_MS = 20_000;
 const SUMMARY_MAX = 2000;
 const LAST_FEEDBACK_MAX = 500;
 
-export function normalizeRepo(fullName: string): string {
-  return fullName.trim().toLowerCase();
-}
 
 // ---------------------------------------------------------------------------
 // Ship state → registry
@@ -63,7 +60,7 @@ export async function syncPullRequestFromShip(
   });
   if (existing) {
     await tx.agentPullRequest.update({
-      where: { id: existing.id },
+      where: { id: existing.id, workspaceId },
       data: {
         ...pr,
         ...(threadId ? { threadId } : {}),
@@ -86,44 +83,8 @@ export async function syncPullRequestFromShip(
   });
 }
 
-// ---------------------------------------------------------------------------
-// Routing (the one cross-workspace read)
-// ---------------------------------------------------------------------------
-
-export interface PullRequestRoute {
-  id: string;
-  workspaceId: string;
-}
-
-/**
- * Which workspace owns this repository's branch (or PR number)? Read-only,
- * through the app.github_route SELECT policy; returns ids only.
- */
-export async function routePullRequest(q: { repoFullName: string; branch?: string | null; prNumber?: number | null }): Promise<PullRequestRoute | null> {
-  const repoFullName = normalizeRepo(q.repoFullName);
-  if (!q.branch && !q.prNumber) return null;
-  return prisma.$transaction(async (tx) => {
-    await tx.$executeRawUnsafe(`SET LOCAL app.github_route = 'lookup'`);
-    return tx.agentPullRequest.findFirst({
-      where: q.branch ? { repoFullName, branch: q.branch } : { repoFullName, prNumber: q.prNumber! },
-      orderBy: { createdAt: "desc" },
-      select: { id: true, workspaceId: true },
-    });
-  });
-}
-
-/** Open agent PRs in every workspace (the poller's discovery; ids only). */
-export async function discoverOpenPullRequests(limit = 500): Promise<PullRequestRoute[]> {
-  return prisma.$transaction(async (tx) => {
-    await tx.$executeRawUnsafe(`SET LOCAL app.github_route = 'lookup'`);
-    return tx.agentPullRequest.findMany({
-      where: { state: { in: ["pushed", "open"] } },
-      orderBy: { updatedAt: "asc" },
-      take: Math.max(1, limit),
-      select: { id: true, workspaceId: true },
-    });
-  });
-}
+// Routing (the one cross-workspace read) lives in ./pr-routing.ts.
+export { discoverOpenPullRequests, normalizeRepo, routePullRequest, type PullRequestRoute } from "./pr-routing";
 
 // ---------------------------------------------------------------------------
 // Feedback
@@ -247,7 +208,7 @@ export async function recordPrFeedback(
     const latest = [...fresh].reverse().find((i) => i.kind === "feedback") ?? fresh[fresh.length - 1];
     const nextState = update.state ?? (update.prNumber && pr.state === "pushed" ? "open" : undefined);
     await tx.agentPullRequest.update({
-      where: { id: pr.id },
+      where: { id: pr.id, workspaceId },
       data: {
         ...(update.prNumber ? { prNumber: update.prNumber } : {}),
         ...(update.prUrl ? { prUrl: update.prUrl } : {}),
