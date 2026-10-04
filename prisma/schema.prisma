@@ -3385,7 +3385,7 @@ model WorkspaceSettings {
   notificationDefaults Json?     @map("notification_defaults")
   dataGovernance       Json?     @map("data_governance")
   // Tool namespaces the agent may use; empty = all enabled.
-  agentAllowList       String[]  @map("agent_allow_list")
+  agentAllowList       String[]  @default([]) @map("agent_allow_list")
   // Phase 14: manual risk-tier overrides for Composio tools, keyed by tool
   // slug → "low" | "medium" | "high". Overrides win over verb-derived
   // classification (spec §3).
