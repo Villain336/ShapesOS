@@ -128,7 +128,14 @@ async function seedMission(opts: {
         planSnapshot: { templateId: template.id, steps: plan } as unknown as Json,
         checkpoints: [],
         budgetCaps: { maxCostCents: template.budgetDefaults.maxCostCents },
-        termination: { maxSteps: template.budgetDefaults.maxSteps, deadlineAt: new Date(now.getTime() + 90 * 86_400_000).toISOString() },
+        // The full TerminationConfig the engine writes (lib/missions/engine.ts startMission).
+        termination: {
+          maxSteps: template.budgetDefaults.maxSteps,
+          maxCostCents: template.budgetDefaults.maxCostCents,
+          deadlineAt: new Date(now.getTime() + 90 * 86_400_000).toISOString(),
+          maxConsecutiveFailures: template.budgetDefaults.maxConsecutiveFailures,
+          goal: { metric: "booked_jobs", targetValue: 40, direction: "increase" },
+        },
         createdBy: TAG,
         createdAt: minAgo(opts.startedMin),
       },
@@ -154,7 +161,8 @@ async function seedMission(opts: {
   });
 }
 
-async function seedRun(kind: "mission" | "playbook" | "browser" | "follow_up", status: "queued" | "running" | "succeeded" | "failed", startedMin: number, missionId: string | null, events: string[] = []) {
+type RunEv = string | { summary: string; type?: "agui" | "gate" | "browser" | "note"; payload?: Record<string, unknown> };
+async function seedRun(kind: "mission" | "playbook" | "browser" | "follow_up", status: "queued" | "running" | "succeeded" | "failed", startedMin: number, missionId: string | null, events: RunEv[] = []) {
   await scoped(async (tx) => {
     const run = await tx.agentRun.create({
       data: {
@@ -168,9 +176,18 @@ async function seedRun(kind: "mission" | "playbook" | "browser" | "follow_up", s
         nextSeq: events.length,
       },
     });
-    for (const [seq, summary] of events.entries()) {
+    for (const [seq, ev] of events.entries()) {
+      const e = typeof ev === "string" ? { summary: ev } : ev;
       await tx.agentRunEvent.create({
-        data: { workspaceId, runId: run.id, seq, type: "note", summary, createdAt: minAgo(startedMin - seq) },
+        data: {
+          workspaceId,
+          runId: run.id,
+          seq,
+          type: e.type ?? "note",
+          summary: e.summary,
+          ...(e.payload ? { payload: e.payload as Json } : {}),
+          createdAt: minAgo(startedMin - seq),
+        },
       });
     }
   });
@@ -208,7 +225,15 @@ const brief = await seedMission({
     route("researcher", "Reading 12 sources", 29),
   ],
 });
-await seedRun("mission", "running", 33, brief, ["Planned the work", "Searched the web: 18 results, 12 kept", "Reading sources (7 of 12)"]);
+await seedRun("mission", "running", 33, brief, [
+  { summary: "Plan the work", type: "agui", payload: { detail: "Split the task into 5 steps." } },
+  {
+    summary: "Search the web",
+    type: "agui",
+    payload: { detail: "Found 18 results and kept 12.", tool: "web.search", query: '"competitor pricing changes, last 7 days"', limit: 20, result: "18 results, 12 kept, 6 duplicates dropped", durationMs: 800 },
+  },
+  { summary: "Read sources", type: "agui", payload: { detail: "Now reading a vendor pricing page.", progress: { done: 7, total: 12 } } },
+]);
 
 // 2. Needs you: the Writer drafted renewal emails; approvals pending.
 hop = 0;
