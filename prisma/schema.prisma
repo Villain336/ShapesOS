@@ -1036,6 +1036,8 @@ model Workspace {
   repoProfiles                RepoProfile[]
   // Phase 9 (sites): agent-made draft revisions of SiteBuilder sites.
   siteRevisions               SiteRevision[]
+  // Phase 11 (seotools): sitemap submissions (Search Console, IndexNow).
+  siteSitemapSubmissions      SiteSitemapSubmission[]
   // Phase 9 (repos): agent pull requests + the GitHub deliveries about them.
   agentPullRequests           AgentPullRequest[]
   githubWebhookDeliveries     GitHubWebhookDelivery[]
@@ -1696,6 +1698,8 @@ model Site {
   fixRuns          FixRun[]
   // Phase 9 (sites): draft revisions (agent drafts + pre-apply backups).
   revisions        SiteRevision[]
+  // Phase 11 (seotools): sitemap submissions to Search Console / IndexNow.
+  sitemapSubmissions SiteSitemapSubmission[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -1746,6 +1750,35 @@ model SiteRevision {
   @@unique([siteId, number])
   @@index([workspaceId, siteId, createdAt])
   @@map("site_revisions")
+}
+
+// ShapesOS Phase 11 (seotools): one sitemap submission for a site — to
+// Google Search Console (the project's connected GSC property) or IndexNow
+// (keyless; Bing, Yandex, Seznam, Naver …). status: submitted |
+// not_connected | needs_reconnect | failed — a submission that did not
+// reach the engine is never recorded as submitted.
+// FORCE RLS on app.workspace_id; cascades from workspaces and sites.
+model SiteSitemapSubmission {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  siteId      String    @map("site_id")
+  site        Site      @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  /// gsc | indexnow
+  target      String
+  /// submitted | not_connected | needs_reconnect | failed
+  status      String
+  sitemapUrl  String    @map("sitemap_url")
+  urlCount    Int       @default(0) @map("url_count")
+  httpStatus  Int?      @map("http_status")
+  detail      String?
+  submittedBy String?   @map("submitted_by")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([workspaceId, siteId, createdAt])
+  @@map("site_sitemap_submissions")
 }
 
 // Marketr — hosting deploy targets (milestone 9). Tokens encrypted in

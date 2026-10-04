@@ -129,7 +129,9 @@ describe("agent draft from the sandbox", () => {
 
 describe("applying a draft", () => {
   it("writes the working copy exactly and keeps a backup; a draft applies once", async () => {
-    const out = await applySiteRevision({ workspaceId: WS_A, projectId, siteId, revisionId: draftId, userId: USER });
+    // Phase 11 rebuilds sitemap.xml after a draft applies (covered in
+    // lib/seo/__tests__/sitemap-db.test.ts); off here to check exactness.
+    const out = await applySiteRevision({ workspaceId: WS_A, projectId, siteId, revisionId: draftId, userId: USER, refreshSitemap: false });
     assert.equal(out.written, 2);
     assert.deepEqual(out.removed, ["/old.html"]);
     const live = await readSiteWorkingCopy(siteId);
@@ -167,7 +169,7 @@ describe("applying a draft", () => {
       applySiteRevision({ workspaceId: WS_A, projectId, siteId, revisionId: stale.id, userId: USER }),
       (e: unknown) => e instanceof SiteRevisionError && e.code === "site_changed" && e.status === 409,
     );
-    await applySiteRevision({ workspaceId: WS_A, projectId, siteId, revisionId: stale.id, userId: USER, force: true });
+    await applySiteRevision({ workspaceId: WS_A, projectId, siteId, revisionId: stale.id, userId: USER, force: true, refreshSitemap: false });
     assert.equal((await readSiteWorkingCopy(siteId)).files[0]!.content, "stale");
 
     const other = await createSiteRevision({ workspaceId: WS_A, siteId, status: "draft", source: "agent", files: [{ path: "/a.html", content: "a" }] });

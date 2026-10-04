@@ -1,4 +1,4 @@
-// ShapesOS Phase 11 (seotools): structured-data agent tools (group "site").
+// ShapesOS Phase 11 (seotools): SEO agent tools (group "site").
 //
 //   add_structured_data       safe   writes a site DRAFT revision with JSON-LD
 //                                    (Organization / WebSite on the home page,
@@ -10,6 +10,10 @@
 //                                    Action draft_structured_data (Tier 0).
 //   validate_structured_data  safe   validate JSON-LD text, or the JSON-LD on a
 //                                    live page (SSRF-guarded polite fetch)
+//   submit_sitemap            publish submit the site's sitemap to Search Console
+//                                    (when connected) and IndexNow. Action
+//                                    refresh_owned_page (Tier 1: asks unless
+//                                    automation is switched on).
 //
 // Self-registers (imported for its side effect by lib/chat/agent.ts).
 
@@ -159,16 +163,52 @@ export const validate_structured_data: ToolDef = {
   },
 };
 
-export const STRUCTURED_DATA_TOOLS: readonly ToolDef[] = [add_structured_data, validate_structured_data];
+export const submit_sitemap: ToolDef = {
+  name: "submit_sitemap",
+  description:
+    "Tell search engines about a site's sitemap: Google Search Console (when the project's Search Console is connected) and IndexNow (keyless; Bing and others). Uses the site's live URL. Each engine's real answer is reported — not connected or refused is never shown as submitted.",
+  kind: "publish",
+  minRole: "editor",
+  argsSchema: {
+    type: "object",
+    properties: {
+      siteId: { type: "string", description: "Site id (optional — defaults to the project's first site)." },
+      targets: { type: "string", description: 'Comma-separated: "gsc", "indexnow" (optional — default both).' },
+    },
+  },
+  async execute(ctx, args) {
+    if (!roleAtLeast(ctx.role, "editor")) throw new Error("editor role required");
+    const site = await siteFor(ctx, str(args.siteId));
+    if (!site) return { summary: "No site found in this project.", details: { error: "no_site" } };
+    const targets = str(args.targets)
+      ?.split(",")
+      .map((t) => t.trim().toLowerCase())
+      .filter((t): t is "gsc" | "indexnow" => t === "gsc" || t === "indexnow");
+    const { submitSiteSitemap, SitemapSubmitError } = await import("./sitemap-submit");
+    try {
+      const out = await submitSiteSitemap({ workspaceId: ctx.workspaceId, projectId: ctx.projectId, siteId: site.id, targets, submittedBy: ctx.userId });
+      const lines = out.results.map((r) => `- ${r.target === "gsc" ? "Search Console" : "IndexNow"}: ${r.status.replace("_", " ")} — ${r.detail}`).join("\n");
+      return {
+        summary: `Sitemap ${out.sitemapUrl} (${out.urlCount} page${out.urlCount === 1 ? "" : "s"}):\n${lines}`,
+        details: out,
+      };
+    } catch (err) {
+      if (err instanceof SitemapSubmitError) return { summary: err.message, details: { error: err.code } };
+      throw err;
+    }
+  },
+};
+
+export const SEO_TOOLS: readonly ToolDef[] = [add_structured_data, validate_structured_data, submit_sitemap];
 
 let registered = false;
-export function registerStructuredDataTools(): void {
+export function registerSeoTools(): void {
   if (registered) return;
   registered = true;
-  for (const t of STRUCTURED_DATA_TOOLS) registerExtraTool(t);
+  for (const t of SEO_TOOLS) registerExtraTool(t);
 }
 
-registerStructuredDataTools();
+registerSeoTools();
 
 // Re-exported for callers that only need the pure helpers.
 export { validateJsonLd };

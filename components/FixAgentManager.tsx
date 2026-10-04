@@ -92,6 +92,24 @@ function VitalsSummary({ vitals }: { vitals: Vitals }) {
   );
 }
 
+// Phase 11 (seotools): sitemap submissions (lib/seo/sitemap-submit.ts).
+interface SitemapSubmission {
+  id: string;
+  target: "gsc" | "indexnow";
+  status: "submitted" | "not_connected" | "needs_reconnect" | "failed";
+  urlCount: number;
+  detail: string | null;
+  createdAt: string;
+}
+
+const SUBMIT_TARGET_LABEL: Record<SitemapSubmission["target"], string> = { gsc: "Search Console", indexnow: "IndexNow" };
+const SUBMIT_STATUS_LABEL: Record<SitemapSubmission["status"], string> = {
+  submitted: "Submitted",
+  not_connected: "Not connected",
+  needs_reconnect: "Needs reconnect",
+  failed: "Failed",
+};
+
 interface LiveAudit {
   id: string;
   status: string;
@@ -196,6 +214,7 @@ export default function FixAgentManager({ projectId }: { projectId: string }) {
   const [showPreview, setShowPreview] = useState<string | null>(null);
   const [liveAudit, setLiveAudit] = useState<LiveAudit | null>(null);
   const [liveUrl, setLiveUrl] = useState("");
+  const [submissions, setSubmissions] = useState<SitemapSubmission[]>([]);
 
   const loadSites = useCallback(async () => {
     const res = await fetch(`/api/websites?projectId=${projectId}`);
@@ -220,6 +239,10 @@ export default function FixAgentManager({ projectId }: { projectId: string }) {
     setSettings(data.settings);
     setAudit(data.latestAudit);
     setLiveAudit(data.latestLiveAudit ?? null);
+    fetch(`/api/websites/${siteId}/sitemap?projectId=${projectId}`)
+      .then((r) => (r.ok ? r.json() : { submissions: [] }))
+      .then((d) => setSubmissions(d.submissions ?? []))
+      .catch(() => setSubmissions([]));
     setLiveUrl((prev) => prev || data.latestLiveAudit?.targetUrl || data.site?.liveUrl || "");
     setIssues(data.issues ?? []);
     setRuns(data.fixRuns ?? []);
@@ -318,6 +341,38 @@ export default function FixAgentManager({ projectId }: { projectId: string }) {
     if (!res.ok) setError(data.error ?? "Couldn't draft structured data");
     else if (!data.saved) setNotice("Every page already carries this structured data — nothing to draft.");
     else setNotice(`Saved draft #${data.revision.number} with structured data on ${data.pages.filter((p: { changed: boolean }) => p.changed).length} pages. Review and apply it in Site drafts — nothing is live yet.`);
+  }
+
+  async function sitemapAction(action: "rebuild" | "submit") {
+    if (!siteId) return;
+    setBusy(true);
+    setError(null);
+    setNotice(null);
+    const res = await fetch(`/api/websites/${siteId}/sitemap`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ projectId, action }),
+    });
+    const data = await res.json();
+    setBusy(false);
+    if (!res.ok) {
+      setError(data.error ?? "Sitemap action failed");
+      return;
+    }
+    if (action === "rebuild") {
+      setNotice(
+        data.skipped === "user_managed"
+          ? `Your hand-written sitemap.xml was kept; robots.txt points at ${data.sitemapUrl}.`
+          : `Sitemap rebuilt with ${data.urlCount} pages${data.written.length ? "" : " (no changes)"}. It goes live with the next deploy.`,
+      );
+    } else {
+      setNotice(
+        (data.results as { target: SitemapSubmission["target"]; status: SitemapSubmission["status"] }[])
+          .map((r) => `${SUBMIT_TARGET_LABEL[r.target]}: ${SUBMIT_STATUS_LABEL[r.status].toLowerCase()}`)
+          .join(" · "),
+      );
+    }
+    loadInbox();
   }
 
   async function setIssueStatus(issueId: string, status: "approved" | "ignored") {
@@ -514,6 +569,34 @@ export default function FixAgentManager({ projectId }: { projectId: string }) {
                   <h4 className="text-xs font-semibold text-ink">Core Web Vitals</h4>
                   <VitalsSummary vitals={liveAudit.vitals} />
                 </div>
+              )}
+            </div>
+
+            {/* Phase 11 (seotools): sitemap rebuild + submission */}
+            <div className="mt-4 border-t border-line pt-4">
+              <h3 className="text-sm font-semibold">Sitemap</h3>
+              <p className="mt-1 text-xs text-muted">
+                sitemap.xml and the robots.txt Sitemap line are rebuilt when a draft is applied and before each deploy. Submit them once the site is live.
+              </p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <button onClick={() => sitemapAction("rebuild")} disabled={busy}
+                  className="rounded-full bg-paper px-3 py-1.5 text-sm font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper disabled:opacity-50">
+                  Rebuild sitemap
+                </button>
+                <button onClick={() => sitemapAction("submit")} disabled={busy}
+                  className="rounded-full bg-paper px-3 py-1.5 text-sm font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper disabled:opacity-50">
+                  Submit to search engines
+                </button>
+              </div>
+              {submissions.length > 0 && (
+                <ul className="mt-3 space-y-1 text-xs text-muted">
+                  {submissions.slice(0, 4).map((sub) => (
+                    <li key={sub.id}>
+                      <span className="font-medium text-ink">{SUBMIT_TARGET_LABEL[sub.target]}</span> · {SUBMIT_STATUS_LABEL[sub.status]} · {new Date(sub.createdAt).toLocaleString()}
+                      {sub.detail && <span className="block">{sub.detail}</span>}
+                    </li>
+                  ))}
+                </ul>
               )}
             </div>
 

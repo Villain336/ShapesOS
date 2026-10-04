@@ -113,3 +113,5 @@ lib/portal/__tests__/portal-isolation-db.test.ts
 lib/audit/__tests__/live-audit-db.test.ts
 # Phase 11 (seotools): JSON-LD only through site draft revisions; apply is human; RLS; validation before save.
 lib/seo/__tests__/jsonld-draft-db.test.ts
+# Phase 11 (seotools): site sitemaps (rebuild on apply, hand-written kept), submissions recorded with real status + RLS.
+lib/seo/__tests__/sitemap-db.test.ts
