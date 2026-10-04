@@ -59,6 +59,7 @@ import {
   useOpsList,
 } from "./shared";
 import { SubTabs } from "./SubTabs";
+import { activateOnKey } from "@/lib/ui/keyboard";
 
 // ---------------------------------------------------------------------------
 // Row shapes (as the generic route returns them)
@@ -253,7 +254,7 @@ function MoListView() {
             </thead>
             <tbody>
               {rows.map((m) => (
-                <tr key={m.id} className={trClickableCls} onClick={() => setSelectedId(m.id)}>
+                <tr key={m.id} className={trClickableCls} tabIndex={0} onClick={() => setSelectedId(m.id)} onKeyDown={activateOnKey(() => setSelectedId(m.id))}>
                   <td className={`${tdCls} font-mono text-[12px]`}>{moLabel(m)}</td>
                   <td className={tdCls}>{P.get(m.productId)?.name ?? m.productId}</td>
                   <td className={`${tdCls} text-right tabular-nums`}>{m.qty}</td>
