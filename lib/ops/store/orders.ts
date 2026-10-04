@@ -158,9 +158,9 @@ export async function markWebOrderPaid(
 
     let promoNote = "";
     if (order.promotionId) {
-      const promo = await tx.opsPromotion.update({
-        where: { id: order.promotionId },
-        data: { usedCount: { increment: 1 } },
+      await tx.opsPromotion.updateMany({ where: { id: order.promotionId, workspaceId }, data: { usedCount: { increment: 1 } } });
+      const promo = await tx.opsPromotion.findFirstOrThrow({
+        where: { id: order.promotionId, workspaceId },
         select: { code: true, usedCount: true, usageLimit: true },
       });
       promoNote = `, code ${promo.code} used ${promo.usedCount}×`;
