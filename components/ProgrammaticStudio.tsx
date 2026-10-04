@@ -146,17 +146,17 @@ function tiptapToSimple(doc: unknown): SimpleBlock[] {
 }
 
 const inputCls =
-  "w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 placeholder-zinc-500 focus:border-accent focus:outline-none";
+  "w-full rounded-md border-[1.5px] border-control bg-paper px-3 py-2 text-sm text-ink placeholder:text-subtle focus:border-focus focus:outline-none focus:ring-[3px] focus:ring-[var(--aos-focus-halo)]";
 const btnPrimary =
-  "rounded-md bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-hover disabled:opacity-50 active:scale-[0.96] transition-[background-color,transform] duration-150 ease-[cubic-bezier(0.2,0,0,1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2";
+  "rounded-full bg-ink px-4 py-2 text-sm font-semibold text-white hover:bg-night-hover disabled:opacity-50 aos-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus";
 const btnSecondary =
-  "rounded-md border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-800 hover:border-zinc-400 disabled:opacity-50";
+  "rounded-full bg-paper px-4 py-2 text-sm font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper disabled:opacity-50";
 const btnDanger =
-  "rounded-md border border-red-200 px-3 py-1.5 text-sm text-red-600 hover:border-red-300 disabled:opacity-50";
+  "rounded-full bg-paper px-3 py-1.5 text-sm font-semibold text-failed-text shadow-[inset_0_0_0_1.5px_var(--aos-failed)] hover:bg-failed-tint disabled:opacity-50";
 
 function FlagBadge({ flag }: { flag: string }) {
   return (
-    <span className="inline-block rounded-full bg-amber-100/40 px-2 py-0.5 text-xs text-amber-700">
+    <span className="inline-block rounded-full bg-paper px-2 py-0.5 text-xs font-semibold text-ink shadow-control">
       {FLAG_LABELS[flag] ?? flag}
     </span>
   );
@@ -164,13 +164,13 @@ function FlagBadge({ flag }: { flag: string }) {
 
 function StatusBadge({ status }: { status: PageRow["status"] }) {
   const colors: Record<string, string> = {
-    draft: "bg-zinc-100 text-zinc-500",
-    ready: "bg-blue-100/40 text-blue-700",
-    published: "bg-emerald-900/40 text-emerald-700",
-    discarded: "bg-white text-zinc-500",
+    draft: "bg-canvas text-muted",
+    ready: "bg-paper text-ink shadow-control",
+    published: "bg-ink text-white",
+    discarded: "bg-paper text-muted line-through",
   };
   return (
-    <span className={`inline-block rounded-full px-2 py-0.5 text-xs ${colors[status]}`}>{status}</span>
+    <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-semibold ${colors[status]}`}>{status}</span>
   );
 }
 
@@ -260,16 +260,16 @@ function TemplateEditor({
   const insertSources = [...new Set([...detectedVars, ...datasetColumns])];
 
   return (
-    <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-5">
+    <div className="rounded-lg bg-paper shadow-hairline p-5">
       <h3 className="mb-4 text-base font-semibold">{initial ? "Edit template" : "New template"}</h3>
-      {error && <p className="mb-3 rounded-md bg-red-100/30 px-3 py-2 text-sm text-red-700">{error}</p>}
+      {error && <p className="mb-3 rounded-md bg-failed-tint px-3 py-2 text-sm text-failed-text">{error}</p>}
       <div className="grid gap-4 md:grid-cols-2">
         <label className="block">
-          <span className="mb-1 block text-xs uppercase tracking-widest text-zinc-500">Name</span>
+          <span className="mb-1 block text-xs font-semibold text-muted">Name</span>
           <input className={inputCls} value={name} onChange={(e) => setName(e.target.value)} placeholder="City × service pages" />
         </label>
         <label className="block">
-          <span className="mb-1 block text-xs uppercase tracking-widest text-zinc-500">URL pattern</span>
+          <span className="mb-1 block text-xs font-semibold text-muted">URL pattern</span>
           <input
             className={inputCls + " font-mono"}
             value={urlPattern}
@@ -281,35 +281,35 @@ function TemplateEditor({
       </div>
       <div className="mt-4 grid gap-4 md:grid-cols-2">
         <label className="block">
-          <span className="mb-1 block text-xs uppercase tracking-widest text-zinc-500">Title template</span>
+          <span className="mb-1 block text-xs font-semibold text-muted">Title template</span>
           <input className={inputCls} value={titleTemplate} onFocus={() => setActiveField("title")} onChange={(e) => setTitleTemplate(e.target.value)} />
         </label>
         <label className="block">
-          <span className="mb-1 block text-xs uppercase tracking-widest text-zinc-500">Meta description template</span>
+          <span className="mb-1 block text-xs font-semibold text-muted">Meta description template</span>
           <input className={inputCls} value={descriptionTemplate} onFocus={() => setActiveField("description")} onChange={(e) => setDescriptionTemplate(e.target.value)} />
         </label>
       </div>
 
       <div className="mt-4">
-        <span className="mb-1 block text-xs uppercase tracking-widest text-zinc-500">Insert variable</span>
+        <span className="mb-1 block text-xs font-semibold text-muted">Insert variable</span>
         <div className="flex flex-wrap gap-1.5">
-          {insertSources.length === 0 && <span className="text-xs text-zinc-500">Type {"{{var}}"} in a field to detect variables, or upload a dataset.</span>}
+          {insertSources.length === 0 && <span className="text-xs text-muted">Type {"{{var}}"} in a field to detect variables, or upload a dataset.</span>}
           {insertSources.map((v) => (
-            <button key={v} type="button" onClick={() => insertVariable(v)} className="rounded border border-zinc-200 px-2 py-0.5 font-mono text-xs text-zinc-500 hover:border-zinc-400">
+            <button key={v} type="button" onClick={() => insertVariable(v)} className="rounded-full bg-paper px-2 py-0.5 font-mono text-xs text-ink shadow-control hover:shadow-outline">
               {`{{${v}}}`}
             </button>
           ))}
         </div>
-        <p className="mt-1 text-xs text-zinc-500">Fallbacks: {"{{city|your area}}"} renders “your area” when city is empty.</p>
+        <p className="mt-1 text-xs text-muted">Fallbacks: {"{{city|your area}}"} renders “your area” when city is empty.</p>
       </div>
 
       <div className="mt-4">
-        <span className="mb-2 block text-xs uppercase tracking-widest text-zinc-500">Content blocks</span>
+        <span className="mb-2 block text-xs font-semibold text-muted">Content blocks</span>
         <div className="flex flex-col gap-2">
           {blocks.map((b, i) => (
             <div key={i} className="flex gap-2">
               <select
-                className="w-28 rounded-md border border-zinc-200 bg-white px-2 py-2 text-xs text-zinc-800"
+                className="w-28 rounded-md border-[1.5px] border-control bg-paper px-2 py-2 text-xs text-ink"
                 value={b.type}
                 onChange={(e) => setBlocks((bs) => bs.map((x, j) => (j === i ? { ...x, type: e.target.value as SimpleBlock["type"] } : x)))}
               >
@@ -331,7 +331,7 @@ function TemplateEditor({
         <button
           type="button"
           onClick={() => setBlocks((bs) => [...bs, { type: "paragraph", text: "" }])}
-          className="mt-2 rounded-md border border-dashed border-zinc-200 px-3 py-1.5 text-xs text-zinc-500 hover:border-zinc-400"
+          className="mt-2 rounded-md border border-dashed border-line px-3 py-1.5 text-xs text-muted hover:border-control"
         >
           + Add block
         </button>
@@ -339,24 +339,24 @@ function TemplateEditor({
 
       <div className="mt-4 grid gap-4 md:grid-cols-3">
         <label className="block">
-          <span className="mb-1 block text-xs uppercase tracking-widest text-zinc-500">Min words (gate)</span>
+          <span className="mb-1 block text-xs font-semibold text-muted">Min words (gate)</span>
           <input type="number" className={inputCls} value={minWordCount} min={50} max={10000} onChange={(e) => setMinWordCount(Number(e.target.value))} />
         </label>
         <label className="block">
-          <span className="mb-1 block text-xs uppercase tracking-widest text-zinc-500">Duplicate-rate cap (0–1)</span>
+          <span className="mb-1 block text-xs font-semibold text-muted">Duplicate-rate cap (0–1)</span>
           <input type="number" className={inputCls} value={duplicateRateCap} min={0} max={1} step={0.01} onChange={(e) => setDuplicateRateCap(Number(e.target.value))} />
         </label>
-        <label className="flex items-center gap-2 pt-5 text-sm text-zinc-500">
+        <label className="flex items-center gap-2 pt-5 text-sm text-muted">
           <input type="checkbox" checked={noindexUntilApproved} onChange={(e) => setNoindexUntilApproved(e.target.checked)} />
           noindex until published
         </label>
       </div>
 
-      <div className="mt-4 rounded-lg border border-zinc-200 p-4">
-        <span className="mb-2 block text-xs uppercase tracking-widest text-zinc-500">Default publish target</span>
+      <div className="mt-4 rounded-lg border border-line p-4">
+        <span className="mb-2 block text-xs font-semibold text-muted">Default publish target</span>
         <div className="grid gap-3 md:grid-cols-3">
           <label className="block">
-            <span className="mb-1 block text-xs text-zinc-500">Target</span>
+            <span className="mb-1 block text-xs font-semibold text-muted">Target</span>
             <select
               className={inputCls}
               value={defaultPublishTarget}
@@ -369,7 +369,7 @@ function TemplateEditor({
           </label>
           {["wordpress", "webflow", "marketr-site"].includes(defaultPublishTarget) && (
             <label className="block">
-              <span className="mb-1 block text-xs text-zinc-500">Site</span>
+              <span className="mb-1 block text-xs font-semibold text-muted">Site</span>
               <select className={inputCls} value={defaultTargetSiteId} onChange={(e) => setDefaultTargetSiteId(e.target.value)}>
                 <option value="">— pick a site —</option>
                 {sites
@@ -385,12 +385,12 @@ function TemplateEditor({
           )}
           {defaultPublishTarget === "webflow" && (
             <label className="block">
-              <span className="mb-1 block text-xs text-zinc-500">Webflow collection id</span>
+              <span className="mb-1 block text-xs font-semibold text-muted">Webflow collection id</span>
               <input className={inputCls + " font-mono"} value={defaultWebflowCollectionId} onChange={(e) => setDefaultWebflowCollectionId(e.target.value)} placeholder="col-…" />
             </label>
           )}
         </div>
-        <p className="mt-2 text-xs text-zinc-500">
+        <p className="mt-2 text-xs text-muted">
           Pages of this template publish here by default; individual pages can override it in the Pages tab. Quality gates still run before every push.
         </p>
       </div>
@@ -443,9 +443,9 @@ function TemplatesTab({
 
   return (
     <div className="flex flex-col gap-4">
-      {error && <p className="rounded-md bg-red-100/30 px-3 py-2 text-sm text-red-700">{error}</p>}
+      {error && <p className="rounded-md bg-failed-tint px-3 py-2 text-sm text-failed-text">{error}</p>}
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-medium uppercase tracking-widest text-zinc-500">Templates</h2>
+        <h2 className="text-sm font-semibold text-ink">Templates</h2>
         {canEdit && (
           <button onClick={() => setEditing("new")} className={btnSecondary}>+ New template</button>
         )}
@@ -461,35 +461,35 @@ function TemplatesTab({
         />
       )}
       {templates.length === 0 && !editing && (
-        <p className="rounded-xl border border-dashed border-zinc-200 p-8 text-center text-sm text-zinc-500">
+        <p className="rounded-xl border border-dashed border-line p-8 text-center text-sm text-muted">
           No templates yet. Create one to start generating pages.
         </p>
       )}
       <div className="grid gap-3">
         {templates.map((t) => (
-          <div key={t.id} className="rounded-xl border border-zinc-200 bg-zinc-50 p-4">
+          <div key={t.id} className="rounded-lg bg-paper shadow-hairline p-4">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <h3 className="font-semibold">{t.name}</h3>
-                <p className="mt-0.5 font-mono text-xs text-zinc-500">{t.urlPattern}</p>
+                <p className="mt-0.5 font-mono text-xs text-muted">{t.urlPattern}</p>
                 <div className="mt-2 flex flex-wrap gap-1.5">
                   {(t.variables ?? []).map((v) => (
-                    <span key={v.name} className="rounded border border-zinc-200 px-1.5 py-0.5 font-mono text-xs text-zinc-500">
+                    <span key={v.name} className="rounded-full bg-canvas px-2 py-0.5 font-mono text-xs text-muted">
                       {`{{${v.name}${v.fallback !== undefined ? `|${v.fallback}` : ""}}}`}
                     </span>
                   ))}
                 </div>
-                <p className="mt-2 text-xs text-zinc-500">
+                <p className="mt-2 text-xs text-muted">
                   Gates: ≥{t.minWordCount} words · duplicate cap {(t.duplicateRateCap * 100).toFixed(0)}%
                   {t.noindexUntilApproved ? " · noindex until published" : ""}
                 </p>
-                <p className="mt-1 text-xs text-zinc-500">
+                <p className="mt-1 text-xs text-muted">
                   Default publish: {TARGET_LABELS[t.defaultPublishTarget] ?? t.defaultPublishTarget}
                   {t.defaultTargetSiteId ? ` → ${sites.find((s) => s.id === t.defaultTargetSiteId)?.name ?? t.defaultTargetSiteId}` : ""}
                 </p>
               </div>
               <div className="flex shrink-0 items-center gap-3">
-                <div className="text-right text-xs text-zinc-500">
+                <div className="text-right text-xs text-muted">
                   <div>{t.pageCounts?.published ?? 0} published</div>
                   <div>{t.pageCounts?.ready ?? 0} ready · {t.pageCounts?.draft ?? 0} draft</div>
                 </div>
@@ -606,9 +606,9 @@ function DatasetsTab({
 
   return (
     <div className="flex flex-col gap-4">
-      {error && <p className="rounded-md bg-red-100/30 px-3 py-2 text-sm text-red-700">{error}</p>}
+      {error && <p className="rounded-md bg-failed-tint px-3 py-2 text-sm text-failed-text">{error}</p>}
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-medium uppercase tracking-widest text-zinc-500">Datasets</h2>
+        <h2 className="text-sm font-semibold text-ink">Datasets</h2>
         {canEdit && (
           <label className={btnSecondary + " cursor-pointer"}>
             {uploading ? "Uploading…" : "+ Upload CSV"}
@@ -616,22 +616,22 @@ function DatasetsTab({
           </label>
         )}
       </div>
-      <p className="text-xs text-zinc-500">CSV upload, parsed server-side. 10,000-row cap. Columns auto-map to template variables by name; override below when names differ.</p>
+      <p className="text-xs text-muted">CSV upload, parsed server-side. 10,000-row cap. Columns auto-map to template variables by name; override below when names differ.</p>
       {datasets.length === 0 && (
-        <p className="rounded-xl border border-dashed border-zinc-200 p-8 text-center text-sm text-zinc-500">
+        <p className="rounded-xl border border-dashed border-line p-8 text-center text-sm text-muted">
           No datasets yet. Upload a CSV to feed your templates.
         </p>
       )}
       <div className="grid gap-3">
         {datasets.map((d) => (
-          <div key={d.id} className="rounded-xl border border-zinc-200 bg-zinc-50 p-4">
+          <div key={d.id} className="rounded-lg bg-paper shadow-hairline p-4">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <h3 className="font-semibold">{d.name}</h3>
-                <p className="mt-0.5 text-xs text-zinc-500">
+                <p className="mt-0.5 text-xs text-muted">
                   {d.rowCount.toLocaleString()} rows · {d.columns.length} columns · {d.pageCount ?? 0} pages generated
                 </p>
-                <p className="mt-1 font-mono text-xs text-zinc-500">{d.columns.join(", ")}</p>
+                <p className="mt-1 font-mono text-xs text-muted">{d.columns.join(", ")}</p>
               </div>
               <div className="flex shrink-0 gap-2">
                 <button onClick={() => loadPreview(d.id)} className={btnSecondary}>
@@ -649,17 +649,17 @@ function DatasetsTab({
               <div className="mt-3 overflow-x-auto">
                 <table className="w-full text-xs">
                   <thead>
-                    <tr className="text-left text-zinc-500">
+                    <tr className="text-left text-muted">
                       {previews[d.id].columns.map((c) => (
-                        <th key={c} className="border-b border-zinc-200 px-2 py-1 font-medium">{c}</th>
+                        <th key={c} className="border-b border-line px-2 py-1 font-medium">{c}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
                     {previews[d.id].rows.map((r, i) => (
-                      <tr key={i} className="text-zinc-500">
+                      <tr key={i} className="text-muted">
                         {previews[d.id].columns.map((c) => (
-                          <td key={c} className="border-b border-zinc-300 px-2 py-1">{String(r[c] ?? "")}</td>
+                          <td key={c} className="border-b border-control px-2 py-1">{String(r[c] ?? "")}</td>
                         ))}
                       </tr>
                     ))}
@@ -668,14 +668,14 @@ function DatasetsTab({
               </div>
             )}
             {mappingFor === d.id && (
-              <div className="mt-3 rounded-lg border border-zinc-200 p-3">
-                <h4 className="mb-2 text-xs font-medium uppercase tracking-widest text-zinc-500">Variable → column mapping</h4>
+              <div className="mt-3 rounded-lg border border-line p-3">
+                <h4 className="mb-2 text-xs font-semibold text-ink">Variable → column mapping</h4>
                 <div className="grid gap-2 md:grid-cols-2">
                   {templateVars.map((v) => (
                     <label key={v} className="flex items-center gap-2 text-sm">
-                      <span className="w-32 shrink-0 font-mono text-xs text-zinc-500">{`{{${v}}}`}</span>
+                      <span className="w-32 shrink-0 font-mono text-xs text-muted">{`{{${v}}}`}</span>
                       <select
-                        className="flex-1 rounded-md border border-zinc-200 bg-white px-2 py-1.5 text-xs text-zinc-800"
+                        className="flex-1 rounded-md border-[1.5px] border-control bg-paper px-2 py-1.5 text-xs text-ink"
                         value={mappingDraft[v] ?? ""}
                         onChange={(e) => setMappingDraft((m) => { const n = { ...m }; if (e.target.value) n[v] = e.target.value; else delete n[v]; return n; })}
                       >
@@ -923,14 +923,14 @@ function PagesTab({
 
   return (
     <div className="flex flex-col gap-4">
-      {error && <p className="rounded-md bg-red-100/30 px-3 py-2 text-sm text-red-700">{error}</p>}
+      {error && <p className="rounded-md bg-failed-tint px-3 py-2 text-sm text-failed-text">{error}</p>}
 
       {/* Generation controls */}
-      <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-4">
-        <h2 className="mb-3 text-sm font-medium uppercase tracking-widest text-zinc-500">Generate</h2>
+      <div className="rounded-lg bg-paper shadow-hairline p-4">
+        <h2 className="mb-3 text-sm font-semibold text-ink">Generate</h2>
         <div className="grid gap-3 md:grid-cols-2">
           <label className="block">
-            <span className="mb-1 block text-xs text-zinc-500">Template</span>
+            <span className="mb-1 block text-xs font-semibold text-muted">Template</span>
             <select className={inputCls} value={templateId} onChange={(e) => setTemplateId(e.target.value)}>
               {templates.map((t) => (
                 <option key={t.id} value={t.id}>{t.name}</option>
@@ -938,7 +938,7 @@ function PagesTab({
             </select>
           </label>
           <label className="block">
-            <span className="mb-1 block text-xs text-zinc-500">Dataset</span>
+            <span className="mb-1 block text-xs font-semibold text-muted">Dataset</span>
             <select className={inputCls} value={datasetId} onChange={(e) => setDatasetId(e.target.value)}>
               {datasets.map((d) => (
                 <option key={d.id} value={d.id}>{d.name} ({d.rowCount.toLocaleString()} rows)</option>
@@ -957,9 +957,9 @@ function PagesTab({
           </div>
         )}
         {genResult && (
-          <div className="mt-3 rounded-lg border border-zinc-200 p-3 text-sm text-zinc-500">
+          <div className="mt-3 rounded-lg border border-line p-3 text-sm text-muted">
             <p>
-              Generated: <strong className="text-zinc-900">{String(genResult.created)} created</strong>,{" "}
+              Generated: <strong className="text-ink">{String(genResult.created)} created</strong>,{" "}
               {String(genResult.updated)} updated, {String(genResult.flagged)} flagged,{" "}
               {String(genResult.skippedPublished)} published skipped,{" "}
               {(genResult.skippedCollisions as unknown[])?.length ?? 0} slug collisions skipped.
@@ -970,26 +970,26 @@ function PagesTab({
 
       {/* Preview results */}
       {preview && (
-        <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-4">
+        <div className="rounded-lg bg-paper shadow-hairline p-4">
           <div className="mb-2 flex items-center justify-between">
             <h3 className="text-sm font-medium">Preview — first {preview.length} of {previewTotal.toLocaleString()} rows</h3>
-            <button onClick={() => setPreview(null)} className="text-xs text-zinc-500 hover:text-zinc-600">close</button>
+            <button onClick={() => setPreview(null)} className="text-xs text-muted hover:text-ink">close</button>
           </div>
           <div className="flex flex-col gap-2">
             {preview.map((p) => (
               <button
                 key={p.rowIndex}
                 onClick={() => setDrawer(p)}
-                className="rounded-lg border border-zinc-200 p-3 text-left hover:border-zinc-300"
+                className="rounded-md border border-line bg-paper p-3 text-left hover:border-ink"
               >
-                <p className="font-mono text-xs text-zinc-500">{p.url}</p>
-                <p className="mt-0.5 text-sm font-medium text-zinc-900">{p.title}</p>
+                <p className="font-mono text-xs text-muted">{p.url}</p>
+                <p className="mt-0.5 text-sm font-medium text-ink">{p.title}</p>
                 <div className="mt-1 flex gap-1.5">
                   {p.flags.map((f) => (
                     <FlagBadge key={f} flag={f} />
                   ))}
-                  {p.flags.length === 0 && <span className="text-xs text-emerald-600">✓ clean</span>}
-                  <span className="text-xs text-zinc-500">{p.wordCount} words</span>
+                  {p.flags.length === 0 && <span className="text-xs text-muted">✓ clean</span>}
+                  <span className="text-xs text-muted">{p.wordCount} words</span>
                 </div>
               </button>
             ))}
@@ -998,14 +998,14 @@ function PagesTab({
       )}
 
       {/* Page list */}
-      <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-4">
+      <div className="rounded-lg bg-paper shadow-hairline p-4">
         <div className="mb-3 flex flex-wrap items-center gap-2">
-          <h2 className="mr-2 text-sm font-medium uppercase tracking-widest text-zinc-500">Pages</h2>
+          <h2 className="mr-2 text-sm font-semibold text-ink">Pages</h2>
           {(["", "draft", "ready", "published", "discarded"] as const).map((s) => (
             <button
               key={s}
               onClick={() => setStatusFilter(s)}
-              className={`rounded-full px-3 py-1 text-xs ${statusFilter === s ? "bg-violet-600 text-white" : "border border-zinc-200 text-zinc-500"}`}
+              className={`rounded-full px-3 py-1 text-xs ${statusFilter === s ? "bg-ink text-white" : "bg-paper text-ink shadow-control hover:shadow-outline"}`}
             >
               {s === "" ? `all (${Object.values(counts).reduce((a, b) => a + b, 0)})` : `${s} (${counts[s] ?? 0})`}
             </button>
@@ -1021,18 +1021,18 @@ function PagesTab({
         </div>
 
         {canEdit && selected.size > 0 && (
-          <div className="mb-3 flex items-center gap-2 rounded-lg border border-zinc-200 p-2">
-            <span className="text-xs text-zinc-500">{selected.size} selected</span>
+          <div className="mb-3 flex items-center gap-2 rounded-lg border border-line p-2">
+            <span className="text-xs text-muted">{selected.size} selected</span>
             <button onClick={() => bulkAction("approve")} disabled={acting} className={btnSecondary}>Approve → ready</button>
             <button onClick={() => bulkAction("publish")} disabled={acting} className={btnPrimary}>Publish</button>
             <button onClick={() => bulkAction("discard")} disabled={acting} className={btnDanger}>Discard</button>
           </div>
         )}
         {actionResult && (
-          <div className="mb-3 rounded-lg border border-zinc-200 p-3 text-sm">
-            <p className="text-emerald-600">{actionResult.changed.length} page(s) updated.</p>
+          <div className="mb-3 rounded-lg border border-line p-3 text-sm">
+            <p className="text-ink">{actionResult.changed.length} page(s) updated.</p>
             {actionResult.pushes && actionResult.pushes.length > 0 && (
-              <ul className="mt-2 list-disc pl-5 text-xs text-zinc-500">
+              <ul className="mt-2 list-disc pl-5 text-xs text-muted">
                 {actionResult.pushes.slice(0, 10).map((pu) => (
                   <li key={pu.id}>
                     <span className="font-mono">{pu.url}</span> → {TARGET_LABELS[pu.target] ?? pu.target}
@@ -1040,7 +1040,7 @@ function PagesTab({
                     {pu.updated ? " (updated in place)" : ""}
                     {pu.mock ? " (mock)" : ""}
                     {pu.externalUrl ? (
-                      <> · <a href={pu.externalUrl} target="_blank" rel="noreferrer" className="underline hover:text-zinc-800">{pu.externalUrl}</a></>
+                      <> · <a href={pu.externalUrl} target="_blank" rel="noreferrer" className="underline hover:text-ink">{pu.externalUrl}</a></>
                     ) : null}
                   </li>
                 ))}
@@ -1049,8 +1049,8 @@ function PagesTab({
             )}
             {actionResult.blocked.length > 0 && (
               <div className="mt-2">
-                <p className="text-amber-700">{actionResult.blocked.length} blocked by quality gates:</p>
-                <ul className="mt-1 list-disc pl-5 text-xs text-zinc-500">
+                <p className="text-ink">{actionResult.blocked.length} blocked by quality gates:</p>
+                <ul className="mt-1 list-disc pl-5 text-xs text-muted">
                   {actionResult.blocked.slice(0, 10).map((b) => (
                     <li key={b.id}><span className="font-mono">{b.url}</span> — {b.reasons.join("; ")}</li>
                   ))}
@@ -1064,7 +1064,7 @@ function PagesTab({
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-left text-xs text-zinc-500">
+              <tr className="text-left text-xs text-muted">
                 {canEdit && <th className="w-8 px-2 py-1"><input type="checkbox" checked={pages.length > 0 && selected.size === pages.length} onChange={() => setSelected(selected.size === pages.length ? new Set() : new Set(pages.map((p) => p.id)))} /></th>}
                 <th className="px-2 py-1">URL</th>
                 <th className="px-2 py-1">Status</th>
@@ -1077,18 +1077,18 @@ function PagesTab({
               {pages.map((p) => {
                 const effKind = p.publishTarget !== "none" ? p.publishTarget : (p.template.defaultPublishTarget ?? "none");
                 return (
-                <tr key={p.id} className="border-t border-zinc-300 text-zinc-500">
+                <tr key={p.id} className="border-t border-line text-muted">
                   {canEdit && <td className="px-2 py-2"><input type="checkbox" checked={selected.has(p.id)} onChange={() => toggleSelect(p.id)} /></td>}
                   <td className="px-2 py-2">
-                    <button onClick={() => setDrawer(p)} className="font-mono text-xs text-zinc-800 hover:text-zinc-900">{p.url}</button>
-                    <p className="max-w-md truncate text-xs text-zinc-500">{p.title}</p>
-                    {p.externalUrl && <p className="max-w-md truncate text-xs text-emerald-600">→ {p.externalUrl}</p>}
+                    <button onClick={() => setDrawer(p)} className="font-mono text-xs text-ink hover:text-ink">{p.url}</button>
+                    <p className="max-w-md truncate text-xs text-muted">{p.title}</p>
+                    {p.externalUrl && <p className="max-w-md truncate text-xs text-muted">→ {p.externalUrl}</p>}
                   </td>
                   <td className="px-2 py-2"><StatusBadge status={p.status} /></td>
                   <td className="px-2 py-2">
                     {canEdit ? (
                       <select
-                        className="rounded-md border border-zinc-200 bg-white px-1.5 py-1 text-xs text-zinc-500"
+                        className="rounded-md border-[1.5px] border-control bg-paper px-1.5 py-1 text-xs text-ink"
                         value={p.publishTarget}
                         onChange={(e) => setPageTarget(p.id, e.target.value)}
                         title="Per-page publish target override (blank = template default)"
@@ -1100,42 +1100,42 @@ function PagesTab({
                         <option value="marketr-site">ShapesOS site</option>
                       </select>
                     ) : (
-                      <span className="text-xs text-zinc-500">{TARGET_LABELS[effKind] ?? effKind}</span>
+                      <span className="text-xs text-muted">{TARGET_LABELS[effKind] ?? effKind}</span>
                     )}
                   </td>
                   <td className="px-2 py-2"><div className="flex flex-wrap gap-1">{p.qualityFlags.map((f) => <FlagBadge key={f} flag={f} />)}</div></td>
-                  <td className="px-2 py-2 text-xs text-zinc-500">{p.wordCount}</td>
+                  <td className="px-2 py-2 text-xs text-muted">{p.wordCount}</td>
                 </tr>
                 );
               })}
             </tbody>
           </table>
           {pages.length === 0 && !loading && (
-            <p className="p-6 text-center text-sm text-zinc-500">No pages loaded. Pick a template + dataset and generate, or adjust filters.</p>
+            <p className="p-6 text-center text-sm text-muted">No pages loaded. Pick a template + dataset and generate, or adjust filters.</p>
           )}
         </div>
 
         <div className="mt-3 flex gap-3 text-xs">
-          <a href={`/api/programmatic/export?projectId=${projectId}${templateId ? `&templateId=${templateId}` : ""}`} className="text-zinc-500 underline hover:text-zinc-800">Export CSV</a>
-          <a href={`/api/programmatic/sitemap?projectId=${projectId}`} target="_blank" rel="noreferrer" className="text-zinc-500 underline hover:text-zinc-800">View sitemap.xml</a>
+          <a href={`/api/programmatic/export?projectId=${projectId}${templateId ? `&templateId=${templateId}` : ""}`} className="text-muted underline hover:text-ink">Export CSV</a>
+          <a href={`/api/programmatic/sitemap?projectId=${projectId}`} target="_blank" rel="noreferrer" className="text-muted underline hover:text-ink">View sitemap.xml</a>
         </div>
       </div>
 
       {/* Publish destination summary modal */}
       {pushModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" role="presentation" onClick={() => setPushModal(false)} onKeyDown={closeOnEscape(() => setPushModal(false))}>
-          <div className="w-full max-w-2xl rounded-xl border border-zinc-200 bg-zinc-50 p-6" onClick={(e) => e.stopPropagation()}>
+          <div className="w-full max-w-2xl rounded-lg bg-paper p-6 shadow-overlay" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-base font-semibold">Publish {selected.size} page(s)</h3>
-            <p className="mt-1 text-xs text-zinc-500">
+            <p className="mt-1 text-xs text-muted">
               Destination per page (explicit override below wins, else the page override, else the template default).
               Quality gates run server-side — gated pages are blocked, never pushed. Re-pushing to the same
               target updates in place instead of duplicating.
             </p>
 
-            <div className="mt-4 max-h-56 overflow-y-auto rounded-lg border border-zinc-200">
+            <div className="mt-4 max-h-56 overflow-y-auto rounded-lg border border-line">
               <table className="w-full text-xs">
                 <thead>
-                  <tr className="text-left text-zinc-500">
+                  <tr className="text-left text-muted">
                     <th className="px-3 py-2">URL</th>
                     <th className="px-3 py-2">Status</th>
                     <th className="px-3 py-2">Destination</th>
@@ -1149,10 +1149,10 @@ function PagesTab({
                       : d.kind === "csv" ? "CSV export (internal)"
                       : `${TARGET_LABELS[d.kind] ?? d.kind}${d.siteId ? ` → ${siteName(d.siteId) ?? d.siteId}` : " (no site!)"}`;
                     return (
-                      <tr key={p.id} className="border-t border-zinc-300 text-zinc-500">
+                      <tr key={p.id} className="border-t border-line text-muted">
                         <td className="px-3 py-1.5 font-mono">{p.url}</td>
                         <td className="px-3 py-1.5"><StatusBadge status={p.status} /></td>
-                        <td className={`px-3 py-1.5 ${d.kind === "none" || ((d.kind === "wordpress" || d.kind === "webflow" || d.kind === "marketr-site") && !d.siteId) ? "text-amber-700" : ""}`}>{label}</td>
+                        <td className={`px-3 py-1.5 ${d.kind === "none" || ((d.kind === "wordpress" || d.kind === "webflow" || d.kind === "marketr-site") && !d.siteId) ? "text-ink" : ""}`}>{label}</td>
                       </tr>
                     );
                   })}
@@ -1162,7 +1162,7 @@ function PagesTab({
 
             <div className="mt-4 grid gap-3 md:grid-cols-3">
               <label className="block">
-                <span className="mb-1 block text-xs text-zinc-500">Override target (all)</span>
+                <span className="mb-1 block text-xs font-semibold text-muted">Override target (all)</span>
                 <select className={inputCls} value={pushTarget} onChange={(e) => { setPushTarget(e.target.value); setPushSiteId(""); }}>
                   <option value="">Use per-page/template targets</option>
                   {Object.entries(TARGET_LABELS).filter(([v]) => v !== "none").map(([v, l]) => (
@@ -1172,7 +1172,7 @@ function PagesTab({
               </label>
               {["wordpress", "webflow", "marketr-site"].includes(pushTarget) && (
                 <label className="block">
-                  <span className="mb-1 block text-xs text-zinc-500">Site</span>
+                  <span className="mb-1 block text-xs font-semibold text-muted">Site</span>
                   <select className={inputCls} value={pushSiteId} onChange={(e) => setPushSiteId(e.target.value)}>
                     <option value="">— pick a site —</option>
                     {sites
@@ -1188,13 +1188,13 @@ function PagesTab({
               )}
               {pushTarget === "webflow" && (
                 <label className="block">
-                  <span className="mb-1 block text-xs text-zinc-500">Webflow collection id</span>
+                  <span className="mb-1 block text-xs font-semibold text-muted">Webflow collection id</span>
                   <input className={inputCls + " font-mono"} value={pushCollectionId} onChange={(e) => setPushCollectionId(e.target.value)} placeholder="col-…" />
                 </label>
               )}
             </div>
             {pushTarget === "webflow" && (
-              <label className="mt-2 flex items-center gap-2 text-xs text-zinc-500">
+              <label className="mt-2 flex items-center gap-2 text-xs text-muted">
                 <input type="checkbox" checked={pushWebflowPublish} onChange={(e) => setPushWebflowPublish(e.target.checked)} />
                 Publish the Webflow site after the CMS items are saved
               </label>
@@ -1213,34 +1213,34 @@ function PagesTab({
       {/* Preview drawer */}
       {drawer && (
         <div className="fixed inset-0 z-50 flex justify-end bg-black/60" role="presentation" onClick={() => setDrawer(null)} onKeyDown={closeOnEscape(() => setDrawer(null))}>
-          <div className="h-full w-full max-w-2xl overflow-y-auto bg-zinc-50 p-6" onClick={(e) => e.stopPropagation()}>
+          <div className="h-full w-full max-w-2xl overflow-y-auto bg-paper p-6 shadow-overlay" onClick={(e) => e.stopPropagation()}>
             <div className="mb-4 flex items-start justify-between">
               <div>
-                <p className="font-mono text-sm text-zinc-500">{drawer.url}</p>
-                <h2 className="mt-1 text-xl font-bold">{drawer.title}</h2>
-                <p className="mt-1 text-sm text-zinc-500">{drawer.description}</p>
+                <p className="font-mono text-sm text-muted">{drawer.url}</p>
+                <h2 className="mt-1 text-xl font-heading tracking-heading stretch-heading">{drawer.title}</h2>
+                <p className="mt-1 text-sm text-muted">{drawer.description}</p>
                 <div className="mt-2 flex flex-wrap items-center gap-1.5">
                   {drawerIsPage && <StatusBadge status={(drawer as PageRow).status} />}
                   {drawerFlags.map((f: string) => (
                     <FlagBadge key={f} flag={f} />
                   ))}
-                  {drawerFlags.length === 0 && <span className="text-xs text-emerald-600">✓ clean</span>}
-                  <span className="text-xs text-zinc-500">{drawer.wordCount} words</span>
+                  {drawerFlags.length === 0 && <span className="text-xs text-muted">✓ clean</span>}
+                  <span className="text-xs text-muted">{drawer.wordCount} words</span>
                   {drawerMissing.length > 0 && (
-                    <span className="text-xs text-amber-700">missing: {drawerMissing.join(", ")}</span>
+                    <span className="text-xs text-ink">missing: {drawerMissing.join(", ")}</span>
                   )}
                 </div>
                 {drawerIsPage && (
-                  <p className="mt-1 text-xs text-zinc-500">
+                  <p className="mt-1 text-xs text-muted">
                     canonical: {(drawer as PageRow).canonical ?? "—"} · noindex: {(drawer as PageRow).noindex ? "yes" : "no"}
                   </p>
                 )}
                 {drawerIsPage && (drawer as PageRow).status === "published" && (
-                  <p className="mt-1 text-xs text-emerald-600">
+                  <p className="mt-1 text-xs text-muted">
                     Published via {TARGET_LABELS[(drawer as PageRow).publishTarget] ?? (drawer as PageRow).publishTarget}
                     {(drawer as PageRow).publishedAt ? ` · ${new Date((drawer as PageRow).publishedAt!).toLocaleString()}` : ""}
                     {(drawer as PageRow).externalUrl ? (
-                      <> · <a href={(drawer as PageRow).externalUrl!} target="_blank" rel="noreferrer" className="underline hover:text-emerald-800">{(drawer as PageRow).externalUrl}</a></>
+                      <> · <a href={(drawer as PageRow).externalUrl!} target="_blank" rel="noreferrer" className="underline hover:text-ink">{(drawer as PageRow).externalUrl}</a></>
                     ) : null}
                   </p>
                 )}
@@ -1248,7 +1248,7 @@ function PagesTab({
               <button onClick={() => setDrawer(null)} className={btnSecondary}>Close</button>
             </div>
             <div
-              className="prose prose-invert max-w-none rounded-xl border border-zinc-200 bg-white/50 p-5 text-sm text-zinc-800 [&_h1]:text-xl [&_h1]:font-bold [&_h2]:text-lg [&_h2]:font-bold [&_h3]:font-bold [&_p]:my-2 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5"
+              className="prose max-w-none rounded-lg bg-paper p-5 shadow-hairline text-sm text-ink [&_h1]:text-xl [&_h1]:font-bold [&_h2]:text-lg [&_h2]:font-bold [&_h3]:font-bold [&_p]:my-2 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5"
               dangerouslySetInnerHTML={{ __html: drawer.html }}
             />
           </div>
@@ -1314,7 +1314,7 @@ export default function ProgrammaticStudio({
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="flex gap-1 border-b border-zinc-200">
+      <div className="flex gap-1 border-b border-line">
         {(
           [
             { id: "templates", label: "Templates", icon: LayoutTemplate },
@@ -1325,7 +1325,7 @@ export default function ProgrammaticStudio({
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
-            className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-[13.5px] font-medium transition-colors ${tab === t.id ? "border-violet-600 text-violet-700" : "border-transparent text-stone-500 hover:text-stone-800"}`}
+            className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-[13.5px] font-semibold transition-colors ${tab === t.id ? "border-ink text-ink" : "border-transparent text-muted hover:text-ink"}`}
           >
             <t.icon size={15} />
             {t.label}

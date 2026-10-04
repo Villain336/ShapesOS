@@ -74,11 +74,19 @@ interface FixRun {
 }
 
 const SEVERITY_ORDER = ["critical", "error", "warning", "info"];
+// Audit severity is finding data, not an agent state: neutral weights only.
 const SEVERITY_COLOR: Record<string, string> = {
-  critical: "text-red-600 border-red-200",
-  error: "text-red-600 border-red-200",
-  warning: "text-amber-700 border-amber-200",
-  info: "text-sky-600 border-sky-200",
+  critical: "text-ink border-ink",
+  error: "text-ink border-control",
+  warning: "text-ink border-line",
+  info: "text-muted border-line",
+};
+
+// Fix runs ARE agent runs: they take the status shape.
+const RUN_SHAPE: Record<string, string> = {
+  running: "aos-shape aos-shape--running aos-is-live",
+  completed: "aos-shape aos-shape--done",
+  failed: "aos-shape aos-shape--failed",
 };
 
 const STATUS_LABEL: Record<string, string> = {
@@ -256,14 +264,14 @@ export default function FixAgentManager({ projectId }: { projectId: string }) {
     items: issues.filter((i) => i.severity === sev),
   })).filter((g) => g.items.length > 0);
 
-  if (loading) return <div className="text-sm text-zinc-500">Loading fix agent…</div>;
+  if (loading) return <div className="text-sm text-muted">Loading fix agent…</div>;
 
   return (
-    <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-5">
+    <div className="rounded-lg bg-paper shadow-hairline p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold">Fix agent <span className="text-xs font-normal text-zinc-500">— scheduled rung</span></h2>
-          <p className="mt-1 text-sm text-zinc-500">
+          <h2 className="text-lg font-heading tracking-heading stretch-heading">Fix agent <span className="text-xs font-normal text-muted">— scheduled rung</span></h2>
+          <p className="mt-1 text-sm text-muted">
             Audit a site, approve the fixes you want, and the agent applies them on schedule.
             Nothing is auto-fixed without your approval — dry-run mode is on by default.
           </p>
@@ -271,7 +279,7 @@ export default function FixAgentManager({ projectId }: { projectId: string }) {
         <select
           value={siteId}
           onChange={(e) => setSiteId(e.target.value)}
-          className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm"
+          className="rounded-md border-[1.5px] border-control bg-paper px-3 py-2 text-sm"
         >
           {sites.map((s) => (
             <option key={s.id} value={s.id}>{s.name}</option>
@@ -279,11 +287,11 @@ export default function FixAgentManager({ projectId }: { projectId: string }) {
         </select>
       </div>
 
-      {error && <div className="mt-3 rounded-lg border border-red-200 bg-red-50/40 px-3 py-2 text-sm text-red-700">{error}</div>}
-      {notice && <div className="mt-3 rounded-lg border border-emerald-800 bg-emerald-50/40 px-3 py-2 text-sm text-emerald-700">{notice}</div>}
+      {error && <div className="mt-3 rounded-md border border-failed bg-failed-tint px-3 py-2 text-sm text-failed-text">{error}</div>}
+      {notice && <div className="mt-3 rounded-md border border-line bg-canvas px-3 py-2 text-sm text-ink">{notice}</div>}
 
       {!sites.length && (
-        <p className="mt-3 text-sm text-zinc-500">
+        <p className="mt-3 text-sm text-muted">
           No file-based sites yet (GitHub, SFTP, or uploaded files). Connect one above to audit it.
           WordPress and Webflow are content-level sources with no file tree to audit.
         </p>
@@ -292,7 +300,7 @@ export default function FixAgentManager({ projectId }: { projectId: string }) {
       {siteId && settings && (
         <div className="mt-4 grid gap-4 lg:grid-cols-[320px_1fr]">
           {/* Settings */}
-          <div className="rounded-lg border border-zinc-200 p-4">
+          <div className="rounded-md border border-line p-4">
             <h3 className="text-sm font-semibold">Agent settings</h3>
             <label className="mt-3 flex items-center justify-between text-sm">
               <span>Enabled</span>
@@ -300,7 +308,7 @@ export default function FixAgentManager({ projectId }: { projectId: string }) {
                 onChange={(e) => saveSettings({ enabled: e.target.checked })} className="h-4 w-4" />
             </label>
             <label className="mt-2 flex items-center justify-between text-sm">
-              <span>Dry-run <span className="text-zinc-500">(previews only)</span></span>
+              <span>Dry-run <span className="text-muted">(previews only)</span></span>
               <input type="checkbox" checked={settings.dryRun} disabled={busy}
                 onChange={(e) => saveSettings({ dryRun: e.target.checked })} className="h-4 w-4" />
             </label>
@@ -308,11 +316,11 @@ export default function FixAgentManager({ projectId }: { projectId: string }) {
               <span>Max fixes per run</span>
               <input type="number" min={1} max={50} value={settings.maxFixesPerRun} disabled={busy}
                 onChange={(e) => saveSettings({ maxFixesPerRun: parseInt(e.target.value || "10", 10) })}
-                className="w-16 rounded border border-zinc-200 bg-white px-2 py-1 text-sm" />
+                className="w-16 rounded-md border-[1.5px] border-control bg-paper px-2 py-1 text-sm" />
             </label>
             <div className="mt-3">
               <p className="text-sm font-medium">Auto-fixable without asking</p>
-              <p className="text-xs text-zinc-500">Per-issue approval always overrides this.</p>
+              <p className="text-xs text-muted">Per-issue approval always overrides this.</p>
               <div className="mt-2 space-y-1">
                 {categories.map((c) => (
                   <label key={c.key} className="flex items-start gap-2 text-xs">
@@ -324,25 +332,25 @@ export default function FixAgentManager({ projectId }: { projectId: string }) {
                           : settings.allowedCategories.filter((k) => k !== c.key);
                         saveSettings({ allowedCategories: next });
                       }} />
-                    <span><span className="font-medium text-zinc-800">{c.label}</span>
-                      <span className="text-zinc-500"> — {c.description}</span></span>
+                    <span><span className="font-medium text-ink">{c.label}</span>
+                      <span className="text-muted"> — {c.description}</span></span>
                   </label>
                 ))}
               </div>
             </div>
             <div className="mt-4 flex flex-wrap gap-2">
               <button onClick={runAudit} disabled={busy}
-                className="rounded-lg bg-zinc-100 px-3 py-1.5 text-sm font-medium text-zinc-900 disabled:opacity-50">
+                className="rounded-full bg-ink px-3 py-1.5 text-sm font-semibold text-white aos-press hover:bg-night-hover disabled:opacity-50">
                 {busy ? "Working…" : "Run audit"}
               </button>
               <button onClick={runFixes} disabled={busy || !settings.enabled}
                 title={settings.enabled ? "Apply eligible fixes now" : "Enable the agent first"}
-                className="rounded-lg border border-zinc-200 px-3 py-1.5 text-sm disabled:opacity-50">
+                className="rounded-full bg-paper px-3 py-1.5 text-sm font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper disabled:opacity-50">
                 {busy ? "Working…" : settings.dryRun ? "Preview fixes (dry-run)" : "Apply fixes now"}
               </button>
             </div>
             {audit && (
-              <p className="mt-3 text-xs text-zinc-500">
+              <p className="mt-3 text-xs text-muted">
                 Last audit: {audit.totalIssues} issues ({audit.errorIssues} errors)
                 {audit.mock ? " — mock data" : ""} · {new Date(audit.createdAt).toLocaleString()}
               </p>
@@ -352,7 +360,7 @@ export default function FixAgentManager({ projectId }: { projectId: string }) {
           {/* Inbox */}
           <div>
             {grouped.length === 0 && (
-              <p className="rounded-lg border border-zinc-200 p-4 text-sm text-zinc-500">
+              <p className="rounded-md border border-line p-4 text-sm text-muted">
                 No open issues. Run an audit to scan this site.
               </p>
             )}
@@ -363,39 +371,39 @@ export default function FixAgentManager({ projectId }: { projectId: string }) {
                     {g.severity} ({g.items.length})
                   </h4>
                   <button onClick={() => approveAll(g.severity)} disabled={busy}
-                    className="text-xs text-zinc-500 underline hover:text-zinc-800 disabled:opacity-50">
+                    className="text-xs text-muted underline hover:text-ink disabled:opacity-50">
                     Approve all {g.severity}
                   </button>
                 </div>
                 <div className="space-y-2">
                   {g.items.map((issue) => (
-                    <div key={issue.id} className={`rounded-lg border bg-white/60 p-3 ${SEVERITY_COLOR[issue.severity]}`}>
+                    <div key={issue.id} className={`rounded-md border bg-paper p-3 ${SEVERITY_COLOR[issue.severity]}`}>
                       <div className="flex flex-wrap items-start justify-between gap-2">
                         <div className="min-w-0">
-                          <p className="text-sm font-medium text-zinc-900">{issue.detail}</p>
-                          <p className="mt-0.5 font-mono text-xs text-zinc-500">
+                          <p className="text-sm font-medium text-ink">{issue.detail}</p>
+                          <p className="mt-0.5 font-mono text-xs text-muted">
                             {issue.filePath}{issue.line ? `:${issue.line}` : ""} · {issue.category}
-                            {!issue.autoFixable && <span className="ml-2 rounded bg-zinc-100 px-1.5 py-0.5 text-[10px] text-zinc-500">manual only</span>}
-                            {issue.destructive && <span className="ml-2 rounded bg-red-100/60 px-1.5 py-0.5 text-[10px] text-red-700">destructive</span>}
+                            {!issue.autoFixable && <span className="ml-2 rounded-full bg-canvas px-1.5 py-0.5 text-[10px] font-semibold text-muted">manual only</span>}
+                            {issue.destructive && <span className="ml-2 rounded-full bg-failed-tint px-1.5 py-0.5 text-[10px] font-semibold text-failed-text">destructive</span>}
                           </p>
-                          {issue.fixHint && <p className="mt-1 text-xs text-zinc-500">{issue.fixHint}</p>}
+                          {issue.fixHint && <p className="mt-1 text-xs text-muted">{issue.fixHint}</p>}
                         </div>
                         <div className="flex shrink-0 items-center gap-2">
-                          <span className="text-xs text-zinc-500">{STATUS_LABEL[issue.status] ?? issue.status}</span>
+                          <span className="text-xs text-muted">{STATUS_LABEL[issue.status] ?? issue.status}</span>
                           {(issue.status === "open" || issue.status === "approved") && (
                             <>
                               {issue.proposedDiff && (
                                 <button onClick={() => setShowPreview(showPreview === issue.id ? null : issue.id)}
-                                  className="rounded border border-zinc-200 px-2 py-1 text-xs">Preview</button>
+                                  className="rounded-full bg-paper px-2.5 py-1 text-xs font-semibold text-ink shadow-control hover:shadow-outline disabled:opacity-50">Preview</button>
                               )}
                               {issue.status === "open" && (
                                 <button onClick={() => setIssueStatus(issue.id, "approved")} disabled={busy}
-                                  className="rounded bg-emerald-600 px-2 py-1 text-xs font-medium text-white disabled:opacity-50">
+                                  className="rounded-full bg-done px-2.5 py-1 text-xs font-semibold text-white aos-press disabled:opacity-50">
                                   Approve fix
                                 </button>
                               )}
                               <button onClick={() => setIssueStatus(issue.id, "ignored")} disabled={busy}
-                                className="rounded border border-zinc-200 px-2 py-1 text-xs text-zinc-500 disabled:opacity-50">
+                                className="rounded-full bg-paper px-2.5 py-1 text-xs font-semibold text-ink shadow-control hover:shadow-outline disabled:opacity-50">
                                 Ignore
                               </button>
                             </>
@@ -403,7 +411,7 @@ export default function FixAgentManager({ projectId }: { projectId: string }) {
                         </div>
                       </div>
                       {showPreview === issue.id && issue.proposedDiff && (
-                        <pre className="mt-2 max-h-64 overflow-auto rounded bg-zinc-50 p-2 font-mono text-[11px] text-zinc-500">
+                        <pre className="mt-2 max-h-64 overflow-auto rounded-md bg-canvas p-2 font-mono text-[11px] text-muted">
                           {issue.proposedDiff}
                         </pre>
                       )}
@@ -419,17 +427,17 @@ export default function FixAgentManager({ projectId }: { projectId: string }) {
                 <h4 className="mb-2 text-sm font-semibold">Fix runs</h4>
                 <div className="space-y-2">
                   {runs.map((r) => (
-                    <div key={r.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-zinc-200 p-3 text-sm">
+                    <div key={r.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-line p-3 text-sm">
                       <div>
-                        <p className="text-zinc-800">
+                        <p className="text-ink">
                           <span className="font-medium">{r.fixesApplied} fix{r.fixesApplied === 1 ? "" : "es"}</span>
-                          <span className="ml-2 text-xs text-zinc-500">{r.status} · {new Date(r.startedAt).toLocaleString()}</span>
+                          <span className="ml-2 inline-flex items-center gap-1.5 text-xs text-muted">{RUN_SHAPE[r.status] && <span className={RUN_SHAPE[r.status]} aria-hidden />}{r.status} · {new Date(r.startedAt).toLocaleString()}</span>
                         </p>
-                        {r.reportSummary && <p className="mt-0.5 text-xs text-zinc-500">{r.reportSummary}</p>}
+                        {r.reportSummary && <p className="mt-0.5 text-xs text-muted">{r.reportSummary}</p>}
                       </div>
                       {r.snapshotRef && r.status === "completed" && (
                         <button onClick={() => revertRun(r.id)} disabled={busy}
-                          className="rounded border border-red-200 px-2 py-1 text-xs text-red-700 disabled:opacity-50">
+                          className="rounded-full bg-paper px-2.5 py-1 text-xs font-semibold text-failed-text shadow-[inset_0_0_0_1.5px_var(--aos-failed)] hover:bg-failed-tint disabled:opacity-50">
                           Revert run
                         </button>
                       )}

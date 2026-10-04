@@ -17,10 +17,10 @@ type Competitor = {
 type Gap = CompetitorKeyword & { opportunity: number };
 
 const th =
-  "px-3 py-2 text-left text-xs font-medium uppercase tracking-widest text-zinc-500";
+  "px-3 py-2 text-left text-xs font-medium text-muted";
 const td = "px-3 py-2 text-sm";
 const inputCls =
-  "rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-accent focus:outline-none";
+  "rounded-md border border-control bg-paper px-3 py-2 text-sm text-ink placeholder:text-subtle focus:border-focus focus:outline-none";
 
 function fmt(n: number | null, digits = 0): string {
   if (n == null) return "—";
@@ -178,10 +178,10 @@ export default function CompetitorGap({ projectId }: { projectId: string }) {
       {/* Provider banner */}
       {provider && (
         <div
-          className={`rounded-xl border px-4 py-3 text-sm ${
+          className={`rounded-lg border px-4 py-3 text-sm ${
             provider.isLive
-              ? "border-emerald-200 bg-emerald-50/40 text-emerald-700"
-              : "border-amber-200 bg-amber-50/40 text-amber-700"
+              ? "border-line bg-paper text-muted"
+              : "border-line bg-canvas text-ink"
           }`}
         >
           {provider.isLive ? (
@@ -200,12 +200,12 @@ export default function CompetitorGap({ projectId }: { projectId: string }) {
       {/* Add competitor */}
       <form
         onSubmit={onAdd}
-        className="flex flex-col gap-3 rounded-xl border border-zinc-200 bg-white/60 p-5 sm:flex-row sm:items-end"
+        className="flex flex-col gap-3 rounded-lg bg-paper shadow-hairline p-5 sm:flex-row sm:items-end"
       >
         <div className="flex-1">
           <label
             htmlFor="domain"
-            className="mb-1 block text-xs font-medium uppercase tracking-widest text-zinc-500"
+            className="mb-1 block text-xs font-medium text-muted"
           >
             Competitor domain
           </label>
@@ -220,20 +220,20 @@ export default function CompetitorGap({ projectId }: { projectId: string }) {
         <button
           type="submit"
           disabled={adding}
-          className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-hover disabled:opacity-50 active:scale-[0.96] transition-[background-color,transform] duration-150 ease-[cubic-bezier(0.2,0,0,1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2"
+          className="rounded-full bg-ink px-4 py-2 text-sm font-semibold text-white hover:bg-night-hover disabled:opacity-50 aos-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
         >
           {adding ? "Adding…" : "Add competitor"}
         </button>
       </form>
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="text-sm text-failed-text">{error}</p>}
 
       {/* Competitor list */}
       <div>
-        <h2 className="mb-3 text-sm font-medium uppercase tracking-widest text-zinc-500">
+        <h2 className="mb-3 text-sm font-medium text-muted">
           Competitors ({competitors.length})
         </h2>
         {competitors.length === 0 ? (
-          <p className="rounded-xl border border-dashed border-zinc-200 p-6 text-center text-sm text-zinc-500">
+          <p className="rounded-lg border border-dashed border-control p-6 text-center text-sm text-muted">
             No competitors yet. Add one above to analyze the keyword gap.
           </p>
         ) : (
@@ -241,15 +241,15 @@ export default function CompetitorGap({ projectId }: { projectId: string }) {
             {competitors.map((c) => (
               <li
                 key={c.id}
-                className={`flex items-center justify-between rounded-xl border px-5 py-3 ${
+                className={`flex items-center justify-between rounded-md border px-5 py-3 ${
                   selectedId === c.id
-                    ? "border-zinc-400 bg-white"
-                    : "border-zinc-200 bg-white/60"
+                    ? "border-ink bg-paper"
+                    : "border-line bg-paper"
                 }`}
               >
                 <button
                   onClick={() => analyzeGap(c.id)}
-                  className="text-left font-medium text-zinc-900 hover:underline"
+                  className="text-left font-medium text-ink hover:underline"
                 >
                   {c.domain}
                 </button>
@@ -257,7 +257,7 @@ export default function CompetitorGap({ projectId }: { projectId: string }) {
                   <button
                     onClick={() => analyzeGap(c.id)}
                     disabled={loading && selectedId === c.id}
-                    className="rounded-md border border-zinc-200 px-3 py-1 text-xs text-zinc-500 hover:border-zinc-400 disabled:opacity-50"
+                    className="rounded-full bg-paper px-2.5 py-1 text-xs font-semibold text-ink shadow-control hover:shadow-outline disabled:opacity-50"
                   >
                     {loading && selectedId === c.id
                       ? "Analyzing…"
@@ -265,7 +265,7 @@ export default function CompetitorGap({ projectId }: { projectId: string }) {
                   </button>
                   <button
                     onClick={() => onRemove(c.id)}
-                    className="text-xs text-zinc-500 hover:text-red-600"
+                    className="rounded-full px-2 py-1 text-xs font-semibold text-failed-text hover:bg-failed-tint"
                   >
                     Remove
                   </button>
@@ -279,10 +279,10 @@ export default function CompetitorGap({ projectId }: { projectId: string }) {
       {/* Gap results */}
       {selectedCompetitor && (
         <div className="flex flex-col gap-4">
-          <h2 className="text-sm font-medium uppercase tracking-widest text-zinc-500">
+          <h2 className="text-sm font-medium text-muted">
             Keyword gaps — {selectedCompetitor.domain}
             {gaps.length > 0 && (
-              <span className="ml-2 normal-case tracking-normal text-zinc-500">
+              <span className="ml-2 normal-case tracking-normal text-muted">
                 {gaps.length} keyword{gaps.length === 1 ? "" : "s"} they rank
                 for that you don’t have, sorted by opportunity
               </span>
@@ -290,7 +290,7 @@ export default function CompetitorGap({ projectId }: { projectId: string }) {
           </h2>
 
           {!loading && gaps.length === 0 && provider && (
-            <p className="rounded-xl border border-dashed border-zinc-200 p-6 text-center text-sm text-zinc-500">
+            <p className="rounded-lg border border-dashed border-control p-6 text-center text-sm text-muted">
               No gaps found — you already cover every keyword this competitor
               ranks for in the analyzed set.
             </p>
@@ -298,9 +298,9 @@ export default function CompetitorGap({ projectId }: { projectId: string }) {
 
           {gaps.length > 0 && (
             <>
-              <div className="overflow-x-auto rounded-xl border border-zinc-200">
+              <div className="overflow-x-auto rounded-lg border border-line bg-paper">
                 <table className="w-full border-collapse">
-                  <thead className="bg-white">
+                  <thead className="bg-paper">
                     <tr>
                       <th className={th}>
                         <input
@@ -326,7 +326,7 @@ export default function CompetitorGap({ projectId }: { projectId: string }) {
                     {gaps.map((g) => (
                       <tr
                         key={g.phrase}
-                        className="border-t border-zinc-200/60 hover:bg-zinc-100/60"
+                        className="border-t border-line hover:bg-hover-paper"
                       >
                         <td className={td}>
                           <input
@@ -336,10 +336,10 @@ export default function CompetitorGap({ projectId }: { projectId: string }) {
                             aria-label={`Select ${g.phrase}`}
                           />
                         </td>
-                        <td className={`${td} font-medium text-zinc-900`}>
+                        <td className={`${td} font-medium text-ink`}>
                           {g.phrase}
                           {g.mock && (
-                            <span className="ml-2 rounded bg-amber-100/60 px-1.5 py-0.5 text-[10px] uppercase text-amber-700">
+                            <span className="ml-2 rounded-full bg-canvas px-1.5 py-0.5 text-[10px] font-semibold text-muted">
                               mock
                             </span>
                           )}
@@ -354,7 +354,7 @@ export default function CompetitorGap({ projectId }: { projectId: string }) {
                               target="_blank"
                               rel="noreferrer"
                               title={g.url}
-                              className="block truncate text-zinc-500 hover:text-zinc-800 hover:underline"
+                              className="block truncate text-muted hover:text-ink hover:underline"
                             >
                               {g.url}
                             </a>
@@ -368,11 +368,11 @@ export default function CompetitorGap({ projectId }: { projectId: string }) {
                           {g.cpc == null ? "—" : `$${fmt(g.cpc, 2)}`}
                         </td>
                         <td className={td}>
-                          <span className="rounded-full border border-zinc-200 px-2 py-0.5 text-xs text-zinc-500">
+                          <span className="rounded-full bg-canvas px-2 py-0.5 text-xs font-semibold text-muted">
                             {g.intent}
                           </span>
                         </td>
-                        <td className={`${td} font-medium text-emerald-600`}>
+                        <td className={`${td} font-semibold text-ink`}>
                           {fmt(g.opportunity)}
                         </td>
                       </tr>
@@ -381,11 +381,11 @@ export default function CompetitorGap({ projectId }: { projectId: string }) {
                 </table>
               </div>
 
-              <div className="flex flex-col gap-3 rounded-xl border border-zinc-200 bg-white/60 p-4 sm:flex-row sm:items-end">
+              <div className="flex flex-col gap-3 rounded-lg bg-paper shadow-hairline p-4 sm:flex-row sm:items-end">
                 <div className="flex-1">
                   <label
                     htmlFor="gap-list"
-                    className="mb-1 block text-xs font-medium uppercase tracking-widest text-zinc-500"
+                    className="mb-1 block text-xs font-medium text-muted"
                   >
                     Save {selected.size} selected to list
                   </label>
@@ -400,13 +400,13 @@ export default function CompetitorGap({ projectId }: { projectId: string }) {
                 <button
                   onClick={onSave}
                   disabled={saving || selected.size === 0}
-                  className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-hover disabled:opacity-50 active:scale-[0.96] transition-[background-color,transform] duration-150 ease-[cubic-bezier(0.2,0,0,1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2"
+                  className="rounded-full bg-ink px-4 py-2 text-sm font-semibold text-white hover:bg-night-hover disabled:opacity-50 aos-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
                 >
                   {saving ? "Saving…" : `Save ${selected.size} keyword(s)`}
                 </button>
               </div>
               {saveMsg && (
-                <p className="text-sm text-emerald-600">{saveMsg}</p>
+                <p className="text-sm text-ink">{saveMsg}</p>
               )}
             </>
           )}
