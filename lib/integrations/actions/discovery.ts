@@ -5,19 +5,34 @@
 // full tool list per connected app; the result lands in ComposioToolCatalog
 // (workspace+app scoped, version-stamped) via refreshCatalogForConnection().
 //
-// NO LIVE COMPOSIO KEY EXISTS. The live HTTP path is stubbed behind
-// COMPOSIO_API_KEY and is clearly marked PENDING-KEY; the fixture backend
-// carries realistic Composio-style tool lists for ~8 toolkits. Never ask
-// for keys in chat — the key comes from the environment (BYO for
-// self-hosted, bundled for hosted), same as lib/integrations/composio.ts.
+// Phase 6: with COMPOSIO_API_KEY set, LiveComposioToolRouter discovers the
+// real directory (GET /toolkits) and each toolkit's tools (GET /tools?
+// toolkit_slug=) through lib/integrations/composio.ts — the only module that
+// talks to Composio. Without a key the fixture backend (realistic tool lists
+// for 8 toolkits) stays the router, so nothing silently hits the network.
+// Discovered tools carry only slug/label/description: risk tiers are still
+// derived at gate time by classifyAction()/deriveTier() exactly as for
+// fixtures — discovery never assigns or relaxes a tier. Never ask for keys
+// in chat — the key comes from the environment (BYO for self-hosted,
+// bundled for hosted). UNVERIFIED-LIVE: built against the documented
+// response shapes with stubbed HTTP; no real key has exercised it yet.
 //
 // Composio tools remain Composio's IP — we store slugs + metadata, never
 // copy their implementations (spec §10).
 
 import { prisma } from "@/lib/prisma";
 import { withWorkspaceScope } from "@/lib/substrate/memory/rls";
-import { V1_ACTION_CATALOG } from "@/lib/integrations/actions/risk";
+import { V1_ACTION_CATALOG, V1_COMPOSIO_APPS } from "@/lib/integrations/actions/risk";
 import { BadRequestError } from "@/lib/api/errors";
+import { createHash } from "node:crypto";
+import {
+  createComposioHttp,
+  getComposioBaseUrl,
+  listComposioToolkitsPage,
+  listComposioToolsPage,
+  type ComposioHttp,
+  type ComposioToolkitSummary,
+} from "@/lib/integrations/composio";
 
 export interface ComposioToolkitTool {
   /** e.g. "SALESFORCE_CREATE_LEAD" */
@@ -34,6 +49,13 @@ export interface ComposioToolkit {
   appKey: string;
   label: string;
   description: string;
+  /**
+   * Live directory only: Composio's advertised tool count, so the
+   * directory can show a count without fetching every toolkit's tools.
+   */
+  toolCount?: number;
+  /** Live directory only: Composio category names (lower-case). */
+  categories?: string[];
 }
 
 export interface ComposioToolRouter {
@@ -42,26 +64,117 @@ export interface ComposioToolRouter {
 }
 
 // ---------------------------------------------------------------------------
-// Live path — PENDING-KEY.
-// When COMPOSIO_API_KEY is set, this is the router; every method throws
-// PENDING-KEY until the GET /tools?toolkit_slug= mapping is wired (a later
-// Phase 15 slice, once a real key exists to develop against).
+// Live path (Phase 6) — COMPOSIO_API_KEY set.
+//
+// Slug mapping: Composio's live slugs drop separators ("googlesheets") where
+// the v1 catalog uses "google_sheets". A live toolkit whose compacted slug
+// matches a v1 app keeps the v1 toolkitSlug + appKey, so enablement
+// defaults, the pinned catalog and existing connections line up; the
+// Composio slug is kept internally for the /tools call. Every other toolkit
+// uses Composio's slug and an appKey with "_" → "-".
+//
+// Bounds: toolkits are paged at 1000 (max 10 pages) and cached for 10
+// minutes per router (the directory page lists them on every load); tools
+// are paged at 1000 (max 10 pages) per toolkit and not cached — a catalog
+// refresh / drift check must see the current list. Deprecated tools are
+// skipped; slugs are upper-cased and de-duplicated; descriptions capped.
 // ---------------------------------------------------------------------------
 
-class LiveComposioToolRouter implements ComposioToolRouter {
-  private pending(): never {
-    throw new Error(
-      "PENDING-KEY: live Composio tool-router path not wired yet — " +
-        "needs the GET /tools?toolkit_slug= response mapping before a real " +
-        "COMPOSIO_API_KEY can drive discovery.",
-    );
-  }
+const LIVE_PAGE_LIMIT = 1000;
+const LIVE_MAX_PAGES = 10;
+const LIVE_TOOLKIT_TTL_MS = 10 * 60_000;
+const MAX_DESCRIPTION = 500;
+
+const compact = (slug: string) => slug.toLowerCase().replace(/[^a-z0-9]/g, "");
+
+function categoryNames(meta: ComposioToolkitSummary["meta"]): string[] {
+  return (meta?.categories ?? [])
+    .map((c) => (typeof c === "string" ? c : c?.name ?? c?.slug ?? c?.id ?? ""))
+    .map((c) => String(c).trim().toLowerCase())
+    .filter(Boolean);
+}
+
+export class LiveComposioToolRouter implements ComposioToolRouter {
+  private toolkitCache: { at: number; toolkits: ComposioToolkit[] } | null = null;
+  /** internal toolkitSlug → Composio slug (differs only for v1 apps). */
+  private readonly composioSlug = new Map<string, string>();
+
+  constructor(
+    private readonly http: ComposioHttp = createComposioHttp(),
+    private readonly now: () => number = Date.now,
+  ) {}
+
   async listToolkits(): Promise<ComposioToolkit[]> {
-    this.pending();
+    if (this.toolkitCache && this.now() - this.toolkitCache.at < LIVE_TOOLKIT_TTL_MS) {
+      return this.toolkitCache.toolkits;
+    }
+    const v1ByCompact = new Map(V1_COMPOSIO_APPS.map((a) => [compact(a.toolkitSlug), a]));
+    const seen = new Set<string>();
+    const out: ComposioToolkit[] = [];
+    let cursor: string | null = null;
+    for (let page = 0; page < LIVE_MAX_PAGES; page++) {
+      const res = await listComposioToolkitsPage({ cursor, limit: LIVE_PAGE_LIMIT }, this.http);
+      for (const item of res.items) {
+        if (!item || typeof item.slug !== "string" || !item.slug.trim()) continue;
+        const live = item.slug.trim().toLowerCase();
+        const v1 = v1ByCompact.get(compact(live));
+        const toolkitSlug = v1?.toolkitSlug ?? live;
+        if (seen.has(toolkitSlug)) continue;
+        seen.add(toolkitSlug);
+        this.composioSlug.set(toolkitSlug, live);
+        const count = Number(item.meta?.tools_count);
+        out.push({
+          toolkitSlug,
+          appKey: v1?.appKey ?? live.replace(/_/g, "-"),
+          label: (item.name ?? "").trim() || v1?.label || live,
+          description: String(item.meta?.description ?? v1?.description ?? "").slice(0, MAX_DESCRIPTION),
+          toolCount: Number.isFinite(count) && count >= 0 ? Math.floor(count) : undefined,
+          categories: categoryNames(item.meta),
+        });
+      }
+      cursor = res.nextCursor;
+      if (!cursor) break;
+    }
+    this.toolkitCache = { at: this.now(), toolkits: out };
+    return out;
   }
-  async getToolkitTools(_toolkitSlug: string): Promise<ComposioToolkitTool[]> {
-    this.pending();
+
+  async getToolkitTools(toolkitSlug: string): Promise<ComposioToolkitTool[]> {
+    if (!this.composioSlug.has(toolkitSlug)) await this.listToolkits();
+    const live = this.composioSlug.get(toolkitSlug);
+    if (!live) throw new BadRequestError(`Unknown toolkit "${toolkitSlug}"`);
+    const seen = new Set<string>();
+    const out: ComposioToolkitTool[] = [];
+    let cursor: string | null = null;
+    for (let page = 0; page < LIVE_MAX_PAGES; page++) {
+      const res = await listComposioToolsPage({ toolkitSlug: live, cursor, limit: LIVE_PAGE_LIMIT }, this.http);
+      for (const t of res.items) {
+        if (!t || typeof t.slug !== "string" || !t.slug.trim() || t.is_deprecated === true) continue;
+        const slug = t.slug.trim().toUpperCase();
+        if (seen.has(slug)) continue;
+        seen.add(slug);
+        out.push({
+          slug,
+          label: (t.name ?? "").trim() || slug,
+          description: String(t.description ?? "").replace(/\s+/g, " ").trim().slice(0, MAX_DESCRIPTION),
+        });
+      }
+      cursor = res.nextCursor;
+      if (!cursor) break;
+    }
+    return out;
   }
+}
+
+/** One live router per (base URL, key) so its toolkit cache survives across requests. */
+let liveRouter: { id: string; router: LiveComposioToolRouter } | null = null;
+
+function liveRouterFor(apiKey: string): LiveComposioToolRouter {
+  const id = createHash("sha256").update(`${getComposioBaseUrl()}\n${apiKey}`).digest("hex");
+  if (!liveRouter || liveRouter.id !== id) {
+    liveRouter = { id, router: new LiveComposioToolRouter(createComposioHttp()) };
+  }
+  return liveRouter.router;
 }
 
 // ---------------------------------------------------------------------------
@@ -293,11 +406,12 @@ export const fixtureToolRouter: ComposioToolRouter = {
 };
 
 /**
- * The active router. Fixture-backed until a real key exists: the live path
- * is stubbed (PENDING-KEY) so nothing silently hits the network.
+ * The active router: live Composio discovery when COMPOSIO_API_KEY is set,
+ * the fixture backend otherwise (no key → no network).
  */
 export function getToolRouter(): ComposioToolRouter {
-  if (process.env.COMPOSIO_API_KEY?.trim()) return new LiveComposioToolRouter();
+  const key = process.env.COMPOSIO_API_KEY?.trim();
+  if (key) return liveRouterFor(key);
   return fixtureToolRouter;
 }
 

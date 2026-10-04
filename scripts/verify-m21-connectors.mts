@@ -3,7 +3,7 @@
 // Run: npx tsx scripts/verify-m21-connectors.mts
 // Run 3x green before calling this done.
 //
-// Part 1 (no DB, no network): all 12 native adapters resolve; listTools()
+// Part 1 (no DB, no network): all 14 native adapters resolve; listTools()
 // non-empty with unique names and honest mutating flags; mock invoke on 3+
 // adapters returns mock:true; secrets() encrypt→decrypt round-trip; OAuth
 // state sign/verify + tamper rejection + expiry rejection.

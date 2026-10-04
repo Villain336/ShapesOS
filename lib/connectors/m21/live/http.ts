@@ -16,10 +16,16 @@
 //     of token-shaped text. Tokens never appear in errors or logs.
 //
 // Provider hosts are fixed constants in each adapter (never user input),
-// so plain fetch is used — safeFetch is for user-supplied URLs.
-// fetchImpl and sleep are injectable so tests run against fixtures.
+// but every call still goes through safeFetch (lib/connectors/safe-fetch.ts)
+// like the rest of the connector layer: the resolved address is checked
+// (no private/metadata ranges), redirects are followed manually and
+// re-validated per hop, and a cross-origin hop drops Authorization so a
+// provider redirect can never carry the bearer token elsewhere.
+// fetchImpl, resolve and sleep are injectable so tests run against fixtures.
 
 import type { DecryptedCredential, InvokeContext, InvokeResult } from "../types";
+import { safeFetch } from "@/lib/connectors/safe-fetch";
+import type { ResolveFn } from "@/lib/safe-url";
 
 /** Closed set of live connector error codes. */
 export type ConnectorErrorCode =
@@ -48,6 +54,8 @@ export class ConnectorApiError extends Error {
 
 export interface LiveDeps {
   fetchImpl?: typeof fetch;
+  /** DNS resolver for safeFetch's address check (tests inject a fake). */
+  resolve?: ResolveFn;
   sleep?: (ms: number) => Promise<void>;
   /** Retries after the first attempt for 429/5xx/network (default 4). */
   maxRetries?: number;
@@ -84,9 +92,16 @@ const TOKENISH: RegExp[] = [
   /EAA[A-Za-z0-9]{20,}/g,
 ];
 
-/** Truncate + scrub a provider message so it is safe to surface. */
-export function scrubMessage(msg: string): string {
+/**
+ * Truncate + scrub a provider message so it is safe to surface. `secrets`
+ * are literal values this request carried (bearer tokens, developer tokens)
+ * that are redacted even when they don't look token-shaped.
+ */
+export function scrubMessage(msg: string, secrets: Array<string | null | undefined> = []): string {
   let out = msg.slice(0, MAX_MESSAGE * 2);
+  for (const secret of secrets) {
+    if (secret && secret.length >= 6) out = out.split(secret).join("[redacted]");
+  }
   for (const re of TOKENISH) out = out.replace(re, "[redacted]");
   out = out.replace(/\s+/g, " ").trim();
   return out.length > MAX_MESSAGE ? `${out.slice(0, MAX_MESSAGE)}…` : out;
@@ -164,6 +179,13 @@ export interface LiveRequest {
   maxTextBytes?: number;
 }
 
+/** Header values that are credentials (developer-token, api keys, proofs). */
+function secretHeaderValues(headers: Record<string, string> | undefined): string[] {
+  return Object.entries(headers ?? {})
+    .filter(([k]) => /token|secret|key|proof|authorization/i.test(k))
+    .map(([, v]) => v);
+}
+
 async function readBody(res: Response): Promise<unknown> {
   const text = await res.text().catch(() => "");
   if (!text) return null;
@@ -208,7 +230,11 @@ export async function liveRequest<T = unknown>(req: LiveRequest, deps: LiveDeps 
 
     let res: Response;
     try {
-      res = await fetchImpl(url.toString(), { method: req.method ?? "GET", headers, body });
+      res = await safeFetch(
+        url.toString(),
+        { method: req.method ?? "GET", headers, body },
+        { fetchFn: fetchImpl, resolve: deps.resolve },
+      );
     } catch {
       if (attempt < maxRetries) {
         await sleep(backoffMs(attempt, base));
@@ -250,7 +276,8 @@ export async function liveRequest<T = unknown>(req: LiveRequest, deps: LiveDeps 
       attempt += 1;
       continue;
     }
-    const detail = c.message ? `: ${scrubMessage(c.message)}` : "";
+    const secrets = [req.auth?.token, token, ...secretHeaderValues(req.headers)];
+    const detail = c.message ? `: ${scrubMessage(c.message, secrets)}` : "";
     throw new ConnectorApiError(req.provider, c.code, `${req.provider} request failed (HTTP ${res.status})${detail}`, res.status);
   }
 }
