@@ -278,6 +278,34 @@ Run in order; each step must pass before the next.
   the setup wizard shows the exact records and a "Verify now" button.
 - Scheduled broadcasts need the host cron entry `*/5 * * * * … /api/cron/newsletter` (see §3.8).
 
+## 4d. Agent worker and code sandbox (Phase 8)
+
+- **Worker.** `docker compose up` starts a `worker` service (`scripts/worker.mts`)
+  that claims `agent_jobs` (`SKIP LOCKED`, leases + heartbeats, a dead run is
+  requeued and resumes from its saved transcript). The app runs with
+  `AGENT_WORKER=external`: a chat turn still running after
+  `AGENT_INLINE_BUDGET_SECONDS` (45) is handed to the worker; build-mode turns
+  go straight there. Without compose, `AGENT_WORKER=internal` runs the worker
+  loop inside the app process; `off` keeps every turn inline. Budgets:
+  `AGENT_MAX_STEPS` (40), `AGENT_MAX_RUN_MINUTES` (30),
+  `AGENT_MAX_RUN_COST_MICRO_USD` ($10). All in `.env.example`.
+- **Code sandbox.** Off by default (no provider → the code tools say why, never
+  fake). Pick one:
+  - Hosted microVMs (recommended for shared/production hosts):
+    `SANDBOX_PROVIDER=e2b` + `E2B_API_KEY`, or `SANDBOX_PROVIDER=daytona` +
+    `DAYTONA_API_KEY`. Nothing else to mount.
+  - Docker on a dedicated host:
+    `docker compose -f docker-compose.yml -f docker-compose.sandbox.yml up -d`
+    (mounts the Docker socket — root-equivalent — into app and worker; see the
+    file's header). Set `DOCKER_GID` to the socket's group id.
+- **GitHub.** Agents push only to `shapes/<run-id>` branches and open PRs after
+  an approval. Uses a GitHub site's personal access token, or a GitHub App when
+  `GITHUB_APP_ID` + `GITHUB_APP_PRIVATE_KEY` are set.
+- **Live checks (unverified in CI — no Docker daemon or keys there):** Docker
+  container create / archive PUT / previews; the E2B and Daytona adapters; real
+  GitHub branch → push → PR; the Claude loop with native tools, caching and
+  compaction.
+
 ## 5. Test targets (safe, non-production)
 
 - SFTP: a disposable directory on a Launchabl staging host (NOT a client site).

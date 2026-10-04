@@ -69,6 +69,7 @@ import {
 } from "@/lib/agents/grants";
 import { subAgentSystemPrompt } from "@/lib/agents/roles";
 import { registerCodeTools } from "@/lib/sandbox/tools";
+import { sandboxAvailability } from "@/lib/sandbox/index";
 import {
   appendAgentRunEvent,
   createAgentRun,
@@ -976,7 +977,15 @@ export async function threadTaskProfile(threadId: string): Promise<{ agentKey: A
   });
   const agentKey: AgentKey = t && isAgentKey(t.agentKey) ? t.agentKey : "lead";
   // Re-computed every turn: a stored grant can never outgrow the agent.
-  return { agentKey, grant: computeGrant({ agentKey, requested: t?.allowedTools ?? [] }).groups };
+  const grant = computeGrant({ agentKey, requested: t?.allowedTools ?? [] }).groups;
+  // Phase 8: no sandbox provider → the code tools are off for this turn (the
+  // model never sees tools that can only refuse, and the turn isn't build
+  // mode). Delegated children inherit the narrowed grant.
+  if (grant.includes("code")) {
+    const avail = await sandboxAvailability().catch(() => ({ ok: false as const }));
+    if (!avail.ok) return { agentKey, grant: grant.filter((g) => g !== "code") };
+  }
+  return { agentKey, grant };
 }
 
 /**
