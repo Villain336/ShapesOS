@@ -52,4 +52,18 @@ export function StatusBadge({
   );
 }
 
+/**
+ * A badge that is NOT an agent state (Cancelled, Merged, …): same pill and
+ * sizes as StatusBadge, white with a hairline control shadow, muted label,
+ * no shape and no status color.
+ */
+export function NeutralBadge({ label, size = "md", className }: { label: string; size?: "sm" | "md"; className?: string }) {
+  const sizing = size === "sm" ? "h-6 px-2.5 text-xs" : "h-badge px-3 text-sm";
+  return (
+    <span className={cn("inline-flex shrink-0 items-center rounded-full bg-paper font-semibold whitespace-nowrap text-muted shadow-control", sizing, className)}>
+      {label}
+    </span>
+  );
+}
+
 export default StatusBadge;
