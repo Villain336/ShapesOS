@@ -107,6 +107,13 @@ Headings get **wider**, not just bolder; that width is the brand's signature. Se
 
 **Permission segmented control.** Pill group on #F0F0EE. Selected option takes its meaning: Ask first = `needs` with black text, Auto-run = `running`, Off = `ink`.
 
+## Agents: one lead, many sub-agents (owner rule, 2026-10-04)
+
+- There is exactly **one lead agent** per workspace (the orchestrator in `lib/orchestrator`). It takes the user's goal, routes the work and reports back. Every surface that shows agents shows the lead first.
+- **Sub-agents branch off the lead** (researcher, planner, drafter, analyst, scheduler, actor). Draw them as branches under the lead: the lead's card or row, then its sub-agents indented beneath it with a connector line, in the order the lead delegated. A sub-agent is never shown as a free-floating peer of the lead.
+- **No agent has a color of its own.** Identity is the name plus a black monogram tile (white letter, `radius-key`). Color appears only as the agent's *current state* (running / needs you / done / failed, with its shape), and changes when the state changes. Never key a chart, avatar, border or card to "the researcher's color".
+- Sidebar "Running now", the Overview, runs and missions follow the same tree: lead → sub-agents.
+
 ## Writing
 
 - Name things the way the user thinks of them: "Tools", "Schedules", "Memory", not internal system names.
