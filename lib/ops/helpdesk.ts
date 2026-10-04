@@ -263,7 +263,7 @@ export async function sendTicketReply(
   return withWorkspaceScope(actor.workspaceId, async (tx) => {
     const now = new Date();
     const sent = await tx.opsTicketMessage.update({
-      where: { id: message.id },
+      where: { id: message.id, workspaceId: actor.workspaceId },
       data: error ? { deliveryStatus: "failed", error } : { deliveryStatus: "sent", providerSid },
     });
     let updated = ticket;
@@ -272,7 +272,7 @@ export async function sendTicketReply(
       const data: Prisma.OpsTicketUpdateInput = { lastMessageAt: now, status: nextStatus };
       if (!ticket.firstRespondedAt) data.firstRespondedAt = now;
       if (nextStatus === "solved") data.solvedAt = now;
-      updated = await tx.opsTicket.update({ where: { id: ticketId }, data });
+      updated = await tx.opsTicket.update({ where: { id: ticketId, workspaceId: actor.workspaceId }, data });
     }
     await auditOpsEvent(tx, OPS_ENTITY_MAP["tickets"]!, actor, error ? "reply_failed" : "reply_sent", ticketId, `reply on #${ticket.number} to ${ticket.requesterEmail}${error ? ` failed: ${error}` : ""}`);
     return { ticket: updated, message: sent, sent: !error, error };
@@ -328,7 +328,7 @@ export async function routeInboundEmailToTicket(workspaceId: string, mail: Inbou
         data: { workspaceId, ticketId: target.id, direction: "inbound", fromEmail: from, body: (mail.text || "(no text)").slice(0, 50_000), providerSid: mail.emailId },
       });
       await tx.opsTicket.update({
-        where: { id: target.id },
+        where: { id: target.id, workspaceId },
         data: {
           lastMessageAt: now,
           // A customer reply re-opens a pending/solved ticket.

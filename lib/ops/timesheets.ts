@@ -56,7 +56,7 @@ export async function patchTaskRow(tx: Tx, actor: OpsActor, id: string, patch: R
   if (typeof patch.stage === "string" && patch.stage !== existing.stage) {
     data.completedAt = patch.stage === "done" ? new Date() : null;
   }
-  return tx.opsTask.update({ where: { id }, data }) as unknown as Promise<Record<string, unknown>>;
+  return tx.opsTask.update({ where: { id, workspaceId: actor.workspaceId }, data }) as unknown as Promise<Record<string, unknown>>;
 }
 
 // ---------------------------------------------------------------------------

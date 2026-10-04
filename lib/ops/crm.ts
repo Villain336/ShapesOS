@@ -111,7 +111,7 @@ export async function patchCompanyRow(tx: Tx, actor: OpsActor, id: string, patch
       if (dupe) throw new OpsError(409, `Another company already uses ${String(data.domain)}`);
     }
   }
-  return del(tx, "opsCompany").update({ where: { id }, data });
+  return del(tx, "opsCompany").update({ where: { id, workspaceId: actor.workspaceId }, data });
 }
 
 export async function createContactRow(tx: Tx, actor: OpsActor, body: Record<string, unknown>) {
@@ -154,7 +154,7 @@ export async function patchContactRow(tx: Tx, actor: OpsActor, id: string, patch
     const c = await del(tx, "opsCompany").findFirst({ where: { id: patch.companyId, workspaceId: actor.workspaceId } });
     if (!c) throw new OpsNotFoundError("companies", patch.companyId);
   }
-  return del(tx, "opsContact").update({ where: { id }, data });
+  return del(tx, "opsContact").update({ where: { id, workspaceId: actor.workspaceId }, data });
 }
 
 /** Stage ids of a CRM pipeline (crm_pipelines.stages JSON). */
@@ -232,7 +232,7 @@ export async function patchDealRow(
       throw new OpsNotFoundError(slug, ref);
     }
   }
-  return del(tx, "opsDeal").update({ where: { id }, data });
+  return del(tx, "opsDeal").update({ where: { id, workspaceId: actor.workspaceId }, data });
 }
 
 // ---------------------------------------------------------------------------
@@ -269,7 +269,7 @@ export async function convertLead(
   } else if (company && domain && !company.domain) {
     // Learn the domain on a name-matched company (dedupes future emails).
     const clash = await del(tx, "opsCompany").findFirst({ where: { workspaceId: actor.workspaceId, domain } });
-    if (!clash) company = await del(tx, "opsCompany").update({ where: { id: company.id }, data: { domain } });
+    if (!clash) company = await del(tx, "opsCompany").update({ where: { id: company.id, workspaceId: actor.workspaceId }, data: { domain } });
   }
 
   // Contact: the lead link, then the email.
@@ -291,7 +291,7 @@ export async function convertLead(
     });
     created.contact = true;
   } else if (!contact.companyId && company) {
-    contact = await del(tx, "opsContact").update({ where: { id: contact.id }, data: { companyId: company.id } });
+    contact = await del(tx, "opsContact").update({ where: { id: contact.id, workspaceId: actor.workspaceId }, data: { companyId: company.id } });
   }
 
   let deal = await del(tx, "opsDeal").findFirst({ where: { workspaceId: actor.workspaceId, leadId } });

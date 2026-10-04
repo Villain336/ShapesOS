@@ -465,7 +465,7 @@ export async function patchReorderRule(
     const loc = await mustFind(tx, "opsLocation", "locations", patch.receiveLocationId, actor.workspaceId);
     if (loc.warehouseId !== existing.warehouseId) throw new OpsError(422, "The receiving location must be inside the rule's warehouse");
   }
-  return del(tx, "opsReorderRule").update({ where: { id }, data: { ...patch } });
+  return del(tx, "opsReorderRule").update({ where: { id, workspaceId: actor.workspaceId }, data: { ...patch } });
 }
 
 export type ReorderPlan =
@@ -557,7 +557,7 @@ export async function runReorderSweep(tx: Tx, actor: OpsActor): Promise<ReorderS
         totalCents: plan.qty * unit,
       },
     });
-    await del(tx, "opsReorderRule").update({ where: { id: r.id }, data: { openPurchaseOrderId: po.id } });
+    await del(tx, "opsReorderRule").update({ where: { id: String(r.id), workspaceId: actor.workspaceId }, data: { openPurchaseOrderId: po.id } });
     await auditOpsEvent(tx, poDef, actor, "create", String(po.id), `reorder rule ${String(r.id)} drafted purchase order ${String(po.id)} for ${plan.qty} × ${String(product.sku)} (on hand ${onHand} ≤ min ${String(r.minQty)})`);
     out.drafted.push({ ruleId: String(r.id), purchaseOrderId: String(po.id), qty: plan.qty });
   }
