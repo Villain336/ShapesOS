@@ -29,6 +29,7 @@ export const KNOWN_ACTION_DEFS: ReadonlyArray<{ action: string; label: string; d
   { action: "search_keywords", label: "Research keywords", description: "Look up keyword ideas (metered data call)." },
   { action: "search_web", label: "Research a question", description: "Answer a question from web sources (metered)." },
   { action: "draft_qr_code", label: "Design a QR code", description: "Design a styled QR code." },
+  { action: "draft_image", label: "Generate an image", description: "Generate an image with OpenAI's image model and save it to the project's files (metered)." },
   { action: "draft_invoice", label: "Draft an invoice", description: "Create a draft invoice (sending always asks)." },
   { action: "draft_purchase_order", label: "Draft a purchase order", description: "Create a draft PO (sending always asks)." },
 ];

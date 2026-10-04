@@ -7,6 +7,7 @@ import assert from "node:assert/strict";
 import { TOOLS, TOOL_ACTION, TOOL_GROUP, toolCatalogForPrompt, toolGranted } from "../tools";
 import { isToolGroup } from "@/lib/agents/grants";
 import { evaluateTier } from "@/lib/orchestrator/authority";
+import { KNOWN_ACTIONS } from "@/lib/automation/policy";
 
 describe("tool groups", () => {
   it("every registered tool belongs to a known group (no silent fall-through)", () => {
@@ -27,6 +28,20 @@ describe("tool groups", () => {
     for (const name of ["ops_send_invoice", "ops_mark_invoice_paid", "run_workflow", "trigger_automation_flow", "ops_launch_workflow"]) {
       assert.ok(evaluateTier({ kind: TOOL_ACTION[name]! }, settings) >= 2, `${name} must always ask`);
     }
+  });
+
+  it("generate_image: media group, spend kind, editor, Tier-0 draft_image (auto-approvable)", () => {
+    const t = TOOLS.find((x) => x.name === "generate_image");
+    assert.ok(t, "generate_image is registered");
+    assert.equal(t!.kind, "spend");
+    assert.equal(t!.minRole, "editor");
+    assert.equal(TOOL_GROUP.generate_image, "media");
+    assert.equal(TOOL_ACTION.generate_image, "draft_image");
+    const settings = { smallActionThresholdCents: 10_000, automationAllows: true };
+    assert.equal(evaluateTier({ kind: "draft_image" }, settings), 0);
+    assert.ok(KNOWN_ACTIONS.some((a) => a.action === "draft_image"), "draft_image is in the automation catalog");
+    assert.equal(toolGranted("generate_image", ["workspace", "content"]), false);
+    assert.equal(toolGranted("generate_image", ["workspace", "media"]), true);
   });
 
   it("the prompt catalog lists only granted tools", () => {

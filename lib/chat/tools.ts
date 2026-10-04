@@ -39,6 +39,8 @@ import { research_question } from "@/lib/knowledge/contextdev/research-tool";
 // Phase 4b: answers grounded in the tenant's published datasets.
 import { PrismaDatasetBuilderStore } from "@/lib/datasetbuilder/prisma-store";
 import { askPublishedDatasets } from "@/lib/datasetbuilder/activate";
+// Phase 7: OpenAI image generation (media group, spend, draft_image).
+import { generate_image } from "@/lib/images/tool";
 // Phase 5: tool groups (per-task tool grants).
 import { isGroupGranted, type AgentKey, type ToolGroup } from "@/lib/agents/grants";
 
@@ -1009,6 +1011,8 @@ export const TOOLS: ToolDef[] = [
   research_question,
   // Phase 4b: grounded answers from published datasets.
   ask_business_data,
+  // Phase 7: images from OpenAI's image model, saved as workspace files.
+  generate_image,
   // Phase 17: business operations (invoices, inventory, POs, projects, HR,
   // workflows) — propose-only money writes.
   ...OPS_TOOLS,
@@ -1044,6 +1048,7 @@ export const TOOL_GROUP: Readonly<Record<string, ToolGroup>> = {
   create_content_draft: "content",
   create_report: "content",
   design_qr_code: "content",
+  generate_image: "media",
   run_seo_audit: "site",
   run_workflow: "automation",
   approve_autopilot_item: "automation",
@@ -1078,6 +1083,7 @@ export const TOOL_ACTION: Readonly<Record<string, string>> = {
   create_content_draft: "draft_content",
   create_report: "report_generate",
   design_qr_code: "draft_qr_code",
+  generate_image: "draft_image",
   run_seo_audit: "audit_site",
   run_workflow: "run_workflow",
   approve_autopilot_item: "approve_autopilot_item",
