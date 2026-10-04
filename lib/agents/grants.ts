@@ -193,6 +193,8 @@ export function connectorGroup(connectorKey: string): ToolGroup {
     case "linear":
     case "jira":
       return "ops";
+    case "airtable": // Phase 11 (devtools): bases are working documents (like Notion databases)
+      return "files";
     case "google-search-console":
     case "ga4":
     case "google-ads":
@@ -239,6 +241,10 @@ export function connectorAction(connectorKey: string, tool: string): string {
     case "jira.transition_issue":
     case "jira.add_comment":
       return "write_project_record";
+    // Phase 11 (devtools): Airtable record writes — Tier 2, always asks.
+    case "airtable.create_records":
+    case "airtable.update_records":
+      return "connector_write";
     default:
       return "connector_write";
   }

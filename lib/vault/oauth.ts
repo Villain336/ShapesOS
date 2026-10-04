@@ -13,7 +13,7 @@ import { createHash, randomBytes } from "crypto";
 import { secrets } from "@/lib/secrets";
 import { getBuiltinMeta, HUBSPOT_SCOPES, MICROSOFT_CALENDAR_SCOPES, MICROSOFT_MAIL_SCOPES, SLACK_BOT_SCOPES } from "@/lib/connectors/m21/registry";
 // Phase 11 (devtools): work-tool connector scopes.
-import { JIRA_SCOPES, LINEAR_SCOPES } from "@/lib/connectors/m21/registry";
+import { AIRTABLE_SCOPES, JIRA_SCOPES, LINEAR_SCOPES } from "@/lib/connectors/m21/registry";
 
 export interface OAuthProviderConfig {
   authorizeUrl: string;
@@ -299,6 +299,20 @@ export const OAUTH_CONFIGS: Record<string, OAuthProviderConfig> = {
     clientSecretEnv: "ATLASSIAN_OAUTH_CLIENT_SECRET",
     extra: { audience: "api.atlassian.com", prompt: "consent" },
     tokenRequest: "json",
+  },
+  // Phase 11 (devtools): Airtable OAuth — authorization code with PKCE
+  // (S256, required). A confidential integration authenticates to the token
+  // endpoint with HTTP Basic (client_id:client_secret) and a form body (both
+  // grants). Access tokens live 60 minutes; refresh tokens rotate (the vault
+  // keeps the newest). Verified against airtable.com/developers/web/api/oauth-reference.
+  airtable: {
+    authorizeUrl: "https://airtable.com/oauth2/v1/authorize",
+    tokenUrl: "https://airtable.com/oauth2/v1/token",
+    scopes: AIRTABLE_SCOPES,
+    clientIdEnv: "AIRTABLE_OAUTH_CLIENT_ID",
+    clientSecretEnv: "AIRTABLE_OAUTH_CLIENT_SECRET",
+    tokenRequest: "form_basic",
+    pkce: true,
   },
   // NOTE (Phase 18 slice 4, outcome B): Walmart Connect is NOT registered
   // here and never will be as an OAuth connector. Research 2026-10-01
