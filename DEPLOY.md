@@ -215,7 +215,7 @@ Run in order; each step must pass before the next.
 - [ ] **Sites builder:** AI-generate a landing page, preview, save, open in IDE.
 - [ ] **WordPress (real app password):** connect, edit a draft post, publish the landing page to WP.
 - [ ] **Webflow (real token):** connect, create a CMS item, publish site.
-- [ ] **Hosting (real tokens):** deploy the landing page to Vercel *or* Cloudflare Pages, visit the live URL.
+- [ ] **Hosting (real tokens):** deploy the landing page to Vercel, Cloudflare Pages *or* Netlify, visit the live URL; deploy again, then roll back to the first deploy (approve it in Actions) and confirm the URL serves it.
 - [ ] **Fix agent (real working copy):** run audit on a test site, approve 2–3 safe fixes, run the scheduled applier, confirm fixes + audit entries, test one-click revert.
 - [ ] **RBAC:** invite a second user as `viewer` — confirm read-only; promote to `editor` — confirm no member management; demote/remove.
 - [ ] **Audit log review:** confirm credential changes, deploys, fix-agent runs, and role changes all appear.
@@ -306,13 +306,37 @@ Run in order; each step must pass before the next.
   GitHub branch → push → PR; the Claude loop with native tools, caching and
   compaction.
 
+## 4e. Sites: agent drafts, Netlify, rollback and live smoke tests (Phase 9)
+
+- **Agents edit sites in the sandbox.** `site_checkout` copies a site's working
+  copy (Sites → IDE files) into the run's code sandbox (needs a sandbox
+  provider, §4d); `site_publish_draft` saves the result as a draft revision.
+  Nothing goes live until a person clicks **Apply** under Sites → Agent drafts
+  (the previous files are kept as a backup revision — **Restore** reverts).
+  Deploy / publish afterwards as usual.
+- **Netlify** joins Vercel and Cloudflare Pages under Sites → Hosting (personal
+  access token, optional site id; file-digest deploys). Tokens are per
+  connection, encrypted at rest — no env var.
+- **One-click rollback.** Deployment history → **Roll back** requests a Tier-2
+  approval (Actions / the "needs you" inbox); once approved, **Run rollback**
+  calls the provider (Vercel instant rollback, Cloudflare Pages rollback,
+  Netlify restore deploy) and records a rollback row.
+- **Live smoke tests (opt-in).** `npx tsx scripts/live/run-all.mts` runs
+  `scripts/live/{github,wordpress,webflow,vercel,cloudflare,netlify,anthropic}.mts`
+  through the app's own adapters. Each SKIPS unless its `LIVE_*` keys are set
+  (listed in `.env.example`); deploy + rollback checks also need
+  `LIVE_DEPLOY_WRITE=1` and create deployments in scratch projects. In GitHub:
+  add the `LIVE_*` repository secrets, then run **Actions → live-smoke → Run
+  workflow** (`.github/workflows/live-smoke.yml`, `workflow_dispatch` only —
+  never on push or PR). `LIVE_ONLY=netlify,anthropic` limits a run.
+
 ## 5. Test targets (safe, non-production)
 
 - SFTP: a disposable directory on a Launchabl staging host (NOT a client site).
 - GitHub: a new scratch repo (e.g. `launchabl/marketr-smoke`), deleted after.
 - WordPress: a staging WP install with an application password.
 - Webflow: a test workspace + API token.
-- Vercel/Cloudflare: tokens scoped to test projects; tear down deployments after.
+- Vercel/Cloudflare/Netlify: tokens scoped to test projects; tear down deployments after.
 
 ## 6. Rollback
 
