@@ -187,6 +187,7 @@ export function connectorGroup(connectorKey: string): ToolGroup {
     case "dataforseo":
       return "web";
     case "hubspot": // Phase 11 (conncore): CRM sync is business operations
+    case "shopify": // Phase 11 (bizsync): commerce + accounting sync is business operations
       return "ops";
     case "google-search-console":
     case "ga4":
@@ -226,6 +227,12 @@ export function connectorAction(connectorKey: string, tool: string): string {
     // Phase 11 (conncore): a HubSpot pull writes your CRM records.
     case "hubspot.sync_from_hubspot":
       return "write_crm_record";
+    // Phase 11 (bizsync): a store pull writes products, stock, orders and
+    // contacts; pushing stock changes a public store — both Tier 2, ask.
+    case "shopify.sync_from_shopify":
+      return "import_commerce_data";
+    case "shopify.push_inventory":
+      return "update_store_inventory";
     default:
       return "connector_write";
   }

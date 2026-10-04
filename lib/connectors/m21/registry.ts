@@ -1,6 +1,6 @@
 // Marketr — M21 built-in connector registry (spec §7, §11).
 //
-// DESIGN DECISION (recorded in prisma/schema.prisma): the 18 built-in
+// DESIGN DECISION (recorded in prisma/schema.prisma): the 19 built-in
 // connectors are CODE-defined here, not DB rows. (The count is pinned by
 // lib/connectors/m21/__tests__/registry.test.ts — update both together.) `Connector` rows exist
 // ONLY for workspace-custom MCP servers (kind=mcp). Do not create DB rows
@@ -51,6 +51,21 @@ export const HUBSPOT_SCOPES = [
   "crm.objects.companies.write",
   "crm.objects.deals.read",
   "crm.objects.deals.write",
+];
+// Phase 11 (bizsync): Shopify (comma-separated on the authorize URL),
+// QuickBooks Online and Xero. Shared with lib/vault/oauth.ts.
+export const SHOPIFY_SCOPES = ["read_products", "read_inventory", "write_inventory", "read_locations", "read_orders", "read_customers"];
+export const QUICKBOOKS_SCOPES = ["com.intuit.quickbooks.accounting"];
+// Xero granular scopes (apps created after 2026-03-02 can no longer request
+// the broad accounting.transactions): invoices (incl. bills + credit notes),
+// payments, manual journals, contacts, read-only settings (chart of accounts).
+export const XERO_SCOPES = [
+  "offline_access",
+  "accounting.invoices",
+  "accounting.payments",
+  "accounting.manualjournals",
+  "accounting.contacts",
+  "accounting.settings.read",
 ];
 export const MICROSOFT_CALENDAR_SCOPES = [
   "offline_access",
@@ -261,6 +276,18 @@ export const BUILT_IN_CONNECTORS: BuiltinConnectorMeta[] = [
     },
     authNote: "HubSpot public app OAuth (CRM objects read/write).",
   },
+  // Phase 11 (bizsync): Shopify ↔ Ops products, stock, orders, customers.
+  {
+    key: "shopify",
+    displayName: "Shopify",
+    authType: "oauth2",
+    description: "Sync Shopify products, stock by location, orders and customers into Ops, and push stock back after you confirm.",
+    oauth: {
+      scopes: SHOPIFY_SCOPES,
+      envVars: ["SHOPIFY_CLIENT_ID", "SHOPIFY_CLIENT_SECRET"],
+    },
+    authNote: "Shopify app install (OAuth per store — enter your *.myshopify.com domain). Webhooks are signed with the app secret.",
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -326,6 +353,7 @@ import { OutlookAdapter } from "./native/outlook";
 import { OutlookCalendarAdapter } from "./native/outlook-calendar";
 import { SlackAdapter } from "./native/slack";
 import { HubspotAdapter } from "./native/hubspot";
+import { ShopifyAdapter } from "./native/shopify"; // Phase 11 (bizsync)
 
 const ADAPTER_CLASSES: Record<string, () => ConnectorAdapter> = {
   "google-search-console": () => new GoogleSearchConsoleAdapter(),
@@ -348,6 +376,8 @@ const ADAPTER_CLASSES: Record<string, () => ConnectorAdapter> = {
   "outlook-calendar": () => new OutlookCalendarAdapter(),
   slack: () => new SlackAdapter(),
   hubspot: () => new HubspotAdapter(),
+  // Phase 11 (bizsync).
+  shopify: () => new ShopifyAdapter(),
 };
 
 /** Resolve a built-in connector key to its native adapter. Throws on unknown key. */
@@ -363,7 +393,7 @@ export function resolveAdapter(key: string): ConnectorAdapter {
 //
 // Phase 4b wired the last six mock-only adapters (GSC, GA4, Drive, Notion,
 // Meta Ads, Google Ads) to their live APIs: with a vault credential they
-// call the provider; without one they stay in labeled mock mode. All 18
+// call the provider; without one they stay in labeled mock mode. All 19
 // built-in adapters have live wiring, so the set is empty (0 mock-only;
 // pinned by lib/connectors/m21/__tests__/registry.test.ts). Keep it in
 // sync with the per-adapter file headers (scripts/verify-connector-health.mts

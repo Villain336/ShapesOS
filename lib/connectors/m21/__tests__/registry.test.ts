@@ -36,6 +36,7 @@ const EXPECTED_KEYS = [
   "outlook-calendar",
   "slack",
   "hubspot",
+  "shopify", // Phase 11 (bizsync)
 ];
 
 const ROOT = join(__dirname, "..", "..", "..", "..");
@@ -48,7 +49,7 @@ describe("built-in connector registry", () => {
       BUILT_IN_CONNECTORS.map((c) => c.key),
       EXPECTED_KEYS,
     );
-    assert.equal(BUILT_IN_CONNECTORS.length, 18);
+    assert.equal(BUILT_IN_CONNECTORS.length, 19); // Phase 11 (bizsync): +1 shopify
   });
 
   it("every key resolves to an adapter with the same key, auth type and at least one tool", () => {

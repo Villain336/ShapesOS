@@ -12,6 +12,9 @@
 import { randomBytes } from "crypto";
 import { secrets } from "@/lib/secrets";
 import { getBuiltinMeta, HUBSPOT_SCOPES, MICROSOFT_CALENDAR_SCOPES, MICROSOFT_MAIL_SCOPES, SLACK_BOT_SCOPES } from "@/lib/connectors/m21/registry";
+// Phase 11 (bizsync): Shopify / QuickBooks / Xero scopes + shop-domain guard.
+import { QUICKBOOKS_SCOPES, SHOPIFY_SCOPES, XERO_SCOPES } from "@/lib/connectors/m21/registry";
+import { normalizeShopDomain } from "@/lib/bizsync/shopify/shop";
 
 export interface OAuthProviderConfig {
   authorizeUrl: string;
@@ -27,8 +30,10 @@ export interface OAuthProviderConfig {
    * x-www-form-urlencoded body carrying client_id/client_secret (Google,
    * Meta, Webflow…). "json_basic": JSON body + HTTP Basic client auth
    * (Notion, verified against developers.notion.com/reference/create-a-token).
+   * Phase 11 (bizsync) "form_basic": form body (grant params only) + HTTP
+   * Basic client auth (Intuit QuickBooks, Xero).
    */
-  tokenRequest?: "form" | "json_basic";
+  tokenRequest?: "form" | "json_basic" | "form_basic";
   /** Phase 11 (conncore): scope separator on the authorize URL (Slack: ","). Default " ". */
   scopeSeparator?: string;
   /**
@@ -37,6 +42,25 @@ export interface OAuthProviderConfig {
    * returns token material.
    */
   tokenMeta?: (token: Record<string, unknown>) => Record<string, string>;
+  /**
+   * Phase 11 (bizsync): authorizeUrl / tokenUrl contain "{shop}" (Shopify:
+   * every store has its own OAuth host). startOAuthFlow needs opts.shop; the
+   * shop travels in the signed state and must match the callback's.
+   */
+  perShop?: boolean;
+  /**
+   * Phase 11 (bizsync): non-secret routing ids from the callback query (e.g.
+   * QuickBooks realmId, the Shopify shop) — stored in ConnectorConnection.meta
+   * AND in the credential payload so adapters can address the right company.
+   */
+  callbackMeta?: (query: Record<string, string>, state: OAuthState) => Record<string, string>;
+}
+
+/** Phase 11 (bizsync): substitute the shop host into a per-shop URL. */
+export function shopUrl(template: string, shop: string | null | undefined): string {
+  const host = normalizeShopDomain(shop);
+  if (!host) throw new Error("A valid *.myshopify.com shop domain is required");
+  return template.replace("{shop}", host);
 }
 
 /**
@@ -49,6 +73,14 @@ export function buildTokenRequest(
   clientId: string,
   clientSecret: string,
 ): RequestInit {
+  if (config.tokenRequest === "form_basic") {
+    const basic = Buffer.from(`${clientId}:${clientSecret}`, "utf8").toString("base64");
+    return {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json", Authorization: `Basic ${basic}` },
+      body: new URLSearchParams(params),
+    };
+  }
   if (config.tokenRequest === "json_basic") {
     const basic = Buffer.from(`${clientId}:${clientSecret}`, "utf8").toString("base64");
     return {
@@ -245,6 +277,51 @@ export const OAUTH_CONFIGS: Record<string, OAuthProviderConfig> = {
     clientIdEnv: "HUBSPOT_CLIENT_ID",
     clientSecretEnv: "HUBSPOT_CLIENT_SECRET",
   },
+  // Phase 11 (bizsync): Shopify (public app, Admin GraphQL API). Each store
+  // has its own OAuth host: https://{shop}/admin/oauth/authorize and
+  // /admin/oauth/access_token (client credentials in the form body). The
+  // offline token does not expire unless the app opts into expiring offline
+  // tokens (then refresh_token + expires_in arrive and refresh goes to the
+  // same per-shop endpoint). The callback's hmac is verified with the app
+  // secret (lib/bizsync/shopify/shop.ts). Verified against
+  // shopify.dev/docs/apps/build/authentication-authorization/access-tokens/authorization-code-grant.
+  shopify: {
+    authorizeUrl: "https://{shop}/admin/oauth/authorize",
+    tokenUrl: "https://{shop}/admin/oauth/access_token",
+    scopes: SHOPIFY_SCOPES,
+    clientIdEnv: "SHOPIFY_CLIENT_ID",
+    clientSecretEnv: "SHOPIFY_CLIENT_SECRET",
+    scopeSeparator: ",",
+    perShop: true,
+    callbackMeta: (_q, state): Record<string, string> => (state.shop ? { shop: state.shop } : {}),
+  },
+  // Phase 11 (bizsync): QuickBooks Online (Intuit OAuth 2.0). The company id
+  // (realmId) arrives as a callback query param, not in the token response.
+  // Token endpoint wants HTTP Basic client auth + a form body; access tokens
+  // live 1 hour, refresh tokens rotate (the vault keeps the newest). Verified
+  // against developer.intuit.com/app/developer/qbo/docs/develop/authentication-and-authorization/oauth-2.0.
+  quickbooks: {
+    authorizeUrl: "https://appcenter.intuit.com/connect/oauth2",
+    tokenUrl: "https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer",
+    scopes: QUICKBOOKS_SCOPES,
+    clientIdEnv: "QUICKBOOKS_CLIENT_ID",
+    clientSecretEnv: "QUICKBOOKS_CLIENT_SECRET",
+    tokenRequest: "form_basic",
+    callbackMeta: (q): Record<string, string> => (/^\d{1,32}$/.test(q.realmId ?? "") ? { realmId: q.realmId } : {}),
+  },
+  // Phase 11 (bizsync): Xero (OAuth 2.0 code flow). The organisation (tenant)
+  // is chosen after the token exchange from GET https://api.xero.com/connections
+  // (lib/bizsync/xero/tenants.ts); access tokens live 30 minutes, refresh
+  // tokens rotate. Basic client auth + form body. Verified against
+  // developer.xero.com/documentation/guides/oauth2/auth-flow.
+  xero: {
+    authorizeUrl: "https://login.xero.com/identity/connect/authorize",
+    tokenUrl: "https://identity.xero.com/connect/token",
+    scopes: XERO_SCOPES,
+    clientIdEnv: "XERO_CLIENT_ID",
+    clientSecretEnv: "XERO_CLIENT_SECRET",
+    tokenRequest: "form_basic",
+  },
   // NOTE (Phase 18 slice 4, outcome B): Walmart Connect is NOT registered
   // here and never will be as an OAuth connector. Research 2026-10-01
   // (docs/phases/PHASE18-SLICE4-WALMART.md) established there is no public
@@ -260,6 +337,8 @@ export interface OAuthState {
   connectorKey: string;
   exp: number;
   nonce: string;
+  /** Phase 11 (bizsync): the Shopify store this flow is for (perShop configs). */
+  shop?: string;
 }
 
 const STATE_TTL_MS = 10 * 60 * 1000;
@@ -346,6 +425,7 @@ export function startOAuthFlow(
   workspaceId: string,
   connectorKey: string,
   redirectBase: string,
+  opts: { shop?: string | null } = {},
 ): { url: string; state: string } {
   const config = OAUTH_CONFIGS[connectorKey];
   if (!config) {
@@ -361,12 +441,19 @@ export function startOAuthFlow(
     );
   }
 
+  // Phase 11 (bizsync): per-shop providers need a valid store domain up front.
+  const shop = config.perShop ? normalizeShopDomain(opts.shop) : null;
+  if (config.perShop && !shop) {
+    throw new Error(`Connecting "${connectorKey}" needs your store domain (your-store.myshopify.com)`);
+  }
+
   const state = signOAuthState({
     userId,
     workspaceId,
     connectorKey,
     exp: Date.now() + STATE_TTL_MS,
     nonce: randomBytes(16).toString("hex"),
+    ...(shop ? { shop } : {}),
   });
 
   const redirectUri = `${redirectBase.replace(/\/+$/, "")}/api/oauth/callback`;
@@ -378,7 +465,8 @@ export function startOAuthFlow(
     ...(config.scopes.length ? { scope: config.scopes.join(config.scopeSeparator ?? " ") } : {}),
     ...(config.extra ?? {}),
   });
-  return { url: `${config.authorizeUrl}?${params.toString()}`, state };
+  const authorizeUrl = shop ? shopUrl(config.authorizeUrl, shop) : config.authorizeUrl;
+  return { url: `${authorizeUrl}?${params.toString()}`, state };
 }
 
 /** Look up the OAuth config for a connector key (undefined for non-OAuth connectors). */

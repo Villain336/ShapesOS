@@ -39,7 +39,7 @@ export interface WebhookIngestResult {
 /** Resolve the webhook secret for a connector: test fixture → vault → null. */
 export async function resolveWebhookSecret(
   connector: GraphConnector,
-): Promise<{ secret: string | null; mode: "fixture" | "vault" | "none" }> {
+): Promise<{ secret: string | null; mode: "fixture" | "vault" | "app" | "none" }> {
   try {
     const fixtures = JSON.parse(process.env.GRAPH_WEBHOOK_TEST_SECRETS ?? "{}") as Record<
       string,
@@ -61,6 +61,13 @@ export async function resolveWebhookSecret(
     } catch {
       // vault lookup failure = not configured; fail honestly below
     }
+  }
+  // Phase 11 (bizsync): a store installed through the ShapesOS Shopify app
+  // (lib/bizsync/install.ts set authRef to that connection) signs its
+  // webhooks with the app's client secret.
+  if (connector.platform === "shopify" && connector.authRef) {
+    const appSecret = (process.env.SHOPIFY_CLIENT_SECRET ?? "").trim();
+    if (appSecret) return { secret: appSecret, mode: "app" };
   }
   return { secret: null, mode: "none" };
 }

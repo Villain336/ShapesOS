@@ -1056,6 +1056,9 @@ model Workspace {
   slackEventReceipts          SlackEventReceipt[]
   // Phase 11 (conncore): HubSpot ↔ Ops CRM id mapping (bidirectional sync).
   hubspotSyncLinks            HubspotSyncLink[]
+  // Phase 11 (bizsync): Shopify / QuickBooks / Xero id mapping + sync run log.
+  bizSyncLinks                BizSyncLink[]
+  bizSyncRuns                 BizSyncRun[]
 
   @@map("workspaces")
 }
@@ -15661,4 +15664,68 @@ model HubspotSyncLink {
   @@unique([workspaceId, objectType, hubspotId])
   @@unique([workspaceId, objectType, localId])
   @@map("hubspot_sync_links")
+}
+
+// ============================================================================
+// Phase 11 (bizsync) — commerce + accounting connectors (Shopify, QuickBooks
+// Online, Xero). Same shape as hubspot_sync_links, keyed by provider:
+// one row per mapped object (product | variant | location | inventory_level |
+// order | customer | vendor | item | invoice_customer …) — the remote id, the
+// local id, the remote updatedAt and a fingerprint of the local mapped fields
+// at the last sync (the conflict rule's inputs, lib/bizsync/links.ts). Both
+// uniques make every pull/push idempotent. FORCE RLS, cascades from
+// workspaces. (ConnectorImportBatch is the consent-gated person-graph import
+// receipt — a different contract — so sync runs get their own small log.)
+// ============================================================================
+
+model BizSyncLink {
+  id              String    @id @default(cuid())
+  workspaceId     String    @map("workspace_id")
+  workspace       Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  // shopify | quickbooks | xero
+  provider        String
+  objectType      String    @map("object_type")
+  remoteId        String    @map("remote_id")
+  localId         String    @map("local_id")
+  // The remote record's updatedAt as of the last sync.
+  remoteUpdatedAt DateTime? @map("remote_updated_at")
+  // sha256 of the local mapped fields right after the last sync ("changed
+  // locally" = the current fingerprint differs), plus the local updatedAt.
+  localHash       String?   @map("local_hash")
+  localUpdatedAt  DateTime? @map("local_updated_at")
+  // pull | push
+  lastDirection   String    @default("pull") @map("last_direction")
+  // Non-secret extras (e.g. inventory: { qty } last agreed on; Shopify
+  // inventory item id on a variant link).
+  meta            Json      @default("{}")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  @@unique([workspaceId, provider, objectType, remoteId])
+  @@unique([workspaceId, provider, objectType, localId])
+  @@map("biz_sync_links")
+}
+
+// One sync / export run per row: what ran, when, how it ended, the counts
+// (summary JSON) and a short error. The Settings → Connectors → Business
+// sync page reads it; the agent tool results carry the same summary.
+model BizSyncRun {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  provider    String
+  // e.g. sync_catalog | sync_inventory | sync_orders | sync_customers |
+  // push_inventory | webhook | import_contacts | export
+  operation   String
+  // running | succeeded | partial | failed
+  status      String    @default("running")
+  // Who started it: user id, or "webhook:shopify".
+  actor       String
+  summary     Json      @default("{}")
+  error       String?
+  startedAt   DateTime  @default(now()) @map("started_at")
+  finishedAt  DateTime? @map("finished_at")
+
+  @@index([workspaceId, provider, startedAt])
+  @@map("biz_sync_runs")
 }
