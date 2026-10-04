@@ -22,8 +22,13 @@ export interface ChartSeed {
 
 export const STANDARD_CHART: readonly ChartSeed[] = [
   { code: "1000", name: "Cash and bank", type: "asset", systemKey: "cash" },
+  // Phase 12 (mfgpos): card takings waiting for the processor's payout.
+  { code: "1050", name: "Card payments clearing", type: "asset", systemKey: "card_clearing" },
   { code: "1100", name: "Accounts receivable", type: "asset", systemKey: "ar" },
   { code: "1200", name: "Inventory", type: "asset", systemKey: "inventory" },
+  // Phase 12 (mfgpos): manufactured goods and production in progress.
+  { code: "1210", name: "Finished goods", type: "asset", systemKey: "finished_goods" },
+  { code: "1250", name: "Work in progress", type: "asset", systemKey: "wip" },
   { code: "1300", name: "Input tax receivable", type: "asset", systemKey: "tax_receivable" },
   { code: "1500", name: "Equipment", type: "asset" },
   { code: "2000", name: "Accounts payable", type: "liability", systemKey: "ap" },
@@ -36,6 +41,10 @@ export const STANDARD_CHART: readonly ChartSeed[] = [
   { code: "4100", name: "Service revenue", type: "income" },
   { code: "4900", name: "Other income", type: "income" },
   { code: "5000", name: "Cost of goods sold", type: "expense", systemKey: "cogs" },
+  // Phase 12 (mfgpos): labour moved into product cost (credit balance), and
+  // scrapped goods.
+  { code: "5100", name: "Labour absorbed into production", type: "expense", systemKey: "labour_absorbed" },
+  { code: "5200", name: "Scrap and waste", type: "expense", systemKey: "scrap_loss" },
   { code: "6000", name: "General expenses", type: "expense", systemKey: "expense_general" },
   { code: "6100", name: "Rent", type: "expense", systemKey: "expense_rent" },
   { code: "6150", name: "Utilities", type: "expense", systemKey: "expense_utilities" },
@@ -46,6 +55,8 @@ export const STANDARD_CHART: readonly ChartSeed[] = [
   { code: "6500", name: "Professional fees", type: "expense", systemKey: "expense_professional" },
   { code: "6600", name: "Advertising and marketing", type: "expense", systemKey: "expense_advertising" },
   { code: "6900", name: "Bank fees", type: "expense", systemKey: "expense_bank_fees" },
+  // Phase 12 (mfgpos): till counted vs expected.
+  { code: "6950", name: "Cash over and short", type: "expense", systemKey: "cash_over_short" },
 ];
 
 /** Accounts whose balance grows on the debit side. */

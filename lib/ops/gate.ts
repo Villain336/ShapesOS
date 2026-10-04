@@ -100,6 +100,15 @@ export const OPS_MONEY_ACTIONS: OpsMoneyAction[] = [
   { slug: "OPS_BILL_PAY", label: "Pay vendor bill", expectedTier: "medium" },
   { slug: "OPS_EXPENSE_APPROVE", label: "Approve expense claim", expectedTier: "medium" },
   { slug: "OPS_EXPENSE_REIMBURSE", label: "Reimburse expense claim", expectedTier: "medium" },
+  // Phase 12 (mfgpos): confirming a manufacturing order commits components
+  // and the work plan; completing it moves stock and posts the costing to
+  // the books; scrap writes stock off (and its value); closing a till
+  // session posts the day's takings. Phase 14 derives unknown OPS_* slugs as
+  // high, which meets the pins.
+  { slug: "OPS_MO_CONFIRM", label: "Confirm manufacturing order", expectedTier: "medium" },
+  { slug: "OPS_MO_COMPLETE", label: "Complete manufacturing order", expectedTier: "medium" },
+  { slug: "OPS_SCRAP_POST", label: "Scrap stock", expectedTier: "medium" },
+  { slug: "OPS_POS_SESSION_CLOSE", label: "Close till session", expectedTier: "medium" },
 ];
 
 export const OPS_MONEY_ACTION_MAP: Record<string, OpsMoneyAction> =

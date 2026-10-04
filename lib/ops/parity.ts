@@ -256,11 +256,46 @@ export const ROWS: ParityRow[] = [
     test: [test("lib/portal/__tests__/portal-core.test.ts"), test("lib/portal/__tests__/portal-db.test.ts"), test("lib/portal/__tests__/portal-isolation-db.test.ts")],
     note: "Separate portal session (cookie on /portal + /api/portal); a client sees only the CRM records linked in Settings → Clients.",
   },
+  // --- Phase 12 (mfgpos) ---
+  {
+    app: "Manufacturing",
+    odoo: "Manufacturing (MRP)",
+    owner: "phase 12",
+    model: [model("OpsWorkCenter"), model("OpsRouting"), model("OpsManufacturingOrder"), model("OpsWorkOrder"), model("OpsWorkTimeLog"), model("OpsScrap"), model("CadBomVersion")],
+    route: [
+      entity("work-centers"),
+      entity("routings"),
+      entity("manufacturing-orders"),
+      entity("work-orders"),
+      entity("work-time-logs"),
+      entity("scraps"),
+      file("app/api/ops/manufacturing/bom/route.ts"),
+      file("app/api/ops/manufacturing/cad/route.ts"),
+    ],
+    page: [page("manufacturing")],
+    test: [test("lib/ops/__tests__/p12-mfg.test.ts"), test("lib/ops/__tests__/p12-mfg-db.test.ts")],
+    note: "BOM = the CAD BOM (CadPart → OpsProduct link, no second BOM model); stock through the Phase 10 ledger, costing through the journal. Confirm/complete/scrap gated.",
+  },
+  {
+    app: "Point of sale",
+    odoo: "Point of Sale",
+    owner: "phase 12",
+    model: [model("OpsPosRegister"), model("OpsPosSession"), model("OpsOrder")],
+    route: [
+      entity("pos-registers"),
+      entity("pos-sessions"),
+      file("app/api/ops/pos/sessions/[id]/sales/route.ts"),
+      file("app/api/ops/pos/sessions/[id]/quote/route.ts"),
+      file("app/api/ops/pos/terminal/route.ts"),
+      file("app/api/ops/pos/orders/[id]/receipt/route.ts"),
+    ],
+    page: [page("pos"), file("app/dashboard/ops/pos/till/[sessionId]/page.tsx")],
+    test: [test("lib/ops/__tests__/p12-pos.test.ts"), test("lib/ops/__tests__/p12-pos-db.test.ts")],
+    note: "Sales are OpsOrders (source pos) priced by the storefront's priceCart; offline queue keyed by client order id; session close posts one balanced entry (gated). Stripe Terminal unverified live (REST adapter + labelled mock).",
+  },
   // --- Not built yet (owner decision: Phase 12 / later) ---
   ...(
     [
-      ["Manufacturing", "Manufacturing", "phase 12"],
-      ["Point of sale", "Point of Sale", "phase 12"],
       ["Payroll", "Payroll", "phase 12"],
       ["Events", "Events", "phase 12"],
     ] as const
@@ -284,9 +319,12 @@ function walk(dir: string, out: string[] = []): string[] {
 
 export function loadCtx(root = ROOT): Ctx {
   const schema = readFileSync(join(root, "prisma/schema.prisma"), "utf8");
-  const entities = readFileSync(join(root, "lib/ops/entities.ts"), "utf8");
-  const entitySlugs = new Set([...entities.matchAll(/^\s*slug:\s*"([a-z0-9-]+)"/gm)].map((m) => m[1]!));
   const files = ["app", "lib", "components", "tests"].flatMap((d) => walk(join(root, d)));
+  // Phase 12 (mfgpos): entity defs also live in lib/ops/<area>/entities.ts
+  // (spread into OPS_ENTITIES), so every registry file is read.
+  const registries = ["lib/ops/entities.ts", ...files.filter((f) => /^lib\/ops\/[a-z-]+\/entities\.ts$/.test(f))];
+  const entities = registries.map((f) => readFileSync(join(root, f), "utf8")).join("\n");
+  const entitySlugs = new Set([...entities.matchAll(/^\s*slug:\s*"([a-z0-9-]+)"/gm)].map((m) => m[1]!));
   return { schema, entitySlugs, files };
 }
 

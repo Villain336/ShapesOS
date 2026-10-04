@@ -68,6 +68,12 @@ export const KNOWN_ACTION_DEFS: ReadonlyArray<{ action: string; label: string; d
   { action: "import_commerce_data", label: "Import store data", description: "Pull products, stock, orders and customers from a connected store into Ops. Always asks." },
   { action: "update_store_inventory", label: "Update store stock", description: "Set stock levels on a connected online store. Always asks." },
   { action: "post_to_accounting", label: "Post to accounting software", description: "Export invoices, bills, payments and journals to QuickBooks or Xero. Never automated." },
+  // Phase 12 (mfgpos): manufacturing + point of sale (lib/chat/ops-mfgpos-tools.ts).
+  { action: "draft_manufacturing_order", label: "Draft a manufacturing order", description: "Create a draft manufacturing order (confirming and completing always ask)." },
+  { action: "confirm_manufacturing_order", label: "Confirm a manufacturing order", description: "Propose confirming a manufacturing order: components and work orders. Always asks." },
+  { action: "log_work_order_time", label: "Log time on a work order", description: "Add minutes worked to a manufacturing work order. Always asks." },
+  { action: "complete_manufacturing_order", label: "Complete a manufacturing order", description: "Propose completing a manufacturing order: stock moves and costing in the books. Never automated." },
+  { action: "close_pos_session", label: "Close a till session", description: "Propose posting a till session's takings to the books. Never automated." },
 ];
 
 

@@ -20,6 +20,9 @@
 import { z } from "zod";
 // Phase 10 (finance): accounting, quotes, purchasing and expense entities.
 import { FINANCE_ENTITIES } from "./finance/entities";
+// Phase 12 (mfgpos): manufacturing and point-of-sale entities.
+import { MFG_ENTITIES } from "./mfg/entities";
+import { POS_ENTITIES } from "./pos/entities";
 import type { Prisma } from "@prisma/client";
 
 export interface OpsGatedTransition {
@@ -1142,6 +1145,9 @@ export const OPS_ENTITIES: OpsEntityDef[] = [
   // Phase 10 (store)
   storeDef,
   storeListingDef,
+  // Phase 12 (mfgpos)
+  ...MFG_ENTITIES,
+  ...POS_ENTITIES,
 ];
 
 export const OPS_ENTITY_MAP: Record<string, OpsEntityDef> = Object.fromEntries(

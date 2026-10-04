@@ -301,7 +301,9 @@ export async function recordInventoryTxn(
   args: {
     productId: string;
     delta: number;
-    reason: "sale" | "restock" | "adjustment" | "transfer";
+    // Phase 12 (mfgpos): production (+), consumption (−) and scrap (−) rows
+    // written by manufacturing orders and scrap records.
+    reason: "sale" | "restock" | "adjustment" | "transfer" | "production" | "consumption" | "scrap";
     note?: string | null;
     /** Defaults to the acting user — callers may pass "agent:<surface>". */
     actorName?: string | null;

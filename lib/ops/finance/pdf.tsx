@@ -23,7 +23,8 @@ export interface FinanceDocLine {
 }
 
 export interface FinanceDocInput {
-  kind: "Invoice" | "Credit note" | "Quote";
+  // Phase 12 (mfgpos): + till receipts.
+  kind: "Invoice" | "Credit note" | "Quote" | "Receipt";
   number: string | null;
   issuedAt: Date | null;
   dueAt?: Date | null;
@@ -33,6 +34,8 @@ export interface FinanceDocInput {
   toDetail?: string | null;
   lines: FinanceDocLine[];
   subtotalCents: number;
+  /** Phase 12 (mfgpos): a promotion discount, shown under the subtotal. */
+  discountCents?: number;
   taxCents: number;
   totalCents: number;
   paidCents?: number;
@@ -81,7 +84,7 @@ export function buildFinanceDocument(d: FinanceDocInput): ReactElement {
           </View>
           <PdfDivider />
           <View style={{ marginTop: 8, marginBottom: 12 }}>
-            <SpanText style={MUTED}>{d.kind === "Quote" ? "Prepared for" : "Billed to"}</SpanText>
+            <SpanText style={MUTED}>{d.kind === "Quote" ? "Prepared for" : d.kind === "Receipt" ? "Sold to" : "Billed to"}</SpanText>
             <SpanText style={{ fontSize: 12 }}>{d.toName}</SpanText>
             {d.toDetail ? <SpanText style={MUTED}>{d.toDetail}</SpanText> : null}
           </View>
@@ -109,6 +112,7 @@ export function buildFinanceDocument(d: FinanceDocInput): ReactElement {
           </PdfTable>
           <View style={{ marginTop: 10 }}>
             <TotalRow label="Subtotal" value={money(d.subtotalCents)} />
+            {d.discountCents ? <TotalRow label="Discount" value={`−${money(d.discountCents)}`} /> : null}
             <TotalRow label="Tax" value={money(d.taxCents)} />
             <TotalRow label="Total" value={money(d.totalCents)} strong />
             {d.paidCents ? <TotalRow label="Paid" value={`−${money(d.paidCents)}`} /> : null}

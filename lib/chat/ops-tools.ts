@@ -40,6 +40,8 @@ import type { ToolContext, ToolDef, ToolResult } from "./tools";
 import { FINANCE_OPS_TOOLS } from "./ops-finance-tools";
 // Phase 10 (store): storefront tools (lib/chat/ops-store-tools.ts).
 import { STORE_OPS_TOOLS } from "./ops-store-tools";
+// Phase 12 (mfgpos): manufacturing + point-of-sale tools (lib/chat/ops-mfgpos-tools.ts).
+import { MFGPOS_OPS_TOOLS } from "./ops-mfgpos-tools";
 
 type Tx = Prisma.TransactionClient;
 
@@ -1018,4 +1020,6 @@ export const OPS_TOOLS: ToolDef[] = [
   ...P10_OPSCORE_TOOLS,
   // Phase 10 (store)
   ...STORE_OPS_TOOLS,
+  // Phase 12 (mfgpos)
+  ...MFGPOS_OPS_TOOLS,
 ];
