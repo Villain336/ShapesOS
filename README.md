@@ -71,7 +71,7 @@ The dashboard is organized the way the sidebar is (`lib/nav/config.ts`). Everyth
 
 ## Quickstart (local dev)
 
-Requirements: Node 22 (see `.nvmrc`) and a Postgres 16 you can reach. For the full Docker stack instead, see [DEPLOY.md](./DEPLOY.md) and [docs/quickstart.md](./docs/quickstart.md).
+Requirements: Node 22 (see `.nvmrc`) and a Postgres 16 with the pgvector extension (for example the `pgvector/pgvector:pg16` image). For the full Docker stack instead, see [DEPLOY.md](./DEPLOY.md) and [docs/quickstart.md](./docs/quickstart.md).
 
 ```bash
 npm ci
@@ -110,7 +110,7 @@ npx tsx scripts/verify-phase7-launch.mts                   # launch-readiness ba
 node scripts/verify-m11-security.mjs                       # security battery
 ```
 
-`mobile/` has its own package and vitest suite. CI (`.github/workflows/ci.yml`) runs install, Prisma validate, typecheck, a secret scan, unit tests, migrations on a fresh database, a schema-drift guard, DB tests as the app role, both batteries, a credential-free smoke test and a production build.
+`mobile/` has its own package and vitest suite. CI (`.github/workflows/ci.yml`) runs install, Prisma validate, typecheck, a secret scan, unit tests, migrations on a fresh database, a schema-drift guard, DB tests as the app role, both batteries, a credential-free smoke test and a production build. Two more jobs run alongside: `e2e` (the Playwright suite in `tests/e2e` against a production build, as the app role) and `compose` (validates `docker-compose.yml` and runs its `db` + `migrate` + `minio-init` services).
 
 ## Deployment
 
@@ -125,6 +125,8 @@ All documented in [.env.example](./.env.example).
 | `DEPLOYMENT_MODE` | `self_hosted` | `self_hosted`: bring your own keys, usage recorded but never blocked. `hosted`: a person's first workspace gets a 14-day, 500-credit trial behind a hard cap, then needs a plan. |
 | `SIGNUP_MODE` | `open` | `open`: any SSO sign-in without a workspace gets one. `invite`: new users need a pending invite. |
 | `TRUSTED_PROXY_HOPS` | `1` | How many reverse proxies append to `X-Forwarded-For`. Used for login lockouts and rate limits; `0` trusts no proxy header. |
+| `RATE_LIMIT_STORE` | `postgres` when `DATABASE_URL` is set, else `memory` | Where API rate limits and the login lockout count. `postgres` shares them across app replicas (falls back to in-memory if the database fails; the lockout never fails open). |
+| `MARKETR_STORAGE` | `local` (compose: `s3` on the bundled MinIO) | Where uploaded files live. Use `s3` (MinIO, S3, R2) whenever more than one app container runs. |
 | `MARKETR_PLATFORM_OPERATORS` | unset (nobody) | User ids or emails allowed to change host-wide resources (shared Knowledge corpus, Activepieces flow bindings). |
 | `ALLOW_FAKE_PROVIDERS` | `0` | Fake SMS/email/call/mail providers are the dev default but refused in production unless set to `1` for a demo install. |
 

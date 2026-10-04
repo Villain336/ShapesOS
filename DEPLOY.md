@@ -10,31 +10,61 @@ research → content → publishing → ranking → site-fix.
 
 ## 1. Recommended architecture
 
-Single VPS + Docker Compose. The repo already ships `docker-compose.yml` (Postgres 16, Redis 7, app
-with `prisma migrate deploy` on boot), so the deploy is an ops task, not a code task.
+Single VPS + Docker Compose. The repo already ships `docker-compose.yml` (Postgres 16 with
+pgvector, Redis 7, MinIO, a one-shot `migrate` service, the app and scheduled backups), so the
+deploy is an ops task, not a code task.
 
 ```
 Internet → Caddy (auto-HTTPS reverse proxy) → app:3000 (Next.js standalone)
-                                              → db:5432 (Postgres, named volume)
+                                              → db:5432 (pgvector/pgvector:pg16, named volume)
+                                              → minio:9000 (uploaded files, named volume)
                                               → redis:6379 (named volume)
 ```
 
 - **VPS:** 2 vCPU / 4 GB RAM minimum (Hetzner, DigitalOcean, or equivalent). Ubuntu 24.04.
 - **Domain:** `marketr.launchabl.com` (or similar) → A record to the VPS. Caddy handles TLS.
 - **Cron:** host-level cron `curl` hitting the two scheduled endpoints with `CRON_SECRET` bearer.
-- **Backups:** the compose `backup` service (daily `pg_dump`, retention, optional S3/MinIO upload; see `docs/ops/BACKUP-RESTORE.md`) + the `marketr-data` volume snapshotted.
+- **Backups:** the compose `backup` service (daily `pg_dump`, retention, optional S3/MinIO upload; see `docs/ops/BACKUP-RESTORE.md`) + the `marketr-minio`, `marketr-data`, `marketr-run-artifacts` and `marketr-corpus` volumes snapshotted.
 
-### 1a. Gap to fix before deploy (small code change, spec'd here)
+### 1a. Day-one defaults (Phase 6): database image, file storage, rate limits
 
-`docker-compose.yml` currently has **no volume for `.data/`** — site working copies (M7),
-fix-agent snapshots (M10), report PDFs + brand-kit logos (M12), and programmatic-SEO
-sitemaps (M17, `.data/sitemaps`, unless `SITEMAP_STORAGE_DIR` points elsewhere) live on the
-container's writable layer. They survive restarts but are lost on `compose down` / rebuild. Before deploy:
+A fresh `docker compose up -d` works with no extra steps beyond the §1b secrets. CI checks this on
+every push (`compose` job: `docker compose config`, then `db` + `migrate` must exit 0, the
+extensions and the app role must exist, and `minio-init` must create the bucket).
 
-1. Add a named volume: `marketr-data:/app/.data` on the `app` service.
-2. Set `SITE_STORAGE_DIR=/app/.data/sites`, `FIX_SNAPSHOT_DIR=/app/.data/fix-snapshots`,
-   `REPORT_STORAGE_DIR=/app/.data/reports`, and `SITEMAP_STORAGE_DIR=/app/.data/sitemaps` in `.env`.
-3. Rebuild and confirm a site working copy survives `docker compose down && docker compose up -d`.
+- **Database image: `pgvector/pgvector:pg16`.** The memory and substrate migrations run
+  `CREATE EXTENSION vector` (and `pg_trgm`, `pgcrypto`); plain `postgres:16-alpine` has no pgvector,
+  so a fresh install used to fail at that migration. `pgvector/pgvector:pg16` is the official
+  `postgres:16` (Debian) image plus pgvector, with the contrib extensions; CI uses the same image.
+  *Upgrading a volume created by `postgres:16-alpine`:* the data directory is compatible (same
+  major version), but Alpine (musl) and Debian (glibc) sort text differently, so run
+  `docker compose exec db psql -U marketr -d marketr -c 'REINDEX DATABASE marketr'` once after the
+  switch (or dump and restore with `docs/ops/BACKUP-RESTORE.md`).
+- **Uploaded files go to the bundled MinIO by default** (`MARKETR_STORAGE=s3` in compose). The
+  one-shot `minio-init` service creates the bucket (`MARKETR_S3_BUCKET`, default `marketr-files`)
+  before the app starts; the bytes live in the `marketr-minio` volume. To use AWS S3, R2 or another
+  S3-compatible store instead, set `MARKETR_S3_ENDPOINT`, `MARKETR_S3_REGION`, `MARKETR_S3_BUCKET`,
+  `MARKETR_S3_ACCESS_KEY` and `MARKETR_S3_SECRET_KEY` in `.env` (create the bucket yourself).
+  `MARKETR_STORAGE=local` keeps files on the `marketr-data` volume instead (one app container only).
+  *MinIO image:* MinIO stopped publishing pullable images (`minio/minio` and
+  `quay.io/minio/minio` refuse anonymous pulls), so compose uses Chainguard's MinIO build
+  (`chainguard/minio:latest-dev`, pinned by digest; override with `MINIO_IMAGE`). It runs as uid
+  65532. A `marketr-minio` volume written by an older root-run MinIO needs
+  `docker compose run --rm --user 0 --entrypoint chown minio -R 65532:65532 /data` once.
+  *Moving existing local files into the bucket:* the storage keys are the same UUIDs in both
+  backends, so copy `/app/.data/workspace-files/*` into the bucket as-is (for example with `mc cp`).
+- **Everything else on disk has a named volume.** `marketr-data` → `/app/.data` (report and brief
+  PDFs, brand logos, site working copies, fix-agent snapshots, sitemaps, the scheduler fallback
+  store, local-mode files), `marketr-run-artifacts` → `/app/.run-artifacts` (agent run recordings),
+  `marketr-corpus` → `/app/data` (the knowledge corpus). The `*_STORAGE_DIR` variables keep their
+  defaults under `/app/.data`; no `.env` changes are needed.
+- **Rate limits and the login lockout are shared in Postgres** (`RATE_LIMIT_STORE=postgres`, the
+  default whenever `DATABASE_URL` is set): one global `rate_limit_buckets` table, so the limits hold
+  when several app containers run. If the database errors or takes over a second, API rate limits
+  fall back to the per-process in-memory limiter, and the login lockout falls back to the in-memory
+  lockout (it never fails open). `RATE_LIMIT_STORE=memory` restores the per-process behaviour.
+  Clear a lockout with
+  `docker compose exec db psql -U marketr -d marketr -c "DELETE FROM rate_limit_buckets WHERE key LIKE 'login:%'"`.
 
 ### 1b. Database role, required secrets, and bound ports (Phase 1 hardening)
 
@@ -104,8 +134,8 @@ them over via the Secure Vault flow and Z7 writes them server-side.
 3. **Code:** `git clone` the vault repo to `/opt/marketr` (local-only remote — this stays private;
    no GitHub remote is created).
 4. **Env:** copy `.env.example` → `.env`, fill §2 items 3–9. `chmod 600 .env`.
-5. **Data volume fix:** apply §1a, set the §1b secrets, then `docker compose up -d --build`.
-6. **Migrations:** watch the `migrate` service logs — `npx prisma migrate deploy` must apply all migrations cleanly
+5. **Start:** set the §1b secrets, then `docker compose up -d --build` (§1a covers what the defaults do).
+6. **Migrations:** watch the `migrate` service logs — `scripts/db/migrate.sh` (`prisma migrate deploy`) must apply all migrations cleanly
    and the app role must be created (§1b)
    (`..._init` → `..._studio_domains`). The M15 (`..._backlinks_internal_links`), M16
    (`..._local_seo`), M17 (`..._programmatic_seo`), M18 (`..._content_autopilot`), M19

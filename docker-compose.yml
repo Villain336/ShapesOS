@@ -3,6 +3,13 @@
 # App: http://127.0.0.1:3000 (put a TLS reverse proxy in front; see DEPLOY.md).
 # Postgres and Redis are not published; MinIO binds to 127.0.0.1 only.
 #
+# Day-one defaults (Phase 6): Postgres is the pgvector image (the memory and
+# substrate migrations create the `vector` extension; pg_trgm/pgcrypto ship
+# with it), uploaded files go to the bundled MinIO (bucket created by the
+# one-shot `minio-init`), the remaining on-disk state has named volumes, and
+# the API rate limits + login lockout are kept in Postgres
+# (RATE_LIMIT_STORE=postgres) so they hold if you run more than one app.
+#
 # Required in .env (compose refuses to start without them — no literal
 # defaults ship): POSTGRES_PASSWORD, APP_DB_PASSWORD, MINIO_ROOT_PASSWORD.
 # Use hex values (`openssl rand -hex 32`) — they are embedded in URLs.
@@ -14,7 +21,10 @@
 
 services:
   db:
-    image: postgres:16-alpine
+    # pgvector/pgvector:pg16 = the official postgres:16 image + pgvector. Plain
+    # postgres:16-alpine has no `vector`, and the migrations need it (plus
+    # pg_trgm and pgcrypto, which are in the image's contrib). Same image as CI.
+    image: pgvector/pgvector:pg16
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-marketr}
@@ -40,10 +50,18 @@ services:
       retries: 5
 
   # Phase B (W3): S3-compatible object storage for the workspace filesystem.
-  # Local disk is single-box only — multi-instance deployments must set
-  # MARKETR_STORAGE=s3 with the credentials below.
+  # Phase 6: the app uses it by default (MARKETR_STORAGE=s3 below), so
+  # uploads live in the marketr-minio volume and survive rebuilds.
+  #
+  # Image: MinIO no longer publishes pullable images (minio/minio and
+  # quay.io/minio/minio refuse anonymous pulls as of 2026-10, so the old
+  # `minio/minio:RELEASE.…` pin broke every fresh `docker compose up`).
+  # Chainguard builds MinIO from source and publishes it free; the -dev
+  # variant carries `mc`, `sh` and `wget`, which the healthcheck and
+  # minio-init below use. Pinned by digest; set MINIO_IMAGE to override
+  # (e.g. your own MinIO build or a newer digest). Runs as uid 65532.
   minio:
-    image: minio/minio:RELEASE.2026-01-01T00-00-00Z
+    image: ${MINIO_IMAGE:-chainguard/minio:latest-dev@sha256:7c248c1d7832ff65a6345cb6ff7bf9cf081ccf88527f8d6f25bb9227801a5121}
     restart: unless-stopped
     command: server /data --console-address ":9001"
     environment:
@@ -55,10 +73,30 @@ services:
     volumes:
       - marketr-minio:/data
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      # MinIO's unauthenticated liveness endpoint (busybox wget in the image).
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:9000/minio/health/live"]
       interval: 10s
       timeout: 5s
       retries: 5
+
+  # One-shot: create the files bucket (idempotent) before the app starts.
+  # Reuses the minio image for its bundled `mc` client — no extra image.
+  minio-init:
+    image: ${MINIO_IMAGE:-chainguard/minio:latest-dev@sha256:7c248c1d7832ff65a6345cb6ff7bf9cf081ccf88527f8d6f25bb9227801a5121}
+    restart: "no"
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-marketr}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD in .env (openssl rand -hex 32)}
+      MARKETR_S3_BUCKET: ${MARKETR_S3_BUCKET:-marketr-files}
+    entrypoint: ["sh", "-c"]
+    command:
+      - >-
+        mc --config-dir /tmp/mc alias set shapes http://minio:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD" &&
+        mc --config-dir /tmp/mc mb --ignore-existing "shapes/$$MARKETR_S3_BUCKET" &&
+        echo "bucket $$MARKETR_S3_BUCKET ready"
 
   # One-shot migrator: repairs renamed-migration history, applies all pending
   # migrations, then creates/refreshes the least-privilege app role. The app
@@ -99,6 +137,8 @@ services:
         condition: service_completed_successfully
       redis:
         condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
     ports:
       # Loopback only: a host reverse proxy (Caddy) terminates TLS in front.
       # Set APP_BIND_ADDR=0.0.0.0 to expose the app port directly.
@@ -110,14 +150,26 @@ services:
       # the superuser (superusers bypass FORCE ROW LEVEL SECURITY).
       DATABASE_URL: postgresql://${APP_DB_USER:-marketr_app}:${APP_DB_PASSWORD:?set APP_DB_PASSWORD in .env}@db:5432/${POSTGRES_DB:-marketr}?schema=public
       REDIS_URL: redis://redis:6379
-      # Phase B (W3) filesystem: local disk by default; set MARKETR_STORAGE=s3
-      # to use the MinIO service above (multi-instance deployments must).
-      MARKETR_STORAGE: ${MARKETR_STORAGE:-local}
+      # Workspace files (Phase 6): the bundled MinIO by default. Point the
+      # MARKETR_S3_* values at S3/R2 to use those instead; MARKETR_STORAGE=local
+      # keeps files on the marketr-data volume (single app container only).
+      MARKETR_STORAGE: ${MARKETR_STORAGE:-s3}
       MARKETR_S3_ENDPOINT: ${MARKETR_S3_ENDPOINT:-http://minio:9000}
       MARKETR_S3_REGION: ${MARKETR_S3_REGION:-us-east-1}
       MARKETR_S3_BUCKET: ${MARKETR_S3_BUCKET:-marketr-files}
-      MARKETR_S3_ACCESS_KEY: ${MINIO_ROOT_USER:-marketr}
-      MARKETR_S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD in .env}
+      MARKETR_S3_ACCESS_KEY: ${MARKETR_S3_ACCESS_KEY:-${MINIO_ROOT_USER:-marketr}}
+      MARKETR_S3_SECRET_KEY: ${MARKETR_S3_SECRET_KEY:-${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD in .env}}
+      # Rate limits + login lockout shared in Postgres (lib/api/rate-limit-store.ts).
+      RATE_LIMIT_STORE: ${RATE_LIMIT_STORE:-postgres}
+    volumes:
+      # On-disk state that is not in the files bucket: report/brief PDFs,
+      # brand logos, site working copies, fix snapshots, sitemaps, scheduler
+      # fallback (.data); agent run recordings (.run-artifacts); the shared
+      # knowledge corpus (data/corpus). The runner image pre-creates these
+      # owned by the app user, so the named volumes start writable.
+      - marketr-data:/app/.data
+      - marketr-run-artifacts:/app/.run-artifacts
+      - marketr-corpus:/app/data
 
   # Phase 4a: scheduled database backups (scripts/ops/backup.sh --loop).
   # pg_dump custom format into the marketr-backups volume every
@@ -154,3 +206,6 @@ volumes:
   marketr-redis:
   marketr-minio:
   marketr-backups:
+  marketr-data:
+  marketr-run-artifacts:
+  marketr-corpus:

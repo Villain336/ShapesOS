@@ -57,6 +57,12 @@ ENV NODE_ENV=production
 ARG MARKETR_GIT_COMMIT=""
 ENV MARKETR_GIT_COMMIT=$MARKETR_GIT_COMMIT
 RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nextjs
+# Runtime state directories (compose mounts named volumes here). Created and
+# owned by the app user so a fresh named volume inherits that ownership and is
+# writable: .data (reports, logos, site copies, local files), .run-artifacts
+# (agent run recordings), data/corpus (knowledge corpus).
+RUN mkdir -p /app/.data /app/.run-artifacts /app/data/corpus \
+ && chown -R nextjs:nodejs /app/.data /app/.run-artifacts /app/data
 COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static

@@ -25,9 +25,10 @@ cp .env.example .env
 openssl rand -base64 32   # → NEXTAUTH_SECRET / AUTH_SECRET
 openssl rand -base64 24   # → ADMIN_PASSWORD (min 20 chars)
 
-# 4. Database (1–2 min). Skip the docker run if you already have Postgres 16.
+# 4. Database (1–2 min). Skip the docker run if you already have Postgres 16
+#    with the pgvector extension installed (the migrations need it).
 docker run -d --name shapes-pg -e POSTGRES_USER=shapes -e POSTGRES_PASSWORD=shapes \
-  -e POSTGRES_DB=shapes -p 127.0.0.1:5433:5432 postgres:16-alpine
+  -e POSTGRES_DB=shapes -p 127.0.0.1:5433:5432 pgvector/pgvector:pg16
 # Migrate as the schema owner…
 DATABASE_URL="postgresql://shapes:shapes@localhost:5433/shapes?schema=public" npm run db:migrate
 # …then create the least-privilege role the app runs as. The app must not
