@@ -37,11 +37,11 @@ export default async function RadarPage({ params }: { params: Promise<{ id: stri
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <Link href={`/dashboard/projects/${project.id}`} className="text-sm text-zinc-500 hover:text-zinc-600">
+        <Link href={`/dashboard/projects/${project.id}`} className="text-sm text-muted hover:text-ink">
           ← {project.domain}
         </Link>
-        <h1 className="mt-1 text-xl font-bold tracking-tight text-ink">Competitor radar</h1>
-        <p className="mt-1 text-sm text-zinc-500">
+        <h1 className="mt-1 text-xl font-heading stretch-heading tracking-heading text-ink">Competitor radar</h1>
+        <p className="mt-1 text-sm text-muted">
           Weekly movement digest: new competitor keywords, ranking gains, new pages, and head-to-head losses.
           {unread > 0 ? ` ${unread} unread.` : " All caught up."}
         </p>

@@ -1,6 +1,6 @@
 // Marketr — community engagement client (Phase 10 M8).
 // Tabs: [Opportunity queue] [Posted outcomes] [Sources & setup].
-// House style: dense tables, violet primaries, Lucide only, #FAFAF7 shell.
+// House style: Agentic OS (docs/design/DESIGN.md) — dense tables, black primaries, Lucide only, canvas shell.
 
 "use client";
 
@@ -246,7 +246,7 @@ function QueueTab() {
         behalf. Drafts failing the taste check never reach the inbox.
       </div>
 
-      <details className="rounded-lg border border-line bg-white px-3 py-2">
+      <details className="rounded-lg border border-line bg-paper px-3 py-2">
         <summary className="cursor-pointer text-[13px] font-medium text-muted">
           RSS feeds for this scan (optional)
         </summary>
@@ -314,7 +314,7 @@ function QueueTab() {
           Loading opportunity queue…
         </div>
       ) : filtered.length === 0 ? (
-        <div className="flex flex-col items-center gap-2 rounded-lg border border-line bg-white px-6 py-12 text-center">
+        <div className="flex flex-col items-center gap-2 rounded-lg border border-line bg-paper px-6 py-12 text-center">
           <MessagesSquare size={28} className="text-subtle" />
           <div className="text-[14px] font-semibold text-ink">Queue is empty</div>
           <div className="max-w-[360px] text-[13px] text-muted">
@@ -323,7 +323,7 @@ function QueueTab() {
           </div>
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-line bg-white">
+        <div className="overflow-x-auto rounded-lg border border-line bg-paper">
           <table className="w-full min-w-[860px] text-left text-[13px]">
             <thead>
               <tr className="border-b border-line text-xs font-semibold text-muted">
@@ -471,7 +471,7 @@ function OutcomesTab() {
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="rounded-lg border border-line bg-white p-3">
+      <div className="rounded-lg border border-line bg-paper p-3">
         <div className="mb-2 text-[13px] font-semibold text-ink">
           Record a posted outcome
         </div>
@@ -543,7 +543,7 @@ function OutcomesTab() {
           Loading outcomes…
         </div>
       ) : outcomes.length === 0 ? (
-        <div className="flex flex-col items-center gap-2 rounded-lg border border-line bg-white px-6 py-12 text-center">
+        <div className="flex flex-col items-center gap-2 rounded-lg border border-line bg-paper px-6 py-12 text-center">
           <BarChart3 size={28} className="text-subtle" />
           <div className="text-[14px] font-semibold text-ink">No posted outcomes yet</div>
           <div className="max-w-[360px] text-[13px] text-muted">
@@ -551,7 +551,7 @@ function OutcomesTab() {
           </div>
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-line bg-white">
+        <div className="overflow-x-auto rounded-lg border border-line bg-paper">
           <table className="w-full min-w-[760px] text-left text-[13px]">
             <thead>
               <tr className="border-b border-line text-xs font-semibold text-muted">
@@ -619,7 +619,7 @@ function SourcesTab() {
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="rounded-lg border border-line bg-white p-4">
+      <div className="rounded-lg border border-line bg-paper p-4">
         <div className="flex items-center gap-2">
           <SourceBadge source="hacker_news" />
           <span className="text-[14px] font-semibold text-ink">Hacker News</span>
@@ -633,7 +633,7 @@ function SourcesTab() {
         </p>
       </div>
 
-      <div className="rounded-lg border border-line bg-white p-4">
+      <div className="rounded-lg border border-line bg-paper p-4">
         <div className="flex items-center gap-2">
           <SourceBadge source="reddit" />
           <span className="text-[14px] font-semibold text-ink">Reddit</span>
@@ -651,14 +651,14 @@ function SourcesTab() {
         </div>
       </div>
 
-      <div className="rounded-lg border border-line bg-white p-4">
+      <div className="rounded-lg border border-line bg-paper p-4">
         <div className="flex items-center gap-2">
           <SourceBadge source="rss" />
           <span className="text-[14px] font-semibold text-ink">Niche forums (RSS)</span>
         </div>
         <p className="mt-2 text-[13px] text-muted">
           Paste forum/community feed URLs below — one per line, optionally as{" "}
-          <code className="rounded bg-hover px-1 text-[12px]">Name | https://…/rss</code>.
+          <code className="rounded-key bg-hover px-1 font-mono text-[12px]">Name | https://…/rss</code>.
           They’re sent with each scan (Discourse, NodeBB, Flarum, Substack feeds all work).
         </p>
         <textarea
