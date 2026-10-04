@@ -1,7 +1,7 @@
 // Marketr — hosting connections API (milestone 9).
 //
 // GET  /api/hosting/connections?projectId=… → { connections: [{ id, name, target, tokenHint, demo, createdAt }] }
-// POST /api/hosting/connections { projectId, target: "vercel"|"cloudflare-pages", name, token, projectId?, teamId?, accountId?, projectName?, demo? }
+// POST /api/hosting/connections { projectId, target: "vercel"|"cloudflare-pages"|"netlify", name, token, vercelProjectId?, teamId?, accountId?, projectName?, siteId?, demo? }
 //   → { ok, connection: { id, name, target, mock } }
 //
 // Tokens are AES-256-GCM encrypted before storage (lib/deploy) and are never
@@ -15,14 +15,13 @@ import { requireProjectRole, forbidden } from "@/lib/authz";
 import { ownedProject, readJsonBody } from "@/lib/sitefiles/api";
 import { prisma } from "@/lib/prisma";
 import {
+  buildDeployTarget,
   decryptHostingConfig,
+  deployTargetEnum,
+  deployTargetSlug,
   encryptHostingConfig,
   maskedTokenHint,
 } from "@/lib/deploy";
-import { VercelDeployTarget } from "@/lib/deploy/vercel";
-import { CloudflarePagesDeployTarget } from "@/lib/deploy/cloudflare";
-import { MockVercelDeployTarget } from "@/lib/deploy/mock-vercel";
-import { MockCloudflarePagesDeployTarget } from "@/lib/deploy/mock-cloudflare";
 
 interface CreateBody {
   projectId?: string;
@@ -33,13 +32,13 @@ interface CreateBody {
   teamId?: string;
   accountId?: string;
   projectName?: string;
+  /** Phase 9: Netlify site id (optional). */
+  siteId?: string;
   demo?: boolean;
 }
 
 function targetEnum(target: string): DeployTargetType {
-  if (target === "vercel") return DeployTargetType.vercel;
-  if (target === "cloudflare-pages") return DeployTargetType.cloudflare_pages;
-  throw new Error(`Unknown deploy target "${target}".`);
+  return DeployTargetType[deployTargetEnum(target)];
 }
 
 export async function GET(req: NextRequest) {
@@ -62,7 +61,7 @@ export async function GET(req: NextRequest) {
       return {
         id: c.id,
         name: c.name,
-        target: c.target === DeployTargetType.vercel ? "vercel" : "cloudflare-pages",
+        target: deployTargetSlug(c.target),
         tokenHint: maskedTokenHint(c.configEnc),
         demo,
         createdAt: c.createdAt.toISOString(),
@@ -99,32 +98,20 @@ export async function POST(req: NextRequest) {
   const demo = body.demo === true;
   const config: Record<string, unknown> = { demo };
   try {
+    const token = (body.token ?? "").trim();
+    let cfg: Record<string, unknown>;
     if (target === DeployTargetType.vercel) {
-      const cfg = {
-        token: (body.token ?? "").trim(),
-        projectId: (body.vercelProjectId ?? "").trim(),
-        teamId: (body.teamId ?? "").trim(),
-        demo,
-      };
-      if (!demo && !cfg.token) throw new Error("A Vercel token is required.");
-      const t = demo ? new MockVercelDeployTarget(cfg) : new VercelDeployTarget(cfg);
-      await t.test();
-      Object.assign(config, cfg);
+      cfg = { token, projectId: (body.vercelProjectId ?? "").trim(), teamId: (body.teamId ?? "").trim(), demo };
+      if (!demo && !token) throw new Error("A Vercel token is required.");
+    } else if (target === DeployTargetType.netlify) {
+      cfg = { token, siteId: (body.siteId ?? "").trim(), demo };
+      if (!demo && !token) throw new Error("A Netlify access token is required.");
     } else {
-      const cfg = {
-        token: (body.token ?? "").trim(),
-        accountId: (body.accountId ?? "").trim(),
-        projectName: (body.projectName ?? "").trim(),
-        demo,
-      };
-      if (!demo && (!cfg.token || !cfg.accountId))
-        throw new Error("A Cloudflare token and account id are required.");
-      const t = demo
-        ? new MockCloudflarePagesDeployTarget(cfg)
-        : new CloudflarePagesDeployTarget(cfg);
-      await t.test();
-      Object.assign(config, cfg);
+      cfg = { token, accountId: (body.accountId ?? "").trim(), projectName: (body.projectName ?? "").trim(), demo };
+      if (!demo && (!token || !cfg.accountId)) throw new Error("A Cloudflare token and account id are required.");
     }
+    await buildDeployTarget(deployTargetSlug(target), cfg).test();
+    Object.assign(config, cfg);
   } catch (err) {
     return Response.json(
       { error: err instanceof Error ? err.message : "Connection test failed" },
