@@ -32,6 +32,10 @@ export NEXTAUTH_URL="$E2E_BASE_URL"
 export NEXTAUTH_SECRET="${NEXTAUTH_SECRET:-e2e-nextauth-secret-please-change}"
 export MARKETR_CREDENTIALS_KEY="${MARKETR_CREDENTIALS_KEY:-$(openssl rand -hex 32)}"
 export E2E_MOCK_OAUTH=1
+# Phase 11 (conncore): `next start` is NODE_ENV=production, where fake /
+# mock connectors now say "not connected" (lib/connectors/no-fakes.ts). The
+# E2E install is a labelled demo install, so it opts in like one.
+export ALLOW_FAKE_PROVIDERS="${ALLOW_FAKE_PROVIDERS:-1}"
 export E2E_MOCK_OAUTH_CLIENT_ID="${E2E_MOCK_OAUTH_CLIENT_ID:-e2e-mock-client}"
 export E2E_MOCK_OAUTH_CLIENT_SECRET="${E2E_MOCK_OAUTH_CLIENT_SECRET:-e2e-mock-secret}"
 export LLM_API_KEY="${LLM_API_KEY:-e2e-no-llm}"

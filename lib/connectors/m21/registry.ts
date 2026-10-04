@@ -222,6 +222,7 @@ export function listBuiltinConnectors(): BuiltinConnectorMeta[] {
 // ports, lib/intelligence/gsc/api.ts), so the import graph stays
 // server-side only.
 import type { ConnectorAdapter } from "./types";
+import { withNoFakesGuard } from "./no-fakes";
 import { GoogleSearchConsoleAdapter } from "./native/google-search-console";
 import { Ga4Adapter } from "./native/ga4";
 import { WordPressM21Adapter } from "./native/wordpress";
@@ -259,7 +260,8 @@ const ADAPTER_CLASSES: Record<string, () => ConnectorAdapter> = {
 export function resolveAdapter(key: string): ConnectorAdapter {
   const make = ADAPTER_CLASSES[key];
   if (!make) throw new Error(`Unknown built-in connector key: ${key}`);
-  return make();
+  // Phase 11 (conncore): production never returns labelled mock data.
+  return withNoFakesGuard(make());
 }
 
 // ---------------------------------------------------------------------------
