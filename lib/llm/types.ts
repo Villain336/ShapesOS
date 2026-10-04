@@ -140,6 +140,12 @@ export interface ChatRequest {
   signal?: AbortSignal;
   /** Metering context; see ChatUsageContext. */
   usage?: ChatUsageContext;
+  /**
+   * Phase 8: ask for server-side context compaction where the model offers it
+   * (Anthropic compaction beta). Where it is not offered nothing is sent and
+   * meta.compaction stays unset — the caller compacts client-side instead.
+   */
+  compaction?: boolean;
 }
 
 // ── chat(): response ────────────────────────────────────────────────────────
@@ -167,6 +173,8 @@ export interface ChatResponseMeta {
   serverToolsSent: ChatServerTool[];
   /** Request features that were adjusted or not applied, in plain words. */
   notes: string[];
+  /** Phase 8: "server" when the provider compacts the context itself. */
+  compaction?: "server";
 }
 
 export interface ChatResponse {

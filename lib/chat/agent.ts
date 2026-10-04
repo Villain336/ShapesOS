@@ -1,11 +1,13 @@
-// Marketr — AI chat agent loop (redesign §3a).
+// Marketr — AI chat agent (redesign §3a; Phase 8: native agent loop).
 //
-// Prompt-engineered tool-calling over the tool catalog in ./tools:
-//   1. Build project context (domain, keywords, rankings, alerts, reports, workflows).
-//   2. Ask the model to reply EITHER with plain text OR a single JSON block:
-//        {"tool_calls":[{"tool":"...","args":{...}}]}
-//   3. Parse defensively, execute allowlisted tools, feed results back,
-//      loop at most 6 iterations, then produce the final answer.
+// A chat turn:
+//   1. Build project context (domain, keywords, rankings, alerts, reports,
+//      workflows), company intelligence, skills and attachments into ONE
+//      stable system prompt, plus the thread's recent history.
+//   2. Run the native agent loop (lib/agents/loop.ts): Phase 7 chat() with
+//      native tools, streaming, caching, adaptive thinking, compaction, and
+//      step / time / cost caps (no JSON-in-text, no fixed 6 iterations).
+//   3. Enforce the workspace's style rules on the final text (fail-closed).
 //   4. Persist every turn as AiChatMessage rows (user / assistant / tool).
 //
 // CONFIRMATION GATE: destructive/publish/spend tools NEVER execute from a
@@ -13,18 +15,19 @@
 // confirmation; the proposal is stored in the assistant message's toolCalls
 // JSON with status "pending_confirmation". Only when the next user message
 // matches /^(yes|confirm|do it|go ahead|approved)/i does the tool execute —
-// with the confirmation recorded in the audit log.
+// with the confirmation recorded in the audit log — and (Phase 8) the model
+// then carries on from the same transcript with the real result.
 //
-// MOCK MODE: when llmStatus() shows no live provider, a deterministic
+// MOCK MODE: when the agent's workload has no live provider, a deterministic
 // rule-based router handles slash commands so the page is fully demonstrable.
 //
-// PHASE 5 — the four agent controls, enforced here on the server:
+// PHASE 5 — the four agent controls, enforced on the server:
 //   * Hand a task to one sub-agent: a thread carries its agent (lead or a
 //     sub-agent) and every turn runs AS that agent (its role prompt, its
 //     tools); the lead can hand work off with delegate_to_subagent, which
 //     runs the sub-agent as a child AgentRun (parentRunId).
 //   * Limit a task's tools: the thread's grant (lib/agents/grants.ts) filters
-//     the catalog the model sees AND executeTool / resolveConnectorTool
+//     the tools the model is given AND executeTool / resolveConnectorTool
 //     refuse anything outside it (status "denied", audited). A child's grant
 //     is always inside its parent's.
 //   * Stop: runTrackedAgentTurn records each turn as an AgentRun; the loop
@@ -34,23 +37,27 @@
 //   * Auto-approve: a per-agent rule (lib/automation/policy.ts) may let a
 //     Tier 0/1 action run without the "yes" — Tier 2/3 and destructive tools
 //     always ask, whatever the rule says.
+//
+// PHASE 8 — durable runs: a turn still working after AGENT_INLINE_BUDGET_SECONDS
+// hands off to the agent worker at its next step boundary (the transcript is
+// saved after every step); build-mode turns go to the worker straight away.
+// The request answers `queued` and the run keeps streaming its events.
 
 import { prisma } from "@/lib/prisma";
 import type { WorkspaceRole } from "@prisma/client";
-import { roleAtLeast } from "@/lib/authz";
-import { getLlmProviderFor, llmStatus } from "@/lib/llm";
+import { getLlmProviderFor } from "@/lib/llm";
+import { workloadForAgent } from "@/lib/llm/router";
+import type { ChatMessage, ChatToolResultBlock } from "@/lib/llm/types";
+import { getTool, registerExtraTool, type ToolContext, type ToolDef } from "./tools";
 import {
-  allTools,
-  getTool,
-  registerExtraTool,
-  toolAction,
-  toolCatalogForPrompt,
-  toolGranted,
-  toolGroup,
-  type ToolContext,
-  type ToolDef,
-  type ToolResult,
-} from "./tools";
+  DELEGATE_TOOL,
+  executeTool,
+  proposalText,
+  runEvent,
+  stopRequested,
+  type ChatToolCall,
+  type LoopContext,
+} from "./tool-exec";
 import {
   AGENT_MAX_GROUPS,
   TOOL_GROUP_LABELS,
@@ -61,20 +68,42 @@ import {
   type ToolGroup,
 } from "@/lib/agents/grants";
 import { subAgentSystemPrompt } from "@/lib/agents/roles";
-import { autoApprovalFor } from "@/lib/automation/policy";
 import {
   appendAgentRunEvent,
   createAgentRun,
   finishAgentRun,
-  isAgentRunCancelRequested,
+  getAgentRun,
   markAgentRunRunning,
 } from "@/lib/agents/runs/service";
-import { abortRun, isRunStopped, registerRunAbort, releaseRunAbort, RunStoppedError } from "@/lib/agents/runs/abort";
+import {
+  abortRun,
+  abortRunWith,
+  isLeaseLost,
+  isRunStopped,
+  LeaseLostError,
+  registerRunAbort,
+  releaseRunAbort,
+  RunStoppedError,
+} from "@/lib/agents/runs/abort";
 import { expireApprovalsForStoppedRun } from "@/lib/integrations/actions/gate";
 import { getEnabledProjectSkills } from "@/lib/skills/service";
 import { skillManifestSection } from "@/lib/skills/disclosure";
-import { connectorToolsSection, resolveConnectorTool } from "./connector-tools";
+import { connectorChatTools } from "./connector-tools";
 import { captureEpisode } from "@/lib/agents/learning/capture";
+import {
+  initialLoopState,
+  isLoopState,
+  loopLimitsFromEnv,
+  runAgentLoop,
+  STOPPED_TEXT,
+  toolResultFor,
+  type AgentLoopResult,
+  type LoopState,
+  type StreamGuard,
+} from "@/lib/agents/loop";
+import { prismaTranscriptStore } from "@/lib/agents/runs/transcript";
+import { cancelAgentJobsForRun, enqueueAgentJob } from "@/lib/agents/queue/store";
+import { inlineBudgetMs } from "@/lib/agents/queue/config";
 // Phase 10 M9: Expert Constitution Pack v1 — the Chief Strategy Agent's
 // system-prompt layer (global hard rules + CSA constitution), wired in
 // front of all project context and retrieval grounding.
@@ -84,7 +113,9 @@ import { constitutionSystemPrompt } from "@/lib/expert/constitution";
 // enforcement on the delivery path.
 import { buildIntelligenceContext } from "@/lib/intelligence/company/prompt-context";
 import {
+  checkOutputAgainstRules,
   enforceStyleRules,
+  loadActiveStyleRules,
   StyleRuleBlockedError,
 } from "@/lib/intelligence/enforce";
 // Phase 12: Agency-Agents persona seeds (MIT, original distillations) as
@@ -98,7 +129,10 @@ import {
   type PersonaId,
 } from "@/lib/expert/personas";
 
-const MAX_ITERATIONS = 6;
+export { DELEGATE_TOOL, type ChatToolCall } from "./tool-exec";
+
+/** Thread messages (user + assistant text) a live turn sees as history. */
+const HISTORY_MESSAGES = 20;
 
 /**
  * Phase 12: selectable advisor personas for the Chief Strategy Agent.
@@ -136,32 +170,6 @@ export async function advisorSystemPromptFor(
     await personaSystemPromptFor(persona, workspaceId),
     `<!-- advisor provenance: ${PERSONAS[persona].provenance.repo} (${PERSONAS[persona].provenance.license}), ${PERSONAS[persona].provenance.sourceFile} -->`,
   ].join("\n\n");
-}
-
-export interface ChatToolCall {
-  tool: string;
-  args: Record<string, unknown>;
-  resultSummary?: string;
-  /**
-   * Phase 5 adds "denied" (outside the task's tool grant) and "cancelled"
-   * (the run was stopped before it ran, or a pending proposal was dropped).
-   */
-  status: "executed" | "pending_confirmation" | "error" | "skipped_role" | "denied" | "cancelled";
-  confirmed?: boolean;
-  /** Phase 5: the agent that made the call (absent = the thread's agent). */
-  agentKey?: string;
-  /** Phase 5: the grant the call was proposed under (re-checked on "yes"). */
-  grant?: string[];
-  /** Phase 5: set when a per-agent rule let it run without asking. */
-  autoApproved?: string;
-  /**
-   * Phase 5: on a pending proposal, the automation action a per-agent rule
-   * could cover (Tier 0/1 only) — the chat offers "do this without asking".
-   * Absent = this kind of action always asks.
-   */
-  autoAction?: string;
-  /** Phase 5: calls a sub-agent made inside a delegate_to_subagent call. */
-  delegated?: ChatToolCall[];
 }
 
 const CONFIRM_RE = /^(yes|confirm|do it|go ahead|approved)(\b|[.!].*)$/i;
@@ -238,7 +246,6 @@ async function buildProjectContext(projectId: string, workspaceId: string): Prom
 
 function systemPrompt(
   projectContext: string,
-  mockMode: boolean,
   supplements: string,
   intelligenceSection = "",
   agentKey: AgentKey = "lead",
@@ -260,7 +267,7 @@ function systemPrompt(
     isLead
       ? "You are ShapesOS, the lead agent (Strategist) embedded in the user's workspace. You can hand focused work to a sub-agent with delegate_to_subagent."
       : `You are the ${agentDisplayName(agentKey)} sub-agent of ShapesOS, working inside the user's workspace.`,
-    "You can ACT on the user's project using the tools below. Use read tools to ground your answers in real data; prefer a tool call over guessing.",
+    "You can ACT on the user's project with your tools. Use read tools to ground your answers in real data; prefer a tool call over guessing. Independent reads can be called together in one turn.",
     grant
       ? `This task may only use these tool groups: ${grant.map((g) => TOOL_GROUP_LABELS[g]).join(", ")}. Calls outside them are refused.`
       : "",
@@ -270,45 +277,21 @@ function systemPrompt(
     "",
     supplements,
     "",
-    "TOOLS:",
-    toolCatalogForPrompt(grant),
-    "",
-    "RESPONSE FORMAT — reply with EITHER:",
-    "  1. Plain text (when no tool is needed or when summarizing tool results), OR",
-    '  2. A SINGLE JSON block, nothing else: {"tool_calls":[{"tool":"<name>","args":{...}}]}',
-    "You may call multiple tools in one block when they are independent reads. After tool results are returned, write a plain-text summary for the user.",
-    "",
     "RULES:",
     "- Never invent data: use tools for keywords, rankings, competitors, content, alerts, scores, workflows.",
-    "- Write tools (spend/publish/destructive) and any tool requiring the editor role are held behind a confirmation gate by the runtime — you don't need to ask for confirmation yourself; just emit the tool call and the system will propose it to the user.",
+    "- Tools marked as waiting for the user's OK are held behind a confirmation gate by the runtime — don't ask for confirmation yourself; call the tool and the system proposes it to the user.",
     "- When a task matches an available skill, call the load_skill tool with its slug BEFORE acting.",
-    '- Invoke connector tools as {"tool_calls":[{"tool":"connector.<key>.<toolName>","args":{...}}]} — args must include no credential; the runtime injects it.',
+    "- Connector tools (connector__<key>__<tool>) act in the user's connected apps; never put a credential in their arguments — the runtime injects it.",
     "- Keep summaries short and concrete: what you did, the key numbers, and what to look at next.",
-    mockMode ? "- NOTE: running in mock/demonstration mode." : "",
   ]
     .filter(Boolean)
     .join("\n");
 }
 
-/**
- * Milestone 21 (part C): parallel loader for the agent supplements —
- * enabled skill manifests, bound connector tool catalog, and attached
- * file contents. Skills + data sources are per project.
- */
-async function buildAgentSupplements(
-  projectId: string,
-  workspaceId: string,
-  grant: readonly ToolGroup[] | null = null,
-): Promise<string> {
-  const [skills, connectors] = await Promise.all([
-    getEnabledProjectSkills(prisma, projectId).catch(() => []),
-    connectorToolsSection(projectId, grant).catch(() => "## CONNECTOR TOOLS\n\nUnavailable."),
-  ]);
-  return [
-    skillManifestSection(skills.map((s) => ({ name: s.name, description: s.description }))),
-    "",
-    connectors,
-  ].join("\n");
+/** Milestone 21 (part C): enabled skill manifests (connector tools are native tools now). */
+async function buildAgentSupplements(projectId: string): Promise<string> {
+  const skills = await getEnabledProjectSkills(prisma, projectId).catch(() => []);
+  return skillManifestSection(skills.map((s) => ({ name: s.name, description: s.description })));
 }
 
 const ATTACHMENT_TEXT_CAP = 50 * 1024;
@@ -362,236 +345,6 @@ async function buildAttachmentSection(
     }),
   );
   return ["## ATTACHED FILES", "", ...parts].join("\n");
-}
-
-// ---------------------------------------------------------------------------
-// JSON extraction (defensive)
-// ---------------------------------------------------------------------------
-
-function extractJsonBlock(text: string): string | null {
-  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
-  if (fenced) return fenced[1].trim();
-  // Fall back to the first balanced {…} block.
-  const start = text.indexOf("{");
-  if (start < 0) return null;
-  let depth = 0;
-  let inStr = false;
-  let esc = false;
-  for (let i = start; i < text.length; i++) {
-    const ch = text[i];
-    if (inStr) {
-      if (esc) esc = false;
-      else if (ch === "\\") esc = true;
-      else if (ch === '"') inStr = false;
-    } else if (ch === '"') {
-      inStr = true;
-    } else if (ch === "{") {
-      depth++;
-    } else if (ch === "}") {
-      depth--;
-      if (depth === 0) return text.slice(start, i + 1);
-    }
-  }
-  return null;
-}
-
-interface ParsedCalls {
-  calls: Array<{ tool: string; args: Record<string, unknown> }>;
-  ok: boolean;
-}
-
-function parseToolCalls(text: string): ParsedCalls {
-  const block = extractJsonBlock(text);
-  if (!block) return { calls: [], ok: false };
-  try {
-    const parsed = JSON.parse(block) as { tool_calls?: Array<{ tool?: string; args?: unknown }> };
-    const calls = (parsed.tool_calls ?? [])
-      .filter((c) => typeof c?.tool === "string")
-      .map((c) => ({
-        tool: c.tool as string,
-        args: c.args && typeof c.args === "object" ? (c.args as Record<string, unknown>) : {},
-      }));
-    return { calls, ok: true };
-  } catch {
-    return { calls: [], ok: false };
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Tool execution + audit
-// ---------------------------------------------------------------------------
-
-async function auditToolExecution(
-  ctx: ToolContext,
-  tool: ToolDef,
-  summary: string,
-  autoReason?: string,
-): Promise<void> {
-  await prisma.fileChangeLog
-    .create({
-      data: {
-        projectId: ctx.projectId,
-        workspaceId: ctx.workspaceId,
-        filePath: `chat:${tool.name}:${ctx.projectId}`,
-        actor: "ai",
-        action: ctx.confirmed || autoReason ? "ai_applied" : "ai_proposal",
-        summary: `[${tool.kind}] ${tool.name}: ${summary}${autoReason ? ` (${autoReason})` : ""}`.slice(0, 500),
-        // An auto-approved call was not approved by a person.
-        approvedBy: ctx.confirmed ? ctx.userId : null,
-      },
-    })
-    .catch(() => {});
-}
-
-/** Phase 5: one line on the run's timeline (never fails the turn). */
-async function runEvent(
-  ctx: ToolContext,
-  summary: string,
-  payload?: Record<string, unknown>,
-  type: "agui" | "gate" | "note" = "agui",
-): Promise<void> {
-  if (!ctx.runId) return;
-  await appendAgentRunEvent(ctx.workspaceId, ctx.runId, { type, summary: summary.slice(0, 500), payload }).catch(() => undefined);
-}
-
-/**
- * Phase 5: has this run been asked to stop? The in-process signal answers at
- * once; otherwise the database is asked (Stop may come from another process),
- * and a stop found there also aborts this process's in-flight work.
- */
-async function stopRequested(ctx: ToolContext): Promise<boolean> {
-  if (ctx.signal?.aborted) return true;
-  if (!ctx.runId) return false;
-  const asked = await isAgentRunCancelRequested(ctx.workspaceId, ctx.runId).catch(() => false);
-  if (asked) abortRun(ctx.runId);
-  return asked;
-}
-
-async function executeTool(
-  ctx: ToolContext,
-  toolName: string,
-  args: Record<string, unknown>,
-  call: ChatToolCall,
-): Promise<void> {
-  // Phase 5: a stopped run runs nothing more.
-  if (await stopRequested(ctx)) {
-    call.status = "cancelled";
-    call.resultSummary = `Not run — the task was stopped.`;
-    return;
-  }
-  if (ctx.agentKey && !call.agentKey) call.agentKey = ctx.agentKey;
-  const tool = getTool(toolName);
-  if (!tool) {
-    // Dynamic connector tools (milestone 21): connector.<key>.<toolName>.
-    if (toolName.startsWith("connector.")) {
-      const outcome = await resolveConnectorTool(toolName, ctx, args);
-      call.status = outcome.status;
-      call.resultSummary = outcome.resultSummary;
-      if (outcome.status === "pending_confirmation" && ctx.grant) call.grant = [...ctx.grant];
-      if (outcome.autoAction) call.autoAction = outcome.autoAction;
-      await runEvent(ctx, `${toolName}: ${outcome.status.replace(/_/g, " ")}`, { tool: toolName, status: outcome.status }, outcome.status === "denied" ? "gate" : "agui");
-      return;
-    }
-    call.status = "error";
-    call.resultSummary = `Unknown tool "${toolName}". Available: ${allTools()
-      .filter((t) => toolGranted(t.name, ctx.grant))
-      .map((t) => t.name)
-      .join(", ")}`;
-    return;
-  }
-  // Phase 5: the task's tool grant, checked before anything runs. The model
-  // only ever sees granted tools, so this is the backstop for a model that
-  // names a tool anyway.
-  if (!toolGranted(tool.name, ctx.grant)) {
-    const group = toolGroup(tool.name);
-    call.status = "denied";
-    call.resultSummary = `This task isn't allowed to use ${TOOL_GROUP_LABELS[group]} tools (${tool.name}).`;
-    await auditToolExecution(ctx, tool, `DENIED (outside the task's tool grant: ${group})`);
-    await runEvent(ctx, `Refused ${tool.name}: outside this task's tools`, { tool: tool.name, group }, "gate");
-    return;
-  }
-  if (!roleAtLeast(ctx.role, tool.minRole)) {
-    call.status = "skipped_role";
-    call.resultSummary = `Tool "${toolName}" needs the ${tool.minRole} role (you have ${ctx.role}).`;
-    return;
-  }
-  // Confirmation gate: non-safe tools only run after an explicit "yes" —
-  // or, Phase 5, when a per-agent auto-approve rule covers a Tier 0/1
-  // action. Destructive tools always ask.
-  let autoReason: string | undefined;
-  if (tool.kind !== "safe" && !ctx.confirmed) {
-    const decision =
-      tool.kind === "destructive"
-        ? null
-        : await autoApprovalFor(ctx.workspaceId, {
-            agentKey: ctx.agentKey ?? "lead",
-            action: toolAction(tool.name),
-            description: `${tool.name}: ${tool.description}`,
-          }).catch(() => null);
-    if (!decision?.auto) {
-      call.status = "pending_confirmation";
-      call.resultSummary = `Proposed ${tool.name} (${tool.kind}) — awaiting confirmation`;
-      if (ctx.grant) call.grant = [...ctx.grant];
-      if (decision && decision.tier <= 1) call.autoAction = toolAction(tool.name);
-      await runEvent(ctx, `Waiting for your OK: ${tool.name}`, { tool: tool.name, kind: tool.kind }, "gate");
-      return;
-    }
-    autoReason = decision.reason;
-    call.autoApproved = decision.reason;
-  }
-  try {
-    const result = await tool.execute(ctx, args);
-    call.status = "executed";
-    call.resultSummary = result.summary;
-    collectDelegated(call, result);
-    await auditToolExecution(ctx, tool, result.summary, autoReason);
-    await runEvent(ctx, `${tool.name}: ${result.summary}`, {
-      tool: tool.name,
-      ...(autoReason ? { autoApproved: autoReason } : {}),
-      ...approvalRef(result),
-    });
-  } catch (err) {
-    if (isRunStopped(err)) {
-      call.status = "cancelled";
-      call.resultSummary = "Stopped while running.";
-      return;
-    }
-    call.status = "error";
-    call.resultSummary = err instanceof Error ? err.message : `${toolName} failed`;
-    await auditToolExecution(ctx, tool, `FAILED: ${call.resultSummary}`, autoReason);
-    await runEvent(ctx, `${tool.name} failed: ${call.resultSummary}`, { tool: tool.name });
-  }
-}
-
-/** Keep the approval a tool raised on the run timeline (so Stop can expire it). */
-function approvalRef(result: ToolResult): Record<string, unknown> {
-  const d = result.details as { approvalId?: unknown } | undefined;
-  return d && typeof d.approvalId === "string" ? { approvalId: d.approvalId } : {};
-}
-
-/** delegate_to_subagent returns the sub-agent's own calls; keep them on the call. */
-function collectDelegated(call: ChatToolCall, result: ToolResult): void {
-  const d = result.details as { calls?: unknown } | undefined;
-  if (call.tool === DELEGATE_TOOL && d && Array.isArray(d.calls)) {
-    call.delegated = d.calls as ChatToolCall[];
-  }
-}
-
-function proposalText(call: ChatToolCall): string {
-  const tool = getTool(call.tool);
-  const kind = tool?.kind ?? "write";
-  const args = Object.entries(call.args)
-    .map(([k, v]) => `${k}=${JSON.stringify(v)}`)
-    .join(", ");
-  const who =
-    call.agentKey && isAgentKey(call.agentKey) && call.agentKey !== "lead"
-      ? `The ${agentDisplayName(call.agentKey)} sub-agent would like`
-      : "I'd like";
-  return [
-    `${who} to run **${call.tool}** (${kind} action)${args ? ` with ${args}` : ""}.`,
-    `${tool?.description ?? ""}`,
-    `Reply **yes** to confirm, or send a new message to cancel.`,
-  ].join("\n");
 }
 
 // ---------------------------------------------------------------------------
@@ -729,7 +482,7 @@ async function pendingProposal(threadId: string): Promise<ChatToolCall[] | null>
 }
 
 // ---------------------------------------------------------------------------
-// Main entry
+// Live turns (Phase 8: the native agent loop)
 // ---------------------------------------------------------------------------
 
 export interface AgentTurnInput {
@@ -749,6 +502,12 @@ export interface AgentTurnInput {
   runId?: string;
   /** Phase 5: aborted when the run is stopped. */
   signal?: AbortSignal;
+  /** Phase 8: "build" runs the Operator on the code workload (default: from the grant). */
+  mode?: "build" | "default";
+  /** Phase 8: hand off to the worker at a step boundary after this (epoch ms). */
+  handoffAt?: number;
+  /** Phase 8: continue the run's saved transcript (the worker sets it). */
+  resume?: boolean;
 }
 
 export interface AgentTurnOutput {
@@ -759,152 +518,219 @@ export interface AgentTurnOutput {
   cancelled?: boolean;
   /** Phase 5: true when the turn ended waiting for the user's "yes". */
   awaitingConfirmation?: boolean;
+  /** Phase 8: the turn was handed to the agent worker and is still running. */
+  queued?: boolean;
+  /** Phase 8: the turn ended in an error (the run finishes `failed`). */
+  failed?: boolean;
 }
 
-const STOPPED_TEXT = "Stopped. Nothing else will run for this task.";
-
-/** ToolContext plus the thread a delegated sub-agent writes its tool rows to. */
-type LoopContext = ToolContext & { threadId?: string };
-
-interface LoopInput {
-  ctx: LoopContext;
-  threadId: string;
-  sys: string;
-  userContent: string;
-  maxIterations: number;
+/** Phase 8: the Operator with the code group works in build mode (code workload). */
+export function turnMode(agentKey: AgentKey, grant: readonly ToolGroup[] | null): "build" | "default" {
+  return agentKey === "actor" && !!grant?.includes("code") ? "build" : "default";
 }
 
-interface LoopOutput {
-  finalText: string;
-  calls: ChatToolCall[];
-  cancelled: boolean;
-  proposal: ChatToolCall | null;
+/** The thread's recent user / assistant text, oldest first, without the current message. */
+async function threadHistory(threadId: string, current: string): Promise<ChatMessage[]> {
+  const rows = await prisma.aiChatMessage
+    .findMany({
+      where: { threadId, role: { in: ["user", "assistant"] } },
+      orderBy: { createdAt: "desc" },
+      take: HISTORY_MESSAGES + 1,
+      select: { role: true, content: true },
+    })
+    .catch(() => []);
+  if (rows[0]?.role === "user" && rows[0].content.trim() === current) rows.shift();
+  const out: ChatMessage[] = rows
+    .slice(0, HISTORY_MESSAGES)
+    .reverse()
+    .filter((r) => r.content.trim())
+    .map((r) => ({ role: r.role as "user" | "assistant", content: r.content }));
+  while (out[0]?.role === "assistant") out.shift(); // the first message must be the user's
+  return out;
 }
 
 /**
- * The live tool loop (shared by a turn and a delegated sub-agent's run).
- * Phase 5: checks for a stop before every model call (executeTool checks
- * before every tool call) and passes the run's abort signal to the model
- * call, so Stop ends it mid-flight.
+ * Phase 13B on the streaming path: block-severity BAN rules are checked
+ * against the text as it streams, so a banned phrase never reaches the live
+ * stream (require / disclaimer rules can only be judged on the final text,
+ * which enforceStyleRules checks before delivery).
  */
-async function runToolLoop({ ctx, threadId, sys, userContent, maxIterations }: LoopInput): Promise<LoopOutput> {
-  // Phase D: the chat agent loop runs on the "bulk" workload.
-  const llm = getLlmProviderFor("bulk");
-  const transcript: Array<{ role: "user" | "assistant"; content: string }> = [
-    { role: "user", content: userContent },
-  ];
-  const calls: ChatToolCall[] = [];
-  let finalText = "";
+async function styleStreamGuard(workspaceId: string): Promise<StreamGuard | undefined> {
+  const rules = await loadActiveStyleRules(workspaceId).catch(() => []);
+  const bans = rules.filter((r) => r.kind === "ban" && r.severity === "block");
+  if (bans.length === 0) return undefined;
+  return (text) => checkOutputAgainstRules(text, bans).violations.some((v) => v.severity === "block");
+}
 
-  for (let i = 0; i < maxIterations; i++) {
-    if (await stopRequested(ctx)) return { finalText: STOPPED_TEXT, calls, cancelled: true, proposal: null };
-    const prompt = [
-      sys,
-      "",
-      "CONVERSATION:",
-      ...transcript.map((m) => `${m.role === "user" ? "USER" : "ASSISTANT"}: ${m.content}`),
-      "ASSISTANT:",
-    ].join("\n");
-
-    let response: string;
-    try {
-      response = await llm.generate(prompt, ctx.signal ? { signal: ctx.signal } : undefined);
-    } catch (err) {
-      if (isRunStopped(err) || ctx.signal?.aborted) {
-        return { finalText: STOPPED_TEXT, calls, cancelled: true, proposal: null };
-      }
-      finalText = `The AI provider failed: ${err instanceof Error ? err.message : "unknown error"}. Try again, or use slash commands in mock mode.`;
-      break;
+/** Phase 13B: fail-closed style-rule enforcement on the delivery path. */
+async function enforceFinalText(text: string, workspaceId: string): Promise<string> {
+  try {
+    await enforceStyleRules(text, workspaceId);
+    return text;
+  } catch (err) {
+    if (err instanceof StyleRuleBlockedError) {
+      return (
+        `I can't deliver that response as written — it violates your style ` +
+        `rule${err.violations.length > 1 ? "s" : ""}: ` +
+        err.violations.map((v) => `"${v.pattern}" (${v.kind})`).join(", ") +
+        `. Adjust the request or the rule and try again.`
+      );
     }
-
-    const parsed = parseToolCalls(response);
-    if (!parsed.ok || parsed.calls.length === 0) {
-      finalText = response.trim();
-      break;
-    }
-
-    // Execute the tool calls.
-    const iterationCalls: ChatToolCall[] = parsed.calls.map((c) => ({
-      tool: c.tool,
-      args: c.args,
-      status: "executed" as const,
-    }));
-    const results: string[] = [];
-    let proposal: ChatToolCall | null = null;
-    let stopped = false;
-    for (const call of iterationCalls) {
-      await executeTool(ctx, call.tool, call.args, call);
-      calls.push(call);
-      if (call.status === "cancelled") {
-        stopped = true;
-        continue;
-      }
-      if (call.status === "executed") {
-        await saveMessage(threadId, "tool", call.resultSummary ?? "", [call]);
-        results.push(`TOOL RESULT (${call.tool}): ${call.resultSummary}`);
-        // A sub-agent's proposal surfaces as this turn's proposal.
-        const subProposal = call.delegated?.find((c) => c.status === "pending_confirmation");
-        if (subProposal && !proposal) proposal = subProposal;
-      } else if (call.status === "pending_confirmation") {
-        if (!proposal) proposal = call;
-        results.push(`TOOL PROPOSED (${call.tool}) — needs user confirmation, do NOT execute yet.`);
-      } else {
-        results.push(`TOOL ${call.status.toUpperCase()} (${call.tool}): ${call.resultSummary}`);
-      }
-    }
-    if (stopped || ctx.signal?.aborted) {
-      return { finalText: STOPPED_TEXT, calls, cancelled: true, proposal: null };
-    }
-    transcript.push({ role: "assistant", content: response.trim() });
-    transcript.push({ role: "user", content: results.join("\n") });
-
-    if (proposal) {
-      // Propose the FIRST pending action to the user and stop the loop.
-      // Mark the remaining proposals as skipped so nothing leaks through later.
-      for (const c of iterationCalls) {
-        if (c.status === "pending_confirmation" && c !== proposal) c.status = "error";
-        for (const d of c.delegated ?? []) {
-          if (d.status === "pending_confirmation" && d !== proposal) d.status = "error";
-        }
-      }
-      // A sub-agent's proposal is lifted to the top level so the user's
-      // "yes" finds it (pendingProposal reads top-level calls only).
-      if (!calls.includes(proposal)) calls.push(proposal);
-      return { finalText: proposalText(proposal), calls, cancelled: false, proposal };
-    }
+    // Infra failures in the checker degrade open so a broken style subsystem
+    // can't take down the whole agent; rule-compile failures are contained
+    // per-rule inside checkOutput.
+    return text;
   }
+}
 
-  return { finalText, calls, cancelled: false, proposal: null };
+/** Tool rows for the thread (executed calls, a sub-agent's included), in order. */
+async function saveToolRows(threadId: string, calls: ChatToolCall[]): Promise<void> {
+  for (const call of calls) {
+    for (const d of call.delegated ?? []) {
+      if (d.status === "executed") await saveMessage(threadId, "tool", d.resultSummary ?? "", [d]);
+    }
+    if (call.status === "executed") await saveMessage(threadId, "tool", call.resultSummary ?? "", [call]);
+  }
+}
+
+/** Turn a finished loop into the turn's reply (style rules, rows, flags). */
+async function finishLiveTurn(
+  input: AgentTurnInput,
+  loop: AgentLoopResult,
+  extraCalls: ChatToolCall[] = [],
+): Promise<AgentTurnOutput> {
+  if (loop.status === "handoff") {
+    return { assistantText: "", toolCalls: [...extraCalls, ...loop.calls], threadTitle: null, queued: true };
+  }
+  const cancelled = loop.status === "cancelled";
+  let finalText = loop.finalText;
+  if (!finalText) finalText = "I checked everything I could. Let me know if you'd like me to dig deeper.";
+  if (!cancelled && loop.status !== "awaiting_confirmation") {
+    finalText = await enforceFinalText(finalText, input.workspaceId);
+  }
+  const calls = [...extraCalls, ...loop.calls];
+  await saveToolRows(input.threadId, loop.calls);
+  await saveMessage(input.threadId, "assistant", finalText, calls);
+  return {
+    assistantText: finalText,
+    toolCalls: calls,
+    threadTitle: null,
+    cancelled,
+    awaitingConfirmation: loop.status === "awaiting_confirmation",
+    failed: loop.status === "error",
+  };
+}
+
+function loopContext(input: AgentTurnInput, confirmed = false): LoopContext {
+  return {
+    projectId: input.projectId,
+    workspaceId: input.workspaceId,
+    userId: input.userId,
+    role: input.role,
+    confirmed,
+    // Turn-scoped skill loading state (milestone 21): load_skill records slugs
+    // here; the connector-tool declared-tool gate reads them.
+    loadedSkills: new Set<string>(),
+    agentKey: input.agentKey ?? "lead",
+    grant: input.grant ?? null,
+    runId: input.runId,
+    signal: input.signal,
+    threadId: input.threadId,
+  };
+}
+
+/** Is a live model routed for this agent's workload? (else: mock mode) */
+function agentIsLive(agentKey: AgentKey, mode: "build" | "default"): boolean {
+  return getLlmProviderFor(workloadForAgent(agentKey, { mode })).isLive;
+}
+
+/** The system prompt + opening messages of a fresh live turn. */
+async function freshTurnPrompt(input: AgentTurnInput, trimmed: string): Promise<{ system: string; messages: ChatMessage[] }> {
+  const agentKey = input.agentKey ?? "lead";
+  const grant = input.grant ?? null;
+  const [projectContext, supplements, attachmentSection, intelligenceSection, history] = await Promise.all([
+    buildProjectContext(input.projectId, input.workspaceId),
+    buildAgentSupplements(input.projectId),
+    buildAttachmentSection(input.projectId, input.threadId, input.attachmentIds),
+    // Phase 13B: layered company intelligence (rules → voice → knowledge →
+    // lessons/prefs → episodes); degrades to "" when the workspace has none.
+    buildIntelligenceContext(input.workspaceId, trimmed).catch(() => ""),
+    threadHistory(input.threadId, trimmed),
+  ]);
+  const system = systemPrompt(
+    projectContext,
+    [supplements, attachmentSection].filter(Boolean).join("\n\n"),
+    intelligenceSection,
+    agentKey,
+    grant,
+  );
+  return { system, messages: [...history, { role: "user", content: trimmed }] };
+}
+
+/**
+ * Phase 8: after the user's "yes", the confirmed calls ran; hand their real
+ * results back into the transcript of the run that proposed them so the
+ * model carries on from there. Null when that transcript is gone (or the
+ * proposal came from a sub-agent, whose transcript is its own).
+ */
+async function continuationState(
+  input: AgentTurnInput,
+  done: Array<{ call: ChatToolCall; exec: ChatToolCall; result: Awaited<ReturnType<typeof executeTool>> }>,
+): Promise<LoopState | null> {
+  const runId = done[0]?.call.runId;
+  if (!runId || done.some((d) => d.call.runId !== runId || !d.call.toolUseId)) return null;
+  const saved = await prismaTranscriptStore.load(input.workspaceId, runId).catch(() => null);
+  if (!isLoopState(saved)) return null;
+  const last = saved.messages[saved.messages.length - 1];
+  if (last?.role !== "user" || typeof last.content === "string") return null;
+  const blocks = last.content;
+  const maxChars = loopLimitsFromEnv().toolResultMaxChars;
+  const patched = new Map<string, ChatToolResultBlock>();
+  for (const d of done) patched.set(d.call.toolUseId!, toolResultFor(d.call.toolUseId!, d.exec, d.result, maxChars));
+  if (![...patched.keys()].every((id) => blocks.some((b) => b.type === "tool_result" && b.toolUseId === id))) {
+    return null;
+  }
+  const messages: ChatMessage[] = [
+    ...saved.messages.slice(0, -1),
+    {
+      role: "user",
+      content: blocks.map((b) =>
+        b.type === "tool_result" && patched.has(b.toolUseId) ? patched.get(b.toolUseId)! : b,
+      ),
+    },
+  ];
+  return initialLoopState({ system: saved.system, messages, mode: saved.mode, workload: saved.workload });
 }
 
 export async function runAgentTurn(input: AgentTurnInput): Promise<AgentTurnOutput> {
-  const { projectId, workspaceId, userId, role, threadId, userContent, attachmentIds } = input;
+  const { projectId, threadId, userContent, attachmentIds } = input;
   const trimmed = userContent.trim();
   const agentKey: AgentKey = input.agentKey ?? "lead";
   const grant = input.grant ?? null;
+  const mode = input.mode ?? turnMode(agentKey, grant);
+  const turn: AgentTurnInput = { ...input, agentKey, grant, mode };
+  const baseCtx = loopContext(turn);
 
-  // Turn-scoped skill loading state (milestone 21): load_skill records slugs
-  // here; the connector-tool declared-tool gate reads them.
-  const loadedSkills = new Set<string>();
-  const baseCtx: LoopContext = {
-    projectId,
-    workspaceId,
-    userId,
-    role,
-    confirmed: false,
-    loadedSkills,
-    agentKey,
-    grant,
-    runId: input.runId,
-    signal: input.signal,
-    threadId,
-  };
+  // 0. Phase 8: a worker picking the run up again continues its transcript.
+  if (input.resume && input.runId) {
+    const saved = await prismaTranscriptStore.load(input.workspaceId, input.runId).catch(() => null);
+    if (isLoopState(saved)) {
+      const loop = await runAgentLoop({
+        ctx: baseCtx,
+        state: saved,
+        streamGuard: await styleStreamGuard(input.workspaceId),
+        deps: { connectorTools: await connectorChatTools(projectId, grant).catch(() => []) },
+      });
+      return finishLiveTurn(turn, loop);
+    }
+  }
 
   // 1. Confirmation path: "yes" + a pending proposal → execute it.
   if (CONFIRM_RE.test(trimmed)) {
     const pending = await pendingProposal(threadId);
     if (pending?.length) {
       const executed: ChatToolCall[] = [];
+      const done: Array<{ call: ChatToolCall; exec: ChatToolCall; result: Awaited<ReturnType<typeof executeTool>> }> = [];
       for (const call of pending) {
         // Phase 5: run as the agent that proposed it, inside the grant it
         // was proposed under — never wider than the thread's grant now.
@@ -914,11 +740,27 @@ export async function runAgentTurn(input: AgentTurnInput): Promise<AgentTurnOutp
           : grant;
         const ctx: LoopContext = { ...baseCtx, confirmed: true, agentKey: callAgent, grant: callGrant };
         const exec: ChatToolCall = { tool: call.tool, args: call.args, confirmed: true, status: "executed", agentKey: callAgent };
-        await executeTool(ctx, call.tool, call.args, exec);
+        const result = await executeTool(ctx, call.tool, call.args, exec);
         executed.push(exec);
+        done.push({ call, exec, result });
         await saveMessage(threadId, "tool", exec.resultSummary ?? "", [exec]);
       }
       const cancelled = executed.some((c) => c.status === "cancelled");
+      // Phase 8: the model carries on from the transcript that proposed it.
+      if (!cancelled && agentIsLive(agentKey, mode)) {
+        const state = await continuationState(turn, done).catch(() => null);
+        if (state) {
+          const loop = await runAgentLoop({
+            ctx: baseCtx,
+            state,
+            handoffAt: input.handoffAt,
+            streamGuard: await styleStreamGuard(input.workspaceId),
+            deps: { connectorTools: await connectorChatTools(projectId, grant).catch(() => []) },
+          });
+          // The confirmed calls (already saved as tool rows) lead the reply's calls.
+          return finishLiveTurn(turn, loop, executed);
+        }
+      }
       const failures = executed.filter((c) => c.status !== "executed");
       const text = cancelled
         ? STOPPED_TEXT
@@ -931,10 +773,8 @@ export async function runAgentTurn(input: AgentTurnInput): Promise<AgentTurnOutp
     // "yes" with nothing pending — fall through to a normal turn.
   }
 
-  const isLive = llmStatus().isLive;
-
   // 2. Mock mode: deterministic rule-based router.
-  if (!isLive) {
+  if (!agentIsLive(agentKey, mode)) {
     // Attachments still bind to the thread in mock mode.
     await buildAttachmentSection(projectId, threadId, attachmentIds);
     const { text, toolCalls } = await mockTurn(baseCtx, trimmed);
@@ -956,79 +796,43 @@ export async function runAgentTurn(input: AgentTurnInput): Promise<AgentTurnOutp
     };
   }
 
-  // 3. Live mode: prompt-engineered agent loop.
-  const [projectContext, supplements, attachmentSection, intelligenceSection] = await Promise.all([
-    buildProjectContext(projectId, workspaceId),
-    buildAgentSupplements(projectId, workspaceId, grant),
-    buildAttachmentSection(projectId, threadId, attachmentIds),
-    // Phase 13B: layered company intelligence (rules → voice → knowledge →
-    // lessons/prefs → episodes); degrades to "" when the workspace has none.
-    buildIntelligenceContext(workspaceId, trimmed).catch(() => ""),
-  ]);
-  const sys = systemPrompt(
-    projectContext,
-    false,
-    [supplements, attachmentSection].filter(Boolean).join("\n\n"),
-    intelligenceSection,
-    agentKey,
-    grant,
-  );
-
-  const loop = await runToolLoop({
+  // 3. Live mode: the native agent loop.
+  if (await stopRequested(baseCtx)) {
+    await saveMessage(threadId, "assistant", STOPPED_TEXT, []);
+    return { assistantText: STOPPED_TEXT, toolCalls: [], threadTitle: null, cancelled: true };
+  }
+  const prompt = await freshTurnPrompt(turn, trimmed);
+  const loop = await runAgentLoop({
     ctx: baseCtx,
-    threadId,
-    sys,
-    userContent: trimmed,
-    maxIterations: MAX_ITERATIONS,
+    system: prompt.system,
+    messages: prompt.messages,
+    mode,
+    handoffAt: input.handoffAt,
+    streamGuard: await styleStreamGuard(input.workspaceId),
+    deps: { connectorTools: await connectorChatTools(projectId, grant).catch(() => []) },
   });
-  const turnCalls = loop.calls;
-  let finalText = loop.finalText;
-
-  if (!finalText) {
-    finalText = "I checked everything I could. Let me know if you'd like me to dig deeper.";
-  }
-  // Phase 13B: fail-closed style-rule enforcement on the Chief Strategy
-  // Agent delivery path. A severity=block violation refuses delivery — the
-  // violating text is replaced with a refusal naming the rule. Infra
-  // failures in the checker degrade open so a broken style subsystem can't
-  // take down the whole agent; rule-compile failures are already contained
-  // per-rule inside checkOutput.
-  if (!loop.cancelled) {
-    try {
-      await enforceStyleRules(finalText, workspaceId);
-    } catch (err) {
-      if (err instanceof StyleRuleBlockedError) {
-        finalText =
-          `I can't deliver that response as written — it violates your style ` +
-          `rule${err.violations.length > 1 ? "s" : ""}: ` +
-          err.violations.map((v) => `"${v.pattern}" (${v.kind})`).join(", ") +
-          `. Adjust the request or the rule and try again.`;
-      }
-      // Non-block errors: deliver as-is (see note above).
-    }
-  }
-  await saveMessage(threadId, "assistant", finalText, turnCalls);
-  return {
-    assistantText: finalText,
-    toolCalls: turnCalls,
-    threadTitle: null,
-    cancelled: loop.cancelled,
-    awaitingConfirmation: loop.proposal !== null,
-  };
+  return finishLiveTurn(turn, loop);
 }
 
 // ---------------------------------------------------------------------------
 // Phase 5: hand a task to one sub-agent (the lead's delegate tool).
 // ---------------------------------------------------------------------------
 
-export const DELEGATE_TOOL = "delegate_to_subagent";
-
-const SUB_AGENT_MAX_ITERATIONS = 6;
+/** A child run already started for this tool call (a resumed parent reuses it). */
+async function existingChildRun(workspaceId: string, parentRunId: string, toolUseId: string) {
+  const { withWorkspaceScope } = await import("@/lib/substrate/memory/rls");
+  return withWorkspaceScope(workspaceId, (tx) =>
+    tx.agentRun.findFirst({
+      where: { workspaceId, parentRunId, agentState: { path: ["toolUseId"], equals: toolUseId } },
+      select: { id: true, status: true },
+    }),
+  ).catch(() => null);
+}
 
 const delegate_to_subagent: ToolDef = {
   name: DELEGATE_TOOL,
   description:
-    "Hand one focused piece of work to a sub-agent and get its result back. agent is one of: researcher, planner, drafter (Writer), analyst, scheduler, actor (Operator). The sub-agent works inside this task's tools (optionally fewer) and its write actions still wait for the user's OK.",
+    "Hand one focused piece of work to a sub-agent and get its result back. Use it when a task needs a specialist: agent is one of researcher, planner, drafter (Writer), analyst, scheduler, actor (Operator). The sub-agent works inside this task's tools (optionally fewer) and its write actions still wait for the user's OK.",
   // Safe to call: the sub-agent's own tools go through every gate.
   kind: "safe",
   minRole: "editor",
@@ -1058,79 +862,95 @@ const delegate_to_subagent: ToolDef = {
     const parentGrant = ctx.grant ?? AGENT_MAX_GROUPS.lead;
     const childGrant = computeGrant({ agentKey: sub, requested, parentGrant });
     const name = agentDisplayName(sub);
-    const threadId = (ctx as LoopContext).threadId;
+    const lctx = ctx as LoopContext;
+    const threadId = lctx.threadId;
 
     // The child run: same workspace and thread, pointing at the lead's run.
+    // A resumed lead (worker restart) picks up the child it already started.
     let childRunId: string | undefined;
+    let resumeChild = false;
     if (ctx.runId) {
-      const child = await createAgentRun({
-        workspaceId: ctx.workspaceId,
-        kind: "chat",
-        startedBy: ctx.userId,
-        threadId,
-        agentKey: sub,
-        parentRunId: ctx.runId,
-        allowedTools: childGrant.groups,
-        agentState: { task: task.slice(0, 500), projectId: ctx.projectId },
-      });
-      childRunId = child.id;
-      await markAgentRunRunning(ctx.workspaceId, child.id);
-      await runEvent(ctx, `Handed to ${name}: ${task.slice(0, 200)}`, { childRunId, agent: sub, grant: childGrant.groups }, "note");
+      const prior = lctx.toolUseId ? await existingChildRun(ctx.workspaceId, ctx.runId, lctx.toolUseId) : null;
+      if (prior) {
+        childRunId = prior.id;
+        resumeChild = true;
+      } else {
+        const child = await createAgentRun({
+          workspaceId: ctx.workspaceId,
+          kind: "chat",
+          startedBy: ctx.userId,
+          threadId,
+          agentKey: sub,
+          parentRunId: ctx.runId,
+          allowedTools: childGrant.groups,
+          agentState: { task: task.slice(0, 500), projectId: ctx.projectId, ...(lctx.toolUseId ? { toolUseId: lctx.toolUseId } : {}) },
+        });
+        childRunId = child.id;
+        await markAgentRunRunning(ctx.workspaceId, child.id);
+        await runEvent(ctx, `Handed to ${name}: ${task.slice(0, 200)}`, { childRunId, agent: sub, grant: childGrant.groups }, "note");
+      }
     }
     const childCtx: LoopContext = {
-      ...ctx,
+      ...lctx,
       confirmed: false,
       agentKey: sub,
       grant: childGrant.groups,
       runId: childRunId ?? ctx.runId,
       threadId,
+      toolUseId: undefined,
     };
 
-    let loop: LoopOutput;
+    let loop: AgentLoopResult | null = null;
+    let finalText: string;
     try {
-      if (!llmStatus().isLive || !threadId) {
-        loop = {
-          finalText: `${name} needs a live model to work on its own; the hand-off was recorded.`,
-          calls: [],
-          cancelled: false,
-          proposal: null,
-        };
+      if (!agentIsLive(sub, "default")) {
+        finalText = `${name} needs a live model to work on its own; the hand-off was recorded.`;
       } else {
-        const [projectContext, supplements] = await Promise.all([
-          buildProjectContext(ctx.projectId, ctx.workspaceId),
-          buildAgentSupplements(ctx.projectId, ctx.workspaceId, childGrant.groups),
-        ]);
-        const sys = systemPrompt(projectContext, false, supplements, "", sub, childGrant.groups);
-        loop = await runToolLoop({
-          ctx: childCtx,
-          threadId,
-          sys,
-          userContent: task,
-          maxIterations: SUB_AGENT_MAX_ITERATIONS,
-        });
+        const connectorTools = await connectorChatTools(ctx.projectId, childGrant.groups).catch(() => []);
+        if (resumeChild && childRunId) {
+          loop = await runAgentLoop({ ctx: childCtx, deps: { connectorTools } });
+        } else {
+          const [projectContext, supplements] = await Promise.all([
+            buildProjectContext(ctx.projectId, ctx.workspaceId),
+            buildAgentSupplements(ctx.projectId),
+          ]);
+          loop = await runAgentLoop({
+            ctx: childCtx,
+            system: systemPrompt(projectContext, supplements, "", sub, childGrant.groups),
+            messages: [{ role: "user", content: task }],
+            deps: { connectorTools },
+          });
+        }
+        finalText = loop.finalText;
       }
     } catch (err) {
       if (childRunId) await finishAgentRun(ctx.workspaceId, childRunId, "failed").catch(() => undefined);
       throw err;
     }
+    const cancelled = loop?.status === "cancelled";
     if (childRunId) {
-      await finishAgentRun(ctx.workspaceId, childRunId, loop.cancelled ? "cancelled" : "succeeded").catch(() => undefined);
+      await finishAgentRun(
+        ctx.workspaceId,
+        childRunId,
+        cancelled ? "cancelled" : loop?.status === "error" ? "failed" : "succeeded",
+      ).catch(() => undefined);
     }
-    const calls = loop.calls.map((c) => ({ ...c, agentKey: c.agentKey ?? sub }));
-    if (loop.cancelled) {
+    const calls = (loop?.calls ?? []).map((c) => ({ ...c, agentKey: c.agentKey ?? sub }));
+    const costMicroUsd = loop?.state.costMicroUsd ?? 0;
+    if (cancelled) {
       // The whole task was stopped: stop the lead too.
       // (ctx is the lead's context here, so this asks about the lead's run.)
       if (await stopRequested(ctx)) throw new RunStoppedError();
       // Only this sub-agent was stopped (Runs page): the lead carries on.
       return {
         summary: `${name} was stopped before it finished.`,
-        details: { subRunId: childRunId ?? null, agent: sub, grant: childGrant.groups, calls, stopped: true },
+        details: { subRunId: childRunId ?? null, agent: sub, grant: childGrant.groups, calls, stopped: true, costMicroUsd },
       };
     }
     const dropped = childGrant.dropped.length ? ` (not allowed: ${childGrant.dropped.join(", ")})` : "";
     return {
-      summary: `${name}: ${loop.finalText || "done"}${dropped}`.slice(0, 2000),
-      details: { subRunId: childRunId ?? null, agent: sub, grant: childGrant.groups, calls },
+      summary: `${name}: ${finalText || "done"}${dropped}`.slice(0, 2000),
+      details: { subRunId: childRunId ?? null, agent: sub, grant: childGrant.groups, calls, costMicroUsd },
     };
   },
 };
@@ -1215,21 +1035,77 @@ export async function stopThreadRuns(input: {
     if (res?.stopped) stopped.push(...res.runIds);
   }
   for (const id of stopped) abortRun(id);
+  // Phase 8: a handed-off turn still waiting in the queue never starts; its
+  // run ends here (a job a worker already holds stops at its next step).
+  for (const id of stopped) {
+    const n = await cancelAgentJobsForRun(input.workspaceId, id).catch(() => 0);
+    if (n > 0) await finishAgentRun(input.workspaceId, id, "cancelled").catch(() => undefined);
+  }
   await cancelPendingProposals(input.threadId).catch(() => undefined);
   if (stopped.length) await expireRunApprovals(input.workspaceId, stopped, input.userId);
   return stopped;
+}
+
+/** Payload of a `chat_turn` agent job (lib/agents/queue): everything a worker needs. */
+export interface ChatTurnJobPayload {
+  runId: string;
+  projectId: string;
+  workspaceId: string;
+  userId: string;
+  role: WorkspaceRole;
+  threadId: string;
+  userContent: string;
+  attachmentIds?: string[];
+  agentKey: AgentKey;
+  grant: ToolGroup[];
+  mode: "build" | "default";
+}
+
+export interface TrackedTurnOptions {
+  capture?: typeof captureEpisode;
+  /** Phase 8: inline time before hand-off (ms); null = never hand off. Default: env. */
+  inlineBudgetMs?: number | null;
+  /** Phase 8: told the run id as soon as the run exists (the SSE route tails it). */
+  onRunCreated?: (runId: string) => void;
+}
+
+/** Finish a tracked turn's run from its outcome (shared by the request and the worker). */
+async function settleTrackedRun(input: AgentTurnInput & { runId: string }, out: AgentTurnOutput): Promise<void> {
+  if (out.cancelled) {
+    await finishAgentRun(input.workspaceId, input.runId, "cancelled");
+    await cancelPendingProposals(input.threadId).catch(() => undefined);
+    await expireRunApprovals(input.workspaceId, [input.runId], input.userId);
+    return;
+  }
+  if (out.awaitingConfirmation) {
+    await appendAgentRunEvent(input.workspaceId, input.runId, {
+      type: "gate",
+      summary: "Waiting for your OK in the chat",
+    }).catch(() => undefined);
+  }
+  await finishAgentRun(input.workspaceId, input.runId, out.failed ? "failed" : "succeeded");
 }
 
 /**
  * Phase 5: the turn entry point for request handlers. Records the turn as an
  * AgentRun (kind chat) running as the thread's agent inside its grant, wires
  * Stop to it, and finishes it as succeeded / failed / cancelled.
+ *
+ * Phase 8 hand-off rule: the turn runs in the request while it is short. A
+ * turn still working after AGENT_INLINE_BUDGET_SECONDS (default 45) is handed
+ * to the agent worker at its next step boundary — its transcript is already
+ * saved, so the worker continues from that step — and the call returns
+ * `queued: true` with the run id (the run keeps streaming its events; Stop
+ * still works). A build-mode turn (the Operator with the code group) goes to
+ * the worker before its first step: code work is long by nature. With
+ * AGENT_WORKER=off nothing is handed off (every turn runs inline).
  */
 export async function runTrackedAgentTurn(
   input: AgentTurnInput,
-  opts: { capture?: typeof captureEpisode } = {},
+  opts: TrackedTurnOptions = {},
 ): Promise<AgentTurnOutput & { runId: string }> {
   const profile = await threadTaskProfile(input.threadId);
+  const mode = input.mode ?? turnMode(profile.agentKey, profile.grant);
   const run = await createAgentRun({
     workspaceId: input.workspaceId,
     kind: "chat",
@@ -1237,34 +1113,99 @@ export async function runTrackedAgentTurn(
     threadId: input.threadId,
     agentKey: profile.agentKey,
     allowedTools: profile.grant,
-    agentState: { projectId: input.projectId, prompt: input.userContent.slice(0, 280) },
+    agentState: { projectId: input.projectId, prompt: input.userContent.slice(0, 280), mode },
   });
   await markAgentRunRunning(input.workspaceId, run.id);
+  opts.onRunCreated?.(run.id);
+  const budget = opts.inlineBudgetMs === undefined ? inlineBudgetMs() : opts.inlineBudgetMs;
+  const tracked: AgentTurnInput & { runId: string } = {
+    ...input,
+    agentKey: profile.agentKey,
+    grant: profile.grant,
+    mode,
+    runId: run.id,
+  };
+  const job: ChatTurnJobPayload = {
+    runId: run.id,
+    projectId: input.projectId,
+    workspaceId: input.workspaceId,
+    userId: input.userId,
+    role: input.role,
+    threadId: input.threadId,
+    userContent: input.userContent,
+    attachmentIds: input.attachmentIds,
+    agentKey: profile.agentKey,
+    grant: profile.grant,
+    mode,
+  };
+  const queued = async (): Promise<AgentTurnOutput & { runId: string }> => {
+    await enqueueAgentJob({ workspaceId: input.workspaceId, kind: "chat_turn", runId: run.id, payload: job });
+    await appendAgentRunEvent(input.workspaceId, run.id, {
+      type: "note",
+      summary: "Handed to the agent worker; it keeps going in the background",
+      payload: { kind: "handoff" },
+    }).catch(() => undefined);
+    return { assistantText: "", toolCalls: [], threadTitle: null, queued: true, runId: run.id };
+  };
+
+  // Build mode goes straight to the worker (a confirmation runs inline).
+  if (budget !== null && (budget === 0 || mode === "build") && !CONFIRM_RE.test(input.userContent.trim())) {
+    return queued();
+  }
+
   const signal = registerRunAbort(run.id);
   try {
     const out = await runAgentTurnWithCapture(
-      { ...input, agentKey: profile.agentKey, grant: profile.grant, runId: run.id, signal },
+      { ...tracked, signal, handoffAt: budget === null ? undefined : Date.now() + budget },
       opts,
     );
-    if (out.cancelled) {
-      await finishAgentRun(input.workspaceId, run.id, "cancelled");
-      await cancelPendingProposals(input.threadId).catch(() => undefined);
-      await expireRunApprovals(input.workspaceId, [run.id], input.userId);
-    } else {
-      if (out.awaitingConfirmation) {
-        await appendAgentRunEvent(input.workspaceId, run.id, {
-          type: "gate",
-          summary: "Waiting for your OK in the chat",
-        }).catch(() => undefined);
-      }
-      await finishAgentRun(input.workspaceId, run.id, "succeeded");
+    if (out.queued) {
+      const q = await queued();
+      return { ...q, toolCalls: out.toolCalls };
     }
+    await settleTrackedRun(tracked, out);
     return { ...out, runId: run.id };
   } catch (err) {
     await finishAgentRun(input.workspaceId, run.id, isRunStopped(err) ? "cancelled" : "failed").catch(() => undefined);
     throw err;
   } finally {
     releaseRunAbort(run.id);
+  }
+}
+
+/**
+ * Phase 8: the worker side of a handed-off turn (agent job `chat_turn`).
+ * Continues the run's saved transcript (or starts the turn when it was
+ * queued before its first step), then finishes the run exactly as the
+ * request would have. Idempotent: a run that already finished is left alone.
+ */
+export async function continueTrackedAgentTurn(
+  job: ChatTurnJobPayload,
+  opts: { capture?: typeof captureEpisode; signal?: AbortSignal } = {},
+): Promise<AgentTurnOutput & { runId: string }> {
+  const run = await getAgentRun(job.workspaceId, job.runId);
+  if (!run) throw new Error(`Run ${job.runId} not found in this workspace.`);
+  const empty = { assistantText: "", toolCalls: [] as ChatToolCall[], threadTitle: null, runId: job.runId };
+  if (run.status === "succeeded" || run.status === "failed" || run.status === "cancelled") return empty;
+  const tracked: AgentTurnInput & { runId: string } = { ...job, resume: true };
+  const signal = registerRunAbort(job.runId);
+  // The worker's lease signal: losing the lease stops the local work but
+  // never finishes the run (the loop treats it as a hand-off).
+  const onLeaseLost = () => abortRunWith(job.runId, new LeaseLostError());
+  if (opts.signal?.aborted) onLeaseLost();
+  opts.signal?.addEventListener("abort", onLeaseLost, { once: true });
+  try {
+    const out = await runAgentTurnWithCapture({ ...tracked, signal }, opts);
+    if (out.queued || isLeaseLost(signal)) throw new LeaseLostError();
+    await settleTrackedRun(tracked, out);
+    return { ...out, runId: job.runId };
+  } catch (err) {
+    if (isLeaseLost(signal) || (err as { name?: unknown })?.name === "LeaseLostError") throw err;
+    await finishAgentRun(job.workspaceId, job.runId, isRunStopped(err) ? "cancelled" : "failed").catch(() => undefined);
+    throw err;
+  } finally {
+    opts.signal?.removeEventListener("abort", onLeaseLost);
+    releaseRunAbort(job.runId);
   }
 }
 

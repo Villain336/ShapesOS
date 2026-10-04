@@ -31,6 +31,7 @@ import type {
 import type { ToolContext } from "./tools";
 import { connectorAction, connectorGroup, isGroupGranted, TOOL_GROUP_LABELS } from "@/lib/agents/grants";
 import { autoApprovalFor } from "@/lib/automation/policy";
+import type { ConnectorChatTool } from "@/lib/agents/loop-tools";
 
 export interface ConnectorToolOutcome {
   status: "executed" | "pending_confirmation" | "error" | "skipped_role" | "denied";
@@ -93,6 +94,34 @@ async function listAdapterTools(adapter: ConnectorAdapter): Promise<ConnectorToo
   return adapter.listTools();
 }
 
+/** Phase 8: one bound connector's tools (or why they are unavailable). */
+interface SourceTools {
+  source: BoundDataSource;
+  tools: ConnectorToolDef[] | null;
+  error: string | null;
+}
+
+/** The tools of every enabled project data source inside the grant. */
+async function grantedSourceTools(projectId: string, grant?: readonly string[] | null): Promise<SourceTools[]> {
+  // Phase 5: connectors outside the task's grant are not listed at all.
+  const sources = (await boundDataSources(projectId)).filter((s) =>
+    isGroupGranted(grant, connectorGroup(s.connectorKey)),
+  );
+  const out: SourceTools[] = [];
+  for (const s of sources) {
+    try {
+      const adapter = await getAdapterForConnection({
+        connectorKey: s.connectorKey,
+        connector: { mcpEndpoint: s.mcpEndpoint, config: s.connectorConfig },
+      });
+      out.push({ source: s, tools: await listAdapterTools(adapter), error: null });
+    } catch (err) {
+      out.push({ source: s, tools: null, error: err instanceof Error ? err.message : "unknown error" });
+    }
+  }
+  return out;
+}
+
 /**
  * "CONNECTOR TOOLS" system-prompt section: one
  * `connector.<key>.<toolName>: <description>` line per tool of every
@@ -103,24 +132,14 @@ export async function connectorToolsSection(
   grant?: readonly string[] | null,
 ): Promise<string> {
   const header = "## CONNECTOR TOOLS";
-  // Phase 5: connectors outside the task's grant are not listed at all.
-  const sources = (await boundDataSources(projectId)).filter((s) =>
-    isGroupGranted(grant, connectorGroup(s.connectorKey)),
-  );
+  const sources = await grantedSourceTools(projectId, grant);
   if (sources.length === 0) {
     return `${header}\n\nNo connector data sources are bound to this project.`;
   }
   const lines: string[] = [];
-  for (const s of sources) {
-    let tools: ConnectorToolDef[];
-    try {
-      const adapter = await getAdapterForConnection({
-        connectorKey: s.connectorKey,
-        connector: { mcpEndpoint: s.mcpEndpoint, config: s.connectorConfig },
-      });
-      tools = await listAdapterTools(adapter);
-    } catch (err) {
-      lines.push(`# ${s.displayName} (${s.connectorKey}) — tools unavailable: ${err instanceof Error ? err.message : "unknown error"}`);
+  for (const { source: s, tools, error } of sources) {
+    if (!tools) {
+      lines.push(`# ${s.displayName} (${s.connectorKey}) — tools unavailable: ${error}`);
       continue;
     }
     lines.push(`# ${s.displayName} (${s.connectorKey})`);
@@ -129,6 +148,30 @@ export async function connectorToolsSection(
     }
   }
   return `${header}\n\n${lines.join("\n")}`;
+}
+
+/**
+ * Phase 8: the same tools as native tool definitions for the agent loop
+ * (lib/agents/loop-tools.ts maps `connector.<key>.<tool>` to an API-safe
+ * name and back). Every call still goes through resolveConnectorTool's gates.
+ */
+export async function connectorChatTools(
+  projectId: string,
+  grant?: readonly string[] | null,
+): Promise<ConnectorChatTool[]> {
+  const out: ConnectorChatTool[] = [];
+  for (const { source, tools } of await grantedSourceTools(projectId, grant)) {
+    for (const t of tools ?? []) {
+      out.push({
+        connectorKey: source.connectorKey,
+        name: t.name,
+        description: t.description,
+        mutating: t.mutating,
+        argsSchema: t.argsSchema,
+      });
+    }
+  }
+  return out;
 }
 
 function parseConnectorTool(toolName: string): { key: string; tool: string } | null {
