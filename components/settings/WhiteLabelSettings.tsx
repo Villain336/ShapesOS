@@ -212,7 +212,7 @@ export default function WhiteLabelSettings({
       setColor("");
       setNotice({
         kind: "info",
-        message: "Brand color cleared — public pages fall back to the default violet. The brand kit keeps its own saved color.",
+        message: "Brand color cleared — public pages fall back to the default black. The brand kit keeps its own saved color.",
       });
       router.refresh();
       previewBrandTheme(null);
@@ -409,7 +409,7 @@ export default function WhiteLabelSettings({
           {savedColor ? (
             <>Saved as <span className="font-mono font-medium text-muted">{savedColor}</span> — the dashboard theme follows the brand kit this saves into.</>
           ) : (
-            <>No brand color set — the default violet is used.</>
+            <>No brand color set — the default black is used.</>
           )}{" "}
           Hover and tint shades derive automatically from this one color.
         </p>
