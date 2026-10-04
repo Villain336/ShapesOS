@@ -58,6 +58,11 @@ export const TIER1_KINDS: ReadonlySet<string> = new Set([
   "update_listing",
   "send_internal_note",
   "refresh_owned_page",
+  // Phase 13 (twincore): internal site operations on the digital twin —
+  // booking a truck onto a free dock and giving a forklift a task. No money,
+  // no external audience; reversible (cancel the booking, free the forklift).
+  "book_dock",
+  "assign_equipment",
 ]);
 
 /** Normalized lookup — normalizeForTier maps _/- to spaces, so the

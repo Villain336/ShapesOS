@@ -79,6 +79,10 @@ export const KNOWN_ACTION_DEFS: ReadonlyArray<{ action: string; label: string; d
   { action: "approve_pay_run", label: "Approve a pay run", description: "Propose approving payroll. Never automated." },
   { action: "post_pay_run", label: "Post a pay run", description: "Propose posting payroll to the books. Never automated." },
   { action: "write_event", label: "Change events", description: "Create draft events and register people for events. Always asks." },
+  // Phase 13 (twincore): the digital twin (lib/chat/ops-twin-tools.ts).
+  { action: "book_dock", label: "Book a dock", description: "Book a truck onto a free dock door of a twin site (an internal site operation)." },
+  { action: "assign_equipment", label: "Assign equipment", description: "Give a forklift or cart a task, or set it available / charging." },
+  { action: "draft_site_layout", label: "Draft a site layout", description: "Draft a digital twin site layout from a description or floor-plan image (a person publishes it)." },
 ];
 
 

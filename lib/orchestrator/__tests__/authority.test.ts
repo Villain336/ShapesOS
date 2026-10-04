@@ -192,7 +192,10 @@ describe("normalizeForTier", () => {
 
 describe("TIER1_KINDS is conservative", () => {
   it("contains only owned-channel / internal kinds", () => {
+    // Phase 13 (twincore): the two internal digital-twin site operations.
+    const internalSiteOps = new Set(["book_dock", "assign_equipment"]);
     for (const k of TIER1_KINDS) {
+      if (internalSiteOps.has(k)) continue;
       assert.match(k, /owned|internal|listing/, `unexpected Tier 1 kind: ${k}`);
     }
   });
