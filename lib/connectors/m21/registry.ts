@@ -1,7 +1,8 @@
 // Marketr — M21 built-in connector registry (spec §7, §11).
 //
-// DESIGN DECISION (recorded in prisma/schema.prisma): the 12 built-in
-// connectors are CODE-defined here, not DB rows. `Connector` rows exist
+// DESIGN DECISION (recorded in prisma/schema.prisma): the 14 built-in
+// connectors are CODE-defined here, not DB rows. (The count is pinned by
+// lib/connectors/m21/__tests__/registry.test.ts — update both together.) `Connector` rows exist
 // ONLY for workspace-custom MCP servers (kind=mcp). Do not create DB rows
 // for built-in keys — resolveAdapter() maps a built-in key directly to
 // its native adapter class.
@@ -217,8 +218,9 @@ export function listBuiltinConnectors(): BuiltinConnectorMeta[] {
 }
 
 // Adapters are imported statically; each adapter module only imports the
-// live port it wraps (DataForSEO, WordPress, Webflow, Buffer, Resend), so
-// the import graph stays server-side only.
+// live client it wraps (lib/connectors/m21/live/*, the WordPress/Webflow
+// ports, lib/intelligence/gsc/api.ts), so the import graph stays
+// server-side only.
 import type { ConnectorAdapter } from "./types";
 import { GoogleSearchConsoleAdapter } from "./native/google-search-console";
 import { Ga4Adapter } from "./native/ga4";
@@ -265,8 +267,9 @@ export function resolveAdapter(key: string): ConnectorAdapter {
 //
 // Phase 4b wired the last six mock-only adapters (GSC, GA4, Drive, Notion,
 // Meta Ads, Google Ads) to their live APIs: with a vault credential they
-// call the provider; without one they stay in labeled mock mode. No
-// built-in adapter is mock-only any more, so the set is empty. Keep it in
+// call the provider; without one they stay in labeled mock mode. All 14
+// built-in adapters have live wiring, so the set is empty (0 mock-only;
+// pinned by lib/connectors/m21/__tests__/registry.test.ts). Keep it in
 // sync with the per-adapter file headers (scripts/verify-connector-health.mts
 // scans them for the MOCK-ONLY marker).
 // ---------------------------------------------------------------------------
