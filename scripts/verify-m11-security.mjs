@@ -257,6 +257,7 @@ ok("twin live stream = editor+, re-checked every loop",
   has("app/api/twin/sites/[id]/live/route.ts", /requireWorkspaceRole\(user\.id, workspace\.id, "editor"\)\)\) \{/) &&
   has("app/api/twin/sites/[id]/live/route.ts", /stillAllowed: async \(\) => Boolean\(await requireWorkspaceRole\(user\.id, workspace\.id, "editor"\)\)/) &&
   has("lib/twin/live.ts", /await opts\.stillAllowed\(\)/));
+ok("twin object delete = editor+", has("app/api/twin/objects/[id]/route.ts", /requireWorkspaceRole\(user\.id, workspace\.id, "editor"\)/));
 ok("twin sample site = admin+", has("app/api/twin/sites/sample/route.ts", /requireWorkspaceRole\(user\.id, workspace\.id, "admin"\)/));
 // Phase 8: sandbox checkpoint restore + previews (lib/sandbox).
 ok("agent-run restore = editor+ or the run's starter", has("app/api/agent-runs/[runId]/restore/route.ts", /!isStarter && !\(await requireWorkspaceRole\(user\.id, workspace\.id, "editor"\)\)/));

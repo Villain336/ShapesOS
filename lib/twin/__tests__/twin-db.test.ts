@@ -22,6 +22,7 @@ import type { TwinPatchOp, TwinSnapshot } from "../types";
 import { twinAssignEquipmentCore, twinBookDockCore, twinDraftLayout, twinFindCore, twinSiteStateCore } from "@/lib/chat/ops-twin-tools";
 import type { ToolContext } from "@/lib/chat/tools";
 import { sweepTwinAlerts } from "../alerts";
+import { deleteObjectRow } from "@/lib/ops/twin/service";
 
 const WS = "p13twin-ws-a";
 const WS_B = "p13twin-ws-b";
@@ -356,6 +357,45 @@ describe("p13 twin alerts (real Postgres, app role)", () => {
     const second = await sweepTwinAlerts(WS);
     assert.equal(second.raised, 0, "a persisting condition doesn't alert again");
     assert.equal(second.alreadyRaised, first.raised);
+  });
+});
+
+describe("p13 object delete (real Postgres, app role)", () => {
+  const del = (id: string, actor: OpsActor = A) => withWorkspaceScope(actor.workspaceId, (tx) => deleteObjectRow(tx, actor, id));
+
+  it("deletes one object (draft or published site), audited; the bound record stays", async () => {
+    const o = String((await create("twin-objects", { siteId, kind: "rack", label: "Temp rack", x: 20, z: 6, w: 2, d: 2, bindingType: "location", bindingId: rack })).id);
+    await inA((tx) => tx.opsSite.update({ where: { id: siteId }, data: { status: "published" } }));
+    const row = await del(o);
+    assert.equal(row.id, o);
+    assert.equal(await inA((tx) => tx.opsSiteObject.count({ where: { id: o } })), 0);
+    assert.equal(await inA((tx) => tx.opsLocation.count({ where: { id: rack } })), 1, "the location is untouched");
+    const audit = await inA((tx) => tx.opsAuditEvent.findFirst({ where: { entity: "twin-objects", entityId: o, action: "delete" } }));
+    assert.match(String(audit?.summary), /removed twin rack "Temp rack"/);
+    await assert.rejects(del(o), status(404), "gone");
+    await inA((tx) => tx.opsSite.update({ where: { id: siteId }, data: { status: "draft" } }));
+  });
+
+  it("another workspace's object is 404", async () => {
+    await assert.rejects(del(rackObj, B), status(404));
+    assert.equal(await inA((tx) => tx.opsSiteObject.count({ where: { id: rackObj } })), 1);
+  });
+
+  it("busy equipment is 409 until it is freed", async () => {
+    const f = String((await create("twin-objects", { siteId, kind: "equipment", label: "Forklift D", x: 22, z: 6 })).id);
+    await patch("twin-objects", { id: f, taskLocationId: bin, taskNote: "Pick" });
+    await assert.rejects(del(f), (e: unknown) => status(409)(e) && /busy on a task \(Pick\)/.test((e as Error).message));
+    await patch("twin-objects", { id: f, equipmentStatus: "available" });
+    assert.equal((await del(f)).id, f);
+  });
+
+  it("a dock door with an active booking on its dock is 409 (says why); free once cancelled", async () => {
+    const dockLoc = String((await create("locations", { warehouseId: wh, kind: "dock", code: "D-DEL" })).id);
+    const d = String((await create("twin-objects", { siteId, kind: "dock_door", label: "Dock DEL", x: 24, z: 18, w: 2, d: 2, bindingType: "location", bindingId: dockLoc })).id);
+    const b = await create("dock-bookings", { siteId, dockLocationId: dockLoc, direction: "inbound", truckRef: "TRK-DEL", eta: new Date(Date.now() + 3600_000).toISOString() });
+    await assert.rejects(del(d), (e: unknown) => status(409)(e) && /active booking \(TRK-DEL, booked/.test((e as Error).message));
+    await patch("dock-bookings", { id: b.id, status: "cancelled" });
+    assert.equal((await del(d)).id, d);
   });
 });
 

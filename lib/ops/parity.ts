@@ -330,6 +330,7 @@ export const ROWS: ParityRow[] = [
       file("app/api/twin/sites/[id]/state/route.ts"),
       file("app/api/twin/sites/[id]/live/route.ts"),
       file("app/api/twin/sites/sample/route.ts"),
+      file("app/api/twin/objects/[id]/route.ts"),
       file("app/api/cron/twin-alerts/route.ts"),
     ],
     page: [page("twin"), file("app/dashboard/ops/twin/[siteId]/page.tsx")],
