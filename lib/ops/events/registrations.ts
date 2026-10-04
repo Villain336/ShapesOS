@@ -25,7 +25,7 @@ import { OpsError, OpsNotFoundError, type OpsActor } from "../doctype";
 import { realStripe, tenantKeys, type StripeFactory } from "../finance/stripe";
 import { postEventTicketSale } from "../finance/posting";
 import { fmtMoney } from "../finance/money";
-import { releaseSeats, reserveSeats } from "./capacity";
+import { releaseSeats, reserveSeats, SoldOutError } from "./capacity";
 import { normalizeEmail, priceRegistration, ticketAvailability, TicketRuleError } from "./pricing";
 import { newTicketCode, signRegistrationView } from "./tickets";
 
@@ -103,6 +103,19 @@ export async function sweepExpiredHolds(tx: Tx, actor: OpsActor, eventId: string
   return n;
 }
 
+/** Which limit is short, in reserveSeats() order (event → session → ticket type). PURE. */
+function soldOutFor(
+  t: { quantity: number | null; soldCount: number },
+  ev: { capacity: number | null; reservedCount: number },
+  session: { capacity: number | null; reservedCount: number } | null,
+  quantity: number,
+): SoldOutError {
+  const left = (cap: number | null, used: number) => (cap == null ? Infinity : cap - used);
+  if (left(ev.capacity, ev.reservedCount) < quantity) return new SoldOutError("seats at this event");
+  if (session && left(session.capacity, session.reservedCount) < quantity) return new SoldOutError("seats in this session");
+  return new SoldOutError("tickets of this type");
+}
+
 export async function registerCore(tx: Tx, actor: OpsActor, input: RegisterInput): Promise<RegisterOutcome> {
   const ws = actor.workspaceId;
   const now = input.now ?? new Date();
@@ -124,6 +137,16 @@ export async function registerCore(tx: Tx, actor: OpsActor, input: RegisterInput
   try {
     price = priceRegistration(t, availability, input.quantity, { comp: input.comp && input.source !== "public" });
   } catch (err) {
+    // Not enough seats is the SAME condition whether this read already sees
+    // the counters full or reserveSeats() loses the race a moment later —
+    // both surface as SoldOutError (callers and the UI branch on it).
+    const shortOfSeats =
+      (availability.state === "sold_out" || availability.state === "on_sale") &&
+      availability.remaining !== null &&
+      input.quantity > availability.remaining;
+    if (err instanceof TicketRuleError && err.status === 409 && shortOfSeats) {
+      throw soldOutFor(t, ev, session, input.quantity);
+    }
     if (err instanceof TicketRuleError) throw new OpsError(err.status, err.message);
     throw err;
   }
