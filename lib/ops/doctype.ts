@@ -296,10 +296,15 @@ export async function recordInventoryTxn(
   args: {
     productId: string;
     delta: number;
-    reason: "sale" | "restock" | "adjustment";
+    reason: "sale" | "restock" | "adjustment" | "transfer";
     note?: string | null;
     /** Defaults to the acting user — callers may pass "agent:<surface>". */
     actorName?: string | null;
+    // Phase 10 (ops-core): which variant (default variant when omitted) and
+    // where (null = unlocated); transferId links the two legs of a transfer.
+    variantId?: string | null;
+    locationId?: string | null;
+    transferId?: string | null;
   },
 ): Promise<Record<string, unknown>> {
   if (!Number.isInteger(args.delta) || args.delta === 0) {
@@ -314,6 +319,10 @@ export async function recordInventoryTxn(
   if (!product.trackInventory) {
     throw new OpsError(422, `Product "${args.productId}" does not track inventory`);
   }
+  // Phase 10 (ops-core): resolve variant + location (lazy import: stock.ts
+  // imports this module).
+  const { resolveStockTarget } = await import("./stock");
+  const target = await resolveStockTarget(tx, actor, args.productId, args.variantId, args.locationId);
   const txn = await txns.create({
     data: {
       workspaceId: actor.workspaceId,
@@ -322,6 +331,9 @@ export async function recordInventoryTxn(
       reason: args.reason,
       actor: args.actorName ?? actor.userId,
       note: args.note ?? null,
+      variantId: target.variantId,
+      locationId: target.locationId,
+      ...(args.transferId ? { transferId: args.transferId } : {}),
     },
   });
   await products.update({
@@ -349,6 +361,8 @@ async function createRows(
 ): Promise<Array<Record<string, unknown>>> {
   const d = delegateFor(tx, def);
   const base = { workspaceId: actor.workspaceId };
+  // Phase 10 (ops-core): entities with their own create rules.
+  if (def.hooks?.create) return [await def.hooks.create(tx, actor, body)];
 
   switch (def.slug) {
     case "orders":
@@ -450,6 +464,8 @@ async function createRows(
         reason: body.reason as "sale" | "restock" | "adjustment",
         note: (body.note as string) ?? null,
         actorName: (body.actor as string) ?? null,
+        variantId: (body.variantId as string) ?? null,
+        locationId: (body.locationId as string) ?? null,
       });
       return [txn];
     }
@@ -458,6 +474,11 @@ async function createRows(
       // the model stores a Date.
       const data: Record<string, unknown> = { ...base, ...stripInternal(body) };
       if (body.startDate != null) data.startDate = parseDate(body.startDate, "startDate");
+      // Phase 10 (ops-core): an optional workspace-user link must be a member.
+      if (typeof body.userId === "string") {
+        const { assertWorkspaceUser } = await import("./people");
+        await assertWorkspaceUser(tx, actor.workspaceId, body.userId);
+      }
       return [await d.create({ data })];
     }
     case "leave-requests": {
@@ -614,6 +635,8 @@ async function applyPatch(
   existing: Record<string, unknown>,
 ): Promise<Record<string, unknown>> {
   const d = delegateFor(tx, def);
+  // Phase 10 (ops-core): entities with their own patch rules.
+  if (def.hooks?.patch) return def.hooks.patch(tx, actor, id, patch, existing);
   const data: Record<string, unknown> = { ...patch };
 
   if (def.slug === "workflow-runs" && patch.compensationAppend) {
@@ -631,6 +654,12 @@ async function applyPatch(
       data.dueAt = new Date(sentAt.getTime() + 30 * 24 * 3600_000);
     }
   }
+  // Phase 10 (ops-core): team-member user links must be workspace members.
+  if (def.slug === "team-members" && typeof patch.userId === "string") {
+    const { assertWorkspaceUser } = await import("./people");
+    await assertWorkspaceUser(tx, actor.workspaceId, patch.userId);
+  }
+  if (def.slug === "team-members" && patch.startDate != null) data.startDate = parseDate(patch.startDate, "startDate");
   if (def.slug === "projects" && typeof patch.status === "string") {
     // Slice 4: guard the status flow — planning → active → on_hold /
     // completed / cancelled. Terminal states have no exits. Non-status
@@ -647,6 +676,12 @@ async function applyPatch(
     if (patch.status === "approved" || patch.status === "denied") {
       data.decidedBy = actor.userId;
       data.decidedAt = new Date();
+    }
+    // Phase 10 (ops-core): approving deducts the leave balance (one ledger
+    // row per request; refuses to overdraw a policy-tracked balance).
+    if (patch.status === "approved") {
+      const { deductApprovedLeave } = await import("./leave");
+      await deductApprovedLeave(tx, actor, existing);
     }
   }
   if (def.statusTransitions) {

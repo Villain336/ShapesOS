@@ -50,6 +50,13 @@ export const KNOWN_ACTION_DEFS: ReadonlyArray<{ action: string; label: string; d
   { action: "submit_expense_claim", label: "Submit an expense claim", description: "Create and submit an expense claim for approval. Always asks." },
   { action: "record_payment", label: "Record a payment", description: "Propose recording a customer payment on an invoice. Never automated." },
   { action: "post_journal_entry", label: "Post a journal entry", description: "Propose a manual entry in the books. Never automated." },
+  // Phase 10 (ops-core): CRM, projects, helpdesk, inventory agent tools.
+  { action: "write_crm_record", label: "Write CRM records", description: "Create contacts, companies and deals, move deal stages, convert leads. Always asks." },
+  { action: "write_project_record", label: "Write project records", description: "Create tasks and log time on projects. Always asks." },
+  { action: "write_ticket", label: "Open or close tickets", description: "Open helpdesk tickets or mark them solved/closed. Always asks." },
+  { action: "send_ticket_reply", label: "Reply to a ticket", description: "Email a customer from a helpdesk ticket. Always asks." },
+  { action: "move_stock", label: "Draft a stock move", description: "Create a draft move between stock locations (a person books it). Always asks." },
+  { action: "set_reorder_rule", label: "Set a reorder rule", description: "Create or change a min/max reorder rule. Always asks." },
 ];
 
 

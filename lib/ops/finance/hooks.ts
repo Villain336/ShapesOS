@@ -325,7 +325,7 @@ const purchaseOrderHooks: OpsEntityHooks = {
     let restocked = 0;
     for (const it of before) {
       if (!it.productId) continue;
-      await recordInventoryTxn(tx, actor, { productId: it.productId, delta: it.qty, reason: "restock", note: `purchase order ${t.id}` });
+      await recordInventoryTxn(tx, actor, { productId: it.productId, delta: it.qty, reason: "restock", note: `purchase order ${t.id}`, variantId: it.variantId ?? null, locationId: it.locationId ?? null });
       restocked += 1;
     }
     return { restocked };

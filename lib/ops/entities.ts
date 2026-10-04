@@ -20,6 +20,7 @@
 import { z } from "zod";
 // Phase 10 (finance): accounting, quotes, purchasing and expense entities.
 import { FINANCE_ENTITIES } from "./finance/entities";
+import type { Prisma } from "@prisma/client";
 
 export interface OpsGatedTransition {
   /** The PATCH field whose move to one of `to` is a gated write. */
@@ -56,6 +57,29 @@ export interface OpsEntityDef {
   createGate?: string;
   /** Statuses in which money fields (taxCents/lineItems) may still change (default ["draft"]). */
   editableStatuses?: string[];
+  /**
+   * Phase 10 (ops-core): entity-specific create/patch rules. When set, the
+   * DocType service (lib/ops/doctype.ts) calls them instead of the generic
+   * insert/update — validation, audit, gating and status-transition checks
+   * still run around them. Implementations live in lib/ops/* and are
+   * imported lazily (they import the service themselves).
+   */
+  hooks?: OpsEntityHooks;
+}
+
+export interface OpsEntityHooks {
+  create?: (
+    tx: Prisma.TransactionClient,
+    actor: { workspaceId: string; userId: string },
+    body: Record<string, unknown>,
+  ) => Promise<Record<string, unknown>>;
+  patch?: (
+    tx: Prisma.TransactionClient,
+    actor: { workspaceId: string; userId: string },
+    id: string,
+    patch: Record<string, unknown>,
+    existing: Record<string, unknown>,
+  ) => Promise<Record<string, unknown>>;
 }
 
 // ---------------------------------------------------------------------------
@@ -318,13 +342,16 @@ const inventoryTxnDef: OpsEntityDef = {
     reason: z.enum(["sale", "restock", "adjustment"]),
     actor: z.string().max(128).optional(),
     note: z.string().max(2000).optional(),
+    // Phase 10 (ops-core): variant (default variant when omitted) + location.
+    variantId: z.string().min(1).max(64).optional(),
+    locationId: z.string().min(1).max(64).optional(),
   }),
   patchSchema: z.object({}),
   // Immutable ledger — PATCH returns 405.
   patchable: false,
   // Slice 3: productId filterable so the UI can show per-product history
   // through the generic route.
-  filterable: ["reason", "productId"],
+  filterable: ["reason", "productId", "locationId", "variantId", "transferId"],
   gatedTransitions: [],
   summarize: (r) => `inventory ${r.reason} ${r.delta} on ${r.productId}`,
 };
@@ -337,6 +364,9 @@ const poLineItemSchema = z.object({
   sku: z.string().max(64).optional(),
   qty: z.number().int().min(1).max(100_000),
   priceCents: z.number().int().min(0).max(1_000_000_000),
+  // Phase 10 (ops-core): receive into this variant / location.
+  variantId: z.string().min(1).max(64).optional(),
+  locationId: z.string().min(1).max(64).optional(),
 });
 
 const purchaseOrderDef: OpsEntityDef = {
@@ -397,6 +427,8 @@ const projectDef: OpsEntityDef = {
     status: z.enum(["planning", "active", "on_hold", "completed", "cancelled"]).default("planning"),
     leadId: z.string().max(64).optional(),
     dealId: z.string().max(64).optional(),
+    // Phase 10 (ops-core): default billing rate for logged time.
+    hourlyRateCents: centsSchema.optional(),
   }),
   patchSchema: z.object({
     name: z.string().min(1).max(200).optional(),
@@ -404,6 +436,7 @@ const projectDef: OpsEntityDef = {
     status: z.enum(["planning", "active", "on_hold", "completed", "cancelled"]).optional(),
     leadId: z.string().max(64).nullable().optional(),
     dealId: z.string().max(64).nullable().optional(),
+    hourlyRateCents: centsSchema.nullable().optional(),
   }),
   patchable: true,
   filterable: ["status"],
@@ -426,15 +459,20 @@ const teamMemberDef: OpsEntityDef = {
     email: z.string().email().max(320).optional(),
     // ISO-8601 date; parsed to a Date in createRows (validated there).
     startDate: z.string().max(64).optional(),
+    // Phase 10 (ops-core): workspace-user link + department.
+    userId: z.string().min(1).max(128).optional(),
+    departmentId: z.string().min(1).max(64).optional(),
   }),
   patchSchema: z.object({
     title: z.string().max(200).nullable().optional(),
     email: z.string().email().max(320).nullable().optional(),
     startDate: z.string().max(64).nullable().optional(),
     status: z.enum(["active", "inactive"]).optional(),
+    userId: z.string().min(1).max(128).nullable().optional(),
+    departmentId: z.string().min(1).max(64).nullable().optional(),
   }),
   patchable: true,
-  filterable: ["status"],
+  filterable: ["status", "departmentId", "userId"],
   gatedTransitions: [],
   summarize: (r) => `team member "${r.name}"${r.title ? ` (${r.title})` : ""} → ${r.status}`,
 };
@@ -494,6 +532,483 @@ const workflowRunDef: OpsEntityDef = {
   summarize: (r) => `workflow "${r.workflowName}" → ${r.status}`,
 };
 
+// ---------------------------------------------------------------------------
+// Phase 10 (ops-core): inventory — warehouses, locations, variants,
+// transfers, reorder rules (rules in lib/ops/stock.ts).
+// ---------------------------------------------------------------------------
+
+const lazyStock = () => import("./stock");
+
+const warehouseDef: OpsEntityDef = {
+  slug: "warehouses",
+  label: "Warehouse",
+  delegate: "opsWarehouse",
+  createSchema: z.object({
+    name: z.string().min(1).max(200),
+    code: z.string().trim().min(1).max(32).regex(/^[A-Za-z0-9._-]+$/, "code may use letters, digits, . _ -"),
+    address: z.string().max(2000).optional(),
+  }),
+  // Codes are immutable (locations' paths and the digital twin key on them).
+  patchSchema: z.object({
+    name: z.string().min(1).max(200).optional(),
+    address: z.string().max(2000).nullable().optional(),
+    active: z.boolean().optional(),
+  }).strict(),
+  patchable: true,
+  filterable: [],
+  gatedTransitions: [],
+  summarize: (r) => `warehouse ${r.code} "${r.name}"`,
+};
+
+const locationDef: OpsEntityDef = {
+  slug: "locations",
+  label: "Location",
+  delegate: "opsLocation",
+  createSchema: z.object({
+    warehouseId: z.string().min(1).max(64),
+    parentId: z.string().min(1).max(64).optional(),
+    kind: z.enum(["zone", "aisle", "rack", "shelf", "bin", "dock"]),
+    code: z.string().trim().min(1).max(64).regex(/^[A-Za-z0-9._-]+$/, "code may use letters, digits, . _ -"),
+    name: z.string().max(200).optional(),
+  }),
+  patchSchema: z.object({
+    name: z.string().max(200).nullable().optional(),
+    active: z.boolean().optional(),
+  }).strict(),
+  patchable: true,
+  filterable: ["warehouseId", "parentId", "kind"],
+  gatedTransitions: [],
+  summarize: (r) => `location ${r.path ?? r.code} (${r.kind})`,
+  hooks: { create: async (tx, a, b) => (await lazyStock()).createLocationRow(tx, a, b) },
+};
+
+const productVariantDef: OpsEntityDef = {
+  slug: "product-variants",
+  label: "Product variant",
+  delegate: "opsProductVariant",
+  createSchema: z.object({
+    productId: z.string().min(1).max(64),
+    sku: z.string().trim().min(1).max(64),
+    name: z.string().trim().min(1).max(200),
+    attributes: z.record(z.string().max(64), z.string().max(200)).default({}),
+    priceCents: centsSchema.optional(),
+  }),
+  patchSchema: z.object({
+    name: z.string().trim().min(1).max(200).optional(),
+    attributes: z.record(z.string().max(64), z.string().max(200)).optional(),
+    priceCents: centsSchema.nullable().optional(),
+    active: z.boolean().optional(),
+  }).strict(),
+  patchable: true,
+  filterable: ["productId"],
+  gatedTransitions: [],
+  summarize: (r) => `variant ${r.sku} "${r.name}"`,
+  hooks: { create: async (tx, a, b) => (await lazyStock()).createVariantRow(tx, a, b) },
+};
+
+const transferDef: OpsEntityDef = {
+  slug: "transfers",
+  label: "Transfer",
+  delegate: "opsTransfer",
+  createSchema: z.object({
+    fromLocationId: z.string().min(1).max(64),
+    toLocationId: z.string().min(1).max(64),
+    lines: z
+      .array(
+        z.object({
+          productId: z.string().min(1).max(64),
+          variantId: z.string().min(1).max(64).optional(),
+          qty: z.number().int().min(1).max(1_000_000),
+        }),
+      )
+      .min(1)
+      .max(200),
+    note: z.string().max(2000).optional(),
+  }),
+  patchSchema: z.object({
+    status: z.enum(["done", "cancelled"]).optional(),
+    note: z.string().max(2000).nullable().optional(),
+  }).strict(),
+  patchable: true,
+  filterable: ["status", "fromLocationId", "toLocationId"],
+  gatedTransitions: [],
+  // Done books the paired ledger legs exactly once (status-guarded claim).
+  statusTransitions: { draft: ["done", "cancelled"], done: [], cancelled: [] },
+  summarize: (r) => `transfer ${r.id} → ${r.status}`,
+  hooks: {
+    create: async (tx, a, b) => (await lazyStock()).createTransferRow(tx, a, b),
+    patch: async (tx, a, id, p, e) => (await lazyStock()).patchTransfer(tx, a, id, p, e),
+  },
+};
+
+const reorderRuleDef: OpsEntityDef = {
+  slug: "reorder-rules",
+  label: "Reorder rule",
+  delegate: "opsReorderRule",
+  createSchema: z.object({
+    productId: z.string().min(1).max(64),
+    variantId: z.string().min(1).max(64).optional(),
+    warehouseId: z.string().min(1).max(64),
+    receiveLocationId: z.string().min(1).max(64).optional(),
+    minQty: z.number().int().min(0).max(10_000_000),
+    maxQty: z.number().int().min(1).max(10_000_000),
+    supplierName: z.string().max(200).optional(),
+    unitCostCents: centsSchema.optional(),
+  }),
+  patchSchema: z.object({
+    minQty: z.number().int().min(0).max(10_000_000).optional(),
+    maxQty: z.number().int().min(1).max(10_000_000).optional(),
+    receiveLocationId: z.string().min(1).max(64).nullable().optional(),
+    supplierName: z.string().max(200).nullable().optional(),
+    unitCostCents: centsSchema.nullable().optional(),
+    active: z.boolean().optional(),
+  }).strict(),
+  patchable: true,
+  filterable: ["productId", "warehouseId"],
+  gatedTransitions: [],
+  summarize: (r) => `reorder rule ${r.id}: min ${r.minQty} / max ${r.maxQty}`,
+  hooks: {
+    create: async (tx, a, b) => (await lazyStock()).createReorderRuleRow(tx, a, b),
+    patch: async (tx, a, id, p, e) => (await lazyStock()).patchReorderRule(tx, a, id, p, e),
+  },
+};
+
+// ---------------------------------------------------------------------------
+// Phase 10 (ops-core): CRM accounts — companies, contacts, deals (rules +
+// Lead conversion in lib/ops/crm.ts).
+// ---------------------------------------------------------------------------
+
+const lazyCrm = () => import("./crm");
+const isoDate = z.string().max(64).refine((v) => !Number.isNaN(new Date(v).getTime()), { message: "must be an ISO-8601 date" });
+
+const companyDef: OpsEntityDef = {
+  slug: "companies",
+  label: "Company",
+  delegate: "opsCompany",
+  createSchema: z.object({
+    name: z.string().trim().min(1).max(200),
+    domain: z.string().max(253).optional(),
+    website: z.string().max(500).optional(),
+    phone: z.string().max(64).optional(),
+    industry: z.string().max(120).optional(),
+    ownerId: z.string().max(128).optional(),
+    notes: z.string().max(5000).optional(),
+  }),
+  patchSchema: z.object({
+    name: z.string().trim().min(1).max(200).optional(),
+    domain: z.string().max(253).nullable().optional(),
+    website: z.string().max(500).nullable().optional(),
+    phone: z.string().max(64).nullable().optional(),
+    industry: z.string().max(120).nullable().optional(),
+    ownerId: z.string().max(128).nullable().optional(),
+    notes: z.string().max(5000).nullable().optional(),
+  }).strict(),
+  patchable: true,
+  filterable: ["ownerId"],
+  gatedTransitions: [],
+  summarize: (r) => `company "${r.name}"${r.domain ? ` (${r.domain})` : ""}`,
+  hooks: {
+    create: async (tx, a, b) => (await lazyCrm()).createCompanyRow(tx, a, b),
+    patch: async (tx, a, id, p) => (await lazyCrm()).patchCompanyRow(tx, a, id, p),
+  },
+};
+
+const contactDef: OpsEntityDef = {
+  slug: "contacts",
+  label: "Contact",
+  delegate: "opsContact",
+  createSchema: z.object({
+    name: z.string().trim().min(1).max(200),
+    email: z.string().max(320).optional(),
+    phone: z.string().max(64).optional(),
+    title: z.string().max(200).optional(),
+    companyId: z.string().min(1).max(64).optional(),
+    ownerId: z.string().max(128).optional(),
+    notes: z.string().max(5000).optional(),
+  }),
+  patchSchema: z.object({
+    name: z.string().trim().min(1).max(200).optional(),
+    email: z.string().max(320).nullable().optional(),
+    phone: z.string().max(64).nullable().optional(),
+    title: z.string().max(200).nullable().optional(),
+    companyId: z.string().min(1).max(64).nullable().optional(),
+    ownerId: z.string().max(128).nullable().optional(),
+    notes: z.string().max(5000).nullable().optional(),
+  }).strict(),
+  patchable: true,
+  filterable: ["companyId", "ownerId", "leadId"],
+  gatedTransitions: [],
+  summarize: (r) => `contact "${r.name}"${r.email ? ` <${r.email}>` : ""}`,
+  hooks: {
+    create: async (tx, a, b) => (await lazyCrm()).createContactRow(tx, a, b),
+    patch: async (tx, a, id, p) => (await lazyCrm()).patchContactRow(tx, a, id, p),
+  },
+};
+
+const dealDef: OpsEntityDef = {
+  slug: "deals",
+  label: "Deal",
+  delegate: "opsDeal",
+  createSchema: z.object({
+    title: z.string().trim().min(1).max(200),
+    pipelineId: z.string().min(1).max(64).optional(),
+    stage: z.string().min(1).max(64).optional(),
+    valueCents: centsSchema.default(0),
+    ownerId: z.string().max(128).optional(),
+    ownerName: z.string().max(200).optional(),
+    contactId: z.string().min(1).max(64).optional(),
+    companyId: z.string().min(1).max(64).optional(),
+    leadId: z.string().min(1).max(64).optional(),
+    expectedCloseAt: isoDate.optional(),
+  }),
+  // Moving a deal between stages is a free, logged write (no money moves).
+  patchSchema: z.object({
+    title: z.string().trim().min(1).max(200).optional(),
+    stage: z.string().min(1).max(64).optional(),
+    valueCents: centsSchema.optional(),
+    ownerId: z.string().max(128).nullable().optional(),
+    ownerName: z.string().max(200).nullable().optional(),
+    contactId: z.string().min(1).max(64).nullable().optional(),
+    companyId: z.string().min(1).max(64).nullable().optional(),
+    expectedCloseAt: isoDate.nullable().optional(),
+    lostReason: z.string().max(500).nullable().optional(),
+  }).strict(),
+  patchable: true,
+  filterable: ["pipelineId", "stage", "status", "contactId", "companyId", "ownerId"],
+  gatedTransitions: [],
+  summarize: (r) => `deal "${r.title}" → ${r.stage} (${r.valueCents}c)`,
+  hooks: {
+    create: async (tx, a, b) => (await lazyCrm()).createDealRow(tx, a, b),
+    patch: async (tx, a, id, p, e) => (await lazyCrm()).patchDealRow(tx, a, id, p, e),
+  },
+};
+
+// ---------------------------------------------------------------------------
+// Phase 10 (ops-core): project tasks (rules in lib/ops/timesheets.ts).
+// ---------------------------------------------------------------------------
+
+const taskStage = z.enum(["backlog", "todo", "in_progress", "review", "done", "cancelled"]);
+const taskPriority = z.enum(["low", "normal", "high", "urgent"]);
+
+const taskDef: OpsEntityDef = {
+  slug: "tasks",
+  label: "Task",
+  delegate: "opsTask",
+  createSchema: z.object({
+    projectId: z.string().min(1).max(64),
+    title: z.string().trim().min(1).max(300),
+    description: z.string().max(10_000).optional(),
+    stage: taskStage.default("todo"),
+    priority: taskPriority.default("normal"),
+    assigneeId: z.string().min(1).max(128).optional(),
+    dueAt: isoDate.optional(),
+    estimateMinutes: z.number().int().min(1).max(100_000).optional(),
+  }),
+  patchSchema: z.object({
+    title: z.string().trim().min(1).max(300).optional(),
+    description: z.string().max(10_000).nullable().optional(),
+    stage: taskStage.optional(),
+    priority: taskPriority.optional(),
+    assigneeId: z.string().min(1).max(128).nullable().optional(),
+    dueAt: isoDate.nullable().optional(),
+    estimateMinutes: z.number().int().min(1).max(100_000).nullable().optional(),
+  }).strict(),
+  patchable: true,
+  filterable: ["projectId", "stage", "assigneeId", "priority"],
+  gatedTransitions: [],
+  summarize: (r) => `task "${r.title}" → ${r.stage}`,
+  hooks: {
+    create: async (tx, a, b) => (await import("./timesheets")).createTaskRow(tx, a, b),
+    patch: async (tx, a, id, p, e) => (await import("./timesheets")).patchTaskRow(tx, a, id, p, e),
+  },
+};
+
+// ---------------------------------------------------------------------------
+// Phase 10 (ops-core): helpdesk — tickets + SLA policies (rules, inbound
+// email threading and replies in lib/ops/helpdesk.ts).
+// ---------------------------------------------------------------------------
+
+const ticketPriority = z.enum(["low", "normal", "high", "urgent"]);
+
+const ticketDef: OpsEntityDef = {
+  slug: "tickets",
+  label: "Ticket",
+  delegate: "opsTicket",
+  createSchema: z.object({
+    subject: z.string().trim().min(1).max(300),
+    body: z.string().max(50_000).optional(),
+    priority: ticketPriority.default("normal"),
+    channel: z.enum(["web", "phone", "chat", "agent", "email"]).default("web"),
+    requesterEmail: z.string().max(320).optional(),
+    requesterName: z.string().max(200).optional(),
+    contactId: z.string().min(1).max(64).optional(),
+    assigneeId: z.string().min(1).max(128).optional(),
+  }),
+  patchSchema: z.object({
+    subject: z.string().trim().min(1).max(300).optional(),
+    status: z.enum(["open", "pending", "solved", "closed"]).optional(),
+    priority: ticketPriority.optional(),
+    assigneeId: z.string().min(1).max(128).nullable().optional(),
+    contactId: z.string().min(1).max(64).nullable().optional(),
+  }).strict(),
+  patchable: true,
+  filterable: ["status", "priority", "assigneeId", "contactId", "requesterEmail"],
+  gatedTransitions: [],
+  statusTransitions: {
+    new: ["open", "pending", "solved", "closed"],
+    open: ["pending", "solved", "closed"],
+    pending: ["open", "solved", "closed"],
+    solved: ["open", "closed"],
+    closed: [],
+  },
+  summarize: (r) => `ticket #${r.number ?? "?"} "${r.subject}" → ${r.status}`,
+  hooks: {
+    create: async (tx, a, b) => (await import("./helpdesk")).createTicketRow(tx, a, b),
+    patch: async (tx, a, id, p, e) => (await import("./helpdesk")).patchTicketRow(tx, a, id, p, e),
+  },
+};
+
+const slaPolicyDef: OpsEntityDef = {
+  slug: "sla-policies",
+  label: "SLA policy",
+  delegate: "opsSlaPolicy",
+  createSchema: z.object({
+    priority: ticketPriority,
+    firstResponseMinutes: z.number().int().min(1).max(525_600),
+    resolutionMinutes: z.number().int().min(1).max(525_600),
+  }).refine((b) => b.resolutionMinutes >= b.firstResponseMinutes, { message: "resolution target must be at least the first-response target" }),
+  patchSchema: z.object({
+    firstResponseMinutes: z.number().int().min(1).max(525_600).optional(),
+    resolutionMinutes: z.number().int().min(1).max(525_600).optional(),
+    active: z.boolean().optional(),
+  }).strict(),
+  patchable: true,
+  filterable: ["priority"],
+  gatedTransitions: [],
+  summarize: (r) => `SLA ${r.priority}: first response ${r.firstResponseMinutes}m, resolution ${r.resolutionMinutes}m`,
+};
+
+// ---------------------------------------------------------------------------
+// Phase 10 (ops-core): HR — departments, leave policies + ledger
+// adjustments, recruiting (rules in lib/ops/leave.ts and lib/ops/hr.ts).
+// ---------------------------------------------------------------------------
+
+const leaveType = z.enum(["vacation", "sick", "personal"]);
+
+const departmentDef: OpsEntityDef = {
+  slug: "departments",
+  label: "Department",
+  delegate: "opsDepartment",
+  createSchema: z.object({
+    name: z.string().trim().min(1).max(200),
+    managerMemberId: z.string().min(1).max(64).optional(),
+  }),
+  patchSchema: z.object({
+    name: z.string().trim().min(1).max(200).optional(),
+    managerMemberId: z.string().min(1).max(64).nullable().optional(),
+  }).strict(),
+  patchable: true,
+  filterable: [],
+  gatedTransitions: [],
+  summarize: (r) => `department "${r.name}"`,
+};
+
+const leavePolicyDef: OpsEntityDef = {
+  slug: "leave-policies",
+  label: "Leave policy",
+  delegate: "opsLeavePolicy",
+  createSchema: z.object({
+    type: leaveType,
+    yearlyDays: z.number().int().min(0).max(366),
+    carryOverCapDays: z.number().int().min(0).max(366).default(0),
+  }),
+  patchSchema: z.object({
+    yearlyDays: z.number().int().min(0).max(366).optional(),
+    carryOverCapDays: z.number().int().min(0).max(366).optional(),
+    active: z.boolean().optional(),
+  }).strict(),
+  patchable: true,
+  filterable: ["type"],
+  gatedTransitions: [],
+  summarize: (r) => `leave policy ${r.type}: ${r.yearlyDays} days/yr, carry ${r.carryOverCapDays}`,
+};
+
+const leaveAdjustmentDef: OpsEntityDef = {
+  slug: "leave-ledger",
+  label: "Leave ledger entry",
+  delegate: "opsLeaveLedger",
+  // Only manual ADJUSTMENTS are created here ("taken" rows come from
+  // approving leave). Append-only: corrections are new signed rows.
+  createSchema: z.object({
+    memberId: z.string().min(1).max(64),
+    type: leaveType,
+    year: z.number().int().min(2000).max(2100),
+    days: z.number().refine((d) => Number.isFinite(d) && d !== 0 && Math.abs(d) <= 366 && Math.round(d * 100) === d * 100, { message: "days must be non-zero with at most two decimals" }),
+    note: z.string().max(500).optional(),
+  }).transform((b) => ({ memberId: b.memberId, type: b.type, year: b.year, kind: "adjustment" as const, centidays: Math.round(b.days * 100), note: b.note })),
+  patchSchema: z.object({}),
+  patchable: false,
+  filterable: ["memberId", "type", "kind"],
+  gatedTransitions: [],
+  summarize: (r) => `leave ${r.kind} ${r.type} ${Number(r.centidays) / 100}d (${r.year})`,
+};
+
+const jobOpeningDef: OpsEntityDef = {
+  slug: "job-openings",
+  label: "Job opening",
+  delegate: "opsJobOpening",
+  createSchema: z.object({
+    title: z.string().trim().min(1).max(200),
+    departmentId: z.string().min(1).max(64).optional(),
+    location: z.string().max(200).optional(),
+    description: z.string().max(20_000).optional(),
+  }),
+  patchSchema: z.object({
+    title: z.string().trim().min(1).max(200).optional(),
+    departmentId: z.string().min(1).max(64).nullable().optional(),
+    location: z.string().max(200).nullable().optional(),
+    description: z.string().max(20_000).nullable().optional(),
+    status: z.enum(["open", "paused", "closed"]).optional(),
+  }).strict(),
+  patchable: true,
+  filterable: ["status", "departmentId"],
+  gatedTransitions: [],
+  summarize: (r) => `job opening "${r.title}" → ${r.status}`,
+};
+
+const applicantStage = z.enum(["applied", "screening", "interview", "offer", "hired", "rejected"]);
+
+const applicantDef: OpsEntityDef = {
+  slug: "applicants",
+  label: "Applicant",
+  delegate: "opsApplicant",
+  createSchema: z.object({
+    openingId: z.string().min(1).max(64),
+    name: z.string().trim().min(1).max(200),
+    email: z.string().email().max(320).optional(),
+    phone: z.string().max(64).optional(),
+    source: z.string().max(120).optional(),
+    stage: applicantStage.default("applied"),
+    rating: z.number().int().min(1).max(5).optional(),
+    notes: z.string().max(20_000).optional(),
+  }),
+  patchSchema: z.object({
+    stage: applicantStage.optional(),
+    rating: z.number().int().min(1).max(5).nullable().optional(),
+    notes: z.string().max(20_000).nullable().optional(),
+    email: z.string().email().max(320).nullable().optional(),
+    phone: z.string().max(64).nullable().optional(),
+  }).strict(),
+  patchable: true,
+  filterable: ["openingId", "stage"],
+  gatedTransitions: [],
+  summarize: (r) => `applicant "${r.name}" → ${r.stage}`,
+  hooks: {
+    create: async (tx, a, b) => (await import("./hr")).createApplicantRow(tx, a, b),
+    patch: async (tx, a, id, p, e) => (await import("./hr")).patchApplicantRow(tx, a, id, p, e),
+  },
+};
+
 export const OPS_ENTITIES: OpsEntityDef[] = [
   productDef,
   orderDef,
@@ -508,6 +1023,23 @@ export const OPS_ENTITIES: OpsEntityDef[] = [
   leaveRequestDef,
   // Phase 10 (finance)
   ...FINANCE_ENTITIES,
+  // Phase 10 (ops-core)
+  departmentDef,
+  leavePolicyDef,
+  leaveAdjustmentDef,
+  jobOpeningDef,
+  applicantDef,
+  ticketDef,
+  slaPolicyDef,
+  taskDef,
+  companyDef,
+  contactDef,
+  dealDef,
+  warehouseDef,
+  locationDef,
+  productVariantDef,
+  transferDef,
+  reorderRuleDef,
 ];
 
 export const OPS_ENTITY_MAP: Record<string, OpsEntityDef> = Object.fromEntries(

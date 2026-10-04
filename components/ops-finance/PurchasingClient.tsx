@@ -1,6 +1,6 @@
 "use client";
 
-// ShapesOS — Phase 10 (finance): client islands for /dashboard/ops/purchasing
+// ShapesOS — Phase 10 (finance): client islands for /dashboard/ops/vendors
 // — vendors, partial receipts against purchase orders, vendor bills (post to
 // accounts payable, pay through an approval, cancel through an approval).
 

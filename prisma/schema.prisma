@@ -605,6 +605,24 @@ model Workspace {
   agentRunTranscripts         AgentRunTranscript[]
   // Phase 16 slice 9: branded report engine back-relation.
   reportSendApprovals         ReportSendApproval[]
+  // Phase 10 (ops-core) back-relations.
+  opsDepartments              OpsDepartment[]
+  opsLeavePolicies            OpsLeavePolicy[]
+  opsLeaveLedger              OpsLeaveLedger[]
+  opsJobOpenings              OpsJobOpening[]
+  opsApplicants               OpsApplicant[]
+  opsSlaPolicies              OpsSlaPolicy[]
+  opsTickets                  OpsTicket[]
+  opsTicketMessages           OpsTicketMessage[]
+  opsTasks                    OpsTask[]
+  opsCompanies                OpsCompany[]
+  opsContacts                 OpsContact[]
+  opsDeals                    OpsDeal[]
+  opsWarehouses               OpsWarehouse[]
+  opsLocations                OpsLocation[]
+  opsProductVariants          OpsProductVariant[]
+  opsTransfers                OpsTransfer[]
+  opsReorderRules             OpsReorderRule[]
   // Phase 17 slice 1: Business Operations back-relations (DocType entities).
   opsProducts                 OpsProduct[]
   opsOrders                   OpsOrder[]
@@ -4022,6 +4040,8 @@ model Pipeline {
 
   leads        Lead[]
   captureForms LeadCaptureForm[]
+  // Phase 10 (ops-core): real deals on this pipeline's stages.
+  opsDeals     OpsDeal[]
 
   @@index([workspaceId])
   @@map("crm_pipelines")
@@ -9378,6 +9398,558 @@ model ReportSendApproval {
 }
 
 // ============================================================================
+// Phase 10 (ops-core) — CRM accounts: companies, contacts, deals. Lead stays
+// the capture record (forms, imports, inbox); converting a lead dedupes onto
+// a Contact (by email) and Company (by domain, then name). A Deal is a real
+// opportunity on a CRM pipeline's stage machine (crm_pipelines.stages).
+// ============================================================================
+
+enum OpsDealStatus {
+  open
+  won
+  lost
+}
+
+model OpsCompany {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name        String
+  // Lower-cased registrable domain ("acme.com"); the dedupe key when set.
+  domain      String?
+  website     String?
+  phone       String?
+  industry    String?
+  // Owning user (Auth.js subject id), optional.
+  ownerId     String?   @map("owner_id")
+  notes       String?   @db.Text
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  contacts OpsContact[]
+  deals    OpsDeal[]
+
+  @@unique([workspaceId, domain])
+  @@index([workspaceId, name])
+  @@map("ops_companies")
+}
+
+model OpsContact {
+  id          String      @id @default(cuid())
+  workspaceId String      @map("workspace_id")
+  workspace   Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  companyId   String?     @map("company_id")
+  company     OpsCompany? @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  name        String
+  // Lower-cased; the dedupe key when set.
+  email       String?
+  phone       String?
+  title       String?
+  ownerId     String?     @map("owner_id")
+  // The capture lead this contact was converted from (crm_leads.id).
+  leadId      String?     @map("lead_id")
+  notes       String?     @db.Text
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
+
+  deals   OpsDeal[]
+  tickets OpsTicket[]
+
+  @@unique([workspaceId, email])
+  @@unique([workspaceId, leadId])
+  @@index([workspaceId, companyId])
+  @@index([workspaceId, name])
+  @@map("ops_contacts")
+}
+
+model OpsDeal {
+  id              String        @id @default(cuid())
+  workspaceId     String        @map("workspace_id")
+  workspace       Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  title           String
+  // Stage machine: crm_pipelines.stages; stage must be one of its ids.
+  pipelineId      String        @map("pipeline_id")
+  pipeline        Pipeline      @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+  stage           String
+  // Integer cents.
+  valueCents      Int           @default(0) @map("value_cents")
+  status          OpsDealStatus @default(open)
+  ownerId         String?       @map("owner_id")
+  ownerName       String?       @map("owner_name")
+  contactId       String?       @map("contact_id")
+  contact         OpsContact?   @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  companyId       String?       @map("company_id")
+  company         OpsCompany?   @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  // The capture lead this deal came from (crm_leads.id), if any.
+  leadId          String?       @map("lead_id")
+  expectedCloseAt DateTime?     @map("expected_close_at")
+  closedAt        DateTime?     @map("closed_at")
+  lostReason      String?       @map("lost_reason")
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+
+  projects OpsProject[]
+
+  @@index([workspaceId, pipelineId, stage])
+  @@index([workspaceId, status, expectedCloseAt])
+  @@index([workspaceId, leadId])
+  @@map("ops_deals")
+}
+
+// ============================================================================
+// Phase 10 (ops-core) — projects: tasks (kanban), user-linked timesheets
+// with approval and rates, billing approved time onto draft invoices.
+// ============================================================================
+
+enum OpsTaskStage {
+  backlog
+  todo
+  in_progress
+  review
+  done
+  cancelled
+}
+
+enum OpsTaskPriority {
+  low
+  normal
+  high
+  urgent
+}
+
+enum OpsTimesheetStatus {
+  pending
+  approved
+  rejected
+}
+
+model OpsTask {
+  id              String          @id @default(cuid())
+  workspaceId     String          @map("workspace_id")
+  workspace       Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  projectId       String          @map("project_id")
+  project         OpsProject      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  title           String
+  description     String?         @db.Text
+  stage           OpsTaskStage    @default(todo)
+  priority        OpsTaskPriority @default(normal)
+  // Workspace member (Auth.js subject id), validated on write.
+  assigneeId      String?         @map("assignee_id")
+  dueAt           DateTime?       @map("due_at")
+  estimateMinutes Int?            @map("estimate_minutes")
+  completedAt     DateTime?       @map("completed_at")
+  createdBy       String?         @map("created_by")
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
+
+  timeEntries OpsTimeEntry[]
+
+  @@index([workspaceId, projectId, stage])
+  @@index([workspaceId, assigneeId, stage])
+  @@map("ops_tasks")
+}
+
+// ============================================================================
+// Phase 10 (ops-core) — helpdesk: tickets, ticket messages, SLA policies.
+// Inbound email reaches tickets through the EXISTING signed inbound route
+// (app/api/messaging/inbound/email): mail to the workspace's signed support
+// address — or an unknown sender replying to its reply address — opens or
+// threads onto a ticket. Replies go out through the messaging email
+// provider (lib/messaging/provider.ts).
+// ============================================================================
+
+enum OpsTicketStatus {
+  new
+  open
+  pending
+  solved
+  closed
+}
+
+enum OpsTicketPriority {
+  low
+  normal
+  high
+  urgent
+}
+
+enum OpsTicketChannel {
+  email
+  web
+  phone
+  chat
+  agent
+}
+
+enum OpsTicketMessageDirection {
+  inbound
+  outbound
+  note
+}
+
+model OpsSlaPolicy {
+  id                   String            @id @default(cuid())
+  workspaceId          String            @map("workspace_id")
+  workspace            Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  priority             OpsTicketPriority
+  // Calendar minutes from ticket creation.
+  firstResponseMinutes Int               @map("first_response_minutes")
+  resolutionMinutes    Int               @map("resolution_minutes")
+  active               Boolean           @default(true)
+  createdAt            DateTime          @default(now()) @map("created_at")
+  updatedAt            DateTime          @updatedAt @map("updated_at")
+
+  @@unique([workspaceId, priority])
+  @@map("ops_sla_policies")
+}
+
+model OpsTicket {
+  id                 String            @id @default(cuid())
+  workspaceId        String            @map("workspace_id")
+  workspace          Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  // Per-workspace sequence shown as "#123" (threads replies by subject).
+  number             Int
+  subject            String
+  status             OpsTicketStatus   @default(new)
+  priority           OpsTicketPriority @default(normal)
+  channel            OpsTicketChannel  @default(web)
+  requesterEmail     String?           @map("requester_email")
+  requesterName      String?           @map("requester_name")
+  contactId          String?           @map("contact_id")
+  contact            OpsContact?       @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  // Workspace member (Auth.js subject id).
+  assigneeId         String?           @map("assignee_id")
+  firstResponseDueAt DateTime?         @map("first_response_due_at")
+  resolutionDueAt    DateTime?         @map("resolution_due_at")
+  firstRespondedAt   DateTime?         @map("first_responded_at")
+  solvedAt           DateTime?         @map("solved_at")
+  closedAt           DateTime?         @map("closed_at")
+  // Set once by the SLA sweep when a target is missed (notifies once).
+  slaBreachedAt      DateTime?         @map("sla_breached_at")
+  slaBreachKind      String?           @map("sla_breach_kind")
+  lastMessageAt      DateTime          @default(now()) @map("last_message_at")
+  createdBy          String?           @map("created_by")
+  createdAt          DateTime          @default(now()) @map("created_at")
+  updatedAt          DateTime          @updatedAt @map("updated_at")
+
+  messages OpsTicketMessage[]
+
+  @@unique([workspaceId, number])
+  @@index([workspaceId, status, priority])
+  @@index([workspaceId, assigneeId, status])
+  @@index([workspaceId, requesterEmail])
+  @@map("ops_tickets")
+}
+
+model OpsTicketMessage {
+  id             String                    @id @default(cuid())
+  workspaceId    String                    @map("workspace_id")
+  workspace      Workspace                 @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  ticketId       String                    @map("ticket_id")
+  ticket         OpsTicket                 @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  direction      OpsTicketMessageDirection
+  authorUserId   String?                   @map("author_user_id")
+  fromEmail      String?                   @map("from_email")
+  toEmail        String?                   @map("to_email")
+  body           String                    @db.Text
+  // Inbound: the Resend email id (idempotency). Outbound: provider sid.
+  providerSid    String?                   @map("provider_sid")
+  // Outbound delivery: queued | sent | failed.
+  deliveryStatus String?                   @map("delivery_status")
+  error          String?
+  createdAt      DateTime                  @default(now()) @map("created_at")
+
+  @@unique([workspaceId, providerSid])
+  @@index([workspaceId, ticketId, createdAt])
+  @@map("ops_ticket_messages")
+}
+
+// ============================================================================
+// Phase 10 (ops-core) — HR: departments, team members linked to workspace
+// users, leave policies + an append-only leave ledger (balances are COMPUTED
+// from policy accrual, carry-over cap and the ledger), recruiting pipeline.
+// ============================================================================
+
+enum OpsLeaveLedgerKind {
+  taken
+  adjustment
+}
+
+enum OpsJobOpeningStatus {
+  open
+  paused
+  closed
+}
+
+enum OpsApplicantStage {
+  applied
+  screening
+  interview
+  offer
+  hired
+  rejected
+}
+
+model OpsDepartment {
+  id              String         @id @default(cuid())
+  workspaceId     String         @map("workspace_id")
+  workspace       Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name            String
+  managerMemberId String?        @map("manager_member_id")
+  manager         OpsTeamMember? @relation("OpsDepartmentManager", fields: [managerMemberId], references: [id], onDelete: SetNull)
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
+
+  members  OpsTeamMember[] @relation("OpsDepartmentMembers")
+  openings OpsJobOpening[]
+
+  @@unique([workspaceId, name])
+  @@map("ops_departments")
+}
+
+// Yearly entitlement per leave type, accrued pro rata by month; unused days
+// carry into the next year up to the cap.
+model OpsLeavePolicy {
+  id               String       @id @default(cuid())
+  workspaceId      String       @map("workspace_id")
+  workspace        Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  type             OpsLeaveType
+  yearlyDays       Int          @map("yearly_days")
+  carryOverCapDays Int          @default(0) @map("carry_over_cap_days")
+  active           Boolean      @default(true)
+  createdAt        DateTime     @default(now()) @map("created_at")
+  updatedAt        DateTime     @updatedAt @map("updated_at")
+
+  @@unique([workspaceId, type])
+  @@map("ops_leave_policies")
+}
+
+// Append-only: approved leave posts one "taken" row (once per request);
+// corrections are signed adjustments. Amounts in hundredths of a day.
+model OpsLeaveLedger {
+  id             String             @id @default(cuid())
+  workspaceId    String             @map("workspace_id")
+  workspace      Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  memberId       String             @map("member_id")
+  member         OpsTeamMember      @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  type           OpsLeaveType
+  year           Int
+  kind           OpsLeaveLedgerKind
+  centidays      Int
+  leaveRequestId String?            @unique @map("leave_request_id")
+  note           String?
+  actor          String?
+  createdAt      DateTime           @default(now()) @map("created_at")
+
+  @@index([workspaceId, memberId, type, year])
+  @@map("ops_leave_ledger")
+}
+
+model OpsJobOpening {
+  id           String              @id @default(cuid())
+  workspaceId  String              @map("workspace_id")
+  workspace    Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  title        String
+  departmentId String?             @map("department_id")
+  department   OpsDepartment?      @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  location     String?
+  description  String?             @db.Text
+  status       OpsJobOpeningStatus @default(open)
+  createdAt    DateTime            @default(now()) @map("created_at")
+  updatedAt    DateTime            @updatedAt @map("updated_at")
+
+  applicants OpsApplicant[]
+
+  @@index([workspaceId, status])
+  @@map("ops_job_openings")
+}
+
+model OpsApplicant {
+  id           String            @id @default(cuid())
+  workspaceId  String            @map("workspace_id")
+  workspace    Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  openingId    String            @map("opening_id")
+  opening      OpsJobOpening     @relation(fields: [openingId], references: [id], onDelete: Cascade)
+  name         String
+  email        String?
+  phone        String?
+  source       String?
+  stage        OpsApplicantStage @default(applied)
+  // 1–5, optional.
+  rating       Int?
+  notes        String?           @db.Text
+  // Set when hired: the team member created for them.
+  hiredMemberId String?          @map("hired_member_id")
+  createdAt    DateTime          @default(now()) @map("created_at")
+  updatedAt    DateTime          @updatedAt @map("updated_at")
+
+  @@index([workspaceId, openingId, stage])
+  @@map("ops_applicants")
+}
+
+// ============================================================================
+// Phase 10 (ops-core) — inventory: warehouses, locations, variants,
+// transfers, reorder rules. Extends the Phase 17 Ops layer (same RLS
+// pattern, same append-only stock ledger). Phase 13's digital twin binds
+// racks/bins/docks to OpsLocation rows — keep the hierarchy clean:
+// warehouse → zone → aisle → rack → shelf → bin (docks sit under the
+// warehouse or a zone). Per-location stock is DERIVED from the ledger
+// (OpsInventoryTxn.locationId/variantId), never stored separately.
+// ============================================================================
+
+enum OpsLocationKind {
+  zone
+  aisle
+  rack
+  shelf
+  bin
+  dock
+}
+
+enum OpsTransferStatus {
+  draft
+  done
+  cancelled
+}
+
+model OpsWarehouse {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name        String
+  // Short code shown everywhere, e.g. "WH-01". Unique per workspace.
+  code        String
+  address     String?   @db.Text
+  active      Boolean   @default(true)
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  locations    OpsLocation[]
+  reorderRules OpsReorderRule[]
+
+  @@unique([workspaceId, code])
+  @@map("ops_warehouses")
+}
+
+model OpsLocation {
+  id          String          @id @default(cuid())
+  workspaceId String          @map("workspace_id")
+  workspace   Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  warehouseId String          @map("warehouse_id")
+  warehouse   OpsWarehouse    @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+  // Null = directly under the warehouse.
+  parentId    String?         @map("parent_id")
+  parent      OpsLocation?    @relation("OpsLocationTree", fields: [parentId], references: [id], onDelete: NoAction)
+  children    OpsLocation[]   @relation("OpsLocationTree")
+  kind        OpsLocationKind
+  // Code unique within the warehouse, e.g. "A", "A-03", "A-03-2-B".
+  code        String
+  name        String?
+  // Denormalized display path "WH-01/A/A-03/A-03-2-B" (set on create;
+  // codes are immutable so it never goes stale).
+  path        String
+  active      Boolean         @default(true)
+  createdAt   DateTime        @default(now()) @map("created_at")
+  updatedAt   DateTime        @updatedAt @map("updated_at")
+
+  inventoryTxns    OpsInventoryTxn[]
+  transfersOut     OpsTransfer[]     @relation("OpsTransferFrom")
+  transfersIn      OpsTransfer[]     @relation("OpsTransferTo")
+  reorderReceiving OpsReorderRule[]
+
+  @@unique([warehouseId, code])
+  @@index([workspaceId, warehouseId, parentId])
+  @@map("ops_locations")
+}
+
+// A sellable variant of a product with its own SKU/attributes. Products
+// without explicit variants get ONE default variant (isDefault) — created
+// by the migration for existing products and lazily for new ones on their
+// first stock move — so stockQty users keep working (stockQty stays the
+// product total).
+model OpsProductVariant {
+  id          String     @id @default(cuid())
+  workspaceId String     @map("workspace_id")
+  workspace   Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  productId   String     @map("product_id")
+  product     OpsProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+  sku         String
+  name        String
+  // { color: "red", size: "L" }
+  attributes  Json       @default("{}")
+  // Null = the product's price.
+  priceCents  Int?       @map("price_cents")
+  isDefault   Boolean    @default(false) @map("is_default")
+  active      Boolean    @default(true)
+  createdAt   DateTime   @default(now()) @map("created_at")
+  updatedAt   DateTime   @updatedAt @map("updated_at")
+
+  inventoryTxns OpsInventoryTxn[]
+  reorderRules  OpsReorderRule[]
+
+  @@unique([workspaceId, sku])
+  @@index([workspaceId, productId])
+  @@map("ops_product_variants")
+}
+
+// Stock transfer between two locations: draft → done (books a paired
+// -qty/+qty txn per line in ONE transaction; product totals unchanged) or
+// cancelled. lines: [{ productId, variantId?, qty }].
+model OpsTransfer {
+  id             String            @id @default(cuid())
+  workspaceId    String            @map("workspace_id")
+  workspace      Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  fromLocationId String            @map("from_location_id")
+  fromLocation   OpsLocation       @relation("OpsTransferFrom", fields: [fromLocationId], references: [id], onDelete: NoAction)
+  toLocationId   String            @map("to_location_id")
+  toLocation     OpsLocation       @relation("OpsTransferTo", fields: [toLocationId], references: [id], onDelete: NoAction)
+  lines          Json
+  status         OpsTransferStatus @default(draft)
+  note           String?           @db.Text
+  createdBy      String?           @map("created_by")
+  doneAt         DateTime?         @map("done_at")
+  createdAt      DateTime          @default(now()) @map("created_at")
+  updatedAt      DateTime          @updatedAt @map("updated_at")
+
+  inventoryTxns OpsInventoryTxn[]
+
+  @@index([workspaceId, status, createdAt])
+  @@map("ops_transfers")
+}
+
+// Min/max reorder rule per product (+ optional variant) and warehouse.
+// The reorder cron drafts ONE OpsPurchaseOrder per breach (never sends —
+// sending stays gated): openPurchaseOrderId holds the draft until it is
+// received or cancelled, so a breach never drafts twice.
+model OpsReorderRule {
+  id                  String             @id @default(cuid())
+  workspaceId         String             @map("workspace_id")
+  workspace           Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  productId           String             @map("product_id")
+  product             OpsProduct         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variantId           String?            @map("variant_id")
+  variant             OpsProductVariant? @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  warehouseId         String             @map("warehouse_id")
+  warehouse           OpsWarehouse       @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+  // Where receipts land (must be inside the warehouse); null = unlocated.
+  receiveLocationId   String?            @map("receive_location_id")
+  receiveLocation     OpsLocation?       @relation(fields: [receiveLocationId], references: [id], onDelete: SetNull)
+  minQty              Int                @map("min_qty")
+  maxQty              Int                @map("max_qty")
+  supplierName        String?            @map("supplier_name")
+  unitCostCents       Int?               @map("unit_cost_cents")
+  active              Boolean            @default(true)
+  openPurchaseOrderId String?            @map("open_purchase_order_id")
+  lastTriggeredAt     DateTime?          @map("last_triggered_at")
+  createdAt           DateTime           @default(now()) @map("created_at")
+  updatedAt           DateTime           @updatedAt @map("updated_at")
+
+  @@unique([workspaceId, productId, warehouseId, variantId])
+  @@index([workspaceId, active])
+  @@map("ops_reorder_rules")
+}
+
+// ============================================================================
 // Phase 17 slice 1 — Business Operations: DocType-style entity convention.
 //
 // Every Operations entity is tenant-scoped (workspace_id FK, ON DELETE
@@ -9439,6 +10011,8 @@ enum OpsInventoryReason {
   sale
   restock
   adjustment
+  // Phase 10 (ops-core): one leg of a location-to-location transfer.
+  transfer
 }
 
 enum OpsProjectStatus {
@@ -9494,6 +10068,9 @@ model OpsProduct {
   updatedAt         DateTime  @updatedAt @map("updated_at")
 
   inventoryTxns OpsInventoryTxn[]
+  // Phase 10 (ops-core)
+  variants      OpsProductVariant[]
+  reorderRules  OpsReorderRule[]
 
   @@unique([workspaceId, sku])
   @@index([workspaceId, name])
@@ -9648,10 +10225,20 @@ model OpsInventoryTxn {
   // Who/what moved the stock: user id or "agent:<surface>".
   actor       String?
   note        String?            @db.Text
+  // Phase 10 (ops-core): where and which variant. Null location =
+  // unlocated stock (pre-location history); variant backfilled to the
+  // product's default variant.
+  variantId   String?            @map("variant_id")
+  variant     OpsProductVariant? @relation(fields: [variantId], references: [id], onDelete: NoAction)
+  locationId  String?            @map("location_id")
+  location    OpsLocation?       @relation(fields: [locationId], references: [id], onDelete: NoAction)
+  transferId  String?            @map("transfer_id")
+  transfer    OpsTransfer?       @relation(fields: [transferId], references: [id], onDelete: NoAction)
   createdAt   DateTime           @default(now()) @map("created_at")
 
   @@index([workspaceId, productId, createdAt])
   @@index([workspaceId, reason, createdAt])
+  @@index([workspaceId, locationId, productId])
   @@map("ops_inventory_txns")
 }
 
@@ -9703,11 +10290,16 @@ model OpsProject {
   status      OpsProjectStatus @default(planning)
   // CRM adjacency (Wave B canonical models).
   leadId      String?          @map("lead_id")
+  // Phase 10 (ops-core): a real relation (was a dangling string).
   dealId      String?          @map("deal_id")
+  deal        OpsDeal?         @relation(fields: [dealId], references: [id], onDelete: SetNull)
+  // Phase 10 (ops-core): default hourly rate for billing time (cents/hour).
+  hourlyRateCents Int?         @map("hourly_rate_cents")
   createdAt   DateTime         @default(now()) @map("created_at")
   updatedAt   DateTime         @updatedAt @map("updated_at")
 
   timeEntries OpsTimeEntry[]
+  tasks       OpsTask[]
 
   @@index([workspaceId, status, createdAt])
   @@index([workspaceId, leadId])
@@ -9732,10 +10324,26 @@ model OpsTimeEntry {
   actor       String?
   occurredAt  DateTime   @default(now()) @map("occurred_at")
   billed      Boolean    @default(false)
+  // Phase 10 (ops-core): whose time (workspace member subject id), the
+  // billing rate (cents/hour; null = the project's rate), the task, the
+  // approval decision, and the invoice the time was billed on. Minutes and
+  // rate stay immutable — only approval/billing metadata moves.
+  userId         String?            @map("user_id")
+  rateCents      Int?               @map("rate_cents")
+  billable       Boolean            @default(true)
+  taskId         String?            @map("task_id")
+  task           OpsTask?           @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  approvalStatus OpsTimesheetStatus @default(pending) @map("approval_status")
+  approvedBy     String?            @map("approved_by")
+  approvedAt     DateTime?          @map("approved_at")
+  // ops_invoices.id the entry was billed on (set exactly once).
+  invoiceId      String?            @map("invoice_id")
   createdAt   DateTime   @default(now()) @map("created_at")
 
   @@index([workspaceId, projectId, occurredAt])
   @@index([workspaceId, projectId, billed])
+  @@index([workspaceId, approvalStatus, userId])
+  @@index([workspaceId, invoiceId])
   @@map("ops_time_entries")
 }
 
@@ -9750,11 +10358,20 @@ model OpsTeamMember {
   email       String?
   startDate   DateTime?           @map("start_date")
   status      OpsTeamMemberStatus @default(active)
+  // Phase 10 (ops-core): the workspace user this person signs in as
+  // (Auth.js subject; optional) and their department.
+  userId       String?            @map("user_id")
+  departmentId String?            @map("department_id")
+  department   OpsDepartment?     @relation("OpsDepartmentMembers", fields: [departmentId], references: [id], onDelete: SetNull)
   createdAt   DateTime            @default(now()) @map("created_at")
   updatedAt   DateTime            @updatedAt @map("updated_at")
 
   leaveRequests OpsLeaveRequest[]
+  // Phase 10 (ops-core)
+  managedDepartments OpsDepartment[] @relation("OpsDepartmentManager")
+  leaveLedger        OpsLeaveLedger[]
 
+  @@unique([workspaceId, userId])
   @@index([workspaceId, status, createdAt])
   @@index([workspaceId, name])
   @@map("ops_team_members")

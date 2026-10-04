@@ -352,3 +352,43 @@ export async function notifyDatasetStale(input: DatasetStaleInput, db: ProducerD
     return 0;
   }
 }
+
+// ---------------------------------------------------------------------------
+// Phase 10 (ops-core): helpdesk SLA breach
+// ---------------------------------------------------------------------------
+
+export interface TicketSlaBreachedInput {
+  workspaceId: string;
+  ticketId: string;
+  number: number;
+  subject: string;
+  kind: "first_response" | "resolution";
+  assigneeId?: string | null;
+}
+
+/** "Ticket #12 missed its first-response target" → the assignee (if a member) + editors. */
+export async function notifyTicketSlaBreached(input: TicketSlaBreachedInput, db: ProducerDb = defaultDb()): Promise<number> {
+  try {
+    const editors = await membersAtLeast(db, input.workspaceId, "editor");
+    const assignee = input.assigneeId && (await isMember(db, input.workspaceId, input.assigneeId)) ? [input.assigneeId] : [];
+    const recipients = [...new Set([...assignee, ...editors])];
+    const what = input.kind === "first_response" ? "first-response" : "resolution";
+    return await createAndEmit(
+      db,
+      recipients.map<NotificationInput>((userId) => ({
+        workspaceId: input.workspaceId,
+        userId,
+        kind: "alert_fired",
+        title: `Ticket #${input.number} missed its ${what} target`,
+        body: input.subject.slice(0, 200),
+        href: `/dashboard/ops/helpdesk?ticket=${encodeURIComponent(input.ticketId)}`,
+        sourceType: "ops_ticket",
+        sourceId: input.ticketId,
+        dedupKey: `ticket_sla:${input.ticketId}:${input.kind}`,
+      })),
+    );
+  } catch (e) {
+    warn("ticket_sla_breached", e);
+    return 0;
+  }
+}

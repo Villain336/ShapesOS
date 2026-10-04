@@ -25,6 +25,9 @@ export interface PoLine {
   qty: number;
   priceCents: number;
   receivedQty?: number;
+  /** Phase 10 (ops-core): where the received stock lands. */
+  variantId?: string;
+  locationId?: string;
 }
 
 export function remainingQty(line: PoLine): number {
@@ -67,14 +70,23 @@ async function lockPo(tx: Tx, workspaceId: string, id: string) {
 }
 
 async function bookReceipt(tx: Tx, actor: OpsActor, poId: string, lines: PoLine[], receipt: ReceiptLineInput[], note: string | null) {
-  const received = receipt.map((r) => ({ index: r.index, productId: lines[r.index]!.productId ?? null, name: lines[r.index]!.name, qty: r.qty }));
+  // Phase 10 (ops-core): receive into the line's variant / location (the
+  // inventory ledger defaults to the product's default variant, unlocated).
+  const received = receipt.map((r) => ({
+    index: r.index,
+    productId: lines[r.index]!.productId ?? null,
+    variantId: lines[r.index]!.variantId ?? null,
+    locationId: lines[r.index]!.locationId ?? null,
+    name: lines[r.index]!.name,
+    qty: r.qty,
+  }));
   const row = await tx.opsPurchaseReceipt.create({
     data: { workspaceId: actor.workspaceId, purchaseOrderId: poId, lines: received as unknown as Prisma.InputJsonValue, note, actor: actor.userId },
   });
   let restocked = 0;
   for (const r of received) {
     if (!r.productId) continue;
-    await recordInventoryTxn(tx, actor, { productId: r.productId, delta: r.qty, reason: "restock", note: `purchase order ${poId} receipt ${row.id}` });
+    await recordInventoryTxn(tx, actor, { productId: r.productId, delta: r.qty, reason: "restock", note: `purchase order ${poId} receipt ${row.id}`, variantId: r.variantId, locationId: r.locationId });
     restocked += 1;
   }
   return { receipt: row, restocked };

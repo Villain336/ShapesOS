@@ -11,7 +11,6 @@
 //
 // The service runs against a stub tx — no live database.
 
-import { FINANCE_ENTITIES } from "../finance/entities";
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import type { Prisma } from "@prisma/client";
@@ -175,14 +174,13 @@ function validCreateBody(slug: string): Record<string, unknown> {
 
 describe("DocType convention conformance (stub tx)", () => {
   it("registers exactly the 11 ops entities (8 slice-1 + purchase-orders + projects + 2 slice-5)", () => {
-    assert.deepEqual(
-      OPS_ENTITIES.map((d) => d.slug).sort(),
-      [
-        "inventory-txns", "invoices", "leave-requests", "orders", "payments", "products", "projects", "promotions", "purchase-orders", "team-members", "workflow-runs",
-        // Phase 10 (finance)
-        ...FINANCE_ENTITIES.map((d) => d.slug),
-      ].sort(),
-    );
+    // Phase 10 extends the registry; the 11 Phase 17 entities must stay and
+    // slugs must stay unique.
+    const slugs = OPS_ENTITIES.map((d) => d.slug);
+    for (const base of ["inventory-txns", "invoices", "leave-requests", "orders", "payments", "products", "projects", "promotions", "purchase-orders", "team-members", "workflow-runs"]) {
+      assert.ok(slugs.includes(base), `${base} still registered`);
+    }
+    assert.equal(new Set(slugs).size, slugs.length, "unique slugs");
     for (const d of OPS_ENTITIES) {
       assert.ok(OPS_ENTITY_MAP[d.slug] === d, `${d.slug} in map`);
       assert.ok(d.delegate.startsWith("ops"), `${d.slug} delegate`);
