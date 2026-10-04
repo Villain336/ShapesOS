@@ -143,3 +143,19 @@ describe("finance PDF document", () => {
     assert.ok(el);
   });
 });
+
+import { validateExpenseLines } from "../finance/expenses";
+
+describe("expense claim lines", () => {
+  const ok = { spentAt: "2026-10-01", description: "Taxi", category: "travel", amountCents: 1_000, taxCents: 100 };
+  it("totals valid lines", () => {
+    assert.equal(validateExpenseLines([ok, { ...ok, amountCents: 500, taxCents: 0 }]).totalCents, 1_500);
+  });
+  it("rejects unknown categories, non-positive amounts, tax above the amount, bad dates and empty claims", () => {
+    assert.throws(() => validateExpenseLines([{ ...ok, category: "yacht" }]), /unknown category/);
+    assert.throws(() => validateExpenseLines([{ ...ok, amountCents: 0 }]), /positive/);
+    assert.throws(() => validateExpenseLines([{ ...ok, taxCents: 1_001 }]), /tax/);
+    assert.throws(() => validateExpenseLines([{ ...ok, spentAt: "soon" }]), /date/);
+    assert.throws(() => validateExpenseLines([]), /at least one/);
+  });
+});

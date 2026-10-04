@@ -243,6 +243,40 @@ export const vendorBillDef: OpsEntityDef = {
   summarize: (r) => `vendor bill ${r.number ?? r.id ?? "(new)"} → ${r.status ?? "draft"} (${r.totalCents ?? "?"}c)`,
 };
 
+const expenseLine = z.object({
+  spentAt: isoDate,
+  description: z.string().min(1).max(500),
+  category: z.enum(["travel", "meals", "software", "office", "rent", "utilities", "professional", "advertising", "bank_fees", "other"]),
+  accountId: id.optional(),
+  amountCents: z.number().int().min(1).max(MAX_CENTS),
+  taxCents: cents.optional(),
+  receiptFileId: id.optional(),
+});
+
+export const expenseClaimDef: OpsEntityDef = {
+  slug: "expense-claims",
+  label: "Expense claim",
+  delegate: "opsExpenseClaim",
+  createSchema: z.object({
+    title: z.string().min(1).max(200),
+    notes: z.string().max(4000).optional(),
+    lines: z.array(expenseLine).min(1).max(100),
+  }),
+  // Draft-only edits by the claimant; submit / approve / reject / reimburse
+  // go through POST /api/ops/expense-claims/[id]/{action}.
+  patchSchema: z
+    .object({
+      title: z.string().min(1).max(200).optional(),
+      notes: z.string().max(4000).nullable().optional(),
+      lines: z.array(expenseLine).min(1).max(100).optional(),
+    })
+    .strict(),
+  patchable: true,
+  filterable: ["status", "claimantId"],
+  gatedTransitions: [],
+  summarize: (r) => `expense claim ${r.number ?? r.id ?? "(new)"} "${r.title}" → ${r.status ?? "draft"} (${r.totalCents ?? "?"}c)`,
+};
+
 export const FINANCE_ENTITIES: OpsEntityDef[] = [
   accountDef,
   taxRateDef,
@@ -251,4 +285,5 @@ export const FINANCE_ENTITIES: OpsEntityDef[] = [
   quoteDef,
   vendorDef,
   vendorBillDef,
+  expenseClaimDef,
 ];

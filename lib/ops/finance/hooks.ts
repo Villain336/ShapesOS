@@ -19,6 +19,7 @@ import { balanceDueCents, computeDocumentTotals, MoneyError, type MoneyLine } fr
 import { hasFinanceLedger, nextDocumentNumber } from "./numbering";
 import { activeRateBps, postInvoiceIssued, postInvoicePayment, postVendorBill } from "./posting";
 import { receiveRemaining, type PoLine } from "./purchasing";
+import { createExpenseClaim, replaceExpenseLines, type ExpenseLineInput } from "./expenses";
 
 type Tx = Prisma.TransactionClient;
 type Row = Record<string, unknown>;
@@ -382,7 +383,33 @@ const vendorBillHooks: OpsEntityHooks = {
   },
 };
 
+// ---------------------------------------------------------------------------
+// Expense claims: created with their lines; draft-only edits by the claimant.
+// ---------------------------------------------------------------------------
+
+const expenseClaimHooks: OpsEntityHooks = {
+  async prepare(tx, actor, body, existing) {
+    if (!existing) return body;
+    if (existing.claimantId !== actor.userId) throw new OpsError(403, "Only the claimant can edit their claim");
+    if (existing.status !== "draft") throw new OpsError(409, `Only a draft claim can be edited (it is ${String(existing.status)})`);
+    const { lines, ...rest } = body;
+    if (Array.isArray(lines)) {
+      return { ...rest, totalCents: await replaceExpenseLines(tx, actor, String(existing.id), lines as ExpenseLineInput[]) };
+    }
+    return rest;
+  },
+  async create(tx, actor, body) {
+    const claim = await createExpenseClaim(tx, actor, {
+      title: String(body.title),
+      notes: (body.notes as string) ?? null,
+      lines: body.lines as ExpenseLineInput[],
+    });
+    return [claim as unknown as Row];
+  },
+};
+
 export const FINANCE_ENTITY_HOOKS: Record<string, OpsEntityHooks> = {
+  "expense-claims": expenseClaimHooks,
   quotes: quoteHooks,
   vendors: vendorHooks,
   "purchase-orders": purchaseOrderHooks,
