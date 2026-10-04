@@ -116,6 +116,13 @@ export const CREDIT_COSTS = {
    * actions/month on the platform key; see lib/integrations/actions/budget.ts).
    * 1 credit = $0.01. */
   composio_tool_call: { credits: 1, basis: "cost-plus", description: "Composio action: 1 hosted tool call" },
+  // ── Phase 7: LLM token usage (chat()/chatStream(), lib/llm/usage.ts) ──
+  /** One model call: token counts, model and estimated vendor cost are on
+   * the event row (usage_events.llm_*). Zero credits for now — it makes
+   * token spend visible per workspace and per agent run; charging credits
+   * for it (and a per-run cost cap) is a pricing decision for Phase 8, and
+   * value-priced actions (ai_article …) already include their model cost. */
+  llm_tokens: { credits: 0, basis: "passthrough", description: "LLM tokens: one model call (tokens + estimated cost recorded)" },
 } as const satisfies Record<string, CreditCostDef>;
 
 /** Action keys meter() accepts. */
