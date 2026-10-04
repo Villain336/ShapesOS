@@ -135,10 +135,10 @@ export default function ScheduleWizard({
       <Notice notice={notice} />
 
       <section className={cardCls}>
-        <h2 className="text-sm font-semibold text-zinc-900">1. Skill</h2>
-        <p className="mt-1 text-xs text-zinc-500">Only skills enabled for this project can be scheduled.</p>
+        <h2 className="text-sm font-semibold text-ink">1. Skill</h2>
+        <p className="mt-1 text-xs text-muted">Only skills enabled for this project can be scheduled.</p>
         {skills.length === 0 ? (
-          <p className="mt-3 text-sm text-zinc-600">
+          <p className="mt-3 text-sm text-muted">
             No skills are enabled for this project yet. Enable one under the project's skill settings first.
           </p>
         ) : (
@@ -153,17 +153,17 @@ export default function ScheduleWizard({
       </section>
 
       <section className={cardCls}>
-        <h2 className="text-sm font-semibold text-zinc-900">2. Trigger</h2>
+        <h2 className="text-sm font-semibold text-ink">2. Trigger</h2>
         <div className="mt-3 flex gap-2">
           {(["cron", "event"] as const).map((t) => (
             <button
               key={t}
               type="button"
               onClick={() => setTriggerType(t)}
-              className={`rounded-md border px-4 py-2 text-sm font-medium ${
+              className={`rounded-full px-4 py-2 text-sm font-semibold ${
                 triggerType === t
-                  ? "border-accent bg-accent/10 text-accent-hover"
-                  : "border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50"
+                  ? "bg-ink text-white"
+                  : "bg-paper text-ink shadow-control hover:shadow-outline"
               }`}
             >
               {t === "cron" ? "Schedule" : "Event"}
@@ -195,12 +195,12 @@ export default function ScheduleWizard({
               </label>
             )}
             {preset !== "custom" && (
-              <p className="font-mono text-xs text-zinc-500">
-                Expression: <span className="text-zinc-800">{cronExpr}</span>
+              <p className="font-mono text-xs text-muted">
+                Expression: <span className="text-ink">{cronExpr}</span>
               </p>
             )}
             <TimezoneField value={timezone} onChange={setTimezoneChoice} />
-            <p className="text-xs text-zinc-500">
+            <p className="text-xs text-muted">
               If the scheduler restarts and misses a window, the run fires once and is marked missed — missed windows are never replayed in bulk.
             </p>
           </div>
@@ -259,10 +259,10 @@ export default function ScheduleWizard({
       </section>
 
       <section className={cardCls}>
-        <h2 className="text-sm font-semibold text-zinc-900">3. Approval mode</h2>
+        <h2 className="text-sm font-semibold text-ink">3. Approval mode</h2>
         <div className="mt-3 flex flex-col gap-2">
           {APPROVAL_MODES.map((m) => (
-            <label key={m.mode} className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 ${approvalMode === m.mode ? "border-accent bg-accent/5" : "border-zinc-200 bg-white"}`}>
+            <label key={m.mode} className={`flex cursor-pointer items-start gap-3 rounded-md border p-3 ${approvalMode === m.mode ? "border-ink bg-hover-paper" : "border-line bg-paper"}`}>
               <input
                 type="radio"
                 name="approvalMode"
@@ -272,8 +272,8 @@ export default function ScheduleWizard({
                 className="mt-1"
               />
               <span>
-                <span className="text-sm font-medium text-zinc-900">{m.label}</span>
-                <span className="block text-xs text-zinc-500">{m.description}</span>
+                <span className="text-sm font-medium text-ink">{m.label}</span>
+                <span className="block text-xs text-muted">{m.description}</span>
               </span>
             </label>
           ))}
@@ -281,7 +281,7 @@ export default function ScheduleWizard({
       </section>
 
       <section className={cardCls}>
-        <h2 className="text-sm font-semibold text-zinc-900">4. Parallelism</h2>
+        <h2 className="text-sm font-semibold text-ink">4. Parallelism</h2>
         <label className={labelCls}>
           Max parallel subagents (1–16, workspace default is 4)
           <input

@@ -27,8 +27,8 @@ export default async function ReviewLandingPage({
   const ip = clientIpFromHeaders(h) ?? "unknown";
   if (!checkReviewPageRateLimit(clean, ip)) {
     return (
-      <main className="flex min-h-dvh items-center justify-center bg-stone-50 px-6">
-        <p className="text-sm text-stone-500">Too many requests — please try again in a minute.</p>
+      <main className="flex min-h-dvh items-center justify-center bg-canvas px-6">
+        <p className="text-sm text-muted">Too many requests — please try again in a minute.</p>
       </main>
     );
   }
@@ -38,10 +38,10 @@ export default async function ReviewLandingPage({
 
   if (req.status === "expired") {
     return (
-      <main className="flex min-h-dvh items-center justify-center bg-stone-50 px-6">
+      <main className="flex min-h-dvh items-center justify-center bg-canvas px-6">
         <div className="max-w-sm text-center">
-          <h1 className="text-lg font-semibold text-stone-900">This link has expired</h1>
-          <p className="mt-2 text-sm text-stone-500">
+          <h1 className="text-lg font-heading tracking-heading stretch-heading text-ink">This link has expired</h1>
+          <p className="mt-2 text-sm text-muted">
             This review invitation is no longer active. You can still find{" "}
             {req.workspace.name} on Google to leave a review.
           </p>
