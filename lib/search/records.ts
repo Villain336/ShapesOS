@@ -266,6 +266,8 @@ const SOURCES: Record<RecordKind, { query: SourceQuery; hit: (r: Row) => Omit<Re
       title: `${r.title ?? "Dataset"} dataset`,
       subtitle: r.sub ? `Dataset · latest ${r.sub}` : "Dataset · not compiled yet",
       href: "/dashboard/datasets?tab=build",
+    }),
+  },
   // Phase 4b: social posts (FORCE RLS; the scope transaction filters them).
   social_post: {
     query: (tx, ws, q, p, n) => tx.$queryRaw<Row[]>`
