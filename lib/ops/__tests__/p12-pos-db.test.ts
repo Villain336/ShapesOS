@@ -14,7 +14,7 @@ import { withWorkspaceScope } from "@/lib/substrate/memory/rls";
 import { OPS_ENTITY_MAP } from "../entities";
 import { OpsError, opsCreate, opsPatch, type OpsActor } from "../doctype";
 import { opsBindingFor } from "../gate";
-import { recordPosSale, receiptDoc, sessionSummary, type PosSaleInput } from "../pos/service";
+import { quoteSale, recordPosSale, receiptDoc, sessionSummary, type PosSaleInput } from "../pos/service";
 import { newClientOrderId } from "../pos/rules";
 import { renderFinancePdf } from "../finance/pdf";
 
@@ -80,6 +80,15 @@ describe("p12 point of sale (real Postgres, app role)", () => {
   });
 
   it("a cash sale is priced server-side (promotion, tax), takes stock from the register's shelf and gives change", async () => {
+    const q = await inA((tx) => quoteSale(tx, A, session, [{ productId: mug, qty: 2 }], "TEN"));
+    assert.deepEqual(
+      { s: q.subtotalCents, d: q.discountCents, t: q.taxCents, total: q.totalCents, ok: q.promo?.ok, blocker: q.blocker },
+      { s: 2000, d: 200, t: 144, total: 1944, ok: true, blocker: null },
+      "the quote is what the sale will charge",
+    );
+    const bad = await inA((tx) => quoteSale(tx, A, session, [{ productId: mug, qty: 1 }], "NOPE"));
+    assert.equal(bad.promo?.ok, false);
+    assert.match(String(bad.blocker), /can't be used/);
     const r = await sell(session, {
       clientOrderId: cashSaleId,
       lines: [{ productId: mug, qty: 2 }],

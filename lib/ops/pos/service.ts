@@ -272,6 +272,48 @@ async function tillCatalog(tx: Tx, workspaceId: string, lines: PosSaleLineInput[
   return out;
 }
 
+export interface PosQuote {
+  subtotalCents: number;
+  discountCents: number;
+  taxCents: number;
+  totalCents: number;
+  promo: { code: string; ok: boolean; reason?: string } | null;
+  /** Buyer-facing reason the sale can't go through yet (null = ready). */
+  blocker: string | null;
+}
+
+async function priceTillSale(tx: Tx, workspaceId: string, taxRateId: string | null, lines: PosSaleLineInput[], promoCodeRaw: string | null | undefined) {
+  const cartLines = lines.map((l) => ({ productId: l.productId, variantId: l.variantId ?? null, qty: l.qty }));
+  const catalog = await tillCatalog(tx, workspaceId, cartLines);
+  let taxRateBps = 0;
+  if (taxRateId) {
+    const r = await tx.opsTaxRate.findFirst({ where: { id: taxRateId, workspaceId, active: true }, select: { rateBps: true } });
+    taxRateBps = r?.rateBps ?? 0;
+  }
+  const promoCode = promoCodeRaw?.trim() || null;
+  const priced = priceCart({ lines: cartLines, catalog, promoCode, promotion: await promotionByCode(tx, workspaceId, promoCode), taxRateBps });
+  // Stock never blocks a till sale (the goods are on the counter); the rest does.
+  const blocking = { ...priced, lines: priced.lines.map((l) => (l.issue?.kind === "insufficient_stock" ? { ...l, issue: null } : l)) };
+  const raw = checkoutBlocker(blocking);
+  const blocker = raw ? raw.replace("Remove it to continue.", "Remove it from the sale.").replace("Your cart is empty.", "The sale is empty.") : null;
+  return { priced, blocker };
+}
+
+/** Price a till sale without writing anything (the till shows this before payment). */
+export async function quoteSale(tx: Tx, actor: OpsActor, sessionId: string, lines: PosSaleLineInput[], promoCode?: string | null): Promise<PosQuote> {
+  const session = await tx.opsPosSession.findFirst({ where: { id: sessionId, workspaceId: actor.workspaceId }, include: { register: { select: { taxRateId: true } } } });
+  if (!session) throw new OpsNotFoundError("pos-sessions", sessionId);
+  const { priced, blocker } = await priceTillSale(tx, actor.workspaceId, session.register.taxRateId, lines, promoCode);
+  return {
+    subtotalCents: priced.subtotalCents,
+    discountCents: priced.discountCents,
+    taxCents: priced.taxCents,
+    totalCents: priced.totalCents,
+    promo: priced.promo ? { code: priced.promo.code, ok: priced.promo.ok, ...(priced.promo.reason ? { reason: priced.promo.reason } : {}) } : null,
+    blocker,
+  };
+}
+
 export async function recordPosSale(tx: Tx, actor: OpsActor, sessionId: string, input: PosSaleInput): Promise<PosSaleResult> {
   // One writer per client order id: a replay racing its original waits, then sees it.
   await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`pos-sale:${actor.workspaceId}:${input.clientOrderId}`}))`;
@@ -283,19 +325,8 @@ export async function recordPosSale(tx: Tx, actor: OpsActor, sessionId: string, 
   if (!session) throw new OpsNotFoundError("pos-sessions", sessionId);
   if (session.status !== "open") throw new OpsError(409, `Session ${session.number ?? sessionId} is ${session.status} — open a session to sell`);
 
-  const cartLines = input.lines.map((l) => ({ productId: l.productId, variantId: l.variantId ?? null, qty: l.qty }));
-  const catalog = await tillCatalog(tx, actor.workspaceId, cartLines);
-  let taxRateBps = 0;
-  if (session.register.taxRateId) {
-    const r = await tx.opsTaxRate.findFirst({ where: { id: session.register.taxRateId, workspaceId: actor.workspaceId, active: true }, select: { rateBps: true } });
-    taxRateBps = r?.rateBps ?? 0;
-  }
-  const promoCode = input.promoCode?.trim() || null;
-  const priced = priceCart({ lines: cartLines, catalog, promoCode, promotion: await promotionByCode(tx, actor.workspaceId, promoCode), taxRateBps });
-  // Stock never blocks a till sale (the goods are on the counter); the rest does.
-  const blocking = { ...priced, lines: priced.lines.map((l) => (l.issue?.kind === "insufficient_stock" ? { ...l, issue: null } : l)) };
-  const blocker = checkoutBlocker(blocking);
-  if (blocker) throw new OpsError(409, blocker.replace("Remove it to continue.", "Remove it from the sale.").replace("Your cart is empty.", "The sale is empty."));
+  const { priced, blocker } = await priceTillSale(tx, actor.workspaceId, session.register.taxRateId, input.lines, input.promoCode);
+  if (blocker) throw new OpsError(409, blocker);
 
   let tendered;
   try {
