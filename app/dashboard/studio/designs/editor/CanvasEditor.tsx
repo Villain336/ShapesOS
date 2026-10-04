@@ -211,7 +211,7 @@ export function CanvasEditor({ designId }: { designId: string }) {
 
   if (loadError || !document) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-2 bg-[#FAFAF7] px-6 text-center">
+      <div className="flex h-full flex-col items-center justify-center gap-2 bg-canvas px-6 text-center">
         <p className="text-[14px] font-semibold text-ink">Could not load this design</p>
         <p className="max-w-md text-[13px] text-muted">
           {loadError ?? "The design came back empty."} The designs API may still be landing — try again in a moment.
@@ -221,7 +221,7 @@ export function CanvasEditor({ designId }: { designId: string }) {
   }
 
   return (
-    <div className="flex h-full bg-[#FAFAF7]">
+    <div className="flex h-full bg-canvas">
       {/* Icon rail */}
       <div className="flex w-12 shrink-0 flex-col items-center gap-1 border-r border-line bg-paper py-2">
         {RAIL.map((r) => (
@@ -232,7 +232,7 @@ export function CanvasEditor({ designId }: { designId: string }) {
             className={`flex h-10 w-10 flex-col items-center justify-center gap-0.5 rounded-md text-[9px] font-medium ${
               panel === r.key
                 ? "bg-ink text-white"
-                : "text-subtle hover:bg-hover-paper hover:text-ink"
+                : "text-muted hover:bg-hover-paper hover:text-ink"
             }`}
           >
             {r.icon}
@@ -276,28 +276,28 @@ export function CanvasEditor({ designId }: { designId: string }) {
           <div className="absolute bottom-3 right-3 z-20 flex items-center gap-0.5 rounded-md border border-line bg-paper px-1 py-1 shadow-outline">
             <button
               onClick={() => setZoom(zoom - 0.1)}
-              className="flex h-6 w-6 items-center justify-center rounded text-muted hover:bg-hover-paper hover:text-ink"
+              className="flex h-6 w-6 items-center justify-center rounded-full text-muted hover:bg-hover-paper hover:text-ink"
               title="Zoom out"
             >
               <Minus className="h-3.5 w-3.5" />
             </button>
             <button
               onClick={fitZoom}
-              className="min-w-12 rounded px-1 text-center text-[11px] font-medium text-ink hover:bg-hover-paper"
+              className="min-w-12 rounded-full px-1 text-center text-[11px] font-medium text-ink hover:bg-hover-paper"
               title="Fit to screen"
             >
               {Math.round(zoom * 100)}%
             </button>
             <button
               onClick={() => setZoom(zoom + 0.1)}
-              className="flex h-6 w-6 items-center justify-center rounded text-muted hover:bg-hover-paper hover:text-ink"
+              className="flex h-6 w-6 items-center justify-center rounded-full text-muted hover:bg-hover-paper hover:text-ink"
               title="Zoom in"
             >
               <Plus className="h-3.5 w-3.5" />
             </button>
             <button
               onClick={fitZoom}
-              className="rounded px-1.5 py-0.5 text-[11px] font-medium text-ink hover:bg-hover-paper"
+              className="rounded-full px-1.5 py-0.5 text-[11px] font-medium text-ink hover:bg-hover-paper"
               title="Fit page to screen"
             >
               Fit

@@ -65,6 +65,8 @@ const orb14ParamsBaked = d.struct({
 // is therefore monochrome, taken from neutral tokens: ink = --aos-night-hover
 // (#1c1c1b), paper = --aos-hover (#e6e6e3). Pillar identity is carried by the
 // halo sprites (per-pillar neutral tints), not the orb.
+// Legit literal hex: these are WebGPU shader uniforms parsed into vec3s
+// (CSS variables can't reach the GPU), mirrored from the tokens named above.
 const orb14BakedVariant: OrbVariant = {
   colors: [
     { default: "#1c1c1b", key: "ink", label: "Ink" },
@@ -89,7 +91,7 @@ const orb14BakedVariant: OrbVariant = {
   shader: orb14ShaderBaked,
   stateColors: {
     idle: { ink: "#1c1c1b", paper: "#e6e6e3" },
-    speaking: { ink: "#2a1410", paper: "#ffd9a4" },
+    speaking: { ink: "#1c1c1b", paper: "#e6e6e3" }, // monochrome too: no warm accent
     thinking: { ink: "#1c1c1b", paper: "#e6e6e3" },
   },
   // Thinking churns the plasma in place while the light freezes.
