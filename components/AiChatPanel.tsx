@@ -64,29 +64,29 @@ export default function AiChatPanel({ workspaceId }: { workspaceId: string }) {
   return (
     <div className="flex h-full min-h-0">
       {/* Transcript + floating composer */}
-      <div className="relative flex min-w-0 flex-1 flex-col bg-page">
+      <div className="relative flex min-w-0 flex-1 flex-col bg-canvas">
         <MessageScrollerProvider autoScroll>
           <MessageScroller className="min-h-0 flex-1">
             <MessageScrollerViewport className="thin-scroll">
               <MessageScrollerContent className="mx-auto w-full max-w-3xl gap-6 px-4 pb-48 pt-8">
                 {messages.length === 0 && !sending ? (
                   <div className="flex flex-col items-center pt-16 text-center">
-                    <span className="flex size-12 items-center justify-center rounded-full bg-violet-600 text-white">
+                    <span className="flex size-12 items-center justify-center rounded-sm bg-ink text-paper">
                       <TrendingUp className="size-6" />
                     </span>
-                    <h2 className="mt-4 text-[24px] font-bold tracking-tight text-stone-900">
+                    <h2 className="mt-4 text-xl font-heading stretch-heading tracking-heading text-ink">
                       Ask ShapesOS to do the work
                     </h2>
-                    <p className="mt-2 max-w-[52ch] text-[13.5px] leading-relaxed text-ink-2">
+                    <p className="mt-2 max-w-[52ch] text-md leading-relaxed text-muted">
                       Rank lookups, keyword research, content drafts, audits, reports, autopilot
                       approvals — grounded in this project’s data.
                     </p>
                     <div className="mt-4 flex flex-wrap items-center justify-center gap-1.5">
-                      <span className="text-[12px] text-ink-3">Try:</span>
+                      <span className="text-[12px] text-muted">Try:</span>
                       {["/rankings", "/keywords", "/alerts", "/help"].map((c) => (
                         <code
                           key={c}
-                          className="rounded-chip bg-surface px-1.5 py-0.5 font-mono text-[12px] text-ink-2 shadow-hairline"
+                          className="rounded-key bg-paper px-1.5 py-0.5 font-mono text-[12px] text-ink shadow-hairline"
                         >
                           {c}
                         </code>
@@ -189,7 +189,7 @@ export default function AiChatPanel({ workspaceId }: { workspaceId: string }) {
           <div className="mx-auto w-full max-w-3xl px-4 pb-4">
             <div className="pointer-events-auto">
               {canEdit ? (
-                <div className="material-float rounded-[14px] p-2 shadow-float-lg ring-1 ring-line">
+                <div className="rounded-xl bg-paper p-2 shadow-raised">
                   <AttachmentMenu />
                   <PromptBar
                     demo={false}
@@ -198,14 +198,14 @@ export default function AiChatPanel({ workspaceId }: { workspaceId: string }) {
                   />
                 </div>
               ) : (
-                <div className="rounded-[14px] bg-surface px-4 py-3 text-center text-[13px] text-ink-2 shadow-float-md ring-1 ring-line">
+                <div className="rounded-xl bg-paper px-4 py-3 text-center text-[13px] text-muted shadow-raised">
                   You need the editor role to chat with ShapesOS.
                 </div>
               )}
               {mockMode && canEdit && (
-                <p className="mt-2 text-center text-[12px] text-ink-3">
+                <p className="mt-2 text-center text-[12px] text-muted">
                   Mock mode — the assistant runs a rule-based demo. Type{" "}
-                  <code className="rounded-chip bg-surface px-1 font-mono shadow-hairline">/help</code>{" "}
+                  <code className="rounded-key bg-paper px-1 font-mono shadow-hairline">/help</code>{" "}
                   to see commands.
                 </p>
               )}
