@@ -27,14 +27,14 @@ export default async function SchedulesPage({ params }: { params: Promise<{ id: 
     <div className="mx-auto flex max-w-5xl flex-col gap-6 px-6 py-8">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <p className="text-xs font-medium uppercase tracking-wider text-zinc-500">
-            <Link href={`/dashboard/projects/${project.id}/automations`} className="hover:text-accent">
+          <p className="text-xs font-semibold text-muted">
+            <Link href={`/dashboard/projects/${project.id}/automations`} className="hover:text-focus hover:underline">
               Automations
             </Link>{" "}
             / Schedules
           </p>
-          <h1 className="mt-1 text-xl font-bold tracking-tight text-ink">Scheduled skills</h1>
-          <p className="mt-2 max-w-2xl text-sm text-zinc-600">
+          <h1 className="aos-heading mt-1 text-ink">Scheduled skills</h1>
+          <p className="mt-2 max-w-2xl text-sm text-muted">
             Skills that run on a cron schedule or react to workspace events, for{" "}
             <span className="font-medium">{project.domain}</span>. Each run fans out to
             parallel subagents and writes its report to the workspace filesystem.
@@ -43,7 +43,7 @@ export default async function SchedulesPage({ params }: { params: Promise<{ id: 
         {canManage && (
           <Link
             href={`/dashboard/projects/${project.id}/automations/schedules/new`}
-            className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-hover"
+            className="inline-flex h-control items-center rounded-full bg-ink px-[22px] text-base font-semibold text-white aos-press"
           >
             New schedule
           </Link>
