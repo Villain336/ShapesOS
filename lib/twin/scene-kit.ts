@@ -110,7 +110,7 @@ export function rotationY(rot: TwinRotation): number {
 export function frontDirection(rot: TwinRotation): { x: number; z: number } {
   const a = rotationY(rot);
   // Rounded so 90° gives exact (1, 0) instead of (1, 6e-17).
-  return { x: Math.round(Math.sin(a)), z: Math.round(Math.cos(a)) };
+  return { x: Math.round(Math.sin(a)) + 0, z: Math.round(Math.cos(a)) + 0 }; // + 0 turns -0 into 0
 }
 
 export function nextRotation(rot: TwinRotation): TwinRotation {

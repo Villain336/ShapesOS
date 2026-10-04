@@ -391,8 +391,9 @@ export function pickShipment(s: Pick<TwinSnapshot, "shipments" | "objects">, sel
     const own = s.shipments.find((sh) => sh.dockObjectId === selectedObjectId);
     if (own) return own;
     const obj = s.objects.find((o) => o.id === selectedObjectId);
-    if (obj?.state.kind === "dock_door" && obj.state.booking) {
-      const byBooking = s.shipments.find((sh) => sh.id === obj.state.booking!.id);
+    const booking = obj?.state.kind === "dock_door" ? obj.state.booking : null;
+    if (booking) {
+      const byBooking = s.shipments.find((sh) => sh.id === booking.id);
       if (byBooking) return byBooking;
     }
   }
