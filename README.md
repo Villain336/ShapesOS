@@ -123,7 +123,7 @@ All documented in [.env.example](./.env.example).
 | Variable | Default | What it does |
 |---|---|---|
 | `DEPLOYMENT_MODE` | `self_hosted` | `self_hosted`: bring your own keys, usage recorded but never blocked. `hosted`: a person's first workspace gets a 14-day, 500-credit trial behind a hard cap, then needs a plan. |
-| `SIGNUP_MODE` | `open` | `open`: any SSO sign-in without a workspace gets one. `invite`: new users need a pending invite. |
+| `SIGNUP_MODE` | `open` | `open`: any SSO sign-in or email signup without a workspace gets one. `invite`: new users need a pending invite. Email + password and magic-link sign-in need outgoing email (SMTP or Resend) and `APP_URL` in production; in development the links print to the server console. |
 | `TRUSTED_PROXY_HOPS` | `1` | How many reverse proxies append to `X-Forwarded-For`. Used for login lockouts and rate limits; `0` trusts no proxy header. |
 | `MARKETR_PLATFORM_OPERATORS` | unset (nobody) | User ids or emails allowed to change host-wide resources (shared Knowledge corpus, Activepieces flow bindings). |
 | `ALLOW_FAKE_PROVIDERS` | `0` | Fake SMS/email/call/mail providers are the dev default but refused in production unless set to `1` for a demo install. |
