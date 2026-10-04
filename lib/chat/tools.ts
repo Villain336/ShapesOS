@@ -1098,6 +1098,10 @@ export const TOOL_GROUP: Readonly<Record<string, ToolGroup>> = {
   edit_file: "code",
   bash: "code",
   run_tests: "code",
+  // Phase 9 (sites): SiteBuilder sites edited in the sandbox
+  // (lib/sites/tools.ts). Drafts only — applying and deploying stay human.
+  site_checkout: "site",
+  site_publish_draft: "site",
 };
 
 /**

@@ -109,6 +109,8 @@ import { inlineBudgetMs } from "@/lib/agents/queue/config";
 // Phase 8: ship tools (git in the sandbox → push → PR) and recorded browser
 // tools register themselves with the tool registry on import.
 import "@/lib/ship/tools";
+// Phase 9 (sites): site_checkout / site_publish_draft (registers on import).
+import "@/lib/sites/tools";
 import "@/lib/agents/runs/browser-tools";
 // Phase 10 M9: Expert Constitution Pack v1 — the Chief Strategy Agent's
 // system-prompt layer (global hard rules + CSA constitution), wired in
