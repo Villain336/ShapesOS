@@ -27,13 +27,30 @@ export interface ToastInput {
   action?: ToastAction;
   /** Auto-dismiss after this many ms; 0 keeps it until dismissed. */
   durationMs?: number;
+  /** Live work: a progress row under the text ("7 of 12"). */
+  progress?: { done: number; total: number };
+  /**
+   * "undo": the one-line toast (message, underlined Undo, dismiss). Defaults
+   * to "undo" when the only action is Undo and there is no description.
+   */
+  variant?: ToastVariant;
 }
+
+export type ToastVariant = "default" | "undo";
 
 export interface ToastRecord extends Required<Pick<ToastInput, "title" | "status">> {
   id: string;
   description?: string;
   action?: ToastAction;
   durationMs: number;
+  progress?: { done: number; total: number };
+  variant: ToastVariant;
+}
+
+/** The compact Undo toast applies when the only action is Undo and nothing else needs room. */
+export function toastVariantFor(input: Pick<ToastInput, "variant" | "action" | "description" | "progress">): ToastVariant {
+  if (input.variant) return input.variant;
+  return input.action?.label === "Undo" && !input.description && !input.progress ? "undo" : "default";
 }
 
 export interface ConfirmOptions {
@@ -207,6 +224,8 @@ export class FeedbackStore {
       status: input.status ?? "done",
       action: input.action,
       durationMs,
+      progress: input.progress,
+      variant: toastVariantFor(input),
     };
     // Newest last; drop the oldest beyond the cap.
     this.toasts = [...this.toasts, record];
