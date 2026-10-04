@@ -21,6 +21,21 @@ import {
   Tv,
   Radio,
   Rocket,
+  // Phase 10 (ops-core): /dashboard/ops section icons.
+  ShoppingCart,
+  CreditCard,
+  TicketPercent,
+  ReceiptText,
+  Boxes,
+  Truck,
+  FolderKanban,
+  LifeBuoy,
+  UserRound,
+  Workflow,
+  Landmark,
+  FileText,
+  Store,
+  Receipt,
   type LucideIcon,
 } from "lucide-react";
 
@@ -38,6 +53,21 @@ const ICONS: Record<string, LucideIcon> = {
   ctv: Tv,
   dsp: Radio,
   launch: Rocket,
+  // Phase 10 (ops-core)
+  orders: ShoppingCart,
+  payments: CreditCard,
+  promotions: TicketPercent,
+  invoices: ReceiptText,
+  inventory: Boxes,
+  purchasing: Truck,
+  projects: FolderKanban,
+  helpdesk: LifeBuoy,
+  team: UserRound,
+  workflows: Workflow,
+  accounting: Landmark,
+  quotes: FileText,
+  vendors: Store,
+  expenses: Receipt,
 };
 
 export interface SectionNavItem {
