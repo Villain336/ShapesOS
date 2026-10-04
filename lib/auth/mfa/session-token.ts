@@ -15,8 +15,8 @@
 //            no guard needs to know 2FA exists. Only the two-factor / passkey
 //            credentials providers read mfaPendingSub, to finish sign-in.
 //
-// token.amr lists how this session authenticated ("pwd", "sso", "otp",
-// "recovery", "passkey"); token.mfaAt is when a second factor (or a passkey,
+// token.amr lists how this session authenticated ("pwd", "sso", "email",
+// "otp", "recovery", "passkey"); token.mfaAt is when a second factor (or a passkey,
 // which is multi-factor on its own: possession + user verification) last
 // passed. It drives the workspace "require 2FA" policy and the re-auth window
 // for sensitive account changes.
@@ -27,8 +27,11 @@ export const REAUTH_WINDOW_SECONDS = 10 * 60;
 
 export const TWO_FACTOR_PROVIDER_ID = "two-factor";
 export const PASSKEY_PROVIDER_ID = "passkey";
+/** Phase 6: email accounts — password, and one-time email link (verify / magic link). */
+export const EMAIL_PASSWORD_PROVIDER_ID = "email-password";
+export const EMAIL_LINK_PROVIDER_ID = "email-link";
 
-export type AuthMethod = "pwd" | "sso" | "otp" | "recovery" | "passkey";
+export type AuthMethod = "pwd" | "sso" | "otp" | "recovery" | "passkey" | "email";
 export type SecondFactorMethod = "otp" | "recovery" | "passkey";
 
 export interface MfaTokenFields {
@@ -54,7 +57,9 @@ export function hasSecondFactor(f: FactorSummary): boolean {
 }
 
 export function firstFactorMethod(provider: string): AuthMethod {
-  return provider === "credentials" ? "pwd" : "sso";
+  if (provider === "credentials" || provider === EMAIL_PASSWORD_PROVIDER_ID) return "pwd";
+  if (provider === EMAIL_LINK_PROVIDER_ID) return "email";
+  return "sso";
 }
 
 /**
