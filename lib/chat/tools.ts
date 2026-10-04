@@ -1170,6 +1170,9 @@ export const TOOL_GROUP: Readonly<Record<string, ToolGroup>> = {
   // Phase 11 (seotools): document output (lib/documents/tools.ts).
   create_document: "content",
   create_spreadsheet: "content",
+  // Phase 11 (seotools): data analysis code in the run's sandbox
+  // (lib/sandbox/analyze-tool.ts) — off with the rest of "code" when no sandbox.
+  analyze_data: "code",
 };
 
 /**
@@ -1247,6 +1250,8 @@ export const TOOL_ACTION: Readonly<Record<string, string>> = {
   // Phase 11 (seotools): files saved to the workspace — Tier 0 drafts.
   create_document: "draft_document",
   create_spreadsheet: "draft_spreadsheet",
+  // Phase 11 (seotools): runs code in the sandbox — same tier as bash (asks).
+  analyze_data: "run_sandbox_command",
 };
 
 /** The group a tool belongs to. Unknown tools fall in "connectors" (fail closed). */

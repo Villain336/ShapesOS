@@ -117,3 +117,5 @@ lib/seo/__tests__/jsonld-draft-db.test.ts
 lib/seo/__tests__/sitemap-db.test.ts
 # Phase 11 (seotools): create_document / create_spreadsheet save real WorkspaceFiles, workspace-scoped.
 lib/documents/__tests__/document-tools-db.test.ts
+# Phase 11 (seotools): analyze_data — workspace files in, sandbox outputs saved back through the upload gate.
+lib/sandbox/__tests__/analyze-tool-db.test.ts
