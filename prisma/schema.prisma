@@ -654,6 +654,9 @@ model Workspace {
   opsVendorBills              OpsVendorBill[]
   opsExpenseClaims            OpsExpenseClaim[]
   opsExpenseLines             OpsExpenseLine[]
+  // Phase 10 (store): public storefront + its product listings.
+  opsStores                   OpsStore[]
+  opsStoreListings            OpsStoreListing[]
   // Phase 18 slice 1: ad-platforms ontology back-relations.
   adPlatforms                 AdPlatform[]
   adAccounts                  AdAccount[]
@@ -10064,10 +10067,14 @@ model OpsProduct {
   // Low-stock alert threshold: alert when trackInventory && stockQty <=
   // lowStockThreshold. Slice 3. Default 0 = alert only when out of stock.
   lowStockThreshold Int       @default(0) @map("low_stock_threshold")
+  // Phase 10 (store): inactive products are never sold on the storefront.
+  active            Boolean   @default(true)
   createdAt         DateTime  @default(now()) @map("created_at")
   updatedAt         DateTime  @updatedAt @map("updated_at")
 
   inventoryTxns OpsInventoryTxn[]
+  // Phase 10 (store)
+  storeListings OpsStoreListing[]
   // Phase 10 (ops-core)
   variants      OpsProductVariant[]
   reorderRules  OpsReorderRule[]
@@ -10094,13 +10101,31 @@ model OpsOrder {
   totalCents    Int            @map("total_cents")
   // Phase 10 (finance): the quote this order was converted from.
   quoteId       String?        @map("quote_id")
+  // ---- Phase 10 (store) ----
+  // Where the order came from: manual | web (storefront checkout) | quote | workflow.
+  source          String        @default("manual")
+  storeId         String?       @map("store_id")
+  store           OpsStore?     @relation(fields: [storeId], references: [id], onDelete: SetNull)
+  // Buyer details (web orders: from the Stripe Checkout Session).
+  customerEmail   String?       @map("customer_email")
+  customerName    String?       @map("customer_name")
+  // Server-computed promotion discount; totalCents = subtotal - discount + tax.
+  discountCents   Int           @default(0) @map("discount_cents")
+  promotionId     String?       @map("promotion_id")
+  promotion       OpsPromotion? @relation(fields: [promotionId], references: [id], onDelete: SetNull)
+  promotionCode   String?       @map("promotion_code")
+  // Tenant Stripe Checkout Session (never the platform billing key).
+  stripeSessionId String?       @map("stripe_session_id")
+  paidAt          DateTime?     @map("paid_at")
   createdAt     DateTime       @default(now()) @map("created_at")
   updatedAt     DateTime       @updatedAt @map("updated_at")
 
   payments OpsPayment[]
 
+  @@unique([workspaceId, stripeSessionId])
   @@index([workspaceId, status, createdAt])
   @@index([workspaceId, customerId])
+  @@index([workspaceId, source, createdAt])
   @@map("ops_orders")
 }
 
@@ -10147,8 +10172,14 @@ model OpsPromotion {
   usageLimit  Int?      @map("usage_limit")
   usedCount   Int       @default(0) @map("used_count")
   active      Boolean   @default(true)
+  // Phase 10 (store): optional validity window (null = open-ended).
+  startsAt    DateTime? @map("starts_at")
+  endsAt      DateTime? @map("ends_at")
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  // Phase 10 (store)
+  orders OpsOrder[]
 
   @@unique([workspaceId, code])
   @@index([workspaceId, active])
@@ -10535,7 +10566,7 @@ model OpsJournalEntry {
   workspace    Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   entryDate    DateTime         @map("entry_date")
   memo         String?          @db.Text
-  // manual | invoice | credit_note | payment | bill | bill_payment | expense | reversal
+  // manual | invoice | credit_note | payment | bill | bill_payment | expense | reversal | web_order (Phase 10 store)
   sourceType   String           @default("manual") @map("source_type")
   sourceId     String?          @map("source_id")
   sourceKey    String?          @map("source_key")
@@ -15346,4 +15377,69 @@ model MiniAppRecord {
   @@index([workspaceId, appId, entity, createdAt])
   @@index([appId, entity])
   @@map("mini_app_records")
+}
+
+// ============================================================================
+// Phase 10 (store): public storefront.
+//
+// One store per workspace, served at /shop/<slug> (slug globally unique).
+// Only a PUBLISHED store is visible; only LISTED listings of ACTIVE products
+// are sold. The public pages resolve slug → workspace through ONE extra,
+// SELECT-only RLS policy (app.store_route = 'lookup', published rows only);
+// everything after that runs under the tenant GUC like every ops table.
+// Orders are OpsOrder rows (source "web"), payments OpsPayment rows from the
+// tenant's own Stripe webhook, stock moves OpsInventoryTxn sale rows.
+// ============================================================================
+
+model OpsStore {
+  id           String    @id @default(cuid())
+  workspaceId  String    @unique @map("workspace_id")
+  workspace    Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  // Public URL segment: /shop/<slug> (lowercase letters, digits, hyphens).
+  slug         String    @unique
+  name         String
+  description  String?   @db.Text
+  published    Boolean   @default(false)
+  // ISO 4217; what the checkout charges in.
+  currency     String    @default("USD")
+  // Optional sales tax on the discounted subtotal (an OpsTaxRate id).
+  taxRateId    String?   @map("tax_rate_id")
+  // Optional: sales pick stock from this warehouse's locations first.
+  warehouseId  String?   @map("warehouse_id")
+  contactEmail String?   @map("contact_email")
+  createdBy    String?   @map("created_by")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  listings OpsStoreListing[]
+  orders   OpsOrder[]
+
+  @@map("ops_stores")
+}
+
+// A product offered in a store: its public URL slug, copy and image (a
+// WorkspaceFile id — validated to be an image of this workspace).
+model OpsStoreListing {
+  id          String     @id @default(cuid())
+  workspaceId String     @map("workspace_id")
+  workspace   Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  storeId     String     @map("store_id")
+  store       OpsStore   @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  productId   String     @map("product_id")
+  product     OpsProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+  // /shop/<store>/p/<slug>
+  slug        String
+  // Null = the product's name.
+  title       String?
+  description String?    @db.Text
+  imageFileId String?    @map("image_file_id")
+  position    Int        @default(0)
+  listed      Boolean    @default(true)
+  createdAt   DateTime   @default(now()) @map("created_at")
+  updatedAt   DateTime   @updatedAt @map("updated_at")
+
+  @@unique([storeId, productId])
+  @@unique([storeId, slug])
+  @@index([workspaceId, storeId, listed, position])
+  @@map("ops_store_listings")
 }

@@ -187,7 +187,12 @@ const PUBLIC_BY_DESIGN = {
   // Phase 9 (repos): GitHub PR feedback webhook — capability model, see route comments.
   // Phase 10 (finance): tenant Stripe Checkout webhook — capability model, see route comments.
   "app/api/ops/stripe/webhook/[workspaceId]/route.ts":
-    "inbound tenant Stripe webhook; Stripe-Signature verified with THAT workspace's own webhook secret (lib/secrets envelope, stripe.webhooks.constructEvent with timestamp tolerance) before any parsing/logic (unset secret 503, bad signature 400); only checkout.session.completed carrying this workspace's invoice metadata is applied, once per payment intent (advisory lock + lookup), under the tenant's RLS scope; 1 MiB body cap; returns ids only",
+    "inbound tenant Stripe webhook; Stripe-Signature verified with THAT workspace's own webhook secret (lib/secrets envelope, stripe.webhooks.constructEvent with timestamp tolerance) before any parsing/logic (unset secret 503, bad signature 400); only checkout.session.completed carrying this workspace's invoice metadata is applied, once per payment intent (advisory lock + lookup), under the tenant's RLS scope; 1 MiB body cap; returns ids only. Phase 10 (store): the same verified handler also applies storefront Checkout Sessions (metadata.order_id of this workspace): paid → draft order confirmed by a status-guarded claim, payment + stock sale + journal once; expired → the unpaid draft is cancelled",
+  // Phase 10 (store): public storefront cart + checkout — capability model, see route comments.
+  "app/api/shop/[storeSlug]/cart/route.ts":
+    "public storefront cart (buyers have no account); only a PUBLISHED store resolves (SELECT-only app.store_route policy), unknown/unpublished 404; the cart is an HMAC-SHA256-signed cookie bound to that store that names products and quantities only — every price, stock level and promotion is re-read from the database; adding a product the store doesn't list and sell is refused; writes nothing to the database; per-store+IP rate limit + proxy IP limit, 4 KiB body cap",
+  "app/api/shop/[storeSlug]/checkout/route.ts":
+    "public storefront checkout; only a PUBLISHED store resolves (unknown/unpublished 404); price, stock and promotion re-validated server-side from the database (never client prices) before a DRAFT web order and a Stripe Checkout Session are created with the WORKSPACE'S OWN Stripe key (no key → 409, never a fake success); nothing is paid here — payment is recorded only by the Stripe-signed tenant webhook; per-store+IP limit (10/10 min) + CAPTCHA step-up (lib/auth/captcha.ts) from the second attempt when configured, 4 KiB body cap; returns the Checkout URL only",
   "app/api/hooks/github/route.ts":
     "inbound GitHub webhook; X-Hub-Signature-256 HMAC-SHA256 with GITHUB_WEBHOOK_SECRET verified in constant time over the raw body before parsing (unset secret → 503); delivery id is the primary key of github_webhook_deliveries so redeliveries are no-ops; bots, non-collaborators, non shapes/<runId> branches and forks ignored; routed to its workspace via a SELECT-only policy on agent_pull_requests, every write under that tenant's GUC; only queues a pr_feedback agent job (pushes still need a person's OK); 1 MiB body cap, per-IP limit in proxy.ts; returns counts only",
 };
@@ -214,7 +219,7 @@ const missingAllowList = Object.keys(PUBLIC_BY_DESIGN).filter(k => {
 ok("every public-by-design entry maps to a real route file", missingAllowList.length === 0, missingAllowList.join("; "));
 ok(
   "public-by-design allow-list is documented",
-  Object.keys(PUBLIC_BY_DESIGN).length === 36 && // Phase 9 (repos): +1 app/api/hooks/github; Phase 10 (finance): +1 tenant Stripe webhook
+  Object.keys(PUBLIC_BY_DESIGN).length === 38 && // Phase 9 (repos): +1 app/api/hooks/github; Phase 10 (finance): +1 tenant Stripe webhook; Phase 10 (store): +2 storefront cart + checkout
     Object.values(PUBLIC_BY_DESIGN).every(v => v.length > 20)
 );
 

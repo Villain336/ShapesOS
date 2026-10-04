@@ -17,6 +17,8 @@ import {
   invoiceIssueLines,
   paymentReceivedLines,
   postEntry,
+  webOrderSaleLines,
+  type AccountRef,
   type PostResult,
   type TaxedLine,
   type TaxRateLike,
@@ -168,5 +170,28 @@ export async function postExpenseReimbursed(
     sourceId: claim.id,
     sourceKey: `expense:${claim.id}:reimburse`,
     lines: expenseReimburseLines(claim.totalCents),
+  });
+}
+
+// Phase 10 (store): a paid storefront order (cash sale, net of discount).
+export async function postWebOrderSale(
+  tx: Tx,
+  actor: OpsActor,
+  order: { id: string; totalCents: number; taxCents: number; paidAt?: Date | string | null },
+  opts: { taxRateId?: string | null; label?: string } = {},
+): Promise<PostResult | null> {
+  if (order.totalCents <= 0) return null;
+  let taxAccount: AccountRef = { key: "tax_payable" };
+  if (order.taxCents > 0 && opts.taxRateId) {
+    const rate = (await loadTaxRates(tx, actor.workspaceId)).get(opts.taxRateId);
+    if (rate?.salesAccountId) taxAccount = { id: rate.salesAccountId };
+  }
+  return postEntry(tx, actor, {
+    entryDate: dayOf(order.paidAt),
+    memo: `Storefront order ${opts.label ?? order.id} paid`,
+    sourceType: "web_order",
+    sourceId: order.id,
+    sourceKey: `web_order:${order.id}:paid`,
+    lines: webOrderSaleLines(order, taxAccount),
   });
 }

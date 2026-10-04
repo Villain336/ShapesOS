@@ -684,6 +684,11 @@ async function applyPatch(
       await deductApprovedLeave(tx, actor, existing);
     }
   }
+  // Phase 10 (store): web orders are priced at checkout (discount, tax, the
+  // Stripe amount); their money fields never change afterwards.
+  if (def.slug === "orders" && existing.source === "web" && (patch.lineItems !== undefined || patch.taxCents !== undefined)) {
+    throw new OpsError(409, "Web orders are priced at checkout — their lines and tax can't be edited");
+  }
   if (def.statusTransitions) {
     // Draft edits to tax/lines recompute the stored totals (never stale).
     if (patch.taxCents !== undefined || patch.lineItems !== undefined) {

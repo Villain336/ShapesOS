@@ -33,7 +33,7 @@ interface Probe {
 export interface ParityRow {
   app: string;
   odoo: string;
-  owner: "ops-core" | "finance" | "phase 12" | "phase 4b" | "earlier";
+  owner: "ops-core" | "finance" | "store" | "phase 12" | "phase 4b" | "earlier";
   model: Probe[];
   route: Probe[];
   page: Probe[];
@@ -228,6 +228,17 @@ export const ROWS: ParityRow[] = [
     page: [page("expenses")],
     test: [anyFile("*expense*.test.ts", /^lib\/ops\/__tests__\/[^/]*expense[^/]*\.test\.ts$/i)],
   },
+  // Phase 10 (store): public storefront, cart, tenant Stripe checkout.
+  {
+    app: "Storefront — public catalog, cart, checkout",
+    odoo: "eCommerce / Website",
+    owner: "store",
+    model: [model("OpsStore"), model("OpsStoreListing"), model("OpsOrder")],
+    route: [entity("stores"), entity("store-listings"), file("app/api/shop/[storeSlug]/cart/route.ts"), file("app/api/shop/[storeSlug]/checkout/route.ts")],
+    page: [page("store"), file("app/shop/[storeSlug]/page.tsx"), file("app/shop/[storeSlug]/p/[productSlug]/page.tsx")],
+    test: [test("lib/ops/__tests__/p10-store.test.ts"), test("lib/ops/__tests__/p10-store-db.test.ts")],
+    note: "Payments through the workspace's own Stripe (FINANCE integration); live Stripe unverified in CI.",
+  },
   // --- Not built yet (owner decision: Phase 12 / later) ---
   ...(
     [
@@ -235,7 +246,6 @@ export const ROWS: ParityRow[] = [
       ["Point of sale", "Point of Sale", "phase 12"],
       ["Payroll", "Payroll", "phase 12"],
       ["Events", "Events", "phase 12"],
-      ["Storefront — public catalog, cart, checkout", "eCommerce / Website", "phase 12"],
       ["Client portal", "Portal", "phase 12"],
     ] as const
   ).map(([app, odoo, owner]): ParityRow => ({ app, odoo, owner, model: [], route: [], page: [], test: [], note: "Planned — not started in this codebase." })),

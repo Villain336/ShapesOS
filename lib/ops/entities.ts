@@ -126,6 +126,13 @@ const invoiceLineSchema = z.object({
   taxRateId: z.string().min(1).max(64).optional(),
 });
 
+// Phase 10 (store): an ISO-8601 date/time from the API contract, as a Date.
+const isoDateValue = z
+  .string()
+  .max(64)
+  .refine((v) => !Number.isNaN(new Date(v).getTime()), { message: "must be an ISO-8601 date" })
+  .transform((v) => new Date(v));
+
 const milestoneSchema = z.object({
   title: z.string().min(1).max(200),
   dueAt: z.string().max(32).optional(),
@@ -159,6 +166,8 @@ const productDef: OpsEntityDef = {
     priceCents: centsSchema,
     stockQty: z.number().int().min(0).max(OPS_MAX_CENTS).default(0),
     trackInventory: z.boolean().default(true),
+    // Phase 10 (store): inactive products are never sold on the storefront.
+    active: z.boolean().default(true),
   }),
   // NOTE: stockQty is deliberately NOT patchable — stock moves only through
   // inventory-txn creation (atomic txn + balance update in the same
@@ -175,6 +184,8 @@ const productDef: OpsEntityDef = {
     priceCents: centsSchema.optional(),
     trackInventory: z.boolean().optional(),
     lowStockThreshold: z.number().int().min(0).optional(),
+    // Phase 10 (store)
+    active: z.boolean().optional(),
   }).strict(),
   patchable: true,
   filterable: [],
@@ -198,7 +209,8 @@ const orderDef: OpsEntityDef = {
     status: z.enum(["confirmed", "fulfilled", "cancelled"]).optional(),
   }),
   patchable: true,
-  filterable: ["status"],
+  // Phase 10 (store): source = manual | web | quote | workflow; storeId.
+  filterable: ["status", "source", "storeId"],
   gatedTransitions: [
     {
       field: "status",
@@ -273,11 +285,17 @@ const promotionDef: OpsEntityDef = {
     rules: z.record(z.string(), z.unknown()).default({}),
     usageLimit: z.number().int().positive().optional(),
     active: z.boolean().default(true),
-  }),
+    // Phase 10 (store): optional validity window (ISO-8601).
+    startsAt: isoDateValue.optional(),
+    endsAt: isoDateValue.optional(),
+  }).refine((b) => !b.startsAt || !b.endsAt || b.endsAt > b.startsAt, { message: "endsAt must be after startsAt", path: ["endsAt"] }),
   patchSchema: z.object({
     rules: z.record(z.string(), z.unknown()).optional(),
     usageLimit: z.number().int().positive().nullable().optional(),
     active: z.boolean().optional(),
+    // Phase 10 (store)
+    startsAt: isoDateValue.nullable().optional(),
+    endsAt: isoDateValue.nullable().optional(),
   }),
   patchable: true,
   filterable: [],
@@ -1009,6 +1027,83 @@ const applicantDef: OpsEntityDef = {
   },
 };
 
+// ---------------------------------------------------------------------------
+// Phase 10 (store): the public storefront and its listings. Rules (same-
+// workspace references, slugs, one store per workspace) live in
+// lib/ops/store/admin.ts.
+// ---------------------------------------------------------------------------
+
+const lazyStoreAdmin = () => import("./store/admin");
+
+const storeSlugSchema = z.string().trim().toLowerCase().min(1).max(64).regex(/^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$/, "use lowercase letters, digits and hyphens");
+const listingSlugSchema = z.string().trim().toLowerCase().min(1).max(120).regex(/^[a-z0-9](?:[a-z0-9-]{0,118}[a-z0-9])?$/, "use lowercase letters, digits and hyphens");
+
+const storeDef: OpsEntityDef = {
+  slug: "stores",
+  label: "Store",
+  delegate: "opsStore",
+  createSchema: z.object({
+    name: z.string().trim().min(1).max(200),
+    slug: storeSlugSchema,
+    description: z.string().max(5000).optional(),
+    currency: z.string().trim().length(3).optional(),
+    published: z.boolean().default(false),
+    taxRateId: z.string().min(1).max(64).optional(),
+    warehouseId: z.string().min(1).max(64).optional(),
+    contactEmail: z.string().email().max(320).optional(),
+  }),
+  patchSchema: z.object({
+    name: z.string().trim().min(1).max(200).optional(),
+    slug: storeSlugSchema.optional(),
+    description: z.string().max(5000).nullable().optional(),
+    currency: z.string().trim().length(3).optional(),
+    published: z.boolean().optional(),
+    taxRateId: z.string().min(1).max(64).nullable().optional(),
+    warehouseId: z.string().min(1).max(64).nullable().optional(),
+    contactEmail: z.string().email().max(320).nullable().optional(),
+  }).strict(),
+  patchable: true,
+  filterable: [],
+  gatedTransitions: [],
+  summarize: (r) => `store "${r.name}" /shop/${r.slug}${r.published ? " (published)" : " (unpublished)"}`,
+  hooks: {
+    create: async (tx, a, b) => (await lazyStoreAdmin()).createStoreRow(tx, a, b),
+    patch: async (tx, a, id, p) => (await lazyStoreAdmin()).patchStoreRow(tx, a, id, p),
+  },
+};
+
+const storeListingDef: OpsEntityDef = {
+  slug: "store-listings",
+  label: "Store listing",
+  delegate: "opsStoreListing",
+  createSchema: z.object({
+    storeId: z.string().min(1).max(64),
+    productId: z.string().min(1).max(64),
+    slug: listingSlugSchema.optional(),
+    title: z.string().trim().max(200).optional(),
+    description: z.string().max(10_000).optional(),
+    imageFileId: z.string().min(1).max(64).optional(),
+    position: z.number().int().min(0).max(100_000).default(0),
+    listed: z.boolean().default(true),
+  }),
+  patchSchema: z.object({
+    slug: listingSlugSchema.optional(),
+    title: z.string().trim().max(200).nullable().optional(),
+    description: z.string().max(10_000).nullable().optional(),
+    imageFileId: z.string().min(1).max(64).nullable().optional(),
+    position: z.number().int().min(0).max(100_000).optional(),
+    listed: z.boolean().optional(),
+  }).strict(),
+  patchable: true,
+  filterable: ["storeId", "productId"],
+  gatedTransitions: [],
+  summarize: (r) => `listing /p/${r.slug} (product ${r.productId})${r.listed === false ? " unlisted" : ""}`,
+  hooks: {
+    create: async (tx, a, b) => (await lazyStoreAdmin()).createListingRow(tx, a, b),
+    patch: async (tx, a, id, p) => (await lazyStoreAdmin()).patchListingRow(tx, a, id, p),
+  },
+};
+
 export const OPS_ENTITIES: OpsEntityDef[] = [
   productDef,
   orderDef,
@@ -1040,6 +1135,9 @@ export const OPS_ENTITIES: OpsEntityDef[] = [
   productVariantDef,
   transferDef,
   reorderRuleDef,
+  // Phase 10 (store)
+  storeDef,
+  storeListingDef,
 ];
 
 export const OPS_ENTITY_MAP: Record<string, OpsEntityDef> = Object.fromEntries(

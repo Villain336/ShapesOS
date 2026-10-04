@@ -30,7 +30,18 @@ interface PromotionRow {
   usageLimit: number | null;
   usedCount: number;
   active: boolean;
+  // Phase 10 (store): validity window.
+  startsAt?: string | null;
+  endsAt?: string | null;
   createdAt: string;
+}
+
+/** Phase 10 (store): "Oct 1 – Oct 31", "from Oct 1", "until Oct 31", or "". */
+function describeWindow(p: { startsAt?: string | null; endsAt?: string | null }): string {
+  if (p.startsAt && p.endsAt) return `${fmtDate(p.startsAt)} – ${fmtDate(p.endsAt)}`;
+  if (p.startsAt) return `from ${fmtDate(p.startsAt)}`;
+  if (p.endsAt) return `until ${fmtDate(p.endsAt)}`;
+  return "";
 }
 
 function describeRules(raw: unknown): string {
@@ -104,7 +115,10 @@ export function PromotionsView() {
                 return (
                   <tr key={p.id}>
                     <td className={`${tdCls} font-mono font-semibold`}>{p.code}</td>
-                    <td className={`${tdCls} text-muted`}>{describeRules(p.rules)}</td>
+                    <td className={`${tdCls} text-muted`}>
+                      {describeRules(p.rules)}
+                      {describeWindow(p) && <span className="block text-[12px]">{describeWindow(p)}</span>}
+                    </td>
                     <td className={tdCls}>
                       <span className={chipCls}>{p.active ? "Active" : "Paused"}</span>
                     </td>
@@ -140,6 +154,9 @@ function NewPromotionModal({ onClose, onCreated }: { onClose: () => void; onCrea
   const [min, setMin] = useState("");
   const [skus, setSkus] = useState("");
   const [limit, setLimit] = useState("");
+  // Phase 10 (store): optional validity window (local dates).
+  const [startsOn, setStartsOn] = useState("");
+  const [endsOn, setEndsOn] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -165,10 +182,13 @@ function NewPromotionModal({ onClose, onCreated }: { onClose: () => void; onCrea
     if (skuList.length) rules.productSkus = skuList;
     const usageLimit = limit.trim() ? Number(limit) : undefined;
     if (usageLimit !== undefined && (!Number.isInteger(usageLimit) || usageLimit < 1)) return setError("Usage limit must be a whole number.");
+    const startsAt = startsOn ? new Date(`${startsOn}T00:00:00`).toISOString() : undefined;
+    const endsAt = endsOn ? new Date(`${endsOn}T23:59:59`).toISOString() : undefined;
+    if (startsAt && endsAt && endsAt <= startsAt) return setError("The end date must be after the start date.");
     setSaving(true);
     setError(null);
     try {
-      await opsJson("/api/ops/promotions", "POST", { code: code.trim().toUpperCase(), rules, ...(usageLimit ? { usageLimit } : {}) });
+      await opsJson("/api/ops/promotions", "POST", { code: code.trim().toUpperCase(), rules, ...(usageLimit ? { usageLimit } : {}), ...(startsAt ? { startsAt } : {}), ...(endsAt ? { endsAt } : {}) });
       onCreated();
       onClose();
     } catch (e) {
@@ -201,6 +221,14 @@ function NewPromotionModal({ onClose, onCreated }: { onClose: () => void; onCrea
           <label className="block">
             <span className={labelCls}>Usage limit</span>
             <input className={`${inputCls} w-full`} value={limit} onChange={(e) => setLimit(e.target.value)} inputMode="numeric" />
+          </label>
+          <label className="block">
+            <span className={labelCls}>Starts (optional)</span>
+            <input type="date" className={`${inputCls} w-full`} value={startsOn} onChange={(e) => setStartsOn(e.target.value)} />
+          </label>
+          <label className="block">
+            <span className={labelCls}>Ends (optional)</span>
+            <input type="date" className={`${inputCls} w-full`} value={endsOn} onChange={(e) => setEndsOn(e.target.value)} />
           </label>
         </div>
         <label className="block">

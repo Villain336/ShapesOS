@@ -23,6 +23,8 @@ const ALLOW = new Map<string, string>([
   // Phase 9 (repos): GitHub delivery routing / poller discovery — the one cross-workspace read, through the SELECT-only app.github_route policy; returns ids only, every write is tenant-scoped.
   ["lib/ship/pr-routing.ts:agentPullRequest.findFirst", "routePullRequest: maps (repository, branch | PR) to its workspace via the SELECT-only app.github_route policy"],
   ["lib/ship/pr-routing.ts:agentPullRequest.findMany", "discoverOpenPullRequests: poller fan-out across workspaces via the SELECT-only app.github_route policy (ids only)"],
+  // Phase 10 (store): public storefront routing — slug → workspace, the one cross-workspace read, through the SELECT-only app.store_route policy (published stores only); everything after it is tenant-scoped.
+  ["lib/ops/store/catalog.ts:opsStore.findFirst", "resolvePublishedStore: maps a public /shop/<slug> to its workspace via the SELECT-only app.store_route policy (published rows only)"],
 ]);
 
 const SCOPE_MARKERS = ["withWorkspaceScope", "withWorkspace(", "withCampaignScope", "setWorkspaceGuc", "app.workspace_id"];
