@@ -82,11 +82,15 @@ function lineData(workspaceId: string, claimId: string, l: ExpenseLineInput) {
 export async function createExpenseClaim(tx: Tx, actor: OpsActor, input: { title: string; notes?: string | null; lines: ExpenseLineInput[]; claimantName?: string | null }) {
   const { totalCents } = validateExpenseLines(input.lines);
   await assertRefs(tx, actor.workspaceId, input.lines);
+  // Display name at claim time, from the workspace membership.
+  const member = input.claimantName
+    ? null
+    : await tx.workspaceMember.findFirst({ where: { workspaceId: actor.workspaceId, userId: actor.userId }, select: { name: true, email: true } });
   const claim = await tx.opsExpenseClaim.create({
     data: {
       workspaceId: actor.workspaceId,
       claimantId: actor.userId,
-      claimantName: input.claimantName ?? null,
+      claimantName: input.claimantName ?? member?.name ?? member?.email ?? null,
       title: input.title.slice(0, 200),
       notes: input.notes ?? null,
       totalCents,
