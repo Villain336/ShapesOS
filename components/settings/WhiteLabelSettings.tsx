@@ -172,7 +172,7 @@ export default function WhiteLabelSettings({
     if (!canEdit || saving) return;
     const clean = sanitizeBrandHex(color);
     if (!clean) {
-      setNotice({ kind: "error", message: "Enter a hex color like #7c3aed, or clear the color." });
+      setNotice({ kind: "error", message: "Enter a hex color like #1f6feb, or clear the color." });
       return;
     }
     setSaving(true);
