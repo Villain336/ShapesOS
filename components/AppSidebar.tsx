@@ -1,35 +1,39 @@
 "use client";
 
-// Marketr — dashboard chrome: sidebar nav (desktop) + top bar (mobile).
-// Nav rows use GlideMenu's gliding highlight; workspace + user menus use
-// shadcn dropdown-menu; user avatar via shadcn avatar.
+// ShapesOS — dashboard chrome: the Agentic OS sidebar (desktop) and the
+// mobile top bar + drawer (kit: docs/design/kit/sidebar-and-menus.png).
 //
-// Agentic OS: the desktop sidebar is a black night surface (aos-night,
-// 288px). Nav items are 40px rows; the current page is a white row with
-// black text and aria-current="page". Icons are Lucide only.
+// Black night surface, 288px expanded / 80px rail. Top: logo mark +
+// ShapesOS + workspace name with the switcher chevron, then the white "New
+// task" pill and the round search button (opens ⌘K). The nav (lib/nav/config
+// — every destination stays reachable; the long list scrolls) has a white
+// current row and pill counts (Approvals = the needs-you count). Below it,
+// "Running now": the lead agent with its sub-agents branching beneath
+// (lib/aos/agents), then the usage meter and the user row. The collapsed
+// rail keeps icons, the needs-you dot and the running shapes, with tooltips.
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
-import type { ReactNode } from "react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useId, useState, type ReactNode } from "react";
+import { Tooltip as TooltipPrimitive } from "@base-ui/react/tooltip";
+import { Dialog } from "@base-ui/react/dialog";
 import {
   Check,
-  ChevronDown,
   ChevronsUpDown,
   CreditCard,
-  List,
   LogOut,
+  Menu as MenuIcon,
   PanelLeftClose,
   PanelLeftOpen,
   Plus,
   RefreshCw,
+  Search,
   Settings,
-  TrendingUp,
+  SlidersHorizontal,
+  X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import GlideMenu from "@/components/vault/primitives/GlideMenu";
-import { buttonVariants } from "@/components/vault/atoms/Button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -38,26 +42,27 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/vault/shadcn/dropdown-menu";
-import { Avatar, AvatarFallback } from "@/components/vault/shadcn/avatar";
 import { useChat } from "@/components/chat/ChatContext";
 import ThreadListSection from "@/components/chat/ThreadListSection";
-import { activeNavHref, NAV_GROUPS, type NavItem } from "@/lib/nav/config";
+import { useNeedsYouCount } from "@/components/approvals/NeedsYouBadge";
+import { OPEN_COMMAND_BAR_EVENT } from "@/components/command-bar/lib";
+import { LogoMark } from "@/components/aos/LogoMark";
+import { AgentTree } from "@/components/aos/AgentTree";
+import { CountBadge } from "@/components/aos/AgentAvatar";
+import { StatusShape } from "@/components/aos/StatusShape";
+import { activeNavHref, NAV_GROUPS } from "@/lib/nav/config";
+import { visibleBranches, type AgentNode } from "@/lib/aos/agents";
+import { STATUS_META } from "@/lib/aos/status";
 
 export type SidebarUser = { name?: string | null; email?: string | null };
 export type SidebarWorkspace = { id: string; name: string };
-
-/**
- * Live count pills keyed by NavItem.badge. The dashboard layout fills
- * `needs-you` with the approvals count (components/approvals/NeedsYouBadge);
- * a missing key renders nothing.
- */
-export type SidebarBadges = Partial<Record<NonNullable<NavItem["badge"]>, ReactNode>>;
-
-// Navigation lives in lib/nav/config.ts (Grow / Design / Operate / Agents +
-// Settings and Billing) so the sidebar and the ⌘K Go section never drift.
-// Settings subpages stay in the SettingsNav tab strip on every settings page.
+export type SidebarTree = { lead: AgentNode; branches: AgentNode[] } | null;
+export type SidebarUsage = { used: number; cap: number; pct: number } | null;
 
 const COLLAPSE_KEY = "shapesos:sidebar:collapsed";
+const ACTIVITY_POLL_MS = 45_000;
+const NEW_TASK_HREF = "/dashboard/assistant";
+const MAX_RUNNING_ROWS = 4;
 
 function initials(user: SidebarUser) {
   const src = user.name ?? user.email ?? "?";
@@ -69,101 +74,83 @@ function initials(user: SidebarUser) {
     .join("");
 }
 
-function NavItems({
-  pathname,
-  onNavigate,
-  onNight,
-  collapsed,
-  badges,
-}: {
-  pathname: string;
-  onNavigate?: () => void;
-  onNight?: boolean;
-  collapsed?: boolean;
-  badges?: SidebarBadges;
-}) {
-  const current = activeNavHref(pathname);
+export function planLabel(plan: string | null | undefined): string | null {
+  if (!plan) return null;
+  const words = plan.replace(/_/g, "-").split("-").join(" ");
+  return `${words[0]!.toUpperCase()}${words.slice(1)} plan`;
+}
+
+export function openCommandBar() {
+  if (typeof window !== "undefined") window.dispatchEvent(new Event(OPEN_COMMAND_BAR_EVENT));
+}
+
+/** Live lead → sub-agent tree + usage: server-rendered first, then polled while visible. */
+export function useAgentActivity(initial: { tree: SidebarTree; usage: SidebarUsage }) {
+  const [state, setState] = useState(initial);
+  const refresh = useCallback(async () => {
+    try {
+      const res = await fetch("/api/agents/activity", { cache: "no-store" });
+      if (!res.ok) return;
+      const body = (await res.json()) as { tree: SidebarTree; usage: SidebarUsage };
+      setState({ tree: body.tree ?? null, usage: body.usage ?? null });
+    } catch {
+      // keep the last good state
+    }
+  }, []);
+  useEffect(() => {
+    const tick = () => {
+      if (document.visibilityState === "visible") void refresh();
+    };
+    const timer = window.setInterval(tick, ACTIVITY_POLL_MS);
+    document.addEventListener("visibilitychange", tick);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", tick);
+    };
+  }, [refresh]);
+  return state;
+}
+
+// ---------------------------------------------------------------------------
+// Rail tooltip (collapsed sidebar)
+// ---------------------------------------------------------------------------
+
+function RailTip({ label, children }: { label: string; children: React.ReactElement<Record<string, unknown>> }) {
   return (
-    <div className="flex flex-col gap-4">
-      {NAV_GROUPS.map((group) => {
-        const headingId = `nav-group-${group.id}${onNight ? "" : "-m"}`;
-        return (
-          <div
-            key={group.id}
-            role="group"
-            aria-labelledby={group.title ? headingId : undefined}
-            aria-label={group.title ? undefined : group.id === "account" ? "Account" : "Home"}
-            className={group.id === "account" ? cn("border-t pt-3", onNight ? "border-night-line" : "border-line") : undefined}
-          >
-            {group.title ? (
-              <div
-                id={headingId}
-                className={cn(
-                  "mb-1 px-3 text-xs font-semibold",
-                  onNight ? "text-night-muted" : "text-muted",
-                  collapsed && "sr-only",
-                )}
-              >
-                {group.title}
-              </div>
-            ) : null}
-            <GlideMenu
-              highlightClassName={cn("inset-x-0 rounded-sm", onNight ? "bg-night-hover" : "bg-hover")}
-            >
-              {group.items.map((item) => {
-                const active = item.href === current;
-                const Icon = item.icon;
-                const badge = item.badge ? badges?.[item.badge] : null;
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    data-menu-row
-                    aria-current={active ? "page" : undefined}
-                    aria-label={collapsed ? item.label : undefined}
-                    title={collapsed ? item.label : undefined}
-                    onClick={onNavigate}
-                    className={cn(
-                      "relative z-10 mb-0.5 flex h-10 items-center gap-2.5 rounded-sm text-base transition-[color,background-color] duration-150 ease-aos",
-                      collapsed ? "justify-center px-0" : "px-3",
-                      active
-                        ? onNight
-                          ? "bg-paper font-semibold text-ink"
-                          : "bg-ink font-semibold text-paper"
-                        : onNight
-                          ? "text-night-soft hover:text-night"
-                          : "text-ink",
-                    )}
-                  >
-                    <Icon aria-hidden className="size-4 shrink-0" />
-                    {collapsed ? null : <span className="min-w-0 flex-1 truncate">{item.label}</span>}
-                    {badge && !collapsed ? <span className="ml-auto shrink-0">{badge}</span> : null}
-                  </Link>
-                );
-              })}
-            </GlideMenu>
-          </div>
-        );
-      })}
-    </div>
+    <TooltipPrimitive.Root>
+      <TooltipPrimitive.Trigger render={children} />
+      <TooltipPrimitive.Portal>
+        <TooltipPrimitive.Positioner side="right" sideOffset={14} className="z-50">
+          <TooltipPrimitive.Popup className="relative rounded-sm bg-ink px-3 py-1.5 text-sm font-semibold whitespace-nowrap text-paper shadow-raised">
+            {label}
+            <TooltipPrimitive.Arrow className="data-[side=right]:-left-1 data-[side=right]:top-1/2! size-2.5 -translate-y-1/2 rotate-45 bg-ink" />
+          </TooltipPrimitive.Popup>
+        </TooltipPrimitive.Positioner>
+      </TooltipPrimitive.Portal>
+    </TooltipPrimitive.Root>
   );
 }
 
-function WorkspaceSwitcher({
+// ---------------------------------------------------------------------------
+// Workspace switcher (header trigger + menu)
+// ---------------------------------------------------------------------------
+
+function WorkspaceMenu({
   workspaces,
   currentId,
   canManageBilling,
+  collapsed,
 }: {
   workspaces: SidebarWorkspace[];
   currentId: string;
   canManageBilling?: boolean;
+  collapsed?: boolean;
 }) {
   const router = useRouter();
   const current = workspaces.find((w) => w.id === currentId) ?? workspaces[0];
-  // Phase 13 Wave A (white-label ops): workspace switching is enabled.
   // Any member may switch — switching is scoping, not privilege; every API
-  // route still enforces its own RBAC for the resolved workspace, and the
-  // cookie is validated against the user's accessible workspaces server-side.
+  // route still enforces its own RBAC, and the cookie is validated against
+  // the user's accessible workspaces server-side.
   const [switchingId, setSwitchingId] = useState<string | null>(null);
 
   async function switchTo(id: string) {
@@ -176,8 +163,7 @@ function WorkspaceSwitcher({
         body: JSON.stringify({ workspaceId: id }),
       });
       if (!res.ok) throw new Error("switch failed");
-      // Full reload so every server component re-resolves the workspace
-      // from the new preference cookie (BrandTheme re-tints, lists refetch).
+      // Full reload so every server component re-resolves the workspace.
       window.location.reload();
     } catch {
       setSwitchingId(null);
@@ -187,49 +173,63 @@ function WorkspaceSwitcher({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
-        className={cn(buttonVariants({ variant: "secondary", size: "sm" }), "w-full justify-between")}
-        aria-label="Switch workspace"
+        aria-label={`Switch workspace (current: ${current?.name ?? "Workspace"})`}
+        className={cn(
+          "flex items-center rounded-sm text-left transition-[background-color] duration-150 hover:bg-night-hover",
+          collapsed ? "size-12 justify-center" : "w-full gap-3 px-2 py-1.5",
+        )}
       >
-        <span className="truncate">{current?.name ?? "Workspace"}</span>
-        <ChevronsUpDown className="size-3.5 shrink-0 opacity-60" />
+        <LogoMark size={collapsed ? 28 : 30} />
+        {collapsed ? null : (
+          <>
+            <span className="min-w-0 flex-1">
+              <span className="block text-[17px] leading-5 font-extrabold stretch-display tracking-heading text-paper">ShapesOS</span>
+              <span className="block truncate text-xs text-night-muted">{current?.name ?? "Workspace"}</span>
+            </span>
+            <ChevronsUpDown className="size-4 shrink-0 text-night-soft" aria-hidden />
+          </>
+        )}
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="w-56">
-        <DropdownMenuLabel>Workspace</DropdownMenuLabel>
+      <DropdownMenuContent align="start" sideOffset={6} className="w-72 rounded-lg bg-paper p-1.5 text-ink shadow-raised ring-0">
+        <DropdownMenuLabel className="px-3 pt-2 pb-1 text-xs font-semibold text-muted">Switch workspace</DropdownMenuLabel>
         {workspaces.map((w) => {
           const selected = w.id === currentId;
           const switching = w.id === switchingId;
           return (
             <DropdownMenuItem
               key={w.id}
-              className="justify-between"
-              title={selected ? "Current workspace" : `Switch to ${w.name}`}
-              onSelect={(e) => {
+              className="min-h-12 gap-3 rounded-sm px-3 text-base font-semibold"
+              onClick={(e) => {
                 e.preventDefault();
                 void switchTo(w.id);
               }}
             >
-              <span className="truncate">{w.name}</span>
+              <span aria-hidden className="flex size-8 shrink-0 items-center justify-center rounded-key bg-ink text-sm font-extrabold text-paper">
+                {w.name.trim()[0]?.toUpperCase() ?? "W"}
+              </span>
+              <span className="min-w-0 flex-1 truncate">{w.name}</span>
               {selected ? (
-                <Check className="size-3.5" />
+                <Check className="size-4" aria-label="Current workspace" />
               ) : switching ? (
-                <RefreshCw className="size-3.5 animate-spin opacity-60" />
+                <RefreshCw className="size-4 animate-spin text-muted" aria-hidden />
               ) : null}
             </DropdownMenuItem>
           );
         })}
-        {/* Phase 3: workspace lifecycle + billing, one click from anywhere. */}
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={() => router.push("/dashboard/settings/workspace#ws-new")}>
-          <Plus />
-          New workspace
+        <DropdownMenuSeparator className="mx-2 my-1.5 bg-line" />
+        <DropdownMenuItem className="min-h-12 gap-3 rounded-sm px-3 text-base font-semibold" onClick={() => router.push("/dashboard/settings/workspace#ws-new")}>
+          <span aria-hidden className="flex size-8 shrink-0 items-center justify-center rounded-key bg-paper shadow-control">
+            <Plus className="size-4" />
+          </span>
+          Create workspace
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => router.push("/dashboard/settings/workspace")}>
-          <Settings />
+        <DropdownMenuItem className="min-h-11 gap-3 rounded-sm px-3 text-base" onClick={() => router.push("/dashboard/settings/workspace")}>
+          <Settings className="ml-2 size-4" aria-hidden />
           Workspace settings
         </DropdownMenuItem>
         {canManageBilling ? (
-          <DropdownMenuItem onClick={() => router.push("/dashboard/billing")}>
-            <CreditCard />
+          <DropdownMenuItem className="min-h-11 gap-3 rounded-sm px-3 text-base" onClick={() => router.push("/dashboard/billing")}>
+            <CreditCard className="ml-2 size-4" aria-hidden />
             Billing
           </DropdownMenuItem>
         ) : null}
@@ -238,82 +238,69 @@ function WorkspaceSwitcher({
   );
 }
 
-function UserMenu({
+// ---------------------------------------------------------------------------
+// User row
+// ---------------------------------------------------------------------------
+
+function UserRow({
   user,
-  triggerClassName,
-  compact,
-  onNight,
+  plan,
+  collapsed,
   canManageBilling,
 }: {
   user: SidebarUser;
-  triggerClassName?: string;
-  compact?: boolean;
-  onNight?: boolean;
+  plan: string | null;
+  collapsed?: boolean;
   canManageBilling?: boolean;
 }) {
   const router = useRouter();
+  const avatar = (
+    <span aria-hidden className="flex size-9 shrink-0 items-center justify-center rounded-full bg-paper text-xs font-extrabold text-ink">
+      {initials(user)}
+    </span>
+  );
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
-        className={cn(
-          "flex items-center gap-2.5 rounded-sm px-2 py-1.5 text-left transition-[background-color] duration-150 ease-aos active:scale-[0.98]",
-          onNight ? "hover:bg-night-hover" : "hover:bg-hover",
-          triggerClassName,
-        )}
         aria-label="Account menu"
+        className={cn(
+          "flex items-center rounded-sm text-left transition-[background-color] duration-150 hover:bg-night-hover",
+          collapsed ? "size-12 justify-center" : "w-full gap-3 px-2 py-2",
+        )}
       >
-        <Avatar size="sm">
-          <AvatarFallback>{initials(user)}</AvatarFallback>
-        </Avatar>
-        {compact ? null : (
+        {avatar}
+        {collapsed ? null : (
           <>
             <span className="min-w-0 flex-1">
-              <span
-                className={cn(
-                  "block truncate text-[13px] font-medium",
-                  onNight ? "text-night" : "text-ink",
-                )}
-              >
-                {user.name ?? user.email ?? "Signed in"}
-              </span>
-              {user.name && user.email ? (
-                <span
-                  className={cn(
-                    "block truncate text-xs",
-                    onNight ? "text-night-muted" : "text-muted",
-                  )}
-                >
-                  {user.email}
-                </span>
-              ) : null}
+              <span className="block truncate text-base leading-5 font-semibold text-paper">{user.name ?? user.email ?? "Signed in"}</span>
+              <span className="block truncate text-xs text-night-muted">{plan ?? user.email}</span>
             </span>
-            <ChevronDown className={cn("size-3.5 shrink-0", onNight ? "text-night-muted" : "text-subtle")} />
+            <SlidersHorizontal className="size-4 shrink-0 text-night-soft" aria-hidden />
           </>
         )}
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" side="top" className="w-56">
-        <DropdownMenuLabel className="font-normal">
-          <span className="block truncate text-[13px] font-medium text-foreground">
-            {user.name ?? "Signed in"}
-          </span>
-          {user.email ? (
-            <span className="block truncate text-[12px] text-muted-foreground">{user.email}</span>
-          ) : null}
+      <DropdownMenuContent align="start" side="top" sideOffset={8} className="w-60 rounded-lg bg-paper p-1.5 text-ink shadow-raised ring-0">
+        <DropdownMenuLabel className="px-3 py-2 font-normal">
+          <span className="block truncate text-md font-semibold text-ink">{user.name ?? "Signed in"}</span>
+          {user.email ? <span className="block truncate text-xs text-muted">{user.email}</span> : null}
         </DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={() => router.push("/dashboard/settings")}>
-          <Settings />
+        <DropdownMenuSeparator className="mx-2 my-1 bg-line" />
+        <DropdownMenuItem className="min-h-11 gap-3 rounded-sm px-3 text-base" onClick={() => router.push("/dashboard/settings")}>
+          <Settings className="size-4" aria-hidden />
           Settings
         </DropdownMenuItem>
         {canManageBilling ? (
-          <DropdownMenuItem onClick={() => router.push("/dashboard/billing")}>
-            <CreditCard />
+          <DropdownMenuItem className="min-h-11 gap-3 rounded-sm px-3 text-base" onClick={() => router.push("/dashboard/billing")}>
+            <CreditCard className="size-4" aria-hidden />
             Billing
           </DropdownMenuItem>
         ) : null}
-        <DropdownMenuSeparator />
-        <DropdownMenuItem variant="destructive" onClick={() => signOut({ callbackUrl: "/login" })}>
-          <LogOut />
+        <DropdownMenuSeparator className="mx-2 my-1 bg-line" />
+        <DropdownMenuItem
+          className="min-h-11 gap-3 rounded-sm px-3 text-base text-failed-text data-highlighted:bg-failed-tint"
+          onClick={() => signOut({ callbackUrl: "/login" })}
+        >
+          <LogOut className="size-4" aria-hidden />
           Sign out
         </DropdownMenuItem>
       </DropdownMenuContent>
@@ -321,23 +308,311 @@ function UserMenu({
   );
 }
 
-export function AppSidebar({
-  user,
-  workspaces,
-  currentWorkspaceId,
-  badges,
-  canManageBilling,
+// ---------------------------------------------------------------------------
+// Nav
+// ---------------------------------------------------------------------------
+
+function NavList({
+  pathname,
+  collapsed,
+  needsYou,
+  onNavigate,
 }: {
+  pathname: string;
+  collapsed: boolean;
+  needsYou: number;
+  onNavigate?: () => void;
+}) {
+  const current = activeNavHref(pathname);
+  const uid = useId();
+  return (
+    <div className="flex flex-col gap-3">
+      {NAV_GROUPS.map((group) => {
+        const headingId = `${uid}-nav-${group.id}`;
+        return (
+          <div
+            key={group.id}
+            role="group"
+            aria-labelledby={group.title && !collapsed ? headingId : undefined}
+            aria-label={group.title ? (collapsed ? group.title : undefined) : group.id === "account" ? "Account" : "Home"}
+            className={cn(group.id === "account" && "border-t border-night-line pt-3", collapsed && group.title && "border-t border-night-line pt-3")}
+          >
+            {group.title && !collapsed ? (
+              <div id={headingId} className="mb-1 px-3 text-xs font-semibold text-night-muted">
+                {group.title}
+              </div>
+            ) : null}
+            <ul className={cn("flex flex-col gap-0.5", collapsed && "items-center")}>
+              {group.items.map((item) => {
+                const active = item.href === current;
+                const Icon = item.icon;
+                const count = item.badge === "needs-you" ? needsYou : 0;
+                if (collapsed) {
+                  const tip = count > 0 ? `${item.label}: ${count} waiting on you` : item.label;
+                  return (
+                    <li key={item.href}>
+                      <RailTip label={tip}>
+                        <Link
+                          href={item.href}
+                          aria-label={tip}
+                          aria-current={active ? "page" : undefined}
+                          onClick={onNavigate}
+                          className={cn(
+                            "relative flex size-11 items-center justify-center rounded-full transition-[background-color,color] duration-150",
+                            active ? "bg-paper text-ink" : "text-night-soft hover:bg-night-hover hover:text-paper",
+                          )}
+                        >
+                          <Icon aria-hidden className="size-[18px]" />
+                          {count > 0 ? (
+                            <span aria-hidden className="absolute top-2 right-2 size-2 rounded-full bg-needs ring-2 ring-ink" />
+                          ) : null}
+                        </Link>
+                      </RailTip>
+                    </li>
+                  );
+                }
+                return (
+                  <li key={item.href}>
+                    <Link
+                      href={item.href}
+                      aria-current={active ? "page" : undefined}
+                      onClick={onNavigate}
+                      className={cn(
+                        "flex h-10 items-center gap-3 rounded-full px-3 text-base transition-[background-color,color] duration-150",
+                        active ? "bg-paper font-semibold text-ink" : "text-night-soft hover:bg-night-hover hover:text-paper",
+                      )}
+                    >
+                      <Icon aria-hidden className="size-[18px] shrink-0" />
+                      <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                      {count > 0 ? (
+                        <CountBadge count={count} tone="needs" label={`${count} approval${count === 1 ? "" : "s"} waiting on you`} />
+                      ) : null}
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Running now + usage
+// ---------------------------------------------------------------------------
+
+function RunningNow({ tree, collapsed, onNavigate }: { tree: SidebarTree; collapsed: boolean; onNavigate?: () => void }) {
+  const headingId = `${useId()}-running`;
+  const live = tree ? [tree.lead, ...tree.branches].filter((n) => n.status !== "done").length : 0;
+  if (collapsed) {
+    if (!tree) return null;
+    const nodes = [tree.lead, ...visibleBranches(tree.branches, MAX_RUNNING_ROWS - 1).shown];
+    return (
+      <ul aria-label="Running now" className="flex flex-col items-center gap-1 border-t border-night-line pt-3">
+        {nodes.map((n) => {
+          const tip = `${n.name}${n.isLead ? " (lead)" : ""}: ${n.line}`;
+          return (
+            <li key={n.key}>
+              <RailTip label={tip}>
+                <Link
+                  href={n.href ?? "/dashboard/runs"}
+                  aria-label={`${tip}. ${STATUS_META[n.status].label}`}
+                  onClick={onNavigate}
+                  className="flex size-10 items-center justify-center rounded-full hover:bg-night-hover"
+                >
+                  <StatusShape status={n.status} size={n.isLead ? 13 : 11} tone="night" />
+                </Link>
+              </RailTip>
+            </li>
+          );
+        })}
+      </ul>
+    );
+  }
+  return (
+    <section aria-labelledby={headingId} className="border-t border-night-line px-2 pt-3">
+      <div className="mb-1 flex items-center justify-between px-2">
+        <h2 id={headingId} className="text-xs font-semibold text-night-muted">
+          Running now
+        </h2>
+        {tree ? <span className="text-xs font-semibold text-night-muted tabular-nums">{live}</span> : null}
+      </div>
+      {tree ? (
+        <AgentTree lead={tree.lead} branches={tree.branches} tone="night" maxBranches={MAX_RUNNING_ROWS - 1} onNavigate={onNavigate} />
+      ) : (
+        <p className="px-2 pb-2 text-xs text-night-muted">Nothing running. Start a new task and it shows up here.</p>
+      )}
+    </section>
+  );
+}
+
+function UsageMeterBox({ usage }: { usage: NonNullable<SidebarUsage> }) {
+  return (
+    <Link
+      href="/dashboard/settings/usage"
+      className="block rounded-md bg-night-hover px-4 py-3 transition-[background-color] duration-150 hover:bg-night-raised"
+      aria-label={`Usage this month: ${usage.pct}% (${usage.used.toLocaleString()} of ${usage.cap.toLocaleString()} credits)`}
+    >
+      <span className="flex items-center justify-between text-xs">
+        <span className="text-night-soft">Usage this month</span>
+        <span className="font-semibold text-paper tabular-nums">{usage.pct}%</span>
+      </span>
+      <span aria-hidden className="mt-2 block h-1 overflow-hidden rounded-full bg-night-line">
+        <span className="block h-full rounded-full bg-paper" style={{ width: `${usage.pct}%` }} />
+      </span>
+    </Link>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// The panel (shared by the desktop sidebar, the mobile drawer and the gallery)
+// ---------------------------------------------------------------------------
+
+export interface SidebarPanelProps {
   user: SidebarUser;
+  plan?: string | null;
   workspaces: SidebarWorkspace[];
   currentWorkspaceId: string;
-  badges?: SidebarBadges;
   canManageBilling?: boolean;
-}) {
+  pathname: string;
+  collapsed?: boolean;
+  onToggleCollapsed?: () => void;
+  needsYou: number;
+  tree: SidebarTree;
+  usage: SidebarUsage;
+  onNavigate?: () => void;
+  /** Contextual section under the nav (assistant chat threads). */
+  extra?: ReactNode;
+  /** Mobile drawer: a close button next to the workspace switcher. */
+  onClose?: () => void;
+}
+
+export function SidebarPanel({
+  user,
+  plan,
+  workspaces,
+  currentWorkspaceId,
+  canManageBilling,
+  pathname,
+  collapsed = false,
+  onToggleCollapsed,
+  needsYou,
+  tree,
+  usage,
+  onNavigate,
+  extra,
+  onClose,
+}: SidebarPanelProps) {
+  const planText = planLabel(plan);
+  const toggle = onToggleCollapsed ? (
+    <button
+      type="button"
+      onClick={onToggleCollapsed}
+      aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+      aria-expanded={!collapsed}
+      className="flex size-9 shrink-0 items-center justify-center rounded-full text-night-soft transition-[background-color,color] duration-150 hover:bg-night-hover hover:text-paper"
+    >
+      {collapsed ? <PanelLeftOpen className="size-4" aria-hidden /> : <PanelLeftClose className="size-4" aria-hidden />}
+    </button>
+  ) : null;
+
+  return (
+    <TooltipPrimitive.Provider delay={150}>
+      <div className="flex h-full min-h-0 flex-col">
+        <div className={cn("flex flex-col gap-4 pt-4", collapsed ? "items-center px-2" : "px-3")}>
+          <div className={cn("flex items-center gap-1", collapsed ? "justify-center" : "w-full")}>
+            <div className={cn(!collapsed && "min-w-0 flex-1")}>
+              <WorkspaceMenu workspaces={workspaces} currentId={currentWorkspaceId} canManageBilling={canManageBilling} collapsed={collapsed} />
+            </div>
+            {onClose ? (
+              <button
+                type="button"
+                onClick={onClose}
+                aria-label="Close navigation"
+                className="flex size-9 shrink-0 items-center justify-center rounded-full text-night-soft hover:bg-night-hover hover:text-paper"
+              >
+                <X className="size-4" aria-hidden />
+              </button>
+            ) : null}
+          </div>
+          {collapsed ? (
+            <RailTip label="New task">
+              <Link
+                href={NEW_TASK_HREF}
+                onClick={onNavigate}
+                aria-label="New task"
+                className="aos-press flex size-11 items-center justify-center rounded-full bg-paper text-ink"
+              >
+                <Plus className="size-5" aria-hidden />
+              </Link>
+            </RailTip>
+          ) : (
+            <div className="flex items-center gap-2">
+              <Link
+                href={NEW_TASK_HREF}
+                onClick={onNavigate}
+                className="aos-press flex h-11 flex-1 items-center justify-center gap-2 rounded-full bg-paper text-base font-semibold text-ink"
+              >
+                <Plus className="size-4" aria-hidden />
+                New task
+              </Link>
+              <button
+                type="button"
+                onClick={() => {
+                  onNavigate?.();
+                  openCommandBar();
+                }}
+                aria-label="Search (⌘K)"
+                title="Search (⌘K)"
+                className="aos-press flex size-11 shrink-0 items-center justify-center rounded-full bg-night-raised text-paper hover:bg-night-line"
+              >
+                <Search className="size-4" aria-hidden />
+              </button>
+            </div>
+          )}
+        </div>
+        <nav aria-label="Dashboard" className={cn("thin-scroll mt-3 min-h-0 flex-1 overflow-y-auto pb-3", collapsed ? "px-2" : "px-3")}>
+          <NavList pathname={pathname} collapsed={collapsed} needsYou={needsYou} onNavigate={onNavigate} />
+          {extra && !collapsed ? <div className="mt-4 border-t border-night-line pt-3">{extra}</div> : null}
+        </nav>
+        <div className={cn("shrink-0", collapsed && "px-2")}>
+          <RunningNow tree={tree} collapsed={collapsed} onNavigate={onNavigate} />
+        </div>
+        <div className={cn("flex shrink-0 flex-col gap-2 pt-3 pb-3", collapsed ? "items-center px-2" : "px-3")}>
+          {usage && !collapsed ? <UsageMeterBox usage={usage} /> : null}
+          <div className={cn("flex items-center gap-1", collapsed && "flex-col")}>
+            <UserRow user={user} plan={planText} collapsed={collapsed} canManageBilling={canManageBilling} />
+            {toggle}
+          </div>
+        </div>
+      </div>
+    </TooltipPrimitive.Provider>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Desktop sidebar
+// ---------------------------------------------------------------------------
+
+export interface DashboardChromeProps {
+  user: SidebarUser;
+  plan?: string | null;
+  workspaces: SidebarWorkspace[];
+  currentWorkspaceId: string;
+  canManageBilling?: boolean;
+  /** Server-rendered first paint of "Running now" and the usage meter. */
+  initialTree?: SidebarTree;
+  initialUsage?: SidebarUsage;
+}
+
+export function AppSidebar(props: DashboardChromeProps) {
   const pathname = usePathname();
   const chat = useChat();
-  // 288px expanded / 80px rail (Agentic OS). The choice is a per-viewer
-  // convenience, so it lives in localStorage and defaults to expanded.
+  const { actionable } = useNeedsYouCount();
+  const { tree, usage } = useAgentActivity({ tree: props.initialTree ?? null, usage: props.initialUsage ?? null });
+  // 288px expanded / 80px rail. A per-viewer convenience: localStorage.
   const [collapsed, setCollapsed] = useState(false);
   useEffect(() => {
     try {
@@ -356,100 +631,88 @@ export function AppSidebar({
       return !c;
     });
   }
-  // One sidebar everywhere: on the assistant page it adjusts, gaining a
-  // contextual chat-thread section under the main nav (AI tab only).
-  const showThreads =
-    !collapsed && pathname === "/dashboard/assistant" && chat.tab === "ai" && chat.session !== null;
+  // On the assistant page the sidebar gains the chat-thread list (AI tab).
+  const showThreads = !collapsed && pathname === "/dashboard/assistant" && chat.tab === "ai" && chat.session !== null;
   return (
-    <aside
-      className={cn(
-        "aos-night sticky top-0 hidden h-screen shrink-0 flex-col border-r border-night-line md:flex",
-        collapsed ? "w-20" : "w-72",
-      )}
-    >
-      <div className={cn("flex flex-col gap-3 pt-4", collapsed ? "items-center px-2" : "px-3")}>
-        <div className={cn("flex items-center gap-2", collapsed ? "flex-col" : "justify-between")}>
-          <Link href="/dashboard" className="flex items-center gap-2 rounded-sm px-1" aria-label="ShapesOS home">
-            <span className="flex size-7 items-center justify-center rounded-sm bg-night-raised text-night">
-              <TrendingUp className="size-4" />
-            </span>
-            {collapsed ? null : (
-              <span className="text-[16px] font-semibold tracking-tight text-night">ShapesOS</span>
-            )}
-          </Link>
-          <button
-            type="button"
-            onClick={toggleCollapsed}
-            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-            aria-expanded={!collapsed}
-            title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-            className="flex size-8 items-center justify-center rounded-full text-night-soft transition-[background-color,color] duration-150 hover:bg-night-hover hover:text-night"
-          >
-            {collapsed ? <PanelLeftOpen className="size-4" /> : <PanelLeftClose className="size-4" />}
-          </button>
-        </div>
-        {collapsed ? null : <WorkspaceSwitcher workspaces={workspaces} currentId={currentWorkspaceId} canManageBilling={canManageBilling} />}
-      </div>
-      <nav className="flex-1 overflow-y-auto px-2 py-4" aria-label="Dashboard">
-        <NavItems pathname={pathname} onNight collapsed={collapsed} badges={badges} />
-        {showThreads ? (
-          <div className="mt-5 border-t border-night-line pt-3">
-            <div className="mb-2 truncate px-3 text-xs font-semibold text-night-muted">
-              Chats · {chat.session?.projectDomain}
-            </div>
-            <ThreadListSection />
-          </div>
-        ) : null}
-      </nav>
-      <div className="border-t border-night-line p-2">
-        <UserMenu user={user} triggerClassName="w-full" onNight compact={collapsed} canManageBilling={canManageBilling} />
-      </div>
+    <aside className={cn("aos-night sticky top-0 hidden h-screen shrink-0 md:block", collapsed ? "w-20" : "w-72")}>
+      <SidebarPanel
+        {...props}
+        pathname={pathname}
+        collapsed={collapsed}
+        onToggleCollapsed={toggleCollapsed}
+        needsYou={actionable}
+        tree={tree}
+        usage={usage}
+        extra={
+          showThreads ? (
+            <>
+              <div className="mb-2 truncate px-3 text-xs font-semibold text-night-muted">Chats · {chat.session?.projectDomain}</div>
+              <ThreadListSection />
+            </>
+          ) : null
+        }
+      />
     </aside>
   );
 }
 
+// ---------------------------------------------------------------------------
+// Mobile: top bar + black drawer with the same panel
+// ---------------------------------------------------------------------------
+
 export function MobileNav({
-  user,
-  workspaces,
-  currentWorkspaceId,
-  badges,
   headerActions,
-  canManageBilling,
-}: {
-  user: SidebarUser;
-  workspaces: SidebarWorkspace[];
-  currentWorkspaceId: string;
-  badges?: SidebarBadges;
-  canManageBilling?: boolean;
-  /** Mobile top-bar slot before the account menu (e.g. the notification bell). */
+  ...props
+}: DashboardChromeProps & {
+  /** Top-bar slot before the menu button (e.g. the notification bell). */
   headerActions?: ReactNode;
 }) {
   const pathname = usePathname();
+  const { actionable } = useNeedsYouCount();
+  const { tree, usage } = useAgentActivity({ tree: props.initialTree ?? null, usage: props.initialUsage ?? null });
+  const [open, setOpen] = useState(false);
+  const lead = tree?.lead ?? null;
   return (
-    <header className="sticky top-0 z-40 flex items-center justify-between border-b border-line bg-paper px-4 py-2.5 md:hidden">
-      <Link href="/dashboard" className="flex items-center gap-2" aria-label="ShapesOS home">
-        <span className="flex size-7 items-center justify-center rounded-sm bg-ink text-paper">
-          <TrendingUp className="size-4" />
-        </span>
-        <span className="text-[16px] font-semibold tracking-tight text-ink">ShapesOS</span>
+    <header className="sticky top-0 z-40 flex h-14 items-center justify-between border-b border-line bg-paper px-4 md:hidden">
+      <Link href="/dashboard" className="flex items-center gap-2.5" aria-label="ShapesOS home">
+        <LogoMark size={26} />
+        <span className="text-[17px] font-extrabold stretch-display tracking-heading text-ink">ShapesOS</span>
       </Link>
       <div className="flex items-center gap-1.5">
-        <DropdownMenu>
-          <DropdownMenuTrigger
-            className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "px-2.5")}
-            aria-label="Open navigation"
+        {lead ? (
+          <Link
+            href={lead.href ?? "/dashboard"}
+            aria-label={`${lead.name}: ${STATUS_META[lead.status].label}. ${lead.line}`}
+            className="flex size-10 items-center justify-center rounded-full hover:bg-hover"
           >
-            <List className="size-4" />
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="max-h-[80vh] w-64 overflow-y-auto p-2">
-            <NavItems pathname={pathname} badges={badges} />
-            <div className="mt-2 border-t border-line pt-2">
-              <WorkspaceSwitcher workspaces={workspaces} currentId={currentWorkspaceId} canManageBilling={canManageBilling} />
-            </div>
-          </DropdownMenuContent>
-        </DropdownMenu>
+            <StatusShape status={lead.status} size={12} />
+          </Link>
+        ) : null}
         {headerActions}
-        <UserMenu user={user} compact canManageBilling={canManageBilling} />
+        <Dialog.Root open={open} onOpenChange={setOpen}>
+          <Dialog.Trigger
+            aria-label="Open navigation"
+            className="relative flex size-10 items-center justify-center rounded-full text-ink hover:bg-hover"
+          >
+            <MenuIcon className="size-5" aria-hidden />
+            {actionable > 0 ? <span aria-hidden className="absolute top-2 right-2 size-2 rounded-full bg-needs ring-2 ring-paper" /> : null}
+          </Dialog.Trigger>
+          <Dialog.Portal>
+            <Dialog.Backdrop className="fixed inset-0 z-50 bg-ink/40 transition-opacity duration-200 data-ending-style:opacity-0 data-starting-style:opacity-0" />
+            <Dialog.Popup className="aos-night fixed inset-y-0 left-0 z-50 w-[min(20rem,88vw)] shadow-overlay transition-transform duration-200 ease-aos data-ending-style:-translate-x-full data-starting-style:-translate-x-full">
+              <Dialog.Title className="sr-only">Navigation</Dialog.Title>
+              <SidebarPanel
+                {...props}
+                pathname={pathname}
+                needsYou={actionable}
+                tree={tree}
+                usage={usage}
+                onNavigate={() => setOpen(false)}
+                onClose={() => setOpen(false)}
+              />
+            </Dialog.Popup>
+          </Dialog.Portal>
+        </Dialog.Root>
       </div>
     </header>
   );

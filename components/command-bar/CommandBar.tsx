@@ -56,6 +56,7 @@ import {
   loadFrecency,
   MISSION_TEMPLATES,
   mergeBySection,
+  OPEN_COMMAND_BAR_EVENT,
   moveSelection,
   rankCommands,
   RECORD_SEARCH_DEBOUNCE_MS,
@@ -208,8 +209,16 @@ export function CommandBar({ workspaceId }: { workspaceId: string }) {
         toggle();
       }
     };
+    // The sidebar's search button opens the palette (never toggles it shut).
+    const onOpen = () => {
+      if (!openRef.current) toggle();
+    };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener(OPEN_COMMAND_BAR_EVENT, onOpen);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener(OPEN_COMMAND_BAR_EVENT, onOpen);
+    };
   }, [toggle]);
 
   const bumpFrecency = useCallback((id: string) => {
