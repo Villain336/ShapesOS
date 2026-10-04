@@ -1143,6 +1143,12 @@ export const TOOL_GROUP: Readonly<Record<string, ToolGroup>> = {
   ops_events_overview: "workspace",
   ops_events_create_event: "ops",
   ops_events_register: "ops",
+  // Phase 13 (twincore): digital twin — reads are workspace, writes are ops.
+  twin_site_state: "workspace",
+  twin_find: "workspace",
+  twin_book_dock: "ops",
+  twin_assign_equipment: "ops",
+  twin_draft_layout: "ops",
   delegate_to_subagent: "delegate",
   // Phase 8 (ship): local git work in the run's sandbox is "code"; anything
   // that leaves the sandbox is "ship" (lib/ship/tools.ts).
@@ -1258,6 +1264,13 @@ export const TOOL_ACTION: Readonly<Record<string, string>> = {
   ops_payroll_request_posting: "post_pay_run",
   ops_events_create_event: "write_event",
   ops_events_register: "write_event",
+  // Phase 13 (twincore): booking a dock and giving a forklift a task are
+  // Tier 1 (internal site operations — an automation rule can let them run;
+  // without one they ask); drafting a layout is Tier 0 (publishing it is a
+  // person's gated step).
+  twin_book_dock: "book_dock",
+  twin_assign_equipment: "assign_equipment",
+  twin_draft_layout: "draft_site_layout",
   // Phase 8: Tier 2 — always asks (lib/automation/actions.ts).
   git_push_branch: "push_branch",
   open_pull_request: "open_pr",

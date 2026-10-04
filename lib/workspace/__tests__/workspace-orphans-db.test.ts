@@ -146,6 +146,8 @@ const FIXED_VALUES: Record<string, Record<string, string>> = {
     employer_tax_cents: "0",
     employer_contrib_cents: "0",
   },
+  // Phase 13 (twincore): a twin site's grid is 4–400 cells each way.
+  ops_sites: { grid_w: "10", grid_d: "10" },
 };
 
 // Committed rows per table (one is enough; parents are shared).

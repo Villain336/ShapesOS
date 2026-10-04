@@ -19,6 +19,9 @@ import { createSampleSite, SAMPLE_SITE_CODES } from "../sample";
 import { twinLiveStream } from "../live";
 import { applyTwinPatch } from "../derive";
 import type { TwinPatchOp, TwinSnapshot } from "../types";
+import { twinAssignEquipmentCore, twinBookDockCore, twinDraftLayout, twinFindCore, twinSiteStateCore } from "@/lib/chat/ops-twin-tools";
+import type { ToolContext } from "@/lib/chat/tools";
+import { sweepTwinAlerts } from "../alerts";
 
 const WS = "p13twin-ws-a";
 const WS_B = "p13twin-ws-b";
@@ -53,6 +56,7 @@ let po = "";
 
 before(async () => {
   for (const id of [WS, WS_B]) {
+    await prisma.$executeRaw`DELETE FROM notifications WHERE workspace_id = ${id}`;
     await prisma.$executeRaw`DELETE FROM workspaces WHERE id = ${id}`;
     await prisma.$executeRaw`INSERT INTO workspaces (id, name, owner_user_id, updated_at) VALUES (${id}, ${id}, ${"test:" + id}, now())`;
   }
@@ -70,7 +74,10 @@ before(async () => {
 });
 
 after(async () => {
-  for (const id of [WS, WS_B]) await prisma.$executeRaw`DELETE FROM workspaces WHERE id = ${id}`;
+  for (const id of [WS, WS_B]) {
+    await prisma.$executeRaw`DELETE FROM notifications WHERE workspace_id = ${id}`;
+    await prisma.$executeRaw`DELETE FROM workspaces WHERE id = ${id}`;
+  }
   await prisma.$disconnect();
 });
 
@@ -274,6 +281,81 @@ describe("p13 digital twin (real Postgres, app role)", () => {
     }
     await assert.rejects(siteSnapshot(WS_B, siteId), (e: unknown) => e instanceof TwinNotFoundError);
     await assert.rejects(withWorkspaceScope(WS_B, (tx) => tx.opsSite.create({ data: { workspaceId: WS, kind: "store", name: "x", code: "X", gridW: 10, gridD: 10, warehouseId: wh } })));
+  });
+});
+
+describe("p13 twin agent tools (real Postgres, app role)", () => {
+  it("twin_book_dock books a named dock or the first free one; clashes are refused", async () => {
+    const eta = new Date(Date.now() + 6 * 3600_000);
+    const named = await inA((tx) => twinBookDockCore(tx, A, { site: "TW-01", dock: "Dock 2", eta: eta.toISOString(), truckRef: "TRK-AG1", direction: "inbound" }));
+    assert.match(named.summary, /Booked Dock 2 \[/);
+    const d = named.details as { booking: { dockLocationId: string }; dockObjectId: string };
+    assert.equal(d.booking.dockLocationId, dock2);
+    // Dock 2 is taken at that ETA → the next free dock (Dock 1) is used.
+    const auto = await inA((tx) => twinBookDockCore(tx, A, { eta: eta.toISOString(), truckRef: "TRK-AG2", direction: "outbound" }));
+    assert.equal((auto.details as { booking: { dockLocationId: string } }).booking.dockLocationId, dock1);
+    await assert.rejects(inA((tx) => twinBookDockCore(tx, A, { eta: eta.toISOString(), direction: "inbound" })), /No dock on TW-01 is free/);
+    await assert.rejects(inA((tx) => twinBookDockCore(tx, A, { dock: "Dock 2", eta: eta.toISOString() })), (e: unknown) => e instanceof OpsError && e.status === 409);
+    await assert.rejects(inA((tx) => twinBookDockCore(tx, A, { eta: "soon" })), /ISO/);
+  });
+
+  it("twin_find finds a truck, a dock by name and the racks holding a SKU", async () => {
+    const truck = await inA((tx) => twinFindCore(tx, A, { query: "TRK-AG1" }));
+    assert.match(truck.summary, /Dock 2 \[.*shipment TRK-AG1: next Arrived/);
+    const sku = await inA((tx) => twinFindCore(tx, A, { query: "TW-MUG" }));
+    assert.match(sku.summary, /Rack A-01 \[.*holds 9 × TW-MUG Mug/);
+    assert.match((await inA((tx) => twinFindCore(tx, A, { query: "nothing-like-this" }))).summary, /Nothing on the twin/);
+  });
+
+  it("twin_assign_equipment gives a forklift a task by object label and frees it", async () => {
+    const busy = await inA((tx) => twinAssignEquipmentCore(tx, A, { equipment: "Forklift 1", to: "Rack A-01", note: "Count stock" }));
+    assert.match(busy.summary, /Forklift 1 \[.*\] is now busy → Rack A-01/);
+    const free = await inA((tx) => twinAssignEquipmentCore(tx, A, { equipment: "Forklift 1", status: "available" }));
+    assert.match(free.summary, /is now available/);
+    await assert.rejects(inA((tx) => twinAssignEquipmentCore(tx, A, { equipment: "Forklift 99" })), /No equipment/);
+  });
+
+  it("twin_site_state summarises KPIs, busy docks and alerts with object ids", async () => {
+    const r = await inA((tx) => twinSiteStateCore(tx, A, {}));
+    assert.match(r.summary, /^Main \(TW-01, warehouse, draft\)\. Stock on hand 9/);
+    assert.match(r.summary, /Busy docks: Dock 1 \[/);
+    assert.match(r.summary, /Alerts: Rack A-01 \[.*at or below the reorder point/);
+  });
+
+  it("twin_draft_layout without a live model lays out the warehouse's records as a DRAFT and says so", async () => {
+    const wh2 = String((await create("warehouses", { name: "Overflow", code: "TW-OVF" })).id);
+    const z = String((await create("locations", { warehouseId: wh2, kind: "zone", code: "Z" })).id);
+    await create("locations", { warehouseId: wh2, parentId: z, kind: "rack", code: "Z-01" });
+    await create("locations", { warehouseId: wh2, kind: "dock", code: "OD1" });
+    const ctx: ToolContext = { projectId: "p13-twin", workspaceId: WS, userId: A.userId, role: "editor", confirmed: true };
+    const { llmStatus } = await import("@/lib/llm");
+    const live = llmStatus().routing.subagent.isLive;
+    const r = await twinDraftLayout(ctx, { kind: "warehouse", warehouse: "TW-OVF", description: "Two racks by the north wall" });
+    const d = r.details as { siteId: string; source: string; objects: number };
+    if (!live) {
+      assert.equal(d.source, "records");
+      assert.match(r.summary, /description was not read/);
+    }
+    assert.match(r.summary, /DRAFT — publishing it needs a person's approval/);
+    const snap = await siteSnapshot(WS, d.siteId);
+    assert.equal(snap.site.status, "draft");
+    assert.equal(snap.objects.filter((o) => o.bindingBroken).length, 0);
+    if (!live) assert.deepEqual(snap.objects.filter((o) => o.binding).map((o) => o.binding!.label).sort(), ["TW-OVF/OD1", "TW-OVF/Z/Z-01"]);
+  });
+});
+
+describe("p13 twin alerts (real Postgres, app role)", () => {
+  it("the sweep notifies editors once per condition (bin low on Rack A-01)", async () => {
+    const first = await sweepTwinAlerts(WS);
+    assert.deepEqual(first.errors, []);
+    assert.ok(first.raised >= 1);
+    const rows = await prisma.notification.findMany({ where: { workspaceId: WS, sourceType: "twin_object", sourceId: rackObj } });
+    assert.equal(rows.length, 1, "one recipient (the workspace owner), one notification");
+    assert.match(String(rows[0]!.dedupKey), /^twin\.bin_low:/);
+    assert.equal(rows[0]!.href, `/dashboard/ops/twin/${siteId}?object=${rackObj}`);
+    const second = await sweepTwinAlerts(WS);
+    assert.equal(second.raised, 0, "a persisting condition doesn't alert again");
+    assert.equal(second.alreadyRaised, first.raised);
   });
 });
 
