@@ -586,28 +586,51 @@ const create_content_draft: ToolDef = {
 const run_seo_audit: ToolDef = {
   name: "run_seo_audit",
   description:
-    "Run an SEO audit scan over a site in this project. Writes a SiteAudit row plus SiteIssue findings into the audit inbox — it never edits site files. Heavy job: scan the whole file tree.",
+    "Run an SEO audit scan over a site in this project. Writes a SiteAudit row plus SiteIssue findings into the audit inbox — it never edits site files. Heavy job: scan the whole file tree. With live=true it crawls the live site instead (status codes, redirects, canonical, hreflang, noindex, structured data, robots/sitemap, a sample of outbound links).",
   kind: "spend",
   minRole: "editor",
   argsSchema: {
     type: "object",
     properties: {
       siteId: { type: "string", description: "Site id to audit (optional — defaults to the project's first auditable site)." },
+      // Phase 11 (seotools): live-URL crawl (lib/audit/live.ts).
+      live: { type: "boolean", description: "Crawl the live URLs instead of the site files (optional)." },
+      url: { type: "string", description: "Live crawl start URL (optional — defaults to the newest deployment or the project domain)." },
+      maxPages: { type: "number", description: "Live crawl page budget (optional, default 20, max 50)." },
+      renderJs: { type: "boolean", description: "Live crawl: render pages with headless Chromium in the code sandbox when one is available (optional)." },
     },
   },
   async execute(ctx, args) {
     if (!hasRole(ctx, "editor")) throw new Error("editor role required");
+    // Phase 11 (seotools): live mode, optionally JS-rendered in the sandbox.
+    const live = args.live === true || args.live === "true" || !!str(args.url);
+    let renderer: import("@/lib/audit/live").PageRenderer | null = null;
+    if (live && (args.renderJs === true || args.renderJs === "true") && ctx.runId) {
+      try {
+        const { sandboxForRun } = await import("@/lib/sandbox");
+        const { sandboxChromiumRenderer } = await import("@/lib/audit/render-sandbox");
+        renderer = sandboxChromiumRenderer(await sandboxForRun(ctx));
+      } catch {
+        renderer = null; // no sandbox: static fetch, labelled in the crawl summary
+      }
+    }
     // Phase 6: shared with the MCP run_seo_audit tool (lib/audit/project-audit).
     const { site, mock: useMock, result } = await auditProjectSite({
       projectId: ctx.projectId,
       siteId: str(args.siteId) || null,
+      live: live ? { url: str(args.url) ?? null, maxPages: Math.min(Math.max(1, num(args.maxPages) ?? 20), 50), renderer } : null,
     });
+    const crawl = (result.audit as { crawl?: { pagesCrawled?: number; rendering?: string; renderingNote?: string } | null }).crawl ?? null;
     return {
-      summary: `SEO audit finished on "${site.name}"${useMock ? " (mock scan)" : ""}: ${result.issues.length} issue${result.issues.length === 1 ? "" : "s"} in the inbox — nothing was auto-fixed`,
+      summary: `SEO audit finished on "${site.name}"${useMock ? " (mock scan)" : ""}${crawl ? ` (live crawl of ${crawl.pagesCrawled} page${crawl.pagesCrawled === 1 ? "" : "s"}, ${crawl.rendering} rendering)` : ""}: ${result.issues.length} issue${result.issues.length === 1 ? "" : "s"} in the inbox — nothing was auto-fixed`,
       details: {
         auditId: result.audit.id,
         issueCount: result.issues.length,
         mock: useMock,
+        mode: live ? "live" : "files",
+        crawl,
+        // Phase 11: Core Web Vitals (PageSpeed Insights) or { unavailable, reason }.
+        vitals: (result.audit as { vitals?: unknown }).vitals ?? null,
         topIssues: result.issues.slice(0, 10).map((i) => ({
           category: i.category,
           severity: i.severity,
@@ -1139,6 +1162,20 @@ export const TOOL_GROUP: Readonly<Record<string, ToolGroup>> = {
   app_create_spec: "ops",
   app_upsert_record: "ops",
   app_delete_record: "ops",
+  // Phase 11 (seotools): structured data for sites (lib/seo/tools.ts) —
+  // drafts only, applying and deploying stay human.
+  add_structured_data: "site",
+  validate_structured_data: "site",
+  submit_sitemap: "site",
+  // Phase 11 (seotools): document output (lib/documents/tools.ts).
+  create_document: "content",
+  create_spreadsheet: "content",
+  // Phase 11 (seotools): data analysis code in the run's sandbox
+  // (lib/sandbox/analyze-tool.ts) — off with the rest of "code" when no sandbox.
+  analyze_data: "code",
+  // Phase 11 (seotools): Context.dev scrape / crawl (lib/knowledge/contextdev/web-tools.ts).
+  web_scrape: "web",
+  web_crawl: "web",
 };
 
 /**
@@ -1208,6 +1245,19 @@ export const TOOL_ACTION: Readonly<Record<string, string>> = {
   app_create_spec: "draft_app_spec",
   app_upsert_record: "write_app_record",
   app_delete_record: "delete_app_record",
+  // Phase 11 (seotools): a site draft revision — Tier 0 (lib/automation/actions.ts).
+  add_structured_data: "draft_structured_data",
+  // Phase 11 (seotools): pinging search engines about your own site — the
+  // existing Tier 1 "refresh owned page" kind (asks unless automation is on).
+  submit_sitemap: "refresh_owned_page",
+  // Phase 11 (seotools): files saved to the workspace — Tier 0 drafts.
+  create_document: "draft_document",
+  create_spreadsheet: "draft_spreadsheet",
+  // Phase 11 (seotools): runs code in the sandbox — same tier as bash (asks).
+  analyze_data: "run_sandbox_command",
+  // Phase 11 (seotools): metered page reads — Tier 0 like search_web.
+  web_scrape: "fetch_web_pages",
+  web_crawl: "fetch_web_pages",
 };
 
 /** The group a tool belongs to. Unknown tools fall in "connectors" (fail closed). */

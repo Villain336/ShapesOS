@@ -3,9 +3,12 @@
 import { prisma } from "@/lib/prisma";
 import type { SiteFileProvider } from "@/lib/sitefiles/types";
 import { CATEGORY_MAP } from "./categories";
-import { scanSite } from "./scanner";
+import { scanSite, type ScanFinding } from "./scanner";
 import { mockScanFindings } from "./mock";
 import { meter } from "@/lib/metering/service";
+import { crawlSite, type LiveCrawlOptions, type LiveCrawlSummary } from "./live";
+import type { Prisma } from "@prisma/client";
+import { fetchCoreWebVitals, vitalsFindings, type VitalsOptions, type VitalsResult } from "@/lib/seo/pagespeed";
 
 export interface AuditInput {
   siteId: string;
@@ -17,22 +20,65 @@ export interface AuditInput {
    *  charged this exact action before running (the MCP runner meters
    *  site_audit per call — charging here too would bill twice, T14). */
   skipMetering?: boolean;
+  /** Phase 11 (seotools): crawl the live URLs instead of the working copy
+   *  (lib/audit/live.ts). Ignored when mock is true. */
+  live?: Omit<LiveCrawlOptions, "startUrl"> & {
+    url: string;
+    /** Core Web Vitals for the start page via PageSpeed Insights (default on; false = skip). */
+    vitals?: VitalsOptions | false;
+  };
 }
+
+/** Phase 11: live findings carry a URL as their "file"; files findings a path. */
+const LIVE_PATH = { startsWith: "http" } as const;
 
 export async function runAudit(input: AuditInput) {
   const { siteId, projectId, siteName, provider, mock } = input;
+  const liveMode = !mock && !!input.live;
 
   const audit = await prisma.siteAudit.create({
-    data: { siteId, projectId, status: "running", mock },
+    data: {
+      siteId,
+      projectId,
+      status: "running",
+      mock,
+      mode: liveMode ? "live" : "files",
+      targetUrl: liveMode ? input.live!.url : null,
+    },
   });
 
   try {
-    const findings = mock || !provider ? mockScanFindings(siteName) : await scanSite(provider);
+    let crawl: LiveCrawlSummary | null = null;
+    let vitals: VitalsResult | null = null;
+    let findings: ScanFinding[];
+    if (mock || (!provider && !liveMode)) {
+      findings = mockScanFindings(siteName);
+    } else if (liveMode) {
+      const { url, vitals: vitalsOpts, ...rest } = input.live!;
+      const res = await crawlSite({ ...rest, startUrl: url });
+      findings = res.findings;
+      crawl = res.crawl;
+      // Phase 11: Core Web Vitals for the start page (lab + CrUX field data).
+      if (vitalsOpts !== false) {
+        const start = res.crawl.pages[0];
+        const target = start?.finalUrl ?? res.crawl.startUrl;
+        vitals = await fetchCoreWebVitals(target, { resolve: rest.resolve, ...(vitalsOpts ?? {}) });
+        findings.push(...vitalsFindings(vitals));
+      }
+    } else {
+      findings = await scanSite(provider!);
+    }
 
     // Supersede previous actionable issues — the inbox always reflects the
-    // latest audit. History stays in the DB via older audit rows.
+    // latest audit. History stays in the DB via older audit rows. Phase 11:
+    // a live audit supersedes live findings only (and a files audit files
+    // findings only), so the two kinds of audit don't wipe each other.
     await prisma.siteIssue.updateMany({
-      where: { siteId, status: { in: ["open", "approved"] } },
+      where: {
+        siteId,
+        status: { in: ["open", "approved"] },
+        ...(liveMode ? { filePath: LIVE_PATH } : { NOT: { filePath: LIVE_PATH } }),
+      },
       data: { status: "ignored" },
     });
 
@@ -67,6 +113,8 @@ export async function runAudit(input: AuditInput) {
         totalIssues: rows.length,
         openIssues: rows.length,
         errorIssues,
+        ...(crawl ? { crawl: crawl as unknown as Prisma.InputJsonValue } : {}),
+        ...(vitals ? { vitals: vitals as unknown as Prisma.InputJsonValue } : {}),
       },
     });
 
@@ -102,7 +150,7 @@ export async function runAudit(input: AuditInput) {
 
 /** Latest audit + its actionable issues + settings for a site (inbox payload). */
 export async function getAuditInbox(siteId: string) {
-  const [settings, latestAudit, issues, fixRuns] = await Promise.all([
+  const [settings, latestAudit, issues, fixRuns, latestLiveAudit] = await Promise.all([
     prisma.fixAgentSettings.upsert({
       where: { siteId },
       update: {},
@@ -122,6 +170,12 @@ export async function getAuditInbox(siteId: string) {
       orderBy: { startedAt: "desc" },
       take: 10,
     }),
+    // Phase 11 (seotools): the newest live crawl (with its crawl summary and
+    // Core Web Vitals), shown alongside the files audit.
+    prisma.siteAudit.findFirst({
+      where: { siteId, mode: "live" },
+      orderBy: { createdAt: "desc" },
+    }),
   ]);
-  return { settings, latestAudit, issues, fixRuns };
+  return { settings, latestAudit, issues, fixRuns, latestLiveAudit };
 }

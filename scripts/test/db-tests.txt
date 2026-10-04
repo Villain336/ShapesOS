@@ -113,3 +113,15 @@ lib/portal/__tests__/portal-isolation-db.test.ts
 lib/slack/__tests__/slack-db.test.ts
 lib/hubspot/__tests__/hubspot-sync-db.test.ts
 lib/webhooks/__tests__/ops-events-db.test.ts
+# Phase 11 (seotools): live-URL audit storage, supersede-by-kind, live start URL, fix-agent exclusion.
+lib/audit/__tests__/live-audit-db.test.ts
+# Phase 11 (seotools): JSON-LD only through site draft revisions; apply is human; RLS; validation before save.
+lib/seo/__tests__/jsonld-draft-db.test.ts
+# Phase 11 (seotools): site sitemaps (rebuild on apply, hand-written kept), submissions recorded with real status + RLS.
+lib/seo/__tests__/sitemap-db.test.ts
+# Phase 11 (seotools): create_document / create_spreadsheet save real WorkspaceFiles, workspace-scoped.
+lib/documents/__tests__/document-tools-db.test.ts
+# Phase 11 (seotools): analyze_data — workspace files in, sandbox outputs saved back through the upload gate.
+lib/sandbox/__tests__/analyze-tool-db.test.ts
+# Phase 11 (seotools): web_scrape / web_crawl — vault key, daily budget, SSRF refusal, sitemap filtering (Context.dev stubbed).
+lib/knowledge/contextdev/__tests__/web-tools-db.test.ts

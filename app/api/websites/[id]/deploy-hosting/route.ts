@@ -21,6 +21,7 @@ import {
   ownedHostingConnection,
   type DeployFile,
 } from "@/lib/deploy";
+import { refreshSiteSitemap } from "@/lib/seo/sitemap";
 
 export async function POST(
   req: NextRequest,
@@ -42,6 +43,9 @@ export async function POST(
 
   try {
     const working = await getSiteIdeProvider(site);
+    // Phase 11 (seotools): what goes live carries a fresh sitemap.xml,
+    // robots.txt Sitemap line and IndexNow key file (best effort).
+    await refreshSiteSitemap({ siteId: site.id, projectId: site.projectId, provider: working }).catch(() => undefined);
     const paths = await collectAllFiles(working);
     if (!paths.length)
       return Response.json({ error: "The site has no files to deploy." }, { status: 400 });
