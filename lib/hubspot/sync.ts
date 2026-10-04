@@ -32,7 +32,6 @@
 // other stage ↔ local "hs-<stage id>"; the mirror pipeline's stages JSON
 // carries each stage's hubspotStageId for the push back.
 
-import { prisma } from "@/lib/prisma";
 import { withWorkspaceScope } from "@/lib/substrate/memory/rls";
 import type { LiveDeps, TokenSource } from "@/lib/connectors/m21/live/http";
 import { normalizeDomain, normalizeEmail, dealStatusForStage } from "@/lib/ops/crm";
@@ -404,19 +403,8 @@ export async function pullFromHubspot(workspaceId: string, auth: TokenSource, op
     );
   }
 
-  await prisma.fileChangeLog
-    .create({
-      data: {
-        projectId: null,
-        workspaceId,
-        filePath: "(crm)",
-        actor: "user",
-        action: "hubspot_sync_pulled",
-        summary: `[hubspot] pulled: ${report.created} created, ${report.updated} updated, ${report.linked} linked, ${report.localAhead} local ahead, ${report.conflicts.length} conflicts`.slice(0, 500),
-        approvedBy: opts.userId,
-      },
-    })
-    .catch(() => undefined);
+  // Audited by the connector gate (lib/chat/connector-tools.ts: ai_applied
+  // with this report's summary) — the only caller of a pull.
   return report;
 }
 
