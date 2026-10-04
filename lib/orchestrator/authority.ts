@@ -181,7 +181,8 @@ export function normalizeForTier(text: string): string {
  * Tier-3 verb in their name — recording a customer payment and posting /
  * reversing journal entries. Never automated, whatever a rule says.
  */
-const TIER3_EXACT_KINDS: ReadonlySet<string> = new Set(["record payment", "post journal entry", "reverse journal entry", "pay vendor bill"]);
+// Phase 11 (bizsync): + posting the books to QuickBooks / Xero.
+const TIER3_EXACT_KINDS: ReadonlySet<string> = new Set(["record payment", "post journal entry", "reverse journal entry", "pay vendor bill", "post to accounting"]);
 
 function isTier3(kind: string, description: string): boolean {
   if (TIER3_EXACT_KINDS.has(normalizeForTier(kind))) return true;

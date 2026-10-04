@@ -187,6 +187,9 @@ export function connectorGroup(connectorKey: string): ToolGroup {
     case "dataforseo":
       return "web";
     case "hubspot": // Phase 11 (conncore): CRM sync is business operations
+    case "shopify": // Phase 11 (bizsync): commerce + accounting sync is business operations
+    case "quickbooks":
+    case "xero":
       return "ops";
     // Phase 11 (devtools): issue trackers are project operations ("code" is
     // the sandbox runner and is unavailable without one).
@@ -252,6 +255,20 @@ export function connectorAction(connectorKey: string, tool: string): string {
     // Phase 11 (devtools): deploying your own site, like webflow.publish_site.
     case "netlify.trigger_deploy":
       return "publish_owned";
+    // Phase 11 (bizsync): a store pull writes products, stock, orders and
+    // contacts; pushing stock changes a public store — both Tier 2, ask.
+    case "shopify.sync_from_shopify":
+      return "import_commerce_data";
+    case "shopify.push_inventory":
+      return "update_store_inventory";
+    // Phase 11 (bizsync): accounting — contacts are CRM writes (Tier 2);
+    // posting the books is Tier 3 (never automated, always asks).
+    case "quickbooks.import_contacts":
+    case "xero.import_contacts":
+      return "write_crm_record";
+    case "quickbooks.post_to_quickbooks":
+    case "xero.post_to_xero":
+      return "post_to_accounting";
     default:
       return "connector_write";
   }

@@ -85,6 +85,24 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ platform: 
       .map((h) => headers[h])
       .find((v) => v) ?? "";
 
+  // Phase 11 (bizsync): a verified Shopify webhook for orders / products /
+  // customers / inventory is also applied to Ops (idempotent through
+  // biz_sync_links). Topics the graph mapper has no facts for (customers,
+  // inventory levels) skip the graph ingest instead of dead-lettering.
+  let ops: { applied: boolean; detail: string } | null = null;
+  if (platform === "shopify") {
+    const { applyShopifyWebhook, isOpsTopic } = await import("@/lib/bizsync/shopify/sync");
+    try {
+      const r = await applyShopifyWebhook(workspaceId, topic ?? "", body);
+      ops = { applied: r.applied, detail: r.detail };
+    } catch (err) {
+      ops = { applied: false, detail: `Ops apply failed: ${err instanceof Error ? err.message.slice(0, 200) : "error"}` };
+    }
+    if (isOpsTopic(topic ?? "") && !/^(orders|products)\//.test(topic ?? "")) {
+      return Response.json({ accepted: true, status: 202, factsAppended: 0, detail: "applied to Ops only", ops }, { status: 202 });
+    }
+  }
+
   const result = await ingestTierWEvent({
     platform: platform as TierWPlatform,
     connector,
@@ -92,5 +110,5 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ platform: 
     body,
     rawBody,
   });
-  return Response.json(result, { status: result.status });
+  return Response.json(ops ? { ...result, ops } : result, { status: result.status });
 }

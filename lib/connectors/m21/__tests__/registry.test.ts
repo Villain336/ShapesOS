@@ -42,6 +42,9 @@ const EXPECTED_KEYS = [
   "airtable",
   "supabase",
   "netlify",
+  "shopify", // Phase 11 (bizsync)
+  "quickbooks", // Phase 11 (bizsync)
+  "xero", // Phase 11 (bizsync)
 ];
 
 const ROOT = join(__dirname, "..", "..", "..", "..");
@@ -54,7 +57,7 @@ describe("built-in connector registry", () => {
       BUILT_IN_CONNECTORS.map((c) => c.key),
       EXPECTED_KEYS,
     );
-    assert.equal(BUILT_IN_CONNECTORS.length, 23);
+    assert.equal(BUILT_IN_CONNECTORS.length, 26); // Phase 11: +5 devtools (linear, jira, airtable, supabase, netlify), +3 bizsync (shopify, quickbooks, xero)
   });
 
   it("every key resolves to an adapter with the same key, auth type and at least one tool", () => {

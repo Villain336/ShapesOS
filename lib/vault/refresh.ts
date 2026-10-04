@@ -12,7 +12,7 @@
 import { prisma } from "@/lib/prisma";
 import { secrets } from "@/lib/secrets";
 import type { DecryptedCredential } from "@/lib/connectors/m21/types";
-import { buildTokenRequest, getOAuthConfig } from "./oauth";
+import { buildTokenRequest, getOAuthConfig, shopUrl } from "./oauth";
 
 export interface RefreshDeps {
   fetchImpl?: typeof fetch;
@@ -117,8 +117,10 @@ export async function refreshConnection(
 
   try {
     const fetchImpl = deps.fetchImpl ?? fetch;
+    // Phase 11 (bizsync): per-shop providers refresh at the store's own host.
+    const tokenUrl = config.perShop ? shopUrl(config.tokenUrl, typeof payload?.shop === "string" ? payload.shop : null) : config.tokenUrl;
     const res = await fetchImpl(
-      config.tokenUrl,
+      tokenUrl,
       buildTokenRequest(config, { grant_type: "refresh_token", refresh_token: refreshToken }, clientId, clientSecret),
     );
     if (!res.ok) {

@@ -1056,6 +1056,12 @@ model Workspace {
   slackEventReceipts          SlackEventReceipt[]
   // Phase 11 (conncore): HubSpot ↔ Ops CRM id mapping (bidirectional sync).
   hubspotSyncLinks            HubspotSyncLink[]
+  // Phase 11 (bizsync): Shopify / QuickBooks / Xero id mapping + sync run log.
+  bizSyncLinks                BizSyncLink[]
+  bizSyncRuns                 BizSyncRun[]
+  // Phase 11 (bizsync): chart ↔ QuickBooks/Xero account map + export ledger.
+  opsAccountingLinks          OpsAccountingLink[]
+  opsAccountingExports        OpsAccountingExport[]
 
   @@map("workspaces")
 }
@@ -10670,6 +10676,8 @@ model OpsAccount {
   updatedAt   DateTime       @updatedAt @map("updated_at")
 
   lines OpsJournalLine[]
+  // Phase 11 (bizsync): the QuickBooks / Xero account this one maps to.
+  accountingLinks OpsAccountingLink[]
 
   @@unique([workspaceId, code])
   @@unique([workspaceId, systemKey])
@@ -15661,4 +15669,138 @@ model HubspotSyncLink {
   @@unique([workspaceId, objectType, hubspotId])
   @@unique([workspaceId, objectType, localId])
   @@map("hubspot_sync_links")
+}
+
+// ============================================================================
+// Phase 11 (bizsync) — commerce + accounting connectors (Shopify, QuickBooks
+// Online, Xero). Same shape as hubspot_sync_links, keyed by provider:
+// one row per mapped object (product | variant | location | inventory_level |
+// order | customer | vendor | item | invoice_customer …) — the remote id, the
+// local id, the remote updatedAt and a fingerprint of the local mapped fields
+// at the last sync (the conflict rule's inputs, lib/bizsync/links.ts). Both
+// uniques make every pull/push idempotent. FORCE RLS, cascades from
+// workspaces. (ConnectorImportBatch is the consent-gated person-graph import
+// receipt — a different contract — so sync runs get their own small log.)
+// ============================================================================
+
+model BizSyncLink {
+  id              String    @id @default(cuid())
+  workspaceId     String    @map("workspace_id")
+  workspace       Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  // shopify | quickbooks | xero
+  provider        String
+  objectType      String    @map("object_type")
+  remoteId        String    @map("remote_id")
+  localId         String    @map("local_id")
+  // The remote record's updatedAt as of the last sync.
+  remoteUpdatedAt DateTime? @map("remote_updated_at")
+  // sha256 of the local mapped fields right after the last sync ("changed
+  // locally" = the current fingerprint differs), plus the local updatedAt.
+  localHash       String?   @map("local_hash")
+  localUpdatedAt  DateTime? @map("local_updated_at")
+  // pull | push
+  lastDirection   String    @default("pull") @map("last_direction")
+  // Non-secret extras (e.g. inventory: { qty } last agreed on; Shopify
+  // inventory item id on a variant link).
+  meta            Json      @default("{}")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  @@unique([workspaceId, provider, objectType, remoteId])
+  @@unique([workspaceId, provider, objectType, localId])
+  @@map("biz_sync_links")
+}
+
+// One sync / export run per row: what ran, when, how it ended, the counts
+// (summary JSON) and a short error. The Settings → Connectors → Business
+// sync page reads it; the agent tool results carry the same summary.
+model BizSyncRun {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  provider    String
+  // e.g. sync_catalog | sync_inventory | sync_orders | sync_customers |
+  // push_inventory | webhook | import_contacts | export
+  operation   String
+  // running | succeeded | partial | failed
+  status      String    @default("running")
+  // Who started it: user id, or "webhook:shopify".
+  actor       String
+  summary     Json      @default("{}")
+  error       String?
+  startedAt   DateTime  @default(now()) @map("started_at")
+  finishedAt  DateTime? @map("finished_at")
+
+  @@index([workspaceId, provider, startedAt])
+  @@map("biz_sync_runs")
+}
+
+// ============================================================================
+// Phase 11 (bizsync) — accounting connectors (QuickBooks Online, Xero).
+// One account-mapping model shared by both providers (keyed by provider):
+// each local chart account → one remote account, "suggested" by code /
+// system role / name, "confirmed" by a person in Settings → Connectors →
+// Business sync. Exports only use confirmed rows.
+// ops_accounting_exports is the export ledger: ONE row per (provider,
+// source document) — journal:<entry> | invoice:<id> | credit_note:<id> |
+// bill:<id> | payment:<id> | bill_payment:<id> — claimed BEFORE the remote
+// call, so a second export is a no-op and a crashed one is retried with the
+// SAME provider idempotency key (QuickBooks requestid / Xero Idempotency-Key,
+// derived from source key + attempt). Exports read the append-only journal;
+// nothing here ever writes it.
+// ============================================================================
+
+model OpsAccountingLink {
+  id              String     @id @default(cuid())
+  workspaceId     String     @map("workspace_id")
+  workspace       Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  // quickbooks | xero
+  provider        String
+  accountId       String     @map("account_id")
+  account         OpsAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  remoteAccountId String     @map("remote_account_id")
+  remoteCode      String?    @map("remote_code")
+  remoteName      String     @map("remote_name")
+  remoteType      String?    @map("remote_type")
+  // suggested | confirmed
+  status          String     @default("suggested")
+  // code | system | name | type (why it was suggested)
+  matchReason     String?    @map("match_reason")
+  confirmedBy     String?    @map("confirmed_by")
+  confirmedAt     DateTime?  @map("confirmed_at")
+  createdAt       DateTime   @default(now()) @map("created_at")
+  updatedAt       DateTime   @updatedAt @map("updated_at")
+
+  @@unique([workspaceId, provider, accountId])
+  @@index([workspaceId, provider, remoteAccountId])
+  @@map("ops_accounting_links")
+}
+
+model OpsAccountingExport {
+  id           String    @id @default(cuid())
+  workspaceId  String    @map("workspace_id")
+  workspace    Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  provider     String
+  sourceKey    String    @map("source_key")
+  // journal_entry | invoice | credit_note | bill | payment | bill_payment
+  docType      String    @map("doc_type")
+  localId      String    @map("local_id")
+  // The journal entry the document was posted with (what was exported).
+  entryId      String?   @map("entry_id")
+  // pending (claimed; remote call in flight or interrupted) | exported | failed
+  status       String    @default("pending")
+  remoteId     String?   @map("remote_id")
+  remoteNumber String?   @map("remote_number")
+  // Bumped only after a definitive refusal; ambiguous failures keep it, so
+  // the retry reuses the same provider idempotency key.
+  attempt      Int       @default(1)
+  lastError    String?   @map("last_error")
+  exportedAt   DateTime? @map("exported_at")
+  createdBy    String    @map("created_by")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  @@unique([workspaceId, provider, sourceKey])
+  @@index([workspaceId, provider, status])
+  @@map("ops_accounting_exports")
 }

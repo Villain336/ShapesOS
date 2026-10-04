@@ -35,6 +35,7 @@
 import { withWorkspaceScope } from "@/lib/substrate/memory/rls";
 import type { LiveDeps, TokenSource } from "@/lib/connectors/m21/live/http";
 import { normalizeDomain, normalizeEmail, dealStatusForStage } from "@/lib/ops/crm";
+import { decideSync, pushAllowedByChanges } from "@/lib/connectors/sync-conflict";
 import {
   hubspotAssociate,
   hubspotCreate,
@@ -65,18 +66,15 @@ export interface LinkTimes {
 export function decidePull(link: LinkTimes | null, hubspotUpdatedAt: Date, localUpdatedAt: Date): SyncDecision {
   const hsChanged = !link?.hubspotUpdatedAt || hubspotUpdatedAt.getTime() > link.hubspotUpdatedAt.getTime();
   const localChanged = !link?.localUpdatedAt || localUpdatedAt.getTime() > link.localUpdatedAt.getTime();
-  if (hsChanged && !localChanged) return "apply";
-  if (!hsChanged && localChanged) return "local_ahead";
-  if (!hsChanged && !localChanged) return "skip_unchanged";
-  return hubspotUpdatedAt.getTime() >= localUpdatedAt.getTime() ? "conflict_hubspot_wins" : "conflict_local_wins";
+  // Phase 11 (bizsync): the rule itself is shared (lib/connectors/sync-conflict.ts).
+  const d = decideSync({ remoteChanged: hsChanged, localChanged, remoteAt: hubspotUpdatedAt, localAt: localUpdatedAt });
+  return d === "conflict_remote_wins" ? "conflict_hubspot_wins" : d;
 }
 
 /** Whether a push may overwrite HubSpot. PURE. */
 export function pushAllowed(link: LinkTimes | null, hubspotUpdatedAt: Date | null, localUpdatedAt: Date, force: boolean): boolean {
-  if (force || !link || !hubspotUpdatedAt) return true;
-  const hsChanged = !link.hubspotUpdatedAt || hubspotUpdatedAt.getTime() > link.hubspotUpdatedAt.getTime();
-  if (!hsChanged) return true;
-  return localUpdatedAt.getTime() > hubspotUpdatedAt.getTime();
+  const hsChanged = !link?.hubspotUpdatedAt || (hubspotUpdatedAt !== null && hubspotUpdatedAt.getTime() > link.hubspotUpdatedAt.getTime());
+  return pushAllowedByChanges({ linked: Boolean(link), remoteChanged: hsChanged, remoteAt: hubspotUpdatedAt, localAt: localUpdatedAt, force });
 }
 
 // ---------------------------------------------------------------------------

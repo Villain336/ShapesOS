@@ -5,6 +5,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { Activity, Check, Plug } from "lucide-react";
 import ConnectorHealthTab from "./ConnectorHealthTab";
 import McpReadOnlyToolsEditor from "./McpReadOnlyToolsEditor";
@@ -116,6 +117,9 @@ export default function ConnectorsManager({
   );
   const [editingReadOnly, setEditingReadOnly] = useState<string | null>(null);
   const [editingPolicies, setEditingPolicies] = useState<string | null>(null);
+  // Phase 11 (bizsync): Shopify installs per store — ask for the store domain first.
+  const [shopFor, setShopFor] = useState<Connector | null>(null);
+  const [shopDomain, setShopDomain] = useState("");
 
   const q = `workspaceId=${encodeURIComponent(workspaceId)}`;
 
@@ -139,13 +143,19 @@ export default function ConnectorsManager({
     return { kind: "error", message: msg };
   }
 
-  async function connect(c: Connector) {
+  async function connect(c: Connector, shop?: string) {
     setNotice(null);
+    if (c.key === "shopify" && !shop) {
+      // Phase 11 (bizsync): the OAuth host is the store itself.
+      setShopDomain("");
+      setShopFor(c);
+      return;
+    }
     if (c.authType === "oauth2") {
       setBusy(`oauth-${c.key}`);
       try {
         const r = await fetch(
-          `/api/connectors/${encodeURIComponent(c.key)}/auth-url?${q}`,
+          `/api/connectors/${encodeURIComponent(c.key)}/auth-url?${q}${shop ? `&shop=${encodeURIComponent(shop)}` : ""}`,
         );
         const j = await r.json().catch(() => ({}));
         if (!r.ok || !j.url) {
@@ -392,7 +402,7 @@ export default function ConnectorsManager({
           )}
         </div>
 
-        <div className="mt-4">
+        <div className="mt-4 flex flex-wrap gap-2">
           {c.authType === "none" ? (
             <p className="text-xs text-subtle">
               This connector needs no credentials — enable it per project instead.
@@ -405,6 +415,12 @@ export default function ConnectorsManager({
             >
               {busy === `oauth-${c.key}` ? "Starting…" : "Connect"}
             </button>
+          )}
+          {/* Phase 11 (bizsync): sync status, mappings and run log. */}
+          {(c.key === "shopify" || c.key === "quickbooks" || c.key === "xero") && (
+            <Link href={`/dashboard/settings/connectors/sync?provider=${c.key}`} className={btnGhost}>
+              Sync settings
+            </Link>
           )}
         </div>
       </div>
@@ -616,6 +632,43 @@ export default function ConnectorsManager({
           </div>
         )}
       </div>
+
+      {shopFor && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/30 p-4">
+          <div className="w-full max-w-md rounded-lg border border-line bg-paper p-5 shadow-overlay">
+            <h3 className="font-medium text-ink">Connect your Shopify store</h3>
+            <p className="mt-1 text-sm text-muted">
+              Enter the store&apos;s Shopify domain. You approve the app on Shopify next.
+            </p>
+            <label className={`${labelCls} mt-3`}>
+              Store domain
+              <input
+                value={shopDomain}
+                onChange={(e) => setShopDomain(e.target.value)}
+                placeholder="your-store.myshopify.com"
+                autoComplete="off"
+                className={`${inputCls} mt-1 w-full font-mono text-xs`}
+              />
+            </label>
+            <div className="mt-4 flex justify-end gap-2">
+              <button onClick={() => setShopFor(null)} className={btnGhost}>
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  const c = shopFor;
+                  setShopFor(null);
+                  connect(c, shopDomain.trim());
+                }}
+                disabled={!shopDomain.trim()}
+                className={btnPrimary}
+              >
+                Continue to Shopify
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {apiKeyFor && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/30 p-4">

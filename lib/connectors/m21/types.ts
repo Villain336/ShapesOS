@@ -1,6 +1,6 @@
 // Marketr — M21 connectors, uniform interface (spec §7, §11).
 //
-// Every data source (23 built-in native adapters + workspace-custom MCP
+// Every data source (26 built-in native adapters + workspace-custom MCP
 // servers) implements ConnectorAdapter so the agent loop, skill-declared
 // tool gating, and project data-source bindings all go through one
 // interface. Credentials are decrypted server-side only (lib/vault) and
