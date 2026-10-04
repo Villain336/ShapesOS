@@ -86,6 +86,30 @@ export async function refreshConnection(
   const clientId = typeof payload?.client_id === "string" ? payload.client_id : "";
   const clientSecret = typeof payload?.client_secret === "string" ? payload.client_secret : "";
 
+  // Phase 11 (conncore): an OAuth-protected custom MCP server refreshes at
+  // its own authorization server (client + token endpoint in the payload).
+  if (!config && payload && refreshToken) {
+    const { isMcpPayload, refreshMcpPayload } = await import("@/lib/connectors/m21/mcp-oauth");
+    if (isMcpPayload(payload)) {
+      try {
+        const next = await refreshMcpPayload(payload, deps.fetchImpl);
+        await prisma.connectorCredential.update({
+          where: { connectionId },
+          data: {
+            encryptedBlob: secrets().encrypt(JSON.stringify(next.payload)),
+            keyVersion: "env-v1",
+            expiresAt: next.expiresIn !== null ? new Date(Date.now() + next.expiresIn * 1000) : null,
+          },
+        });
+        await prisma.connectorConnection.update({ where: { id: connectionId }, data: { status: "active", lastRefreshAt: new Date() } });
+        return "refreshed";
+      } catch {
+        await markNeedsReauth(connectionId);
+        return "needs_reauth";
+      }
+    }
+  }
+
   if (!refreshToken || !config || !clientId || !clientSecret) {
     await markNeedsReauth(connectionId);
     return "needs_reauth";
