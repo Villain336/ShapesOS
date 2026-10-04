@@ -167,11 +167,25 @@ const PUBLIC_BY_DESIGN = {
     "public session-replay ingest for a shared Studio page; hashed share token is the capability (revoked/expired/opt-in checked), batch-size capped; append-only, never returns data",
   "app/r/funding/[token]/views/[viewId]/route.ts":
     "public data-room view-duration beacon; the view row must belong to the link resolved from the unguessable 128-bit token and its workspace; only updates that view's duration",
+  // Sign-in surface under /api/auth (proxy auth tier: 10 req/min per IP).
+  // Phase 6 replaced the blanket "app/api/auth/ is Auth.js" skip with these
+  // explicit entries, so a new route there must justify itself too.
+  "app/api/auth/passkey/options/route.ts":
+    "Phase 4a passkey sign-in options; first half of a sign-in, returns a random single-use 5-minute challenge that grants nothing until signIn(\"passkey\") verifies a signed assertion with a registered credential",
+  "app/api/auth/email/signup/route.ts":
+    "Phase 6 email signup; creates an UNVERIFIED account and emails a single-use verify link (SHA-256 at rest), password unusable until verified; SIGNUP_MODE=invite via signInAllowed, login lockout, CAPTCHA, password policy, per-address send limit; same 202 whether or not the address exists",
+  "app/api/auth/email/magic-link/route.ts":
+    "Phase 6 magic link request; always the same 200; emails a single-use 15-minute link (SHA-256 at rest) redeemed only through the email-link Credentials provider; lockout, CAPTCHA step-up, per-address send limit",
+  "app/api/auth/email/password/forgot/route.ts":
+    "Phase 6 password reset request; always the same 200; emails a single-use 1-hour reset link (SHA-256 at rest) only when an email account exists; lockout, CAPTCHA step-up, per-address send limit",
+  "app/api/auth/email/password/reset/route.ts":
+    "Phase 6 password reset; the single-use reset token is the capability, consumed by one guarded UPDATE (used_at IS NULL AND expires_at > now) after the password policy passes; voids every other link for the address",
 };
 const uncovered = [];
 for (const f of routeFiles) {
   const rel = f.replace(ROOT + "/", "");
-  if (rel.startsWith("app/api/auth/")) continue; // Auth.js provider routes
+  // Auth.js's own catch-all handler (re-exports GET/POST from handlers).
+  if (rel === "app/api/auth/[...nextauth]/route.ts") continue;
   // E2E test-only mock infrastructure: every handler 404s unless the
   // E2E_MOCK_OAUTH=1 flag is set; never enabled in production builds.
   if (rel.startsWith("app/api/e2e/")) continue;
@@ -190,7 +204,7 @@ const missingAllowList = Object.keys(PUBLIC_BY_DESIGN).filter(k => {
 ok("every public-by-design entry maps to a real route file", missingAllowList.length === 0, missingAllowList.join("; "));
 ok(
   "public-by-design allow-list is documented",
-  Object.keys(PUBLIC_BY_DESIGN).length === 28 &&
+  Object.keys(PUBLIC_BY_DESIGN).length === 33 &&
     Object.values(PUBLIC_BY_DESIGN).every(v => v.length > 20)
 );
 
@@ -254,6 +268,26 @@ const sso = readFileSync(join(ROOT, "lib/sso.ts"), "utf8");
 ok("OIDC provisioning defaults to editor", /SSO_DEFAULT_ROLE/.test(sso));
 const login = readFileSync(join(ROOT, "app/login/page.tsx"), "utf8") + readFileSync(join(ROOT, "app/login/LoginClient.tsx"), "utf8");
 ok("SSO buttons conditional on config", /providers\.length/.test(login) || /configured/i.test(login));
+
+// --- 5b. Email sign-in (Phase 6): stateless JWT kept, guards wired ---
+console.log("email sign-in");
+const emailStore = readFileSync(join(ROOT, "lib/auth/email/store.ts"), "utf8");
+const emailAuthorize = readFileSync(join(ROOT, "lib/auth/email/authorize.ts"), "utf8");
+const emailPassword = readFileSync(join(ROOT, "lib/auth/email/password.ts"), "utf8");
+const emailMail = readFileSync(join(ROOT, "lib/auth/email/mail.ts"), "utf8");
+ok("no Auth.js database adapter (stateless JWT)", !/adapter\s*:/.test(authCfg) && /strategy:\s*"jwt"/.test(authCfg));
+ok("email providers registered in auth.ts", /EMAIL_PASSWORD_PROVIDER_ID/.test(authCfg) && /EMAIL_LINK_PROVIDER_ID/.test(authCfg) && /authorizeEmailPassword/.test(authCfg) && /authorizeEmailLink/.test(authCfg));
+ok("email password login reuses lockout + CAPTCHA step-up + audit",
+  /loginLockedOut\(/.test(emailAuthorize) && /recordLoginFailure\(/.test(emailAuthorize) && /recordLoginSuccess\(/.test(emailAuthorize) &&
+  /captchaRequired\(/.test(emailAuthorize) && /verifyCaptchaToken\(/.test(emailAuthorize) && /auth_login_failed/.test(emailAuthorize));
+ok("unverified accounts can't use a password", /status: "unverified"/.test(emailStore) && /EmailUnverifiedError/.test(emailAuthorize));
+ok("signup honours SIGNUP_MODE=invite (signInAllowed)", /signupMode\(deps\.env\) === "invite" && !\(await signInAllowed\(/.test(emailStore));
+ok("links are single use (guarded UPDATE on used_at/expires_at)", /usedAt: null, expiresAt: \{ gt: now \}/.test(emailStore) && /res\.count !== 1/.test(emailStore));
+ok("only token hashes stored", /tokenHash: hashEmailToken\(token\)/.test(emailStore));
+ok("scrypt with explicit parameters + timingSafeEqual", /SCRYPT_PARAMS = \{ N: 2 \*\* 15, r: 8, p: 1 \}/.test(emailPassword) && /timingSafeEqual\(/.test(emailPassword));
+ok("console link fallback is development-only", /isProduction\(env\) \? null : "console"/.test(emailMail));
+ok("production links never use the request Host", /appBaseUrl\(env, null\) \?\? \(isProduction\(env\) \? null :/.test(emailMail));
+ok("account deletion removes email accounts + links", /"email_accounts"/.test(readFileSync(join(ROOT, "lib/gdpr/account-delete.ts"), "utf8")) && /DELETE FROM "email_auth_tokens"/.test(readFileSync(join(ROOT, "lib/gdpr/account-delete.ts"), "utf8")));
 
 // --- 6. Secrets abstraction contract ---
 console.log("secrets");
