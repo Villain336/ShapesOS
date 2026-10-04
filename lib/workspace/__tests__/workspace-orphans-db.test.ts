@@ -126,6 +126,13 @@ async function valueFor(c: Column): Promise<string> {
   throw new Error(`no synthetic value for type ${t} (${c.col})`);
 }
 
+// Columns whose CHECK constraint only accepts specific values (a synthetic
+// string never passes them), keyed by table.
+const FIXED_VALUES: Record<string, Record<string, string>> = {
+  ops_accounting_links: { provider: "quickbooks" },
+  ops_accounting_exports: { provider: "quickbooks" },
+};
+
 // Committed rows per table (one is enough; parents are shared).
 const made = new Map<string, Record<string, unknown>>();
 // Rows created in tables WITHOUT workspace_id (global parents), for cleanup.
@@ -156,6 +163,7 @@ async function synth(
       const fk = fks.find((f) => f.col === c.col);
       let v: unknown;
       if (c.col === "workspace_id") v = ws;
+      else if (FIXED_VALUES[table]?.[c.col] !== undefined) v = FIXED_VALUES[table]![c.col];
       else if (fk && c.notnull && !c.hasdef) {
         const parent = fk.reftable === table ? null : await synth(tx, fk.reftable, ws, pending, depth + 1);
         if (!parent) throw new Error(`self-referencing NOT NULL key ${table}.${c.col}`);
@@ -257,7 +265,11 @@ describe("delete leaves nothing behind", () => {
       });
       made.set("ops_journal_entries", { id: entry.id });
       made.set("ops_journal_lines", { entry_id: entry.id });
-      made.set("ops_accounts", { workspace_id: doomed });
+      const [account] = await (tx as Tx).$queryRawUnsafe<{ id: string }[]>(
+        `SELECT id FROM ops_accounts WHERE workspace_id = $1 LIMIT 1`,
+        doomed,
+      );
+      made.set("ops_accounts", { id: account!.id, workspace_id: doomed });
     });
     for (const table of tables) {
       if (made.has(table)) continue;
