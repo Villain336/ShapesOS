@@ -140,6 +140,8 @@ export function buildBriefNowAdapterPackage(
   dataset: DatasetRecord,
   version: number,
   entries: ResolvedPublishEntry[],
+  /** Publish time (defaults to now); injectable so the package is deterministic. */
+  now: Date = new Date(),
 ): BriefNowAdapterPackage {
   const adapterEntries: BriefNowAdapterEntry[] = entries.map((e) => ({
     chunkId: e.chunk.id,
@@ -163,7 +165,7 @@ export function buildBriefNowAdapterPackage(
     datasetType: dataset.type,
     datasetVersion: version,
     chunkCount: adapterEntries.length,
-    publishedAt: new Date().toISOString(),
+    publishedAt: now.toISOString(),
     entries: adapterEntries,
   };
 }
