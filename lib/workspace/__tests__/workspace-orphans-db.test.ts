@@ -21,6 +21,7 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { withWorkspaceScope } from "@/lib/substrate/memory/rls";
 import { createWorkspaceForUser, deleteWorkspace, KEEP_ON_WORKSPACE_DELETE } from "../lifecycle";
+import { postEntry } from "@/lib/ops/accounting";
 
 type Tx = Prisma.TransactionClient;
 
@@ -242,6 +243,22 @@ describe("catalog guard", () => {
 
 describe("delete leaves nothing behind", () => {
   it("one row lands in every workspace-owned table", async () => {
+    // Phase 10: the ledger only accepts balanced entries (a deferred trigger
+    // checks each entry at commit), so the journal tables get a real
+    // two-line entry instead of the generic one-row-per-table insert.
+    await withWorkspaceScope(doomed, async (tx) => {
+      const { entry } = await postEntry(tx as Tx, { workspaceId: doomed, userId: OWNER }, {
+        sourceType: "manual",
+        memo: "orphan check",
+        lines: [
+          { account: { key: "cash" }, debitCents: 100, creditCents: 0 },
+          { account: { key: "ar" }, debitCents: 0, creditCents: 100 },
+        ],
+      });
+      made.set("ops_journal_entries", { id: entry.id });
+      made.set("ops_journal_lines", { entry_id: entry.id });
+      made.set("ops_accounts", { workspace_id: doomed });
+    });
     for (const table of tables) {
       if (made.has(table)) continue;
       const pending = new Map<string, Record<string, unknown>>();
