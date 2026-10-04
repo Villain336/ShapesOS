@@ -127,7 +127,10 @@ export function priceCart(input: {
   const bps = Number.isInteger(input.taxRateBps) && input.taxRateBps > 0 ? input.taxRateBps : 0;
   const taxCents = bps && net > 0 ? divRoundHalfUp(net * bps, 10_000) : 0;
   const totalCents = net + taxCents;
-  const checkoutReady = lines.length > 0 && lines.every((l) => l.issue === null) && totalCents > 0 && totalCents <= OPS_MAX_CENTS;
+  // A code the buyer entered that no longer applies blocks checkout: they
+  // must see the new total (remove the code) rather than be charged more.
+  const checkoutReady =
+    lines.length > 0 && lines.every((l) => l.issue === null) && !(promo && !promo.ok) && totalCents > 0 && totalCents <= OPS_MAX_CENTS;
   return { lines, subtotalCents, discountCents, taxCents, totalCents, promo, checkoutReady };
 }
 
@@ -143,6 +146,7 @@ export function checkoutBlocker(p: PricedCart): string | null {
         : `${name} is out of stock. Remove it to continue.`;
     }
   }
+  if (p.promo && !p.promo.ok) return `Code ${p.promo.code} can't be used: ${p.promo.reason ?? "it isn't valid"}. Remove it to continue.`;
   if (p.totalCents <= 0) return "There is nothing to pay for.";
   if (p.totalCents > OPS_MAX_CENTS) return "This order is too large to check out online.";
   return null;

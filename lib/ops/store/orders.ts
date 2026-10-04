@@ -220,6 +220,8 @@ export async function bookSale(
       groups.filter((g) => vOf(g) === variantId).reduce((s, g) => s + (g._sum.delta ?? 0), 0) +
       (isDefault ? product.stockQty - ledgerAll : 0);
     if (onHand < line.qty) oversold.push(line.sku ?? line.name);
+    // The default variant is materialized on its first move (ensureDefaultVariant).
+    const bookVariant = isDefault ? null : variantId;
     const locIds = groups.map((g) => g.locationId).filter((x): x is string => Boolean(x));
     const locs = locIds.length
       ? await tx.opsLocation.findMany({ where: { workspaceId: actor.workspaceId, id: { in: locIds }, active: true }, select: { id: true, warehouseId: true } })
@@ -234,12 +236,12 @@ export async function bookSale(
     for (const q of quants) {
       if (left <= 0) break;
       const take = Math.min(left, q.qty);
-      await recordInventoryTxn(tx, actor, { productId: line.productId, delta: -take, reason: "sale", variantId, locationId: q.locationId, note: `web order ${orderLabel(orderId)}`, actorName: "storefront" });
+      await recordInventoryTxn(tx, actor, { productId: line.productId, delta: -take, reason: "sale", variantId: bookVariant, locationId: q.locationId, note: `web order ${orderLabel(orderId)}`, actorName: "storefront" });
       left -= take;
       moves += 1;
     }
     if (left > 0) {
-      await recordInventoryTxn(tx, actor, { productId: line.productId, delta: -left, reason: "sale", variantId, locationId: null, note: `web order ${orderLabel(orderId)}`, actorName: "storefront" });
+      await recordInventoryTxn(tx, actor, { productId: line.productId, delta: -left, reason: "sale", variantId: bookVariant, locationId: null, note: `web order ${orderLabel(orderId)}`, actorName: "storefront" });
       moves += 1;
     }
   }

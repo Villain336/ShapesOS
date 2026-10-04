@@ -157,6 +157,9 @@ describe("server-side pricing", () => {
     assert.equal(p.promo?.ok, false);
     assert.equal(p.discountCents, 0);
     assert.equal(p.totalCents, 1500);
+    // The buyer must remove a dead code before paying a higher total.
+    assert.equal(p.checkoutReady, false);
+    assert.match(checkoutBlocker(p)!, /Code NOPE can't be used/);
   });
 
   it("promotion rules: usage limit, minimum subtotal, SKU scope by variant or product SKU", () => {
