@@ -109,7 +109,7 @@ export async function updateClientPortal(workspaceId: string, actorUserId: strin
     await check(data.portalLeadIds, () => tx.lead.count({ where: { workspaceId, id: { in: data.portalLeadIds! } } }), "leads");
   });
   if (Object.keys(data).length === 0) return { id: c.id, revoked: 0 };
-  await prisma.client.update({ where: { id: c.id }, data });
+  await prisma.client.update({ where: { id: c.id, workspaceId }, data });
   let revoked = 0;
   if (data.portalEnabled === false && c.portalEnabled) {
     revoked = await revokePortalSessions(workspaceId, c.id, actorUserId, { reason: "portal turned off" });

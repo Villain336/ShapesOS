@@ -23,6 +23,8 @@ const ALLOW = new Map<string, string>([
   // Phase 9 (repos): GitHub delivery routing / poller discovery — the one cross-workspace read, through the SELECT-only app.github_route policy; returns ids only, every write is tenant-scoped.
   ["lib/ship/pr-routing.ts:agentPullRequest.findFirst", "routePullRequest: maps (repository, branch | PR) to its workspace via the SELECT-only app.github_route policy"],
   ["lib/ship/pr-routing.ts:agentPullRequest.findMany", "discoverOpenPullRequests: poller fan-out across workspaces via the SELECT-only app.github_route policy (ids only)"],
+  // Phase 10 (portal): the sign-in request names no workspace — the address may be a client of several; clients is not a tenant (RLS) table. Ids + workspace name only; every link write that follows is tenant-scoped.
+  ["lib/portal/store.ts:client.findMany", "requestPortalLink: finds the portal-enabled clients with this sign-in email across workspaces (no workspace in the request); returns ids only, each link row is written under that client's own workspace scope"],
 ]);
 
 const SCOPE_MARKERS = ["withWorkspaceScope", "withWorkspace(", "withCampaignScope", "setWorkspaceGuc", "app.workspace_id"];

@@ -104,3 +104,6 @@ lib/ops/__tests__/p10-projects-db.test.ts
 lib/ops/__tests__/p10-helpdesk-db.test.ts
 lib/ops/__tests__/p10-hr-db.test.ts
 lib/chat/__tests__/p10-ops-tools-db.test.ts
+# Phase 10 (portal): client portal sign-in, scoping, routes; portal session never grants workspace access.
+lib/portal/__tests__/portal-db.test.ts
+lib/portal/__tests__/portal-isolation-db.test.ts
