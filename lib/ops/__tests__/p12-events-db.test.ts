@@ -258,11 +258,24 @@ describe("capacity under concurrency", () => {
     );
     const ok = attempts.filter((a) => a.status === "fulfilled").length;
     const soldOut = attempts.filter((a) => a.status === "rejected" && a.reason instanceof SoldOutError).length;
+    // Every refusal is a SoldOutError (409), whether the attempt read the
+    // counters already full or lost the seat claim a moment later.
+    for (const a of attempts) if (a.status === "rejected") assert.equal((a.reason as { status?: number }).status, 409);
     assert.equal(ok, 5);
     assert.equal(soldOut, 7, `others are sold out: ${attempts.filter((a) => a.status === "rejected" && !(a.reason instanceof SoldOutError)).map((a) => String((a as PromiseRejectedResult).reason)).join("; ")}`);
     const t = await ticketRow(ids.tiny);
     assert.equal(t.soldCount, 5);
     assert.equal(await withWorkspaceScope(WS_A, (tx) => tx.opsEventRegistration.count({ where: { workspaceId: WS_A, ticketTypeId: ids.tiny, status: "confirmed" } })), 5);
+  });
+
+  it("a registration that reads the counters already full is a SoldOutError too", async () => {
+    // Deterministic version of the race's other path (seen on CI): the ticket
+    // type is already at quantity before this attempt reads it.
+    await assert.rejects(
+      withWorkspaceScope(WS_A, (tx) => registerCore(tx, { workspaceId: WS_A, userId: "event-registration" }, { ticketTypeId: ids.tiny, quantity: 1, name: "Late", email: "late@example.test", source: "public" })),
+      (err: unknown) => err instanceof SoldOutError && (err as SoldOutError).status === 409,
+    );
+    assert.equal((await ticketRow(ids.tiny)).soldCount, 5);
   });
 
   it("the database refuses an oversell even outside the service", async () => {
