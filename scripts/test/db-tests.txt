@@ -88,3 +88,4 @@ lib/workspace/__tests__/settings-default-db.test.ts
 lib/agents/queue/__tests__/agent-queue-db.test.ts
 lib/ship/__tests__/ship-db.test.ts
 lib/sandbox/__tests__/sandbox-db.test.ts
+lib/apps/__tests__/apps-db.test.ts
