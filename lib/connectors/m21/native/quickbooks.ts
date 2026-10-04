@@ -9,20 +9,9 @@
 // ?requestid=) and never touches the local journal. QUICKBOOKS_ENVIRONMENT=
 // sandbox points at Intuit's sandbox host.
 
-import type { DecryptedCredential, InvokeContext } from "../types";
-import { tokenSourceFrom } from "../live/http";
-import type { AccountingProvider } from "@/lib/bizsync/accounting/types";
-import { quickbooksProvider } from "@/lib/bizsync/quickbooks/provider";
 import { AccountingAdapter } from "./accounting";
 
 export class QuickbooksAdapter extends AccountingAdapter {
   readonly key = "quickbooks" as const;
   readonly displayName = "QuickBooks";
-
-  protected providerFor(credential: DecryptedCredential | null, ctx: InvokeContext): AccountingProvider | null {
-    const token = tokenSourceFrom(credential, ctx);
-    const realmId = credential?.payload?.realmId;
-    if (!token || typeof realmId !== "string" || !realmId) return null;
-    return quickbooksProvider(ctx.workspaceId, { realmId, token }, this.deps);
-  }
 }

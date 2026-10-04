@@ -11,20 +11,9 @@
 // Posting is idempotent per source document (ops_accounting_exports +
 // Idempotency-Key) and never touches the local journal.
 
-import type { DecryptedCredential, InvokeContext } from "../types";
-import { tokenSourceFrom } from "../live/http";
-import type { AccountingProvider } from "@/lib/bizsync/accounting/types";
-import { xeroProvider } from "@/lib/bizsync/xero/provider";
 import { AccountingAdapter } from "./accounting";
 
 export class XeroAdapter extends AccountingAdapter {
   readonly key = "xero" as const;
   readonly displayName = "Xero";
-
-  protected providerFor(credential: DecryptedCredential | null, ctx: InvokeContext): AccountingProvider | null {
-    const token = tokenSourceFrom(credential, ctx);
-    const tenantId = credential?.payload?.tenantId;
-    if (!token || typeof tenantId !== "string" || !tenantId) return null;
-    return xeroProvider({ tenantId, token }, this.deps);
-  }
 }

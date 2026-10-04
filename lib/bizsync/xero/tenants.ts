@@ -14,6 +14,7 @@
 
 import type { ConnectorConnection, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { withWorkspaceScope } from "@/lib/substrate/memory/rls";
 import { secrets } from "@/lib/secrets";
 import { getDecryptedCredential } from "@/lib/vault/refresh";
 import { tokenSourceFrom, type LiveDeps } from "@/lib/connectors/m21/live/http";
@@ -30,7 +31,7 @@ export function tenantsOf(meta: unknown): XeroTenant[] {
   }
 }
 
-async function writeTenant(connectionId: string, meta: Record<string, unknown>, tenant: XeroTenant, list: XeroTenant[]): Promise<void> {
+async function writeTenant(workspaceId: string, connectionId: string, meta: Record<string, unknown>, tenant: XeroTenant, list: XeroTenant[]): Promise<void> {
   const credential = await getDecryptedCredential(connectionId);
   if (credential) {
     await prisma.connectorCredential.update({
@@ -40,7 +41,7 @@ async function writeTenant(connectionId: string, meta: Record<string, unknown>, 
   }
   const next = { ...meta, xeroTenants: JSON.stringify(list), tenantId: tenant.tenantId, tenantName: tenant.tenantName, label: tenant.tenantName };
   delete (next as Record<string, unknown>).xeroTenantError;
-  await prisma.connectorConnection.update({ where: { id: connectionId }, data: { meta: next as Prisma.InputJsonValue } });
+  await prisma.connectorConnection.update({ where: { id: connectionId, workspaceId }, data: { meta: next as Prisma.InputJsonValue } });
 }
 
 /** After the OAuth callback: discover the organisations and select the first. Never throws. */
@@ -51,22 +52,22 @@ export async function recordXeroTenants(connection: ConnectorConnection, deps: L
     if (!token) return [];
     const list = await xeroTenants(token, deps);
     if (list.length === 0) {
-      await prisma.connectorConnection.update({ where: { id: connection.id }, data: { meta: { ...meta, xeroTenantError: "no Xero organisation was granted" } as Prisma.InputJsonValue } });
+      await prisma.connectorConnection.update({ where: { id: connection.id, workspaceId: connection.workspaceId }, data: { meta: { ...meta, xeroTenantError: "no Xero organisation was granted" } as Prisma.InputJsonValue } });
       return [];
     }
     const current = typeof meta.tenantId === "string" ? list.find((t) => t.tenantId === meta.tenantId) : undefined;
-    await writeTenant(connection.id, meta, current ?? list[0]!, list);
+    await writeTenant(connection.workspaceId, connection.id, meta, current ?? list[0]!, list);
     return list;
   } catch {
     await prisma.connectorConnection
-      .update({ where: { id: connection.id }, data: { meta: { ...meta, xeroTenantError: "could not list Xero organisations — reconnect Xero" } as Prisma.InputJsonValue } })
+      .update({ where: { id: connection.id, workspaceId: connection.workspaceId }, data: { meta: { ...meta, xeroTenantError: "could not list Xero organisations — reconnect Xero" } as Prisma.InputJsonValue } })
       .catch(() => undefined);
     return [];
   }
 }
 
 /** A person picks the organisation for this workspace's Xero connection(s). */
-export async function selectXeroTenant(workspaceId: string, tenantId: string): Promise<{ ok: true; tenantName: string } | { ok: false; error: string }> {
+export async function selectXeroTenant(workspaceId: string, tenantId: string, userId = "system"): Promise<{ ok: true; tenantName: string } | { ok: false; error: string }> {
   const conns = await prisma.connectorConnection.findMany({ where: { workspaceId, connectorKey: "xero", status: "active" } });
   if (conns.length === 0) return { ok: false, error: "Xero is not connected in this workspace." };
   let name: string | null = null;
@@ -74,8 +75,12 @@ export async function selectXeroTenant(workspaceId: string, tenantId: string): P
     const list = tenantsOf(c.meta);
     const t = list.find((x) => x.tenantId === tenantId);
     if (!t) continue;
-    await writeTenant(c.id, (c.meta ?? {}) as Record<string, unknown>, t, list);
+    await writeTenant(workspaceId, c.id, (c.meta ?? {}) as Record<string, unknown>, t, list);
     name = t.tenantName;
   }
-  return name ? { ok: true, tenantName: name } : { ok: false, error: "That organisation is not one this Xero connection was granted." };
+  if (!name) return { ok: false, error: "That organisation is not one this Xero connection was granted." };
+  await withWorkspaceScope(workspaceId, (tx) =>
+    tx.opsAuditEvent.create({ data: { workspaceId, entity: "accounting-links", entityId: null, action: "select_xero_tenant", actor: userId, summary: `Xero organisation set to ${name}` } }),
+  );
+  return { ok: true, tenantName: name };
 }

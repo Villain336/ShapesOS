@@ -27,6 +27,8 @@ import { importParties } from "../accounting/contacts";
 import { xeroProvider } from "../xero/provider";
 import { recordXeroTenants, selectXeroTenant, tenantsOf } from "../xero/tenants";
 import type { OpsActor } from "@/lib/ops/doctype";
+import { bizSyncStatus } from "../status";
+import { recordRun } from "../links";
 
 const RUN = `p11x-${Date.now().toString(36)}`;
 const WS = `${RUN}-a`;
@@ -209,6 +211,19 @@ describe("Xero contacts + isolation", () => {
     const r2 = await importParties(WS, provider());
     assert.equal(r2.created + r2.updated, 0);
     assert.equal(r2.unchanged, 4);
+  });
+
+  it("the Business sync page status: connection label, organisations, export counts, last error", async () => {
+    await assert.rejects(recordRun(WS, "xero", "export", USER, async () => { throw new Error("Xero request failed (HTTP 401)"); }));
+    const xs = (await bizSyncStatus(WS)).find((p) => p.provider === "xero")!;
+    assert.equal(xs.connection?.label, "Demo Co (US)");
+    assert.deepEqual(xs.tenants?.map((t) => t.tenantName), ["Demo Co (US)", "Second Co"]);
+    assert.equal(xs.tenantId, T1);
+    assert.equal(xs.exports?.exported, 4);
+    assert.equal(xs.lastError?.operation, "export");
+    assert.ok((xs.links.customer ?? 0) >= 2);
+    const other = await bizSyncStatus(WS_B);
+    assert.ok(other.every((p) => p.connection === null && p.runs.length === 0 && (p.exports?.exported ?? 0) === 0));
   });
 
   it("FORCE RLS; nothing in the other workspace", async () => {

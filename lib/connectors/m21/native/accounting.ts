@@ -43,8 +43,15 @@ export abstract class AccountingAdapter implements ConnectorAdapter {
 
   constructor(protected readonly deps: LiveDeps = {}) {}
 
-  /** The provider for a live credential, or null (→ mock mode). */
-  protected abstract providerFor(credential: DecryptedCredential | null, ctx: InvokeContext): AccountingProvider | null;
+  /**
+   * The provider for a live credential, or null (→ mock mode). Loaded lazily
+   * (like the HubSpot adapter): the registry's import graph stays free of
+   * the DB-backed sync engines.
+   */
+  protected async providerFor(credential: DecryptedCredential | null, ctx: InvokeContext): Promise<AccountingProvider | null> {
+    const { accountingProviderFrom } = await import("@/lib/bizsync/accounting/providers");
+    return accountingProviderFrom(this.key, ctx.workspaceId, credential, ctx, this.deps);
+  }
 
   protected get postTool(): string {
     return `post_to_${this.key}`;
@@ -87,7 +94,7 @@ export abstract class AccountingAdapter implements ConnectorAdapter {
   }
 
   async invoke(tool: string, args: Record<string, unknown>, credential: DecryptedCredential | null, ctx: InvokeContext): Promise<InvokeResult> {
-    const provider = this.providerFor(credential, ctx);
+    const provider = await this.providerFor(credential, ctx);
     if (!provider) return this.mock(tool);
     const ws = ctx.workspaceId;
     try {
@@ -121,7 +128,7 @@ export abstract class AccountingAdapter implements ConnectorAdapter {
   }
 
   async healthCheck(credential: DecryptedCredential, ctx: InvokeContext): Promise<InvokeResult> {
-    const provider = this.providerFor(credential, ctx);
+    const provider = await this.providerFor(credential, ctx);
     if (!provider) return { ok: false, errorCode: "not_connected", error: `${this.displayName} is not connected.` };
     try {
       return liveOk({ reachable: true, accounts: (await provider.listAccounts()).length });

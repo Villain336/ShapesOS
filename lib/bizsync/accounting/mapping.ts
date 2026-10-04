@@ -160,6 +160,9 @@ export async function confirmMapping(
       });
       confirmed += 1;
     }
+    await tx.opsAuditEvent.create({
+      data: { workspaceId, entity: "accounting-links", entityId: null, action: "confirm_mapping", actor: userId, summary: `${provider}: ${confirmed} account mapping(s) confirmed, ${cleared} cleared` },
+    });
     return { confirmed, cleared };
   });
 }

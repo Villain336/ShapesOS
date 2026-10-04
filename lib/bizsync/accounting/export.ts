@@ -376,7 +376,7 @@ async function exportOne(
     if (!row) {
       return tx.opsAccountingExport.create({ data: { workspaceId, provider: provider.key, sourceKey: plan.sourceKey, docType: plan.docType, localId: plan.localId, entryId: entry.id, status: "pending", createdBy: userId } });
     }
-    return row.status === "failed" ? tx.opsAccountingExport.update({ where: { id: row.id }, data: { status: "pending" } }) : row;
+    return row.status === "failed" ? tx.opsAccountingExport.update({ where: { id: row.id, workspaceId }, data: { status: "pending" } }) : row;
   });
   if (!claim) {
     report.alreadyExported += 1;
@@ -394,7 +394,7 @@ async function exportOne(
       else ref = await provider.createPayment({ ...built.doc, partyRemoteId: partyId }, key);
     }
     await withWorkspaceScope(workspaceId, (tx) =>
-      tx.opsAccountingExport.update({ where: { id: claim.id }, data: { status: "exported", remoteId: ref.id, remoteNumber: ref.number ?? null, exportedAt: new Date(), lastError: null } }),
+      tx.opsAccountingExport.update({ where: { id: claim.id, workspaceId }, data: { status: "exported", remoteId: ref.id, remoteNumber: ref.number ?? null, exportedAt: new Date(), lastError: null } }),
     );
     done.add(plan.sourceKey);
     report.exported.push({ sourceKey: plan.sourceKey, remoteId: ref.id, remoteNumber: ref.number ?? null });
@@ -403,7 +403,7 @@ async function exportOne(
     const msg = err instanceof Error ? scrubMessage(err.message) : "unexpected error";
     await withWorkspaceScope(workspaceId, (tx) =>
       tx.opsAccountingExport.update({
-        where: { id: claim.id },
+        where: { id: claim.id, workspaceId },
         data: definitive ? { status: "failed", attempt: { increment: 1 }, lastError: msg.slice(0, 500) } : { status: "pending", lastError: msg.slice(0, 500) },
       }),
     );

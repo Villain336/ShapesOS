@@ -242,7 +242,7 @@ export async function syncLocations(workspaceId: string, auth: ShopifyAuth, acto
 }
 
 /** A person maps a Shopify location onto an existing OpsLocation (Settings UI). */
-export async function setLocationMapping(workspaceId: string, remoteLocationId: string, opsLocationId: string): Promise<{ ok: true } | { ok: false; error: string }> {
+export async function setLocationMapping(workspaceId: string, remoteLocationId: string, opsLocationId: string, userId: string): Promise<{ ok: true } | { ok: false; error: string }> {
   return withWorkspaceScope(workspaceId, async (tx) => {
     const loc = await tx.opsLocation.findFirst({ where: { id: opsLocationId, workspaceId, active: true }, select: { id: true } });
     if (!loc) return { ok: false as const, error: "That location is not in this workspace." };
@@ -253,6 +253,7 @@ export async function setLocationMapping(workspaceId: string, remoteLocationId: 
     // Quantities agreed on for the old location no longer apply: the next
     // inventory sync treats every level at this location as a first match.
     await tx.bizSyncLink.deleteMany({ where: { workspaceId, provider: P, objectType: "inventory_level", remoteId: { endsWith: `@${remoteLocationId}` } } });
+    await tx.opsAuditEvent.create({ data: { workspaceId, entity: "locations", entityId: opsLocationId, action: "map_shopify_location", actor: userId, summary: `Shopify location ${remoteLocationId} mapped to this location` } });
     return { ok: true as const };
   });
 }
