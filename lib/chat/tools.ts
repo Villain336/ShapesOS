@@ -1098,6 +1098,8 @@ export const TOOL_GROUP: Readonly<Record<string, ToolGroup>> = {
   edit_file: "code",
   bash: "code",
   run_tests: "code",
+  // Phase 9 (repos): lint / typecheck / test / build from the repo profile.
+  run_checks: "code",
 };
 
 /**
@@ -1135,6 +1137,8 @@ export const TOOL_ACTION: Readonly<Record<string, string>> = {
   edit_file: "edit_sandbox_files",
   bash: "run_sandbox_command",
   run_tests: "run_sandbox_command",
+  // Phase 9 (repos): runs repository code like run_tests — Tier 2, asks.
+  run_checks: "run_sandbox_command",
 };
 
 /** The group a tool belongs to. Unknown tools fall in "connectors" (fail closed). */
