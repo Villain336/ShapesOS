@@ -94,3 +94,4 @@ lib/sites/__tests__/site-revisions-db.test.ts
 lib/ship/__tests__/pr-feedback-db.test.ts
 lib/apps/__tests__/apps-db.test.ts
 lib/ops/__tests__/p10-inventory-db.test.ts
+lib/ops/__tests__/p10-crm-db.test.ts

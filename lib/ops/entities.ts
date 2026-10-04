@@ -636,6 +636,116 @@ const reorderRuleDef: OpsEntityDef = {
   },
 };
 
+// ---------------------------------------------------------------------------
+// Phase 10 (ops-core): CRM accounts — companies, contacts, deals (rules +
+// Lead conversion in lib/ops/crm.ts).
+// ---------------------------------------------------------------------------
+
+const lazyCrm = () => import("./crm");
+const isoDate = z.string().max(64).refine((v) => !Number.isNaN(new Date(v).getTime()), { message: "must be an ISO-8601 date" });
+
+const companyDef: OpsEntityDef = {
+  slug: "companies",
+  label: "Company",
+  delegate: "opsCompany",
+  createSchema: z.object({
+    name: z.string().trim().min(1).max(200),
+    domain: z.string().max(253).optional(),
+    website: z.string().max(500).optional(),
+    phone: z.string().max(64).optional(),
+    industry: z.string().max(120).optional(),
+    ownerId: z.string().max(128).optional(),
+    notes: z.string().max(5000).optional(),
+  }),
+  patchSchema: z.object({
+    name: z.string().trim().min(1).max(200).optional(),
+    domain: z.string().max(253).nullable().optional(),
+    website: z.string().max(500).nullable().optional(),
+    phone: z.string().max(64).nullable().optional(),
+    industry: z.string().max(120).nullable().optional(),
+    ownerId: z.string().max(128).nullable().optional(),
+    notes: z.string().max(5000).nullable().optional(),
+  }).strict(),
+  patchable: true,
+  filterable: ["ownerId"],
+  gatedTransitions: [],
+  summarize: (r) => `company "${r.name}"${r.domain ? ` (${r.domain})` : ""}`,
+  hooks: {
+    create: async (tx, a, b) => (await lazyCrm()).createCompanyRow(tx, a, b),
+    patch: async (tx, a, id, p) => (await lazyCrm()).patchCompanyRow(tx, a, id, p),
+  },
+};
+
+const contactDef: OpsEntityDef = {
+  slug: "contacts",
+  label: "Contact",
+  delegate: "opsContact",
+  createSchema: z.object({
+    name: z.string().trim().min(1).max(200),
+    email: z.string().max(320).optional(),
+    phone: z.string().max(64).optional(),
+    title: z.string().max(200).optional(),
+    companyId: z.string().min(1).max(64).optional(),
+    ownerId: z.string().max(128).optional(),
+    notes: z.string().max(5000).optional(),
+  }),
+  patchSchema: z.object({
+    name: z.string().trim().min(1).max(200).optional(),
+    email: z.string().max(320).nullable().optional(),
+    phone: z.string().max(64).nullable().optional(),
+    title: z.string().max(200).nullable().optional(),
+    companyId: z.string().min(1).max(64).nullable().optional(),
+    ownerId: z.string().max(128).nullable().optional(),
+    notes: z.string().max(5000).nullable().optional(),
+  }).strict(),
+  patchable: true,
+  filterable: ["companyId", "ownerId", "leadId"],
+  gatedTransitions: [],
+  summarize: (r) => `contact "${r.name}"${r.email ? ` <${r.email}>` : ""}`,
+  hooks: {
+    create: async (tx, a, b) => (await lazyCrm()).createContactRow(tx, a, b),
+    patch: async (tx, a, id, p) => (await lazyCrm()).patchContactRow(tx, a, id, p),
+  },
+};
+
+const dealDef: OpsEntityDef = {
+  slug: "deals",
+  label: "Deal",
+  delegate: "opsDeal",
+  createSchema: z.object({
+    title: z.string().trim().min(1).max(200),
+    pipelineId: z.string().min(1).max(64).optional(),
+    stage: z.string().min(1).max(64).optional(),
+    valueCents: centsSchema.default(0),
+    ownerId: z.string().max(128).optional(),
+    ownerName: z.string().max(200).optional(),
+    contactId: z.string().min(1).max(64).optional(),
+    companyId: z.string().min(1).max(64).optional(),
+    leadId: z.string().min(1).max(64).optional(),
+    expectedCloseAt: isoDate.optional(),
+  }),
+  // Moving a deal between stages is a free, logged write (no money moves).
+  patchSchema: z.object({
+    title: z.string().trim().min(1).max(200).optional(),
+    stage: z.string().min(1).max(64).optional(),
+    valueCents: centsSchema.optional(),
+    ownerId: z.string().max(128).nullable().optional(),
+    ownerName: z.string().max(200).nullable().optional(),
+    contactId: z.string().min(1).max(64).nullable().optional(),
+    companyId: z.string().min(1).max(64).nullable().optional(),
+    expectedCloseAt: isoDate.nullable().optional(),
+    lostReason: z.string().max(500).nullable().optional(),
+  }).strict(),
+  patchable: true,
+  filterable: ["pipelineId", "stage", "status", "contactId", "companyId", "ownerId"],
+  gatedTransitions: [],
+  summarize: (r) => `deal "${r.title}" → ${r.stage} (${r.valueCents}c)`,
+  hooks: {
+    create: async (tx, a, b) => (await lazyCrm()).createDealRow(tx, a, b),
+    patch: async (tx, a, id, p, e) => (await lazyCrm()).patchDealRow(tx, a, id, p, e),
+  },
+};
+
 export const OPS_ENTITIES: OpsEntityDef[] = [
   productDef,
   orderDef,
@@ -649,6 +759,9 @@ export const OPS_ENTITIES: OpsEntityDef[] = [
   teamMemberDef,
   leaveRequestDef,
   // Phase 10 (ops-core)
+  companyDef,
+  contactDef,
+  dealDef,
   warehouseDef,
   locationDef,
   productVariantDef,

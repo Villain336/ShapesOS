@@ -606,6 +606,9 @@ model Workspace {
   // Phase 16 slice 9: branded report engine back-relation.
   reportSendApprovals         ReportSendApproval[]
   // Phase 10 (ops-core) back-relations.
+  opsCompanies                OpsCompany[]
+  opsContacts                 OpsContact[]
+  opsDeals                    OpsDeal[]
   opsWarehouses               OpsWarehouse[]
   opsLocations                OpsLocation[]
   opsProductVariants          OpsProductVariant[]
@@ -4014,6 +4017,8 @@ model Pipeline {
 
   leads        Lead[]
   captureForms LeadCaptureForm[]
+  // Phase 10 (ops-core): real deals on this pipeline's stages.
+  opsDeals     OpsDeal[]
 
   @@index([workspaceId])
   @@map("crm_pipelines")
@@ -9370,6 +9375,104 @@ model ReportSendApproval {
 }
 
 // ============================================================================
+// Phase 10 (ops-core) — CRM accounts: companies, contacts, deals. Lead stays
+// the capture record (forms, imports, inbox); converting a lead dedupes onto
+// a Contact (by email) and Company (by domain, then name). A Deal is a real
+// opportunity on a CRM pipeline's stage machine (crm_pipelines.stages).
+// ============================================================================
+
+enum OpsDealStatus {
+  open
+  won
+  lost
+}
+
+model OpsCompany {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name        String
+  // Lower-cased registrable domain ("acme.com"); the dedupe key when set.
+  domain      String?
+  website     String?
+  phone       String?
+  industry    String?
+  // Owning user (Auth.js subject id), optional.
+  ownerId     String?   @map("owner_id")
+  notes       String?   @db.Text
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  contacts OpsContact[]
+  deals    OpsDeal[]
+
+  @@unique([workspaceId, domain])
+  @@index([workspaceId, name])
+  @@map("ops_companies")
+}
+
+model OpsContact {
+  id          String      @id @default(cuid())
+  workspaceId String      @map("workspace_id")
+  workspace   Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  companyId   String?     @map("company_id")
+  company     OpsCompany? @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  name        String
+  // Lower-cased; the dedupe key when set.
+  email       String?
+  phone       String?
+  title       String?
+  ownerId     String?     @map("owner_id")
+  // The capture lead this contact was converted from (crm_leads.id).
+  leadId      String?     @map("lead_id")
+  notes       String?     @db.Text
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
+
+  deals OpsDeal[]
+
+  @@unique([workspaceId, email])
+  @@unique([workspaceId, leadId])
+  @@index([workspaceId, companyId])
+  @@index([workspaceId, name])
+  @@map("ops_contacts")
+}
+
+model OpsDeal {
+  id              String        @id @default(cuid())
+  workspaceId     String        @map("workspace_id")
+  workspace       Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  title           String
+  // Stage machine: crm_pipelines.stages; stage must be one of its ids.
+  pipelineId      String        @map("pipeline_id")
+  pipeline        Pipeline      @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+  stage           String
+  // Integer cents.
+  valueCents      Int           @default(0) @map("value_cents")
+  status          OpsDealStatus @default(open)
+  ownerId         String?       @map("owner_id")
+  ownerName       String?       @map("owner_name")
+  contactId       String?       @map("contact_id")
+  contact         OpsContact?   @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  companyId       String?       @map("company_id")
+  company         OpsCompany?   @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  // The capture lead this deal came from (crm_leads.id), if any.
+  leadId          String?       @map("lead_id")
+  expectedCloseAt DateTime?     @map("expected_close_at")
+  closedAt        DateTime?     @map("closed_at")
+  lostReason      String?       @map("lost_reason")
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+
+  projects OpsProject[]
+
+  @@index([workspaceId, pipelineId, stage])
+  @@index([workspaceId, status, expectedCloseAt])
+  @@index([workspaceId, leadId])
+  @@map("ops_deals")
+}
+
+// ============================================================================
 // Phase 10 (ops-core) — inventory: warehouses, locations, variants,
 // transfers, reorder rules. Extends the Phase 17 Ops layer (same RLS
 // pattern, same append-only stock ledger). Phase 13's digital twin binds
@@ -9819,7 +9922,9 @@ model OpsProject {
   status      OpsProjectStatus @default(planning)
   // CRM adjacency (Wave B canonical models).
   leadId      String?          @map("lead_id")
+  // Phase 10 (ops-core): a real relation (was a dangling string).
   dealId      String?          @map("deal_id")
+  deal        OpsDeal?         @relation(fields: [dealId], references: [id], onDelete: SetNull)
   createdAt   DateTime         @default(now()) @map("created_at")
   updatedAt   DateTime         @updatedAt @map("updated_at")
 

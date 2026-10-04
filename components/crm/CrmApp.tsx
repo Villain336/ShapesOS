@@ -2,7 +2,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ChevronDown, Plus, SquareArrowOutUpRight, Users, KanbanSquare, TrendingUp, ClipboardList, ArrowUpRight, type LucideIcon } from "lucide-react";
+import { ChevronDown, Plus, SquareArrowOutUpRight, Users, KanbanSquare, TrendingUp, ClipboardList, ArrowUpRight, Contact, Building2, Handshake, type LucideIcon } from "lucide-react";
+import { CompaniesView, ContactsView, DealsView } from "@/components/ops/CrmAccounts";
 import Link from "next/link";
 import type { CrmLead, CrmPipeline } from "./types";
 import { formatMoney } from "./types";
@@ -18,7 +19,9 @@ import { EmptyState, btnGhostSm, chipCls, tabCls } from "./ui";
 // Phase 10 (ops-core): invoicing, inventory, purchase orders, projects, team
 // and workflows moved to /dashboard/ops (the components are reused there
 // unchanged); old ?tab= links redirect server-side (app/dashboard/crm/page.tsx).
-type Tab = "leads" | "pipeline" | "forecast" | "forms";
+// Contacts, companies and deals are the Phase 10 CRM accounts (OpsContact /
+// OpsCompany / OpsDeal); leads stay the capture records.
+type Tab = "leads" | "pipeline" | "contacts" | "companies" | "deals" | "forecast" | "forms";
 
 interface Summary {
   count: number;
@@ -29,6 +32,9 @@ interface Summary {
 const TABS: { id: Tab; label: string; icon: LucideIcon }[] = [
   { id: "leads", label: "Leads", icon: Users },
   { id: "pipeline", label: "Pipeline", icon: KanbanSquare },
+  { id: "contacts", label: "Contacts", icon: Contact },
+  { id: "companies", label: "Companies", icon: Building2 },
+  { id: "deals", label: "Deals", icon: Handshake },
   { id: "forecast", label: "Forecast", icon: TrendingUp },
   { id: "forms", label: "Forms", icon: ClipboardList },
 ];
@@ -225,7 +231,13 @@ export function CrmApp() {
 
       {/* Body */}
       <div className="flex-1 overflow-y-auto px-5 py-4">
-        {pipelines.length === 0 && !loading ? (
+        {tab === "contacts" ? (
+          <ContactsView />
+        ) : tab === "companies" ? (
+          <CompaniesView />
+        ) : tab === "deals" && pipeline ? (
+          <DealsView key={pipeline.id} pipeline={pipeline} />
+        ) : pipelines.length === 0 && !loading ? (
           <EmptyState
             title="No pipelines yet"
             hint="Create your first pipeline to start tracking leads."
