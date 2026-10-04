@@ -82,8 +82,10 @@ export async function storeOAuthTokens(input: {
   const clientSecret = (process.env[config?.clientSecretEnv ?? ""] ?? "").trim();
 
   // Non-sensitive metadata the UI may display.
-  const meta: { grantedScopes?: string } = {};
+  const meta: Record<string, string> = {};
   if (typeof token.scope === "string") meta.grantedScopes = token.scope;
+  // Phase 11 (conncore): provider routing metadata (e.g. Slack team id).
+  Object.assign(meta, config?.tokenMeta?.(token as unknown as Record<string, unknown>) ?? {});
 
   const credentialPayload: Record<string, unknown> = {
     access_token: token.access_token,
@@ -156,11 +158,18 @@ export async function handleOAuthCallback(
     redirectUri,
     deps.fetchImpl ?? fetch,
   );
-  return storeOAuthTokens({
+  const connection = await storeOAuthTokens({
     userId: parsed.userId,
     workspaceId: parsed.workspaceId,
     connectorKey: parsed.connectorKey,
     token,
     scopes: config.scopes,
   });
+  // Phase 11 (conncore): a Slack install also records the team → workspace
+  // route the Events API receiver needs (lib/slack/install.ts).
+  if (parsed.connectorKey === "slack") {
+    const { recordSlackInstall } = await import("@/lib/slack/install");
+    await recordSlackInstall({ workspaceId: parsed.workspaceId, userId: parsed.userId, connectionId: connection.id, meta: connection.meta });
+  }
+  return connection;
 }

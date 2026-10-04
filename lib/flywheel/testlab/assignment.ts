@@ -13,6 +13,7 @@
 // Fake/test mode is the default. Real senders throw NotConfiguredError.
 
 import type { Experiment, ExperimentVariant } from "./experiment";
+import { assertFakeProviderAllowed } from "@/lib/env/secrets";
 
 export class NotConfiguredError extends Error {
   readonly provider: string;
@@ -164,6 +165,8 @@ export async function resolveNurturePort(): Promise<{ port: NurtureSendPort; rea
       // fall through to fake — never silently pretend
     }
   }
+  // Phase 11 (conncore): the in-memory recorder is refused in production.
+  assertFakeProviderAllowed("A/B test email sending");
   return { port: createFakeNurturePort(), real: false };
 }
 

@@ -83,7 +83,7 @@ export class McpConnectorClient {
    */
   async connect(
     endpoint: string,
-    opts: { readOnlyTools?: Iterable<string> } = {},
+    opts: { readOnlyTools?: Iterable<string>; accessToken?: string | null } = {},
   ): Promise<McpServerInfo> {
     if (this.client) throw new Error("McpConnectorClient already connected");
     this.endpoint = endpoint;
@@ -99,7 +99,13 @@ export class McpConnectorClient {
       const transport = new StdioClientTransport({ command, args });
       await client.connect(transport);
     } else {
-      const transport = new StreamableHTTPClientTransport(new URL(endpoint));
+      // Phase 11 (conncore): an OAuth-protected server gets the vault's
+      // bearer token (lib/connectors/m21/mcp-oauth.ts); a 401 surfaces to
+      // the caller, which refreshes once and retries.
+      const transport = new StreamableHTTPClientTransport(
+        new URL(endpoint),
+        opts.accessToken ? { requestInit: { headers: { Authorization: `Bearer ${opts.accessToken}` } } } : undefined,
+      );
       await client.connect(transport);
     }
 

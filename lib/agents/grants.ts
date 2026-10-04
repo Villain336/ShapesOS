@@ -171,8 +171,10 @@ export function connectorGroup(connectorKey: string): ToolGroup {
   switch (connectorKey) {
     case "gmail":
     case "resend":
+    case "outlook": // Phase 11 (conncore)
       return "email";
     case "google-calendar":
+    case "outlook-calendar": // Phase 11 (conncore)
       return "calendar";
     case "google-drive":
     case "notion":
@@ -184,6 +186,8 @@ export function connectorGroup(connectorKey: string): ToolGroup {
       return "site";
     case "dataforseo":
       return "web";
+    case "hubspot": // Phase 11 (conncore): CRM sync is business operations
+      return "ops";
     case "google-search-console":
     case "ga4":
     case "google-ads":
@@ -213,6 +217,15 @@ export function connectorAction(connectorKey: string, tool: string): string {
       return "publish_owned";
     case "resend.send_test_email":
       return "send_internal_note";
+    // Phase 11 (conncore): email to anyone is external — Tier 2, always asks.
+    case "gmail.send_email":
+    case "gmail.reply_to_message":
+    case "outlook.send_email":
+    case "outlook.reply_to_message":
+      return "send_outreach_email";
+    // Phase 11 (conncore): a HubSpot pull writes your CRM records.
+    case "hubspot.sync_from_hubspot":
+      return "write_crm_record";
     default:
       return "connector_write";
   }

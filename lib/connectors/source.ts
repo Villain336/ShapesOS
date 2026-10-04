@@ -23,6 +23,7 @@ import type { SafeFetchOptions } from "./safe-fetch";
 import { MockWordPressConnector } from "./mock-wordpress";
 import { WebflowConnector } from "./webflow";
 import { MockWebflowConnector } from "./mock-webflow";
+import { fakeOrRefuse } from "@/lib/env/secrets";
 import type {
   ContentConnector,
   GitHubConfig,
@@ -79,8 +80,9 @@ export async function getSiteRemote(
       branch: String(cfg.branch ?? "main"),
       demo: cfg.demo === true,
     };
+    // Phase 11 (conncore): demo (mock) connections are refused in production.
     const connector: GitHubConnector = full.demo
-      ? new MockGitHubConnector()
+      ? fakeOrRefuse("demo GitHub", () => new MockGitHubConnector())
       : new GitHubSiteFileProvider(full);
     return { kind: "github", connector };
   }
@@ -137,7 +139,7 @@ export async function getContentConnector(
     // is rejected here instead of being fetched. (Every request is also
     // re-validated per-request + per-redirect-hop inside safeFetch.)
     return full.demo
-      ? new MockWordPressConnector(full)
+      ? fakeOrRefuse("demo WordPress", () => new MockWordPressConnector(full))
       : await WordPressConnector.create(full, wpDeps);
   }
   if (site.sourceType === "webflow") {
@@ -146,7 +148,7 @@ export async function getContentConnector(
       siteId: String(cfg.siteId ?? ""),
       demo: cfg.demo === true,
     };
-    return full.demo ? new MockWebflowConnector(full) : new WebflowConnector(full);
+    return full.demo ? fakeOrRefuse("demo Webflow", () => new MockWebflowConnector(full)) : new WebflowConnector(full);
   }
   throw new Error(`Site ${site.id} is not a content source (${site.sourceType})`);
 }

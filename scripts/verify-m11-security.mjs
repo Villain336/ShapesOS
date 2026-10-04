@@ -201,6 +201,9 @@ const PUBLIC_BY_DESIGN = {
     "Phase 10 client-portal link redemption; the single-use link token is the capability, consumed by one guarded UPDATE (used_at IS NULL AND expires_at > now) under the token's workspace RLS scope; client must still have the portal on and the same sign-in email; issues a PORTAL session cookie (Path=/portal + /api/portal), never a workspace session; same-Origin + JSON only, per-IP lockout, proxy auth tier",
   "app/api/hooks/github/route.ts":
     "inbound GitHub webhook; X-Hub-Signature-256 HMAC-SHA256 with GITHUB_WEBHOOK_SECRET verified in constant time over the raw body before parsing (unset secret → 503); delivery id is the primary key of github_webhook_deliveries so redeliveries are no-ops; bots, non-collaborators, non shapes/<runId> branches and forks ignored; routed to its workspace via a SELECT-only policy on agent_pull_requests, every write under that tenant's GUC; only queues a pr_feedback agent job (pushes still need a person's OK); 1 MiB body cap, per-IP limit in proxy.ts; returns counts only",
+  // Phase 11 (conncore): Slack Events API — capability model, see route comments.
+  "app/api/hooks/slack/events/route.ts":
+    "inbound Slack Events API; X-Slack-Signature v0 HMAC-SHA256 with SLACK_SIGNING_SECRET over 'v0:'+timestamp+':'+raw body verified in constant time with a 5-minute timestamp window before parsing (unset secret → 503); event_id is the primary key of slack_event_receipts so retries are no-ops; bots/edits ignored; team_id routed to its workspace via a SELECT-only policy on slack_installations, every write under that tenant's GUC; optional per-install Slack user allow-list; only queues one slack_mention agent job (agent writes still need a person's OK); 1 MiB body cap, per-IP limit in proxy.ts; returns counts only",
 };
 const uncovered = [];
 for (const f of routeFiles) {
@@ -225,7 +228,7 @@ const missingAllowList = Object.keys(PUBLIC_BY_DESIGN).filter(k => {
 ok("every public-by-design entry maps to a real route file", missingAllowList.length === 0, missingAllowList.join("; "));
 ok(
   "public-by-design allow-list is documented",
-  Object.keys(PUBLIC_BY_DESIGN).length === 40 && // Phase 9 (repos): +1 app/api/hooks/github; Phase 10 (finance): +1 tenant Stripe webhook; Phase 10 (store): +2 storefront cart + checkout; Phase 10 (portal): +2 portal sign-in
+  Object.keys(PUBLIC_BY_DESIGN).length === 41 && // Phase 9 (repos): +1 app/api/hooks/github; Phase 10 (finance): +1 tenant Stripe webhook; Phase 10 (store): +2 storefront cart + checkout; Phase 10 (portal): +2 portal sign-in; Phase 11 (conncore): +1 Slack events
     Object.values(PUBLIC_BY_DESIGN).every(v => v.length > 20)
 );
 

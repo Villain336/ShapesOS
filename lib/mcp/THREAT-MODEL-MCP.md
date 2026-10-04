@@ -153,6 +153,18 @@ workspace (or deleted the workspace).
 - Revoked keys and deleted workspaces fail at the same gate.
 *Tests:* valid key + `mcpEnabled=false` → 403; enable → 200; disable → 403 again.
 
+*Phase 11 (conncore) — default on for paid plans.* `mcpEnabled` is now
+nullable: `null` means the plan default — ON for Pro and Agency (paid plans
+with `api_access`), OFF for trial, starter and self-hosted
+(`lib/mcp/enabled.ts`, `MCP_DEFAULT_ON_PLANS`). An admin's explicit `false` is
+the workspace off switch and always wins; `true` still needs the entitlement;
+`PUT /api/mcp/settings { enabled: null }` returns to the default. The
+migration resets never-touched `false` rows to `null` but keeps `false` for
+workspaces whose audit log shows an admin turned MCP off. Being on exposes no
+data by itself: a caller still needs an API key or an OAuth grant an admin
+created, and every gate above (fresh read per request, entitlement, scopes,
+rate limit, metering) is unchanged.
+
 ### T9 — Unmetered execution (metering service unavailable)
 *Attack/failure:* `lib/metering/service` fails to import (sibling track not yet
 deployed) or `meter()` throws → tool runs for free, ledger silently diverges.

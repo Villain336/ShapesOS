@@ -26,6 +26,7 @@
 // not a draft) is NOT applied automatically: an audit row flags it for a
 // person, mirroring the invoice path.
 
+import { emitOpsEvent, orderPaidEvent } from "@/lib/webhooks/ops-events";
 import type { Prisma } from "@prisma/client";
 import { withWorkspaceScope } from "@/lib/substrate/memory/rls";
 import { OPS_ENTITY_MAP } from "../entities";
@@ -179,6 +180,12 @@ export async function markWebOrderPaid(
       "paid",
       order.id,
       `web order ${orderLabel(order.id)} paid via Stripe (${amount}c, ${providerRef}) → confirmed; ${stock.moves} stock move(s)${stock.oversold.length ? `, OVERSOLD ${stock.oversold.join(", ")}` : ""}${promoNote}`,
+    );
+    // Phase 11 (conncore): order.paid, in this transaction (once per order).
+    await emitOpsEvent(
+      tx,
+      workspaceId,
+      orderPaidEvent({ ...order, status: "confirmed", paidAt, customerEmail: email } as unknown as Record<string, unknown>, "stripe"),
     );
     return { duplicate: false, orderId, paymentId: payment.id, status: "confirmed", stockMoves: stock.moves, oversold: stock.oversold, journalEntryId: posted?.entry.id ?? null };
   });

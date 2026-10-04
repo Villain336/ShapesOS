@@ -11,7 +11,7 @@
 
 import { randomBytes } from "crypto";
 import { secrets } from "@/lib/secrets";
-import { getBuiltinMeta } from "@/lib/connectors/m21/registry";
+import { getBuiltinMeta, HUBSPOT_SCOPES, MICROSOFT_CALENDAR_SCOPES, MICROSOFT_MAIL_SCOPES, SLACK_BOT_SCOPES } from "@/lib/connectors/m21/registry";
 
 export interface OAuthProviderConfig {
   authorizeUrl: string;
@@ -29,6 +29,14 @@ export interface OAuthProviderConfig {
    * (Notion, verified against developers.notion.com/reference/create-a-token).
    */
   tokenRequest?: "form" | "json_basic";
+  /** Phase 11 (conncore): scope separator on the authorize URL (Slack: ","). Default " ". */
+  scopeSeparator?: string;
+  /**
+   * Phase 11 (conncore): non-secret display/routing metadata pulled from the
+   * token response into ConnectorConnection.meta (e.g. Slack team id). Never
+   * returns token material.
+   */
+  tokenMeta?: (token: Record<string, unknown>) => Record<string, string>;
 }
 
 /**
@@ -60,6 +68,12 @@ const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
 const GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
 const GOOGLE_ID_ENV = "GOOGLE_OAUTH_CLIENT_ID";
 const GOOGLE_SECRET_ENV = "GOOGLE_OAUTH_CLIENT_SECRET";
+
+// Phase 11 (conncore): Microsoft identity platform v2.0 (multi-tenant "common").
+const MICROSOFT_AUTH_URL = "https://login.microsoftonline.com/common/oauth2/v2.0/authorize";
+const MICROSOFT_TOKEN_URL = "https://login.microsoftonline.com/common/oauth2/v2.0/token";
+const MICROSOFT_ID_ENV = "MICROSOFT_OAUTH_CLIENT_ID";
+const MICROSOFT_SECRET_ENV = "MICROSOFT_OAUTH_CLIENT_SECRET";
 
 /** OAuth config per built-in connector that uses OAuth2. Non-OAuth keys are absent. */
 export const OAUTH_CONFIGS: Record<string, OAuthProviderConfig> = {
@@ -94,7 +108,8 @@ export const OAUTH_CONFIGS: Record<string, OAuthProviderConfig> = {
   gmail: {
     authorizeUrl: GOOGLE_AUTH_URL,
     tokenUrl: GOOGLE_TOKEN_URL,
-    scopes: ["https://www.googleapis.com/auth/gmail.readonly"],
+    // Phase 11 (conncore): + gmail.send for the gated send / reply tools.
+    scopes: ["https://www.googleapis.com/auth/gmail.readonly", "https://www.googleapis.com/auth/gmail.send"],
     clientIdEnv: GOOGLE_ID_ENV,
     clientSecretEnv: GOOGLE_SECRET_ENV,
     extra: { access_type: "offline", prompt: "consent" },
@@ -104,7 +119,8 @@ export const OAUTH_CONFIGS: Record<string, OAuthProviderConfig> = {
   "google-calendar": {
     authorizeUrl: GOOGLE_AUTH_URL,
     tokenUrl: GOOGLE_TOKEN_URL,
-    scopes: ["https://www.googleapis.com/auth/calendar.readonly"],
+    // Phase 11 (conncore): + calendar.events for list/create/update events.
+    scopes: ["https://www.googleapis.com/auth/calendar.readonly", "https://www.googleapis.com/auth/calendar.events"],
     clientIdEnv: GOOGLE_ID_ENV,
     clientSecretEnv: GOOGLE_SECRET_ENV,
     extra: { access_type: "offline", prompt: "consent" },
@@ -172,6 +188,59 @@ export const OAUTH_CONFIGS: Record<string, OAuthProviderConfig> = {
     scopes: ["advertising::campaign_management"],
     clientIdEnv: "AMAZON_ADS_CLIENT_ID",
     clientSecretEnv: "AMAZON_ADS_CLIENT_SECRET",
+  },
+  // Phase 11 (conncore): Outlook mail through Microsoft Graph. The "common"
+  // tenant accepts work/school and personal accounts; client credentials go
+  // in the form body (both grants). Verified against
+  // learn.microsoft.com/entra/identity-platform/v2-oauth2-auth-code-flow.
+  outlook: {
+    authorizeUrl: MICROSOFT_AUTH_URL,
+    tokenUrl: MICROSOFT_TOKEN_URL,
+    scopes: MICROSOFT_MAIL_SCOPES,
+    clientIdEnv: MICROSOFT_ID_ENV,
+    clientSecretEnv: MICROSOFT_SECRET_ENV,
+    extra: { response_mode: "query" },
+  },
+  "outlook-calendar": {
+    authorizeUrl: MICROSOFT_AUTH_URL,
+    tokenUrl: MICROSOFT_TOKEN_URL,
+    scopes: MICROSOFT_CALENDAR_SCOPES,
+    clientIdEnv: MICROSOFT_ID_ENV,
+    clientSecretEnv: MICROSOFT_SECRET_ENV,
+    extra: { response_mode: "query" },
+  },
+  // Phase 11 (conncore): the ShapesOS Slack app (OAuth v2, bot token).
+  // Scopes are comma-separated on the authorize URL; oauth.v2.access answers
+  // HTTP 200 { ok, access_token: "xoxb-…", team: { id, name }, bot_user_id }
+  // (ok:false has no access_token → the exchange fails closed). Bot tokens
+  // don't expire unless token rotation is turned on for the app.
+  // Verified against docs.slack.dev/authentication/installing-with-oauth.
+  slack: {
+    authorizeUrl: "https://slack.com/oauth/v2/authorize",
+    tokenUrl: "https://slack.com/api/oauth.v2.access",
+    scopes: SLACK_BOT_SCOPES,
+    clientIdEnv: "SLACK_CLIENT_ID",
+    clientSecretEnv: "SLACK_CLIENT_SECRET",
+    scopeSeparator: ",",
+    tokenMeta: (t) => {
+      const team = (t.team ?? {}) as { id?: unknown; name?: unknown };
+      const out: Record<string, string> = {};
+      if (typeof team.id === "string") out.slackTeamId = team.id;
+      if (typeof team.name === "string") out.slackTeamName = team.name.slice(0, 200);
+      if (typeof t.bot_user_id === "string") out.slackBotUserId = t.bot_user_id;
+      return out;
+    },
+  },
+  // Phase 11 (conncore): HubSpot public app. Authorize on app.hubspot.com,
+  // token (both grants, client credentials in the form body) on
+  // api.hubapi.com; access tokens live 30 minutes, refresh tokens rotate
+  // never (kept). Verified against developers.hubspot.com/docs/apps/legacy-apps/authentication/oauth-quickstart-guide.
+  hubspot: {
+    authorizeUrl: "https://app.hubspot.com/oauth/authorize",
+    tokenUrl: "https://api.hubapi.com/oauth/v1/token",
+    scopes: HUBSPOT_SCOPES,
+    clientIdEnv: "HUBSPOT_CLIENT_ID",
+    clientSecretEnv: "HUBSPOT_CLIENT_SECRET",
   },
   // NOTE (Phase 18 slice 4, outcome B): Walmart Connect is NOT registered
   // here and never will be as an OAuth connector. Research 2026-10-01
@@ -303,7 +372,7 @@ export function startOAuthFlow(
     redirect_uri: redirectUri,
     response_type: "code",
     state,
-    ...(config.scopes.length ? { scope: config.scopes.join(" ") } : {}),
+    ...(config.scopes.length ? { scope: config.scopes.join(config.scopeSeparator ?? " ") } : {}),
     ...(config.extra ?? {}),
   });
   return { url: `${config.authorizeUrl}?${params.toString()}`, state };

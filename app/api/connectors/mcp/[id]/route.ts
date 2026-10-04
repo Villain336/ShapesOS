@@ -11,6 +11,8 @@ import { workspaceIdFrom, badRequest, notFound } from "@/lib/route-utils";
 import { auditEvent } from "@/lib/auditlog";
 import { readJsonBody } from "@/lib/sitefiles/api";
 import { validateBody, z } from "@/lib/api/validate";
+import type { Prisma } from "@prisma/client";
+import { validateToolPolicies, type McpToolPolicy } from "@/lib/connectors/m21/mcp-policy";
 
 export const dynamic = "force-dynamic";
 
@@ -57,7 +59,9 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
 
 const PatchSchema = z.object({
   workspaceId: z.string().trim().max(120).optional(),
-  readOnlyTools: z.array(z.string().trim().min(1).max(200)).max(200),
+  readOnlyTools: z.array(z.string().trim().min(1).max(200)).max(200).optional(),
+  // Phase 11 (conncore): { [tool]: { group, action } } (lib/connectors/m21/mcp-policy.ts).
+  toolPolicies: z.record(z.string(), z.object({ group: z.string(), action: z.string() })).optional(),
 });
 
 /**
@@ -79,23 +83,43 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
   const connector = await prisma.connector.findFirst({ where: { id, workspaceId } });
   if (!connector) return notFound("Connector not found");
-  if (connector.kind !== "mcp") return badRequest("Only custom MCP connectors have a read-only allow-list");
+  if (connector.kind !== "mcp") return badRequest("Only custom MCP connectors have tool settings");
 
-  const readOnlyTools = [...new Set(v.data.readOnlyTools)];
   const prevConfig =
     connector.config && typeof connector.config === "object" && !Array.isArray(connector.config)
       ? (connector.config as Record<string, unknown>)
       : {};
+  if (v.data.readOnlyTools === undefined && v.data.toolPolicies === undefined) {
+    return badRequest("Nothing to update — pass readOnlyTools or toolPolicies.");
+  }
+  const next: Record<string, unknown> = { ...prevConfig };
+  const changes: string[] = [];
+  let readOnlyTools: string[] | undefined;
+  if (v.data.readOnlyTools !== undefined) {
+    readOnlyTools = [...new Set(v.data.readOnlyTools)];
+    next.readOnlyTools = readOnlyTools;
+    changes.push(`read-only allow-list set to [${readOnlyTools.join(", ")}]`);
+  }
+  // Phase 11 (conncore): per-tool group + action (tier). Unmapped tools stay
+  // in "Connected apps" and always ask.
+  let toolPolicies: Record<string, McpToolPolicy> | undefined;
+  if (v.data.toolPolicies !== undefined) {
+    const checked = validateToolPolicies(v.data.toolPolicies);
+    if (!checked.ok) return badRequest(checked.error);
+    toolPolicies = checked.policies;
+    next.toolPolicies = toolPolicies;
+    changes.push(`tool groups/tiers set for ${Object.keys(toolPolicies).length} tool(s)`);
+  }
   await prisma.connector.update({
     where: { id: connector.id },
-    data: { config: { ...prevConfig, readOnlyTools } },
+    data: { config: next as Prisma.InputJsonValue },
   });
   await auditEvent({
     projectId: null,
     workspaceId,
     action: "settings_workspace_updated",
-    summary: `MCP connector "${connector.displayName}": read-only allow-list set to [${readOnlyTools.join(", ")}]`,
+    summary: `MCP connector "${connector.displayName}": ${changes.join("; ")}`.slice(0, 500),
     actorUserId: user.id,
   });
-  return Response.json({ ok: true, readOnlyTools });
+  return Response.json({ ok: true, ...(readOnlyTools ? { readOnlyTools } : {}), ...(toolPolicies ? { toolPolicies } : {}) });
 }

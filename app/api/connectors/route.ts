@@ -5,6 +5,8 @@
 //   readOnlyTools?: string[]   (custom MCP only — the admin allow-list)
 // }] } (viewer+). Credential blobs are never returned.
 
+import { mcpOAuthConfig } from "@/lib/connectors/m21/mcp-oauth";
+import { mcpToolPolicies } from "@/lib/connectors/m21/mcp-policy";
 import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
@@ -76,6 +78,9 @@ export async function GET(req: NextRequest) {
       custom: true,
       connections: (byKey.get(c.key) ?? []).map(publicConnection),
       readOnlyTools: c.kind === "mcp" ? readOnlyToolsFromConfig(c.config) : [],
+      // Phase 11 (conncore): OAuth-protected MCP server + mapped tool count.
+      needsAuth: c.kind === "mcp" && mcpOAuthConfig(c.config) !== null,
+      mappedTools: c.kind === "mcp" ? Object.keys(mcpToolPolicies(c.config)).length : 0,
     };
   });
 

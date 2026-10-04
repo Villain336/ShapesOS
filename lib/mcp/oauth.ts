@@ -17,6 +17,7 @@
 //   capped to the scopes the approver's role allows (TOOL_MIN_ROLE), and
 //   lib/mcp/auth.ts re-checks membership + re-caps on every call.
 
+import { mcpEffectiveState } from "./enabled";
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import type { WorkspaceRole } from "@prisma/client";
@@ -398,8 +399,9 @@ export async function approveWorkspaceBoundGrant(grant: string, userId: string):
   }
   const gate = await consentGate(userId, workspaceId);
   if (!gate.ok) return { ok: false, status: 403, error: gate.error };
-  const ws = await prisma.workspace.findUnique({ where: { id: workspaceId }, select: { mcpEnabled: true } });
-  if (!ws?.mcpEnabled) {
+  // Phase 11 (conncore): explicit switch, else the paid-plan default.
+  const ws = await prisma.workspace.findUnique({ where: { id: workspaceId }, select: { mcpEnabled: true, plan: true } });
+  if (!mcpEffectiveState(ws).on) {
     return { ok: false, status: 403, error: "MCP is not enabled for this workspace" };
   }
   try {

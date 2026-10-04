@@ -138,6 +138,84 @@ export const DatasetStaleData = z.object({
   message: z.string(),
 });
 
+// ── Phase 11 (conncore): Phase 9/10 business entities (Zapier / n8n / Make)
+// Emitted inside the business write's transaction (transactional outbox,
+// lib/webhooks/ops-events.ts), so an event exists exactly when its write does.
+
+export const InvoiceSentData = z.object({
+  id: z.string(),
+  number: z.string().nullable(),
+  customerId: z.string().nullable(),
+  totalCents: z.number().int(),
+  taxCents: z.number().int(),
+  status: z.literal("sent"),
+  sentAt: isoDate.nullable(),
+  dueAt: isoDate.nullable(),
+});
+
+export const OrderPaidData = z.object({
+  id: z.string(),
+  source: z.string().nullable().describe("manual | web | quote | workflow"),
+  storeId: z.string().nullable(),
+  customerId: z.string().nullable(),
+  customerEmail: z.string().nullable(),
+  totalCents: z.number().int(),
+  taxCents: z.number().int(),
+  status: z.string(),
+  paidAt: isoDate,
+  paymentProvider: z.string().nullable(),
+});
+
+export const QuoteEventData = z.object({
+  id: z.string(),
+  number: z.string().nullable(),
+  customerId: z.string().nullable(),
+  totalCents: z.number().int(),
+  status: z.string(),
+  validUntil: isoDate.nullable(),
+});
+
+export const DealEventData = z.object({
+  id: z.string(),
+  title: z.string(),
+  pipelineId: z.string(),
+  stage: z.string(),
+  /** deal.stage_changed only: the stage it left. */
+  fromStage: z.string().nullable().optional(),
+  status: z.enum(["open", "won", "lost"]),
+  valueCents: z.number().int(),
+  contactId: z.string().nullable(),
+  companyId: z.string().nullable(),
+  ownerId: z.string().nullable(),
+  expectedCloseAt: isoDate.nullable(),
+  closedAt: isoDate.nullable(),
+  updatedAt: isoDate,
+});
+
+export const TicketEventData = z.object({
+  id: z.string(),
+  number: z.number().int().nullable(),
+  subject: z.string(),
+  status: z.string(),
+  priority: z.string(),
+  channel: z.string().nullable(),
+  requesterEmail: z.string().nullable(),
+  contactId: z.string().nullable(),
+  assigneeId: z.string().nullable(),
+  createdAt: isoDate,
+  updatedAt: isoDate,
+});
+
+export const ContactCreatedData = z.object({
+  id: z.string(),
+  name: z.string(),
+  email: z.string().nullable(),
+  phone: z.string().nullable(),
+  title: z.string().nullable(),
+  companyId: z.string().nullable(),
+  createdAt: isoDate,
+});
+
 export const WEBHOOK_EVENT_SCHEMAS = {
   "lead.created": LeadEventData,
   "lead.updated": LeadEventData,
@@ -154,6 +232,18 @@ export const WEBHOOK_EVENT_SCHEMAS = {
   "dataset.compiled": DatasetCompiledData,
   "dataset.published": DatasetPublishedData,
   "dataset.stale": DatasetStaleData,
+  // Phase 11 (conncore): Phase 9/10 business entities
+  "invoice.sent": InvoiceSentData,
+  "order.paid": OrderPaidData,
+  "quote.sent": QuoteEventData,
+  "quote.accepted": QuoteEventData,
+  "deal.created": DealEventData,
+  "deal.stage_changed": DealEventData,
+  "deal.won": DealEventData,
+  "deal.lost": DealEventData,
+  "ticket.created": TicketEventData,
+  "ticket.solved": TicketEventData,
+  "contact.created": ContactCreatedData,
 } as const;
 
 export type WebhookEventType = keyof typeof WEBHOOK_EVENT_SCHEMAS;
@@ -180,6 +270,18 @@ export const WEBHOOK_EVENT_LABELS: Record<WebhookEventType, string> = {
   "dataset.compiled": "A dataset version is compiled",
   "dataset.published": "A dataset version goes live",
   "dataset.stale": "A dataset goes stale",
+  // Phase 11 (conncore)
+  "invoice.sent": "An invoice is sent",
+  "order.paid": "An order is paid",
+  "quote.sent": "A quote is sent",
+  "quote.accepted": "A quote is accepted",
+  "deal.created": "A deal is created",
+  "deal.stage_changed": "A deal moves to another stage",
+  "deal.won": "A deal is won",
+  "deal.lost": "A deal is lost",
+  "ticket.created": "A ticket is opened",
+  "ticket.solved": "A ticket is solved",
+  "contact.created": "A contact is created",
 };
 
 export function isWebhookEventType(v: unknown): v is WebhookEventType {

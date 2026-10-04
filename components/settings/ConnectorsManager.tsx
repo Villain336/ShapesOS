@@ -8,6 +8,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Activity, Check, Plug } from "lucide-react";
 import ConnectorHealthTab from "./ConnectorHealthTab";
 import McpReadOnlyToolsEditor from "./McpReadOnlyToolsEditor";
+import McpToolPoliciesEditor from "./McpToolPoliciesEditor";
 import { confirmAction } from "@/lib/ui/feedback";
 
 // AOS atoms (local — components/settings/ui.tsx is owned by another slice).
@@ -71,6 +72,9 @@ interface Connector {
   connections: Connection[];
   /** Custom MCP only: tools the agent may run without asking (admin allow-list). */
   readOnlyTools?: string[];
+  /** Phase 11 (conncore): OAuth-protected MCP server; tools mapped to a group/tier. */
+  needsAuth?: boolean;
+  mappedTools?: number;
 }
 
 // Connection/auth states are provider states, not agent states — neutral chips.
@@ -111,6 +115,7 @@ export default function ConnectorsManager({
     "streamable-http",
   );
   const [editingReadOnly, setEditingReadOnly] = useState<string | null>(null);
+  const [editingPolicies, setEditingPolicies] = useState<string | null>(null);
 
   const q = `workspaceId=${encodeURIComponent(workspaceId)}`;
 
@@ -253,8 +258,35 @@ export default function ConnectorsManager({
       }
       setMcpName("");
       setMcpEndpoint("");
-      setNotice({ kind: "ok", message: `Added MCP server "${j.connector?.displayName ?? mcpName}".` });
+      setNotice({
+        kind: "ok",
+        message: j.needsAuth
+          ? `Added MCP server "${j.connector?.displayName ?? mcpName}". It needs sign-in: use Sign in next to it.`
+          : `Added MCP server "${j.connector?.displayName ?? mcpName}".`,
+      });
       await load();
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  // Phase 11 (conncore): sign in to an OAuth-protected MCP server.
+  async function signInMcp(connector: Connector) {
+    if (!connector.id) return;
+    setBusy(`mcp-auth-${connector.key}`);
+    setNotice(null);
+    try {
+      const r = await fetch(`/api/connectors/mcp/${encodeURIComponent(connector.id)}/oauth?${q}`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ workspaceId }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok || typeof j.url !== "string") {
+        setNotice(err(j, "Could not start sign-in."));
+        return;
+      }
+      window.location.assign(j.url);
     } finally {
       setBusy(null);
     }
@@ -441,7 +473,8 @@ export default function ConnectorsManager({
         <h2 className="font-medium text-ink">Custom MCP servers</h2>
         <p className="mt-1 text-sm text-muted">
           Attach a generic MCP server (Streamable HTTP; stdio is allowed on
-          self-hosted installs only). ShapesOS handshakes and lists its tools.
+          self-hosted installs only). ShapesOS handshakes and lists its tools;
+          a server that needs sign-in is added first, then you sign in with OAuth.
         </p>
         <div className="mt-3 grid gap-2 md:grid-cols-4">
           <label className={labelCls}>
@@ -498,12 +531,35 @@ export default function ConnectorsManager({
                         {c.description ?? c.key}
                       </div>
                     </div>
-                    <div className="flex shrink-0 items-center gap-2">
+                    <div className="flex shrink-0 flex-wrap items-center gap-2">
+                      {c.needsAuth && (
+                        <span className={chipCls}>
+                          {c.connections.some((x) => x.status === "active") ? "signed in" : "needs sign-in"}
+                        </span>
+                      )}
                       <span className={chipCls}>
                         {ro.length === 0
                           ? "all tools ask first"
                           : `${ro.length} read-only tool${ro.length === 1 ? "" : "s"}`}
                       </span>
+                      {c.needsAuth && c.id && (
+                        <button
+                          onClick={() => signInMcp(c)}
+                          disabled={busy === `mcp-auth-${c.key}`}
+                          className={btnGhost}
+                        >
+                          {c.connections.some((x) => x.status === "active") ? "Sign in again" : "Sign in"}
+                        </button>
+                      )}
+                      {c.id && (
+                        <button
+                          onClick={() => setEditingPolicies(editingPolicies === c.id ? null : c.id!)}
+                          aria-expanded={editingPolicies === c.id}
+                          className={btnGhost}
+                        >
+                          Tool groups
+                        </button>
+                      )}
                       {c.id && (
                         <button
                           onClick={() => setEditingReadOnly(editingReadOnly === c.id ? null : c.id!)}
@@ -522,6 +578,19 @@ export default function ConnectorsManager({
                       </button>
                     </div>
                   </div>
+                  {c.id && editingPolicies === c.id && (
+                    <McpToolPoliciesEditor
+                      workspaceId={workspaceId}
+                      connectorId={c.id}
+                      connectorName={c.displayName}
+                      onCancel={() => setEditingPolicies(null)}
+                      onSaved={(mapped) => {
+                        setEditingPolicies(null);
+                        setConnectors((prev) => prev.map((x) => (x.id === c.id ? { ...x, mappedTools: mapped } : x)));
+                        setNotice({ kind: "ok", message: `Saved tool groups for "${c.displayName}".` });
+                      }}
+                    />
+                  )}
                   {c.id && editingReadOnly === c.id && (
                     <McpReadOnlyToolsEditor
                       workspaceId={workspaceId}

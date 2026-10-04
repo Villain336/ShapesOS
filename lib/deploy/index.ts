@@ -16,6 +16,7 @@ import { MockVercelDeployTarget } from "./mock-vercel";
 import { MockCloudflarePagesDeployTarget } from "./mock-cloudflare";
 import { NetlifyDeployTarget } from "./netlify";
 import { MockNetlifyDeployTarget } from "./mock-netlify";
+import { assertFakeProviderAllowed } from "@/lib/env/secrets";
 import type {
   CloudflareConfig,
   DeployFile,
@@ -55,6 +56,8 @@ export function deployTargetEnum(slug: string): "vercel" | "cloudflare_pages" | 
  */
 export function buildDeployTarget(kind: DeployTargetKind, raw: Record<string, unknown>): DeployTarget {
   const demo = raw.demo === true;
+  // Phase 11 (conncore): a demo (mock) deploy target never "deploys" in production.
+  if (demo) assertFakeProviderAllowed("demo hosting");
   const s = (k: string) => String(raw[k] ?? "").trim();
   if (kind === "vercel") {
     const vcfg: VercelConfig = { token: s("token"), projectId: s("projectId"), teamId: s("teamId"), demo };
