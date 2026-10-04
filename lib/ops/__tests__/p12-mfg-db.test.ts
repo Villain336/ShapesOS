@@ -16,6 +16,14 @@ import { OPS_ENTITY_MAP } from "../entities";
 import { OpsError, opsCreate, opsPatch, type OpsActor } from "../doctype";
 import { opsBindingFor } from "../gate";
 import { completeMo, linkCadPart, productBom } from "../mfg/service";
+import { __setOpsToolsTestGatePort } from "@/lib/chat/ops-tools";
+import {
+  completeManufacturingOrderCore,
+  confirmManufacturingOrderCore,
+  createManufacturingOrderCore,
+  listManufacturingOrdersCore,
+  logWorkTimeCore,
+} from "@/lib/chat/ops-mfgpos-tools";
 
 const WS = "p12mfg-ws-a";
 const WS_B = "p12mfg-ws-b";
@@ -300,6 +308,30 @@ describe("p12 manufacturing (real Postgres, app role)", () => {
       inA((tx) => opsCreate(tx, def("scraps"), A, { productId: chair, qty: 999, locationId: fg, reason: "x", approvalId: "nope" })),
       "an unknown approval never executes",
     );
+  });
+
+  it("agent tools: a draft is free; confirm and complete only propose (nothing moves)", async () => {
+    __setOpsToolsTestGatePort({ propose: async () => ({ id: "appr_tool", status: "pending", riskTier: "high" }), getApproval: async () => { throw new Error("unused"); } });
+    try {
+      const draft = await inA((tx) => createManufacturingOrderCore(tx, A, { productId: chair, qty: "1", componentLocationId: raw, finishedLocationId: fg }));
+      const id = String((draft.details as { id: string }).id);
+      const proposed = await inA((tx) => confirmManufacturingOrderCore(tx, A, { id }));
+      assert.equal((proposed.details as { approvalRequired: boolean }).approvalRequired, true);
+      assert.equal((await inA((tx) => tx.opsManufacturingOrder.findFirstOrThrow({ where: { id } }))).status, "draft");
+      await gatedMoPatch(id, { status: "confirmed" }, "OPS_MO_CONFIRM");
+      const [wo] = await inA((tx) => tx.opsWorkOrder.findMany({ where: { moId: id }, orderBy: { sequence: "asc" } }));
+      const logged = await inA((tx) => logWorkTimeCore(tx, A, { workOrderId: wo!.id, minutes: "15" }));
+      assert.match(logged.summary, /15 min/);
+      const legBefore = await stockOf(leg);
+      const complete = await inA((tx) => completeManufacturingOrderCore(tx, A, { id, producedQty: "1" }));
+      assert.equal((complete.details as { approvalRequired: boolean }).approvalRequired, true);
+      assert.equal((await inA((tx) => tx.opsManufacturingOrder.findFirstOrThrow({ where: { id } }))).status, "confirmed");
+      assert.equal(await stockOf(leg), legBefore, "a proposal moves no stock");
+      const list = await inA((tx) => listManufacturingOrdersCore(tx, A, { status: "confirmed" }));
+      assert.ok((list.details as { rows: Array<{ id: string }> }).rows.some((r) => r.id === id));
+    } finally {
+      __setOpsToolsTestGatePort(null);
+    }
   });
 
   it("RLS: workspace B sees none of A's manufacturing rows; no GUC sees nothing; WITH CHECK blocks cross-tenant inserts", async () => {

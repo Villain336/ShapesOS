@@ -17,6 +17,8 @@ import { opsBindingFor } from "../gate";
 import { quoteSale, recordPosSale, receiptDoc, sessionSummary, type PosSaleInput } from "../pos/service";
 import { newClientOrderId } from "../pos/rules";
 import { renderFinancePdf } from "../finance/pdf";
+import { __setOpsToolsTestGatePort } from "@/lib/chat/ops-tools";
+import { closePosSessionCore, posOverviewCore } from "@/lib/chat/ops-mfgpos-tools";
 
 const WS = "p12pos-ws-a";
 const WS_B = "p12pos-ws-b";
@@ -164,6 +166,20 @@ describe("p12 point of sale (real Postgres, app role)", () => {
       throw new Error("proposed");
     }), /proposed/, "closing without an approval only proposes it");
     assert.equal((await inA((tx) => tx.opsPosSession.findFirstOrThrow({ where: { id: session } }))).status, "closing");
+  });
+
+  it("agent tools: the overview reads the count; closing only proposes", async () => {
+    const ov = await inA((tx) => posOverviewCore(tx, A));
+    assert.match(ov.summary, /0\.44 short/);
+    __setOpsToolsTestGatePort({ propose: async () => ({ id: "appr_tool", status: "pending", riskTier: "high" }), getApproval: async () => { throw new Error("unused"); } });
+    try {
+      const r = await inA((tx) => closePosSessionCore(tx, A, { sessionId: session }));
+      assert.equal((r.details as { approvalRequired: boolean }).approvalRequired, true);
+    } finally {
+      __setOpsToolsTestGatePort(null);
+    }
+    assert.equal((await inA((tx) => tx.opsPosSession.findFirstOrThrow({ where: { id: session } }))).status, "closing");
+    assert.equal(await inA((tx) => tx.opsJournalEntry.count({ where: { sourceType: "pos_session" } })), 0);
   });
 
   it("the approved close posts ONE balanced entry: sales, tax, cash, card clearing, cash short", async () => {
