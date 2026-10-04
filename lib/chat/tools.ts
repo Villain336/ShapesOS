@@ -77,6 +77,12 @@ export interface ToolResult {
   details?: unknown;
 }
 
+/**
+ * Phase 8: a tool that appended its own (richer) run event sets
+ * details[TOOL_RECORDED_EVENT] = true so the loop doesn't record it twice.
+ */
+export const TOOL_RECORDED_EVENT = "recordedRunEvent";
+
 export interface ToolArgSchema {
   type: string;
   description: string;
@@ -1069,6 +1075,19 @@ export const TOOL_GROUP: Readonly<Record<string, ToolGroup>> = {
   ops_approve_leave: "ops",
   ops_launch_workflow: "ops",
   delegate_to_subagent: "delegate",
+  // Phase 8 (ship): local git work in the run's sandbox is "code"; anything
+  // that leaves the sandbox is "ship" (lib/ship/tools.ts).
+  git_clone: "code",
+  git_status: "code",
+  git_diff: "code",
+  git_commit: "code",
+  git_push_branch: "ship",
+  open_pull_request: "ship",
+  read_pr_feedback: "ship",
+  // Phase 8: recorded browser tools (lib/agents/runs/browser-tools.ts).
+  browser_open: "web",
+  browser_extract: "web",
+  browser_act: "web",
 };
 
 /**
@@ -1096,6 +1115,10 @@ export const TOOL_ACTION: Readonly<Record<string, string>> = {
   ops_mark_invoice_paid: "mark_invoice_paid",
   ops_approve_leave: "approve_leave",
   ops_launch_workflow: "launch_workflow",
+  // Phase 8: Tier 2 — always asks (lib/automation/actions.ts).
+  git_push_branch: "push_branch",
+  open_pull_request: "open_pr",
+  browser_act: "browser_act",
 };
 
 /** The group a tool belongs to. Unknown tools fall in "connectors" (fail closed). */

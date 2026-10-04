@@ -43,6 +43,7 @@ import {
   allTools,
   getTool,
   registerExtraTool,
+  TOOL_RECORDED_EVENT,
   toolAction,
   toolCatalogForPrompt,
   toolGranted,
@@ -75,6 +76,10 @@ import { getEnabledProjectSkills } from "@/lib/skills/service";
 import { skillManifestSection } from "@/lib/skills/disclosure";
 import { connectorToolsSection, resolveConnectorTool } from "./connector-tools";
 import { captureEpisode } from "@/lib/agents/learning/capture";
+// Phase 8: ship tools (git in the sandbox → push → PR) and recorded browser
+// tools register themselves with the tool registry on import.
+import "@/lib/ship/tools";
+import "@/lib/agents/runs/browser-tools";
 // Phase 10 M9: Expert Constitution Pack v1 — the Chief Strategy Agent's
 // system-prompt layer (global hard rules + CSA constitution), wired in
 // front of all project context and retrieval grounding.
@@ -545,11 +550,15 @@ async function executeTool(
     call.resultSummary = result.summary;
     collectDelegated(call, result);
     await auditToolExecution(ctx, tool, result.summary, autoReason);
-    await runEvent(ctx, `${tool.name}: ${result.summary}`, {
-      tool: tool.name,
-      ...(autoReason ? { autoApproved: autoReason } : {}),
-      ...approvalRef(result),
-    });
+    // Phase 8: a tool that recorded its own (richer) run event — the ship and
+    // browser tools — is not recorded twice.
+    if (!recordedOwnEvent(result)) {
+      await runEvent(ctx, `${tool.name}: ${result.summary}`, {
+        tool: tool.name,
+        ...(autoReason ? { autoApproved: autoReason } : {}),
+        ...approvalRef(result),
+      });
+    }
   } catch (err) {
     if (isRunStopped(err)) {
       call.status = "cancelled";
@@ -561,6 +570,11 @@ async function executeTool(
     await auditToolExecution(ctx, tool, `FAILED: ${call.resultSummary}`, autoReason);
     await runEvent(ctx, `${tool.name} failed: ${call.resultSummary}`, { tool: tool.name });
   }
+}
+
+function recordedOwnEvent(result: ToolResult): boolean {
+  const d = result.details as Record<string, unknown> | undefined;
+  return !!d && d[TOOL_RECORDED_EVENT] === true;
 }
 
 /** Keep the approval a tool raised on the run timeline (so Stop can expire it). */
@@ -716,7 +730,7 @@ async function saveMessage(
   return msg.id;
 }
 
-async function pendingProposal(threadId: string): Promise<ChatToolCall[] | null> {
+export async function pendingProposal(threadId: string): Promise<ChatToolCall[] | null> {
   const lastAssistant = await prisma.aiChatMessage.findFirst({
     where: { threadId, role: "assistant" },
     orderBy: { createdAt: "desc" },
