@@ -365,3 +365,25 @@ describe("pay-run totals, journal and digest", () => {
     assert.notEqual(payRunDigest(run, [a, b]), payRunDigest({ ...run, payDate: D("2026-03-21") }, [a, b]));
   });
 });
+
+describe("payroll and event tools: never automated where it matters", () => {
+  it("approving and posting payroll are Tier 3; drafting is Tier 0; event writes always ask", async () => {
+    const { evaluateTier } = await import("@/lib/orchestrator/authority");
+    const { TOOL_ACTION, TOOL_GROUP } = await import("@/lib/chat/tools");
+    const { OPS_TOOLS } = await import("@/lib/chat/ops-tools");
+    const { KNOWN_ACTION_DEFS } = await import("@/lib/automation/actions");
+    const settings = { smallActionThresholdCents: 10_000, automationAllows: true };
+    assert.equal(evaluateTier({ kind: TOOL_ACTION.ops_payroll_request_approval! }, settings), 3);
+    assert.equal(evaluateTier({ kind: TOOL_ACTION.ops_payroll_request_posting! }, settings), 3);
+    assert.equal(evaluateTier({ kind: TOOL_ACTION.ops_payroll_draft_run! }, settings), 0);
+    assert.equal(evaluateTier({ kind: TOOL_ACTION.ops_events_create_event! }, settings), 2);
+    const names = OPS_TOOLS.map((t) => t.name);
+    for (const n of ["ops_payroll_overview", "ops_payroll_draft_run", "ops_payroll_request_approval", "ops_payroll_request_posting", "ops_events_overview", "ops_events_create_event", "ops_events_register"]) {
+      assert.ok(names.includes(n), n);
+      assert.ok(TOOL_GROUP[n], `${n} group`);
+    }
+    for (const n of names.filter((x) => x.startsWith("ops_payroll"))) assert.equal(OPS_TOOLS.find((t) => t.name === n)!.minRole, "admin", n);
+    const known = new Set(KNOWN_ACTION_DEFS.map((d) => d.action));
+    for (const a of ["draft_pay_run", "approve_pay_run", "post_pay_run", "write_event"]) assert.ok(known.has(a), a);
+  });
+});
