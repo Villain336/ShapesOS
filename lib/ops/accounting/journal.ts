@@ -251,13 +251,13 @@ export interface JournalListQuery {
 }
 
 export async function listJournal(tx: Tx, workspaceId: string, q: JournalListQuery = {}): Promise<JournalEntryView[]> {
-  const where: Prisma.OpsJournalEntryWhereInput = { workspaceId };
+  const where: Prisma.OpsJournalEntryWhereInput = {};
   if (q.from || q.to) where.entryDate = { ...(q.from ? { gte: q.from } : {}), ...(q.to ? { lte: q.to } : {}) };
   if (q.sourceType) where.sourceType = q.sourceType;
   if (q.sourceId) where.sourceId = q.sourceId;
   if (q.accountId) where.lines = { some: { accountId: q.accountId } };
   const rows = await tx.opsJournalEntry.findMany({
-    where,
+    where: { ...where, workspaceId },
     include: ENTRY_INCLUDE,
     orderBy: [{ entryDate: "desc" }, { createdAt: "desc" }],
     take: Math.min(Math.max(q.limit ?? 50, 1), 200),

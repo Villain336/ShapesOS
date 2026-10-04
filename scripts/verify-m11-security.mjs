@@ -214,7 +214,7 @@ const missingAllowList = Object.keys(PUBLIC_BY_DESIGN).filter(k => {
 ok("every public-by-design entry maps to a real route file", missingAllowList.length === 0, missingAllowList.join("; "));
 ok(
   "public-by-design allow-list is documented",
-  Object.keys(PUBLIC_BY_DESIGN).length === 35 && // Phase 9 (repos): +1 app/api/hooks/github
+  Object.keys(PUBLIC_BY_DESIGN).length === 36 && // Phase 9 (repos): +1 app/api/hooks/github; Phase 10 (finance): +1 tenant Stripe webhook
     Object.values(PUBLIC_BY_DESIGN).every(v => v.length > 20)
 );
 

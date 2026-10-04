@@ -160,13 +160,13 @@ export async function loadAccountSums(
   workspaceId: string,
   range: { from?: Date; to?: Date },
 ): Promise<Map<string, AccountSums>> {
-  const where: Prisma.OpsJournalLineWhereInput = { workspaceId };
+  const where: Prisma.OpsJournalLineWhereInput = {};
   if (range.from || range.to) {
     where.entryDate = { ...(range.from ? { gte: range.from } : {}), ...(range.to ? { lte: range.to } : {}) };
   }
   const grouped = await tx.opsJournalLine.groupBy({
     by: ["accountId"],
-    where,
+    where: { ...where, workspaceId },
     _sum: { debitCents: true, creditCents: true },
   });
   return new Map(
