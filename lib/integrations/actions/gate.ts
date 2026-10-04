@@ -444,6 +444,13 @@ export interface ExecuteApprovedInput {
  *  - failed execution reverts to "approved" (retry allowed) with an audit
  *    event; the failure is still logged.
  */
+/** appKeys whose approvals run from their own surface, never via Composio. */
+const INTERNAL_APPROVAL_HOMES: Record<string, string> = {
+  hosting: "run this rollback from the site's deployment list (Sites → Hosting).",
+  ops: "this operations action runs from where it was proposed (Ops, or the agent that asked).",
+  apps: "run this mini-app action again from the app (or the agent that asked).",
+};
+
 export async function executeApproved(input: ExecuteApprovedInput) {
   const approval = await withWorkspaceScope(input.workspaceId, (tx) =>
     tx.composioActionApproval.findFirst({
@@ -451,11 +458,12 @@ export async function executeApproved(input: ExecuteApprovedInput) {
     }),
   );
   if (!approval) throw new NotFoundError("Approval not found");
-  // Phase 9 (sites): a hosting rollback is approved here but runs from the
-  // site's deployment list (lib/deploy/rollback.ts) — it is not a Composio
-  // tool. Refuse BEFORE the claim so the approval stays usable there.
-  if (approval.appKey === "hosting") {
-    throw new ConflictError("Cannot execute here: run this rollback from the site's deployment list (Sites → Hosting).");
+  // Phase 9: approvals raised by ShapesOS's own gates share this table but
+  // are not Composio tools — they run where they were proposed. Refuse
+  // BEFORE the claim so the approval stays usable there.
+  const internal = INTERNAL_APPROVAL_HOMES[approval.appKey];
+  if (internal) {
+    throw new ConflictError(`Cannot execute here: ${internal}`);
   }
   if (approval.status === "executed") {
     throw new ConflictError("Cannot execute: approval already executed (replay blocked)");

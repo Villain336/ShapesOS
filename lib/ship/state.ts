@@ -89,7 +89,14 @@ export async function findRunState<T>(q: ShipLookup, read: (agentState: unknown)
 }
 
 /** Merge one key into a run's agentState (Phase 9: shared by ship + sites). */
-export async function mergeRunState(workspaceId: string, runId: string, key: string, value: unknown): Promise<void> {
+export async function mergeRunState(
+  workspaceId: string,
+  runId: string,
+  key: string,
+  value: unknown,
+  /** Runs in the same transaction after the write (ship: PR routing index). */
+  after?: (tx: Prisma.TransactionClient, run: { threadId: string | null }) => Promise<void>,
+): Promise<void> {
   await withWorkspaceScope(workspaceId, async (tx) => {
     const run = await tx.agentRun.findFirst({ where: { id: runId, workspaceId }, select: { agentState: true, threadId: true } });
     if (!run) throw new Error("Run not found");
@@ -101,8 +108,7 @@ export async function mergeRunState(workspaceId: string, runId: string, key: str
       where: { id: runId, workspaceId },
       data: { agentState: { ...base, [key]: value } as unknown as Prisma.InputJsonValue },
     });
-    // Phase 9 (repos): pushed work is indexed for GitHub feedback routing.
-    await syncPullRequestFromShip(tx, workspaceId, run.threadId, state);
+    if (after) await after(tx, run);
   });
 }
 
@@ -113,5 +119,8 @@ export function loadShipState(q: ShipLookup): Promise<ShipState | null> {
 
 /** Write the ship state onto a run (merged into its agentState). */
 export async function saveShipState(workspaceId: string, runId: string, state: ShipState): Promise<void> {
-  await mergeRunState(workspaceId, runId, "ship", { ...state });
+  await mergeRunState(workspaceId, runId, "ship", { ...state }, (tx, run) =>
+    // Phase 9 (repos): pushed work is indexed for GitHub feedback routing.
+    syncPullRequestFromShip(tx, workspaceId, run.threadId, state),
+  );
 }
