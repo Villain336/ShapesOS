@@ -11,14 +11,19 @@
 //   T2 legacy LLM_MODEL honored as bulk-only override, never copy
 //   T3 no key material in errors, status payloads, or fallback warnings
 //   T7 mock honesty (isLive=false, labeled) and loud fallback warnings
+//   T9 failover (Phase 6) only to allow-listed, keyed, non-blocked models
+//   T10 single-key mode (Phase 6) only for DEFAULT choices, never env ones
 // Plus: routing correctness per workload, self-host Qwen gating,
 // back-compat getLlmProvider()/llmStatus() contract shapes.
 
 import {
   getLlmProviderFor,
   llmRoutingStatus,
+  resolveWorkload,
   resolveWorkloadModel,
+  isRoutableHostedModel,
   ANTHROPIC_ZDR_MODELS,
+  FAMILY_WORKLOAD_DEFAULTS,
   OPENAI_ZDR_MODELS,
   WORKLOAD_DEFAULTS,
 } from "../lib/llm/router.js";
@@ -55,6 +60,8 @@ function cleanEnv() {
     "LLM_BASE_URL",
     "ANTHROPIC_API_KEY",
     "LLM_SELF_HOST",
+    "LLM_FAILOVER",
+    "LLM_TIMEOUT_MS",
   ]) {
     delete process.env[k];
   }
@@ -330,6 +337,78 @@ ok(
   (OPENAI_ZDR_MODELS as readonly string[]).includes("gpt-5-nano") &&
     (OPENAI_ZDR_MODELS as readonly string[]).includes("gpt-5-nano:flex"),
 );
+
+// ================= 8. single-key mode (Phase 6, T10) =================
+section("single-key mode (T10)");
+
+cleanEnv();
+process.env.OPENAI_API_KEY = "sk-test-key";
+{
+  const st = llmRoutingStatus();
+  ok("OpenAI-only: copy is live", st.copy.isLive === true);
+  ok("OpenAI-only: copy routed to the OpenAI copy default", st.copy.model === FAMILY_WORKLOAD_DEFAULTS.openai.copy);
+  ok("OpenAI-only: copy source stays default", st.copy.source === "default");
+  ok("OpenAI-only: swap is explained", typeof st.copy.singleKey === "string" && /ANTHROPIC_API_KEY/.test(st.copy.singleKey));
+  ok("OpenAI-only: bulk untouched", st.bulk.model === "gpt-5-nano" && st.bulk.singleKey === null);
+}
+
+cleanEnv();
+process.env.ANTHROPIC_API_KEY = "sk-ant-test-key";
+{
+  const st = llmRoutingStatus();
+  ok("Anthropic-only: bulk live on claude-haiku-4-5", st.bulk.isLive && st.bulk.model === "claude-haiku-4-5");
+  ok("Anthropic-only: background live on claude-haiku-4-5", st.background.isLive && st.background.model === "claude-haiku-4-5");
+}
+
+cleanEnv();
+process.env.OPENAI_API_KEY = "sk-test-key";
+process.env.LLM_MODEL_COPY = "claude-haiku-4-5";
+ok("explicit env model is never swapped (mock)", getLlmProviderFor("copy").name === "mock");
+
+cleanEnv();
+process.env.LLM_API_KEY = "";
+process.env.OPENAI_API_KEY = "sk-test-key";
+ok("empty LLM_API_KEY does not mask OPENAI_API_KEY", getLlmProviderFor("bulk").name === "openai-compatible");
+
+cleanEnv();
+process.env.LLM_SELF_HOST = "1";
+process.env.LLM_API_KEY = "dummy";
+ok("single-key mode off under self-host", resolveWorkload("copy").singleKey === null);
+
+// ================= 9. failover (Phase 6, T9) =================
+section("failover arming (T9)");
+
+for (const fam of ["anthropic", "openai"] as const) {
+  for (const w of ["copy", "bulk", "background"] as const) {
+    ok(`family default ${fam}/${w} is routable`, isRoutableHostedModel(FAMILY_WORKLOAD_DEFAULTS[fam][w]));
+  }
+}
+for (const killed of ["deepseek-flash", "gemini-3.8-flash", "qwen3.8-27b", "gpt-4o-mini", "claude-fable-5"]) {
+  ok(`${killed} can never be a fallback`, !isRoutableHostedModel(killed));
+}
+
+cleanEnv();
+process.env.ANTHROPIC_API_KEY = "sk-ant-test-key";
+process.env.OPENAI_API_KEY = "sk-test-key";
+{
+  const st = llmRoutingStatus();
+  ok("both keys: copy fails over to OpenAI", st.copy.failover === FAMILY_WORKLOAD_DEFAULTS.openai.copy);
+  ok("both keys: bulk fails over to Anthropic", st.bulk.failover === "claude-haiku-4-5");
+  ok("both keys: provider still reports the primary", getLlmProviderFor("copy").name === "anthropic");
+}
+process.env.LLM_FAILOVER = "0";
+ok("LLM_FAILOVER=0 disarms failover", llmRoutingStatus().bulk.failover === null);
+
+cleanEnv();
+process.env.ANTHROPIC_API_KEY = "sk-ant-test-key";
+ok("one key: no failover armed", llmRoutingStatus().copy.failover === null);
+
+cleanEnv();
+process.env.LLM_SELF_HOST = "1";
+process.env.LLM_API_KEY = "dummy";
+process.env.ANTHROPIC_API_KEY = "sk-ant-test-key";
+process.env.LLM_MODEL_BULK = "qwen3.8-27b";
+ok("self-host: never fails over to a hosted vendor", llmRoutingStatus().bulk.failover === null);
 
 // back-compat: getLlmProvider() still resolves bulk
 cleanEnv();

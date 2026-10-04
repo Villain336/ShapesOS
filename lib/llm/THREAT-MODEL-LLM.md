@@ -127,8 +127,68 @@ coverage, length) — it explicitly does NOT measure copy quality. The script's
 header and output both state this so a passing score is never presented as
 "Qwen is good enough for client copy."
 
+## Phase 6 additions (2026-10-04): reliability, failover, single-key mode
+
+### Adapter reliability (`openai.ts`, `anthropic.ts`, `errors.ts`)
+- Every adapter error is an `LlmProviderError` with a `kind`:
+  `rate_limit` (429) / `server` (5xx, unreadable body) / `timeout` /
+  `network` are **retryable**; `client` (other 4xx) and `empty` are not.
+  Messages carry provider, HTTP status and a whitelisted machine code only —
+  never the key and never the response body (OpenAI echoes partial keys in
+  auth-error text) (T3).
+- OpenAI-compatible: per-attempt timeout (120 s; 15 min for `:flex`;
+  `LLM_TIMEOUT_MS` overrides), the caller's AbortSignal (Phase 5 Stop) is
+  combined with it and surfaces as the abort itself. ONE bounded retry with
+  backoff, honouring `Retry-After` / `retry-after-ms` up to 30 s — a longer
+  wait hands over to failover instead of stalling a run.
+- GPT-5 family / o-series: no `temperature`, `max_completion_tokens` instead
+  of `max_tokens`. `gpt-5-nano:flex` is sent as `gpt-5-nano` with
+  `service_tier: "flex"`. Self-host keeps `max_tokens` + `temperature` and
+  never strips a `:tag` (Ollama names use one).
+- Anthropic: SDK retries bounded to 1 (it honours Retry-After), 120 s
+  timeout, errors classified the same way.
+
+### T9 — Cross-vendor failover sends the prompt to a second vendor (MEDIUM)
+Abuse: a failover silently routes client data to a vendor the operator did
+not choose, or to a blocked / non-ZDR model.
+
+Mitigations (`router.ts`, `failover.ts`):
+- Fallback model = the other family's default for the same workload
+  (`FAMILY_WORKLOAD_DEFAULTS`), and it must pass `isRoutableHostedModel`:
+  the hard block-list AND the ZDR allow-list. A blocked or unlisted model is
+  never a fallback (battery asserts every family default is routable).
+- Armed only when that family's key is configured — both vendors were
+  deliberately configured by the operator.
+- Fires only on retryable errors, after the adapter's own retry; never on
+  the caller's abort and never on other 4xx (a rejected request is not
+  re-sent to anyone).
+- Every failover logs `[llm-router] workload=… model="…" failed: <kind>
+  (HTTP n) → failing over to "…"` (no key material); the last event per
+  workload is kept in-process (`lastFailover`). `llmRoutingStatus()`
+  shows the armed failover model per workload in Settings → Providers.
+- Off with `LLM_FAILOVER=0`, and never with `LLM_SELF_HOST=1` (a self-host
+  operator chose to keep prompts on-box; see SELF-HOST.md).
+
+### T10 — Single-key mode substitutes a model (LOW)
+With one key, workloads whose model came from the **default** use the other
+family's default instead of mock (e.g. only `OPENAI_API_KEY`: copy runs on
+`gpt-5.4-nano`). Bounds:
+- Applies to `source: "default"` only. An explicit `LLM_MODEL_*` (or legacy
+  `LLM_MODEL`) is never swapped — it still falls back to mock, loudly (T2).
+- The substitute passes the same block-list + ZDR allow-list check.
+- Not applied with `LLM_SELF_HOST=1`.
+- Visible: `llmRoutingStatus()[w].singleKey` explains the swap, and the
+  Settings → Providers "What's running on mock data" list is built from the
+  same status plus real env checks (`lib/providers/mock-inventory.ts`).
+- Key lookup uses the first NON-EMPTY of `LLM_API_KEY` / `OPENAI_API_KEY`:
+  an empty `LLM_API_KEY=""` copied from `.env.example` used to mask
+  `OPENAI_API_KEY` (`??`), silently putting every OpenAI workload on mock.
+
 ## Out of scope (documented, not built)
 
 - Token-level metering against the Phase C ledger.
 - Per-workspace model allow-lists / admin UI for routing config.
 - Live adapter testing (Tico's separate track; this phase is offline/mock-only).
+  Phase 6 adapter behaviour is proven against stub fetches / fake providers
+  only (`lib/llm/__tests__`); it is UNVERIFIED against the live APIs.
+- `chat()`, tool use, streaming, new allow-listed models: Phase 7.

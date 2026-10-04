@@ -8,14 +8,18 @@
 // getLlmProvider() is kept for back-compat and now resolves the "bulk"
 // workload (the old single-provider default), honoring legacy LLM_MODEL as a
 // bulk override. llmStatus() keeps its old top-level shape (based on bulk,
-// the historical default) and adds per-workload routing detail.
+// the historical default) and adds per-workload routing detail: the routed
+// model, live/mock with the reason, single-key substitution and the armed
+// failover model (Phase 6). Settings → Providers renders it.
 
 import { getLlmProviderFor, llmRoutingStatus, resolveWorkload } from "./router";
 import type { LlmProvider } from "./types";
 import type { LlmWorkload } from "./router";
 
 export type { LlmProvider, LlmWorkload };
+export type { LlmWorkloadStatus } from "./router";
 export { getLlmProviderFor, llmRoutingStatus, WORKLOAD_DEFAULTS, WORKLOAD_MAX_TOKENS } from "./router";
+export { LlmProviderError, isRetryableLlmError } from "./errors";
 
 /** Back-compat factory. Resolves the "bulk" workload (the pre-D default). */
 export function getLlmProvider(): LlmProvider {

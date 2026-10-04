@@ -32,13 +32,24 @@ pointed at the hosted default (`claude-haiku-4-5`).
 ## API fallback for chained tool sequences
 
 The self-host model is validated for single-shot tool calling, not long
-chained agentic sequences. For the agent loop / skill runs, keep an API
-fallback available: if `getLlmProviderFor("bulk").generate()` throws on the
-self-hosted endpoint, callers may retry once against the hosted bulk default
-(`gpt-5-nano`) before failing. This is a caller-side pattern, intentionally
-not built into the router — the router never silently substitutes vendors
-(T2). Implement the retry where the loop lives (`lib/chat/agent.ts`,
-`lib/seo/autopilot-service.ts`) when self-host is adopted.
+chained agentic sequences. The router's automatic failover (Phase 6) is
+**off under `LLM_SELF_HOST=1`**: choosing self-host means prompts stay on
+your box, so the router never sends them to a hosted vendor on its own.
+Single-key mode is off too — name every workload's model explicitly.
+
+If you want a hosted safety net for the agent loop, opt in at the caller:
+retry once against the hosted bulk default (`gpt-5-nano`) where the loop
+lives (`lib/chat/agent.ts`, `lib/seo/autopilot-service.ts`).
+
+## Request shape and timeouts
+
+With `LLM_SELF_HOST=1` the OpenAI-compatible adapter sends the classic
+shape vLLM and Ollama accept (`max_tokens`, `temperature`) and keeps any
+`:tag` in the model name (Ollama: `qwen3:27b`). Hosted OpenAI gets
+`max_completion_tokens` and no `temperature` for GPT-5 / o-series. Each
+attempt times out after 120 s; CPU-only servers are slower — set
+`LLM_TIMEOUT_MS` (e.g. `600000`). Timeouts, 429 and 5xx get one retry with
+backoff.
 
 ## ZDR posture
 
