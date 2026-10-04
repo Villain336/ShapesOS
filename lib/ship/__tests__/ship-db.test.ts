@@ -18,6 +18,7 @@ import * as path from "node:path";
 import { prisma } from "@/lib/prisma";
 import { countWithoutScope, withWorkspaceScope } from "@/lib/substrate/memory/rls";
 import { createAgentRun, listAgentRunEvents } from "@/lib/agents/runs/service";
+import { isStreamEvent } from "@/lib/agents/runs/usage";
 import { getRepoProfile, saveRepoProfile } from "@/lib/sandbox/repo-profile";
 import { MockGitHubConnector } from "@/lib/connectors/mock-github";
 import { createShipTools, defaultShipDeps, type ShipDeps } from "../tools";
@@ -170,7 +171,13 @@ describe("ship tools on a real run", () => {
     assert.equal(follow?.threadId, threadId);
     assert.equal(readShipState(follow?.agentState)?.branchUrl, `https://github.com/acme/site/tree/shapes/${runId}`);
     const pushed = (await listAgentRunEvents(WS_A, out.followUpRunId!)).filter((e) => (e.payload as { tool?: string } | null)?.tool === "git_push_branch");
-    assert.equal(pushed.length, 1, "one event (the tool's own, not a duplicate)");
+    // One timeline event (the tool's own); the loop's tool_result for the same
+    // call is kept for the live stream only and hidden from the timeline.
+    assert.equal(pushed.filter((e) => !isStreamEvent(e)).length, 1, "one timeline event (the tool's own, not a duplicate)");
+    assert.ok(pushed.filter(isStreamEvent).every((e) => (e.payload as { recorded?: unknown }).recorded === true));
+    // The Changes review still finds the patch (not the newer patch-less stream event).
+    const after = await loadRunReview(WS_A, out.followUpRunId!);
+    assert.ok(after?.changes && after.changes.files.length > 0, "Changes review reads the tool's own event");
     const gate = (await listAgentRunEvents(WS_A, runId)).find((e) => e.type === "gate" && /Approved git push branch/.test(e.summary));
     assert.ok(gate, "the approval is on the reviewed run's timeline");
     const msgs = await prisma.aiChatMessage.findMany({ where: { threadId, role: "user" }, select: { content: true } });

@@ -81,15 +81,19 @@ export async function loadRunReview(workspaceId: string, runId: string): Promise
         ship ??= readShipState(r.agentState);
       }
     }
-    const event = await tx.agentRunEvent.findFirst({
+    // The newest event that carries a patch: the tool's own event. (The
+    // loop's live-stream tool_result event for the same call has none.)
+    const candidates = await tx.agentRunEvent.findMany({
       where: {
         workspaceId,
         runId: { in: ids },
         OR: PATCH_TOOLS.map((t) => ({ payload: { path: ["tool"], equals: t } })),
       },
       orderBy: [{ createdAt: "desc" }, { seq: "desc" }],
+      take: 20,
       select: { runId: true, payload: true, createdAt: true },
     });
+    const event = candidates.find((e) => typeof (e.payload as { patch?: unknown } | null)?.patch === "string") ?? null;
     return { run, ship, event };
   });
   if (!found) return null;
