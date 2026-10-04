@@ -412,7 +412,12 @@ describe("Phase 5 agent controls (Phase 8 native loop, fake Responses API)", () 
     const d = byTool(out.toolCalls, "delegate_to_subagent");
     assert.equal(d.status, "executed");
     assert.match(d.resultSummary ?? "", /Analyst was stopped before it finished/);
-    assert.equal(d.delegated?.[0]?.status, "cancelled", "the sub-agent's next tool never ran");
+    // The stop lands either while the sub-agent's model call is in flight (it
+    // is aborted, so no tool is ever proposed) or just after it returns (the
+    // proposed tool is cancelled before it runs) — both are a correct stop.
+    // What must hold: nothing the sub-agent asked for ran.
+    const childCalls = d.delegated ?? [];
+    assert.ok(childCalls.every((c) => c.status === "cancelled"), `the sub-agent's next tool never ran (${JSON.stringify(childCalls.map((c) => [c.tool, c.status]))})`);
     assert.equal((await getAgentRun(WS_A, child!.id))?.status, "cancelled");
     assert.equal((await getAgentRun(WS_A, out.runId))?.status, "succeeded");
   });
