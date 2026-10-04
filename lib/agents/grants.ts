@@ -188,6 +188,10 @@ export function connectorGroup(connectorKey: string): ToolGroup {
       return "web";
     case "hubspot": // Phase 11 (conncore): CRM sync is business operations
       return "ops";
+    // Phase 11 (devtools): issue trackers are project operations ("code" is
+    // the sandbox runner and is unavailable without one).
+    case "linear":
+      return "ops";
     case "google-search-console":
     case "ga4":
     case "google-ads":
@@ -226,6 +230,11 @@ export function connectorAction(connectorKey: string, tool: string): string {
     // Phase 11 (conncore): a HubSpot pull writes your CRM records.
     case "hubspot.sync_from_hubspot":
       return "write_crm_record";
+    // Phase 11 (devtools): issue writes are project records — Tier 2, always asks.
+    case "linear.create_issue":
+    case "linear.update_issue":
+    case "linear.add_comment":
+      return "write_project_record";
     default:
       return "connector_write";
   }

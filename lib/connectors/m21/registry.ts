@@ -1,6 +1,6 @@
 // Marketr — M21 built-in connector registry (spec §7, §11).
 //
-// DESIGN DECISION (recorded in prisma/schema.prisma): the 18 built-in
+// DESIGN DECISION (recorded in prisma/schema.prisma): the 19 built-in
 // connectors are CODE-defined here, not DB rows. (The count is pinned by
 // lib/connectors/m21/__tests__/registry.test.ts — update both together.) `Connector` rows exist
 // ONLY for workspace-custom MCP servers (kind=mcp). Do not create DB rows
@@ -57,6 +57,9 @@ export const MICROSOFT_CALENDAR_SCOPES = [
   "https://graph.microsoft.com/User.Read",
   "https://graph.microsoft.com/Calendars.ReadWrite",
 ];
+// Phase 11 (devtools): work-tool connector scopes. Shared with lib/vault/oauth.ts.
+// Linear: read + write (issue create/update and comments need write).
+export const LINEAR_SCOPES = ["read", "write"];
 
 export const BUILT_IN_CONNECTORS: BuiltinConnectorMeta[] = [
   {
@@ -261,6 +264,18 @@ export const BUILT_IN_CONNECTORS: BuiltinConnectorMeta[] = [
     },
     authNote: "HubSpot public app OAuth (CRM objects read/write).",
   },
+  // Phase 11 (devtools): Linear issues, projects and comments (gated writes).
+  {
+    key: "linear",
+    displayName: "Linear",
+    authType: "oauth2",
+    description: "List and search Linear teams, projects and issues; create or update issues and comment after you confirm.",
+    oauth: {
+      scopes: LINEAR_SCOPES,
+      envVars: ["LINEAR_OAUTH_CLIENT_ID", "LINEAR_OAUTH_CLIENT_SECRET"],
+    },
+    authNote: "Linear OAuth2 application (Settings → API → OAuth applications).",
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -326,6 +341,8 @@ import { OutlookAdapter } from "./native/outlook";
 import { OutlookCalendarAdapter } from "./native/outlook-calendar";
 import { SlackAdapter } from "./native/slack";
 import { HubspotAdapter } from "./native/hubspot";
+// Phase 11 (devtools).
+import { LinearAdapter } from "./native/linear";
 
 const ADAPTER_CLASSES: Record<string, () => ConnectorAdapter> = {
   "google-search-console": () => new GoogleSearchConsoleAdapter(),
@@ -348,6 +365,8 @@ const ADAPTER_CLASSES: Record<string, () => ConnectorAdapter> = {
   "outlook-calendar": () => new OutlookCalendarAdapter(),
   slack: () => new SlackAdapter(),
   hubspot: () => new HubspotAdapter(),
+  // Phase 11 (devtools).
+  linear: () => new LinearAdapter(),
 };
 
 /** Resolve a built-in connector key to its native adapter. Throws on unknown key. */
@@ -363,7 +382,7 @@ export function resolveAdapter(key: string): ConnectorAdapter {
 //
 // Phase 4b wired the last six mock-only adapters (GSC, GA4, Drive, Notion,
 // Meta Ads, Google Ads) to their live APIs: with a vault credential they
-// call the provider; without one they stay in labeled mock mode. All 18
+// call the provider; without one they stay in labeled mock mode. All 19
 // built-in adapters have live wiring, so the set is empty (0 mock-only;
 // pinned by lib/connectors/m21/__tests__/registry.test.ts). Keep it in
 // sync with the per-adapter file headers (scripts/verify-connector-health.mts
