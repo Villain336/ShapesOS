@@ -261,7 +261,7 @@ export async function saveDraft(actor: AppActor, slug: string, input: unknown): 
   return withWorkspaceScope(actor.workspaceId, async (tx) => {
     const row = await appRow(tx, actor, slug);
     await tx.miniApp.update({
-      where: { id: row.id },
+      where: { id: row.id, workspaceId: actor.workspaceId },
       data: { draftSpec: toJson(spec), draftUpdatedBy: actor.userId, ...(row.published ? {} : { name: spec.name, description: spec.description ?? null }) },
     });
     await audit(tx, actor, slug, "app_draft_saved", row.id, `saved the draft of "${spec.name}"`);
@@ -341,7 +341,7 @@ export async function unpublishApp(actor: AppActor, slug: string): Promise<void>
   requireRole(actor, "admin", "Unpublishing an app");
   await withWorkspaceScope(actor.workspaceId, async (tx) => {
     const row = await appRow(tx, actor, slug);
-    await tx.miniApp.update({ where: { id: row.id }, data: { published: false } });
+    await tx.miniApp.update({ where: { id: row.id, workspaceId: actor.workspaceId }, data: { published: false } });
     await audit(tx, actor, slug, "app_unpublish", row.id, `unpublished "${row.name}"`);
   });
 }
@@ -351,7 +351,7 @@ export async function deleteApp(actor: AppActor, slug: string): Promise<void> {
   requireRole(actor, "admin", "Deleting an app");
   await withWorkspaceScope(actor.workspaceId, async (tx) => {
     const row = await appRow(tx, actor, slug);
-    await tx.miniApp.delete({ where: { id: row.id } });
+    await tx.miniApp.delete({ where: { id: row.id, workspaceId: actor.workspaceId } });
     await audit(tx, actor, slug, "app_delete", row.id, `deleted app "${row.name}" and its records`);
   });
 }
