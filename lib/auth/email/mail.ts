@@ -62,13 +62,16 @@ export class EmailAuthUnavailableError extends HttpError {
   }
 }
 
-export type AuthMailKind = "verify" | "login" | "login_new" | "reset" | "already_registered";
+// Phase 10 (portal): "portal" is the client-portal sign-in link (lib/portal/store.ts).
+export type AuthMailKind = "verify" | "login" | "login_new" | "reset" | "already_registered" | "portal";
 
 export interface AuthMail {
   kind: AuthMailKind;
   to: string;
   /** Absolute link (with #token=… for token links). */
   url: string;
+  /** Phase 10 (portal): who the portal belongs to (the workspace name), shown in the body. */
+  detail?: string;
 }
 
 const esc = (s: string) =>
@@ -115,10 +118,21 @@ const COPY: Record<AuthMailKind, { subject: string; heading: string; body: strin
     button: "Sign in",
     footer: "If this wasn't you, ignore this email. Nothing about your account changed.",
   },
+  // Phase 10 (portal): client portal sign-in (same 15-minute single-use rules as a login link).
+  portal: {
+    subject: "Your client portal sign-in link",
+    heading: "Sign in to your client portal",
+    body: "Use this link to see your invoices, quotes, projects, tickets and documents.",
+    button: "Open the client portal",
+    footer: `The link works once and expires in ${ttlText("login")}. If you didn't ask for it, ignore this email.`,
+  },
 };
 
 export function renderAuthEmail(m: AuthMail): { subject: string; text: string; html: string } {
-  const c = COPY[m.kind];
+  const base = COPY[m.kind];
+  // Phase 10 (portal): the portal email names whose portal it is.
+  const detail = m.detail?.replace(/[\u0000-\u001f\u007f]/g, " ").trim().slice(0, 120);
+  const c = detail ? { ...base, body: `${base.body} Shared with you by ${detail}.` } : base;
   const text = `${c.heading}\n\n${c.body}\n\n${c.button}: ${m.url}\n\n${c.footer}`;
   const html = `<!doctype html><html><body style="font-family:Archivo,system-ui,-apple-system,sans-serif;color:#000000;background:#F3F3F1;margin:0;padding:24px">
 <div style="max-width:520px;margin:0 auto;background:#FFFFFF;border-radius:14px;padding:28px">
