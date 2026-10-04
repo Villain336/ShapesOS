@@ -32,6 +32,15 @@
 //     matched) each time. The subject is now "<provider>:<providerAccountId>".
 //   - CAPTCHA step-up on the credentials login after repeated failures
 //     (lib/auth/captcha.ts; no-op unless a provider is configured).
+//
+// Phase 6 (email accounts, lib/auth/email/*): anyone can sign up with an
+// email address. Two more Credentials providers, subject "email:<address>":
+//   - "email-password": verified email + scrypt password, with the same
+//     lockout, CAPTCHA step-up and audit events as the admin login.
+//   - "email-link": a single-use token from a verify or magic-link email
+//     (Auth.js's email provider needs a DB adapter; this stays stateless).
+// Both go through the same signIn/jwt callbacks below, so invite-only mode,
+// the second-factor pending session and the 2FA policy apply unchanged.
 
 import NextAuth from "next-auth";
 import Google from "next-auth/providers/google";
@@ -58,6 +67,8 @@ import { CredentialsSignin, type Session } from "next-auth";
 import { captchaRequired, verifyCaptchaToken } from "./lib/auth/captcha";
 import { authorizePasskey, authorizeTwoFactor, type MfaSignInMarker } from "./lib/auth/mfa/authorize";
 import {
+  EMAIL_LINK_PROVIDER_ID,
+  EMAIL_PASSWORD_PROVIDER_ID,
   PASSKEY_PROVIDER_ID,
   TWO_FACTOR_PROVIDER_ID,
   applySignIn,
@@ -66,6 +77,7 @@ import {
 } from "./lib/auth/mfa/session-token";
 import { factorSummary } from "./lib/auth/mfa/store";
 import { linkScimMembersOnSsoLogin } from "./lib/scim/link";
+import { authorizeEmailLink, authorizeEmailPassword } from "./lib/auth/email/authorize";
 
 /** The CAPTCHA step-up is due and the attempt carried no valid token. */
 class CaptchaRequiredError extends CredentialsSignin {
@@ -237,6 +249,24 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       name: "Passkey",
       credentials: { challengeId: { label: "Challenge", type: "text" }, response: { label: "Response", type: "text" } },
       authorize: (credentials, req) => authorizePasskey(credentials ?? {}, req as Request),
+    }),
+    // Phase 6: email + password accounts (verified addresses only).
+    Credentials({
+      id: EMAIL_PASSWORD_PROVIDER_ID,
+      name: "Email",
+      credentials: {
+        email: { label: "Email", type: "email" },
+        password: { label: "Password", type: "password" },
+        captchaToken: { label: "CAPTCHA", type: "hidden" },
+      },
+      authorize: (credentials, req) => authorizeEmailPassword(credentials ?? {}, req as Request | undefined),
+    }),
+    // Phase 6: one-time email link (verification or magic link).
+    Credentials({
+      id: EMAIL_LINK_PROVIDER_ID,
+      name: "Email link",
+      credentials: { token: { label: "Token", type: "text" } },
+      authorize: (credentials, req) => authorizeEmailLink(credentials ?? {}, req as Request | undefined),
     }),
     ...extraProviders,
   ],

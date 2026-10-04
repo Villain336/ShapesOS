@@ -336,6 +336,11 @@ enum FileChangeAction {
   scim_user_deprovisioned
   scim_user_deleted
   scim_group_changed
+  // Phase 6 (email sign-in): account created, email verified, password reset.
+  // Summaries carry the email address, never a token or password.
+  auth_account_created
+  auth_email_verified
+  auth_password_reset
 }
 
 // ---------------------------------------------------------------------------
@@ -13596,6 +13601,56 @@ model AuthChallenge {
 
   @@index([expiresAt])
   @@map("auth_challenges")
+}
+
+// Phase 6: email + password accounts and email magic links. Sign-in stays
+// Auth.js stateless JWT (no adapter); an email account's stable subject is
+// user_id = "email:<normalized email>". No workspace data: no tenant RLS.
+model EmailAccount {
+  id              String    @id @default(cuid())
+  // "email:<email>" — the Auth.js subject (token.sub).
+  userId          String    @unique @map("user_id")
+  // Normalized (trimmed, lower-cased) address.
+  email           String    @unique
+  name            String?
+  // "scrypt$N$r$p$salt$hash" (lib/auth/email/password.ts). Null for
+  // magic-link-only accounts and after a magic link verifies an account whose
+  // password was never proven by the mailbox owner.
+  passwordHash    String?   @map("password_hash")
+  emailVerifiedAt DateTime? @map("email_verified_at")
+  lastLoginAt     DateTime? @map("last_login_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  @@map("email_accounts")
+}
+
+enum EmailAuthTokenPurpose {
+  verify
+  login
+  reset
+}
+
+// Single-use, expiring email links. Only the SHA-256 of the token is stored;
+// consumption is one guarded UPDATE (used_at IS NULL AND expires_at > now).
+model EmailAuthToken {
+  id           String                @id @default(cuid())
+  tokenHash    String                @unique @map("token_hash")
+  // Normalized address the link was sent to (an account may not exist yet:
+  // an open-signup magic link creates it on first use).
+  email        String
+  purpose      EmailAuthTokenPurpose
+  // verify only: the password chosen in the signup that sent this link
+  // (scrypt hash). Verifying activates exactly that password, so a second
+  // signup for the same unverified address can't plant its own.
+  passwordHash String?               @map("password_hash")
+  expiresAt    DateTime              @map("expires_at")
+  usedAt       DateTime?             @map("used_at")
+  createdAt    DateTime              @default(now()) @map("created_at")
+
+  @@index([email, createdAt])
+  @@index([expiresAt])
+  @@map("email_auth_tokens")
 }
 
 model ScimToken {

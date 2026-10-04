@@ -12,6 +12,7 @@ lib/agents/runs/__tests__/watch.test.ts
 lib/approvals/__tests__/inbox-db.test.ts
 lib/auth/__tests__/member-roles.test.ts
 lib/auth/__tests__/signup-mode.test.ts
+lib/auth/email/__tests__/email-auth-db.test.ts
 lib/auth/mfa/__tests__/mfa-db.test.ts
 lib/auth/mfa/__tests__/security-settings-db.test.ts
 lib/authority/outreach/__tests__/webhook-tenant-db.test.ts
