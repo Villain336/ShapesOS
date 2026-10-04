@@ -131,6 +131,21 @@ async function valueFor(c: Column): Promise<string> {
 const FIXED_VALUES: Record<string, Record<string, string>> = {
   ops_accounting_links: { provider: "quickbooks" },
   ops_accounting_exports: { provider: "quickbooks" },
+  // Phase 12 (people): events run forward in time; registration and payslip
+  // money must reconcile (amount = unit × qty; net = gross − deductions − tax).
+  ops_events: { starts_at: "2030-01-01T10:00:00.000Z", ends_at: "2030-01-01T12:00:00.000Z" },
+  ops_event_sessions: { starts_at: "2030-01-01T10:00:00.000Z", ends_at: "2030-01-01T12:00:00.000Z" },
+  ops_event_registrations: { quantity: "1", unit_price_cents: "0", amount_cents: "0" },
+  ops_payslips: {
+    gross_cents: "0",
+    pre_tax_deduction_cents: "0",
+    taxable_wages_cents: "0",
+    employee_tax_cents: "0",
+    post_tax_deduction_cents: "0",
+    net_cents: "0",
+    employer_tax_cents: "0",
+    employer_contrib_cents: "0",
+  },
 };
 
 // Committed rows per table (one is enough; parents are shared).
