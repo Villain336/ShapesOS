@@ -335,6 +335,7 @@ export const OAUTH_CONFIGS: Record<string, OAuthProviderConfig> = {
     clientSecretEnv: "AIRTABLE_OAUTH_CLIENT_SECRET",
     tokenRequest: "form_basic",
     pkce: true,
+  },
   // Phase 11 (bizsync): Shopify (public app, Admin GraphQL API). Each store
   // has its own OAuth host: https://{shop}/admin/oauth/authorize and
   // /admin/oauth/access_token (client credentials in the form body). The
