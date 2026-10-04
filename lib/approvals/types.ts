@@ -58,6 +58,12 @@ export interface InboxAction {
   body: Record<string, unknown>;
 }
 
+/** One row of what a request covers (approval card list): a recipient, a fact. */
+export interface InboxLine {
+  label: string;
+  detail: string | null;
+}
+
 export interface InboxItem {
   /** Unique across sources: `${source}:${id}`. */
   key: string;
@@ -83,6 +89,14 @@ export interface InboxItem {
   /** Inline actions, only when canDecide and the queue's API supports it cleanly. */
   approve: InboxAction | null;
   deny: InboxAction | null;
+  /** The agent that asked, when the queue knows it (scheduled skill, Connector). */
+  agent: string | null;
+  /** Mission the request came from: the inbox groups it under the lead → sub-agent tree. */
+  missionId: string | null;
+  missionName: string | null;
+  /** What the request covers, one row each (a preview when lineTotal is larger). */
+  lines: InboxLine[];
+  lineTotal: number;
 }
 
 /** Who is looking: the role rules of every queue are evaluated against this. */
