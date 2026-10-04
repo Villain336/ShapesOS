@@ -97,6 +97,9 @@ const invoiceLineSchema = z.object({
   description: z.string().min(1).max(500),
   qty: z.number().int().min(1).max(100_000),
   priceCents: z.number().int().min(0).max(1_000_000_000),
+  // Phase 10 (finance): line-level tax — the server computes the line's
+  // taxCents from the rate (lib/ops/finance/money.ts); client values are ignored.
+  taxRateId: z.string().min(1).max(64).optional(),
 });
 
 const milestoneSchema = z.object({
@@ -210,6 +213,9 @@ const paymentDef: OpsEntityDef = {
       provider: z.string().max(32).default("stripe"),
       providerRef: z.string().max(128).optional(),
       status: z.enum(["pending", "succeeded", "failed"]).default("pending"),
+      // Phase 10 (finance): a (partial) payment against an invoice.
+      invoiceId: z.string().min(1).max(64).optional(),
+      note: z.string().max(2000).optional(),
     }),
     z.object({
       kind: z.literal("refund"),
@@ -267,15 +273,20 @@ const invoiceDef: OpsEntityDef = {
     // ISO-8601 payment due date (optional — defaults to sentAt + 30 days
     // when the invoice is sent). Slice 2.
     dueAt: z.string().max(64).optional(),
+    // Phase 10 (finance): recipient override (else the CRM lead's email).
+    customerEmail: z.string().email().max(320).optional(),
   }).superRefine(totalFitsInt4),
   patchSchema: z.object({
     customerId: z.string().min(1).max(64).optional(),
     lineItems: z.array(invoiceLineSchema).min(1).max(200).optional(),
     taxCents: centsSchema.optional(),
     status: z.enum(["sent", "paid", "overdue", "cancelled"]).optional(),
+    // Phase 10 (finance)
+    customerEmail: z.string().email().max(320).nullable().optional(),
   }),
   patchable: true,
-  filterable: ["status"],
+  // Phase 10 (finance): kind = invoice | credit_note.
+  filterable: ["status", "kind"],
   gatedTransitions: [
     // Sending an invoice is a gated write (medium, approval required —
     // money is a red lane). Same for marking paid and voiding.

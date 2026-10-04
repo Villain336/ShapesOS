@@ -94,4 +94,83 @@ export const journalEntryDef: OpsEntityDef = {
   summarize: (r) => `journal entry ${r.id ?? "(new)"} (${r.totalCents ?? "?"}c)${r.memo ? ` — ${String(r.memo).slice(0, 80)}` : ""}`,
 };
 
-export const FINANCE_ENTITIES: OpsEntityDef[] = [accountDef, taxRateDef, journalEntryDef];
+// Invoice-style line (mirrors lib/ops/entities.ts invoice lines).
+const docLine = z.object({
+  description: z.string().min(1).max(500),
+  qty: z.number().int().min(1).max(100_000),
+  priceCents: z.number().int().min(0).max(1_000_000_000),
+  taxRateId: id.optional(),
+});
+
+export const recurringInvoiceDef: OpsEntityDef = {
+  slug: "recurring-invoices",
+  label: "Recurring invoice",
+  delegate: "opsRecurringInvoice",
+  createSchema: z.object({
+    customerId: id.optional(),
+    lineItems: z.array(docLine).min(1).max(200),
+    taxCents: cents.default(0),
+    cadence: z.enum(["weekly", "monthly", "quarterly", "yearly"]),
+    intervalCount: z.number().int().min(1).max(24).default(1),
+    // First draft date (ISO); default now. The cron drafts on/after it.
+    startAt: isoDate.optional(),
+    endAt: isoDate.optional(),
+    dueDays: z.number().int().min(0).max(365).default(30),
+  }),
+  patchSchema: z.object({
+    customerId: id.nullable().optional(),
+    lineItems: z.array(docLine).min(1).max(200).optional(),
+    taxCents: cents.optional(),
+    cadence: z.enum(["weekly", "monthly", "quarterly", "yearly"]).optional(),
+    intervalCount: z.number().int().min(1).max(24).optional(),
+    nextRunAt: isoDate.optional(),
+    endAt: isoDate.nullable().optional(),
+    dueDays: z.number().int().min(0).max(365).optional(),
+    active: z.boolean().optional(),
+  }),
+  patchable: true,
+  filterable: ["customerId"],
+  gatedTransitions: [],
+  summarize: (r) => `recurring invoice ${r.id ?? "(new)"} ${r.cadence}${r.active === false ? " (paused)" : ""}`,
+};
+
+const quoteLine = docLine.extend({ sku: z.string().max(64).optional() });
+
+export const quoteDef: OpsEntityDef = {
+  slug: "quotes",
+  label: "Quote",
+  delegate: "opsQuote",
+  createSchema: z.object({
+    customerId: id.optional(),
+    customerEmail: z.string().email().max(320).optional(),
+    lineItems: z.array(quoteLine).min(1).max(200),
+    taxCents: cents.default(0),
+    validUntil: isoDate.optional(),
+    notes: z.string().max(4000).optional(),
+  }),
+  patchSchema: z.object({
+    customerId: id.nullable().optional(),
+    customerEmail: z.string().email().max(320).nullable().optional(),
+    lineItems: z.array(quoteLine).min(1).max(200).optional(),
+    taxCents: cents.optional(),
+    validUntil: isoDate.nullable().optional(),
+    notes: z.string().max(4000).nullable().optional(),
+    status: z.enum(["sent", "accepted", "declined"]).optional(),
+  }),
+  patchable: true,
+  filterable: ["status", "customerId"],
+  gatedTransitions: [
+    // Sending prices to a customer is outbound money comms — gated like invoices.
+    { field: "status", to: ["sent"], slug: "OPS_QUOTE_SEND", label: "Send quote" },
+  ],
+  statusTransitions: {
+    draft: ["sent"],
+    sent: ["accepted", "declined", "expired"],
+    accepted: [],
+    declined: [],
+    expired: [],
+  },
+  summarize: (r) => `quote ${r.number ?? r.id ?? "(new)"} → ${r.status ?? "draft"} (${r.totalCents ?? "?"}c)`,
+};
+
+export const FINANCE_ENTITIES: OpsEntityDef[] = [accountDef, taxRateDef, journalEntryDef, recurringInvoiceDef, quoteDef];

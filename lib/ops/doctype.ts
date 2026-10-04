@@ -162,7 +162,9 @@ async function materialize(
 ): Promise<Array<Record<string, unknown>>> {
   const hooks = await entityHooks(def.slug);
   const prepared = hooks?.prepare ? await hooks.prepare(tx, actor, body, null) : body;
-  return hooks?.create ? hooks.create(tx, actor, prepared) : createRows(tx, def, actor, prepared);
+  // A create hook may decline (null) and leave the generic insert to run.
+  const rows = hooks?.create ? await hooks.create(tx, actor, prepared) : null;
+  return rows ?? createRows(tx, def, actor, prepared);
 }
 
 // ---------------------------------------------------------------------------
@@ -383,6 +385,8 @@ async function createRows(
           ? { idempotencyKey: body.idempotencyKey }
           : {}),
         ...(def.slug === "invoices" && dueAt ? { dueAt } : {}),
+        // Phase 10 (finance): recipient override for invoice delivery.
+        ...(def.slug === "invoices" && typeof body.customerEmail === "string" ? { customerEmail: body.customerEmail } : {}),
       };
       if (def.slug === "invoices" && typeof body.idempotencyKey === "string") {
         // Atomic on the (workspaceId, idempotencyKey) unique: a concurrent

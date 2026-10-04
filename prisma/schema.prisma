@@ -10025,6 +10025,8 @@ model OpsRecurringInvoice {
   cadence       OpsRecurrenceCadence
   intervalCount Int                  @default(1) @map("interval_count")
   nextRunAt     DateTime             @map("next_run_at")
+  // Day of month the schedule started on (month-end clamping keeps it).
+  anchorDay     Int?                 @map("anchor_day")
   endAt         DateTime?            @map("end_at")
   dueDays       Int                  @default(30) @map("due_days")
   active        Boolean              @default(true)

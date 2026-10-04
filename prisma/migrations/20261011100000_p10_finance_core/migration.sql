@@ -172,6 +172,7 @@ CREATE TABLE "ops_recurring_invoices" (
     "cadence" "OpsRecurrenceCadence" NOT NULL,
     "interval_count" INTEGER NOT NULL DEFAULT 1,
     "next_run_at" TIMESTAMP(3) NOT NULL,
+    "anchor_day" INTEGER,
     "end_at" TIMESTAMP(3),
     "due_days" INTEGER NOT NULL DEFAULT 30,
     "active" BOOLEAN NOT NULL DEFAULT true,

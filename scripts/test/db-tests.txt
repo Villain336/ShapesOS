@@ -95,3 +95,4 @@ lib/ship/__tests__/pr-feedback-db.test.ts
 lib/apps/__tests__/apps-db.test.ts
 # Phase 10 (finance)
 lib/ops/__tests__/accounting-db.test.ts
+lib/ops/__tests__/finance-invoicing-db.test.ts

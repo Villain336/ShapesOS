@@ -181,6 +181,15 @@ export const CRON_JOBS: readonly CronJob[] = [
     note: 'Route header: "schedule daily so the 90/30/7/overdue tiers fire on time". Early, staggered.',
     timeoutMs: SHORT,
   },
+  {
+    // Phase 10 (finance): recurring invoice drafts, quote expiry, overdue sweep.
+    key: "finance",
+    path: "/api/cron/finance",
+    cron: "20 6 * * *",
+    source: "picked",
+    note: 'Route header: "daily". Drafts recurring invoices (drafts only — sending still asks), expires quotes, flips overdue invoices. Early so drafts are ready at the start of the day; staggered from the other 06:xx sweeps.',
+    timeoutMs: SHORT,
+  },
   { key: "fix-agent", path: "/api/cron/fix-agent", cron: "30 6 * * *", source: "deploy", timeoutMs: LONG },
   { key: "reports", path: "/api/cron/reports", cron: "0 7 * * *", source: "deploy", timeoutMs: LONG },
   { key: "autopilot", path: "/api/cron/autopilot", cron: "0 7 * * *", source: "deploy", timeoutMs: LONG },
