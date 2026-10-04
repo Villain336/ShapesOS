@@ -303,6 +303,23 @@ export default function FixAgentManager({ projectId }: { projectId: string }) {
     }
   }
 
+  async function draftStructuredData() {
+    if (!siteId) return;
+    setBusy(true);
+    setError(null);
+    setNotice(null);
+    const res = await fetch(`/api/websites/${siteId}/structured-data`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ projectId }),
+    });
+    const data = await res.json();
+    setBusy(false);
+    if (!res.ok) setError(data.error ?? "Couldn't draft structured data");
+    else if (!data.saved) setNotice("Every page already carries this structured data — nothing to draft.");
+    else setNotice(`Saved draft #${data.revision.number} with structured data on ${data.pages.filter((p: { changed: boolean }) => p.changed).length} pages. Review and apply it in Site drafts — nothing is live yet.`);
+  }
+
   async function setIssueStatus(issueId: string, status: "approved" | "ignored") {
     const res = await fetch(`/api/websites/${siteId}/issues/${issueId}`, {
       method: "PATCH",
@@ -498,6 +515,18 @@ export default function FixAgentManager({ projectId }: { projectId: string }) {
                   <VitalsSummary vitals={liveAudit.vitals} />
                 </div>
               )}
+            </div>
+
+            {/* Phase 11 (seotools): JSON-LD as a site draft */}
+            <div className="mt-4 border-t border-line pt-4">
+              <h3 className="text-sm font-semibold">Structured data</h3>
+              <p className="mt-1 text-xs text-muted">
+                Adds schema.org JSON-LD (organisation, website, breadcrumbs, FAQs) to every page as a draft you review before it goes live.
+              </p>
+              <button onClick={draftStructuredData} disabled={busy}
+                className="mt-2 rounded-full bg-paper px-3 py-1.5 text-sm font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper disabled:opacity-50">
+                {busy ? "Working…" : "Draft structured data"}
+              </button>
             </div>
           </div>
 

@@ -115,6 +115,8 @@ import "@/lib/sites/tools";
 import "@/lib/agents/runs/browser-tools";
 // Phase 9 (apps): the mini-app tools register themselves on import.
 import "@/lib/apps/tools";
+// Phase 11 (seotools): structured-data tools (group "site").
+import "@/lib/seo/tools";
 // Phase 10 M9: Expert Constitution Pack v1 — the Chief Strategy Agent's
 // system-prompt layer (global hard rules + CSA constitution), wired in
 // front of all project context and retrieval grounding.

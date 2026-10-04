@@ -1162,6 +1162,10 @@ export const TOOL_GROUP: Readonly<Record<string, ToolGroup>> = {
   app_create_spec: "ops",
   app_upsert_record: "ops",
   app_delete_record: "ops",
+  // Phase 11 (seotools): structured data for sites (lib/seo/tools.ts) —
+  // drafts only, applying and deploying stay human.
+  add_structured_data: "site",
+  validate_structured_data: "site",
 };
 
 /**
@@ -1231,6 +1235,8 @@ export const TOOL_ACTION: Readonly<Record<string, string>> = {
   app_create_spec: "draft_app_spec",
   app_upsert_record: "write_app_record",
   app_delete_record: "delete_app_record",
+  // Phase 11 (seotools): a site draft revision — Tier 0 (lib/automation/actions.ts).
+  add_structured_data: "draft_structured_data",
 };
 
 /** The group a tool belongs to. Unknown tools fall in "connectors" (fail closed). */

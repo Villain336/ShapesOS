@@ -59,6 +59,8 @@ export const KNOWN_ACTION_DEFS: ReadonlyArray<{ action: string; label: string; d
   { action: "set_reorder_rule", label: "Set a reorder rule", description: "Create or change a min/max reorder rule. Always asks." },
   // Phase 10 (store): storefront listings (lib/chat/ops-store-tools.ts).
   { action: "write_store_listing", label: "Change the online store", description: "Show, hide or edit a product in the public online store. Always asks." },
+  // Phase 11 (seotools): SEO + document tools.
+  { action: "draft_structured_data", label: "Draft structured data", description: "Add schema.org JSON-LD to a site as a draft revision (a person applies it)." },
 ];
 
 

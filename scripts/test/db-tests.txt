@@ -111,3 +111,5 @@ lib/portal/__tests__/portal-db.test.ts
 lib/portal/__tests__/portal-isolation-db.test.ts
 # Phase 11 (seotools): live-URL audit storage, supersede-by-kind, live start URL, fix-agent exclusion.
 lib/audit/__tests__/live-audit-db.test.ts
+# Phase 11 (seotools): JSON-LD only through site draft revisions; apply is human; RLS; validation before save.
+lib/seo/__tests__/jsonld-draft-db.test.ts
