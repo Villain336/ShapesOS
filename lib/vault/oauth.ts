@@ -11,7 +11,7 @@
 
 import { randomBytes } from "crypto";
 import { secrets } from "@/lib/secrets";
-import { getBuiltinMeta, MICROSOFT_CALENDAR_SCOPES, MICROSOFT_MAIL_SCOPES } from "@/lib/connectors/m21/registry";
+import { getBuiltinMeta, HUBSPOT_SCOPES, MICROSOFT_CALENDAR_SCOPES, MICROSOFT_MAIL_SCOPES, SLACK_BOT_SCOPES } from "@/lib/connectors/m21/registry";
 
 export interface OAuthProviderConfig {
   authorizeUrl: string;
@@ -29,6 +29,14 @@ export interface OAuthProviderConfig {
    * (Notion, verified against developers.notion.com/reference/create-a-token).
    */
   tokenRequest?: "form" | "json_basic";
+  /** Phase 11 (conncore): scope separator on the authorize URL (Slack: ","). Default " ". */
+  scopeSeparator?: string;
+  /**
+   * Phase 11 (conncore): non-secret display/routing metadata pulled from the
+   * token response into ConnectorConnection.meta (e.g. Slack team id). Never
+   * returns token material.
+   */
+  tokenMeta?: (token: Record<string, unknown>) => Record<string, string>;
 }
 
 /**
@@ -201,6 +209,39 @@ export const OAUTH_CONFIGS: Record<string, OAuthProviderConfig> = {
     clientSecretEnv: MICROSOFT_SECRET_ENV,
     extra: { response_mode: "query" },
   },
+  // Phase 11 (conncore): the ShapesOS Slack app (OAuth v2, bot token).
+  // Scopes are comma-separated on the authorize URL; oauth.v2.access answers
+  // HTTP 200 { ok, access_token: "xoxb-…", team: { id, name }, bot_user_id }
+  // (ok:false has no access_token → the exchange fails closed). Bot tokens
+  // don't expire unless token rotation is turned on for the app.
+  // Verified against docs.slack.dev/authentication/installing-with-oauth.
+  slack: {
+    authorizeUrl: "https://slack.com/oauth/v2/authorize",
+    tokenUrl: "https://slack.com/api/oauth.v2.access",
+    scopes: SLACK_BOT_SCOPES,
+    clientIdEnv: "SLACK_CLIENT_ID",
+    clientSecretEnv: "SLACK_CLIENT_SECRET",
+    scopeSeparator: ",",
+    tokenMeta: (t) => {
+      const team = (t.team ?? {}) as { id?: unknown; name?: unknown };
+      const out: Record<string, string> = {};
+      if (typeof team.id === "string") out.slackTeamId = team.id;
+      if (typeof team.name === "string") out.slackTeamName = team.name.slice(0, 200);
+      if (typeof t.bot_user_id === "string") out.slackBotUserId = t.bot_user_id;
+      return out;
+    },
+  },
+  // Phase 11 (conncore): HubSpot public app. Authorize on app.hubspot.com,
+  // token (both grants, client credentials in the form body) on
+  // api.hubapi.com; access tokens live 30 minutes, refresh tokens rotate
+  // never (kept). Verified against developers.hubspot.com/docs/apps/legacy-apps/authentication/oauth-quickstart-guide.
+  hubspot: {
+    authorizeUrl: "https://app.hubspot.com/oauth/authorize",
+    tokenUrl: "https://api.hubapi.com/oauth/v1/token",
+    scopes: HUBSPOT_SCOPES,
+    clientIdEnv: "HUBSPOT_CLIENT_ID",
+    clientSecretEnv: "HUBSPOT_CLIENT_SECRET",
+  },
   // NOTE (Phase 18 slice 4, outcome B): Walmart Connect is NOT registered
   // here and never will be as an OAuth connector. Research 2026-10-01
   // (docs/phases/PHASE18-SLICE4-WALMART.md) established there is no public
@@ -331,7 +372,7 @@ export function startOAuthFlow(
     redirect_uri: redirectUri,
     response_type: "code",
     state,
-    ...(config.scopes.length ? { scope: config.scopes.join(" ") } : {}),
+    ...(config.scopes.length ? { scope: config.scopes.join(config.scopeSeparator ?? " ") } : {}),
     ...(config.extra ?? {}),
   });
   return { url: `${config.authorizeUrl}?${params.toString()}`, state };

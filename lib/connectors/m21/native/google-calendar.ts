@@ -267,8 +267,10 @@ export class GoogleCalendarAdapter implements ConnectorAdapter {
 
 /** Phase 11 (conncore): the event tools shared by Google and Outlook calendars. */
 export function calendarEventTools(provider: string, hasCalendarId: boolean): ConnectorToolDef[] {
-  const cal = hasCalendarId ? { calendarId: strProp('Calendar id (default "primary").') } : {};
-  const fields = {
+  type Props = Record<string, { type: string; description: string }>;
+  const cal: Props = hasCalendarId ? { calendarId: strProp('Calendar id (default "primary").') } : {};
+  const notify: Props = hasCalendarId ? { notifyAttendees: boolProp("Email invitations / changes to attendees (default true).") } : {};
+  const fields: Props = {
     title: strProp("Event title."),
     start: strProp("Start, ISO date-time (e.g. 2026-10-12T15:00:00)."),
     end: strProp("End, ISO date-time."),
@@ -293,7 +295,7 @@ export function calendarEventTools(provider: string, hasCalendarId: boolean): Co
       mutating: true,
       argsSchema: {
         type: "object",
-        properties: { ...cal, ...fields, ...(hasCalendarId ? { notifyAttendees: boolProp("Email invitations to attendees (default true).") } : {}) },
+        properties: { ...cal, ...fields, ...notify },
         required: ["title", "start", "end"],
       },
     },
@@ -303,7 +305,7 @@ export function calendarEventTools(provider: string, hasCalendarId: boolean): Co
       mutating: true,
       argsSchema: {
         type: "object",
-        properties: { ...cal, eventId: strProp("Event id (from list_events or create_event)."), ...fields, ...(hasCalendarId ? { notifyAttendees: boolProp("Email the change to attendees (default true).") } : {}) },
+        properties: { ...cal, eventId: strProp("Event id (from list_events or create_event)."), ...fields, ...notify },
         required: ["eventId"],
       },
     },

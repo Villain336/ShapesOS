@@ -1046,6 +1046,13 @@ model Workspace {
   // Phase 10 (portal): client portal magic links + sessions.
   portalLoginLinks            PortalLoginLink[]
   portalSessions              PortalSession[]
+  // Phase 11 (conncore): Slack app installs, Slack thread → chat thread map,
+  // Events API receipts (dedupe).
+  slackInstallations          SlackInstallation[]
+  slackThreadLinks            SlackThreadLink[]
+  slackEventReceipts          SlackEventReceipt[]
+  // Phase 11 (conncore): HubSpot ↔ Ops CRM id mapping (bidirectional sync).
+  hubspotSyncLinks            HubspotSyncLink[]
 
   @@map("workspaces")
 }
@@ -15510,4 +15517,103 @@ model OpsStoreListing {
   @@unique([storeId, slug])
   @@index([workspaceId, storeId, listed, position])
   @@map("ops_store_listings")
+}
+
+// ============================================================================
+// Phase 11 (conncore) — Slack app. One install per Slack team (the bot token
+// lives in the vault as the "slack" ConnectorConnection's credential). The
+// Events API receiver (POST /api/hooks/slack/events) routes team_id → the
+// installing workspace through a SELECT-only policy (app.slack_route =
+// 'lookup'); every write runs under that workspace's GUC. All three tables
+// are FORCE RLS and cascade from workspaces.
+// ============================================================================
+
+model SlackInstallation {
+  id             String    @id @default(cuid())
+  workspaceId    String    @map("workspace_id")
+  workspace      Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  // Slack team (workspace) id, e.g. T0123ABC — one ShapesOS workspace per team.
+  teamId         String    @unique @map("team_id")
+  teamName       String?   @map("team_name")
+  botUserId      String?   @map("bot_user_id")
+  // The vault connection holding the bot token (connector_connections.id).
+  connectionId   String    @map("connection_id")
+  // Who installed it: Slack mentions run as this member (with their CURRENT role).
+  installedBy    String    @map("installed_by")
+  // Project whose chat threads mentions become.
+  projectId      String?   @map("project_id")
+  // Slack user ids allowed to start tasks; empty = anyone in the Slack team.
+  allowedUserIds String[]  @default([]) @map("allowed_user_ids")
+  enabled        Boolean   @default(true)
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  @@index([workspaceId])
+  @@map("slack_installations")
+}
+
+// A Slack thread (channel + root ts) mapped to the ShapesOS chat thread that
+// answers it: follow-up mentions in the same Slack thread continue the chat.
+model SlackThreadLink {
+  id           String    @id @default(cuid())
+  workspaceId  String    @map("workspace_id")
+  workspace    Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  teamId       String    @map("team_id")
+  channelId    String    @map("channel_id")
+  threadTs     String    @map("thread_ts")
+  chatThreadId String    @map("chat_thread_id")
+  lastRunId    String?   @map("last_run_id")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  @@unique([teamId, channelId, threadTs])
+  @@index([workspaceId, chatThreadId])
+  @@map("slack_thread_links")
+}
+
+// One row per Events API event_id (the primary key is the dedupe: Slack
+// retries a delivery it thinks failed).
+model SlackEventReceipt {
+  eventId     String    @id @map("event_id")
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  teamId      String    @map("team_id")
+  eventType   String    @map("event_type")
+  // queued | ignored | refused
+  outcome     String
+  jobId       String?   @map("job_id")
+  receivedAt  DateTime  @default(now()) @map("received_at")
+
+  @@index([workspaceId, receivedAt])
+  @@map("slack_event_receipts")
+}
+
+// ============================================================================
+// Phase 11 (conncore) — HubSpot ↔ Ops CRM bidirectional sync. One row per
+// mapped object (contact | company | deal | pipeline): the HubSpot id, the
+// local ops_* / crm_pipelines id, and both sides' updatedAt at the last sync
+// — the inputs of the conflict rule in lib/hubspot/sync.ts. Both uniques make
+// the mapping idempotent (a re-sync never duplicates). FORCE RLS, cascades
+// from workspaces.
+// ============================================================================
+
+model HubspotSyncLink {
+  id               String    @id @default(cuid())
+  workspaceId      String    @map("workspace_id")
+  workspace        Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  // contact | company | deal | pipeline
+  objectType       String    @map("object_type")
+  hubspotId        String    @map("hubspot_id")
+  localId          String    @map("local_id")
+  // HubSpot's updatedAt / the local row's updatedAt right after the last sync.
+  hubspotUpdatedAt DateTime? @map("hubspot_updated_at")
+  localUpdatedAt   DateTime? @map("local_updated_at")
+  // pull | push
+  lastDirection    String    @default("pull") @map("last_direction")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  @@unique([workspaceId, objectType, hubspotId])
+  @@unique([workspaceId, objectType, localId])
+  @@map("hubspot_sync_links")
 }

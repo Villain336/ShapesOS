@@ -7,6 +7,8 @@
 //               sub-agent loop (lib/agents/mission-runtime.ts).
 //   pr_feedback — Phase 9 (repos): GitHub feedback on an agent PR continues
 //               the run's chat thread on the same branch (lib/ship/continue.ts).
+//   slack_mention — Phase 11 (conncore): a Slack @mention / DM runs a turn in
+//               the Slack thread's chat thread and replies in Slack.
 //
 // Handlers are imported lazily so the worker module stays light (and tests
 // can pass their own handler table).
@@ -41,5 +43,13 @@ export const defaultAgentJobHandlers: Record<string, AgentJobHandler> = {
     const payload = job.payload as import("@/lib/ship/pull-requests").PrFeedbackJobPayload;
     if (payload.workspaceId !== job.workspaceId) throw new Error("pr_feedback payload belongs to another workspace");
     return continueFromPrFeedback(payload);
+  },
+  // Phase 11 (conncore): a Slack mention runs a turn in its chat thread and
+  // answers in Slack (lib/slack/mention.ts).
+  async slack_mention(job) {
+    const { runSlackMention } = await import("@/lib/slack/mention");
+    const payload = job.payload as import("@/lib/slack/events").SlackMentionJobPayload;
+    if (payload.workspaceId !== job.workspaceId) throw new Error("slack_mention payload belongs to another workspace");
+    return runSlackMention(payload);
   },
 };

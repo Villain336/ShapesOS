@@ -1,6 +1,6 @@
 // Marketr — M21 built-in connector registry (spec §7, §11).
 //
-// DESIGN DECISION (recorded in prisma/schema.prisma): the 16 built-in
+// DESIGN DECISION (recorded in prisma/schema.prisma): the 18 built-in
 // connectors are CODE-defined here, not DB rows. (The count is pinned by
 // lib/connectors/m21/__tests__/registry.test.ts — update both together.) `Connector` rows exist
 // ONLY for workspace-custom MCP servers (kind=mcp). Do not create DB rows
@@ -30,6 +30,27 @@ export const MICROSOFT_MAIL_SCOPES = [
   "https://graph.microsoft.com/User.Read",
   "https://graph.microsoft.com/Mail.Read",
   "https://graph.microsoft.com/Mail.Send",
+];
+// Phase 11 (conncore): Slack bot scopes (mentions → agent tasks, read
+// channels/threads, post). Shared with lib/vault/oauth.ts.
+export const SLACK_BOT_SCOPES = [
+  "app_mentions:read",
+  "channels:history",
+  "channels:read",
+  "chat:write",
+  "groups:history",
+  "groups:read",
+  "im:history",
+];
+// Phase 11 (conncore): HubSpot CRM scopes (read + write for the sync).
+export const HUBSPOT_SCOPES = [
+  "oauth",
+  "crm.objects.contacts.read",
+  "crm.objects.contacts.write",
+  "crm.objects.companies.read",
+  "crm.objects.companies.write",
+  "crm.objects.deals.read",
+  "crm.objects.deals.write",
 ];
 export const MICROSOFT_CALENDAR_SCOPES = [
   "offline_access",
@@ -216,6 +237,30 @@ export const BUILT_IN_CONNECTORS: BuiltinConnectorMeta[] = [
     },
     authNote: "Microsoft identity platform OAuth2 (work, school or personal Microsoft account).",
   },
+  // Phase 11 (conncore): the full Slack app (bot install, Events API).
+  {
+    key: "slack",
+    displayName: "Slack",
+    authType: "oauth2",
+    description: "Read channels and threads, post after you confirm, and start agent tasks by mentioning @ShapesOS in Slack.",
+    oauth: {
+      scopes: SLACK_BOT_SCOPES,
+      envVars: ["SLACK_CLIENT_ID", "SLACK_CLIENT_SECRET"],
+    },
+    authNote: "Slack OAuth v2 app install (bot token). Mentions need the app's Events API URL and SLACK_SIGNING_SECRET.",
+  },
+  // Phase 11 (conncore): HubSpot ↔ Ops CRM bidirectional sync.
+  {
+    key: "hubspot",
+    displayName: "HubSpot",
+    authType: "oauth2",
+    description: "Sync HubSpot contacts, companies and deals into the CRM, and push CRM changes back after you confirm.",
+    oauth: {
+      scopes: HUBSPOT_SCOPES,
+      envVars: ["HUBSPOT_CLIENT_ID", "HUBSPOT_CLIENT_SECRET"],
+    },
+    authNote: "HubSpot public app OAuth (CRM objects read/write).",
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -279,6 +324,8 @@ import { GoogleCalendarAdapter } from "./native/google-calendar";
 import { GoogleBusinessProfileAdapter } from "./native/google-business-profile";
 import { OutlookAdapter } from "./native/outlook";
 import { OutlookCalendarAdapter } from "./native/outlook-calendar";
+import { SlackAdapter } from "./native/slack";
+import { HubspotAdapter } from "./native/hubspot";
 
 const ADAPTER_CLASSES: Record<string, () => ConnectorAdapter> = {
   "google-search-console": () => new GoogleSearchConsoleAdapter(),
@@ -299,6 +346,8 @@ const ADAPTER_CLASSES: Record<string, () => ConnectorAdapter> = {
   // Phase 11 (conncore).
   outlook: () => new OutlookAdapter(),
   "outlook-calendar": () => new OutlookCalendarAdapter(),
+  slack: () => new SlackAdapter(),
+  hubspot: () => new HubspotAdapter(),
 };
 
 /** Resolve a built-in connector key to its native adapter. Throws on unknown key. */
@@ -314,7 +363,7 @@ export function resolveAdapter(key: string): ConnectorAdapter {
 //
 // Phase 4b wired the last six mock-only adapters (GSC, GA4, Drive, Notion,
 // Meta Ads, Google Ads) to their live APIs: with a vault credential they
-// call the provider; without one they stay in labeled mock mode. All 16
+// call the provider; without one they stay in labeled mock mode. All 18
 // built-in adapters have live wiring, so the set is empty (0 mock-only;
 // pinned by lib/connectors/m21/__tests__/registry.test.ts). Keep it in
 // sync with the per-adapter file headers (scripts/verify-connector-health.mts

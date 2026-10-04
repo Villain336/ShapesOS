@@ -186,6 +186,8 @@ export function connectorGroup(connectorKey: string): ToolGroup {
       return "site";
     case "dataforseo":
       return "web";
+    case "hubspot": // Phase 11 (conncore): CRM sync is business operations
+      return "ops";
     case "google-search-console":
     case "ga4":
     case "google-ads":
@@ -221,6 +223,9 @@ export function connectorAction(connectorKey: string, tool: string): string {
     case "outlook.send_email":
     case "outlook.reply_to_message":
       return "send_outreach_email";
+    // Phase 11 (conncore): a HubSpot pull writes your CRM records.
+    case "hubspot.sync_from_hubspot":
+      return "write_crm_record";
     default:
       return "connector_write";
   }
