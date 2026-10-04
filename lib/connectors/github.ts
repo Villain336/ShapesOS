@@ -6,14 +6,31 @@
 // commit via the Git Data API (used by Deploy). Untested against the live API
 // from this sandbox (egress blocked); the mock in ./mock-github.ts covers the
 // full flow end-to-end and every mock row is labeled mock: true.
+//
+// Phase 8 (ship): branches (create from the default branch, get, compare),
+// pull requests (open, update, get, find by branch, status + checks, review
+// comments and reviews), and a GitHub App mode next to the PAT: when
+// cfg.getToken is set (lib/ship/github-access.ts wires it to
+// lib/connectors/github-app.ts) every request uses a fresh-or-cached
+// installation token instead of cfg.token. Request shapes follow the REST
+// docs (API version 2022-11-28); the unit suite stubs fetch.
 
 import type { FileEntry, ReadResult, SiteFileProvider } from "@/lib/sitefiles/types";
 import { sanitizePath } from "@/lib/sitefiles/paths";
 import type {
+  GitHubBranch,
+  GitHubCheck,
+  GitHubCompare,
   GitHubConfig,
   GitHubConnector,
+  GitHubPrStatus,
+  GitHubPullRequest,
   GitHubRepoSummary,
+  GitHubReview,
+  GitHubReviewComment,
+  OpenPullRequestInput,
   PushResult,
+  UpdatePullRequestInput,
 } from "./types";
 
 const API = "https://api.github.com";
@@ -48,7 +65,10 @@ export class GitHubSiteFileProvider implements GitHubConnector {
   readonly name = "github";
   readonly isLive = true;
 
-  constructor(private cfg: GitHubConfig) {}
+  constructor(
+    private cfg: GitHubConfig,
+    private deps: { fetch?: typeof fetch } = {},
+  ) {}
 
   private get owner() {
     return this.cfg.owner;
@@ -65,10 +85,11 @@ export class GitHubSiteFileProvider implements GitHubConnector {
 
   private async gh(path: string, init?: RequestInit): Promise<Response> {
     let res: Response;
+    const token = this.cfg.getToken ? await this.cfg.getToken() : this.cfg.token;
     try {
-      res = await fetch(`${API}${path}`, {
+      res = await (this.deps.fetch ?? fetch)(`${API}${path}`, {
         ...init,
-        headers: { ...headers(this.cfg.token), ...(init?.headers ?? {}) },
+        headers: { ...headers(token), ...(init?.headers ?? {}) },
       });
     } catch (err) {
       throw new Error(
@@ -299,6 +320,295 @@ export class GitHubSiteFileProvider implements GitHubConnector {
       files: clean.map((f) => ({ path: "/" + f.path, ok: true })),
     };
   }
+
+  // ---------------------------------------------------------------------
+  // Phase 8: ship operations.
+  // ---------------------------------------------------------------------
+
+  private get repoPath(): string {
+    return `/repos/${encodeURIComponent(this.owner)}/${encodeURIComponent(this.repo)}`;
+  }
+
+  private get htmlBase(): string {
+    return `https://github.com/${this.owner}/${this.repo}`;
+  }
+
+  private jsonInit(method: string, body: unknown): RequestInit {
+    return { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) };
+  }
+
+  async getRepo(): Promise<GitHubRepoSummary> {
+    const r = await this.ghJson<RawRepo>(this.repoPath);
+    return toRepoSummary(r);
+  }
+
+  async getBranch(name: string): Promise<GitHubBranch | null> {
+    assertBranchName(name);
+    try {
+      const ref = await this.ghJson<{ object: { sha: string } }>(`${this.repoPath}/git/ref/heads/${encodeRef(name)}`);
+      return { name, sha: ref.object.sha, url: `${this.htmlBase}/tree/${encodeRef(name)}` };
+    } catch (err) {
+      if (err instanceof Error && /Not found/.test(err.message)) return null;
+      throw err;
+    }
+  }
+
+  async createBranch(name: string, opts?: { from?: string }): Promise<GitHubBranch> {
+    assertBranchName(name);
+    const from = opts?.from ?? (await this.getRepo()).defaultBranch;
+    const base = await this.getBranch(from);
+    if (!base) throw new Error(`Base branch ${from} not found on GitHub`);
+    const ref = await this.ghJson<{ object: { sha: string } }>(
+      `${this.repoPath}/git/refs`,
+      this.jsonInit("POST", { ref: `refs/heads/${name}`, sha: base.sha }),
+    );
+    return { name, sha: ref.object.sha, url: `${this.htmlBase}/tree/${encodeRef(name)}` };
+  }
+
+  async compare(base: string, head: string): Promise<GitHubCompare> {
+    const c = await this.ghJson<{
+      status: GitHubCompare["status"];
+      ahead_by: number;
+      behind_by: number;
+      total_commits: number;
+      html_url: string;
+      files?: { filename: string; status: string; additions: number; deletions: number; patch?: string }[];
+    }>(`${this.repoPath}/compare/${encodeRef(base)}...${encodeRef(head)}?per_page=100`);
+    return {
+      status: c.status,
+      aheadBy: c.ahead_by,
+      behindBy: c.behind_by,
+      totalCommits: c.total_commits,
+      htmlUrl: c.html_url,
+      files: (c.files ?? []).map((f) => ({
+        filename: f.filename,
+        status: f.status,
+        additions: f.additions,
+        deletions: f.deletions,
+        ...(typeof f.patch === "string" ? { patch: f.patch } : {}),
+      })),
+    };
+  }
+
+  async openPullRequest(input: OpenPullRequestInput): Promise<GitHubPullRequest> {
+    assertBranchName(input.head);
+    const title = input.title.trim();
+    if (!title) throw new Error("A pull request needs a title");
+    const base = input.base ?? (await this.getRepo()).defaultBranch;
+    if (base === input.head) throw new Error("A pull request needs a head branch different from its base");
+    const pr = await this.ghJson<RawPull>(
+      `${this.repoPath}/pulls`,
+      this.jsonInit("POST", {
+        title: title.slice(0, 256),
+        head: input.head,
+        base,
+        body: input.body ?? "",
+        draft: input.draft === true,
+        maintainer_can_modify: true,
+      }),
+    );
+    return toPull(pr);
+  }
+
+  async updatePullRequest(number: number, patch: UpdatePullRequestInput): Promise<GitHubPullRequest> {
+    const body: Record<string, unknown> = {};
+    if (patch.title !== undefined) body.title = patch.title.slice(0, 256);
+    if (patch.body !== undefined) body.body = patch.body;
+    if (patch.state !== undefined) body.state = patch.state;
+    if (patch.base !== undefined) body.base = patch.base;
+    const pr = await this.ghJson<RawPull>(`${this.repoPath}/pulls/${prNumber(number)}`, this.jsonInit("PATCH", body));
+    return toPull(pr);
+  }
+
+  async getPullRequest(number: number): Promise<GitHubPullRequest> {
+    return toPull(await this.ghJson<RawPull>(`${this.repoPath}/pulls/${prNumber(number)}`));
+  }
+
+  async findPullRequestForBranch(branch: string): Promise<GitHubPullRequest | null> {
+    assertBranchName(branch);
+    const list = await this.ghJson<RawPull[]>(
+      `${this.repoPath}/pulls?state=open&head=${encodeURIComponent(`${this.owner}:${branch}`)}&per_page=10`,
+    );
+    return list.length ? toPull(list[0]!) : null;
+  }
+
+  async getPullRequestStatus(number: number): Promise<GitHubPrStatus> {
+    const pr = await this.getPullRequest(number);
+    const sha = encodeURIComponent(pr.headSha);
+    const [runs, combined] = await Promise.all([
+      this.ghJson<{
+        total_count: number;
+        check_runs: {
+          name: string;
+          status: string;
+          conclusion: string | null;
+          html_url: string | null;
+          details_url: string | null;
+          output?: { title: string | null; summary: string | null };
+        }[];
+      }>(`${this.repoPath}/commits/${sha}/check-runs?per_page=100`),
+      this.ghJson<{
+        state: string;
+        statuses: { context: string; state: string; description: string | null; target_url: string | null }[];
+      }>(`${this.repoPath}/commits/${sha}/status`),
+    ]);
+    const checks: GitHubCheck[] = [
+      ...(runs.check_runs ?? []).map((r) => ({
+        name: r.name,
+        source: "check_run" as const,
+        status: r.status,
+        conclusion: r.conclusion,
+        url: r.html_url ?? r.details_url,
+        summary: r.output?.title || r.output?.summary || null,
+      })),
+      ...(combined.statuses ?? []).map((st) => ({
+        name: st.context,
+        source: "status" as const,
+        status: st.state === "pending" ? "pending" : "completed",
+        conclusion: st.state === "pending" ? null : st.state,
+        url: st.target_url,
+        summary: st.description,
+      })),
+    ];
+    return { pr, ...rollUpChecks(checks) };
+  }
+
+  async listReviewComments(number: number): Promise<GitHubReviewComment[]> {
+    const rows = await this.ghJson<
+      {
+        id: number;
+        path: string;
+        line: number | null;
+        original_line: number | null;
+        body: string;
+        user: { login: string } | null;
+        html_url: string;
+        created_at: string;
+        in_reply_to_id?: number;
+        diff_hunk?: string;
+      }[]
+    >(`${this.repoPath}/pulls/${prNumber(number)}/comments?per_page=100&sort=created&direction=asc`);
+    return rows.map((c) => ({
+      id: c.id,
+      path: c.path,
+      line: c.line ?? c.original_line ?? null,
+      body: c.body,
+      author: c.user?.login ?? "unknown",
+      url: c.html_url,
+      createdAt: c.created_at,
+      inReplyTo: c.in_reply_to_id ?? null,
+      ...(c.diff_hunk ? { diffHunk: c.diff_hunk } : {}),
+    }));
+  }
+
+  async listReviews(number: number): Promise<GitHubReview[]> {
+    const rows = await this.ghJson<
+      { id: number; user: { login: string } | null; body: string | null; state: string; html_url: string; submitted_at?: string | null }[]
+    >(`${this.repoPath}/pulls/${prNumber(number)}/reviews?per_page=100`);
+    return rows.map((r) => ({
+      id: r.id,
+      author: r.user?.login ?? "unknown",
+      state: r.state,
+      body: r.body ?? "",
+      url: r.html_url,
+      submittedAt: r.submitted_at ?? null,
+    }));
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Phase 8 helpers (exported for the mock and the unit suite).
+// ---------------------------------------------------------------------------
+
+interface RawRepo {
+  owner: { login: string };
+  name: string;
+  full_name: string;
+  private: boolean;
+  default_branch: string;
+  updated_at: string | null;
+}
+
+interface RawPull {
+  number: number;
+  html_url: string;
+  title: string;
+  body: string | null;
+  state: "open" | "closed";
+  merged?: boolean;
+  merged_at?: string | null;
+  draft?: boolean;
+  mergeable?: boolean | null;
+  head: { ref: string; sha: string };
+  base: { ref: string };
+}
+
+function toRepoSummary(r: RawRepo): GitHubRepoSummary {
+  return {
+    owner: r.owner.login,
+    name: r.name,
+    fullName: r.full_name,
+    private: r.private,
+    defaultBranch: r.default_branch,
+    updatedAt: r.updated_at,
+  };
+}
+
+function toPull(p: RawPull): GitHubPullRequest {
+  return {
+    number: p.number,
+    url: p.html_url,
+    title: p.title,
+    body: p.body ?? "",
+    state: p.state,
+    merged: p.merged === true || !!p.merged_at,
+    draft: p.draft === true,
+    head: p.head.ref,
+    base: p.base.ref,
+    headSha: p.head.sha,
+    mergeable: p.mergeable ?? null,
+  };
+}
+
+function prNumber(n: number): number {
+  if (!Number.isInteger(n) || n <= 0) throw new Error("Invalid pull request number");
+  return n;
+}
+
+/** Encode a ref for a URL path, keeping the "/" separators of branch names. */
+function encodeRef(ref: string): string {
+  return ref.split("/").map(encodeURIComponent).join("/");
+}
+
+/** git check-ref-format, the parts that matter for API calls. */
+export function assertBranchName(name: string): void {
+  if (
+    typeof name !== "string" ||
+    !name ||
+    name.length > 200 ||
+    name.startsWith("-") ||
+    name.startsWith("/") ||
+    name.endsWith("/") ||
+    name.endsWith(".lock") ||
+    name.endsWith(".") ||
+    name.includes("..") ||
+    name.includes("//") ||
+    name.includes("@{") ||
+    /[\x00-\x20~^:?*[\\\x7f]/.test(name)
+  ) {
+    throw new Error(`Invalid branch name: ${JSON.stringify(String(name).slice(0, 80))}`);
+  }
+}
+
+const FAILING_CONCLUSIONS = new Set(["failure", "error", "timed_out", "cancelled", "action_required", "startup_failure"]);
+
+/** Roll individual checks up into one state (failure > pending > success). */
+export function rollUpChecks(checks: GitHubCheck[]): { state: GitHubPrStatus["state"]; checks: GitHubCheck[]; failing: GitHubCheck[] } {
+  const failing = checks.filter((c) => c.conclusion !== null && FAILING_CONCLUSIONS.has(c.conclusion));
+  const pending = checks.some((c) => c.conclusion === null);
+  const state: GitHubPrStatus["state"] =
+    checks.length === 0 ? "none" : failing.length ? "failure" : pending ? "pending" : "success";
+  return { state, checks, failing };
 }
 
 export type SiteFileProviderT = SiteFileProvider;
