@@ -80,7 +80,10 @@ export const OAUTH_CONFIGS: Record<string, OAuthProviderConfig> = {
   "google-search-console": {
     authorizeUrl: GOOGLE_AUTH_URL,
     tokenUrl: GOOGLE_TOKEN_URL,
-    scopes: ["https://www.googleapis.com/auth/webmasters.readonly"],
+    // Phase 11: full "webmasters" (includes read) so sitemaps can be submitted;
+    // connections made with the old read-only grant keep reading and are asked
+    // to reconnect before a submit (lib/seo/sitemap-submit.ts).
+    scopes: ["https://www.googleapis.com/auth/webmasters"],
     clientIdEnv: GOOGLE_ID_ENV,
     clientSecretEnv: GOOGLE_SECRET_ENV,
     extra: { access_type: "offline", prompt: "consent" },

@@ -65,7 +65,7 @@ export const BUILT_IN_CONNECTORS: BuiltinConnectorMeta[] = [
     authType: "oauth2",
     description: "Search performance: queries, pages, clicks, impressions, CTR, position.",
     oauth: {
-      scopes: ["https://www.googleapis.com/auth/webmasters.readonly"],
+      scopes: ["https://www.googleapis.com/auth/webmasters"], // Phase 11: sitemap submit (lib/vault/oauth.ts)
       envVars: ["GOOGLE_OAUTH_CLIENT_ID", "GOOGLE_OAUTH_CLIENT_SECRET"],
     },
     authNote: "Google OAuth2 (shared Google app credentials).",

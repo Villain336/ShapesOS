@@ -81,6 +81,15 @@ describe("errorResponse — typed errors keep status and message", () => {
 });
 
 describe("errorResponse — client mistakes are 4xx, never 500", () => {
+  it("a provider that is not connected in production → 409 not_connected (Phase 11)", async () => {
+    const { FakeProviderRefusedError } = await import("../../env/secrets");
+    const res = errorResponse(new FakeProviderRefusedError("SEO data (DataForSEO)"));
+    assert.equal(res.status, 409);
+    const body = (await res.json()) as { error: string; code: string };
+    assert.equal(body.code, "not_connected");
+    assert.match(body.error, /not connected/);
+  });
+
   it("ZodError → 400 with field paths and messages, never values", async () => {
     const schema = z.object({ name: z.string().min(1), secret: z.string().max(3) });
     let err: unknown;
