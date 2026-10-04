@@ -149,7 +149,7 @@ export const defaultSlackEventsDeps: SlackEventsDeps = {
   },
   attachJob: async (workspaceId, eventId, jobId) => {
     const { withWorkspaceScope } = await import("@/lib/substrate/memory/rls");
-    return withWorkspaceScope(workspaceId, (tx) => tx.slackEventReceipt.update({ where: { eventId }, data: { jobId } }));
+    return withWorkspaceScope(workspaceId, (tx) => tx.slackEventReceipt.updateMany({ where: { eventId, workspaceId }, data: { jobId } }));
   },
   workerAvailable: () => agentWorkerMode() !== "off",
   now: () => Date.now(),

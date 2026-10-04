@@ -67,7 +67,7 @@ export async function recordSlackInstall(input: {
       };
       if (existing) {
         return tx.slackInstallation.update({
-          where: { id: existing.id },
+          where: { id: existing.id, workspaceId: input.workspaceId },
           data: { ...data, projectId: existing.projectId ?? project?.id ?? null },
         });
       }

@@ -152,6 +152,21 @@ describe("HubSpot pull", () => {
   });
 });
 
+describe("HubSpot pull: unique clashes", () => {
+  it("an email already used by another local contact is kept local and reported (the transaction survives)", async () => {
+    const bob = store.contacts.find((c) => c.id === "22")!;
+    bob.properties.email = "ada@acme.com";
+    bob.properties.firstname = "Bobby";
+    bob.updatedAt = new Date(Date.now() + 20 * 3_600_000).toISOString();
+    const report = await pullFromHubspot(WS, auth, { objectTypes: ["contact"], userId: USER }, deps);
+    assert.ok(report.conflicts.some((c) => /email used by another local contact/.test(c.resolution)));
+    const l = await local();
+    const robert = l.contacts.find((c) => c.email === "bob@acme.com");
+    assert.equal(robert?.name, "Bobby", "the other fields still applied");
+    assert.equal(l.contacts.filter((c) => c.email === "ada@acme.com").length, 1);
+  });
+});
+
 describe("HubSpot push (gated write)", () => {
   it("creates a new local contact in HubSpot, associates its linked company, and links it", async () => {
     const { companies } = await local();

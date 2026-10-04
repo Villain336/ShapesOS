@@ -158,7 +158,7 @@ export async function runSlackMention(payload: SlackMentionJobPayload, deps: Men
     chatThread = created;
     link = await withWorkspaceScope(workspaceId, (tx) =>
       tx.slackThreadLink.upsert({
-        where: { teamId_channelId_threadTs: key },
+        where: { teamId_channelId_threadTs: key, workspaceId },
         create: { workspaceId, ...key, chatThreadId: created.id },
         update: { chatThreadId: created.id },
       }),

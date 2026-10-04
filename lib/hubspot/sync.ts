@@ -191,8 +191,6 @@ async function saveLink(
   });
 }
 
-const isUnique = (err: unknown) => (err as { code?: unknown })?.code === "P2002";
-
 export interface PullOptions {
   objectTypes?: SyncObjectType[];
   /** Pages of 100 per object type (default 20 → up to 2,000 records each). */
@@ -211,7 +209,7 @@ async function pullPipelines(workspaceId: string, auth: TokenSource, deps: LiveD
       const existing = link ? await tx.pipeline.findFirst({ where: { id: link.localId, workspaceId } }) : null;
       const data = { name: `HubSpot: ${p.label}`.slice(0, 120), stages: stages as unknown as object };
       const row = existing
-        ? await tx.pipeline.update({ where: { id: existing.id }, data })
+        ? await tx.pipeline.update({ where: { id: existing.id, workspaceId }, data })
         : await tx.pipeline.create({ data: { workspaceId, ...data } });
       await saveLink(tx, workspaceId, "pipeline", p.id, row.id, { hubspotUpdatedAt: null, localUpdatedAt: row.updatedAt }, "pull");
       if (!existing) report.created += 1;
@@ -315,15 +313,13 @@ export async function pullFromHubspot(workspaceId: string, auth: TokenSource, op
                 : null,
           create: () => tx.opsCompany.create({ data: { workspaceId, ...f } }),
           update: async (local) => {
-            try {
-              return await tx.opsCompany.update({ where: { id: local.id }, data: present(f) });
-            } catch (err) {
-              if (!isUnique(err)) throw err;
+            // A unique clash would abort the transaction, so check first.
+            const data: Partial<typeof f> = present(f);
+            if (data.domain && (await tx.opsCompany.findFirst({ where: { workspaceId, domain: data.domain, NOT: { id: local.id } }, select: { id: true } }))) {
               report.conflicts.push({ objectType: "company", hubspotId: o.id, localId: local.id, resolution: "domain used by another local company; kept the local domain" });
-              const { domain: _d, ...rest } = f;
-              void _d;
-              return tx.opsCompany.update({ where: { id: local.id }, data: present(rest) });
+              delete data.domain;
             }
+            return tx.opsCompany.update({ where: { id: local.id, workspaceId }, data });
           },
         });
       }),
@@ -346,16 +342,13 @@ export async function pullFromHubspot(workspaceId: string, auth: TokenSource, op
                 : null,
           create: () => tx.opsContact.create({ data: { workspaceId, ...f, companyId } }),
           update: async (local) => {
-            const data = { ...present(f), ...(companyId ? { companyId } : {}) };
-            try {
-              return await tx.opsContact.update({ where: { id: local.id }, data });
-            } catch (err) {
-              if (!isUnique(err)) throw err;
+            // A unique clash would abort the transaction, so check first.
+            const data: Partial<typeof f> & { companyId?: string } = { ...present(f), ...(companyId ? { companyId } : {}) };
+            if (data.email && (await tx.opsContact.findFirst({ where: { workspaceId, email: data.email, NOT: { id: local.id } }, select: { id: true } }))) {
               report.conflicts.push({ objectType: "contact", hubspotId: o.id, localId: local.id, resolution: "email used by another local contact; kept the local email" });
-              const { email: _e, ...rest } = data as Record<string, unknown>;
-              void _e;
-              return tx.opsContact.update({ where: { id: local.id }, data: rest });
+              delete data.email;
             }
+            return tx.opsContact.update({ where: { id: local.id, workspaceId }, data });
           },
         });
       }),
@@ -395,7 +388,7 @@ export async function pullFromHubspot(workspaceId: string, auth: TokenSource, op
             tx.opsDeal.create({ data: { workspaceId, ...fields, ownerId: opts.userId, closedAt: status === "open" ? null : new Date() } }),
           update: (local) =>
             tx.opsDeal.update({
-              where: { id: local.id },
+              where: { id: local.id, workspaceId },
               data: { ...present(fields), closedAt: status === "open" ? null : (local as { closedAt?: Date | null }).closedAt ?? new Date() },
             }),
         });
