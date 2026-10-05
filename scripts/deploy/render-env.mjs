@@ -510,12 +510,12 @@ export function renderDocBlock() {
     out.push(`**${name}** (${GROUPS[name].toLowerCase()})`, "", "```dotenv");
     if (launch.length) {
       out.push("# Needed before the first deploy");
-      for (const [k, s] of launch) out.push(`${k}=${s.why ? `   # ${s.why}` : ""}`);
+      for (const [k, s] of launch) out.push(...(s.why ? [`# ${s.why}`] : []), `${k}=`);
     }
     if (later.length) {
       if (launch.length) out.push("");
       out.push("# When you turn the feature on (leave out otherwise)");
-      for (const [k, s] of later) out.push(`${k}=${s.why ? `   # ${s.why}` : ""}`);
+      for (const [k, s] of later) out.push(...(s.why ? [`# ${s.why}`] : []), `${k}=`);
     }
     out.push("```", "");
   }
