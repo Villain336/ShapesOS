@@ -270,10 +270,14 @@ function NumberField({ label, value, onChange, min = 0 }: { label: string; value
 function ObjectForm({ o, snapshot, writes, onDeleted }: { o: TwinObject; snapshot: TwinSnapshot; writes: Writes; onDeleted: () => void }) {
   const [label, setLabel] = useState(o.label);
   const [fp, setFp] = useState<TwinFootprint>(o.footprint);
+  // Reset on a real change only: live frames hand us new object identities
+  // with the same values, which must not wipe what's being typed.
+  const serverKey = `${o.label}|${o.footprint.x},${o.footprint.z},${o.footprint.w},${o.footprint.d},${o.footprint.h},${o.footprint.rotation}`;
   useEffect(() => {
     setLabel(o.label);
     setFp(o.footprint);
-  }, [o.label, o.footprint]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- serverKey is the value of o.label + o.footprint
+  }, [serverKey]);
   const clamped = clampFootprint(fp, snapshot.site);
   // Same rule the server applies (lib/twin/derive.ts): only paths and equipment may overlap.
   const clash = overlapWith({ id: o.id, kind: o.kind, label: o.label, footprint: clamped }, snapshot.objects);

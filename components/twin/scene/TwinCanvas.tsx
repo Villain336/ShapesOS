@@ -17,7 +17,12 @@ import { Canvas, useThree, type ThreeEvent } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 import gsap from "gsap";
-import type { TwinFootprint, TwinObject, TwinObjectKind, TwinSnapshot } from "@/lib/twin/types";
+import type {
+  TwinFootprint,
+  TwinObject,
+  TwinObjectKind,
+  TwinSnapshot,
+} from "@/lib/twin/types";
 import {
   clayColor,
   clayMaterial,
@@ -38,7 +43,12 @@ import { agentsByObject } from "@/lib/twin/view-model";
 import type { TwinCameraApi } from "../camera-api";
 import { TwinSceneContext, type SceneCtx } from "./context";
 import { ObjectShell } from "./ObjectShell";
-import { FocusLabel, ObjectMarkers } from "./Markers";
+import {
+  MarkerLayer,
+  MarkerProjector,
+  markerAnchor,
+  type MarkerAnchor,
+} from "./Markers";
 
 export interface TwinCanvasProps {
   snapshot: TwinSnapshot;
@@ -49,7 +59,10 @@ export interface TwinCanvasProps {
   placing: { kind: TwinObjectKind; w: number; d: number } | null;
   onSelect: (id: string | null) => void;
   onHover: (id: string | null) => void;
-  onMove: (o: TwinObject, footprint: TwinFootprint) => Promise<boolean | void> | void;
+  onMove: (
+    o: TwinObject,
+    footprint: TwinFootprint,
+  ) => Promise<boolean | void> | void;
   onPlace: (cell: { x: number; z: number }) => void;
   onApi: (api: TwinCameraApi | null) => void;
   /** The first frame is on screen (the SVG placeholder can go). */
@@ -61,21 +74,34 @@ export interface TwinCanvasProps {
 const DISTANCE = 220;
 
 function prefersReducedMotion(): boolean {
-  return typeof window !== "undefined" && !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+  return (
+    typeof window !== "undefined" &&
+    !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches
+  );
 }
 
 // ---------------------------------------------------------------------------
 // Ground: the site slab and its 1 m grid (5 m lines a touch stronger)
 // ---------------------------------------------------------------------------
 
-function Ground({ grid, onGround, onGroundMove }: { grid: SiteGrid; onGround: (e: ThreeEvent<MouseEvent>) => void; onGroundMove: (e: ThreeEvent<PointerEvent>) => void }) {
+function Ground({
+  grid,
+  onGround,
+  onGroundMove,
+}: {
+  grid: SiteGrid;
+  onGround: (e: ThreeEvent<MouseEvent>) => void;
+  onGroundMove: (e: ThreeEvent<PointerEvent>) => void;
+}) {
   const lines = useMemo(() => {
     const minor: number[] = [];
     const major: number[] = [];
     const hw = grid.gridW / 2;
     const hd = grid.gridD / 2;
-    for (let x = 0; x <= grid.gridW; x++) (x % 5 === 0 ? major : minor).push(x - hw, 0.012, -hd, x - hw, 0.012, hd);
-    for (let z = 0; z <= grid.gridD; z++) (z % 5 === 0 ? major : minor).push(-hw, 0.012, z - hd, hw, 0.012, z - hd);
+    for (let x = 0; x <= grid.gridW; x++)
+      (x % 5 === 0 ? major : minor).push(x - hw, 0.012, -hd, x - hw, 0.012, hd);
+    for (let z = 0; z <= grid.gridD; z++)
+      (z % 5 === 0 ? major : minor).push(-hw, 0.012, z - hd, hw, 0.012, z - hd);
     const mk = (arr: number[]) => {
       const g = new THREE.BufferGeometry();
       g.setAttribute("position", new THREE.Float32BufferAttribute(arr, 3));
@@ -85,8 +111,12 @@ function Ground({ grid, onGround, onGroundMove }: { grid: SiteGrid; onGround: (e
   }, [grid.gridW, grid.gridD]);
   const mats = useMemo(
     () => ({
-      minor: new THREE.LineBasicMaterial({ color: new THREE.Color(clayColor("grid")) }),
-      major: new THREE.LineBasicMaterial({ color: new THREE.Color(clayColor(2)) }),
+      minor: new THREE.LineBasicMaterial({
+        color: new THREE.Color(clayColor("grid")),
+      }),
+      major: new THREE.LineBasicMaterial({
+        color: new THREE.Color(clayColor(2)),
+      }),
     }),
     [],
   );
@@ -108,9 +138,23 @@ function Ground({ grid, onGround, onGroundMove }: { grid: SiteGrid; onGround: (e
         onPointerMove={onGroundMove}
       />
       {/* a thin plinth so the site reads as a slab */}
-      <mesh geometry={boxGeometry()} material={clayMaterial(2)} scale={[grid.gridW, 0.4, grid.gridD]} position={[0, -0.205, 0]} raycast={() => null} />
-      <lineSegments geometry={lines.minor} material={mats.minor} raycast={() => null} />
-      <lineSegments geometry={lines.major} material={mats.major} raycast={() => null} />
+      <mesh
+        geometry={boxGeometry()}
+        material={clayMaterial(2)}
+        scale={[grid.gridW, 0.4, grid.gridD]}
+        position={[0, -0.205, 0]}
+        raycast={() => null}
+      />
+      <lineSegments
+        geometry={lines.minor}
+        material={mats.minor}
+        raycast={() => null}
+      />
+      <lineSegments
+        geometry={lines.major}
+        material={mats.major}
+        raycast={() => null}
+      />
     </group>
   );
 }
@@ -136,11 +180,19 @@ function CameraRig({
   const snapRef = useRef(snapshot);
   snapRef.current = snapshot;
   const tween = useRef<gsap.core.Tween | null>(null);
-  const fit = useCallback(() => fitZoom(grid, size.width, size.height), [grid, size.width, size.height]);
+  const fit = useCallback(
+    () => fitZoom(grid, size.width, size.height),
+    [grid, size.width, size.height],
+  );
 
   /** Put the camera at (target, azimuth, zoom) — instantly or with a short ease. */
   const goTo = useCallback(
-    (target: { x: number; z: number }, azimuth: number, zoom: number, animate = true) => {
+    (
+      target: { x: number; z: number },
+      azimuth: number,
+      zoom: number,
+      animate = true,
+    ) => {
       const ctl = controls.current;
       const cam = camera as THREE.OrthographicCamera;
       const from = {
@@ -174,7 +226,12 @@ function CameraRig({
         return;
       }
       const state = { ...from };
-      tween.current = gsap.to(state, { ...to, duration: 0.6, ease: "power2.inOut", onUpdate: () => apply(state) });
+      tween.current = gsap.to(state, {
+        ...to,
+        duration: 0.6,
+        ease: "power2.inOut",
+        onUpdate: () => apply(state),
+      });
     },
     [camera, controls, invalidate],
   );
@@ -224,22 +281,40 @@ function CameraRig({
       zoomBy: (f) => {
         const cam = camera as THREE.OrthographicCamera;
         const c = ctl();
-        const z = Math.max(c?.minZoom ?? 1, Math.min(c?.maxZoom ?? 400, cam.zoom * f));
-        goTo({ x: c?.target.x ?? 0, z: c?.target.z ?? 0 }, c?.getAzimuthalAngle() ?? ISO_AZIMUTH, z);
+        const z = Math.max(
+          c?.minZoom ?? 1,
+          Math.min(c?.maxZoom ?? 400, cam.zoom * f),
+        );
+        goTo(
+          { x: c?.target.x ?? 0, z: c?.target.z ?? 0 },
+          c?.getAzimuthalAngle() ?? ISO_AZIMUTH,
+          z,
+        );
       },
       rotate90: () => {
         const c = ctl();
-        goTo({ x: c?.target.x ?? 0, z: c?.target.z ?? 0 }, (c?.getAzimuthalAngle() ?? ISO_AZIMUTH) - Math.PI / 2, (camera as THREE.OrthographicCamera).zoom);
+        goTo(
+          { x: c?.target.x ?? 0, z: c?.target.z ?? 0 },
+          (c?.getAzimuthalAngle() ?? ISO_AZIMUTH) - Math.PI / 2,
+          (camera as THREE.OrthographicCamera).zoom,
+        );
       },
       reset: () => goTo({ x: 0, z: 0 }, ISO_AZIMUTH, fit()),
-      home: () => goTo({ x: 0, z: 0 }, ctl()?.getAzimuthalAngle() ?? ISO_AZIMUTH, fit()),
+      home: () =>
+        goTo({ x: 0, z: 0 }, ctl()?.getAzimuthalAngle() ?? ISO_AZIMUTH, fit()),
       flyTo: (id) => {
         const o = snapRef.current.objects.find((x) => x.id === id);
         if (!o) return;
         const c =
-          o.state.kind === "equipment" ? cellToWorld(o.state.position.x, o.state.position.z, grid) : footprintCenter(o.footprint, grid);
+          o.state.kind === "equipment"
+            ? cellToWorld(o.state.position.x, o.state.position.z, grid)
+            : footprintCenter(o.footprint, grid);
         const cam = camera as THREE.OrthographicCamera;
-        goTo(c, ctl()?.getAzimuthalAngle() ?? ISO_AZIMUTH, Math.max(cam.zoom, fit() * 2.2));
+        goTo(
+          c,
+          ctl()?.getAzimuthalAngle() ?? ISO_AZIMUTH,
+          Math.max(cam.zoom, fit() * 2.2),
+        );
       },
     };
     onApi(api);
@@ -254,10 +329,34 @@ function CameraRig({
 // Placement ghost (edit mode)
 // ---------------------------------------------------------------------------
 
-function Ghost({ cell, size, grid }: { cell: { x: number; z: number }; size: { w: number; d: number }; grid: SiteGrid }) {
+function Ghost({
+  cell,
+  size,
+  grid,
+}: {
+  cell: { x: number; z: number };
+  size: { w: number; d: number };
+  grid: SiteGrid;
+}) {
   const c = cellToWorld(cell.x + size.w / 2, cell.z + size.d / 2, grid);
-  const mat = useMemo(() => new THREE.MeshBasicMaterial({ color: new THREE.Color(clayColor(4)), transparent: true, opacity: 0.35 }), []);
-  return <mesh geometry={boxGeometry()} material={mat} scale={[size.w, 0.3, size.d]} position={[c.x, 0.15, c.z]} raycast={() => null} />;
+  const mat = useMemo(
+    () =>
+      new THREE.MeshBasicMaterial({
+        color: new THREE.Color(clayColor(4)),
+        transparent: true,
+        opacity: 0.35,
+      }),
+    [],
+  );
+  return (
+    <mesh
+      geometry={boxGeometry()}
+      material={mat}
+      scale={[size.w, 0.3, size.d]}
+      position={[c.x, 0.15, c.z]}
+      raycast={() => null}
+    />
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -265,12 +364,49 @@ function Ghost({ cell, size, grid }: { cell: { x: number; z: number }; size: { w
 // ---------------------------------------------------------------------------
 
 export function TwinCanvas(props: TwinCanvasProps) {
-  const { snapshot, selectedId, hoverId, editing, placing, onSelect, onHover, onMove, onPlace, onApi, onReady, onFail } = props;
-  const grid = useMemo(() => ({ gridW: snapshot.site.gridW, gridD: snapshot.site.gridD }), [snapshot.site.gridW, snapshot.site.gridD]);
+  const {
+    snapshot,
+    selectedId,
+    hoverId,
+    editing,
+    placing,
+    onSelect,
+    onHover,
+    onMove,
+    onPlace,
+    onApi,
+    onReady,
+    onFail,
+  } = props;
+  const grid = useMemo(
+    () => ({ gridW: snapshot.site.gridW, gridD: snapshot.site.gridD }),
+    [snapshot.site.gridW, snapshot.site.gridD],
+  );
   const controls = useRef<OrbitControlsImpl | null>(null);
   const [quadrant, setQuadrant] = useState<0 | 1 | 2 | 3>(0);
   const [ghost, setGhost] = useState<{ x: number; z: number } | null>(null);
   const agents = useMemo(() => agentsByObject(snapshot), [snapshot]);
+  const markerNodes = useRef(new Map<string, HTMLElement>());
+  const marked = useMemo(
+    () => snapshot.objects.filter((o) => agents.has(o.id) || o.alert),
+    [snapshot.objects, agents],
+  );
+  const focusedId = hoverId ?? selectedId;
+  const focus = useMemo(
+    () =>
+      focusedId
+        ? (snapshot.objects.find((o) => o.id === focusedId) ?? null)
+        : null,
+    [focusedId, snapshot.objects],
+  );
+  const anchors = useMemo<MarkerAnchor[]>(() => {
+    const out: MarkerAnchor[] = marked.map((o) => ({
+      key: `m:${o.id}`,
+      ...markerAnchor(o, grid),
+    }));
+    if (focus) out.push({ key: "focus", ...markerAnchor(focus, grid) });
+    return out;
+  }, [marked, focus, grid]);
   // R3F forces a context loss when the canvas unmounts (view switch): that is
   // not a GPU failure, so the handler ignores it.
   const unmounting = useRef(false);
@@ -300,11 +436,35 @@ export function TwinCanvas(props: TwinCanvasProps) {
   }, [snapshot.objects]);
 
   const ctx: SceneCtx = useMemo(
-    () => ({ grid, quadrant, selectedId, hoverId, editing, hollowBuildings, onSelect, onHover, onMove, controls }),
-    [grid, quadrant, selectedId, hoverId, editing, hollowBuildings, onSelect, onHover, onMove],
+    () => ({
+      grid,
+      quadrant,
+      selectedId,
+      hoverId,
+      editing,
+      hollowBuildings,
+      onSelect,
+      onHover,
+      onMove,
+      controls,
+    }),
+    [
+      grid,
+      quadrant,
+      selectedId,
+      hoverId,
+      editing,
+      hollowBuildings,
+      onSelect,
+      onHover,
+      onMove,
+    ],
   );
 
-  const fit0 = typeof window !== "undefined" ? fitZoom(grid, window.innerWidth * 0.7, 640) : 10;
+  const fit0 =
+    typeof window !== "undefined"
+      ? fitZoom(grid, window.innerWidth * 0.7, 640)
+      : 10;
   const start = isoCameraPosition({ x: 0, y: 0, z: 0 }, DISTANCE);
   const span = Math.max(grid.gridW, grid.gridD);
 
@@ -328,70 +488,99 @@ export function TwinCanvas(props: TwinCanvasProps) {
   };
 
   return (
-    <Canvas
-      orthographic
-      frameloop="demand"
-      shadows
-      flat
-      dpr={[1, 2]}
-      camera={{ position: [start.x, start.y, start.z], zoom: fit0, near: 1, far: 2000 }}
-      gl={{ antialias: true, alpha: true, powerPreference: "high-performance" }}
-      onCreated={({ gl }) => {
-        gl.domElement.addEventListener(
-          "webglcontextlost",
-          () => {
-            if (!unmounting.current) onFail("The 3D view lost its graphics context.");
-          },
-          { once: true },
-        );
-        requestAnimationFrame(() => onReady());
-      }}
-      onPointerMissed={() => !editing && onSelect(null)}
-      aria-label={`${snapshot.site.name} — 3D view`}
-      role="img"
-    >
-      <TwinSceneContext.Provider value={ctx}>
-        <ambientLight intensity={1.7} />
-        <directionalLight
-          position={[span * 0.45, span * 0.9, span * 0.3]}
-          intensity={1.9}
-          castShadow
-          shadow-mapSize={[2048, 2048]}
-          shadow-camera-left={-span * 0.8}
-          shadow-camera-right={span * 0.8}
-          shadow-camera-top={span * 0.8}
-          shadow-camera-bottom={-span * 0.8}
-          shadow-camera-near={1}
-          shadow-camera-far={span * 3}
-          shadow-bias={-0.0004}
-        />
-        <directionalLight position={[-span, span * 0.6, -span * 0.4]} intensity={0.45} />
-        <Ground grid={grid} onGround={onGround} onGroundMove={onGroundMove} />
-        {snapshot.objects.map((o) => (
-          <ObjectShell key={o.id} o={o} />
-        ))}
-        {snapshot.objects
-          .filter((o) => agents.has(o.id) || o.alert)
-          .map((o) => (
-            <ObjectMarkers key={`m-${o.id}`} o={o} agents={agents.get(o.id) ?? []} />
+    <div className="relative h-full w-full">
+      <Canvas
+        orthographic
+        frameloop="demand"
+        shadows
+        flat
+        dpr={[1, 2]}
+        camera={{
+          position: [start.x, start.y, start.z],
+          zoom: fit0,
+          near: 1,
+          far: 2000,
+        }}
+        gl={{
+          antialias: true,
+          alpha: true,
+          powerPreference: "high-performance",
+        }}
+        onCreated={({ gl }) => {
+          gl.domElement.addEventListener(
+            "webglcontextlost",
+            () => {
+              if (!unmounting.current)
+                onFail("The 3D view lost its graphics context.");
+            },
+            { once: true },
+          );
+          requestAnimationFrame(() => onReady());
+        }}
+        onPointerMissed={() => !editing && onSelect(null)}
+        aria-label={`${snapshot.site.name} — 3D view`}
+        role="img"
+      >
+        <TwinSceneContext.Provider value={ctx}>
+          <ambientLight intensity={1.7} />
+          <directionalLight
+            position={[span * 0.45, span * 0.9, span * 0.3]}
+            intensity={1.9}
+            castShadow
+            shadow-mapSize={[2048, 2048]}
+            shadow-camera-left={-span * 0.8}
+            shadow-camera-right={span * 0.8}
+            shadow-camera-top={span * 0.8}
+            shadow-camera-bottom={-span * 0.8}
+            shadow-camera-near={1}
+            shadow-camera-far={span * 3}
+            shadow-bias={-0.0004}
+          />
+          <directionalLight
+            position={[-span, span * 0.6, -span * 0.4]}
+            intensity={0.45}
+          />
+          <Ground grid={grid} onGround={onGround} onGroundMove={onGroundMove} />
+          {snapshot.objects.map((o) => (
+            <ObjectShell key={o.id} o={o} />
           ))}
-        <FocusLabel objects={snapshot.objects} />
-        {editing && placing && ghost && <Ghost cell={ghost} size={placing} grid={grid} />}
-        <OrbitControls
-          ref={controls}
-          makeDefault
-          enableDamping={false}
-          screenSpacePanning={false}
-          minPolarAngle={0.35}
-          maxPolarAngle={1.3}
-          minZoom={2}
-          maxZoom={200}
-          mouseButtons={{ LEFT: THREE.MOUSE.PAN, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.ROTATE }}
-          touches={{ ONE: THREE.TOUCH.PAN, TWO: THREE.TOUCH.DOLLY_ROTATE }}
-        />
-        <CameraRig snapshot={snapshot} controls={controls} onApi={onApi} onQuadrant={setQuadrant} />
-      </TwinSceneContext.Provider>
-    </Canvas>
+          <MarkerProjector anchors={anchors} nodes={markerNodes} />
+          {editing && placing && ghost && (
+            <Ghost cell={ghost} size={placing} grid={grid} />
+          )}
+          <OrbitControls
+            ref={controls}
+            makeDefault
+            enableDamping={false}
+            screenSpacePanning={false}
+            minPolarAngle={0.35}
+            maxPolarAngle={1.3}
+            minZoom={2}
+            maxZoom={200}
+            mouseButtons={{
+              LEFT: THREE.MOUSE.PAN,
+              MIDDLE: THREE.MOUSE.DOLLY,
+              RIGHT: THREE.MOUSE.ROTATE,
+            }}
+            touches={{ ONE: THREE.TOUCH.PAN, TWO: THREE.TOUCH.DOLLY_ROTATE }}
+          />
+          <CameraRig
+            snapshot={snapshot}
+            controls={controls}
+            onApi={onApi}
+            onQuadrant={setQuadrant}
+          />
+        </TwinSceneContext.Provider>
+      </Canvas>
+      <MarkerLayer
+        marked={marked}
+        agents={agents}
+        focus={focus}
+        focusedId={focusedId}
+        nodes={markerNodes}
+        onSelect={onSelect}
+      />
+    </div>
   );
 }
 

@@ -60,8 +60,12 @@ export function ObjectShell({ o }: { o: TwinObject }) {
   const selected = ctx.selectedId === o.id;
   const hovered = ctx.hoverId === o.id;
 
-  // Drop the draft once the server's footprint catches up.
-  useEffect(() => setDraft(null), [o.footprint]);
+  // Drop the draft once the server's footprint (its values, not the object
+  // identity a live frame hands us) catches up.
+  const fpKey = `${o.footprint.x},${o.footprint.z},${o.footprint.w},${o.footprint.d},${o.footprint.rotation}`;
+  useEffect(() => {
+    if (!drag.current) setDraft(null);
+  }, [fpKey]);
 
   const pos = useMemo(() => {
     if (o.state.kind === "equipment" && !draft) {
