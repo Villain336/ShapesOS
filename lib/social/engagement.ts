@@ -145,7 +145,8 @@ export async function runSocialSync(now: Date = new Date()): Promise<{ workspace
       // sidecar scope (its own Postiz; a shared one is refused on hosted).
       // The selection itself (getSocialProvider) is unchanged.
       const r = await withWorkspaceSidecars(ws.id, async () => {
-        const provider = getSocialProvider();
+        // Phase 15.4 (zernio): the provider is per workspace (its Zernio profile).
+        const provider = getSocialProvider(ws.id);
         return provider ? syncSocialWorkspace(ws.id, provider, now) : null;
       });
       if (!r) continue;

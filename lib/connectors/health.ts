@@ -12,7 +12,7 @@
 //      flow (lib/vault/refresh.ts), which talks only to provider token
 //      endpoints, never to user-configured hosts.
 //   2. Mock-only adapters (no live wiring) report `unknown` with an honest
-//      label — NEVER fake green. (Phase 4b wired the last six: 0 of the 27
+//      label — NEVER fake green. (Phase 4b wired the last six: 0 of the 28
 //      built-ins are mock-only and MOCK_ONLY_ADAPTER_KEYS in registry.ts is
 //      empty, but the rule stays for any future adapter.)
 //   5. Phase 4b: the MANUAL check (POST /api/connections/[id]/check) may
@@ -243,6 +243,28 @@ export async function checkConnection(
         liveCheck: false,
         label: "Live check unavailable — mock adapter (no live provider wiring yet).",
       });
+    }
+
+    // Phase 15.4 (zernio): a platform key (env), no per-connection
+    // credential — health follows the key, and a live check reads the
+    // workspace's profile (ZernioAdapter.healthCheck via deps.liveCheck).
+    if (connectorKey === "zernio") {
+      const { zernioMode } = await import("@/lib/zernio/config");
+      const mode = zernioMode();
+      if (mode === "off") return finish("error", "config_missing", { label: "ZERNIO_API_KEY is not set on this server." });
+      if (mode === "mock") {
+        return finish("unknown", "mock_adapter", { liveCheck: false, label: "Running on the labelled fake Zernio (no ZERNIO_API_KEY) — mock data." });
+      }
+      if (deps.liveCheck) {
+        const outcome = await deps.liveCheck(connectionId);
+        if (outcome?.ok) return finish("healthy", null, { lastSuccessAt: now });
+        if (outcome) {
+          const v = liveCheckVerdict(outcome.errorCode);
+          return finish(v.status, v.code);
+        }
+      }
+      if (prev?.lastSuccessAt) return finish("healthy", null);
+      return finish("unknown", "unverified", { label: "Platform key set — no successful Zernio call recorded yet." });
     }
 
     const authType = await getConnectionAuthType(connectorKey);

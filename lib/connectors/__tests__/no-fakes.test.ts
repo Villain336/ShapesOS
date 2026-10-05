@@ -25,6 +25,8 @@ const ENV_KEYS = [
   "ENRICHMENT_PROVIDERS",
   "VIBE_TEST_MODE",
   "TESTLAB_REAL_SEND",
+  // Phase 15.4 (zernio): the platform key — unset, production must say "not connected".
+  "ZERNIO_API_KEY",
 ] as const;
 
 let saved: Record<string, string | undefined> = {};

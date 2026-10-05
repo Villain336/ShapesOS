@@ -26,8 +26,10 @@ export async function probeConnection(connectionId: string): Promise<ProbeOutcom
   const adapter = resolveAdapter(connection.connectorKey);
   if (typeof adapter.healthCheck !== "function") return null;
   const { credential, refreshCredential } = await loadLiveCredential(connectionId);
-  if (!credential) return { ok: false, errorCode: "not_connected" };
-  const res = await adapter.healthCheck(credential, {
+  // Phase 15.4 (zernio): a platform-key connector (authType "none") has no
+  // stored credential — its healthCheck reads the key server-side.
+  if (!credential && adapter.authType !== "none") return { ok: false, errorCode: "not_connected" };
+  const res = await adapter.healthCheck(credential ?? { kind: "api_key", payload: {} }, {
     workspaceId: connection.workspaceId,
     userId: connection.userId,
     refreshCredential,

@@ -7,6 +7,7 @@ import { guardWorkspace, httpErrorResponse, readJson } from "@/lib/enrichment/gu
 import { FsError } from "@/lib/filesystem/service";
 import { HttpError } from "@/lib/api/errors";
 import { PostizApiError, PostizConfigError } from "@/lib/integrations/postiz";
+import { ZernioError } from "@/lib/zernio/client";
 
 export { guardWorkspace, readJson };
 
@@ -17,6 +18,8 @@ export function socialError(e: unknown): Response {
   }
   if (e instanceof PostizConfigError) return Response.json({ error: e.message }, { status: 400 });
   if (e instanceof PostizApiError) return Response.json({ error: e.message }, { status: e.status >= 500 ? 502 : e.status });
+  // Phase 15.4 (zernio): Zernio's own (key-scrubbed) message, never a 500.
+  if (e instanceof ZernioError) return Response.json({ error: e.message }, { status: e.code === "rate_limited" ? 429 : 502 });
   if (e instanceof HttpError) {
     return Response.json({ error: e.message, ...(e.code ? { code: e.code } : {}) }, { status: e.status });
   }

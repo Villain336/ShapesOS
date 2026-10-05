@@ -1,6 +1,6 @@
 // Marketr — M21 connectors, uniform interface (spec §7, §11).
 //
-// Every data source (27 built-in native adapters + workspace-custom MCP
+// Every data source (28 built-in native adapters + workspace-custom MCP
 // servers) implements ConnectorAdapter so the agent loop, skill-declared
 // tool gating, and project data-source bindings all go through one
 // interface. Credentials are decrypted server-side only (lib/vault) and
@@ -83,6 +83,21 @@ export interface ConnectorAdapter {
    * the manual connector health check. Only live-wired adapters define it.
    */
   healthCheck?(credential: DecryptedCredential, ctx: InvokeContext): Promise<InvokeResult>;
+  /**
+   * Phase 15.4 (zernio): refine the automation action of a mutating call from
+   * SERVER-SIDE state (e.g. a budget change is "update_campaign_budget" —
+   * Tier 3 — unless a live read proves it lowers spend). Returns null to keep
+   * the static connectorAction(); must fail safe (any doubt → null / the
+   * stricter action). Never trusts the model's description of the call.
+   */
+  resolveAction?(tool: string, args: Record<string, unknown>, ctx: InvokeContext): Promise<string | null>;
+  /**
+   * Phase 15.4 (zernio): a dry run before a mutating call is PROPOSED (e.g. an
+   * ad create's validateOnly). ok:false → the call is refused and never
+   * proposed; ok:true → its summary is shown with the proposal. null = no dry
+   * run for this tool.
+   */
+  preflight?(tool: string, args: Record<string, unknown>, ctx: InvokeContext): Promise<InvokeResult | null>;
 }
 
 /** Tool argument helper: string property. */

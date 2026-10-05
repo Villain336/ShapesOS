@@ -38,6 +38,17 @@ export interface CreditCostDef {
   category?: CreditCategory;
 }
 
+// ── Phase 15.4 (zernio): connected Zernio accounts + managed ads ──────────
+// OWNER KNOBS. Zernio bills ShapesOS per connected account per month (2 free,
+// accounts 3–10 at $6, 11–100 at $3, 101+ at $1; ads included, managed ads
+// 500 free per account per month then a per-active-ad charge).
+/** Credits per connected Zernio account per month: ~2× Zernio's marginal $3 rate (1 credit = $0.01). */
+export const ZERNIO_ACCOUNT_MONTH_CREDITS = 600;
+/** Every workspace's first connected accounts are included, whatever the plan (plans may include more: lib/billing/entitlements.ts ZERNIO_INCLUDED_ACCOUNTS). */
+export const ZERNIO_FREE_ACCOUNTS_PER_WORKSPACE = 2;
+/** Managed-ad overage Zernio bills for a workspace's profile is passed through at cost × this margin. */
+export const ZERNIO_MANAGED_ADS_MARGIN = 1.25;
+
 export const CREDIT_COSTS = {
   // ── SEO data actions (cost-plus, ~4x raw DataForSEO cost) ──
   /** 1 keyword, live SERP. */
@@ -193,6 +204,23 @@ export const CREDIT_COSTS = {
    * (the import route has metered it since Phase 11; the action was missing
    * from the table, so every charge came back "unknown_action"). */
   penpot_import: { credits: 0, basis: "free", description: "Penpot token import (BYO instance)", category: "other" },
+  // ── Phase 15.4 (zernio) — appended; the keys workstream appends its own ──
+  /** One connected Zernio account beyond the included ones, for one month
+   *  (lib/zernio/metering.ts; idempotent per workspace + month). */
+  zernio_account_month: {
+    credits: ZERNIO_ACCOUNT_MONTH_CREDITS,
+    basis: "cost-plus",
+    description: "Zernio: 1 connected account for a month, beyond the included accounts",
+    category: "messaging",
+  },
+  /** Managed-ad overage Zernio billed for the workspace's profile, passed
+   *  through at cost × ZERNIO_MANAGED_ADS_MARGIN (credits override). */
+  zernio_managed_ads: {
+    credits: 0,
+    basis: "passthrough",
+    description: "Zernio managed ads beyond the free allowance: Zernio's charge at cost plus margin",
+    category: "messaging",
+  },
 } as const satisfies Record<string, CreditCostDef>;
 
 // ── Phase 15.2: cost-based conversions (named constants; owner knobs) ───────

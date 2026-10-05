@@ -125,6 +125,16 @@ export default function ConnectButton({
   if (platformKey === "stackadapt") {
     return <StackAdaptKeyForm />;
   }
+  if (platformKey === "zernio") {
+    // Phase 15.4 (zernio): ad accounts connect on the Zernio card (one
+    // profile per workspace; the platform key is pre-added).
+    return (
+      <a href="/dashboard/settings/connectors#zernio" className={btnPrimarySm}>
+        <PlugZap className="h-3.5 w-3.5" />
+        Connect ad accounts
+      </a>
+    );
+  }
   if (platformKey === "spotify" || platformKey === "walmart") {
     // Tico 2026-09-30: both ship as "coming soon" in the hub — the guided
     // flows stay in the codebase, staged behind this badge until launch.

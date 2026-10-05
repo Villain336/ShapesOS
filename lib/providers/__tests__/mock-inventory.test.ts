@@ -54,6 +54,7 @@ const REQUIRED = [
   "calls",
   "stripe",
   "composio",
+  "zernio", // Phase 15.4
   "activepieces",
 ];
 
@@ -63,7 +64,7 @@ describe("mockInventory", () => {
     assert.deepEqual(inv.map((e) => e.key).sort(), [...REQUIRED].sort());
     assert.equal(inv.filter((e) => e.mode === "live").length, 0);
     // Things that run on sample data are "mock"; things that refuse are "off".
-    for (const k of ["llm-copy", "llm-bulk", "llm-background", "seo-data", "email-messaging", "sms", "calls", "composio"]) {
+    for (const k of ["llm-copy", "llm-bulk", "llm-background", "seo-data", "email-messaging", "sms", "calls", "composio", "zernio"]) {
       assert.equal(by(inv, k).mode, "mock", k);
     }
     for (const k of ["images", "contextdev", "email-system", "stripe", "activepieces"]) {
@@ -92,6 +93,7 @@ describe("mockInventory", () => {
       COMPOSIO_API_KEY: "c",
       ACTIVEPIECES_URL: "https://ap.example.test/",
       ACTIVEPIECES_API_KEY: "a",
+      ZERNIO_API_KEY: "z", // Phase 15.4
     };
     const inv = mockInventory(env, { llm: allLiveLlm, contextDevConnected: true });
     assert.deepEqual(notLive(inv), []);

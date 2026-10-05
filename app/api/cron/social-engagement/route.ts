@@ -23,7 +23,8 @@ export async function POST(req: Request) {
   if (!gate.isCron) {
     // Phase 15.1: the signed-in workspace's own sidecar scope.
     return withWorkspaceSidecars(gate.workspaceId!, async () => {
-      const provider = getSocialProvider();
+      // Phase 15.4: the provider is per workspace (its Zernio profile on hosted).
+      const provider = getSocialProvider(gate.workspaceId);
       if (!provider) return Response.json({ skipped: "no social provider configured" });
       return Response.json(await syncSocialWorkspace(gate.workspaceId!, provider));
     });
