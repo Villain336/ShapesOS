@@ -14,6 +14,9 @@
 //     lower the quantity (paying less needs no confirmation).
 //   - SCIM / SSO auto-provisioning can't confirm anything, so past the
 //     included + approved seats they are refused, never charged.
+//   - an approval is for one plan's per-seat price on one subscription: a
+//     plan change, a new subscription or an ended one resets it to 0
+//     (lib/metering/billing.ts resetSeatApproval, audited).
 // Trial: a hard seat limit (no extra seats). Self-hosted: unlimited, free.
 // A paid plan whose extra seats can't be billed on this deployment (no
 // Stripe, no subscription, no seat Price) keeps the included seats as a hard

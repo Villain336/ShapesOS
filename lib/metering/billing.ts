@@ -778,6 +778,8 @@ export class StripeBillingSink implements BillingSink {
       .catch(() => null);
     if (!prior || prior.planId !== planId) {
       await setWorkspacePlan(workspaceId, planId as Plan, `subscribed via Stripe (${subscriptionId})`);
+    } else if (prior.stripeSubscriptionId !== subscriptionId) {
+      await resetSeatApproval(workspaceId, `new subscription ${subscriptionId}`);
     }
     // Phase 15.3: bring the seat line in line with the new plan (never above
     // the admin-approved extra seats). Best-effort: a failure is recorded and
@@ -1495,6 +1497,24 @@ async function setWorkspacePlan(workspaceId: string, planId: Plan, reason: strin
   // an upgraded workspace is never left capped at the old tier's pool.
   await applyPlanChange(workspaceId, planId);
   await auditBilling(workspaceId, `Billing: plan set to ${planId} (${reason})`);
+  // Phase 15.3: an admin approved extra seats at THAT plan's per-seat price;
+  // a different plan has a different price, so the approval never carries over.
+  await resetSeatApproval(workspaceId, `plan changed to ${planId}`);
+}
+
+/**
+ * Phase 15.3: drop the admin-approved extra-seat ceiling (plan change, a new
+ * subscription, or the subscription ended). Extra seats are then billed
+ * again only after an admin confirms them at the current price.
+ */
+async function resetSeatApproval(workspaceId: string, why: string): Promise<void> {
+  const r = await prisma.billingWorkspace.updateMany({
+    where: { workspaceId, approvedExtraSeats: { gt: 0 } },
+    data: { approvedExtraSeats: 0 },
+  });
+  if (r.count > 0) {
+    await auditBilling(workspaceId, `Billing: approved extra seats reset to 0 (${why}) — an admin confirms extra seats again at the current price`);
+  }
 }
 
 export interface SubscriptionState {
@@ -1637,6 +1657,8 @@ export async function syncSeatQuantityWith(client: SeatStripeClient, workspaceId
 
   if (!row || !BILLABLE_SUBSCRIPTION_STATUSES.includes(row.status) || !isPaidPlanId(ws.plan)) {
     if (bw.billedExtraSeats !== 0) await recordBilled(0, false);
+    // The approval belonged to a subscription that no longer bills.
+    if (row && !BILLABLE_SUBSCRIPTION_STATUSES.includes(row.status)) await resetSeatApproval(workspaceId, `subscription ${row.status}`);
     return { status: "not_billable", workspaceId, quantity: 0, reason: !row ? "no subscription" : `subscription ${row.status}` };
   }
 

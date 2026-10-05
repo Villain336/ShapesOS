@@ -359,7 +359,22 @@ describe("subscription webhooks with a seat line", () => {
       assert.equal(row?.planId, "pro");
       assert.equal(row?.interval, "year");
       assert.equal((await prisma.workspace.findUniqueOrThrow({ where: { id: WS } })).plan, "pro");
+      assert.equal((await billing()).approvedExtraSeats, 5, "same plan: the admin's approval stands");
+
+      // A plan change (here Pro → Starter through the portal) changes the
+      // per-seat price: the approval does NOT carry over (audited).
+      const moved = {
+        ...sub,
+        items: { data: [{ id: "si_FAKE_base", price: { id: "price_FAKE_starter_month" }, quantity: 1 }] },
+      } as unknown as Stripe.Subscription;
+      assert.equal((await syncSubscriptionFromStripe(moved, false)).ok, true);
+      assert.equal((await prisma.workspace.findUniqueOrThrow({ where: { id: WS } })).plan, "starter");
+      assert.equal((await billing()).approvedExtraSeats, 0);
+      const reset = await prisma.fileChangeLog.findMany({ where: { workspaceId: WS, summary: { contains: "approved extra seats reset to 0" } } });
+      assert.equal(reset.length, 1);
     } finally {
+      await prisma.workspace.update({ where: { id: WS }, data: { plan: "pro" } });
+      await prisma.billingWorkspace.update({ where: { workspaceId: WS }, data: { approvedExtraSeats: 5 } });
       delete process.env.STRIPE_PRICE_PRO_ANNUAL;
       delete process.env.STRIPE_PRICE_SEAT_PRO_ANNUAL;
       await prisma.$executeRaw`UPDATE billing_subscriptions SET billing_interval = 'month' WHERE workspace_id = ${WS}`;

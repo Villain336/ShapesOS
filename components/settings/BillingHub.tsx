@@ -477,7 +477,8 @@ export default function BillingHub({
                 <p className="mt-3 text-xs text-muted">
                   Extra seats are only charged after an admin confirms the price — when adding a member past
                   your seats, or by approving seats here (needed for SCIM and SSO, which can&rsquo;t ask).
-                  Removing members lowers the bill automatically.
+                  Removing members lowers the bill automatically. A plan change resets the approval, since
+                  the per-seat price changes with the plan.
                 </p>
               </div>
             </section>
