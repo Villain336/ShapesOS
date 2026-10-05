@@ -29,12 +29,14 @@ export async function loadLiveCredential(
   const refreshCredential = async (): Promise<DecryptedCredential | null> => {
     if (refreshedOnce) return null;
     refreshedOnce = true;
-    const outcome = await refreshConnection(connectionId, { fetchImpl: deps.fetchImpl });
+    const outcome = await refreshConnection(connectionId, { fetchImpl: deps.fetchImpl, resolve: deps.resolve });
     return outcome === "refreshed" ? getDecryptedCredential(connectionId) : null;
   };
 
   let credential = await getDecryptedCredential(connectionId);
-  if (credential?.kind === "oauth2" && typeof credential.payload.refresh_token === "string") {
+  // Phase 14 (connectors): a Shopify client-credentials token (24 h, no
+  // refresh token) is renewed up front the same way.
+  if (credential?.kind === "oauth2" && (typeof credential.payload.refresh_token === "string" || credential.payload.auth_mode === "client_credentials")) {
     const row = await prisma.connectorCredential.findUnique({
       where: { connectionId },
       select: { expiresAt: true },

@@ -179,7 +179,8 @@ function LiveIndicator({ status, generatedAt }: { status: TwinLiveStatus; genera
       className="flex h-11 items-center gap-2 rounded-full bg-paper px-3.5 shadow-hairline"
       role="status"
       aria-live="polite"
-      title={`${status === "off" ? "Live updates need the editor role. " : ""}Updated ${Number.isNaN(updated.getTime()) ? "—" : updated.toLocaleTimeString("en-GB")}`}
+      data-live-status={status}
+      title={`${status === "off" ? "Live updates stopped (this site is no longer published, or it was removed) — reload to check. " : ""}Updated ${Number.isNaN(updated.getTime()) ? "—" : updated.toLocaleTimeString("en-GB")}`}
     >
       <span
         aria-hidden

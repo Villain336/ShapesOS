@@ -43,6 +43,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ platform: 
     "x-shopify-hmac-sha256",
     "x-shopify-topic",
     "x-shopify-webhook-id",
+    "x-shopify-shop-domain",
     "x-hub-signature-256",
     "x-wc-webhook-signature",
     "x-sfdc-signature",
@@ -90,6 +91,14 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ platform: 
   // biz_sync_links). Topics the graph mapper has no facts for (customers,
   // inventory levels) skip the graph ingest instead of dead-lettering.
   let ops: { applied: boolean; detail: string } | null = null;
+  // Phase 14 (connectors): the app was removed from the store — revoke the
+  // connection(s) and stop ingest (lib/bizsync/shopify/uninstall.ts). The
+  // shop body has no graph facts; answer 200 so Shopify doesn't retry.
+  if (platform === "shopify" && topic === "app/uninstalled") {
+    const { handleShopifyAppUninstalled } = await import("@/lib/bizsync/shopify/uninstall");
+    const r = await handleShopifyAppUninstalled(workspaceId, connector, headers["x-shopify-shop-domain"] ?? null, body);
+    return Response.json({ accepted: true, status: 200, factsAppended: 0, detail: r.detail, ops: { applied: r.applied, detail: r.detail } }, { status: 200 });
+  }
   if (platform === "shopify") {
     const { applyShopifyWebhook, isOpsTopic } = await import("@/lib/bizsync/shopify/sync");
     try {

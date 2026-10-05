@@ -14,8 +14,13 @@
 //                      locations (refused over newer Shopify changes unless
 //                      force)  [mutating — update_store_inventory, asks]
 //   register_webhooks  subscribe the store's orders/products/customers/
-//                      inventory webhooks to the existing signed Tier-W
-//                      ingest route  [mutating — connector_write, asks]
+//                      inventory webhooks (+ app/uninstalled, Phase 14) to
+//                      the existing signed Tier-W ingest route  [mutating —
+//                      connector_write, asks]
+// Phase 14 (connectors): the credential may also come from the single-store
+// connection (lib/bizsync/shopify/single-store.ts — a Dev Dashboard app's
+// client-credentials token or an existing custom app's token); it is stored
+// with the same { access_token, shop } keys, so nothing here changes.
 // Every run is logged in biz_sync_runs (Settings → Connectors → Business sync).
 //
 // MOCK MODE (no credential; dev/test/demo only — production answers "not

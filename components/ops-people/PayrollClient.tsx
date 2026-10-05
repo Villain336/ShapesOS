@@ -501,3 +501,62 @@ export function PayRunActions({ id, label, status, summary }: { id: string; labe
     </div>
   );
 }
+
+/**
+ * Phase 14 (connectors): the Gusto steps on a pay run. "Send to Gusto" is
+ * Tier 3 (an OPS_PAYROLL_SEND_PROVIDER approval, bound to the run's figures:
+ * never automated, always asks); "Sync results" brings Gusto's processed
+ * taxes and net pay back (and, once posted and paid, clears net pay).
+ */
+export function GustoPayRunActions({ id, label, status, gustoStatus, stale, summary }: { id: string; label: string; status: string; gustoStatus: string | null; stale: boolean; summary: string }) {
+  const router = useRouter();
+  const gated = useGated();
+  const [busy, setBusy] = useState(false);
+
+  const send = () =>
+    gated.start({
+      label: "Send pay run to Gusto",
+      summary: `${summary}. Gusto computes the taxes; you review and submit the payroll in Gusto.`,
+      executeLabel: "Send to Gusto",
+      send: (approvalId) => jsonPost(`/api/ops/pay-runs/${id}/send_to_gusto`, approvalId ? { approvalId } : {}),
+      onDone: () => {
+        gated.setNote(`Sent ${label} to Gusto. Review and submit the payroll in Gusto, then sync the results here.`);
+        router.refresh();
+      },
+    });
+
+  async function sync() {
+    setBusy(true);
+    gated.setError(null);
+    const r = await jsonPost(`/api/ops/pay-runs/${id}/sync_gusto`, {});
+    setBusy(false);
+    if (!r.ok) return gated.setError(await readErr(r));
+    const j = (await r.json().catch(() => ({}))) as { gusto?: { outcome?: string; detail?: string; changed?: boolean; paid?: boolean; discrepancies?: string[] } };
+    const g = j.gusto ?? {};
+    if (g.outcome === "not_processed") gated.setNote(g.detail ?? "Gusto hasn't processed this payroll yet.");
+    else gated.setNote([g.changed ? "Gusto's taxes and net pay are on the payslips." : "Up to date with Gusto.", g.paid ? "Gusto reports it paid." : "", g.discrepancies?.length ? `Differences recorded: ${g.discrepancies.length}.` : ""].filter(Boolean).join(" "));
+    router.refresh();
+  }
+
+  const canSend = status === "computed" && (gustoStatus === null || (gustoStatus === "sent" && stale));
+  const canSync = status !== "cancelled" && status !== "draft" && gustoStatus !== null;
+  return (
+    <div className="flex flex-col items-start gap-3">
+      <div className="flex flex-wrap gap-2">
+        {canSend ? (
+          <button type="button" className={aosButton({ variant: "primary", size: "sm" })} disabled={busy || gated.busy} onClick={send}>
+            {gustoStatus ? "Send again to Gusto" : "Send to Gusto"}
+          </button>
+        ) : null}
+        {canSync ? (
+          <button type="button" className={aosButton({ variant: "secondary", size: "sm" })} disabled={busy || gated.busy} onClick={sync}>
+            {busy ? "Syncing…" : "Sync results"}
+          </button>
+        ) : null}
+      </div>
+      {gated.card}
+      {gated.error ? <ErrorLine>{gated.error}</ErrorLine> : null}
+      {gated.note ? <Note>{gated.note}</Note> : null}
+    </div>
+  );
+}

@@ -122,6 +122,8 @@ const keyOf: Record<string, string> = {
   hubspot: "hubspot", linear: "linear", jira: "jira", airtable: "airtable",
   supabase: "supabase", netlify: "netlify", shopify: "shopify",
   quickbooks: "quickbooks", xero: "xero",
+  // Phase 14 (connectors).
+  gusto: "gusto",
 };
 // Shared helpers that live beside the adapters but are not connectors.
 const sharedNativeModules = new Set(["accounting"]);

@@ -306,6 +306,6 @@ describe("OAuth + adapter wiring", () => {
     assert.equal(connectorGroup("shopify"), "ops");
     assert.equal(connectorAction("shopify", "sync_from_shopify"), "import_commerce_data");
     assert.equal(connectorAction("shopify", "push_inventory"), "update_store_inventory");
-    assert.equal(connectorAction("shopify", "register_webhooks"), "connector_write");
+    assert.equal(connectorAction("shopify", "register_webhooks"), "write_shopify");
   });
 });

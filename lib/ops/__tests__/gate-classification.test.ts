@@ -26,13 +26,13 @@ import {
 const RANK: Record<RiskTier, number> = { low: 0, medium: 1, high: 2 };
 
 describe("ops gate classification", () => {
-  it("pins 26 money actions with medium-minimum tiers (bulk refund and payroll approval high)", () => {
+  it("pins 27 money actions with medium-minimum tiers (bulk refund and payroll approval high)", () => {
     // 12 + Phase 10 (finance): journal post/reverse, credit note, quote send,
     // bill pay, expense approve/reimburse + Phase 12 (mfgpos): MO confirm /
     // complete, scrap, till session close + Phase 12 (people): payroll
     // approve (high) and post.
     // + Phase 13 (twincore): publishing a twin site layout.
-    assert.equal(OPS_MONEY_ACTIONS.length, 26);
+    assert.equal(OPS_MONEY_ACTIONS.length, 27); // Phase 14 (connectors): + OPS_PAYROLL_SEND_PROVIDER
     const pins: Record<string, RiskTier> = {
       OPS_INVOICE_SEND: "medium",
       OPS_INVOICE_MARK_PAID: "medium",
@@ -68,6 +68,8 @@ describe("ops gate classification", () => {
       // Phase 12 (people)
       OPS_PAYROLL_APPROVE: "high",
       OPS_PAYROLL_POST: "medium",
+      // Phase 14 (connectors)
+      OPS_PAYROLL_SEND_PROVIDER: "medium",
       // Phase 13 (twincore)
       OPS_TWIN_SITE_PUBLISH: "medium",
     };
@@ -82,7 +84,7 @@ describe("ops gate classification", () => {
 
   it("Phase 14 derivation meets or exceeds every ops pin (no drift)", () => {
     const rows = assertPhase14TierMeetsPin();
-    assert.equal(rows.length, 26); // 12 + 7 Phase 10 (finance) + 4 Phase 12 (mfgpos) + 2 Phase 12 (people) + 1 Phase 13 (twincore)
+    assert.equal(rows.length, 27); // 12 + 7 Phase 10 (finance) + 4 Phase 12 (mfgpos) + 2 Phase 12 (people) + 1 Phase 13 (twincore) + 1 Phase 14 (connectors: Gusto send)
     for (const r of rows) {
       assert.ok(
         RANK[r.derived] >= RANK[r.expected],

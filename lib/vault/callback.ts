@@ -194,10 +194,10 @@ export async function handleOAuthCallback(
     connectorKey: parsed.connectorKey,
     token,
     scopes: config.scopes,
-    routing: config.callbackMeta?.(query, parsed) ?? {},
+    routing: { ...(config.callbackMeta?.(query, parsed) ?? {}), ...(config.refreshWithRedirectUri ? { redirect_uri: redirectUri } : {}) },
   });
   // Phase 11 (bizsync): Shopify webhook route / Xero tenant discovery.
-  if (parsed.connectorKey === "shopify" || parsed.connectorKey === "xero") {
+  if (parsed.connectorKey === "shopify" || parsed.connectorKey === "xero" || parsed.connectorKey === "gusto") {
     const { onBizsyncConnected } = await import("@/lib/bizsync/install");
     await onBizsyncConnected({ connectorKey: parsed.connectorKey, connection, fetchImpl: deps.fetchImpl });
   }

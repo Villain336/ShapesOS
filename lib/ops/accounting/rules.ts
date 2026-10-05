@@ -418,6 +418,17 @@ export function payRunPostLines(t: PayRunTotals): DraftLine[] {
   ]);
 }
 
+// Phase 14 (connectors): a payroll provider (Gusto) paid the run's net pay
+// from the bank — the liability the posted run created is settled.
+//   Dr Net pay payable (net)
+//     Cr Cash and bank (net)
+export function payRunNetPayPaidLines(netCents: number): DraftLine[] {
+  return compactLines([
+    dr({ key: "wages_payable" }, netCents, "Net pay paid"),
+    cr({ key: "cash" }, netCents, "Net pay paid by the payroll provider"),
+  ]);
+}
+
 // Phase 12 (people): a paid event registration is a cash sale like a web
 // order (no tax line — ticket prices are tax-inclusive or untaxed).
 export function eventTicketSaleLines(amountCents: number): DraftLine[] {

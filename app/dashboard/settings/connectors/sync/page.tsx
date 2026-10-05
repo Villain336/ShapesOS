@@ -1,7 +1,7 @@
 // ShapesOS — Phase 11 (bizsync): Settings → Connectors → Business sync.
 // Admin+ only (server-gated, like the Connectors page). Sync status, last
-// run, errors, and the mappings a person confirms for Shopify, QuickBooks
-// and Xero.
+// run, errors, and the mappings a person confirms for Shopify, QuickBooks,
+// Xero and (Phase 14) Gusto employees.
 
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -20,7 +20,7 @@ export default async function BusinessSyncPage({ searchParams }: { searchParams:
   const membership = await requireWorkspaceRole(user.id, workspace.id, "admin");
   if (!membership) redirect("/dashboard");
   const { provider } = await searchParams;
-  const initial = provider === "quickbooks" || provider === "xero" || provider === "shopify" ? provider : undefined;
+  const initial = provider === "quickbooks" || provider === "xero" || provider === "shopify" || provider === "gusto" ? provider : undefined;
 
   return (
     <div className="flex flex-col gap-6">
@@ -30,7 +30,7 @@ export default async function BusinessSyncPage({ searchParams }: { searchParams:
         </Link>
         <h1 className="aos-heading mt-1">Business sync</h1>
         <p className="mt-0.5 text-[13px] text-muted">
-          {workspace.name} — Shopify, QuickBooks and Xero: what is mapped, when it last ran, and what needs you.
+          {workspace.name} — Shopify, QuickBooks, Xero and Gusto: what is mapped, when it last ran, and what needs you.
         </p>
       </div>
       <SettingsNav />
