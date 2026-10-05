@@ -4,13 +4,16 @@
 // person makes — Shopify location ↔ stock location, the Xero organisation,
 // and the chart-of-accounts mapping (shared QuickBooks/Xero model). Syncs and
 // exports themselves run as agent tools that always ask first.
+// Phase 14 (connectors): + Gusto — a person confirms which Gusto employee each
+// team member is (email matches are only suggestions); pay runs are sent to
+// Gusto from the pay run page.
 // Run and connection states are provider states, not agent states: neutral
 // chips, never the status colors.
 
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { BookOpen, Calculator, Check, RefreshCw, ShoppingBag, type LucideIcon } from "lucide-react";
+import { BookOpen, Calculator, Check, RefreshCw, ShoppingBag, Wallet, type LucideIcon } from "lucide-react";
 import {
   btnGhostSm,
   btnPrimarySm,
@@ -26,7 +29,7 @@ import {
   thCls,
 } from "@/components/crm/ui";
 
-type Provider = "shopify" | "quickbooks" | "xero";
+type Provider = "shopify" | "quickbooks" | "xero" | "gusto";
 
 interface RunView {
   id: string;
@@ -69,6 +72,7 @@ const META: Record<Provider, { label: string; icon: LucideIcon; tools: string }>
   shopify: { label: "Shopify", icon: ShoppingBag, tools: "shopify.sync_from_shopify, shopify.push_inventory, shopify.register_webhooks" },
   quickbooks: { label: "QuickBooks", icon: Calculator, tools: "quickbooks.import_contacts, quickbooks.post_to_quickbooks" },
   xero: { label: "Xero", icon: BookOpen, tools: "xero.import_contacts, xero.post_to_xero" },
+  gusto: { label: "Gusto", icon: Wallet, tools: "gusto.sync_employees, gusto.send_payroll" },
 };
 
 const OBJECT_LABEL: Record<string, string> = {
@@ -82,6 +86,7 @@ const OBJECT_LABEL: Record<string, string> = {
   vendor: "vendors",
   invoice_customer: "invoice customers",
   item: "sales items",
+  employee: "employees",
 };
 
 type Loaded<T> = { ok: true; data: T } | { ok: false; error: string | null };
@@ -228,7 +233,8 @@ function ProviderPanel({ workspaceId, status, onChanged }: { workspaceId: string
 
       {conn?.status === "active" && status.provider === "xero" && <XeroTenantPicker workspaceId={workspaceId} status={status} onChanged={onChanged} />}
       {conn?.status === "active" && status.provider === "shopify" && <LocationMapping workspaceId={workspaceId} />}
-      {conn?.status === "active" && status.provider !== "shopify" && (status.provider !== "xero" || status.tenantId) && (
+      {conn?.status === "active" && status.provider === "gusto" && <EmployeeMapping workspaceId={workspaceId} />}
+      {conn?.status === "active" && (status.provider === "quickbooks" || status.provider === "xero") && (status.provider !== "xero" || status.tenantId) && (
         <AccountMapping workspaceId={workspaceId} provider={status.provider} />
       )}
 
@@ -291,7 +297,9 @@ function ProviderPanel({ workspaceId, status, onChanged }: { workspaceId: string
       </section>
 
       <p className={infoBoxCls}>
-        Syncs and exports run as agent tools ({meta.tools}) and always ask before they write. Posting to accounting software is never automated.
+        {status.provider === "gusto"
+          ? `Pay runs go to Gusto from the pay run page (or the ${meta.tools} agent tools). Sending payroll is never automated: it always asks, and you submit the payroll in Gusto yourself.`
+          : `Syncs and exports run as agent tools (${meta.tools}) and always ask before they write. Posting to accounting software is never automated.`}
       </p>
     </div>
   );
@@ -423,6 +431,130 @@ function LocationMapping({ workspaceId }: { workspaceId: string }) {
                       <button onClick={() => save(l.id)} disabled={busy === l.id || !choice[l.id] || choice[l.id] === linked} className={btnPrimarySm}>
                         {busy === l.id ? "Saving…" : "Save"}
                       </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+  );
+}
+
+interface EmployeeView {
+  remote: Array<{ id: string; name: string; email: string | null; terminated: boolean }>;
+  local: Array<{ id: string; name: string; email: string | null; status: string }>;
+  links: Array<{ remoteId: string; localId: string; confirmed: boolean; matchedBy: string | null }>;
+  suggestions: Array<{ remoteId: string; localId: string; email: string }>;
+  truncated: boolean;
+}
+
+/** Phase 14: Gusto employee ↔ team member — a person confirms every match. */
+function EmployeeMapping({ workspaceId }: { workspaceId: string }) {
+  const [data, setData] = useState<EmployeeView | null>(null);
+  const [choice, setChoice] = useState<Record<string, string>>({});
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const q = `workspaceId=${encodeURIComponent(workspaceId)}`;
+  const apply = useCallback((res: Loaded<EmployeeView>) => {
+    if (!res.ok) {
+      setMsg({ ok: false, text: res.error ?? "Could not load Gusto employees." });
+      return;
+    }
+    setData(res.data);
+    const next: Record<string, string> = {};
+    for (const s of res.data.suggestions) next[s.remoteId] = s.localId;
+    for (const l of res.data.links) next[l.remoteId] = l.localId;
+    setChoice(next);
+  }, []);
+  const load = useCallback(async () => apply(await getJson<EmployeeView>(`/api/bizsync/gusto?${q}`)), [apply, q]);
+  useEffect(() => {
+    let live = true;
+    getJson<EmployeeView>(`/api/bizsync/gusto?${q}`).then((res) => {
+      if (live) apply(res);
+    });
+    return () => {
+      live = false;
+    };
+  }, [apply, q]);
+  async function save(remoteEmployeeId: string, memberId: string | null) {
+    setBusy(remoteEmployeeId);
+    setMsg(null);
+    try {
+      const r = await fetch(`/api/bizsync/gusto`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ workspaceId, action: "map_employee", remoteEmployeeId, memberId }) });
+      const j = await r.json().catch(() => ({}));
+      setMsg(r.ok ? { ok: true, text: memberId ? "Match confirmed. Pay runs send this person's hours to Gusto." : "Match cleared." } : { ok: false, text: j.error ?? "Could not save the match." });
+      if (r.ok) load();
+    } finally {
+      setBusy(null);
+    }
+  }
+  const unconfirmed = data ? data.remote.filter((e) => !data.links.some((l) => l.remoteId === e.id && l.confirmed)).length : 0;
+  return (
+    <section>
+      <h3 className="mb-1 text-[13px] font-bold text-ink">Gusto employees</h3>
+      <p className="mb-2 text-[13px] text-muted">
+        Confirm which team member each Gusto employee is. Email matches are suggestions; only confirmed matches are used when a pay run is sent to Gusto.{" "}
+        {data ? `${unconfirmed} not confirmed.` : ""}
+      </p>
+      {msg && <p className={`mb-2 ${msg.ok ? noteBoxCls : errorBoxCls}`}>{msg.text}</p>}
+      {data?.truncated && <p className={`mb-2 ${noteBoxCls}`}>Only the first 2,000 Gusto employees are shown.</p>}
+      {data && (
+        <div className={tableWrapCls}>
+          <table className={`${tableCls} min-w-[720px]`}>
+            <thead>
+              <tr>
+                <th className={thCls}>Gusto employee</th>
+                <th className={thCls}>Team member</th>
+                <th className={thCls}>State</th>
+                <th className={thCls}>
+                  <span className="sr-only">Actions</span>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.remote.map((e) => {
+                const link = data.links.find((l) => l.remoteId === e.id) ?? null;
+                const suggestion = data.suggestions.find((x) => x.remoteId === e.id) ?? null;
+                const picked = choice[e.id] ?? "";
+                return (
+                  <tr key={e.id}>
+                    <td className={tdCls}>
+                      {e.name}
+                      {e.email && <span className="block text-xs text-muted">{e.email}</span>}
+                      {e.terminated && <span className={`${chipCls} mt-1`}>terminated</span>}
+                    </td>
+                    <td className={tdCls}>
+                      <label className="sr-only" htmlFor={`emp-${e.id}`}>
+                        Team member for {e.name}
+                      </label>
+                      <select id={`emp-${e.id}`} value={picked} onChange={(ev) => setChoice((c) => ({ ...c, [e.id]: ev.target.value }))} className={`${selectCls} w-full max-w-[300px]`}>
+                        <option value="">Not matched</option>
+                        {data.local.map((m) => (
+                          <option key={m.id} value={m.id}>
+                            {m.name}
+                            {m.email ? ` — ${m.email}` : ""}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className={tdCls}>
+                      <span className={chipCls}>{link?.confirmed ? "confirmed" : link ? "suggested" : suggestion ? "suggested · email match" : "not matched"}</span>
+                    </td>
+                    <td className={`${tdCls} whitespace-nowrap text-right`}>
+                      <div className="flex justify-end gap-2">
+                        {link && (
+                          <button onClick={() => save(e.id, null)} disabled={busy === e.id} className={btnGhostSm}>
+                            Clear
+                          </button>
+                        )}
+                        <button onClick={() => save(e.id, picked)} disabled={busy === e.id || !picked || (link?.confirmed === true && link.localId === picked)} className={btnPrimarySm}>
+                          <Check size={13} aria-hidden="true" />
+                          {busy === e.id ? "Saving…" : "Confirm"}
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );

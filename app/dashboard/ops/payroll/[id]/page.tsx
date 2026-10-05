@@ -3,10 +3,16 @@
 // Approve and Post are Tier-3: the first click proposes a Phase 14 approval,
 // a person approves it, then the action executes with that approval.
 // Admins only.
+// Phase 14 (connectors): with Gusto connected, a "Gusto" panel shows the
+// steps — sent → submitted in Gusto (taxes computed by Gusto) → posted →
+// paid (net pay cleared) — with Send to Gusto (Tier 3) and Sync results.
+// Without Gusto the built-in tax tables and the accountant banner remain.
 
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { ShieldAlert } from "lucide-react";
+import { Check, Minus, ShieldAlert } from "lucide-react";
+import { prisma } from "@/lib/prisma";
+import { providerSyncFor } from "@/lib/ops/payroll/provider";
 import { withWorkspaceScope } from "@/lib/substrate/memory/rls";
 import { financePageActor } from "@/lib/ops/finance/page";
 import { OpsError } from "@/lib/ops/doctype";
@@ -14,7 +20,7 @@ import { getPayRunWithSlips, payRunLabel } from "@/lib/ops/payroll/runs";
 import { PAYROLL_TAX_DISCLAIMER } from "@/lib/ops/payroll/tax";
 import type { PayslipLine } from "@/lib/ops/payroll/rules";
 import { DataTable, ErrorLine, FinanceHeader, Panel, Pill, cellCls, fmtDay, money, numCls, rowCls } from "@/components/ops-finance/kit";
-import { PayRunActions } from "@/components/ops-people/PayrollClient";
+import { GustoPayRunActions, PayRunActions } from "@/components/ops-people/PayrollClient";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Pay run — ShapesOS", description: "One pay run: payslips, approval and posting." };
@@ -42,6 +48,16 @@ export default async function PayRunPage({ params, searchParams }: PageProps<"/d
     throw err;
   }
   const { run, payslips } = data;
+  // Phase 14 (connectors): Gusto state (no network on page load).
+  const [gustoConnected, sync] = await Promise.all([
+    prisma.connectorConnection.count({ where: { workspaceId: actor.workspaceId, connectorKey: "gusto", status: "active" } }).then((n) => n > 0),
+    withWorkspaceScope(actor.workspaceId, (tx) => providerSyncFor(tx, actor.workspaceId, id)),
+  ]);
+  const gusto = sync?.provider === "gusto" ? sync : null;
+  const byGusto = gusto?.status === "synced" || gusto?.status === "paid";
+  const gustoSummary = (gusto?.summary ?? {}) as { checkDate?: string | null; skipped?: Array<{ memberName: string; reason: string }>; warnings?: string[]; sent?: unknown[]; salaried?: unknown[]; lastSync?: { discrepancies?: string[]; warnings?: string[] } };
+  const stale = gusto?.status === "sent" && gusto.sentDigest !== run.computeDigest;
+  const gustoNotes = [...(gustoSummary.skipped ?? []).map((x) => `${x.memberName}: ${x.reason}`), ...(gustoSummary.warnings ?? []), ...(gustoSummary.lastSync?.warnings ?? []), ...(gustoSummary.lastSync?.discrepancies ?? []).map((d) => `Differs from Gusto — ${d}`)];
   const label = payRunLabel(run);
   const preTax = payslips.reduce((s, p) => s + p.preTaxDeductionCents, 0);
   const postTax = payslips.reduce((s, p) => s + p.postTaxDeductionCents, 0);
@@ -61,13 +77,52 @@ export default async function PayRunPage({ params, searchParams }: PageProps<"/d
         actions={<PayRunActions id={run.id} label={label} status={run.status} summary={summary} />}
       />
       {error ? <ErrorLine>{error}</ErrorLine> : null}
-      <div className="flex items-start gap-3 rounded-md bg-paper px-4 py-3 shadow-hairline">
-        <ShieldAlert size={18} className="mt-0.5 shrink-0 text-ink" aria-hidden />
-        <p className="text-md">
-          <span className="font-semibold">Verify with your accountant. </span>
-          <span className="text-muted">{PAYROLL_TAX_DISCLAIMER}</span>
-        </p>
-      </div>
+      {byGusto ? (
+        <div className="flex items-start gap-3 rounded-md bg-paper px-4 py-3 shadow-hairline">
+          <Check size={18} className="mt-0.5 shrink-0 text-ink" aria-hidden />
+          <p className="text-md">
+            <span className="font-semibold">Taxes computed by Gusto. </span>
+            <span className="text-muted">The payslips hold the taxes, deductions and net pay from Gusto&apos;s processed payroll.</span>
+          </p>
+        </div>
+      ) : (
+        <div className="flex items-start gap-3 rounded-md bg-paper px-4 py-3 shadow-hairline">
+          <ShieldAlert size={18} className="mt-0.5 shrink-0 text-ink" aria-hidden />
+          <p className="text-md">
+            <span className="font-semibold">Verify with your accountant. </span>
+            <span className="text-muted">{PAYROLL_TAX_DISCLAIMER}</span>
+          </p>
+        </div>
+      )}
+      {gustoConnected || gusto ? (
+        <Panel title="Gusto">
+          <ol className="flex flex-col gap-2 px-5 py-4 text-md">
+            {[
+              { done: !!gusto, label: gusto ? `Sent to Gusto ${fmtDay(gusto.sentAt)}${gustoSummary.checkDate ? ` · check date ${gustoSummary.checkDate}` : ""}${stale ? " · out of date: recomputed since — send again" : ""}` : "Send the computed run's hours to Gusto's open payroll for this period" },
+              { done: byGusto, label: byGusto ? `Submitted in Gusto — taxes and net pay synced ${fmtDay(gusto?.syncedAt ?? null)}` : "Review and submit the payroll in Gusto, then sync the results" },
+              { done: run.status === "posted", label: run.status === "posted" ? `Posted to the books ${fmtDay(run.postedAt)}` : "Approve and post the run with Gusto's figures" },
+              { done: gusto?.status === "paid", label: gusto?.status === "paid" ? (gusto.paymentEntryId ? `Paid by Gusto — Net pay payable cleared (entry ${gusto.paymentEntryId.slice(0, 14)})` : "Paid by Gusto — net pay is cleared once the run is posted") : "Gusto pays on the check date; sync again to clear Net pay payable" },
+            ].map((step, i) => (
+              <li key={i} className="flex items-start gap-2">
+                {step.done ? <Check size={16} className="mt-0.5 shrink-0 text-ink" aria-label="done" /> : <Minus size={16} className="mt-0.5 shrink-0 text-subtle" aria-label="not yet" />}
+                <span className={step.done ? "text-ink" : "text-muted"}>{step.label}</span>
+              </li>
+            ))}
+          </ol>
+          {gustoNotes.length ? (
+            <ul className="flex flex-col gap-1 border-t border-line px-5 py-3 text-sm text-muted">
+              {gustoNotes.map((w, i) => (
+                <li key={i}>{w}</li>
+              ))}
+            </ul>
+          ) : null}
+          {gustoConnected ? (
+            <div className="border-t border-line px-5 py-3">
+              <GustoPayRunActions id={run.id} label={label} status={run.status} gustoStatus={gusto?.status ?? null} stale={stale} summary={summary} />
+            </div>
+          ) : null}
+        </Panel>
+      ) : null}
       <Panel title="Totals">
         <dl className="grid grid-cols-2 gap-x-8 gap-y-3 px-5 py-4 text-md sm:grid-cols-4">
           {[

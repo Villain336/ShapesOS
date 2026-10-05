@@ -44,7 +44,7 @@ export async function bizSyncStatus(workspaceId: string): Promise<ProviderStatus
       runs,
       lastRun: runs[0] ?? null,
       lastError: failed ? { at: failed.startedAt, operation: failed.operation, error: failed.error! } : null,
-      exports: provider === "shopify" ? null : await exportStatus(workspaceId, provider),
+      exports: provider === "quickbooks" || provider === "xero" ? await exportStatus(workspaceId, provider) : null,
       tenants: provider === "xero" && conn ? tenantsOf(meta) : null,
       tenantId: provider === "xero" && typeof meta.tenantId === "string" ? meta.tenantId : null,
       tenantError: provider === "xero" && typeof meta.xeroTenantError === "string" ? meta.xeroTenantError : null,

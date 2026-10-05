@@ -45,6 +45,7 @@ const EXPECTED_KEYS = [
   "shopify", // Phase 11 (bizsync)
   "quickbooks", // Phase 11 (bizsync)
   "xero", // Phase 11 (bizsync)
+  "gusto", // Phase 14 (connectors)
 ];
 
 const ROOT = join(__dirname, "..", "..", "..", "..");
@@ -57,7 +58,7 @@ describe("built-in connector registry", () => {
       BUILT_IN_CONNECTORS.map((c) => c.key),
       EXPECTED_KEYS,
     );
-    assert.equal(BUILT_IN_CONNECTORS.length, 26); // Phase 11: +5 devtools (linear, jira, airtable, supabase, netlify), +3 bizsync (shopify, quickbooks, xero)
+    assert.equal(BUILT_IN_CONNECTORS.length, 27); // Phase 11: +5 devtools (linear, jira, airtable, supabase, netlify), +3 bizsync (shopify, quickbooks, xero); Phase 14: +gusto
   });
 
   it("every key resolves to an adapter with the same key, auth type and at least one tool", () => {

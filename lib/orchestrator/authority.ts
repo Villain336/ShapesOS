@@ -193,6 +193,9 @@ export function normalizeForTier(text: string): string {
 // Phase 12 (mfgpos): + completing a manufacturing order (stock + costing to
 // the books) and closing a till session (the takings to the books).
 // Phase 12 (people): + approving and posting payroll.
+// Phase 14 (connectors): + sending a pay run to the payroll provider (Gusto
+// pays people from what is sent). The words "send payroll" match no money
+// pattern, so it is listed here explicitly.
 export const TIER3_EXACT_KINDS: ReadonlySet<string> = new Set([
   "record payment",
   "post journal entry",
@@ -213,6 +216,7 @@ export const TIER3_EXACT_KINDS: ReadonlySet<string> = new Set([
   "mark invoice paid",
   "update campaign budget",
   "money connector write",
+  "send payroll to provider",
 ]);
 
 /**

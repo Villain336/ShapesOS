@@ -190,6 +190,7 @@ export function connectorGroup(connectorKey: string): ToolGroup {
     case "shopify": // Phase 11 (bizsync): commerce + accounting sync is business operations
     case "quickbooks":
     case "xero":
+    case "gusto": // Phase 14 (connectors): payroll is business operations
       return "ops";
     // Phase 11 (devtools): issue trackers are project operations ("code" is
     // the sandbox runner and is unavailable without one).
@@ -280,6 +281,13 @@ export function connectorAction(connectorKey: string, tool: string): string {
     case "quickbooks.post_to_quickbooks":
     case "xero.post_to_xero":
       return "post_to_accounting";
+    // Phase 14 (connectors): Gusto. Sending a pay run is money — Tier 3
+    // (send_payroll_to_provider is in TIER3_EXACT_KINDS: never automated,
+    // always asks). Saving suggested employee matches is a Tier-2 write.
+    case "gusto.send_payroll":
+      return "send_payroll_to_provider";
+    case "gusto.sync_employees":
+      return "write_gusto";
     default:
       return defaultConnectorWriteAction(connectorKey);
   }

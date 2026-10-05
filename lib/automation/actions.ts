@@ -117,6 +117,10 @@ export const KNOWN_ACTION_DEFS: ReadonlyArray<KnownActionDef> = [
   { action: "draft_pay_run", label: "Draft a pay run", description: "Create and compute a pay run (approving and posting it are a person's job).", group: "ops" },
   { action: "approve_pay_run", label: "Approve a pay run", description: "Propose approving payroll. Never automated.", group: "ops" },
   { action: "post_pay_run", label: "Post a pay run", description: "Propose posting payroll to the books. Never automated.", group: "ops" },
+  // Phase 14 (connectors): the Gusto payroll connector. Sending a pay run is
+  // money (Tier 3, TIER3_EXACT_KINDS); saving suggested employee matches is not.
+  { action: "send_payroll_to_provider", label: "Send payroll to Gusto", description: "Write a pay run's hours into Gusto's open payroll (Gusto pays people from it). Never automated.", group: "ops" },
+  { action: "write_gusto", label: "Change Gusto matches", description: "Save suggested Gusto employee matches for a person to confirm.", group: "connectors" },
   { action: "write_event", label: "Change events", description: "Create draft events and register people for events.", group: "ops" },
   // Phase 13 (twincore): the digital twin (lib/chat/ops-twin-tools.ts).
   { action: "book_dock", label: "Book a dock", description: "Book a truck onto a free dock door of a twin site (an internal site operation).", group: "ops" },

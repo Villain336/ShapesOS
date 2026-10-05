@@ -3,6 +3,7 @@
 //
 // GET  /api/bizsync/{quickbooks|xero}?workspaceId=  → { local rows + links, remote accounts }
 // GET  /api/bizsync/shopify?workspaceId=            → { Shopify locations, local locations, links }
+// GET  /api/bizsync/gusto?workspaceId=              → { Gusto employees, team members, links, email suggestions } (Phase 14)
 //   Admin+. Calls the provider live with the workspace's connection; 409 when
 //   it isn't connected (no mock data, ever).
 // POST /api/bizsync/{provider}  { workspaceId, action, … }   connectors.connect grant
@@ -10,6 +11,9 @@
 //   confirm_accounts { entries }        confirm or clear mappings (checked against the live chart)
 //   map_location { remoteLocationId, opsLocationId }   Shopify location → stock location
 //   select_tenant { tenantId }          Xero organisation (only one the grant covers)
+//   map_employee { remoteEmployeeId, memberId | null }   Gusto employee ↔ team
+//                                       member, CONFIRMED by this person (null clears);
+//                                       only confirmed links are used to pay anyone
 // Each decision is recorded in the Ops audit trail.
 
 import type { NextRequest } from "next/server";
@@ -22,17 +26,26 @@ import { liveConnection } from "@/lib/bizsync/connection";
 import { accountingProviderFrom } from "@/lib/bizsync/accounting/providers";
 import { confirmMapping, mappingRows, MappingError, saveSuggestions } from "@/lib/bizsync/accounting/mapping";
 import type { AccountingProvider } from "@/lib/bizsync/accounting/types";
+import { GustoLinkError } from "@/lib/bizsync/gusto/payroll";
+
+// Phase 14 (connectors): the workspace's live Gusto connection as API auth.
+async function gustoAuth(workspaceId: string, userId: string) {
+  const live = await liveConnection(workspaceId, "gusto", userId);
+  const { gustoAuthFrom } = await import("@/lib/connectors/m21/native/gusto");
+  return gustoAuthFrom(live?.credential ?? null, { refreshCredential: live?.refreshCredential });
+}
 
 export const dynamic = "force-dynamic";
 
 type Params = { params: Promise<{ provider: string }> };
-const PROVIDERS = new Set(["shopify", "quickbooks", "xero"]);
+const PROVIDERS = new Set(["shopify", "quickbooks", "xero", "gusto"]);
 const notConnected = (label: string, why = "is not connected") =>
   Response.json({ error: `${label} ${why}. Connect it in Settings → Connectors.`, code: "not_connected" }, { status: 409 });
 
 function providerError(err: unknown) {
   if (err instanceof ConnectorApiError) return Response.json({ error: err.message, code: err.code }, { status: err.code === "auth_rejected" ? 409 : 502 });
   if (err instanceof MappingError) return badRequest(err.message);
+  if (err instanceof GustoLinkError) return Response.json({ error: err.message }, { status: 409 });
   throw err;
 }
 
@@ -72,6 +85,12 @@ export async function GET(req: NextRequest, { params }: Params) {
   if (!(await requireWorkspaceRole(user.id, workspaceId, "admin"))) return forbidden("Admin role required.");
   try {
     if (provider === "shopify") return await shopifyLocationsView(workspaceId, user.id);
+    if (provider === "gusto") {
+      const auth = await gustoAuth(workspaceId, user.id);
+      if (!auth) return notConnected("Gusto");
+      const { gustoEmployeeView } = await import("@/lib/bizsync/gusto/payroll");
+      return Response.json(await gustoEmployeeView(workspaceId, auth));
+    }
     const p = await accounting(workspaceId, provider as "quickbooks" | "xero", user.id);
     if (p instanceof Response) return p;
     const [remote, rows] = await Promise.all([p.listAccounts(), mappingRows(workspaceId, provider as "quickbooks" | "xero")]);
@@ -100,6 +119,18 @@ export async function POST(req: NextRequest, { params }: Params) {
       const { setLocationMapping } = await import("@/lib/bizsync/shopify/sync");
       const r = await setLocationMapping(workspaceId, remoteLocationId, opsLocationId, user.id);
       return r.ok ? Response.json({ ok: true }) : Response.json({ error: r.error }, { status: 409 });
+    }
+    if (provider === "gusto") {
+      if (action !== "map_employee") return badRequest("Unknown action for Gusto");
+      const remoteEmployeeId = String(body?.remoteEmployeeId ?? "");
+      const memberId = body?.memberId === null ? null : String(body?.memberId ?? "");
+      if (!/^[A-Za-z0-9-]{8,64}$/.test(remoteEmployeeId) || memberId === "") return badRequest("remoteEmployeeId and memberId (or null to clear) are required");
+      const auth = await gustoAuth(workspaceId, user.id);
+      if (!auth) return notConnected("Gusto");
+      const { gustoEmployees } = await import("@/lib/bizsync/gusto/api");
+      const { setGustoEmployeeLink } = await import("@/lib/bizsync/gusto/payroll");
+      const emps = await gustoEmployees(auth);
+      return Response.json(await setGustoEmployeeLink(workspaceId, remoteEmployeeId, memberId, user.id, emps.items));
     }
     const key = provider as "quickbooks" | "xero";
     if (action === "select_tenant") {
