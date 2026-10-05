@@ -111,7 +111,7 @@ describe("applyLivePatch (the data side's applier, guarded)", () => {
     next.objects = next.objects.filter((o) => o.id !== "o_w_yard_3");
     next.objects.push({ ...structuredClone(prev.objects[0]!), id: "o_w_zz_new", label: "New rack" });
     next.objects.sort((a, b) => (a.id < b.id ? -1 : 1));
-    next.kpis[0]!.value += 40;
+    next.kpis[0]!.value = (next.kpis[0]!.value ?? 0) + 40;
     next.generatedAt = "2026-10-04T09:34:00.000Z";
     for (const [a, b] of [
       [prev, next],

@@ -413,7 +413,7 @@ describe("p13 sample sites (real Postgres, app role)", () => {
       assert.equal(s.objects.filter((o) => o.bindingBroken).length, 0, "every binding resolves");
       assert.equal(s.objects.filter((o) => o.kind === "equipment").length, 2, "two forklifts / carts");
       assert.ok(s.objects.some((o) => o.state.kind === "equipment" && o.state.status === "busy"));
-      assert.ok(s.kpis.find((k) => k.key === "stock_on_hand")!.value > 0, "stock through the ledger");
+      assert.ok((s.kpis.find((k) => k.key === "stock_on_hand")!.value ?? 0) > 0, "stock through the ledger");
       assert.ok(s.shipments.length >= 2, "a couple of dock bookings");
       const states = (k: string) => s.objects.filter((o) => o.kind === k).map((o) => (o.state as { status?: string }).status);
       if (kind === "warehouse") {
@@ -425,7 +425,7 @@ describe("p13 sample sites (real Postgres, app role)", () => {
       if (kind === "factory") {
         assert.deepEqual(states("work_center").sort(), ["idle", "running"]);
         const util = s.kpis.find((k) => k.key === "work_center_utilisation")!;
-        assert.ok(util.value > 0, "logged time counts");
+        assert.ok((util.value ?? 0) > 0, "logged time counts");
         const cnc = s.objects.find((o) => o.label === "CNC mill")!;
         assert.equal(cnc.state.kind === "work_center" && cnc.state.late, true, "the MO is past its planned start");
       }
