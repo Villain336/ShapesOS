@@ -33,6 +33,7 @@ const STATUS_FILTERS: Array<{ value: AgentRunStatus | "all"; label: string; shap
   { value: "all", label: "All" },
   { value: "running", label: "Running", shape: "running" },
   { value: "queued", label: "Queued", shape: "queued" },
+  { value: "awaiting_confirmation", label: "Needs you", shape: "needs" },
   { value: "failed", label: "Failed", shape: "failed" },
   { value: "succeeded", label: "Done", shape: "done" },
   { value: "cancelled", label: "Cancelled" },

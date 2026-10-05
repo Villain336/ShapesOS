@@ -9,6 +9,12 @@
 //               the run's chat thread on the same branch (lib/ship/continue.ts).
 //   slack_mention — Phase 11 (conncore): a Slack @mention / DM runs a turn in
 //               the Slack thread's chat thread and replies in Slack.
+//   subagent_run — Phase 16 (deleg): one delegated sub-agent (start, or resume
+//               after a lease loss / the user's decision on its proposals).
+//   delegation_tick — Phase 16: start tasks held back by the caps, or arm a
+//               plan whose parent saved its waiting state (safety net).
+//   delegation_join — Phase 16: every task of a plan finished — the delegating
+//               run carries on (a chat turn, or a sub-agent one level up).
 //
 // Handlers are imported lazily so the worker module stays light (and tests
 // can pass their own handler table).
@@ -19,6 +25,8 @@ export interface AgentJobContext {
   /** Aborted when this worker loses the job's lease. */
   signal: AbortSignal;
   workerId: string;
+  /** Phase 16: this claim is the job's last allowed attempt (no retry after it). */
+  lastAttempt?: boolean;
 }
 
 export type AgentJobHandler = (job: ClaimedAgentJob, ctx: AgentJobContext) => Promise<unknown>;
@@ -46,6 +54,26 @@ export const defaultAgentJobHandlers: Record<string, AgentJobHandler> = {
   },
   // Phase 11 (conncore): a Slack mention runs a turn in its chat thread and
   // answers in Slack (lib/slack/mention.ts).
+  // Phase 16 (deleg): delegated sub-agents and their joins (lib/chat/delegation.ts).
+  async subagent_run(job, ctx) {
+    const { runDelegatedChild } = await import("@/lib/chat/delegation");
+    const payload = job.payload as import("@/lib/agents/delegation/store").SubagentRunJobPayload;
+    if (payload.workspaceId !== job.workspaceId) throw new Error("subagent_run payload belongs to another workspace");
+    return runDelegatedChild(payload, { signal: ctx.signal, lastAttempt: ctx.lastAttempt });
+  },
+  async delegation_tick(job) {
+    const { pumpDelegation } = await import("@/lib/chat/delegation");
+    const payload = job.payload as { workspaceId: string; parentRunId: string; check?: number };
+    if (payload.workspaceId !== job.workspaceId) throw new Error("delegation_tick payload belongs to another workspace");
+    return pumpDelegation(payload.workspaceId, payload.parentRunId, Number(payload.check) || 0);
+  },
+  async delegation_join(job, ctx) {
+    const { runDelegationJoin } = await import("@/lib/chat/delegation");
+    const payload = job.payload as import("@/lib/chat/delegation").DelegationJoinPayload;
+    const ws = payload.kind === "chat_turn" ? payload.turn.workspaceId : payload.run.workspaceId;
+    if (ws !== job.workspaceId) throw new Error("delegation_join payload belongs to another workspace");
+    return runDelegationJoin(payload, { signal: ctx.signal, lastAttempt: ctx.lastAttempt });
+  },
   async slack_mention(job) {
     const { runSlackMention } = await import("@/lib/slack/mention");
     const payload = job.payload as import("@/lib/slack/events").SlackMentionJobPayload;

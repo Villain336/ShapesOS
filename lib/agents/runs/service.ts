@@ -18,7 +18,7 @@ import type {
   AgentRunLinkage,
   AgentRunEventInput,
 } from "./types";
-import { TERMINAL_RUN_STATUSES } from "./types";
+import { LIVE_RUN_STATUSES, TERMINAL_RUN_STATUSES } from "./types";
 import { notifyAgentRunFailed } from "@/lib/notifications/producers";
 import { emitWebhookEvent } from "@/lib/webhooks/emit";
 
@@ -256,8 +256,8 @@ export async function requestAgentRunCancel(
       select: { id: true, status: true },
     });
     if (!root) return null;
-    // Walk the sub-agent tree (bounded: delegation is one level deep today,
-    // the bound keeps a malformed tree from looping).
+    // Walk the sub-agent tree (bounded: delegation is at most two levels deep
+    // (Phase 16), the bound keeps a malformed tree from looping).
     const ids = [root.id];
     let frontier = [root.id];
     for (let depth = 0; depth < 8 && frontier.length > 0; depth++) {
@@ -269,8 +269,9 @@ export async function requestAgentRunCancel(
       ids.push(...frontier);
     }
     const now = new Date();
+    // Phase 16: a run waiting for the user's OK is live too.
     const live = await tx.agentRun.findMany({
-      where: { workspaceId, id: { in: ids }, status: { in: ["queued", "running"] } },
+      where: { workspaceId, id: { in: ids }, status: { in: [...LIVE_RUN_STATUSES] } },
       select: { id: true },
     });
     if (live.length === 0) return { runIds: [], stopped: false };
@@ -322,7 +323,7 @@ export async function isAgentRunCancelRequested(workspaceId: string, runId: stri
 export async function listLiveThreadRuns(workspaceId: string, threadId: string) {
   return withWorkspaceScope(workspaceId, (tx) =>
     tx.agentRun.findMany({
-      where: { workspaceId, threadId, status: { in: ["queued", "running"] } },
+      where: { workspaceId, threadId, status: { in: [...LIVE_RUN_STATUSES] } },
       orderBy: { createdAt: "desc" },
       select: { id: true, agentKey: true, parentRunId: true },
     }),

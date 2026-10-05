@@ -117,7 +117,7 @@ export async function loadAgentActivity(workspaceId: string, now = new Date()): 
       tx.agentRun.findMany({
         where: {
           workspaceId,
-          OR: [{ status: { in: ["queued", "running"] } }, { createdAt: { gte: since } }],
+          OR: [{ status: { in: ["queued", "running", "awaiting_confirmation"] } }, { createdAt: { gte: since } }],
         },
         orderBy: { createdAt: "desc" },
         take: MAX_RUNS,

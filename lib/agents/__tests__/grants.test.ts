@@ -34,9 +34,16 @@ describe("computeGrant", () => {
     const g = computeGrant({ agentKey: "planner", requested: ["web", "calendar", "nonsense"] });
     assert.deepEqual(g.groups, ["workspace", "calendar"]);
     assert.deepEqual(g.dropped.sort(), ["nonsense", "web"]);
-    // Sub-agents can never hand work off.
+    // Phase 16: sub-agents never hand work off by default; "delegate" is an
+    // opt-in group (depth 2) granted only when asked for by name, and only
+    // inside a parent grant that has it.
     for (const k of AGENT_KEYS.filter((k) => k !== "lead")) {
-      assert.ok(!computeGrant({ agentKey: k, requested: ["delegate"] }).groups.includes("delegate"), k);
+      assert.ok(!computeGrant({ agentKey: k }).groups.includes("delegate"), `${k} default`);
+      assert.ok(!computeGrant({ agentKey: k, requested: ["web"] }).groups.includes("delegate"), `${k} narrowed`);
+      assert.ok(computeGrant({ agentKey: k, requested: ["delegate"] }).groups.includes("delegate"), `${k} opt-in`);
+      const noHandOff = computeGrant({ agentKey: k, requested: ["delegate"], parentGrant: ["workspace", "web"] });
+      assert.ok(!noHandOff.groups.includes("delegate"), `${k} beyond its parent`);
+      assert.ok(noHandOff.dropped.includes("delegate"));
     }
   });
 

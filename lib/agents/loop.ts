@@ -65,14 +65,15 @@ import type {
 } from "@/lib/llm/types";
 import { allTools, getTool, toolGroup, type ToolResult } from "@/lib/chat/tools";
 import {
-  DELEGATE_TOOL,
   executeTool,
-  proposalText,
+  isDelegationTool,
+  proposalsText,
   runEvent,
   stopRequested,
   type ChatToolCall,
   type LoopContext,
 } from "@/lib/chat/tool-exec";
+import { waitingPlaceholder } from "./delegation/plan";
 import { buildLoopTools, type ConnectorChatTool, type LoopToolSet } from "./loop-tools";
 import { appendAgentRunEvent } from "./runs/service";
 import { isLeaseLost, isRunStopped } from "./runs/abort";
@@ -168,12 +169,17 @@ export type LoopStatus =
   | "refused"
   | "capped"
   | "handoff"
+  // Phase 16: the run handed a plan to sub-agents and waits for them (not
+  // an outcome: the run resumes at the join, like a hand-off).
+  | "waiting_on_children"
   | "error";
 
 export interface LoopOutcome {
   status: LoopStatus;
   finalText: string;
   proposal: ChatToolCall | null;
+  /** Phase 16: every action the last step left waiting for the user's OK (proposal is the first). */
+  proposals?: ChatToolCall[];
   cap?: "steps" | "time" | "cost";
   stopReason?: ChatStopReason;
 }
@@ -204,6 +210,14 @@ export interface LoopState {
   lastServerCompaction: boolean;
   /** Set once the run is over (a resumed finished run returns it as is). */
   outcome?: LoopOutcome;
+  /** Phase 16: when the run stopped to wait for the user's OK (a resume rebases startedAt by the wait). */
+  pausedAt?: number;
+  /** Phase 16: delegation plans whose results were merged into the transcript (each once). */
+  appliedPlans?: string[];
+  /** Phase 16: calls[0..rowsSaved) are already on the thread (saved while waiting on sub-agents). */
+  rowsSaved?: number;
+  /** Phase 16: the last model call's cost (the budget guard expects the next one to cost as much). */
+  lastCallCostMicroUsd?: number;
 }
 
 export function isLoopState(v: unknown): v is LoopState {
@@ -287,6 +301,12 @@ export interface AgentLoopInput {
    * declared tools: others are hidden from the model and refused if named.
    */
   toolFilter?: (canonical: string) => boolean;
+  /**
+   * Phase 16: a delegated sub-agent's budget is a hard share of its parent's
+   * — stop BEFORE a model call that would likely cross the cost cap (the next
+   * call is assumed to cost what the last one did), not after it.
+   */
+  budgetGuard?: boolean;
   deps?: AgentLoopDeps;
 }
 
@@ -338,7 +358,14 @@ export function toolResultFor(
   switch (call.status) {
     case "executed": {
       let details = result?.details;
-      if (call.tool === DELEGATE_TOOL && details && typeof details === "object") {
+      const plan = (details as { delegationWait?: unknown; delegation?: { planId?: unknown; tasks?: unknown } } | undefined) ?? undefined;
+      if (isDelegationTool(call.tool) && plan?.delegationWait === true && typeof plan.delegation?.planId === "string") {
+        // Phase 16: a placeholder the model never reads — the join replaces it
+        // with every sub-agent's deliverable before the run carries on.
+        content = waitingPlaceholder(plan.delegation.planId, Number(plan.delegation.tasks) || 0);
+        break;
+      }
+      if (isDelegationTool(call.tool) && details && typeof details === "object") {
         // The sub-agent's own calls are on the call record; the model gets its report.
         const rest = { ...(details as Record<string, unknown>) };
         delete rest.calls;
@@ -495,11 +522,18 @@ export async function runAgentLoop(input: AgentLoopInput): Promise<AgentLoopResu
     // whoever owns the run now continues from the saved state.
     if (outcome.status === "cancelled" && isLeaseLost(ctx.signal)) outcome = { status: "handoff", finalText: "", proposal: null };
     if (outcome.status !== "handoff") s.outcome = outcome;
+    if (outcome.status === "awaiting_confirmation") s.pausedAt = now();
     await save();
     return { ...outcome, calls: s.calls, state: s };
   };
   const note = (summary: string, payload?: Record<string, unknown>) =>
     persistEvents ? runEvent(ctx, summary, payload, "note") : Promise.resolve();
+  // Phase 16: the step handed a plan to sub-agents — save and stop WITHOUT an
+  // outcome; the join resumes this transcript with their results.
+  const waitOnChildren = async (tr: ToolStepResult): Promise<AgentLoopResult> => {
+    await save();
+    return { status: "waiting_on_children", finalText: "", proposal: tr.proposal, proposals: tr.proposals, calls: s.calls, state: s };
+  };
 
   const tools: LoopToolSet = buildLoopTools({
     tools: allTools(),
@@ -525,8 +559,9 @@ export async function runAgentLoop(input: AgentLoopInput): Promise<AgentLoopResu
     if (pending.length > 0) {
       const tr = await runToolStep(s, pending, tools, ctx, input, limits, persistEvents);
       if (tr.cancelled) return finish({ status: "cancelled", finalText: STOPPED_TEXT, proposal: null });
+      if (tr.waiting) return waitOnChildren(tr);
       if (tr.proposal) {
-        return finish({ status: "awaiting_confirmation", finalText: proposalText(tr.proposal), proposal: tr.proposal });
+        return finish({ status: "awaiting_confirmation", finalText: proposalsText(tr.proposals), proposal: tr.proposal, proposals: tr.proposals });
       }
     }
   }
@@ -542,7 +577,8 @@ export async function runAgentLoop(input: AgentLoopInput): Promise<AgentLoopResu
         ? "steps"
         : elapsed >= limits.maxMs || (ctx.deadlineAt !== undefined && now() >= ctx.deadlineAt)
           ? "time"
-          : s.costMicroUsd >= Math.min(limits.maxCostMicroUsd, ctx.costLeftMicroUsd ?? Infinity)
+          : s.costMicroUsd + (input.budgetGuard && s.steps > 0 ? (s.lastCallCostMicroUsd ?? 0) : 0) >=
+              Math.min(limits.maxCostMicroUsd, ctx.costLeftMicroUsd ?? Infinity)
             ? "cost"
             : null;
     if (cap) {
@@ -633,7 +669,10 @@ export async function runAgentLoop(input: AgentLoopInput): Promise<AgentLoopResu
 
     s.steps = step;
     if (res.costMicroUsd === null) s.unpricedCalls++;
-    else s.costMicroUsd += res.costMicroUsd;
+    else {
+      s.costMicroUsd += res.costMicroUsd;
+      s.lastCallCostMicroUsd = res.costMicroUsd;
+    }
     s.lastInputTokens = res.usage.inputTokens + res.usage.cacheReadTokens + res.usage.cacheWriteTokens;
     s.lastServerCompaction = res.meta.compaction === "server";
     input.onEvent?.({ type: "step", step, stopReason: res.stopReason, model: res.model, costMicroUsd: res.costMicroUsd });
@@ -696,10 +735,21 @@ export async function runAgentLoop(input: AgentLoopInput): Promise<AgentLoopResu
     // ── tools ────────────────────────────────────────────────────────────────
     const tr = await runToolStep(s, toolUses, tools, ctx, input, limits, persistEvents);
     if (tr.cancelled) return finish({ status: "cancelled", finalText: STOPPED_TEXT, proposal: null });
+    if (tr.waiting) return waitOnChildren(tr);
     if (tr.proposal) {
-      return finish({ status: "awaiting_confirmation", finalText: proposalText(tr.proposal), proposal: tr.proposal });
+      return finish({ status: "awaiting_confirmation", finalText: proposalsText(tr.proposals), proposal: tr.proposal, proposals: tr.proposals });
     }
   }
+}
+
+interface ToolStepResult {
+  cancelled: boolean;
+  /** The first pending action (null = none). */
+  proposal: ChatToolCall | null;
+  /** Phase 16: every pending action of the step (all stay pending). */
+  proposals: ChatToolCall[];
+  /** Phase 16: a delegation tool started a plan in this step. */
+  waiting: boolean;
 }
 
 /** Run one step's tool calls; append their results as one user message. */
@@ -711,13 +761,14 @@ async function runToolStep(
   input: AgentLoopInput,
   limits: AgentLoopLimits,
   persistEvents: boolean,
-): Promise<{ cancelled: boolean; proposal: ChatToolCall | null }> {
+): Promise<ToolStepResult> {
   const store = input.deps?.store ?? prismaTranscriptStore;
   const save = () =>
     ctx.runId ? store.save(ctx.workspaceId, ctx.runId, s, s.steps).catch(() => undefined) : Promise.resolve();
   const results: ChatToolResultBlock[] = [];
   const stepCalls: ChatToolCall[] = [];
-  let proposal: ChatToolCall | null = null;
+  const proposals: ChatToolCall[] = [];
+  let waiting = false;
   let failedTests = false;
 
   for (const block of toolUses) {
@@ -761,7 +812,7 @@ async function runToolStep(
         call.resultSummary = "Not run — the task was stopped.";
         s.calls.push(call);
         await save();
-        return { cancelled: true, proposal: null };
+        return { cancelled: true, proposal: null, proposals: [], waiting: false };
       }
       if (sideEffects) {
         s.toolStarted.push(block.id);
@@ -777,12 +828,18 @@ async function runToolStep(
         toolUseId: block.id,
         deadlineAt: Math.min(ctx.deadlineAt ?? Infinity, s.startedAt + limits.maxMs),
         costLeftMicroUsd: Math.max(0, Math.min(ctx.costLeftMicroUsd ?? Infinity, limits.maxCostMicroUsd) - s.costMicroUsd),
+        // Phase 16: what a delegation may split (model calls left in this run).
+        stepsLeft: Math.max(0, limits.maxSteps - s.steps),
       };
       result = await executeTool(toolCtx, canonical, call.args, call);
       if (call.status === "cancelled") {
         s.calls.push(call);
         await save();
-        return { cancelled: true, proposal: null };
+        return { cancelled: true, proposal: null, proposals: [], waiting: false };
+      }
+      // Phase 16: a delegation tool started a plan — the run waits after this step.
+      if (call.status === "executed" && isDelegationTool(canonical) && (result?.details as { delegationWait?: unknown } | undefined)?.delegationWait === true) {
+        waiting = true;
       }
       // A delegated sub-agent's spend counts against this run's budget.
       const childCost = (result?.details as { costMicroUsd?: unknown } | undefined)?.costMicroUsd;
@@ -795,28 +852,18 @@ async function runToolStep(
     s.calls.push(call);
     stepCalls.push(call);
     input.onEvent?.({ type: "tool_result", toolUseId: block.id, tool: canonical, status: call.status, summary: call.resultSummary ?? "" });
-    if (call.status === "pending_confirmation" && !proposal) proposal = call;
-    const sub = call.delegated?.find((c) => c.status === "pending_confirmation");
-    if (sub && !proposal) proposal = sub;
+    if (call.status === "pending_confirmation") proposals.push(call);
     await save();
   }
 
   if (failedTests) s.testFailCycles++;
   s.messages.push({ role: "user", content: results });
 
-  if (proposal) {
-    // Propose the FIRST pending action and stop; drop the rest so nothing
-    // leaks through a later "yes".
-    for (const c of stepCalls) {
-      if (c.status === "pending_confirmation" && c !== proposal) c.status = "error";
-      for (const d of c.delegated ?? []) if (d.status === "pending_confirmation" && d !== proposal) d.status = "error";
-    }
-    // A sub-agent's proposal is lifted to the top level so the user's "yes"
-    // finds it (the chat reads top-level calls only).
-    if (!s.calls.includes(proposal)) s.calls.push(proposal);
-  }
+  // Phase 16: every pending action of the step stays pending and is listed
+  // to the user (none is turned into an error); "yes" confirms the listed
+  // ones, each re-checked against the grant it was proposed under.
   await save();
-  return { cancelled: false, proposal };
+  return { cancelled: false, proposal: proposals[0] ?? null, proposals, waiting };
 }
 
 /**

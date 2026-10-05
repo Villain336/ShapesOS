@@ -87,6 +87,8 @@ export const TOOL_RECORDED_EVENT = "recordedRunEvent";
 export interface ToolArgSchema {
   type: string;
   description: string;
+  /** Phase 16: JSON-schema item shape for an array argument (delegate_tasks' tasks). */
+  items?: Record<string, unknown>;
 }
 
 export interface ToolDef {
@@ -1150,6 +1152,7 @@ export const TOOL_GROUP: Readonly<Record<string, ToolGroup>> = {
   twin_assign_equipment: "ops",
   twin_draft_layout: "ops",
   delegate_to_subagent: "delegate",
+  delegate_tasks: "delegate", // Phase 16: parallel sub-agents (lib/chat/delegation.ts)
   // Phase 8 (ship): local git work in the run's sandbox is "code"; anything
   // that leaves the sandbox is "ship" (lib/ship/tools.ts).
   git_clone: "code",

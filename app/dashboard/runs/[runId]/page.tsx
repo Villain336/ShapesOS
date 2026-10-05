@@ -178,7 +178,8 @@ export default async function RunViewerPage({ params }: { params: Promise<{ runI
   });
 
   const canControl = roleAtLeast(membership?.role, "editor");
-  const live = run.status === "running" || run.status === "queued";
+  // Phase 16: a run waiting for the user's OK can still be stopped.
+  const live = run.status === "running" || run.status === "queued" || run.status === "awaiting_confirmation";
   const control =
     mission && canControl && live && (mission.status === "active" || mission.status === "paused")
       ? { missionId: mission.id, can: mission.status === "paused" ? ("resume" as const) : ("pause" as const) }

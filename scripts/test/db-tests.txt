@@ -152,3 +152,5 @@ lib/twin/__tests__/twin-viewer-db.test.ts
 lib/automation/__tests__/p14-approvals-db.test.ts
 # Phase 14: the connector refresh sweep never marks an API key or a non-expiring token needs_reauth; renewable credentials still refresh, expiring ones without a refresh token still ask.
 lib/vault/__tests__/refresh-due-db.test.ts
+# Phase 16 (deleg): the two delegation bugs — lease loss mid sub-agent stays resumable (never succeeded); "yes" on a sub-agent's proposal resumes THAT sub-agent (its tools, its run); a waiting sub-agent is awaiting_confirmation. Fake Responses API (MOCK), real loop + queue.
+lib/chat/__tests__/delegation-bugs-db.test.ts

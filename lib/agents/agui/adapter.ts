@@ -380,6 +380,11 @@ export async function* streamChatTurnAgui(
 }
 
 const TERMINAL = new Set(["succeeded", "failed", "cancelled"]);
+/**
+ * Phase 16: a queued turn's tail also ends when its run waits for the user's
+ * OK (sub-agents' proposals are listed in the thread) — "yes" is a new turn.
+ */
+const TAIL_ENDS = new Set([...TERMINAL, "awaiting_confirmation"]);
 
 function sleepOrSettle(ms: number, settled: Promise<unknown>): Promise<void> {
   return new Promise((resolve) => {
@@ -545,7 +550,7 @@ async function* streamLiveTurn(
     for (;;) {
       yield* drain();
       const status = await getStatus(request.workspaceId, agentRunId).catch(() => null);
-      if (!status || TERMINAL.has(status) || Date.now() >= deadline) break;
+      if (!status || TAIL_ENDS.has(status) || Date.now() >= deadline) break;
       await new Promise((r) => setTimeout(r, Math.max(pollMs, 500)));
     }
     yield* drain();
