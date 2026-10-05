@@ -209,6 +209,27 @@ async function deny(
 }
 
 /**
+ * Phase 14 (approvals): the enabled Slack installation of this workspace
+ * whose project is this one (or unset), as a binding-shaped row — null when
+ * there is none or its connection is not active.
+ */
+async function slackInstallBinding(ctx: ToolContext) {
+  const { withWorkspaceScope } = await import("@/lib/substrate/memory/rls");
+  const install = await withWorkspaceScope(ctx.workspaceId, (tx) =>
+    tx.slackInstallation.findFirst({
+      where: { workspaceId: ctx.workspaceId, enabled: true, OR: [{ projectId: ctx.projectId }, { projectId: null }] },
+      select: { connectionId: true },
+    }),
+  ).catch(() => null);
+  if (!install) return null;
+  const connection = await prisma.connectorConnection.findFirst({
+    where: { id: install.connectionId, workspaceId: ctx.workspaceId, connectorKey: "slack", status: "active" },
+    include: { connector: true },
+  });
+  return connection ? { projectConfig: null, connection } : null;
+}
+
+/**
  * Resolve and execute `connector.<key>.<toolName>`. Returns a ChatToolCall
  * status + summary; every denial is explained and audited.
  */
@@ -262,10 +283,15 @@ export async function resolveConnectorTool(
   }
 
   // 2. Project data-source binding with an active connection.
-  const binding = await prisma.projectDataSource.findFirst({
+  const bound = await prisma.projectDataSource.findFirst({
     where: { projectId: ctx.projectId, connectorKey: key },
     include: { connection: { include: { connector: true } } },
   });
+  // Phase 14 (approvals): the Slack app installed for this project (its
+  // mentions become this project's chat threads) counts as the project's
+  // Slack binding, so a held Slack reply posts through this same gate.
+  const binding =
+    bound?.connection?.status === "active" || key !== "slack" ? bound : ((await slackInstallBinding(ctx)) ?? bound);
   const connection = binding?.connection;
   if (!binding || !connection || connection.status !== "active") {
     return deny(
