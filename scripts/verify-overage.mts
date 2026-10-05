@@ -258,7 +258,8 @@ async function armWorkspace(workspaceId: string, adminId: string): Promise<void>
   if (r.status !== 200) throw new Error(`arm overage failed: ${r.status} ${JSON.stringify(r.body)}`);
 }
 
-const POOL = 2500; // starter plan included credits
+// Phase 15.3: the starter pool comes from the constants (lib/metering/credits.ts).
+const POOL = (await import("@/lib/metering/credits")).includedCreditsForPlan("starter");
 
 let burnSeq = 0; // global — burn() must never reuse an idempotency key
 async function burn(workspaceId: string, totalCredits: number, chunk = 100): Promise<void> {

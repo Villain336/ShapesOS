@@ -17,7 +17,7 @@
 import { planHasFeature } from "@/lib/billing/entitlements";
 
 /** Paid plans whose workspaces get the MCP server on unless an admin turns it off. */
-export const MCP_DEFAULT_ON_PLANS: readonly string[] = ["pro", "agency"];
+export const MCP_DEFAULT_ON_PLANS: readonly string[] = ["pro", "business", "agency"];
 
 export type McpEnabledSource = "explicit_on" | "explicit_off" | "plan_default";
 

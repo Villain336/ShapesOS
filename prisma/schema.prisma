@@ -21,6 +21,9 @@ enum Plan {
   trial
   starter
   pro
+  // Phase 15.3 (pricing): base fee + 25 seats + 40,000 credits, SSO/SCIM and
+  // unlimited twin sites (lib/billing/plans.ts, lib/billing/entitlements.ts).
+  business
   agency
 }
 

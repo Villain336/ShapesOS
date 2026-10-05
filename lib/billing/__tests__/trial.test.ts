@@ -12,7 +12,7 @@ import {
   trialEndsAtFrom,
   trialExpiredMessage,
 } from "../trial";
-import { includedCreditsForPlan } from "@/lib/metering/credits";
+import { TRIAL_INCLUDED_CREDITS, includedCreditsForPlan } from "@/lib/metering/credits";
 
 const env = (v?: string) => ({ ...(v === undefined ? {} : { DEPLOYMENT_MODE: v }) }) as NodeJS.ProcessEnv;
 const NOW = new Date("2026-10-04T12:00:00Z");
@@ -47,8 +47,9 @@ describe("plan assignment by DEPLOYMENT_MODE", () => {
     assert.equal(lapsedPlanFor("self_hosted"), "self_hosted");
     assert.equal(lapsedPlanFor("hosted"), "trial");
   });
-  it("the trial includes a small pool", () => {
-    assert.equal(includedCreditsForPlan("trial"), 500);
+  it("the trial includes a small one-time pool (Phase 15.3: 1,000 credits)", () => {
+    assert.equal(includedCreditsForPlan("trial"), TRIAL_INCLUDED_CREDITS);
+    assert.equal(TRIAL_INCLUDED_CREDITS, 1_000);
     assert.equal(includedCreditsForPlan("self_hosted"), 0);
   });
 });

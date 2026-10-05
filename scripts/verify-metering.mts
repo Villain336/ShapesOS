@@ -82,7 +82,9 @@ console.log("metering battery");
   let threw = false;
   try { credits.creditsFor("nope_not_real"); } catch { threw = true; }
   check("unknown action throws in creditsFor", threw);
-  check("tier pools starter/pro/agency", credits.TIER_INCLUDED_CREDITS.starter === 2500 && credits.TIER_INCLUDED_CREDITS.pro === 10000 && credits.TIER_INCLUDED_CREDITS.agency === 30000);
+  // Phase 15.3: pools = base × INCLUDED_CREDITS_MULTIPLIER (owner knob, ×2 after the Phase 17 evaluation).
+  const M = credits.INCLUDED_CREDITS_MULTIPLIER;
+  check("tier pools starter/pro/business/agency", credits.TIER_INCLUDED_CREDITS.starter === 4000 * M && credits.TIER_INCLUDED_CREDITS.pro === 15000 * M && credits.TIER_INCLUDED_CREDITS.business === 40000 * M && credits.TIER_INCLUDED_CREDITS.agency === 30000 * M);
 }
 
 // ── 2. happy path + idempotency replay ───────────────────────────────────────

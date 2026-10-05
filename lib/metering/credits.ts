@@ -183,21 +183,46 @@ export function creditsFor(action: string): number {
   return CREDIT_COSTS[action].credits;
 }
 
-// ── Tier pools (spec Appendix A) ─────────────────────────────────────────────
-// Seat tiers keep their base fee; each includes a monthly credit pool.
-// Purchased top-up credits roll over 12 months (tracked via
-// CreditBalance.purchasedExpiresAt).
+// ── Tier pools (Phase 15.3 pricing: base fee + seats + credits) ─────────────
+// Each paid tier includes a monthly credit pool (pre-paid usage at 1 credit =
+// $0.01). Purchased top-up credits roll over 12 months (tracked via
+// CreditBalance.purchasedExpiresAt). Prices and seats live in
+// lib/billing/plans.ts and lib/billing/entitlements.ts.
+//
+// OWNER KNOB — the included credits are provisional: the Phase 17 evaluation
+// (cache layout + model routing) is expected to make each AI turn ~5× cheaper,
+// and the plan is to DOUBLE every paid pool once that is confirmed
+// (Starter 8,000 · Pro 30,000 · Business 80,000 · Agency 60,000). That is a
+// one-line change: set INCLUDED_CREDITS_MULTIPLIER to 2. Each base number
+// below can also be edited on its own.
+export const INCLUDED_CREDITS_MULTIPLIER = 1;
+
+/** Monthly included pool per paid plan, before INCLUDED_CREDITS_MULTIPLIER. */
+export const BASE_INCLUDED_CREDITS = {
+  starter: 4_000, // $59/mo
+  pro: 15_000, // $199/mo
+  business: 40_000, // $499/mo
+  agency: 30_000, // $399/mo — pooled across the agency's client workspaces (see plans.ts)
+} as const;
+
+/**
+ * Phase 3 hosted trial (lib/billing/trial.ts): a ONE-TIME pool for the
+ * 14-day trial — it does not refill at a month boundary — behind the hard
+ * cap; no auto-overage. Not scaled by the multiplier (a trial is a taste).
+ */
+export const TRIAL_INCLUDED_CREDITS = 1_000;
 
 export const TIER_INCLUDED_CREDITS = {
-  self_hosted: 0, // self-host = BYO keys; metering records locally, no pool billed
-  // Phase 3: hosted trial (lib/billing/trial.ts). One-time pool ($5) for the
-  // 14-day trial — it does not refill at a month boundary — behind the hard
-  // cap; no auto-overage.
-  trial: 500,
-  starter: 2500, // $29/mo
-  pro: 10000, // $79/mo
-  agency: 30000, // $199/mo
-} as const;
+  // Self-host = bring your own keys; metering records locally, no pool
+  // billed. A hosted workspace that brings its own model key (Phase 15.1,
+  // keySource "workspace") also spends 0 credits on those calls on ANY plan.
+  self_hosted: 0,
+  trial: TRIAL_INCLUDED_CREDITS,
+  starter: BASE_INCLUDED_CREDITS.starter * INCLUDED_CREDITS_MULTIPLIER,
+  pro: BASE_INCLUDED_CREDITS.pro * INCLUDED_CREDITS_MULTIPLIER,
+  business: BASE_INCLUDED_CREDITS.business * INCLUDED_CREDITS_MULTIPLIER,
+  agency: BASE_INCLUDED_CREDITS.agency * INCLUDED_CREDITS_MULTIPLIER,
+} as const satisfies Record<string, number>;
 
 export type TierKey = keyof typeof TIER_INCLUDED_CREDITS;
 
