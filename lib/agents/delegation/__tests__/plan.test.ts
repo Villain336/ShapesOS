@@ -32,6 +32,7 @@ import {
 } from "../plan";
 import { applyJoinToState, hasUnappliedJoin, patchDecidedProposals, placeholderSaved } from "../join";
 import { initialLoopState, type LoopState } from "@/lib/agents/loop";
+import { DELEGATION_GUIDANCE } from "@/lib/agents/roles";
 
 const limits = DEFAULT_DELEGATION_LIMITS;
 
@@ -325,6 +326,15 @@ describe("the automatic trigger (a cheap nudge; the model decides)", () => {
     assert.match(delegationNudge("Please:\n- audit the site\n- draft a post\n- check rankings") ?? "", /3 separate items/);
     const long = `${"We need a full launch plan for the spring collection and then the email copy and also the ad budget plus a review of last year. ".repeat(6)}`;
     assert.match(delegationNudge(long) ?? "", /multi-part/);
+  });
+
+  it("the lead's guidance says when to split and when not (lib/agents/roles.ts)", () => {
+    assert.match(DELEGATION_GUIDANCE, /independent parts/);
+    assert.match(DELEGATION_GUIDANCE, /different tools/);
+    assert.match(DELEGATION_GUIDANCE, /a third of this run's budget/);
+    assert.match(DELEGATION_GUIDANCE, /Keep small tasks inline/);
+    assert.match(DELEGATION_GUIDANCE, /Never delegate a single tool call/);
+    assert.match(DELEGATION_GUIDANCE, /money and irreversible actions always ask/);
   });
 
   it("stays quiet on small requests", () => {

@@ -9,7 +9,11 @@
 //     reads), and a tool filter that hides / refuses every tool the skill did
 //     not declare — the T4 envelope, enforced per tool call by the loop;
 //   * no person is waiting: a write the rules don't auto-approve ends the
-//     subtask "awaiting approval" (it never runs on its own).
+//     subtask "awaiting approval" (it never runs on its own);
+//   * Phase 16: the subtask runs are children of ONE AgentRun for the skill
+//     run (parentRunId), so a scheduled skill shows as one tree and Stop on
+//     it reaches every subtask; each subtask has its own abort controller
+//     (stopping it interrupts its in-flight model call).
 // In mock mode (no live model) the runner keeps its mock subagents.
 
 import type { Skill } from "@prisma/client";
@@ -17,6 +21,7 @@ import { getLlmProviderFor, workloadForAgent } from "@/lib/llm/router";
 import { getTool, toolGroup } from "@/lib/chat/tools";
 import { computeGrant, connectorGroup, type ToolGroup } from "@/lib/agents/grants";
 import { createAgentRun, finishAgentRun, markAgentRunRunning } from "@/lib/agents/runs/service";
+import { registerRunAbort, releaseRunAbort } from "@/lib/agents/runs/abort";
 import { runAgentLoop, SYSTEM_RUN_ROLE } from "@/lib/agents/loop";
 import { GLOBAL_HARD_RULES } from "@/lib/expert/constitution";
 import { prisma } from "@/lib/prisma";
@@ -62,6 +67,8 @@ export interface LiveSubtaskInput {
   skillRunId: string;
   subagentRunId: string;
   signal?: AbortSignal;
+  /** Phase 16: the skill run's own AgentRun (the subtask runs hang under it). */
+  parentRunId?: string;
 }
 
 export interface LiveSubtaskResult {
@@ -85,9 +92,14 @@ export const runSkillSubtaskLive: LiveSubtaskRunner = async (input) => {
     startedBy: "scheduler",
     agentKey: SKILL_AGENT,
     allowedTools: groups,
+    ...(input.parentRunId ? { parentRunId: input.parentRunId } : {}),
     agentState: { skillRunId: input.skillRunId, subagentRunId: input.subagentRunId, skill: input.skill.slug, task: input.subtask.label },
   });
   await markAgentRunRunning(input.workspaceId, run.id);
+  // Phase 16: this subtask's own controller (Stop on it — or on the skill
+  // run above it — interrupts its in-flight model call), tied to the caller's.
+  const own = registerRunAbort(run.id);
+  const signal = input.signal ? AbortSignal.any([own, input.signal]) : own;
   const system = [
     GLOBAL_HARD_RULES,
     "",
@@ -111,7 +123,7 @@ export const runSkillSubtaskLive: LiveSubtaskRunner = async (input) => {
         agentKey: SKILL_AGENT,
         grant: groups,
         runId: run.id,
-        signal: input.signal,
+        signal,
       },
       system,
       messages: [{ role: "user", content: `${input.subtask.label}\n\n${input.subtask.detail}` }],
@@ -129,5 +141,24 @@ export const runSkillSubtaskLive: LiveSubtaskRunner = async (input) => {
   } catch (err) {
     await finishAgentRun(input.workspaceId, run.id, "failed").catch(() => undefined);
     throw err;
+  } finally {
+    releaseRunAbort(run.id);
   }
 };
+
+/**
+ * Phase 16: the AgentRun a live skill run's subtasks hang under (kind
+ * playbook, the lead's agent key) — one tree on the Runs page and in the
+ * sidebar, one Stop for the whole fan-out.
+ */
+export async function createSkillParentRun(input: { workspaceId: string; skillRunId: string; skillName: string; projectId: string | null }): Promise<string> {
+  const run = await createAgentRun({
+    workspaceId: input.workspaceId,
+    kind: "playbook",
+    startedBy: "scheduler",
+    agentKey: SKILL_AGENT,
+    agentState: { skillRunId: input.skillRunId, task: `Scheduled skill: ${input.skillName}`, projectId: input.projectId },
+  });
+  await markAgentRunRunning(input.workspaceId, run.id);
+  return run.id;
+}

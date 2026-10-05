@@ -48,7 +48,6 @@ import { finishAgentRun, getAgentRun, markAgentRunRunning } from "@/lib/agents/r
 import { withWorkspaceScope } from "@/lib/substrate/memory/rls";
 import {
   childBriefMessage,
-  DELEGATION_GUIDANCE,
   DELIVERABLE_INSTRUCTIONS,
   parseDeliverable,
   splitBudget,
@@ -70,6 +69,7 @@ import {
 } from "@/lib/agents/delegation/store";
 import { applyJoinToState, patchDecidedProposals, placeholderSaved, type DecidedProposal } from "@/lib/agents/delegation/join";
 import { connectorChatTools } from "./connector-tools";
+import { DELEGATION_GUIDANCE } from "@/lib/agents/roles";
 
 // ── the tools ───────────────────────────────────────────────────────────────
 

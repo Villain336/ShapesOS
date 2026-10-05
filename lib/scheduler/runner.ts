@@ -258,6 +258,8 @@ export async function executeSkillRun(db: Db, runId: string, deps: ExecutorDeps 
     actorUserId: null,
   });
 
+  // Phase 16: the AgentRun the live subtasks hang under (one tree, one Stop).
+  let parentAgentRunId: string | null = null;
   try {
     const subtasks = deps.subtasks ?? decomposeSkill(skill);
     // Phase 8: the real agent loop when a model is live; mock otherwise.
@@ -281,6 +283,11 @@ export async function executeSkillRun(db: Db, runId: string, deps: ExecutorDeps 
       });
     }
     const limit = Math.max(1, cap - activeElsewhere);
+
+    // Phase 16: live subtasks hang under one AgentRun for this skill run.
+    parentAgentRunId = runLive
+      ? await (await import("./live")).createSkillParentRun({ workspaceId: run.workspaceId, skillRunId: run.id, skillName: skill.name, projectId: run.projectId })
+      : null;
 
     const subagentResults = await runWithLimit(subtasks, limit, async (subtask) => {
       const sub = await db.subagentRun.create({
@@ -322,6 +329,7 @@ export async function executeSkillRun(db: Db, runId: string, deps: ExecutorDeps 
             subtask,
             skillRunId: run.id,
             subagentRunId: sub.id,
+            ...(parentAgentRunId ? { parentRunId: parentAgentRunId } : {}),
           });
           result = `${live.result}\n\nAgent run: ${live.runId}`;
           subStatus = live.status;
@@ -356,6 +364,16 @@ export async function executeSkillRun(db: Db, runId: string, deps: ExecutorDeps 
       });
       return { label: subtask.label, tool: subtask.tool, status: subStatus, credits, result };
     });
+
+    if (parentAgentRunId) {
+      const { finishAgentRun, isAgentRunCancelRequested } = await import("@/lib/agents/runs/service");
+      const stopped = await isAgentRunCancelRequested(run.workspaceId, parentAgentRunId).catch(() => false);
+      await finishAgentRun(
+        run.workspaceId,
+        parentAgentRunId,
+        stopped ? "cancelled" : subagentResults.some((r) => r.status === "failed") ? "failed" : "succeeded",
+      ).catch(() => undefined);
+    }
 
     const creditsUsed =
       SKILL_RUN_BASE_CREDITS +
@@ -411,6 +429,10 @@ export async function executeSkillRun(db: Db, runId: string, deps: ExecutorDeps 
     }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
+    if (parentAgentRunId) {
+      const { finishAgentRun } = await import("@/lib/agents/runs/service");
+      await finishAgentRun(run.workspaceId, parentAgentRunId, "failed").catch(() => undefined);
+    }
     await db.skillRun.update({
       where: { id: run.id },
       data: { status: "failed", finishedAt: new Date(), error: message.slice(0, 2000) },

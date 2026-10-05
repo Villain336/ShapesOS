@@ -626,15 +626,6 @@ export function isWaitingPlaceholder(content: string, planId: string): boolean {
 
 // ── the automatic trigger ───────────────────────────────────────────────────
 
-/** Lead system-prompt guidance (lib/agents/roles.ts adds it when automatic delegation is on). */
-export const DELEGATION_GUIDANCE = [
-  "## Working with sub-agents",
-  "You can split work across sub-agents that run IN PARALLEL with delegate_tasks: a goal, one task per sub-agent (agent, a self-contained brief, the deliverable you need back, optional narrower tools, optional dependsOn), and how you will merge the results.",
-  "Split when the work has independent parts, needs different tools or specialists, or would take more than about a third of this run's budget. Keep small tasks inline. Never delegate a single tool call.",
-  "Each sub-agent works only from its brief — include the context it needs. Its actions still ask the user first unless a rule allows them; money and irreversible actions always ask.",
-  "When the results come back, check each one against its task, retry a failed task at most once, then merge into one answer. Say plainly what failed or is missing.",
-].join("\n");
-
 const PARALLEL_RE = /\b(in parallel|at the same time|simultaneously|concurrently|split (?:this|it|the work)|fan(?:ned)? out|sub-?agents?|delegate)\b/i;
 const LIST_ITEM_RE = /^\s*(?:[-*•]|\d+[.)])\s+\S/;
 

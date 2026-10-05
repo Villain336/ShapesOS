@@ -156,3 +156,5 @@ lib/vault/__tests__/refresh-due-db.test.ts
 lib/chat/__tests__/delegation-bugs-db.test.ts
 # Phase 16 (deleg): parallel delegation end to end — overlap within the per-run / per-workspace caps, the join exactly once (worker restart, racing settles), siblings inside the parent's budget, dependsOn order + deliverables passed on, stop one child / the lead, two children's proposals + "yes" resumes the right child, decline, Tier 3 in a child still asks, no grant widening, depth 2, the Automatic delegation switch. Fake Responses API (MOCK).
 lib/chat/__tests__/delegation-db.test.ts
+# Phase 16 (deleg): a scheduled skill's live subtasks hang under one AgentRun (parentRunId) and Stop on it interrupts every subtask's in-flight call. Fake Responses API (MOCK).
+lib/scheduler/__tests__/skill-tree-db.test.ts
