@@ -152,7 +152,7 @@ export async function proposeBrandSync(
   };
 
   // Budget gate BEFORE the vendor.
-  const gate = await checkAndReserve(workspaceId, contextDevCreditsFor("brand"));
+  const gate = await checkAndReserve(workspaceId, contextDevCreditsFor("brand_retrieve"));
   if (gate.decision !== "allow") {
     await fail("BUDGET_EXCEEDED", gate.reason);
   }
@@ -187,7 +187,7 @@ export async function proposeBrandSync(
       status: diff.length ? "pending_approval" : "unchanged",
       profileJson: profile! as unknown as Prisma.InputJsonValue,
       diffJson: diff as unknown as Prisma.InputJsonValue,
-      creditsUsed: contextDevCreditsFor("brand"),
+      creditsUsed: contextDevCreditsFor("brand_retrieve"),
     },
   });
 }

@@ -164,3 +164,5 @@ lib/agents/delegation/__tests__/delegation-routes-db.test.ts
 lib/billing/__tests__/plan-gates-db.test.ts
 # Phase 15.3 (pricing): extra seats as a Stripe QUANTITY line against a labelled FAKE Stripe client — sync idempotent (no write when in step, retries and concurrent syncs never double-charge); a member past the included seats is refused (402, nothing added or charged) without the admin's confirmation and allowed with it (audited); removal lowers the quantity; SCIM uses approved seats and is refused past them; a downgrade never bills above the approved seats; no subscription = hard limit.
 lib/billing/__tests__/seat-billing-db.test.ts
+# Phase 15.1 (keys): BUG A — a Context.dev brand sync is priced as brand_retrieve (it threw "unknown operation brand" on every sync); fake Context.dev.
+lib/knowledge/contextdev/__tests__/brandsync-db.test.ts
