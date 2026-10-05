@@ -144,12 +144,15 @@ export async function finishAgentRun(workspaceId: string, runId: string, status:
   if (!TERMINAL_RUN_STATUSES.has(status)) {
     throw new Error(`finishAgentRun: ${status} is not a terminal status`);
   }
-  const run = await withWorkspaceScope(workspaceId, (tx) =>
-    tx.agentRun.update({
+  const run = await withWorkspaceScope(workspaceId, async (tx) => {
+    // Phase 16: a run already ended (e.g. a delegated child ended with its
+    // task) keeps its first end time.
+    const prior = await tx.agentRun.findFirst({ where: { id: runId, workspaceId }, select: { endedAt: true } });
+    return tx.agentRun.update({
       where: { id: runId, workspaceId },
-      data: { status, endedAt: new Date() },
-    }),
-  );
+      data: { status, endedAt: prior?.endedAt ?? new Date() },
+    });
+  });
   // Phase 4a: agent_run.finished / agent_run.failed webhook (never throws).
   await emitWebhookEvent({
     workspaceId,

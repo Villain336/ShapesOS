@@ -372,20 +372,20 @@ export async function runDelegatedChild(p: SubagentRunJobPayload, opts: ChildRun
   };
   try {
     if (await stopRequested(ctx)) {
-      await finishAgentRun(ws, p.childRunId, "cancelled").catch(() => undefined);
       await settle({ status: "cancelled", error: "Stopped before it started." });
+      await finishAgentRun(ws, p.childRunId, "cancelled").catch(() => undefined);
       return { childRunId: p.childRunId, status: "cancelled" };
     }
     const agentMod = await import("./agent");
     if (!agentMod.agentIsLive(agent, "default")) {
-      await finishAgentRun(ws, p.childRunId, "failed").catch(() => undefined);
       await settle({ status: "failed", error: `${agentDisplayName(agent)} needs a live model to work on its own.` });
+      await finishAgentRun(ws, p.childRunId, "failed").catch(() => undefined);
       return { childRunId: p.childRunId, status: "failed" };
     }
     const capped = await meterSpawn(p);
     if (capped) {
-      await finishAgentRun(ws, p.childRunId, "failed").catch(() => undefined);
       await settle({ status: "failed", error: capped });
+      await finishAgentRun(ws, p.childRunId, "failed").catch(() => undefined);
       return { childRunId: p.childRunId, status: "failed" };
     }
 
@@ -425,8 +425,8 @@ export async function runDelegatedChild(p: SubagentRunJobPayload, opts: ChildRun
     if (isLeaseLost(signal) || (err as { name?: unknown })?.name === "LeaseLostError") throw err;
     if (!opts.lastAttempt) throw err; // the queue retries with backoff
     const msg = err instanceof Error ? err.message : String(err);
-    await finishAgentRun(ws, p.childRunId, "failed").catch(() => undefined);
     await settle({ status: "failed", error: msg.slice(0, 500) });
+    await finishAgentRun(ws, p.childRunId, "failed").catch(() => undefined);
     return { childRunId: p.childRunId, status: "failed", error: msg };
   } finally {
     opts.signal?.removeEventListener("abort", onLeaseLost);
@@ -464,14 +464,16 @@ async function settleChildLoop(
       await settle({ status: "awaiting_confirmation", proposals, ...used });
       return { childRunId: p.childRunId, status: "awaiting_confirmation", proposals: proposals.length };
     }
+    // The task's outcome lands BEFORE the run is finished: a sibling settling
+    // in between must never see the run end without its real outcome.
     case "done": {
-      await finishAgentRun(ws, p.childRunId, "succeeded").catch(() => undefined);
       await settle({ status: "succeeded", deliverable: parseDeliverable(loop.finalText), ...used });
+      await finishAgentRun(ws, p.childRunId, "succeeded").catch(() => undefined);
       return { childRunId: p.childRunId, status: "succeeded" };
     }
     case "cancelled": {
-      await finishAgentRun(ws, p.childRunId, "cancelled").catch(() => undefined);
       await settle({ status: "cancelled", error: "Stopped before it finished.", ...used });
+      await finishAgentRun(ws, p.childRunId, "cancelled").catch(() => undefined);
       return { childRunId: p.childRunId, status: "cancelled" };
     }
     default: {
@@ -482,13 +484,13 @@ async function settleChildLoop(
           : loop.status === "refused"
             ? "The model declined this task."
             : loop.finalText || "The sub-agent stopped on an error.";
-      await finishAgentRun(ws, p.childRunId, "failed").catch(() => undefined);
       await settle({
         status: "failed",
         error: why.slice(0, 500),
         ...(loop.finalText && loop.status === "capped" ? { deliverable: parseDeliverable(loop.finalText) } : {}),
         ...used,
       });
+      await finishAgentRun(ws, p.childRunId, "failed").catch(() => undefined);
       return { childRunId: p.childRunId, status: "failed", parentRunId };
     }
   }

@@ -268,7 +268,20 @@ export async function settleDelegation(
           if (update.activeMs !== undefined) task.activeMs = update.activeMs;
           if (update.status === "awaiting_confirmation") task.proposals = update.proposals ?? [];
           else delete task.proposals;
-          if (TERMINAL_TASK_STATUSES.has(update.status)) task.endedAt = now.toISOString();
+          if (TERMINAL_TASK_STATUSES.has(update.status)) {
+            task.endedAt = now.toISOString();
+            // The child run ends in the SAME transaction as its task: nobody
+            // can see a finished task with a live run (or the reverse), and the
+            // caps below count the slot as free. finishAgentRun() afterwards
+            // only adds its side effects (webhook, sandbox, notification).
+            if (task.childRunId) {
+              const runStatus = update.status === "succeeded" ? "succeeded" : update.status === "cancelled" ? "cancelled" : "failed";
+              await t.agentRun.updateMany({
+                where: { id: task.childRunId, workspaceId, status: { in: ["queued", "running", "awaiting_confirmation"] } },
+                data: { status: runStatus, endedAt: now },
+              });
+            }
+          }
           if (update.resume && task.childRunId) {
             task.status = "queued";
             await t.agentRun.update({ where: { id: task.childRunId, workspaceId }, data: { status: "running" } });
