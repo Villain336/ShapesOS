@@ -114,6 +114,14 @@ export const OPS_MONEY_ACTIONS: OpsMoneyAction[] = [
   // approve_pay_run / post_pay_run); both bind the run's compute digest.
   { slug: "OPS_PAYROLL_APPROVE", label: "Approve pay run", expectedTier: "high" },
   { slug: "OPS_PAYROLL_POST", label: "Post pay run to the books", expectedTier: "medium" },
+  // Phase 14 (connectors): writing a computed run's hours into the payroll
+  // provider's (Gusto's) unprocessed payroll — what people will be paid.
+  // Money: never automated (Tier 3 kind send_payroll_to_provider), bound to
+  // the run's compute digest. Pinned medium like the other money sends
+  // (OPS_INVOICE_SEND, OPS_BILL_PAY): the Phase 14 classifier derives the
+  // SEND verb as medium, and a gated write needs a person's approval at any
+  // tier.
+  { slug: "OPS_PAYROLL_SEND_PROVIDER", label: "Send pay run to Gusto", expectedTier: "medium" },
   // Phase 13 (twincore): publishing a digital twin site layout (an agent's
   // twin_draft_layout output, or a person's edits) is a person's decision.
   // No money moves; it rides the same propose → approve → execute gate.

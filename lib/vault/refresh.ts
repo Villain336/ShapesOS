@@ -147,7 +147,17 @@ export async function refreshConnection(
     const tokenUrl = config.perShop ? shopUrl(config.tokenUrl, typeof payload?.shop === "string" ? payload.shop : null) : config.tokenUrl;
     const res = await fetchImpl(
       tokenUrl,
-      buildTokenRequest(config, { grant_type: "refresh_token", refresh_token: refreshToken }, clientId, clientSecret),
+      buildTokenRequest(
+        config,
+        {
+          grant_type: "refresh_token",
+          refresh_token: refreshToken,
+          // Phase 14 (connectors): Gusto documents redirect_uri on refresh too.
+          ...(config.refreshWithRedirectUri && typeof payload?.redirect_uri === "string" ? { redirect_uri: payload.redirect_uri } : {}),
+        },
+        clientId,
+        clientSecret,
+      ),
     );
     if (!res.ok) {
       await markNeedsReauth(connectionId);

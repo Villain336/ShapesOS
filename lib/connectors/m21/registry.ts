@@ -1,6 +1,6 @@
 // Marketr — M21 built-in connector registry (spec §7, §11).
 //
-// DESIGN DECISION (recorded in prisma/schema.prisma): the 26 built-in
+// DESIGN DECISION (recorded in prisma/schema.prisma): the 27 built-in
 // connectors are CODE-defined here, not DB rows. (The count is pinned by
 // lib/connectors/m21/__tests__/registry.test.ts — update both together.) `Connector` rows exist
 // ONLY for workspace-custom MCP servers (kind=mcp). Do not create DB rows
@@ -88,6 +88,11 @@ export const LINEAR_SCOPES = ["read", "write"];
 export const JIRA_SCOPES = ["read:jira-work", "write:jira-work", "read:jira-user", "offline_access"];
 // Airtable: record read/write + base schema (to list bases, tables, fields).
 export const AIRTABLE_SCOPES = ["data.records:read", "data.records:write", "schema.bases:read"];
+// Phase 14 (connectors): Gusto assigns an app's API scopes during its review
+// (docs.gusto.com/app-integrations/docs/scopes) — nothing is requested on the
+// authorize URL. This integration needs employees:read, payrolls:read and
+// payrolls:write (ask Gusto for exactly those). Shared with lib/vault/oauth.ts.
+export const GUSTO_SCOPES: string[] = [];
 
 export const BUILT_IN_CONNECTORS: BuiltinConnectorMeta[] = [
   {
@@ -443,6 +448,19 @@ export const BUILT_IN_CONNECTORS: BuiltinConnectorMeta[] = [
     },
     authNote: "Xero OAuth 2.0; after connecting, choose the organisation in Settings → Connectors → Business sync.",
   },
+  // Phase 14 (connectors): Gusto payroll ↔ Ops pay runs (27th built-in).
+  {
+    key: "gusto",
+    displayName: "Gusto",
+    authType: "oauth2",
+    description:
+      "Match team members to Gusto employees, send a computed pay run's hours into Gusto's open payroll after you confirm (Gusto computes the taxes; you submit it in Gusto), and bring Gusto's taxes and net pay back onto the payslips.",
+    oauth: {
+      scopes: GUSTO_SCOPES,
+      envVars: ["GUSTO_CLIENT_ID", "GUSTO_CLIENT_SECRET"],
+    },
+    authNote: "Gusto OAuth2, one company per connection (a primary or full-access admin authorizes). GUSTO_ENVIRONMENT=demo (default) uses api.gusto-demo.com; production needs Gusto's app approval with employees:read, payrolls:read and payrolls:write.",
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -517,6 +535,7 @@ import { NetlifyM21Adapter } from "./native/netlify";
 import { ShopifyAdapter } from "./native/shopify"; // Phase 11 (bizsync)
 import { QuickbooksAdapter } from "./native/quickbooks"; // Phase 11 (bizsync)
 import { XeroAdapter } from "./native/xero"; // Phase 11 (bizsync)
+import { GustoAdapter } from "./native/gusto"; // Phase 14 (connectors)
 
 const ADAPTER_CLASSES: Record<string, () => ConnectorAdapter> = {
   "google-search-console": () => new GoogleSearchConsoleAdapter(),
@@ -549,6 +568,8 @@ const ADAPTER_CLASSES: Record<string, () => ConnectorAdapter> = {
   shopify: () => new ShopifyAdapter(),
   quickbooks: () => new QuickbooksAdapter(),
   xero: () => new XeroAdapter(),
+  // Phase 14 (connectors).
+  gusto: () => new GustoAdapter(),
 };
 
 /** Resolve a built-in connector key to its native adapter. Throws on unknown key. */
@@ -564,7 +585,7 @@ export function resolveAdapter(key: string): ConnectorAdapter {
 //
 // Phase 4b wired the last six mock-only adapters (GSC, GA4, Drive, Notion,
 // Meta Ads, Google Ads) to their live APIs: with a vault credential they
-// call the provider; without one they stay in labeled mock mode. All 26
+// call the provider; without one they stay in labeled mock mode. All 27
 // built-in adapters have live wiring, so the set is empty (0 mock-only;
 // pinned by lib/connectors/m21/__tests__/registry.test.ts). Keep it in
 // sync with the per-adapter file headers (scripts/verify-connector-health.mts

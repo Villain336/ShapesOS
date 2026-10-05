@@ -20,6 +20,11 @@
 // and the automation kinds are Tier 3. No money moves here — net pay is a
 // liability ("Net pay payable") until someone pays it outside ShapesOS.
 // The database backs every rule up (CHECKs + the lifecycle trigger).
+// Phase 14 (connectors): with Gusto connected the run can be sent to Gusto
+// while computed (lib/bizsync/gusto/payroll.ts); Gusto computes the taxes,
+// "Sync results" puts Gusto's figures on the payslips, and only then can the
+// run be approved and posted (lib/ops/payroll/provider.ts). When Gusto
+// reports it paid, Net pay payable is cleared by one payment entry.
 
 import { createHash } from "node:crypto";
 import type { Prisma } from "@prisma/client";
@@ -31,6 +36,7 @@ import { postPayRunEntry } from "../finance/posting";
 import { fmtMoney } from "../finance/money";
 import { computePayslip, parseComponents, runTotals, utcDay, type ComputedPayslip, type PayFrequency, type PayType } from "./rules";
 import { payrollTaxTableFor, type FilingStatus, type YtdWages } from "./tax";
+import { assertProviderAllows, clearNetPayIfPaid, providerSyncFor } from "./provider";
 
 type Tx = Prisma.TransactionClient;
 type Row = Record<string, unknown>;
@@ -161,6 +167,7 @@ export async function computePayRun(tx: Tx, actor: OpsActor, id: string): Promis
   if (run.status !== "draft" && run.status !== "computed") {
     throw new OpsError(409, `Only a draft or computed pay run can be (re)computed — this one is ${run.status}`);
   }
+  assertProviderAllows(await providerSyncFor(tx, ws, id), "compute");
   const { periodStart, periodEnd, payDate } = run;
   const assignments = await tx.opsSalaryAssignment.findMany({
     where: { workspaceId: ws, effectiveFrom: { lte: periodEnd }, OR: [{ effectiveTo: null }, { effectiveTo: { gte: periodStart } }] },
@@ -323,6 +330,7 @@ export async function approvePayRun(tx: Tx, actor: OpsActor, id: string, approva
   const run = await loadPayRun(tx, ws, id);
   if (run.status !== "computed") throw new OpsError(409, `Only a computed pay run can be approved — this one is ${run.status}`);
   if (run.payslipCount === 0 || !run.computeDigest) throw new OpsError(422, "Compute the pay run first");
+  assertProviderAllows(await providerSyncFor(tx, ws, id), "approve");
   if (!approvalId) {
     const approval = await requestOpsApproval(port, {
       workspaceId: ws,
@@ -361,6 +369,8 @@ export async function postPayRun(tx: Tx, actor: OpsActor, id: string, approvalId
   const run = await loadPayRun(tx, ws, id);
   if (run.status === "posted") return { outcome: "done", run, journalEntryId: run.journalEntryId };
   if (run.status !== "approved") throw new OpsError(409, `Only an approved pay run can be posted — this one is ${run.status}`);
+  const sync = await providerSyncFor(tx, ws, id);
+  assertProviderAllows(sync, "post");
   if (!approvalId) {
     const approval = await requestOpsApproval(port, {
       workspaceId: ws,
@@ -398,7 +408,10 @@ export async function postPayRun(tx: Tx, actor: OpsActor, id: string, approvalId
   });
   if (moved.count !== 1) throw new OpsError(409, "The pay run changed concurrently — reload");
   await audit(tx, actor, id, "gate_executed", `${payRunLabel(run)} posted (approval ${approvalId}): journal entry ${posted.entry.id} (${fmtMoney(posted.entry.totalCents)})`);
-  return { outcome: "done", run: await loadPayRun(tx, ws, id), journalEntryId: posted.entry.id };
+  const after = await loadPayRun(tx, ws, id);
+  // Phase 14 (connectors): already paid by the provider → settle net pay now.
+  await clearNetPayIfPaid(tx, actor, after, sync);
+  return { outcome: "done", run: after, journalEntryId: posted.entry.id };
 }
 
 export async function cancelPayRun(tx: Tx, actor: OpsActor, id: string): Promise<RunRow> {

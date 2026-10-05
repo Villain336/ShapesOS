@@ -141,6 +141,8 @@ lib/ops/__tests__/p12-mfg-db.test.ts
 lib/ops/__tests__/p12-pos-db.test.ts
 # Phase 12 (people): payroll — compute from salary + approved time, Tier-3 approve/post through the real Phase 14 gate, DB lifecycle guards, one balanced journal entry, YTD bases, FORCE RLS.
 lib/ops/__tests__/p12-payroll-db.test.ts
+# Phase 14 (connectors): Gusto payroll (fake Gusto, documented shapes): employee links suggested → confirmed by a person (FORCE RLS), Tier 3 send through the chat gate (never auto) and the ops gate (person approves), send idempotent per run + figures, approve/post wait for sync, sync-back reconciliation (payslips + totals), posted entry untouched, net-pay clearing balanced and once-only.
+lib/bizsync/__tests__/gusto-payroll-db.test.ts
 # Phase 12 (people): events — published-only routing, free/paid registration (paid pending until the signed Stripe webhook), concurrent capacity, once-only QR check-in, reminders, FORCE RLS.
 lib/ops/__tests__/p12-events-db.test.ts
 # Phase 13 (twincore): digital twin — FORCE RLS on sites/objects/dock bookings, layout validation + same-workspace bindings, overlapping active dock bookings refused (code + exclusion constraint), booking states reflected by siteSnapshot, gated publish, agent markers, live stream patch after a write, sample site per kind consistent + idempotent.

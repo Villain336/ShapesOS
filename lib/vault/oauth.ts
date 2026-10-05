@@ -15,8 +15,10 @@ import { getBuiltinMeta, HUBSPOT_SCOPES, MICROSOFT_CALENDAR_SCOPES, MICROSOFT_MA
 // Phase 11 (devtools): work-tool connector scopes.
 import { AIRTABLE_SCOPES, JIRA_SCOPES, LINEAR_SCOPES } from "@/lib/connectors/m21/registry";
 // Phase 11 (bizsync): Shopify / QuickBooks / Xero scopes + shop-domain guard.
-import { QUICKBOOKS_SCOPES, SHOPIFY_SCOPES, XERO_SCOPES } from "@/lib/connectors/m21/registry";
+import { GUSTO_SCOPES, QUICKBOOKS_SCOPES, SHOPIFY_SCOPES, XERO_SCOPES } from "@/lib/connectors/m21/registry";
 import { normalizeShopDomain } from "@/lib/bizsync/shopify/shop";
+// Phase 14 (connectors): Gusto demo vs production host.
+import { gustoBaseUrl } from "@/lib/bizsync/gusto/env";
 
 export interface OAuthProviderConfig {
   authorizeUrl: string;
@@ -63,6 +65,12 @@ export interface OAuthProviderConfig {
    * AND in the credential payload so adapters can address the right company.
    */
   callbackMeta?: (query: Record<string, string>, state: OAuthState) => Record<string, string>;
+  /**
+   * Phase 14 (connectors): the provider wants redirect_uri on the
+   * refresh_token grant too (Gusto). The callback keeps the redirect URI in
+   * the credential payload (and meta — it is not secret) for the refresher.
+   */
+  refreshWithRedirectUri?: boolean;
 }
 
 /** Phase 11 (bizsync): substitute the shop host into a per-shop URL. */
@@ -384,6 +392,28 @@ export const OAUTH_CONFIGS: Record<string, OAuthProviderConfig> = {
     clientIdEnv: "XERO_CLIENT_ID",
     clientSecretEnv: "XERO_CLIENT_SECRET",
     tokenRequest: "form_basic",
+  },
+  // Phase 14 (connectors): Gusto App Integrations OAuth2. Authorize and token
+  // endpoints live on the API host of the chosen environment
+  // (GUSTO_ENVIRONMENT=production → api.gusto.com, else api.gusto-demo.com —
+  // read at call time). The token endpoint takes a JSON body carrying the
+  // client credentials (both grants); access tokens last 2 hours and each
+  // refresh token works once (rotates; the vault keeps the newest). Scopes
+  // are assigned to the app by Gusto, not requested here. A token covers one
+  // company (strict access, v2023-05-01+). Verified against
+  // docs.gusto.com/app-integrations/docs/oauth2 (2026-10-05).
+  gusto: {
+    get authorizeUrl() {
+      return `${gustoBaseUrl()}/oauth/authorize`;
+    },
+    get tokenUrl() {
+      return `${gustoBaseUrl()}/oauth/token`;
+    },
+    scopes: GUSTO_SCOPES,
+    clientIdEnv: "GUSTO_CLIENT_ID",
+    clientSecretEnv: "GUSTO_CLIENT_SECRET",
+    tokenRequest: "json",
+    refreshWithRedirectUri: true,
   },
   // NOTE (Phase 18 slice 4, outcome B): Walmart Connect is NOT registered
   // here and never will be as an OAuth connector. Research 2026-10-01
