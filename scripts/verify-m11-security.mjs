@@ -194,6 +194,9 @@ const PUBLIC_BY_DESIGN = {
     "public storefront cart (buyers have no account); only a PUBLISHED store resolves (SELECT-only app.store_route policy), unknown/unpublished 404; the cart is an HMAC-SHA256-signed cookie bound to that store that names products and quantities only — every price, stock level and promotion is re-read from the database; adding a product the store doesn't list and sell is refused; writes nothing to the database; per-store+IP rate limit + proxy IP limit, 4 KiB body cap",
   "app/api/shop/[storeSlug]/checkout/route.ts":
     "public storefront checkout; only a PUBLISHED store resolves (unknown/unpublished 404); price, stock and promotion re-validated server-side from the database (never client prices) before a DRAFT web order and a Stripe Checkout Session are created with the WORKSPACE'S OWN Stripe key (no key → 409, never a fake success); nothing is paid here — payment is recorded only by the Stripe-signed tenant webhook; per-store+IP limit (10/10 min) + CAPTCHA step-up (lib/auth/captcha.ts) from the second attempt when configured, 4 KiB body cap; returns the Checkout URL only",
+  // Phase 12 (people): public event registration — capability model, see route comments.
+  "app/api/events/[slug]/register/route.ts":
+    "public event registration (registrants have no account); only a PUBLISHED event resolves (SELECT-only app.event_route policy), unknown/draft 404; ticket price, sales window and seats re-checked server-side from the database (never client prices); seats reserved with row-locked conditional counter updates + DB CHECKs (never oversold); paid tickets stay PENDING until the Stripe-signed tenant webhook confirms them, the Checkout Session uses the WORKSPACE'S OWN Stripe key (no key → 409, never a fake success); per-event+IP limit (10/10 min) + CAPTCHA step-up from the second attempt when configured; 16 KiB body cap; returns a signed view link or the Checkout URL only",
   // Phase 10 (portal): client-portal sign-in — capability model, see route comments.
   "app/api/portal/login/route.ts":
     "Phase 10 client-portal sign-in request; always the same 200; emails a single-use 15-minute link (SHA-256 at rest, FORCE RLS) only to a client whose portal is on; login lockout, CAPTCHA step-up, per-address send limit shared with workspace sign-in mail, JSON only, proxy auth tier",
@@ -228,7 +231,7 @@ const missingAllowList = Object.keys(PUBLIC_BY_DESIGN).filter(k => {
 ok("every public-by-design entry maps to a real route file", missingAllowList.length === 0, missingAllowList.join("; "));
 ok(
   "public-by-design allow-list is documented",
-  Object.keys(PUBLIC_BY_DESIGN).length === 41 && // Phase 9 (repos): +1 app/api/hooks/github; Phase 10 (finance): +1 tenant Stripe webhook; Phase 10 (store): +2 storefront cart + checkout; Phase 10 (portal): +2 portal sign-in; Phase 11 (conncore): +1 Slack events
+  Object.keys(PUBLIC_BY_DESIGN).length === 42 && // Phase 9 (repos): +1 app/api/hooks/github; Phase 10 (finance): +1 tenant Stripe webhook; Phase 10 (store): +2 storefront cart + checkout; Phase 10 (portal): +2 portal sign-in; Phase 11 (conncore): +1 Slack events; Phase 12 (people): +1 event registration
     Object.values(PUBLIC_BY_DESIGN).every(v => v.length > 20)
 );
 
@@ -246,6 +249,30 @@ ok("member management = admin+", has("app/api/workspace/members/route.ts", /requ
 ok("deploy writes = editor+", has("app/api/websites/[id]/deploy/route.ts", /"editor"/));
 ok("audit writes = editor+", has("app/api/websites/[id]/audit/route.ts", /requireProjectRole\(user\.id, site\.projectId, "editor"\)/));
 ok("issue approval = editor+", has("app/api/websites/[id]/issues/approve-all/route.ts", /"editor"/));
+// Phase 13 (twincore): the digital twin's routes; the sample seeder is
+// admin+; twin CRUD rides the generic /api/ops/[entity] guard.
+// Phase 14 (approvals): state + live are viewer+ for PUBLISHED sites only —
+// drafts stay editor+ (the snapshot path refuses a draft to a non-editor, and
+// the stream re-checks role AND status every loop); the generic route reads
+// twin sites / objects / dock bookings at editor+ (no draft leak to viewers).
+ok("twin state = viewer+, drafts editor+",
+  has("app/api/twin/sites/[id]/state/route.ts", /requireWorkspaceRole\(user\.id, workspace\.id, "viewer"\)/) &&
+  has("app/api/twin/sites/[id]/state/route.ts", /const canEdit = Boolean\(await requireWorkspaceRole\(user\.id, workspace\.id, "editor"\)\)/) &&
+  has("app/api/twin/sites/[id]/state/route.ts", /siteSnapshotFor\(workspace\.id, id, canEdit\)/) &&
+  has("lib/twin/state.ts", /return canEdit \|\| status === "published";/) &&
+  has("lib/twin/state.ts", /if \(!canViewSite\(snap\.site\.status, canEdit\)\) throw new TwinNotFoundError\(siteId\);/));
+ok("twin live stream = viewer+ (published only), role + status re-checked every loop",
+  has("app/api/twin/sites/[id]/live/route.ts", /requireWorkspaceRole\(user\.id, workspace\.id, "viewer"\)\)\) \{/) &&
+  has("app/api/twin/sites/[id]/live/route.ts", /siteSnapshotFor\(workspace\.id, id, await isEditor\(\)\)/) &&
+  has("app/api/twin/sites/[id]/live/route.ts", /isMember: async \(\) => Boolean\(await requireWorkspaceRole\(user\.id, workspace\.id, "viewer"\)\)/) &&
+  has("lib/twin/state.ts", /if \(!\(await input\.isMember\(\)\)\) return false;/) &&
+  has("lib/twin/state.ts", /return canViewSite\(\(await siteStatus\(workspaceId, siteId\)\) \?\? "gone", false\);/) &&
+  has("lib/twin/live.ts", /await opts\.stillAllowed\(\)/));
+ok("twin entities on the generic ops route = editor+ reads (no draft leak)",
+  (readFileSync(join(ROOT, "lib/ops/twin/entities.ts"), "utf8").match(/readRole: "editor",/g) ?? []).length === 3 &&
+  has("app/api/ops/[entity]/route.ts", /op === "read" \? def\?\.readRole \?\? "viewer"/));
+ok("twin object delete = editor+", has("app/api/twin/objects/[id]/route.ts", /requireWorkspaceRole\(user\.id, workspace\.id, "editor"\)/));
+ok("twin sample site = admin+", has("app/api/twin/sites/sample/route.ts", /requireWorkspaceRole\(user\.id, workspace\.id, "admin"\)/));
 // Phase 8: sandbox checkpoint restore + previews (lib/sandbox).
 ok("agent-run restore = editor+ or the run's starter", has("app/api/agent-runs/[runId]/restore/route.ts", /!isStarter && !\(await requireWorkspaceRole\(user\.id, workspace\.id, "editor"\)\)/));
 ok("agent-run stop = editor+ or the run's starter", has("app/api/agent-runs/[runId]/cancel/route.ts", /!isStarter && !\(await requireWorkspaceRole\(user\.id, workspace\.id, "editor"\)\)/));

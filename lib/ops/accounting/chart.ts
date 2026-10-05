@@ -22,13 +22,22 @@ export interface ChartSeed {
 
 export const STANDARD_CHART: readonly ChartSeed[] = [
   { code: "1000", name: "Cash and bank", type: "asset", systemKey: "cash" },
+  // Phase 12 (mfgpos): card takings waiting for the processor's payout.
+  { code: "1050", name: "Card payments clearing", type: "asset", systemKey: "card_clearing" },
   { code: "1100", name: "Accounts receivable", type: "asset", systemKey: "ar" },
   { code: "1200", name: "Inventory", type: "asset", systemKey: "inventory" },
+  // Phase 12 (mfgpos): manufactured goods and production in progress.
+  { code: "1210", name: "Finished goods", type: "asset", systemKey: "finished_goods" },
+  { code: "1250", name: "Work in progress", type: "asset", systemKey: "wip" },
   { code: "1300", name: "Input tax receivable", type: "asset", systemKey: "tax_receivable" },
   { code: "1500", name: "Equipment", type: "asset" },
   { code: "2000", name: "Accounts payable", type: "liability", systemKey: "ap" },
   { code: "2100", name: "Sales tax payable", type: "liability", systemKey: "tax_payable" },
   { code: "2200", name: "Reimbursements payable", type: "liability", systemKey: "reimbursements_payable" },
+  // Phase 12 (people): payroll liabilities.
+  { code: "2300", name: "Payroll taxes payable", type: "liability", systemKey: "payroll_tax_payable" },
+  { code: "2310", name: "Net pay payable", type: "liability", systemKey: "wages_payable" },
+  { code: "2320", name: "Payroll deductions payable", type: "liability", systemKey: "payroll_deductions_payable" },
   { code: "2500", name: "Loans payable", type: "liability" },
   { code: "3000", name: "Owner's equity", type: "equity", systemKey: "owner_equity" },
   { code: "3900", name: "Retained earnings", type: "equity", systemKey: "retained_earnings" },
@@ -36,6 +45,10 @@ export const STANDARD_CHART: readonly ChartSeed[] = [
   { code: "4100", name: "Service revenue", type: "income" },
   { code: "4900", name: "Other income", type: "income" },
   { code: "5000", name: "Cost of goods sold", type: "expense", systemKey: "cogs" },
+  // Phase 12 (mfgpos): labour moved into product cost (credit balance), and
+  // scrapped goods.
+  { code: "5100", name: "Labour absorbed into production", type: "expense", systemKey: "labour_absorbed" },
+  { code: "5200", name: "Scrap and waste", type: "expense", systemKey: "scrap_loss" },
   { code: "6000", name: "General expenses", type: "expense", systemKey: "expense_general" },
   { code: "6100", name: "Rent", type: "expense", systemKey: "expense_rent" },
   { code: "6150", name: "Utilities", type: "expense", systemKey: "expense_utilities" },
@@ -45,7 +58,13 @@ export const STANDARD_CHART: readonly ChartSeed[] = [
   { code: "6400", name: "Office supplies", type: "expense", systemKey: "expense_office" },
   { code: "6500", name: "Professional fees", type: "expense", systemKey: "expense_professional" },
   { code: "6600", name: "Advertising and marketing", type: "expense", systemKey: "expense_advertising" },
+  // Phase 12 (people): payroll expenses.
+  { code: "6700", name: "Salaries and wages", type: "expense", systemKey: "payroll_wages" },
+  { code: "6710", name: "Employer payroll taxes", type: "expense", systemKey: "payroll_taxes" },
+  { code: "6720", name: "Employee benefits", type: "expense", systemKey: "payroll_benefits" },
   { code: "6900", name: "Bank fees", type: "expense", systemKey: "expense_bank_fees" },
+  // Phase 12 (mfgpos): till counted vs expected.
+  { code: "6950", name: "Cash over and short", type: "expense", systemKey: "cash_over_short" },
 ];
 
 /** Accounts whose balance grows on the debit side. */

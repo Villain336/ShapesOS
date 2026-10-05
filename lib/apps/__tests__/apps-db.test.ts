@@ -333,9 +333,10 @@ describe("mini-app agent tools (DB, through executeTool)", () => {
     return { tool, args, status: "pending_confirmation" };
   }
 
-  it("writes and deletes wait for a person; deletes ask even with an auto-approve rule", async () => {
-    // A (misconfigured) every-agent "auto" row for deletes and for writes:
-    // neither may let the call run without a person.
+  it("writes wait for a person unless a rule says auto (Phase 14); deletes ask even with an auto-approve rule", async () => {
+    // A (misconfigured) every-agent "auto" row for deletes — it may never let
+    // a delete run without a person — and (Phase 14) one for writes, which
+    // is honoured: a Tier-2 write runs under it.
     await withWorkspaceScope(WS_A, async (tx) => {
       for (const action of ["delete_app_record", "write_app_record"]) {
         await tx.automationSetting.create({ data: { workspaceId: WS_A, agentKey: "*", action, behavior: "auto", updatedBy: OWNER } });
@@ -343,7 +344,13 @@ describe("mini-app agent tools (DB, through executeTool)", () => {
     });
     const up = call("app_upsert_record", { app: "facilities", entity: "tickets", data: JSON.stringify({ title: "Agent", status: "Open", priority: "Low" }) });
     await executeTool(ctx(), "app_upsert_record", up.args, up);
-    assert.equal(up.status, "pending_confirmation");
+    assert.equal(up.status, "executed", up.resultSummary);
+    assert.match(up.autoApproved ?? "", /auto-approved by the write_app_record rule for every agent/);
+    // Without the rule the write waits for a person.
+    await withWorkspaceScope(WS_A, (tx) => tx.automationSetting.deleteMany({ where: { workspaceId: WS_A, action: "write_app_record" } }));
+    const asks = call("app_upsert_record", up.args);
+    await executeTool(ctx(), "app_upsert_record", up.args, asks);
+    assert.equal(asks.status, "pending_confirmation");
     const del = call("app_delete_record", { app: "facilities", entity: "tickets", recordId: ticketId });
     await executeTool(ctx(), "app_delete_record", del.args, del);
     assert.equal(del.status, "pending_confirmation", "destructive always asks");

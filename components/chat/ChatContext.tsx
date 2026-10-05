@@ -113,6 +113,27 @@ export function useChat(): ChatContextValue {
   return ctx;
 }
 
+/** Phase 14: the chat context when there is one (cards also render outside the chat). */
+export function useOptionalChat(): ChatContextValue | null {
+  return useContext(ChatContext);
+}
+
+/**
+ * Phase 5 / 14: save a "do this without asking" rule (PUT /api/automation/settings).
+ * Returns null on success, else the server's message. setAutoApprove uses it;
+ * so do approval cards rendered outside the chat.
+ */
+export async function putAutoApproveRule(agentKey: string, action: string, on: boolean): Promise<string | null> {
+  const res = await fetch("/api/automation/settings", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ agentKey, action, behavior: on ? "auto" : "ask" }),
+  });
+  if (res.ok) return null;
+  const data = (await res.json().catch(() => ({}))) as { error?: string };
+  return data.error ?? "Couldn't save the rule.";
+}
+
 export function ChatProvider({ children }: { children: React.ReactNode }) {
   const [session, setSessionState] = useState<ChatSession | null>(null);
   const [tab, setTab] = useState<ChatTab>("ai");
@@ -406,16 +427,10 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const setAutoApprove = useCallback(async (agentKey: string, action: string, on: boolean) => {
-    const res = await fetch("/api/automation/settings", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ agentKey, action, behavior: on ? "auto" : "ask" }),
-    });
-    if (res.ok) return null;
-    const data = (await res.json().catch(() => ({}))) as { error?: string };
-    return data.error ?? "Couldn't save the rule.";
-  }, []);
+  const setAutoApprove = useCallback(
+    (agentKey: string, action: string, on: boolean) => putAutoApproveRule(agentKey, action, on),
+    [],
+  );
 
   return (
     <ChatContext.Provider

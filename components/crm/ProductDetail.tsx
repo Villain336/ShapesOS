@@ -17,7 +17,7 @@ import { backdropCls, btnGhost, btnPrimary, chipCls, errorBoxCls, inputCls, labe
 interface OpsInventoryTxn {
   id: string;
   delta: number;
-  reason: "sale" | "restock" | "adjustment";
+  reason: "sale" | "restock" | "adjustment" | "transfer" | "production" | "consumption" | "scrap";
   actor: string | null;
   note: string | null;
   createdAt: string;
@@ -27,6 +27,11 @@ const REASON_META: Record<string, { label: string; tint: string }> = {
   sale: { label: "Sale", tint: "bg-canvas text-ink" },
   restock: { label: "Restock", tint: "bg-canvas text-ink" },
   adjustment: { label: "Adjustment", tint: "bg-line text-ink" },
+  transfer: { label: "Transfer", tint: "bg-canvas text-ink" },
+  // Phase 12 (mfgpos): manufacturing-order and scrap moves.
+  production: { label: "Produced", tint: "bg-canvas text-ink" },
+  consumption: { label: "Used in production", tint: "bg-canvas text-ink" },
+  scrap: { label: "Scrapped", tint: "bg-line text-ink" },
 };
 
 function fmtDateTime(v: string): string {

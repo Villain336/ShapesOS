@@ -65,7 +65,11 @@ export async function resolveWebhookSecret(
   // Phase 11 (bizsync): a store installed through the ShapesOS Shopify app
   // (lib/bizsync/install.ts set authRef to that connection) signs its
   // webhooks with the app's client secret.
-  if (connector.platform === "shopify" && connector.authRef) {
+  // Phase 14 (connectors): only when no per-connection secret is configured.
+  // A single-store connection (webhookSecretRef set) is signed by ITS app's
+  // secret; if that is missing we fail honestly instead of trying the hosted
+  // app's secret (which would verify another app's deliveries).
+  if (connector.platform === "shopify" && connector.authRef && !connector.webhookSecretRef) {
     const appSecret = (process.env.SHOPIFY_CLIENT_SECRET ?? "").trim();
     if (appSecret) return { secret: appSecret, mode: "app" };
   }

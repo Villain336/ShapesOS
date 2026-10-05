@@ -1127,6 +1127,28 @@ export const TOOL_GROUP: Readonly<Record<string, ToolGroup>> = {
   // Phase 10 (store): the overview is a read; listing products is an ops write.
   ops_store_overview: "workspace",
   ops_store_list_product: "ops",
+  // Phase 12 (mfgpos): reads are workspace, writes are ops.
+  ops_list_manufacturing_orders: "workspace",
+  ops_pos_overview: "workspace",
+  ops_create_manufacturing_order: "ops",
+  ops_confirm_manufacturing_order: "ops",
+  ops_log_work_time: "ops",
+  ops_complete_manufacturing_order: "ops",
+  ops_close_pos_session: "ops",
+  // Phase 12 (people): payroll + events (reads are workspace, writes ops).
+  ops_payroll_overview: "workspace",
+  ops_payroll_draft_run: "ops",
+  ops_payroll_request_approval: "ops",
+  ops_payroll_request_posting: "ops",
+  ops_events_overview: "workspace",
+  ops_events_create_event: "ops",
+  ops_events_register: "ops",
+  // Phase 13 (twincore): digital twin — reads are workspace, writes are ops.
+  twin_site_state: "workspace",
+  twin_find: "workspace",
+  twin_book_dock: "ops",
+  twin_assign_equipment: "ops",
+  twin_draft_layout: "ops",
   delegate_to_subagent: "delegate",
   // Phase 8 (ship): local git work in the run's sandbox is "code"; anything
   // that leaves the sandbox is "ship" (lib/ship/tools.ts).
@@ -1227,6 +1249,28 @@ export const TOOL_ACTION: Readonly<Record<string, string>> = {
   ops_set_reorder_rule: "set_reorder_rule",
   // Phase 10 (store): Tier 2 — always asks (lib/automation/actions.ts).
   ops_store_list_product: "write_store_listing",
+  // Phase 12 (mfgpos): a draft MO is Tier 0; confirming and logging time are
+  // Tier 2 (always ask); completing an MO and closing a till session move
+  // stock and the books — Tier 3, never automated (lib/orchestrator/authority.ts).
+  ops_create_manufacturing_order: "draft_manufacturing_order",
+  ops_confirm_manufacturing_order: "confirm_manufacturing_order",
+  ops_log_work_time: "log_work_order_time",
+  ops_complete_manufacturing_order: "complete_manufacturing_order",
+  ops_close_pos_session: "close_pos_session",
+  // Phase 12 (people): drafting a pay run is Tier 0; approving and posting
+  // payroll are Tier 3 (never automated); event writes are Tier 2.
+  ops_payroll_draft_run: "draft_pay_run",
+  ops_payroll_request_approval: "approve_pay_run",
+  ops_payroll_request_posting: "post_pay_run",
+  ops_events_create_event: "write_event",
+  ops_events_register: "write_event",
+  // Phase 13 (twincore): booking a dock and giving a forklift a task are
+  // Tier 1 (internal site operations — an automation rule can let them run;
+  // without one they ask); drafting a layout is Tier 0 (publishing it is a
+  // person's gated step).
+  twin_book_dock: "book_dock",
+  twin_assign_equipment: "assign_equipment",
+  twin_draft_layout: "draft_site_layout",
   // Phase 8: Tier 2 — always asks (lib/automation/actions.ts).
   git_push_branch: "push_branch",
   open_pull_request: "open_pr",

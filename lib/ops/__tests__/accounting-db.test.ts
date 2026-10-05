@@ -8,6 +8,7 @@
 // Run (DB suite): DATABASE_URL=… npx tsx --test lib/ops/__tests__/accounting-db.test.ts
 
 import "dotenv/config";
+import { STANDARD_CHART } from "../accounting/chart";
 import { describe, it, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { prisma } from "@/lib/prisma";
@@ -76,7 +77,11 @@ describe("chart of accounts", () => {
   it("seeds the standard chart once, even when first use races", async () => {
     await Promise.all(Array.from({ length: 4 }, () => withWorkspaceScope(WS_A, (tx) => ensureChartOfAccounts(tx, WS_A))));
     const n = await withWorkspaceScope(WS_A, (tx) => tx.opsAccount.count({ where: { workspaceId: WS_A } }));
-    assert.equal(n, 25);
+    // 25 standard accounts + Phase 12 (mfgpos): card clearing, finished goods,
+    // work in progress, labour absorbed, scrap, cash over/short + Phase 12
+    // (people): 6 payroll accounts.
+    assert.equal(n, STANDARD_CHART.length);
+    assert.equal(n, 37);
   });
 });
 

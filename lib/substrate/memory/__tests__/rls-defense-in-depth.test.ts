@@ -28,6 +28,8 @@ const ALLOW = new Map<string, string>([
   // Phase 11 (conncore): Slack Events API routing — team_id → workspace, the one cross-workspace read, through the SELECT-only app.slack_route policy; every write after it is tenant-scoped.
   ["lib/slack/install.ts:slackInstallation.findFirst", "routeSlackTeam: maps a signed Slack event's team_id to its workspace via the SELECT-only app.slack_route policy"],
   // Phase 10 (portal): the sign-in request names no workspace — the address may be a client of several; clients is not a tenant (RLS) table. Ids + workspace name only; every link write that follows is tenant-scoped.
+  // Phase 12 (people): public event routing — /events/<slug> → workspace, the one cross-workspace read, through the SELECT-only app.event_route policy (published events only); everything after it is tenant-scoped.
+  ["lib/ops/events/catalog.ts:opsEvent.findFirst", "resolvePublishedEvent: maps a public /events/<slug> to its workspace via the SELECT-only app.event_route policy (published rows only)"],
   ["lib/portal/store.ts:client.findMany", "requestPortalLink: finds the portal-enabled clients with this sign-in email across workspaces (no workspace in the request); returns ids only, each link row is written under that client's own workspace scope"],
 ]);
 

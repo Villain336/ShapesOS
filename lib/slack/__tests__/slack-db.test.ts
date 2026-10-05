@@ -165,3 +165,202 @@ describe("Slack mention → agent task", () => {
     assert.match(posts[posts.length - 1].text, /no longer a member/);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Phase 14 (approvals): Slack replies follow the slack_reply rule.
+// ---------------------------------------------------------------------------
+
+import { SLACK_PLACEHOLDER_TEXT, SLACK_REPLY_TOOL } from "../mention";
+import { runAgentTurn, type ChatToolCall } from "@/lib/chat/agent";
+
+describe("Phase 14: Slack reply approval", () => {
+  const posts: Array<{ channel: string; threadTs: string; text: string }> = [];
+  const held: Array<{ sourceId: string; title: string; href: string }> = [];
+  let n = 0;
+  const deps: MentionDeps = {
+    runTurn: async (input) => {
+      n++;
+      await prisma.aiChatMessage.create({ data: { threadId: input.threadId, role: "assistant", content: `Answer ${n}.` } });
+      return { runId: `p14-run-${n}`, assistantText: `Answer ${n}.` };
+    },
+    threadBusy: async () => null,
+    roleOf: async () => "editor",
+    requeue: async () => undefined,
+    post: async (_conn, channel, threadTs, text) => void posts.push({ channel, threadTs, text }),
+    appUrl: () => "https://app.example.com",
+    now: () => new Date(),
+    notifyHeld: async (i) => void held.push(i),
+  };
+  let installationId = "";
+  const mention = (ts: string, text = "draft the launch post"): SlackMentionJobPayload => ({
+    workspaceId: WS_A,
+    installationId,
+    eventId: `Ev${ts.replace(".", "")}`,
+    teamId: TEAM,
+    eventType: "app_mention",
+    channel: "C0CHAN002",
+    user: "U0USER01",
+    ts,
+    threadTs: ts,
+    text,
+  });
+  const setRule = (agentKey: string, action: string, behavior: "auto" | "ask" | "never") =>
+    withWorkspaceScope(WS_A, (tx) =>
+      tx.automationSetting.upsert({
+        where: { workspaceId_agentKey_action: { workspaceId: WS_A, agentKey, action } },
+        create: { workspaceId: WS_A, agentKey, action, behavior, updatedBy: USER },
+        update: { behavior },
+      }),
+    );
+  const clearRules = () => withWorkspaceScope(WS_A, (tx) => tx.automationSetting.deleteMany({ where: { workspaceId: WS_A } }));
+
+  before(async () => {
+    installationId = (await routeSlackTeam(TEAM))!.id;
+    await withWorkspaceScope(WS_A, (tx) => tx.slackInstallation.updateMany({ where: { teamId: TEAM }, data: { enabled: true } }));
+    // The earlier suite removed the installer; Slack tasks run as a current member.
+    await prisma.workspaceMember.deleteMany({ where: { workspaceId: WS_A, userId: USER } });
+    await prisma.workspaceMember.create({ data: { workspaceId: WS_A, userId: USER, role: "editor", email: `${RUN}@example.com` } });
+  });
+  after(clearRules);
+
+  it("default (no rule): the reply is posted at once — today's behaviour", async () => {
+    await clearRules();
+    const before = posts.length;
+    const out = await runSlackMention(mention("1760001000.000100"), deps);
+    assert.equal(out.status === "answered" && out.reply, "posted");
+    assert.equal(posts.length, before + 1);
+    assert.equal(posts.at(-1)!.text, `Answer ${n}.`);
+  });
+
+  it("slack_reply = ask: nothing is posted; the reply waits as a pending connector call; approvers are told", async () => {
+    await clearRules();
+    await setRule("*", "slack_reply", "ask");
+    const before = posts.length;
+    const out = await runSlackMention(mention("1760001100.000100"), deps);
+    assert.equal(out.status, "answered");
+    if (out.status !== "answered") return;
+    assert.equal(out.reply, "held");
+    assert.equal(posts.length, before, "nothing posted to Slack");
+    assert.equal(held.length, 1);
+    assert.match(held[0]!.title, /Slack reply waiting for your OK: Answer/);
+    assert.match(held[0]!.href, /^\/dashboard\/assistant\?project=/);
+
+    const last = await prisma.aiChatMessage.findFirst({ where: { threadId: out.chatThreadId, role: "assistant" }, orderBy: { createdAt: "desc" } });
+    const calls = last!.toolCalls as unknown as ChatToolCall[];
+    const call = calls.find((c) => c.tool === SLACK_REPLY_TOOL);
+    assert.equal(call?.status, "pending_confirmation");
+    assert.deepEqual(call?.args, { channel: "C0CHAN002", threadTs: "1760001100.000100", text: `Answer ${n}.` });
+    assert.equal(call?.autoAction, "slack_reply", "the chat offers 'do this without asking'");
+    assert.match(last!.content, /nothing has been posted yet/);
+
+    // Approve: "yes" in the chat posts it through the connector gate (the
+    // Slack installation is this project's Slack binding).
+    const yes = await runAgentTurn({ projectId, workspaceId: WS_A, userId: USER, role: "editor", threadId: out.chatThreadId, userContent: "yes" });
+    const ran = yes.toolCalls.find((c) => c.tool === SLACK_REPLY_TOOL);
+    assert.equal(ran?.status, "executed", ran?.resultSummary);
+    // No bot token in this test: the adapter's labelled MOCK answered (the
+    // live chat.postMessage is UNVERIFIED-LIVE here; its request shape is
+    // covered by the Slack adapter's unit tests).
+    assert.match(ran!.resultSummary ?? "", /connector\.slack\.reply_in_thread/);
+    const audit = await prisma.fileChangeLog.findFirst({
+      where: { workspaceId: WS_A, summary: { contains: "connector.slack.reply_in_thread" }, action: "ai_applied" },
+    });
+    assert.ok(audit, "the post is audited as applied after the person's OK");
+    // Nothing is waiting any more.
+    const { pendingProposal } = await import("@/lib/chat/agent");
+    assert.equal(await pendingProposal(out.chatThreadId), null);
+  });
+
+  it("status and error lines follow the same rule (held, not posted)", async () => {
+    await clearRules();
+    await setRule("*", "slack_reply", "ask");
+    const before = posts.length;
+    const busyDeps: MentionDeps = { ...deps, threadBusy: async () => "a run is still working in this thread" };
+    // A first mention maps the thread; then a busy thread gives up at the cap.
+    const first = await runSlackMention(mention("1760001200.000100"), deps);
+    assert.equal(first.status === "answered" && first.reply, "held");
+    const out = await runSlackMention({ ...mention("1760001200.000100"), eventId: "EvGiveUp", deferrals: 20 }, busyDeps);
+    assert.equal(out.status, "skipped");
+    assert.equal(posts.length, before, "the give-up line was not posted");
+    if (first.status !== "answered") return;
+    const last = await prisma.aiChatMessage.findFirst({ where: { threadId: first.chatThreadId, role: "assistant" }, orderBy: { createdAt: "desc" } });
+    const texts = (last!.toolCalls as unknown as ChatToolCall[]).filter((c) => c.tool === SLACK_REPLY_TOOL).map((c) => String(c.args.text));
+    assert.ok(texts.some((t) => /couldn't start this/.test(t)), "the status line joined the pending reply");
+  });
+
+  it("slack_placeholder on: only the one-line note is posted while the reply waits", async () => {
+    await clearRules();
+    await setRule("*", "slack_reply", "ask");
+    await setRule("*", "slack_placeholder", "auto");
+    const before = posts.length;
+    const out = await runSlackMention(mention("1760001300.000100"), deps);
+    assert.equal(out.status === "answered" && out.reply, "held");
+    assert.equal(posts.length, before + 1);
+    assert.equal(posts.at(-1)!.text, SLACK_PLACEHOLDER_TEXT);
+  });
+
+  it("an agent's own auto rule wins (posted at once); Off posts and holds nothing", async () => {
+    await clearRules();
+    await setRule("*", "slack_reply", "ask");
+    await setRule("lead", "slack_reply", "auto");
+    let before = posts.length;
+    const out = await runSlackMention(mention("1760001400.000100"), deps);
+    assert.equal(out.status === "answered" && out.reply, "posted");
+    assert.equal(posts.length, before + 1);
+
+    await clearRules();
+    await setRule("*", "slack_reply", "never");
+    before = posts.length;
+    const off = await runSlackMention(mention("1760001500.000100"), deps);
+    assert.equal(off.status === "answered" && off.reply, "off");
+    assert.equal(posts.length, before);
+    if (off.status !== "answered") return;
+    const last = await prisma.aiChatMessage.findFirst({ where: { threadId: off.chatThreadId, role: "assistant" }, orderBy: { createdAt: "desc" } });
+    assert.ok(!(Array.isArray(last?.toolCalls) && (last!.toolCalls as unknown as ChatToolCall[]).some((c) => c.tool === SLACK_REPLY_TOOL)));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 14 (approvals): connector writes have their own switch.
+// ---------------------------------------------------------------------------
+
+import { resolveConnectorTool } from "@/lib/chat/connector-tools";
+import type { ToolContext } from "@/lib/chat/tools";
+
+describe("Phase 14: a connector write runs under its write_<key> rule; a money connector's never", () => {
+  const ctx = (): ToolContext =>
+    ({ projectId, workspaceId: WS_A, userId: USER, role: "editor", agentKey: "lead", grant: null, confirmed: false }) as unknown as ToolContext;
+  const setRule = (action: string, behavior: "auto" | "ask") =>
+    withWorkspaceScope(WS_A, (tx) =>
+      tx.automationSetting.upsert({
+        where: { workspaceId_agentKey_action: { workspaceId: WS_A, agentKey: "lead", action } },
+        create: { workspaceId: WS_A, agentKey: "lead", action, behavior, updatedBy: USER },
+        update: { behavior },
+      }),
+    );
+  after(() => withWorkspaceScope(WS_A, (tx) => tx.automationSetting.deleteMany({ where: { workspaceId: WS_A } })));
+
+  it("slack.post_message: asks (offering write_slack) without a rule, runs without a prompt under one", async () => {
+    await withWorkspaceScope(WS_A, (tx) => tx.automationSetting.deleteMany({ where: { workspaceId: WS_A } }));
+    const asked = await resolveConnectorTool("connector.slack.post_message", ctx(), { channel: "C0CHAN001", text: "hi" });
+    assert.equal(asked.status, "pending_confirmation", asked.resultSummary);
+    assert.equal(asked.autoAction, "write_slack");
+    await setRule("write_slack", "auto");
+    const ran = await resolveConnectorTool("connector.slack.post_message", ctx(), { channel: "C0CHAN001", text: "hi" });
+    assert.equal(ran.status, "executed", ran.resultSummary);
+    const audit = await prisma.fileChangeLog.findFirst({
+      where: { workspaceId: WS_A, action: "ai_applied", summary: { contains: "auto-approved by the write_slack rule for agent lead" } },
+    });
+    assert.ok(audit, "the auto-approval is audited, naming the rule");
+  });
+
+  it("quickbooks.post_to_quickbooks (Tier 3) still asks with forced auto rows, and is never offered", async () => {
+    const qb = await prisma.connectorConnection.create({ data: { connectorKey: "quickbooks", workspaceId: WS_A, userId: USER, status: "active", scopes: [] } });
+    await prisma.projectDataSource.create({ data: { projectId, connectionId: qb.id, connectorKey: "quickbooks" } });
+    await setRule("post_to_accounting", "auto");
+    await setRule("money_connector_write", "auto");
+    const out = await resolveConnectorTool("connector.quickbooks.post_to_quickbooks", ctx(), {});
+    assert.equal(out.status, "pending_confirmation", out.resultSummary);
+    assert.equal(out.autoAction, undefined);
+  });
+});

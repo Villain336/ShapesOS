@@ -14,6 +14,8 @@
 //   bill paid        Dr AP                  Cr Cash
 //   expense approved Dr Expense + Dr Input tax   Cr Reimbursements payable
 //   expense repaid   Dr Reimbursements payable   Cr Cash
+//   pay run posted   Dr Wages + Dr Employer taxes + Dr Benefits
+//                    Cr Payroll taxes payable + Cr Deductions payable + Cr Net pay payable
 //
 // Money is integer cents everywhere; nothing here ever rounds.
 
@@ -40,7 +42,23 @@ export type SystemAccountKey =
   | "expense_office"
   | "expense_professional"
   | "expense_advertising"
-  | "expense_bank_fees";
+  | "expense_bank_fees"
+  // Phase 12 (mfgpos): manufacturing (work in progress, finished goods,
+  // labour absorbed into production, scrap) and point of sale (card
+  // clearing, cash over/short).
+  | "wip"
+  | "finished_goods"
+  | "labour_absorbed"
+  | "scrap_loss"
+  | "card_clearing"
+  | "cash_over_short"
+  // Phase 12 (people): payroll.
+  | "payroll_tax_payable"
+  | "wages_payable"
+  | "payroll_deductions_payable"
+  | "payroll_wages"
+  | "payroll_taxes"
+  | "payroll_benefits";
 
 export type AccountRef = { key: SystemAccountKey } | { id: string };
 
@@ -288,5 +306,134 @@ export function webOrderSaleLines(order: { totalCents: number; taxCents: number 
     dr({ key: "cash" }, order.totalCents, "Storefront payment"),
     cr({ key: "sales" }, order.totalCents - order.taxCents, "Sales (storefront)"),
     cr(taxAccount, order.taxCents, "Sales tax"),
+  ]);
+}
+
+// ---------------------------------------------------------------------------
+// Phase 12 (mfgpos): manufacturing costing and point-of-sale session close.
+//
+//   MO components + labour into WIP
+//       Dr WIP (components + labour)   Cr Inventory (components)
+//                                      Cr Labour absorbed (labour)
+//   MO finished out of WIP
+//       Dr Finished goods (finished)   Cr WIP (components + labour)
+//       Dr Scrap loss (scrapped share)
+//   Scrap of stock on hand
+//       Dr Scrap loss                  Cr Inventory (or Finished goods)
+//   POS session close (sales booked net of discounts, like web orders)
+//       Dr Cash (cash sales ± difference)   Cr Sales (net)
+//       Dr Card clearing (card sales)       Cr Tax payable (tax)
+//       Dr/Cr Cash over and short (the counted − expected difference)
+// The WIP account nets to zero over one manufacturing order.
+// ---------------------------------------------------------------------------
+
+export interface MoCosting {
+  componentCostCents: number;
+  labourCostCents: number;
+  finishedCostCents: number;
+  scrapCostCents: number;
+}
+
+export function moWipLines(c: MoCosting, label: string): DraftLine[] {
+  const total = c.componentCostCents + c.labourCostCents;
+  return compactLines([
+    dr({ key: "wip" }, total, `Work in progress ${label}`),
+    cr({ key: "inventory" }, c.componentCostCents, `Components used by ${label}`),
+    cr({ key: "labour_absorbed" }, c.labourCostCents, `Labour absorbed by ${label}`),
+  ]);
+}
+
+export function moFinishLines(c: MoCosting, label: string): DraftLine[] {
+  return compactLines([
+    dr({ key: "finished_goods" }, c.finishedCostCents, `Finished goods from ${label}`),
+    dr({ key: "scrap_loss" }, c.scrapCostCents, `Scrapped in ${label}`),
+    cr({ key: "wip" }, c.finishedCostCents + c.scrapCostCents, `Work in progress ${label}`),
+  ]);
+}
+
+/** Scrap of stock on hand: Dr Scrap loss, Cr the stock account it sat in. */
+export function scrapLines(totalCostCents: number, from: "inventory" | "finished_goods", label: string): DraftLine[] {
+  return [dr({ key: "scrap_loss" }, totalCostCents, `Scrap ${label}`), cr({ key: from }, totalCostCents, `Stock written off (${label})`)];
+}
+
+export interface PosCloseTotals {
+  /** Σ order totals − Σ tax (sales net of discounts). */
+  netSalesCents: number;
+  taxCents: number;
+  cashSalesCents: number;
+  cardSalesCents: number;
+  /** counted − expected (positive = over, negative = short). */
+  cashDifferenceCents: number;
+}
+
+export function posSessionCloseLines(t: PosCloseTotals, label: string, taxAccount: AccountRef = { key: "tax_payable" }): DraftLine[] {
+  const cashIn = t.cashSalesCents + t.cashDifferenceCents;
+  const diff = t.cashDifferenceCents;
+  return compactLines([
+    cashIn > 0 ? dr({ key: "cash" }, cashIn, `Till cash ${label}`) : cr({ key: "cash" }, -cashIn, `Till cash ${label}`),
+    dr({ key: "card_clearing" }, t.cardSalesCents, `Card payments ${label}`),
+    cr({ key: "sales" }, t.netSalesCents, `Sales (point of sale) ${label}`),
+    cr(taxAccount, t.taxCents, `Sales tax ${label}`),
+    diff < 0 ? dr({ key: "cash_over_short" }, -diff, `Cash short ${label}`) : cr({ key: "cash_over_short" }, diff, `Cash over ${label}`),
+  ]);
+}
+
+// ---------------------------------------------------------------------------
+// Phase 12 (people): a posted pay run. Gross pay is the wage expense; the
+// employer's own taxes and contributions are expenses on top. What the run
+// owes: every withheld and employer tax to the tax authorities, every
+// deduction and employer contribution to the benefit providers, and net pay
+// to the employees (the money transfer itself happens outside ShapesOS).
+//   Dr Salaries and wages (gross)
+//   Dr Employer payroll taxes (employer tax)
+//   Dr Employee benefits (employer contributions)
+//     Cr Payroll taxes payable (employee tax + employer tax)
+//     Cr Payroll deductions payable (pre-tax + post-tax + employer contributions)
+//     Cr Net pay payable (net)
+// Balances because net = gross − pre-tax − employee tax − post-tax.
+// ---------------------------------------------------------------------------
+
+export interface PayRunTotals {
+  grossCents: number;
+  preTaxDeductionCents: number;
+  employeeTaxCents: number;
+  postTaxDeductionCents: number;
+  netCents: number;
+  employerTaxCents: number;
+  employerContribCents: number;
+}
+
+export function payRunPostLines(t: PayRunTotals): DraftLine[] {
+  const expected = t.grossCents - t.preTaxDeductionCents - t.employeeTaxCents - t.postTaxDeductionCents;
+  if (expected !== t.netCents) {
+    throw new UnbalancedEntryError(`Pay run net (${t.netCents}) must equal gross − deductions − employee taxes (${expected})`);
+  }
+  return compactLines([
+    dr({ key: "payroll_wages" }, t.grossCents, "Gross pay"),
+    dr({ key: "payroll_taxes" }, t.employerTaxCents, "Employer payroll taxes"),
+    dr({ key: "payroll_benefits" }, t.employerContribCents, "Employer contributions"),
+    cr({ key: "payroll_tax_payable" }, t.employeeTaxCents + t.employerTaxCents, "Withheld and employer taxes"),
+    cr({ key: "payroll_deductions_payable" }, t.preTaxDeductionCents + t.postTaxDeductionCents + t.employerContribCents, "Deductions and contributions"),
+    cr({ key: "wages_payable" }, t.netCents, "Net pay"),
+  ]);
+}
+
+// Phase 14 (connectors): a payroll provider (Gusto) paid the run's net pay
+// from the bank — the liability the posted run created is settled.
+//   Dr Net pay payable (net)
+//     Cr Cash and bank (net)
+export function payRunNetPayPaidLines(netCents: number): DraftLine[] {
+  return compactLines([
+    dr({ key: "wages_payable" }, netCents, "Net pay paid"),
+    cr({ key: "cash" }, netCents, "Net pay paid by the payroll provider"),
+  ]);
+}
+
+// Phase 12 (people): a paid event registration is a cash sale like a web
+// order (no tax line — ticket prices are tax-inclusive or untaxed).
+export function eventTicketSaleLines(amountCents: number): DraftLine[] {
+  return compactLines([
+    dr({ key: "cash" }, amountCents, "Event ticket payment"),
+    cr({ key: "sales" }, amountCents, "Sales (event tickets)"),
   ]);
 }

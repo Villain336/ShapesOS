@@ -12,7 +12,9 @@ describe("ops home sections", () => {
   it("every ops-core section has a page; finance sections are links only", () => {
     for (const s of OPS_SECTIONS) {
       const file = s.slug ? `app/dashboard/ops/${s.slug}/page.tsx` : "app/dashboard/ops/page.tsx";
-      if (s.owner === "opscore") assert.ok(existsSync(file), `${file} missing`);
+      // Phase 12 (mfgpos): its sections ship their pages too.
+      // Phase 13 (twin): the digital twin ships its pages too.
+      if (s.owner === "opscore" || s.owner === "mfgpos" || s.owner === "twin") assert.ok(existsSync(file), `${file} missing`);
       assert.ok(s.href.startsWith("/dashboard/ops"));
     }
     const slugs = OPS_SECTIONS.map((s) => s.slug);

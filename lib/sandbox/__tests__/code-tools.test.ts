@@ -82,7 +82,7 @@ describe("tool groups, actions and tiers", () => {
     for (const a of ["edit_sandbox_files", "run_sandbox_command"]) assert.ok(KNOWN_ACTIONS.some((k) => k.action === a), `${a} in the automation catalog`);
   });
 
-  it("sandbox edits are Tier 0 (a per-agent auto rule applies); commands always ask", () => {
+  it("sandbox edits are Tier 0 (a per-agent auto rule applies); commands are Tier 2 (Phase 14: auto only with a rule)", () => {
     const settings = { smallActionThresholdCents: 10_000, automationAllows: true };
     assert.equal(evaluateTier({ kind: "edit_sandbox_files" }, settings), 0);
     assert.equal(evaluateTier({ kind: "run_sandbox_command" }, settings), 2);
@@ -94,9 +94,13 @@ describe("tool groups, actions and tiers", () => {
       const d = decideAutoApproval(rule as never, { agentKey: "actor", action: TOOL_ACTION[name]!, description: `${t.name}: ${t.description}` });
       assert.equal(d.auto, true, `${name}: ${d.reason}`);
     }
-    const bashRule = [{ agentKey: "actor", action: "run_sandbox_command", behavior: "auto" as const }];
     const b = getTool("bash")!;
-    assert.equal(decideAutoApproval(bashRule as never, { agentKey: "actor", action: "run_sandbox_command", description: `bash: ${b.description}` }).auto, false);
+    // No rule → asks; Phase 14: a rule set to auto lets a Tier-2 command run.
+    assert.equal(decideAutoApproval([], { agentKey: "actor", action: "run_sandbox_command", description: `bash: ${b.description}` }).auto, false);
+    const bashRule = [{ agentKey: "actor", action: "run_sandbox_command", behavior: "auto" as const }];
+    const bd = decideAutoApproval(bashRule as never, { agentKey: "actor", action: "run_sandbox_command", description: `bash: ${b.description}` });
+    assert.equal(bd.tier, 2);
+    assert.equal(bd.auto, true, bd.reason);
   });
 
   it("the grant gates the code tools like any other group", () => {

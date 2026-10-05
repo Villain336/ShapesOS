@@ -12,7 +12,9 @@ import type { Prisma } from "@prisma/client";
 
 type Tx = Prisma.TransactionClient;
 
-export type DocumentKind = "invoice" | "credit_note" | "quote" | "bill" | "expense";
+// Phase 12 (mfgpos): + manufacturing orders and point-of-sale sessions.
+// Phase 12 (people): + pay_run (numbered when a pay run is first computed).
+export type DocumentKind = "invoice" | "credit_note" | "quote" | "bill" | "expense" | "mo" | "pos_session" | "pay_run";
 
 export const DEFAULT_PREFIX: Readonly<Record<DocumentKind, string>> = {
   invoice: "INV-",
@@ -20,6 +22,9 @@ export const DEFAULT_PREFIX: Readonly<Record<DocumentKind, string>> = {
   quote: "QUO-",
   bill: "BILL-",
   expense: "EXP-",
+  mo: "MO-",
+  pos_session: "POS-",
+  pay_run: "PAY-",
 };
 
 /** INV- + 7 with padding 4 → "INV-0007". Longer numbers are never truncated. */

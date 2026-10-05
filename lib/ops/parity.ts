@@ -33,7 +33,7 @@ interface Probe {
 export interface ParityRow {
   app: string;
   odoo: string;
-  owner: "ops-core" | "finance" | "store" | "portal" | "phase 12" | "phase 4b" | "earlier";
+  owner: "ops-core" | "finance" | "store" | "portal" | "phase 12" | "phase 13" | "phase 4b" | "earlier";
   model: Probe[];
   route: Probe[];
   page: Probe[];
@@ -256,15 +256,87 @@ export const ROWS: ParityRow[] = [
     test: [test("lib/portal/__tests__/portal-core.test.ts"), test("lib/portal/__tests__/portal-db.test.ts"), test("lib/portal/__tests__/portal-isolation-db.test.ts")],
     note: "Separate portal session (cookie on /portal + /api/portal); a client sees only the CRM records linked in Settings → Clients.",
   },
-  // --- Not built yet (owner decision: Phase 12 / later) ---
-  ...(
-    [
-      ["Manufacturing", "Manufacturing", "phase 12"],
-      ["Point of sale", "Point of Sale", "phase 12"],
-      ["Payroll", "Payroll", "phase 12"],
-      ["Events", "Events", "phase 12"],
-    ] as const
-  ).map(([app, odoo, owner]): ParityRow => ({ app, odoo, owner, model: [], route: [], page: [], test: [], note: "Planned — not started in this codebase." })),
+  // --- Phase 12 (mfgpos) ---
+  {
+    app: "Manufacturing",
+    odoo: "Manufacturing (MRP)",
+    owner: "phase 12",
+    model: [model("OpsWorkCenter"), model("OpsRouting"), model("OpsManufacturingOrder"), model("OpsWorkOrder"), model("OpsWorkTimeLog"), model("OpsScrap"), model("CadBomVersion")],
+    route: [
+      entity("work-centers"),
+      entity("routings"),
+      entity("manufacturing-orders"),
+      entity("work-orders"),
+      entity("work-time-logs"),
+      entity("scraps"),
+      file("app/api/ops/manufacturing/bom/route.ts"),
+      file("app/api/ops/manufacturing/cad/route.ts"),
+    ],
+    page: [page("manufacturing")],
+    test: [test("lib/ops/__tests__/p12-mfg.test.ts"), test("lib/ops/__tests__/p12-mfg-db.test.ts")],
+    note: "BOM = the CAD BOM (CadPart → OpsProduct link, no second BOM model); stock through the Phase 10 ledger, costing through the journal. Confirm/complete/scrap gated.",
+  },
+  {
+    app: "Point of sale",
+    odoo: "Point of Sale",
+    owner: "phase 12",
+    model: [model("OpsPosRegister"), model("OpsPosSession"), model("OpsOrder")],
+    route: [
+      entity("pos-registers"),
+      entity("pos-sessions"),
+      file("app/api/ops/pos/sessions/[id]/sales/route.ts"),
+      file("app/api/ops/pos/sessions/[id]/quote/route.ts"),
+      file("app/api/ops/pos/terminal/route.ts"),
+      file("app/api/ops/pos/orders/[id]/receipt/route.ts"),
+    ],
+    page: [page("pos"), file("app/dashboard/ops/pos/till/[sessionId]/page.tsx")],
+    test: [test("lib/ops/__tests__/p12-pos.test.ts"), test("lib/ops/__tests__/p12-pos-db.test.ts")],
+    note: "Sales are OpsOrders (source pos) priced by the storefront's priceCart; offline queue keyed by client order id; session close posts one balanced entry (gated). Stripe Terminal unverified live (REST adapter + labelled mock).",
+  },
+  // --- Phase 12 (people): payroll + events ---
+  {
+    app: "Payroll",
+    odoo: "Payroll",
+    owner: "phase 12",
+    model: [model("OpsSalaryStructure"), model("OpsSalaryAssignment"), model("OpsPayRun"), model("OpsPayslip")],
+    route: [entity("salary-structures"), entity("salary-assignments"), entity("pay-runs"), file("app/api/ops/pay-runs/[id]/[action]/route.ts"), file("app/api/ops/payslips/[id]/pdf/route.ts")],
+    page: [page("payroll"), file("app/dashboard/ops/payroll/[id]/page.tsx")],
+    test: [test("lib/ops/__tests__/p12-payroll.test.ts"), test("lib/ops/__tests__/p12-payroll-db.test.ts")],
+    note: "US federal 2026 + flat state tax tables (pluggable per country; verify with an accountant). Approve and post are Tier 3; money transfer stays with the payroll provider.",
+  },
+  {
+    app: "Events",
+    odoo: "Events",
+    owner: "phase 12",
+    model: [model("OpsEvent"), model("OpsEventSession"), model("OpsEventTicketType"), model("OpsEventRegistration"), model("OpsEventAttendee")],
+    route: [entity("events"), entity("event-ticket-types"), entity("event-registrations"), file("app/api/events/[slug]/register/route.ts"), file("app/api/ops/events/check-in/route.ts")],
+    page: [page("events"), file("app/dashboard/ops/events/[id]/check-in/page.tsx"), file("app/events/[slug]/page.tsx")],
+    test: [test("lib/ops/__tests__/p12-events.test.ts"), test("lib/ops/__tests__/p12-events-db.test.ts")],
+    note: "Paid tickets through the workspace's own Stripe, confirmed only by its webhook (live Stripe unverified in CI); QR tickets; once-only check-in.",
+  },
+  // Phase 12 built the last planned apps (manufacturing, point of sale,
+  // payroll, events): nothing is "not started" any more.
+  // --- Phase 13: the digital twin (data side "twincore"; the pages come from
+  // the scene side "twinui" and light up when both branches are merged) ---
+  {
+    app: "Digital twin",
+    odoo: "— (no Odoo equivalent)",
+    owner: "phase 13",
+    model: [model("OpsSite"), model("OpsSiteObject"), model("OpsDockBooking")],
+    route: [
+      entity("twin-sites"),
+      entity("twin-objects"),
+      entity("dock-bookings"),
+      file("app/api/twin/sites/[id]/state/route.ts"),
+      file("app/api/twin/sites/[id]/live/route.ts"),
+      file("app/api/twin/sites/sample/route.ts"),
+      file("app/api/twin/objects/[id]/route.ts"),
+      file("app/api/cron/twin-alerts/route.ts"),
+    ],
+    page: [page("twin"), file("app/dashboard/ops/twin/[siteId]/page.tsx")],
+    test: [test("lib/twin/__tests__/twin-derive.test.ts"), test("lib/twin/__tests__/twin-db.test.ts"), test("lib/chat/__tests__/ops-twin-tools.test.ts")],
+    note: "A layout layer over a warehouse: objects bind to locations, work centres, registers, products; live state is derived from those records (equipment excepted). Dock bookings are the one new record. Live via SSE (DB poll, no in-memory bus).",
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -284,9 +356,12 @@ function walk(dir: string, out: string[] = []): string[] {
 
 export function loadCtx(root = ROOT): Ctx {
   const schema = readFileSync(join(root, "prisma/schema.prisma"), "utf8");
-  const entities = readFileSync(join(root, "lib/ops/entities.ts"), "utf8");
-  const entitySlugs = new Set([...entities.matchAll(/^\s*slug:\s*"([a-z0-9-]+)"/gm)].map((m) => m[1]!));
   const files = ["app", "lib", "components", "tests"].flatMap((d) => walk(join(root, d)));
+  // Phase 12 (mfgpos): entity defs also live in lib/ops/<area>/entities.ts
+  // (spread into OPS_ENTITIES), so every registry file is read.
+  const registries = ["lib/ops/entities.ts", ...files.filter((f) => /^lib\/ops\/[a-z-]+\/entities\.ts$/.test(f))];
+  const entities = registries.map((f) => readFileSync(join(root, f), "utf8")).join("\n");
+  const entitySlugs = new Set([...entities.matchAll(/^\s*slug:\s*"([a-z0-9-]+)"/gm)].map((m) => m[1]!));
   return { schema, entitySlugs, files };
 }
 

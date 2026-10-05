@@ -129,7 +129,26 @@ lib/knowledge/contextdev/__tests__/web-tools-db.test.ts
 lib/connectors/m21/live/__tests__/netlify-hosting-db.test.ts
 # Phase 11 (bizsync): Shopify ↔ Ops (fake Shopify GraphQL): catalogue/inventory/orders/customers idempotent, conflict rules, gated stock push, webhook apply, journal untouched, FORCE RLS.
 lib/bizsync/__tests__/shopify-sync-db.test.ts
+# Phase 14 (connectors): Shopify single store (fake Shopify): client-credentials connect stored encrypted + used by the adapter, per-connection webhook secret (never the hosted app secret), 24 h token renewal, app/uninstalled revokes + stops ingest once.
+lib/bizsync/__tests__/shopify-single-store-db.test.ts
 # Phase 11 (bizsync): QuickBooks (fake QBO honouring requestid): mapping confirm, export once per source (re-export no-op, interrupted → same key, concurrent → once, 400 → new attempt), contacts import, ledger untouched, FORCE RLS.
 lib/bizsync/__tests__/accounting-db.test.ts
 # Phase 11 (bizsync): Xero (fake Xero honouring Idempotency-Key): tenant discovery/selection, mapping shared with QuickBooks, export once, contacts (customer/supplier), ledger untouched, FORCE RLS.
 lib/bizsync/__tests__/xero-db.test.ts
+# Phase 12 (mfgpos): manufacturing — CAD BOM via part↔product link, gated confirm/complete, completion consumes/produces/scraps through the ledger once (ledger balances, second completion no-op), WIP/finish entries balance, gated scrap, work-order timer + capacity, FORCE RLS.
+lib/ops/__tests__/p12-mfg-db.test.ts
+# Phase 12 (mfgpos): point of sale — one open session per register, till sales priced server-side (promo + tax), client-order-id replay no-op (incl. concurrent), single-use card refs, cash count, gated close posts ONE balanced entry, receipt PDF, FORCE RLS.
+lib/ops/__tests__/p12-pos-db.test.ts
+# Phase 12 (people): payroll — compute from salary + approved time, Tier-3 approve/post through the real Phase 14 gate, DB lifecycle guards, one balanced journal entry, YTD bases, FORCE RLS.
+lib/ops/__tests__/p12-payroll-db.test.ts
+# Phase 14 (connectors): Gusto payroll (fake Gusto, documented shapes): employee links suggested → confirmed by a person (FORCE RLS), Tier 3 send through the chat gate (never auto) and the ops gate (person approves), send idempotent per run + figures, approve/post wait for sync, sync-back reconciliation (payslips + totals), posted entry untouched, net-pay clearing balanced and once-only.
+lib/bizsync/__tests__/gusto-payroll-db.test.ts
+# Phase 12 (people): events — published-only routing, free/paid registration (paid pending until the signed Stripe webhook), concurrent capacity, once-only QR check-in, reminders, FORCE RLS.
+lib/ops/__tests__/p12-events-db.test.ts
+# Phase 13 (twincore): digital twin — FORCE RLS on sites/objects/dock bookings, layout validation + same-workspace bindings, overlapping active dock bookings refused (code + exclusion constraint), booking states reflected by siteSnapshot, gated publish, agent markers, live stream patch after a write, sample site per kind consistent + idempotent.
+lib/twin/__tests__/twin-db.test.ts
+# Phase 14 (approvals): ops gate automatable slug auto-approves (audited) / money slug never; twin live for viewers (published only, draft refused, stream ends when it goes back to draft; generic route editor+); missions read the rules (drafter auto-approval, executor tier settings).
+lib/twin/__tests__/twin-viewer-db.test.ts
+lib/automation/__tests__/p14-approvals-db.test.ts
+# Phase 14: the connector refresh sweep never marks an API key or a non-expiring token needs_reauth; renewable credentials still refresh, expiring ones without a refresh token still ask.
+lib/vault/__tests__/refresh-due-db.test.ts
