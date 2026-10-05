@@ -284,7 +284,7 @@ export const OAUTH_CONFIGS: Record<string, OAuthProviderConfig> = {
       return out;
     },
   },
-  // Phase 11 (conncore): HubSpot public app. Authorize on app.hubspot.com,
+  // Phase 11 (conncore): HubSpot OAuth app. Authorize on app.hubspot.com,
   // token (both grants, client credentials in the form body) on
   // api.hubapi.com; access tokens live 30 minutes, refresh tokens rotate
   // never (kept). Verified against developers.hubspot.com/docs/apps/legacy-apps/authentication/oauth-quickstart-guide.
@@ -336,8 +336,12 @@ export const OAUTH_CONFIGS: Record<string, OAuthProviderConfig> = {
     tokenRequest: "form_basic",
     pkce: true,
   },
-  // Phase 11 (bizsync): Shopify (public app, Admin GraphQL API). Each store
-  // has its own OAuth host: https://{shop}/admin/oauth/authorize and
+  // Phase 11 (bizsync): Shopify, a hosted ShapesOS app installed per store
+  // (authorization code grant, Admin GraphQL API). Phase 14: the default way
+  // to connect your own store needs no hosted app at all — the single-store
+  // connection (lib/bizsync/shopify/single-store.ts, client credentials
+  // grant or an existing custom app's token, via the api-key route). Each
+  // store has its own OAuth host: https://{shop}/admin/oauth/authorize and
   // /admin/oauth/access_token (client credentials in the form body). The
   // offline token does not expire unless the app opts into expiring offline
   // tokens (then refresh_token + expires_in arrive and refresh goes to the

@@ -16,6 +16,8 @@ import { buildTokenRequest, getOAuthConfig, shopUrl } from "./oauth";
 
 export interface RefreshDeps {
   fetchImpl?: typeof fetch;
+  /** Phase 14: DNS resolver for safeFetch's address check (tests inject a fake). */
+  resolve?: (host: string) => Promise<string[]>;
 }
 
 /** Fetch the connector's authType from the registry (built-in) or fall back to "none". */
@@ -100,6 +102,30 @@ export async function refreshConnection(
             keyVersion: "env-v1",
             expiresAt: next.expiresIn !== null ? new Date(Date.now() + next.expiresIn * 1000) : null,
           },
+        });
+        await prisma.connectorConnection.update({ where: { id: connectionId }, data: { status: "active", lastRefreshAt: new Date() } });
+        return "refreshed";
+      } catch {
+        await markNeedsReauth(connectionId);
+        return "needs_reauth";
+      }
+    }
+  }
+
+  // Phase 14 (connectors): a single-store Shopify connection has no refresh
+  // token. Client-credentials tokens are simply requested again (24 h each);
+  // a static admin-created-app token is re-verified (nothing to rotate).
+  if (connection.connectorKey === "shopify" && payload) {
+    const { singleStoreModeOf, renewSingleStoreCredential } = await import("@/lib/bizsync/shopify/single-store");
+    if (singleStoreModeOf(payload)) {
+      // Uninstalled from the store (app/uninstalled webhook): stays revoked
+      // until a person connects again.
+      if (connection.status === "revoked") return "needs_reauth";
+      try {
+        const next = await renewSingleStoreCredential(payload, { fetchImpl: deps.fetchImpl, resolve: deps.resolve });
+        await prisma.connectorCredential.update({
+          where: { connectionId },
+          data: { encryptedBlob: secrets().encrypt(JSON.stringify(next.payload)), keyVersion: "env-v1", expiresAt: next.expiresAt },
         });
         await prisma.connectorConnection.update({ where: { id: connectionId }, data: { status: "active", lastRefreshAt: new Date() } });
         return "refreshed";

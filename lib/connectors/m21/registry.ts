@@ -9,6 +9,8 @@
 
 export type ConnectorAuthType = "oauth2" | "api_key" | "none";
 
+import type { CredentialMode } from "./credential-fields";
+
 export interface BuiltinConnectorMeta {
   key: string;
   displayName: string;
@@ -21,6 +23,13 @@ export interface BuiltinConnectorMeta {
   };
   /** Human-readable note about auth expectations. */
   authNote: string;
+  /**
+   * Phase 14 (connectors): the typed-in credential fields this connector
+   * accepts (lib/connectors/m21/credential-fields.ts). api_key connectors
+   * that declare nothing take one API key; an oauth2 connector declares
+   * modes only for a supported alternative to OAuth (Shopify single store).
+   */
+  credentialModes?: CredentialMode[];
 }
 
 // Phase 11 (conncore): Microsoft Graph delegated scopes (offline_access for
@@ -109,6 +118,19 @@ export const BUILT_IN_CONNECTORS: BuiltinConnectorMeta[] = [
     authType: "api_key",
     description: "Publish and edit pages/posts on a WordPress site via the REST API.",
     authNote: "WordPress Application Password (Users → Profile → Application Passwords).",
+    // Phase 14: the adapter reads baseUrl + username + apiKey (the application password).
+    credentialModes: [
+      {
+        id: "application_password",
+        label: "Application password",
+        help: "In WordPress: Users → Profile → Application Passwords → Add new.",
+        fields: [
+          { name: "baseUrl", label: "Site URL", kind: "url", required: true, placeholder: "https://example.com" },
+          { name: "username", label: "Username", kind: "text", required: true, placeholder: "admin" },
+          { name: "apiKey", label: "Application password", kind: "secret", required: true, placeholder: "abcd efgh ijkl mnop qrst uvwx" },
+        ],
+      },
+    ],
   },
   {
     key: "webflow",
@@ -161,6 +183,7 @@ export const BUILT_IN_CONNECTORS: BuiltinConnectorMeta[] = [
     authType: "api_key",
     description: "Send test emails and newsletters through the Resend API.",
     authNote: "Resend API key (re_…).",
+    credentialModes: [{ id: "api_key", label: "API key", fields: [{ name: "apiKey", label: "API key", kind: "secret", required: true, placeholder: "re_…" }] }],
   },
   {
     key: "dataforseo",
@@ -168,6 +191,18 @@ export const BUILT_IN_CONNECTORS: BuiltinConnectorMeta[] = [
     authType: "api_key",
     description: "Keyword ideas, SERP snapshots, competitor keywords, backlinks.",
     authNote: "DataForSEO login + password (basic auth pair stored as one credential).",
+    // Phase 14: the adapter reads apiKey (the API login) + password.
+    credentialModes: [
+      {
+        id: "login_password",
+        label: "API login",
+        help: "DataForSEO dashboard → API access: the API login and API password (not your account password).",
+        fields: [
+          { name: "apiKey", label: "API login", kind: "text", required: true, placeholder: "you@example.com" },
+          { name: "password", label: "API password", kind: "secret", required: true },
+        ],
+      },
+    ],
   },
   {
     key: "meta-ads",
@@ -326,6 +361,7 @@ export const BUILT_IN_CONNECTORS: BuiltinConnectorMeta[] = [
     authType: "api_key",
     description: "List Supabase projects and storage buckets, and run read-only SQL queries (anything that writes is refused).",
     authNote: "Supabase personal access token (sbp_…, Dashboard → Account → Access tokens). Read-only: no writes in v1.",
+    credentialModes: [{ id: "api_key", label: "Access token", fields: [{ name: "apiKey", label: "Personal access token", kind: "secret", required: true, placeholder: "sbp_…" }] }],
   },
   // Phase 11 (devtools): Netlify sites and deploys through the Phase 9 deploy
   // adapter (lib/deploy/netlify.ts) and its hosting-connection credentials.
@@ -335,6 +371,7 @@ export const BUILT_IN_CONNECTORS: BuiltinConnectorMeta[] = [
     authType: "api_key",
     description: "List Netlify sites and deploys, and start a new deploy from the linked repository after you confirm.",
     authNote: "Reuse a project's Netlify hosting connection (Sites → Hosting → Use for agents), or a Netlify personal access token.",
+    credentialModes: [{ id: "api_key", label: "Access token", fields: [{ name: "apiKey", label: "Personal access token", kind: "secret", required: true, placeholder: "nfp_…" }] }],
   },
   // Phase 11 (bizsync): Shopify ↔ Ops products, stock, orders, customers.
   {
@@ -346,7 +383,41 @@ export const BUILT_IN_CONNECTORS: BuiltinConnectorMeta[] = [
       scopes: SHOPIFY_SCOPES,
       envVars: ["SHOPIFY_CLIENT_ID", "SHOPIFY_CLIENT_SECRET"],
     },
-    authNote: "Shopify app install (OAuth per store — enter your *.myshopify.com domain). Webhooks are signed with the app secret.",
+    authNote:
+      "Your own store, no app listing: a Dev Dashboard app in your Shopify organization (client ID + secret; ShapesOS requests 24-hour tokens with the client credentials grant), or an older admin-created custom app's Admin API token. A hosted ShapesOS Shopify app (OAuth per store) also works when SHOPIFY_CLIENT_ID/SECRET are set.",
+    // Phase 14 (connectors): the single-store connection (no App Store
+    // listing). Verified 2026-10-05 against
+    //   shopify.dev/docs/apps/build/authentication-authorization (grants table:
+    //     "Is a server-side integration that acts on your own stores → Client
+    //     credentials grant"; admin-created custom apps "can no longer" be
+    //     created, existing ones keep working)
+    //   shopify.dev/docs/apps/build/authentication-authorization/client-credentials-grant
+    //   shopify.dev/docs/apps/build/authentication-authorization/legacy/admin-custom-apps
+    // Stored as { shop, access_token, webhook_secret?, auth_mode, … } so
+    // shopifyAuthFrom (native/shopify.ts) works unchanged
+    // (lib/bizsync/shopify/single-store.ts validates + stores it).
+    credentialModes: [
+      {
+        id: "client_credentials",
+        label: "Dev Dashboard app",
+        help: "dev.shopify.com → your organization → Apps → Create app; select the scopes, release a version, install it on your store, then copy the client ID and secret from Settings. The store must be in the same organization.",
+        fields: [
+          { name: "shop", label: "Store domain", kind: "shop_domain", required: true, placeholder: "your-store.myshopify.com" },
+          { name: "client_id", label: "Client ID", kind: "text", required: true, maxLength: 200 },
+          { name: "client_secret", label: "Client secret", kind: "secret", required: true, maxLength: 500 },
+        ],
+      },
+      {
+        id: "admin_token",
+        label: "Existing custom app token",
+        help: "Only for a custom app created in the Shopify admin before 2026 (Apps → Develop apps → API credentials). New apps use the Dev Dashboard.",
+        fields: [
+          { name: "shop", label: "Store domain", kind: "shop_domain", required: true, placeholder: "your-store.myshopify.com" },
+          { name: "access_token", label: "Admin API access token", kind: "secret", required: true, placeholder: "shpat_…", maxLength: 500 },
+          { name: "webhook_secret", label: "API secret key (verifies webhooks)", kind: "secret", required: false, maxLength: 500, help: "Shopify signs this app's webhooks with it. Without it, webhooks are refused." },
+        ],
+      },
+    ],
   },
   // Phase 11 (bizsync): QuickBooks Online ↔ the Ops accounting core.
   {
