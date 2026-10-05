@@ -678,7 +678,12 @@ async function finishLiveTurn(
   if (!cancelled && loop.status !== "awaiting_confirmation") {
     finalText = await enforceFinalText(finalText, input.workspaceId);
   }
-  const calls = [...extraCalls, ...newCalls];
+  // Phase 16: an action this run proposed in the step that started its
+  // sub-agents, still waiting for the user's OK, moves to this (now last)
+  // message — so "yes" still finds it once the merged answer is in.
+  const carried = cancelled ? [] : loop.calls.slice(0, from).filter((c) => c.status === "pending_confirmation");
+  if (carried.length && loop.status !== "awaiting_confirmation") finalText = `${finalText}\n\nStill waiting for your OK: ${proposalsText(carried)}`;
+  const calls = [...extraCalls, ...newCalls, ...carried];
   await saveToolRows(input.threadId, newCalls);
   await saveMessage(input.threadId, "assistant", finalText, calls);
   return {
@@ -686,7 +691,7 @@ async function finishLiveTurn(
     toolCalls: calls,
     threadTitle: null,
     cancelled,
-    awaitingConfirmation: loop.status === "awaiting_confirmation",
+    awaitingConfirmation: loop.status === "awaiting_confirmation" || carried.length > 0,
     failed: loop.status === "error",
   };
 }

@@ -663,6 +663,33 @@ describe("Phase 16 automatic delegation (fake Responses API, real loop + queue +
     assert.equal((await getAgentRun(WS, out.runId))?.status, "succeeded");
   });
 
+  it("the lead's own action proposed alongside a plan still waits for (and gets) the user's OK after the merge", async () => {
+    const t = await thread();
+    model.script = (b) => {
+      if (childTask(b)) return { text: deliverable("checked", "CHECK-OUT") };
+      const outs = toolOutputs(b);
+      if (outs.length === 0) {
+        return {
+          calls: [
+            { tool: "delegate_tasks", args: { goal: "Check first", tasks: [{ id: "chk", agent: "researcher", brief: "Check", deliverable: "check" }], mergeInstructions: "Say what was checked." } },
+            { tool: "run_workflow", args: { workflowId: "wf-lead" } },
+          ],
+        };
+      }
+      return { text: "Checked; the workflow waits for you." };
+    };
+    const out = await turn(t.id, "Check it and start the workflow");
+    assert.match(out.assistantText, /Meanwhile/, "the waiting message lists the lead's own proposal");
+    await pump(newWorker());
+    const last = await lastAssistant(t.id);
+    const pending = ((last?.toolCalls ?? []) as unknown as ChatToolCall[]).filter((c) => c.status === "pending_confirmation");
+    assert.deepEqual(pending.map((c) => c.tool), ["run_workflow"], "carried into the merged answer");
+    assert.match(last!.content, /Checked; the workflow waits for you\.[\s\S]*Still waiting for your OK/);
+    const yes = await turn(t.id, "yes");
+    const ran = yes.toolCalls.find((c) => c.tool === "run_workflow");
+    assert.ok(ran && ran.confirmed && ran.status !== "pending_confirmation", "\"yes\" ran it");
+  });
+
   it("a plan the rules refuse starts nothing and tells the model why", async () => {
     const t = await thread();
     model.script = (b) =>
