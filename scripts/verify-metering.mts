@@ -257,9 +257,26 @@ const wsF = await makeWorkspace("pro");
   const r = await meter({ workspaceId: wsF.id, action: "keyword_research", idempotencyKey: key("ro1") });
   const bal = await prisma.creditBalance.findUnique({ where: { workspaceId: wsF.id } });
   check("rollover: used == only the new charge", r.ok && bal?.usedCredits === 40, `used=${bal?.usedCredits}`);
-  const thisMonth = new Date();
-  thisMonth.setDate(1); thisMonth.setHours(0, 0, 0, 0);
-  check("rollover: periodStart advanced", bal!.periodStart >= thisMonth);
+  // Periods are anchored to the billing date (lib/metering/service.ts advances
+  // periodStart by whole months while now >= periodStart + 1 month), not to
+  // the 1st of the calendar month — so the new period starts on the backdated
+  // day of a month, within the last month and not in the future. (The old
+  // check compared against the 1st of this month and failed on any day of the
+  // month earlier than the backdated anchor.)
+  const expected = new Date(past);
+  for (;;) {
+    const next = new Date(expected);
+    next.setMonth(next.getMonth() + 1);
+    if (Date.now() < next.getTime()) break;
+    expected.setTime(next.getTime());
+  }
+  const lastMonth = new Date();
+  lastMonth.setMonth(lastMonth.getMonth() - 1);
+  check(
+    "rollover: periodStart advanced",
+    bal!.periodStart.getTime() === expected.getTime() && bal!.periodStart > lastMonth && bal!.periodStart <= new Date(),
+    `periodStart=${bal!.periodStart.toISOString()} expected=${expected.toISOString()}`,
+  );
   // Alert re-arms in the new period: drive to 80% of the (default) cap.
   const capBefore = await prisma.spendCap.findUnique({ where: { workspaceId: wsF.id } });
   check("rollover: alert re-armed (lastAlertAt predates period)", !capBefore?.lastAlertAt || capBefore.lastAlertAt < bal!.periodStart);
