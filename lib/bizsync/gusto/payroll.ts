@@ -29,6 +29,7 @@
 
 import type { Prisma } from "@prisma/client";
 import { withWorkspaceScope } from "@/lib/substrate/memory/rls";
+import { requireEntitlementTx } from "@/lib/billing/entitlements-server";
 import { ConnectorApiError, type LiveDeps } from "@/lib/connectors/m21/live/http";
 import { OpsError, type OpsActor } from "@/lib/ops/doctype";
 import { phase14GatePort, requestOpsApproval, verifyAndConsumeOpsApproval, type OpsGatePort, type OpsGateProposal } from "@/lib/ops/gate";
@@ -209,6 +210,9 @@ export async function sendPayRunToGusto(workspaceId: string, runId: string, auth
   return withWorkspaceScope(
     workspaceId,
     async (tx) => {
+      // Phase 15.3 (pricing): pushing a run to Gusto is producing payroll —
+      // the payroll feature is needed (Pro and up; trial/self-hosted keep it).
+      await requireEntitlementTx(tx, workspaceId, "payroll");
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`payroll-run:${workspaceId}`}))`;
       const run = await loadPayRun(tx, workspaceId, runId);
       if (run.status !== "computed") throw new OpsError(409, `Send to Gusto works on a computed pay run (before approval) — this one is ${run.status}`);

@@ -21,6 +21,9 @@ enum Plan {
   trial
   starter
   pro
+  // Phase 15.3 (pricing): base fee + 25 seats + 40,000 credits, SSO/SCIM and
+  // unlimited twin sites (lib/billing/plans.ts, lib/billing/entitlements.ts).
+  business
   agency
 }
 
@@ -341,6 +344,10 @@ enum FileChangeAction {
   auth_account_created
   auth_email_verified
   auth_password_reset
+  // Phase 15.3 (pricing): an admin confirmed an extra-seat charge / changed
+  // the approved extra-seat ceiling (summaries carry counts and prices only).
+  seat_charge_confirmed
+  seat_ceiling_changed
 }
 
 // ---------------------------------------------------------------------------
@@ -4082,6 +4089,19 @@ model BillingWorkspace {
   // Sub-minimum amounts are NOT invoiced but the watermark does not advance,
   // so they carry forward and are billed once the $5 minimum is reached (B15).
   lastOverageInvoicedThrough DateTime? @map("last_overage_invoiced_through")
+  // ---- Phase 15.3 (pricing): extra seats as a Stripe QUANTITY line ----
+  // The extra seats (beyond the plan's included seats) an admin has
+  // EXPLICITLY confirmed paying for — a ceiling, raised only by an admin's
+  // confirmation (adding a member past it, or Billing → Seats). Nothing
+  // beyond it is ever billed: quantity = min(used − included, approved).
+  approvedExtraSeats         Int       @default(0) @map("approved_extra_seats")
+  // The quantity last confirmed on the Stripe subscription's seat item.
+  billedExtraSeats           Int       @default(0) @map("billed_extra_seats")
+  // Bumped on every quantity change sent to Stripe (idempotency keys).
+  seatSyncVersion            Int       @default(0) @map("seat_sync_version")
+  seatsSyncedAt              DateTime? @map("seats_synced_at")
+  // Last sync failure, shown in Billing with a retry (null when in sync).
+  seatSyncError              String?   @map("seat_sync_error")
   createdAt                  DateTime  @default(now()) @map("created_at")
   updatedAt                  DateTime  @updatedAt @map("updated_at")
 

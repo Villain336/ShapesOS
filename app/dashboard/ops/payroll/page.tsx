@@ -12,6 +12,7 @@ import { US_PAYROLL_TAX_TABLE } from "@/lib/ops/payroll/tax";
 import { US_STATE_CODES } from "@/lib/ops/payroll/tax/us-state-flat";
 import { payRunLabel } from "@/lib/ops/payroll/runs";
 import { DataTable, Empty, FinanceHeader, Panel, Pill, cellCls, fmtDay, money, numCls, rowCls } from "@/components/ops-finance/kit";
+import { PlanFeatureNotice } from "@/components/billing/PlanFeatureNotice";
 import { EndAssignmentButton, NewAssignmentButton, NewPayRunButton, NewStructureButton } from "@/components/ops-people/PayrollClient";
 
 export const dynamic = "force-dynamic";
@@ -114,6 +115,8 @@ export default async function PayrollPage() {
         description="Compute pay from salary structures and approved timesheets, approve it, and post it to the books. Approving and posting always ask a person."
         actions={<NewPayRunButton />}
       />
+      {/* Phase 15.3 (pricing): explains the payroll gate on plans without it. */}
+      <PlanFeatureNotice workspaceId={ws} userId={actor.userId} feature="payroll" />
       <Disclaimer />
       <Panel title="Pay runs">
         {data.runs.length === 0 ? (

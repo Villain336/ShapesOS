@@ -15,6 +15,7 @@
 import { prisma } from "./prisma";
 import type { WorkspaceRole } from "@prisma/client";
 import { planHasFeature } from "./billing/entitlements";
+import { seatProvisioningRefusal } from "./billing/seats";
 
 // Owner is deliberately excluded: SSO must never mint owners.
 const SSO_ROLES: WorkspaceRole[] = ["viewer", "editor", "admin"];
@@ -55,6 +56,18 @@ export async function provisionSsoUser(
   });
   if (existing) return;
 
+  // Phase 15.3 (pricing): auto-provisioning can't confirm a seat charge.
+  // Past the included seats (and any extra seats an admin approved) the user
+  // is not provisioned — an admin adds them in Members (confirming the seat).
+  // Lazy: keeps Stripe/billing out of the auth module graph (auth.ts imports this file).
+  const { checkSeatForNewMember, syncSeatsBestEffort } = await import("./billing/seats-server");
+  const seat = await checkSeatForNewMember(workspaceId, { confirmed: false });
+  const refusal = seatProvisioningRefusal(seat);
+  if (refusal) {
+    console.warn(`[sso] not auto-provisioning ${normalized} into ${workspaceId}: ${refusal}`);
+    return;
+  }
+
   // If the user holds a pending token invite for this workspace, leave it
   // alone — claiming stays an explicit token-link action.
   await prisma.workspaceMember.create({
@@ -65,4 +78,5 @@ export async function provisionSsoUser(
       role: defaultSsoRole(),
     },
   });
+  if (seat.kind === "within_approved") await syncSeatsBestEffort(workspaceId);
 }

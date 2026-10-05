@@ -15,6 +15,7 @@ import { ChevronDown, Users } from "lucide-react";
 import { DelegationPlan } from "@/components/aos/DelegationPlan";
 import { StatusShape } from "@/components/aos/StatusShape";
 import { viewProgress, type DelegationView } from "@/lib/aos/delegation";
+import { AGENT_ACTIVITY_CHANGED_EVENT } from "@/lib/aos/events";
 import { progressLine } from "@/lib/agents/delegation/plan";
 import { statusLabel, type AosStatus } from "@/lib/aos/status";
 import { cn } from "@/lib/utils";
@@ -36,6 +37,7 @@ export function DelegationCard({ runId, planId, tasks, goal }: { runId: string; 
   const [open, setOpen] = useState(false);
   const refreshed = useRef(false);
   const wasLive = useRef<boolean | null>(null);
+  const lastProgress = useRef<string | null>(null);
 
   useEffect(() => {
     let stop = false;
@@ -48,6 +50,10 @@ export function DelegationCard({ runId, planId, tasks, goal }: { runId: string; 
         if (stop) return;
         setView(next);
         const settled = !next.live || next.runStatus === "awaiting_confirmation";
+        // Tell the sidebar's agent tree when a sub-agent starts, finishes or the plan settles.
+        const progress = `${progressLine(viewProgress(next))}|${next.runStatus}|${settled}`;
+        if (lastProgress.current !== null && lastProgress.current !== progress) window.dispatchEvent(new Event(AGENT_ACTIVITY_CHANGED_EVENT));
+        lastProgress.current = progress;
         // The lead answered (or asks for the user's OK): show its message.
         if (settled && wasLive.current && !refreshed.current && chat?.activeId) {
           refreshed.current = true;

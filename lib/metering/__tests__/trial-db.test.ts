@@ -14,6 +14,7 @@ import { randomUUID } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import { applyPlanChange, checkCap, meter } from "../service";
 import { createWorkspaceForUser } from "@/lib/workspace/lifecycle";
+import { TRIAL_INCLUDED_CREDITS } from "../credits";
 
 const RUN = randomUUID().slice(0, 8);
 const HOSTED = { DEPLOYMENT_MODE: "hosted" } as unknown as NodeJS.ProcessEnv;
@@ -76,9 +77,9 @@ describe("plan assignment by DEPLOYMENT_MODE", () => {
 });
 
 describe("trial metering", () => {
-  it("hard-caps a running trial at its 500-credit pool, even with auto-overage on", async () => {
+  it("hard-caps a running trial at its one-time pool (TRIAL_INCLUDED_CREDITS), even with auto-overage on", async () => {
     const ws = await createWorkspaceForUser({ userId: user("cap"), name: "Cap", env: HOSTED });
-    assert.equal((await charge(ws.id, 400)).ok, true);
+    assert.equal((await charge(ws.id, TRIAL_INCLUDED_CREDITS - 100)).ok, true);
     await prisma.spendCap.update({ where: { workspaceId: ws.id }, data: { autoOverage: true, blockAtCap: false } });
     const over = await charge(ws.id, 200);
     assert.equal(over.ok, false);
@@ -86,8 +87,8 @@ describe("trial metering", () => {
     assert.match(!over.ok ? over.message : "", /Trial credits used up/);
     assert.equal((await charge(ws.id, 100)).ok, true, "exactly up to the pool still passes");
     const bal = await prisma.creditBalance.findUnique({ where: { workspaceId: ws.id } });
-    assert.equal(bal?.includedCredits, 500);
-    assert.equal(bal?.usedCredits, 500);
+    assert.equal(bal?.includedCredits, TRIAL_INCLUDED_CREDITS);
+    assert.equal(bal?.usedCredits, TRIAL_INCLUDED_CREDITS);
     const events = await prisma.usageEvent.findMany({ where: { workspaceId: ws.id } });
     assert.equal(events.reduce((n, e) => n + e.overageCredits, 0), 0, "a trial never accrues billable overage");
   });
@@ -120,14 +121,16 @@ describe("trial metering", () => {
 
   it("the trial pool does not refill at a month boundary", async () => {
     const ws = await createWorkspaceForUser({ userId: user("rollover"), name: "Rollover", env: HOSTED });
-    assert.equal((await charge(ws.id, 300)).ok, true);
+    // Phase 15.3: relative to the one-time pool (TRIAL_INCLUDED_CREDITS).
+    const first = TRIAL_INCLUDED_CREDITS - 200;
+    assert.equal((await charge(ws.id, first)).ok, true);
     await prisma.creditBalance.update({
       where: { workspaceId: ws.id },
       data: { periodStart: new Date(new Date().getFullYear(), new Date().getMonth() - 1, 1) },
     });
     assert.equal((await charge(ws.id, 100)).ok, true);
     const bal = await prisma.creditBalance.findUnique({ where: { workspaceId: ws.id } });
-    assert.equal(bal?.usedCredits, 400, "used credits carried across the rollover");
+    assert.equal(bal?.usedCredits, first + 100, "used credits carried across the rollover");
     assert.equal((await charge(ws.id, 200)).ok, false);
   });
 

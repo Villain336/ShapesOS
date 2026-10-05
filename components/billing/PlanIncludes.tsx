@@ -11,12 +11,13 @@ import {
   LIMIT_LABELS,
   entitlementsFor,
 } from "@/lib/billing/entitlements";
+import { PRICING_ORDER, planDisplayName } from "@/lib/billing/plans";
 
-const PLAN_COLUMNS = [
-  { id: "starter", label: "Starter" },
-  { id: "pro", label: "Pro" },
-  { id: "agency", label: "Agency" },
-] as const;
+// Phase 15.3: the column order is the pricing order (lib/billing/plans.ts).
+const PLAN_COLUMNS: ReadonlyArray<{ id: string; label: string }> = PRICING_ORDER.map((id) => ({
+  id,
+  label: planDisplayName(id),
+}));
 
 function limitText(v: number | null): string {
   return v === null ? "Unlimited" : String(v);
@@ -35,7 +36,7 @@ export function PlanIncludes({ plan, planName }: { plan: string; planName: strin
         These limits are enforced by the server.
       </p>
       <div className="mt-3 overflow-x-auto">
-        <table className="w-full min-w-[480px] text-left text-sm">
+        <table className="w-full min-w-[560px] text-left text-sm">
           <thead>
             <tr className="border-b border-line text-xs font-semibold text-muted">
               <th scope="col" className="py-2 pr-3 font-semibold">Feature</th>

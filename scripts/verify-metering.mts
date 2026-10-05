@@ -82,7 +82,9 @@ console.log("metering battery");
   let threw = false;
   try { credits.creditsFor("nope_not_real"); } catch { threw = true; }
   check("unknown action throws in creditsFor", threw);
-  check("tier pools starter/pro/agency", credits.TIER_INCLUDED_CREDITS.starter === 2500 && credits.TIER_INCLUDED_CREDITS.pro === 10000 && credits.TIER_INCLUDED_CREDITS.agency === 30000);
+  // Phase 15.3: pools = base × INCLUDED_CREDITS_MULTIPLIER (owner knob, ×2 after the Phase 17 evaluation).
+  const M = credits.INCLUDED_CREDITS_MULTIPLIER;
+  check("tier pools starter/pro/business/agency", credits.TIER_INCLUDED_CREDITS.starter === 4000 * M && credits.TIER_INCLUDED_CREDITS.pro === 15000 * M && credits.TIER_INCLUDED_CREDITS.business === 40000 * M && credits.TIER_INCLUDED_CREDITS.agency === 30000 * M);
 }
 
 // ── 2. happy path + idempotency replay ───────────────────────────────────────
@@ -222,7 +224,9 @@ const wsD = await makeWorkspace("starter");
   check("summary(A) has no rows from E", !("ai_article" in sumA.byAction) || sumA.byAction["ai_article"] === undefined);
   const sumE = await getUsageSummary({ workspaceId: wsE.id });
   check("summary(E) sees its own charge", sumE.byAction["ai_article"] === 15 && sumE.used === 15);
-  check("summary contract shape", sumE.included === 2500 && sumE.purchased === 0 && sumE.remaining === 2485 && typeof sumE.periodStart === "string");
+  // Phase 15.3: the starter pool comes from the constants.
+  const starterPool = credits.TIER_INCLUDED_CREDITS.starter;
+  check("summary contract shape", sumE.included === starterPool && sumE.purchased === 0 && sumE.remaining === starterPool - 15 && typeof sumE.periodStart === "string");
 }
 
 // ── 11. T5: ledger tamper attempts ───────────────────────────────────────────
@@ -253,9 +257,26 @@ const wsF = await makeWorkspace("pro");
   const r = await meter({ workspaceId: wsF.id, action: "keyword_research", idempotencyKey: key("ro1") });
   const bal = await prisma.creditBalance.findUnique({ where: { workspaceId: wsF.id } });
   check("rollover: used == only the new charge", r.ok && bal?.usedCredits === 40, `used=${bal?.usedCredits}`);
-  const thisMonth = new Date();
-  thisMonth.setDate(1); thisMonth.setHours(0, 0, 0, 0);
-  check("rollover: periodStart advanced", bal!.periodStart >= thisMonth);
+  // Periods are anchored to the billing date (lib/metering/service.ts advances
+  // periodStart by whole months while now >= periodStart + 1 month), not to
+  // the 1st of the calendar month — so the new period starts on the backdated
+  // day of a month, within the last month and not in the future. (The old
+  // check compared against the 1st of this month and failed on any day of the
+  // month earlier than the backdated anchor.)
+  const expected = new Date(past);
+  for (;;) {
+    const next = new Date(expected);
+    next.setMonth(next.getMonth() + 1);
+    if (Date.now() < next.getTime()) break;
+    expected.setTime(next.getTime());
+  }
+  const lastMonth = new Date();
+  lastMonth.setMonth(lastMonth.getMonth() - 1);
+  check(
+    "rollover: periodStart advanced",
+    bal!.periodStart.getTime() === expected.getTime() && bal!.periodStart > lastMonth && bal!.periodStart <= new Date(),
+    `periodStart=${bal!.periodStart.toISOString()} expected=${expected.toISOString()}`,
+  );
   // Alert re-arms in the new period: drive to 80% of the (default) cap.
   const capBefore = await prisma.spendCap.findUnique({ where: { workspaceId: wsF.id } });
   check("rollover: alert re-armed (lastAlertAt predates period)", !capBefore?.lastAlertAt || capBefore.lastAlertAt < bal!.periodStart);
@@ -281,7 +302,7 @@ const wsF = await makeWorkspace("pro");
     return Math.abs(top.expiresAt.getTime() - d.getTime()) < 86400000 * 2;
   })());
   const sum = await getUsageSummary({ workspaceId: wsA.id });
-  check("summary reflects purchased pool", sum.purchased === 5000 && sum.remaining === 5000 + 2500 - sum.used);
+  check("summary reflects purchased pool", sum.purchased === 5000 && sum.remaining === 5000 + credits.TIER_INCLUDED_CREDITS.starter - sum.used);
 }
 
 // ── 15. default rows for untouched workspaces ────────────────────────────────

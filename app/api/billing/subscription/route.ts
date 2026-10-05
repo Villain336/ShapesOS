@@ -1,8 +1,9 @@
 // Marketr — plan subscription checkout + state (Phase 13 Wave A).
 // GET /api/billing/subscription?workspaceId= → subscription state (plan,
 //   subscription row, card-on-file, per-plan purchasability). Admin-only.
-// POST /api/billing/subscription { workspaceId, planId } → { url }
+// POST /api/billing/subscription { workspaceId, planId, interval? } → { url }
 //   Create a Stripe Checkout Session (mode=subscription) for the plan.
+//   Phase 15.3: interval "month" (default) or "year" (annual, 2 months free).
 //   Admin-only; the workspace is the authenticated admin's own. 503 when
 //   Stripe keys are absent; 503 with a plain-language message when the plan
 //   isn't linked to a Stripe Price yet.
@@ -15,7 +16,7 @@ import {
   BillingNotConfiguredError,
   getSubscriptionState,
 } from "@/lib/metering/billing";
-import { planById } from "@/lib/billing/plans";
+import { isBillingInterval, planById } from "@/lib/billing/plans";
 
 export const dynamic = "force-dynamic";
 
@@ -30,7 +31,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const user = await requireUser();
   if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
-  let body: { planId?: unknown; workspaceId?: unknown } | null = null;
+  let body: { planId?: unknown; workspaceId?: unknown; interval?: unknown } | null = null;
   try {
     body = await req.json();
   } catch {
@@ -42,6 +43,8 @@ export async function POST(req: NextRequest) {
   } catch {
     return badRequest("unknown plan");
   }
+  const interval = body?.interval === undefined ? "month" : body.interval;
+  if (!isBillingInterval(interval)) return badRequest('interval must be "month" or "year"');
   const access = await requireWorkspaceAccess(user.id, workspaceIdFrom(req, body), "admin");
   if ("error" in access) return access.error;
 
@@ -51,6 +54,7 @@ export async function POST(req: NextRequest) {
     const { url } = await sink.createSubscriptionCheckout({
       workspaceId: access.workspaceId,
       planId,
+      interval,
       successUrl: `${origin}/dashboard/billing?sub=success`,
       cancelUrl: `${origin}/dashboard/billing?sub=cancelled`,
     });

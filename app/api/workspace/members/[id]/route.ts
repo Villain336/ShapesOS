@@ -6,6 +6,7 @@
 // demoted or removed.
 
 import type { NextRequest } from "next/server";
+import { syncSeatsBestEffort } from "@/lib/billing/seats-server";
 import { prisma } from "@/lib/prisma";
 import { requireUser, getOrCreateWorkspace } from "@/lib/session";
 import {
@@ -118,5 +119,11 @@ export async function DELETE(
     "member_removed",
     `${user.email ?? user.id} removed ${member.email ?? member.id} (${member.role})`,
   );
-  return Response.json({ ok: true });
+  // Phase 15.3 (pricing): one seat fewer can lower the Stripe extra-seat
+  // quantity (paying less needs no confirmation). Never fails the removal.
+  const seatSync = await syncSeatsBestEffort(workspace.id);
+  return Response.json({
+    ok: true,
+    ...(seatSync.skipped ? {} : { seatSync: { ok: seatSync.ok, quantity: seatSync.result?.quantity ?? null, error: seatSync.error ?? null } }),
+  });
 }

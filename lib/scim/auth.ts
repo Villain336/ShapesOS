@@ -13,6 +13,8 @@
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { withWorkspaceScope } from "@/lib/substrate/memory/rls";
 import { ScimError } from "./http";
+import { hasEntitlement } from "@/lib/billing/entitlements-server";
+import { featureUpgradeMessage } from "@/lib/billing/entitlements";
 
 export const SCIM_TOKEN_PREFIX = "scim_";
 const TOKEN_RE = /^scim_([A-Za-z0-9-]{1,120})_([0-9a-f]{48})$/;
@@ -68,5 +70,12 @@ export async function requireScimAuth(req: Request): Promise<ScimContext> {
     return t;
   });
   if (!row) throw new ScimError(401, "A valid SCIM bearer token is required.");
+  // Phase 15.3 (pricing): SCIM is a plan feature (Business, Agency,
+  // self-hosted). A valid token on a workspace that moved to a plan without
+  // it stops provisioning (403, RFC 7644 error body) until the plan includes
+  // it again — the token itself is kept so nothing has to be re-issued.
+  if (!(await hasEntitlement(row.workspaceId, "scim"))) {
+    throw new ScimError(403, featureUpgradeMessage("scim"));
+  }
   return { workspaceId: row.workspaceId, tokenId: row.id };
 }

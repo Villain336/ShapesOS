@@ -28,6 +28,7 @@
 
 import { createHash } from "node:crypto";
 import type { Prisma } from "@prisma/client";
+import { requireEntitlementTx } from "@/lib/billing/entitlements-server";
 import { canonicalize } from "@/lib/authority/approvals";
 import { OpsError, OpsNotFoundError, type OpsActor } from "../doctype";
 import { phase14GatePort, requestOpsApproval, verifyAndConsumeOpsApproval, type OpsGatePort, type OpsGateProposal } from "../gate";
@@ -162,6 +163,10 @@ export interface ComputeResult {
 
 export async function computePayRun(tx: Tx, actor: OpsActor, id: string): Promise<ComputeResult> {
   const ws = actor.workspaceId;
+  // Phase 15.3 (pricing): producing payroll figures needs the payroll feature
+  // (Pro and up; trial and self-hosted keep it). Approving, posting or
+  // cancelling a run that already exists is never blocked by a plan change.
+  await requireEntitlementTx(tx, ws, "payroll");
   await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`payroll-run:${ws}`}))`;
   const run = await loadPayRun(tx, ws, id);
   if (run.status !== "draft" && run.status !== "computed") {
