@@ -34,19 +34,12 @@ import { liveFailure } from "../live/http";
 import { notConnectedResult } from "../no-fakes";
 import type { ZernioClient } from "@/lib/zernio/client";
 import { ZernioNotConfiguredError, activeZernioMode } from "@/lib/zernio/config";
-import { ZernioScopeError, getZernioScope, syncZernioAccounts, type ZernioScope } from "@/lib/zernio/tenancy";
-import {
-  budgetDirection,
-  campaignInsights,
-  campaignTree,
-  createAd,
-  createAudience,
-  createLeadForm,
-  dryRunCreateAd,
-  listAdAccountsForWorkspace,
-  setCampaignStatus,
-  updateCampaignBudget,
-} from "@/lib/zernio/ads";
+import type { ZernioScope } from "@/lib/zernio/tenancy";
+
+// The tenancy / ads modules need the database: imported on first use, so
+// importing the connector registry never opens a Prisma client.
+const tenancy = () => import("@/lib/zernio/tenancy");
+const ads = () => import("@/lib/zernio/ads");
 
 const objProp = (description: string) => ({ type: "object", description });
 
@@ -185,7 +178,8 @@ function ok(scope: ZernioScope, data: unknown): InvokeResult {
 
 function failure(err: unknown): InvokeResult {
   if (err instanceof ZernioNotConfiguredError) return notConnectedResult("Zernio");
-  if (err instanceof ZernioScopeError) return { ok: false, error: err.message, errorCode: "forbidden", mock: false };
+  // ZernioScopeError (lib/zernio/tenancy.ts): an id that is not this workspace's.
+  if (err instanceof Error && err.name === "ZernioScopeError") return { ok: false, error: err.message, errorCode: "forbidden", mock: false };
   return liveFailure(err, "Zernio");
 }
 
@@ -202,8 +196,8 @@ export class ZernioAdapter implements ConnectorAdapter {
     return ZERNIO_TOOLS.map((t) => ({ ...t }));
   }
 
-  private scope(ctx: InvokeContext): Promise<ZernioScope> {
-    return getZernioScope(ctx.workspaceId, { client: this.deps.client, userId: ctx.userId });
+  private async scope(ctx: InvokeContext): Promise<ZernioScope> {
+    return (await tenancy()).getZernioScope(ctx.workspaceId, { client: this.deps.client, userId: ctx.userId });
   }
 
   private off(): boolean {
@@ -215,9 +209,12 @@ export class ZernioAdapter implements ConnectorAdapter {
     if (this.off()) return notConnectedResult("Zernio");
     try {
       const scope = await this.scope(ctx);
+      const {
+        campaignInsights, campaignTree, createAd, createAudience, createLeadForm, listAdAccountsForWorkspace, setCampaignStatus, updateCampaignBudget,
+      } = await ads();
       switch (tool) {
         case "accounts":
-          return ok(scope, { profileId: scope.profileId, accounts: await syncZernioAccounts(scope) });
+          return ok(scope, { profileId: scope.profileId, accounts: await (await tenancy()).syncZernioAccounts(scope) });
         case "ads_accounts":
           return ok(scope, await listAdAccountsForWorkspace(scope, args));
         case "ads_campaigns":
@@ -254,7 +251,7 @@ export class ZernioAdapter implements ConnectorAdapter {
   async resolveAction(tool: string, args: Record<string, unknown>, ctx: InvokeContext): Promise<string | null> {
     if (tool !== "ads_update_budget" || this.off()) return null;
     try {
-      const d = await budgetDirection(await this.scope(ctx), args);
+      const d = await (await ads()).budgetDirection(await this.scope(ctx), args);
       return d.direction === "lower" ? "lower_campaign_budget" : "update_campaign_budget";
     } catch {
       return null;
@@ -267,7 +264,7 @@ export class ZernioAdapter implements ConnectorAdapter {
       if (this.off()) return notConnectedResult("Zernio");
       try {
         const scope = await this.scope(ctx);
-        const d = await budgetDirection(scope, args);
+        const d = await (await ads()).budgetDirection(scope, args);
         return ok(scope, { summary: d.reason, direction: d.direction });
       } catch (err) {
         return failure(err);
@@ -277,7 +274,7 @@ export class ZernioAdapter implements ConnectorAdapter {
     if (this.off()) return notConnectedResult("Zernio");
     try {
       const scope = await this.scope(ctx);
-      const dry = await dryRunCreateAd(scope, args);
+      const dry = await (await ads()).dryRunCreateAd(scope, args);
       if (dry.status === "failed") return { ok: false, error: dry.message, errorCode: "bad_request", mock: scope.mode === "mock" };
       return ok(scope, { summary: `${dry.plan.summary}. ${dry.message}`, dryRun: dry.status, validationId: dry.validationId });
     } catch (err) {

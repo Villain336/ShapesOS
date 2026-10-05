@@ -415,7 +415,6 @@ describe("monthly account metering", () => {
     const now = new Date("2026-11-01T02:30:00Z");
     const out = await runZernioAccountMetering({ client, now, workspaceIds: [T, H, AG1, AG2] });
     const by = (id: string) => out.results.find((r) => r.workspaceId === id)!;
-    if (process.env.ZDEBUG) console.log(JSON.stringify(out.results, null, 1));
     assert.equal(by(T).status, "included");
     assert.equal(by(T).billable, 0);
     assert.equal(by(H).status, "included");
