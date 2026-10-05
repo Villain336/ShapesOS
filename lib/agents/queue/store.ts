@@ -167,6 +167,25 @@ export async function failAgentJob(
 }
 
 /**
+ * Deploy PR: hand a running job back on shutdown — queued again at once, and
+ * the attempt is NOT charged (the work did not fail; this process is going
+ * away). The run's transcript was saved at its last step, so whichever worker
+ * claims it next continues from there. False when this worker no longer
+ * owned the job.
+ */
+export async function releaseAgentJob(workspaceId: string, jobId: string, workerId: string): Promise<boolean> {
+  const n = await withWorkspaceScope(workspaceId, (tx) =>
+    tx.$executeRaw`
+      UPDATE "agent_jobs"
+         SET "status" = 'queued', "locked_by" = NULL, "lease_until" = NULL,
+             "attempts" = GREATEST("attempts" - 1, 0), "run_after" = ${SQL_NOW_UTC}, "updated_at" = ${SQL_NOW_UTC}
+       WHERE "id" = ${jobId} AND "workspace_id" = ${workspaceId}
+         AND "status" = 'running' AND "locked_by" = ${workerId}`,
+  );
+  return n > 0;
+}
+
+/**
  * Dead-letter orphaned jobs that used up their attempts (their lease expired
  * on the last allowed claim). Returns them so the caller can fail their runs.
  */

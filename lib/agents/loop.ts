@@ -79,6 +79,7 @@ import { waitingPlaceholder } from "./delegation/plan";
 import { buildLoopTools, type ConnectorChatTool, type LoopToolSet } from "./loop-tools";
 import { appendAgentRunEvent } from "./runs/service";
 import { isLeaseLost, isRunStopped } from "./runs/abort";
+import { isDraining } from "@/lib/runtime/shutdown";
 import { prismaTranscriptStore, type TranscriptStore } from "./runs/transcript";
 import type { AgentKey } from "./grants";
 
@@ -598,7 +599,10 @@ export async function runAgentLoop(input: AgentLoopInput): Promise<AgentLoopResu
         .join("\n\n");
       return finish({ status: "capped", finalText: text, proposal: null, cap });
     }
-    if (input.handoffAt !== undefined && s.steps > 0 && now() >= input.handoffAt) {
+    // Deploy PR: a draining server hands its inline turns to the worker at
+    // the next step boundary too (the transcript is saved; the worker — or
+    // another replica's in-app worker — continues from this step).
+    if (input.handoffAt !== undefined && s.steps > 0 && (now() >= input.handoffAt || isDraining())) {
       await save();
       return { status: "handoff", finalText: "", proposal: null, calls: s.calls, state: s };
     }

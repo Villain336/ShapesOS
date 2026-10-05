@@ -29,10 +29,11 @@ import {
   failAgentJob,
   heartbeatAgentJob,
   reapExpiredJobs,
+  releaseAgentJob,
   type ClaimedAgentJob,
 } from "./store";
 import { defaultAgentJobHandlers, type AgentJobHandler } from "./handlers";
-import { LeaseLostError, abortRun } from "@/lib/agents/runs/abort";
+import { LeaseLostError, abortRun, abortRunWith } from "@/lib/agents/runs/abort";
 
 export interface AgentWorkerLogger {
   info(msg: string, fields?: Record<string, unknown>): void;
@@ -76,6 +77,8 @@ export class AgentWorker {
   private readonly log: AgentWorkerLogger;
   private readonly isRunCancelRequested: (workspaceId: string, runId: string) => Promise<boolean>;
   private readonly active = new Map<string, Promise<JobOutcome>>();
+  /** Deploy PR: the running jobs' abort handles (hand-back on shutdown). */
+  private readonly running = new Map<string, { job: ClaimedAgentJob; ac: AbortController }>();
   private readonly kinds: readonly string[] | null;
   private timer: ReturnType<typeof setTimeout> | null = null;
   private stopping = false;
@@ -125,11 +128,53 @@ export class AgentWorker {
 
   /** Stop claiming; wait for running jobs (they keep heartbeating until done). */
   async stop(): Promise<void> {
+    this.stopClaiming();
+    await Promise.allSettled([...this.active.values()]);
+    this.log.info("stopped", { workerId: this.workerId });
+  }
+
+  /** The agent runs this worker's jobs are working on right now. */
+  runIds(): Set<string> {
+    const ids = new Set<string>();
+    for (const { job } of this.running.values()) if (job.runId) ids.add(job.runId);
+    return ids;
+  }
+
+  /** Stop claiming new jobs; running ones carry on. */
+  stopClaiming(): void {
     this.stopping = true;
     if (this.timer) clearTimeout(this.timer);
     this.timer = null;
+  }
+
+  /**
+   * Deploy PR (graceful shutdown): stop claiming, give running jobs up to
+   * `graceMs` to finish, then hand the rest back — each one's run is aborted
+   * as a lease loss (the agent loop saves its transcript and stops WITHOUT
+   * finishing the run) and the job is re-queued at once without charging the
+   * attempt, so another worker continues it immediately instead of after the
+   * lease expires.
+   */
+  async handBack(graceMs: number): Promise<{ finished: number; handedBack: number }> {
+    this.stopClaiming();
+    const before = this.active.size;
+    if (before === 0) return { finished: 0, handedBack: 0 };
+    await Promise.race([
+      Promise.allSettled([...this.active.values()]),
+      new Promise((r) => setTimeout(r, Math.max(0, graceMs))),
+    ]);
+    const left = [...this.running.values()];
+    for (const { job, ac } of left) {
+      ac.abort(new LeaseLostError("Handed back: this worker is shutting down"));
+      if (job.runId) abortRunWith(job.runId, new LeaseLostError("Handed back: this worker is shutting down"));
+    }
     await Promise.allSettled([...this.active.values()]);
-    this.log.info("stopped", { workerId: this.workerId });
+    let handedBack = 0;
+    for (const { job } of left) {
+      if (await releaseAgentJob(job.workspaceId, job.id, this.workerId).catch(() => false)) handedBack++;
+    }
+    this.log.info("handed back running jobs on shutdown", { workerId: this.workerId, handedBack, finished: before - left.length });
+    return { finished: before - left.length, handedBack };
   }
 
   /**
@@ -199,6 +244,7 @@ export class AgentWorker {
       return { jobId: job.id, status: status ?? "lease_lost", error: "no handler" };
     }
     const ac = new AbortController();
+    this.running.set(job.id, { job, ac });
     let beating = false;
     const beat = async () => {
       if (beating || ac.signal.aborted) return;
@@ -237,6 +283,7 @@ export class AgentWorker {
       return { jobId: job.id, status: status ?? "lease_lost", error: message };
     } finally {
       clearInterval(hb);
+      this.running.delete(job.id);
     }
   }
 }

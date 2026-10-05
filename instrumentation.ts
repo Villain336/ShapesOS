@@ -11,6 +11,12 @@
 //                     Phase 8: then the in-app agent worker
 //                     (lib/agents/queue/worker.ts) unless AGENT_WORKER is
 //                     external (a separate `worker` service) or off.
+//                     Deploy PR: first of all, the ONE graceful-shutdown
+//                     path (lib/runtime/shutdown.ts): on SIGTERM open SSE
+//                     streams reconnect elsewhere, readiness answers 503,
+//                     the cron runner and the in-app worker stop, inline
+//                     agent turns hand off to the worker, and the process
+//                     exits by SHUTDOWN_GRACE_MS at the latest.
 //   onRequestError()  errors Next caught itself (render, route, action,
 //                     proxy): one structured log line, plus a Sentry report
 //                     when SENTRY_DSN is set (lib/observability/sentry.ts).
@@ -22,6 +28,8 @@ import type { Instrumentation } from "next";
 
 export async function register(): Promise<void> {
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
+  const shutdown = await import("./lib/runtime/shutdown");
+  if (process.env.NEXT_PHASE !== "phase-production-build") shutdown.installShutdownHandlers();
   const { otelOptions } = await import("./lib/observability/otel");
   const options = otelOptions(process.env);
   if (options) {
@@ -34,18 +42,31 @@ export async function register(): Promise<void> {
   // itself returns immediately (it must finish before requests are served).
   try {
     const { startCronRunnerFromEnv } = await import("./lib/cron/runner");
-    await startCronRunnerFromEnv(process.env);
+    const runner = await startCronRunnerFromEnv(process.env);
+    if (runner) {
+      shutdown.onShutdown("cron-runner", async () => {
+        runner.stop();
+        await runner.drain();
+      });
+    }
   } catch (err) {
     const { log } = await import("./lib/observability/log");
     log.error("in-app cron runner failed to start", { err: err instanceof Error ? err.message : String(err) });
   }
+  let worker: import("./lib/agents/queue/worker").AgentWorker | null = null;
   try {
     const { startAgentWorkerFromEnv } = await import("./lib/agents/queue/worker");
-    await startAgentWorkerFromEnv(process.env);
+    worker = await startAgentWorkerFromEnv(process.env);
   } catch (err) {
     const { log } = await import("./lib/observability/log");
     log.error("in-app agent worker failed to start", { err: err instanceof Error ? err.message : String(err) });
   }
+  // Agent work this process is running: in-app worker jobs are handed back,
+  // inline chat turns hand off to the worker (lib/runtime/agent-drain.ts).
+  shutdown.onShutdown("agent-work", async () => {
+    const { drainAgentWork } = await import("./lib/runtime/agent-drain");
+    await drainAgentWork({ worker });
+  });
 }
 
 export const onRequestError: Instrumentation.onRequestError = async (err, request, context) => {

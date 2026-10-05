@@ -72,7 +72,7 @@ function frames(stream: ReadableStream<Uint8Array>) {
         if (i >= 0) {
           const raw = buf.slice(0, i);
           buf = buf.slice(i + 2);
-          if (raw.startsWith(":")) continue;
+          if (raw.startsWith(":") || raw.startsWith("retry:")) continue;
           return { event: /^event: (.*)$/m.exec(raw)![1]!, data: JSON.parse(/^data: (.*)$/m.exec(raw)![1]!) };
         }
         const { value, done } = await reader.read();

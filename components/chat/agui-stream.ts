@@ -14,8 +14,15 @@ export interface AguiFrame {
   name?: string;
 }
 
-/** Split an SSE byte stream into parsed `data:` frames. */
-export async function* readSseFrames(body: ReadableStream<Uint8Array>): AsyncGenerator<AguiFrame> {
+/** One SSE event block as it arrived (comments and `retry:` lines dropped). */
+export interface SseEventBlock {
+  event: string | null;
+  id: string | null;
+  data: string;
+}
+
+/** Split an SSE byte stream into event blocks (event name, id, joined data). */
+export async function* readSseEvents(body: ReadableStream<Uint8Array>): AsyncGenerator<SseEventBlock> {
   const reader = body.getReader();
   const decoder = new TextDecoder();
   let buf = "";
@@ -28,21 +35,124 @@ export async function* readSseFrames(body: ReadableStream<Uint8Array>): AsyncGen
       while ((sep = /\r?\n\r?\n/.exec(buf))) {
         const raw = buf.slice(0, sep.index);
         buf = buf.slice(sep.index + sep[0].length);
-        const data = raw
-          .split(/\r?\n/)
-          .filter((l) => l.startsWith("data:"))
-          .map((l) => l.slice(5).replace(/^ /, ""))
-          .join("\n");
-        if (!data) continue;
-        try {
-          yield JSON.parse(data) as AguiFrame;
-        } catch {
-          // a malformed frame is skipped
+        let event: string | null = null;
+        let id: string | null = null;
+        const data: string[] = [];
+        for (const line of raw.split(/\r?\n/)) {
+          if (line.startsWith("data:")) data.push(line.slice(5).replace(/^ /, ""));
+          else if (line.startsWith("event:")) event = line.slice(6).trim();
+          else if (line.startsWith("id:")) id = line.slice(3).trim();
         }
+        if (!data.length) continue;
+        yield { event, id, data: data.join("\n") };
       }
     }
   } finally {
     reader.releaseLock();
+  }
+}
+
+/** Split an SSE byte stream into parsed AG-UI `data:` frames (default events only). */
+export async function* readSseFrames(body: ReadableStream<Uint8Array>): AsyncGenerator<AguiFrame> {
+  for await (const block of readSseEvents(body)) {
+    if (block.event && block.event !== "message") continue;
+    try {
+      yield JSON.parse(block.data) as AguiFrame;
+    } catch {
+      // a malformed frame is skipped
+    }
+  }
+}
+
+/** Where a cut chat stream resumes (the server's `reconnect` payload). */
+export interface ChatResumePoint {
+  runId: string;
+  after: number;
+  aguiRunId: string;
+}
+
+/** GET /api/agents/chat/stream for a resume point (Last-Event-ID carries the cursor too). */
+export function chatResumeUrl(p: ChatResumePoint): string {
+  const q = new URLSearchParams({ runId: p.runId, aguiRunId: p.aguiRunId, after: String(p.after) });
+  return `/api/agents/chat/stream?${q.toString()}`;
+}
+
+/**
+ * Deploy PR: the frames of one chat turn, across server restarts. Reads the
+ * POST response; when the server says `event: reconnect` (it is shutting
+ * down; the turn went to the worker) — or the stream is cut before
+ * RUN_FINISHED / RUN_ERROR after the run id is known — it resumes on
+ * GET /api/agents/chat/stream (any replica) from the last event id, with
+ * backoff, at most `maxResumes` times in a row without progress.
+ */
+export async function* streamChatFrames(
+  body: ReadableStream<Uint8Array>,
+  opts: {
+    fetchResume: (url: string, lastEventId: string | null) => Promise<Response>;
+    maxResumes?: number;
+    sleep?: (ms: number) => Promise<void>;
+  },
+): AsyncGenerator<AguiFrame> {
+  const sleep = opts.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
+  const maxResumes = opts.maxResumes ?? 5;
+  let current: ReadableStream<Uint8Array> | null = body;
+  let lastId: string | null = null;
+  let aguiRunId: string | null = null;
+  let resume: ChatResumePoint | null = null;
+  let failures = 0;
+  for (;;) {
+    let finished = false;
+    let progressed = false;
+    resume = null;
+    if (current) {
+      for await (const block of readSseEvents(current)) {
+        if (block.event === "reconnect") {
+          try {
+            const p = JSON.parse(block.data) as Partial<ChatResumePoint>;
+            if (typeof p.runId === "string" && p.runId) {
+              resume = { runId: p.runId, after: typeof p.after === "number" ? p.after : -1, aguiRunId: String(p.aguiRunId ?? aguiRunId ?? "") };
+            }
+          } catch {
+            // fall back to the last id below
+          }
+          break;
+        }
+        if (block.event && block.event !== "message") continue;
+        if (block.id) lastId = block.id;
+        let frame: AguiFrame & { metadata?: { marketr?: { runId?: unknown } } };
+        try {
+          frame = JSON.parse(block.data);
+        } catch {
+          continue;
+        }
+        progressed = true;
+        const meta = frame.metadata?.marketr?.runId;
+        if (!aguiRunId && typeof meta === "string") aguiRunId = meta;
+        if (frame.type === "RUN_FINISHED" || frame.type === "RUN_ERROR") finished = true;
+        yield frame;
+      }
+    }
+    if (finished) return;
+    if (!resume && lastId && aguiRunId) {
+      // Cut without a goodbye (crash, proxy timeout): resume from the last id.
+      const m = /^(.+):(-?\d+)$/.exec(lastId);
+      if (m) resume = { runId: m[1]!, after: Number(m[2]), aguiRunId };
+    }
+    if (resume && !aguiRunId && resume.aguiRunId) aguiRunId = resume.aguiRunId;
+    if (!resume || !resume.aguiRunId) return;
+    if (resume.after >= 0) lastId = `${resume.runId}:${resume.after}`;
+    failures = progressed ? 0 : failures + 1;
+    if (failures >= maxResumes) return;
+    // A deploy's reconnect goes at once; repeated failures back off.
+    if (failures > 0) await sleep(Math.min(8_000, 500 * 2 ** (failures - 1)));
+    let res: Response | null = null;
+    try {
+      res = await opts.fetchResume(chatResumeUrl(resume), lastId);
+    } catch {
+      res = null;
+    }
+    if (res && res.status === 404) return;
+    current = res && res.ok && res.body ? res.body : null;
   }
 }
 

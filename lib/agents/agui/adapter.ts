@@ -51,6 +51,7 @@ import {
 } from "./events";
 import { createAguiLogger } from "./logger";
 import { mergeSharedState, type SharedAgentState } from "./shared-state";
+import { sseResponse, type SseOptions } from "@/lib/http/sse";
 import type { AppliedStateChange } from "./shared-state-db";
 import type { WorkspaceRole } from "@prisma/client";
 import type { AgentTurnInput, AgentTurnOutput, ChatToolCall } from "@/lib/chat/agent";
@@ -110,6 +111,18 @@ export interface AguiAdapterDeps {
   /** Phase 8: tail interval (default 200 ms) and cap on one stream (default 30 min). */
   pollMs?: number;
   maxStreamMs?: number;
+  /**
+   * Deploy PR: told the run cursor (agent run id + timeline seq) before each
+   * run event is mapped — the SSE route stamps it as the event id, so a
+   * client can resume after that event (Last-Event-ID).
+   */
+  onCursor?: (agentRunId: string, seq: number) => void;
+  /**
+   * Deploy PR: true while this server drains. A tailing stream then ends at a
+   * clean boundary with CUSTOM marketr.reconnect { runId, after, aguiRunId }
+   * instead of waiting for the run (which the worker carries on).
+   */
+  shouldReconnect?: () => boolean;
   /** Injectable run-id factory (tests pin it). */
   newRunId?: () => string;
   /** Text chunker for TEXT_MESSAGE_CONTENT deltas. */
@@ -403,71 +416,45 @@ function sleepOrSettle(ms: number, settled: Promise<unknown>): Promise<void> {
 }
 
 /**
- * Phase 8: run the turn tracked and stream it from its run timeline as it
- * happens (see the header). Never throws: a failure is RUN_ERROR.
+ * The run-timeline tail shared by a live turn (POST /api/agents/chat) and a
+ * resumed one (GET /api/agents/chat/stream, deploy PR): maps run events to
+ * AG-UI as they land, remembering the open message and seen tool calls.
+ * Message ids derive from the AG-UI run id + agent run id + model step, so a
+ * resumed stream continues the SAME messages the client already shows.
  */
-async function* streamLiveTurn(
-  request: AguiTurnRequest,
+function createRunTail(
+  request: { workspaceId: string },
   deps: AguiAdapterDeps,
   meta: AguiRunMeta,
   emit: (event: AguiEvent) => Generator<AguiEvent>,
-): AsyncGenerator<AguiEvent> {
-  const runTracked = deps.runTrackedTurn ?? defaultRunTrackedTurn;
+  afterSeq = -1,
+) {
   const listEvents = deps.listRunEvents ?? defaultListRunEvents;
-  const getStatus = deps.getRunStatus ?? defaultGetRunStatus;
-  const latestText = deps.latestAssistantText ?? defaultLatestAssistantText;
-  const pollMs = deps.pollMs ?? 200;
-  const deadline = Date.now() + (deps.maxStreamMs ?? 30 * 60_000);
   const runIdAgui = meta.runId;
-
-  let agentRunId: string | null = null;
-  let output: (AgentTurnOutput & { runId: string }) | null = null;
-  let failure: unknown = null;
-  let settled = false;
-  const turn = runTracked(
-    {
-      projectId: request.projectId,
-      workspaceId: request.workspaceId,
-      userId: request.userId,
-      role: request.role,
-      threadId: request.threadId,
-      userContent: request.userContent,
-      attachmentIds: request.attachmentIds,
-    },
-    { onRunCreated: (id) => (agentRunId = id) },
-  ).then(
-    (o) => {
-      output = o;
-      agentRunId = o.runId;
-    },
-    (e: unknown) => {
-      failure = e;
-    },
-  );
-  void turn.finally(() => (settled = true));
-
-  let lastSeq = -1;
-  let openMsg: string | null = null;
-  let openText = "";
-  const openTools = new Set<string>();
-  const seenTools = new Set<string>();
+  const st = {
+    agentRunId: null as string | null,
+    lastSeq: afterSeq,
+    openMsg: null as string | null,
+    openText: "",
+    seenTools: new Set<string>(),
+  };
 
   const closeMsg = function* (): Generator<AguiEvent> {
-    if (!openMsg) return;
-    yield* emit(stamp({ type: EventType.TEXT_MESSAGE_END, messageId: openMsg }, meta));
-    openMsg = null;
+    if (!st.openMsg) return;
+    yield* emit(stamp({ type: EventType.TEXT_MESSAGE_END, messageId: st.openMsg }, meta));
+    st.openMsg = null;
   };
   const mapEvent = function* (ev: TailedRunEvent): Generator<AguiEvent> {
     const p = (ev.payload ?? {}) as Record<string, unknown>;
     if (ev.type === "text" && p.kind === "text_delta" && typeof p.text === "string") {
-      const id = `${runIdAgui}:msg:${agentRunId}:${String(p.step ?? 0)}`;
-      if (openMsg !== id) {
+      const id = `${runIdAgui}:msg:${st.agentRunId}:${String(p.step ?? 0)}`;
+      if (st.openMsg !== id) {
         yield* closeMsg();
-        openMsg = id;
-        openText = "";
+        st.openMsg = id;
+        st.openText = "";
         yield* emit(stamp({ type: EventType.TEXT_MESSAGE_START, messageId: id, role: "assistant" }, meta));
       }
-      openText += p.text;
+      st.openText += p.text;
       yield* emit(stamp({ type: EventType.TEXT_MESSAGE_CONTENT, messageId: id, delta: p.text } as TextMessageContentEvent, meta));
       return;
     }
@@ -476,14 +463,12 @@ async function* streamLiveTurn(
     if (!toolUseId || !tool) return;
     const toolCallId = `${runIdAgui}:tool:${toolUseId}`;
     const start = function* (args: unknown): Generator<AguiEvent> {
-      if (seenTools.has(toolCallId)) return;
-      seenTools.add(toolCallId);
+      if (st.seenTools.has(toolCallId)) return;
+      st.seenTools.add(toolCallId);
       yield* closeMsg();
-      openTools.add(toolCallId);
       yield* emit(stamp({ type: EventType.TOOL_CALL_START, toolCallId, toolCallName: tool, parentMessageId: `${runIdAgui}:msg:assistant` }, meta));
       yield* emit(stamp({ type: EventType.TOOL_CALL_ARGS, toolCallId, delta: JSON.stringify(args ?? {}) } as ToolCallArgsEvent, meta));
       yield* emit(stamp({ type: EventType.TOOL_CALL_END, toolCallId }, meta));
-      openTools.delete(toolCallId);
     };
     if (p.kind === "tool_start") {
       yield* start(p.args);
@@ -508,27 +493,129 @@ async function* streamLiveTurn(
     }
   };
   const drain = async function* (): AsyncGenerator<AguiEvent> {
-    if (!agentRunId) return;
+    if (!st.agentRunId) return;
     for (;;) {
-      const batch = await listEvents(request.workspaceId, agentRunId, lastSeq).catch(() => [] as TailedRunEvent[]);
+      const batch = await listEvents(request.workspaceId, st.agentRunId, st.lastSeq).catch(() => [] as TailedRunEvent[]);
       for (const ev of batch) {
-        lastSeq = Math.max(lastSeq, ev.seq);
+        st.lastSeq = Math.max(st.lastSeq, ev.seq);
+        // Every AG-UI event derived from run event N carries cursor N.
+        deps.onCursor?.(st.agentRunId, st.lastSeq);
         yield* mapEvent(ev);
       }
       if (batch.length < 500) return;
     }
   };
-
-  // While the request runs the turn: tail the run.
-  while (!settled && Date.now() < deadline) {
+  /** Draining: end at this clean boundary and tell the client where to resume. */
+  const reconnect = function* (): Generator<AguiEvent> {
+    yield* emit(
+      stamp(
+        {
+          type: EventType.CUSTOM,
+          name: MARKETR_CUSTOM_NAMES.reconnect,
+          value: { runId: st.agentRunId, after: st.lastSeq, aguiRunId: runIdAgui },
+        },
+        meta,
+      ),
+    );
+  };
+  /** Reconcile the final (delivered) text with what streamed, then finish. */
+  const finish = function* (finalText: string, threadId: string): Generator<AguiEvent> {
+    const final = finalText.trim();
+    if (final) {
+      if (st.openMsg && final.startsWith(st.openText.trim()) && st.openText.trim()) {
+        const rest = finalText.slice(finalText.indexOf(st.openText.trim()) + st.openText.trim().length);
+        if (rest) yield* emit(stamp({ type: EventType.TEXT_MESSAGE_CONTENT, messageId: st.openMsg, delta: rest } as TextMessageContentEvent, meta));
+        yield* closeMsg();
+      } else if (!st.openMsg || final !== st.openText.trim()) {
+        yield* closeMsg();
+        const messageId = `${runIdAgui}:msg:assistant`;
+        yield* emit(stamp({ type: EventType.TEXT_MESSAGE_START, messageId, role: "assistant" }, meta));
+        for (const delta of (deps.chunkText ?? chunkTextFixed)(finalText)) {
+          yield* emit(stamp({ type: EventType.TEXT_MESSAGE_CONTENT, messageId, delta } as TextMessageContentEvent, meta));
+        }
+        yield* emit(stamp({ type: EventType.TEXT_MESSAGE_END, messageId }, meta));
+      } else {
+        yield* closeMsg();
+      }
+    } else {
+      yield* closeMsg();
+    }
+    yield* emit(stamp({ type: EventType.RUN_FINISHED, threadId, runId: runIdAgui, outcome: { type: "success" } }, meta));
+  };
+  /**
+   * Tail a run the worker carries until it ends (or waits for the user), or
+   * until this server drains. Returns "stopped" when it ended for the drain.
+   */
+  const tailUntilEnd = async function* (deadline: number): AsyncGenerator<AguiEvent, "ended" | "stopped"> {
+    const getStatus = deps.getRunStatus ?? defaultGetRunStatus;
+    const pollMs = deps.pollMs ?? 200;
+    for (;;) {
+      yield* drain();
+      if (deps.shouldReconnect?.()) return "stopped";
+      const status = st.agentRunId ? await getStatus(request.workspaceId, st.agentRunId).catch(() => null) : null;
+      if (!status || TAIL_ENDS.has(status) || Date.now() >= deadline) break;
+      await new Promise((r) => setTimeout(r, Math.max(pollMs, 500)));
+    }
     yield* drain();
+    return "ended";
+  };
+  return { st, closeMsg, drain, reconnect, finish, tailUntilEnd };
+}
+
+/**
+ * Phase 8: run the turn tracked and stream it from its run timeline as it
+ * happens (see the header). Never throws: a failure is RUN_ERROR.
+ */
+async function* streamLiveTurn(
+  request: AguiTurnRequest,
+  deps: AguiAdapterDeps,
+  meta: AguiRunMeta,
+  emit: (event: AguiEvent) => Generator<AguiEvent>,
+): AsyncGenerator<AguiEvent> {
+  const runTracked = deps.runTrackedTurn ?? defaultRunTrackedTurn;
+  const latestText = deps.latestAssistantText ?? defaultLatestAssistantText;
+  const pollMs = deps.pollMs ?? 200;
+  const deadline = Date.now() + (deps.maxStreamMs ?? 30 * 60_000);
+  const runIdAgui = meta.runId;
+  const tail = createRunTail(request, deps, meta, emit);
+
+  let output: (AgentTurnOutput & { runId: string }) | null = null;
+  let failure: unknown = null;
+  let settled = false;
+  const turn = runTracked(
+    {
+      projectId: request.projectId,
+      workspaceId: request.workspaceId,
+      userId: request.userId,
+      role: request.role,
+      threadId: request.threadId,
+      userContent: request.userContent,
+      attachmentIds: request.attachmentIds,
+    },
+    { onRunCreated: (id) => (tail.st.agentRunId = id) },
+  ).then(
+    (o) => {
+      output = o;
+      tail.st.agentRunId = o.runId;
+    },
+    (e: unknown) => {
+      failure = e;
+    },
+  );
+  void turn.finally(() => (settled = true));
+
+  // While the request runs the turn: tail the run. (When the server drains,
+  // an inline turn hands off to the worker at its next step boundary — see
+  // lib/agents/loop.ts — so it settles as `queued` and we reconnect below.)
+  while (!settled && Date.now() < deadline) {
+    yield* tail.drain();
     await sleepOrSettle(pollMs, turn);
   }
   await turn;
-  yield* drain();
+  yield* tail.drain();
 
   if (failure) {
-    yield* closeMsg();
+    yield* tail.closeMsg();
     yield* emit(
       stamp(
         {
@@ -544,41 +631,53 @@ async function* streamLiveTurn(
   }
 
   let finalText = (output as (AgentTurnOutput & { runId: string }) | null)?.assistantText ?? "";
-  if ((output as AgentTurnOutput | null)?.queued && agentRunId) {
+  if ((output as AgentTurnOutput | null)?.queued && tail.st.agentRunId) {
     // Handed to the worker: keep tailing until the run ends.
-    yield* emit(stamp({ type: EventType.CUSTOM, name: MARKETR_CUSTOM_NAMES.queued, value: { runId: agentRunId } }, meta));
-    for (;;) {
-      yield* drain();
-      const status = await getStatus(request.workspaceId, agentRunId).catch(() => null);
-      if (!status || TAIL_ENDS.has(status) || Date.now() >= deadline) break;
-      await new Promise((r) => setTimeout(r, Math.max(pollMs, 500)));
+    yield* emit(stamp({ type: EventType.CUSTOM, name: MARKETR_CUSTOM_NAMES.queued, value: { runId: tail.st.agentRunId } }, meta));
+    if ((yield* tail.tailUntilEnd(deadline)) === "stopped") {
+      yield* tail.reconnect();
+      return;
     }
-    yield* drain();
     finalText = (await latestText(request.threadId).catch(() => null)) ?? "";
   }
+  yield* tail.finish(finalText, request.threadId);
+}
 
-  // Reconcile the final (delivered) text with what streamed.
-  const final = finalText.trim();
-  if (final) {
-    if (openMsg && final.startsWith(openText.trim()) && openText.trim()) {
-      const rest = finalText.slice(finalText.indexOf(openText.trim()) + openText.trim().length);
-      if (rest) yield* emit(stamp({ type: EventType.TEXT_MESSAGE_CONTENT, messageId: openMsg, delta: rest } as TextMessageContentEvent, meta));
-      yield* closeMsg();
-    } else if (!openMsg || final !== openText.trim()) {
-      yield* closeMsg();
-      const messageId = `${runIdAgui}:msg:assistant`;
-      yield* emit(stamp({ type: EventType.TEXT_MESSAGE_START, messageId, role: "assistant" }, meta));
-      for (const delta of (deps.chunkText ?? chunkTextFixed)(finalText)) {
-        yield* emit(stamp({ type: EventType.TEXT_MESSAGE_CONTENT, messageId, delta } as TextMessageContentEvent, meta));
-      }
-      yield* emit(stamp({ type: EventType.TEXT_MESSAGE_END, messageId }, meta));
-    } else {
-      yield* closeMsg();
-    }
-  } else {
-    yield* closeMsg();
+/** What a resumed chat stream needs (GET /api/agents/chat/stream). */
+export interface AguiResumeRequest {
+  workspaceId: string;
+  threadId: string;
+  /** The agent run behind the turn (the reconnect event's runId). */
+  agentRunId: string;
+  /** The original AG-UI run id, so message ids continue unchanged. */
+  aguiRunId: string;
+  /** Resume after this run-timeline seq (-1 = from the start). */
+  afterSeq: number;
+}
+
+/**
+ * Deploy PR: continue a chat turn's stream after a reconnect (this or
+ * another replica): tail the run from `afterSeq` until it ends, then the
+ * final text and RUN_FINISHED — the same tail as the live stream. Ends with
+ * marketr.reconnect again if this server starts draining meanwhile.
+ */
+export async function* resumeChatTurnAgui(request: AguiResumeRequest, deps: AguiAdapterDeps = {}): AsyncGenerator<AguiEvent> {
+  const meta: AguiRunMeta = { runId: request.aguiRunId, threadId: request.threadId, workspaceId: request.workspaceId };
+  const log = createAguiLogger(meta, deps.logSink);
+  const emit = function* (event: AguiEvent): Generator<AguiEvent> {
+    log(event);
+    yield event;
+  };
+  const latestText = deps.latestAssistantText ?? defaultLatestAssistantText;
+  const tail = createRunTail(request, deps, meta, emit, request.afterSeq);
+  tail.st.agentRunId = request.agentRunId;
+  const deadline = Date.now() + (deps.maxStreamMs ?? 30 * 60_000);
+  if ((yield* tail.tailUntilEnd(deadline)) === "stopped") {
+    yield* tail.reconnect();
+    return;
   }
-  yield* emit(stamp({ type: EventType.RUN_FINISHED, threadId: request.threadId, runId: runIdAgui, outcome: { type: "success" } }, meta));
+  const finalText = (await latestText(request.threadId).catch(() => null)) ?? "";
+  yield* tail.finish(finalText, request.threadId);
 }
 
 /**
@@ -625,28 +724,51 @@ export function newAguiRunMeta(init: {
   return { runId: init.runId ?? randomUUID(), threadId: init.threadId, workspaceId: init.workspaceId };
 }
 
+/** Deploy PR: what the SSE layer hands the adapter (cursor + drain state). */
+export interface AguiStreamHooks {
+  onCursor: (agentRunId: string, seq: number) => void;
+  shouldReconnect: () => boolean;
+}
+
 /**
- * Serialize an AG-UI event generator as a text/event-stream Response.
- * One `data: <json>` frame per event; stream ends when the generator ends.
+ * Serialize an AG-UI event generator as a text/event-stream Response
+ * (lib/http/sse.ts: heartbeats, ids, drain). One `data: <json>` frame per
+ * event; the stream ends when the generator ends.
+ *
+ * Deploy PR: pass a factory to get the hooks — every frame then carries
+ * `id: <agentRunId>:<seq>` (the run-timeline cursor), and when the server
+ * drains the adapter stops at a clean boundary and the frame
+ * `event: reconnect` + data { runId, after, aguiRunId } tells the client to
+ * resume on GET /api/agents/chat/stream. The drain is cooperative: a turn
+ * still running inline gets its hand-off window first, and the helper
+ * forces the reconnect at its deadline.
  */
-export function aguiStreamResponse(events: AsyncGenerator<AguiEvent>): Response {
-  const encoder = new TextEncoder();
-  const stream = new ReadableStream<Uint8Array>({
-    async start(controller) {
-      try {
-        for await (const event of events) {
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
+export function aguiStreamResponse(
+  source: AsyncGenerator<AguiEvent> | ((hooks: AguiStreamHooks) => AsyncGenerator<AguiEvent>),
+  opts: { lastEventId?: string | null; sse?: SseOptions } = {},
+): Response {
+  let cursor: { runId: string; seq: number } | null = null;
+  let aguiRunId: string | null = null;
+  const resumePoint = () => ({ runId: cursor?.runId ?? null, after: cursor?.seq ?? -1, aguiRunId });
+  return sseResponse(
+    async (ch) => {
+      const hooks: AguiStreamHooks = {
+        onCursor: (runId, seq) => (cursor = { runId, seq }),
+        shouldReconnect: () => ch.draining,
+      };
+      const events = typeof source === "function" ? source(hooks) : source;
+      // for-await's break hands the generator back (its finally blocks run).
+      for await (const event of events) {
+        if (ch.closed) break;
+        const meta = (event.metadata as { marketr?: { runId?: unknown } } | undefined)?.marketr;
+        if (!aguiRunId && typeof meta?.runId === "string") aguiRunId = meta.runId;
+        if (event.type === EventType.CUSTOM && (event as { name?: unknown }).name === MARKETR_CUSTOM_NAMES.reconnect) {
+          ch.reconnect((event as { value?: unknown }).value ?? resumePoint());
+          break;
         }
-      } finally {
-        controller.close();
+        ch.send(null, event, { id: cursor ? `${cursor.runId}:${cursor.seq}` : null });
       }
     },
-  });
-  return new Response(stream, {
-    headers: {
-      "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache",
-      Connection: "keep-alive",
-    },
-  });
+    { drain: "cooperative", lastEventId: opts.lastEventId ?? null, reconnectData: resumePoint, ...(opts.sse ?? {}) },
+  );
 }

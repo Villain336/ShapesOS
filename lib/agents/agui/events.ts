@@ -179,4 +179,9 @@ export const MARKETR_CUSTOM_NAMES = {
   toolProposal: "marketr.toolProposal",
   /** Phase 8: the turn was handed to the agent worker; the stream keeps tailing it. */
   queued: "marketr.queued",
+  /**
+   * Deploy PR: this server is shutting down; resume the turn on another
+   * replica (GET /api/agents/chat/stream) from { runId, after, aguiRunId }.
+   */
+  reconnect: "marketr.reconnect",
 } as const;

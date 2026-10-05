@@ -113,6 +113,16 @@ export function useTwinLive(initial: TwinSnapshot, opts: { enabled?: boolean } =
           void resync();
         }
       });
+      // Deploy PR: the server is shutting down (lib/http/sse.ts drain) —
+      // reconnect right away; the load balancer picks a live replica and the
+      // new stream starts with a fresh snapshot.
+      es.addEventListener("reconnect", () => {
+        es?.close();
+        es = null;
+        setStatus("reconnecting");
+        if (retryTimer) clearTimeout(retryTimer);
+        retryTimer = setTimeout(connect, 100 + Math.round(Math.random() * 400));
+      });
       es.addEventListener("end", (ev) => {
         es?.close();
         let reason = "";

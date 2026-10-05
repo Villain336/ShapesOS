@@ -4,7 +4,10 @@
 //              an orchestrator only restarts the app when it is truly wedged.
 //   readiness  GET /api/health: the database answers within a short timeout
 //              and every migration shipped with this build is applied (and
-//              none failed). 200 when ready, 503 otherwise.
+//              none failed). 200 when ready, 503 otherwise. Deploy PR: also
+//              503 (draining: true) once the process got SIGTERM, so the load
+//              balancer stops routing here while it drains
+//              (lib/runtime/shutdown.ts).
 //
 // Public and unauthenticated by design, so the body says nothing an outsider
 // could use: status words, counts and a latency. No hostnames, error text,
@@ -15,6 +18,7 @@ import { readdirSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { prisma } from "@/lib/prisma";
 import pkg from "../../package.json";
+import { isDraining } from "@/lib/runtime/shutdown";
 
 export type CheckStatus = "ok" | "fail" | "unknown";
 
@@ -33,6 +37,8 @@ export interface MigrationsCheck {
 
 export interface HealthReport {
   status: "ok" | "unavailable";
+  /** Present (true) while this instance is shutting down. */
+  draining?: true;
   checks: { database: DatabaseCheck; migrations: MigrationsCheck };
   version: string;
   commit: string | null;
@@ -140,8 +146,10 @@ export async function readiness(): Promise<HealthReport> {
   const migrations: MigrationsCheck =
     database.status === "ok" ? await checkMigrations() : { status: "unknown", pending: null, failed: null };
   const checks = { database, migrations };
+  const draining = isDraining();
   return {
-    status: overallStatus(checks),
+    status: draining ? "unavailable" : overallStatus(checks),
+    ...(draining ? { draining: true as const } : {}),
     checks,
     version: String((pkg as { version?: string }).version ?? "0.0.0"),
     commit: buildCommit(),
