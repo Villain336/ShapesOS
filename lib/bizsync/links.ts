@@ -23,8 +23,10 @@ import { withWorkspaceScope } from "@/lib/substrate/memory/rls";
 import { decideSync, type SyncDecision } from "@/lib/connectors/sync-conflict";
 import { scrubMessage } from "@/lib/connectors/m21/live/http";
 
-export type BizProvider = "shopify" | "quickbooks" | "xero";
-export const BIZ_PROVIDERS: readonly BizProvider[] = ["shopify", "quickbooks", "xero"];
+// Phase 14 (connectors): + gusto (employee ↔ team member links, objectType
+// "employee"; a person confirms each one — meta.confirmed).
+export type BizProvider = "shopify" | "quickbooks" | "xero" | "gusto";
+export const BIZ_PROVIDERS: readonly BizProvider[] = ["shopify", "quickbooks", "xero", "gusto"];
 
 type Tx = Prisma.TransactionClient;
 

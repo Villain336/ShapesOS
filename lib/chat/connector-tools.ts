@@ -9,8 +9,9 @@
 //   4. Declared-tool gating against load_skill-loaded skills
 //   5. Role gate (mutating → editor+, reads → viewer+)
 //   6. Confirmation gate (mutating tools behave like kind "publish"); a
-//      per-agent auto-approve rule may let Tier 0/1 writes (your own
-//      channels) run without asking — Tier 2/3 always ask (Phase 5)
+//      per-agent auto-approve rule may let Tier 0–2 writes run without
+//      asking (Phase 14; e.g. the write_slack switch) — Tier 3 and
+//      destructive (MCP destructiveHint) writes always ask
 //   7. invoke() with the server-side decrypted credential (never in args);
 //      live adapters get a vault-backed refresher for 401s (Phase 4b) and a
 //      successful live call is recorded as connector-health evidence.
@@ -38,7 +39,7 @@ import type { ConnectorChatTool } from "@/lib/agents/loop-tools";
 export interface ConnectorToolOutcome {
   status: "executed" | "pending_confirmation" | "error" | "skipped_role" | "denied";
   resultSummary: string;
-  /** Phase 5: the action a per-agent auto-approve rule could cover (Tier 0/1). */
+  /** Phase 5: the action a per-agent auto-approve rule could cover (Phase 14: Tier 0–2). */
   autoAction?: string;
 }
 
@@ -208,6 +209,27 @@ async function deny(
 }
 
 /**
+ * Phase 14 (approvals): the enabled Slack installation of this workspace
+ * whose project is this one (or unset), as a binding-shaped row — null when
+ * there is none or its connection is not active.
+ */
+async function slackInstallBinding(ctx: ToolContext) {
+  const { withWorkspaceScope } = await import("@/lib/substrate/memory/rls");
+  const install = await withWorkspaceScope(ctx.workspaceId, (tx) =>
+    tx.slackInstallation.findFirst({
+      where: { workspaceId: ctx.workspaceId, enabled: true, OR: [{ projectId: ctx.projectId }, { projectId: null }] },
+      select: { connectionId: true },
+    }),
+  ).catch(() => null);
+  if (!install) return null;
+  const connection = await prisma.connectorConnection.findFirst({
+    where: { id: install.connectionId, workspaceId: ctx.workspaceId, connectorKey: "slack", status: "active" },
+    include: { connector: true },
+  });
+  return connection ? { projectConfig: null, connection } : null;
+}
+
+/**
  * Resolve and execute `connector.<key>.<toolName>`. Returns a ChatToolCall
  * status + summary; every denial is explained and audited.
  */
@@ -261,10 +283,15 @@ export async function resolveConnectorTool(
   }
 
   // 2. Project data-source binding with an active connection.
-  const binding = await prisma.projectDataSource.findFirst({
+  const bound = await prisma.projectDataSource.findFirst({
     where: { projectId: ctx.projectId, connectorKey: key },
     include: { connection: { include: { connector: true } } },
   });
+  // Phase 14 (approvals): the Slack app installed for this project (its
+  // mentions become this project's chat threads) counts as the project's
+  // Slack binding, so a held Slack reply posts through this same gate.
+  const binding =
+    bound?.connection?.status === "active" || key !== "slack" ? bound : ((await slackInstallBinding(ctx)) ?? bound);
   const connection = binding?.connection;
   if (!binding || !connection || connection.status !== "active") {
     return deny(
@@ -368,22 +395,24 @@ export async function resolveConnectorTool(
   }
 
   // 6. Confirmation gate: mutating tools behave like kind "publish" — unless
-  //    a per-agent auto-approve rule covers this write (Tier 0/1 only).
+  //    a per-agent auto-approve rule covers this write (Phase 14: Tier 0–2).
   let autoReason: string | null = null;
   // Phase 11 (conncore): a custom MCP tool's action (tier) comes from its
-  // tool policy; unmapped → connector_write (Tier 2, always asks).
+  // tool policy; unmapped → mcp_write (Phase 14: Tier 2, asks unless a rule says auto).
   const action = builtin ? connectorAction(key, tool) : mcpToolAction(connectorConfig, tool);
   if (toolDef.mutating && !ctx.confirmed) {
     const decision = await autoApprovalFor(ctx.workspaceId, {
       agentKey: ctx.agentKey ?? "lead",
       action,
       description: `${toolDef.name}: ${toolDef.description}`,
+      destructive: toolDef.destructive === true,
     }).catch(() => null);
     if (!decision?.auto) {
       return {
         status: "pending_confirmation",
         resultSummary: `Proposed ${toolName} (mutating) — awaiting confirmation`,
-        ...(decision && decision.tier <= 1 ? { autoAction: action } : {}),
+        // Phase 14: offered on every Tier 0–2 write (never Tier 3 / destructive).
+        ...(decision?.offerAuto ? { autoAction: action } : {}),
       };
     }
     autoReason = decision.reason;

@@ -190,6 +190,7 @@ export function connectorGroup(connectorKey: string): ToolGroup {
     case "shopify": // Phase 11 (bizsync): commerce + accounting sync is business operations
     case "quickbooks":
     case "xero":
+    case "gusto": // Phase 14 (connectors): payroll is business operations
       return "ops";
     // Phase 11 (devtools): issue trackers are project operations ("code" is
     // the sandbox runner and is unavailable without one).
@@ -213,9 +214,19 @@ export function connectorGroup(connectorKey: string): ToolGroup {
 }
 
 /**
+ * Phase 14 (approvals): connectors whose writes move money or the books
+ * (accounting, payroll). A write on one of them without its own mapping
+ * below falls to "money_connector_write" — a Tier-3 kind that can never be
+ * auto-approved — instead of the per-connector write_<key> switch.
+ */
+export const MONEY_CONNECTOR_KEYS: ReadonlySet<string> = new Set(["quickbooks", "xero", "gusto"]);
+
+/**
  * The automation action a mutating connector tool stands for, so the same
  * per-agent rules (lib/automation/policy.ts) decide whether it may run
- * without asking. Unknown writes map to a Tier-2 kind: they always ask.
+ * without asking. Phase 14: an unmapped write is "write_<key>" (one switch
+ * per connector, e.g. write_slack — Tier 2: asks unless a rule says auto);
+ * on a money connector it is "money_connector_write" (Tier 3, always asks).
  */
 export function connectorAction(connectorKey: string, tool: string): string {
   const key = `${connectorKey}.${tool}`;
@@ -248,10 +259,11 @@ export function connectorAction(connectorKey: string, tool: string): string {
     case "jira.transition_issue":
     case "jira.add_comment":
       return "write_project_record";
-    // Phase 11 (devtools): Airtable record writes — Tier 2, always asks.
+    // Phase 11 (devtools): Airtable record writes — Tier 2 (Phase 14: the
+    // per-connector write_airtable switch).
     case "airtable.create_records":
     case "airtable.update_records":
-      return "connector_write";
+      return "write_airtable";
     // Phase 11 (devtools): deploying your own site, like webflow.publish_site.
     case "netlify.trigger_deploy":
       return "publish_owned";
@@ -269,9 +281,23 @@ export function connectorAction(connectorKey: string, tool: string): string {
     case "quickbooks.post_to_quickbooks":
     case "xero.post_to_xero":
       return "post_to_accounting";
+    // Phase 14 (connectors): Gusto. Sending a pay run is money — Tier 3
+    // (send_payroll_to_provider is in TIER3_EXACT_KINDS: never automated,
+    // always asks). Saving suggested employee matches is a Tier-2 write.
+    case "gusto.send_payroll":
+      return "send_payroll_to_provider";
+    case "gusto.sync_employees":
+      return "write_gusto";
     default:
-      return "connector_write";
+      return defaultConnectorWriteAction(connectorKey);
   }
+}
+
+/** Phase 14: "google-calendar" → "write_google_calendar"; money connectors → money_connector_write. */
+export function defaultConnectorWriteAction(connectorKey: string): string {
+  if (MONEY_CONNECTOR_KEYS.has(connectorKey)) return "money_connector_write";
+  const slug = connectorKey.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 100);
+  return slug ? `write_${slug}` : "connector_write";
 }
 
 /** The composer's tool chips and the group each one grants. */

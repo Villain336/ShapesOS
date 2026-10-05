@@ -249,6 +249,30 @@ ok("member management = admin+", has("app/api/workspace/members/route.ts", /requ
 ok("deploy writes = editor+", has("app/api/websites/[id]/deploy/route.ts", /"editor"/));
 ok("audit writes = editor+", has("app/api/websites/[id]/audit/route.ts", /requireProjectRole\(user\.id, site\.projectId, "editor"\)/));
 ok("issue approval = editor+", has("app/api/websites/[id]/issues/approve-all/route.ts", /"editor"/));
+// Phase 13 (twincore): the digital twin's routes; the sample seeder is
+// admin+; twin CRUD rides the generic /api/ops/[entity] guard.
+// Phase 14 (approvals): state + live are viewer+ for PUBLISHED sites only —
+// drafts stay editor+ (the snapshot path refuses a draft to a non-editor, and
+// the stream re-checks role AND status every loop); the generic route reads
+// twin sites / objects / dock bookings at editor+ (no draft leak to viewers).
+ok("twin state = viewer+, drafts editor+",
+  has("app/api/twin/sites/[id]/state/route.ts", /requireWorkspaceRole\(user\.id, workspace\.id, "viewer"\)/) &&
+  has("app/api/twin/sites/[id]/state/route.ts", /const canEdit = Boolean\(await requireWorkspaceRole\(user\.id, workspace\.id, "editor"\)\)/) &&
+  has("app/api/twin/sites/[id]/state/route.ts", /siteSnapshotFor\(workspace\.id, id, canEdit\)/) &&
+  has("lib/twin/state.ts", /return canEdit \|\| status === "published";/) &&
+  has("lib/twin/state.ts", /if \(!canViewSite\(snap\.site\.status, canEdit\)\) throw new TwinNotFoundError\(siteId\);/));
+ok("twin live stream = viewer+ (published only), role + status re-checked every loop",
+  has("app/api/twin/sites/[id]/live/route.ts", /requireWorkspaceRole\(user\.id, workspace\.id, "viewer"\)\)\) \{/) &&
+  has("app/api/twin/sites/[id]/live/route.ts", /siteSnapshotFor\(workspace\.id, id, await isEditor\(\)\)/) &&
+  has("app/api/twin/sites/[id]/live/route.ts", /isMember: async \(\) => Boolean\(await requireWorkspaceRole\(user\.id, workspace\.id, "viewer"\)\)/) &&
+  has("lib/twin/state.ts", /if \(!\(await input\.isMember\(\)\)\) return false;/) &&
+  has("lib/twin/state.ts", /return canViewSite\(\(await siteStatus\(workspaceId, siteId\)\) \?\? "gone", false\);/) &&
+  has("lib/twin/live.ts", /await opts\.stillAllowed\(\)/));
+ok("twin entities on the generic ops route = editor+ reads (no draft leak)",
+  (readFileSync(join(ROOT, "lib/ops/twin/entities.ts"), "utf8").match(/readRole: "editor",/g) ?? []).length === 3 &&
+  has("app/api/ops/[entity]/route.ts", /op === "read" \? def\?\.readRole \?\? "viewer"/));
+ok("twin object delete = editor+", has("app/api/twin/objects/[id]/route.ts", /requireWorkspaceRole\(user\.id, workspace\.id, "editor"\)/));
+ok("twin sample site = admin+", has("app/api/twin/sites/sample/route.ts", /requireWorkspaceRole\(user\.id, workspace\.id, "admin"\)/));
 // Phase 8: sandbox checkpoint restore + previews (lib/sandbox).
 ok("agent-run restore = editor+ or the run's starter", has("app/api/agent-runs/[runId]/restore/route.ts", /!isStarter && !\(await requireWorkspaceRole\(user\.id, workspace\.id, "editor"\)\)/));
 ok("agent-run stop = editor+ or the run's starter", has("app/api/agent-runs/[runId]/cancel/route.ts", /!isStarter && !\(await requireWorkspaceRole\(user\.id, workspace\.id, "editor"\)\)/));

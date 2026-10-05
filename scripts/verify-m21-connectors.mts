@@ -3,7 +3,7 @@
 // Run: npx tsx scripts/verify-m21-connectors.mts
 // Run 3x green before calling this done.
 //
-// Part 1 (no DB, no network): all 26 native adapters resolve; listTools()
+// Part 1 (no DB, no network): all 27 native adapters resolve; listTools()
 // non-empty with unique names and honest mutating flags; mock invoke on 3+
 // adapters returns mock:true; secrets() encrypt→decrypt round-trip; OAuth
 // state sign/verify + tamper rejection + expiry rejection.
@@ -57,7 +57,7 @@ async function main() {
 
   const metas = listBuiltinConnectors();
   // 11 original + Gmail/Calendar (Connector Agent slice 2) + Google Business Profile (Phase 4b).
-  check("26 built-in connectors registered", metas.length === 26); // Phase 11: +5 devtools, +3 bizsync
+  check("27 built-in connectors registered", metas.length === 27); // Phase 11: +5 devtools, +3 bizsync; Phase 14: +gusto
   const expectedKeys = [
     "google-search-console", "ga4", "wordpress", "webflow", "google-drive",
     "notion", "buffer", "resend", "dataforseo", "meta-ads", "google-ads",

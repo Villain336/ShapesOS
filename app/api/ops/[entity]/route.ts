@@ -131,7 +131,8 @@ export async function POST(
     }
     // A reused invoice idempotency key returns the original row (200).
     return Response.json(
-      { entity: def.slug, row: result.row },
+      // Phase 14: autoApproved names the rule that approved an automatable gate.
+      { entity: def.slug, row: result.row, ...(result.autoApproved ? { autoApproved: result.autoApproved } : {}) },
       { status: result.action === "idempotent_replay" ? 200 : 201 },
     );
   } catch (err) {
@@ -174,7 +175,13 @@ export async function PATCH(
     // Phase 10 (finance): an approved send emails the document with its PDF
     // AFTER the send committed (best-effort; the outcome is recorded on it).
     const delivery = await deliverAfterSend(gate, def.slug, row, body);
-    return Response.json({ entity: def.slug, row: result.row, ...(delivery ? { delivery } : {}) });
+    return Response.json({
+      entity: def.slug,
+      row: result.row,
+      ...(delivery ? { delivery } : {}),
+      // Phase 14: autoApproved names the rule that approved an automatable gate.
+      ...(result.autoApproved ? { autoApproved: result.autoApproved } : {}),
+    });
   } catch (err) {
     return opsError(err);
   }

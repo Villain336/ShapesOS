@@ -42,6 +42,8 @@ import { FINANCE_OPS_TOOLS } from "./ops-finance-tools";
 import { STORE_OPS_TOOLS } from "./ops-store-tools";
 // Phase 12 (mfgpos): manufacturing + point-of-sale tools (lib/chat/ops-mfgpos-tools.ts).
 import { MFGPOS_OPS_TOOLS } from "./ops-mfgpos-tools";
+// Phase 13 (twincore): digital twin tools.
+import { TWIN_OPS_TOOLS } from "./ops-twin-tools";
 // Phase 12 (people): payroll + events tools (lib/chat/ops-people-tools.ts).
 import { PEOPLE_OPS_TOOLS } from "./ops-people-tools";
 
@@ -68,7 +70,8 @@ export function gatePort(): OpsGatePort {
 // ---------------------------------------------------------------------------
 
 function actorOf(ctx: ToolContext): OpsActor {
-  return { userId: ctx.userId, workspaceId: ctx.workspaceId };
+  // Phase 14: the acting agent, so its own automation rule decides automatable ops gates.
+  return { userId: ctx.userId, workspaceId: ctx.workspaceId, ...(ctx.agentKey ? { agentKey: ctx.agentKey } : {}) };
 }
 
 function num(v: unknown, fallback: number, max: number): number {
@@ -138,6 +141,11 @@ function draftWriteResult(label: string, r: OpsWriteResult): ToolResult {
  * fail-open bug and the tool throws instead of reporting success.
  */
 export function moneyWriteResult(r: OpsWriteResult): ToolResult {
+  // Phase 14: an automatable (no-money) gate a rule approved ran under that
+  // approval — report it, naming the rule. Money gates never get here.
+  if (r.outcome === "done" && r.action === "gate_executed" && r.autoApproved) {
+    return { summary: `Done — ${r.autoApproved}.`, details: { row: r.row, autoApproved: r.autoApproved } };
+  }
   if (r.outcome !== "approval_required") {
     throw new Error(
       "marketr: money-moving write executed without a Phase 14 approval — refusing to report success",
@@ -1026,4 +1034,6 @@ export const OPS_TOOLS: ToolDef[] = [
   ...MFGPOS_OPS_TOOLS,
   // Phase 12 (people)
   ...PEOPLE_OPS_TOOLS,
+  // Phase 13 (twincore)
+  ...TWIN_OPS_TOOLS,
 ];

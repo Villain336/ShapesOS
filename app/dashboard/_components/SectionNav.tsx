@@ -44,6 +44,8 @@ import {
   // Phase 12 (people)
   Banknote,
   CalendarDays,
+  // Phase 13 (twin)
+  Map as MapIcon,
   type LucideIcon,
 } from "lucide-react";
 
@@ -84,6 +86,8 @@ const ICONS: Record<string, LucideIcon> = {
   // Phase 12 (people)
   payroll: Banknote,
   events: CalendarDays,
+  // Phase 13 (twin)
+  twin: MapIcon,
 };
 
 export interface SectionNavItem {

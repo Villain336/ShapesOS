@@ -1,8 +1,19 @@
-// Marketr — API-key connector connect (milestone 21).
-// POST /api/connectors/[key]/api-key { workspaceId, apiKey, label? }
-//   → { connection: { id, status } }
-// Stores the key encrypted via the vault (never returned). Admin+ or
-// connectors.connect grant. Audited (connector_connected).
+// Marketr — typed-in credential connect (milestone 21; Phase 14 field schemas).
+// POST /api/connectors/[key]/api-key
+//   { workspaceId, mode?, fields: { <name>: value, … }, label? }
+//   (legacy { workspaceId, apiKey, label? } still works when the mode has an
+//   apiKey field)
+//   → 201 { connection: { id, status }, warnings? }
+// Phase 14 (connectors): each connector declares its credential fields in the
+// registry (lib/connectors/m21/credential-fields.ts): WordPress site URL +
+// username + application password, DataForSEO login + password, Shopify
+// store domain + client ID/secret (or an existing custom app's token), and
+// single-key connectors unchanged. The route refuses connectors that don't
+// take typed-in credentials (OAuth-only, no-auth), validates the fields, and
+// stores EXACTLY the declared fields, encrypted via the vault (never
+// returned). Shopify is validated against the store first (token request +
+// one GraphQL call) and wired to the per-connection webhook secret.
+// Admin+ or connectors.connect grant. Audited (connector_connected).
 // Phase 11 (devtools): POST /api/connectors/netlify/api-key
 //   { hostingConnectionId, workspaceId?, label? } connects the Netlify
 //   connector to an existing Netlify hosting connection instead of a new
@@ -16,8 +27,11 @@ import { workspaceIdFrom, badRequest } from "@/lib/route-utils";
 import { auditEvent } from "@/lib/auditlog";
 import { readJsonBody } from "@/lib/sitefiles/api";
 import { validateBody, z } from "@/lib/api/validate";
-import { storeApiKey, storeCredentialPayload } from "@/lib/vault/apikey";
+import { storeCredentialPayload } from "@/lib/vault/apikey";
 import { prisma } from "@/lib/prisma";
+import { getBuiltinMeta, isBuiltinKey } from "@/lib/connectors/m21/registry";
+import { parseCredentialFields } from "@/lib/connectors/m21/credential-fields";
+import { ConnectorApiError } from "@/lib/connectors/m21/live/http";
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +41,9 @@ const BodySchema = z.object({
   // may be significant. Length-capped to bound vault input.
   apiKey: z.string().min(1, "apiKey is required").max(8000, "apiKey is too long").optional(),
   label: z.string().trim().max(120).optional(),
+  // Phase 14: the connector's credential mode + its declared fields.
+  mode: z.string().trim().max(60).optional(),
+  fields: z.record(z.string(), z.string().max(8000, "a field is too long")).optional(),
   // Phase 11 (devtools): Netlify only — reuse a hosting connection's token.
   hostingConnectionId: z.string().trim().min(1).max(120).optional(),
 });
@@ -69,20 +86,45 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ key
   if (!(await requirePermission(user.id, workspaceId, "connectors.connect"))) {
     return forbidden("connectors.connect permission required.");
   }
-  const apiKey = body.apiKey ?? "";
-  if (!apiKey.trim()) return badRequest("apiKey is required");
-  const label = body.label?.trim() ? body.label.trim().slice(0, 120) : key;
+  // Phase 14: only built-in connectors that take typed-in credentials.
+  if (!isBuiltinKey(key)) return Response.json({ error: `Unknown connector "${key.slice(0, 60)}"` }, { status: 404 });
+  const meta = getBuiltinMeta(key);
+  const parsed = parseCredentialFields(meta, { mode: body.mode ?? null, fields: body.fields ?? null, legacyApiKey: body.apiKey ?? null });
+  if (!parsed.ok) return badRequest(parsed.error);
   try {
-    const connection = await storeApiKey(user.id, workspaceId, key, label, apiKey);
+    // Shopify: validate against the store and wire the webhook secret.
+    if (key === "shopify") {
+      const { connectShopifySingleStore } = await import("@/lib/bizsync/shopify/single-store");
+      const r = await connectShopifySingleStore({
+        userId: user.id,
+        workspaceId,
+        mode: parsed.mode.id === "admin_token" ? "admin_token" : "client_credentials",
+        values: parsed.values,
+        label: body.label ?? null,
+      });
+      await auditEvent({
+        projectId: null,
+        workspaceId,
+        action: "connector_connected",
+        summary: `Connected shopify (single store, ${parsed.mode.label.toLowerCase()}: ${r.label})`.slice(0, 500),
+        actorUserId: user.id,
+      });
+      return Response.json({ connection: { id: r.connection.id, status: r.connection.status }, warnings: r.warnings }, { status: 201 });
+    }
+    const label = body.label?.trim() ? body.label.trim().slice(0, 120) : meta.displayName;
+    const connection = await storeCredentialPayload(user.id, workspaceId, key, label, parsed.values);
     await auditEvent({
       projectId: null,
       workspaceId,
       action: "connector_connected",
-      summary: `Connected ${key} (API key, label "${label}")`,
+      summary: `Connected ${key} (${parsed.mode.label.toLowerCase()}, label "${label}")`,
       actorUserId: user.id,
     });
     return Response.json({ connection: { id: connection.id, status: connection.status } }, { status: 201 });
   } catch (err) {
-    return badRequest(err instanceof Error ? err.message : "Could not store API key");
+    if (err instanceof ConnectorApiError) {
+      return Response.json({ error: err.message, code: err.code }, { status: err.code === "provider_unreachable" || err.code === "provider_error" ? 502 : 400 });
+    }
+    return badRequest(err instanceof Error ? err.message : "Could not store the credential");
   }
 }

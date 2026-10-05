@@ -96,10 +96,14 @@ describe("connectors", () => {
     assert.equal(connectorGroup("my-mcp-server"), "connectors");
   });
 
-  it("maps owned-channel writes to Tier-1 kinds and everything else to a kind that always asks", () => {
+  it("maps owned-channel writes to Tier-1 kinds and everything else to a per-connector write_<key> switch (Phase 14)", () => {
     assert.equal(connectorAction("buffer", "create_post"), "post_owned_social");
     assert.equal(connectorAction("wordpress", "save_content"), "publish_owned");
     assert.equal(connectorAction("buffer", "delete_post"), "delete_social_post");
-    assert.equal(connectorAction("my-mcp", "send_invoice"), "connector_write");
+    assert.equal(connectorAction("my-mcp", "send_invoice"), "write_my_mcp");
+    assert.equal(connectorAction("slack", "post_message"), "write_slack");
+    // Money connectors: an unmapped write is a Tier-3 kind (never auto).
+    assert.equal(connectorAction("quickbooks", "anything_new"), "money_connector_write");
+    assert.equal(connectorAction("gusto", "anything_new"), "money_connector_write");
   });
 });

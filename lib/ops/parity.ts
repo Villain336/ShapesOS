@@ -33,7 +33,7 @@ interface Probe {
 export interface ParityRow {
   app: string;
   odoo: string;
-  owner: "ops-core" | "finance" | "store" | "portal" | "phase 12" | "phase 4b" | "earlier";
+  owner: "ops-core" | "finance" | "store" | "portal" | "phase 12" | "phase 13" | "phase 4b" | "earlier";
   model: Probe[];
   route: Probe[];
   page: Probe[];
@@ -316,6 +316,27 @@ export const ROWS: ParityRow[] = [
   },
   // Phase 12 built the last planned apps (manufacturing, point of sale,
   // payroll, events): nothing is "not started" any more.
+  // --- Phase 13: the digital twin (data side "twincore"; the pages come from
+  // the scene side "twinui" and light up when both branches are merged) ---
+  {
+    app: "Digital twin",
+    odoo: "— (no Odoo equivalent)",
+    owner: "phase 13",
+    model: [model("OpsSite"), model("OpsSiteObject"), model("OpsDockBooking")],
+    route: [
+      entity("twin-sites"),
+      entity("twin-objects"),
+      entity("dock-bookings"),
+      file("app/api/twin/sites/[id]/state/route.ts"),
+      file("app/api/twin/sites/[id]/live/route.ts"),
+      file("app/api/twin/sites/sample/route.ts"),
+      file("app/api/twin/objects/[id]/route.ts"),
+      file("app/api/cron/twin-alerts/route.ts"),
+    ],
+    page: [page("twin"), file("app/dashboard/ops/twin/[siteId]/page.tsx")],
+    test: [test("lib/twin/__tests__/twin-derive.test.ts"), test("lib/twin/__tests__/twin-db.test.ts"), test("lib/chat/__tests__/ops-twin-tools.test.ts")],
+    note: "A layout layer over a warehouse: objects bind to locations, work centres, registers, products; live state is derived from those records (equipment excepted). Dock bookings are the one new record. Live via SSE (DB poll, no in-memory bus).",
+  },
 ];
 
 // ---------------------------------------------------------------------------

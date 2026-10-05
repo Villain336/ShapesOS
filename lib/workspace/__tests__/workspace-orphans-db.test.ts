@@ -146,6 +146,11 @@ const FIXED_VALUES: Record<string, Record<string, string>> = {
     employer_tax_cents: "0",
     employer_contrib_cents: "0",
   },
+  // Phase 14 (connectors): a pay run's Gusto sync row — a synced row needs its
+  // synced_at (ops_pay_run_provider_syncs_state_chk).
+  ops_pay_run_provider_syncs: { provider: "gusto", status: "synced", synced_at: "2030-01-01T10:00:00.000Z" },
+  // Phase 13 (twincore): a twin site's grid is 4–400 cells each way.
+  ops_sites: { grid_w: "10", grid_d: "10" },
 };
 
 // Committed rows per table (one is enough; parents are shared).

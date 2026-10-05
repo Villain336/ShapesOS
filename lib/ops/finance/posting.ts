@@ -13,6 +13,7 @@ import {
   billPostLines,
   eventTicketSaleLines,
   payRunPostLines,
+  payRunNetPayPaidLines,
   creditNoteLines,
   expenseApproveLines,
   expenseReimburseLines,
@@ -311,6 +312,27 @@ export async function postPayRunEntry(
     sourceId: run.id,
     sourceKey: `pay_run:${run.id}:post`,
     lines: payRunPostLines(run),
+  });
+}
+
+// Phase 14 (connectors): the payroll provider (Gusto) reported the run paid —
+// ONE balanced payment entry clears Net pay payable, keyed
+// pay_run:<id>:net_pay_paid so a repeated sync is a no-op.
+export async function postPayRunNetPayPaid(
+  tx: Tx,
+  actor: OpsActor,
+  run: { id: string; number?: string | null; netCents: number },
+  paidOn: Date,
+  providerLabel: string,
+): Promise<PostResult | null> {
+  if (run.netCents <= 0) return null;
+  return postEntry(tx, actor, {
+    entryDate: paidOn,
+    memo: `Pay run ${run.number ?? run.id}: net pay paid by ${providerLabel}`,
+    sourceType: "pay_run",
+    sourceId: run.id,
+    sourceKey: `pay_run:${run.id}:net_pay_paid`,
+    lines: payRunNetPayPaidLines(run.netCents),
   });
 }
 
