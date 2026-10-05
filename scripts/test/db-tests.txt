@@ -166,3 +166,5 @@ lib/billing/__tests__/plan-gates-db.test.ts
 lib/billing/__tests__/seat-billing-db.test.ts
 # Phase 15.1 (keys): BUG A — a Context.dev brand sync is priced as brand_retrieve (it threw "unknown operation brand" on every sync); fake Context.dev.
 lib/knowledge/contextdev/__tests__/brandsync-db.test.ts
+# Phase 15.1 (keys): BUG B — intelligence connector disconnect deletes the workspace's connection by its connection id through the vault (was deleteConnection(workspaceId, vaultKey), always "not found"); other workspaces untouched.
+lib/authority/intelligence/__tests__/disconnect-db.test.ts
