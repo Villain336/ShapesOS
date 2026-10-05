@@ -114,6 +114,10 @@ export const OPS_MONEY_ACTIONS: OpsMoneyAction[] = [
   // approve_pay_run / post_pay_run); both bind the run's compute digest.
   { slug: "OPS_PAYROLL_APPROVE", label: "Approve pay run", expectedTier: "high" },
   { slug: "OPS_PAYROLL_POST", label: "Post pay run to the books", expectedTier: "medium" },
+  // Phase 13 (twincore): publishing a digital twin site layout (an agent's
+  // twin_draft_layout output, or a person's edits) is a person's decision.
+  // No money moves; it rides the same propose → approve → execute gate.
+  { slug: "OPS_TWIN_SITE_PUBLISH", label: "Publish twin site layout", expectedTier: "medium" },
 ];
 
 export const OPS_MONEY_ACTION_MAP: Record<string, OpsMoneyAction> =

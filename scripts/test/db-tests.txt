@@ -141,3 +141,5 @@ lib/ops/__tests__/p12-pos-db.test.ts
 lib/ops/__tests__/p12-payroll-db.test.ts
 # Phase 12 (people): events — published-only routing, free/paid registration (paid pending until the signed Stripe webhook), concurrent capacity, once-only QR check-in, reminders, FORCE RLS.
 lib/ops/__tests__/p12-events-db.test.ts
+# Phase 13 (twincore): digital twin — FORCE RLS on sites/objects/dock bookings, layout validation + same-workspace bindings, overlapping active dock bookings refused (code + exclusion constraint), booking states reflected by siteSnapshot, gated publish, agent markers, live stream patch after a write, sample site per kind consistent + idempotent.
+lib/twin/__tests__/twin-db.test.ts

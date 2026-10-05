@@ -249,6 +249,16 @@ ok("member management = admin+", has("app/api/workspace/members/route.ts", /requ
 ok("deploy writes = editor+", has("app/api/websites/[id]/deploy/route.ts", /"editor"/));
 ok("audit writes = editor+", has("app/api/websites/[id]/audit/route.ts", /requireProjectRole\(user\.id, site\.projectId, "editor"\)/));
 ok("issue approval = editor+", has("app/api/websites/[id]/issues/approve-all/route.ts", /"editor"/));
+// Phase 13 (twincore): the digital twin's routes — reads are operator role
+// (editor+) and the live stream re-checks it every loop; the sample seeder is
+// admin+; twin CRUD rides the generic /api/ops/[entity] guard.
+ok("twin state = editor+", has("app/api/twin/sites/[id]/state/route.ts", /requireWorkspaceRole\(user\.id, workspace\.id, "editor"\)/));
+ok("twin live stream = editor+, re-checked every loop",
+  has("app/api/twin/sites/[id]/live/route.ts", /requireWorkspaceRole\(user\.id, workspace\.id, "editor"\)\)\) \{/) &&
+  has("app/api/twin/sites/[id]/live/route.ts", /stillAllowed: async \(\) => Boolean\(await requireWorkspaceRole\(user\.id, workspace\.id, "editor"\)\)/) &&
+  has("lib/twin/live.ts", /await opts\.stillAllowed\(\)/));
+ok("twin object delete = editor+", has("app/api/twin/objects/[id]/route.ts", /requireWorkspaceRole\(user\.id, workspace\.id, "editor"\)/));
+ok("twin sample site = admin+", has("app/api/twin/sites/sample/route.ts", /requireWorkspaceRole\(user\.id, workspace\.id, "admin"\)/));
 // Phase 8: sandbox checkpoint restore + previews (lib/sandbox).
 ok("agent-run restore = editor+ or the run's starter", has("app/api/agent-runs/[runId]/restore/route.ts", /!isStarter && !\(await requireWorkspaceRole\(user\.id, workspace\.id, "editor"\)\)/));
 ok("agent-run stop = editor+ or the run's starter", has("app/api/agent-runs/[runId]/cancel/route.ts", /!isStarter && !\(await requireWorkspaceRole\(user\.id, workspace\.id, "editor"\)\)/));
