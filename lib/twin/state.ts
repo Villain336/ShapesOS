@@ -66,6 +66,56 @@ export async function siteSnapshot(workspaceId: string, siteId: string): Promise
   return withWorkspaceScope(workspaceId, (tx) => siteSnapshotTx(tx, workspaceId, siteId));
 }
 
+/**
+ * Phase 14 (approvals): who may see a site live. Editors (operators) see
+ * drafts and published sites; every other member sees PUBLISHED sites only
+ * — a draft is editor-only. PURE.
+ */
+export function canViewSite(status: TwinSiteStatus | string, canEdit: boolean): boolean {
+  return canEdit || status === "published";
+}
+
+/**
+ * Phase 14: the snapshot for a member — a draft is "not found" for a
+ * non-editor (never revealed), exactly like a site of another workspace.
+ */
+export async function siteSnapshotFor(workspaceId: string, siteId: string, canEdit: boolean): Promise<TwinSnapshot> {
+  const snap = await siteSnapshot(workspaceId, siteId);
+  if (!canViewSite(snap.site.status, canEdit)) throw new TwinNotFoundError(siteId);
+  return snap;
+}
+
+/**
+ * Phase 14: the live stream's snapshot loader + per-tick access check for one
+ * member (GET /api/twin/sites/[id]/live): still a member, and — unless an
+ * editor — the site is still PUBLISHED, so a site moving back to draft ends
+ * a viewer's stream (access-revoked).
+ */
+export function twinLiveAccess(input: {
+  workspaceId: string;
+  siteId: string;
+  isMember: () => Promise<boolean>;
+  isEditor: () => Promise<boolean>;
+}): { snapshot: () => Promise<TwinSnapshot>; stillAllowed: () => Promise<boolean> } {
+  const { workspaceId, siteId } = input;
+  return {
+    snapshot: async () => siteSnapshotFor(workspaceId, siteId, await input.isEditor()),
+    stillAllowed: async () => {
+      if (!(await input.isMember())) return false;
+      if (await input.isEditor()) return true;
+      return canViewSite((await siteStatus(workspaceId, siteId)) ?? "gone", false);
+    },
+  };
+}
+
+/** Phase 14: the site's status (null when it is gone) — the live stream's per-tick access re-check. */
+export async function siteStatus(workspaceId: string, siteId: string): Promise<TwinSiteStatus | null> {
+  const row = await withWorkspaceScope(workspaceId, (tx) =>
+    tx.opsSite.findFirst({ where: { id: siteId, workspaceId }, select: { status: true } }),
+  );
+  return row ? (row.status as TwinSiteStatus) : null;
+}
+
 /** Sites of the workspace for the list page (no derived state). */
 export async function listSites(
   workspaceId: string,

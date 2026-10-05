@@ -15,8 +15,16 @@ import { applyLivePatch } from "@/lib/twin/view-model";
 import { TWIN_API, TWIN_LIVE_POLL_MS, type TwinPatchOp, type TwinSnapshot } from "@/lib/twin/types";
 import { sharedJson } from "@/lib/ui/shared-fetch";
 
-/** "off": not subscribed (viewers — the live and state routes need the editor role). */
+/**
+ * "off" (shown as "Snapshot"): not live — disabled, or (Phase 14) the stream
+ * ended for good (access revoked: e.g. a published site went back to draft
+ * for a viewer; or the site is gone). The last snapshot stays on screen.
+ * Every member gets live updates since Phase 14 (published sites).
+ */
 export type TwinLiveStatus = "live" | "reconnecting" | "polling" | "off";
+
+/** Phase 14: stream end reasons after which reconnecting can't help. */
+const FINAL_END_REASONS = new Set(["access-revoked", "site-gone"]);
 
 function looksLikeSnapshot(v: unknown): v is TwinSnapshot {
   const s = v as TwinSnapshot | null;
@@ -28,6 +36,7 @@ export function useTwinLive(initial: TwinSnapshot, opts: { enabled?: boolean } =
   const siteId = initial.site.id;
   const [snapshot, setSnapshot] = useState<TwinSnapshot>(initial);
   const [status, setStatus] = useState<TwinLiveStatus>("reconnecting");
+  const [ended, setEnded] = useState(false);
   const snapRef = useRef(snapshot);
   snapRef.current = snapshot;
 
@@ -104,9 +113,24 @@ export function useTwinLive(initial: TwinSnapshot, opts: { enabled?: boolean } =
           void resync();
         }
       });
-      es.addEventListener("end", () => {
-        // max duration reached server-side: reconnect for a fresh stream
+      es.addEventListener("end", (ev) => {
         es?.close();
+        let reason = "";
+        try {
+          reason = String((JSON.parse((ev as MessageEvent).data ?? "{}") as { reason?: unknown }).reason ?? "");
+        } catch {
+          reason = "";
+        }
+        // Phase 14: access revoked / site gone — stop; keep the last snapshot.
+        if (FINAL_END_REASONS.has(reason)) {
+          closed = true;
+          es = null;
+          stopPolling();
+          if (retryTimer) clearTimeout(retryTimer);
+          setEnded(true);
+          return;
+        }
+        // max duration reached server-side: reconnect for a fresh stream
         setStatus("reconnecting");
         retryTimer = setTimeout(connect, 500);
       });
@@ -131,5 +155,5 @@ export function useTwinLive(initial: TwinSnapshot, opts: { enabled?: boolean } =
     };
   }, [enabled, siteId, resync]);
 
-  return { snapshot, status: enabled ? status : ("off" as TwinLiveStatus), resync, setSnapshot };
+  return { snapshot, status: enabled && !ended ? status : ("off" as TwinLiveStatus), resync, setSnapshot };
 }
