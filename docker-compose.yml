@@ -165,6 +165,9 @@ services:
       MARKETR_S3_SECRET_KEY: ${MARKETR_S3_SECRET_KEY:-${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD in .env}}
       # Rate limits + login lockout shared in Postgres (lib/api/rate-limit-store.ts).
       RATE_LIMIT_STORE: ${RATE_LIMIT_STORE:-postgres}
+      # Phase 8: the `worker` service below runs queued agent work; the app
+      # only enqueues. (internal = the app runs it itself; off = no queue.)
+      AGENT_WORKER: ${AGENT_WORKER:-external}
     volumes:
       # On-disk state that is not in the files bucket: report/brief PDFs,
       # brand logos, site working copies, fix snapshots, sitemaps, scheduler
@@ -174,6 +177,39 @@ services:
       - marketr-data:/app/.data
       - marketr-run-artifacts:/app/.run-artifacts
       - marketr-corpus:/app/data
+
+  # Phase 8: the agent worker — claims agent_jobs (SKIP LOCKED, leased,
+  # heartbeated) and runs the agent loop: chat turns handed off by their
+  # request, mission launches. Same image source as the app; scale it with
+  # `docker compose up -d --scale worker=N` (claims never collide). It needs
+  # the same model keys and database role as the app.
+  worker:
+    build:
+      context: .
+      target: worker
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+      minio-init:
+        condition: service_completed_successfully
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://${APP_DB_USER:-marketr_app}:${APP_DB_PASSWORD:?set APP_DB_PASSWORD in .env}@db:5432/${POSTGRES_DB:-marketr}?schema=public
+      REDIS_URL: redis://redis:6379
+      MARKETR_STORAGE: ${MARKETR_STORAGE:-s3}
+      MARKETR_S3_ENDPOINT: ${MARKETR_S3_ENDPOINT:-http://minio:9000}
+      MARKETR_S3_REGION: ${MARKETR_S3_REGION:-us-east-1}
+      MARKETR_S3_BUCKET: ${MARKETR_S3_BUCKET:-marketr-files}
+      MARKETR_S3_ACCESS_KEY: ${MARKETR_S3_ACCESS_KEY:-${MINIO_ROOT_USER:-marketr}}
+      MARKETR_S3_SECRET_KEY: ${MARKETR_S3_SECRET_KEY:-${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD in .env}}
+      RATE_LIMIT_STORE: ${RATE_LIMIT_STORE:-postgres}
+    volumes:
+      - marketr-data:/app/.data
+      - marketr-run-artifacts:/app/.run-artifacts
 
   # Phase 4a: scheduled database backups (scripts/ops/backup.sh --loop).
   # pg_dump custom format into the marketr-backups volume every

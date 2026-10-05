@@ -11,6 +11,9 @@ import { prisma } from "@/lib/prisma";
 import { CONTEXTDEV_CONNECTOR_KEY } from "@/lib/knowledge/contextdev/keys";
 import { mockInventory, notLive, type FeatureMode } from "@/lib/providers/mock-inventory";
 import { unsplashStatus } from "@/lib/design/unsplash";
+import { sandboxAvailability } from "@/lib/sandbox";
+import { sandboxConfig } from "@/lib/sandbox/config";
+import { decryptHostingConfig, hostingKindLabel } from "@/lib/deploy";
 /* PROVIDER:pexels */ import { pexelsStatus } from "@/lib/design/pexels"; /* END */
 /* PROVIDER:pixabay */ import { pixabayStatus } from "@/lib/design/pixabay"; /* END */
 /* PROVIDER:cloudinary */ import { cloudinaryStatus } from "@/lib/design/cloudinary"; /* END */
@@ -88,7 +91,19 @@ export default async function ProvidersSettingsPage() {
     })
     .then((c) => c !== null)
     .catch(() => null);
-  const inventory = mockInventory(process.env, { llm: llm.routing, contextDevConnected });
+  // Phase 8: the code sandbox provider (cheap check, cached 30 s).
+  const sandbox = await sandboxAvailability().catch(() => null);
+  const sandboxCfg = sandboxConfig();
+  // Phase 9: hosting connections (per connection, demo flag in the encrypted blob).
+  const hosting = await prisma.hostingConnection
+    .findMany({ where: { project: { workspaceId: workspace.id } }, select: { target: true, configEnc: true } })
+    .then((rows) => {
+      const out = { live: [] as string[], demo: [] as string[] };
+      for (const r of rows) (decryptHostingConfig(r).demo === true ? out.demo : out.live).push(hostingKindLabel(r.target));
+      return out;
+    })
+    .catch(() => null);
+  const inventory = mockInventory(process.env, { llm: llm.routing, contextDevConnected, sandbox, hosting });
   const mocked = notLive(inventory);
   const live = inventory.filter((f) => f.mode === "live");
   const unsplash = unsplashStatus();
@@ -290,6 +305,57 @@ export default async function ProvidersSettingsPage() {
             enough: every workload then runs live on that provider.
           </p>
         )}
+      </section>
+
+      <section
+        className="rounded-lg border border-line bg-paper/60 p-5"
+        aria-labelledby="providers-sandbox"
+      >
+        <div className="flex items-center justify-between gap-2">
+          <h2 id="providers-sandbox" className="font-medium">Code sandbox</h2>
+          <StatusBadge ok={!!sandbox?.ok} label={sandbox?.ok ? "available" : "not available"} />
+        </div>
+        <p className="mt-1 text-xs text-subtle">
+          Where agents write and run code: one isolated sandbox per agent run,
+          destroyed when the run ends, is stopped or sits idle. Nothing runs on
+          this host. Without a provider the Code tools stay off and say why.
+        </p>
+        <dl className="mt-3 grid gap-2 text-sm md:grid-cols-2">
+          <div>
+            <dt className="text-xs text-subtle">Provider</dt>
+            <dd className="font-mono text-xs">{sandbox?.provider ?? "off"}</dd>
+          </div>
+          <div>
+            <dt className="text-xs text-subtle">Status</dt>
+            <dd className="text-xs">{sandbox ? (sandbox.ok ? "Answering" : sandbox.reason) : "Could not be checked."}</dd>
+          </div>
+          {sandboxCfg.provider === "docker" && (
+            <div className="md:col-span-2">
+              <dt className="text-xs text-subtle">Image</dt>
+              <dd className="break-all font-mono text-xs">{sandboxCfg.docker.image}</dd>
+            </div>
+          )}
+          <div>
+            <dt className="text-xs text-subtle">Limits per sandbox</dt>
+            <dd className="text-xs">
+              {sandboxCfg.resources.cpus} CPU, {sandboxCfg.resources.memoryMb} MB memory, {sandboxCfg.resources.pids} processes,{" "}
+              {sandboxCfg.resources.diskMb ? `${sandboxCfg.resources.diskMb} MB disk` : "disk not capped"}; idle after{" "}
+              {Math.round(sandboxCfg.idleSeconds / 60)} min
+            </dd>
+          </div>
+          <div>
+            <dt className="text-xs text-subtle">Network</dt>
+            <dd className="text-xs">Only {sandboxCfg.egressAllow.length} allowed hosts (package registries, GitHub)</dd>
+          </div>
+          <div className="md:col-span-2">
+            <dt className="text-xs text-subtle">Environment variables</dt>
+            <dd className="font-mono text-xs">
+              SANDBOX_PROVIDER, DOCKER_HOST, SANDBOX_IMAGE, SANDBOX_CPUS, SANDBOX_MEMORY_MB,
+              SANDBOX_PIDS, SANDBOX_DISK_MB, SANDBOX_IDLE_MINUTES, SANDBOX_EGRESS_ALLOW,
+              E2B_API_KEY, DAYTONA_API_KEY
+            </dd>
+          </div>
+        </dl>
       </section>
 
       <div className="rounded-lg border border-line bg-paper/60 p-5">

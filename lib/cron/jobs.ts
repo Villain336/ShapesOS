@@ -99,6 +99,15 @@ export const CRON_JOBS: readonly CronJob[] = [
     timeoutMs: SHORT,
     secretEnv: "REMINDERS_CRON_SECRET",
   },
+  {
+    // Phase 9 (repos): webhook fallback for agent PR feedback; a no-op unless GITHUB_PR_POLL=on.
+    key: "github-prs",
+    path: "/api/cron/github-prs",
+    cron: "*/5 * * * *",
+    source: "picked",
+    note: "Phase 9 webhook fallback (opt-in, GITHUB_PR_POLL=on): review feedback is picked up within ~5 minutes; each pass reads at most 50 PRs, 4 GitHub calls each.",
+    timeoutMs: SHORT,
+  },
   { key: "alerts", path: "/api/cron/alerts", cron: "*/15 * * * *", source: "deploy", timeoutMs: SHORT },
   { key: "gsc-inspection", path: "/api/cron/gsc-inspection", cron: "*/15 * * * *", source: "deploy", timeoutMs: SHORT },
   { key: "social-engagement", path: "/api/cron/social-engagement", cron: "*/15 * * * *", source: "deploy", timeoutMs: SHORT },
@@ -121,6 +130,33 @@ export const CRON_JOBS: readonly CronJob[] = [
 
   // --- Hourly -------------------------------------------------------------
   { key: "gsc-pull", path: "/api/cron/gsc-pull", cron: "5 * * * *", source: "deploy", timeoutMs: LONG },
+  // Phase 10 (ops-core): helpdesk SLA breaches → notify once per ticket.
+  {
+    key: "ops-helpdesk-sla",
+    path: "/api/cron/ops-helpdesk-sla",
+    cron: "*/10 * * * *",
+    source: "picked",
+    note: "New in Phase 10. The tightest default SLA is a 60-minute first response; a 10-minute sweep flags a breach within 10 minutes and notifies once.",
+    timeoutMs: SHORT,
+  },
+  // Phase 13 (twincore): digital twin conditions → alerts + editor notifications.
+  {
+    key: "twin-alerts",
+    path: "/api/cron/twin-alerts",
+    cron: "*/5 * * * *",
+    source: "picked",
+    note: "New in Phase 13. The tightest twin threshold is a truck 30 minutes past its ETA; a 5-minute sweep flags it within 5 minutes, and each condition alerts once (dedup keys), so the cadence never repeats an alert.",
+    timeoutMs: SHORT,
+  },
+  // Phase 10 (ops-core): min/max reorder rules → draft purchase orders.
+  {
+    key: "ops-reorder",
+    path: "/api/cron/ops-reorder",
+    cron: "20 * * * *",
+    source: "picked",
+    note: "New in Phase 10. Drafts only (sending stays gated) and one draft per breach, so hourly is safe and keeps reorders same-day.",
+    timeoutMs: SHORT,
+  },
 
   // --- Daily --------------------------------------------------------------
   {
@@ -170,6 +206,15 @@ export const CRON_JOBS: readonly CronJob[] = [
     cron: "15 6 * * *",
     source: "picked",
     note: 'Route header: "schedule daily so the 90/30/7/overdue tiers fire on time". Early, staggered.',
+    timeoutMs: SHORT,
+  },
+  {
+    // Phase 10 (finance): recurring invoice drafts, quote expiry, overdue sweep.
+    key: "finance",
+    path: "/api/cron/finance",
+    cron: "20 6 * * *",
+    source: "picked",
+    note: 'Route header: "daily". Drafts recurring invoices (drafts only — sending still asks), expires quotes, flips overdue invoices. Early so drafts are ready at the start of the day; staggered from the other 06:xx sweeps.',
     timeoutMs: SHORT,
   },
   { key: "fix-agent", path: "/api/cron/fix-agent", cron: "30 6 * * *", source: "deploy", timeoutMs: LONG },

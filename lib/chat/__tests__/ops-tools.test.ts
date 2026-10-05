@@ -43,9 +43,9 @@ function auditStub(calls: string[]) {
 }
 
 describe("OPS_TOOLS registration contract", () => {
-  it("exposes the full ops tool surface (15 tools)", () => {
-    const names = OPS_TOOLS.map((t) => t.name).sort();
-    assert.deepEqual(names, [
+  it("exposes the Phase 17 ops tool surface (15 tools; later phases only add)", () => {
+    const names = OPS_TOOLS.map((t) => t.name);
+    for (const base of [
       "ops_approve_leave",
       "ops_create_project",
       "ops_draft_invoice",
@@ -61,7 +61,7 @@ describe("OPS_TOOLS registration contract", () => {
       "ops_operations_summary",
       "ops_request_leave",
       "ops_send_invoice",
-    ]);
+    ]) assert.ok(names.includes(base), `${base} still registered`);
   });
 
   it("names are unique and every tool declares kind/minRole/argsSchema", () => {

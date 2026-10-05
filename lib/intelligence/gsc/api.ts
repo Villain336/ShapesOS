@@ -3,6 +3,8 @@
 //   GET  https://www.googleapis.com/webmasters/v3/sites
 //   POST https://www.googleapis.com/webmasters/v3/sites/{siteUrl}/searchAnalytics/query
 //        body { startDate, endDate, dimensions, dataState, rowLimit, startRow }
+//   PUT  https://www.googleapis.com/webmasters/v3/sites/{siteUrl}/sitemaps/{feedpath}
+//        (Phase 11 seotools: sitemap submission)
 // Pagination: searchAnalytics pages by startRow (rowLimit max 25,000).
 // Docs: https://developers.google.com/webmaster-tools/v1/searchanalytics/query
 //
@@ -118,6 +120,31 @@ export async function gscQuery(
     startRow += rows.length;
   }
   return out.slice(0, args.limit);
+}
+
+/**
+ * Phase 11 (seotools): submit a sitemap to a property.
+ *   PUT https://www.googleapis.com/webmasters/v3/sites/{siteUrl}/sitemaps/{feedpath}
+ * Needs the full "webmasters" scope; a read-only grant answers 403
+ * (ConnectorApiError "forbidden"). Docs:
+ * https://developers.google.com/webmaster-tools/v1/sitemaps/submit
+ */
+export async function gscSubmitSitemap(
+  auth: TokenSource,
+  property: string,
+  sitemapUrl: string,
+  deps: LiveDeps = {},
+): Promise<void> {
+  await liveRequest(
+    {
+      provider: GSC_PROVIDER,
+      method: "PUT",
+      url: `${GSC_BASE}/sites/${encodeURIComponent(normalizeProperty(property))}/sitemaps/${encodeURIComponent(sitemapUrl)}`,
+      auth,
+      responseType: "text",
+    },
+    deps,
+  );
 }
 
 export function shapeGscRow(r: GscApiRow, dimension: "query" | "page") {

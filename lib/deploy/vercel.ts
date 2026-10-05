@@ -5,6 +5,9 @@
 // POST /v13/deployments with a files payload ({file, data (base64), sha});
 // Vercel auto-creates a project when none is given, or deploys into an
 // existing project when projectId is set. Returns the live *.vercel.app URL.
+// Phase 9: rollback() is Vercel's instant rollback
+// (POST /v9/projects/:project/rollback/:deployment) — production domains
+// point at the earlier deployment again, nothing is rebuilt.
 //
 // NOTE: live API is untested from this sandbox (no network egress). Shapes
 // follow the documented Vercel REST API (api.vercel.com, v13 deployments).
@@ -16,6 +19,7 @@ import {
   type DeployResult,
   type DeployTarget,
   type DeploymentSummary,
+  type DeployPlace,
   type VercelConfig,
 } from "./types";
 
@@ -73,9 +77,9 @@ export class VercelDeployTarget implements DeployTarget {
     return { ok: true, info: `Vercel user ${name}${email ? ` (${email})` : ""}` };
   }
 
-  async deploy(files: DeployFile[], opts?: { projectName?: string }): Promise<DeployResult> {
+  async deploy(files: DeployFile[], opts?: { projectName?: string; project?: string | null }): Promise<DeployResult> {
     if (!files.length) throw new Error("Nothing to deploy — the site has no files.");
-    const projectId = (opts?.projectName ?? this.cfg.projectId).trim();
+    const projectId = (opts?.project || opts?.projectName || this.cfg.projectId).trim();
     const payload: Record<string, unknown> = {
       name: projectId || "marketr-site",
       files: files.map((f) => ({
@@ -98,6 +102,7 @@ export class VercelDeployTarget implements DeployTarget {
       url: url ?? `https://${id}.vercel.app`,
       status: normalizeStatus(body.status),
       mock: false,
+      project: body.projectId ? String(body.projectId) : projectId || undefined,
     };
   }
 
@@ -131,5 +136,21 @@ export class VercelDeployTarget implements DeployTarget {
       status: normalizeStatus(body.status),
       mock: false,
     };
+  }
+
+  async rollback(deploymentId: string, place: DeployPlace): Promise<DeploymentSummary> {
+    if (!deploymentId) throw new Error("A deployment id is required to roll back.");
+    let project = (place.project ?? this.cfg.projectId ?? "").trim();
+    if (!project) {
+      const d = await this.check(await this.api(`/v13/deployments/${encodeURIComponent(deploymentId)}`), "deployment lookup");
+      project = String(d.projectId ?? "").trim();
+    }
+    if (!project) throw new Error("Could not tell which Vercel project this deployment belongs to.");
+    const res = await this.api(
+      `/v9/projects/${encodeURIComponent(project)}/rollback/${encodeURIComponent(deploymentId)}`,
+      { method: "POST" },
+    );
+    if (!res.ok) await this.check(res, "rollback");
+    return this.getDeploymentStatus(deploymentId);
   }
 }

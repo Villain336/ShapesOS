@@ -10,7 +10,7 @@ import { describe, it, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { prisma } from "@/lib/prisma";
 import { withWorkspaceScope } from "@/lib/substrate/memory/rls";
-import { decideApproval, proposeAction, SeparationOfDutiesError } from "../gate";
+import { decideApproval, executeApproved, proposeAction, SeparationOfDutiesError } from "../gate";
 
 const TEAM = "p1b-sod-team";
 const SOLO = "p1b-sod-solo";
@@ -82,3 +82,32 @@ describe("Composio approvals: separation of duties", () => {
     assert.match(trail.at(-1)?.detail ?? "", /self-approved/);
   });
 });
+
+describe("Composio execute refuses approvals owned by ShapesOS's own gates (Phase 9)", () => {
+  for (const appKey of ["ops", "apps", "hosting"]) {
+    it(`an approved "${appKey}" approval is refused before it is claimed`, async () => {
+      const row = await withWorkspaceScope(SOLO, (tx) =>
+        tx.composioActionApproval.create({
+          data: {
+            workspaceId: SOLO,
+            appKey,
+            toolName: `${appKey.toUpperCase()}_ACTION`,
+            riskTier: "medium",
+            proposedArgs: {},
+            plainSummary: "internal gate approval",
+            status: "approved",
+            decidedBy: SOLO_OWNER,
+            decidedAt: new Date(),
+            expiresAt: new Date(Date.now() + 3_600_000),
+          },
+        }),
+      );
+      await assert.rejects(
+        () => executeApproved({ workspaceId: SOLO, approvalId: row.id, executedBy: SOLO_OWNER }),
+        /Cannot execute here/,
+      );
+      assert.equal((await readApproval(SOLO, row.id))?.status, "approved", "still usable where it was proposed");
+    });
+  }
+});
+

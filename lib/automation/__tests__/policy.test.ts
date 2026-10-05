@@ -280,12 +280,16 @@ describe("decideAutoApproval (Phase 5)", () => {
     assert.equal(decideAutoApproval(rows, { agentKey: "lead", action: "draft_content" }).auto, false);
   });
 
-  it("Tier 2 always asks, whatever the rule says", () => {
+  it("Phase 14: Tier 2 runs without asking only under an auto rule", () => {
     const rows = [agentRow("drafter", "send_outreach_email", "auto"), agentRow(ALL_AGENTS, "run_workflow", "auto")];
     const d = decideAutoApproval(rows, { agentKey: "drafter", action: "send_outreach_email" });
-    assert.equal(d.auto, false);
+    assert.equal(d.auto, true);
     assert.equal(d.tier, 2);
-    assert.equal(decideAutoApproval(rows, { agentKey: "lead", action: "run_workflow" }).auto, false);
+    assert.match(d.reason, /auto-approved by the send_outreach_email rule for agent drafter/);
+    assert.equal(decideAutoApproval(rows, { agentKey: "lead", action: "run_workflow" }).auto, true);
+    // Without a rule (or another agent's rule) it asks.
+    assert.equal(decideAutoApproval(rows, { agentKey: "lead", action: "send_outreach_email" }).auto, false);
+    assert.equal(decideAutoApproval([], { agentKey: "drafter", action: "send_outreach_email" }).auto, false);
   });
 
   it("Tier 3 can never run automatically — kind or description", () => {

@@ -22,9 +22,12 @@ export class MissingSecretError extends Error {
 
 export class FakeProviderRefusedError extends Error {
   readonly provider: string;
+  /** Phase 11 (conncore): the closed connector error code callers surface. */
+  readonly code = "not_connected" as const;
   constructor(provider: string) {
     super(
-      `The fake ${provider} provider is disabled in production. Configure a real provider, ` +
+      `${provider.charAt(0).toUpperCase()}${provider.slice(1)} is not connected. ` +
+        `The fake ${provider} provider is disabled in production — connect a real provider, ` +
         `or set ALLOW_FAKE_PROVIDERS=1 for a demo install.`,
     );
     this.name = "FakeProviderRefusedError";
@@ -66,4 +69,16 @@ export function fakeProvidersAllowed(env: NodeJS.ProcessEnv = process.env): bool
 /** Throw FakeProviderRefusedError when a fake provider would run in production. */
 export function assertFakeProviderAllowed(provider: string, env: NodeJS.ProcessEnv = process.env): void {
   if (!fakeProvidersAllowed(env)) throw new FakeProviderRefusedError(provider);
+}
+
+/**
+ * Phase 11 (conncore): the "no fakes in production" helper for code that
+ * would otherwise fall back to a labelled mock/fixture when nothing is
+ * connected. Returns make() outside production (or with the demo opt-in),
+ * throws FakeProviderRefusedError ("<provider> is not connected") inside.
+ * The full list of guarded surfaces is lib/connectors/no-fakes.ts.
+ */
+export function fakeOrRefuse<T>(provider: string, make: () => T, env: NodeJS.ProcessEnv = process.env): T {
+  assertFakeProviderAllowed(provider, env);
+  return make();
 }

@@ -93,6 +93,11 @@ jobs:
       - name: Security battery (M11)
         run: node scripts/verify-m11-security.mjs
 
+      # Phase 10 (ops-core): a committed ✅ app that loses its model, route,
+      # page or test fails here (docs/audit/ODOO-PARITY.md).
+      - name: Odoo parity guard (Phase 10)
+        run: npx tsx scripts/verify/odoo-parity.mts --check
+
       - name: Credential-free smoke
         run: npx tsx scripts/smoke-no-creds.mts
 

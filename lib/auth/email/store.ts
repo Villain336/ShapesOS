@@ -127,6 +127,19 @@ export async function recentLinkCount(email: string, now: Date = new Date(), db:
   return db.emailAuthToken.count({ where: { email, createdAt: { gt: new Date(now.getTime() - EMAIL_SEND_WINDOW_MS) } } });
 }
 
+/**
+ * Count one email against the per-address send limit without creating a
+ * usable link: an already-expired, already-used row (never redeemable). Used
+ * for the "already registered" note and by the client portal
+ * (lib/portal/store.ts), so every kind of sign-in mail to one mailbox shares
+ * the same EMAIL_SEND_LIMIT budget.
+ */
+export async function countLinkSend(email: string, now: Date = new Date(), db: Db = prisma): Promise<void> {
+  await db.emailAuthToken.create({
+    data: { tokenHash: hashEmailToken(generateEmailToken()), email, purpose: "login", expiresAt: now, usedAt: now, createdAt: now },
+  });
+}
+
 /** Store a new single-use link (hash only) and return the raw token. */
 export async function issueEmailToken(
   opts: { email: string; purpose: EmailTokenPurpose; passwordHash?: string | null; now?: Date },
@@ -174,9 +187,7 @@ async function sendAlreadyRegistered(email: string, deps: FlowDeps): Promise<voi
   if (!base) return;
   // Count it like a link (an expired, never-usable row) so repeated signups
   // for a registered address can't flood its inbox either.
-  await prisma.emailAuthToken.create({
-    data: { tokenHash: hashEmailToken(generateEmailToken()), email, purpose: "login", expiresAt: now, usedAt: now, createdAt: now },
-  });
+  await countLinkSend(email, now);
   await sendAuthEmail({ kind: "already_registered", to: email, url: `${base}/login` }, deps);
 }
 

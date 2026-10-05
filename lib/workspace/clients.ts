@@ -80,6 +80,8 @@ export async function listClients(workspaceId: string) {
     reports: c._count.reports,
     brandKits: c._count.brandKits,
     pipelines: c._count.pipelines,
+    // Phase 10 (portal)
+    portalEnabled: c.portalEnabled,
     createdAt: c.createdAt.toISOString(),
   }));
 }
@@ -102,6 +104,12 @@ export async function updateClient(workspaceId: string, actorUserId: string, cli
   if (!existing) throw new NotFoundError("Client not found.");
   try {
     const c = await prisma.client.update({ where: { id: existing.id }, data });
+    // Phase 10 (portal): a new sign-in email ends every client-portal session
+    // (outstanding sign-in links already fail: they must match loginEmail).
+    if (data.loginEmail !== undefined && data.loginEmail !== existing.loginEmail) {
+      const { revokePortalSessions } = await import("@/lib/portal/store");
+      await revokePortalSessions(workspaceId, existing.id, "system", { reason: "sign-in email changed" });
+    }
     const changed = Object.keys(data).join(", ") || "nothing";
     await audit(workspaceId, actorUserId, "client_updated", `Client "${c.name}" updated (${changed})`);
     return c;

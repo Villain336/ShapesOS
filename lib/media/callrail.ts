@@ -34,7 +34,7 @@
 import { createHmac, createHash } from "node:crypto";
 import type { MediaStore, CallNumber } from "./store";
 import { safeEqual } from "../mail/provider";
-import { requireSecret } from "@/lib/env/secrets";
+import { assertFakeProviderAllowed, requireSecret } from "@/lib/env/secrets";
 
 export type CallRailProviderName = "fake" | "callrail";
 
@@ -89,6 +89,8 @@ export class FakeCallRailProvider implements CallRailProvider {
   private counter = 0;
 
   async provisionNumber(input: CallNumberInput): Promise<{ numberE164: string }> {
+    // Phase 11 (conncore): a fake tracking number is refused in production.
+    assertFakeProviderAllowed("CallRail");
     this.counter += 1;
     const area = (input.areaCode ?? "336").replace(/\D/g, "").slice(0, 3).padStart(3, "3");
     const hash = createHash("sha256")

@@ -26,6 +26,7 @@ import { AuditLog } from "./audit";
 import type { ReallocationStore } from "./store";
 import type { ProposalRecord } from "./store";
 import type { SraEnvelope } from "./types";
+import { assertFakeProviderAllowed } from "@/lib/env/secrets";
 
 export class NotConfiguredError extends Error {
   constructor(what: string) {
@@ -56,6 +57,8 @@ export function createFixturePlatformAdapter() {
     name: "fixture",
     shifts,
     async applyBudgetShift(shift) {
+      // Phase 11 (conncore): a fixture "executed" budget shift is refused in production.
+      assertFakeProviderAllowed("ad platform budget");
       if (seen.has(shift.idempotencyKey)) {
         return { ok: true, platformRef: `fixture:duplicate:${shift.idempotencyKey}` };
       }

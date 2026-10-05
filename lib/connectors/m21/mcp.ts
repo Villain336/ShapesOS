@@ -27,8 +27,8 @@ export interface McpServerInfo {
 interface RawTool {
   name: string;
   description?: string | null;
-  /** MCP tool annotations (spec 2025-03-26+); only readOnlyHint is used. */
-  annotations?: { readOnlyHint?: unknown } | null;
+  /** MCP tool annotations (spec 2025-03-26+): readOnlyHint, and (Phase 14) destructiveHint. */
+  annotations?: { readOnlyHint?: unknown; destructiveHint?: unknown } | null;
   inputSchema?: {
     type?: string;
     properties?: Record<string, { type?: string; description?: string }>;
@@ -63,6 +63,9 @@ export function mcpToolToDef(
     name: raw.name,
     description: raw.description ?? raw.name,
     mutating: !readOnly,
+    // Phase 14: an explicit destructiveHint makes the write never
+    // auto-approvable (lib/chat/connector-tools.ts).
+    ...(!readOnly && raw.annotations?.destructiveHint === true ? { destructive: true } : {}),
     argsSchema: {
       type: "object",
       properties: props,
@@ -83,7 +86,7 @@ export class McpConnectorClient {
    */
   async connect(
     endpoint: string,
-    opts: { readOnlyTools?: Iterable<string> } = {},
+    opts: { readOnlyTools?: Iterable<string>; accessToken?: string | null } = {},
   ): Promise<McpServerInfo> {
     if (this.client) throw new Error("McpConnectorClient already connected");
     this.endpoint = endpoint;
@@ -99,7 +102,13 @@ export class McpConnectorClient {
       const transport = new StdioClientTransport({ command, args });
       await client.connect(transport);
     } else {
-      const transport = new StreamableHTTPClientTransport(new URL(endpoint));
+      // Phase 11 (conncore): an OAuth-protected server gets the vault's
+      // bearer token (lib/connectors/m21/mcp-oauth.ts); a 401 surfaces to
+      // the caller, which refreshes once and retries.
+      const transport = new StreamableHTTPClientTransport(
+        new URL(endpoint),
+        opts.accessToken ? { requestInit: { headers: { Authorization: `Bearer ${opts.accessToken}` } } } : undefined,
+      );
       await client.connect(transport);
     }
 

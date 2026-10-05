@@ -78,7 +78,13 @@ describe("toolCallFromPayload", () => {
     assert.equal(t.duration, "0.8 s");
   });
 
-  it("is null when nothing names a tool", () => {
+  it("leaves loop plumbing and ship patches out of the arguments", () => {
+    const t = toolCallFromPayload({ tool: "git_diff", kind: "tool_result", toolUseId: "call_1", recorded: true, status: "executed", patch: "diff --git a/x b/x" })!;
+    assert.equal(t.name, "git_diff");
+    assert.deepEqual(t.args, [["status", "executed"]]);
+  });
+
+    it("is null when nothing names a tool", () => {
     assert.equal(toolCallFromPayload({ startUrl: "https://x" }), null);
     assert.equal(toolCallFromPayload(null), null);
   });

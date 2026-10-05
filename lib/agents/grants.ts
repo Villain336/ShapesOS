@@ -39,6 +39,7 @@ export const TOOL_GROUPS = [
   "connectors", // custom MCP servers and other connected apps
   "delegate", // hand work to a sub-agent (lead only)
   "code", // code runner (arrives with the sandbox, Phase 8)
+  "ship", // push branches and open pull requests — leaves the sandbox (Phase 8)
 ] as const;
 
 export type ToolGroup = (typeof TOOL_GROUPS)[number];
@@ -63,10 +64,30 @@ export const TOOL_GROUP_LABELS: Readonly<Record<ToolGroup, string>> = {
   connectors: "Connected apps",
   delegate: "Hand off to sub-agents",
   code: "Code runner",
+  ship: "Push and pull requests",
 };
 
-/** Groups that have no tools yet — offered in the UI as unavailable, never faked. */
-export const UNAVAILABLE_GROUPS: ReadonlySet<ToolGroup> = new Set<ToolGroup>(["code"]);
+/**
+ * Phase 8: groups whose tools need infrastructure that may not be there.
+ * "code" works exactly when a sandbox provider reports available
+ * (lib/sandbox sandboxAvailability(), read server-side and passed in — this
+ * module stays pure). Unknown availability counts as unavailable: offered
+ * in the UI as unavailable with the reason, never faked.
+ */
+export interface GroupAvailability {
+  code?: { ok: true } | { ok: false; reason: string } | null;
+}
+
+export const CODE_UNAVAILABLE_DEFAULT = "No code sandbox is available on this server.";
+
+/** The groups that can't be used right now, each with the reason. PURE. */
+export function unavailableGroups(availability?: GroupAvailability | null): ReadonlyMap<ToolGroup, string> {
+  const out = new Map<ToolGroup, string>();
+  const code = availability?.code;
+  if (!code) out.set("code", CODE_UNAVAILABLE_DEFAULT);
+  else if (!code.ok) out.set("code", code.reason || CODE_UNAVAILABLE_DEFAULT);
+  return out;
+}
 
 /** Every task may read its own workspace (it's how an agent grounds itself). */
 export const ALWAYS_GRANTED: readonly ToolGroup[] = ["workspace"];
@@ -84,7 +105,9 @@ export const AGENT_MAX_GROUPS: Readonly<Record<AgentKey, readonly ToolGroup[]>> 
   analyst: ["workspace", "data", "web", "files", "code"],
   scheduler: ["workspace", "calendar", "automation"],
   // media: images for the social posts and site pages the Operator ships.
-  actor: ["workspace", "email", "calendar", "site", "social", "media", "automation", "ops", "connectors", "files", "code"],
+  // ship: the Operator takes code from a branch to a pull request (the lead
+  // has every group). Never always-granted: it must be asked for.
+  actor: ["workspace", "email", "calendar", "site", "social", "media", "automation", "ops", "connectors", "files", "code", "ship"],
 };
 
 export interface GrantInput {
@@ -148,8 +171,10 @@ export function connectorGroup(connectorKey: string): ToolGroup {
   switch (connectorKey) {
     case "gmail":
     case "resend":
+    case "outlook": // Phase 11 (conncore)
       return "email";
     case "google-calendar":
+    case "outlook-calendar": // Phase 11 (conncore)
       return "calendar";
     case "google-drive":
     case "notion":
@@ -161,6 +186,23 @@ export function connectorGroup(connectorKey: string): ToolGroup {
       return "site";
     case "dataforseo":
       return "web";
+    case "hubspot": // Phase 11 (conncore): CRM sync is business operations
+    case "shopify": // Phase 11 (bizsync): commerce + accounting sync is business operations
+    case "quickbooks":
+    case "xero":
+    case "gusto": // Phase 14 (connectors): payroll is business operations
+      return "ops";
+    // Phase 11 (devtools): issue trackers are project operations ("code" is
+    // the sandbox runner and is unavailable without one).
+    case "linear":
+    case "jira":
+      return "ops";
+    case "airtable": // Phase 11 (devtools): bases are working documents (like Notion databases)
+      return "files";
+    case "supabase": // Phase 11 (devtools): read-only SQL is analysis
+      return "data";
+    case "netlify": // Phase 11 (devtools): hosting for your own sites
+      return "site";
     case "google-search-console":
     case "ga4":
     case "google-ads":
@@ -172,9 +214,19 @@ export function connectorGroup(connectorKey: string): ToolGroup {
 }
 
 /**
+ * Phase 14 (approvals): connectors whose writes move money or the books
+ * (accounting, payroll). A write on one of them without its own mapping
+ * below falls to "money_connector_write" — a Tier-3 kind that can never be
+ * auto-approved — instead of the per-connector write_<key> switch.
+ */
+export const MONEY_CONNECTOR_KEYS: ReadonlySet<string> = new Set(["quickbooks", "xero", "gusto"]);
+
+/**
  * The automation action a mutating connector tool stands for, so the same
  * per-agent rules (lib/automation/policy.ts) decide whether it may run
- * without asking. Unknown writes map to a Tier-2 kind: they always ask.
+ * without asking. Phase 14: an unmapped write is "write_<key>" (one switch
+ * per connector, e.g. write_slack — Tier 2: asks unless a rule says auto);
+ * on a money connector it is "money_connector_write" (Tier 3, always asks).
  */
 export function connectorAction(connectorKey: string, tool: string): string {
   const key = `${connectorKey}.${tool}`;
@@ -190,9 +242,62 @@ export function connectorAction(connectorKey: string, tool: string): string {
       return "publish_owned";
     case "resend.send_test_email":
       return "send_internal_note";
+    // Phase 11 (conncore): email to anyone is external — Tier 2, always asks.
+    case "gmail.send_email":
+    case "gmail.reply_to_message":
+    case "outlook.send_email":
+    case "outlook.reply_to_message":
+      return "send_outreach_email";
+    // Phase 11 (conncore): a HubSpot pull writes your CRM records.
+    case "hubspot.sync_from_hubspot":
+      return "write_crm_record";
+    // Phase 11 (devtools): issue writes are project records — Tier 2, always asks.
+    case "linear.create_issue":
+    case "linear.update_issue":
+    case "linear.add_comment":
+    case "jira.create_issue":
+    case "jira.transition_issue":
+    case "jira.add_comment":
+      return "write_project_record";
+    // Phase 11 (devtools): Airtable record writes — Tier 2 (Phase 14: the
+    // per-connector write_airtable switch).
+    case "airtable.create_records":
+    case "airtable.update_records":
+      return "write_airtable";
+    // Phase 11 (devtools): deploying your own site, like webflow.publish_site.
+    case "netlify.trigger_deploy":
+      return "publish_owned";
+    // Phase 11 (bizsync): a store pull writes products, stock, orders and
+    // contacts; pushing stock changes a public store — both Tier 2, ask.
+    case "shopify.sync_from_shopify":
+      return "import_commerce_data";
+    case "shopify.push_inventory":
+      return "update_store_inventory";
+    // Phase 11 (bizsync): accounting — contacts are CRM writes (Tier 2);
+    // posting the books is Tier 3 (never automated, always asks).
+    case "quickbooks.import_contacts":
+    case "xero.import_contacts":
+      return "write_crm_record";
+    case "quickbooks.post_to_quickbooks":
+    case "xero.post_to_xero":
+      return "post_to_accounting";
+    // Phase 14 (connectors): Gusto. Sending a pay run is money — Tier 3
+    // (send_payroll_to_provider is in TIER3_EXACT_KINDS: never automated,
+    // always asks). Saving suggested employee matches is a Tier-2 write.
+    case "gusto.send_payroll":
+      return "send_payroll_to_provider";
+    case "gusto.sync_employees":
+      return "write_gusto";
     default:
-      return "connector_write";
+      return defaultConnectorWriteAction(connectorKey);
   }
+}
+
+/** Phase 14: "google-calendar" → "write_google_calendar"; money connectors → money_connector_write. */
+export function defaultConnectorWriteAction(connectorKey: string): string {
+  if (MONEY_CONNECTOR_KEYS.has(connectorKey)) return "money_connector_write";
+  const slug = connectorKey.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 100);
+  return slug ? `write_${slug}` : "connector_write";
 }
 
 /** The composer's tool chips and the group each one grants. */

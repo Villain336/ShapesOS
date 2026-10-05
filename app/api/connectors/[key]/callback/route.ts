@@ -20,7 +20,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ key:
   if (!code || !state) return Response.redirect(failed, 302);
   try {
     const redirectUri = `${origin}/api/connectors/${encodeURIComponent(key)}/callback`;
-    const connection = await handleOAuthCallback(state, code, redirectUri);
+    // Phase 11 (bizsync): the whole query (Shopify hmac + shop, QuickBooks realmId).
+    const query = Object.fromEntries(req.nextUrl.searchParams.entries());
+    const connection = await handleOAuthCallback(state, code, redirectUri, {}, query);
     // A completed token exchange is a real provider interaction — honest
     // evidence for the health checker (Phase B, track B3).
     await recordSuccessfulSync(connection.id);

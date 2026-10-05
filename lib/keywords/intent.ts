@@ -61,9 +61,11 @@ const NAVIGATIONAL = [
 ];
 
 export function inferIntent(phrase: string): KeywordIntentLabel {
-  const p = ` ${phrase.toLowerCase().trim()} `;
+  // Phase 11 (seotools): modifiers match at a word start ("border collie" is
+  // not "order"); short ones (≤3 chars, "vs") must be whole words.
+  const p = ` ${phrase.toLowerCase().trim().replace(/[^a-z0-9]+/g, " ")} `;
   const hit = (words: string[]) =>
-    words.some((w) => p.includes(w === "vs" || w.length <= 3 ? ` ${w} ` : w));
+    words.some((w) => p.includes(w.length <= 3 ? ` ${w} ` : ` ${w}`));
   if (hit(TRANSACTIONAL)) return "transactional";
   if (hit(COMMERCIAL)) return "commercial";
   if (hit(INFORMATIONAL)) return "informational";
