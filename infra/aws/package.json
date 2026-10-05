@@ -1,0 +1,30 @@
+{
+  "name": "shapesos-infra-aws",
+  "version": "0.1.0",
+  "private": true,
+  "license": "AGPL-3.0-only",
+  "description": "ShapesOS on AWS (ECS Fargate + RDS PostgreSQL 16 + CloudFront/WAF), AWS CDK v2. Own package: not part of the app build.",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "tsc --noEmit -p tsconfig.json",
+    "test": "tsc --noEmit -p tsconfig.json && tsx --test test/*.test.ts",
+    "synth": "cdk synth --quiet",
+    "cdk": "cdk",
+    "bootstrap-template": "tsx bin/write-bootstrap.ts"
+  },
+  "dependencies": {
+    "aws-cdk-lib": "2.272.0",
+    "constructs": "10.8.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "aws-cdk": "2.1144.0",
+    "ajv": "8.20.0",
+    "yaml": "2.9.1",
+    "tsx": "4.23.15",
+    "typescript": "5.9.3"
+  }
+}

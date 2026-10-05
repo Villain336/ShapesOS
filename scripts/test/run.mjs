@@ -6,7 +6,8 @@
 //   npm run test:db   suites listed in scripts/test/db-tests.txt (needs a
 //                     migrated DATABASE_URL — see scripts/db/migrate.sh)
 //
-// mobile/ has its own package (vitest) and is tested there.
+// mobile/ has its own package (vitest) and is tested there; so does infra/aws
+// (the AWS CDK app: `cd infra/aws && npm test`, the ci workflow's infra job).
 import { execFileSync, spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 
@@ -23,7 +24,7 @@ const dbTests = new Set(
 const all = execFileSync("git", ["ls-files", "*.test.ts", "*.test.tsx", "*.test.mts"], { encoding: "utf8" })
   .split("\n")
   .filter(Boolean)
-  .filter((f) => !f.startsWith("mobile/"));
+  .filter((f) => !f.startsWith("mobile/") && !f.startsWith("infra/"));
 
 for (const f of dbTests) {
   if (!all.includes(f)) {
