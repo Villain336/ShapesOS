@@ -5,7 +5,7 @@
 
 import AdmZip from "adm-zip";
 import { sanitizePath } from "@/lib/sitefiles/paths";
-import { LocalDirProvider } from "./local";
+import type { WorkingCopyProvider } from "./local";
 
 const MAX_ZIP_FILES = 2000;
 const MAX_ZIP_BYTES = 50 * 1024 * 1024;
@@ -24,7 +24,7 @@ function safeEntryPath(name: string): string {
  */
 export async function extractZipToProvider(
   zipBuffer: Buffer,
-  provider: LocalDirProvider,
+  provider: WorkingCopyProvider,
 ): Promise<string[]> {
   if (zipBuffer.length > MAX_ZIP_BYTES) throw new Error("Zip too large (max 50 MB)");
   let zip: AdmZip;
@@ -56,7 +56,7 @@ export async function extractZipToProvider(
 }
 
 /** Pack every file in the provider's root into a zip buffer. */
-export async function zipProviderFiles(provider: LocalDirProvider): Promise<Buffer> {
+export async function zipProviderFiles(provider: WorkingCopyProvider): Promise<Buffer> {
   const zip = new AdmZip();
   const walk = async (dir: string) => {
     for (const e of await provider.listDir(dir)) {

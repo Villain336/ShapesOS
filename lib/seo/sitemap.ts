@@ -20,7 +20,7 @@
 
 import { createHmac } from "node:crypto";
 import { prisma } from "@/lib/prisma";
-import type { LocalDirProvider } from "@/lib/connectors/local";
+import type { WorkingCopyProvider } from "@/lib/connectors/local";
 import { readSiteWorkingCopy, workingCopy, type SiteFile } from "@/lib/sites/files";
 import { resolveLiveAuditUrl } from "@/lib/audit/project-audit";
 import { urlPathForFile } from "./jsonld";
@@ -131,7 +131,7 @@ export async function refreshSiteSitemap(input: {
   siteId: string;
   projectId: string;
   origin?: string | null;
-  provider?: LocalDirProvider;
+  provider?: WorkingCopyProvider;
   secret?: string | null;
 }): Promise<SitemapRefresh> {
   const provider = input.provider ?? workingCopy(input.siteId);
