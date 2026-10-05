@@ -547,6 +547,9 @@ export const SHOPIFY_WEBHOOK_TOPICS = [
   "CUSTOMERS_CREATE",
   "CUSTOMERS_UPDATE",
   "INVENTORY_LEVELS_UPDATE",
+  // Phase 14 (connectors): uninstalling the app revokes the connection and
+  // stops ingest (lib/bizsync/shopify/uninstall.ts; handled by the route).
+  "APP_UNINSTALLED",
 ] as const;
 
 /** Whether this verified webhook topic is applied to Ops (else only the graph ingest sees it). */
