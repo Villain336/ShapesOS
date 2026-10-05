@@ -179,6 +179,12 @@ describe("Phase 16 automatic delegation (fake Responses API, real loop + queue +
     assert.match(node!.line, /5 of 5 sub-agents done/);
     assert.equal(node!.children?.length, 5, "its sub-agents hang under it");
     assert.ok(node!.children!.every((c) => c.name === "Researcher" && c.status === "done"));
+
+    // The subagent_spawn credit is metered once per child (idempotent per run).
+    const spawns = await withWorkspaceScope(WS, (tx) =>
+      tx.usageEvent.findMany({ where: { workspaceId: WS, action: "subagent_spawn", idempotencyKey: { in: kids.map((k) => `subagent-spawn:${k.id}`) } } }),
+    );
+    assert.equal(spawns.length, 5, "one spawn charge per sub-agent");
   });
 
   it("the workspace cap holds across runs (a workspace setting: 2 live sub-agents)", async () => {
@@ -614,6 +620,47 @@ describe("Phase 16 automatic delegation (fake Responses API, real loop + queue +
     } finally {
       await withWorkspaceScope(WS, (tx) => tx.agentDelegationSetting.deleteMany({ where: { workspaceId: WS } }));
     }
+  });
+
+  it("verify and fix: a failed task is reported, retried at most once, and the merge uses the retry", async () => {
+    const t = await thread();
+    model.requests.length = 0;
+    let leadStep = 0;
+    model.script = (b) => {
+      const id = childTask(b);
+      if (id === "good") return { text: deliverable("good ok", "GOOD-OUT") };
+      if (id === "flaky") throw new Error("the flaky sub-agent's provider is down (fake 500)");
+      if (id === "flaky2") return { text: deliverable("retry ok", "RETRY-OUT") };
+      const outs = toolOutputs(b);
+      if (outs.length === 0) {
+        return delegateCall("Two parts", [
+          { id: "good", agent: "researcher", brief: "Good part", deliverable: "good" },
+          { id: "flaky", agent: "analyst", brief: "Flaky part", deliverable: "numbers" },
+        ]);
+      }
+      leadStep++;
+      if (leadStep === 1) {
+        assert.ok(outs.some((o) => /Task flaky — Analyst — FAILED/.test(o)), "the failure is reported, not dropped");
+        return delegateCall("Retry the flaky part", [{ id: "flaky2", agent: "analyst", brief: "Flaky part, again", deliverable: "numbers", fixes: "flaky" }]);
+      }
+      if (leadStep === 2) {
+        // A second retry of the same task is refused.
+        return delegateCall("Retry again", [{ id: "flaky3", agent: "analyst", brief: "Again", deliverable: "numbers", fixes: "flaky" }]);
+      }
+      return { text: `Merged: ${outs.some((o) => /RETRY-OUT/.test(o)) ? "with the retry" : "without"}.` };
+    };
+    const out = await turn(t.id, "Do both parts");
+    await pump(newWorker());
+    const plans = (await getDelegation(WS, out.runId))!.state!.plans;
+    assert.equal(plans.length, 2, "the first plan and ONE fix round");
+    assert.deepEqual(plans[0]!.tasks.map((x) => x.status), ["succeeded", "failed"]);
+    assert.equal(plans[1]!.round, 1);
+    assert.equal(plans[1]!.tasks[0]!.fixes, "flaky");
+    assert.equal(plans[1]!.tasks[0]!.status, "succeeded");
+    const refused = model.requests.filter((r) => isLead(r.body)).at(-1)!;
+    assert.ok(toolOutputs(refused.body).some((o) => /already retried once/.test(o)), "a second retry was refused with the reason");
+    assert.equal((await lastAssistant(t.id))?.content, "Merged: with the retry.");
+    assert.equal((await getAgentRun(WS, out.runId))?.status, "succeeded");
   });
 
   it("a plan the rules refuse starts nothing and tells the model why", async () => {
