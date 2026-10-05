@@ -8,7 +8,8 @@
 //                         to (confirmed or suggested)  (read)
 //   sync_employees        save email matches as SUGGESTIONS a person confirms
 //                         on Settings → Connectors → Business sync  [mutating —
-//                         write_gusto, Tier 2, asks]
+//                         write_gusto, Tier 2: asks unless an
+//                         automation rule lets it run — no money moves]
 //   send_payroll          write a computed pay run's hours into Gusto's open
 //                         payroll for the same period (idempotent per run and
 //                         figures; Gusto computes the taxes; the person

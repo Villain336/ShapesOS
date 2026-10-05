@@ -231,8 +231,10 @@ describe("Phase 14: connector writes", () => {
         const d = decideAutoApproval([auto(action)], { agentKey: "lead", action, description: `${t.name}: ${t.description}` });
         const intrinsic = evaluateTier({ kind: action, description: `${t.name}: ${t.description}` }, ON);
         assert.equal(d.auto, intrinsic !== 3, `${meta.key}.${t.name}`);
-        // On a money connector only a contact import (CRM records, no money) may auto-run.
-        if (MONEY_CONNECTOR_KEYS.has(meta.key) && action !== "write_crm_record") {
+        // On a money connector only a contact import (CRM records, no money)
+        // and Gusto's employee-match SUGGESTIONS (a person confirms each; no
+        // money, nothing written to Gusto) may auto-run.
+        if (MONEY_CONNECTOR_KEYS.has(meta.key) && action !== "write_crm_record" && action !== "write_gusto") {
           assert.equal(d.auto, false, `${meta.key}.${t.name} moves money or the books`);
         }
       }
