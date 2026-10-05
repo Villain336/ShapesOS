@@ -66,8 +66,14 @@ const CONNECTOR_KEY = "zernio";
  * "zernio") — what the agent's project data-source bindings point at. The
  * platform key is server-side; the row carries no credential.
  */
-export async function ensureZernioConnection(workspaceId: string, userId: string, profileId: string, mode: string): Promise<string> {
-  const existing = await prisma.connectorConnection.findFirst({
+export async function ensureZernioConnection(
+  workspaceId: string,
+  userId: string,
+  profileId: string,
+  mode: string,
+  db: Pick<Prisma.TransactionClient, "connectorConnection"> = prisma,
+): Promise<string> {
+  const existing = await db.connectorConnection.findFirst({
     where: { workspaceId, connectorKey: CONNECTOR_KEY },
     orderBy: { connectedAt: "asc" },
     select: { id: true, meta: true, status: true },
@@ -76,11 +82,11 @@ export async function ensureZernioConnection(workspaceId: string, userId: string
   if (existing) {
     const m = (existing.meta ?? {}) as Record<string, unknown>;
     if (m.profileId !== profileId || m.mode !== mode || existing.status !== "active") {
-      await prisma.connectorConnection.update({ where: { id: existing.id }, data: { meta, status: "active" } });
+      await db.connectorConnection.update({ where: { id: existing.id }, data: { meta, status: "active" } });
     }
     return existing.id;
   }
-  const row = await prisma.connectorConnection.create({
+  const row = await db.connectorConnection.create({
     data: { workspaceId, connectorKey: CONNECTOR_KEY, userId, status: "active", scopes: [], meta },
     select: { id: true },
   });
@@ -132,14 +138,16 @@ export async function getZernioScope(
         const again = await tx.zernioProfile.findUnique({ where: { workspaceId_mode: { workspaceId, mode } } });
         if (again) return again;
         const remote = await createRemoteProfile(client, workspaceId, mode);
-        return tx.zernioProfile.create({
+        const created = await tx.zernioProfile.create({
           data: { workspaceId, mode, profileId: remote.id, name: remote.name, createdBy: opts.userId ?? null },
         });
+        // Under the same lock: concurrent first uses never race on the connection row.
+        const owner = opts.userId ?? (await tx.workspace.findUnique({ where: { id: workspaceId }, select: { ownerUserId: true } }))?.ownerUserId ?? "system";
+        await ensureZernioConnection(workspaceId, owner, created.profileId, mode, tx as unknown as Prisma.TransactionClient);
+        return created;
       },
       { timeoutMs: 60_000 },
     );
-    const owner = opts.userId ?? (await prisma.workspace.findUnique({ where: { id: workspaceId }, select: { ownerUserId: true } }))?.ownerUserId ?? "system";
-    await ensureZernioConnection(workspaceId, owner, row.profileId, mode);
   }
   // Dev mock mode: the in-memory fake forgets profiles on restart.
   if (mode === "mock" && isDefaultFakeClient(client)) getFakeZernio().adoptProfile(row.profileId, row.name);

@@ -161,7 +161,8 @@ export async function runZernioAccountMetering(opts: {
       results.push({ workspaceId: w.id, month, status: "error", detail: c.error });
       continue;
     }
-    const inc = included.get(w.id) ?? ZERNIO_FREE_ACCOUNTS_PER_WORKSPACE;
+    // null = every account included (self-hosted, own key) — not "missing".
+    const inc = included.has(w.id) ? (included.get(w.id) as number | null) : ZERNIO_FREE_ACCOUNTS_PER_WORKSPACE;
     const billable = billableAccounts(c.connected, inc);
     const accountCredits = billable * ZERNIO_ACCOUNT_MONTH_CREDITS;
 
