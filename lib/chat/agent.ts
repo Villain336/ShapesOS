@@ -52,7 +52,7 @@ import { getTool, registerExtraTool, type ToolContext, type ToolDef } from "./to
 import {
   DELEGATE_TOOL,
   executeTool,
-  proposalText,
+  proposalText as proposalTextFor,
   runEvent,
   stopRequested,
   type ChatToolCall,
@@ -390,6 +390,11 @@ async function mockTurn(
     await executeTool(ctx, toolName, args, call);
     return call;
   };
+  // Phase 14: a call an automation rule let run is reported as done, not proposed.
+  const proposalText = (call: ChatToolCall): string =>
+    call.autoApproved
+      ? `${call.status === "executed" ? "Done" : "Tried"} without asking (${call.autoApproved}): ${call.resultSummary ?? call.tool}`
+      : proposalTextFor(call);
 
   const first = lower.split(/\s+/)[0];
   switch (first) {
