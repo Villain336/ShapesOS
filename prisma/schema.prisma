@@ -612,6 +612,12 @@ model Workspace {
   agentJobs                   AgentJob[]
   // Phase 16 (deleg): the workspace's automatic-delegation switch and limits.
   agentDelegationSetting      AgentDelegationSetting?
+  // Phase 15.4 (zernio): the workspace's Zernio profile(s), connected
+  // accounts, ad-create dry runs and monthly account metering snapshots.
+  zernioProfiles              ZernioProfile[]
+  zernioAccounts              ZernioAccount[]
+  zernioAdValidations         ZernioAdValidation[]
+  zernioAccountUsage          ZernioAccountUsage[]
   agentRunTranscripts         AgentRunTranscript[]
   // Phase 16 slice 9: branded report engine back-relation.
   reportSendApprovals         ReportSendApproval[]
@@ -11098,6 +11104,9 @@ enum AdPlatformKey {
   stackadapt
   walmart
   spotify
+  // Phase 15.4 (zernio): Meta, Google, TikTok, LinkedIn, Pinterest, X and
+  // OpenAI ads through the Zernio platform key (lib/zernio/reports.ts).
+  zernio
 }
 
 enum AdPlatformAuthKind {
@@ -16776,4 +16785,111 @@ model AgentDelegationSetting {
   updatedAt           DateTime  @updatedAt @map("updated_at")
 
   @@map("agent_delegation_settings")
+}
+
+// ---------------------------------------------------------------------------
+// Phase 15.4 (zernio): Zernio as a live, pre-added platform key for ads on 7
+// networks and social publishing on 16 platforms (lib/zernio). One Zernio
+// PROFILE per workspace (createProfile, /v1/profiles) — every call is scoped to
+// it, and every accountId / ad account / campaign an agent names is checked to
+// belong to it before use. All four tables are FORCE RLS on app.workspace_id
+// and cascade from workspaces.
+// ---------------------------------------------------------------------------
+
+// The workspace's Zernio profile. `mode` separates a profile on the live API
+// (ZERNIO_API_KEY) from one on the labelled FAKE Zernio used in dev/tests, so
+// turning the key on later provisions a real profile instead of reusing a fake
+// id. Created once per (workspace, mode) under an advisory lock.
+model ZernioProfile {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  mode        String // "live" | "mock"
+  profileId   String    @map("profile_id")
+  name        String
+  createdBy   String?   @map("created_by")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  accounts ZernioAccount[]
+
+  @@unique([workspaceId, mode])
+  @@unique([mode, profileId])
+  @@map("zernio_profiles")
+}
+
+// A connected Zernio account (social, ads, communication) on the workspace's
+// profile — the local mirror the ownership checks read first (no HTTP), kept
+// in step with GET /v1/accounts by the connect callback and the card.
+model ZernioAccount {
+  id             String        @id @default(cuid())
+  workspaceId    String        @map("workspace_id")
+  workspace      Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  profileRowId   String        @map("profile_row_id")
+  profile        ZernioProfile @relation(fields: [profileRowId], references: [id], onDelete: Cascade)
+  accountId      String        @map("account_id")
+  platform       String
+  // social | ads | communication | blogs (GET /v1/accounts `category`)
+  category       String
+  username       String?
+  displayName    String?       @map("display_name")
+  // connected | needs_reconnect | disconnected
+  status         String        @default("connected")
+  // Platform ad account ids seen under this ads account (GET /v1/ads/accounts).
+  adAccountIds   String[]      @default([]) @map("ad_account_ids")
+  connectedAt    DateTime      @default(now()) @map("connected_at")
+  lastSeenAt     DateTime      @default(now()) @map("last_seen_at")
+  disconnectedAt DateTime?     @map("disconnected_at")
+
+  @@unique([workspaceId, accountId])
+  @@index([profileRowId])
+  @@index([accountId])
+  @@map("zernio_accounts")
+}
+
+// A validateOnly dry run of an ad create (POST /v1/ads/create, validateOnly:
+// true). The real create runs only after a person confirms, and only on a
+// payload whose hash passed (or could not be dry-run on that platform) here —
+// one validation per real create (Meta counts validateOnly as a write).
+model ZernioAdValidation {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  payloadHash String    @map("payload_hash")
+  accountId   String    @map("account_id")
+  adAccountId String    @map("ad_account_id")
+  // passed | unsupported | failed
+  status      String
+  result      Json      @default("{}")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  consumedAt  DateTime? @map("consumed_at")
+
+  @@index([workspaceId, payloadHash])
+  @@map("zernio_ad_validations")
+}
+
+// One monthly metering snapshot per workspace: connected Zernio accounts, the
+// plan's included accounts, and what was charged (zernio_account_month) plus
+// managed-ad overage passed through at cost + margin. Idempotent per
+// (workspace, month); the usage page reads it.
+model ZernioAccountUsage {
+  id                String    @id @default(cuid())
+  workspaceId       String    @map("workspace_id")
+  workspace         Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  // YYYY-MM
+  month             String
+  connectedAccounts Int       @map("connected_accounts")
+  includedAccounts  Int       @map("included_accounts")
+  billableAccounts  Int       @map("billable_accounts")
+  accountCredits    Int       @default(0) @map("account_credits")
+  managedAdsUsd     Float     @default(0) @map("managed_ads_usd")
+  managedAdsCredits Int       @default(0) @map("managed_ads_credits")
+  // charged | included | blocked | error
+  status            String
+  detail            String?
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  @@unique([workspaceId, month])
+  @@map("zernio_account_usage")
 }
