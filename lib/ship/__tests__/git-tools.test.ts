@@ -82,6 +82,12 @@ const connector = {
   async listReviewComments() {
     return [{ id: 2, path: "src/a.js", line: 3, body: "Off by one here.", author: "rev", url: "u", createdAt: "", inReplyTo: null }];
   },
+  async listIssueComments() {
+    return [
+      { id: 3, body: "Also bump the version.", author: "rev", url: "u3", createdAt: "" },
+      { id: 4, body: "Deployed preview.", author: "netlify[bot]", url: "u4", createdAt: "" },
+    ];
+  },
 } as unknown as GitHubConnector;
 
 const access: RepoAccess = {
@@ -232,6 +238,8 @@ describe("git tools (real git, fake sandbox, no network)", () => {
     assert.match(fb.summary, /unit tests: failure — 2 failed/);
     assert.match(fb.summary, /rev: CHANGES_REQUESTED — Rename the helper\./);
     assert.match(fb.summary, /src\/a\.js:3 rev: Off by one here\./);
+    assert.match(fb.summary, /Conversation:\n- rev: Also bump the version\./);
+    assert.doesNotMatch(fb.summary, /netlify\[bot\]/, "bots' comments are left out");
   });
 
   it("the token never appears in a command line, a run event or a tool result", () => {

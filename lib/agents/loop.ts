@@ -39,9 +39,11 @@
 //   * Events: text is streamed to the run timeline as `text` events (chunks
 //     of deltas, what the AG-UI SSE route replays live), tool start / result
 //     as `agui` events, usage by the provider (lib/llm/usage.ts).
-//   * Code mode: mode "build" runs on the `code` workload; after two tool
-//     results flagged details.testsFailed === true the next call escalates to
-//     `code_max`.
+//   * Code mode: mode "build" runs on the `code` workload. A step whose tool
+//     results include details.testsFailed === true (run_tests / run_checks)
+//     is one failed fix cycle. After AGENT_FIX_CYCLES of them (default 5) the
+//     next call escalates to `code_max`; after as many again on code_max the
+//     run stops and hands the failing state back to the person (Phase 9).
 
 import type { WorkspaceRole } from "@prisma/client";
 import {
@@ -94,6 +96,8 @@ export interface AgentLoopLimits {
   compactAtTokens: number;
   /** Characters of one tool result sent back to the model. */
   toolResultMaxChars: number;
+  /** Phase 9: failed test/check cycles before code mode escalates (and again before it hands back). */
+  fixCycles: number;
 }
 
 export const DEFAULT_LOOP_LIMITS: Readonly<AgentLoopLimits> = Object.freeze({
@@ -102,6 +106,7 @@ export const DEFAULT_LOOP_LIMITS: Readonly<AgentLoopLimits> = Object.freeze({
   maxCostMicroUsd: 10_000_000,
   compactAtTokens: 150_000,
   toolResultMaxChars: 20_000,
+  fixCycles: 5,
 });
 
 function posInt(v: string | undefined): number | null {
@@ -113,7 +118,8 @@ function posInt(v: string | undefined): number | null {
  * Limits from the environment (documented in .env.example):
  *   AGENT_MAX_STEPS (40) · AGENT_MAX_RUN_MINUTES (30) ·
  *   AGENT_MAX_RUN_COST_MICRO_USD (10000000 = $10) ·
- *   AGENT_COMPACT_AT_TOKENS (150000) · AGENT_TOOL_RESULT_MAX_CHARS (20000)
+ *   AGENT_COMPACT_AT_TOKENS (150000) · AGENT_TOOL_RESULT_MAX_CHARS (20000) ·
+ *   AGENT_FIX_CYCLES (5)
  */
 export function loopLimitsFromEnv(env: EnvLike = process.env): AgentLoopLimits {
   const minutes = posInt(env.AGENT_MAX_RUN_MINUTES);
@@ -123,6 +129,7 @@ export function loopLimitsFromEnv(env: EnvLike = process.env): AgentLoopLimits {
     maxCostMicroUsd: posInt(env.AGENT_MAX_RUN_COST_MICRO_USD) ?? DEFAULT_LOOP_LIMITS.maxCostMicroUsd,
     compactAtTokens: posInt(env.AGENT_COMPACT_AT_TOKENS) ?? DEFAULT_LOOP_LIMITS.compactAtTokens,
     toolResultMaxChars: posInt(env.AGENT_TOOL_RESULT_MAX_CHARS) ?? DEFAULT_LOOP_LIMITS.toolResultMaxChars,
+    fixCycles: posInt(env.AGENT_FIX_CYCLES) ?? DEFAULT_LOOP_LIMITS.fixCycles,
   };
 }
 
@@ -130,8 +137,23 @@ export function loopLimitsFromEnv(env: EnvLike = process.env): AgentLoopLimits {
 const MAX_PAUSE_RESUMES = 5;
 /** Client-side compactions per run (a context-window error retries after one). */
 const MAX_COMPACTIONS = 4;
-/** Test-fail cycles before code mode escalates to code_max. */
-export const ESCALATE_AFTER_TEST_FAILURES = 2;
+/** Default failed fix cycles before code mode escalates to code_max (AGENT_FIX_CYCLES). */
+export const ESCALATE_AFTER_TEST_FAILURES = DEFAULT_LOOP_LIMITS.fixCycles;
+
+/** What the fix-cycle policy says before the next model call. PURE. */
+export function fixCyclePolicy(
+  s: Pick<LoopState, "mode" | "workload" | "escalated" | "testFailCycles">,
+  fixCycles: number,
+): "continue" | "escalate" | "hand_back" {
+  if (s.mode !== "build" || fixCycles <= 0) return "continue";
+  if (!s.escalated && s.workload === "code" && s.testFailCycles >= fixCycles) return "escalate";
+  if (s.testFailCycles >= fixCycles * (s.escalated ? 2 : 1) && (s.escalated || s.workload === "code_max")) return "hand_back";
+  return "continue";
+}
+
+export const handBackText = (cycles: number): string =>
+  `I stopped after ${cycles} rounds of fixes that still leave the checks failing (the stronger code model included). ` +
+  "The diff so far is on the run page. Tell me how you'd like to proceed, or point me at the failing part.";
 
 export const STOPPED_TEXT = "Stopped. Nothing else will run for this task.";
 export const MAX_TOKENS_NOTE =
@@ -348,7 +370,7 @@ function stripThinking(messages: ChatMessage[]): ChatMessage[] {
   );
 }
 
-function testsFailed(result: ToolResult | null): boolean {
+export function testsFailed(result: ToolResult | null): boolean {
   const d = result?.details as { testsFailed?: unknown } | undefined;
   return !!d && typeof d === "object" && d.testsFailed === true;
 }
@@ -541,6 +563,19 @@ export async function runAgentLoop(input: AgentLoopInput): Promise<AgentLoopResu
       return { status: "handoff", finalText: "", proposal: null, calls: s.calls, state: s };
     }
 
+    // ── code mode: fix cycles (escalate, then hand back) ─────────────────────
+    const policy = fixCyclePolicy(s, limits.fixCycles);
+    if (policy === "escalate") {
+      s.escalated = true;
+      s.workload = "code_max";
+      s.messages = stripThinking(s.messages);
+      await note(`Checks failed ${s.testFailCycles} times: escalating to the code_max model`, { kind: "escalation", workload: "code_max" });
+      await save();
+    } else if (policy === "hand_back") {
+      await note(`Checks still failing after ${s.testFailCycles} fix cycles: handing back`, { kind: "fix_cycles_exhausted", cycles: s.testFailCycles });
+      return finish({ status: "done", finalText: [lastText, handBackText(s.testFailCycles)].filter(Boolean).join("\n\n"), proposal: null });
+    }
+
     // ── client-side compaction ───────────────────────────────────────────────
     const provider = resolveProvider(deps, s.workload);
     if (!s.lastServerCompaction && s.lastInputTokens >= limits.compactAtTokens && s.compactions < MAX_COMPACTIONS) {
@@ -663,14 +698,6 @@ export async function runAgentLoop(input: AgentLoopInput): Promise<AgentLoopResu
     if (tr.cancelled) return finish({ status: "cancelled", finalText: STOPPED_TEXT, proposal: null });
     if (tr.proposal) {
       return finish({ status: "awaiting_confirmation", finalText: proposalText(tr.proposal), proposal: tr.proposal });
-    }
-    // Code mode: escalate after repeated failing test cycles.
-    if (s.mode === "build" && s.workload === "code" && !s.escalated && s.testFailCycles >= ESCALATE_AFTER_TEST_FAILURES) {
-      s.escalated = true;
-      s.workload = "code_max";
-      s.messages = stripThinking(s.messages);
-      await note(`Tests failed ${s.testFailCycles} times: escalating to the code_max model`, { kind: "escalation", workload: "code_max" });
-      await save();
     }
   }
 }

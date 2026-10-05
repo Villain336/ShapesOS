@@ -25,6 +25,7 @@
 // mutating calls simulate against a local fake and NEVER touch api.vibe.co.
 
 import type { CtvStore } from "./store";
+import { assertFakeProviderAllowed } from "@/lib/env/secrets";
 
 /** Pinned OpenAPI revision — verified live 2026-09-25. */
 export const VIBE_API_REVISION = "2026-06-01";
@@ -365,5 +366,8 @@ export class VibeAdapter {
 }
 
 export function createVibeAdapter(env: NodeJS.ProcessEnv = process.env, fetchImpl?: typeof fetch): VibeAdapter {
-  return new VibeAdapter(resolveVibeConfig(env), fetchImpl);
+  const cfg = resolveVibeConfig(env);
+  // Phase 11 (conncore): test-mode (fake) campaigns are refused in production.
+  if (cfg.testMode) assertFakeProviderAllowed("Vibe CTV", env);
+  return new VibeAdapter(cfg, fetchImpl);
 }

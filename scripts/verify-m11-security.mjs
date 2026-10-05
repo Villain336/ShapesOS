@@ -89,6 +89,8 @@ const AUTHZ_PRIMITIVES = [
   "requireSelfService",                         // Phase 4a own-account actions (lib/auth/require-self-service.ts) — no target id read from the request; keyed to the session subject
   "requireScimAuth",                            // Phase 4a SCIM 2.0 (lib/scim/auth.ts) — per-workspace hashed bearer token; tenant from the token, RLS-scoped
   "requireAccountUser",                         // Phase 4a self-service account security (lib/auth/mfa/guard.ts) — acts only on the caller's own factors; destructive changes need re-auth
+  "financeGuard",                               // Phase 10 (finance) ops guard (lib/ops/finance/http.ts) — requireUser + requireWorkspaceRole(editor|admin) for mutations
+  "portalGuard",                                // Phase 10 (portal) client-portal guard (lib/portal/http.ts) — portal session cookie (never a workspace session), CSRF, Client.viewerRole section/action gate; data scoped to (workspace, client links) under RLS
 ];
 // Public by design. Each entry documents WHY — this is a justification list,
 // not a suppression list. Adding an entry requires a code comment in the
@@ -183,6 +185,28 @@ const PUBLIC_BY_DESIGN = {
   // Phase 6 (runtime): workflow canvas webhook trigger — capability model, see route comments.
   "app/api/hooks/workflows/[id]/route.ts":
     "inbound workflow-trigger webhook; ShapesOS-Signature HMAC-SHA256 (lib/webhooks/signing.ts verifyWebhookSignature, per-workflow whsec_ secret stored as a secrets() envelope) verified before any parsing/logic with a 5-minute window; exact replays 409 via unique receipt; unknown workflow/no secret/no webhook trigger 404 alike; per-workflow rate limit + 64 KiB body cap; only starts a run through startWorkflowRun (kill switch honoured), returns run id + status only",
+  // Phase 9 (repos): GitHub PR feedback webhook — capability model, see route comments.
+  // Phase 10 (finance): tenant Stripe Checkout webhook — capability model, see route comments.
+  "app/api/ops/stripe/webhook/[workspaceId]/route.ts":
+    "inbound tenant Stripe webhook; Stripe-Signature verified with THAT workspace's own webhook secret (lib/secrets envelope, stripe.webhooks.constructEvent with timestamp tolerance) before any parsing/logic (unset secret 503, bad signature 400); only checkout.session.completed carrying this workspace's invoice metadata is applied, once per payment intent (advisory lock + lookup), under the tenant's RLS scope; 1 MiB body cap; returns ids only. Phase 10 (store): the same verified handler also applies storefront Checkout Sessions (metadata.order_id of this workspace): paid → draft order confirmed by a status-guarded claim, payment + stock sale + journal once; expired → the unpaid draft is cancelled",
+  // Phase 10 (store): public storefront cart + checkout — capability model, see route comments.
+  "app/api/shop/[storeSlug]/cart/route.ts":
+    "public storefront cart (buyers have no account); only a PUBLISHED store resolves (SELECT-only app.store_route policy), unknown/unpublished 404; the cart is an HMAC-SHA256-signed cookie bound to that store that names products and quantities only — every price, stock level and promotion is re-read from the database; adding a product the store doesn't list and sell is refused; writes nothing to the database; per-store+IP rate limit + proxy IP limit, 4 KiB body cap",
+  "app/api/shop/[storeSlug]/checkout/route.ts":
+    "public storefront checkout; only a PUBLISHED store resolves (unknown/unpublished 404); price, stock and promotion re-validated server-side from the database (never client prices) before a DRAFT web order and a Stripe Checkout Session are created with the WORKSPACE'S OWN Stripe key (no key → 409, never a fake success); nothing is paid here — payment is recorded only by the Stripe-signed tenant webhook; per-store+IP limit (10/10 min) + CAPTCHA step-up (lib/auth/captcha.ts) from the second attempt when configured, 4 KiB body cap; returns the Checkout URL only",
+  // Phase 12 (people): public event registration — capability model, see route comments.
+  "app/api/events/[slug]/register/route.ts":
+    "public event registration (registrants have no account); only a PUBLISHED event resolves (SELECT-only app.event_route policy), unknown/draft 404; ticket price, sales window and seats re-checked server-side from the database (never client prices); seats reserved with row-locked conditional counter updates + DB CHECKs (never oversold); paid tickets stay PENDING until the Stripe-signed tenant webhook confirms them, the Checkout Session uses the WORKSPACE'S OWN Stripe key (no key → 409, never a fake success); per-event+IP limit (10/10 min) + CAPTCHA step-up from the second attempt when configured; 16 KiB body cap; returns a signed view link or the Checkout URL only",
+  // Phase 10 (portal): client-portal sign-in — capability model, see route comments.
+  "app/api/portal/login/route.ts":
+    "Phase 10 client-portal sign-in request; always the same 200; emails a single-use 15-minute link (SHA-256 at rest, FORCE RLS) only to a client whose portal is on; login lockout, CAPTCHA step-up, per-address send limit shared with workspace sign-in mail, JSON only, proxy auth tier",
+  "app/api/portal/link/route.ts":
+    "Phase 10 client-portal link redemption; the single-use link token is the capability, consumed by one guarded UPDATE (used_at IS NULL AND expires_at > now) under the token's workspace RLS scope; client must still have the portal on and the same sign-in email; issues a PORTAL session cookie (Path=/portal + /api/portal), never a workspace session; same-Origin + JSON only, per-IP lockout, proxy auth tier",
+  "app/api/hooks/github/route.ts":
+    "inbound GitHub webhook; X-Hub-Signature-256 HMAC-SHA256 with GITHUB_WEBHOOK_SECRET verified in constant time over the raw body before parsing (unset secret → 503); delivery id is the primary key of github_webhook_deliveries so redeliveries are no-ops; bots, non-collaborators, non shapes/<runId> branches and forks ignored; routed to its workspace via a SELECT-only policy on agent_pull_requests, every write under that tenant's GUC; only queues a pr_feedback agent job (pushes still need a person's OK); 1 MiB body cap, per-IP limit in proxy.ts; returns counts only",
+  // Phase 11 (conncore): Slack Events API — capability model, see route comments.
+  "app/api/hooks/slack/events/route.ts":
+    "inbound Slack Events API; X-Slack-Signature v0 HMAC-SHA256 with SLACK_SIGNING_SECRET over 'v0:'+timestamp+':'+raw body verified in constant time with a 5-minute timestamp window before parsing (unset secret → 503); event_id is the primary key of slack_event_receipts so retries are no-ops; bots/edits ignored; team_id routed to its workspace via a SELECT-only policy on slack_installations, every write under that tenant's GUC; optional per-install Slack user allow-list; only queues one slack_mention agent job (agent writes still need a person's OK); 1 MiB body cap, per-IP limit in proxy.ts; returns counts only",
 };
 const uncovered = [];
 for (const f of routeFiles) {
@@ -207,7 +231,7 @@ const missingAllowList = Object.keys(PUBLIC_BY_DESIGN).filter(k => {
 ok("every public-by-design entry maps to a real route file", missingAllowList.length === 0, missingAllowList.join("; "));
 ok(
   "public-by-design allow-list is documented",
-  Object.keys(PUBLIC_BY_DESIGN).length === 34 &&
+  Object.keys(PUBLIC_BY_DESIGN).length === 42 && // Phase 9 (repos): +1 app/api/hooks/github; Phase 10 (finance): +1 tenant Stripe webhook; Phase 10 (store): +2 storefront cart + checkout; Phase 10 (portal): +2 portal sign-in; Phase 11 (conncore): +1 Slack events; Phase 12 (people): +1 event registration
     Object.values(PUBLIC_BY_DESIGN).every(v => v.length > 20)
 );
 
@@ -225,6 +249,30 @@ ok("member management = admin+", has("app/api/workspace/members/route.ts", /requ
 ok("deploy writes = editor+", has("app/api/websites/[id]/deploy/route.ts", /"editor"/));
 ok("audit writes = editor+", has("app/api/websites/[id]/audit/route.ts", /requireProjectRole\(user\.id, site\.projectId, "editor"\)/));
 ok("issue approval = editor+", has("app/api/websites/[id]/issues/approve-all/route.ts", /"editor"/));
+// Phase 13 (twincore): the digital twin's routes; the sample seeder is
+// admin+; twin CRUD rides the generic /api/ops/[entity] guard.
+// Phase 14 (approvals): state + live are viewer+ for PUBLISHED sites only —
+// drafts stay editor+ (the snapshot path refuses a draft to a non-editor, and
+// the stream re-checks role AND status every loop); the generic route reads
+// twin sites / objects / dock bookings at editor+ (no draft leak to viewers).
+ok("twin state = viewer+, drafts editor+",
+  has("app/api/twin/sites/[id]/state/route.ts", /requireWorkspaceRole\(user\.id, workspace\.id, "viewer"\)/) &&
+  has("app/api/twin/sites/[id]/state/route.ts", /const canEdit = Boolean\(await requireWorkspaceRole\(user\.id, workspace\.id, "editor"\)\)/) &&
+  has("app/api/twin/sites/[id]/state/route.ts", /siteSnapshotFor\(workspace\.id, id, canEdit\)/) &&
+  has("lib/twin/state.ts", /return canEdit \|\| status === "published";/) &&
+  has("lib/twin/state.ts", /if \(!canViewSite\(snap\.site\.status, canEdit\)\) throw new TwinNotFoundError\(siteId\);/));
+ok("twin live stream = viewer+ (published only), role + status re-checked every loop",
+  has("app/api/twin/sites/[id]/live/route.ts", /requireWorkspaceRole\(user\.id, workspace\.id, "viewer"\)\)\) \{/) &&
+  has("app/api/twin/sites/[id]/live/route.ts", /siteSnapshotFor\(workspace\.id, id, await isEditor\(\)\)/) &&
+  has("app/api/twin/sites/[id]/live/route.ts", /isMember: async \(\) => Boolean\(await requireWorkspaceRole\(user\.id, workspace\.id, "viewer"\)\)/) &&
+  has("lib/twin/state.ts", /if \(!\(await input\.isMember\(\)\)\) return false;/) &&
+  has("lib/twin/state.ts", /return canViewSite\(\(await siteStatus\(workspaceId, siteId\)\) \?\? "gone", false\);/) &&
+  has("lib/twin/live.ts", /await opts\.stillAllowed\(\)/));
+ok("twin entities on the generic ops route = editor+ reads (no draft leak)",
+  (readFileSync(join(ROOT, "lib/ops/twin/entities.ts"), "utf8").match(/readRole: "editor",/g) ?? []).length === 3 &&
+  has("app/api/ops/[entity]/route.ts", /op === "read" \? def\?\.readRole \?\? "viewer"/));
+ok("twin object delete = editor+", has("app/api/twin/objects/[id]/route.ts", /requireWorkspaceRole\(user\.id, workspace\.id, "editor"\)/));
+ok("twin sample site = admin+", has("app/api/twin/sites/sample/route.ts", /requireWorkspaceRole\(user\.id, workspace\.id, "admin"\)/));
 // Phase 8: sandbox checkpoint restore + previews (lib/sandbox).
 ok("agent-run restore = editor+ or the run's starter", has("app/api/agent-runs/[runId]/restore/route.ts", /!isStarter && !\(await requireWorkspaceRole\(user\.id, workspace\.id, "editor"\)\)/));
 ok("agent-run stop = editor+ or the run's starter", has("app/api/agent-runs/[runId]/cancel/route.ts", /!isStarter && !\(await requireWorkspaceRole\(user\.id, workspace\.id, "editor"\)\)/));
@@ -304,6 +352,25 @@ ok("scrypt with explicit parameters + timingSafeEqual", /SCRYPT_PARAMS = \{ N: 2
 ok("console link fallback is development-only", /isProduction\(env\) \? null : "console"/.test(emailMail));
 ok("production links never use the request Host", /appBaseUrl\(env, null\) \?\? \(isProduction\(env\) \? null :/.test(emailMail));
 ok("account deletion removes email accounts + links", /"email_accounts"/.test(readFileSync(join(ROOT, "lib/gdpr/account-delete.ts"), "utf8")) && /DELETE FROM "email_auth_tokens"/.test(readFileSync(join(ROOT, "lib/gdpr/account-delete.ts"), "utf8")));
+
+// --- 5c. Client portal (Phase 10 portal): a separate credential, never a workspace session ---
+console.log("client portal");
+const portalCore = readFileSync(join(ROOT, "lib/portal/core.ts"), "utf8");
+const portalStore = readFileSync(join(ROOT, "lib/portal/store.ts"), "utf8");
+const portalHttp = readFileSync(join(ROOT, "lib/portal/http.ts"), "utf8");
+ok("portal cookie is scoped to /portal + /api/portal, httpOnly, SameSite=Lax",
+  /PORTAL_COOKIE_PATHS = \["\/portal", "\/api\/portal"\] as const/.test(portalCore) && /"HttpOnly"/.test(portalCore) && /"SameSite=Lax"/.test(portalCore));
+ok("workspace session code never reads the portal cookie",
+  !/shapes_portal|lib\/portal/.test(readFileSync(join(ROOT, "lib/session.ts"), "utf8") + authCfg + readFileSync(join(ROOT, "lib/authz.ts"), "utf8") + proxySrc));
+ok("portal code never resolves a workspace session",
+  ["core.ts", "store.ts", "http.ts", "data.ts", "page.ts"].every((f) => !/from "@\/auth"|from "@\/lib\/session"|from "next-auth/.test(readFileSync(join(ROOT, "lib/portal", f), "utf8"))));
+ok("portalGuard checks CSRF before the session, then the viewerRole gate",
+  /checkPortalCsrf\(req/.test(portalHttp) && /portalSees\(principal\.role/.test(portalHttp) && /portalCan\(principal\.role/.test(portalHttp));
+ok("portal links are single use + hash-only, sessions hash-only",
+  /usedAt: null, expiresAt: \{ gt: now \}/.test(portalStore) && /used\.count !== 1/.test(portalStore) && /tokenHash: hash,/.test(portalStore) && /tokenHash: session\.hash/.test(portalStore));
+const portalRoutes = routeFiles.map((f) => f.replace(ROOT + "/", "")).filter((r) => r.startsWith("app/api/portal/"));
+const unguardedPortal = portalRoutes.filter((r) => !PUBLIC_BY_DESIGN[r] && !readFileSync(join(ROOT, r), "utf8").includes("portalGuard("));
+ok(`every /api/portal route (${portalRoutes.length}) is portalGuard-ed or a documented sign-in route`, portalRoutes.length > 0 && unguardedPortal.length === 0, unguardedPortal.join("; "));
 
 // --- 6. Secrets abstraction contract ---
 console.log("secrets");

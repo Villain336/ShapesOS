@@ -52,12 +52,23 @@ interface MeteringService {
 
 let cached: MeteringService | null | undefined;
 
-/** Test seam (scripts/verify-mcp.mts): override the loader result. */
+// The test override lives on globalThis: under tsx a .mts script and the
+// library can load this file as two module instances (ESM and CJS), and a
+// module-level override set through one never reached the other — so
+// verify-mcp's metering checks silently ran against the real service.
+const OVERRIDE = Symbol.for("shapesos.mcp.meteringOverride");
+type OverrideHolder = { [OVERRIDE]?: { svc: MeteringService | null } };
+
+/** Test seam (scripts/verify-mcp.mts): override the loader result (undefined clears it). */
 export function __setMeteringForTest(svc: MeteringService | null | undefined): void {
-  cached = svc;
+  const g = globalThis as OverrideHolder;
+  if (svc === undefined) delete g[OVERRIDE];
+  else g[OVERRIDE] = { svc };
 }
 
 async function loadMetering(): Promise<MeteringService | null> {
+  const override = (globalThis as OverrideHolder)[OVERRIDE];
+  if (override) return override.svc;
   if (cached !== undefined) return cached;
   try {
     const mod = (await import("@/lib/metering/service")) as Partial<MeteringService>;

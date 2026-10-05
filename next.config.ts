@@ -22,6 +22,13 @@ const nextConfig: NextConfig = {
   // peak memory and got the runner killed. Only CI sets SKIP_BUILD_TYPECHECK —
   // local and Docker builds still type-check. (Next's memory-usage guide.)
   typescript: { ignoreBuildErrors: process.env.SKIP_BUILD_TYPECHECK === "1" },
+  // Next 16.3 writes Turbopack's build cache to .next/cache by default. CI
+  // never restores that directory, so the multi-GB write is pure waste — and
+  // it runs alongside page-data collection, which (with Phase 10's routes)
+  // pushed the GitHub runner out of memory ("runner has received a shutdown
+  // signal" during "Collecting page data"). Per Next's turbopackFileSystemCache
+  // guide: off where the cache is never kept (CI); local builds keep it warm.
+  experimental: { turbopackFileSystemCacheForBuild: !process.env.CI },
   // No X-Powered-By (also suppresses the "Next.js, Payload" header that
   // withPayload adds when this is left unset).
   poweredByHeader: false,

@@ -26,7 +26,8 @@ import { parseUnifiedDiff, type DiffFile } from "./diff";
 export { parseUnifiedDiff, type DiffFile, type DiffHunk, type DiffLine } from "./diff";
 
 /** Tools whose run events carry a stored patch, newest wins. */
-export const PATCH_TOOLS = ["git_diff", "git_commit", "git_push_branch"] as const;
+// Phase 9: + site_publish_draft (an agent's site draft carries its diff).
+export const PATCH_TOOLS = ["git_diff", "git_commit", "git_push_branch", "site_publish_draft"] as const;
 /** Proposals this page may approve. */
 export const SHIP_APPROVABLE_TOOLS = new Set(["git_push_branch", "open_pull_request"]);
 

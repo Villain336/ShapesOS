@@ -64,6 +64,16 @@ export interface OpsMoneyAction {
   label: string;
   /** Minimum tier — the Phase 14 derivation must meet or exceed this. */
   expectedTier: RiskTier;
+  /**
+   * Phase 14 (approvals, owner decision 2026-10-05): true ONLY for gated
+   * ops actions that move no money and no stock value. When true and an
+   * automation rule says "auto" for `action`, requestOpsApproval approves
+   * the request itself (audit entry naming the rule) and the write runs.
+   * Everything that moves money or stock value stays false — always asks.
+   */
+  automatable?: boolean;
+  /** Phase 14: the automation action (lib/automation/actions.ts) an automatable slug's rule is keyed on. */
+  action?: string;
 }
 
 export const OPS_MONEY_ACTIONS: OpsMoneyAction[] = [
@@ -90,7 +100,52 @@ export const OPS_MONEY_ACTIONS: OpsMoneyAction[] = [
   // slugs as high (conservative floor), which meets the medium pin.
   { slug: "OPS_WORKFLOW_RUN", label: "Run operations workflow", expectedTier: "medium" },
   { slug: "OPS_RECORD_DELETE", label: "Delete operations record", expectedTier: "medium" },
+  // Phase 10 (finance): posting to / reversing the ledger, credit notes,
+  // quote sends, vendor bill payments and expense approvals/reimbursements.
+  // Phase 14 derives unknown OPS_* slugs as high, which meets the pins.
+  { slug: "OPS_JOURNAL_POST", label: "Post journal entry", expectedTier: "medium" },
+  { slug: "OPS_JOURNAL_REVERSE", label: "Reverse journal entry", expectedTier: "medium" },
+  { slug: "OPS_CREDIT_NOTE_ISSUE", label: "Issue credit note", expectedTier: "medium" },
+  { slug: "OPS_QUOTE_SEND", label: "Send quote", expectedTier: "medium" },
+  { slug: "OPS_BILL_PAY", label: "Pay vendor bill", expectedTier: "medium" },
+  { slug: "OPS_EXPENSE_APPROVE", label: "Approve expense claim", expectedTier: "medium" },
+  { slug: "OPS_EXPENSE_REIMBURSE", label: "Reimburse expense claim", expectedTier: "medium" },
+  // Phase 12 (mfgpos): confirming a manufacturing order commits components
+  // and the work plan; completing it moves stock and posts the costing to
+  // the books; scrap writes stock off (and its value); closing a till
+  // session posts the day's takings. Phase 14 derives unknown OPS_* slugs as
+  // high, which meets the pins.
+  // Phase 14: confirming only snapshots components and creates work orders
+  // (lib/ops/mfg/service.ts confirmMo) — no stock moves, nothing posts to the
+  // books, and a confirmed MO can still be cancelled. Automatable.
+  { slug: "OPS_MO_CONFIRM", label: "Confirm manufacturing order", expectedTier: "medium", automatable: true, action: "confirm_manufacturing_order" },
+  { slug: "OPS_MO_COMPLETE", label: "Complete manufacturing order", expectedTier: "medium" },
+  { slug: "OPS_SCRAP_POST", label: "Scrap stock", expectedTier: "medium" },
+  { slug: "OPS_POS_SESSION_CLOSE", label: "Close till session", expectedTier: "medium" },
+  // Phase 12 (people): approving a computed pay run (what every person is
+  // paid) and posting it to the books. Never automated (Tier 3 kinds
+  // approve_pay_run / post_pay_run); both bind the run's compute digest.
+  { slug: "OPS_PAYROLL_APPROVE", label: "Approve pay run", expectedTier: "high" },
+  { slug: "OPS_PAYROLL_POST", label: "Post pay run to the books", expectedTier: "medium" },
+  // Phase 14 (connectors): writing a computed run's hours into the payroll
+  // provider's (Gusto's) unprocessed payroll — what people will be paid.
+  // Money: never automated (Tier 3 kind send_payroll_to_provider), bound to
+  // the run's compute digest. Pinned medium like the other money sends
+  // (OPS_INVOICE_SEND, OPS_BILL_PAY): the Phase 14 classifier derives the
+  // SEND verb as medium, and a gated write needs a person's approval at any
+  // tier.
+  { slug: "OPS_PAYROLL_SEND_PROVIDER", label: "Send pay run to Gusto", expectedTier: "medium" },
+  // Phase 13 (twincore): publishing a digital twin site layout (an agent's
+  // twin_draft_layout output, or a person's edits) is a person's decision.
+  // No money moves; it rides the same propose → approve → execute gate.
+  // Phase 14: publishing a layout moves no money or stock — automatable.
+  { slug: "OPS_TWIN_SITE_PUBLISH", label: "Publish twin site layout", expectedTier: "medium", automatable: true, action: "publish_site_layout" },
 ];
+
+/** Phase 14: the slugs a rule may approve (no money, no stock value). */
+export const OPS_AUTOMATABLE_SLUGS: ReadonlySet<string> = new Set(
+  OPS_MONEY_ACTIONS.filter((a) => a.automatable === true).map((a) => a.slug),
+);
 
 export const OPS_MONEY_ACTION_MAP: Record<string, OpsMoneyAction> =
   Object.fromEntries(OPS_MONEY_ACTIONS.map((a) => [a.slug, a]));
@@ -152,6 +207,9 @@ export function classifyOpsWrite(input: ClassifyOpsWriteInput): OpsWriteClassifi
       if (kind === "refund") return gated("OPS_PAYMENT_REFUND", "Refund payment — gated write");
       return gated("OPS_PAYMENT_RECORD_CHARGE", "Record charge — gated write");
     }
+    // Phase 10 (finance): entities whose create moves the books (manual
+    // journal entries) declare their gate.
+    if (def.createGate) return gated(def.createGate, `Create ${def.label} — gated write`);
     return free(`Draft-creator: create ${def.label} runs freely, logged`);
   }
 
@@ -195,6 +253,8 @@ export interface OpsGateProposal {
   id: string;
   status: string;
   riskTier: string;
+  /** Phase 14: set when a rule approved it at once (the reason names the rule). */
+  autoApproved?: string;
 }
 
 export interface OpsGateApproval {
@@ -214,7 +274,14 @@ export interface OpsGatePort {
     args: Record<string, unknown>;
     proposedBy: string;
     plainSummary: string;
+    /** Phase 14: store it already approved by this rule (automatable slugs only). */
+    autoApprovedReason?: string;
   }): Promise<OpsGateProposal>;
+  /**
+   * Phase 14: the automation decision for an automatable slug's action.
+   * Absent (test stubs) = no rule, so it asks.
+   */
+  autoDecision?(workspaceId: string, input: { agentKey: string; action: string; description: string }): Promise<{ auto: boolean; reason: string }>;
   /**
    * Load an approval. When `tx` is given (the gated write's open transaction),
    * read through it: a second pooled connection per concurrent write exhausted
@@ -227,6 +294,10 @@ export interface OpsGatePort {
 export const phase14GatePort: OpsGatePort = {
   async propose(input) {
     const { approval, classified } = await proposeAction(input);
+    // Phase 14: proposeAction refuses to pre-approve a high tier; report the stored state.
+    if (input.autoApprovedReason && approval.status === "approved") {
+      return { id: approval.id, status: approval.status, riskTier: approval.riskTier, autoApproved: input.autoApprovedReason };
+    }
     // Fail closed: the Phase 14 tier must meet the ops pin.
     const pin = OPS_MONEY_ACTION_MAP[input.toolName];
     if (pin && TIER_RANK[classified.tier] < TIER_RANK[pin.expectedTier]) {
@@ -236,6 +307,10 @@ export const phase14GatePort: OpsGatePort = {
       );
     }
     return { id: approval.id, status: approval.status, riskTier: approval.riskTier };
+  },
+  async autoDecision(workspaceId, input) {
+    const { autoApprovalFor } = await import("@/lib/automation/policy");
+    return autoApprovalFor(workspaceId, input);
   },
   async getApproval(workspaceId: string, id: string, tx?: unknown) {
     const a = tx
@@ -298,11 +373,24 @@ export async function requestOpsApproval(
     mutation: Record<string, unknown>;
     actor: string;
     summary: string;
+    /** Phase 14: the agent asking (its own rule wins); default every-agent rules. */
+    agentKey?: string;
   },
 ): Promise<OpsGateProposal> {
   const action = OPS_MONEY_ACTION_MAP[args.slug];
   if (!action) throw new OpsGateError("unknown_money_action", `Unknown money action ${args.slug}`);
+  // Phase 14: an automatable slug (no money, no stock value) whose action has
+  // an "auto" rule is stored already approved, naming the rule. Money slugs
+  // never get here (automatable is false), whatever a rule says.
+  let autoApprovedReason: string | undefined;
+  if (action.automatable === true && action.action && OPS_AUTOMATABLE_SLUGS.has(args.slug) && port.autoDecision) {
+    const decision = await port
+      .autoDecision(args.workspaceId, { agentKey: args.agentKey ?? "*", action: action.action, description: action.label })
+      .catch(() => null);
+    if (decision?.auto) autoApprovedReason = decision.reason;
+  }
   return port.propose({
+    ...(autoApprovedReason ? { autoApprovedReason } : {}),
     workspaceId: args.workspaceId,
     appKey: "ops",
     toolName: args.slug,

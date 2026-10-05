@@ -17,6 +17,12 @@
 //
 // Rate bounds: first 5 calendars, max 1000 events per call.
 // Auth: OAuth2 Bearer <redacted> refresh via lib/vault/refresh.ts.
+//
+// Phase 11 (conncore): list_events (read) and create_event / update_event
+// (MUTATING — the chat confirmation gate asks first; they map to the
+// default Tier-2 connector_write action, so they always ask). Scope
+// calendar.events. Live calls: lib/connectors/m21/live/gcal.ts. Without a
+// credential they fail "not connected" (no mock writes).
 
 import type {
   ConnectorAdapter,
@@ -25,7 +31,11 @@ import type {
   InvokeContext,
   InvokeResult,
 } from "../types";
-import { fail, liveOk, strProp } from "../types";
+import { boolProp, fail, liveOk, numProp, strProp } from "../types";
+import { liveFailure, tokenSourceFrom, type LiveDeps } from "../live/http";
+import { eventWindow, gcalCreateEvent, gcalListEvents, gcalUpdateEvent } from "../live/gcal";
+import { parseEventArgs } from "../live/graph";
+import { inputFailure } from "./outlook";
 
 const CAL_BASE = "https://www.googleapis.com/calendar/v3";
 const MAX_EVENTS_HARD_CAP = 1000;
@@ -68,8 +78,12 @@ export class GoogleCalendarAdapter implements ConnectorAdapter {
     properties: {},
   };
 
+  constructor(private readonly deps: LiveDeps = {}) {}
+
   listTools(): ConnectorToolDef[] {
     return [
+      // Phase 11 (conncore): events read + gated writes.
+      ...calendarEventTools("Google Calendar", true),
       {
         name: "list_network_contacts",
         description:
@@ -94,6 +108,9 @@ export class GoogleCalendarAdapter implements ConnectorAdapter {
     credential: DecryptedCredential | null,
     _ctx: InvokeContext,
   ): Promise<InvokeResult> {
+    if (tool === "list_events" || tool === "create_event" || tool === "update_event") {
+      return this.events(tool, args, credential, _ctx);
+    }
     if (tool !== "list_network_contacts") {
       return fail(`Unknown tool "${tool}" for the Google Calendar connector.`);
     }
@@ -219,4 +236,78 @@ export class GoogleCalendarAdapter implements ConnectorAdapter {
       return fail(err instanceof Error ? err.message : "Calendar import failed.");
     }
   }
+
+  /** Phase 11 (conncore): events read/write (writes gated upstream). */
+  private async events(
+    tool: "list_events" | "create_event" | "update_event",
+    args: Record<string, unknown>,
+    credential: DecryptedCredential | null,
+    ctx: InvokeContext,
+  ): Promise<InvokeResult> {
+    const auth = tokenSourceFrom(credential, ctx);
+    if (!auth) {
+      return { ok: false, mock: false, errorCode: "not_connected", error: "Google Calendar is not connected. Connect it to manage events." };
+    }
+    const notify = args.notifyAttendees !== false && args.notifyAttendees !== "false";
+    try {
+      if (tool === "list_events") {
+        return liveOk(await gcalListEvents(auth, { calendarId: args.calendarId, ...eventWindow(args), max: Number(args.limit) || 50 }, this.deps));
+      }
+      if (tool === "create_event") {
+        return liveOk(await gcalCreateEvent(auth, { calendarId: args.calendarId, fields: parseEventArgs(args, true), notify }, this.deps));
+      }
+      return liveOk(
+        await gcalUpdateEvent(auth, { calendarId: args.calendarId, eventId: args.eventId, fields: parseEventArgs(args, false), notify }, this.deps),
+      );
+    } catch (err) {
+      return inputFailure(err, "Google Calendar");
+    }
+  }
+}
+
+/** Phase 11 (conncore): the event tools shared by Google and Outlook calendars. */
+export function calendarEventTools(provider: string, hasCalendarId: boolean): ConnectorToolDef[] {
+  type Props = Record<string, { type: string; description: string }>;
+  const cal: Props = hasCalendarId ? { calendarId: strProp('Calendar id (default "primary").') } : {};
+  const notify: Props = hasCalendarId ? { notifyAttendees: boolProp("Email invitations / changes to attendees (default true).") } : {};
+  const fields: Props = {
+    title: strProp("Event title."),
+    start: strProp("Start, ISO date-time (e.g. 2026-10-12T15:00:00)."),
+    end: strProp("End, ISO date-time."),
+    timeZone: strProp("IANA time zone for start/end without an offset (default UTC), e.g. Europe/London."),
+    description: strProp("Event description (plain text)."),
+    location: strProp("Location."),
+    attendees: strProp("Attendee email addresses, comma-separated."),
+  };
+  return [
+    {
+      name: "list_events",
+      description: `List ${provider} events in a window (default: the next 14 days) with ids, titles, times and attendees.`,
+      mutating: false,
+      argsSchema: {
+        type: "object",
+        properties: { ...cal, from: strProp("Window start (ISO date-time; default now)."), to: strProp("Window end (ISO date-time; default from + 14 days)."), limit: numProp("Max events (default 50).") },
+      },
+    },
+    {
+      name: "create_event",
+      description: `Create a ${provider} event and invite attendees. Asks for confirmation first.`,
+      mutating: true,
+      argsSchema: {
+        type: "object",
+        properties: { ...cal, ...fields, ...notify },
+        required: ["title", "start", "end"],
+      },
+    },
+    {
+      name: "update_event",
+      description: `Change a ${provider} event (only the fields you pass). Asks for confirmation first.`,
+      mutating: true,
+      argsSchema: {
+        type: "object",
+        properties: { ...cal, eventId: strProp("Event id (from list_events or create_event)."), ...fields, ...notify },
+        required: ["eventId"],
+      },
+    },
+  ];
 }

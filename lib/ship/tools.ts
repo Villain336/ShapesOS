@@ -34,6 +34,7 @@ import {
 } from "@/lib/sandbox/repo-profile";
 import { assertBranchName } from "@/lib/connectors/github";
 import { resolveRepoAccess, type RepoAccess } from "./access";
+import { isBotLogin, isTrustedAssociation } from "./github-events";
 import { loadShipState, saveShipState, type ShipLookup, type ShipState } from "./state";
 import {
   GIT_AUTHOR,
@@ -204,6 +205,11 @@ async function diffSnapshot(
 function diffHeadline(d: DiffSnapshot): string {
   if (d.files.length === 0) return "No changes";
   return `${d.files.length} ${d.files.length === 1 ? "file" : "files"} changed (+${d.additions} −${d.deletions})`;
+}
+
+/** Feedback from someone who is not a collaborator is labelled (it is not a reviewer's request). */
+function outsider(association: string | undefined): string {
+  return association && !isTrustedAssociation(association) ? " (not a repository collaborator)" : "";
 }
 
 function forModel(patch: string): string {
@@ -571,10 +577,12 @@ export function createShipTools(deps: ShipDeps = defaultShipDeps): ToolDef[] {
         prNumber = found.number;
         await deps.saveState(ctx.workspaceId, runId, { ...state, prNumber, prUrl: found.url });
       }
-      const [status, reviews, comments] = await Promise.all([
+      const [status, reviews, comments, conversation] = await Promise.all([
         access.connector.getPullRequestStatus(prNumber),
         access.connector.listReviews(prNumber),
         access.connector.listReviewComments(prNumber),
+        // Phase 9: the PR conversation too (bots' comments left out).
+        access.connector.listIssueComments(prNumber).then((cs) => cs.filter((c) => !isBotLogin(c.author))),
       ]);
       const verdicts = reviews.filter((r) => r.state !== "PENDING");
       const lines: string[] = [
@@ -592,10 +600,14 @@ export function createShipTools(deps: ShipDeps = defaultShipDeps): ToolDef[] {
       }
       if (comments.length) {
         lines.push("Review comments:");
-        for (const c of comments) lines.push(`- ${c.path}${c.line ? `:${c.line}` : ""} ${c.author}${c.inReplyTo ? " (reply)" : ""}: ${c.body.trim().slice(0, 600)}`);
+        for (const c of comments) lines.push(`- ${c.path}${c.line ? `:${c.line}` : ""} ${c.author}${outsider(c.authorAssociation)}${c.inReplyTo ? " (reply)" : ""}: ${c.body.trim().slice(0, 600)}`);
       }
-      if (!status.failing.length && !verdicts.length && !comments.length) lines.push("No review feedback or failing checks yet.");
-      const mock = status.mock === true || reviews.some((r) => r.mock) || comments.some((c) => c.mock);
+      if (conversation.length) {
+        lines.push("Conversation:");
+        for (const c of conversation.slice(-20)) lines.push(`- ${c.author}${outsider(c.authorAssociation)}: ${c.body.trim().slice(0, 600)}`);
+      }
+      if (!status.failing.length && !verdicts.length && !comments.length && !conversation.length) lines.push("No review feedback or failing checks yet.");
+      const mock = status.mock === true || reviews.some((r) => r.mock) || comments.some((c) => c.mock) || conversation.some((c) => c.mock);
       if (mock) lines.push("(Demo data — mock.)");
       const text = lines.join("\n");
       await record(
@@ -611,10 +623,11 @@ export function createShipTools(deps: ShipDeps = defaultShipDeps): ToolDef[] {
           failing: status.failing.map((c) => ({ name: c.name, conclusion: c.conclusion, url: c.url })),
           reviews: verdicts.map((r) => ({ author: r.author, state: r.state })),
           comments: comments.length,
+          conversation: conversation.length,
           mock,
         },
       );
-      return done(forModel(text), { prNumber, checks: status.state, failing: status.failing, reviews: verdicts, comments });
+      return done(forModel(text), { prNumber, checks: status.state, failing: status.failing, reviews: verdicts, comments, conversation });
     },
   };
 

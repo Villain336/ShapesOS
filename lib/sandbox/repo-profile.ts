@@ -339,3 +339,96 @@ export async function saveRepoProfile(
   );
   return toProfile(row);
 }
+
+// ---------------------------------------------------------------------------
+// Phase 9 (repos): which commands run_tests / run_checks run.
+// ---------------------------------------------------------------------------
+
+export const CHECK_ORDER = ["lint", "typecheck", "test", "build"] as const;
+export type CheckName = (typeof CHECK_ORDER)[number];
+
+/**
+ * A `.shapes/profile.json` checked into the repository overrides detection,
+ * per command. Accepts { "commands": { "test": …, "lint": … } } and the
+ * Phase 8 shorthand { "testCommand": …, "lintCommand": … }. PURE.
+ */
+export function parseProfileOverride(text: string | null): RepoCommands | null {
+  if (!text) return null;
+  let raw: unknown;
+  try {
+    raw = JSON.parse(text);
+  } catch {
+    return null;
+  }
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const o = raw as Record<string, unknown>;
+  const out: RepoCommands = {};
+  const nested = o.commands && typeof o.commands === "object" && !Array.isArray(o.commands) ? (o.commands as Record<string, unknown>) : {};
+  for (const k of ["install", "test", "lint", "build", "typecheck"] as const) {
+    const v = nested[k] ?? o[`${k}Command`];
+    if (typeof v === "string" && v.trim()) out[k] = v.trim();
+  }
+  return Object.keys(out).length ? out : null;
+}
+
+export interface ResolvedRepoCommands {
+  commands: RepoCommands;
+  /** Where each command came from, as a phrase ("from …", "detected from …"). */
+  sourceOf: Partial<Record<keyof RepoCommands, string>>;
+}
+
+export interface ResolveRepoCommandsInput {
+  workspaceId: string;
+  /** The repository the run cloned (ship state), when there is one. */
+  ship: { repo: string; dir: string } | null;
+  getProfile: (workspaceId: string, repoFullName: string) => Promise<RepoProfile | null>;
+  saveProfile: (workspaceId: string, repoFullName: string, profile: DetectedRepoProfile) => Promise<unknown>;
+}
+
+/**
+ * The commands for the checkout at `dir`, per command, in this order:
+ *   1. `.shapes/profile.json` in that directory (the repository's own say);
+ *   2. the saved repo profile — when `dir` is the run's cloned repository
+ *      (git_clone detects and saves it on the first clone; when it is still
+ *      missing it is detected now and saved);
+ *   3. detection from the directory's files (any other checkout).
+ */
+export async function resolveRepoCommands(sandbox: Sandbox, dir: string, input: ResolveRepoCommandsInput): Promise<ResolvedRepoCommands> {
+  const commands: RepoCommands = {};
+  const sourceOf: ResolvedRepoCommands["sourceOf"] = {};
+  const fill = (cmds: RepoCommands, source: string) => {
+    for (const k of ["install", "test", "lint", "build", "typecheck"] as const) {
+      if (!commands[k] && cmds[k]) {
+        commands[k] = cmds[k];
+        sourceOf[k] = source;
+      }
+    }
+  };
+
+  const overrideText = await sandbox
+    .readFile(path.join(dir, ".shapes/profile.json"))
+    .then((b) => b.subarray(0, MAX_PROFILE_FILE_BYTES).toString("utf8"))
+    .catch(() => null);
+  const override = parseProfileOverride(overrideText);
+  if (override) fill(override, "from .shapes/profile.json");
+
+  const isClone = !!input.ship && path.normalize(input.ship.dir) === path.normalize(dir);
+  if (isClone) {
+    const repo = input.ship!.repo;
+    const saved = await input.getProfile(input.workspaceId, repo).catch(() => null);
+    if (saved) {
+      fill(saved.commands, `from the saved profile of ${repo}`);
+    } else {
+      const detected = await detectRepoProfileInSandbox(sandbox, dir).catch(() => null);
+      if (detected) {
+        await input.saveProfile(input.workspaceId, repo, detected).catch(() => undefined);
+        fill(detected.commands, `detected now and saved for ${repo}`);
+      }
+    }
+    return { commands, sourceOf };
+  }
+
+  const detected = await detectRepoProfileInSandbox(sandbox, dir).catch(() => null);
+  if (detected) fill(detected.commands, detected.detectedFrom.length ? `detected from ${detected.detectedFrom.slice(0, 3).join(", ")}` : "detected");
+  return { commands, sourceOf };
+}

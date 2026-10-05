@@ -20,6 +20,8 @@
 //   Composio       lib/integrations/actions/discovery.ts getToolRouter()
 //   Activepieces   lib/integrations/activepieces/config.ts
 //   Code sandbox   lib/sandbox/index.ts sandboxAvailability() (passed in)
+//   Hosting        lib/deploy/index.ts hostingConnectorFor() — per connection
+//                  (Vercel / Cloudflare Pages / Netlify; demo flag), passed in
 //
 // A mocked feature is configuration, not an agent state: the UI renders
 // these as neutral chips, never with the agent status colours.
@@ -62,6 +64,11 @@ export interface InventoryFacts {
    * checked (the entry is left out).
    */
   sandbox?: { ok: boolean; provider: string | null; reason?: string } | null;
+  /**
+   * Phase 9: this workspace's hosting connections by provider label, split
+   * live / demo (tokens are per connection, not env). Omitted = not checked.
+   */
+  hosting?: { live: string[]; demo: string[] } | null;
 }
 
 const set = (env: EnvLike, k: string) => Boolean((env[k] ?? "").trim());
@@ -262,6 +269,27 @@ export function mockInventory(env: EnvLike, facts: InventoryFacts): FeatureStatu
         ? `Live on ${sb.provider === "e2b" ? "E2B" : sb.provider === "daytona" ? "Daytona" : "Docker"} — agents read, write and run code in an isolated sandbox per run.`
         : `Off — ${sb?.reason ?? "the sandbox provider could not be checked."} Code tools say so and do nothing.`,
       envVars: ["SANDBOX_PROVIDER", "DOCKER_HOST", "E2B_API_KEY", "DAYTONA_API_KEY"],
+    });
+  }
+
+  // Hosting deploys: tokens live per connection (Sites → Hosting), so the
+  // mode comes from this workspace's connections, never from env.
+  if (facts.hosting !== undefined) {
+    const h = facts.hosting;
+    const live = [...new Set(h?.live ?? [])];
+    const demo = [...new Set(h?.demo ?? [])];
+    out.push({
+      key: "hosting",
+      label: "Hosting deploys (Vercel, Cloudflare Pages, Netlify)",
+      mode: live.length ? "live" : demo.length ? "mock" : "off",
+      detail: live.length
+        ? `Live through ${live.join(", ")}${demo.length ? `; demo connections (labelled mock) for ${demo.join(", ")}` : ""}.`
+        : demo.length
+          ? `Only demo connections (${demo.join(", ")}) — deploys and rollbacks are labelled mock; nothing is published.`
+          : h === null
+            ? "Off — hosting connections could not be checked."
+            : "Off — no hosting connection yet. Connect one under a project's Sites → Hosting.",
+      envVars: [],
     });
   }
 

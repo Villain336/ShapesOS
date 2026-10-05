@@ -9,7 +9,15 @@
 //   bash        spend  run_sandbox_command  streamed, with a timeout
 //   run_tests   spend  run_sandbox_command  the repo profile's test command;
 //                      details.testsFailed=true on failure (the runtime
-//                      escalates the model on that flag)
+//                      counts fix cycles and escalates the model on it)
+//   run_checks  spend  run_sandbox_command  Phase 9: lint, typecheck, test,
+//                      build — the repo profile's commands, in that order;
+//                      details.testsFailed=true when any fails
+//
+// Which commands: lib/sandbox/repo-profile.ts resolveRepoCommands — the
+// checkout's .shapes/profile.json, then the saved repo profile of the
+// repository the run cloned (git_clone stores it), then detection. Without a
+// path both run in the cloned repository (the run's ship state).
 //
 // Every path resolves inside the sandbox workdir (traversal refused). The
 // sandbox comes from sandboxForRun(ctx) and Stop from ctx.signal. Command
@@ -24,11 +32,20 @@ import type { Sandbox } from "./types";
 import { liveSandboxForRun, sandboxForRun, SandboxUnavailableError, sandboxAvailability } from "./index";
 import { addExposedPort } from "./store";
 import { resolveSandboxPath, relativeToWorkdir, SandboxPathError, shq } from "./paths";
-import { applyExactEdit, detectRepoProfile, globToRegExp, numberLines } from "./edit";
+import { applyExactEdit, globToRegExp, numberLines } from "./edit";
+import {
+  CHECK_ORDER,
+  getRepoProfile,
+  resolveRepoCommands,
+  saveRepoProfile,
+  type CheckName,
+  type ResolvedRepoCommands,
+  type ResolveRepoCommandsInput,
+} from "./repo-profile";
 import { SandboxCommandError } from "./exec-fs";
 import { previewPath } from "./preview";
 
-export const CODE_TOOL_NAMES = ["read_file", "write_file", "edit_file", "glob", "grep", "bash", "run_tests"] as const;
+export const CODE_TOOL_NAMES = ["read_file", "write_file", "edit_file", "glob", "grep", "bash", "run_tests", "run_checks"] as const;
 export type CodeToolName = (typeof CODE_TOOL_NAMES)[number];
 
 /** Biggest file read_file / edit_file will load. */
@@ -460,33 +477,84 @@ const bash: ToolDef = {
     }),
 };
 
+// ---------------------------------------------------------------------------
+// Repo commands (Phase 9: the saved repo profile drives run_tests / run_checks)
+// ---------------------------------------------------------------------------
+
+export interface RepoCommandDeps {
+  /** The repository this run cloned (its ship state), if any. */
+  shipRepo: (ctx: ToolContext) => Promise<{ repo: string; dir: string } | null>;
+  getProfile: ResolveRepoCommandsInput["getProfile"];
+  saveProfile: ResolveRepoCommandsInput["saveProfile"];
+}
+
+const defaultRepoCommandDeps: RepoCommandDeps = {
+  shipRepo: async (ctx) => {
+    if (!ctx.runId) return null;
+    const { loadShipState } = await import("@/lib/ship/state");
+    const threadId = (ctx as ToolContext & { threadId?: string }).threadId;
+    const st = await loadShipState({ workspaceId: ctx.workspaceId, runId: ctx.runId, threadId }).catch(() => null);
+    return st ? { repo: st.repo, dir: st.dir } : null;
+  },
+  getProfile: getRepoProfile,
+  saveProfile: saveRepoProfile,
+};
+let repoCommandDeps: RepoCommandDeps = defaultRepoCommandDeps;
+
+/** Tests: replace how the tools find the cloned repo / its profile (null restores). */
+export function setRepoCommandDepsForTests(deps: Partial<RepoCommandDeps> | null): void {
+  repoCommandDeps = deps ? { ...defaultRepoCommandDeps, ...deps } : defaultRepoCommandDeps;
+}
+
+/** The project directory and its commands (default: the cloned repository). */
+async function commandsFor(ctx: ToolContext, sb: Sandbox, rawPath: string | undefined): Promise<{ dir: string; resolved: ResolvedRepoCommands }> {
+  const ship = await repoCommandDeps.shipRepo(ctx).catch(() => null);
+  let shipDir: string | null = null;
+  try {
+    shipDir = ship ? resolveSandboxPath(sb.workdir, ship.dir) : null;
+  } catch {
+    shipDir = null; // cloned into another sandbox's workdir: not this checkout
+  }
+  const dir = rawPath !== undefined ? resolveSandboxPath(sb.workdir, rawPath) : (shipDir ?? resolveSandboxPath(sb.workdir, "."));
+  const resolved = await resolveRepoCommands(sb, dir, {
+    workspaceId: ctx.workspaceId,
+    ship: ship && shipDir ? { repo: ship.repo, dir: shipDir } : null,
+    getProfile: repoCommandDeps.getProfile,
+    saveProfile: repoCommandDeps.saveProfile,
+  });
+  return { dir, resolved };
+}
+
+function secs(ms: number): string {
+  return `${Math.round(ms / 100) / 10} s`;
+}
+
 const run_tests: ToolDef = {
   name: "run_tests",
   description:
-    "Run the project's tests in the code sandbox: the repo profile's test command (.shapes/profile.json, else package.json / pytest / go / cargo / make conventions), or the command given.",
+    "Run the project's tests in the code sandbox: the repo profile's test command (.shapes/profile.json, else the profile saved when the repository was cloned, else detected from package.json / pytest / go / cargo / make), or the command given. Runs in the cloned repository unless a path is given.",
   kind: "spend",
   minRole: "editor",
   argsSchema: {
     type: "object",
     properties: {
-      path: { type: "string", description: "Project directory, relative to the workdir (default: the workdir)." },
+      path: { type: "string", description: "Project directory, relative to the workdir (default: the cloned repository, else the workdir)." },
       command: { type: "string", description: "Override the detected test command." },
       timeout_ms: { type: "number", description: "Time limit in ms (default 600000)." },
     },
   },
   execute: (ctx, args) =>
     guarded("run_tests", ctx, async (sb) => {
-      const dir = resolveSandboxPath(sb.workdir, str(args.path) ?? ".");
+      const { dir, resolved } = await commandsFor(ctx, sb, str(args.path));
       let command = str(args.command)?.trim() || null;
-      let source = "the command given";
+      let source = "as given";
       if (!command) {
-        const profile = await repoProfileIn(sb, dir);
-        command = profile.testCommand;
-        source = profile.source;
+        command = resolved.commands.test ?? null;
+        source = resolved.sourceOf.test ?? "nothing recognised";
       }
       if (!command) {
         return {
-          summary: "No test command found (no .shapes/profile.json, test script, pytest, go, cargo or make test). Pass one in `command`.",
+          summary: "No test command found (no .shapes/profile.json, saved repo profile, test script, pytest, go, cargo or make test). Pass one in `command`.",
           details: { error: "no_test_command" },
         };
       }
@@ -496,28 +564,93 @@ const run_tests: ToolDef = {
       const failed = r.exitCode !== 0 || r.timedOut;
       const verdict = r.timedOut ? `timed out after ${Math.round(timeoutMs / 1000)} s` : failed ? `FAILED (exit ${r.exitCode})` : "passed";
       return {
-        summary: `Tests ${verdict}: ${command} (from ${source})\n${tail(`${r.stdout}${r.stderr ? `\n${r.stderr}` : ""}`)}`,
+        summary: `Tests ${verdict}: ${command} (${source})\n${tail(`${r.stdout}${r.stderr ? `\n${r.stderr}` : ""}`)}`,
         details: { testsFailed: failed, exitCode: r.exitCode, timedOut: r.timedOut, command, source, durationMs: r.durationMs },
       };
     }),
 };
 
-async function repoProfileIn(sb: Sandbox, dir: string) {
-  const top = await sb.listFiles(dir, { recursive: false, maxEntries: 500 }).catch(() => []);
-  const files = top.map((e) => e.path);
-  const read = async (name: string) => {
-    try {
-      return (await sb.readFile(`${dir}/${name}`)).toString("utf8");
-    } catch {
-      return null;
-    }
-  };
-  return detectRepoProfile({
-    files,
-    profileJson: await read(".shapes/profile.json"),
-    packageJson: files.includes("package.json") ? await read("package.json") : null,
-  });
+export interface CheckResult {
+  check: CheckName | "install";
+  command: string;
+  source: string;
+  passed: boolean;
+  exitCode: number;
+  timedOut: boolean;
+  durationMs: number;
 }
+
+function parseChecks(v: unknown): CheckName[] | null {
+  const raw = typeof v === "string" ? v.split(",") : Array.isArray(v) ? v.map(String) : null;
+  if (!raw) return null;
+  const want = new Set(raw.map((x) => x.trim().toLowerCase()).filter(Boolean));
+  const picked = CHECK_ORDER.filter((c) => want.has(c));
+  return picked.length ? picked : null;
+}
+
+const run_checks: ToolDef = {
+  name: "run_checks",
+  description:
+    "Run the project's checks in the code sandbox, in order: lint, typecheck, test, build — the commands from the repo profile (.shapes/profile.json, else the profile saved when the repository was cloned, else detected). Every check runs; the result says which failed with their output. Use it after each batch of edits; fix and run it again until everything passes.",
+  kind: "spend",
+  minRole: "editor",
+  argsSchema: {
+    type: "object",
+    properties: {
+      path: { type: "string", description: "Project directory, relative to the workdir (default: the cloned repository, else the workdir)." },
+      checks: { type: "string", description: "Comma-separated subset of lint,typecheck,test,build (default: all the profile has)." },
+      install: { type: "boolean", description: "Install dependencies first with the profile's install command (default false; do it once per sandbox)." },
+      timeout_ms: { type: "number", description: "Time limit per check in ms (default 600000)." },
+    },
+  },
+  execute: (ctx, args) =>
+    guarded("run_checks", ctx, async (sb) => {
+      const { dir, resolved } = await commandsFor(ctx, sb, str(args.path));
+      const wanted = parseChecks(args.checks) ?? [...CHECK_ORDER];
+      const plan = wanted.filter((c) => !!resolved.commands[c]);
+      if (plan.length === 0) {
+        return {
+          summary: `No ${wanted.join(" / ")} command found for ${relativeToWorkdir(sb.workdir, dir) || "the workdir"} (no .shapes/profile.json, saved repo profile, or recognised scripts). Use run_tests with a command, or bash.`,
+          details: { error: "no_checks", checks: [] },
+        };
+      }
+      await flushCheckpoint(ctx, sb);
+      const timeoutMs = Math.min(Math.max(int(args.timeout_ms) ?? DEFAULT_TEST_TIMEOUT_MS, 1000), MAX_BASH_TIMEOUT_MS);
+      const results: CheckResult[] = [];
+      const outputs = new Map<string, string>();
+      const steps: Array<CheckName | "install"> = bool(args.install) && resolved.commands.install ? ["install", ...plan] : plan;
+      for (const check of steps) {
+        const command = resolved.commands[check]!;
+        const r = await runStreamed(ctx, sb, "run_checks", command, { cwd: dir, timeoutMs });
+        const passed = r.exitCode === 0 && !r.timedOut;
+        results.push({ check, command, source: resolved.sourceOf[check] ?? "from the repo profile", passed, exitCode: r.exitCode, timedOut: r.timedOut, durationMs: r.durationMs });
+        if (!passed) outputs.set(check, `${r.stdout}${r.stderr ? `\n${r.stderr}` : ""}`);
+        // Nothing else can run without the dependencies.
+        if (check === "install" && !passed) break;
+      }
+      const ran = results.filter((r) => r.check !== "install");
+      const failed = results.filter((r) => !r.passed);
+      const line = (r: CheckResult) =>
+        `${r.check} ${r.passed ? "passed" : r.timedOut ? `timed out after ${Math.round(timeoutMs / 1000)} s` : `FAILED (exit ${r.exitCode})`} in ${secs(r.durationMs)}: ${r.command}`;
+      const headline = failed.length
+        ? `Checks FAILED: ${failed.map((r) => r.check).join(", ")} (${ran.length - failed.filter((r) => r.check !== "install").length} of ${plan.length} passed)`
+        : `All ${plan.length} checks passed`;
+      const perFailure = Math.floor(MODEL_OUTPUT_CHARS / Math.max(1, failed.length));
+      const parts = [headline, ...results.map(line)];
+      for (const r of failed) parts.push(`--- ${r.check} output ---\n${tail(outputs.get(r.check) ?? "", perFailure)}`);
+      const sources = [...new Set(results.map((r) => r.source))];
+      parts.push(`(Commands ${sources.join("; ")}.)`);
+      await runNote(ctx, headline, {
+        kind: "sandbox.checks",
+        dir: relativeToWorkdir(sb.workdir, dir),
+        results: results.map(({ check, passed, exitCode, timedOut, durationMs }) => ({ check, passed, exitCode, timedOut, durationMs })),
+      });
+      return {
+        summary: parts.join("\n"),
+        details: { testsFailed: failed.length > 0, checks: results, failed: failed.map((r) => r.check) },
+      };
+    }),
+};
 
 /** Expose a sandbox port for this run's preview and remember it on the row. */
 export async function exposeForRun(ctx: ToolContext, sb: Sandbox, port: number): Promise<{ url: string }> {
@@ -533,7 +666,7 @@ export async function exposeForRun(ctx: ToolContext, sb: Sandbox, port: number):
   return res;
 }
 
-export const CODE_TOOLS: readonly ToolDef[] = [read_file, glob, grep, write_file, edit_file, bash, run_tests];
+export const CODE_TOOLS: readonly ToolDef[] = [read_file, glob, grep, write_file, edit_file, bash, run_tests, run_checks];
 
 let registered = false;
 

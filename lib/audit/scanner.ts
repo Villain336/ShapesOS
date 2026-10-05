@@ -4,9 +4,11 @@
 // getSiteIdeProvider — the same files the IDE edits) and produces structured
 // findings. Pure HTML parsing with regexes: no headless browser, no network.
 // Findings reference file + line so the inbox can deep-link into the IDE.
+// Phase 11 (seotools): the per-page checks are exported (checkHtmlPage) and
+// shared with the live-URL crawl in ./live.ts.
 
 import type { SiteFileProvider } from "@/lib/sitefiles/types";
-import { CATEGORY_MAP } from "./categories";
+import { checkStructuredData } from "./structured-data";
 
 export interface ScanFinding {
   category: string;
@@ -88,6 +90,98 @@ function bodyText(html: string): string {
     .trim();
 }
 
+/**
+ * The per-page HTML checks shared by the files scan and the live crawl
+ * (Phase 11, lib/audit/live.ts): missing title, meta description and Open
+ * Graph tags, images without alt, mixed content, inline style bloat.
+ * `path` is the file path (files mode) or page URL (live mode).
+ */
+export function checkHtmlPage(path: string, content: string): ScanFinding[] {
+  const findings: ScanFinding[] = [];
+  const head = headContent(content);
+
+  // 1. Missing <title>
+  if (!/<title[\s>][\s\S]*?<\/title\s*>/i.test(head)) {
+    findings.push({
+      category: "missing-title",
+      filePath: path,
+      line: firstMatchLine(content, /<head[\s>]/i),
+      detail: `${path} has no <title> tag.`,
+      fixHint: "Generate a concise title from the page's h1/content and insert it into <head>.",
+      autoFixable: true,
+    });
+  }
+
+  // 2. Missing meta description
+  if (!/<meta[^>]+name=["']description["']/i.test(head)) {
+    findings.push({
+      category: "missing-meta-description",
+      filePath: path,
+      line: firstMatchLine(content, /<head[\s>]/i),
+      detail: `${path} has no meta description.`,
+      fixHint: "Generate a ~150 character description from the page content.",
+      autoFixable: true,
+    });
+  }
+
+  // 3. Missing Open Graph tags
+  if (!/<meta[^>]+property=["']og:title["']/i.test(head)) {
+    findings.push({
+      category: "missing-og-tags",
+      filePath: path,
+      line: firstMatchLine(content, /<head[\s>]/i),
+      detail: `${path} has no Open Graph tags — social link previews will look broken.`,
+      fixHint: "Insert og:title / og:description / og:type derived from the page title and description.",
+      autoFixable: true,
+    });
+  }
+
+  // 4. Images missing alt
+  const imgRe = /<img\b[^>]*>/gi;
+  let m: RegExpExecArray | null;
+  while ((m = imgRe.exec(content))) {
+    if (!/\balt\s*=/i.test(m[0])) {
+      const src = /src=["']([^"']+)["']/i.exec(m[0])?.[1] ?? "(no src)";
+      findings.push({
+        category: "missing-alt",
+        filePath: path,
+        line: lineOf(content, m.index),
+        detail: `<img src="${src}"> has no alt text.`,
+        fixHint: `Generate a short descriptive alt for the image "${src}".`,
+        autoFixable: true,
+      });
+    }
+  }
+
+  // 5. Mixed content (http:// resource URLs)
+  const mixedRe = /(src|href)\s*=\s*["']http:\/\/[^"']+["']/gi;
+  while ((m = mixedRe.exec(content))) {
+    findings.push({
+      category: "mixed-content",
+      filePath: path,
+      line: lineOf(content, m.index),
+      detail: `Loads a resource over http://: ${m[0].slice(0, 80)}…`,
+      fixHint: "Rewrite the http:// URL to https://.",
+      autoFixable: true,
+    });
+  }
+
+  // 7. Inline style bloat
+  const styleBlocks = content.match(/<style[\s>][\s\S]*?<\/style\s*>/gi) ?? [];
+  const inlineBytes = styleBlocks.join("").length + (content.match(/\sstyle\s*=\s*["'][^"']*["']/gi) ?? []).join("").length;
+  if (inlineBytes > 4000) {
+    findings.push({
+      category: "inline-style-bloat",
+      filePath: path,
+      line: firstMatchLine(content, /<style[\s>]/i),
+      detail: `${path} carries ~${Math.round(inlineBytes / 1024)}KB of inline styles.`,
+      fixHint: "Move repeated inline styles into a shared stylesheet.",
+      autoFixable: false,
+    });
+  }
+  return findings;
+}
+
 export async function scanSite(
   provider: SiteFileProvider,
   opts: ScanOptions = {},
@@ -120,76 +214,15 @@ export async function scanSite(
     } catch {
       continue; // binary / unreadable — skip
     }
-    const head = headContent(content);
 
-    // 1. Missing <title>
-    if (!/<title[\s>][\s\S]*?<\/title\s*>/i.test(head)) {
-      findings.push({
-        category: "missing-title",
-        filePath: f.path,
-        line: firstMatchLine(content, /<head[\s>]/i),
-        detail: `${f.path} has no <title> tag.`,
-        fixHint: "Generate a concise title from the page's h1/content and insert it into <head>.",
-        autoFixable: true,
-      });
-    }
+    // Checks 1–5 and 7 (shared with the live crawl, lib/audit/live.ts).
+    findings.push(...checkHtmlPage(f.path, content));
+    // Phase 11: JSON-LD presence + validity (./structured-data.ts).
+    findings.push(...checkStructuredData(f.path, content));
 
-    // 2. Missing meta description
-    if (!/<meta[^>]+name=["']description["']/i.test(head)) {
-      findings.push({
-        category: "missing-meta-description",
-        filePath: f.path,
-        line: firstMatchLine(content, /<head[\s>]/i),
-        detail: `${f.path} has no meta description.`,
-        fixHint: "Generate a ~150 character description from the page content.",
-        autoFixable: true,
-      });
-    }
-
-    // 3. Missing Open Graph tags
-    if (!/<meta[^>]+property=["']og:title["']/i.test(head)) {
-      findings.push({
-        category: "missing-og-tags",
-        filePath: f.path,
-        line: firstMatchLine(content, /<head[\s>]/i),
-        detail: `${f.path} has no Open Graph tags — social link previews will look broken.`,
-        fixHint: "Insert og:title / og:description / og:type derived from the page title and description.",
-        autoFixable: true,
-      });
-    }
-
-    // 4. Images missing alt
-    const imgRe = /<img\b[^>]*>/gi;
-    let m: RegExpExecArray | null;
-    while ((m = imgRe.exec(content))) {
-      if (!/\balt\s*=/i.test(m[0])) {
-        const src = /src=["']([^"']+)["']/i.exec(m[0])?.[1] ?? "(no src)";
-        findings.push({
-          category: "missing-alt",
-          filePath: f.path,
-          line: lineOf(content, m.index),
-          detail: `<img src="${src}"> has no alt text.`,
-          fixHint: `Generate a short descriptive alt for the image "${src}".`,
-          autoFixable: true,
-        });
-      }
-    }
-
-    // 5. Mixed content (http:// resource URLs)
-    const mixedRe = /(src|href)\s*=\s*["']http:\/\/[^"']+["']/gi;
-    while ((m = mixedRe.exec(content))) {
-      findings.push({
-        category: "mixed-content",
-        filePath: f.path,
-        line: lineOf(content, m.index),
-        detail: `Loads a resource over http://: ${m[0].slice(0, 80)}…`,
-        fixHint: "Rewrite the http:// URL to https://.",
-        autoFixable: true,
-      });
-    }
-
-    // 6. Broken internal links
+    // 6. Broken internal links (against the working copy's file list)
     const linkRe = /<a\b[^>]*href\s*=\s*["']([^"']+)["'][^>]*>/gi;
+    let m: RegExpExecArray | null;
     while ((m = linkRe.exec(content))) {
       const resolved = resolveInternal(f.path, m[1]);
       if (!resolved) continue; // external link — out of scope
@@ -209,20 +242,6 @@ export async function scanSite(
           autoFixable: false,
         });
       }
-    }
-
-    // 7. Inline style bloat
-    const styleBlocks = content.match(/<style[\s>][\s\S]*?<\/style\s*>/gi) ?? [];
-    const inlineBytes = styleBlocks.join("").length + (content.match(/\sstyle\s*=\s*["'][^"']*["']/gi) ?? []).join("").length;
-    if (inlineBytes > 4000) {
-      findings.push({
-        category: "inline-style-bloat",
-        filePath: f.path,
-        line: firstMatchLine(content, /<style[\s>]/i),
-        detail: `${f.path} carries ~${Math.round(inlineBytes / 1024)}KB of inline styles.`,
-        fixHint: "Move repeated inline styles into a shared stylesheet.",
-        autoFixable: false,
-      });
     }
   }
 

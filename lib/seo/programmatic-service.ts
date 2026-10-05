@@ -8,6 +8,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { renderSitemapXml } from "./sitemap";
 import {
   GENERATE_CHUNK_SIZE,
   MAX_DATASET_ROWS,
@@ -510,14 +511,13 @@ export async function buildSitemapXml(projectId: string): Promise<{ xml: string;
     select: { canonical: true, url: true, publishedAt: true, updatedAt: true },
   });
   const origin = siteOrigin(project.domain);
-  const urls = pages
-    .map((p) => {
-      const loc = p.canonical ?? `${origin}${p.url}`;
-      const lastmod = (p.publishedAt ?? p.updatedAt).toISOString().slice(0, 10);
-      return `  <url>\n    <loc>${loc.replace(/&/g, "&amp;")}</loc>\n    <lastmod>${lastmod}</lastmod>\n  </url>`;
-    })
-    .join("\n");
-  const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`;
+  // Phase 11 (seotools): one XML renderer for programmatic and site sitemaps.
+  const xml = renderSitemapXml(
+    pages.map((p) => ({
+      loc: p.canonical ?? `${origin}${p.url}`,
+      lastmod: (p.publishedAt ?? p.updatedAt).toISOString().slice(0, 10),
+    })),
+  );
   return { xml, count: pages.length };
 }
 

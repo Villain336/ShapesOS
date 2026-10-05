@@ -160,6 +160,17 @@ describe("pull requests", () => {
     assert.equal(seen.length, 2);
   });
 
+  it("lists the PR conversation's comments with the author's association (Phase 9)", async () => {
+    const { fn, seen } = stubFetch([
+      [/^GET .*\/issues\/5\/comments\?per_page=100$/, () => ({
+        json: [{ id: 7, body: "Please add a test", user: { login: "alice" }, html_url: "u7", created_at: "t7", author_association: "MEMBER" }],
+      })],
+    ]);
+    const [c] = await gh(fn).listIssueComments(5);
+    assert.deepEqual(c, { id: 7, body: "Please add a test", author: "alice", url: "u7", createdAt: "t7", authorAssociation: "MEMBER" });
+    assert.equal(seen.length, 1);
+  });
+
   it("rolls up: none / pending / success / failure", () => {
     const c = (conclusion: string | null) => ({ name: "x", source: "check_run" as const, status: "s", conclusion, url: null, summary: null });
     assert.equal(rollUpChecks([]).state, "none");
@@ -238,7 +249,7 @@ describe("mock connector stays in sync", () => {
     const m = new MockGitHubConnector();
     const ops: Array<keyof GitHubShipOps> = [
       "getRepo", "createBranch", "getBranch", "compare", "openPullRequest", "updatePullRequest",
-      "getPullRequest", "findPullRequestForBranch", "getPullRequestStatus", "listReviewComments", "listReviews",
+      "getPullRequest", "findPullRequestForBranch", "getPullRequestStatus", "listReviewComments", "listReviews", "listIssueComments",
     ];
     for (const op of ops) assert.equal(typeof m[op], "function", op);
     const b = await m.createBranch("shapes/r1");
@@ -252,6 +263,7 @@ describe("mock connector stays in sync", () => {
     assert.equal(st.state, "success");
     assert.ok((await m.listReviews(pr.number)).every((r) => r.mock && /MOCK/.test(r.body)));
     assert.ok((await m.listReviewComments(pr.number)).every((c) => c.mock));
+    assert.ok((await m.listIssueComments(pr.number)).every((c) => c.mock && /MOCK/.test(c.body)));
     assert.equal((await m.compare("main", "shapes/r1")).mock, true);
     // The existing repo operations still work (websites/github routes).
     assert.equal((await m.listRepos()).length, 2);

@@ -49,3 +49,22 @@ export function subAgentSystemPrompt(agentKey: SubAgentKey): string {
   }
   return [GLOBAL_HARD_RULES, BRIEFS[agentKey]].join("\n\n");
 }
+
+/**
+ * Phase 9 (repos): how the Operator works on code (build mode — the actor
+ * with the code group). The runtime enforces the cycle limit (lib/agents/
+ * loop.ts fixCyclePolicy: escalate to code_max, then hand back); this tells
+ * the model the loop it is in.
+ */
+export function buildModeSystemPrompt(fixCycles: number): string {
+  return [
+    "## Build mode: the test-fix loop",
+    "1. Plan: read the code first (read_file, grep, glob); say in one or two lines what you will change.",
+    "2. Edit with edit_file / write_file in small batches (each batch is checkpointed).",
+    "3. Run run_checks (lint, typecheck, test, build from the repository's saved profile) after each batch.",
+    `4. Fix what failed and run run_checks again, until everything passes or ${fixCycles} failed rounds. After ${fixCycles} the stronger code model takes over; after ${fixCycles} more you stop and hand back with what is still failing.`,
+    "5. When the checks pass: git_commit, then git_diff so the person sees the whole change.",
+    "6. Only then git_push_branch and open_pull_request — each waits for the person's OK. Never push failing work without saying so.",
+    "Work only on the task's branch (shapes/<run id>). When you continue from pull-request feedback, read it with read_pr_feedback first and push to the same branch.",
+  ].join("\n");
+}

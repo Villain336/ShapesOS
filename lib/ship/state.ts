@@ -13,6 +13,7 @@
 
 import type { Prisma } from "@prisma/client";
 import { withWorkspaceScope } from "@/lib/substrate/memory/rls";
+import { syncPullRequestFromShip } from "./pull-requests";
 
 export interface ShipState {
   /** owner/name */
@@ -48,8 +49,12 @@ export interface ShipLookup {
   threadId?: string;
 }
 
-/** Find the ship state this tool call works on (null = nothing cloned yet). */
-export async function loadShipState(q: ShipLookup): Promise<ShipState | null> {
+/**
+ * Phase 9: the lookup every per-run tool state uses (ship here, the site
+ * checkouts in lib/sites/state.ts): the call's own run → the run that
+ * handed it work → the newest run of the same chat thread that has one.
+ */
+export async function findRunState<T>(q: ShipLookup, read: (agentState: unknown) => T | null): Promise<T | null> {
   if (!q.runId) return null;
   return withWorkspaceScope(q.workspaceId, async (tx) => {
     const run = await tx.agentRun.findFirst({
@@ -57,14 +62,14 @@ export async function loadShipState(q: ShipLookup): Promise<ShipState | null> {
       select: { agentState: true, parentRunId: true, threadId: true },
     });
     if (!run) return null;
-    const own = readShipState(run.agentState);
+    const own = read(run.agentState);
     if (own) return own;
     if (run.parentRunId) {
       const parent = await tx.agentRun.findFirst({
         where: { id: run.parentRunId, workspaceId: q.workspaceId },
         select: { agentState: true },
       });
-      const p = readShipState(parent?.agentState);
+      const p = read(parent?.agentState);
       if (p) return p;
     }
     const threadId = q.threadId ?? run.threadId;
@@ -76,17 +81,24 @@ export async function loadShipState(q: ShipLookup): Promise<ShipState | null> {
       select: { agentState: true },
     });
     for (const r of recent) {
-      const s = readShipState(r.agentState);
+      const s = read(r.agentState);
       if (s) return s;
     }
     return null;
   });
 }
 
-/** Write the ship state onto a run (merged into its agentState). */
-export async function saveShipState(workspaceId: string, runId: string, state: ShipState): Promise<void> {
+/** Merge one key into a run's agentState (Phase 9: shared by ship + sites). */
+export async function mergeRunState(
+  workspaceId: string,
+  runId: string,
+  key: string,
+  value: unknown,
+  /** Runs in the same transaction after the write (ship: PR routing index). */
+  after?: (tx: Prisma.TransactionClient, run: { threadId: string | null }) => Promise<void>,
+): Promise<void> {
   await withWorkspaceScope(workspaceId, async (tx) => {
-    const run = await tx.agentRun.findFirst({ where: { id: runId, workspaceId }, select: { agentState: true } });
+    const run = await tx.agentRun.findFirst({ where: { id: runId, workspaceId }, select: { agentState: true, threadId: true } });
     if (!run) throw new Error("Run not found");
     const base =
       run.agentState && typeof run.agentState === "object" && !Array.isArray(run.agentState)
@@ -94,7 +106,21 @@ export async function saveShipState(workspaceId: string, runId: string, state: S
         : {};
     await tx.agentRun.update({
       where: { id: runId, workspaceId },
-      data: { agentState: { ...base, ship: { ...state } } as unknown as Prisma.InputJsonValue },
+      data: { agentState: { ...base, [key]: value } as unknown as Prisma.InputJsonValue },
     });
+    if (after) await after(tx, run);
   });
+}
+
+/** Find the ship state this tool call works on (null = nothing cloned yet). */
+export function loadShipState(q: ShipLookup): Promise<ShipState | null> {
+  return findRunState(q, readShipState);
+}
+
+/** Write the ship state onto a run (merged into its agentState). */
+export async function saveShipState(workspaceId: string, runId: string, state: ShipState): Promise<void> {
+  await mergeRunState(workspaceId, runId, "ship", { ...state }, (tx, run) =>
+    // Phase 9 (repos): pushed work is indexed for GitHub feedback routing.
+    syncPullRequestFromShip(tx, workspaceId, run.threadId, state),
+  );
 }

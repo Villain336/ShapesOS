@@ -35,8 +35,8 @@
 //     an in-flight model call, cancels the turn's pending proposals and
 //     expires the approvals it raised.
 //   * Auto-approve: a per-agent rule (lib/automation/policy.ts) may let a
-//     Tier 0/1 action run without the "yes" — Tier 2/3 and destructive tools
-//     always ask, whatever the rule says.
+//     Tier 0–2 action (Phase 14) run without the "yes" — Tier 3 (money and
+//     irreversible) and destructive tools always ask, whatever the rule says.
 //
 // PHASE 8 — durable runs: a turn still working after AGENT_INLINE_BUDGET_SECONDS
 // hands off to the agent worker at its next step boundary (the transcript is
@@ -52,7 +52,7 @@ import { getTool, registerExtraTool, type ToolContext, type ToolDef } from "./to
 import {
   DELEGATE_TOOL,
   executeTool,
-  proposalText,
+  proposalText as proposalTextFor,
   runEvent,
   stopRequested,
   type ChatToolCall,
@@ -67,7 +67,7 @@ import {
   type AgentKey,
   type ToolGroup,
 } from "@/lib/agents/grants";
-import { subAgentSystemPrompt } from "@/lib/agents/roles";
+import { buildModeSystemPrompt, subAgentSystemPrompt } from "@/lib/agents/roles";
 import { registerCodeTools } from "@/lib/sandbox/tools";
 import { sandboxAvailability } from "@/lib/sandbox/index";
 import {
@@ -98,6 +98,7 @@ import {
   loopLimitsFromEnv,
   runAgentLoop,
   STOPPED_TEXT,
+  testsFailed,
   toolResultFor,
   type AgentLoopResult,
   type LoopState,
@@ -109,7 +110,19 @@ import { inlineBudgetMs } from "@/lib/agents/queue/config";
 // Phase 8: ship tools (git in the sandbox → push → PR) and recorded browser
 // tools register themselves with the tool registry on import.
 import "@/lib/ship/tools";
+// Phase 9 (sites): site_checkout / site_publish_draft (registers on import).
+import "@/lib/sites/tools";
 import "@/lib/agents/runs/browser-tools";
+// Phase 9 (apps): the mini-app tools register themselves on import.
+import "@/lib/apps/tools";
+// Phase 11 (seotools): structured data + sitemap tools (group "site").
+import "@/lib/seo/tools";
+// Phase 11 (seotools): create_document / create_spreadsheet (group "content").
+import "@/lib/documents/tools";
+// Phase 11 (seotools): analyze_data (group "code", runs in the sandbox).
+import "@/lib/sandbox/analyze-tool";
+// Phase 11 (seotools): web_scrape / web_crawl (group "web", Context.dev).
+import "@/lib/knowledge/contextdev/web-tools";
 // Phase 10 M9: Expert Constitution Pack v1 — the Chief Strategy Agent's
 // system-prompt layer (global hard rules + CSA constitution), wired in
 // front of all project context and retrieval grounding.
@@ -277,6 +290,8 @@ function systemPrompt(
     grant
       ? `This task may only use these tool groups: ${grant.map((g) => TOOL_GROUP_LABELS[g]).join(", ")}. Calls outside them are refused.`
       : "",
+    // Phase 9 (repos): the Operator in build mode follows the test-fix loop.
+    turnMode(agentKey, grant) === "build" ? buildModeSystemPrompt(loopLimitsFromEnv().fixCycles) : "",
     "",
     "PROJECT CONTEXT:",
     projectContext,
@@ -375,6 +390,11 @@ async function mockTurn(
     await executeTool(ctx, toolName, args, call);
     return call;
   };
+  // Phase 14: a call an automation rule let run is reported as done, not proposed.
+  const proposalText = (call: ChatToolCall): string =>
+    call.autoApproved
+      ? `${call.status === "executed" ? "Done" : "Tried"} without asking (${call.autoApproved}): ${call.resultSummary ?? call.tool}`
+      : proposalTextFor(call);
 
   const first = lower.split(/\s+/)[0];
   switch (first) {
@@ -705,7 +725,13 @@ async function continuationState(
       ),
     },
   ];
-  return initialLoopState({ system: saved.system, messages, mode: saved.mode, workload: saved.workload });
+  const next = initialLoopState({ system: saved.system, messages, mode: saved.mode, workload: saved.workload });
+  // Phase 9: the fix-cycle count survives an approval (run_checks / run_tests
+  // ask first, so every cycle passes through here) — a confirmed failing
+  // check is one more cycle.
+  next.testFailCycles = (saved.testFailCycles ?? 0) + (done.some((d) => testsFailed(d.result ?? null)) ? 1 : 0);
+  next.escalated = saved.escalated === true;
+  return next;
 }
 
 export async function runAgentTurn(input: AgentTurnInput): Promise<AgentTurnOutput> {
