@@ -10,6 +10,7 @@
 // spread is the metric.
 
 import { NotConfiguredError } from "../fake";
+import { fakeProvidersAllowed } from "@/lib/env/secrets";
 
 export type AeoEngineName = "openai" | "anthropic" | "gemini" | "perplexity";
 
@@ -139,8 +140,15 @@ export interface EngineResolveOpts {
  * NotConfiguredError without a key — never silently pretend to work.
  */
 export function resolveEngineClient(engine: AeoEngineName, opts: EngineResolveOpts = {}): AeoEngineClient {
-  if (opts.fake === true || !opts.apiKey) {
+  if ((opts.fake === true || !opts.apiKey) && fakeProvidersAllowed()) {
     return createFakeEngineClient(engine, { brand: opts.brand, ownedDomain: opts.ownedDomain });
+  }
+  // Phase 11 (conncore): fixture answers are refused in production.
+  if (opts.fake === true || !opts.apiKey) {
+    throw new NotConfiguredError(
+      `${ENGINE_LABELS[engine]} (${ENGINE_MODELS[engine]})`,
+      "not connected — fixture engine answers are never used in production.",
+    );
   }
   throw new NotConfiguredError(
     `${ENGINE_LABELS[engine]} (${ENGINE_MODELS[engine]})`,

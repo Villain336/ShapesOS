@@ -7,6 +7,7 @@ import { ArrowLeft } from "lucide-react";
 import { redirect } from "next/navigation";
 import { requireUser, getOrCreateWorkspace } from "@/lib/session";
 import { CanvasEditor } from "../editor/CanvasEditor";
+import { SendToSocialButton } from "./SendToSocialButton";
 
 export const dynamic = "force-dynamic";
 
@@ -27,7 +28,7 @@ export default async function DesignEditorPage({
 
   return (
     <div className="-mx-4 -my-6 flex h-[calc(100dvh-105px)] flex-col bg-canvas sm:-mx-6 sm:-my-8 md:h-[calc(100dvh-48px)] lg:-mx-10">
-      <div className="flex shrink-0 items-center border-b border-line bg-canvas px-4 py-2">
+      <div className="flex shrink-0 items-center justify-between gap-2 border-b border-line bg-canvas px-4 py-2">
         <Link
           href="/dashboard/studio"
           className="flex items-center gap-1.5 text-[13px] font-medium text-muted hover:text-ink"
@@ -35,6 +36,8 @@ export default async function DesignEditorPage({
           <ArrowLeft className="h-4 w-4" />
           Back to Studio
         </Link>
+        {/* Phase 4b: Studio → social (exports the saved design as a post draft). */}
+        <SendToSocialButton designId={id} />
       </div>
       <div className="min-h-0 flex-1">
         <CanvasEditor designId={id} />

@@ -1,21 +1,21 @@
-// Marketr — M21 Google Ads adapter.
+// ShapesOS — M21 Google Ads adapter.
 //
-// LIVE WIRING (not yet implemented): this adapter is MOCK-ONLY today. The
-// live pass must call the Google Ads API (REST or google-ads client lib):
-//   GET https://googleads.googleapis.com/v17/customers:listAccessibleCustomers
-//     → list_accounts()
-//   POST https://googleads.googleapis.com/v17/customers/{customerId}/googleAds:search
-//     GAQL: SELECT campaign.name, campaign.status, metrics.impressions,
-//           metrics.clicks, metrics.cost_micros, metrics.conversions
-//           FROM campaign WHERE segments.date DURING LAST_30_DAYS
-//     → campaign_report()
-// Auth: OAuth2 Bearer access_token (scope adwords) + a developer token
-// (stored in the credential payload as developerToken) + a login customer
-// id for MCC setups. Refresh via lib/vault/refresh.ts. Docs:
-// https://developers.google.com/google-ads/api/docs/start
+// LIVE WIRING (Phase 4b): with a vault credential this adapter calls the
+// Google Ads API over REST (lib/connectors/m21/live/google-ads.ts):
+//   GET  https://googleads.googleapis.com/v25/customers:listAccessibleCustomers
+//     → list_accounts() (+ customer.descriptive_name per account) + health check
+//   POST https://googleads.googleapis.com/v25/customers/{customerId}/googleAds:searchStream
+//     GAQL FROM campaign → campaign_report(); FROM keyword_view → keyword_report()
+//     (one streamed request; rows bounded by a GAQL LIMIT)
+// Auth: OAuth2 Bearer (scope adwords) + the developer-token header (the
+// app's GOOGLE_ADS_DEVELOPER_TOKEN, or a BYO developerToken in the credential
+// payload) + login-customer-id (projectConfig.loginCustomerId, args, or the
+// credential payload) for manager-account setups. Refresh-on-401 through
+// the vault; quota errors / 429 / 5xx back off and retry.
+// Docs: https://developers.google.com/google-ads/api/rest/overview
 //
-// MOCK MODE: deterministic demo account data; every row flagged mock: true,
-// names carry "(MOCK)". No network calls.
+// MOCK MODE (no credential): deterministic demo account data; every row
+// flagged mock: true, names carry "(MOCK)". No network calls.
 
 import type {
   ConnectorAdapter,
@@ -24,7 +24,20 @@ import type {
   InvokeContext,
   InvokeResult,
 } from "../types";
-import { strProp, mockOk, fail } from "../types";
+import { strProp, mockOk, liveOk, fail } from "../types";
+import { liveFailure, tokenSourceFrom, ConnectorApiError, type LiveDeps } from "../live/http";
+import {
+  googleAdsCampaignReport,
+  googleAdsKeywordReport,
+  googleAdsListAccessible,
+  googleAdsListAccounts,
+  normalizeCustomerId,
+  type GoogleAdsAuth,
+} from "../live/google-ads";
+
+function optionalString(v: unknown): string | undefined {
+  return typeof v === "string" && v.trim() ? v.trim() : undefined;
+}
 
 export class GoogleAdsAdapter implements ConnectorAdapter {
   readonly key = "google-ads";
@@ -39,6 +52,8 @@ export class GoogleAdsAdapter implements ConnectorAdapter {
       },
     },
   };
+
+  constructor(private readonly deps: LiveDeps = {}) {}
 
   listTools(): ConnectorToolDef[] {
     return [
@@ -56,7 +71,7 @@ export class GoogleAdsAdapter implements ConnectorAdapter {
           type: "object",
           properties: {
             customerId: strProp("Google Ads customer id (10 digits)."),
-            dateRange: strProp("e.g. LAST_30_DAYS, LAST_7_DAYS."),
+            dateRange: strProp("e.g. LAST_30_DAYS, LAST_7_DAYS, or YYYY-MM-DD..YYYY-MM-DD."),
           },
           required: ["customerId"],
         },
@@ -70,6 +85,7 @@ export class GoogleAdsAdapter implements ConnectorAdapter {
           properties: {
             customerId: strProp("Google Ads customer id (10 digits)."),
             campaignId: strProp("Campaign id."),
+            dateRange: strProp("e.g. LAST_30_DAYS (default) or YYYY-MM-DD..YYYY-MM-DD."),
           },
           required: ["customerId", "campaignId"],
         },
@@ -77,12 +93,83 @@ export class GoogleAdsAdapter implements ConnectorAdapter {
     ];
   }
 
+  /** Live auth: bearer + developer token + optional manager login id. */
+  private adsAuth(
+    credential: DecryptedCredential | null,
+    ctx: InvokeContext,
+    args: Record<string, unknown> = {},
+  ): GoogleAdsAuth | null {
+    const base = tokenSourceFrom(credential, ctx);
+    if (!base) return null;
+    const developerToken =
+      optionalString(credential?.payload.developerToken) ??
+      optionalString(process.env.GOOGLE_ADS_DEVELOPER_TOKEN);
+    if (!developerToken) {
+      throw new ConnectorApiError(
+        this.displayName,
+        "config_missing",
+        "Google Ads needs a developer token: set GOOGLE_ADS_DEVELOPER_TOKEN (Google Ads API Center) before live calls.",
+      );
+    }
+    const login =
+      optionalString(args.loginCustomerId) ??
+      optionalString(ctx.projectConfig?.loginCustomerId) ??
+      optionalString(credential?.payload.loginCustomerId);
+    return {
+      ...base,
+      developerToken,
+      ...(login ? { loginCustomerId: normalizeCustomerId(login, "loginCustomerId") } : {}),
+    };
+  }
+
   async invoke(
     tool: string,
     args: Record<string, unknown>,
-    _credential: DecryptedCredential | null,
+    credential: DecryptedCredential | null,
     ctx: InvokeContext,
   ): Promise<InvokeResult> {
+    if (!tokenSourceFrom(credential, ctx)) return this.mockInvoke(tool, args, ctx);
+    try {
+      const auth = this.adsAuth(credential, ctx, args);
+      if (!auth) return this.mockInvoke(tool, args, ctx);
+      switch (tool) {
+        case "list_accounts":
+          return liveOk(await googleAdsListAccounts(auth, this.deps));
+        case "campaign_report": {
+          const customerId = normalizeCustomerId(args.customerId ?? ctx.projectConfig?.customerId);
+          const campaigns = await googleAdsCampaignReport(auth, { customerId, dateRange: args.dateRange }, this.deps);
+          return liveOk({ customerId, dateRange: args.dateRange ?? "LAST_30_DAYS", campaigns });
+        }
+        case "keyword_report": {
+          const customerId = normalizeCustomerId(args.customerId ?? ctx.projectConfig?.customerId);
+          const campaignId = String(args.campaignId ?? "").trim();
+          const keywords = await googleAdsKeywordReport(
+            auth,
+            { customerId, campaignId, dateRange: args.dateRange },
+            this.deps,
+          );
+          return liveOk({ customerId, campaignId, keywords });
+        }
+        default:
+          return fail(`Unknown tool "${tool}" for connector ${this.key}`);
+      }
+    } catch (err) {
+      return liveFailure(err, this.displayName);
+    }
+  }
+
+  async healthCheck(credential: DecryptedCredential, ctx: InvokeContext): Promise<InvokeResult> {
+    try {
+      const auth = this.adsAuth(credential, ctx);
+      if (!auth) return { ok: false, error: "No access token stored.", errorCode: "not_connected" };
+      const ids = await googleAdsListAccessible(auth, this.deps);
+      return liveOk({ reachable: true, accounts: ids.length });
+    } catch (err) {
+      return liveFailure(err, this.displayName);
+    }
+  }
+
+  private mockInvoke(tool: string, args: Record<string, unknown>, ctx: InvokeContext): InvokeResult {
     const customerId =
       (args.customerId as string | undefined) ??
       (ctx.projectConfig?.customerId as string | undefined) ??

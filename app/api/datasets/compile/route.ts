@@ -11,6 +11,7 @@ import { PrismaDatasetBuilderStore } from "@/lib/datasetbuilder/prisma-store";
 import { DATASET_TYPES, DATASET_TYPE_LABELS } from "@/lib/datasetbuilder/classify";
 import { compileDataset, compileDatasets } from "@/lib/datasetbuilder/build";
 import { DatasetBuilderError } from "@/lib/datasetbuilder/types";
+import { emitDatasetCompiled } from "@/lib/datasetbuilder/events";
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +28,13 @@ export async function POST(req: Request) {
     if (body.type !== "all") {
       try {
         const result = await compileDataset(store, workspace.id, body.type);
+        await emitDatasetCompiled(workspace.id, {
+          datasetId: result.dataset.id,
+          type: result.dataset.type,
+          version: result.version.version,
+          chunkCount: result.chunkCount,
+          compiledAt: result.version.compiledAt,
+        });
         return Response.json({
           compiled: [
             {
@@ -52,6 +60,15 @@ export async function POST(req: Request) {
     }
 
     const { compiled, skipped } = await compileDatasets(store, workspace.id);
+    for (const r of compiled) {
+      await emitDatasetCompiled(workspace.id, {
+        datasetId: r.dataset.id,
+        type: r.dataset.type,
+        version: r.version.version,
+        chunkCount: r.chunkCount,
+        compiledAt: r.version.compiledAt,
+      });
+    }
     return Response.json({
       compiled: compiled.map((r) => ({
         datasetId: r.dataset.id,

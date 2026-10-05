@@ -181,3 +181,24 @@ describe("Context.dev daily budget reserve is atomic", () => {
     assert.equal((await getDailyBudget(WS_CD)).capCredits, DEFAULT_DAILY_CAP_CREDITS);
   });
 });
+
+describe("first charge race on a new workspace", () => {
+  // Regression (Phase 4c CI): lockBalance/lockSpendCap created the row with
+  // create + catch P2002 and retried, but a unique violation aborts the
+  // Postgres transaction, so every loser failed "current transaction is
+  // aborted". The rows are now created with ON CONFLICT DO NOTHING.
+  it("concurrent first meter() calls all succeed and charge exactly once each", async () => {
+    const ws = `p4c-meter-first-${RUN}`;
+    await createWorkspace(ws, "starter");
+    try {
+      const results = await Promise.all(Array.from({ length: 8 }, () => charge(ws, 1)));
+      assert.deepEqual(results.map((r) => r.ok), Array(8).fill(true));
+      const { bal, cap } = await state(ws);
+      assert.equal(bal?.usedCredits, 8);
+      assert.equal(cap?.capCredits, includedCreditsForPlan("starter"));
+      assert.equal(cap?.blockAtCap, true);
+    } finally {
+      await prisma.$executeRaw`DELETE FROM workspaces WHERE id = ${ws}`;
+    }
+  });
+});

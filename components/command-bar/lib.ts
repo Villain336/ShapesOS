@@ -3,17 +3,41 @@
 // React/DOM-free on purpose: every function here is unit-testable via
 // `npx tsx --test` without a browser. CommandBar.tsx wires these up to UI.
 
-// Phase 4a: "records" = workspace records found by /api/search/records.
-export type SectionId = "go" | "records" | "do" | "ask";
+import { LEAD_AGENT, SUB_AGENTS, isSubAgentKey, type AgentNode, type SubAgentKey } from "@/lib/aos/agents";
+import { STATUS_META, type AosStatus } from "@/lib/aos/status";
 
-export const SECTION_ORDER: SectionId[] = ["go", "records", "do", "ask"];
+/**
+ * Window event that opens the palette from anywhere (the sidebar's search
+ * button): `window.dispatchEvent(new Event(OPEN_COMMAND_BAR_EVENT))`.
+ */
+export const OPEN_COMMAND_BAR_EVENT = "shapes:command-bar-open";
+
+/**
+ * Window event that opens the New task composer (components/aos/composer):
+ * `window.dispatchEvent(new CustomEvent(OPEN_COMPOSER_EVENT, { detail: { agent } }))`.
+ * `agent` is "lead" (default) or a sub-agent key.
+ */
+export const OPEN_COMPOSER_EVENT = "shapes:composer-open";
+
+// Phase 4a: "records" = workspace records found by /api/search/records.
+// Phase 4d: the kit palette leads with Agents (lead first, then sub-agents),
+// Actions (with keycaps) and Tools (connection state); Go/Records follow.
+export type SectionId = "agents" | "actions" | "tools" | "go" | "records" | "do" | "ask";
+
+export const SECTION_ORDER: SectionId[] = ["agents", "actions", "tools", "go", "records", "do", "ask"];
 
 export const SECTION_LABELS: Record<SectionId, string> = {
+  agents: "Agents",
+  actions: "Actions",
+  tools: "Tools",
   go: "Go",
   records: "Records",
   do: "Do",
   ask: "Ask",
 };
+
+/** Agent/run state carried by an Agents row (lib/aos/status AosStatus). */
+export type CommandStatus = AosStatus;
 
 /** A palette command. `action` decides what CommandBar.tsx does on Enter. */
 export interface CommandItem {
@@ -23,11 +47,181 @@ export interface CommandItem {
   subtitle?: string;
   keywords?: string;
   hotkey?: string;
-  action: "go" | "missions-page" | "playbooks-page" | "template" | "playbook-run" | "ask";
+  action:
+    | "go"
+    | "missions-page"
+    | "playbooks-page"
+    | "template"
+    | "playbook-run"
+    | "ask"
+    /** Open the New task composer (agentKey picks the agent). */
+    | "new-task";
   href?: string;
   templateId?: string;
   goal?: string;
   playbookId?: string;
+  /** Agents rows: the agent's current state (color + shape + label). */
+  status?: CommandStatus;
+  /** Agents rows: "lead" or a sub-agent key; for new-task, the preselected agent. */
+  agentKey?: string;
+  /** Tools rows: connection state shown on the right. */
+  toolState?: "connected" | "reconnect";
+}
+
+// ---------------------------------------------------------------------------
+// Keycaps
+// ---------------------------------------------------------------------------
+
+/**
+ * Split a shortcut label into keycaps: "⌘N" → ["⌘","N"], "G I" → ["G","I"]
+ * (a sequence), "⌥1" → ["⌥","1"], "⌘↵" → ["⌘","↵"].
+ */
+export function hotkeyParts(hotkey: string | undefined): string[] {
+  const h = (hotkey ?? "").trim();
+  if (!h) return [];
+  if (/\s/.test(h)) return h.split(/\s+/);
+  return Array.from(h);
+}
+
+/** True when the keyboard target is somewhere the user types (no single-key shortcuts there). */
+export function isTypingTarget(target: { tagName?: string; isContentEditable?: boolean } | null): boolean {
+  if (!target) return false;
+  if (target.isContentEditable) return true;
+  const tag = (target.tagName ?? "").toUpperCase();
+  return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
+}
+
+/** "G then I" within this window opens approvals. */
+export const SEQUENCE_WINDOW_MS = 1200;
+
+// ---------------------------------------------------------------------------
+// Agents section: the lead first, then its sub-agents (lib/aos/agents)
+// ---------------------------------------------------------------------------
+
+export interface PaletteTree {
+  lead: AgentNode;
+  branches: AgentNode[];
+}
+
+function agentHint(node: AgentNode): string {
+  const p = node.progress;
+  if (p && p.total > 0 && node.status === "running") {
+    return `Step ${Math.min(p.done + 1, p.total)} of ${p.total} · ${node.line}`;
+  }
+  return node.line;
+}
+
+/**
+ * Agents rows. With live work: the lead, then every branch in delegation
+ * order, each with its one-line state and status; a row opens its work.
+ * With nothing running: the lead and the sub-agents as hand-off targets
+ * (Enter opens the composer with that agent picked) and no status, since an
+ * idle agent has no state to show.
+ */
+export function agentCommandItems(tree: PaletteTree | null): CommandItem[] {
+  if (tree) {
+    return [tree.lead, ...tree.branches].map((n) => {
+      const sub = !n.isLead && isSubAgentKey(n.key);
+      return {
+        id: `agent:${n.key}`,
+        section: "agents" as const,
+        title: n.name,
+        subtitle: agentHint(n),
+        keywords: [n.isLead ? "lead agent strategist orchestrator" : "sub-agent", STATUS_META[n.status].label, n.missionName ?? ""].join(" "),
+        status: n.status,
+        agentKey: n.isLead ? "lead" : sub ? n.key : undefined,
+        ...(n.href ? { action: "go" as const, href: n.href } : { action: "new-task" as const }),
+      };
+    });
+  }
+  const idle: CommandItem[] = [
+    {
+      id: "agent:lead",
+      section: "agents",
+      title: LEAD_AGENT.name,
+      subtitle: "Lead agent · nothing running",
+      keywords: "lead agent strategist orchestrator hand off task",
+      action: "new-task",
+      agentKey: "lead",
+    },
+  ];
+  for (const [key, profile] of Object.entries(SUB_AGENTS) as Array<[SubAgentKey, (typeof SUB_AGENTS)[SubAgentKey]]>) {
+    idle.push({
+      id: `agent:${key}`,
+      section: "agents",
+      title: profile.name,
+      subtitle: profile.description.replace(/\.$/, ""),
+      keywords: "sub-agent hand off task",
+      action: "new-task",
+      agentKey: key,
+    });
+  }
+  return idle;
+}
+
+// ---------------------------------------------------------------------------
+// Tools section: connection state from /api/connectors (real data only)
+// ---------------------------------------------------------------------------
+
+export interface ConnectorSummary {
+  key: string;
+  displayName: string;
+  description: string | null;
+  connections: Array<{ status: string; meta?: Record<string, unknown> | null }>;
+}
+
+export const CONNECTORS_HREF = "/dashboard/settings/connectors";
+
+function metaLabel(meta: Record<string, unknown> | null | undefined): string | null {
+  for (const k of ["label", "email", "account"]) {
+    const v = meta?.[k];
+    if (typeof v === "string" && v.trim()) return v.trim();
+  }
+  return null;
+}
+
+/**
+ * One row per connector that has a connection: Connected when any
+ * connection is active, Reconnect when its only connections need re-auth or
+ * were revoked. Connectors never connected are left out (the catalog is
+ * long); with none at all, a single "Connect a tool" row.
+ */
+export function toolCommandItems(connectors: readonly ConnectorSummary[]): CommandItem[] {
+  const rows: CommandItem[] = [];
+  for (const c of connectors) {
+    if (!c.connections.length) continue;
+    const active = c.connections.find((x) => x.status === "active");
+    const state = active ? "connected" : "reconnect";
+    const reauth = c.connections.some((x) => x.status === "needs_reauth");
+    const hint = active
+      ? (metaLabel(active.meta) ?? c.description ?? "")
+      : reauth
+        ? "Access expired"
+        : "Access revoked";
+    rows.push({
+      id: `tool:${c.key}`,
+      section: "tools",
+      title: c.displayName,
+      subtitle: hint || undefined,
+      keywords: `tool connector connection ${state === "connected" ? "connected" : "reconnect expired"}`,
+      action: "go",
+      href: CONNECTORS_HREF,
+      toolState: state,
+    });
+  }
+  rows.sort((a, b) => (a.toolState === b.toolState ? a.title.localeCompare(b.title) : a.toolState === "connected" ? -1 : 1));
+  if (rows.length === 0) {
+    rows.push({
+      id: "tool:connect",
+      section: "tools",
+      title: "Connect a tool",
+      subtitle: "No tools connected yet",
+      keywords: "tool connector connect integration",
+      action: "go",
+      href: CONNECTORS_HREF,
+    });
+  }
+  return rows;
 }
 
 // ---------------------------------------------------------------------------

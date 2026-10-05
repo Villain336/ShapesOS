@@ -139,6 +139,34 @@ export const USER_FILE_VIEW_CSP = [
   "form-action 'none'",
 ].join("; ");
 
+/**
+ * Phase 8: CSP for a sandbox preview (/api/agent-runs/<runId>/preview/…,
+ * lib/sandbox/preview-proxy.ts) — a dev server an agent built, so it must
+ * run its own scripts, but it is untrusted: `sandbox` WITHOUT
+ * allow-same-origin makes it an opaque origin (no access to the app's
+ * cookies or storage; its requests to the app are cross-site, so the Lax
+ * session cookie is not sent), no top-level navigation, no popups, and it
+ * may only be framed by our own pages.
+ */
+export const SANDBOX_PREVIEW_CSP = [
+  "sandbox allow-scripts allow-forms allow-modals allow-downloads",
+  "default-src 'self' data: blob:",
+  "script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: blob: https:",
+  "font-src 'self' data: https:",
+  "connect-src 'self'",
+  "frame-ancestors 'self'",
+  "base-uri 'self'",
+  "form-action 'self'",
+  "object-src 'none'",
+].join("; ");
+
+/** Phase 8: is this a sandbox preview path (see SANDBOX_PREVIEW_CSP)? */
+export function isSandboxPreviewPath(pathname: string): boolean {
+  return /^\/api\/agent-runs\/[^/]+\/preview\/\d+(\/|$)/.test(pathname);
+}
+
 /** Requests outside /api whose response is user file bytes (see USER_FILE_VIEW_CSP). */
 export function isUserFileRequest(pathname: string, search: URLSearchParams | string = ""): boolean {
   const params = typeof search === "string" ? new URLSearchParams(search) : search;
@@ -150,6 +178,7 @@ export function contentSecurityPolicyFor(
   pathname: string,
   opts: { nonce: string; dev?: boolean; search?: URLSearchParams | string },
 ): string {
+  if (isSandboxPreviewPath(pathname)) return SANDBOX_PREVIEW_CSP;
   if (pathname === "/api" || pathname.startsWith("/api/")) return API_CONTENT_SECURITY_POLICY;
   if (isUserFileRequest(pathname, opts.search ?? "")) return USER_FILE_VIEW_CSP;
   return buildContentSecurityPolicy(opts);

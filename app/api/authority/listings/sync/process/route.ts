@@ -3,15 +3,15 @@
 // Trigger one pass of the sync executor: due queued listing_sync_jobs run in
 // cap order. Every job re-verifies its listing_edit binding at execution;
 // binding mismatches HALT the job — the payload never reaches the provider.
-// (v1 uses the fake GBP client; the real adapter throws NotConfiguredError
-// without credentials — it never silently pretends to work.)
+// Phase 4b: live GBP when the workspace has a Google Business Profile
+// connection (OAuth business.manage); the fake client otherwise.
 
 import type { NextRequest } from "next/server";
 import { authorityGuard, safetyError } from "@/app/api/authority/_lib";
 import { authorityTablesReady } from "@/lib/authority/db";
 import { createPrismaListingStore } from "@/lib/authority/listings/store";
 import { processDueSyncJobs } from "@/lib/authority/listings/sync";
-import { resolveGbpClient } from "@/lib/authority/fake";
+import { gbpClientForWorkspace } from "@/lib/authority/reviews/gbpClient";
 
 export const dynamic = "force-dynamic";
 
@@ -23,7 +23,7 @@ export async function POST(_req: NextRequest) {
   }
   try {
     const store = createPrismaListingStore();
-    const client = resolveGbpClient({ fake: true });
+    const client = await gbpClientForWorkspace(gate.workspaceId);
     const result = await processDueSyncJobs(gate.workspaceId, { store, client });
     return Response.json({ ...result, provider: client.name });
   } catch (err) {

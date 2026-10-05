@@ -22,6 +22,7 @@ import {
   type NativeGenerativeComponentName,
 } from "./registry.native";
 import type { GateClientOptions } from "../api/gate";
+import { color } from "../theme";
 
 function toolCallArgs(tc: ToolCall): Record<string, unknown> {
   try {
@@ -115,11 +116,11 @@ export function MessageList({ messages, gate }: { messages: readonly Message[]; 
 
 const styles = StyleSheet.create({
   userRow: { flexDirection: "row", justifyContent: "flex-end", marginVertical: 4 },
-  userBubble: { backgroundColor: "#7c3aed", borderRadius: 16, borderBottomRightRadius: 4, paddingVertical: 10, paddingHorizontal: 14, maxWidth: "85%" },
-  userText: { color: "#fff", fontSize: 15 },
+  userBubble: { backgroundColor: color.ink, borderRadius: 16, borderBottomRightRadius: 4, paddingVertical: 10, paddingHorizontal: 14, maxWidth: "85%" },
+  userText: { color: color.paper, fontSize: 15 },
   assistantWrap: { marginVertical: 4 },
-  assistantBubble: { backgroundColor: "#f5f5f4", borderRadius: 16, borderBottomLeftRadius: 4, paddingVertical: 10, paddingHorizontal: 14, maxWidth: "92%", alignSelf: "flex-start" },
-  assistantText: { color: "#1c1917", fontSize: 15 },
-  fallbackCard: { backgroundColor: "#fafaf9", borderWidth: 1, borderColor: "#e7e5e4", borderRadius: 12, padding: 12, marginVertical: 6 },
-  fallbackText: { fontSize: 13, color: "#78716c", fontStyle: "italic" },
+  assistantBubble: { backgroundColor: color.canvas, borderRadius: 16, borderBottomLeftRadius: 4, paddingVertical: 10, paddingHorizontal: 14, maxWidth: "92%", alignSelf: "flex-start" },
+  assistantText: { color: color.ink, fontSize: 15 },
+  fallbackCard: { backgroundColor: color.canvas, borderWidth: 1, borderColor: color.line, borderRadius: 12, padding: 12, marginVertical: 6 },
+  fallbackText: { fontSize: 13, color: color.muted, fontStyle: "italic" },
 });

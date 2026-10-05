@@ -1,12 +1,10 @@
 // Marketr — Google Business Profile management scaffold (milestone 16).
 //
-// The GBP API application is backlogged with no ETA (filed at milestone
-// start per the spec). Until it is approved and credentials are configured,
-// EVERYTHING here stays behind the FEATURE_GBP_MANAGEMENT flag and only the
-// mock implementation exists. No live Google API calls anywhere in this file.
-//
-// When approval arrives: implement GbpLiveProvider against the GBP API
-// (accounts.locations, localPosts, performance insights) and flip the flag.
+// EVERYTHING here stays behind the FEATURE_GBP_MANAGEMENT flag. This file
+// holds the contract + the mock provider (no network). Phase 4b: the live
+// provider (localPosts list/create, Performance API daily metrics) is
+// lib/local/gbp-live.ts, selected per workspace by gbpProviderForWorkspace()
+// when the workspace has a Google Business Profile OAuth connection.
 
 export interface GbpPostInput {
   locationId: string;
@@ -25,7 +23,8 @@ export interface GbpPost {
   summary: string;
   status: "draft" | "scheduled" | "published" | "failed";
   scheduledAt: string | null;
-  mock: true;
+  /** true for the mock provider; false for live provider rows. */
+  mock: boolean;
 }
 
 export interface GbpInsight {
@@ -115,7 +114,10 @@ export class MockGbpProvider implements GbpProvider {
   }
 }
 
-/** Today: mock only. Wire GbpLiveProvider here when the GBP API is approved. */
+/**
+ * The mock provider. Routes use gbpProviderForWorkspace() (lib/local/gbp-live.ts),
+ * which returns the live provider when the workspace has connected GBP.
+ */
 export function getGbpProvider(): GbpProvider {
   return new MockGbpProvider();
 }

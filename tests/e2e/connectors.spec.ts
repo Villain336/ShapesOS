@@ -23,7 +23,9 @@ test.describe("connectors", () => {
       {
         data: {
           workspaceId,
-          apiKey: "e2e-fake-key",
+          // Phase 14: DataForSEO declares login + password fields.
+          mode: "login_password",
+          fields: { apiKey: "e2e-fake-login", password: "e2e-fake-key" },
           label: "E2E DataForSEO",
         },
       },

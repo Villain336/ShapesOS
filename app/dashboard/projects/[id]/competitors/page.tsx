@@ -28,11 +28,11 @@ export default async function CompetitorsPage({
       <div>
         <Link
           href={`/dashboard/projects/${project.id}`}
-          className="text-sm text-zinc-500 hover:text-zinc-600"
+          className="text-sm text-muted hover:text-ink"
         >
           ← {project.domain}
         </Link>
-        <h1 className="mt-1 text-xl font-bold tracking-tight text-ink">
+        <h1 className="mt-1 text-xl font-heading tracking-heading stretch-heading text-ink">
           Competitor keyword gap
         </h1>
       </div>

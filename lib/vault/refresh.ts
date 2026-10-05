@@ -12,10 +12,12 @@
 import { prisma } from "@/lib/prisma";
 import { secrets } from "@/lib/secrets";
 import type { DecryptedCredential } from "@/lib/connectors/m21/types";
-import { getOAuthConfig } from "./oauth";
+import { buildTokenRequest, getOAuthConfig, shopUrl } from "./oauth";
 
 export interface RefreshDeps {
   fetchImpl?: typeof fetch;
+  /** Phase 14: DNS resolver for safeFetch's address check (tests inject a fake). */
+  resolve?: (host: string) => Promise<string[]>;
 }
 
 /** Fetch the connector's authType from the registry (built-in) or fall back to "none". */
@@ -56,6 +58,28 @@ export async function getDecryptedCredential(
   return { kind, payload };
 }
 
+/**
+ * Phase 14: whether a credential with NO expiry can be renewed at all — the
+ * cron's "stale" branch (providers that omit expires_in) may only send these
+ * to refreshConnection. API keys and non-expiring OAuth tokens without a
+ * refresh token have nothing to renew; refreshing them would flip a working
+ * connection to needs_reauth ten minutes after it was connected.
+ * Renewable: an OAuth refresh token (built-in or custom MCP), or a
+ * single-store Shopify credential (re-minted / re-verified).
+ */
+export async function renewableWithoutExpiry(
+  connectorKey: string,
+  payload: Record<string, unknown> | null | undefined,
+): Promise<boolean> {
+  if (!payload) return false;
+  if (typeof payload.refresh_token === "string" && payload.refresh_token) return true;
+  if (connectorKey === "shopify") {
+    const { singleStoreModeOf } = await import("@/lib/bizsync/shopify/single-store");
+    return singleStoreModeOf(payload) !== null;
+  }
+  return false;
+}
+
 interface RefreshTokenResponse {
   access_token: string;
   refresh_token?: string;
@@ -86,6 +110,54 @@ export async function refreshConnection(
   const clientId = typeof payload?.client_id === "string" ? payload.client_id : "";
   const clientSecret = typeof payload?.client_secret === "string" ? payload.client_secret : "";
 
+  // Phase 11 (conncore): an OAuth-protected custom MCP server refreshes at
+  // its own authorization server (client + token endpoint in the payload).
+  if (!config && payload && refreshToken) {
+    const { isMcpPayload, refreshMcpPayload } = await import("@/lib/connectors/m21/mcp-oauth");
+    if (isMcpPayload(payload)) {
+      try {
+        const next = await refreshMcpPayload(payload, deps.fetchImpl);
+        await prisma.connectorCredential.update({
+          where: { connectionId },
+          data: {
+            encryptedBlob: secrets().encrypt(JSON.stringify(next.payload)),
+            keyVersion: "env-v1",
+            expiresAt: next.expiresIn !== null ? new Date(Date.now() + next.expiresIn * 1000) : null,
+          },
+        });
+        await prisma.connectorConnection.update({ where: { id: connectionId }, data: { status: "active", lastRefreshAt: new Date() } });
+        return "refreshed";
+      } catch {
+        await markNeedsReauth(connectionId);
+        return "needs_reauth";
+      }
+    }
+  }
+
+  // Phase 14 (connectors): a single-store Shopify connection has no refresh
+  // token. Client-credentials tokens are simply requested again (24 h each);
+  // a static admin-created-app token is re-verified (nothing to rotate).
+  if (connection.connectorKey === "shopify" && payload) {
+    const { singleStoreModeOf, renewSingleStoreCredential } = await import("@/lib/bizsync/shopify/single-store");
+    if (singleStoreModeOf(payload)) {
+      // Uninstalled from the store (app/uninstalled webhook): stays revoked
+      // until a person connects again.
+      if (connection.status === "revoked") return "needs_reauth";
+      try {
+        const next = await renewSingleStoreCredential(payload, { fetchImpl: deps.fetchImpl, resolve: deps.resolve });
+        await prisma.connectorCredential.update({
+          where: { connectionId },
+          data: { encryptedBlob: secrets().encrypt(JSON.stringify(next.payload)), keyVersion: "env-v1", expiresAt: next.expiresAt },
+        });
+        await prisma.connectorConnection.update({ where: { id: connectionId }, data: { status: "active", lastRefreshAt: new Date() } });
+        return "refreshed";
+      } catch {
+        await markNeedsReauth(connectionId);
+        return "needs_reauth";
+      }
+    }
+  }
+
   if (!refreshToken || !config || !clientId || !clientSecret) {
     await markNeedsReauth(connectionId);
     return "needs_reauth";
@@ -93,17 +165,22 @@ export async function refreshConnection(
 
   try {
     const fetchImpl = deps.fetchImpl ?? fetch;
-    const body = new URLSearchParams({
-      grant_type: "refresh_token",
-      refresh_token: refreshToken,
-      client_id: clientId,
-      client_secret: clientSecret,
-    });
-    const res = await fetchImpl(config.tokenUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
-      body,
-    });
+    // Phase 11 (bizsync): per-shop providers refresh at the store's own host.
+    const tokenUrl = config.perShop ? shopUrl(config.tokenUrl, typeof payload?.shop === "string" ? payload.shop : null) : config.tokenUrl;
+    const res = await fetchImpl(
+      tokenUrl,
+      buildTokenRequest(
+        config,
+        {
+          grant_type: "refresh_token",
+          refresh_token: refreshToken,
+          // Phase 14 (connectors): Gusto documents redirect_uri on refresh too.
+          ...(config.refreshWithRedirectUri && typeof payload?.redirect_uri === "string" ? { redirect_uri: payload.redirect_uri } : {}),
+        },
+        clientId,
+        clientSecret,
+      ),
+    );
     if (!res.ok) {
       await markNeedsReauth(connectionId);
       return "needs_reauth";

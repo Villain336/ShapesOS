@@ -197,14 +197,14 @@ export default function BacklinksExplorer({
       </div>
 
       {/* Spend bar */}
-      <div className="rounded-lg border border-zinc-200 bg-white/50 p-4">
+      <div className="rounded-lg bg-paper shadow-hairline p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="text-sm text-zinc-500">
+          <div className="text-sm text-muted">
             <span className="font-medium">Monthly backlinks spend:</span>{" "}
-            <span className={spendPct >= 90 ? "text-red-700" : "text-zinc-800"}>
+            <span className={spendPct >= 90 ? "text-failed-text" : "text-ink"}>
               ${spendState.usedUsd.toFixed(4)} / ${spendState.capUsd.toFixed(2)}
             </span>
-            {!spendState.custom && <span className="ml-2 text-xs text-zinc-500">(default guardrail)</span>}
+            {!spendState.custom && <span className="ml-2 text-xs text-muted">(default guardrail)</span>}
           </div>
           <div className="flex items-center gap-3">
             {canToggleBacklinks ? (
@@ -212,47 +212,49 @@ export default function BacklinksExplorer({
                 onClick={toggleEnabled}
                 disabled={toggling}
                 title="Weekly backlink refresh for this project"
-                className={`relative h-5 w-9 rounded-full transition-colors disabled:opacity-50 ${enabled ? "bg-violet-600" : "bg-zinc-200"}`}
+                role="switch"
+                aria-checked={enabled}
+                className={`relative h-5 w-9 rounded-full transition-colors disabled:opacity-50 ${enabled ? "bg-ink" : "bg-disabled-fg"}`}
               >
                 <span
-                  className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition-[left] duration-150 ${enabled ? "left-[18px]" : "left-0.5"}`}
+                  className={`absolute top-0.5 h-4 w-4 rounded-full bg-paper transition-[left] duration-150 ${enabled ? "left-[18px]" : "left-0.5"}`}
                 />
               </button>
             ) : null}
-            <span className="text-xs text-zinc-500" title="Weekly backlink refresh for this project">
+            <span className="text-xs text-muted" title="Weekly backlink refresh for this project">
               Auto-refresh {enabled ? "on" : "off"}
             </span>
             <button
               onClick={openRefresh}
-              className="rounded-md bg-accent px-4 py-1.5 text-sm font-medium text-white hover:bg-accent-hover active:scale-[0.96] transition-[background-color,transform] duration-150 ease-[cubic-bezier(0.2,0,0,1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2"
+              className="rounded-full bg-ink px-4 py-1.5 text-sm font-semibold text-white hover:bg-night-hover aos-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
             >
               Refresh backlinks…
             </button>
           </div>
         </div>
-        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-zinc-100">
+        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-canvas">
           <div
-            className={`h-full rounded-full ${spendPct >= 90 ? "bg-red-500" : spendPct >= 70 ? "bg-amber-500" : "bg-emerald-500"}`}
+            className={`h-full rounded-full ${spendPct >= 90 ? "bg-failed" : "bg-ink"}`}
             style={{ width: `${spendPct}%` }}
           />
         </div>
         {canManageSpend && (
           <div className="mt-3 flex items-center gap-2 text-sm">
-            <label className="text-zinc-500">Monthly cap (USD):</label>
+            <label className="text-muted">Monthly cap (USD):</label>
             <input
               value={capInput}
               onChange={(e) => setCapInput(e.target.value)}
               inputMode="decimal"
-              className="w-24 rounded-md border border-zinc-200 bg-white px-2 py-1 text-zinc-800"
+              className="w-24 rounded-md border-[1.5px] border-control bg-paper px-2 py-1 text-ink"
             />
             <button
               onClick={saveCap}
               disabled={capSaving}
-              className="rounded-md border border-zinc-200 px-3 py-1 text-zinc-500 hover:border-zinc-400 disabled:opacity-50"
+              className="rounded-full bg-paper px-2.5 py-1 text-xs font-semibold text-ink shadow-control hover:shadow-outline disabled:opacity-50"
             >
               {capSaving ? "Saving…" : "Save"}
             </button>
-            <span className="text-xs text-zinc-500">Empty = revert to default (${spendState.defaultCapUsd}).</span>
+            <span className="text-xs text-muted">Empty = revert to default (${spendState.defaultCapUsd}).</span>
           </div>
         )}
       </div>
@@ -262,13 +264,13 @@ export default function BacklinksExplorer({
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          className="rounded-md border border-zinc-200 bg-white px-3 py-1.5 text-sm text-zinc-800"
+          className="rounded-md border-[1.5px] border-control bg-paper px-3 py-1.5 text-sm text-ink"
         >
           <option value="all">All statuses</option>
           <option value="active">Active</option>
           <option value="lost">Lost</option>
         </select>
-        <label className="flex items-center gap-1.5 text-sm text-zinc-500">
+        <label className="flex items-center gap-1.5 text-sm text-muted">
           <input type="checkbox" checked={dofollowOnly} onChange={(e) => setDofollowOnly(e.target.checked)} />
           Dofollow only
         </label>
@@ -276,16 +278,16 @@ export default function BacklinksExplorer({
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search anchor, domain, URL…"
-          className="min-w-52 flex-1 rounded-md border border-zinc-200 bg-white px-3 py-1.5 text-sm text-zinc-800 placeholder:text-zinc-400"
+          className="min-w-52 flex-1 rounded-md border-[1.5px] border-control bg-paper px-3 py-1.5 text-sm text-ink placeholder:text-subtle"
         />
-        <span className="text-xs text-zinc-500">{visible.length} shown</span>
+        <span className="text-xs text-muted">{visible.length} shown</span>
       </div>
 
       {/* Table */}
-      <div className="overflow-x-auto rounded-lg border border-zinc-200">
+      <div className="overflow-x-auto rounded-lg border border-line bg-paper">
         <table className="w-full text-left text-sm">
           <thead>
-            <tr className="border-b border-zinc-200 bg-white/60 text-xs uppercase tracking-wide text-zinc-500">
+            <tr className="border-b border-line bg-canvas text-xs text-muted">
               <th className="px-3 py-2">Source</th>
               <th className="px-3 py-2">Anchor</th>
               <th className="px-3 py-2">Follow</th>
@@ -296,21 +298,21 @@ export default function BacklinksExplorer({
           </thead>
           <tbody>
             {visible.map((l) => (
-              <tr key={l.id} className="border-b border-zinc-200/60 last:border-0 hover:bg-zinc-100/40">
+              <tr key={l.id} className="border-b border-line last:border-0 hover:bg-hover-paper">
                 <td className="max-w-64 px-3 py-2">
-                  <div className="truncate font-medium text-zinc-800" title={l.sourceUrl}>{l.sourceDomain}</div>
-                  <div className="truncate text-xs text-zinc-500" title={l.sourceUrl}>→ {l.targetUrl.replace(/^https?:\/\//, "").slice(0, 60)}</div>
+                  <div className="truncate font-medium text-ink" title={l.sourceUrl}>{l.sourceDomain}</div>
+                  <div className="truncate text-xs text-muted" title={l.sourceUrl}>→ {l.targetUrl.replace(/^https?:\/\//, "").slice(0, 60)}</div>
                 </td>
-                <td className="max-w-48 truncate px-3 py-2 text-zinc-500">{l.anchorText ?? <span className="text-zinc-500">—</span>}</td>
+                <td className="max-w-48 truncate px-3 py-2 text-muted">{l.anchorText ?? <span className="text-muted">—</span>}</td>
                 <td className="px-3 py-2">
-                  <span className={`rounded border px-1.5 py-0.5 text-xs ${l.dofollow ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700" : "border-zinc-300 bg-zinc-100 text-zinc-500"}`}>
+                  <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${l.dofollow ? "bg-paper text-ink shadow-control" : "bg-canvas text-muted"}`}>
                     {l.dofollow ? "follow" : "nofollow"}
                   </span>
                 </td>
-                <td className="px-3 py-2 text-zinc-500">{l.sourceRank ?? "—"}</td>
-                <td className="px-3 py-2 text-zinc-500">{l.spamScore ?? "—"}</td>
+                <td className="px-3 py-2 text-muted">{l.sourceRank ?? "—"}</td>
+                <td className="px-3 py-2 text-muted">{l.spamScore ?? "—"}</td>
                 <td className="px-3 py-2">
-                  <span className={`rounded border px-1.5 py-0.5 text-xs ${l.status === "lost" ? "border-red-200/30 bg-red-500/10 text-red-700" : "border-zinc-300 bg-zinc-100 text-zinc-500"}`}>
+                  <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${l.status === "lost" ? "bg-ink text-white" : "bg-canvas text-muted"}`}>
                     {l.status}
                   </span>
                 </td>
@@ -318,7 +320,7 @@ export default function BacklinksExplorer({
             ))}
             {visible.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-3 py-8 text-center text-sm text-zinc-500">
+                <td colSpan={6} className="px-3 py-8 text-center text-sm text-muted">
                   {initialLinks.length === 0
                     ? "No backlink data yet — run a refresh to pull the link profile."
                     : "No links match these filters."}
@@ -332,13 +334,13 @@ export default function BacklinksExplorer({
       {/* Refresh modal */}
       {showRefresh && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" role="presentation" onClick={() => !pulling && setShowRefresh(false)} onKeyDown={closeOnEscape(() => !pulling && setShowRefresh(false))}>
-          <div className="w-full max-w-md rounded-xl border border-zinc-200 bg-white p-6" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-lg font-semibold text-zinc-900">Refresh backlinks</h2>
-            <p className="mt-1 text-sm text-zinc-500">
-              Pulls the live link profile for <span className="text-zinc-800">{domain}</span>. This spends
+          <div className="w-full max-w-md rounded-lg bg-paper shadow-overlay p-6" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-lg font-heading tracking-heading stretch-heading text-ink">Refresh backlinks</h2>
+            <p className="mt-1 text-sm text-muted">
+              Pulls the live link profile for <span className="text-ink">{domain}</span>. This spends
               DataForSEO credits — review the estimate first.
             </p>
-            <label className="mt-4 block text-sm text-zinc-500">
+            <label className="mt-4 block text-sm text-muted">
               Rows to pull (max 10,000)
               <input
                 type="number"
@@ -346,32 +348,32 @@ export default function BacklinksExplorer({
                 max={10000}
                 value={limit}
                 onChange={(e) => setLimit(Math.max(1, Math.floor(Number(e.target.value) || 1)))}
-                className="mt-1 w-full rounded-md border border-zinc-200 bg-zinc-50 px-3 py-1.5 text-zinc-800"
+                className="mt-1 w-full rounded-md border-[1.5px] border-control bg-paper px-3 py-1.5 text-ink"
               />
             </label>
 
-            {previewLoading && <p className="mt-4 text-sm text-zinc-500">Estimating cost…</p>}
+            {previewLoading && <p className="mt-4 text-sm text-muted">Estimating cost…</p>}
 
             {preview && (
-              <div className="mt-4 rounded-lg border border-zinc-200 bg-zinc-50 p-4 text-sm">
-                <div className="flex justify-between text-zinc-500">
+              <div className="mt-4 rounded-lg border border-line bg-canvas p-4 text-sm">
+                <div className="flex justify-between text-muted">
                   <span>Provider</span>
-                  <span className="text-zinc-900">{preview.providerName}{preview.isLive ? "" : " (mock — free)"}</span>
+                  <span className="text-ink">{preview.providerName}{preview.isLive ? "" : " (mock — free)"}</span>
                 </div>
-                <div className="mt-1 flex justify-between text-zinc-500">
+                <div className="mt-1 flex justify-between text-muted">
                   <span>Rows requested</span>
-                  <span className="text-zinc-900">{preview.rowsRequested.toLocaleString()}</span>
+                  <span className="text-ink">{preview.rowsRequested.toLocaleString()}</span>
                 </div>
-                <div className="mt-1 flex justify-between font-medium text-zinc-900">
+                <div className="mt-1 flex justify-between font-medium text-ink">
                   <span>Estimated cost</span>
                   <span>${preview.estimatedCostUsd.toFixed(4)}</span>
                 </div>
-                <div className="mt-1 flex justify-between text-zinc-500">
+                <div className="mt-1 flex justify-between text-muted">
                   <span>Budget after pull</span>
                   <span>${(preview.spendUsedUsd + preview.estimatedCostUsd).toFixed(4)} / ${preview.spendCapUsd.toFixed(2)}</span>
                 </div>
                 {!preview.withinCap && (
-                  <p className="mt-2 rounded border border-red-200/30 bg-red-500/10 p-2 text-xs text-red-700">
+                  <p className="mt-2 rounded-md border border-failed bg-failed-tint p-2 text-xs text-failed-text">
                     {preview.blockedReason}
                   </p>
                 )}
@@ -379,14 +381,14 @@ export default function BacklinksExplorer({
             )}
 
             {pullResult && (
-              <div className="mt-4 rounded-lg border border-zinc-200 bg-zinc-50 p-4 text-sm text-zinc-500">
-                <p className="font-medium text-zinc-900">Pull {pullResult.status}</p>
+              <div className="mt-4 rounded-lg border border-line bg-canvas p-4 text-sm text-muted">
+                <p className="font-medium text-ink">Pull {pullResult.status}</p>
                 <p className="mt-1">
                   {pullResult.rowsReturned.toLocaleString()} rows · {pullResult.newLinks} new ·{" "}
                   {pullResult.lostLinks} lost · ${pullResult.actualCostUsd?.toFixed(4) ?? "—"}
                 </p>
-                {pullResult.note && <p className="mt-1 text-xs text-zinc-500">{pullResult.note}</p>}
-                <p className="mt-1 text-xs text-zinc-500">Reload the page to see updated data.</p>
+                {pullResult.note && <p className="mt-1 text-xs text-muted">{pullResult.note}</p>}
+                <p className="mt-1 text-xs text-muted">Reload the page to see updated data.</p>
               </div>
             )}
 
@@ -394,7 +396,7 @@ export default function BacklinksExplorer({
               <button
                 onClick={() => setShowRefresh(false)}
                 disabled={pulling}
-                className="rounded-md border border-zinc-200 px-4 py-1.5 text-sm text-zinc-500 hover:border-zinc-400 disabled:opacity-50"
+                className="rounded-full bg-paper px-4 py-1.5 text-sm font-semibold text-ink shadow-outline aos-press hover:bg-hover-paper disabled:opacity-50"
               >
                 {pullResult ? "Close" : "Cancel"}
               </button>
@@ -402,7 +404,7 @@ export default function BacklinksExplorer({
                 <button
                   onClick={confirmPull}
                   disabled={!preview || !preview.withinCap || pulling}
-                  className="rounded-md bg-accent px-4 py-1.5 text-sm font-medium text-white hover:bg-accent-hover disabled:opacity-40 active:scale-[0.96] transition-[background-color,transform] duration-150 ease-[cubic-bezier(0.2,0,0,1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2"
+                  className="rounded-full bg-ink px-4 py-1.5 text-sm font-semibold text-white hover:bg-night-hover disabled:opacity-40 aos-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
                 >
                   {pulling ? "Pulling…" : `Confirm pull${preview ? ` — $${preview.estimatedCostUsd.toFixed(4)}` : ""}`}
                 </button>
@@ -417,10 +419,10 @@ export default function BacklinksExplorer({
 
 function Card({ label, value, sub, accent }: { label: string; value: string; sub: string; accent?: boolean }) {
   return (
-    <div className={`rounded-lg border p-4 ${accent && value !== "0" ? "border-red-200/30 bg-red-500/5" : "border-zinc-200 bg-white/50"}`}>
-      <div className="text-xs uppercase tracking-wide text-zinc-500">{label}</div>
-      <div className="mt-1 text-2xl font-bold text-zinc-900">{value}</div>
-      <div className="mt-0.5 text-xs text-zinc-500">{sub}</div>
+    <div className={`rounded-lg border p-4 ${accent && value !== "0" ? "border-ink bg-paper" : "border-line bg-paper"}`}>
+      <div className="text-xs font-semibold text-muted">{label}</div>
+      <div className="mt-1 text-xl font-heading tracking-heading stretch-heading text-ink">{value}</div>
+      <div className="mt-0.5 text-xs text-muted">{sub}</div>
     </div>
   );
 }

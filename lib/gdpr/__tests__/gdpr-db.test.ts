@@ -90,6 +90,10 @@ before(async () => {
   // Phase 4a identity: sign-in factors the deletion must remove.
   await prisma.userSecurity.create({ data: { userId: OWNER, email: OWNER_EMAIL, totpSecretEnc: "sealed", totpEnabledAt: new Date() } });
   await prisma.userRecoveryCode.create({ data: { userId: OWNER, codeHash: `rc-${RUN}` } });
+  // Phase 4b: a push device in the shared workspace (FORCE RLS table).
+  await withWorkspaceScope(SHARED, (tx) =>
+    tx.pushDevice.create({ data: { workspaceId: SHARED, userId: OWNER, expoToken: `ExponentPushToken[${RUN}]`, platform: "ios" } }),
+  );
   wsExport = await import("@/app/api/workspaces/[id]/export/route");
   accExport = await import("@/app/api/account/export/route");
   account = await import("@/app/api/account/route");
@@ -235,6 +239,9 @@ describe("account deletion", () => {
     const ev = await prisma.workspaceLifecycleEvent.findFirst({ where: { workspaceId: SOLO, action: "deleted" } });
     assert.equal(ev?.actorUserId, OWNER);
     assert.deepEqual(ev?.detail, { reason: "account_deleted" });
+
+    // Per-user rows in RLS tables of the workspace they left are gone too.
+    assert.equal(await withWorkspaceScope(SHARED, (tx) => tx.pushDevice.count({ where: { workspaceId: SHARED, userId: OWNER } })), 0);
 
     // Sign-in factors gone; user_security is a bare tombstone.
     assert.equal(await prisma.userRecoveryCode.count({ where: { userId: OWNER } }), 0);

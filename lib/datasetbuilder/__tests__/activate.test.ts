@@ -266,8 +266,11 @@ describe("buildBriefNowAdapterPackage", () => {
       WS,
       compiled.version.id,
     );
-    const a = buildBriefNowAdapterPackage(compiled.dataset, 1, entries);
-    const b = buildBriefNowAdapterPackage(compiled.dataset, 1, entries);
+    // Fixed publish time: two builds in the same test can straddle a
+    // millisecond (flaked in CI on publishedAt alone).
+    const at = new Date("2026-10-04T00:00:00.000Z");
+    const a = buildBriefNowAdapterPackage(compiled.dataset, 1, entries, at);
+    const b = buildBriefNowAdapterPackage(compiled.dataset, 1, entries, at);
     assert.deepEqual(a, b);
     assert.deepEqual(
       a.entries.map((e) => e.documentName),

@@ -6,33 +6,20 @@
 // Confirm: Base UI AlertDialog (focus trap, Esc = cancel, focus returns to
 // the trigger, role="alertdialog" + labelled/described). Destructive
 // confirmations focus Cancel first so Enter never deletes by accident.
-// Toasts: Agentic OS night surface, status shape first, exactly one action,
-// polite live region (failed toasts are role="alert"), pause on hover/focus.
+// Toasts: components/aos/Toast (night surface, status shape first, at most
+// one action, Undo variant), polite live region (failed toasts are
+// role="alert"), pause on hover/focus.
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { AlertDialog } from "@base-ui/react/alert-dialog";
-import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { feedback, type FeedbackState, type ToastRecord, type ToastStatus } from "@/lib/ui/feedback";
+import { feedback, type FeedbackState, type ToastRecord } from "@/lib/ui/feedback";
+import { ToastView } from "@/components/aos/Toast";
 
 const EMPTY: FeedbackState = { toasts: [], confirm: null };
 
 const pill =
   "aos-press inline-flex h-control items-center justify-center rounded-full px-[22px] text-base font-semibold";
-
-const SHAPE_NIGHT_COLOR: Record<ToastStatus, string> = {
-  running: "var(--aos-running-on-night)",
-  needs: "var(--aos-needs)",
-  done: "var(--aos-done-on-night)",
-  failed: "var(--aos-failed-on-night)",
-};
-
-const STATUS_LABEL: Record<ToastStatus, string> = {
-  running: "Running",
-  needs: "Needs you",
-  done: "Done",
-  failed: "Failed",
-};
 
 function ConfirmDialog({ state }: { state: FeedbackState }) {
   const req = state.confirm;
@@ -92,55 +79,39 @@ function ConfirmDialog({ state }: { state: FeedbackState }) {
 
 function ToastItem({ t }: { t: ToastRecord }) {
   const [actionState, setActionState] = useState<"idle" | "busy" | "done">("idle");
+  const action = t.action
+    ? {
+        label: actionState === "done" ? (t.action.doneLabel ?? t.action.label) : t.action.label,
+        disabled: actionState !== "idle",
+        onClick: async () => {
+          setActionState("busy");
+          try {
+            await t.action!.onClick();
+            setActionState("done");
+            setTimeout(() => feedback.dismiss(t.id), 1200);
+          } catch {
+            setActionState("idle");
+          }
+        },
+      }
+    : null;
   return (
-    <div
+    <ToastView
       role={t.status === "failed" ? "alert" : "status"}
+      status={t.status}
+      title={t.title}
+      description={t.description}
+      progress={t.progress ?? null}
+      variant={t.variant}
+      action={action}
+      onDismiss={() => feedback.dismiss(t.id)}
       onMouseEnter={() => feedback.pause(t.id)}
       onMouseLeave={() => feedback.resume(t.id)}
       onFocus={() => feedback.pause(t.id)}
       onBlur={(e) => {
         if (!e.currentTarget.contains(e.relatedTarget as Node | null)) feedback.resume(t.id);
       }}
-      className="aos-night pointer-events-auto flex w-full items-start gap-3 rounded-lg p-3 pl-4 shadow-toast animate-toast-in"
-    >
-      <span
-        className={`aos-shape aos-shape--${t.status} mt-1.5`}
-        style={{ color: SHAPE_NIGHT_COLOR[t.status] }}
-        role="img"
-        aria-label={STATUS_LABEL[t.status]}
-      />
-      <div className="min-w-0 flex-1">
-        <p className="text-base font-semibold text-night">{t.title}</p>
-        {t.description ? <p className="mt-0.5 text-sm text-night-soft">{t.description}</p> : null}
-      </div>
-      {t.action ? (
-        <button
-          type="button"
-          disabled={actionState !== "idle"}
-          onClick={async () => {
-            setActionState("busy");
-            try {
-              await t.action!.onClick();
-              setActionState("done");
-              setTimeout(() => feedback.dismiss(t.id), 1200);
-            } catch {
-              setActionState("idle");
-            }
-          }}
-          className="h-control-sm shrink-0 rounded-full bg-paper px-4 text-sm font-semibold text-ink disabled:bg-night-raised disabled:text-night-soft"
-        >
-          {actionState === "done" ? (t.action.doneLabel ?? t.action.label) : t.action.label}
-        </button>
-      ) : null}
-      <button
-        type="button"
-        onClick={() => feedback.dismiss(t.id)}
-        aria-label="Dismiss notification"
-        className="flex size-8 shrink-0 items-center justify-center rounded-full text-night-soft hover:bg-night-hover hover:text-night"
-      >
-        <X className="size-4" aria-hidden />
-      </button>
-    </div>
+    />
   );
 }
 

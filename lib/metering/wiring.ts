@@ -53,3 +53,11 @@ export function gbOverQuota(
   if (over <= BigInt(0)) return 0;
   return Number((over + BigInt(999_999_999)) / BigInt(1_000_000_000));
 }
+
+/** Plain-language refusal for a pre-spend cap gate (checkCap().allowed false). */
+export function capDeniedMessage(used: number, capCredits: number): string {
+  return (
+    `Credit cap reached (${used.toLocaleString()} of ${capCredits.toLocaleString()} ` +
+    `credits used). Raise the cap or add credits in Settings → Usage.`
+  );
+}

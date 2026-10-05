@@ -10,6 +10,7 @@ import type {
   DeployResult,
   DeployTarget,
   DeploymentSummary,
+  DeployPlace,
   VercelConfig,
 } from "./types";
 
@@ -48,6 +49,17 @@ export class MockVercelDeployTarget implements DeployTarget {
     const d = this.deployments.get(deploymentId);
     if (!d) throw new Error(`Unknown demo deployment ${deploymentId}.`);
     return { id: deploymentId, url: d.url, status: d.status, mock: true };
+  }
+
+  /**
+   * Phase 9: demo rollback. Mock targets are built per request, so the
+   * deployment is usually not in this instance's memory — the rollback is
+   * reported as done on the demo URL, flagged mock. Nothing is contacted.
+   */
+  async rollback(deploymentId: string, _place: DeployPlace): Promise<DeploymentSummary> {
+    if (!deploymentId) throw new Error("A deployment id is required to roll back.");
+    const d = this.deployments.get(deploymentId);
+    return { id: deploymentId, url: d?.url ?? `https://${MOCK_PROJECT}.vercel.app`, status: "ready", mock: true };
   }
 }
 

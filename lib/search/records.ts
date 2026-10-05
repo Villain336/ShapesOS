@@ -2,7 +2,8 @@
 //
 // One query, many record types, always inside the caller's workspace:
 // leads, invoices, Office docs, files, SEO projects, ops projects, missions,
-// CAD projects, e-sign envelopes, legal documents and agency clients.
+// CAD projects, e-sign envelopes, legal documents, agency clients and social
+// posts.
 // Every source runs in ONE withWorkspaceScope transaction, so FORCE-RLS
 // tables (ops_invoices, ops_projects, univer_docs, missions) are filtered by
 // Postgres itself, and every statement also carries an explicit
@@ -39,6 +40,11 @@ export const RECORD_MIN_ROLE: Record<RecordKind, WorkspaceRole> = {
   envelope: "viewer",
   legal_document: "viewer",
   client: "viewer",
+  // Phase 4b: CAD BOM lines (CAD reads at viewer) and datasets (Datasets
+  // page reads at viewer).
+  bom_line: "viewer",
+  dataset: "viewer",
+  social_post: "viewer",
 };
 
 export interface RecordHit {
@@ -104,7 +110,7 @@ const SOURCES: Record<RecordKind, { query: SourceQuery; hit: (r: Row) => Omit<Re
       id: r.id,
       title: `Invoice ${r.id.length > 12 ? `${r.id.slice(0, 8)}…` : r.id}${r.title ? ` · ${r.title}` : ""}`,
       subtitle: [money(r.n), r.sub].filter(Boolean).join(" · ") || null,
-      href: `/dashboard/crm?tab=invoicing&invoice=${encodeURIComponent(r.id)}`,
+      href: `/dashboard/ops/invoices?invoice=${encodeURIComponent(r.id)}`,
     }),
   },
   doc: {
@@ -156,7 +162,7 @@ const SOURCES: Record<RecordKind, { query: SourceQuery; hit: (r: Row) => Omit<Re
       id: r.id,
       title: r.title ?? "Project",
       subtitle: r.sub ? `Client project · ${r.sub}` : "Client project",
-      href: "/dashboard/crm?tab=projects",
+      href: "/dashboard/ops/projects",
     }),
   },
   mission: {
@@ -180,7 +186,12 @@ const SOURCES: Record<RecordKind, { query: SourceQuery; hit: (r: Row) => Omit<Re
        WHERE workspace_id = ${ws} AND name ILIKE ${p}
        ORDER BY similarity(name, ${q}) DESC, updated_at DESC
        LIMIT ${n}`,
-    hit: (r) => ({ id: r.id, title: r.title ?? "CAD project", subtitle: r.sub?.slice(0, 120) ?? "CAD project", href: "/dashboard/cad" }),
+    hit: (r) => ({
+      id: r.id,
+      title: r.title ?? "CAD project",
+      subtitle: r.sub?.slice(0, 120) ?? "CAD project",
+      href: `/dashboard/cad?project=${encodeURIComponent(r.id)}`,
+    }),
   },
   envelope: {
     query: (tx, ws, q, p, n) => tx.$queryRaw<Row[]>`
@@ -213,6 +224,64 @@ const SOURCES: Record<RecordKind, { query: SourceQuery; hit: (r: Row) => Omit<Re
        ORDER BY similarity(name, ${q}) DESC, updated_at DESC
        LIMIT ${n}`,
     hit: (r) => ({ id: r.id, title: r.title ?? "Client", subtitle: "Agency client", href: "/dashboard/settings/clients" }),
+  },
+  // Phase 4b. One hit per BOM line; `extra` carries "<projectId>|<modelId>"
+  // for the deep link, `sub` the model + BOM + revision label.
+  bom_line: {
+    query: (tx, ws, q, p, n) => tx.$queryRaw<Row[]>`
+      SELECT l.id,
+             l.part_name AS title,
+             concat_ws(' · ', m.name, 'BOM #' || b.bom_number, 'v' || v.version_number, nullif(l.material_spec, '')) AS sub,
+             m.project_id || '|' || m.id AS extra,
+             NULL::int AS n
+        FROM cad_bom_lines l
+        JOIN cad_bom_versions b ON b.id = l.bom_version_id AND b.workspace_id = l.workspace_id
+        JOIN cad_models m ON m.id = b.model_id AND m.workspace_id = l.workspace_id
+        JOIN cad_model_versions v ON v.id = b.model_version_id AND v.workspace_id = l.workspace_id
+       WHERE l.workspace_id = ${ws}
+         AND (l.part_name || ' ' || coalesce(l.material_spec, '')) ILIKE ${p}
+       ORDER BY similarity(l.part_name, ${q}) DESC, l.updated_at DESC
+       LIMIT ${n}`,
+    hit: (r) => {
+      const [projectId = "", modelId = ""] = (r.extra ?? "").split("|");
+      return {
+        id: r.id,
+        title: r.title ?? "BOM part",
+        subtitle: r.sub ? `BOM part · ${r.sub}` : "BOM part",
+        href: `/dashboard/cad?project=${encodeURIComponent(projectId)}&model=${encodeURIComponent(modelId)}&tab=prototype`,
+      };
+    },
+  },
+  dataset: {
+    query: (tx, ws, q, p, n) => tx.$queryRaw<Row[]>`
+      SELECT d.id, d.name AS title,
+             (SELECT 'v' || max(v.version) FROM dataset_versions v WHERE v.dataset_id = d.id) AS sub,
+             NULL::text AS extra, NULL::int AS n
+        FROM datasets d
+       WHERE d.workspace_id = ${ws} AND d.name ILIKE ${p}
+       ORDER BY similarity(d.name, ${q}) DESC, d.updated_at DESC
+       LIMIT ${n}`,
+    hit: (r) => ({
+      id: r.id,
+      title: `${r.title ?? "Dataset"} dataset`,
+      subtitle: r.sub ? `Dataset · latest ${r.sub}` : "Dataset · not compiled yet",
+      href: "/dashboard/datasets?tab=build",
+    }),
+  },
+  // Phase 4b: social posts (FORCE RLS; the scope transaction filters them).
+  social_post: {
+    query: (tx, ws, q, p, n) => tx.$queryRaw<Row[]>`
+      SELECT id, left(regexp_replace(content, '[[:space:]]+', ' ', 'g'), 120) AS title, status::text AS sub, NULL::text AS extra, NULL::int AS n
+        FROM social_publications
+       WHERE workspace_id = ${ws} AND content ILIKE ${p}
+       ORDER BY similarity(content, ${q}) DESC, updated_at DESC
+       LIMIT ${n}`,
+    hit: (r) => ({
+      id: r.id,
+      title: r.title || "Social post",
+      subtitle: r.sub ? `Social · ${r.sub.replace(/_/g, " ")}` : "Social",
+      href: `/dashboard/social?post=${encodeURIComponent(r.id)}`,
+    }),
   },
 };
 

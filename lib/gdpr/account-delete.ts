@@ -15,7 +15,8 @@
 //      log records that a member left;
 //   4. deletes personal rows that exist only for this user: notifications,
 //      MCP keys and OAuth grants, private AI chat threads, permission grants,
-//      work-from-home records, pending invites addressed to their email;
+//      work-from-home records, pending invites addressed to their email, the
+//      email + password account and its sign-in links (Phase 6);
 //   5. pseudonymizes every remaining reference to the user id (created_by,
 //      approved_by, actor, …; catalog-driven) to "deleted-user-<random>",
 //      and the email in audit-log summaries to "[deleted user]".
@@ -33,6 +34,7 @@ import { BadRequestError, ConflictError } from "@/lib/api/errors";
 import { LIVE_SUBSCRIPTION, purgeWorkspace, readSubscription } from "@/lib/workspace/lifecycle";
 import { WORKSPACE_GUC } from "@/lib/substrate/memory/rls";
 import { isUserRefColumn, loadCatalog, q, type Catalog } from "./catalog";
+import { emailFromUserId } from "@/lib/auth/email/tokens";
 
 // ── Pure rules (unit-tested) ────────────────────────────────────────────────
 
@@ -129,7 +131,26 @@ export const PERSONAL_TABLES: readonly { table: string; column: string }[] = [
   { table: "user_recovery_codes", column: "user_id" },
   { table: "user_passkeys", column: "user_id" },
   { table: "auth_challenges", column: "user_id" },
+  // Phase 6: the email + password account (its single-use links are keyed by
+  // address and deleted just before; see EMAIL_TOKEN_TABLE).
+  { table: "email_accounts", column: "user_id" },
   { table: "user_security", column: "user_id" },
+];
+
+/**
+ * Phase 6: one-time email links (verify / magic link / reset) are keyed by
+ * address, not subject: deleted for the address of the user's email account
+ * (and of an "email:" subject, which may have links before its row exists).
+ */
+export const EMAIL_TOKEN_TABLE = "email_auth_tokens";
+
+/**
+ * Per-user rows in FORCE-RLS tables: deleted inside each remaining
+ * workspace's scope (solo workspaces cascade with the workspace itself).
+ */
+export const PERSONAL_RLS_TABLES: readonly { table: string; column: string }[] = [
+  { table: "push_devices", column: "user_id" },
+  { table: "conversation_reads", column: "user_id" },
 ];
 
 /**
@@ -144,7 +165,7 @@ export const KEEP_REFERENCES: readonly string[] = ["workspaces", "workspace_memb
 
 /** Columns pseudonymized on account deletion (catalog-driven; pure). */
 export function pseudonymizeTargets(catalog: Catalog): { table: string; columns: string[]; rls: boolean }[] {
-  const skip = new Set([...PERSONAL_TABLES.map((p) => p.table), ...KEEP_REFERENCES]);
+  const skip = new Set([...PERSONAL_TABLES.map((p) => p.table), ...PERSONAL_RLS_TABLES.map((p) => p.table), ...KEEP_REFERENCES]);
   const out: { table: string; columns: string[]; rls: boolean }[] = [];
   for (const name of [...catalog.keys()].sort()) {
     if (skip.has(name)) continue;
@@ -251,6 +272,13 @@ export async function deleteAccount(opts: {
   let referencesPseudonymized = 0;
   await prisma.$transaction(
     async (tx) => {
+      if (catalog.has(EMAIL_TOKEN_TABLE) && catalog.has("email_accounts")) {
+        const subjectEmail = emailFromUserId(userId) ?? "";
+        personalRowsDeleted += await tx.$executeRaw`
+          DELETE FROM "email_auth_tokens"
+           WHERE "email" IN (SELECT "email" FROM "email_accounts" WHERE "user_id" = ${userId})
+              OR "email" = ${subjectEmail}`;
+      }
       for (const p of PERSONAL_TABLES) {
         if (!catalog.has(p.table)) continue;
         personalRowsDeleted += await tx.$executeRawUnsafe(`DELETE FROM ${q(p.table)} WHERE ${q(p.column)} = $1`, userId);
@@ -262,6 +290,13 @@ export async function deleteAccount(opts: {
         referencesPseudonymized += await tx.$executeRaw`
           UPDATE "file_change_log" SET "summary" = replace("summary", ${email}, '[deleted user]')
            WHERE "summary" ILIKE ${`%${email.replace(/[\\%_]/g, (c) => `\\${c}`)}%`}`;
+      }
+      for (const p of PERSONAL_RLS_TABLES) {
+        if (!catalog.has(p.table)) continue;
+        for (const ws of scopeWorkspaces) {
+          await tx.$queryRaw`SELECT set_config(${WORKSPACE_GUC}, ${ws}, true)`;
+          personalRowsDeleted += await tx.$executeRawUnsafe(`DELETE FROM ${q(p.table)} WHERE ${q(p.column)} = $1`, userId);
+        }
       }
       // Tombstone: no secrets, no email, only when the account was deleted.
       await tx.userSecurity.upsert({

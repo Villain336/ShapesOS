@@ -35,6 +35,13 @@ import {
 } from "../webauthn";
 import { authorizeTwoFactor, SecondFactorLockedError } from "../authorize";
 import { __resetLoginAttempts } from "@/lib/auth/rate-limit";
+
+// The lockout is shared in Postgres (Phase 6, rate_limit_buckets) when
+// DATABASE_URL is set, so a reset clears both stores.
+async function resetLockouts(): Promise<void> {
+  __resetLoginAttempts();
+  await prisma.$executeRaw`DELETE FROM "rate_limit_buckets" WHERE "key" LIKE 'login:%'`;
+}
 import { __setSessionMfaStateForTests } from "../policy";
 import { getMembership, requireWorkspaceRole } from "@/lib/authz";
 
@@ -309,7 +316,7 @@ describe("two-factor provider (DB)", () => {
     });
 
   it("completes a pending sign-in with a code; the subject comes from the cookie", async () => {
-    __resetLoginAttempts();
+    await resetLockouts();
     // Fresh enrollment so the next step's code is inside the ±1 window.
     const s3 = (await startTotpEnrollment(U3, { email: "u3@example.com" })).secret;
     assert.equal((await confirmTotpEnrollment(U3, totpCode(s3))).ok, true);
@@ -340,12 +347,12 @@ describe("two-factor provider (DB)", () => {
   });
 
   it("wrong codes trip the shared login lockout", async () => {
-    __resetLoginAttempts();
+    await resetLockouts();
     const now = Math.floor(Date.now() / 1000);
     const c = await cookie({ mfaPendingSub: U1, mfaPendingExp: now + 300 });
     for (let i = 0; i < 5; i++) assert.equal(await authorizeTwoFactor({ code: "000000" }, request(c)), null);
     await assert.rejects(() => authorizeTwoFactor({ code: recoveryCodes[7] }, request(c)), SecondFactorLockedError);
-    __resetLoginAttempts();
+    await resetLockouts();
   });
 });
 

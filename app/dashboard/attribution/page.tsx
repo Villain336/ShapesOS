@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { AttributionApp } from "@/components/attribution/AttributionApp";
 
-export const metadata = { title: "Revenue Attribution — ShapesOS" };
+export const metadata = { title: "Revenue attribution — ShapesOS" };
 
 export default async function AttributionPage() {
   const session = await auth();

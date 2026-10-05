@@ -146,13 +146,16 @@ export default function ScheduleDetail({
       <section className={cardCls}>
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h2 className="text-lg font-semibold text-zinc-900">{schedule.skill.name}</h2>
-            <p className="mt-1 text-sm text-zinc-600">
+            <h2 className="text-lg font-heading tracking-heading stretch-heading text-ink">{schedule.skill.name}</h2>
+            <p className="mt-1 text-sm text-muted">
               {schedule.triggerType === "cron" ? `Cron · ${schedule.cronExpr} · ${schedule.timezone || "UTC"}` : `Event · ${schedule.eventSource}`}
               {" · "}
-              <span className={schedule.status === "active" ? "text-emerald-700" : "text-zinc-500"}>{schedule.status}</span>
+              <span className={`inline-flex items-center gap-1 ${schedule.status === "active" ? "font-semibold text-ink" : "text-muted"}`}>
+                {schedule.status === "paused" && <span className="aos-shape aos-shape--paused" aria-hidden />}
+                {schedule.status}
+              </span>
             </p>
-            <p className="mt-0.5 text-xs text-zinc-500">
+            <p className="mt-0.5 text-xs text-muted">
               Next run {schedule.nextRunAt ? new Date(schedule.nextRunAt).toLocaleString() : "—"}
               {schedule.lastRunAt ? ` · Last run ${new Date(schedule.lastRunAt).toLocaleString()}` : ""}
             </p>
@@ -169,7 +172,7 @@ export default function ScheduleDetail({
         </div>
 
         {canManage && (
-          <div className="mt-4 border-t border-zinc-200 pt-4">
+          <div className="mt-4 border-t border-line pt-4">
             {!editing ? (
               <button className={btnCls} onClick={() => setEditing(true)}>Edit settings</button>
             ) : (
@@ -212,21 +215,21 @@ export default function ScheduleDetail({
       </section>
 
       <section className={cardCls}>
-        <h2 className="text-sm font-semibold text-zinc-900">Run history</h2>
+        <h2 className="text-sm font-semibold text-ink">Run history</h2>
         {runs.length === 0 ? (
-          <p className="mt-2 text-sm text-zinc-500">No runs yet.</p>
+          <p className="mt-2 text-sm text-muted">No runs yet.</p>
         ) : (
           <ul className="mt-3 flex flex-col gap-2">
             {runs.map((run) => (
-              <li key={run.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm">
+              <li key={run.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-line bg-paper px-3 py-2 text-sm">
                 <span>
                   <Link
                     href={`/dashboard/projects/${projectId}/automations/schedules/runs/${run.id}`}
-                    className="font-medium text-zinc-900 hover:text-accent"
+                    className="font-medium text-ink hover:underline"
                   >
                     {new Date(run.startedAt).toLocaleString()}
                   </Link>
-                  <span className="text-zinc-500">
+                  <span className="text-muted">
                     {" · "}{run.trigger}{" · "}{run.status}
                     {run.wasMissed ? " · missed window" : ""}
                     {" · "}{run._count.subagents} subagents{" · "}{run.creditsUsed} credits

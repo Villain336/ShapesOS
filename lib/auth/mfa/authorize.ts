@@ -16,7 +16,7 @@ import { CredentialsSignin, type User } from "next-auth";
 import type { AuthenticationResponseJSON } from "@simplewebauthn/server";
 import { prisma } from "@/lib/prisma";
 import { clientIpFromHeaders } from "@/lib/api/client-ip";
-import { loginLockedOut, recordLoginFailure, recordLoginSuccess } from "@/lib/auth/rate-limit";
+import { loginLockedOutAsync, recordLoginFailureAsync, recordLoginSuccessAsync } from "@/lib/auth/rate-limit";
 import { readSessionToken } from "./token";
 import { fullSubject, pendingSubject, type AuthMethod, type SecondFactorMethod } from "./session-token";
 import { verifySecondFactorCode } from "./store";
@@ -58,7 +58,7 @@ export async function authorizeTwoFactor(
   if (!subject || !token) return null;
   const ip = clientIpFromHeaders(request.headers);
   const key = `2fa:${subject}`;
-  if (loginLockedOut(ip, key)) throw new SecondFactorLockedError();
+  if (await loginLockedOutAsync(ip, key)) throw new SecondFactorLockedError();
 
   const code = typeof credentials?.code === "string" ? credentials.code.slice(0, 64) : "";
   const proof = typeof credentials?.proof === "string" ? credentials.proof.slice(0, 200) : "";
@@ -67,11 +67,11 @@ export async function authorizeTwoFactor(
   else if (code) method = await verifySecondFactorCode(subject, code);
 
   if (!method) {
-    recordLoginFailure(ip, key);
+    await recordLoginFailureAsync(ip, key);
     await auditFailure(`second-factor check failed for ${String(token.email ?? subject)} from ${ip ?? "unknown ip"}`);
     return null;
   }
-  recordLoginSuccess(ip, key);
+  await recordLoginSuccessAsync(ip, key);
   const first = Array.isArray(token.amr) ? (token.amr[0] as AuthMethod | undefined) : undefined;
   return {
     id: subject,
@@ -98,14 +98,14 @@ export async function authorizePasskey(
   }
   const credId = typeof response?.id === "string" ? response.id.slice(0, 512) : "unknown";
   const key = `passkey:${credId}`;
-  if (loginLockedOut(ip, key)) throw new SecondFactorLockedError();
+  if (await loginLockedOutAsync(ip, key)) throw new SecondFactorLockedError();
   const verified = await verifyPasskeyAuthentication({ challengeId, response });
   if (!verified) {
-    recordLoginFailure(ip, key);
+    await recordLoginFailureAsync(ip, key);
     await auditFailure(`passkey sign-in failed from ${ip ?? "unknown ip"}`);
     return null;
   }
-  recordLoginSuccess(ip, key);
+  await recordLoginSuccessAsync(ip, key);
   await prisma.fileChangeLog
     .create({
       data: {

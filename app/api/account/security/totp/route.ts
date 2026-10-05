@@ -14,7 +14,7 @@ import { BadRequestError, ConflictError, errorResponse } from "@/lib/api/errors"
 import { validateBody, z } from "@/lib/api/validate";
 import { readJsonBody } from "@/lib/sitefiles/api";
 import { clientIpFromHeaders } from "@/lib/api/client-ip";
-import { loginLockedOut, recordLoginFailure, recordLoginSuccess } from "@/lib/auth/rate-limit";
+import { loginLockedOutAsync, recordLoginFailureAsync, recordLoginSuccessAsync } from "@/lib/auth/rate-limit";
 import { requireAccountUser, requireReauth } from "@/lib/auth/mfa/guard";
 import { auditSecurity, confirmTotpEnrollment, disableTotp, factorSummary, startTotpEnrollment } from "@/lib/auth/mfa/store";
 import { otpauthQrDataUrl, wouldBreakPolicy } from "@/lib/auth/mfa/account";
@@ -43,11 +43,11 @@ export async function PUT(req: Request) {
     if (!v.ok) return v.error;
     const ip = clientIpFromHeaders(req.headers);
     const key = `2fa:${user.id}`;
-    if (loginLockedOut(ip, key)) return Response.json({ error: "Too many wrong codes. Wait a while and try again." }, { status: 429 });
+    if (await loginLockedOutAsync(ip, key)) return Response.json({ error: "Too many wrong codes. Wait a while and try again." }, { status: 429 });
     const result = await confirmTotpEnrollment(user.id, v.data.code);
     if (!result.ok) {
       if (result.reason === "invalid") {
-        recordLoginFailure(ip, key);
+        await recordLoginFailureAsync(ip, key);
         throw new BadRequestError("That code didn't match. Check the time on your phone and enter the newest code.", { code: "invalid_code" });
       }
       throw new BadRequestError(
@@ -55,7 +55,7 @@ export async function PUT(req: Request) {
         { code: result.reason },
       );
     }
-    recordLoginSuccess(ip, key);
+    await recordLoginSuccessAsync(ip, key);
     await auditSecurity(user.id, "security_2fa_enabled", `authenticator app enabled for ${user.email ?? user.id}`);
     const proof = await mintMfaProof(user.id, "otp");
     return Response.json({ enabled: true, recoveryCodes: result.recoveryCodes, proof });

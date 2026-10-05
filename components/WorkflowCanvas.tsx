@@ -57,6 +57,10 @@ import {
   Settings,
   History,
   MousePointer,
+  Copy,
+  Check,
+  RefreshCw,
+  KeyRound,
 } from "lucide-react";
 import {
   NODE_CATALOG,
@@ -187,14 +191,14 @@ const ICONS: Record<string, typeof Play> = {
   Sparkle: Zap,
 };
 
-/* Kind tiles — icons are always warm ink (never orange/red); kind is
- * distinguished by the tile wash. Approval nodes additionally carry a warm
- * amber ring on the node itself. */
+/* Kind tiles — node kind is a category, not an agent state, so it stays
+ * neutral: ink icons on canvas/paper tiles. Approval nodes carry an ink ring
+ * on the node itself. */
 const KIND_STYLES: Record<string, string> = {
-  trigger: "bg-accent-tint text-ink-2",
-  action: "bg-inset text-ink-2",
-  approval: "bg-amber-tint text-ink-2",
-  logic: "bg-green-tint text-ink-2",
+  trigger: "bg-ink text-white",
+  action: "bg-canvas text-ink",
+  approval: "bg-paper text-ink",
+  logic: "bg-canvas text-muted",
 };
 
 const KIND_LABELS: Record<WorkflowNodeKind, string> = {
@@ -204,35 +208,35 @@ const KIND_LABELS: Record<WorkflowNodeKind, string> = {
   logic: "Logic",
 };
 
-const STATUS_TONES: Record<string, "neutral" | "green" | "orange" | "red" | "accent"> = {
-  running: "orange",
-  waiting_approval: "orange",
-  succeeded: "green",
-  active: "green",
-  paused: "orange",
-  failed: "red",
-};
-
-const STATUS_DOTS: Record<string, string> = {
-  running: "bg-orange",
-  waiting_approval: "bg-orange",
-  succeeded: "bg-green",
-  failed: "bg-red",
-  active: "bg-green",
-  paused: "bg-orange",
+/* Workflow runs and their steps are genuine agent states: each takes its
+ * status shape (running circle, needs-you triangle, done quarter-disc, failed
+ * square, paused bars). A workflow being "active" (enabled) is a setting, not
+ * a run state, so it gets no status color. */
+const STATUS_SHAPES: Record<string, string> = {
+  running: "aos-shape aos-shape--running aos-is-live",
+  waiting_approval: "aos-shape aos-shape--needs aos-shape--edged",
+  succeeded: "aos-shape aos-shape--done",
+  failed: "aos-shape aos-shape--failed",
+  paused: "aos-shape aos-shape--paused",
 };
 
 function StatusPill({ status }: { status: string }) {
-  return <ValuePill tone={STATUS_TONES[status] ?? "neutral"}>{status.replace(/_/g, " ")}</ValuePill>;
+  const shape = STATUS_SHAPES[status];
+  return (
+    <span className="inline-flex h-badge items-center gap-1.5 rounded-full bg-paper px-2.5 text-[13px] font-semibold capitalize text-ink shadow-control">
+      {shape && <span className={shape} aria-hidden />}
+      {status.replace(/_/g, " ")}
+    </span>
+  );
 }
 
 function statusDot(status?: string | null) {
   if (!status) return null;
-  const cls = STATUS_DOTS[status] ?? "bg-ink-3";
-  const pulse = status === "running" ? " animate-pulse" : "";
+  const cls = STATUS_SHAPES[status] ?? "aos-shape aos-shape--queued";
   return (
     <span
-      className={`absolute -right-1 -top-1 z-10 h-3 w-3 rounded-full ring-2 ring-surface ${cls}${pulse}`}
+      className={`absolute -right-1 -top-1 z-10 ${cls}`}
+      style={{ ["--aos-shape-size" as string]: "12px" }}
       title={status.replace(/_/g, " ")}
     />
   );
@@ -249,23 +253,23 @@ function WfNodeView({ data, selected }: NodeProps<WfNode>) {
   return (
     <Card
       className={cn(
-        "relative min-w-[190px] max-w-[230px] rounded-card",
-        isApproval && "ring-1 ring-amber",
-        selected && "ring-2 ring-accent",
+        "relative min-w-[190px] max-w-[230px] rounded-lg",
+        isApproval && "ring-1 ring-ink",
+        selected && "ring-2 ring-focus",
       )}
     >
       {statusDot(data.status)}
-      <Handle type="target" position={Position.Top} className="!h-2.5 !w-2.5 !border-2 !border-surface !bg-ink-3" />
+      <Handle type="target" position={Position.Top} className="!h-2.5 !w-2.5 !border-2 !border-paper !bg-muted" />
       <div className="flex items-center gap-2 px-3 py-2">
-        <span className={cn("flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ring-1 ring-line", isApproval && "ring-amber", KIND_STYLES[data.kind] ?? "bg-field text-ink-2")}>
+        <span className={cn("flex h-7 w-7 shrink-0 items-center justify-center rounded-sm ring-1 ring-line", isApproval && "ring-ink", KIND_STYLES[data.kind] ?? "bg-paper text-muted")}>
           <Icon className="h-3.5 w-3.5" />
         </span>
         <div className="min-w-0">
           <div className="truncate text-[13px] font-semibold text-ink">{data.label}</div>
-          <div className="text-[11px] capitalize text-ink-3">{def?.label ?? data.type}</div>
+          <div className="text-[11px] capitalize text-muted">{def?.label ?? data.type}</div>
         </div>
       </div>
-      <Handle type="source" position={Position.Bottom} className="!h-2.5 !w-2.5 !border-2 !border-surface !bg-ink-3" />
+      <Handle type="source" position={Position.Bottom} className="!h-2.5 !w-2.5 !border-2 !border-paper !bg-muted" />
     </Card>
   );
 }
@@ -313,7 +317,7 @@ function ConfigEditor({
   disabled: boolean;
 }) {
   if (fields.length === 0) {
-    return <p className="text-xs text-ink-3">No configuration for this node.</p>;
+    return <p className="text-xs text-muted">No configuration for this node.</p>;
   }
   return (
     <div className="flex flex-col gap-3">
@@ -384,10 +388,10 @@ function Palette({ canEdit }: { canEdit: boolean }) {
     <div className="flex flex-col gap-4">
       {NODE_KINDS.map((kind) => (
         <div key={kind}>
-          <div className="mb-1.5 text-[12.5px] font-medium text-ink-3">
+          <div className="mb-1.5 text-[12.5px] font-medium text-muted">
             {KIND_LABELS[kind]}
           </div>
-          <GlideMenu highlightClassName="inset-x-0 rounded-control bg-hover">
+          <GlideMenu highlightClassName="inset-x-0 rounded-sm bg-hover">
             <div className="flex flex-col gap-1">
               {NODE_CATALOG[kind].map((def) => {
                 const Icon = ICONS[def.icon] || WorkflowIcon;
@@ -402,7 +406,7 @@ function Palette({ canEdit }: { canEdit: boolean }) {
                     }}
                     title={def.description}
                     className={cn(
-                      "flex items-center gap-2 rounded-control border border-line bg-surface px-2.5 py-1.5 text-[13px] text-ink shadow-hairline",
+                      "flex items-center gap-2 rounded-sm border border-line bg-paper px-2.5 py-1.5 text-[13px] text-ink shadow-hairline",
                       canEdit ? "cursor-grab hover:border-line-strong active:cursor-grabbing" : "opacity-60",
                     )}
                   >
@@ -417,7 +421,7 @@ function Palette({ canEdit }: { canEdit: boolean }) {
           </GlideMenu>
         </div>
       ))}
-      <p className="text-[11px] leading-snug text-ink-3">
+      <p className="text-[11px] leading-snug text-muted">
         Drag a node onto the canvas, then drag from a handle to connect it. Click a node to edit its
         config; click an edge to label it true/false for condition branches.
       </p>
@@ -781,12 +785,12 @@ function CanvasInner({
       edges.map((e) => ({
         ...e,
         style: {
-          /* Selected edges: orange-tinted stroke per design-v2. */
-          stroke: selEdgeId === e.id ? "#fed7aa" : "#d6d3d1",
+          /* Selected edges: ink stroke; idle edges: control gray (SVG, so tokens work). */
+          stroke: selEdgeId === e.id ? "var(--aos-ink)" : "var(--aos-control)",
           strokeWidth: selEdgeId === e.id ? 2.5 : 2,
         },
-        labelStyle: { fontSize: 11, fontWeight: 600, fill: "#71717a" },
-        labelBgStyle: { fill: "#ffffff", fillOpacity: 1 },
+        labelStyle: { fontSize: 11, fontWeight: 600, fill: "var(--aos-text-muted)" },
+        labelBgStyle: { fill: "var(--aos-paper)", fillOpacity: 1 },
         labelBgPadding: [6, 10] as [number, number],
         labelBgBorderRadius: 6,
       })),
@@ -803,7 +807,7 @@ function CanvasInner({
   const [rightOpen, setRightOpen] = useState(true);
 
   return (
-    <div className="relative h-full overflow-hidden bg-page">
+    <div className="relative h-full overflow-hidden bg-canvas">
       {/* Canvas base — full bleed */}
       <div
         className="absolute inset-0"
@@ -841,20 +845,20 @@ function CanvasInner({
             fitView
             proOptions={{ hideAttribution: true }}
           >
-            <Background color="#ddd9cc" gap={24} />
-            <Controls className="!border-line !bg-surface !shadow-hairline" />
+            <Background color="var(--aos-line-strong)" gap={24} />
+            <Controls className="!border-line !bg-paper !shadow-hairline" />
           </ReactFlow>
         )}
       </div>
 
       {/* Floating top-center toolbar: save + run */}
-      <div className="material-float absolute left-1/2 top-4 z-20 flex max-w-[calc(100%-2rem)] -translate-x-1/2 items-center gap-1.5 rounded-full py-1.5 pl-4 pr-1.5 shadow-float-md ring-1 ring-line">
+      <div className="bg-paper absolute left-1/2 top-4 z-20 flex max-w-[calc(100%-2rem)] -translate-x-1/2 items-center gap-1.5 rounded-full py-1.5 pl-4 pr-1.5 shadow-raised">
         <span className="max-w-40 truncate text-[13px] font-semibold text-ink">
           {wf?.name ?? "No workflow"}
         </span>
         {wf && <StatusPill status={wf.status} />}
         {dirty && canEdit && (
-          <span className="size-2 shrink-0 rounded-full bg-amber" title="Unsaved changes" />
+          <span className="size-2 shrink-0 rounded-full bg-ink" title="Unsaved changes" />
         )}
         <span className="mx-1 h-5 w-px shrink-0 bg-line" aria-hidden />
         <Tooltip>
@@ -877,9 +881,10 @@ function CanvasInner({
               <Button
                 type="button"
                 size="sm"
-                variant="accent"
+                variant="primary"
                 onClick={handleRun}
                 disabled={!canEdit || running || !wf}
+                className="bg-running text-white hover:bg-running-pressed hover:opacity-100"
                 aria-label={dirty ? "Saves first, then runs" : "Run now"}
               >
                 {running ? <LoaderCircle className="size-3.5 animate-spin" /> : <Play className="size-3.5" />}
@@ -895,7 +900,7 @@ function CanvasInner({
       {(error || selectedRun) && (
         <div className="absolute left-1/2 top-[68px] z-20 flex w-full max-w-xl -translate-x-1/2 flex-col gap-2 px-4">
           {error && (
-            <div className="flex items-start gap-2 rounded-card bg-red-tint px-4 py-2 text-sm text-red shadow-float-sm ring-1 ring-line">
+            <div className="flex items-start gap-2 rounded-lg border border-failed bg-failed-tint px-4 py-2 text-sm text-failed-text shadow-raised">
               <TriangleAlert className="mt-0.5 size-4 shrink-0" />
               <span className="flex-1">{error}</span>
               <Button type="button" size="xs" variant="quiet" onClick={() => setError(null)} aria-label="Dismiss error">
@@ -904,20 +909,20 @@ function CanvasInner({
             </div>
           )}
           {selectedRun && (
-            <div className="material-float flex items-center gap-3 rounded-card px-4 py-2 text-sm shadow-float-sm ring-1 ring-line">
+            <div className="bg-paper flex items-center gap-3 rounded-lg px-4 py-2 text-sm shadow-raised">
               <StatusPill status={selectedRun.status} />
-              <span className="min-w-0 flex-1 truncate text-ink-2">
+              <span className="min-w-0 flex-1 truncate text-muted">
                 Run {selectedRun.triggerKind} · {new Date(selectedRun.startedAt).toLocaleString()}
               </span>
               {selectedRun.status === "waiting_approval" && (
                 <a
                   href={`/dashboard/projects/${projectId}/autopilot`}
-                  className="shrink-0 font-medium text-accent-ink hover:underline"
+                  className="shrink-0 font-medium text-ink hover:underline"
                 >
                   Review in approval queue →
                 </a>
               )}
-              {selectedRun.error && <span className="truncate text-red">{selectedRun.error}</span>}
+              {selectedRun.error && <span className="truncate text-failed-text">{selectedRun.error}</span>}
               <Button type="button" size="xs" variant="quiet" onClick={() => selectRun(null)} className="shrink-0">
                 <X className="size-3.5" /> Clear run overlay
               </Button>
@@ -928,11 +933,11 @@ function CanvasInner({
 
       {/* Left: floating workflows + palette */}
       {leftOpen ? (
-        <div className="material-float absolute bottom-4 left-4 top-4 z-10 flex w-64 flex-col rounded-card p-3 shadow-float-md ring-1 ring-line">
+        <div className="bg-paper absolute bottom-4 left-4 top-4 z-10 flex w-64 flex-col rounded-lg p-3 shadow-raised">
           <div className="mb-2 flex items-center justify-between gap-2">
             <Link
               href={`/dashboard/projects/${projectId}`}
-              className="inline-flex min-w-0 items-center gap-1 text-[13px] font-medium text-ink-2 transition-colors hover:text-ink"
+              className="inline-flex min-w-0 items-center gap-1 text-[13px] font-medium text-muted transition-colors hover:text-ink"
             >
               <ArrowLeft className="size-3.5 shrink-0" />
               <span className="truncate">{projectDomain}</span>
@@ -943,11 +948,11 @@ function CanvasInner({
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto">
             <div>
-              <div className="mb-2 text-[12.5px] font-medium text-ink-3">Workflows</div>
+              <div className="mb-2 text-[12.5px] font-medium text-muted">Workflows</div>
               {workflows.length === 0 ? (
-                <p className="text-xs text-ink-3">No workflows yet — create one below.</p>
+                <p className="text-xs text-muted">No workflows yet — create one below.</p>
               ) : (
-                <GlideMenu highlightClassName="inset-x-0 rounded-control bg-hover">
+                <GlideMenu highlightClassName="inset-x-0 rounded-sm bg-hover">
                   <div className="flex flex-col gap-0.5">
                     {workflows.map((w) => {
                       const lastRun = w.runs?.[0];
@@ -959,19 +964,19 @@ function CanvasInner({
                           data-menu-row
                           onClick={() => loadWorkflow(w.id)}
                           className={cn(
-                            "flex items-center gap-2 rounded-control px-2.5 py-2 text-left text-sm",
-                            active && "bg-accent-tint shadow-hairline",
+                            "flex items-center gap-2 rounded-sm px-2.5 py-2 text-left text-sm",
+                            active && "bg-canvas shadow-hairline",
                           )}
                         >
-                          <WorkflowIcon className={cn("size-4 shrink-0", active ? "text-ink" : "text-ink-3")} />
+                          <WorkflowIcon className={cn("size-4 shrink-0", active ? "text-ink" : "text-muted")} />
                           <span className="min-w-0 flex-1">
                             <span className="block truncate font-medium text-ink">{w.name}</span>
-                            <span className="block text-[11px] text-ink-3">
+                            <span className="block text-[11px] text-muted">
                               {w.status}
                               {lastRun ? ` · last run ${lastRun.status.replace(/_/g, " ")}` : ""}
                             </span>
                           </span>
-                          {lastRun && <span className={cn("size-2 shrink-0 rounded-full", STATUS_DOTS[lastRun.status] ?? "bg-ink-3")} />}
+                          {lastRun && <span className={STATUS_SHAPES[lastRun.status] ?? "aos-shape aos-shape--queued"} style={{ ["--aos-shape-size" as string]: "8px" }} aria-hidden />}
                         </button>
                       );
                     })}
@@ -993,7 +998,7 @@ function CanvasInner({
                         <Button
                           type="button"
                           size="xs"
-                          variant="accent"
+                          variant="primary"
                           onClick={createWorkflow}
                           disabled={creating || !newName.trim()}
                           aria-label="Create workflow"
@@ -1009,7 +1014,7 @@ function CanvasInner({
               )}
             </div>
             <div className="mt-3 border-t border-line pt-3">
-              <div className="mb-2 text-[12.5px] font-medium text-ink-3">Node palette</div>
+              <div className="mb-2 text-[12.5px] font-medium text-muted">Node palette</div>
               <Palette canEdit={canEdit} />
             </div>
           </div>
@@ -1019,7 +1024,7 @@ function CanvasInner({
           type="button"
           onClick={() => setLeftOpen(true)}
           aria-label="Open workflows and palette"
-          className="material-float absolute left-4 top-4 z-10 flex items-center gap-2 rounded-full py-2 pl-3 pr-4 text-[13px] font-medium text-ink-2 shadow-float-md ring-1 ring-line transition-colors hover:text-ink"
+          className="bg-paper absolute left-4 top-4 z-10 flex items-center gap-2 rounded-full py-2 pl-3 pr-4 text-[13px] font-medium text-muted shadow-raised transition-colors hover:text-ink"
         >
           <WorkflowIcon className="size-4" />
           Workflows
@@ -1028,7 +1033,7 @@ function CanvasInner({
 
       {/* Right: floating inspector / runs */}
       {rightOpen ? (
-        <div className="material-float absolute bottom-4 right-4 top-4 z-10 flex w-80 flex-col overflow-hidden rounded-card shadow-float-md ring-1 ring-line">
+        <div className="bg-paper absolute bottom-4 right-4 top-4 z-10 flex w-80 flex-col overflow-hidden rounded-lg shadow-raised">
           <Tabs value={tab} onValueChange={(v) => setTab(v as "inspector" | "runs")} className="flex min-h-0 flex-1 flex-col">
             <div className="flex items-center justify-between gap-1 px-2 pt-1">
               <TabsList variant="line" className="min-w-0 flex-1">
@@ -1068,7 +1073,7 @@ function CanvasInner({
           type="button"
           onClick={() => setRightOpen(true)}
           aria-label="Open inspector"
-          className="material-float absolute right-4 top-4 z-10 flex items-center gap-2 rounded-full py-2 pl-3 pr-4 text-[13px] font-medium text-ink-2 shadow-float-md ring-1 ring-line transition-colors hover:text-ink"
+          className="bg-paper absolute right-4 top-4 z-10 flex items-center gap-2 rounded-full py-2 pl-3 pr-4 text-[13px] font-medium text-muted shadow-raised transition-colors hover:text-ink"
         >
           <Settings className="size-4" />
           Inspector
@@ -1091,6 +1096,7 @@ function CanvasInner({
               <NodeInspector
                 node={selNode}
                 def={selNodeDef}
+                workflowId={selectedId}
                 canEdit={canEdit}
                 onLabel={(label) => updateNodeData(selNode.id, { label })}
                 onConfig={(key, value) =>
@@ -1120,6 +1126,7 @@ function CanvasInner({
 function NodeInspector({
   node,
   def,
+  workflowId,
   canEdit,
   onLabel,
   onConfig,
@@ -1127,6 +1134,7 @@ function NodeInspector({
 }: {
   node: WfNode;
   def: ReturnType<typeof nodeTypeDef>;
+  workflowId: string | null;
   canEdit: boolean;
   onLabel: (label: string) => void;
   onConfig: (key: string, value: unknown) => void;
@@ -1137,10 +1145,10 @@ function NodeInspector({
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <ValuePill tone="neutral">{node.data.kind}</ValuePill>
-          <span className="text-xs text-ink-3">{def?.label ?? node.data.type}</span>
+          <span className="text-xs text-muted">{def?.label ?? node.data.type}</span>
         </div>
         {canEdit && (
-          <Button type="button" size="xs" variant="ghost" onClick={onDelete} title="Delete node" className="text-red">
+          <Button type="button" size="xs" variant="ghost" onClick={onDelete} title="Delete node" className="text-failed-text">
             <Trash className="h-3.5 w-3.5" /> Delete
           </Button>
         )}
@@ -1148,24 +1156,180 @@ function NodeInspector({
       <Field label="Label">
         <Input value={node.data.label} disabled={!canEdit} onChange={(e) => onLabel(e.target.value)} />
       </Field>
-      {def && <ConfigEditor fields={def.fields} config={node.data.config} onChange={onConfig} disabled={!canEdit} />}
+      {node.data.kind === "trigger" && node.data.type === "webhook" ? (
+        workflowId ? <WebhookTriggerPanel key={workflowId} workflowId={workflowId} canEdit={canEdit} /> : null
+      ) : (
+        def && <ConfigEditor fields={def.fields} config={node.data.config} onChange={onConfig} disabled={!canEdit} />
+      )}
       {node.data.type === "condition" && (
-        <p className="rounded-control bg-field px-3 py-2 text-[11px] leading-snug text-ink-2">
+        <p className="rounded-sm bg-paper px-3 py-2 text-[11px] leading-snug text-muted">
           Branch tip: click an outgoing edge and set its label to <b>true</b> or <b>false</b>. Unlabeled
           edges are followed on the default path.
         </p>
       )}
       {node.data.type === "approval_gate" && (
-        <p className="rounded-control bg-field px-3 py-2 text-[11px] leading-snug text-ink-2">
+        <p className="rounded-sm bg-paper px-3 py-2 text-[11px] leading-snug text-muted">
           Pauses the run and pushes a pending item into the approval queue. Approve to resume, reject to
           cancel the run.
         </p>
       )}
       {node.data.status && (
-        <div className="flex items-center gap-2 text-xs text-ink-3">
+        <div className="flex items-center gap-2 text-xs text-muted">
           Last run status: <StatusPill status={node.data.status} />
         </div>
       )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Webhook trigger: inbound URL + signing secret (Phase 6). The secret is shown
+// once, right after it is created or rotated; afterwards only its hint.
+// ---------------------------------------------------------------------------
+
+interface WebhookView {
+  hasTrigger: boolean;
+  configured: boolean;
+  secretHint: string | null;
+  lastReceivedAt: string | null;
+  url: string;
+  signatureHeader: string;
+}
+
+function CopyButton({ value, label }: { value: string; label: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <Button
+      type="button"
+      size="xs"
+      variant="secondary"
+      aria-label={label}
+      onClick={async () => {
+        try {
+          await navigator.clipboard.writeText(value);
+          setCopied(true);
+          setTimeout(() => setCopied(false), 1500);
+        } catch {
+          setCopied(false);
+        }
+      }}
+    >
+      {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+      {copied ? "Copied" : "Copy"}
+    </Button>
+  );
+}
+
+function WebhookTriggerPanel({ workflowId, canEdit }: { workflowId: string; canEdit: boolean }) {
+  const [view, setView] = useState<WebhookView | null>(null);
+  const [secret, setSecret] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    // State resets per workflow via the component key (see NodeInspector).
+    let live = true;
+    fetch(`/api/workflows/${workflowId}/webhook`)
+      .then(async (res) => {
+        const j = await res.json().catch(() => ({}));
+        if (!live) return;
+        if (res.ok) setView(j.webhook as WebhookView);
+        else setError(typeof j.error === "string" ? j.error : "Couldn't load the webhook settings.");
+      })
+      .catch(() => live && setError("Couldn't load the webhook settings."));
+    return () => {
+      live = false;
+    };
+  }, [workflowId]);
+
+  const rotate = useCallback(async () => {
+    if (view?.configured) {
+      const ok = await confirmAction({
+        title: "Rotate the signing secret?",
+        description: "The old secret stops working immediately. Update the sender with the new one.",
+        confirmLabel: "Rotate",
+      });
+      if (!ok) return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/workflows/${workflowId}/webhook`, { method: "POST" });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(typeof j.error === "string" ? j.error : "Couldn't create the secret.");
+        return;
+      }
+      setView(j.webhook as WebhookView);
+      setSecret(String(j.secret));
+    } finally {
+      setBusy(false);
+    }
+  }, [view?.configured, workflowId]);
+
+  if (error && !view) return <p className="text-[13px] text-failed-text">{error}</p>;
+  if (!view) {
+    return (
+      <p className="flex items-center gap-2 text-[13px] text-muted">
+        <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> Loading webhook settings
+      </p>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-3">
+      <Field label="Inbound URL" hint="POST JSON here. The body is available to later nodes as trigger.<field>.">
+        <div className="flex items-center gap-2">
+          <code className="min-w-0 flex-1 truncate rounded-md bg-paper px-3 py-2 font-mono text-xs text-ink shadow-hairline" title={view.url}>
+            {view.url}
+          </code>
+          <CopyButton value={view.url} label="Copy inbound URL" />
+        </div>
+      </Field>
+
+      <Field label="Signing secret">
+        {secret ? (
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-2">
+              <code className="min-w-0 flex-1 break-all rounded-md bg-paper px-3 py-2 font-mono text-xs text-ink shadow-hairline">
+                {secret}
+              </code>
+              <CopyButton value={secret} label="Copy signing secret" />
+            </div>
+            <p className="text-[13px] text-muted">Copy it now. This is the only time it&apos;s shown.</p>
+          </div>
+        ) : view.configured ? (
+          <code className="block rounded-md bg-paper px-3 py-2 font-mono text-xs text-muted shadow-hairline">{view.secretHint}</code>
+        ) : (
+          <p className="text-[13px] text-muted">
+            No secret yet. Calls to this URL are refused until you create one.
+          </p>
+        )}
+      </Field>
+
+      {!view.hasTrigger && (
+        <p className="text-[13px] text-muted">Save the workflow first, then create the secret.</p>
+      )}
+      {error && <p className="text-[13px] text-failed-text">{error}</p>}
+
+      {canEdit && (
+        <div>
+          <Button type="button" size="sm" variant={view.configured ? "secondary" : "primary"} onClick={rotate} disabled={busy || !view.hasTrigger}>
+            {busy ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : view.configured ? <RefreshCw className="h-3.5 w-3.5" /> : <KeyRound className="h-3.5 w-3.5" />}
+            {busy ? (view.configured ? "Rotating" : "Creating") : view.configured ? "Rotate secret" : "Create secret"}
+          </Button>
+        </div>
+      )}
+
+      {view.lastReceivedAt && (
+        <p className="text-[13px] text-muted">Last call received {new Date(view.lastReceivedAt).toLocaleString()}.</p>
+      )}
+
+      <p className="rounded-sm bg-paper px-3 py-2 text-[13px] leading-snug text-muted">
+        Sign each request with <span className="font-mono">{view.signatureHeader}: t=&lt;unix&gt;,v1=&lt;hex&gt;</span>,
+        the HMAC-SHA256 of <span className="font-mono">&lt;t&gt;.&lt;raw body&gt;</span> with this secret. Requests older
+        than 5 minutes, replays and bodies over 64 KB are refused. The workflow must be active.
+      </p>
     </div>
   );
 }
@@ -1187,7 +1351,7 @@ function EdgeInspector({
       <div className="flex items-center justify-between">
         <span className="text-sm font-semibold text-ink">Connection</span>
         {canEdit && (
-          <Button type="button" size="xs" variant="ghost" onClick={onDelete} title="Delete edge" className="text-red">
+          <Button type="button" size="xs" variant="ghost" onClick={onDelete} title="Delete edge" className="text-failed-text">
             <Trash className="h-3.5 w-3.5" /> Delete
           </Button>
         )}
@@ -1230,7 +1394,7 @@ function WorkflowSettings({
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center gap-2 text-sm font-semibold text-ink">
-        <Settings className="h-4 w-4 text-ink-3" />
+        <Settings className="h-4 w-4 text-muted" />
         Workflow settings
       </div>
       <Field label="Name">
@@ -1256,19 +1420,19 @@ function WorkflowSettings({
         <Input value={settings.schedule} disabled={!canEdit} placeholder="0 9 * * *" onChange={(e) => onChange({ schedule: e.target.value })} />
       </Field>
       <div className="flex items-center justify-between gap-3">
-        <span className="text-[13px] text-ink-2">Enabled</span>
+        <span className="text-[13px] text-muted">Enabled</span>
         <Switch checked={settings.enabled} disabled={!canEdit} onCheckedChange={(checked) => onChange({ enabled: checked })} />
       </div>
       {canEdit && (
         <div className="flex gap-2">
-          <Button type="button" size="sm" variant="accent" onClick={onSave} disabled={saving} className="flex-1">
+          <Button type="button" size="sm" variant="primary" onClick={onSave} disabled={saving} className="flex-1">
             {saving ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
             Save settings
           </Button>
           <Tooltip>
             <TooltipTrigger
               render={
-                <Button type="button" size="sm" variant="ghost" onClick={onDelete} aria-label="Delete workflow" className="text-red">
+                <Button type="button" size="sm" variant="ghost" onClick={onDelete} aria-label="Delete workflow" className="text-failed-text">
                   <Trash className="h-4 w-4" />
                 </Button>
               }
@@ -1277,7 +1441,7 @@ function WorkflowSettings({
           </Tooltip>
         </div>
       )}
-      <p className="text-[11px] leading-snug text-ink-3">
+      <p className="text-[11px] leading-snug text-muted">
         Only <b>active</b> + enabled workflows run. Manual runs need an active workflow; the kill switch
         in Content autopilot blocks all runs with a 423.
       </p>
@@ -1320,7 +1484,7 @@ function RunsPanel({
   }
   return (
     <div className="flex flex-col gap-2">
-      <GlideMenu highlightClassName="inset-x-0 rounded-control bg-hover">
+      <GlideMenu highlightClassName="inset-x-0 rounded-sm bg-hover">
         <div className="flex flex-col gap-1">
           {runs.map((r) => {
             const active = selectedRun?.id === r.id;
@@ -1331,19 +1495,19 @@ function RunsPanel({
                 data-menu-row
                 onClick={() => onSelect(active ? null : r.id)}
                 className={cn(
-                  "rounded-control border px-2.5 py-2 text-left",
-                  active ? "border-line-strong bg-accent-tint" : "border-line bg-surface hover:border-line-strong",
+                  "rounded-sm border px-2.5 py-2 text-left",
+                  active ? "border-line-strong bg-canvas" : "border-line bg-paper hover:border-line-strong",
                 )}
               >
                 <div className="flex items-center justify-between gap-2">
                   <StatusPill status={r.status} />
-                  <span className="text-[11px] text-ink-3">{new Date(r.startedAt).toLocaleString()}</span>
+                  <span className="text-[11px] text-muted">{new Date(r.startedAt).toLocaleString()}</span>
                 </div>
-                <div className="mt-1 flex items-center justify-between text-[11px] text-ink-3">
+                <div className="mt-1 flex items-center justify-between text-[11px] text-muted">
                   <span>{r.triggerKind} · {r._count?.steps ?? r.steps?.length ?? 0} steps</span>
                   <ChevronRight className="h-3.5 w-3.5" />
                 </div>
-                {r.error && <div className="mt-1 truncate text-[11px] text-red">{r.error}</div>}
+                {r.error && <div className="mt-1 truncate text-[11px] text-failed-text">{r.error}</div>}
               </button>
             );
           })}
@@ -1351,15 +1515,16 @@ function RunsPanel({
       </GlideMenu>
       {selectedRun?.steps && selectedRun.steps.length > 0 && (
         <div className="mt-2 border-t border-line pt-2">
-          <div className="mb-1.5 text-[12.5px] font-medium text-ink-3">
+          <div className="mb-1.5 text-[12.5px] font-medium text-muted">
             Steps · {new Date(selectedRun.startedAt).toLocaleString()}
           </div>
           <TaskRows variant="List" rows={selectedRun.steps.map(stepTaskRow)} />
           {selectedRun.status === "waiting_approval" && (
             <a
               href={`/dashboard/projects/${projectId}/autopilot`}
-              className="mt-2 block rounded-control bg-orange-tint px-2.5 py-2 text-[12px] font-medium text-orange"
+              className="mt-2 flex items-center gap-1.5 rounded-sm bg-needs px-2.5 py-2 text-[12px] font-semibold text-ink"
             >
+              <span className="aos-shape aos-shape--needs" style={{ color: "inherit" }} aria-hidden />
               Waiting on approval — review in the approval queue →
             </a>
           )}

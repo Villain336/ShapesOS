@@ -1,0 +1,58 @@
+{
+  "cli": {
+    "version": ">= 16.0.0",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "base": {
+      "node": "22.22.0",
+      "env": {
+        "SHAPESOS_IOS_BUNDLE_ID": "com.example.shapesos",
+        "SHAPESOS_ANDROID_PACKAGE": "com.example.shapesos"
+      }
+    },
+    "development": {
+      "extends": "base",
+      "developmentClient": true,
+      "distribution": "internal",
+      "channel": "development",
+      "env": {
+        "SHAPESOS_APP_VARIANT": "development",
+        "EXPO_PUBLIC_API_BASE_URL": "http://localhost:3000"
+      },
+      "ios": { "simulator": true }
+    },
+    "preview": {
+      "extends": "base",
+      "distribution": "internal",
+      "channel": "preview",
+      "env": {
+        "SHAPESOS_APP_VARIANT": "preview",
+        "EXPO_PUBLIC_API_BASE_URL": "https://staging.shapes.example.com"
+      },
+      "android": { "buildType": "apk" }
+    },
+    "production": {
+      "extends": "base",
+      "channel": "production",
+      "autoIncrement": true,
+      "env": {
+        "SHAPESOS_APP_VARIANT": "production",
+        "EXPO_PUBLIC_API_BASE_URL": "https://app.shapes.example.com"
+      }
+    }
+  },
+  "submit": {
+    "production": {
+      "ios": {
+        "appleId": "REPLACE_WITH_APPLE_ID_EMAIL",
+        "ascAppId": "REPLACE_WITH_APP_STORE_CONNECT_APP_ID",
+        "appleTeamId": "REPLACE_WITH_APPLE_TEAM_ID"
+      },
+      "android": {
+        "serviceAccountKeyPath": "./secrets/play-service-account.json",
+        "track": "internal"
+      }
+    }
+  }
+}

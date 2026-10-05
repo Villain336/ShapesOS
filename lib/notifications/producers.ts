@@ -14,6 +14,9 @@ import { createNotifications, safeHref, type NotificationInput } from "./store";
 // Phase 4a: outbound webhooks hang off the same producer seam (best-effort,
 // never throws — see lib/webhooks/emit.ts).
 import { emitWebhookEvent } from "@/lib/webhooks/emit";
+// Phase 4b: mobile push for the push kinds (fire-and-forget, no-op unless
+// PUSH_PROVIDER=expo — see lib/push/notify.ts).
+import { queuePushForNotifications } from "@/lib/push/notify";
 
 export type ProducerDb = Pick<Prisma.TransactionClient, "notification" | "workspaceMember" | "workspace">;
 
@@ -49,6 +52,7 @@ export function actorUserId(actor: string | null | undefined): string | null {
 async function createAndEmit(db: ProducerDb, inputs: NotificationInput[]): Promise<number> {
   const created = await createNotifications(db, inputs);
   if (created > 0) {
+    queuePushForNotifications(inputs);
     for (const n of inputs) {
       await emitWebhookEvent({
         workspaceId: n.workspaceId,
@@ -308,6 +312,123 @@ export async function notifyInviteAccepted(input: InviteAcceptedInput, db: Produ
     );
   } catch (e) {
     warn("invite_accepted", e);
+    return 0;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Phase 4b: Dataset Builder staleness
+// ---------------------------------------------------------------------------
+
+export interface DatasetStaleInput {
+  workspaceId: string;
+  datasetId: string;
+  version: number;
+  /** e.g. "Your pricing dataset is 120 days old". */
+  title: string;
+  body?: string | null;
+}
+
+/** "Dataset is stale" → editors and up (they can re-ingest and recompile). */
+export async function notifyDatasetStale(input: DatasetStaleInput, db: ProducerDb = defaultDb()): Promise<number> {
+  try {
+    const recipients = await membersAtLeast(db, input.workspaceId, "editor");
+    return await createAndEmit(
+      db,
+      recipients.map<NotificationInput>((userId) => ({
+        workspaceId: input.workspaceId,
+        userId,
+        kind: "alert_fired",
+        title: input.title,
+        body: input.body ?? null,
+        href: "/dashboard/datasets?tab=build",
+        sourceType: "dataset",
+        sourceId: input.datasetId,
+        dedupKey: `dataset_stale:${input.datasetId}:v${input.version}`,
+      })),
+    );
+  } catch (e) {
+    warn("dataset_stale", e);
+    return 0;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Phase 10 (ops-core): helpdesk SLA breach
+// ---------------------------------------------------------------------------
+
+export interface TicketSlaBreachedInput {
+  workspaceId: string;
+  ticketId: string;
+  number: number;
+  subject: string;
+  kind: "first_response" | "resolution";
+  assigneeId?: string | null;
+}
+
+/** "Ticket #12 missed its first-response target" → the assignee (if a member) + editors. */
+export async function notifyTicketSlaBreached(input: TicketSlaBreachedInput, db: ProducerDb = defaultDb()): Promise<number> {
+  try {
+    const editors = await membersAtLeast(db, input.workspaceId, "editor");
+    const assignee = input.assigneeId && (await isMember(db, input.workspaceId, input.assigneeId)) ? [input.assigneeId] : [];
+    const recipients = [...new Set([...assignee, ...editors])];
+    const what = input.kind === "first_response" ? "first-response" : "resolution";
+    return await createAndEmit(
+      db,
+      recipients.map<NotificationInput>((userId) => ({
+        workspaceId: input.workspaceId,
+        userId,
+        kind: "alert_fired",
+        title: `Ticket #${input.number} missed its ${what} target`,
+        body: input.subject.slice(0, 200),
+        href: `/dashboard/ops/helpdesk?ticket=${encodeURIComponent(input.ticketId)}`,
+        sourceType: "ops_ticket",
+        sourceId: input.ticketId,
+        dedupKey: `ticket_sla:${input.ticketId}:${input.kind}`,
+      })),
+    );
+  } catch (e) {
+    warn("ticket_sla_breached", e);
+    return 0;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Phase 13 (twincore): digital twin alerts (dock overdue, bin low, machine
+// stopped while late, register left open) → editors, once per condition.
+// ---------------------------------------------------------------------------
+
+export interface TwinAlertInput {
+  workspaceId: string;
+  siteId: string;
+  siteName: string;
+  objectId: string;
+  objectLabel: string;
+  message: string;
+  /** Names the condition's record (lib/twin/derive.ts alertCandidates) — one notification per recipient per condition. */
+  dedupKey: string;
+}
+
+/** "Dock 3: TRK-1 is 45 min past its ETA" → editors, linking to the object on the twin. */
+export async function notifyTwinAlert(input: TwinAlertInput, db: ProducerDb = defaultDb()): Promise<number> {
+  try {
+    const editors = await membersAtLeast(db, input.workspaceId, "editor");
+    return await createAndEmit(
+      db,
+      editors.map<NotificationInput>((userId) => ({
+        workspaceId: input.workspaceId,
+        userId,
+        kind: "alert_fired",
+        title: `${input.siteName} · ${input.objectLabel}`,
+        body: input.message.slice(0, 500),
+        href: `/dashboard/ops/twin/${encodeURIComponent(input.siteId)}?object=${encodeURIComponent(input.objectId)}`,
+        sourceType: "twin_object",
+        sourceId: input.objectId,
+        dedupKey: input.dedupKey,
+      })),
+    );
+  } catch (e) {
+    warn("twin_alert", e);
     return 0;
   }
 }

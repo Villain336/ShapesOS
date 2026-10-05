@@ -56,12 +56,9 @@ export default function FeedbackButtons({
       title={label}
       onClick={() => void send(kind)}
       className={cn(
-        "rounded-md p-1 transition-colors",
-        vote === kind
-          ? kind === "explicit_up"
-            ? "text-brand-700"
-            : "text-red-500"
-          : "text-stone-300 hover:bg-stone-100 hover:text-stone-500",
+        "rounded-full p-1 transition-colors",
+        // Pressed toggles are solid black (DESIGN.md); a vote is not a status.
+        vote === kind ? "bg-ink text-white" : "text-muted hover:bg-hover-paper hover:text-ink",
       )}
     >
       <Icon className="size-3.5" aria-hidden />

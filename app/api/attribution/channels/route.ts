@@ -2,10 +2,15 @@
 // GET /api/attribution/channels?from=&to=&pipelineId=
 // Leads/CPL/spend are model-independent; customers/CAC/revenue/ROAS are
 // reported per model in `perModel`.
+// Phase 4b: the social_organic row carries `engagement` (impressions, likes,
+// comments, shares, clicks from social_post_metrics in the window), and is
+// present even before any social lead arrives.
 
 import { getOrCreateWorkspace, requireUser } from "@/lib/session";
 import { getAttributionReport, resolveWindow } from "@/lib/attribution/report";
 import { ATTRIBUTION_MODELS, type AttributionModel } from "@/lib/attribution/models";
+import { SOCIAL_CHANNEL } from "@/lib/attribution/social";
+import { getSocialEngagement, type EngagementNumbers } from "@/lib/social/engagement";
 
 export async function GET(req: Request) {
   const user = await requireUser();
@@ -16,7 +21,10 @@ export async function GET(req: Request) {
   const win = await resolveWindow(workspace.id, sp);
   if (!win.ok) return Response.json({ error: win.error }, { status: 400 });
 
-  const { report } = await getAttributionReport(workspace.id, win.window);
+  const [{ report }, social] = await Promise.all([
+    getAttributionReport(workspace.id, win.window),
+    getSocialEngagement(workspace.id, win.window).catch(() => null),
+  ]);
   const base = report.linear.channels;
   const byChannel = new Map(base.map((c) => [c.channel, c]));
 
@@ -32,8 +40,21 @@ export async function GET(req: Request) {
       spendCents: b.spendCents,
       cplCents: b.cplCents,
       perModel,
+      ...(channel === SOCIAL_CHANNEL && social ? { engagement: social.totals as EngagementNumbers } : {}),
     };
   });
+
+  if (social && social.totals.impressions + social.totals.engagements > 0 && !byChannel.has(SOCIAL_CHANNEL)) {
+    const none = { customers: 0, cacCents: null, revenueCents: 0, roas: null };
+    channels.push({
+      channel: SOCIAL_CHANNEL,
+      leads: 0,
+      spendCents: 0,
+      cplCents: null,
+      perModel: { first_touch: none, last_touch: none, linear: none },
+      engagement: social.totals,
+    });
+  }
 
   return Response.json({ channels });
 }

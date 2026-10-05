@@ -442,9 +442,16 @@ export interface DatasetPublishInput {
    * rag → snapshot pointer (rag://workspace/type/vN).
    */
   artifactRef: string;
+  /**
+   * Phase 4b (rollback / roll-forward): when the (target, version) record
+   * already exists, refresh its publishedAt so it becomes the live one
+   * again. The live record is the most recently published, not the
+   * highest version.
+   */
+  makeLive?: boolean;
 }
 
-export interface DatasetPublishRecord extends DatasetPublishInput {
+export interface DatasetPublishRecord extends Omit<DatasetPublishInput, "makeLive"> {
   id: string;
   publishedAt: Date;
 }

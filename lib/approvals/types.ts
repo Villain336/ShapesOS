@@ -21,6 +21,7 @@ export const INBOX_SOURCES = [
   "integration",
   "media",
   "mail",
+  "social",
 ] as const;
 
 export type InboxSourceKey = (typeof INBOX_SOURCES)[number];
@@ -41,6 +42,7 @@ export const INBOX_SOURCE_LABELS: Record<InboxSourceKey, string> = {
   integration: "Tool action",
   media: "Media buy",
   mail: "Direct mail",
+  social: "Social post",
 };
 
 export function isInboxSource(value: unknown): value is InboxSourceKey {
@@ -54,6 +56,12 @@ export interface InboxAction {
   method: "POST";
   url: string;
   body: Record<string, unknown>;
+}
+
+/** One row of what a request covers (approval card list): a recipient, a fact. */
+export interface InboxLine {
+  label: string;
+  detail: string | null;
 }
 
 export interface InboxItem {
@@ -81,6 +89,14 @@ export interface InboxItem {
   /** Inline actions, only when canDecide and the queue's API supports it cleanly. */
   approve: InboxAction | null;
   deny: InboxAction | null;
+  /** The agent that asked, when the queue knows it (scheduled skill, Connector). */
+  agent: string | null;
+  /** Mission the request came from: the inbox groups it under the lead → sub-agent tree. */
+  missionId: string | null;
+  missionName: string | null;
+  /** What the request covers, one row each (a preview when lineTotal is larger). */
+  lines: InboxLine[];
+  lineTotal: number;
 }
 
 /** Who is looking: the role rules of every queue are evaluated against this. */

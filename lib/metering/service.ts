@@ -63,6 +63,28 @@ export interface MeterOptions {
    * meaning.
    */
   credits?: number;
+  /**
+   * Phase 7: token usage of one model call (action "llm_tokens", written by
+   * lib/llm/usage.ts). Stored on the same append-only event row. costMicroUsd
+   * is the estimated vendor cost; null when a price is unknown.
+   */
+  llm?: LlmUsageFields | null;
+}
+
+export interface LlmUsageFields {
+  provider: string;
+  model: string;
+  workload: string | null;
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheWriteTokens: number;
+  costMicroUsd: number | null;
+}
+
+function nonNegInt(n: number, field: string): number {
+  if (!Number.isInteger(n) || n < 0) throw new Error(`metering: llm.${field} must be a non-negative integer`);
+  return n;
 }
 
 export type MeterResult =
@@ -159,20 +181,14 @@ async function lockBalance(tx: Tx, workspaceId: string): Promise<LockedBalance> 
     if (rows.length > 0) return rows[0];
     const ws = await tx.workspace.findUnique({ where: { id: workspaceId }, select: { plan: true } });
     if (!ws) throw new Error(`metering: unknown workspace ${workspaceId}`);
-    try {
-      await tx.creditBalance.create({
-        data: {
-          workspaceId,
-          includedCredits: includedCreditsForPlan(ws.plan),
-          purchasedCredits: 0,
-          usedCredits: 0,
-          periodStart: monthStart(new Date()),
-        },
-      });
-    } catch (err) {
-      if (isUniqueViolation(err)) continue; // lost the create race — re-lock
-      throw err;
-    }
+    // ON CONFLICT DO NOTHING, not create + catch: in Postgres a unique
+    // violation aborts the whole transaction, so a caught P2002 could never be
+    // retried (every later statement fails "current transaction is aborted").
+    // Losing the create race is now a no-op and the loop re-locks the winner's row.
+    await tx.$executeRaw`
+      INSERT INTO credit_balances (workspace_id, included_credits, purchased_credits, used_credits, period_start)
+      VALUES (${workspaceId}, ${includedCreditsForPlan(ws.plan)}, 0, 0, ${monthStart(new Date())})
+      ON CONFLICT (workspace_id) DO NOTHING`;
   }
   throw new Error("metering: could not lock credit balance");
 }
@@ -185,17 +201,14 @@ async function lockSpendCap(tx: Tx, workspaceId: string, pool: number): Promise<
              auto_overage AS "autoOverage"
       FROM spend_caps WHERE workspace_id = ${workspaceId} FOR UPDATE`;
     if (rows.length > 0) return rows[0];
-    try {
-      // Self-hosted = BYO provider keys (credits.ts): usage is recorded, never
-      // blocked. Every other plan starts with the hard cap at its pool.
-      const ws = await tx.workspace.findUnique({ where: { id: workspaceId }, select: { plan: true } });
-      await tx.spendCap.create({
-        data: { workspaceId, capCredits: pool, blockAtCap: ws?.plan !== "self_hosted", alertAtPct: 80 },
-      });
-    } catch (err) {
-      if (isUniqueViolation(err)) continue;
-      throw err;
-    }
+    // Self-hosted = BYO provider keys (credits.ts): usage is recorded, never
+    // blocked. Every other plan starts with the hard cap at its pool.
+    // ON CONFLICT DO NOTHING for the same reason as lockBalance.
+    const ws = await tx.workspace.findUnique({ where: { id: workspaceId }, select: { plan: true } });
+    await tx.$executeRaw`
+      INSERT INTO spend_caps (workspace_id, cap_credits, block_at_cap, alert_at_pct, auto_overage)
+      VALUES (${workspaceId}, ${pool}, ${ws?.plan !== "self_hosted"}, 80, false)
+      ON CONFLICT (workspace_id) DO NOTHING`;
   }
   throw new Error("metering: could not lock spend cap");
 }
@@ -218,9 +231,22 @@ export async function meter(opts: MeterOptions): Promise<MeterResult> {
     action,
     idempotencyKey,
     evidenceRef = null,
+    llm = null,
   } = opts;
   if (!workspaceId) throw new Error("metering: workspaceId is required");
   if (!idempotencyKey) throw new Error("metering: idempotencyKey is required");
+  const llmData = llm
+    ? {
+        llmProvider: llm.provider,
+        llmModel: llm.model,
+        llmWorkload: llm.workload,
+        llmInputTokens: nonNegInt(llm.inputTokens, "inputTokens"),
+        llmOutputTokens: nonNegInt(llm.outputTokens, "outputTokens"),
+        llmCacheReadTokens: nonNegInt(llm.cacheReadTokens, "cacheReadTokens"),
+        llmCacheWriteTokens: nonNegInt(llm.cacheWriteTokens, "cacheWriteTokens"),
+        llmCostMicroUsd: llm.costMicroUsd === null ? null : BigInt(nonNegInt(llm.costMicroUsd, "costMicroUsd")),
+      }
+    : {};
 
   if (!isMeteredAction(action)) {
     return {
@@ -379,6 +405,7 @@ export async function meter(opts: MeterOptions): Promise<MeterResult> {
             overageCredits,
             idempotencyKey,
             evidenceRef,
+            ...llmData,
           },
           select: { id: true },
         });

@@ -106,10 +106,10 @@ function MindmapNodeView({ data, selected }: NodeProps<MindmapNode>) {
   const Icon = TYPE_ICONS[data.entityType] ?? Circle;
   return (
     <div
-      className={`flex w-[168px] items-center gap-2 rounded-lg border bg-white px-2.5 py-2 transition-shadow ${
+      className={`flex w-[168px] items-center gap-2 rounded-lg border bg-paper px-2.5 py-2 transition-shadow ${
         selected
-          ? "border-violet-600 shadow-[0_0_0_2px_rgba(124,58,237,0.35)]"
-          : "border-stone-200 shadow-sm hover:shadow"
+          ? "border-ink shadow-raised"
+          : "border-line hover:shadow-raised"
       }`}
     >
       {/* Invisible handles: React Flow needs at least one source + one target
@@ -117,14 +117,14 @@ function MindmapNodeView({ data, selected }: NodeProps<MindmapNode>) {
           is false so these are never interactive. */}
       <Handle type="target" position={Position.Top} style={{ opacity: 0, pointerEvents: "none" }} />
       <Handle type="source" position={Position.Bottom} style={{ opacity: 0, pointerEvents: "none" }} />
-      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-violet-50">
-        <Icon size={15} className="text-violet-700" />
+      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-key bg-ink">
+        <Icon size={15} className="text-paper" />
       </span>
       <span className="min-w-0">
-        <span className="block truncate text-[12px] font-semibold text-stone-900">
+        <span className="block truncate text-[12px] font-semibold text-ink">
           {data.displayName}
         </span>
-        <span className="mt-0.5 inline-block rounded-full border border-stone-200 bg-stone-50 px-1.5 py-px text-[10px] font-medium text-stone-600">
+        <span className="mt-0.5 inline-block rounded-full bg-canvas px-1.5 py-px text-[11px] font-semibold text-muted">
           {data.entityType}
         </span>
       </span>
@@ -237,7 +237,7 @@ function easeOutCubic(t: number): number {
 function ZoomControls() {
   const { zoomIn, zoomOut, fitView } = useReactFlow();
   const btn =
-    "flex h-8 w-8 items-center justify-center rounded-full border border-line bg-paper text-muted shadow-control transition hover:text-ink active:scale-[0.97]";
+    "flex h-8 w-8 items-center justify-center rounded-full bg-paper text-ink shadow-control aos-press hover:shadow-outline";
   return (
     <div className="absolute bottom-3 right-3 z-10 flex gap-1.5">
       <button type="button" className={btn} onClick={() => zoomIn({ duration: 200 })} aria-label="Zoom in">
@@ -342,10 +342,10 @@ function GraphCanvas({
           target: e.to.id,
           label: e.edgeType,
           type: "smoothstep" as const,
-          labelStyle: { fontSize: 10, fill: "#a8a29e", fontFamily: "monospace" },
-          labelBgStyle: { fill: "#ffffff", fillOpacity: 0.9 },
+          labelStyle: { fontSize: 10, fill: "var(--aos-text-muted)", fontFamily: "var(--aos-font-mono)" },
+          labelBgStyle: { fill: "var(--aos-paper)", fillOpacity: 0.9 },
           labelBgPadding: [3, 5] as [number, number],
-          style: { stroke: "#d6d3d1", strokeWidth: 1.5 },
+          style: { stroke: "var(--aos-line-strong)", strokeWidth: 1.5 },
         }));
         setNodes(rfNodes);
         setEdges(rfEdges);
@@ -459,7 +459,7 @@ function GraphCanvas({
   const nodeCount = nodes.length;
 
   return (
-    <div ref={wrapRef} className="relative h-[560px] overflow-hidden rounded-lg border border-line bg-paper">
+    <div ref={wrapRef} className="relative h-[560px] overflow-hidden rounded-lg bg-paper shadow-hairline">
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -474,7 +474,7 @@ function GraphCanvas({
         proOptions={{ hideAttribution: true }}
         className="bg-canvas"
       >
-        <Background color="#e7e5e4" gap={26} size={1} />
+        <Background color="var(--aos-line-strong)" gap={26} size={1} />
         <ZoomControls />
       </ReactFlow>
 
@@ -486,20 +486,20 @@ function GraphCanvas({
         </div>
       )}
       {error && (
-        <div role="alert" className="absolute inset-x-0 top-3 z-20 mx-auto w-fit rounded-md border border-failed bg-failed-tint px-3 py-1.5 text-[12.5px] text-failed-text">
+        <div role="alert" className="absolute inset-x-0 top-3 z-20 mx-auto w-fit rounded-md bg-failed-tint px-3 py-1.5 text-[13px] text-failed-text">
           Couldn&apos;t load the graph: {error}
         </div>
       )}
       {!loading && !error && nodeCount === 0 && (
         <div className="absolute inset-0 z-20 flex items-center justify-center">
-          <p className="max-w-sm text-center text-[13px] text-subtle">
+          <p className="max-w-sm text-center text-[13px] text-muted">
             No entities yet. Seed the graph from the onboarding bootstrap or connect a source —
             every fact lands here with provenance.
           </p>
         </div>
       )}
       {!loading && !error && nodeCount > 0 && (
-        <div className="absolute left-3 top-3 z-10 rounded-full border border-line bg-paper/90 px-2.5 py-1 text-[11.5px] font-medium text-muted">
+        <div className="absolute left-3 top-3 z-10 rounded-full bg-paper px-2.5 py-1 text-[12px] font-semibold text-muted shadow-hairline">
           {nodeCount} nodes · {edges.length} edges · drag to move, scroll to zoom
         </div>
       )}

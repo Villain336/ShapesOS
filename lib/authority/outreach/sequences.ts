@@ -300,7 +300,15 @@ export async function sendNextStep(
     sequenceId: seq.id,
     unsubscribeUrl: "",
     physicalAddress: "",
+    // Phase 4b: the live relay partner routes by step and dedupes on this key,
+    // so a retry after a crash between send and save never delivers twice.
+    stepIndex: next.index,
+    idempotencyKey: `shapes:${seq.id}:${next.index}`,
+    workspaceId: opts.workspaceId,
   });
+  if (!result.accepted) {
+    throw new Error(`The sending partner did not accept step ${next.index}; nothing was marked sent.`);
+  }
 
   next.status = "sent";
   next.sentAt = new Date().toISOString();

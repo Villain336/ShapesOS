@@ -205,7 +205,10 @@ export class PrismaIntroductionStore {
     const row = await this.getIntroOrThrow(workspaceId, introId);
     const events = await this.prisma.connectorIntroductionEvent.findMany({
       where: { introductionId: introId, workspaceId },
-      orderBy: { createdAt: "asc" },
+      // Two events of one transition can share a millisecond (side A
+      // accepts → offer goes to side B); cuid ids increase within a
+      // process, so they break the tie in write order.
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
     });
     return {
       ...toIntroductionView(row),
