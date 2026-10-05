@@ -58,6 +58,28 @@ export async function getDecryptedCredential(
   return { kind, payload };
 }
 
+/**
+ * Phase 14: whether a credential with NO expiry can be renewed at all — the
+ * cron's "stale" branch (providers that omit expires_in) may only send these
+ * to refreshConnection. API keys and non-expiring OAuth tokens without a
+ * refresh token have nothing to renew; refreshing them would flip a working
+ * connection to needs_reauth ten minutes after it was connected.
+ * Renewable: an OAuth refresh token (built-in or custom MCP), or a
+ * single-store Shopify credential (re-minted / re-verified).
+ */
+export async function renewableWithoutExpiry(
+  connectorKey: string,
+  payload: Record<string, unknown> | null | undefined,
+): Promise<boolean> {
+  if (!payload) return false;
+  if (typeof payload.refresh_token === "string" && payload.refresh_token) return true;
+  if (connectorKey === "shopify") {
+    const { singleStoreModeOf } = await import("@/lib/bizsync/shopify/single-store");
+    return singleStoreModeOf(payload) !== null;
+  }
+  return false;
+}
+
 interface RefreshTokenResponse {
   access_token: string;
   refresh_token?: string;

@@ -147,3 +147,5 @@ lib/bizsync/__tests__/gusto-payroll-db.test.ts
 lib/ops/__tests__/p12-events-db.test.ts
 # Phase 13 (twincore): digital twin — FORCE RLS on sites/objects/dock bookings, layout validation + same-workspace bindings, overlapping active dock bookings refused (code + exclusion constraint), booking states reflected by siteSnapshot, gated publish, agent markers, live stream patch after a write, sample site per kind consistent + idempotent.
 lib/twin/__tests__/twin-db.test.ts
+# Phase 14: the connector refresh sweep never marks an API key or a non-expiring token needs_reauth; renewable credentials still refresh, expiring ones without a refresh token still ask.
+lib/vault/__tests__/refresh-due-db.test.ts
